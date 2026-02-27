@@ -298,14 +298,14 @@ it having the same AST as the one without the parentheses. Both mypy and Pyright
 reveal_type(OnlyParamSpec[(int, str)]().attr)  # revealed: (int, str, /) -> None
 ```
 
-<!-- blacken-docs:off -->
+<!-- fmt:off -->
 
 ```py
 # error: [invalid-syntax]
 reveal_type(OnlyParamSpec[]().attr)  # revealed: (...) -> None
 ```
 
-<!-- blacken-docs:on -->
+<!-- fmt:on -->
 
 The square brackets can be omitted when `ParamSpec` is the only type variable
 

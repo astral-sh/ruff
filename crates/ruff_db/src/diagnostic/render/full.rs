@@ -338,6 +338,25 @@ mod tests {
         1 | if a == 1: pass
           |    ^
           |
+
+        error[undefined-name]: Undefined name `fibonaccii`
+          --> fib.py:12:16
+           |
+        10 |         return 1
+        11 |     else:
+        12 |         return fibonaccii(n - 1) + fibonacci(n - 2)
+           |                ^^^^^^^^^^          -
+           |
+        info: Did you mean to import it from `/some/path/def.py`?
+         --> fib.py:4:5
+          |
+        4 | def fibonacci(n):
+          |     ^^^^^^^^^ `fibonacci` is defined here
+        5 |     """Compute the nth number in the Fibonacci sequence."""
+          |     ------------------------------------------------------- `fibonacci` is documented here
+        6 |     x = 1
+        7 |     if n == 0:
+          |
         "#);
     }
 
@@ -400,6 +419,25 @@ mod tests {
           |
         1 | if a == 1: pass
           |    ^
+          |
+
+        F821 Undefined name `fibonaccii`
+          --> fib.py:12:16
+           |
+        10 |         return 1
+        11 |     else:
+        12 |         return fibonaccii(n - 1) + fibonacci(n - 2)
+           |                ^^^^^^^^^^          -
+           |
+        info: Did you mean to import it from `/some/path/def.py`?
+         --> fib.py:4:5
+          |
+        4 | def fibonacci(n):
+          |     ^^^^^^^^^ `fibonacci` is defined here
+        5 |     """Compute the nth number in the Fibonacci sequence."""
+          |     ------------------------------------------------------- `fibonacci` is documented here
+        6 |     x = 1
+        7 |     if n == 0:
           |
         "#);
     }

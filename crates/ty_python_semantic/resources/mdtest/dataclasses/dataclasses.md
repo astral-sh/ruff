@@ -258,6 +258,7 @@ from ty_extensions import TypeOf
 class SomeClass: ...
 
 def some_function() -> None: ...
+
 @dataclass
 class D:
     function_literal: TypeOf[some_function]
@@ -1450,6 +1451,41 @@ class C:
     field: AcceptsStrAndInt = AcceptsStrAndInt()
 
 reveal_type(C.__init__)  # revealed: (self: C, field: str | int = ...) -> None
+```
+
+### Intersections of descriptor `__set__` types
+
+When the descriptor type is an intersection, the generated `__init__` parameter should use the
+intersection of the acceptable `value` types from `__set__`.
+
+```py
+from dataclasses import dataclass
+from typing import Callable, cast
+from ty_extensions import Intersection
+
+class A: ...
+class B: ...
+
+def set_a(self: "DescA", instance: object, value: A) -> None: ...
+def set_b(self: "DescB", instance: object, value: B) -> None: ...
+
+class DescA:
+    # We use callable attributes instead of regular methods here because regular methods currently
+    # trigger a separate known issue where method attributes on intersections can collapse to `Never`:
+    # https://github.com/astral-sh/ty/issues/2428
+    __set__: Callable[["DescA", object, A], None] = set_a
+
+class DescB:
+    __set__: Callable[["DescB", object, B], None] = set_b
+
+@dataclass
+class C:
+    field: Intersection[DescA, DescB] = cast(
+        Intersection[DescA, DescB],
+        DescA(),
+    )
+
+reveal_type(C.__init__)  # revealed: (self: C, field: A & B = ...) -> None
 ```
 
 ## `dataclasses.field`

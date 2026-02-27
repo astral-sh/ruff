@@ -220,6 +220,7 @@ def _(flag: bool):
         if flag:
             def __getitem__(self, key: int) -> str:
                 return str(key)
+
         else:
             def __getitem__(self, key: int) -> bytes:
                 return bytes()

@@ -572,7 +572,6 @@ def could_raise_returns_E() -> E:
 x = 1
 
 try:
-
     def foo(param=could_raise_returns_A()):
         x = could_raise_returns_A()
 

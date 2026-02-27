@@ -18,7 +18,7 @@ use crate::rules::pydocstyle::helpers::normalize_word;
 ///
 /// This rule may not apply to all projects; its applicability is a matter of
 /// convention. By default, this rule is enabled when using the `numpy`
-/// convention,, and disabled when using the `google` and `pep257` conventions.
+/// convention, and disabled when using the `google` and `pep257` conventions.
 ///
 /// ## Example
 /// ```python

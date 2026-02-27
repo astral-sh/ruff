@@ -1,0 +1,30 @@
+---
+source: crates/ruff_linter/src/rules/isort/mod.rs
+---
+I001 [*] Import block is un-sorted or un-formatted
+ --> import_heading_wrong_heading.py:2:1
+  |
+1 |   # Wrong heading
+2 | / import os
+3 | | import sys
+4 | |
+5 | | # Also wrong heading
+6 | | import pandas
+7 | | import requests
+8 | |
+9 | | from my_first_party import my_first_party_object
+  | |________________________________________________^
+  |
+help: Organize imports
+1  | # Wrong heading
+2  + # Standard library imports
+3  | import os
+4  | import sys
+5  | 
+6  + # Third party imports
+7  | # Also wrong heading
+8  | import pandas
+9  | import requests
+10 | 
+11 + # First party imports
+12 | from my_first_party import my_first_party_object

@@ -1,5 +1,4 @@
-use compact_str::{CompactString, ToCompactString};
-use infer::nearest_enclosing_class;
+use compact_str::ToCompactString;
 use itertools::{Either, Itertools};
 use ruff_diagnostics::{Edit, Fix};
 use rustc_hash::FxHashMap;
@@ -62,11 +61,10 @@ use crate::types::function::{
     DataclassTransformerFlags, DataclassTransformerParams, FunctionDecorators, FunctionSpans,
     FunctionType, KnownFunction,
 };
-pub(crate) use crate::types::generics::GenericContext;
 use crate::types::generics::{
-    ApplySpecialization, InferableTypeVars, Specialization, SpecializationBuilder, bind_typevar,
-    typing_self, walk_generic_context,
+    ApplySpecialization, InferableTypeVars, Specialization, bind_typevar, walk_generic_context,
 };
+pub(crate) use crate::types::generics::{GenericContext, SpecializationBuilder};
 use crate::types::mro::{Mro, MroIterator, StaticMroError};
 pub(crate) use crate::types::narrow::{
     NarrowingConstraint, PossiblyNarrowedPlaces, PossiblyNarrowedPlacesBuilder,
@@ -75,6 +73,7 @@ pub(crate) use crate::types::narrow::{
 use crate::types::newtype::NewType;
 pub(crate) use crate::types::signatures::{Parameter, Parameters};
 use crate::types::signatures::{ParameterForm, walk_signature};
+use crate::types::special_form::TypeQualifier;
 use crate::types::tuple::{Tuple, TupleSpec, TupleSpecBuilder};
 use crate::types::typed_dict::TypedDictField;
 pub(crate) use crate::types::typed_dict::{TypedDictParams, TypedDictType, walk_typed_dict_type};
@@ -87,6 +86,9 @@ pub use class::KnownClass;
 pub(crate) use class::{ClassLiteral, ClassType, GenericAlias, StaticClassLiteral};
 use instance::Protocol;
 pub use instance::{NominalInstanceType, ProtocolInstanceType};
+pub(crate) use literal::{
+    BytesLiteralType, EnumLiteralType, LiteralValueType, LiteralValueTypeKind, StringLiteralType,
+};
 pub use special_form::SpecialFormType;
 
 mod bound_super;
@@ -106,6 +108,7 @@ pub mod ide_support;
 mod infer;
 mod instance;
 pub mod list_members;
+mod literal;
 mod member;
 mod mro;
 mod narrow;
@@ -774,19 +777,8 @@ pub enum Type<'db> {
     /// - `AlwaysFalsy`: `__bool__` always returns `False`
     AlwaysTruthy,
     AlwaysFalsy,
-    /// An integer literal
-    IntLiteral(i64),
-    /// A boolean literal, either `True` or `False`.
-    BooleanLiteral(bool),
-    /// A string literal whose value is known
-    StringLiteral(StringLiteralType<'db>),
-    /// A singleton type that represents a specific enum member
-    EnumLiteral(EnumLiteralType<'db>),
-    /// A string known to originate only from literal values, but whose value is not known (unlike
-    /// `StringLiteral` above).
-    LiteralString,
-    /// A bytes literal
-    BytesLiteral(BytesLiteralType<'db>),
+    /// A literal value type.
+    LiteralValue(LiteralValueType<'db>),
     /// An instance of a typevar. When the generic class or function binding this typevar is
     /// specialized, we will replace the typevar with its specialization.
     TypeVar(BoundTypeVarInstance<'db>),
@@ -996,7 +988,11 @@ impl<'db> Type<'db> {
             );
             let call_result = call_result.as_ref();
             call_result.is_ok_and(|bindings| {
-                bindings.return_type(db) == Type::BooleanLiteral(allowed_return_value)
+                bindings
+                    .return_type(db)
+                    .as_literal_value()
+                    .and_then(literal::LiteralValueType::as_bool)
+                    == Some(allowed_return_value)
             }) || call_result.is_err_and(|err| matches!(err, CallDunderError::MethodNotAvailable))
         };
 
@@ -1025,23 +1021,25 @@ impl<'db> Type<'db> {
         matches!(self, Type::GenericAlias(_))
     }
 
-    /// Returns whether the definition of this type is generic
-    /// (this is different from whether this type *is* a generic type; a type that is already fully specialized is not a generic type).
-    pub(crate) fn is_definition_generic(self, db: &'db dyn Db) -> bool {
+    /// Returns whether this type represents a specialization of a generic type.
+    ///
+    /// For example, whereas `<class 'list'>` is a generic type, `<class 'list[int]'>`
+    /// is a specialization of that type.
+    pub(crate) fn is_specialized_generic(self, db: &'db dyn Db) -> bool {
         match self {
             Type::Union(union) => union
                 .elements(db)
                 .iter()
-                .any(|ty| ty.is_definition_generic(db)),
+                .any(|ty| ty.is_specialized_generic(db)),
             Type::Intersection(intersection) => {
                 intersection
                     .positive(db)
                     .iter()
-                    .any(|ty| ty.is_definition_generic(db))
+                    .any(|ty| ty.is_specialized_generic(db))
                     || intersection
                         .negative(db)
                         .iter()
-                        .any(|ty| ty.is_definition_generic(db))
+                        .any(|ty| ty.is_specialized_generic(db))
             }
             Type::NominalInstance(instance_type) => instance_type.is_definition_generic(),
             Type::ProtocolInstance(protocol) => {
@@ -1054,7 +1052,7 @@ impl<'db> Type<'db> {
                 matches!(dynamic, DynamicType::UnknownGeneric(_))
             }
             // Due to inheritance rules, enums cannot be generic.
-            Type::EnumLiteral(_) => false,
+            Type::LiteralValue(literal) if literal.is_enum() => false,
             // Once generic NewType is officially specified, handle it.
             _ => false,
         }
@@ -1179,6 +1177,23 @@ impl<'db> Type<'db> {
             .and_then(|instance| instance.own_tuple_spec(db))
     }
 
+    /// If this type is a fixed-length tuple instance, returns a slice of its element types.
+    ///
+    /// Returns `None` if this is not a tuple instance, or if it's a variable-length tuple.
+    fn fixed_tuple_elements(&self, db: &'db dyn Db) -> Option<Cow<'db, [Type<'db>]>> {
+        let tuple_spec = self.tuple_instance_spec(db)?;
+        match tuple_spec {
+            Cow::Borrowed(spec) => {
+                let elements = spec.as_fixed_length()?.elements_slice();
+                Some(Cow::Borrowed(elements))
+            }
+            Cow::Owned(spec) => {
+                let elements = spec.as_fixed_length()?.elements_slice();
+                Some(Cow::Owned(elements.to_vec()))
+            }
+        }
+    }
+
     /// Returns the materialization of this type depending on the given `variance`.
     ///
     /// More concretely, `T'`, the materialization of `T`, is the type `T` with all occurrences of
@@ -1223,6 +1238,15 @@ impl<'db> Type<'db> {
 
     pub(crate) fn has_typevar(self, db: &'db dyn Db) -> bool {
         any_over_type(db, self, false, |ty| matches!(ty, Type::TypeVar(_)))
+    }
+
+    pub(crate) fn has_non_self_typevar(self, db: &'db dyn Db) -> bool {
+        any_over_type(
+            db,
+            self,
+            false,
+            |ty| matches!(ty, Type::TypeVar(tv) if !tv.typevar(db).is_self(db)),
+        )
     }
 
     pub(crate) fn has_unspecialized_type_var(self, db: &'db dyn Db) -> bool {
@@ -1327,18 +1351,18 @@ impl<'db> Type<'db> {
         matches!(self, Type::ClassLiteral(..))
     }
 
-    pub(crate) const fn as_enum_literal(self) -> Option<EnumLiteralType<'db>> {
+    pub(crate) const fn as_literal_value(self) -> Option<LiteralValueType<'db>> {
         match self {
-            Type::EnumLiteral(enum_literal) => Some(enum_literal),
+            Type::LiteralValue(literal) => Some(literal),
             _ => None,
         }
     }
 
-    #[cfg(test)]
-    #[track_caller]
-    pub(crate) const fn expect_enum_literal(self) -> EnumLiteralType<'db> {
-        self.as_enum_literal()
-            .expect("Expected a Type::EnumLiteral variant")
+    pub(crate) fn as_literal_value_kind(self) -> Option<LiteralValueTypeKind<'db>> {
+        match self {
+            Type::LiteralValue(literal) => Some(literal.kind()),
+            _ => None,
+        }
     }
 
     pub(crate) const fn is_typed_dict(&self) -> bool {
@@ -1457,6 +1481,46 @@ impl<'db> Type<'db> {
         matches!(self, Type::FunctionLiteral(..))
     }
 
+    pub(crate) fn as_string_literal(self) -> Option<StringLiteralType<'db>> {
+        match self {
+            Type::LiteralValue(literal) => literal.as_string(),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn as_int_literal(self) -> Option<i64> {
+        match self {
+            Type::LiteralValue(literal) => literal.as_int(),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn as_enum_literal(self) -> Option<EnumLiteralType<'db>> {
+        match self {
+            Type::LiteralValue(literal) => literal.as_enum(),
+            _ => None,
+        }
+    }
+
+    #[cfg(test)]
+    #[track_caller]
+    pub(crate) fn expect_enum_literal(self) -> EnumLiteralType<'db> {
+        match self.as_literal_value_kind() {
+            Some(LiteralValueTypeKind::Enum(e)) => e,
+            _ => panic!("Expected a `LiteralValueTypeKind::Enum` variant"),
+        }
+    }
+
+    pub(crate) fn is_literal_string(&self) -> bool {
+        self.as_literal_value()
+            .is_some_and(literal::LiteralValueType::is_literal_string)
+    }
+
+    pub(crate) fn is_string_literal(&self) -> bool {
+        self.as_literal_value()
+            .is_some_and(literal::LiteralValueType::is_string)
+    }
+
     /// Detects types which are valid to appear inside a `Literal[…]` type annotation.
     pub(crate) fn is_literal_or_union_of_literals(&self, db: &'db dyn Db) -> bool {
         match self {
@@ -1464,11 +1528,14 @@ impl<'db> Type<'db> {
                 .elements(db)
                 .iter()
                 .all(|ty| ty.is_literal_or_union_of_literals(db)),
-            Type::StringLiteral(_)
-            | Type::BytesLiteral(_)
-            | Type::IntLiteral(_)
-            | Type::BooleanLiteral(_)
-            | Type::EnumLiteral(_) => true,
+            Type::LiteralValue(literal) => match literal.kind() {
+                LiteralValueTypeKind::String(_)
+                | LiteralValueTypeKind::Bytes(_)
+                | LiteralValueTypeKind::Int(_)
+                | LiteralValueTypeKind::Bool(_)
+                | LiteralValueTypeKind::Enum(_) => true,
+                LiteralValueTypeKind::LiteralString => false,
+            },
             Type::NominalInstance(_) => self.is_none(db) || self.is_bool(db) || self.is_enum(db),
             _ => false,
         }
@@ -1500,27 +1567,49 @@ impl<'db> Type<'db> {
             || (self.is_enum(db) && !self.overrides_equality(db))
     }
 
-    pub(crate) fn as_string_literal(self) -> Option<StringLiteralType<'db>> {
-        match self {
-            Type::StringLiteral(string_literal) => Some(string_literal),
-            _ => None,
-        }
-    }
-
-    pub(crate) const fn is_literal_string(&self) -> bool {
-        matches!(self, Type::LiteralString)
-    }
-
+    /// Create a promotable string literal.
     pub(crate) fn string_literal(db: &'db dyn Db, string: &str) -> Self {
-        Self::StringLiteral(StringLiteralType::new(db, string))
+        Self::LiteralValue(LiteralValueType::promotable(StringLiteralType::new(
+            db, string,
+        )))
     }
 
+    /// Create a promotable enum literal.
+    pub(crate) fn enum_literal(value: EnumLiteralType<'db>) -> Self {
+        Self::LiteralValue(LiteralValueType::promotable(value))
+    }
+
+    /// Create a promotable integer literal.
+    pub(crate) fn int_literal(int: i64) -> Self {
+        Self::LiteralValue(LiteralValueType::promotable(int))
+    }
+
+    /// Create a promotable single-character string literal.
     pub(crate) fn single_char_string_literal(db: &'db dyn Db, c: char) -> Self {
-        Type::StringLiteral(StringLiteralType::new(db, c.to_compact_string()))
+        Self::LiteralValue(LiteralValueType::promotable(StringLiteralType::new(
+            db,
+            c.to_compact_string(),
+        )))
     }
 
+    /// Create a promotable bytes literal.
     pub(crate) fn bytes_literal(db: &'db dyn Db, bytes: &[u8]) -> Self {
-        Self::BytesLiteral(BytesLiteralType::new(db, bytes))
+        Self::LiteralValue(LiteralValueType::promotable(BytesLiteralType::new(
+            db, bytes,
+        )))
+    }
+
+    /// Create a promotable boolean literal.
+    pub fn bool_literal(value: bool) -> Self {
+        Self::LiteralValue(LiteralValueType::promotable(value))
+    }
+
+    /// Create a `LiteralString`.
+    pub(crate) fn literal_string() -> Self {
+        // Note that `LiteralString`s are never implicitly inferred, and so are always unpromotable.
+        Self::LiteralValue(LiteralValueType::unpromotable(
+            LiteralValueTypeKind::LiteralString,
+        ))
     }
 
     pub(crate) fn typed_dict(defining_class: impl Into<ClassType<'db>>) -> Self {
@@ -1543,7 +1632,6 @@ impl<'db> Type<'db> {
 
             Type::AlwaysTruthy
             | Type::AlwaysFalsy
-            | Type::BooleanLiteral(_)
             | Type::KnownBoundMethod(_)
             | Type::KnownInstance(_)
             | Type::SpecialForm(_)
@@ -1561,15 +1649,11 @@ impl<'db> Type<'db> {
             | Type::GenericAlias(_)
             | Type::SubclassOf(_)
             | Type::PropertyInstance(_)
-            | Type::IntLiteral(_)
-            | Type::StringLiteral(_)
-            | Type::BytesLiteral(_)
-            | Type::LiteralString
+            | Type::LiteralValue(_)
             | Type::DataclassDecorator(_)
             | Type::DataclassTransformer(_)
             | Type::Callable(_)
             | Type::WrapperDescriptor(_)
-            | Type::EnumLiteral(_)
             | Type::TypeAlias(_)
             | Type::BoundMethod(_) => Type::Intersection(IntersectionType::new(
                 db,
@@ -1592,14 +1676,9 @@ impl<'db> Type<'db> {
     /// in user annotations without nonstandard extensions to the type system
     pub(crate) fn is_spellable(&self, db: &'db dyn Db) -> bool {
         match self {
-            Type::StringLiteral(_)
-            | Type::LiteralString
-            | Type::IntLiteral(_)
-            | Type::BooleanLiteral(_)
-            | Type::BytesLiteral(_)
+            Type::LiteralValue(_)
             | Type::Never
             | Type::NewTypeInstance(_)
-            | Type::EnumLiteral(_)
             | Type::NominalInstance(_)
             // `TypedDict` and `Protocol` can be synthesized,
             // but it's always possible to create an equivalent type using a class definition.
@@ -1676,13 +1755,9 @@ impl<'db> Type<'db> {
         // into what's included vs not; this is just an empirical choice that makes our ecosystem
         // report look better until we have proper bidirectional type inference.
         match self {
-            Type::StringLiteral(_) | Type::LiteralString => Some(KnownClass::Str.to_instance(db)),
-            Type::BooleanLiteral(_) => Some(KnownClass::Bool.to_instance(db)),
-            Type::IntLiteral(_) => Some(KnownClass::Int.to_instance(db)),
-            Type::BytesLiteral(_) => Some(KnownClass::Bytes.to_instance(db)),
             Type::ModuleLiteral(_) => Some(KnownClass::ModuleType.to_instance(db)),
             Type::FunctionLiteral(_) => Some(KnownClass::FunctionType.to_instance(db)),
-            Type::EnumLiteral(literal) => Some(literal.enum_class_instance(db)),
+            Type::LiteralValue(literal) => Some(literal.fallback_instance(db)),
             _ => None,
         }
     }
@@ -1692,38 +1767,22 @@ impl<'db> Type<'db> {
     /// Note that this function tries to promote literals to a more user-friendly form than their
     /// fallback instance type. For example, `def _() -> int` is promoted to `Callable[[], int]`,
     /// as opposed to `FunctionType`.
-    ///
-    /// It also avoids literal promotion if a literal type annotation was provided as type context.
-    pub(crate) fn promote_literals(self, db: &'db dyn Db, tcx: TypeContext<'db>) -> Type<'db> {
+    pub(crate) fn promote_literals(self, db: &'db dyn Db) -> Type<'db> {
         self.apply_type_mapping(
             db,
             &TypeMapping::PromoteLiterals(PromoteLiteralsMode::On),
-            tcx,
+            TypeContext::default(),
         )
     }
 
     /// Like [`Type::promote_literals`], but does not recurse into nested types.
-    fn promote_literals_impl(self, db: &'db dyn Db, tcx: TypeContext<'db>) -> Type<'db> {
-        let promoted = match self {
-            Type::StringLiteral(_) => KnownClass::Str.to_instance(db),
-            Type::LiteralString => KnownClass::Str.to_instance(db),
-            Type::BooleanLiteral(_) => KnownClass::Bool.to_instance(db),
-            Type::IntLiteral(_) => KnownClass::Int.to_instance(db),
-            Type::BytesLiteral(_) => KnownClass::Bytes.to_instance(db),
+    fn promote_literals_impl(self, db: &'db dyn Db) -> Type<'db> {
+        match self {
+            Type::LiteralValue(literal) if literal.is_promotable() => literal.fallback_instance(db),
             Type::ModuleLiteral(_) => KnownClass::ModuleType.to_instance(db),
-            Type::EnumLiteral(literal) => literal.enum_class_instance(db),
             Type::FunctionLiteral(literal) => Type::Callable(literal.into_callable_type(db)),
-            _ => return self,
-        };
-
-        // Avoid literal promotion if it leads to an unassignable type.
-        if tcx.annotation.is_some_and(|annotation| {
-            self.is_assignable_to(db, annotation) && !promoted.is_assignable_to(db, annotation)
-        }) {
-            return self;
+            _ => self,
         }
-
-        promoted
     }
 
     /// Return a "normalized" version of `self` that ensures that equivalent types have the same Salsa ID.
@@ -1737,6 +1796,7 @@ impl<'db> Type<'db> {
     ///   *has* or *does not have* a default value is relevant to whether two `Callable` types  are equivalent.
     /// - Converts class-based protocols into synthesized protocols
     /// - Converts class-based typeddicts into synthesized typeddicts
+    /// - Converts all literal types to their promotable form
     #[must_use]
     pub(crate) fn normalized(self, db: &'db dyn Db) -> Self {
         self.normalized_impl(db, &NormalizedVisitor::default())
@@ -1792,11 +1852,13 @@ impl<'db> Type<'db> {
                 type_guard.with_type(db, type_guard.return_type(db).normalized_impl(db, visitor))
             }),
             Type::Dynamic(dynamic) => Type::Dynamic(dynamic.normalized()),
-            Type::EnumLiteral(enum_literal)
-                if is_single_member_enum(db, enum_literal.enum_class(db)) =>
+            Type::LiteralValue(literal)
+                if literal.as_enum().is_some_and(|enum_literal| {
+                    is_single_member_enum(db, enum_literal.enum_class(db))
+                }) =>
             {
                 // Always normalize single-member enums to their class instance (`Literal[Single.VALUE]` => `Single`)
-                enum_literal.enum_class_instance(db)
+                literal.as_enum().unwrap().enum_class_instance(db)
             }
             Type::TypedDict(typed_dict) => visitor.visit(self, || {
                 Type::TypedDict(typed_dict.normalized_impl(db, visitor))
@@ -1809,21 +1871,16 @@ impl<'db> Type<'db> {
                     }))
                 })
             }
-            Type::LiteralString
-            | Type::AlwaysFalsy
+            Type::LiteralValue(literal) => Type::LiteralValue(literal.normalized_impl(db, visitor)),
+            Type::AlwaysFalsy
             | Type::AlwaysTruthy
-            | Type::BooleanLiteral(_)
-            | Type::BytesLiteral(_)
-            | Type::EnumLiteral(_)
-            | Type::StringLiteral(_)
             | Type::Never
             | Type::WrapperDescriptor(_)
             | Type::DataclassDecorator(_)
             | Type::DataclassTransformer(_)
             | Type::ModuleLiteral(_)
             | Type::ClassLiteral(_)
-            | Type::SpecialForm(_)
-            | Type::IntLiteral(_) => self,
+            | Type::SpecialForm(_) => self,
         }
     }
 
@@ -1930,13 +1987,8 @@ impl<'db> Type<'db> {
                     class_type.recursive_type_normalized_impl(db, div, nested)
                 })
                 .map(Type::NewTypeInstance),
-            Type::LiteralString
-            | Type::AlwaysFalsy
+            Type::AlwaysFalsy
             | Type::AlwaysTruthy
-            | Type::BooleanLiteral(_)
-            | Type::BytesLiteral(_)
-            | Type::EnumLiteral(_)
-            | Type::StringLiteral(_)
             | Type::Never
             | Type::WrapperDescriptor(_)
             | Type::DataclassDecorator(_)
@@ -1944,7 +1996,7 @@ impl<'db> Type<'db> {
             | Type::ModuleLiteral(_)
             | Type::ClassLiteral(_)
             | Type::SpecialForm(_)
-            | Type::IntLiteral(_) => Some(self),
+            | Type::LiteralValue(_) => Some(self),
         }
     }
 
@@ -1966,12 +2018,7 @@ impl<'db> Type<'db> {
             | Type::DataclassDecorator(_)
             | Type::DataclassTransformer(_)
             | Type::ModuleLiteral(..)
-            | Type::IntLiteral(_)
-            | Type::BooleanLiteral(_)
-            | Type::StringLiteral(_)
-            | Type::LiteralString
-            | Type::BytesLiteral(_)
-            | Type::EnumLiteral(_)
+            | Type::LiteralValue(_)
             | Type::SpecialForm(_)
             | Type::KnownInstance(_)
             | Type::AlwaysFalsy
@@ -2046,13 +2093,49 @@ impl<'db> Type<'db> {
             // TODO: This is unsound so in future we can consider an opt-in option to disable it.
             Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
                 SubclassOfInner::Class(class) => Some(class.into_callable(db)),
-
-                SubclassOfInner::Dynamic(_) | SubclassOfInner::TypeVar(_) => {
-                    Some(CallableTypes::one(CallableType::single(
+                SubclassOfInner::TypeVar(tvar) => match tvar.typevar(db).bound_or_constraints(db) {
+                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                        let upcast_callables = bound.to_meta_type(db).try_upcast_to_callable(db)?;
+                        Some(upcast_callables.map(|callable| {
+                            let signatures = callable
+                                .signatures(db)
+                                .into_iter()
+                                .map(|sig| sig.clone().with_return_type(Type::TypeVar(tvar)));
+                            CallableType::new(
+                                db,
+                                CallableSignature::from_overloads(signatures),
+                                callable.kind(db),
+                            )
+                        }))
+                    }
+                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                        let mut callables = SmallVec::new();
+                        for constraint in constraints.elements(db) {
+                            let element_upcast =
+                                constraint.to_meta_type(db).try_upcast_to_callable(db)?;
+                            for callable in element_upcast.into_inner() {
+                                let signatures = callable
+                                    .signatures(db)
+                                    .into_iter()
+                                    .map(|sig| sig.clone().with_return_type(Type::TypeVar(tvar)));
+                                callables.push(CallableType::new(
+                                    db,
+                                    CallableSignature::from_overloads(signatures),
+                                    callable.kind(db),
+                                ));
+                            }
+                        }
+                        Some(CallableTypes(callables))
+                    }
+                    None => Some(CallableTypes::one(CallableType::single(
                         db,
-                        Signature::new(Parameters::unknown(), Type::from(subclass_of_ty)),
-                    )))
-                }
+                        Signature::new(Parameters::gradual_form(), Type::TypeVar(tvar)),
+                    ))),
+                },
+                SubclassOfInner::Dynamic(_) => Some(CallableTypes::one(CallableType::single(
+                    db,
+                    Signature::new(Parameters::unknown(), Type::from(subclass_of_ty)),
+                ))),
             },
 
             Type::Union(union) => {
@@ -2064,9 +2147,12 @@ impl<'db> Type<'db> {
                 Some(CallableTypes(callables))
             }
 
-            Type::EnumLiteral(enum_literal) => enum_literal
-                .enum_class_instance(db)
-                .try_upcast_to_callable(db),
+            Type::LiteralValue(literal) => match literal.kind() {
+                LiteralValueTypeKind::Enum(enum_literal) => enum_literal
+                    .enum_class_instance(db)
+                    .try_upcast_to_callable(db),
+                _ => None,
+            },
 
             Type::TypeAlias(alias) => alias.value_type(db).try_upcast_to_callable(db),
 
@@ -2102,11 +2188,6 @@ impl<'db> Type<'db> {
             | Type::DataclassTransformer(_)
             | Type::AlwaysTruthy
             | Type::AlwaysFalsy
-            | Type::IntLiteral(_)
-            | Type::BooleanLiteral(_)
-            | Type::StringLiteral(_)
-            | Type::LiteralString
-            | Type::BytesLiteral(_)
             | Type::TypeIs(_)
             | Type::TypeGuard(_)
             | Type::TypedDict(_) => None,
@@ -2212,17 +2293,21 @@ impl<'db> Type<'db> {
     /// for more complicated types that are actually singletons.
     pub(crate) fn is_singleton(self, db: &'db dyn Db) -> bool {
         match self {
-            Type::Dynamic(_)
-            | Type::Never
-            | Type::IntLiteral(..)
-            | Type::StringLiteral(..)
-            | Type::BytesLiteral(..)
-            | Type::LiteralString => {
-                // Note: The literal types included in this pattern are not true singletons.
-                // There can be multiple Python objects (at different memory locations) that
-                // are both of type Literal[345], for example.
-                false
-            }
+            Type::Dynamic(_) | Type::Never => false,
+
+            Type::LiteralValue(literal) => match literal.kind() {
+                LiteralValueTypeKind::Int(..)
+                | LiteralValueTypeKind::String(..)
+                | LiteralValueTypeKind::Bytes(..)
+                | LiteralValueTypeKind::LiteralString => {
+                    // Note: The literal types included in this pattern are not true singletons.
+                    // There can be multiple Python objects (at different memory locations) that
+                    // are both of type Literal[345], for example.
+                    false
+                }
+
+                LiteralValueTypeKind::Bool(_) | LiteralValueTypeKind::Enum(_) => true,
+            },
 
             Type::ProtocolInstance(..) => {
                 // It *might* be possible to have a singleton protocol-instance type...?
@@ -2263,13 +2348,11 @@ impl<'db> Type<'db> {
             // We eagerly transform `SubclassOf` to `ClassLiteral` for final types, so `SubclassOf` is never a singleton.
             Type::SubclassOf(..) => false,
             Type::BoundSuper(..) => false,
-            Type::BooleanLiteral(_)
-            | Type::FunctionLiteral(..)
+            Type::FunctionLiteral(..)
             | Type::WrapperDescriptor(..)
             | Type::ClassLiteral(..)
             | Type::GenericAlias(..)
-            | Type::ModuleLiteral(..)
-            | Type::EnumLiteral(..) => true,
+            | Type::ModuleLiteral(..) => true,
             Type::SpecialForm(special_form) => {
                 // Nearly all `SpecialForm` types are singletons, but if a symbol could validly
                 // originate from either `typing` or `typing_extensions` then this is not guaranteed.
@@ -2340,14 +2423,19 @@ impl<'db> Type<'db> {
             | Type::ModuleLiteral(..)
             | Type::ClassLiteral(..)
             | Type::GenericAlias(..)
-            | Type::IntLiteral(..)
-            | Type::BooleanLiteral(..)
-            | Type::StringLiteral(..)
-            | Type::BytesLiteral(..)
             | Type::SpecialForm(..)
             | Type::KnownInstance(..) => true,
 
-            Type::EnumLiteral(_) => !self.overrides_equality(db),
+            Type::LiteralValue(literal) => match literal.kind() {
+                LiteralValueTypeKind::Enum(..) => !self.overrides_equality(db),
+
+                LiteralValueTypeKind::Int(..)
+                | LiteralValueTypeKind::String(..)
+                | LiteralValueTypeKind::Bytes(..)
+                | LiteralValueTypeKind::Bool(_) => true,
+
+                LiteralValueTypeKind::LiteralString => false,
+            },
 
             Type::ProtocolInstance(..) => {
                 // See comment in the `Type::ProtocolInstance` branch for `Type::is_singleton`.
@@ -2393,7 +2481,6 @@ impl<'db> Type<'db> {
             | Type::Never
             | Type::Union(..)
             | Type::Intersection(..)
-            | Type::LiteralString
             | Type::AlwaysTruthy
             | Type::AlwaysFalsy
             | Type::Callable(_)
@@ -2531,12 +2618,7 @@ impl<'db> Type<'db> {
             | Type::KnownInstance(_)
             | Type::AlwaysTruthy
             | Type::AlwaysFalsy
-            | Type::IntLiteral(_)
-            | Type::BooleanLiteral(_)
-            | Type::StringLiteral(_)
-            | Type::LiteralString
-            | Type::BytesLiteral(_)
-            | Type::EnumLiteral(_)
+            | Type::LiteralValue(_)
             | Type::TypeVar(_)
             | Type::NominalInstance(_)
             | Type::ProtocolInstance(_)
@@ -2676,17 +2758,11 @@ impl<'db> Type<'db> {
                 }
             }
 
-            Type::IntLiteral(_) => KnownClass::Int.to_instance(db).instance_member(db, name),
-            Type::BooleanLiteral(_) | Type::TypeIs(_) | Type::TypeGuard(_) => {
+            Type::TypeIs(_) | Type::TypeGuard(_) => {
                 KnownClass::Bool.to_instance(db).instance_member(db, name)
             }
-            Type::StringLiteral(_) | Type::LiteralString => {
-                KnownClass::Str.to_instance(db).instance_member(db, name)
-            }
-            Type::BytesLiteral(_) => KnownClass::Bytes.to_instance(db).instance_member(db, name),
-            Type::EnumLiteral(enum_literal) => enum_literal
-                .enum_class_instance(db)
-                .instance_member(db, name),
+
+            Type::LiteralValue(literal) => literal.fallback_instance(db).instance_member(db, name),
 
             Type::AlwaysTruthy | Type::AlwaysFalsy => Type::object().instance_member(db, name),
             Type::ModuleLiteral(_) => KnownClass::ModuleType
@@ -2750,13 +2826,13 @@ impl<'db> Type<'db> {
     pub(crate) fn try_call_dunder_get(
         self,
         db: &'db dyn Db,
-        instance: Type<'db>,
+        instance: Option<Type<'db>>,
         owner: Type<'db>,
     ) -> Option<(Type<'db>, AttributeKind)> {
         tracing::trace!(
             "try_call_dunder_get: {}, {}, {}",
             self.display(db),
-            instance.display(db),
+            instance.unwrap_or_else(|| Type::none(db)).display(db),
             owner.display(db)
         );
         match self {
@@ -2776,21 +2852,35 @@ impl<'db> Type<'db> {
                 // method of these synthesized functions. The method-wrapper would then be returned from
                 // `find_name_in_mro` when called on function-like `Callable`s. This would allow us to
                 // correctly model the behavior of *explicit* `SomeDataclass.__init__.__get__` calls.
-                return if instance.is_none(db) && callable.is_function_like(db) {
+                return if instance.is_none() && callable.is_function_like(db) {
                     Some((self, AttributeKind::NormalOrNonDataDescriptor))
                 } else {
-                    // For classmethod-like callables, bind to the owner class. For function-like callables, bind to the instance.
-                    let self_type = if callable.is_classmethod_like(db) && instance.is_none(db) {
+                    let self_type = instance.unwrap_or_else(|| {
+                        // For classmethod-like callables, bind to the owner class.
                         owner.to_instance(db).unwrap_or(owner)
-                    } else {
-                        instance
-                    };
+                    });
 
                     Some((
                         Type::Callable(callable.bind_self(db, Some(self_type))),
                         AttributeKind::NormalOrNonDataDescriptor,
                     ))
                 };
+            }
+            Type::FunctionLiteral(function)
+                if instance.is_some_and(|ty| ty.is_none(db))
+                    && !function.is_staticmethod(db)
+                    && !function.is_classmethod(db) =>
+            {
+                // When the instance is of type `None` (`NoneType`), we must handle
+                // `FunctionType.__get__` here rather than falling through to the generic
+                // `__get__` path. The stubs for `FunctionType.__get__` use an overload
+                // with `instance: None` to indicate class-level access (returning the
+                // unbound function). This incorrectly matches when the instance is actually
+                // an instance of `None`
+                return Some((
+                    Type::BoundMethod(BoundMethodType::new(db, function, instance.unwrap())),
+                    AttributeKind::NormalOrNonDataDescriptor,
+                ));
             }
             _ => {}
         }
@@ -2803,8 +2893,9 @@ impl<'db> Type<'db> {
             ..
         }) = descr_get
         {
+            let instance_ty = instance.unwrap_or_else(|| Type::none(db));
             let return_ty = descr_get
-                .try_call(db, &CallArguments::positional([self, instance, owner]))
+                .try_call(db, &CallArguments::positional([self, instance_ty, owner]))
                 .map(|bindings| {
                     if descr_get_boundness == Definedness::AlwaysDefined {
                         bindings.return_type(db)
@@ -2834,7 +2925,7 @@ impl<'db> Type<'db> {
     fn try_call_dunder_get_on_attribute(
         db: &'db dyn Db,
         attribute: PlaceAndQualifiers<'db>,
-        instance: Type<'db>,
+        instance: Option<Type<'db>>,
         owner: Type<'db>,
     ) -> (PlaceAndQualifiers<'db>, AttributeKind) {
         match attribute {
@@ -3023,7 +3114,7 @@ impl<'db> Type<'db> {
         ) = Self::try_call_dunder_get_on_attribute(
             db,
             self.class_member_with_policy(db, name.into(), member_policy),
-            self,
+            Some(self),
             self.to_meta_type(db),
         );
 
@@ -3186,10 +3277,14 @@ impl<'db> Type<'db> {
                 Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderSet(property)),
             )
             .into(),
-            Type::StringLiteral(literal) if name == "startswith" => Place::bound(
-                Type::KnownBoundMethod(KnownBoundMethodType::StrStartswith(literal)),
-            )
-            .into(),
+
+            Type::LiteralValue(literal) if literal.is_string() && name == "startswith" => {
+                let string_literal = literal.as_string().unwrap();
+                Place::bound(Type::KnownBoundMethod(KnownBoundMethodType::StrStartswith(
+                    string_literal,
+                )))
+                .into()
+            }
 
             Type::ClassLiteral(class)
                 if name == "range" && class.is_known(db, KnownClass::ConstraintSet) =>
@@ -3320,7 +3415,7 @@ impl<'db> Type<'db> {
                 } else {
                     python_version.minor
                 };
-                Place::bound(Type::IntLiteral(segment.into())).into()
+                Place::bound(Type::int_literal(segment.into())).into()
             }
 
             Type::PropertyInstance(property) if name == "fget" => {
@@ -3330,12 +3425,17 @@ impl<'db> Type<'db> {
                 Place::bound(property.setter(db).unwrap_or(Type::none(db))).into()
             }
 
-            Type::IntLiteral(_) if matches!(name_str, "real" | "numerator") => {
+            Type::LiteralValue(literal)
+                if literal.is_int() && matches!(name_str, "real" | "numerator") =>
+            {
                 Place::bound(self).into()
             }
 
-            Type::BooleanLiteral(bool_value) if matches!(name_str, "real" | "numerator") => {
-                Place::bound(Type::IntLiteral(i64::from(bool_value))).into()
+            Type::LiteralValue(literal)
+                if literal.is_bool() && matches!(name_str, "real" | "numerator") =>
+            {
+                let bool_value = literal.as_bool().unwrap();
+                Place::bound(Type::int_literal(i64::from(bool_value))).into()
             }
 
             Type::ModuleLiteral(module) => module.static_member(db, name_str),
@@ -3382,19 +3482,25 @@ impl<'db> Type<'db> {
                 .value_type(db)
                 .member_lookup_with_policy(db, name, policy),
 
-            Type::EnumLiteral(enum_literal)
-                if matches!(name_str, "name" | "_name_")
-                    && Type::ClassLiteral(enum_literal.enum_class(db))
-                        .is_subtype_of(db, KnownClass::Enum.to_subclass_of(db)) =>
+            Type::LiteralValue(literal)
+                if literal.as_enum().is_some_and(|enum_literal| {
+                    matches!(name_str, "name" | "_name_")
+                        && Type::ClassLiteral(enum_literal.enum_class(db))
+                            .is_subtype_of(db, KnownClass::Enum.to_subclass_of(db))
+                }) =>
             {
+                let enum_literal = literal.as_enum().unwrap();
                 Place::bound(Type::string_literal(db, enum_literal.name(db))).into()
             }
 
-            Type::EnumLiteral(enum_literal)
-                if matches!(name_str, "value" | "_value_")
-                    && Type::ClassLiteral(enum_literal.enum_class(db))
-                        .is_subtype_of(db, KnownClass::Enum.to_subclass_of(db)) =>
+            Type::LiteralValue(literal)
+                if literal.as_enum().is_some_and(|enum_literal| {
+                    matches!(name_str, "value" | "_value_")
+                        && Type::ClassLiteral(enum_literal.enum_class(db))
+                            .is_subtype_of(db, KnownClass::Enum.to_subclass_of(db))
+                }) =>
             {
+                let enum_literal = literal.as_enum().unwrap();
                 enum_metadata(db, enum_literal.enum_class(db))
                     .and_then(|metadata| metadata.members.get(enum_literal.name(db)))
                     .map_or_else(|| Place::Undefined, Place::bound)
@@ -3430,12 +3536,7 @@ impl<'db> Type<'db> {
             Type::NominalInstance(..)
             | Type::ProtocolInstance(..)
             | Type::NewTypeInstance(..)
-            | Type::BooleanLiteral(..)
-            | Type::IntLiteral(..)
-            | Type::StringLiteral(..)
-            | Type::BytesLiteral(..)
-            | Type::EnumLiteral(..)
-            | Type::LiteralString
+            | Type::LiteralValue(..)
             | Type::TypeVar(..)
             | Type::SpecialForm(..)
             | Type::KnownInstance(..)
@@ -3480,7 +3581,7 @@ impl<'db> Type<'db> {
                     && let Some(metadata) = enum_metadata(db, enum_class)
                     && let Some(resolved_name) = metadata.resolve_member(&name)
                 {
-                    return Place::bound(Type::EnumLiteral(EnumLiteralType::new(
+                    return Place::bound(Type::enum_literal(EnumLiteralType::new(
                         db,
                         enum_class,
                         resolved_name,
@@ -3498,13 +3599,8 @@ impl<'db> Type<'db> {
                 let class_attr_plain =
                     class_attr_plain.map_type(|ty| ty.bind_self_typevars(db, self_instance));
 
-                let class_attr_fallback = Self::try_call_dunder_get_on_attribute(
-                    db,
-                    class_attr_plain,
-                    Type::none(db),
-                    self,
-                )
-                .0;
+                let class_attr_fallback =
+                    Self::try_call_dunder_get_on_attribute(db, class_attr_plain, None, self).0;
 
                 let result = self.invoke_descriptor_protocol(
                     db,
@@ -3576,10 +3672,10 @@ impl<'db> Type<'db> {
         allow_short_circuit: bool,
         visitor: &TryBoolVisitor<'db>,
     ) -> Result<Truthiness, BoolError<'db>> {
-        let type_to_truthiness = |ty| {
-            match ty {
-                Type::BooleanLiteral(bool_val) => Truthiness::from(bool_val),
-                Type::IntLiteral(int_val) => Truthiness::from(int_val != 0),
+        let type_to_truthiness = |ty: Type<'db>| {
+            match ty.as_literal_value_kind() {
+                Some(LiteralValueTypeKind::Bool(bool_val)) => Truthiness::from(bool_val),
+                Some(LiteralValueTypeKind::Int(int_val)) => Truthiness::from(int_val.as_i64() != 0),
                 // anything else is handled lower down
                 _ => Truthiness::Ambiguous,
             }
@@ -3734,7 +3830,6 @@ impl<'db> Type<'db> {
             Type::Dynamic(_)
             | Type::Never
             | Type::Callable(_)
-            | Type::LiteralString
             | Type::TypeIs(_)
             | Type::TypeGuard(_) => Truthiness::Ambiguous,
 
@@ -3815,16 +3910,18 @@ impl<'db> Type<'db> {
                 Truthiness::Ambiguous
             }
 
-            Type::EnumLiteral(enum_type) => {
-                enum_type
+            Type::LiteralValue(literal) => match literal.kind() {
+                LiteralValueTypeKind::LiteralString => Truthiness::Ambiguous,
+                LiteralValueTypeKind::Enum(enum_type) => enum_type
                     .enum_class_instance(db)
-                    .try_bool_impl(db, allow_short_circuit, visitor)?
-            }
+                    .try_bool_impl(db, allow_short_circuit, visitor)?,
 
-            Type::IntLiteral(num) => Truthiness::from(*num != 0),
-            Type::BooleanLiteral(bool) => Truthiness::from(*bool),
-            Type::StringLiteral(str) => Truthiness::from(!str.value(db).is_empty()),
-            Type::BytesLiteral(bytes) => Truthiness::from(!bytes.value(db).is_empty()),
+                LiteralValueTypeKind::Int(num) => Truthiness::from(num.as_i64() != 0),
+                LiteralValueTypeKind::Bool(bool) => Truthiness::from(bool),
+                LiteralValueTypeKind::String(str) => Truthiness::from(!str.value(db).is_empty()),
+                LiteralValueTypeKind::Bytes(bytes) => Truthiness::from(!bytes.value(db).is_empty()),
+            },
+
             Type::TypeAlias(alias) => visitor.visit(*self, || {
                 alias
                     .value_type(db)
@@ -3849,8 +3946,11 @@ impl<'db> Type<'db> {
         fn non_negative_int_literal<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Type<'db>> {
             match ty {
                 // TODO: Emit diagnostic for non-integers and negative integers
-                Type::IntLiteral(value) => (value >= 0).then_some(ty),
-                Type::BooleanLiteral(value) => Some(Type::IntLiteral(value.into())),
+                Type::LiteralValue(literal) => match literal.kind() {
+                    LiteralValueTypeKind::Int(value) => (value.as_i64() >= 0).then_some(ty),
+                    LiteralValueTypeKind::Bool(value) => Some(Type::int_literal(i64::from(value))),
+                    _ => None,
+                },
                 Type::Union(union) => {
                     union.try_map(db, |element| non_negative_int_literal(db, *element))
                 }
@@ -3858,14 +3958,14 @@ impl<'db> Type<'db> {
             }
         }
 
-        let usize_len = match self {
-            Type::BytesLiteral(bytes) => Some(bytes.python_len(db)),
-            Type::StringLiteral(string) => Some(string.python_len(db)),
+        let usize_len = match self.as_literal_value_kind() {
+            Some(LiteralValueTypeKind::Bytes(bytes)) => Some(bytes.python_len(db)),
+            Some(LiteralValueTypeKind::String(string)) => Some(string.python_len(db)),
             _ => None,
         };
 
         if let Some(usize_len) = usize_len {
-            return usize_len.try_into().ok().map(Type::IntLiteral);
+            return usize_len.try_into().ok().map(Type::int_literal);
         }
 
         let return_ty = match self.try_call_dunder(
@@ -4101,7 +4201,7 @@ impl<'db> Type<'db> {
                                     // errors instead of `type-assertion-failure` errors.
                                     .with_annotated_type(Type::any())],
                             ),
-                            Type::none(db),
+                            Type::Never,
                         ),
                     )
                     .into()
@@ -4168,34 +4268,34 @@ impl<'db> Type<'db> {
                                     [
                                         Parameter::keyword_only(Name::new_static("init"))
                                             .with_annotated_type(KnownClass::Bool.to_instance(db))
-                                            .with_default_type(Type::BooleanLiteral(true)),
+                                            .with_default_type(Type::bool_literal(true)),
                                         Parameter::keyword_only(Name::new_static("repr"))
                                             .with_annotated_type(KnownClass::Bool.to_instance(db))
-                                            .with_default_type(Type::BooleanLiteral(true)),
+                                            .with_default_type(Type::bool_literal(true)),
                                         Parameter::keyword_only(Name::new_static("eq"))
                                             .with_annotated_type(KnownClass::Bool.to_instance(db))
-                                            .with_default_type(Type::BooleanLiteral(true)),
+                                            .with_default_type(Type::bool_literal(true)),
                                         Parameter::keyword_only(Name::new_static("order"))
                                             .with_annotated_type(KnownClass::Bool.to_instance(db))
-                                            .with_default_type(Type::BooleanLiteral(false)),
+                                            .with_default_type(Type::bool_literal(false)),
                                         Parameter::keyword_only(Name::new_static("unsafe_hash"))
                                             .with_annotated_type(KnownClass::Bool.to_instance(db))
-                                            .with_default_type(Type::BooleanLiteral(false)),
+                                            .with_default_type(Type::bool_literal(false)),
                                         Parameter::keyword_only(Name::new_static("frozen"))
                                             .with_annotated_type(KnownClass::Bool.to_instance(db))
-                                            .with_default_type(Type::BooleanLiteral(false)),
+                                            .with_default_type(Type::bool_literal(false)),
                                         Parameter::keyword_only(Name::new_static("match_args"))
                                             .with_annotated_type(KnownClass::Bool.to_instance(db))
-                                            .with_default_type(Type::BooleanLiteral(true)),
+                                            .with_default_type(Type::bool_literal(true)),
                                         Parameter::keyword_only(Name::new_static("kw_only"))
                                             .with_annotated_type(KnownClass::Bool.to_instance(db))
-                                            .with_default_type(Type::BooleanLiteral(false)),
+                                            .with_default_type(Type::bool_literal(false)),
                                         Parameter::keyword_only(Name::new_static("slots"))
                                             .with_annotated_type(KnownClass::Bool.to_instance(db))
-                                            .with_default_type(Type::BooleanLiteral(false)),
+                                            .with_default_type(Type::bool_literal(false)),
                                         Parameter::keyword_only(Name::new_static("weakref_slot"))
                                             .with_annotated_type(KnownClass::Bool.to_instance(db))
-                                            .with_default_type(Type::BooleanLiteral(false)),
+                                            .with_default_type(Type::bool_literal(false)),
                                     ],
                                 ),
                                 Type::unknown(),
@@ -4224,25 +4324,23 @@ impl<'db> Type<'db> {
                     Binding::single(self, Signature::dynamic(Type::Dynamic(dynamic_type))).into()
                 }
                 SubclassOfInner::Class(class) => self.constructor_bindings(db, class),
-                SubclassOfInner::TypeVar(bound_typevar) => {
-                    let Some(class) = (match bound_typevar.typevar(db).bound_or_constraints(db) {
-                        None | Some(TypeVarBoundOrConstraints::UpperBound(_)) => {
-                            subclass_of_type.subclass_of().into_class(db)
+                SubclassOfInner::TypeVar(tvar) => {
+                    let bindings = match tvar.typevar(db).bound_or_constraints(db) {
+                        None => KnownClass::Type.to_instance(db).bindings(db),
+                        Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                            bound.to_meta_type(db).bindings(db)
                         }
-                        // TODO: model calls to `type[T]` where `T` is constrained
-                        Some(TypeVarBoundOrConstraints::Constraints(_)) => None,
-                    }) else {
-                        return Binding::single(
-                            self,
-                            Signature::new(
-                                Parameters::gradual_form(),
-                                self.to_instance(db).unwrap_or(Type::unknown()),
-                            ),
-                        )
-                        .into();
+                        Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                            Bindings::from_union(
+                                self,
+                                constraints
+                                    .elements(db)
+                                    .iter()
+                                    .map(|ty| ty.to_meta_type(db).bindings(db)),
+                            )
+                        }
                     };
-
-                    self.constructor_bindings(db, class)
+                    bindings.with_constructor_instance_type(Type::TypeVar(tvar))
                 }
             },
 
@@ -4260,7 +4358,7 @@ impl<'db> Type<'db> {
                                     .with_default_type(Type::any()),
                                 Parameter::keyword_only(Name::new_static("total"))
                                     .with_annotated_type(KnownClass::Bool.to_instance(db))
-                                    .with_default_type(Type::BooleanLiteral(true)),
+                                    .with_default_type(Type::bool_literal(true)),
                                 // Future compatibility, in case new keyword arguments will be added:
                                 Parameter::keyword_variadic(Name::new_static("kwargs"))
                                     .with_annotated_type(Type::any()),
@@ -4317,9 +4415,12 @@ impl<'db> Type<'db> {
                     .map(|element| element.bindings(db)),
             ),
 
-            Type::Intersection(_) => {
-                Binding::single(self, Signature::todo("Type::Intersection.call")).into()
-            }
+            Type::Intersection(intersection) => Bindings::from_intersection(
+                self,
+                intersection
+                    .positive_elements_or_object(db)
+                    .map(|element| element.bindings(db)),
+            ),
 
             Type::DataclassDecorator(_) => {
                 let typevar = BoundTypeVarInstance::synthetic(
@@ -4342,7 +4443,12 @@ impl<'db> Type<'db> {
             // TODO: some `SpecialForm`s are callable (e.g. TypedDicts)
             Type::SpecialForm(_) => CallableBinding::not_callable(self).into(),
 
-            Type::EnumLiteral(enum_literal) => enum_literal.enum_class_instance(db).bindings(db),
+            Type::LiteralValue(literal) => match literal.kind() {
+                LiteralValueTypeKind::Enum(enum_literal) => {
+                    enum_literal.enum_class_instance(db).bindings(db)
+                }
+                _ => CallableBinding::not_callable(self).into(),
+            },
 
             Type::KnownInstance(KnownInstanceType::NewType(newtype)) => Binding::single(
                 self,
@@ -4366,11 +4472,6 @@ impl<'db> Type<'db> {
             Type::PropertyInstance(_)
             | Type::AlwaysFalsy
             | Type::AlwaysTruthy
-            | Type::IntLiteral(_)
-            | Type::StringLiteral(_)
-            | Type::BytesLiteral(_)
-            | Type::BooleanLiteral(_)
-            | Type::LiteralString
             | Type::BoundSuper(_)
             | Type::ModuleLiteral(_)
             | Type::TypeIs(_)
@@ -4400,7 +4501,7 @@ impl<'db> Type<'db> {
                                 db,
                                 [Parameter::positional_only(Some(Name::new_static("o")))
                                     .with_annotated_type(Type::any())
-                                    .with_default_type(Type::BooleanLiteral(false))],
+                                    .with_default_type(Type::bool_literal(false))],
                             ),
                             KnownClass::Bool.to_instance(db),
                         ),
@@ -4543,7 +4644,7 @@ impl<'db> Type<'db> {
                                 db,
                                 [
                                     Parameter::positional_only(Some(Name::new_static("message")))
-                                        .with_annotated_type(Type::LiteralString),
+                                        .with_annotated_type(Type::literal_string()),
                                     Parameter::keyword_only(Name::new_static("category"))
                                         .with_annotated_type(UnionType::from_elements(
                                             db,
@@ -4557,7 +4658,7 @@ impl<'db> Type<'db> {
                                         .with_default_type(Type::any()),
                                     Parameter::keyword_only(Name::new_static("stacklevel"))
                                         .with_annotated_type(KnownClass::Int.to_instance(db))
-                                        .with_default_type(Type::IntLiteral(1)),
+                                        .with_default_type(Type::int_literal(1)),
                                 ],
                             ),
                             KnownClass::Deprecated.to_instance(db),
@@ -5031,6 +5132,38 @@ impl<'db> Type<'db> {
         tcx: TypeContext<'db>,
         policy: MemberLookupPolicy,
     ) -> Result<Bindings<'db>, CallDunderError<'db>> {
+        // For intersection types, call the dunder on each element separately and combine
+        // the results. This avoids intersecting bound methods (which often collapses to Never)
+        // and instead intersects the return types.
+        //
+        // TODO: we might be able to remove this after fixing
+        // https://github.com/astral-sh/ty/issues/2428.
+        if let Type::Intersection(intersection) = self {
+            // Using `positive()` rather than `positive_elements_or_object()` is safe
+            // here because `object` does not define any of the dunders that are called
+            // through this path without `MRO_NO_OBJECT_FALLBACK` (e.g. `__await__`,
+            // `__iter__`, `__enter__`, `__bool__`).
+            let positive = intersection.positive(db);
+
+            let mut successful_bindings = Vec::with_capacity(positive.len());
+            let mut last_error = None;
+
+            for element in positive {
+                match element.try_call_dunder_with_policy(db, name, argument_types, tcx, policy) {
+                    Ok(bindings) => successful_bindings.push(bindings),
+                    Err(err) => last_error = Some(err),
+                }
+            }
+
+            if successful_bindings.is_empty() {
+                // TODO we are only showing one of the errors here; should we aggregate them
+                // somehow or show all of them?
+                return Err(last_error.unwrap_or(CallDunderError::MethodNotAvailable));
+            }
+
+            return Ok(Bindings::from_intersection(self, successful_bindings));
+        }
+
         // Implicit calls to dunder methods never access instance members, so we pass
         // `NO_INSTANCE_FALLBACK` here in addition to other policies:
         match self
@@ -5260,31 +5393,38 @@ impl<'db> Type<'db> {
                         "*tuple[] annotations"
                     ))))
                 }
-                Type::StringLiteral(string_literal_ty) => {
-                    let string_literal = string_literal_ty.value(db);
-                    let spec = if string_literal.len() < MAX_TUPLE_LENGTH {
-                        TupleSpec::heterogeneous(
-                            string_literal
-                                .chars()
-                                .map(|c| Type::string_literal(db, &c.to_string())),
-                        )
-                    } else {
-                        TupleSpec::homogeneous(Type::LiteralString)
-                    };
-                    Some(Cow::Owned(spec))
-                }
-                Type::BytesLiteral(bytes) => {
-                    let bytes_literal = bytes.value(db);
-                    let spec = if bytes_literal.len() < MAX_TUPLE_LENGTH {
-                        TupleSpec::heterogeneous(
-                            bytes_literal
-                                .iter()
-                                .map(|b| Type::IntLiteral(i64::from(*b))),
-                        )
-                    } else {
-                        TupleSpec::homogeneous(KnownClass::Int.to_instance(db))
-                    };
-                    Some(Cow::Owned(spec))
+                Type::LiteralValue(literal) => match literal.kind() {
+                    LiteralValueTypeKind::Bytes(bytes) => {
+                        let bytes_literal = bytes.value(db);
+                        let spec = if bytes_literal.len() < MAX_TUPLE_LENGTH {
+                            TupleSpec::heterogeneous(
+                                bytes_literal
+                                    .iter()
+                                    .map(|b| Type::int_literal( i64::from(*b))),
+                            )
+                        } else {
+                            TupleSpec::homogeneous(KnownClass::Int.to_instance(db))
+                        };
+                        Some(Cow::Owned(spec))
+                    },
+                    LiteralValueTypeKind::String(string_literal_ty) => {
+                        let string_literal = string_literal_ty.value(db);
+                        let spec = if string_literal.len() < MAX_TUPLE_LENGTH {
+                            TupleSpec::heterogeneous(
+                                string_literal
+                                    .chars()
+                                    .map(|c| Type::string_literal(db, &c.to_string())),
+                            )
+                        } else {
+                            TupleSpec::homogeneous(Type::literal_string())
+                        };
+                        Some(Cow::Owned(spec))
+                    }
+                    // N.B. This special case isn't strictly necessary, it's just an obvious optimization
+                    LiteralValueTypeKind::LiteralString => {
+                        Some(Cow::Owned(TupleSpec::homogeneous(ty)))
+                    }
+                    _ => None
                 }
                 Type::Never => {
                     // The dunder logic below would have us return `tuple[Never, ...]`, which eagerly
@@ -5355,8 +5495,8 @@ impl<'db> Type<'db> {
                     // Flattening changed the type; recursively iterate the flattened result.
                     non_async_special_case(db, flattened)
                 }
-                // N.B. These special cases aren't strictly necessary, they're just obvious optimizations
-                Type::LiteralString | Type::Dynamic(_) => Some(Cow::Owned(TupleSpec::homogeneous(ty))),
+                // N.B. This special case isn't strictly necessary, it's just an obvious optimization
+                Type::Dynamic(_) => Some(Cow::Owned(TupleSpec::homogeneous(ty))),
 
                 Type::FunctionLiteral(_)
                 | Type::GenericAlias(_)
@@ -5379,9 +5519,6 @@ impl<'db> Type<'db> {
                 | Type::PropertyInstance(_)
                 | Type::AlwaysTruthy
                 | Type::AlwaysFalsy
-                | Type::IntLiteral(_)
-                | Type::BooleanLiteral(_)
-                | Type::EnumLiteral(_)
                 | Type::BoundSuper(_)
                 | Type::TypeIs(_)
                 | Type::TypeGuard(_)
@@ -5692,6 +5829,20 @@ impl<'db> Type<'db> {
                 }
             }
             Type::Union(union) => union.try_map(db, |ty| ty.generator_return_type(db)),
+            Type::Intersection(intersection) => {
+                let mut builder = IntersectionBuilder::new(db);
+                let mut any_success = false;
+                // Using `positive()` rather than `positive_elements_or_object()` is safe
+                // here because `object` is not a generator, so falling back to it would
+                // still return `None`.
+                for ty in intersection.positive(db) {
+                    if let Some(return_ty) = ty.generator_return_type(db) {
+                        builder = builder.add_positive(return_ty);
+                        any_success = true;
+                    }
+                }
+                any_success.then(|| builder.build())
+            }
             ty @ (Type::Dynamic(_) | Type::Never) => Some(ty),
             _ => None,
         }
@@ -5725,10 +5876,7 @@ impl<'db> Type<'db> {
             {
                 Some(Type::object())
             }
-            Type::BooleanLiteral(_)
-            | Type::BytesLiteral(_)
-            | Type::EnumLiteral(_)
-            | Type::FunctionLiteral(_)
+            Type::FunctionLiteral(_)
             | Type::Callable(..)
             | Type::KnownBoundMethod(_)
             | Type::BoundMethod(_)
@@ -5741,9 +5889,7 @@ impl<'db> Type<'db> {
             | Type::KnownInstance(_)
             | Type::PropertyInstance(_)
             | Type::ModuleLiteral(_)
-            | Type::IntLiteral(_)
-            | Type::StringLiteral(_)
-            | Type::LiteralString
+            | Type::LiteralValue(_)
             | Type::BoundSuper(_)
             | Type::AlwaysTruthy
             | Type::AlwaysFalsy
@@ -5783,15 +5929,10 @@ impl<'db> Type<'db> {
             Type::GenericAlias(alias) => Ok(Type::instance(db, ClassType::from(*alias))),
 
             Type::SubclassOf(_)
-            | Type::BooleanLiteral(_)
-            | Type::BytesLiteral(_)
-            | Type::EnumLiteral(_)
+            | Type::LiteralValue(_)
             | Type::AlwaysTruthy
             | Type::AlwaysFalsy
-            | Type::IntLiteral(_)
-            | Type::LiteralString
             | Type::ModuleLiteral(_)
-            | Type::StringLiteral(_)
             | Type::TypeVar(_)
             | Type::Callable(_)
             | Type::BoundMethod(_)
@@ -5885,134 +6026,9 @@ impl<'db> Type<'db> {
                 KnownInstanceType::LiteralStringAlias(ty) => Ok(ty.inner(db)),
             },
 
-            Type::SpecialForm(special_form) => match special_form {
-                SpecialFormType::Never | SpecialFormType::NoReturn => Ok(Type::Never),
-                SpecialFormType::LiteralString => Ok(Type::LiteralString),
-                SpecialFormType::Any => Ok(Type::any()),
-                SpecialFormType::Unknown => Ok(Type::unknown()),
-                SpecialFormType::AlwaysTruthy => Ok(Type::AlwaysTruthy),
-                SpecialFormType::AlwaysFalsy => Ok(Type::AlwaysFalsy),
-
-                // We treat `typing.Type` exactly the same as `builtins.type`:
-                SpecialFormType::Type => Ok(KnownClass::Type.to_instance(db)),
-                SpecialFormType::Tuple => Ok(Type::homogeneous_tuple(db, Type::unknown())),
-
-                // Legacy `typing` aliases
-                SpecialFormType::List => Ok(KnownClass::List.to_instance(db)),
-                SpecialFormType::Dict => Ok(KnownClass::Dict.to_instance(db)),
-                SpecialFormType::Set => Ok(KnownClass::Set.to_instance(db)),
-                SpecialFormType::FrozenSet => Ok(KnownClass::FrozenSet.to_instance(db)),
-                SpecialFormType::ChainMap => Ok(KnownClass::ChainMap.to_instance(db)),
-                SpecialFormType::Counter => Ok(KnownClass::Counter.to_instance(db)),
-                SpecialFormType::DefaultDict => Ok(KnownClass::DefaultDict.to_instance(db)),
-                SpecialFormType::Deque => Ok(KnownClass::Deque.to_instance(db)),
-                SpecialFormType::OrderedDict => Ok(KnownClass::OrderedDict.to_instance(db)),
-
-                // TODO: Use an opt-in rule for a bare `Callable`
-                SpecialFormType::Callable => Ok(Type::Callable(CallableType::unknown(db))),
-
-                // Special case: `NamedTuple` in a type expression is understood to describe the type
-                // `tuple[object, ...] & <a protocol that any `NamedTuple` class would satisfy>`.
-                // This isn't very principled (since at runtime, `NamedTuple` is just a function),
-                // but it appears to be what users often expect, and it improves compatibility with
-                // other type checkers such as mypy.
-                // See conversation in https://github.com/astral-sh/ruff/pull/19915.
-                SpecialFormType::NamedTuple => Ok(IntersectionType::from_elements(
-                    db,
-                    [
-                        Type::homogeneous_tuple(db, Type::object()),
-                        KnownClass::NamedTupleLike.to_instance(db),
-                    ],
-                )),
-                SpecialFormType::TypingSelf => {
-                    let index = semantic_index(db, scope_id.file(db));
-                    let Some(class) = nearest_enclosing_class(db, index, scope_id) else {
-                        return Err(InvalidTypeExpressionError {
-                            fallback_type: Type::unknown(),
-                            invalid_expressions: smallvec_inline![
-                                InvalidTypeExpression::InvalidType(*self, scope_id)
-                            ],
-                        });
-                    };
-
-                    Ok(
-                        typing_self(db, scope_id, typevar_binding_context, class.into())
-                            .map(Type::TypeVar)
-                            .unwrap_or(*self),
-                    )
-                }
-                // We ensure that `typing.TypeAlias` used in the expected position (annotating an
-                // annotated assignment statement) doesn't reach here. Using it in any other type
-                // expression is an error.
-                SpecialFormType::TypeAlias => Err(InvalidTypeExpressionError {
-                    invalid_expressions: smallvec_inline![InvalidTypeExpression::TypeAlias],
-                    fallback_type: Type::unknown(),
-                }),
-                SpecialFormType::TypedDict => Err(InvalidTypeExpressionError {
-                    invalid_expressions: smallvec_inline![InvalidTypeExpression::TypedDict],
-                    fallback_type: Type::unknown(),
-                }),
-
-                SpecialFormType::Literal
-                | SpecialFormType::Union
-                | SpecialFormType::Intersection => Err(InvalidTypeExpressionError {
-                    invalid_expressions: smallvec_inline![
-                        InvalidTypeExpression::RequiresArguments(*special_form)
-                    ],
-                    fallback_type: Type::unknown(),
-                }),
-
-                SpecialFormType::Protocol => Err(InvalidTypeExpressionError {
-                    invalid_expressions: smallvec_inline![InvalidTypeExpression::Protocol],
-                    fallback_type: Type::unknown(),
-                }),
-                SpecialFormType::Generic => Err(InvalidTypeExpressionError {
-                    invalid_expressions: smallvec_inline![InvalidTypeExpression::Generic],
-                    fallback_type: Type::unknown(),
-                }),
-
-                SpecialFormType::Optional
-                | SpecialFormType::Not
-                | SpecialFormType::Top
-                | SpecialFormType::Bottom
-                | SpecialFormType::TypeOf
-                | SpecialFormType::TypeIs
-                | SpecialFormType::TypeGuard
-                | SpecialFormType::Unpack
-                | SpecialFormType::CallableTypeOf => Err(InvalidTypeExpressionError {
-                    invalid_expressions: smallvec_inline![
-                        InvalidTypeExpression::RequiresOneArgument(*special_form)
-                    ],
-                    fallback_type: Type::unknown(),
-                }),
-
-                SpecialFormType::Annotated | SpecialFormType::Concatenate => {
-                    Err(InvalidTypeExpressionError {
-                        invalid_expressions: smallvec_inline![
-                            InvalidTypeExpression::RequiresTwoArguments(*special_form)
-                        ],
-                        fallback_type: Type::unknown(),
-                    })
-                }
-
-                SpecialFormType::ClassVar | SpecialFormType::Final => {
-                    Err(InvalidTypeExpressionError {
-                        invalid_expressions: smallvec_inline![
-                            InvalidTypeExpression::TypeQualifier(*special_form)
-                        ],
-                        fallback_type: Type::unknown(),
-                    })
-                }
-
-                SpecialFormType::ReadOnly
-                | SpecialFormType::NotRequired
-                | SpecialFormType::Required => Err(InvalidTypeExpressionError {
-                    invalid_expressions: smallvec_inline![
-                        InvalidTypeExpression::TypeQualifierRequiresOneArgument(*special_form)
-                    ],
-                    fallback_type: Type::unknown(),
-                }),
-            },
+            Type::SpecialForm(special_form) => {
+                special_form.in_type_expression(db, scope_id, typevar_binding_context)
+            }
 
             Type::Union(union) => {
                 let mut builder = UnionBuilder::new(db);
@@ -6091,12 +6107,18 @@ impl<'db> Type<'db> {
             Type::SpecialForm(special_form) => special_form.to_meta_type(db),
             Type::PropertyInstance(_) => KnownClass::Property.to_class_literal(db),
             Type::Union(union) => union.map(db, |ty| ty.to_meta_type(db)),
-            Type::BooleanLiteral(_) | Type::TypeIs(_) | Type::TypeGuard(_) => {
-                KnownClass::Bool.to_class_literal(db)
-            }
-            Type::BytesLiteral(_) => KnownClass::Bytes.to_class_literal(db),
-            Type::IntLiteral(_) => KnownClass::Int.to_class_literal(db),
-            Type::EnumLiteral(enum_literal) => Type::ClassLiteral(enum_literal.enum_class(db)),
+            Type::TypeIs(_) | Type::TypeGuard(_) => KnownClass::Bool.to_class_literal(db),
+            Type::LiteralValue(literal) => match literal.kind() {
+                LiteralValueTypeKind::Bool(_) => KnownClass::Bool.to_class_literal(db),
+                LiteralValueTypeKind::Bytes(_) => KnownClass::Bytes.to_class_literal(db),
+                LiteralValueTypeKind::Int(_) => KnownClass::Int.to_class_literal(db),
+                LiteralValueTypeKind::Enum(enum_literal) => {
+                    Type::ClassLiteral(enum_literal.enum_class(db))
+                }
+                LiteralValueTypeKind::String(_) | LiteralValueTypeKind::LiteralString => {
+                    KnownClass::Str.to_class_literal(db)
+                }
+            },
             Type::FunctionLiteral(_) => KnownClass::FunctionType.to_class_literal(db),
             Type::BoundMethod(_) => KnownClass::MethodType.to_class_literal(db),
             Type::KnownBoundMethod(method) => method.class().to_class_literal(db),
@@ -6113,7 +6135,6 @@ impl<'db> Type<'db> {
             Type::ClassLiteral(class) => class.metaclass(db),
             Type::GenericAlias(alias) => ClassType::from(alias).metaclass(db),
             Type::SubclassOf(subclass_of_ty) => subclass_of_ty.to_meta_type(db),
-            Type::StringLiteral(_) | Type::LiteralString => KnownClass::Str.to_class_literal(db),
             Type::Dynamic(dynamic) => SubclassOfType::from(db, SubclassOfInner::Dynamic(dynamic)),
             // TODO intersections
             Type::Intersection(_) => {
@@ -6297,14 +6318,27 @@ impl<'db> Type<'db> {
                 },
             }
 
-            Type::FunctionLiteral(function) => {
-                let function = Type::FunctionLiteral(function.apply_type_mapping_impl(db, type_mapping, tcx, visitor));
-
+            Type::FunctionLiteral(function) => visitor.visit(self, || {
                 match type_mapping {
-                    TypeMapping::PromoteLiterals(PromoteLiteralsMode::On) => function.promote_literals_impl(db, tcx),
-                    _ => function
+                    // Promote the types within the signature before promoting the signature to its
+                    // callable form.
+                    TypeMapping::PromoteLiterals(PromoteLiteralsMode::On) => {
+                        Type::FunctionLiteral(function.apply_type_mapping_impl(
+                            db,
+                            type_mapping,
+                            tcx,
+                            visitor,
+                        ))
+                        .promote_literals_impl(db)
+                    }
+                    _ => Type::FunctionLiteral(function.apply_type_mapping_impl(
+                        db,
+                        type_mapping,
+                        tcx,
+                        visitor,
+                    )),
                 }
-            }
+            }),
 
             Type::BoundMethod(method) => Type::BoundMethod(BoundMethodType::new(
                 db,
@@ -6450,13 +6484,7 @@ impl<'db> Type<'db> {
                 }
             }
 
-            Type::ModuleLiteral(_)
-            | Type::IntLiteral(_)
-            | Type::BooleanLiteral(_)
-            | Type::LiteralString
-            | Type::StringLiteral(_)
-            | Type::BytesLiteral(_)
-            | Type::EnumLiteral(_) => match type_mapping {
+            Type::ModuleLiteral(_) => match type_mapping {
                 TypeMapping::ApplySpecialization(_) |
                 TypeMapping::UniqueSpecialization { .. } |
                 TypeMapping::BindLegacyTypevars(_) |
@@ -6467,7 +6495,21 @@ impl<'db> Type<'db> {
                 TypeMapping::EagerExpansion |
                 TypeMapping::RescopeReturnCallables(_) |
                 TypeMapping::PromoteLiterals(PromoteLiteralsMode::Off) => self,
-                TypeMapping::PromoteLiterals(PromoteLiteralsMode::On) => self.promote_literals_impl(db, tcx)
+                TypeMapping::PromoteLiterals(PromoteLiteralsMode::On) => self.promote_literals_impl(db)
+            }
+
+            Type::LiteralValue(_) => match type_mapping {
+                TypeMapping::ApplySpecialization(_) |
+                TypeMapping::UniqueSpecialization { .. } |
+                TypeMapping::BindLegacyTypevars(_) |
+                TypeMapping::BindSelf { .. } |
+                TypeMapping::ReplaceSelf { .. } |
+                TypeMapping::Materialize(_) |
+                TypeMapping::ReplaceParameterDefaults |
+                TypeMapping::EagerExpansion |
+                TypeMapping::RescopeReturnCallables(_) |
+                TypeMapping::PromoteLiterals(PromoteLiteralsMode::Off) => self,
+                TypeMapping::PromoteLiterals(PromoteLiteralsMode::On) => self.promote_literals_impl(db),
             }
 
             Type::Dynamic(_) => match type_mapping {
@@ -6562,7 +6604,9 @@ impl<'db> Type<'db> {
             }
 
             Type::FunctionLiteral(function) => {
-                function.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
+                visitor.visit(self, || {
+                    function.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
+                });
             }
 
             Type::BoundMethod(method) => {
@@ -6733,12 +6777,7 @@ impl<'db> Type<'db> {
             | Type::DataclassTransformer(_)
             | Type::ModuleLiteral(_)
             | Type::ClassLiteral(_)
-            | Type::IntLiteral(_)
-            | Type::BooleanLiteral(_)
-            | Type::LiteralString
-            | Type::StringLiteral(_)
-            | Type::BytesLiteral(_)
-            | Type::EnumLiteral(_)
+            | Type::LiteralValue(_)
             | Type::BoundSuper(_)
             | Type::SpecialForm(_)
             | Type::TypedDict(_) => {}
@@ -6800,16 +6839,19 @@ impl<'db> Type<'db> {
     #[must_use]
     pub(crate) fn str(&self, db: &'db dyn Db) -> Type<'db> {
         match self {
-            Type::IntLiteral(_) | Type::BooleanLiteral(_) => self.repr(db),
-            Type::StringLiteral(_) | Type::LiteralString => *self,
-            Type::EnumLiteral(enum_literal) => Type::string_literal(
-                db,
-                &format!(
-                    "{enum_class}.{name}",
-                    enum_class = enum_literal.enum_class(db).name(db),
-                    name = enum_literal.name(db)
+            Type::LiteralValue(literal) => match literal.kind() {
+                LiteralValueTypeKind::Int(_) | LiteralValueTypeKind::Bool(_) => self.repr(db),
+                LiteralValueTypeKind::String(_) | LiteralValueTypeKind::LiteralString => *self,
+                LiteralValueTypeKind::Enum(enum_literal) => Type::string_literal(
+                    db,
+                    &format!(
+                        "{enum_class}.{name}",
+                        enum_class = enum_literal.enum_class(db).name(db),
+                        name = enum_literal.name(db)
+                    ),
                 ),
-            ),
+                LiteralValueTypeKind::Bytes(_) => KnownClass::Str.to_instance(db),
+            },
             Type::SpecialForm(special_form) => Type::string_literal(db, &special_form.to_string()),
             Type::KnownInstance(known_instance) => {
                 Type::string_literal(db, &known_instance.repr(db).to_string())
@@ -6824,13 +6866,16 @@ impl<'db> Type<'db> {
     #[must_use]
     pub(crate) fn repr(&self, db: &'db dyn Db) -> Type<'db> {
         match self {
-            Type::IntLiteral(number) => Type::string_literal(db, &number.to_string()),
-            Type::BooleanLiteral(true) => Type::string_literal(db, "True"),
-            Type::BooleanLiteral(false) => Type::string_literal(db, "False"),
-            Type::StringLiteral(literal) => {
-                Type::string_literal(db, &format!("'{}'", literal.value(db).escape_default()))
-            }
-            Type::LiteralString => Type::LiteralString,
+            Type::LiteralValue(literal) => match literal.kind() {
+                LiteralValueTypeKind::Int(number) => Type::string_literal(db, &number.to_string()),
+                LiteralValueTypeKind::Bool(true) => Type::string_literal(db, "True"),
+                LiteralValueTypeKind::Bool(false) => Type::string_literal(db, "False"),
+                LiteralValueTypeKind::String(literal) => {
+                    Type::string_literal(db, &format!("'{}'", literal.value(db).escape_default()))
+                }
+                LiteralValueTypeKind::LiteralString => Type::literal_string(),
+                _ => KnownClass::Str.to_instance(db),
+            },
             Type::SpecialForm(special_form) => Type::string_literal(db, &special_form.to_string()),
             Type::KnownInstance(known_instance) => {
                 Type::string_literal(db, &known_instance.repr(db).to_string())
@@ -6887,13 +6932,8 @@ impl<'db> Type<'db> {
                 .and_then(|getter|getter.definition(db))
                 .or_else(||property.setter(db).and_then(|setter|setter.definition(db))),
 
-            Self::StringLiteral(_)
-            | Self::BooleanLiteral(_)
-            | Self::LiteralString
-            | Self::IntLiteral(_)
-            | Self::BytesLiteral(_)
+            Self::LiteralValue(_)
             // TODO: For enum literals, it would be even better to jump to the definition of the specific member
-            | Self::EnumLiteral(_)
             | Self::KnownBoundMethod(_)
             | Self::WrapperDescriptor(_)
             | Self::DataclassDecorator(_)
@@ -7097,12 +7137,7 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
             | Type::DataclassDecorator(_)
             | Type::DataclassTransformer(_)
             | Type::ModuleLiteral(_)
-            | Type::IntLiteral(_)
-            | Type::BooleanLiteral(_)
-            | Type::StringLiteral(_)
-            | Type::EnumLiteral(_)
-            | Type::LiteralString
-            | Type::BytesLiteral(_)
+            | Type::LiteralValue(_)
             | Type::SpecialForm(_)
             | Type::AlwaysFalsy
             | Type::AlwaysTruthy
@@ -7831,9 +7866,10 @@ impl<'db> TypeAndQualifiers<'db> {
         self.origin
     }
 
-    /// Insert/add an additional type qualifier.
-    pub(crate) fn add_qualifier(&mut self, qualifier: TypeQualifiers) {
+    /// Return `self` with an additional qualifier added to the set of qualifiers.
+    pub(crate) fn with_qualifier(mut self, qualifier: TypeQualifiers) -> Self {
         self.qualifiers |= qualifier;
+        self
     }
 
     /// Return the set of type qualifiers.
@@ -7918,10 +7954,10 @@ enum InvalidTypeExpression<'db> {
     TypeAlias,
     /// Type qualifiers are always invalid in *type expressions*,
     /// but these ones are okay with 0 arguments in *annotation expressions*
-    TypeQualifier(SpecialFormType),
+    TypeQualifier(TypeQualifier),
     /// Type qualifiers that are invalid in type expressions,
     /// and which would require exactly one argument even if they appeared in an annotation expression
-    TypeQualifierRequiresOneArgument(SpecialFormType),
+    TypeQualifierRequiresOneArgument(TypeQualifier),
     /// Some types are always invalid in type expressions
     InvalidType(Type<'db>, ScopeId<'db>),
 }
@@ -10505,8 +10541,8 @@ impl Truthiness {
 
     fn into_type(self, db: &dyn Db) -> Type<'_> {
         match self {
-            Self::AlwaysTrue => Type::BooleanLiteral(true),
-            Self::AlwaysFalse => Type::BooleanLiteral(false),
+            Self::AlwaysTrue => Type::bool_literal(true),
+            Self::AlwaysFalse => Type::bool_literal(false),
             Self::Ambiguous => KnownClass::Bool.to_instance(db),
         }
     }
@@ -11053,7 +11089,10 @@ pub(super) fn walk_method_wrapper_type<'db, V: visitor::TypeVisitor<'db> + ?Size
             visitor.visit_property_instance_type(db, property);
         }
         KnownBoundMethodType::StrStartswith(string_literal) => {
-            visitor.visit_type(db, Type::StringLiteral(string_literal));
+            visitor.visit_type(
+                db,
+                LiteralValueType::promotable(LiteralValueTypeKind::String(string_literal)).into(),
+            );
         }
         KnownBoundMethodType::ConstraintSetRange
         | KnownBoundMethodType::ConstraintSetAlways
@@ -12285,19 +12324,15 @@ impl<'db> UnionType<'db> {
         self.try_map(db, |element| element.to_instance(db))
     }
 
-    pub(crate) fn filter(
-        self,
-        db: &'db dyn Db,
-        mut f: impl FnMut(&Type<'db>) -> bool,
-    ) -> Type<'db> {
-        self.elements(db)
-            .iter()
-            .filter(|ty| f(ty))
-            .fold(UnionBuilder::new(db), |builder, element| {
-                builder.add(*element)
-            })
-            .recursively_defined(self.recursively_defined(db))
-            .build()
+    pub(crate) fn filter(self, db: &'db dyn Db, f: impl FnMut(&Type<'db>) -> bool) -> Type<'db> {
+        let current = self.elements(db);
+        let new: Box<[Type<'db>]> = current.iter().copied().filter(f).collect();
+        match &*new {
+            [] => Type::Never,
+            [single] => *single,
+            _ if new.len() == current.len() => Type::Union(self),
+            _ => Type::Union(UnionType::new(db, new, self.recursively_defined(db))),
+        }
     }
 
     pub(crate) fn map_with_boundness(
@@ -13063,73 +13098,6 @@ impl<'db> IntersectionType<'db> {
     }
 }
 
-/// # Ordering
-/// Ordering is based on the string literal's salsa-assigned id and not on its value.
-/// The id may change between runs, or when the string literal was garbage collected and recreated.
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
-#[derive(PartialOrd, Ord)]
-pub struct StringLiteralType<'db> {
-    #[returns(deref)]
-    value: CompactString,
-}
-
-// The Salsa heap is tracked separately.
-impl get_size2::GetSize for StringLiteralType<'_> {}
-
-impl<'db> StringLiteralType<'db> {
-    /// The length of the string, as would be returned by Python's `len()`.
-    pub(crate) fn python_len(self, db: &'db dyn Db) -> usize {
-        self.value(db).chars().count()
-    }
-}
-
-/// # Ordering
-/// Ordering is based on the byte literal's salsa-assigned id and not on its value.
-/// The id may change between runs, or when the byte literal was garbage collected and recreated.
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
-#[derive(PartialOrd, Ord)]
-pub struct BytesLiteralType<'db> {
-    #[returns(deref)]
-    value: Box<[u8]>,
-}
-
-// The Salsa heap is tracked separately.
-impl get_size2::GetSize for BytesLiteralType<'_> {}
-
-impl<'db> BytesLiteralType<'db> {
-    pub(crate) fn python_len(self, db: &'db dyn Db) -> usize {
-        self.value(db).len()
-    }
-}
-
-/// A singleton type corresponding to a specific enum member.
-///
-/// For the enum variant `Answer.YES` of the enum below, this type would store
-/// a reference to `Answer` in `enum_class` and the name "YES" in `name`.
-/// ```py
-/// class Answer(Enum):
-///     NO = 0
-///     YES = 1
-/// ```
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
-#[derive(PartialOrd, Ord)]
-pub struct EnumLiteralType<'db> {
-    /// A reference to the enum class this literal belongs to
-    enum_class: ClassLiteral<'db>,
-    /// The name of the enum member
-    #[returns(ref)]
-    name: Name,
-}
-
-// The Salsa heap is tracked separately.
-impl get_size2::GetSize for EnumLiteralType<'_> {}
-
-impl<'db> EnumLiteralType<'db> {
-    pub(crate) fn enum_class_instance(self, db: &'db dyn Db) -> Type<'db> {
-        self.enum_class(db).to_non_generic_instance(db)
-    }
-}
-
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct TypeIsType<'db> {
     return_type: Type<'db>,
@@ -13466,24 +13434,30 @@ pub(crate) mod tests {
         assert!(!div.is_redundant_with(&db, Type::unknown()));
         assert!(!Type::unknown().is_redundant_with(&db, div));
 
-        let truthy_div = IntersectionBuilder::new(&db)
+        // `Divergent & T` and `Divergent & ~T` both simplify to `Divergent`, except for the
+        // specific case of `Divergent & Never`, which simplifies to `Never`.
+        let divergent_intersection = IntersectionBuilder::new(&db)
             .add_positive(div)
-            .add_negative(Type::AlwaysFalsy)
+            .add_positive(todo_type!("2"))
+            .add_negative(todo_type!("3"))
             .build();
-
-        let union = UnionType::from_elements(&db, [Type::unknown(), truthy_div]);
-        assert!(!truthy_div.is_redundant_with(&db, Type::unknown()));
-        assert_eq!(
-            union.display(&db).to_string(),
-            "Unknown | (Divergent & ~AlwaysFalsy)"
-        );
-
-        let union = UnionType::from_elements(&db, [truthy_div, Type::unknown()]);
-        assert!(!Type::unknown().is_redundant_with(&db, truthy_div));
-        assert_eq!(
-            union.display(&db).to_string(),
-            "(Divergent & ~AlwaysFalsy) | Unknown"
-        );
+        assert_eq!(divergent_intersection, div);
+        let divergent_intersection = IntersectionBuilder::new(&db)
+            .add_positive(todo_type!("2"))
+            .add_negative(todo_type!("3"))
+            .add_positive(div)
+            .build();
+        assert_eq!(divergent_intersection, div);
+        let divergent_never_intersection = IntersectionBuilder::new(&db)
+            .add_positive(div)
+            .add_positive(Type::Never)
+            .build();
+        assert_eq!(divergent_never_intersection, Type::Never);
+        let divergent_never_intersection = IntersectionBuilder::new(&db)
+            .add_positive(Type::Never)
+            .add_positive(div)
+            .build();
+        assert_eq!(divergent_never_intersection, Type::Never);
 
         // The `object` type has a good convergence property, that is, its union with all other types is `object`.
         // (e.g. `object | tuple[Divergent] == object`, `object | tuple[object] == object`)

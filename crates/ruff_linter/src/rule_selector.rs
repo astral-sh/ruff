@@ -35,6 +35,15 @@ pub enum RuleSelector {
     },
 }
 
+impl RuleSelector {
+    pub(crate) const fn rule(prefix: RuleCodePrefix) -> Self {
+        Self::Rule {
+            prefix,
+            redirected_from: None,
+        }
+    }
+}
+
 impl From<Linter> for RuleSelector {
     fn from(linter: Linter) -> Self {
         Self::Linter(linter)

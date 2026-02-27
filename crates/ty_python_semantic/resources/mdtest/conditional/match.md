@@ -435,3 +435,76 @@ def _(answer: Answer | None):
     x = Foo()
     reveal_type(x)  # revealed: Foo
 ```
+
+## Invalid class patterns
+
+For class patterns, the runtime first checks that the match pattern is an instance of `type`, and
+then uses `isinstance` to check the match.
+
+If the match pattern is not an instance of `type`, we raise a diagnostic:
+
+```py
+from typing import Any
+from ty_extensions import Intersection
+
+def _(val, Valid1: type | Any, Valid2: Intersection[type, Any], Valid3: type[Any], Valid4: type[int]):
+    Invalid1 = "foo"
+
+    match val:
+        # error: [invalid-match-pattern] "`Literal["foo"]` cannot be used in a class pattern because it is not a type"
+        case Invalid1(): ...
+
+    Invalid2 = int | str
+
+    match val:
+        # error: [invalid-match-pattern] "`<types.UnionType special-form 'int | str'>` cannot be used in a class pattern because it is not a type"
+        case Invalid2():
+            pass
+        case Valid1():  # fine
+            pass
+        case Valid2():  # fine
+            pass
+        case Valid3():  # fine
+            pass
+        case Valid4():  # fine
+            pass
+```
+
+We also raise a diagnostic if the class cannot be used with `isinstance`:
+
+```py
+from typing import Any, TypedDict
+
+def _(val):
+    Invalid3 = Any
+
+    match val:
+        # TODO: this should be an `invalid-match-pattern` error
+        case Invalid3(): ...
+
+    class Invalid4(TypedDict): ...
+
+    match val:
+        # TODO: this could have the `invalid-match-pattern` error code instead.
+        # error: [isinstance-against-typed-dict] "`TypedDict` class `Invalid4` cannot be used in a class pattern"
+        case Invalid4(): ...
+```
+
+We do not raise a diagnostic for dynamic types:
+
+```py
+def _(val, UnknownSymbol):
+    reveal_type(UnknownSymbol)  # revealed: Unknown
+
+    match val:
+        case UnknownSymbol(): ...
+```
+
+We also do not raise a diagnostic if the match pattern is a non-statically known instance of `type`:
+
+```py
+def _(val, IntOrStr: type[int | str]):
+    match val:
+        case IntOrStr():
+            print(f"Matched as {IntOrStr}: {val!r}")
+```

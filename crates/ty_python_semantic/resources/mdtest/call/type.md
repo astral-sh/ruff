@@ -594,6 +594,17 @@ class Y(C, B): ...
 Conflict = type("Conflict", (X, Y), {})
 ```
 
+## Cyclic base class MRO
+
+A dynamic class inheriting from a static class with a cyclic MRO also produces an error:
+
+```pyi
+class Cyclic(Cyclic): ...  # error: [cyclic-class-definition]
+
+# error: [cyclic-class-definition]
+CyclicChild = type("CyclicChild", (Cyclic,), {})
+```
+
 ## `inconsistent-mro` errors with autofixes
 
 A common cause of "inconsistent MRO" errors is where a class inherits from `Generic[]`, but
@@ -785,12 +796,58 @@ Y = type("Y", bases, {})
 
 ## Cyclic functional class definitions
 
+### Self-referential
+
 Self-referential class definitions using `type()` are detected. The name being defined is referenced
 in the bases tuple before it's available:
 
 ```pyi
 # error: [unresolved-reference] "Name `X` used when not defined"
 X = type("X", (X,), {})
+```
+
+### No string literal bases
+
+String literals directly in the bases tuple are not valid class bases:
+
+```py
+# error: [invalid-base] "Invalid class base with type `Literal["X"]`"
+X = type("X", ("X",), {})
+```
+
+### Forward references via string annotations
+
+However, forward references via string annotations are supported, similar to regular class
+definitions. This works with `NamedTuple` where field annotations can be forward references:
+
+```py
+from typing import NamedTuple
+
+# Forward reference in NamedTuple field annotation
+X = type("X", (NamedTuple("NT", [("field", "X | int")]),), {})
+reveal_type(X)  # revealed: <class 'X'>
+```
+
+### Static class inheriting from dynamic class with forward ref
+
+Forward references also work when a static class inherits from a dynamic class that references it:
+
+```py
+from typing import NamedTuple
+
+# Static class inheriting from dynamic class with forward ref back to static class
+class Y(type("X", (NamedTuple("NT", [("field", "Y | int")]),), {})): ...
+
+reveal_type(Y)  # revealed: <class 'Y'>
+```
+
+Forward references via subscript annotations on generic bases are supported:
+
+```py
+# Forward reference to X via subscript annotation in tuple base
+# (This fails at runtime, but we should handle it without panicking)
+X = type("X", (tuple["X | None"],), {})
+reveal_type(X)  # revealed: <class 'X'>
 ```
 
 ## Dynamic class names (non-literal strings)
@@ -953,7 +1010,7 @@ Dynamic classes cannot directly inherit from `Generic`, `Protocol`, or `TypedDic
 forms require class syntax for their semantics to be properly applied:
 
 ```py
-from typing import Generic, Protocol, TypeVar
+from typing import Generic, NamedTuple, Protocol, TypeVar
 from typing_extensions import TypedDict
 
 T = TypeVar("T")
@@ -966,6 +1023,19 @@ ProtocolClass = type("ProtocolClass", (Protocol,), {})
 
 # error: [invalid-base] "Invalid base for class created via `type()`"
 TypedDictClass = type("TypedDictClass", (TypedDict,), {})
+
+# error: [invalid-base] "Invalid class base with type `<special-form 'typing.NamedTuple'>`"
+NamedTupleClass = type("NamedTupleClass", (NamedTuple,), {"x": int})
+```
+
+`NamedTuple` is also not allowed as a base for dynamic classes, since creating a NamedTuple requires
+class syntax for the field declarations to be properly processed:
+
+```py
+from typing import NamedTuple
+
+# error: [invalid-base] "Invalid class base with type `<special-form 'typing.NamedTuple'>`"
+NT = type("NT", (NamedTuple,), {})
 ```
 
 ### Protocol bases
@@ -979,7 +1049,7 @@ from ty_extensions import reveal_mro
 class MyProtocol(Protocol):
     def method(self) -> int: ...
 
-ProtoImpl = type("ProtoImpl", (MyProtocol,), {})
+ProtoImpl = type("ProtoImpl", (MyProtocol,), {"method": lambda self: 42})
 reveal_type(ProtoImpl)  # revealed: <class 'ProtoImpl'>
 reveal_mro(ProtoImpl)  # revealed: (<class 'ProtoImpl'>, <class 'MyProtocol'>, typing.Protocol, typing.Generic, <class 'object'>)
 
@@ -1126,4 +1196,36 @@ class Base: ...
 FinalDerived = final(type("FinalDerived", (Base,), {}))
 
 class Child2(FinalDerived): ...
+```
+
+## Calling `type` via unannotated parameter
+
+When `type` is captured as an unannotated parameter default (a common Python optimization pattern),
+the parameter type is inferred as `Unknown | type[type]`. This union bypasses the early-return guard
+for `type()` calls, but should not panic.
+
+```py
+def _check_type_strict(obj, t, type=type, tuple=tuple):
+    if type(t) is tuple:
+        return type(obj) in t
+    else:
+        return type(obj) is t
+```
+
+## Three-argument `type()` in a union
+
+When `type` is one member of a union, three-argument `type()` calls go through normal call binding
+instead of the early-return path, so dynamic class creation is missed.
+
+```py
+def f(flag: bool):
+    if flag:
+        x = type
+    else:
+        x = int
+
+    # TODO: should be `type[MyClass] | int`, but the `type` arm misses dynamic class creation
+    # because the early-return guard only matches `ClassLiteral`, not union members.
+    MyClass = x("MyClass", (), {})  # error: [no-matching-overload]
+    reveal_type(MyClass)  # revealed: type | Unknown
 ```

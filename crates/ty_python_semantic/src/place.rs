@@ -5,19 +5,21 @@ use ty_module_resolver::{
 };
 
 use crate::dunder_all::dunder_all_names;
-use crate::semantic_index::definition::{Definition, DefinitionState};
+use crate::semantic_index::definition::{Definition, DefinitionKind, DefinitionState};
+use crate::semantic_index::narrowing_constraints::ScopedNarrowingConstraint;
 use crate::semantic_index::place::{PlaceExprRef, ScopedPlaceId};
 use crate::semantic_index::scope::ScopeId;
 use crate::semantic_index::{
-    BindingWithConstraints, BindingWithConstraintsIterator, DeclarationsIterator, place_table,
+    BindingWithConstraints, BindingWithConstraintsIterator, DeclarationsIterator, get_loop_header,
+    place_table,
 };
 use crate::semantic_index::{DeclarationWithConstraint, global_scope, use_def_map};
 use crate::types::{
     ApplyTypeMappingVisitor, DynamicType, KnownClass, MaterializationKind, MemberLookupPolicy,
     Truthiness, Type, TypeAndQualifiers, TypeQualifiers, UnionBuilder, UnionType, binding_type,
-    declaration_type, todo_type,
+    declaration_type,
 };
-use crate::{Db, FxOrderSet, Program};
+use crate::{Db, FxIndexSet, FxOrderSet, Program};
 
 pub(crate) use implicit_globals::{
     module_type_implicit_global_declaration, module_type_implicit_global_symbol,
@@ -174,13 +176,6 @@ impl<'db> Place<'db> {
         Place::Defined(DefinedPlace::new(ty.into()).with_origin(TypeOrigin::Declared))
     }
 
-    /// Constructor that creates a [`Place`] with a [`crate::types::TodoType`] type
-    /// and definedness [`Definedness::AlwaysDefined`].
-    #[allow(unused_variables)] // Only unused in release builds
-    pub(crate) fn todo(message: &'static str) -> Self {
-        Place::Defined(DefinedPlace::new(todo_type!(message)))
-    }
-
     pub(crate) fn is_undefined(&self) -> bool {
         matches!(self, Place::Undefined)
     }
@@ -267,7 +262,7 @@ impl<'db> Place<'db> {
 
             Place::Defined(defined) => {
                 if let Some((dunder_get_return_ty, _)) =
-                    defined.ty.try_call_dunder_get(db, Type::none(db), owner)
+                    defined.ty.try_call_dunder_get(db, None, owner)
                 {
                     Place::Defined(DefinedPlace {
                         ty: dunder_get_return_ty,
@@ -675,17 +670,6 @@ pub(crate) struct PlaceAndQualifiers<'db> {
 }
 
 impl<'db> PlaceAndQualifiers<'db> {
-    /// Constructor that creates a [`PlaceAndQualifiers`] instance with a [`TodoType`] type
-    /// and no qualifiers.
-    ///
-    /// [`TodoType`]: crate::types::TodoType
-    pub(crate) fn todo(message: &'static str) -> Self {
-        Self {
-            place: Place::todo(message),
-            qualifiers: TypeQualifiers::empty(),
-        }
-    }
-
     pub(crate) fn unbound() -> Self {
         Self::default()
     }
@@ -1170,6 +1154,122 @@ fn place_impl<'db>(
         .unwrap_or_default()
 }
 
+/// Pre-computed reachability analysis for loop-back bindings in a loop header.
+#[salsa::tracked(
+    cycle_initial=|db, _, definition| loop_header_reachability_impl(db, definition, true),
+    cycle_fn=loop_header_reachability_cycle_recover,
+    heap_size = ruff_memory_usage::heap_size,
+)]
+pub(crate) fn loop_header_reachability<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+) -> LoopHeaderReachability<'db> {
+    loop_header_reachability_impl(db, definition, false)
+}
+
+fn loop_header_reachability_cycle_recover<'db>(
+    _db: &'db dyn Db,
+    _cycle: &salsa::Cycle,
+    previous: &LoopHeaderReachability<'db>,
+    result: LoopHeaderReachability<'db>,
+    _definition: Definition<'db>,
+) -> LoopHeaderReachability<'db> {
+    result.cycle_normalized(previous)
+}
+
+fn loop_header_reachability_impl<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+    is_cycle_initial: bool,
+) -> LoopHeaderReachability<'db> {
+    let DefinitionKind::LoopHeader(loop_header_definition) = definition.kind(db) else {
+        unreachable!("`loop_header_reachability` called with non-loop-header definition");
+    };
+
+    let scope = definition.scope(db);
+    let use_def = use_def_map(db, scope);
+    let loop_header = get_loop_header(db, loop_header_definition.loop_token());
+    let place = loop_header_definition.place();
+
+    let mut has_defined_bindings = false;
+    let mut deleted_reachability = Truthiness::AlwaysFalse;
+    let mut reachable_bindings = FxIndexSet::default();
+
+    for live_binding in loop_header.bindings_for_place(place) {
+        let reachability = if is_cycle_initial {
+            Truthiness::Ambiguous
+        } else {
+            use_def.evaluate_reachability(db, live_binding.reachability_constraint)
+        };
+        // Skip unreachable bindings.
+        if reachability.is_always_false() {
+            continue;
+        }
+
+        match use_def.definition(live_binding.binding) {
+            DefinitionState::Defined(def) => {
+                has_defined_bindings = true;
+                if def != definition {
+                    reachable_bindings.insert(ReachableLoopBinding {
+                        definition: def,
+                        narrowing_constraint: live_binding.narrowing_constraint,
+                    });
+                }
+            }
+            // `del` in the loop body is always visible to code after the loop via the
+            // normal control flow merge. Updating `deleted_reachability` here is
+            // necessary for prior uses in the loop to see it.
+            DefinitionState::Deleted => {
+                deleted_reachability = deleted_reachability.or(reachability);
+            }
+            // If UNBOUND is visible at loop-back, then it was visible before the loop.
+            // Loop header definitions don't shadow preexisting bindings, so we don't
+            // need to do anything with this.
+            DefinitionState::Undefined => {}
+        }
+    }
+
+    LoopHeaderReachability {
+        has_defined_bindings,
+        deleted_reachability,
+        reachable_bindings,
+    }
+}
+
+/// Result of [`loop_header_reachability`]: pre-computed reachability info for loop-back bindings.
+#[derive(Debug, Clone, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+pub(crate) struct LoopHeaderReachability<'db> {
+    /// Whether any reachable loop-back binding is a defined binding.
+    pub(crate) has_defined_bindings: bool,
+    pub(crate) deleted_reachability: Truthiness,
+    /// Reachable, defined loop-back bindings (excluding the loop header definition itself).
+    pub(crate) reachable_bindings: FxIndexSet<ReachableLoopBinding<'db>>,
+}
+
+impl<'db> LoopHeaderReachability<'db> {
+    fn cycle_normalized(
+        self,
+        previous: &LoopHeaderReachability<'db>,
+    ) -> LoopHeaderReachability<'db> {
+        let mut reachable_bindings = FxIndexSet::default();
+        reachable_bindings.extend(previous.reachable_bindings.iter().copied());
+        reachable_bindings.extend(self.reachable_bindings);
+
+        LoopHeaderReachability {
+            has_defined_bindings: self.has_defined_bindings,
+            deleted_reachability: self.deleted_reachability,
+            reachable_bindings,
+        }
+    }
+}
+
+/// A single reachable loop-back binding with its narrowing constraint.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+pub(crate) struct ReachableLoopBinding<'db> {
+    pub(crate) definition: Definition<'db>,
+    pub(crate) narrowing_constraint: ScopedNarrowingConstraint,
+}
+
 /// Implementation of [`place_from_bindings`].
 ///
 /// ## Implementation Note
@@ -1209,6 +1309,7 @@ fn place_from_bindings_impl<'db>(
     };
 
     let mut first_definition = None;
+    let mut only_loop_header_bindings = true;
 
     let mut types = bindings_with_constraints.filter_map(
         |BindingWithConstraints {
@@ -1290,6 +1391,23 @@ fn place_from_bindings_impl<'db>(
                 return None;
             }
 
+            // We need to "look through" loop header definitions to do boundness analysis. The
+            // actual type is computed by `infer_loop_header_definition` via `binding_type` below,
+            // like all other bindings, so that it can participate in fixpoint iteration.
+            if binding.kind(db).is_loop_header() {
+                let loop_header = loop_header_reachability(db, binding);
+                deleted_reachability = deleted_reachability.or(loop_header.deleted_reachability);
+                // If all the bindings in the loop are in statically false branches, it might be
+                // that none of them loop-back. In that case short-circuit, so that we don't
+                // produce an `Unknown` fallback type, and so that `Place::Undefined` is still a
+                // possibility below.
+                if !loop_header.has_defined_bindings {
+                    return None;
+                }
+            } else {
+                only_loop_header_bindings = false;
+            }
+
             first_definition.get_or_insert(binding);
             let binding_ty = binding_type(db, binding);
             Some(narrowing_constraint.narrow(db, binding_ty, binding.place(db)))
@@ -1314,6 +1432,12 @@ fn place_from_bindings_impl<'db>(
         let boundness = match boundness_analysis {
             BoundnessAnalysis::AssumeBound => Definedness::AlwaysDefined,
             BoundnessAnalysis::BasedOnUnboundVisibility => match unbound_visibility() {
+                Some(Truthiness::AlwaysTrue) if only_loop_header_bindings => {
+                    // Loop header definitions don't shadow prior bindings, so UNBOUND can still be
+                    // definitely-visible alongside a loop header binding. See "Use with loop
+                    // header and also `UNBOUND` definitely visible" in `while_loop.md`.
+                    Definedness::PossiblyUndefined
+                }
                 Some(Truthiness::AlwaysTrue) => {
                     unreachable!(
                         "If we have at least one binding, the implicit `unbound` binding should not be definitely visible"
@@ -1922,8 +2046,8 @@ mod tests {
         use TypeOrigin::Inferred;
 
         let db = setup_db();
-        let ty1 = Type::IntLiteral(1);
-        let ty2 = Type::IntLiteral(2);
+        let ty1 = Type::int_literal(1);
+        let ty2 = Type::int_literal(2);
 
         let unbound = || PlaceAndQualifiers::default();
 

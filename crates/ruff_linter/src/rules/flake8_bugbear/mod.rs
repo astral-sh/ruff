@@ -8,13 +8,14 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
+    use ruff_db::diagnostic::DiagnosticTag;
     use test_case::test_case;
 
     use crate::assert_diagnostics;
     use crate::registry::Rule;
 
     use crate::settings::LinterSettings;
-    use crate::test::test_path;
+    use crate::test::{test_path, test_snippet};
 
     use crate::settings::types::PreviewMode;
     use ruff_python_ast::PythonVersion;
@@ -211,5 +212,38 @@ mod tests {
         )?;
         assert_diagnostics!(snapshot, diagnostics);
         Ok(())
+    }
+
+    #[test]
+    fn b007_unnecessary_tag_only_for_certain_cases() {
+        let settings = LinterSettings::for_rule(Rule::UnusedLoopControlVariable);
+
+        let certain = test_snippet(
+            r"
+for i in range(3):
+    print(1)
+",
+            &settings,
+        );
+        assert_eq!(certain.len(), 1);
+        assert!(
+            certain[0]
+                .primary_tags()
+                .is_some_and(|tags| tags.contains(&DiagnosticTag::Unnecessary))
+        );
+
+        let uncertain = test_snippet(
+            r"
+for i in range(3):
+    print(locals())
+",
+            &settings,
+        );
+        assert_eq!(uncertain.len(), 1);
+        assert!(
+            !uncertain[0]
+                .primary_tags()
+                .is_some_and(|tags| tags.contains(&DiagnosticTag::Unnecessary))
+        );
     }
 }

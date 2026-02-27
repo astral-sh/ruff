@@ -49,9 +49,9 @@ within a string.  Escaped quotation marks, nested semicolons, and other
 such trickeries do not confuse it.
 
    >>> C = cookies.SimpleCookie()
-   >>> C.load('keebler="E=everybody; L=\\\\"Loves\\\\"; fudge=\\\\012;";')
+   >>> C.load('keebler="E=everybody; L=\\\\"Loves\\\\"; fudge=;";')
    >>> print(C)
-   Set-Cookie: keebler="E=everybody; L=\\"Loves\\"; fudge=\\012;"
+   Set-Cookie: keebler="E=everybody; L=\\"Loves\\"; fudge=;"
 
 Each element of the Cookie also supports all of the RFC 2109
 Cookie attributes.  Here's an example which sets the Path

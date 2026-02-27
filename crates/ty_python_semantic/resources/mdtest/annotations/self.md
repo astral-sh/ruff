@@ -860,7 +860,7 @@ bound at `C.f`.
 from typing import Self
 from ty_extensions import generic_context
 
-class C[T]():
+class C[T]():  # fmt:skip
     def f(self: Self):
         def b(x: Self):
             reveal_type(x)  # revealed: Self@f

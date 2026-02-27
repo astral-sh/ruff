@@ -22,45 +22,47 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/loops/for.md
  7 |         if flag:
  8 |             def __getitem__(self, item: int) -> str:
  9 |                 return "foo"
-10 |         else:
-11 |             __getitem__: None = None
-12 | 
-13 |         if flag2:
-14 |             def __iter__(self) -> Iterator:
-15 |                 return Iterator()
-16 | 
-17 |     class Iterable2:
-18 |         if flag:
-19 |             def __getitem__(self, item: int) -> str:
-20 |                 return "foo"
-21 |         else:
-22 |             def __getitem__(self, item: str) -> int:
-23 |                 return 42
-24 |         if flag2:
-25 |             def __iter__(self) -> Iterator:
-26 |                 return Iterator()
-27 | 
-28 |     # error: [not-iterable]
-29 |     for x in Iterable1():
-30 |         # TODO: `bytes | str` might be better
-31 |         reveal_type(x)  # revealed: bytes | str | Unknown
-32 | 
-33 |     # error: [not-iterable]
-34 |     for y in Iterable2():
-35 |         reveal_type(y)  # revealed: bytes | str | int
+10 | 
+11 |         else:
+12 |             __getitem__: None = None
+13 | 
+14 |         if flag2:
+15 |             def __iter__(self) -> Iterator:
+16 |                 return Iterator()
+17 | 
+18 |     class Iterable2:
+19 |         if flag:
+20 |             def __getitem__(self, item: int) -> str:
+21 |                 return "foo"
+22 | 
+23 |         else:
+24 |             def __getitem__(self, item: str) -> int:
+25 |                 return 42
+26 |         if flag2:
+27 |             def __iter__(self) -> Iterator:
+28 |                 return Iterator()
+29 | 
+30 |     # error: [not-iterable]
+31 |     for x in Iterable1():
+32 |         # TODO: `bytes | str` might be better
+33 |         reveal_type(x)  # revealed: bytes | str | Unknown
+34 | 
+35 |     # error: [not-iterable]
+36 |     for y in Iterable2():
+37 |         reveal_type(y)  # revealed: bytes | str | int
 ```
 
 # Diagnostics
 
 ```
 error[not-iterable]: Object of type `Iterable1` may not be iterable
-  --> src/mdtest_snippet.py:29:14
+  --> src/mdtest_snippet.py:31:14
    |
-28 |     # error: [not-iterable]
-29 |     for x in Iterable1():
+30 |     # error: [not-iterable]
+31 |     for x in Iterable1():
    |              ^^^^^^^^^^^
-30 |         # TODO: `bytes | str` might be better
-31 |         reveal_type(x)  # revealed: bytes | str | Unknown
+32 |         # TODO: `bytes | str` might be better
+33 |         reveal_type(x)  # revealed: bytes | str | Unknown
    |
 info: It may not have an `__iter__` method and its `__getitem__` attribute (with type `(bound method Iterable1.__getitem__(item: int) -> str) | None`) may not be callable
 info: rule `not-iterable` is enabled by default
@@ -69,12 +71,12 @@ info: rule `not-iterable` is enabled by default
 
 ```
 error[not-iterable]: Object of type `Iterable2` may not be iterable
-  --> src/mdtest_snippet.py:34:14
+  --> src/mdtest_snippet.py:36:14
    |
-33 |     # error: [not-iterable]
-34 |     for y in Iterable2():
+35 |     # error: [not-iterable]
+36 |     for y in Iterable2():
    |              ^^^^^^^^^^^
-35 |         reveal_type(y)  # revealed: bytes | str | int
+37 |         reveal_type(y)  # revealed: bytes | str | int
    |
 info: It may not have an `__iter__` method and its `__getitem__` method (with type `(bound method Iterable2.__getitem__(item: int) -> str) | (bound method Iterable2.__getitem__(item: str) -> int)`) may have an incorrect signature for the old-style iteration protocol
 info: `__getitem__` must be at least as permissive as `def __getitem__(self, key: int): ...` to satisfy the old-style iteration protocol

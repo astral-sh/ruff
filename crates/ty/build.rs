@@ -92,7 +92,7 @@ fn commit_info(git_dir: &Path, workspace_root: &Path, is_ruff: bool) {
     let stdout = String::from_utf8(output.stdout).unwrap();
     let mut parts = stdout.split_whitespace();
     let mut next = || parts.next().unwrap();
-    let _commit_hash = next();
+    println!("cargo::rustc-env=TY_COMMIT_HASH={}", next());
     println!("cargo::rustc-env=TY_COMMIT_SHORT_HASH={}", next());
     println!("cargo::rustc-env=TY_COMMIT_DATE={}", next());
 

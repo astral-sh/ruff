@@ -557,16 +557,10 @@ impl<'db> BoundSuperType<'db> {
                     }
                 }
             }
-            Type::BooleanLiteral(_) | Type::TypeIs(_) | Type::TypeGuard(_) => {
+            Type::TypeIs(_) | Type::TypeGuard(_) => {
                 return delegate_to(KnownClass::Bool.to_instance(db));
             }
-            Type::IntLiteral(_) => return delegate_to(KnownClass::Int.to_instance(db)),
-            Type::StringLiteral(_) | Type::LiteralString => {
-                return delegate_to(KnownClass::Str.to_instance(db));
-            }
-            Type::BytesLiteral(_) => {
-                return delegate_to(KnownClass::Bytes.to_instance(db));
-            }
+            Type::LiteralValue(literal) => return delegate_to(literal.fallback_instance(db)),
             Type::SpecialForm(special_form) => {
                 return delegate_to(special_form.instance_fallback(db));
             }
@@ -588,9 +582,6 @@ impl<'db> BoundSuperType<'db> {
             }
             Type::GenericAlias(_) => return delegate_to(KnownClass::GenericAlias.to_instance(db)),
             Type::PropertyInstance(_) => return delegate_to(KnownClass::Property.to_instance(db)),
-            Type::EnumLiteral(enum_literal_type) => {
-                return delegate_to(enum_literal_type.enum_class_instance(db));
-            }
             Type::BoundSuper(_) => return delegate_to(KnownClass::Super.to_instance(db)),
             Type::TypedDict(td) => {
                 // In general it isn't sound to upcast a `TypedDict` to a `dict`,
@@ -691,13 +682,7 @@ impl<'db> BoundSuperType<'db> {
             // Also, invoking a descriptor on a dynamic attribute is meaningless, so we don't handle this.
             SuperOwnerKind::Dynamic(_) => None,
             SuperOwnerKind::Class(_) => Some(
-                Type::try_call_dunder_get_on_attribute(
-                    db,
-                    attribute,
-                    Type::none(db),
-                    owner.owner_type(db),
-                )
-                .0,
+                Type::try_call_dunder_get_on_attribute(db, attribute, None, owner.owner_type(db)).0,
             ),
             SuperOwnerKind::Instance(_) | SuperOwnerKind::InstanceTypeVar(..) => {
                 let owner_type = owner.owner_type(db);
@@ -705,7 +690,7 @@ impl<'db> BoundSuperType<'db> {
                     Type::try_call_dunder_get_on_attribute(
                         db,
                         attribute,
-                        owner_type,
+                        Some(owner_type),
                         owner_type.to_meta_type(db),
                     )
                     .0,
@@ -713,15 +698,7 @@ impl<'db> BoundSuperType<'db> {
             }
             SuperOwnerKind::ClassTypeVar(..) => {
                 let owner_type = owner.owner_type(db);
-                Some(
-                    Type::try_call_dunder_get_on_attribute(
-                        db,
-                        attribute,
-                        Type::none(db),
-                        owner_type,
-                    )
-                    .0,
-                )
+                Some(Type::try_call_dunder_get_on_attribute(db, attribute, None, owner_type).0)
             }
         }
     }

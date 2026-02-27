@@ -11,13 +11,14 @@ use crate::types::diagnostic::{
 use crate::types::generics::bind_typevar;
 use crate::types::infer::builder::InnerExpressionInferenceState;
 use crate::types::signatures::Signature;
+use crate::types::special_form::{AliasSpec, LegacyStdlibAlias};
 use crate::types::string_annotation::parse_string_annotation;
 use crate::types::tuple::{TupleSpecBuilder, TupleType};
 use crate::types::{
     BindingContext, CallableType, DynamicType, GenericContext, IntersectionBuilder, KnownClass,
-    KnownInstanceType, LintDiagnosticGuard, Parameter, Parameters, SpecialFormType, SubclassOfType,
-    Type, TypeAliasType, TypeContext, TypeGuardType, TypeIsType, TypeMapping, TypeVarKind,
-    UnionBuilder, UnionType, any_over_type, todo_type,
+    KnownInstanceType, LintDiagnosticGuard, LiteralValueTypeKind, Parameter, Parameters,
+    SpecialFormType, SubclassOfType, Type, TypeAliasType, TypeContext, TypeGuardType, TypeIsType,
+    TypeMapping, TypeVarKind, UnionBuilder, UnionType, any_over_type, todo_type,
 };
 
 /// Type expressions
@@ -1023,7 +1024,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             self.context.report_lint(&NOT_SUBSCRIPTABLE, subscript)
                         {
                             let mut diagnostic =
-                                builder.into_diagnostic("Cannot subscript non-generic type alias");
+                                builder.into_diagnostic("Cannot specialize non-generic type alias");
                             diagnostic.set_primary_message("Double specialization is not allowed");
                         }
                         return Type::unknown();
@@ -1052,14 +1053,22 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             if let Some(builder) =
                                 self.context.report_lint(&NOT_SUBSCRIPTABLE, subscript)
                             {
+                                let mut diagnostic = builder.into_diagnostic(format_args!(
+                                    "Cannot specialize non-generic type alias `{}`",
+                                    type_alias.name(self.db())
+                                ));
+                                let secondary = self.context.secondary(&*subscript.value);
                                 let value_type = type_alias.raw_value_type(self.db());
-                                let mut diagnostic = builder
-                                    .into_diagnostic("Cannot subscript non-generic type alias");
-                                if value_type.is_definition_generic(self.db()) {
-                                    diagnostic.set_primary_message(format_args!(
-                                        "`{}` is already specialized",
-                                        value_type.display(self.db()),
-                                    ));
+                                if value_type.is_specialized_generic(self.db()) {
+                                    diagnostic.annotate(secondary.message(format_args!(
+                                        "Alias to `{}`, which is already specialized",
+                                        value_type.display(self.db())
+                                    )));
+                                } else {
+                                    diagnostic.annotate(secondary.message(format_args!(
+                                        "Alias to `{}`, which is not generic",
+                                        value_type.display(self.db())
+                                    )));
                                 }
                             }
 
@@ -1180,7 +1189,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             Type::GenericAlias(_) => {
                 self.infer_explicit_type_alias_specialization(subscript, value_ty, true)
             }
-            Type::StringLiteral(_) => {
+            Type::LiteralValue(literal) if literal.is_string() => {
                 self.infer_type_expression(slice);
                 // For stringified TypeAlias; remove once properly supported
                 todo_type!("string literal subscripted in type expression")
@@ -1213,9 +1222,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     fn infer_parameterized_legacy_typing_alias(
         &mut self,
         subscript_node: &ast::ExprSubscript,
-        expected_arg_count: usize,
-        alias: SpecialFormType,
-        class: KnownClass,
+        alias: LegacyStdlibAlias,
     ) -> Type<'db> {
         let arguments = &*subscript_node.slice;
         let args = if let ast::Expr::Tuple(t) = arguments {
@@ -1223,15 +1230,21 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         } else {
             std::slice::from_ref(arguments)
         };
-        if args.len() != expected_arg_count {
+
+        let AliasSpec {
+            class,
+            expected_argument_number,
+        } = alias.alias_spec();
+
+        if args.len() != expected_argument_number {
             if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript_node) {
-                let noun = if expected_arg_count == 1 {
+                let noun = if expected_argument_number == 1 {
                     "argument"
                 } else {
                     "arguments"
                 };
                 builder.into_diagnostic(format_args!(
-                    "Legacy alias `{alias}` expected exactly {expected_arg_count} {noun}, \
+                    "Legacy alias `{alias}` expected exactly {expected_argument_number} {noun}, \
                     got {}",
                     args.len()
                 ));
@@ -1301,7 +1314,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         callable_type
     }
 
-    pub(crate) fn infer_parameterized_special_form_type_expression(
+    fn infer_parameterized_special_form_type_expression(
         &mut self,
         subscript: &ast::ExprSubscript,
         special_form: SpecialFormType,
@@ -1532,70 +1545,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
                 callable_type
             }
-
-            SpecialFormType::ChainMap => self.infer_parameterized_legacy_typing_alias(
-                subscript,
-                2,
-                SpecialFormType::ChainMap,
-                KnownClass::ChainMap,
-            ),
-            SpecialFormType::OrderedDict => self.infer_parameterized_legacy_typing_alias(
-                subscript,
-                2,
-                SpecialFormType::OrderedDict,
-                KnownClass::OrderedDict,
-            ),
-            SpecialFormType::Dict => self.infer_parameterized_legacy_typing_alias(
-                subscript,
-                2,
-                SpecialFormType::Dict,
-                KnownClass::Dict,
-            ),
-            SpecialFormType::List => self.infer_parameterized_legacy_typing_alias(
-                subscript,
-                1,
-                SpecialFormType::List,
-                KnownClass::List,
-            ),
-            SpecialFormType::DefaultDict => self.infer_parameterized_legacy_typing_alias(
-                subscript,
-                2,
-                SpecialFormType::DefaultDict,
-                KnownClass::DefaultDict,
-            ),
-            SpecialFormType::Counter => self.infer_parameterized_legacy_typing_alias(
-                subscript,
-                1,
-                SpecialFormType::Counter,
-                KnownClass::Counter,
-            ),
-            SpecialFormType::Set => self.infer_parameterized_legacy_typing_alias(
-                subscript,
-                1,
-                SpecialFormType::Set,
-                KnownClass::Set,
-            ),
-            SpecialFormType::FrozenSet => self.infer_parameterized_legacy_typing_alias(
-                subscript,
-                1,
-                SpecialFormType::FrozenSet,
-                KnownClass::FrozenSet,
-            ),
-            SpecialFormType::Deque => self.infer_parameterized_legacy_typing_alias(
-                subscript,
-                1,
-                SpecialFormType::Deque,
-                KnownClass::Deque,
-            ),
-
-            SpecialFormType::ClassVar
-            | SpecialFormType::Final
-            | SpecialFormType::Required
-            | SpecialFormType::NotRequired
-            | SpecialFormType::ReadOnly => {
+            SpecialFormType::LegacyStdlibAlias(alias) => {
+                self.infer_parameterized_legacy_typing_alias(subscript, alias)
+            }
+            SpecialFormType::TypeQualifier(qualifier) => {
                 if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                     let diag = builder.into_diagnostic(format_args!(
-                        "Type qualifier `{special_form}` is not allowed in type expressions \
+                        "Type qualifier `{qualifier}` is not allowed in type expressions \
                          (only in annotation expressions)",
                     ));
                     diagnostic::add_type_expression_reference_link(diag);
@@ -1632,9 +1588,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     self.infer_type_expression(arguments_slice);
 
                     if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
-                        let diag = builder.into_diagnostic(format_args!(
+                        let diag = builder.into_diagnostic(
                             "Special form `typing.TypeGuard` expected exactly one type parameter",
-                        ));
+                        );
                         diagnostic::add_type_expression_reference_link(diag);
                     }
 
@@ -1721,10 +1677,17 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         .copied();
 
                     let probably_meant_literal = argument_elements.all(|ty| match ty {
-                        Type::StringLiteral(_)
-                        | Type::BytesLiteral(_)
-                        | Type::EnumLiteral(_)
-                        | Type::BooleanLiteral(_) => true,
+                        Type::LiteralValue(literal)
+                            if matches!(
+                                literal.kind(),
+                                LiteralValueTypeKind::String(_)
+                                    | LiteralValueTypeKind::Bytes(_)
+                                    | LiteralValueTypeKind::Enum(_)
+                                    | LiteralValueTypeKind::Bool(_)
+                            ) =>
+                        {
+                            true
+                        }
                         Type::NominalInstance(instance) => {
                             instance.has_known_class(db, KnownClass::NoneType)
                         }
@@ -1762,7 +1725,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         &mut self,
         parameters: &'param ast::Expr,
     ) -> Result<Type<'db>, Vec<&'param ast::Expr>> {
-        Ok(match parameters {
+        let ty = match parameters {
             ast::Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
                 let value_ty = self.infer_expression(value, TypeContext::default());
                 if matches!(value_ty, Type::SpecialForm(SpecialFormType::Literal)) {
@@ -1814,6 +1777,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             literal @ ast::Expr::NumberLiteral(number) if number.value.is_int() => {
                 self.infer_expression(literal, TypeContext::default())
             }
+
             // for negative and positive numbers
             ast::Expr::UnaryOp(u)
                 if matches!(u.op, ast::UnaryOp::USub | ast::UnaryOp::UAdd)
@@ -1838,8 +1802,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         return Ok(ty.inner(self.db()));
                     }
                     // `Literal[SomeEnum.Member]`
-                    Type::EnumLiteral(_) => {
-                        return Ok(subscript_ty);
+                    Type::LiteralValue(literal) if literal.is_enum() => {
+                        // Avoid promoting values originating from an explicitly annotated literal type.
+                        return Ok(Type::LiteralValue(literal.to_unpromotable()));
                     }
                     // `Literal[SingletonEnum.Member]`, where `SingletonEnum.Member` simplifies to
                     // just `SingletonEnum`.
@@ -1858,6 +1823,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 self.infer_expression(parameters, TypeContext::default());
                 return Err(vec![parameters]);
             }
+        };
+
+        Ok(if let Type::LiteralValue(literal) = ty {
+            // Avoid promoting values originating from an explicitly annotated literal type.
+            Type::LiteralValue(literal.to_unpromotable())
+        } else {
+            ty
         })
     }
 

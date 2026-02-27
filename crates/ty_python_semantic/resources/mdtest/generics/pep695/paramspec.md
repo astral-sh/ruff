@@ -22,7 +22,7 @@ def foo1[**P]() -> None:
 TODO: This results in a lot of syntax errors mainly because the AST doesn't accept them in this
 position. The parser could do a better job in recovering from these errors.
 
-<!-- blacken-docs:off -->
+<!-- fmt:off -->
 
 ```py
 # error: [invalid-syntax]
@@ -37,7 +37,7 @@ def foo[**P: int]() -> None:
     pass
 ```
 
-<!-- blacken-docs:on -->
+<!-- fmt:on -->
 
 ## Default
 
@@ -255,14 +255,14 @@ it having the same AST as the one without the parentheses. Both mypy and Pyright
 reveal_type(OnlyParamSpec[(int, str)]().attr)  # revealed: (int, str, /) -> None
 ```
 
-<!-- blacken-docs:off -->
+<!-- fmt:off -->
 
 ```py
 # error: [invalid-syntax]
 reveal_type(OnlyParamSpec[]().attr)  # revealed: (...) -> None
 ```
 
-<!-- blacken-docs:on -->
+<!-- fmt:on -->
 
 The square brackets can be omitted when `ParamSpec` is the only type variable
 
@@ -649,12 +649,10 @@ from typing import overload
 def int_int(x: int) -> int: ...
 @overload
 def int_int(x: str) -> int: ...
-
 @overload
 def int_str(x: int) -> int: ...
 @overload
 def int_str(x: str) -> str: ...
-
 @overload
 def str_str(x: int) -> str: ...
 @overload
