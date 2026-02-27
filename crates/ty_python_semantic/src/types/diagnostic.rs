@@ -4954,13 +4954,14 @@ pub(crate) fn report_invalid_pep695_typevar_default_reference<'db>(
         return;
     };
 
-    let mut diagnostic = builder.into_diagnostic(format_args!(
-        "Type parameter `{}` cannot use type parameter `{}` in its default, \
-        because `{}` is defined after `{}` in the type parameter list",
+    let mut diagnostic = builder.into_diagnostic(
+        "Default for a type parameter cannot reference a type parameter defined later in the list",
+    );
+
+    diagnostic.set_concise_message(format_args!(
+        "Default of type parameter `{}` cannot reference later type parameter `{}`",
         typevar_with_bad_default.name(db),
         referenced_later_typevar.name(db),
-        referenced_later_typevar.name(db),
-        typevar_with_bad_default.name(db),
     ));
 
     for tvar in [typevar_with_bad_default, referenced_later_typevar] {
