@@ -75,6 +75,8 @@ from typing import Any, Final, ParamSpec, Callable, Concatenate
 def valid[**P](
     a1: Callable[P, int],
     a2: Callable[Concatenate[int, P], int],
+    a3: Callable["P", int],
+    a4: Callable[Concatenate[int, "P"], int],
 ) -> None: ...
 def invalid[**P](
     # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"

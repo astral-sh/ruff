@@ -1949,6 +1949,20 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     return Some(Parameters::paramspec(self.db(), bound_typevar));
                 }
             }
+            ast::Expr::StringLiteral(string) => {
+                if let Some(parsed) = parse_string_annotation(&self.context, string) {
+                    self.string_annotations
+                        .insert(ruff_python_ast::ExprRef::StringLiteral(string).into());
+                    let node_key = self.enclosing_node_key(string.into());
+                    let previous_deferred_state = std::mem::replace(
+                        &mut self.deferred_state,
+                        DeferredExpressionState::InStringAnnotation(node_key),
+                    );
+                    let result = self.infer_callable_parameter_types(parsed.expr());
+                    self.deferred_state = previous_deferred_state;
+                    return result;
+                }
+            }
             _ => {}
         }
         if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, parameters) {
