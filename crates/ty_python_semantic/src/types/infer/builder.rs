@@ -14276,6 +14276,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 op,
             ),
 
+            // Non-todo Anys take precedence over Todos (as if we fix this `Todo` in the future,
+            // the result would then become Any or Unknown, respectively).
+            (div @ Type::Dynamic(DynamicType::Divergent(_)), _, _)
+            | (_, div @ Type::Dynamic(DynamicType::Divergent(_)), _) => Some(div),
+
+            (any @ Type::Dynamic(DynamicType::Any), _, _)
+            | (_, any @ Type::Dynamic(DynamicType::Any), _) => Some(any),
+
+            (unknown @ Type::Dynamic(DynamicType::Unknown), _, _)
+            | (_, unknown @ Type::Dynamic(DynamicType::Unknown), _) => Some(unknown),
+
+            (unknown @ Type::Dynamic(DynamicType::UnknownGeneric(_)), _, _)
+            | (_, unknown @ Type::Dynamic(DynamicType::UnknownGeneric(_)), _) => Some(unknown),
+
+            (typevar @ Type::Dynamic(DynamicType::UnspecializedTypeVar), _, _)
+            | (_, typevar @ Type::Dynamic(DynamicType::UnspecializedTypeVar), _) => Some(typevar),
+
             // When both operands are the same constrained TypeVar (e.g., `T: (int, str)`),
             // we check if the operation is valid for each constraint paired with itself.
             // This is different from treating it as a union, where we'd check all combinations.
@@ -14411,23 +14428,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         )
                     })
             }
-
-            // Non-todo Anys take precedence over Todos (as if we fix this `Todo` in the future,
-            // the result would then become Any or Unknown, respectively).
-            (div @ Type::Dynamic(DynamicType::Divergent(_)), _, _)
-            | (_, div @ Type::Dynamic(DynamicType::Divergent(_)), _) => Some(div),
-
-            (any @ Type::Dynamic(DynamicType::Any), _, _)
-            | (_, any @ Type::Dynamic(DynamicType::Any), _) => Some(any),
-
-            (unknown @ Type::Dynamic(DynamicType::Unknown), _, _)
-            | (_, unknown @ Type::Dynamic(DynamicType::Unknown), _) => Some(unknown),
-
-            (unknown @ Type::Dynamic(DynamicType::UnknownGeneric(_)), _, _)
-            | (_, unknown @ Type::Dynamic(DynamicType::UnknownGeneric(_)), _) => Some(unknown),
-
-            (typevar @ Type::Dynamic(DynamicType::UnspecializedTypeVar), _, _)
-            | (_, typevar @ Type::Dynamic(DynamicType::UnspecializedTypeVar), _) => Some(typevar),
 
             (
                 todo @ Type::Dynamic(
