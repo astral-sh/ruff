@@ -68,7 +68,7 @@ def foo[**P = int]() -> None:
 `ParamSpec` is only valid as the first element to `Callable` or the final element to `Concatenate`.
 
 ```py
-from typing import ParamSpec, Callable, Concatenate
+from typing import Any, Final, ParamSpec, Callable, Concatenate
 
 def valid[**P](
     a1: Callable[P, int],
@@ -93,8 +93,6 @@ def invalid_return[**P]() -> P:
 
 # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
 type Alias[**P] = P
-
-from typing import Any, Final
 
 def invalid_variable_annotation[**P](y: Any) -> None:
     # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
