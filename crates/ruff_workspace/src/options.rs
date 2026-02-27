@@ -24,7 +24,7 @@ use ruff_linter::rules::isort::settings::RelativeImportsOrder;
 use ruff_linter::rules::isort::{ImportSection, ImportType};
 use ruff_linter::rules::pep8_naming::settings::IgnoreNames;
 use ruff_linter::rules::pydocstyle::settings::Convention;
-use ruff_linter::rules::pylint::settings::ConstantType;
+use ruff_linter::rules::pylint::settings::{AllowedValue, ConstantType};
 use ruff_linter::rules::{
     flake8_copyright, flake8_errmsg, flake8_gettext, flake8_implicit_str_concat,
     flake8_import_conventions, flake8_pytest_style, flake8_quotes, flake8_self,
@@ -3352,6 +3352,32 @@ pub struct PylintOptions {
     )]
     pub allow_magic_value_types: Option<Vec<ConstantType>>,
 
+    /// Specific literal values to ignore when used as "magic values" (see `PLR2004`).
+    ///
+    /// When set, this option replaces the defaults entirely.
+    #[option(
+        default = r#"[0, 1, -1, 0.0, 1.0, -1.0, "", "__main__"]"#,
+        value_type = r#"list[str | int | float]"#,
+        example = r#"
+            allow-magic-values = [42, 3.14, "special"]
+        "#
+    )]
+    pub allow_magic_values: Option<Vec<AllowedValue>>,
+
+    /// Additional literal values to ignore when used as "magic values" (see `PLR2004`),
+    /// in addition to the default set.
+    ///
+    /// This option is used to extend the default set without replacing it.
+    /// If `allow-magic-values` is set, this option is ignored.
+    #[option(
+        default = r#"[]"#,
+        value_type = r#"list[str | int | float]"#,
+        example = r#"
+            extend-allowed-magic-values = [42, 3.14, "special"]
+        "#
+    )]
+    pub extend_allowed_magic_values: Option<Vec<AllowedValue>>,
+
     /// Dunder methods name to allow, in addition to the default set from the
     /// Python standard library (see `PLW3201`).
     #[option(
@@ -3422,10 +3448,23 @@ pub struct PylintOptions {
 impl PylintOptions {
     pub fn into_settings(self) -> pylint::settings::Settings {
         let defaults = pylint::settings::Settings::default();
+        let allow_magic_values = if let Some(values) = self.allow_magic_values {
+            // If allow_magic_values is set, use it (replaces defaults)
+            values
+        } else if let Some(extend) = self.extend_allowed_magic_values {
+            // If extend_allowed_magic_values is set, combine with defaults
+            let mut combined = defaults.allow_magic_values.clone();
+            combined.extend(extend);
+            combined
+        } else {
+            // Otherwise use defaults
+            defaults.allow_magic_values
+        };
         pylint::settings::Settings {
             allow_magic_value_types: self
                 .allow_magic_value_types
                 .unwrap_or(defaults.allow_magic_value_types),
+            allow_magic_values,
             allow_dunder_method_names: self.allow_dunder_method_names.unwrap_or_default(),
             max_args: self.max_args.unwrap_or(defaults.max_args),
             max_positional_args: self
