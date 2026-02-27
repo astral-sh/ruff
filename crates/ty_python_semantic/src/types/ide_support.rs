@@ -6,7 +6,7 @@ use crate::semantic_index::definition::Definition;
 use crate::semantic_index::definition::DefinitionKind;
 use crate::semantic_index::{attribute_scopes, global_scope, semantic_index, use_def_map};
 use crate::types::call::{CallArguments, CallError, MatchedArgument};
-use crate::types::class::{DynamicClassAnchor, DynamicNamedTupleAnchor};
+use crate::types::class::{DynamicClassAnchor, DynamicEnumAnchor, DynamicNamedTupleAnchor};
 use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::signatures::{ParameterKind, Signature};
 use crate::types::{
@@ -1803,6 +1803,16 @@ fn class_literal_to_hierarchy_info(
                 (kind.full_range(&parsed), kind.target_range(&parsed))
             } else {
                 let header_range = namedtuple.header_range(db);
+                (header_range, header_range)
+            }
+        }
+        ClassLiteral::DynamicEnum(dynamic_enum) => {
+            if let DynamicEnumAnchor::Definition { definition, .. } = dynamic_enum.anchor(db) {
+                let parsed = parsed_module(db, file).load(db);
+                let kind = definition.kind(db);
+                (kind.full_range(&parsed), kind.target_range(&parsed))
+            } else {
+                let header_range = dynamic_enum.header_range(db);
                 (header_range, header_range)
             }
         }
