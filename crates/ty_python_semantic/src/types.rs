@@ -30,7 +30,7 @@ pub(crate) use self::diagnostic::register_lints;
 pub use self::diagnostic::{TypeCheckDiagnostics, UNDEFINED_REVEAL, UNRESOLVED_REFERENCE};
 pub(crate) use self::infer::{
     TypeContext, infer_complete_scope_types, infer_deferred_types, infer_definition_types,
-    infer_expression_type, infer_expression_types, infer_scope_types,
+    infer_expression_type, infer_expression_types, infer_scope_types, nearest_enclosing_class,
 };
 pub use self::signatures::ParameterKind;
 pub(crate) use self::signatures::{CallableSignature, Signature};
@@ -4802,7 +4802,6 @@ impl<'db> Type<'db> {
 
         let mut metaclass_mixed_non_instance_sigs = None;
         let mut metaclass_instance_bindings: Option<(Bindings<'db>, Type<'db>)> = None;
-        let mut has_custom_constructor_return = false;
 
         if has_custom_metaclass {
             let metaclass_dunder_call = self_type.member_lookup_with_policy(
@@ -4832,7 +4831,6 @@ impl<'db> Type<'db> {
                         metaclass_mixed_non_instance_sigs = Some(combined_sigs);
                     }
                     OverloadDisposition::AllInstance => {
-                        has_custom_constructor_return = true;
                         let metaclass_call_ty = Type::BoundMethod(metaclass_call_method);
                         metaclass_instance_bindings =
                             Some((metaclass_call_ty.bindings(db), metaclass_call_ty));
@@ -4896,9 +4894,6 @@ impl<'db> Type<'db> {
         // Classify `__new__` overloads the same way we did for metaclass `__call__` above.
         let mut new_mixed_non_instance_sigs = None;
 
-        // `lookup_dunder_new` already excludes `object.__new__` and `type.__new__`
-        // (via `MRO_NO_OBJECT_FALLBACK` and `META_CLASS_NO_TYPE_FALLBACK`), so any
-        // `__new__` found here is user-defined and needs return-type classification.
         if let Some((ref _new_bindings_inner, ref new_callable)) = new_bindings {
             let func = match *new_callable {
                 Type::FunctionLiteral(func) => Some(func),
@@ -4906,22 +4901,32 @@ impl<'db> Type<'db> {
                 _ => None,
             };
             if let Some(func) = func {
-                match classify_constructor_overloads(
+                let enclosing_class = nearest_enclosing_class(
                     db,
-                    func.signature(db),
-                    class,
-                    constructor_instance_ty,
-                    Some(self_type),
-                ) {
-                    OverloadDisposition::AllNonInstance => {
-                        let (new_bindings, _) = new_bindings.unwrap();
-                        return new_bindings.with_generic_context(db, class_generic_context);
-                    }
-                    OverloadDisposition::Mixed(combined_sigs) => {
-                        new_mixed_non_instance_sigs = Some(combined_sigs);
-                    }
-                    OverloadDisposition::AllInstance => {
-                        has_custom_constructor_return = true;
+                    semantic_index(db, func.file(db)),
+                    func.definition(db).scope(db),
+                );
+                let is_object_or_type =
+                    enclosing_class.is_some_and(|cls: StaticClassLiteral<'db>| {
+                        matches!(cls.known(db), Some(KnownClass::Type | KnownClass::Object))
+                    });
+
+                if !is_object_or_type {
+                    match classify_constructor_overloads(
+                        db,
+                        func.signature(db),
+                        class,
+                        constructor_instance_ty,
+                        Some(self_type),
+                    ) {
+                        OverloadDisposition::AllNonInstance => {
+                            let (new_bindings, _) = new_bindings.unwrap();
+                            return new_bindings.with_generic_context(db, class_generic_context);
+                        }
+                        OverloadDisposition::Mixed(combined_sigs) => {
+                            new_mixed_non_instance_sigs = Some(combined_sigs);
+                        }
+                        OverloadDisposition::AllInstance => {}
                     }
                 }
             }
@@ -5032,12 +5037,6 @@ impl<'db> Type<'db> {
                     Bindings::from_union(callable_type, all_bindings)
                 }
             }
-        };
-
-        let bindings = if has_custom_constructor_return {
-            bindings.with_custom_constructor_return()
-        } else {
-            bindings
         };
 
         bindings

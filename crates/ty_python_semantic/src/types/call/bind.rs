@@ -224,11 +224,6 @@ pub(crate) struct Bindings<'db> {
 
     /// Whether each argument will be used as a value and/or a type form in this call.
     argument_forms: ArgumentForms,
-
-    /// Whether a custom `__new__` or metaclass `__call__` was found with non-standard return
-    /// types that need resolution in [`Self::constructor_return_type`]. When `false`, the
-    /// return-type resolution loops can be skipped entirely (the common case).
-    has_custom_constructor_return: bool,
 }
 
 impl<'db> Bindings<'db> {
@@ -241,7 +236,6 @@ impl<'db> Bindings<'db> {
     {
         let mut implicit_dunder_new_is_possibly_unbound = false;
         let mut implicit_dunder_init_is_possibly_unbound = false;
-        let mut has_custom_constructor_return = false;
         let mut elements_acc = SmallVec::new();
 
         // Preserve each input's existing union/intersection structure.
@@ -249,7 +243,6 @@ impl<'db> Bindings<'db> {
             implicit_dunder_new_is_possibly_unbound |= set.implicit_dunder_new_is_possibly_unbound;
             implicit_dunder_init_is_possibly_unbound |=
                 set.implicit_dunder_init_is_possibly_unbound;
-            has_custom_constructor_return |= set.has_custom_constructor_return;
             elements_acc.extend(set.elements);
         }
 
@@ -262,7 +255,6 @@ impl<'db> Bindings<'db> {
             constructor_instance_type: None,
             implicit_dunder_new_is_possibly_unbound,
             implicit_dunder_init_is_possibly_unbound,
-            has_custom_constructor_return,
         }
     }
 
@@ -276,14 +268,12 @@ impl<'db> Bindings<'db> {
         // Flatten all input bindings into a single intersection element
         let mut implicit_dunder_new_is_possibly_unbound = true;
         let mut implicit_dunder_init_is_possibly_unbound = true;
-        let mut has_custom_constructor_return = false;
         let mut inner_bindings_acc = SmallVec::new();
 
         for set in bindings_iter {
             implicit_dunder_new_is_possibly_unbound &= set.implicit_dunder_new_is_possibly_unbound;
             implicit_dunder_init_is_possibly_unbound &=
                 set.implicit_dunder_init_is_possibly_unbound;
-            has_custom_constructor_return |= set.has_custom_constructor_return;
             for element in set.elements {
                 for binding in element.bindings {
                     inner_bindings_acc.push(binding);
@@ -298,7 +288,6 @@ impl<'db> Bindings<'db> {
             callable_type,
             implicit_dunder_new_is_possibly_unbound,
             implicit_dunder_init_is_possibly_unbound,
-            has_custom_constructor_return,
             elements,
             argument_forms: ArgumentForms::new(0),
             constructor_instance_type: None,
@@ -312,11 +301,6 @@ impl<'db> Bindings<'db> {
         for binding in self.iter_flat_mut() {
             binding.replace_callable_type(before, after);
         }
-    }
-
-    pub(crate) fn with_custom_constructor_return(mut self) -> Self {
-        self.has_custom_constructor_return = true;
-        self
     }
 
     pub(crate) fn with_constructor_instance_type(
@@ -471,7 +455,6 @@ impl<'db> Bindings<'db> {
             constructor_instance_type: self.constructor_instance_type,
             implicit_dunder_new_is_possibly_unbound: self.implicit_dunder_new_is_possibly_unbound,
             implicit_dunder_init_is_possibly_unbound: self.implicit_dunder_init_is_possibly_unbound,
-            has_custom_constructor_return: self.has_custom_constructor_return,
             elements: self
                 .elements
                 .into_iter()
@@ -648,96 +631,91 @@ impl<'db> Bindings<'db> {
     // Constructor calls should combine `__new__`/`__init__` specializations instead of unioning.
     fn constructor_return_type(&self, db: &'db dyn Db) -> Option<Type<'db>> {
         let constructor_instance_type = self.constructor_instance_type?;
+        let class_literal = constructor_instance_type
+            .as_nominal_instance()
+            .and_then(|inst| inst.class(db).static_class_literal(db))
+            .map(|(lit, _)| lit);
         let has_mixed_constructor_inits = self
             .iter_flat()
             .any(|binding| binding.mixed_constructor_init.is_some());
 
-        // Only run the return-type resolution loops when a custom `__new__` or
-        // metaclass `__call__` was found that may have non-standard returns
-        // (typevars, strict subclasses, non-instance types). For the common case
-        // (no custom `__new__`), this skips directly to specialization handling.
-        if self.has_custom_constructor_return || has_mixed_constructor_inits {
-            let class_literal = constructor_instance_type
-                .as_nominal_instance()
-                .and_then(|inst| inst.class(db).static_class_literal(db))
-                .map(|(lit, _)| lit);
+        // If any matched overload's signature return type, when resolved with the inferred
+        // specialization, is a non-instance type (e.g. `__new__[S] -> S` with `S` inferred as
+        // `str`), use that resolved type directly. This handles arbitrary `__new__` return
+        // types like `S`, `list[S]`, etc.
+        let constructor_class = constructor_instance_type
+            .as_nominal_instance()
+            .map(|inst| inst.class(db));
+        for binding in self.iter_flat() {
+            if has_mixed_constructor_inits && binding.mixed_constructor_init.is_none() {
+                continue;
+            }
 
-            let constructor_class = constructor_instance_type
-                .as_nominal_instance()
-                .map(|inst| inst.class(db));
+            let Some((_, overload)) = binding.matching_overloads().next() else {
+                continue;
+            };
+            let sig_return = overload.signature.return_ty;
+            if !has_mixed_constructor_inits && !sig_return.has_typevar(db) {
+                continue;
+            }
+            // Fast path: if the declared return is already a specialization of the
+            // constructed class, this overload is instance-returning and cannot trigger
+            // the non-instance early return.
+            if class_literal
+                .and_then(|lit| sig_return.specialization_of(db, lit))
+                .is_some()
+            {
+                continue;
+            }
+            let resolved = overload
+                .specialization
+                .map(|specialization| sig_return.apply_specialization(db, specialization))
+                .unwrap_or(overload.return_ty);
+            if resolved.has_typevar(db) || resolved.is_unknown() {
+                continue;
+            }
+            // Check if the resolved type is an instance of the constructing class or a
+            // base class. If so, it's a normal instance-returning `__new__` and should be
+            // handled by the standard constructor return logic below.
+            let is_instance_return =
+                resolved
+                    .as_nominal_instance()
+                    .is_some_and(|inst: NominalInstanceType<'db>| {
+                        constructor_class.is_some_and(|cc| {
+                            cc.class_literal(db) == inst.class(db).class_literal(db)
+                                || cc.is_subclass_of(db, inst.class(db))
+                        })
+                    });
+            if !is_instance_return {
+                return Some(resolved);
+            }
+        }
 
-            // If any matched overload's signature return type, when resolved with the inferred
-            // specialization, is a non-instance type (e.g. `__new__[S] -> S` with `S` inferred as
-            // `str`), use that resolved type directly. This handles arbitrary `__new__` return
-            // types like `S`, `list[S]`, etc.
+        // Preserve explicit strict-subclass constructor returns, e.g. constructing `C` from
+        // `__new__ -> D` where `D` is a subclass of `C`.
+        if let Some(constructor_class) = constructor_class {
             for binding in self.iter_flat() {
                 if has_mixed_constructor_inits && binding.mixed_constructor_init.is_none() {
                     continue;
                 }
-
                 let Some((_, overload)) = binding.matching_overloads().next() else {
                     continue;
                 };
+
                 let sig_return = overload.signature.return_ty;
-                if !has_mixed_constructor_inits && !sig_return.has_typevar(db) {
+                if sig_return.has_typevar(db) || sig_return.is_unknown() {
                     continue;
                 }
-                // Fast path: if the declared return is already a specialization of the
-                // constructed class, this overload is instance-returning and cannot trigger
-                // the non-instance early return.
-                if class_literal
-                    .and_then(|lit| sig_return.specialization_of(db, lit))
-                    .is_some()
+
+                let Some(returned_instance) = sig_return.as_nominal_instance() else {
+                    continue;
+                };
+                let returned_class = returned_instance.class(db);
+
+                if returned_class.class_literal(db) != constructor_class.class_literal(db)
+                    && returned_class.is_subclass_of(db, constructor_class)
                 {
-                    continue;
-                }
-                let resolved = overload
-                    .specialization
-                    .map(|specialization| sig_return.apply_specialization(db, specialization))
-                    .unwrap_or(overload.return_ty);
-                if resolved.has_typevar(db) || resolved.is_unknown() {
-                    continue;
-                }
-                // Check if the resolved type is an instance of the constructing class or a
-                // base class. If so, it's a normal instance-returning `__new__` and should be
-                // handled by the standard constructor return logic below.
-                let is_instance_return =
-                    resolved
-                        .as_nominal_instance()
-                        .is_some_and(|inst: NominalInstanceType<'db>| {
-                            constructor_class.is_some_and(|cc| {
-                                cc.class_literal(db) == inst.class(db).class_literal(db)
-                                    || cc.is_subclass_of(db, inst.class(db))
-                            })
-                        });
-                if !is_instance_return {
-                    return Some(resolved);
-                }
-            }
-
-            // Preserve explicit strict-subclass constructor returns, e.g. constructing `C` from
-            // `__new__ -> D` where `D` is a subclass of `C`.
-            if let Some(constructor_class) = constructor_class {
-                for binding in self.iter_flat() {
-                    let Some((_, overload)) = binding.matching_overloads().next() else {
-                        continue;
-                    };
-
-                    let sig_return = overload.signature.return_ty;
-                    if sig_return.has_typevar(db) || sig_return.is_unknown() {
-                        continue;
-                    }
-
-                    let Some(returned_instance) = sig_return.as_nominal_instance() else {
-                        continue;
-                    };
-                    let returned_class = returned_instance.class(db);
-
-                    if returned_class.class_literal(db) != constructor_class.class_literal(db)
-                        && returned_class.is_subclass_of(db, constructor_class)
-                    {
-                        return Some(sig_return);
-                    }
+                    return Some(sig_return);
                 }
             }
         }
@@ -746,11 +724,6 @@ impl<'db> Bindings<'db> {
             return Some(constructor_instance_type);
         };
         let class_context = class_specialization.generic_context(db);
-
-        let class_literal = constructor_instance_type
-            .as_nominal_instance()
-            .and_then(|inst| inst.class(db).static_class_literal(db))
-            .map(|(lit, _)| lit);
 
         let mut combined: Option<Specialization<'db>> = None;
         let mut combine_binding_specialization = |binding: &CallableBinding<'db>| {
@@ -2219,7 +2192,6 @@ impl<'db> From<CallableBinding<'db>> for Bindings<'db> {
             constructor_instance_type: None,
             implicit_dunder_new_is_possibly_unbound: false,
             implicit_dunder_init_is_possibly_unbound: false,
-            has_custom_constructor_return: false,
         }
     }
 }
@@ -2248,7 +2220,6 @@ impl<'db> From<Binding<'db>> for Bindings<'db> {
             constructor_instance_type: None,
             implicit_dunder_new_is_possibly_unbound: false,
             implicit_dunder_init_is_possibly_unbound: false,
-            has_custom_constructor_return: false,
         }
     }
 }
