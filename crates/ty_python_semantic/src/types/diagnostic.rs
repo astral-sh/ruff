@@ -4942,7 +4942,7 @@ pub(crate) fn report_invalid_type_param_order<'db>(
     }
 }
 
-pub(crate) fn report_invalid_pep695_typevar_default_reference<'db>(
+pub(crate) fn report_invalid_typevar_default_reference<'db>(
     context: &InferContext<'db, '_>,
     class: StaticClassLiteral<'db>,
     typevar_with_bad_default: TypeVarInstance<'db>,
