@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
+assertion_line: 132
 ---
 RUF010 [*] Use explicit conversion flag
   --> RUF010.py:9:4
@@ -392,3 +393,54 @@ help: Replace with conversion flag
 59 | 
 60 | # Debug text cases - should not trigger RUF010
 61 | f"{str(1)=}"
+
+RUF010 [*] Use explicit conversion flag
+  --> RUF010.py:75:4
+   |
+73 |   )}"  # RUF010 (unsafe fix)
+74 |
+75 |   f"{repr(
+   |  ____^
+76 | |     # comment outside arg
+77 | |     'hello'
+78 | | )}"  # RUF010 (unsafe fix)
+   | |_^
+79 |
+80 |   # Fix is safe when comment is preserved (comment inside parenthesized arg)
+   |
+help: Replace with conversion flag
+72 |     1
+73 | )}"  # RUF010 (unsafe fix)
+74 | 
+   - f"{repr(
+   -     # comment outside arg
+   -     'hello'
+   - )}"  # RUF010 (unsafe fix)
+75 + f"{'hello'!r}"  # RUF010 (unsafe fix)
+76 | 
+77 | # Fix is safe when comment is preserved (comment inside parenthesized arg)
+78 | f"{ascii((
+note: This is an unsafe fix and may change runtime behavior
+
+RUF010 [*] Use explicit conversion flag
+  --> RUF010.py:86:4
+   |
+84 |   ))}"  # RUF010 (safe fix)
+85 |
+86 |   f"{repr((
+   |  ____^
+87 | |     # comment inside parens
+88 | |     'hello'
+89 | | ))}"  # RUF010 (safe fix)
+   | |__^
+   |
+help: Replace with conversion flag
+83 |     1
+84 | ))}"  # RUF010 (safe fix)
+85 | 
+   - f"{repr((
+86 + f"{(
+87 |     # comment inside parens
+88 |     'hello'
+   - ))}"  # RUF010 (safe fix)
+89 + )!r}"  # RUF010 (safe fix)

@@ -3,8 +3,9 @@ use std::fmt::Display;
 use anyhow::Result;
 
 use libcst_native::{LeftParen, ParenthesizedNode, RightParen};
+use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::token::TokenKind;
+use ruff_python_ast::token::{parenthesized_range, TokenKind};
 use ruff_python_ast::{self as ast, Expr, OperatorPrecedence};
 use ruff_text_size::Ranged;
 
@@ -122,8 +123,27 @@ pub(crate) fn explicit_f_string_type_conversion(checker: &Checker, f_string: &as
         let mut diagnostic =
             checker.report_diagnostic(ExplicitFStringTypeConversion, expression.range());
 
+        let arg_with_parens = parenthesized_range(
+            arg.into(),
+            (&call.arguments).into(),
+            checker.tokens(),
+        )
+        .unwrap_or(arg.range());
+
+        let has_comments_outside_arg = checker
+            .comment_ranges()
+            .comments_in_range(call.range())
+            .iter()
+            .any(|comment| !arg_with_parens.contains_range(*comment));
+
+        let applicability = if has_comments_outside_arg {
+            Applicability::Unsafe
+        } else {
+            Applicability::Safe
+        };
+
         diagnostic.try_set_fix(|| {
-            convert_call_to_conversion_flag(checker, conversion, f_string, index, arg)
+            convert_call_to_conversion_flag(checker, conversion, f_string, index, arg, applicability)
         });
     }
 }
@@ -135,6 +155,7 @@ fn convert_call_to_conversion_flag(
     f_string: &ast::FString,
     index: usize,
     arg: &Expr,
+    applicability: Applicability,
 ) -> Result<Fix> {
     let source_code = checker.locator().slice(f_string);
     transform_expression(source_code, checker.stylist(), |mut expression| {
@@ -161,7 +182,7 @@ fn convert_call_to_conversion_flag(
 
         Ok(expression)
     })
-    .map(|output| Fix::safe_edit(Edit::range_replacement(output, f_string.range())))
+    .map(|output| Fix::applicable_edit(Edit::range_replacement(output, f_string.range()), applicability))
 }
 
 fn starts_with_brace(checker: &Checker, arg: &Expr) -> bool {
