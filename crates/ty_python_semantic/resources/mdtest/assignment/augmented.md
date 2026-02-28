@@ -169,6 +169,123 @@ def f(flag: bool, flag2: bool):
     reveal_type(f)  # revealed: int | str | float
 ```
 
+## Attribute target with incompatible result type
+
+```py
+class Foo:
+    def __add__(self, other: object) -> object:
+        return other
+
+class Foo2:
+    def __iadd__(self, other: object) -> object:
+        return other
+
+class Bar:
+    x: Foo
+    y: Foo2
+
+b = Bar()
+# error: [invalid-assignment] "Object of type `object` is not assignable to attribute `x` of type `Foo`"
+b.x += 1
+# error: [invalid-assignment] "Object of type `object` is not assignable to attribute `y` of type `Foo2`"
+b.y += 1
+```
+
+## Attribute target with compatible result type
+
+```py
+class Foo:
+    def __iadd__(self, other: int) -> "Foo":
+        return self
+
+class Bar:
+    x: Foo
+
+b = Bar()
+b.x += 1
+```
+
+## Subscript target with incompatible result type
+
+```py
+class Foo:
+    def __add__(self, other: object) -> object:
+        return other
+
+class Foo2:
+    def __iadd__(self, other: object) -> object:
+        return other
+
+class Bar:
+    def __getitem__(self, key: int) -> Foo:
+        return Foo()
+    def __setitem__(self, key: int, value: Foo) -> None:
+        pass
+
+class Bar2:
+    def __getitem__(self, key: int) -> Foo2:
+        return Foo2()
+    def __setitem__(self, key: int, value: Foo2) -> None:
+        pass
+
+b = Bar()
+# error: [invalid-assignment] "Invalid subscript assignment with key of type `Literal[0]` and value of type `object` on object of type `Bar`"
+b[0] += 1
+
+b2 = Bar2()
+# error: [invalid-assignment] "Invalid subscript assignment with key of type `Literal[0]` and value of type `object` on object of type `Bar2`"
+b2[0] += 1
+```
+
+## Nonexistent attribute target
+
+```py
+class Foo: ...
+
+f = Foo()
+# error: [unresolved-attribute] "Object of type `Foo` has no attribute `nonexistent`"
+f.nonexistent += 1
+```
+
+## Attribute target on union with incompatible member type
+
+```py
+class A:
+    x: str
+
+class B:
+    x: int
+
+def f(o: A | B):
+    # error: [unsupported-operator] "Operator `+=` is not supported between objects of type `str` and `Literal[1]`"
+    o.x += 1
+```
+
+## Attribute target on union with missing attribute
+
+```py
+class A:
+    pass
+
+class B:
+    x: int
+
+def f(o: A | B):
+    # error: [unresolved-attribute]
+    o.x += 1
+```
+
+## Subscript target with invalid key type
+
+Both `__getitem__` and `__setitem__` fail for the same reason (wrong key type), so only one
+diagnostic should be emitted.
+
+```py
+d: dict[str, int] = {}
+# error: [invalid-argument-type]
+d[1] += 1
+```
+
 ## Implicit dunder calls on class objects
 
 ```py

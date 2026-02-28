@@ -9749,9 +9749,63 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             _ => self.infer_expression(target, TypeContext::default()),
         };
 
-        self.infer_augmented_op(assignment, target_type, value, &mut |builder, tcx| {
-            builder.infer_expression(value, tcx)
-        })
+        let result_type =
+            self.infer_augmented_op(assignment, target_type, value, &mut |builder, tcx| {
+                builder.infer_expression(value, tcx)
+            });
+
+        // For attribute and subscript targets, validate that the result type is
+        // assignable to the declared type of the target. Skip validation when
+        // the load already failed (e.g. nonexistent attribute, wrong key type),
+        // to avoid duplicate diagnostics.
+        let db = self.db();
+        match &**target {
+            ast::Expr::Attribute(attr) => {
+                if let Some(object_ty) = self.try_expression_type(&attr.value)
+                    && !result_type.is_assignable_to(db, target_type)
+                    && !object_ty.member(db, &attr.attr.id).place.is_undefined()
+                {
+                    self.validate_attribute_assignment(
+                        attr,
+                        object_ty,
+                        attr.attr.id(),
+                        &mut |_, _| result_type,
+                        true,
+                    );
+                }
+            }
+            ast::Expr::Subscript(subscript) => {
+                if let Some(object_ty) = self.try_expression_type(&subscript.value) {
+                    let slice_ty = self
+                        .try_expression_type(&subscript.slice)
+                        .unwrap_or(Type::unknown());
+
+                    let getitem_ok = object_ty
+                        .try_call_dunder(
+                            db,
+                            "__getitem__",
+                            CallArguments::positional([slice_ty]),
+                            TypeContext::default(),
+                        )
+                        .is_ok();
+
+                    if getitem_ok {
+                        self.validate_subscript_assignment_impl(
+                            subscript,
+                            None,
+                            object_ty,
+                            &mut |_, _| slice_ty,
+                            value,
+                            &mut |_, _| result_type,
+                            true,
+                        );
+                    }
+                }
+            }
+            _ => {}
+        }
+
+        result_type
     }
 
     fn infer_dict_key_assignment_definition(
