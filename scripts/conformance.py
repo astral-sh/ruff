@@ -126,14 +126,6 @@ class Classification(StrEnum):
                 return f"False negatives {verb}"
 
 
-@dataclass(kw_only=True, slots=True)
-class Evaluation:
-    classification: Classification
-    true_positives: int = 0
-    false_positives: int = 0
-    false_negatives: int = 0
-
-
 class Change(StrEnum):
     ADDED = auto()
     REMOVED = auto()
@@ -314,67 +306,31 @@ class TestCase:
     def diagnostics_by_source(self, source: Source) -> list[TyDiagnostic]:
         return self.old if source == Source.OLD else self.new
 
-    def classify(self, source: Source) -> Evaluation:
+    def classify(self, source: Source) -> Classification:
         diagnostics = self.diagnostics_by_source(source)
 
         if diagnostics:
             if self.optional:
-                return Evaluation(
-                    classification=Classification.TRUE_POSITIVE,
-                    true_positives=len(diagnostics),
-                )
-
+                return Classification.TRUE_POSITIVE
             if self.expected:
                 distinct_lines = len(
-                    {
-                        diagnostic.location.positions.begin.line
-                        for diagnostic in diagnostics
-                    }
+                    {d.location.positions.begin.line for d in diagnostics}
                 )
                 expected_max = len(self.expected) if self.multi else 1
-
                 if 1 <= distinct_lines <= expected_max:
-                    return Evaluation(
-                        classification=Classification.TRUE_POSITIVE,
-                        true_positives=len(diagnostics),
-                    )
+                    return Classification.TRUE_POSITIVE
                 else:
-                    # We select the line with the most diagnostics
-                    # as our true positive, while the rest are false positives.
-                    by_line = {
-                        line: list(group)
-                        for line, group in groupby(
-                            sorted(
-                                diagnostics,
-                                key=lambda d: d.location.positions.begin.line,
-                            ),
-                            key=lambda d: d.location.positions.begin.line,
-                        )
-                    }
-                    best_count = max(len(g) for g in by_line.values())
-                    return Evaluation(
-                        classification=Classification.FALSE_POSITIVE,
-                        true_positives=best_count,
-                        false_positives=len(diagnostics) - best_count,
-                    )
+                    return Classification.FALSE_POSITIVE
             else:
-                return Evaluation(
-                    classification=Classification.FALSE_POSITIVE,
-                    false_positives=len(diagnostics),
-                )
+                return Classification.FALSE_POSITIVE
 
         elif self.expected:
             if self.optional:
-                return Evaluation(classification=Classification.TRUE_NEGATIVE)
-            return Evaluation(
-                classification=Classification.FALSE_NEGATIVE,
-                false_negatives=1,
-            )
+                return Classification.TRUE_NEGATIVE
+            return Classification.FALSE_NEGATIVE
 
         else:
-            return Evaluation(
-                classification=Classification.TRUE_NEGATIVE,
-            )
+            return Classification.TRUE_NEGATIVE
 
 
 def tc_location_cell(tc: TestCase, *, rowspan: int, source: Source | None) -> str:
@@ -464,6 +420,29 @@ class Statistics:
             return self.true_positives / (self.true_positives + self.false_negatives)
         else:
             return 0.0
+
+
+@dataclass(kw_only=True, slots=True)
+class FileStats:
+    path: Path
+    old: Statistics
+    new: Statistics
+
+    @property
+    def old_passes(self) -> bool:
+        return self.old.false_positives == 0 and self.old.false_negatives == 0
+
+    @property
+    def new_passes(self) -> bool:
+        return self.new.false_positives == 0 and self.new.false_negatives == 0
+
+    @property
+    def total_change(self) -> int:
+        return (
+            abs(self.new.true_positives - self.old.true_positives)
+            + abs(self.new.false_positives - self.old.false_positives)
+            + abs(self.new.false_negatives - self.old.false_negatives)
+        )
 
 
 def collect_expected_diagnostics(test_files: Sequence[Path]) -> list[ExpectedError]:
@@ -587,8 +566,7 @@ def group_diagnostics_by_key(
 def compute_stats(test_cases: list[TestCase], source: Source) -> Statistics:
     stats = Statistics()
     for tc in test_cases:
-        evaluation = tc.classify(source)
-        match evaluation.classification:
+        match tc.classify(source):
             case Classification.TRUE_POSITIVE:
                 stats.true_positives += 1
             case Classification.FALSE_POSITIVE:
@@ -625,18 +603,18 @@ def render_test_cases(
                 entries.append((Change.CHANGED.into_title(), test_case, None))
         else:
             if change == Change.ADDED:
-                new_class = test_case.classify(Source.NEW).classification
+                new_class = test_case.classify(Source.NEW)
                 entries.append(
                     (new_class.into_title(verb="added"), test_case, Source.NEW)
                 )
             elif change == Change.REMOVED:
-                old_class = test_case.classify(Source.OLD).classification
+                old_class = test_case.classify(Source.OLD)
                 entries.append(
                     (old_class.into_title(verb="removed"), test_case, Source.OLD)
                 )
             elif change == Change.CHANGED:
-                old_class = test_case.classify(Source.OLD).classification
-                new_class = test_case.classify(Source.NEW).classification
+                old_class = test_case.classify(Source.OLD)
+                new_class = test_case.classify(Source.NEW)
                 if old_class == new_class:
                     # Same classification but different diagnostics: show a before/after diff
                     # in a single "changed" section rather than the confusing split into
@@ -720,59 +698,50 @@ def render_file_stats_table(test_cases: list[TestCase]) -> str:
         return f"{new} ({diff:+}){indicator}"
 
     # Collect per-file data; track totals across all files regardless of change.
-    changed: list[tuple[int, Path, Statistics, Statistics, bool, bool]] = []
+    file_stats: list[FileStats] = []
     old_totals = Statistics()
     new_totals = Statistics()
     passing = 0
     total_files = 0
 
     for path, cases in path_to_cases.items():
-        old_stats = compute_stats(cases, Source.OLD)
-        new_stats = compute_stats(cases, Source.NEW)
-
-        old_totals.true_positives += old_stats.true_positives
-        old_totals.false_positives += old_stats.false_positives
-        old_totals.false_negatives += old_stats.false_negatives
-        new_totals.true_positives += new_stats.true_positives
-        new_totals.false_positives += new_stats.false_positives
-        new_totals.false_negatives += new_stats.false_negatives
-
-        old_passes = old_stats.false_positives == 0 and old_stats.false_negatives == 0
-        new_passes = new_stats.false_positives == 0 and new_stats.false_negatives == 0
-        passing += new_passes
-        total_files += 1
-
-        total_change = (
-            abs(new_stats.true_positives - old_stats.true_positives)
-            + abs(new_stats.false_positives - old_stats.false_positives)
-            + abs(new_stats.false_negatives - old_stats.false_negatives)
+        fs = FileStats(
+            path=path,
+            old=compute_stats(cases, Source.OLD),
+            new=compute_stats(cases, Source.NEW),
         )
-        if total_change > 0:
-            changed.append(
-                (total_change, path, old_stats, new_stats, old_passes, new_passes)
-            )
+        old_totals.true_positives += fs.old.true_positives
+        old_totals.false_positives += fs.old.false_positives
+        old_totals.false_negatives += fs.old.false_negatives
+        new_totals.true_positives += fs.new.true_positives
+        new_totals.false_positives += fs.new.false_positives
+        new_totals.false_negatives += fs.new.false_negatives
+        passing += fs.new_passes
+        total_files += 1
+        file_stats.append(fs)
 
+    changed = [fs for fs in file_stats if fs.total_change > 0]
     if not changed:
         return ""
 
-    changed.sort(key=lambda x: (-x[0], x[1].name))
+    changed.sort(key=lambda fs: (-fs.total_change, fs.path.name))
 
     rows = []
-    for _, path, old_stats, new_stats, old_passes, new_passes in changed:
-        if new_passes and not old_passes:
+    for fs in changed:
+        if fs.new_passes and not fs.old_passes:
             status = "✅ Newly Passing 🎉"
-        elif old_passes and not new_passes:
+        elif fs.old_passes and not fs.new_passes:
             status = "❌ Regressed"
-        elif new_passes:
+        elif fs.new_passes:
             status = "✅"
         else:
             status = "❌"
-        url = CONFORMANCE_DIR_WITH_README + f"tests/{path.name}"
+        url = CONFORMANCE_DIR_WITH_README + f"tests/{fs.path.name}"
         rows.append(
-            f"| [{path.name}]({url})"
-            f" | {fmt(old_stats.true_positives, new_stats.true_positives, greater_is_better=True)}"
-            f" | {fmt(old_stats.false_positives, new_stats.false_positives, greater_is_better=False)}"
-            f" | {fmt(old_stats.false_negatives, new_stats.false_negatives, greater_is_better=False)}"
+            f"| [{fs.path.name}]({url})"
+            f" | {fmt(fs.old.true_positives, fs.new.true_positives, greater_is_better=True)}"
+            f" | {fmt(fs.old.false_positives, fs.new.false_positives, greater_is_better=False)}"
+            f" | {fmt(fs.old.false_negatives, fs.new.false_negatives, greater_is_better=False)}"
             f" | {status} |"
         )
 
