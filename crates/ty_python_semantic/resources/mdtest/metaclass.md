@@ -278,7 +278,7 @@ T = TypeVar("T")
 
 class GenericMeta(type, Generic[T]): ...
 
-# error: [invalid-metaclass]
+# error: [invalid-metaclass] "Generic metaclasses are not supported"
 class GenericMetaInstance(metaclass=GenericMeta[T]): ...
 ```
 

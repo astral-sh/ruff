@@ -1222,14 +1222,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             ));
                         }
                     }
-                    MetaclassErrorKind::GenericMetaclass(ty) => {
+                    MetaclassErrorKind::GenericMetaclass => {
                         if let Some(builder) =
                             self.context.report_lint(&INVALID_METACLASS, class_node)
                         {
-                            builder.into_diagnostic(format_args!(
-                                "Cannot use a parameterized generic class `{}` as a metaclass",
-                                ty.display(self.db())
-                            ));
+                            builder.into_diagnostic("Generic metaclasses are not supported");
                         }
                     }
                     MetaclassErrorKind::NotCallable(ty) => {

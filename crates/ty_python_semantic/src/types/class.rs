@@ -2887,7 +2887,7 @@ impl<'db> StaticClassLiteral<'db> {
         // Generic metaclasses parameterized by type variables are not supported.
         // `metaclass=Meta[int]` is fine, but `metaclass=Meta[T]` is not.
         // See: https://typing.python.org/en/latest/spec/generics.html#generic-metaclasses
-        if let Some(ty @ Type::GenericAlias(alias)) = explicit_metaclass {
+        if let Some(Type::GenericAlias(alias)) = explicit_metaclass {
             let specialization_has_typevars = alias
                 .specialization(db)
                 .types(db)
@@ -2895,7 +2895,7 @@ impl<'db> StaticClassLiteral<'db> {
                 .any(|ty| ty.has_typevar_or_typevar_instance(db));
             if specialization_has_typevars {
                 return Err(MetaclassError {
-                    kind: MetaclassErrorKind::GenericMetaclass(ty),
+                    kind: MetaclassErrorKind::GenericMetaclass,
                 });
             }
         }
@@ -8294,7 +8294,7 @@ pub(super) enum MetaclassErrorKind<'db> {
         candidate1_is_base_class: bool,
     },
     /// The metaclass is a parameterized generic class, which is not supported.
-    GenericMetaclass(Type<'db>),
+    GenericMetaclass,
     /// The metaclass is not callable
     NotCallable(Type<'db>),
     /// The metaclass is of a union type whose some members are not callable
