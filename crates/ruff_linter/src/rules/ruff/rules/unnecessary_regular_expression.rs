@@ -118,6 +118,18 @@ pub(crate) fn unnecessary_regular_expression(checker: &Checker, call: &ExprCall)
         return;
     }
 
+    // `str.split("")` raises `ValueError: empty separator` while `re.split("", s)` succeeds,
+    // so skip the diagnostic for `re.split` with an empty pattern.
+    if matches!(re_func.kind, ReFuncKind::Split) {
+        let is_empty = match &literal {
+            Literal::Str(str_lit) => str_lit.value.to_str().is_empty(),
+            Literal::Bytes(bytes_lit) => bytes_lit.value.iter().all(|part| part.is_empty()),
+        };
+        if is_empty {
+            return;
+        }
+    }
+
     // Now we know the pattern is a string literal with no metacharacters, so
     // we can proceed with the str method replacement.
     let new_expr = re_func.replacement();

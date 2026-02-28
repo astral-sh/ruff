@@ -98,3 +98,8 @@ re.sub(r"a", r"\?", "a")
 re.sub(r'abc', "", s)
 re.sub(r"""abc""", "", s)
 re.sub(r'''abc''', "", s)
+
+# Empty pattern: re.split("", s) should not be flagged because
+# str.split("") raises ValueError while re.split("", s) succeeds
+re.split("", s)
+re.split(r"", s)
