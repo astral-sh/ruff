@@ -376,23 +376,25 @@ def render_html_test_case_rows(tc: TestCase, *, source: Source | None) -> list[s
             f"</tr>"
         )
 
+    def render_group(
+        diags: list[TyDiagnostic], symbol: str, loc_prefix: str = ""
+    ) -> None:
+        for i, d in enumerate(diags):
+            prepend = (loc_prefix + delta_cell(symbol, len(diags))) if i == 0 else ""
+            rows.append(diag_row(d, prepend))
+
     rows: list[str] = []
+
     if source is None:
         old_diags, new_diags = tc.old, tc.new
         loc = tc_location_cell(tc, rowspan=len(old_diags) + len(new_diags), source=None)
-        for i, d in enumerate(old_diags):
-            prepend = (loc + delta_cell("-", len(old_diags))) if i == 0 else ""
-            rows.append(diag_row(d, prepend))
-        for i, d in enumerate(new_diags):
-            prepend = delta_cell("+", len(new_diags)) if i == 0 else ""
-            rows.append(diag_row(d, prepend))
+        render_group(old_diags, "-", loc)
+        render_group(new_diags, "+")
     else:
         diags = tc.diagnostics_by_source(source)
-        symbol = "-" if source == Source.OLD else "+"
         loc = tc_location_cell(tc, rowspan=len(diags), source=source)
-        for i, d in enumerate(diags):
-            prepend = (loc + delta_cell(symbol, len(diags))) if i == 0 else ""
-            rows.append(diag_row(d, prepend))
+        render_group(diags, "-" if source == Source.OLD else "+", loc)
+
     return rows
 
 
@@ -420,6 +422,16 @@ class Statistics:
             return self.true_positives / (self.true_positives + self.false_negatives)
         else:
             return 0.0
+
+
+@dataclass(kw_only=True, slots=True)
+class DiagnosticEntry:
+    """A test case bound to the section title and source side it should be rendered under."""
+
+    title: str
+    test_case: TestCase
+    # None means show both old (removed) and new (added) in a single "changed" section.
+    source: Source | None
 
 
 @dataclass(kw_only=True, slots=True)
@@ -579,67 +591,101 @@ def compute_stats(test_cases: list[TestCase], source: Source) -> Statistics:
     return stats
 
 
+def collect_diagnostic_entries(test_cases: list[TestCase]) -> list[DiagnosticEntry]:
+    """Classify each changed test case and assign it to a titled section."""
+    entries: list[DiagnosticEntry] = []
+
+    for tc in test_cases:
+        change = tc.change
+        if change == Change.UNCHANGED:
+            continue
+
+        if tc.optional:
+            if change == Change.ADDED:
+                entries.append(
+                    DiagnosticEntry(
+                        title=Change.ADDED.into_title(), test_case=tc, source=Source.NEW
+                    )
+                )
+            elif change == Change.REMOVED:
+                entries.append(
+                    DiagnosticEntry(
+                        title=Change.REMOVED.into_title(),
+                        test_case=tc,
+                        source=Source.OLD,
+                    )
+                )
+            elif change == Change.CHANGED:
+                entries.append(
+                    DiagnosticEntry(
+                        title=Change.CHANGED.into_title(), test_case=tc, source=None
+                    )
+                )
+        else:
+            if change == Change.ADDED:
+                new_class = tc.classify(Source.NEW)
+                entries.append(
+                    DiagnosticEntry(
+                        title=new_class.into_title(verb="added"),
+                        test_case=tc,
+                        source=Source.NEW,
+                    )
+                )
+            elif change == Change.REMOVED:
+                old_class = tc.classify(Source.OLD)
+                entries.append(
+                    DiagnosticEntry(
+                        title=old_class.into_title(verb="removed"),
+                        test_case=tc,
+                        source=Source.OLD,
+                    )
+                )
+            elif change == Change.CHANGED:
+                old_class = tc.classify(Source.OLD)
+                new_class = tc.classify(Source.NEW)
+                if old_class == new_class:
+                    # Same classification but different diagnostics: one "changed" section.
+                    entries.append(
+                        DiagnosticEntry(
+                            title=new_class.into_title(verb="changed"),
+                            test_case=tc,
+                            source=None,
+                        )
+                    )
+                else:
+                    # Classification changed: split into separate removed/added sections.
+                    entries.append(
+                        DiagnosticEntry(
+                            title=old_class.into_title(verb="removed"),
+                            test_case=tc,
+                            source=Source.OLD,
+                        )
+                    )
+                    entries.append(
+                        DiagnosticEntry(
+                            title=new_class.into_title(verb="added"),
+                            test_case=tc,
+                            source=Source.NEW,
+                        )
+                    )
+
+    entries.sort(
+        key=lambda e: (TITLE_PRIORITY.get(e.title, 99), e.title, e.test_case.key)
+    )
+    return entries
+
+
 def render_test_cases(
     test_cases: list[TestCase],
     *,
     format: Literal["diff", "github"] = "diff",
 ) -> str:
-    # Each entry is (title, test_case, source) where source=None means show both old
-    # (removed) and new (added) — used for "changed" sections where the classification
-    # is the same in both versions but the diagnostics themselves differ.
-    entries: list[tuple[str, TestCase, Source | None]] = []
-
-    for test_case in test_cases:
-        change = test_case.change
-        if change == Change.UNCHANGED:
-            continue
-
-        if test_case.optional:
-            if change == Change.ADDED:
-                entries.append((Change.ADDED.into_title(), test_case, Source.NEW))
-            elif change == Change.REMOVED:
-                entries.append((Change.REMOVED.into_title(), test_case, Source.OLD))
-            elif change == Change.CHANGED:
-                entries.append((Change.CHANGED.into_title(), test_case, None))
-        else:
-            if change == Change.ADDED:
-                new_class = test_case.classify(Source.NEW)
-                entries.append(
-                    (new_class.into_title(verb="added"), test_case, Source.NEW)
-                )
-            elif change == Change.REMOVED:
-                old_class = test_case.classify(Source.OLD)
-                entries.append(
-                    (old_class.into_title(verb="removed"), test_case, Source.OLD)
-                )
-            elif change == Change.CHANGED:
-                old_class = test_case.classify(Source.OLD)
-                new_class = test_case.classify(Source.NEW)
-                if old_class == new_class:
-                    # Same classification but different diagnostics: show a before/after diff
-                    # in a single "changed" section rather than the confusing split into
-                    # separate "removed" and "added" sections for the same classification.
-                    entries.append(
-                        (new_class.into_title(verb="changed"), test_case, None)
-                    )
-                else:
-                    # Classification changed: show old under "[X] removed" and new under
-                    # "[Y] added" since the status genuinely changed.
-                    entries.append(
-                        (old_class.into_title(verb="removed"), test_case, Source.OLD)
-                    )
-                    entries.append(
-                        (new_class.into_title(verb="added"), test_case, Source.NEW)
-                    )
-
+    entries = collect_diagnostic_entries(test_cases)
     if not entries:
         return ""
 
-    # Sort by priority then test-case key so groups are contiguous and stable.
-    entries.sort(key=lambda e: (TITLE_PRIORITY.get(e[0], 99), e[0], e[1].key))
-
     lines = []
-    for title, group in groupby(entries, key=lambda e: e[0]):
+    for title, group in groupby(entries, key=lambda e: e.title):
         group_list = list(group)
         n = len(group_list)
 
@@ -658,19 +704,22 @@ def render_test_cases(
         else:
             lines.extend(GITHUB_HEADER)
 
-        for _, tc, source in group_list:
+        for entry in group_list:
+            tc, source = entry.test_case, entry.source
             if source is None:
-                # "Changed" entry: interleave old (-) and new (+) rows per test case.
                 if format == "diff":
                     lines.append(render_diff_row(tc.old, removed=True))
                     lines.append(render_diff_row(tc.new, removed=False))
                 else:
                     lines.extend(render_html_test_case_rows(tc, source=None))
             else:
-                diagnostics = tc.diagnostics_by_source(source)
-                removed = source == Source.OLD
                 if format == "diff":
-                    lines.append(render_diff_row(diagnostics, removed=removed))
+                    lines.append(
+                        render_diff_row(
+                            tc.diagnostics_by_source(source),
+                            removed=source == Source.OLD,
+                        )
+                    )
                 else:
                     lines.extend(render_html_test_case_rows(tc, source=source))
 
@@ -747,9 +796,9 @@ def render_file_stats_table(test_cases: list[TestCase]) -> str:
 
     totals_row = (
         f"| **Total**"
-        f" | **{fmt(old_totals.true_positives, new_totals.true_positives)}**"
-        f" | **{fmt(old_totals.false_positives, new_totals.false_positives)}**"
-        f" | **{fmt(old_totals.false_negatives, new_totals.false_negatives)}**"
+        f" | **{fmt(old_totals.true_positives, new_totals.true_positives, greater_is_better=True)}**"
+        f" | **{fmt(old_totals.false_positives, new_totals.false_positives, greater_is_better=False)}**"
+        f" | **{fmt(old_totals.false_negatives, new_totals.false_negatives, greater_is_better=False)}**"
         f" | {passing}/{total_files} |"
     )
 
