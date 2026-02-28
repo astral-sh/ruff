@@ -490,10 +490,10 @@ reveal_type(T.__bases__)  # revealed: tuple[type, ...]
 reveal_type(T.__mro__)  # revealed: tuple[type, ...]
 ```
 
-`type[Any]` and `type[Unknown]` are gradual forms with an unknown metaclass that is at
-least `type`. Attributes defined as data descriptors on `type` (like `__mro__`) resolve
-to their declared types intersected with `Unknown`, reflecting uncertainty about whether
-the unknown metaclass overrides them:
+`type[Any]` and `type[Unknown]` are gradual forms with an unknown metaclass that is at least `type`.
+Attributes defined as data descriptors on `type` (like `__mro__`) resolve to their declared types
+intersected with `Unknown`, reflecting uncertainty about whether the unknown metaclass overrides
+them:
 
 ```py
 from typing import Any
