@@ -79,6 +79,16 @@ GITHUB_HEADER = [
     "<tr><th>Test case</th><th>Δ</th><th>Location</th><th>Name</th><th>Message</th></tr>",
 ]
 GITHUB_FOOTER = ["</table>"]
+SUMMARY_NOTE = """
+    Each test case represents one expected error annotation or a group of annotations
+    sharing a tag. Counts are per test case, not per diagnostic — multiple diagnostics
+    on the same line count as one. Required annotations (`E`) are true positives when
+    ty flags the expected location and false negatives when it does not. Optional
+    annotations (`E?`) are true positives when flagged but true negatives (not false
+    negatives) when not. Tagged annotations (`E[tag]`) require ty to flag exactly one
+    of the tagged lines; tagged multi-annotations (`E[tag+]`) allow any number up to
+    the tag count. Flagging unexpected locations counts as a false positive.
+"""
 # Priority order for section headings: improvements first, regressions last.
 TITLE_PRIORITY: dict[str, int] = {
     "True positives added": 0,
@@ -167,7 +177,7 @@ class Location:
     def as_html_link(self) -> str:
         file = self.path.name
         link = CONFORMANCE_URL.format(filename=file, line=self.positions.begin.line)
-        return f'<a href="{link}">{file}:{self.positions.begin.line}:{self.positions.begin.column}</a>'
+        return f'<a href="{link}">{self.positions.begin.line}:{self.positions.begin.column}</a>'
 
 
 @dataclass(kw_only=True, slots=True)
@@ -389,20 +399,45 @@ def tc_location_cell(tc: TestCase, *, rowspan: int, source: Source | None) -> st
     return f'<td{rowspan_attr} align="center" valign="middle"><a href="{url}">{display}</a></td>'
 
 
-def render_github_row(
-    diagnostics: list[TyDiagnostic], *, delta: str = "", location_cell: str = ""
-) -> str:
-    locs = "<br>".join(d.location.as_html_link() for d in diagnostics)
-    names = "<br>".join(d.check_name for d in diagnostics)
-    messages = "<br>".join(d.description for d in diagnostics)
-    return (
-        f"<tr>{location_cell}"
-        f'<td align="center" valign="middle">{delta}</td>'
-        f"<td>{locs}</td>"
-        f"<td>{names}</td>"
-        f"<td>{messages}</td>"
-        f"</tr>"
-    )
+def render_html_test_case_rows(tc: TestCase, *, source: Source | None) -> list[str]:
+    """Render one HTML <tr> per diagnostic for a test case.
+
+    The test-case location cell spans all rows. The delta cell (-/+) spans
+    the diagnostics for its side. For changed entries, old rows come first,
+    then new rows, each group with its own spanning delta cell.
+    """
+
+    def delta_cell(symbol: str, rowspan: int) -> str:
+        rowspan_attr = f' rowspan="{rowspan}"' if rowspan > 1 else ""
+        return f'<td{rowspan_attr} align="center" valign="middle">{symbol}</td>'
+
+    def diag_row(d: TyDiagnostic, prepend: str = "") -> str:
+        return (
+            f"<tr>{prepend}"
+            f"<td>{d.location.as_html_link()}</td>"
+            f"<td>{d.check_name}</td>"
+            f"<td>{d.description}</td>"
+            f"</tr>"
+        )
+
+    rows: list[str] = []
+    if source is None:
+        old_diags, new_diags = tc.old, tc.new
+        loc = tc_location_cell(tc, rowspan=len(old_diags) + len(new_diags), source=None)
+        for i, d in enumerate(old_diags):
+            prepend = (loc + delta_cell("-", len(old_diags))) if i == 0 else ""
+            rows.append(diag_row(d, prepend))
+        for i, d in enumerate(new_diags):
+            prepend = delta_cell("+", len(new_diags)) if i == 0 else ""
+            rows.append(diag_row(d, prepend))
+    else:
+        diags = tc.diagnostics_by_source(source)
+        symbol = "-" if source == Source.OLD else "+"
+        loc = tc_location_cell(tc, rowspan=len(diags), source=source)
+        for i, d in enumerate(diags):
+            prepend = (loc + delta_cell(symbol, len(diags))) if i == 0 else ""
+            rows.append(diag_row(d, prepend))
+    return rows
 
 
 def render_diff_row(diagnostics: list[TyDiagnostic], *, removed: bool = False) -> str:
@@ -652,25 +687,14 @@ def render_test_cases(
                     lines.append(render_diff_row(tc.old, removed=True))
                     lines.append(render_diff_row(tc.new, removed=False))
                 else:
-                    loc = tc_location_cell(tc, rowspan=2, source=None)
-                    lines.append(
-                        render_github_row(tc.old, delta="-", location_cell=loc)
-                    )
-                    lines.append(render_github_row(tc.new, delta="+"))
+                    lines.extend(render_html_test_case_rows(tc, source=None))
             else:
                 diagnostics = tc.diagnostics_by_source(source)
                 removed = source == Source.OLD
                 if format == "diff":
                     lines.append(render_diff_row(diagnostics, removed=removed))
                 else:
-                    loc = tc_location_cell(tc, rowspan=1, source=source)
-                    lines.append(
-                        render_github_row(
-                            diagnostics,
-                            delta="-" if removed else "+",
-                            location_cell=loc,
-                        )
-                    )
+                    lines.extend(render_html_test_case_rows(tc, source=source))
 
         if format == "diff":
             lines.append("```")
@@ -863,111 +887,7 @@ def render_summary(test_cases: list[TestCase], *, force_summary_table: bool) -> 
         f"(precision **{old.precision:.1%}**)."
     )
 
-    summary_note = " ".join(
-        [
-            "Each",
-            "test",
-            "case",
-            "represents",
-            "one",
-            "expected",
-            "error",
-            "annotation",
-            "or",
-            "a",
-            "group",
-            "of",
-            "annotations",
-            "sharing",
-            "a",
-            "tag.",
-            "Counts",
-            "are",
-            "per",
-            "test",
-            "case,",
-            "not",
-            "per",
-            "diagnostic",
-            "—",
-            "multiple",
-            "diagnostics",
-            "on",
-            "the",
-            "same",
-            "line",
-            "count",
-            "as",
-            "one.",
-            "Required",
-            "annotations",
-            "(`E`)",
-            "are",
-            "true",
-            "positives",
-            "when",
-            "ty",
-            "flags",
-            "the",
-            "expected",
-            "location",
-            "and",
-            "false",
-            "negatives",
-            "when",
-            "it",
-            "does",
-            "not.",
-            "Optional",
-            "annotations",
-            "(`E?`)",
-            "are",
-            "true",
-            "positives",
-            "when",
-            "flagged",
-            "but",
-            "true",
-            "negatives",
-            "(not",
-            "false",
-            "negatives)",
-            "when",
-            "not.",
-            "Tagged",
-            "annotations",
-            "(`E[tag]`)",
-            "require",
-            "ty",
-            "to",
-            "flag",
-            "exactly",
-            "one",
-            "of",
-            "the",
-            "tagged",
-            "lines;",
-            "tagged",
-            "multi-annotations",
-            "(`E[tag+]`)",
-            "allow",
-            "any",
-            "number",
-            "up",
-            "to",
-            "the",
-            "tag",
-            "count.",
-            "Flagging",
-            "unexpected",
-            "locations",
-            "counts",
-            "as",
-            "a",
-            "false",
-            "positive.",
-        ]
-    )
+    summary_note = " ".join(SUMMARY_NOTE.split())
 
     return dedent(
         f"""
