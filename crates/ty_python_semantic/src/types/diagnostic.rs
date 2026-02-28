@@ -83,6 +83,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_CONTEXT_MANAGER);
     registry.register_lint(&INVALID_DECLARATION);
     registry.register_lint(&INVALID_EXCEPTION_CAUGHT);
+    registry.register_lint(&INVALID_ENUM_MEMBER_ANNOTATION);
     registry.register_lint(&INVALID_GENERIC_ENUM);
     registry.register_lint(&INVALID_GENERIC_CLASS);
     registry.register_lint(&INVALID_LEGACY_TYPE_VARIABLE);
@@ -1188,6 +1189,49 @@ declare_lint! {
     pub(crate) static INVALID_EXCEPTION_CAUGHT = {
         summary: "detects exception handlers that catch classes that do not inherit from `BaseException`",
         status: LintStatus::stable("0.0.1-alpha.1"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for enum members that have explicit type annotations.
+    ///
+    /// ## Why is this bad?
+    /// The [typing spec] states that type checkers should infer a literal type
+    /// for all enum members. An explicit type annotation on an enum member is
+    /// misleading because the annotated type will be incorrect — the actual
+    /// runtime type is the enum class itself, not the annotated type.
+    ///
+    /// In CPython's `enum` module, annotated assignments with values are still
+    /// treated as members at runtime, but the annotation is meaningless and
+    /// will confuse readers of the code.
+    ///
+    /// ## Examples
+    /// ```python
+    /// from enum import Enum
+    ///
+    /// class Pet(Enum):
+    ///     CAT = 1       # OK
+    ///     DOG: int = 2  # Error: enum members should not be annotated
+    /// ```
+    ///
+    /// Use instead:
+    /// ```python
+    /// from enum import Enum
+    ///
+    /// class Pet(Enum):
+    ///     CAT = 1
+    ///     DOG = 2
+    /// ```
+    ///
+    /// ## References
+    /// - [Typing spec: Enum members](https://typing.python.org/en/latest/spec/enums.html#enum-members)
+    ///
+    /// [typing spec]: https://typing.python.org/en/latest/spec/enums.html#enum-members
+    pub(crate) static INVALID_ENUM_MEMBER_ANNOTATION = {
+        summary: "detects type annotations on enum members",
+        status: LintStatus::stable("0.0.16"),
         default_level: Level::Error,
     }
 }

@@ -76,11 +76,11 @@ use crate::types::diagnostic::{
     DATACLASS_FIELD_ORDER, DIVISION_BY_ZERO, DUPLICATE_BASE, DUPLICATE_KW_ONLY,
     FINAL_ON_NON_METHOD, FINAL_WITHOUT_VALUE, INCONSISTENT_MRO, INEFFECTIVE_FINAL,
     INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, INVALID_BASE,
-    INVALID_DATACLASS, INVALID_DECLARATION, INVALID_GENERIC_CLASS, INVALID_GENERIC_ENUM,
-    INVALID_KEY, INVALID_LEGACY_POSITIONAL_PARAMETER, INVALID_LEGACY_TYPE_VARIABLE,
-    INVALID_METACLASS, INVALID_NAMED_TUPLE, INVALID_NEWTYPE, INVALID_OVERLOAD,
-    INVALID_PARAMETER_DEFAULT, INVALID_PARAMSPEC, INVALID_PROTOCOL, INVALID_TYPE_ALIAS_TYPE,
-    INVALID_TYPE_ARGUMENTS, INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL,
+    INVALID_DATACLASS, INVALID_DECLARATION, INVALID_ENUM_MEMBER_ANNOTATION, INVALID_GENERIC_CLASS,
+    INVALID_GENERIC_ENUM, INVALID_KEY, INVALID_LEGACY_POSITIONAL_PARAMETER,
+    INVALID_LEGACY_TYPE_VARIABLE, INVALID_METACLASS, INVALID_NAMED_TUPLE, INVALID_NEWTYPE,
+    INVALID_OVERLOAD, INVALID_PARAMETER_DEFAULT, INVALID_PARAMSPEC, INVALID_PROTOCOL,
+    INVALID_TYPE_ALIAS_TYPE, INVALID_TYPE_ARGUMENTS, INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL,
     INVALID_TYPE_GUARD_DEFINITION, INVALID_TYPE_VARIABLE_BOUND, INVALID_TYPE_VARIABLE_CONSTRAINTS,
     INVALID_TYPE_VARIABLE_DEFAULT, INVALID_TYPED_DICT_HEADER, INVALID_TYPED_DICT_STATEMENT,
     IncompatibleBases, MISSING_ARGUMENT, NO_MATCHING_OVERLOAD, NOT_SUBSCRIPTABLE,
@@ -117,7 +117,7 @@ use crate::types::generics::{
     GenericContext, InferableTypeVars, SpecializationBuilder, bind_typevar,
     enclosing_generic_contexts, typing_self,
 };
-use crate::types::infer::nearest_enclosing_function;
+use crate::types::infer::{nearest_enclosing_class, nearest_enclosing_function};
 use crate::types::mro::{DynamicMroErrorKind, StaticMroErrorKind};
 use crate::types::newtype::NewType;
 use crate::types::special_form::AliasSpec;
@@ -9353,6 +9353,43 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     &DeclaredAndInferredType::AreTheSame(TypeAndQualifiers::declared(inferred_ty)),
                 );
             } else {
+                // Check for annotated enum members. The typing spec states that enum
+                // members should not have explicit type annotations.
+                if let Some(name_expr) = target.as_name_expr()
+                    && !name_expr.id.starts_with("__")
+                    && !matches!(name_expr.id.as_str(), "_ignore_" | "_value_" | "_name_")
+                    // Not bare Final (bare Final is allowed on enum members)
+                    && !(declared.qualifiers.contains(TypeQualifiers::FINAL)
+                        && matches!(declared.inner_type(), Type::Dynamic(DynamicType::Unknown)))
+                    // Not enum.member annotation
+                    && !matches!(
+                        declared.inner_type(),
+                        Type::NominalInstance(instance)
+                            if instance.has_known_class(self.db(), KnownClass::Member)
+                    )
+                    // Value type would be an enum member at runtime (exclude callables,
+                    // functions, and descriptors which are never members)
+                    && !matches!(inferred_ty, Type::Callable(_) | Type::FunctionLiteral(_))
+                {
+                    let current_scope_id = self.scope().file_scope_id(self.db());
+                    let current_scope = self.index.scope(current_scope_id);
+                    if current_scope.kind() == ScopeKind::Class
+                        && let Some(class) =
+                            nearest_enclosing_class(self.db(), self.index, self.scope())
+                        && is_enum_class_by_inheritance(self.db(), class)
+                    {
+                        if let Some(builder) = self
+                            .context
+                            .report_lint(&INVALID_ENUM_MEMBER_ANNOTATION, annotation)
+                        {
+                            builder.into_diagnostic(format_args!(
+                                "Type annotation on enum member `{}` is not allowed",
+                                &name_expr.id
+                            ));
+                        }
+                    }
+                }
+
                 self.add_declaration_with_binding(
                     target.into(),
                     definition,
