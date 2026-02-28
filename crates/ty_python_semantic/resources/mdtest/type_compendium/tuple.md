@@ -388,8 +388,8 @@ static_assert(not is_disjoint_from(tuple[F1, ...], tuple[F2, ...]))
 static_assert(not is_disjoint_from(tuple[N1, ...], tuple[N2, ...]))
 ```
 
-We currently model tuple types to _not_ be disjoint from arbitrary instance types, because we allow
-for the possibility of `tuple` to be subclassed
+We model tuple types to _not_ be disjoint from arbitrary instance types, because we allow for the
+possibility of `tuple` to be subclassed.
 
 ```py
 class C: ...
@@ -399,17 +399,14 @@ static_assert(not is_disjoint_from(tuple[int, str], C))
 class CommonSubtype(tuple[int, str], C): ...
 ```
 
-Note: This is inconsistent with the fact that we model heterogeneous tuples to be disjoint from
-other heterogeneous tuples above:
+However, we model heterogeneous tuples to be disjoint from other heterogeneous tuples. To reconcile
+these two things, we explicitly ban two differently specialized heterogeneous tuples from coexisting
+in the same MRO:
 
 ```py
 class I1(tuple[F1, F2]): ...
 class I2(tuple[F2, F1]): ...
-
-# TODO
-# This is a subtype of both `tuple[F1, F2]` and `tuple[F2, F1]`, so those two heterogeneous tuples
-# should not be disjoint from each other (see conflicting test above).
-class CommonSubtypeOfTuples(I1, I2): ...
+class CommonSubtypeOfTuples(I1, I2): ...  # error: [invalid-generic-class]
 ```
 
 ## Truthiness

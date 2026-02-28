@@ -135,6 +135,69 @@ reveal_type(generic_context(ExplicitInheritedGenericPartiallySpecialized))
 reveal_type(generic_context(ExplicitInheritedGenericPartiallySpecializedExtraTypevar))
 ```
 
+## Errors for inconsistent type arguments
+
+<!-- snapshot-diagnostics -->
+
+When inheriting from the same generic ancestor through multiple paths, the type argument ordering
+must be consistent. It is an error for a class to explicitly inherit from a generic base class that
+also appears elsewhere in the MRO with a different specialization:
+
+```py
+from typing import TypeVar, Generic, Any
+
+T1 = TypeVar("T1")
+T2 = TypeVar("T2")
+
+class Grandparent(Generic[T1, T2]): ...
+class Parent(Grandparent[T1, T2]): ...
+
+# Consistent ordering is fine:
+class GoodChild(Parent[T1, T2], Grandparent[T1, T2]): ...
+
+# error: [invalid-generic-class] "Inconsistent type arguments: class cannot inherit from both `Grandparent[T2@BadChild, T1@BadChild]` and `Grandparent[T1@BadChild, T2@BadChild]`"
+class BadChild(Parent[T1, T2], Grandparent[T2, T1]): ...
+
+# The same applies when the explicit base is partially specialized differently:
+class Parent2(Grandparent[T1, T2]): ...
+
+# error: [invalid-generic-class] "Inconsistent type arguments: class cannot inherit from both `Grandparent[T2@BadChild2, int]` and `Grandparent[T1@BadChild2, T2@BadChild2]`"
+class BadChild2(Parent2[T1, T2], Grandparent[T2, int]): ...
+
+# The inconsistency can also come through two intermediate classes (diamond):
+class Parent3(Grandparent[T1, T2]): ...
+class Parent4(Grandparent[T1, T2]): ...
+
+# error: [invalid-generic-class] "Inconsistent type arguments: class cannot inherit from both `Grandparent[T2@BadChild3, T1@BadChild3]` and `Grandparent[T1@BadChild3, T2@BadChild3]`"
+class BadChild3(Parent3[T1, T2], Parent4[T2, T1]): ...
+
+# Implicit specialization is fine:
+class Fine(Parent, Grandparent[T1, T2]): ...
+class AlsoFine(Parent3, Parent4[T1, T2]): ...
+class Dandy(Parent, Parent3, Parent4): ...
+
+# Edge cases: the first class is implicitly specialized
+# (or explicitly specialized with `Any`s), but later classes are not:
+
+# error: [invalid-generic-class]
+class BadChild4(Parent, Parent3[T1, T2], Parent4[T2, T1]): ...
+
+# error: [invalid-generic-class]
+class BadChild5(Parent[Any, Any], Parent3[T1, T2], Parent4[T2, T1]): ...
+
+# error: [invalid-generic-class]
+class BadChild6(Parent[T1, T2], Parent3, Parent4[T2, T1]): ...
+
+# error: [invalid-generic-class]
+class BadChild7(Parent[T1, T2], Parent3[Any, Any], Parent4[T2, T1]): ...
+
+# error: [invalid-generic-class]
+class BadChild8(Parent[T1, T2], Parent3[T2, T1], Parent4): ...
+
+# error: [invalid-generic-class]
+class BadChild9(Parent[T1, T2], Parent3[T2, T1], Parent4[Any, Any]): ...
+```
+
 ## Specializing generic classes explicitly
 
 <!-- snapshot-diagnostics -->
