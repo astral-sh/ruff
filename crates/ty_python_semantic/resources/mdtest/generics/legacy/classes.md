@@ -508,6 +508,56 @@ reveal_type(D(1))  # revealed: D[int]
 wrong_innards: D[int] = D("five")
 ```
 
+### Constructor inference can swap type parameters
+
+```py
+from typing import Generic, TypeVar
+
+K = TypeVar("K")
+V = TypeVar("V")
+
+class Pair(Generic[K, V]):
+    def __init__(self, key: K, value: V) -> None:
+        self.key: K = key
+        self.value: V = value
+
+    def swap(self) -> "Pair[V, K]":
+        swapped = Pair(self.value, self.key)
+        reveal_type(swapped)  # revealed: Pair[V@Pair, K@Pair]
+        return swapped
+
+pair = Pair("foo", 123)
+reveal_type(pair.swap())  # revealed: Pair[int, str]
+```
+
+### `typing.Self` classmethods can specialize generic constructors
+
+```py
+from typing_extensions import Generic, Self, TypeVar
+
+T = TypeVar("T")
+
+class Box(Generic[T]):
+    value: T
+
+    def __init__(self, value: T) -> None:
+        self.value = value
+
+    @classmethod
+    def from_value(cls, value: T) -> Self:
+        created = cls(value)
+        reveal_type(created)  # revealed: Self@from_value
+        return created
+
+class IntBox(Box[int]):
+    pass
+
+reveal_type(Box.from_value(1))  # revealed: Box[Unknown]
+reveal_type(IntBox.from_value(1))  # revealed: IntBox
+
+IntBox.from_value("x")  # error: [invalid-argument-type]
+```
+
 ### Both present, `__new__` inherited from a generic base class
 
 If either method comes from a generic base class, we don't currently use its inferred specialization
