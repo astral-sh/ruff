@@ -35,12 +35,11 @@ import re
 import subprocess
 import sys
 import tomllib
+from collections import defaultdict
 from collections.abc import Sequence, Set as AbstractSet
 from dataclasses import dataclass
 from enum import StrEnum, auto
-from functools import reduce
 from itertools import chain, groupby
-from operator import attrgetter
 from pathlib import Path
 from textwrap import dedent
 from typing import Any, Literal, Self, assert_never
@@ -75,6 +74,12 @@ CONFORMANCE_DIR_WITH_README = (
 )
 CONFORMANCE_URL = CONFORMANCE_DIR_WITH_README + "tests/{filename}#L{line}"
 
+GITHUB_HEADER = ["| Location | Name | Message |", "|----------|------|---------|"]
+GITHUB_CHANGED_HEADER = [
+    "| Δ | Location | Name | Message |",
+    "|---|----------|------|---------|",
+]
+
 # Priority order for section headings: improvements first, regressions last.
 TITLE_PRIORITY: dict[str, int] = {
     "True positives added": 0,
@@ -92,7 +97,6 @@ TITLE_PRIORITY: dict[str, int] = {
 class Source(StrEnum):
     OLD = auto()
     NEW = auto()
-    EXPECTED = auto()
 
 
 class Classification(StrEnum):
@@ -118,7 +122,6 @@ class Evaluation:
     classification: Classification
     true_positives: int = 0
     false_positives: int = 0
-    true_negatives: int = 0
     false_negatives: int = 0
 
 
@@ -159,28 +162,21 @@ class Location:
 
     def as_link(self) -> str:
         file = self.path.name
-        link = CONFORMANCE_URL.format(
-            conformance_suite_commit=CONFORMANCE_SUITE_COMMIT,
-            filename=file,
-            line=self.positions.begin.line,
-        )
+        link = CONFORMANCE_URL.format(filename=file, line=self.positions.begin.line)
         return f"[{file}:{self.positions.begin.line}:{self.positions.begin.column}]({link})"
 
 
 @dataclass(kw_only=True, slots=True)
-class Diagnostic:
+class TyDiagnostic:
+    """A diagnostic emitted by a ty version (old or new) during a conformance run."""
+
     check_name: str
     description: str
     severity: str
     location: Location
     source: Source
-    optional: bool
-    # tag identifying an error that can occur on multiple lines
-    tag: str | None
-    # True if one or more errors can occur on lines with the same tag
-    multi: bool
 
-    def __post_init__(self, *args, **kwargs) -> None:
+    def __post_init__(self) -> None:
         # Remove check name prefix from description
         self.description = self.description.replace(f"{self.check_name}: ", "")
         # Escape pipe characters for GitHub markdown tables
@@ -217,18 +213,6 @@ class Diagnostic:
                 ),
             ),
             source=source,
-            optional=False,
-            tag=None,
-            multi=False,
-        )
-
-    @property
-    def key(self) -> str:
-        """Key to group diagnostics by path and beginning line or path and tag."""
-        return (
-            f"{self.location.path.as_posix()}:{self.location.positions.begin.line}"
-            if self.tag is None
-            else f"{self.location.path.as_posix()}:{self.tag}"
         )
 
     @property
@@ -240,23 +224,58 @@ class Diagnostic:
 
 
 @dataclass(kw_only=True, slots=True)
+class ExpectedError:
+    """An error annotation parsed from a conformance test file (e.g. ``# E: ...``)."""
+
+    description: str
+    location: Location
+    optional: bool
+    # tag identifying an error that can occur on multiple lines
+    tag: str | None
+    # True if one or more errors can occur on lines with the same tag
+    multi: bool
+
+    @property
+    def key(self) -> str:
+        """Key to group expected errors by path and beginning line or path and tag."""
+        return (
+            f"{self.location.path.as_posix()}:{self.location.positions.begin.line}"
+            if self.tag is None
+            else f"{self.location.path.as_posix()}:{self.tag}"
+        )
+
+
+def diagnostics_are_equivalent(a: list[TyDiagnostic], b: list[TyDiagnostic]) -> bool:
+    """Compare two diagnostic lists for equality, ignoring the ``source`` field."""
+
+    def fingerprint(d: TyDiagnostic) -> tuple:
+        return (
+            d.check_name,
+            d.description,
+            d.severity,
+            str(d.location.path),
+            d.location.positions.begin.line,
+            d.location.positions.begin.column,
+        )
+
+    return sorted(map(fingerprint, a)) == sorted(map(fingerprint, b))
+
+
+@dataclass(kw_only=True, slots=True)
 class TestCase:
     key: str
-    sources: AbstractSet[Source]
-    old: list[Diagnostic]
-    new: list[Diagnostic]
-    expected: list[Diagnostic]
+    old: list[TyDiagnostic]
+    new: list[TyDiagnostic]
+    expected: list[ExpectedError]
 
     @property
     def change(self) -> Change:
-        if Source.NEW in self.sources and Source.OLD not in self.sources:
+        if self.new and not self.old:
             return Change.ADDED
-        elif Source.OLD in self.sources and Source.NEW not in self.sources:
+        elif self.old and not self.new:
             return Change.REMOVED
         elif (
-            Source.NEW in self.sources
-            and Source.OLD in self.sources
-            and not self.diagnostics_are_equivalent(self.old, self.new)
+            self.old and self.new and not diagnostics_are_equivalent(self.old, self.new)
         ):
             return Change.CHANGED
         else:
@@ -264,55 +283,26 @@ class TestCase:
 
     @property
     def optional(self) -> bool:
-        return bool(self.expected) and all(
-            diagnostic.optional for diagnostic in self.expected
-        )
+        return bool(self.expected) and all(e.optional for e in self.expected)
 
     @property
     def multi(self) -> bool:
-        return bool(self.expected) and all(
-            diagnostic.multi for diagnostic in self.expected
-        )
+        return bool(self.expected) and all(e.multi for e in self.expected)
 
-    def diagnostics_by_source(self, source: Source) -> list[Diagnostic]:
-        match source:
-            case Source.NEW:
-                return self.new
-            case Source.OLD:
-                return self.old
-            case Source.EXPECTED:
-                return self.expected
-
-    @staticmethod
-    def diagnostics_are_equivalent(a: list[Diagnostic], b: list[Diagnostic]) -> bool:
-        """Compare two diagnostic lists for equality, ignoring the `source` field."""
-
-        def fingerprint(d: Diagnostic) -> tuple:
-            return (
-                d.check_name,
-                d.description,
-                d.severity,
-                str(d.location.path),
-                d.location.positions.begin.line,
-                d.location.positions.begin.column,
-            )
-
-        return sorted(map(fingerprint, a)) == sorted(map(fingerprint, b))
+    def diagnostics_by_source(self, source: Source) -> list[TyDiagnostic]:
+        return self.old if source == Source.OLD else self.new
 
     def classify(self, source: Source) -> Evaluation:
         diagnostics = self.diagnostics_by_source(source)
 
-        if source in self.sources:
+        if diagnostics:
             if self.optional:
                 return Evaluation(
                     classification=Classification.TRUE_POSITIVE,
                     true_positives=len(diagnostics),
-                    false_positives=0,
-                    true_negatives=0,
-                    false_negatives=0,
                 )
 
-            if Source.EXPECTED in self.sources:
+            if self.expected:
                 distinct_lines = len(
                     {
                         diagnostic.location.positions.begin.line
@@ -325,107 +315,73 @@ class TestCase:
                     return Evaluation(
                         classification=Classification.TRUE_POSITIVE,
                         true_positives=len(diagnostics),
-                        false_positives=0,
-                        true_negatives=0,
-                        false_negatives=0,
                     )
                 else:
                     # We select the line with the most diagnostics
-                    # as our true positive, while the rest are false positives
-                    # TODO: The ty diagnostics below are because we are not
-                    # inferring a precise type for the `key` lambda, which gives
-                    # us the wrong type for `max_line`.
-                    # https://github.com/astral-sh/ty/issues/181
-                    max_line = max(
-                        groupby(
-                            diagnostics, key=lambda d: d.location.positions.begin.line
-                        ),
-                        key=lambda x: len(x[1]),
-                    )
-                    remaining = len(diagnostics) - max_line  # ty: ignore[unsupported-operator]
-                    # We can never exceed the number of distinct lines
-                    # if the diagnostic is multi, so we ignore that case
+                    # as our true positive, while the rest are false positives.
+                    by_line = {
+                        line: list(group)
+                        for line, group in groupby(
+                            sorted(
+                                diagnostics,
+                                key=lambda d: d.location.positions.begin.line,
+                            ),
+                            key=lambda d: d.location.positions.begin.line,
+                        )
+                    }
+                    best_count = max(len(g) for g in by_line.values())
                     return Evaluation(
                         classification=Classification.FALSE_POSITIVE,
-                        true_positives=max_line,  # ty: ignore[invalid-argument-type]
-                        false_positives=remaining,
-                        true_negatives=0,
-                        false_negatives=0,
+                        true_positives=best_count,
+                        false_positives=len(diagnostics) - best_count,
                     )
             else:
                 return Evaluation(
                     classification=Classification.FALSE_POSITIVE,
-                    true_positives=0,
                     false_positives=len(diagnostics),
-                    true_negatives=0,
-                    false_negatives=0,
                 )
 
-        elif Source.EXPECTED in self.sources:
+        elif self.expected:
             if self.optional:
-                return Evaluation(
-                    classification=Classification.TRUE_NEGATIVE,
-                    true_positives=0,
-                    false_positives=0,
-                    true_negatives=len(diagnostics),
-                    false_negatives=0,
-                )
+                return Evaluation(classification=Classification.TRUE_NEGATIVE)
             return Evaluation(
                 classification=Classification.FALSE_NEGATIVE,
-                true_positives=0,
-                false_positives=0,
-                true_negatives=0,
                 false_negatives=1,
             )
 
         else:
             return Evaluation(
                 classification=Classification.TRUE_NEGATIVE,
-                true_positives=0,
-                false_positives=0,
-                true_negatives=1,
-                false_negatives=0,
             )
 
-    def _render_row(self, diagnostics: list[Diagnostic]):
-        locs = []
-        check_names = []
-        descriptions = []
 
-        for diagnostic in diagnostics:
-            loc = (
-                diagnostic.location.as_link()
-                if diagnostic.location
-                else f"`{diagnostic.tag}`"
-            )
-            locs.append(loc)
-            check_names.append(diagnostic.check_name)
-            descriptions.append(diagnostic.description)
+def render_github_row(diagnostics: list[TyDiagnostic]) -> str:
+    locs = []
+    check_names = []
+    descriptions = []
+    for d in diagnostics:
+        locs.append(d.location.as_link())
+        check_names.append(d.check_name)
+        descriptions.append(d.description)
+    return f"| {'<br>'.join(locs)} | {'<br>'.join(check_names)} | {'<br>'.join(descriptions)} |"
 
-        return f"| {'<br>'.join(locs)} | {'<br>'.join(check_names)} | {'<br>'.join(descriptions)} |"
 
-    def _render_diff(self, diagnostics: list[Diagnostic], *, removed: bool = False):
-        sign = "-" if removed else "+"
-        return "\n".join(f"{sign} {diagnostic}" for diagnostic in diagnostics)
+def render_github_changed_row(diagnostics: list[TyDiagnostic], *, removed: bool) -> str:
+    """Like render_github_row but prepends a sign column for use in 'changed' sections."""
+    sign = "-" if removed else "+"
+    locs = []
+    check_names = []
+    descriptions = []
+    for d in diagnostics:
+        locs.append(d.location.as_link())
+        check_names.append(d.check_name)
+        descriptions.append(d.description)
+    return f"| {sign} | {'<br>'.join(locs)} | {'<br>'.join(check_names)} | {'<br>'.join(descriptions)} |"
 
-    def _render_changed_row(
-        self, diagnostics: list[Diagnostic], *, removed: bool
-    ) -> str:
-        """Like _render_row but prepends a sign column for use in "changed" sections."""
-        sign = "-" if removed else "+"
-        locs = []
-        check_names = []
-        descriptions = []
-        for diagnostic in diagnostics:
-            loc = (
-                diagnostic.location.as_link()
-                if diagnostic.location
-                else f"`{diagnostic.tag}`"
-            )
-            locs.append(loc)
-            check_names.append(diagnostic.check_name)
-            descriptions.append(diagnostic.description)
-        return f"| {sign} | {'<br>'.join(locs)} | {'<br>'.join(check_names)} | {'<br>'.join(descriptions)} |"
+
+def render_diff_row(diagnostics: list[TyDiagnostic], *, removed: bool = False) -> str:
+    sign = "-" if removed else "+"
+    return "\n".join(f"{sign} {d}" for d in diagnostics)
 
 
 @dataclass(kw_only=True, slots=True)
@@ -449,42 +405,39 @@ class Statistics:
             return 0.0
 
 
-def collect_expected_diagnostics(test_files: Sequence[Path]) -> list[Diagnostic]:
-    diagnostics: list[Diagnostic] = []
+def collect_expected_diagnostics(test_files: Sequence[Path]) -> list[ExpectedError]:
+    errors: list[ExpectedError] = []
     for file in test_files:
         for idx, line in enumerate(file.read_text().splitlines(), 1):
-            if error := re.search(CONFORMANCE_ERROR_PATTERN, line):
-                diagnostics.append(
-                    Diagnostic(
-                        check_name="conformance",
-                        description=(error.group("description") or "Missing"),
-                        severity="major",
+            if match := re.search(CONFORMANCE_ERROR_PATTERN, line):
+                errors.append(
+                    ExpectedError(
+                        description=(match.group("description") or "Missing"),
                         location=Location(
                             path=file,
                             positions=Positions(
                                 begin=Position(
                                     line=idx,
-                                    column=error.start(),
+                                    column=match.start(),
                                 ),
                                 end=Position(
                                     line=idx,
-                                    column=error.end(),
+                                    column=match.end(),
                                 ),
                             ),
                         ),
-                        source=Source.EXPECTED,
-                        optional=error.group("optional") is not None,
+                        optional=match.group("optional") is not None,
                         tag=(
-                            f"{file.name}:{error.group('tag')}"
-                            if error.group("tag")
+                            f"{file.name}:{match.group('tag')}"
+                            if match.group("tag")
                             else None
                         ),
-                        multi=error.group("multi") is not None,
+                        multi=match.group("multi") is not None,
                     )
                 )
 
-    assert diagnostics, "Failed to discover any expected diagnostics!"
-    return diagnostics
+    assert errors, "Failed to discover any expected diagnostics!"
+    return errors
 
 
 def collect_ty_diagnostics(
@@ -493,7 +446,7 @@ def collect_ty_diagnostics(
     test_files: Sequence[Path],
     python_version: str = "3.12",
     extra_search_paths: Sequence[Path] = (),
-) -> list[Diagnostic]:
+) -> list[TyDiagnostic]:
     extra_search_path_args = [
         f"--extra-search-path={path}" for path in extra_search_paths
     ]
@@ -517,88 +470,68 @@ def collect_ty_diagnostics(
         timeout=15,
     )
 
-    if process.returncode != 0:
-        print(process.stderr)
-        raise RuntimeError(f"ty check failed with exit code {process.returncode}")
-
     return [
-        Diagnostic.from_gitlab_output(dct, source=source)
+        TyDiagnostic.from_gitlab_output(dct, source=source)
         for dct in json.loads(process.stdout)
         if dct["severity"] == "major"
     ]
 
 
 def group_diagnostics_by_key(
-    old: list[Diagnostic],
-    new: list[Diagnostic],
-    expected: list[Diagnostic],
+    old: list[TyDiagnostic],
+    new: list[TyDiagnostic],
+    expected: list[ExpectedError],
 ) -> list[TestCase]:
-    # propagate tags from expected diagnostics to old and new diagnostics
-    tagged_lines = {
-        (d.location.path.name, d.location.positions.begin.line): d.tag
-        for d in expected
-        if d.tag is not None
+    # Build a lookup from (filename, line) to tag so ty diagnostics on a tagged
+    # line can be grouped with all other expected errors sharing that tag.
+    tagged_lines: dict[tuple[str, int], str] = {
+        (e.location.path.name, e.location.positions.begin.line): e.tag
+        for e in expected
+        if e.tag is not None
     }
 
-    for diag in chain(old, new):
-        diag.tag = tagged_lines.get(
-            (
-                diag.location.path.name,
-                diag.location.positions.begin.line,
-            )
+    def ty_key(diag: TyDiagnostic) -> str:
+        tag = tagged_lines.get(
+            (diag.location.path.name, diag.location.positions.begin.line)
+        )
+        return (
+            f"{diag.location.path.as_posix()}:{tag}"
+            if tag is not None
+            else f"{diag.location.path.as_posix()}:{diag.location.positions.begin.line}"
         )
 
-    diagnostics = [
-        *old,
-        *new,
-        *expected,
+    old_by_key: defaultdict[str, list[TyDiagnostic]] = defaultdict(list)
+    new_by_key: defaultdict[str, list[TyDiagnostic]] = defaultdict(list)
+    expected_by_key: defaultdict[str, list[ExpectedError]] = defaultdict(list)
+
+    for diag in old:
+        old_by_key[ty_key(diag)].append(diag)
+    for diag in new:
+        new_by_key[ty_key(diag)].append(diag)
+    for err in expected:
+        expected_by_key[err.key].append(err)
+
+    all_keys = sorted(old_by_key.keys() | new_by_key.keys() | expected_by_key.keys())
+    return [
+        TestCase(
+            key=key,
+            old=old_by_key[key],
+            new=new_by_key[key],
+            expected=expected_by_key[key],
+        )
+        for key in all_keys
     ]
 
-    diagnostics = sorted(diagnostics, key=attrgetter("key"))
-    test_cases = []
-    for key, group in groupby(diagnostics, key=attrgetter("key")):
-        old_diagnostics: list[Diagnostic] = []
-        new_diagnostics: list[Diagnostic] = []
-        expected_diagnostics: list[Diagnostic] = []
-        sources: set[Source] = set()
 
-        for diag in group:
-            sources.add(diag.source)
-            match diag.source:
-                case Source.OLD:
-                    old_diagnostics.append(diag)
-                case Source.NEW:
-                    new_diagnostics.append(diag)
-                case Source.EXPECTED:
-                    expected_diagnostics.append(diag)
-
-        grouped = TestCase(
-            key=key,
-            sources=sources,
-            old=old_diagnostics,
-            new=new_diagnostics,
-            expected=expected_diagnostics,
-        )
-        test_cases.append(grouped)
-
-    return test_cases
-
-
-def compute_stats(
-    test_cases: list[TestCase],
-    ty_version: Literal["new", "old"],
-) -> Statistics:
-    source = Source.NEW if ty_version == "new" else Source.OLD
-
-    def increment(statistics: Statistics, grouped: TestCase) -> Statistics:
-        eval = grouped.classify(source)
-        statistics.true_positives += eval.true_positives
-        statistics.false_positives += eval.false_positives
-        statistics.false_negatives += eval.false_negatives
-        statistics.total_diagnostics += len(grouped.diagnostics_by_source(source))
-        return statistics
-
-    return reduce(increment, test_cases, Statistics())
+def compute_stats(test_cases: list[TestCase], source: Source) -> Statistics:
+    stats = Statistics()
+    for tc in test_cases:
+        evaluation = tc.classify(source)
+        stats.true_positives += evaluation.true_positives
+        stats.false_positives += evaluation.false_positives
+        stats.false_negatives += evaluation.false_negatives
+        stats.total_diagnostics += len(tc.diagnostics_by_source(source))
+    return stats
 
 
 def render_test_cases(
@@ -660,12 +593,6 @@ def render_test_cases(
     # Sort by priority then test-case key so groups are contiguous and stable.
     entries.sort(key=lambda e: (TITLE_PRIORITY.get(e[0], 99), e[0], e[1].key))
 
-    _GITHUB_HEADER = ["| Location | Name | Message |", "|----------|------|---------|"]
-    _GITHUB_CHANGED_HEADER = [
-        "| Δ | Location | Name | Message |",
-        "|---|----------|------|---------|",
-    ]
-
     lines = []
     for title, group in groupby(entries, key=lambda e: e[0]):
         group_list = list(group)
@@ -677,26 +604,26 @@ def render_test_cases(
         if format == "diff":
             lines.append("```diff")
         elif is_changed_section:
-            lines.extend(_GITHUB_CHANGED_HEADER)
+            lines.extend(GITHUB_CHANGED_HEADER)
         else:
-            lines.extend(_GITHUB_HEADER)
+            lines.extend(GITHUB_HEADER)
 
         for _, tc, source in group_list:
             if source is None:
                 # "Changed" entry: render old diagnostics (-) then new diagnostics (+).
                 if format == "diff":
-                    lines.append(tc._render_diff(tc.old, removed=True))
-                    lines.append(tc._render_diff(tc.new, removed=False))
+                    lines.append(render_diff_row(tc.old, removed=True))
+                    lines.append(render_diff_row(tc.new, removed=False))
                 else:
-                    lines.append(tc._render_changed_row(tc.old, removed=True))
-                    lines.append(tc._render_changed_row(tc.new, removed=False))
+                    lines.append(render_github_changed_row(tc.old, removed=True))
+                    lines.append(render_github_changed_row(tc.new, removed=False))
             else:
                 diagnostics = tc.diagnostics_by_source(source)
                 removed = source == Source.OLD
                 if format == "diff":
-                    lines.append(tc._render_diff(diagnostics, removed=removed))
+                    lines.append(render_diff_row(diagnostics, removed=removed))
                 else:
-                    lines.append(tc._render_row(diagnostics))
+                    lines.append(render_github_row(diagnostics))
 
         if format == "diff":
             lines.append("```")
@@ -709,7 +636,7 @@ def file_is_fully_passing(test_cases: list[TestCase], source: Source) -> bool:
     """Return True if every test case for a file classifies as TP or TN for source."""
     return all(
         tc.classify(source).classification
-        in (Classification.TRUE_POSITIVE, Classification.TRUE_NEGATIVE)
+        not in (Classification.FALSE_POSITIVE, Classification.FALSE_NEGATIVE)
         for tc in test_cases
     )
 
@@ -799,8 +726,8 @@ def render_summary(test_cases: list[TestCase], *, force_summary_table: bool) -> 
             return f"decreased from {old:.2%} to {new:.2%}"
         return f"held steady at {old:.2%}"
 
-    old = compute_stats(test_cases, ty_version="old")
-    new = compute_stats(test_cases, ty_version="new")
+    old = compute_stats(test_cases, Source.OLD)
+    new = compute_stats(test_cases, Source.NEW)
 
     assert new.true_positives > 0, (
         "Expected ty to have at least one true positive.\n"
