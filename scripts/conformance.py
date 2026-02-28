@@ -29,6 +29,7 @@ Examples:
 from __future__ import annotations
 
 import argparse
+import html
 import json
 import os
 import re
@@ -368,11 +369,13 @@ def render_html_test_case_rows(tc: TestCase, *, source: Source | None) -> list[s
         return f'<td{rowspan_attr} align="center" valign="middle">{symbol}</td>'
 
     def diag_row(d: TyDiagnostic, prepend: str = "") -> str:
+        name = html.escape(d.check_name)
+        desc = html.escape(d.description.replace("\\|", "|"))
         return (
             f"<tr>{prepend}"
             f"<td>{d.location.as_html_link()}</td>"
-            f"<td>{d.check_name}</td>"
-            f"<td>{d.description}</td>"
+            f"<td>{name}</td>"
+            f"<td>{desc}</td>"
             f"</tr>"
         )
 
