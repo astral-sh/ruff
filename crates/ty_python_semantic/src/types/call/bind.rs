@@ -24,6 +24,7 @@ use super::{Argument, CallArguments, CallError, CallErrorKind, InferContext, Sig
 use crate::db::Db;
 use crate::dunder_all::dunder_all_names;
 use crate::place::{DefinedPlace, Definedness, Place, known_module_symbol};
+use crate::subscript::PyIndex;
 use crate::types::call::arguments::{Expansion, is_expandable_type};
 use crate::types::constraints::{ConstraintSet, ConstraintSetBuilder};
 use crate::types::diagnostic::{
@@ -3332,6 +3333,14 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
     ) -> Result<(), ()> {
         enum VariadicArgumentType<'db> {
             ParamSpec(Type<'db>),
+            /// A union type where each element has been individually iterated into a tuple spec.
+            /// We pre-compute the per-position union types, length bounds, and variable element
+            /// so the rest of the matching logic can handle unions without special-casing.
+            Union {
+                argument_types: Vec<Type<'db>>,
+                length: TupleLength,
+                variable_element: Option<Type<'db>>,
+            },
             Other(Cow<'db, TupleSpec<'db>>),
             None,
         }
@@ -3347,13 +3356,84 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
             // `*args: P.args` (another ParamSpec).
             Some(argument_type) => match argument_type.as_paramspec_typevar(db) {
                 Some(paramspec) => VariadicArgumentType::ParamSpec(paramspec),
-                // TODO: `Type::iterate` internally handles unions, but in a lossy way.
-                // It might be superior here to manually map over the union and call `try_iterate`
-                // on each element, similar to the way that `unpacker.rs` does in the `unpack_inner` method.
-                // It might be a bit of a refactor, though.
-                // See <https://github.com/astral-sh/ruff/pull/20377#issuecomment-3401380305>
-                // for more details. --Alex
-                None => VariadicArgumentType::Other(argument_type.iterate(db)),
+                None => match argument_type {
+                    // `Type::iterate` unions tuple specs in a way that can invent additional
+                    // arities. Iterate each union element individually and compute per-position
+                    // union types, length bounds, and variable element so that the rest of the
+                    // matching logic handles unions correctly.
+                    //
+                    // We restrict this to cases where all remaining positional parameters are
+                    // defaulted and there is no variadic parameter, because the per-position
+                    // union loses the correlation between element lengths and per-position types.
+                    // In overloaded contexts, this loss would prevent the expansion step from
+                    // correctly splitting the union into separate argument lists.
+                    //
+                    // TODO: This is overly conservative. We could also apply this when all
+                    // non-defaulted parameters are covered by the shortest union element,
+                    // e.g. `f(a: int, b: int = 0)` with `*x` where `x: tuple[int] | tuple[int, int]`.
+                    Type::Union(union)
+                        if self.parameters.variadic().is_none()
+                            && self
+                                .parameters
+                                .positional()
+                                .skip(self.next_positional)
+                                .all(|parameter| parameter.default_type().is_some()) =>
+                    {
+                        let tuple_specs: Vec<_> =
+                            union.elements(db).iter().map(|ty| ty.iterate(db)).collect();
+
+                        let min_len = tuple_specs
+                            .iter()
+                            .map(|s| s.len().minimum())
+                            .min()
+                            .unwrap_or(0);
+                        let any_variable = tuple_specs.iter().any(|s| s.len().is_variable());
+                        let max_elements = tuple_specs
+                            .iter()
+                            .map(|s| s.all_elements().len())
+                            .max()
+                            .unwrap_or(0);
+
+                        let variable_element = {
+                            let var_types: Vec<_> = tuple_specs
+                                .iter()
+                                .filter_map(|s| s.variable_element().copied())
+                                .collect();
+                            if var_types.is_empty() {
+                                None
+                            } else {
+                                Some(UnionType::from_elements_leave_aliases(db, var_types))
+                            }
+                        };
+
+                        let max_elements = i32::try_from(max_elements).unwrap_or(i32::MAX);
+                        let mut argument_types_vec = Vec::new();
+                        for index in 0..max_elements {
+                            let positional_types: Vec<_> = tuple_specs
+                                .iter()
+                                .filter_map(|s| s.py_index(db, index).ok())
+                                .collect();
+                            if positional_types.is_empty() {
+                                break;
+                            }
+                            argument_types_vec
+                                .push(UnionType::from_elements_leave_aliases(db, positional_types));
+                        }
+
+                        let length = if any_variable || argument_types_vec.len() > min_len {
+                            TupleLength::Variable(min_len, 0)
+                        } else {
+                            TupleLength::Fixed(min_len)
+                        };
+
+                        VariadicArgumentType::Union {
+                            argument_types: argument_types_vec,
+                            length,
+                            variable_element,
+                        }
+                    }
+                    _ => VariadicArgumentType::Other(argument_type.iterate(db)),
+                },
             },
             None => VariadicArgumentType::None,
         };
@@ -3362,6 +3442,11 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
             VariadicArgumentType::ParamSpec(paramspec) => {
                 ([].as_slice(), TupleLength::unknown(), Some(*paramspec))
             }
+            VariadicArgumentType::Union {
+                argument_types,
+                length,
+                variable_element,
+            } => (argument_types.as_slice(), *length, *variable_element),
             VariadicArgumentType::Other(tuple) => (
                 tuple.all_elements(),
                 tuple.len(),
@@ -3372,6 +3457,12 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
 
         let mut argument_types = argument_types.iter().copied();
         let is_variable = length.is_variable();
+
+        // For union types with no variable element, we know the exact set of possible argument
+        // positions. When argument types are exhausted, we should stop matching rather than
+        // continuing with unknown types.
+        let bounded = variable_element.is_none()
+            && matches!(&variadic_type, VariadicArgumentType::Union { .. });
 
         // We must be able to match up the fixed-length portion of the argument with positional
         // parameters, so we pass on any errors that occur.
@@ -3399,12 +3490,11 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
                 {
                     break;
                 }
-                self.match_positional(
-                    argument_index,
-                    argument,
-                    argument_types.next().or(variable_element),
-                    is_variable,
-                )?;
+                let arg_type = argument_types.next().or(variable_element);
+                if bounded && arg_type.is_none() {
+                    break;
+                }
+                self.match_positional(argument_index, argument, arg_type, is_variable)?;
             }
         }
 
