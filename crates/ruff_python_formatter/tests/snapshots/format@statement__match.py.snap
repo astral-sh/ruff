@@ -1124,7 +1124,8 @@ match pattern_match_class:
         pass
 
     case Point2D(  # end of line
-        0, 0
+        0,
+        0,
     ):
         pass
 
@@ -1310,7 +1311,9 @@ match n % 3, n % 5:
 # Unparenthesized tuples
 match x:
     case Child(aaaaaaaaa, bbbbbbbbbbbbbbb, cccccc), Doc(
-        aaaaa, bbbbbbbbbb, ddddddddddddd
+        aaaaa,
+        bbbbbbbbbb,
+        ddddddddddddd,
     ):
         pass
 
