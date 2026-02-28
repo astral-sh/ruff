@@ -837,9 +837,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                     )
                                 }
                                 None => {
-                                    // TODO: emit a diagnostic if you try to specialize a non-generic class.
                                     self.infer_type_expression(parameters);
-                                    todo_type!("specialized non-generic class")
+                                    if let Some(builder) =
+                                        self.context.report_lint(&NOT_SUBSCRIPTABLE, subscript)
+                                    {
+                                        builder
+                                            .into_diagnostic("Cannot subscript non-generic type");
+                                    }
+                                    Type::unknown()
                                 }
                             }
                         }
@@ -1190,9 +1195,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             .unwrap_or(Type::unknown())
                     }
                     _ => {
-                        // TODO: emit a diagnostic if you try to specialize a non-generic class.
                         self.infer_type_expression(slice);
-                        todo_type!("specialized non-generic class")
+                        if let Some(builder) =
+                            self.context.report_lint(&NOT_SUBSCRIPTABLE, subscript)
+                        {
+                            builder.into_diagnostic("Cannot subscript non-generic type");
+                        }
+                        Type::unknown()
                     }
                 }
             }
