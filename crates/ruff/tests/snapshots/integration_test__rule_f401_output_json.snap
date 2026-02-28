@@ -32,7 +32,7 @@ exit_code: 0
   },
   "source_location": {
     "file": "<FILE>",
-    "line": 144
+    "line": 143
   }
 }
 ----- stderr -----

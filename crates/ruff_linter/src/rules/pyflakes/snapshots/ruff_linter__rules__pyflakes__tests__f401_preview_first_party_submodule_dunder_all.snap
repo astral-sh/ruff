@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
-F401 [*] `submodule.a` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+F401 [*] `submodule.a` imported but unused
  --> __init__.py:2:8
   |
 2 | import submodule.a
@@ -9,9 +9,9 @@ F401 [*] `submodule.a` imported but unused; consider removing, adding to `__all_
 3 | __all__ = ['FOO']
 4 | FOO = 42
   |
-help: Add `submodule` to __all__
+help: Remove unused import: `submodule.a`
 1 | 
-2 | import submodule.a
-  - __all__ = ['FOO']
-3 + __all__ = ['FOO', 'submodule']
-4 | FOO = 42
+  - import submodule.a
+2 | __all__ = ['FOO']
+3 | FOO = 42
+note: This is an unsafe fix and may change runtime behavior

@@ -303,6 +303,24 @@ mod tests {
         assert_diagnostics!(snapshot, diagnostics);
     }
 
+    #[test_case(Rule::UnusedImport, Path::new("F401_same_package/__init__.py"))]
+    fn f401_preview_same_package(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "preview__{}_{}",
+            rule_code.noqa_code(),
+            path.to_string_lossy()
+        );
+        let diagnostics = test_path(
+            Path::new("pyflakes").join(path).as_path(),
+            &LinterSettings {
+                preview: PreviewMode::Enabled,
+                ..LinterSettings::for_rule(rule_code)
+            },
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
     // Regression test for https://github.com/astral-sh/ruff/issues/12897
     #[test_case(Rule::UnusedImport, Path::new("F401_33/__init__.py"))]
     fn f401_preview_local_init_import(rule_code: Rule, path: &Path) -> Result<()> {
