@@ -104,3 +104,45 @@ from pathlib import Path
 def format_file(file: Path):
     with file.open() as f:
         contents = f.read()
+
+# https://github.com/astral-sh/ruff/issues/23278
+def returns_path() -> Path: ...
+def returns_not_path(): ...
+
+class A:
+    @staticmethod
+    def method_returns_path() -> Path: ...
+    @staticmethod
+    def method_returns_not_path(): ...
+
+# Errors
+x1 = returns_path()
+x1.open()
+x2 = A.method_returns_path()
+x2.open()
+returns_path().open()
+A.method_returns_path().open()
+
+# Non-errors
+## because encoding
+x1 = returns_path()
+x1.open(encoding="")
+x2 = A.method_returns_path()
+x2.open(encoding="")
+returns_path().open(encoding="")
+A.method_returns_path().open(encoding="")
+
+## because non-path return by functions
+x3 = A.method_returns_not_path()
+x3.open()
+x4 = returns_not_path()
+x4.open()
+returns_not_path().open()
+A.method_returns_not_path().open()
+
+## because not only reference
+x3 = returns_path()
+x3.open()
+x5 = returns_path()
+x5 = 1
+x5.open()

@@ -927,7 +927,7 @@ impl PathlibPathChecker {
             return false;
         };
 
-        matches!(
+        if matches!(
             qualified_name.segments(),
             [
                 "pathlib",
@@ -938,7 +938,21 @@ impl PathlibPathChecker {
                     | "PureWindowsPath"
                     | "WindowsPath"
             ]
-        )
+        ) {
+            true
+        } else {
+            if let Some(binding_id) = match expr {
+                Expr::Name(expr_name) => semantic.only_binding(expr_name),
+                Expr::Attribute(_) => semantic.lookup_attribute(expr),
+                _ => {
+                    return false;
+                }
+            } {
+                is_pathlib_path(semantic.binding(binding_id), semantic)
+            } else {
+                false
+            }
+        }
     }
 }
 

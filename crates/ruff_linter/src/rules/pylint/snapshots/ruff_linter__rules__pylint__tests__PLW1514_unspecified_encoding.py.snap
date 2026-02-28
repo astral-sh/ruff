@@ -472,4 +472,89 @@ help: Add explicit `encoding` argument
     -     with file.open() as f:
 105 +     with file.open(encoding="utf-8") as f:
 106 |         contents = f.read()
+107 | 
+108 | # https://github.com/astral-sh/ruff/issues/23278
+note: This is an unsafe fix and may change runtime behavior
+
+PLW1514 [*] `pathlib.Path(...).open` in text mode without explicit `encoding` argument
+   --> unspecified_encoding.py:120:1
+    |
+118 | # Errors
+119 | x1 = returns_path()
+120 | x1.open()
+    | ^^^^^^^
+121 | x2 = A.method_returns_path()
+122 | x2.open()
+    |
+help: Add explicit `encoding` argument
+117 | 
+118 | # Errors
+119 | x1 = returns_path()
+    - x1.open()
+120 + x1.open(encoding="utf-8")
+121 | x2 = A.method_returns_path()
+122 | x2.open()
+123 | returns_path().open()
+note: This is an unsafe fix and may change runtime behavior
+
+PLW1514 [*] `pathlib.Path(...).open` in text mode without explicit `encoding` argument
+   --> unspecified_encoding.py:122:1
+    |
+120 | x1.open()
+121 | x2 = A.method_returns_path()
+122 | x2.open()
+    | ^^^^^^^
+123 | returns_path().open()
+124 | A.method_returns_path().open()
+    |
+help: Add explicit `encoding` argument
+119 | x1 = returns_path()
+120 | x1.open()
+121 | x2 = A.method_returns_path()
+    - x2.open()
+122 + x2.open(encoding="utf-8")
+123 | returns_path().open()
+124 | A.method_returns_path().open()
+125 | 
+note: This is an unsafe fix and may change runtime behavior
+
+PLW1514 [*] `pathlib.Path(...).open` in text mode without explicit `encoding` argument
+   --> unspecified_encoding.py:123:1
+    |
+121 | x2 = A.method_returns_path()
+122 | x2.open()
+123 | returns_path().open()
+    | ^^^^^^^^^^^^^^^^^^^
+124 | A.method_returns_path().open()
+    |
+help: Add explicit `encoding` argument
+120 | x1.open()
+121 | x2 = A.method_returns_path()
+122 | x2.open()
+    - returns_path().open()
+123 + returns_path().open(encoding="utf-8")
+124 | A.method_returns_path().open()
+125 | 
+126 | # Non-errors
+note: This is an unsafe fix and may change runtime behavior
+
+PLW1514 [*] `pathlib.Path(...).open` in text mode without explicit `encoding` argument
+   --> unspecified_encoding.py:124:1
+    |
+122 | x2.open()
+123 | returns_path().open()
+124 | A.method_returns_path().open()
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+125 |
+126 | # Non-errors
+    |
+help: Add explicit `encoding` argument
+121 | x2 = A.method_returns_path()
+122 | x2.open()
+123 | returns_path().open()
+    - A.method_returns_path().open()
+124 + A.method_returns_path().open(encoding="utf-8")
+125 | 
+126 | # Non-errors
+127 | ## because encoding
 note: This is an unsafe fix and may change runtime behavior
