@@ -79,11 +79,13 @@ CONFORMANCE_URL = CONFORMANCE_DIR_WITH_README + "tests/{filename}#L{line}"
 TITLE_PRIORITY: dict[str, int] = {
     "True positives added": 0,
     "False positives removed": 1,
-    "False positives added": 2,
-    "True positives removed": 3,
-    "Optional Diagnostics Added": 4,
-    "Optional Diagnostics Removed": 5,
-    "Optional Diagnostics Changed": 6,
+    "True positives changed": 2,
+    "False positives changed": 3,
+    "False positives added": 4,
+    "True positives removed": 5,
+    "Optional Diagnostics Added": 6,
+    "Optional Diagnostics Removed": 7,
+    "Optional Diagnostics Changed": 8,
 }
 
 
@@ -406,6 +408,25 @@ class TestCase:
         sign = "-" if removed else "+"
         return "\n".join(f"{sign} {diagnostic}" for diagnostic in diagnostics)
 
+    def _render_changed_row(
+        self, diagnostics: list[Diagnostic], *, removed: bool
+    ) -> str:
+        """Like _render_row but prepends a sign column for use in "changed" sections."""
+        sign = "-" if removed else "+"
+        locs = []
+        check_names = []
+        descriptions = []
+        for diagnostic in diagnostics:
+            loc = (
+                diagnostic.location.as_link()
+                if diagnostic.location
+                else f"`{diagnostic.tag}`"
+            )
+            locs.append(loc)
+            check_names.append(diagnostic.check_name)
+            descriptions.append(diagnostic.description)
+        return f"| {sign} | {'<br>'.join(locs)} | {'<br>'.join(check_names)} | {'<br>'.join(descriptions)} |"
+
 
 @dataclass(kw_only=True, slots=True)
 class Statistics:
@@ -585,10 +606,10 @@ def render_test_cases(
     *,
     format: Literal["diff", "github"] = "diff",
 ) -> str:
-    # Each entry is (title, test_case, source) — one entry per section a test case appears in.
-    # CHANGED test cases contribute two entries: old diagnostics under "[X] removed" and
-    # new diagnostics under "[Y] added".
-    entries: list[tuple[str, TestCase, Source]] = []
+    # Each entry is (title, test_case, source) where source=None means show both old
+    # (removed) and new (added) — used for "changed" sections where the classification
+    # is the same in both versions but the diagnostics themselves differ.
+    entries: list[tuple[str, TestCase, Source | None]] = []
 
     for test_case in test_cases:
         change = test_case.change
@@ -601,18 +622,37 @@ def render_test_cases(
             elif change == Change.REMOVED:
                 entries.append((Change.REMOVED.into_title(), test_case, Source.OLD))
             elif change == Change.CHANGED:
-                # Show old under "removed" and new under "added" so both are visible.
-                entries.append((Change.REMOVED.into_title(), test_case, Source.OLD))
-                entries.append((Change.ADDED.into_title(), test_case, Source.NEW))
+                entries.append((Change.CHANGED.into_title(), test_case, None))
         else:
-            if change in (Change.ADDED, Change.CHANGED):
+            if change == Change.ADDED:
                 new_class = test_case.classify(Source.NEW).classification
-                title = new_class.into_title(verb="added")
-                entries.append((title, test_case, Source.NEW))
-            if change in (Change.REMOVED, Change.CHANGED):
+                entries.append(
+                    (new_class.into_title(verb="added"), test_case, Source.NEW)
+                )
+            elif change == Change.REMOVED:
                 old_class = test_case.classify(Source.OLD).classification
-                title = old_class.into_title(verb="removed")
-                entries.append((title, test_case, Source.OLD))
+                entries.append(
+                    (old_class.into_title(verb="removed"), test_case, Source.OLD)
+                )
+            elif change == Change.CHANGED:
+                old_class = test_case.classify(Source.OLD).classification
+                new_class = test_case.classify(Source.NEW).classification
+                if old_class == new_class:
+                    # Same classification but different diagnostics: show a before/after diff
+                    # in a single "changed" section rather than the confusing split into
+                    # separate "removed" and "added" sections for the same classification.
+                    entries.append(
+                        (new_class.into_title(verb="changed"), test_case, None)
+                    )
+                else:
+                    # Classification changed: show old under "[X] removed" and new under
+                    # "[Y] added" since the status genuinely changed.
+                    entries.append(
+                        (old_class.into_title(verb="removed"), test_case, Source.OLD)
+                    )
+                    entries.append(
+                        (new_class.into_title(verb="added"), test_case, Source.NEW)
+                    )
 
     if not entries:
         return ""
@@ -620,34 +660,46 @@ def render_test_cases(
     # Sort by priority then test-case key so groups are contiguous and stable.
     entries.sort(key=lambda e: (TITLE_PRIORITY.get(e[0], 99), e[0], e[1].key))
 
-    match format:
-        case "diff":
-            header = ["```diff"]
-            footer = "```"
-        case "github":
-            header = [
-                "| Location | Name | Message |",
-                "|----------|------|---------|",
-            ]
-            footer = ""
-        case _:
-            raise ValueError("format must be one of 'diff' or 'github'")
+    _GITHUB_HEADER = ["| Location | Name | Message |", "|----------|------|---------|"]
+    _GITHUB_CHANGED_HEADER = [
+        "| Δ | Location | Name | Message |",
+        "|---|----------|------|---------|",
+    ]
 
     lines = []
     for title, group in groupby(entries, key=lambda e: e[0]):
+        group_list = list(group)
+        is_changed_section = group_list[0][2] is None
+
         lines.append(f"### {title}")
         lines.extend(["", "<details>", ""])
-        lines.extend(header)
 
-        for _, test_case, source in group:
-            diagnostics = test_case.diagnostics_by_source(source)
-            removed = source == Source.OLD
-            if format == "diff":
-                lines.append(test_case._render_diff(diagnostics, removed=removed))
+        if format == "diff":
+            lines.append("```diff")
+        elif is_changed_section:
+            lines.extend(_GITHUB_CHANGED_HEADER)
+        else:
+            lines.extend(_GITHUB_HEADER)
+
+        for _, tc, source in group_list:
+            if source is None:
+                # "Changed" entry: render old diagnostics (-) then new diagnostics (+).
+                if format == "diff":
+                    lines.append(tc._render_diff(tc.old, removed=True))
+                    lines.append(tc._render_diff(tc.new, removed=False))
+                else:
+                    lines.append(tc._render_changed_row(tc.old, removed=True))
+                    lines.append(tc._render_changed_row(tc.new, removed=False))
             else:
-                lines.append(test_case._render_row(diagnostics))
+                diagnostics = tc.diagnostics_by_source(source)
+                removed = source == Source.OLD
+                if format == "diff":
+                    lines.append(tc._render_diff(diagnostics, removed=removed))
+                else:
+                    lines.append(tc._render_row(diagnostics))
 
-        lines.append(footer)
+        if format == "diff":
+            lines.append("```")
         lines.extend(["", "</details>", ""])
 
     return "\n".join(lines)
