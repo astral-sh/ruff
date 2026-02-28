@@ -1448,34 +1448,29 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .or(class.legacy_generic_context(self.db()))
                 {
                     let db = self.db();
-                    let variables = generic_context.variables(db);
-
-                    let all_typevars: smallvec::SmallVec<[TypeVarInstance<'_>; 4]> =
-                        variables.clone().map(|btv| btv.typevar(db)).collect();
+                    let typevars = generic_context.variables(db).map(|btv| btv.typevar(db));
 
                     // `variables` should be fairly cheap to clone; it's just several cheap wrappers around
                     // a `std::slice::Iter` under the hood.
-                    for (i, bound_typevar) in variables.enumerate() {
-                        let typevar = bound_typevar.typevar(db);
+                    for (i, typevar) in typevars.clone().enumerate() {
                         let Some(default_ty) = typevar.default_type(db) else {
                             continue;
                         };
 
-                        let earlier_typevars = &all_typevars[..i];
                         let first_bad_tvar = find_over_type(db, default_ty, false, |t| {
                             let tvar = match t {
                                 Type::TypeVar(tvar) => tvar.typevar(db),
                                 Type::KnownInstance(KnownInstanceType::TypeVar(tvar)) => tvar,
                                 _ => return None,
                             };
-                            if !earlier_typevars.contains(&tvar) {
+                            if !typevars.clone().take(i).contains(&tvar) {
                                 Some(tvar)
                             } else {
                                 None
                             }
                         });
                         if let Some(bad_typevar) = first_bad_tvar {
-                            let is_later_in_list = all_typevars[i + 1..].contains(&bad_typevar);
+                            let is_later_in_list = typevars.clone().skip(i).contains(&bad_typevar);
                             report_invalid_typevar_default_reference(
                                 &self.context,
                                 class,
