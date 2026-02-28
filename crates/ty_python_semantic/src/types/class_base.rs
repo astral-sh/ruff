@@ -59,6 +59,7 @@ impl<'db> ClassBase<'db> {
             ClassBase::Dynamic(DynamicType::UnspecializedTypeVar) => "UnspecializedTypeVar",
             ClassBase::Dynamic(
                 DynamicType::Todo(_)
+                | DynamicType::TodoFunctionalTypedDict
                 | DynamicType::TodoUnpack
                 | DynamicType::TodoStarredExpression
                 | DynamicType::TodoTypeVarTuple,

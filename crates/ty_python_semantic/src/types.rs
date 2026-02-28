@@ -939,6 +939,7 @@ impl<'db> Type<'db> {
             DynamicType::Todo(_)
             | DynamicType::TodoStarredExpression
             | DynamicType::TodoUnpack
+            | DynamicType::TodoFunctionalTypedDict
             | DynamicType::TodoTypeVarTuple => true,
         })
     }
@@ -4221,7 +4222,7 @@ impl<'db> Type<'db> {
                                     .with_annotated_type(Type::any()),
                             ],
                         ),
-                        Type::unknown(),
+                        Type::Dynamic(DynamicType::TodoFunctionalTypedDict),
                     ),
                 )
                 .into()
@@ -6817,7 +6818,15 @@ impl<'db> Type<'db> {
             Self::AlwaysFalsy => Type::SpecialForm(SpecialFormType::AlwaysFalsy).definition(db),
 
             // These types have no definition
-            Self::Dynamic(DynamicType::Divergent(_) | DynamicType::Todo(_) | DynamicType::TodoUnpack | DynamicType::TodoStarredExpression | DynamicType::TodoTypeVarTuple | DynamicType::UnspecializedTypeVar)
+            Self::Dynamic(
+                DynamicType::Divergent(_)
+                | DynamicType::Todo(_)
+                | DynamicType::TodoUnpack
+                | DynamicType::TodoStarredExpression
+                | DynamicType::TodoTypeVarTuple
+                | DynamicType::UnspecializedTypeVar
+                | DynamicType::TodoFunctionalTypedDict
+            )
             | Self::Callable(_)
             | Self::TypeIs(_)
             | Self::TypeGuard(_) => None,
@@ -7538,6 +7547,8 @@ pub enum DynamicType<'db> {
     TodoStarredExpression,
     /// A special Todo-variant for `TypeVarTuple` instances encountered in type expressions
     TodoTypeVarTuple,
+    /// A special Todo-variant for functional `TypedDict`s.
+    TodoFunctionalTypedDict,
     /// A type that is determined to be divergent during recursive type inference.
     Divergent(DivergentType),
 }
@@ -7564,6 +7575,7 @@ impl std::fmt::Display for DynamicType<'_> {
             DynamicType::TodoUnpack => f.write_str("@Todo(typing.Unpack)"),
             DynamicType::TodoStarredExpression => f.write_str("@Todo(StarredExpression)"),
             DynamicType::TodoTypeVarTuple => f.write_str("@Todo(TypeVarTuple)"),
+            DynamicType::TodoFunctionalTypedDict => f.write_str("@Todo(Functional TypedDicts)"),
             DynamicType::Divergent(_) => f.write_str("Divergent"),
         }
     }
@@ -8411,6 +8423,7 @@ impl<'db> TypeVarInstance<'db> {
                     DynamicType::Todo(_)
                     | DynamicType::TodoUnpack
                     | DynamicType::TodoStarredExpression
+                    | DynamicType::TodoFunctionalTypedDict
                     | DynamicType::TodoTypeVarTuple => Parameters::todo(),
                     DynamicType::Any
                     | DynamicType::Unknown

@@ -49,7 +49,6 @@ use crate::types::{
     KnownClass, KnownInstanceType, LiteralValueTypeKind, MemberLookupPolicy, NominalInstanceType,
     PropertyInstanceType, SpecialFormType, TypeAliasType, TypeContext, TypeVarBoundOrConstraints,
     TypeVarVariance, UnionBuilder, UnionType, WrapperDescriptorKind, enums, list_members,
-    todo_type,
 };
 use crate::unpack::EvaluationMode;
 use crate::{DisplaySettings, Program};
@@ -1956,7 +1955,9 @@ impl<'db> Bindings<'db> {
                     },
 
                     Type::SpecialForm(SpecialFormType::TypedDict) => {
-                        overload.set_return_type(todo_type!("Support for functional `TypedDict`"));
+                        overload.set_return_type(Type::Dynamic(
+                            crate::types::DynamicType::TodoFunctionalTypedDict,
+                        ));
                     }
 
                     // Not a special case
