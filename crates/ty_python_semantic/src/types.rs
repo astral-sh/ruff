@@ -79,7 +79,7 @@ use crate::types::typed_dict::TypedDictField;
 pub(crate) use crate::types::typed_dict::{TypedDictParams, TypedDictType, walk_typed_dict_type};
 pub use crate::types::variance::TypeVarVariance;
 use crate::types::variance::VarianceInferable;
-use crate::types::visitor::any_over_type;
+use crate::types::visitor::{any_over_type, find_over_type};
 use crate::unpack::EvaluationMode;
 use crate::{Db, FxOrderSet, Program};
 pub use class::KnownClass;
@@ -1192,31 +1192,6 @@ impl<'db> Type<'db> {
                 Type::KnownInstance(KnownInstanceType::TypeVar(_)) | Type::TypeVar(_)
             )
         })
-    }
-
-    /// Finds and returns the first `TypeVarInstance` referenced by this type
-    /// that is not in the `allowed` set.
-    pub(crate) fn find_typevar_not_in(
-        self,
-        db: &'db dyn Db,
-        allowed: &[TypeVarInstance<'db>],
-    ) -> Option<TypeVarInstance<'db>> {
-        let found = std::cell::Cell::new(None);
-        any_over_type(db, self, false, |ty| {
-            let tv = match ty {
-                Type::TypeVar(bound_tv) => Some(bound_tv.typevar(db)),
-                Type::KnownInstance(KnownInstanceType::TypeVar(tv)) => Some(tv),
-                _ => None,
-            };
-            if let Some(tv) = tv {
-                if !allowed.contains(&tv) {
-                    found.set(Some(tv));
-                    return true;
-                }
-            }
-            false
-        });
-        found.get()
     }
 
     pub(crate) const fn as_special_form(self) -> Option<SpecialFormType> {

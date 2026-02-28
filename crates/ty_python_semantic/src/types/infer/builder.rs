@@ -140,7 +140,8 @@ use crate::types::{
     TypeVarBoundOrConstraints, TypeVarBoundOrConstraintsEvaluation, TypeVarConstraints,
     TypeVarDefaultEvaluation, TypeVarIdentity, TypeVarInstance, TypeVarKind, TypeVarVariance,
     TypedDictType, UnionBuilder, UnionType, UnionTypeInstance, any_over_type, binding_type,
-    definition_expression_type, infer_complete_scope_types, infer_scope_types, todo_type,
+    definition_expression_type, find_over_type, infer_complete_scope_types, infer_scope_types,
+    todo_type,
 };
 use crate::types::{CallableTypes, overrides};
 use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
@@ -1461,9 +1462,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         };
 
                         let earlier_typevars = &all_typevars[..i];
-                        if let Some(bad_typevar) =
-                            default_ty.find_typevar_not_in(db, earlier_typevars)
-                        {
+                        let first_bad_tvar = find_over_type(db, default_ty, false, |t| {
+                            let tvar = match t {
+                                Type::TypeVar(tvar) => tvar.typevar(db),
+                                Type::KnownInstance(KnownInstanceType::TypeVar(tvar)) => tvar,
+                                _ => return None,
+                            };
+                            if !earlier_typevars.contains(&tvar) {
+                                Some(tvar)
+                            } else {
+                                None
+                            }
+                        });
+                        if let Some(bad_typevar) = first_bad_tvar {
                             let is_later_in_list = all_typevars[i + 1..].contains(&bad_typevar);
                             report_invalid_typevar_default_reference(
                                 &self.context,

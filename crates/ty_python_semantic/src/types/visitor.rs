@@ -282,6 +282,57 @@ impl<'db> TypeCollector<'db> {
     }
 }
 
+/// Implementation for `any_over_type` and `find_over_type`.
+fn any_over_type_impl<'db, F, T>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    should_visit_lazy_type_attributes: bool,
+    query: F,
+) -> T
+where
+    T: Copy + Default + PartialEq,
+    F: Fn(Type<'db>) -> T,
+{
+    struct AnyOverTypeVisitor<'db, 'a, U> {
+        query: &'a dyn Fn(Type<'db>) -> U,
+        recursion_guard: TypeCollector<'db>,
+        found_matching_type: Cell<U>,
+        should_visit_lazy_type_attributes: bool,
+    }
+
+    impl<'db, U> TypeVisitor<'db> for AnyOverTypeVisitor<'db, '_, U>
+    where
+        U: Copy + Default + PartialEq,
+    {
+        fn should_visit_lazy_type_attributes(&self) -> bool {
+            self.should_visit_lazy_type_attributes
+        }
+
+        fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+            let default_value = U::default();
+            let pre_existing = self.found_matching_type.get();
+            if pre_existing != default_value {
+                return;
+            }
+            let new_value = (self.query)(ty);
+            self.found_matching_type.set(new_value);
+            if new_value != default_value {
+                return;
+            }
+            walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
+        }
+    }
+
+    let visitor = AnyOverTypeVisitor {
+        query: &query,
+        recursion_guard: TypeCollector::default(),
+        found_matching_type: Cell::default(),
+        should_visit_lazy_type_attributes,
+    };
+    visitor.visit_type(db, ty);
+    visitor.found_matching_type.get()
+}
+
 /// Return `true` if `ty`, or any of the types contained in `ty`, match the closure passed in.
 ///
 /// The function guards against infinite recursion
@@ -296,38 +347,30 @@ pub(super) fn any_over_type<'db>(
     should_visit_lazy_type_attributes: bool,
     query: impl Fn(Type<'db>) -> bool,
 ) -> bool {
-    struct AnyOverTypeVisitor<'db, 'a> {
-        query: &'a dyn Fn(Type<'db>) -> bool,
-        recursion_guard: TypeCollector<'db>,
-        found_matching_type: Cell<bool>,
-        should_visit_lazy_type_attributes: bool,
-    }
+    any_over_type_impl(db, ty, should_visit_lazy_type_attributes, query)
+}
 
-    impl<'db> TypeVisitor<'db> for AnyOverTypeVisitor<'db, '_> {
-        fn should_visit_lazy_type_attributes(&self) -> bool {
-            self.should_visit_lazy_type_attributes
-        }
-
-        fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
-            let already_found = self.found_matching_type.get();
-            if already_found {
-                return;
-            }
-            let found = already_found | (self.query)(ty);
-            self.found_matching_type.set(found);
-            if found {
-                return;
-            }
-            walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
-        }
-    }
-
-    let visitor = AnyOverTypeVisitor {
-        query: &query,
-        recursion_guard: TypeCollector::default(),
-        found_matching_type: Cell::new(false),
-        should_visit_lazy_type_attributes,
-    };
-    visitor.visit_type(db, ty);
-    visitor.found_matching_type.get()
+/// Recurse into a type and calls the passed-in closure on every nested type
+/// encountered, returning the first non-`None` value returned by the closure.
+///
+/// For example, if `ty` is `list[tuple[int, T]]` where `T` is a type variable
+/// and the closure passed in is `|t| matches!(t, Type::TypeVar(_))`, then this
+/// function will return `Some(T)`.
+///
+/// The function guards against infinite recursion
+/// by keeping track of the non-atomic types it has already seen.
+///
+/// The `should_visit_lazy_type_attributes` parameter controls whether deferred type attributes
+/// (value of a type alias, attributes of a class-based protocol, bounds/constraints of a typevar)
+/// are visited or not.
+pub(super) fn find_over_type<'db, T>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    should_visit_lazy_type_attributes: bool,
+    query: impl Fn(Type<'db>) -> Option<T>,
+) -> Option<T>
+where
+    T: Copy + PartialEq,
+{
+    any_over_type_impl(db, ty, should_visit_lazy_type_attributes, query)
 }
