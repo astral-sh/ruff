@@ -13,6 +13,7 @@ use ruff_formatter::printer::SourceMapGeneration;
 use ruff_python_ast::{AnyStringFlags, StringFlags, str::Quote};
 use ruff_python_parser::ParseOptions;
 use ruff_python_trivia::CommentRanges;
+use rustc_hash::FxHashSet;
 use {
     ruff_formatter::{FormatOptions, IndentStyle, LineWidth, Printed, write},
     ruff_python_trivia::{PythonWhitespace, is_python_whitespace},
@@ -20,6 +21,7 @@ use {
 };
 
 use super::NormalizedString;
+use crate::context::collect_import_aliases;
 use crate::string::StringQuotes;
 use crate::{DocstringCodeLineWidth, FormatModuleError, prelude::*};
 
@@ -1581,11 +1583,16 @@ fn docstring_format_source(
 ) -> Result<Printed, FormatModuleError> {
     let source_type = options.source_type();
     let parsed = ruff_python_parser::parse(source, ParseOptions::from(source_type))?;
+    let import_aliases = if let Some(module) = parsed.syntax().as_module() {
+        collect_import_aliases(module.body.as_slice())
+    } else {
+        FxHashSet::default()
+    };
     let comment_ranges = CommentRanges::from(parsed.tokens());
     let source_code = ruff_formatter::SourceCode::new(source);
     let comments = crate::Comments::from_ast(parsed.syntax(), source_code, &comment_ranges);
 
-    let ctx = PyFormatContext::new(options, source, comments, parsed.tokens())
+    let ctx = PyFormatContext::new(options, source, comments, parsed.tokens(), import_aliases)
         .in_docstring(docstring_quote_style);
     let formatted = crate::format!(ctx, [parsed.syntax().format()])?;
     formatted
