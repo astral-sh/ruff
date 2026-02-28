@@ -437,3 +437,22 @@ def i[T](x: Foo, y: type[Spam[T]]):
     else:
         reveal_type(x)  # revealed: Foo
 ```
+
+## Return type checks for narrowed `type[T]` branches
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+class Foo: ...
+
+def f[T: Foo | str](arg: type[T]) -> T:
+    if arg is Foo:
+        return Foo()
+    elif arg is str:
+        return ""
+    else:
+        raise ValueError()
+```

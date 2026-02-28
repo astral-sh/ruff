@@ -460,6 +460,13 @@ impl<'db> UseDefMap<'db> {
         }
     }
 
+    pub(crate) fn node_reachability_constraint(
+        &self,
+        node_key: NodeKey,
+    ) -> Option<ScopedReachabilityConstraintId> {
+        self.node_reachability.get(&node_key).copied()
+    }
+
     /// Check whether or not a given expression is reachable from the start of the scope. This
     /// is a local analysis which does not capture the possibility that the entire scope might
     /// be unreachable. Use [`super::SemanticIndex::is_node_reachable`] for the global

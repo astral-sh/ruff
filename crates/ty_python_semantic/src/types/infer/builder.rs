@@ -11457,6 +11457,53 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         Type::bool_literal(*value)
     }
 
+    fn map_class_constraints_to_instance(&self, ty: Type<'db>) -> Type<'db> {
+        let db = self.db();
+
+        match ty {
+            Type::Intersection(intersection) => {
+                let mut builder = IntersectionBuilder::new(db);
+                for ty in intersection.positive(db) {
+                    builder = builder.add_positive(ty.to_instance(db).unwrap_or(*ty));
+                }
+                for ty in intersection.negative(db) {
+                    builder = builder.add_negative(ty.to_instance(db).unwrap_or(*ty));
+                }
+                builder.build()
+            }
+            _ => ty.to_instance(db).unwrap_or(ty),
+        }
+    }
+
+    fn infer_narrowed_builtin_str_instance_constraint(
+        &self,
+        node_key: NodeKey,
+    ) -> Option<Type<'db>> {
+        let db = self.db();
+
+        // Avoid recursion while inferring builtins itself.
+        if file_to_module(db, self.file())
+            .and_then(|module| module.known(db))
+            .is_some_and(KnownModule::is_builtins)
+        {
+            return None;
+        }
+
+        let file_scope_id = self.scope().file_scope_id(db);
+        let use_def_map = self.index.use_def_map(file_scope_id);
+        let reachability = use_def_map.node_reachability_constraint(node_key)?;
+        let place_table = self.index.place_table(file_scope_id);
+        let str_symbol_id = place_table.symbol_id("str")?;
+
+        let narrowed_str_ty = use_def_map.narrowing_evaluator(reachability).narrow(
+            db,
+            KnownClass::Str.to_class_literal(db),
+            str_symbol_id.into(),
+        );
+
+        Some(self.map_class_constraints_to_instance(narrowed_str_ty))
+    }
+
     fn infer_string_literal_expression(
         &mut self,
         literal: &ast::ExprStringLiteral,
@@ -11469,10 +11516,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 aliased_type,
             )));
         }
-        if literal.value.len() <= Self::MAX_STRING_LITERAL_SIZE {
+        let literal_ty = if literal.value.len() <= Self::MAX_STRING_LITERAL_SIZE {
             Type::string_literal(self.db(), literal.value.to_str())
         } else {
             Type::literal_string()
+        };
+
+        if let Some(str_constraint) = self
+            .infer_narrowed_builtin_str_instance_constraint(self.enclosing_node_key(literal.into()))
+        {
+            IntersectionType::from_elements(self.db(), [literal_ty, str_constraint])
+        } else {
+            literal_ty
         }
     }
 
@@ -13294,7 +13349,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 if Some(self.scope()) == builtins_module_scope(db) {
                     Place::Undefined.into()
                 } else {
-                    builtins_symbol(db, symbol_name)
+                    builtins_symbol(db, symbol_name).map_type(|ty| {
+                        self.narrow_place_with_applicable_constraints(
+                            PlaceExprRef::from(&expr),
+                            ty,
+                            &constraint_keys,
+                        )
+                    })
                 }
             })
             // Still not found? It might be `reveal_type`...
