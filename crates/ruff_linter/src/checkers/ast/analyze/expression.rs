@@ -25,38 +25,19 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
         Expr::Subscript(subscript @ ast::ExprSubscript { value, slice, .. }) => {
             // Ex) Optional[...], Union[...]
             if checker.any_rule_enabled(&[
-                Rule::FutureRewritableTypeAnnotation,
                 Rule::NonPEP604AnnotationUnion,
                 Rule::NonPEP604AnnotationOptional,
             ]) {
                 if let Some(operator) = typing::to_pep604_operator(value, slice, &checker.semantic)
                 {
-                    if checker.is_rule_enabled(Rule::FutureRewritableTypeAnnotation) {
-                        if !checker.semantic.future_annotations_or_stub()
-                            && checker.target_version() < PythonVersion::PY310
-                            && checker.target_version() >= PythonVersion::PY37
-                            && checker.semantic.in_annotation()
-                            && !checker.settings().pyupgrade.keep_runtime_typing
-                        {
-                            flake8_future_annotations::rules::future_rewritable_type_annotation(
-                                checker, value,
-                            );
-                        }
-                    }
-                    if checker.any_rule_enabled(&[
-                        Rule::NonPEP604AnnotationUnion,
-                        Rule::NonPEP604AnnotationOptional,
-                    ]) {
-                        if checker.source_type.is_stub()
-                            || checker.target_version() >= PythonVersion::PY310
-                            || (checker.target_version() >= PythonVersion::PY37
-                                && checker.semantic.future_annotations_or_stub()
-                                && (checker.semantic.in_annotation()
-                                    || checker.semantic.in_string_type_definition())
-                                && !checker.settings().pyupgrade.keep_runtime_typing)
-                        {
-                            pyupgrade::rules::non_pep604_annotation(checker, expr, slice, operator);
-                        }
+                    if checker.source_type.is_stub()
+                        || checker.target_version() >= PythonVersion::PY310
+                        || (checker.target_version() >= PythonVersion::PY37
+                            && (checker.semantic.in_annotation()
+                                || checker.semantic.in_string_type_definition())
+                            && !checker.settings().pyupgrade.keep_runtime_typing)
+                    {
+                        pyupgrade::rules::non_pep604_annotation(checker, expr, slice, operator);
                     }
                 }
             }
