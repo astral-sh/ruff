@@ -144,7 +144,7 @@ must be consistent. It is an error for a class to explicitly inherit from a gene
 also appears elsewhere in the MRO with a different specialization:
 
 ```py
-from typing import TypeVar, Generic
+from typing import TypeVar, Generic, Any
 
 T1 = TypeVar("T1")
 T2 = TypeVar("T2")
@@ -176,15 +176,26 @@ class Fine(Parent, Grandparent[T1, T2]): ...
 class AlsoFine(Parent3, Parent4[T1, T2]): ...
 class Dandy(Parent, Parent3, Parent4): ...
 
-# Edge case: the first class is implicitly specialized, but later classes are not:
+# Edge cases: the first class is implicitly specialized
+# (or explicitly specialized with `Any`s), but later classes are not:
+
 # error: [invalid-generic-class]
 class BadChild4(Parent, Parent3[T1, T2], Parent4[T2, T1]): ...
 
 # error: [invalid-generic-class]
-class BadChild5(Parent[T1, T2], Parent3, Parent4[T2, T1]): ...
+class BadChild5(Parent[Any, Any], Parent3[T1, T2], Parent4[T2, T1]): ...
 
 # error: [invalid-generic-class]
-class BadChild6(Parent[T1, T2], Parent3[T2, T1], Parent4): ...
+class BadChild6(Parent[T1, T2], Parent3, Parent4[T2, T1]): ...
+
+# error: [invalid-generic-class]
+class BadChild7(Parent[T1, T2], Parent3[Any, Any], Parent4[T2, T1]): ...
+
+# error: [invalid-generic-class]
+class BadChild8(Parent[T1, T2], Parent3[T2, T1], Parent4): ...
+
+# error: [invalid-generic-class]
+class BadChild9(Parent[T1, T2], Parent3[T2, T1], Parent4[Any, Any]): ...
 ```
 
 ## Specializing generic classes explicitly

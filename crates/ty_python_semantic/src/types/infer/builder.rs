@@ -1303,7 +1303,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                     ));
                                     break 'outer;
                                 }
-                            } else {
+                            } else if !supercls_alias
+                                .specialization(self.db())
+                                .types(self.db())
+                                .iter()
+                                .all(Type::is_dynamic)
+                            {
                                 ancestor_specs.insert(origin, (supercls_alias, i));
                             }
                         }

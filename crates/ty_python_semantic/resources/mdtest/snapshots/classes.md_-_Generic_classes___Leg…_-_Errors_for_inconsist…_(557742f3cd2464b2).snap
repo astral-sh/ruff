@@ -13,7 +13,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/generics/legacy/classes.
 ## mdtest_snippet.py
 
 ```
- 1 | from typing import TypeVar, Generic
+ 1 | from typing import TypeVar, Generic, Any
  2 | 
  3 | T1 = TypeVar("T1")
  4 | T2 = TypeVar("T2")
@@ -45,15 +45,26 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/generics/legacy/classes.
 30 | class AlsoFine(Parent3, Parent4[T1, T2]): ...
 31 | class Dandy(Parent, Parent3, Parent4): ...
 32 | 
-33 | # Edge case: the first class is implicitly specialized, but later classes are not:
-34 | # error: [invalid-generic-class]
-35 | class BadChild4(Parent, Parent3[T1, T2], Parent4[T2, T1]): ...
-36 | 
-37 | # error: [invalid-generic-class]
-38 | class BadChild5(Parent[T1, T2], Parent3, Parent4[T2, T1]): ...
-39 | 
-40 | # error: [invalid-generic-class]
-41 | class BadChild6(Parent[T1, T2], Parent3[T2, T1], Parent4): ...
+33 | # Edge cases: the first class is implicitly specialized
+34 | # (or explicitly specialized with `Any`s), but later classes are not:
+35 | 
+36 | # error: [invalid-generic-class]
+37 | class BadChild4(Parent, Parent3[T1, T2], Parent4[T2, T1]): ...
+38 | 
+39 | # error: [invalid-generic-class]
+40 | class BadChild5(Parent[Any, Any], Parent3[T1, T2], Parent4[T2, T1]): ...
+41 | 
+42 | # error: [invalid-generic-class]
+43 | class BadChild6(Parent[T1, T2], Parent3, Parent4[T2, T1]): ...
+44 | 
+45 | # error: [invalid-generic-class]
+46 | class BadChild7(Parent[T1, T2], Parent3[Any, Any], Parent4[T2, T1]): ...
+47 | 
+48 | # error: [invalid-generic-class]
+49 | class BadChild8(Parent[T1, T2], Parent3[T2, T1], Parent4): ...
+50 | 
+51 | # error: [invalid-generic-class]
+52 | class BadChild9(Parent[T1, T2], Parent3[T2, T1], Parent4[Any, Any]): ...
 ```
 
 # Diagnostics
@@ -111,17 +122,16 @@ info: rule `invalid-generic-class` is enabled by default
 
 ```
 error[invalid-generic-class]: Inconsistent type arguments for `Grandparent` among class bases
-  --> src/mdtest_snippet.py:35:7
+  --> src/mdtest_snippet.py:37:7
    |
-33 | # Edge case: the first class is implicitly specialized, but later classes are not:
-34 | # error: [invalid-generic-class]
-35 | class BadChild4(Parent, Parent3[T1, T2], Parent4[T2, T1]): ...
+36 | # error: [invalid-generic-class]
+37 | class BadChild4(Parent, Parent3[T1, T2], Parent4[T2, T1]): ...
    |       ^^^^^^^^^^^^^^^^^^---------------^^---------------^
    |                         |                |
    |                         |                Later class base inherits from `Grandparent[T2@BadChild4, T1@BadChild4]`
    |                         Earlier class base inherits from `Grandparent[T1@BadChild4, T2@BadChild4]`
-36 |
-37 | # error: [invalid-generic-class]
+38 |
+39 | # error: [invalid-generic-class]
    |
 info: rule `invalid-generic-class` is enabled by default
 
@@ -129,16 +139,33 @@ info: rule `invalid-generic-class` is enabled by default
 
 ```
 error[invalid-generic-class]: Inconsistent type arguments for `Grandparent` among class bases
-  --> src/mdtest_snippet.py:38:7
+  --> src/mdtest_snippet.py:40:7
    |
-37 | # error: [invalid-generic-class]
-38 | class BadChild5(Parent[T1, T2], Parent3, Parent4[T2, T1]): ...
+39 | # error: [invalid-generic-class]
+40 | class BadChild5(Parent[Any, Any], Parent3[T1, T2], Parent4[T2, T1]): ...
+   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^---------------^^---------------^
+   |                                   |                |
+   |                                   |                Later class base inherits from `Grandparent[T2@BadChild5, T1@BadChild5]`
+   |                                   Earlier class base inherits from `Grandparent[T1@BadChild5, T2@BadChild5]`
+41 |
+42 | # error: [invalid-generic-class]
+   |
+info: rule `invalid-generic-class` is enabled by default
+
+```
+
+```
+error[invalid-generic-class]: Inconsistent type arguments for `Grandparent` among class bases
+  --> src/mdtest_snippet.py:43:7
+   |
+42 | # error: [invalid-generic-class]
+43 | class BadChild6(Parent[T1, T2], Parent3, Parent4[T2, T1]): ...
    |       ^^^^^^^^^^--------------^^^^^^^^^^^---------------^
    |                 |                        |
-   |                 |                        Later class base inherits from `Grandparent[T2@BadChild5, T1@BadChild5]`
-   |                 Earlier class base inherits from `Grandparent[T1@BadChild5, T2@BadChild5]`
-39 |
-40 | # error: [invalid-generic-class]
+   |                 |                        Later class base inherits from `Grandparent[T2@BadChild6, T1@BadChild6]`
+   |                 Earlier class base inherits from `Grandparent[T1@BadChild6, T2@BadChild6]`
+44 |
+45 | # error: [invalid-generic-class]
    |
 info: rule `invalid-generic-class` is enabled by default
 
@@ -146,14 +173,48 @@ info: rule `invalid-generic-class` is enabled by default
 
 ```
 error[invalid-generic-class]: Inconsistent type arguments for `Grandparent` among class bases
-  --> src/mdtest_snippet.py:41:7
+  --> src/mdtest_snippet.py:46:7
    |
-40 | # error: [invalid-generic-class]
-41 | class BadChild6(Parent[T1, T2], Parent3[T2, T1], Parent4): ...
+45 | # error: [invalid-generic-class]
+46 | class BadChild7(Parent[T1, T2], Parent3[Any, Any], Parent4[T2, T1]): ...
+   |       ^^^^^^^^^^--------------^^^^^^^^^^^^^^^^^^^^^---------------^
+   |                 |                                  |
+   |                 |                                  Later class base inherits from `Grandparent[T2@BadChild7, T1@BadChild7]`
+   |                 Earlier class base inherits from `Grandparent[T1@BadChild7, T2@BadChild7]`
+47 |
+48 | # error: [invalid-generic-class]
+   |
+info: rule `invalid-generic-class` is enabled by default
+
+```
+
+```
+error[invalid-generic-class]: Inconsistent type arguments for `Grandparent` among class bases
+  --> src/mdtest_snippet.py:49:7
+   |
+48 | # error: [invalid-generic-class]
+49 | class BadChild8(Parent[T1, T2], Parent3[T2, T1], Parent4): ...
    |       ^^^^^^^^^^--------------^^---------------^^^^^^^^^^
    |                 |               |
-   |                 |               Later class base inherits from `Grandparent[T2@BadChild6, T1@BadChild6]`
-   |                 Earlier class base inherits from `Grandparent[T1@BadChild6, T2@BadChild6]`
+   |                 |               Later class base inherits from `Grandparent[T2@BadChild8, T1@BadChild8]`
+   |                 Earlier class base inherits from `Grandparent[T1@BadChild8, T2@BadChild8]`
+50 |
+51 | # error: [invalid-generic-class]
+   |
+info: rule `invalid-generic-class` is enabled by default
+
+```
+
+```
+error[invalid-generic-class]: Inconsistent type arguments for `Grandparent` among class bases
+  --> src/mdtest_snippet.py:52:7
+   |
+51 | # error: [invalid-generic-class]
+52 | class BadChild9(Parent[T1, T2], Parent3[T2, T1], Parent4[Any, Any]): ...
+   |       ^^^^^^^^^^--------------^^---------------^^^^^^^^^^^^^^^^^^^^
+   |                 |               |
+   |                 |               Later class base inherits from `Grandparent[T2@BadChild9, T1@BadChild9]`
+   |                 Earlier class base inherits from `Grandparent[T1@BadChild9, T2@BadChild9]`
    |
 info: rule `invalid-generic-class` is enabled by default
 
