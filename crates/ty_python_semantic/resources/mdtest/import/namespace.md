@@ -146,3 +146,70 @@ from opentelemetry import trace, metrics
 reveal_type(trace)  # revealed: <module 'opentelemetry.trace'>
 reveal_type(metrics)  # revealed: <module 'opentelemetry.metrics'>
 ```
+
+## Priority across search paths
+
+According PEP 420, namespace packages always have lower precedence than normal packages/modules,
+regardless of search path ordering.
+
+These are regression tests for <https://github.com/astral-sh/ty/issues/1749>
+
+### Namespace package comes first on the search path
+
+```toml
+[environment]
+extra-paths = ["/path-one", "/path-two"]
+```
+
+`/path-one/mod/sub1.py`:
+
+```py
+```
+
+`/path-two/mod/__init__.py`:
+
+```py
+```
+
+`/path-two/mod/sub2.py`:
+
+```py
+```
+
+`main.py`:
+
+```py
+import mod
+import mod.sub1  # error: "Cannot resolve"
+import mod.sub2
+```
+
+### Namespace package comes last on the search path
+
+```toml
+[environment]
+extra-paths = ["/path-two", "/path-one"]
+```
+
+`/path-one/mod/sub1.py`:
+
+```py
+```
+
+`/path-two/mod/__init__.py`:
+
+```py
+```
+
+`/path-two/mod/sub2.py`:
+
+```py
+```
+
+`main.py`:
+
+```py
+import mod
+import mod.sub1  # error: "Cannot resolve"
+import mod.sub2
+```

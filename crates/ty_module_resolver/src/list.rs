@@ -25,28 +25,40 @@ pub fn all_modules(db: &dyn Db) -> Vec<Module<'_>> {
 /// List all available top-level modules.
 #[salsa::tracked]
 pub fn list_modules(db: &dyn Db) -> Vec<Module<'_>> {
-    let mut modules = BTreeMap::new();
+    let mut modules: BTreeMap<&ModuleName, ListedModule<'_>> = BTreeMap::new();
     for search_path in search_paths(db, ModuleResolveMode::StubsAllowed) {
-        for module in list_modules_in(db, SearchPathIngredient::new(db, search_path.clone())) {
-            match modules.entry(module.name(db)) {
+        for new in list_modules_in(db, SearchPathIngredient::new(db, search_path.clone())) {
+            match modules.entry(new.module(db).name(db)) {
                 Entry::Vacant(entry) => {
-                    entry.insert(module);
+                    entry.insert(new);
                 }
                 Entry::Occupied(mut entry) => {
-                    // The only case where a module can override
-                    // a module with the same name in a higher
-                    // precedent search path is if the higher
-                    // precedent search path contained a namespace
-                    // package and the lower precedent search path
-                    // contained a "regular" module.
-                    if let (None, Some(_)) = (entry.get().search_path(db), module.search_path(db)) {
-                        entry.insert(module);
+                    // A module can override a module with the same name in
+                    // a higher precedent search path when either of the following
+                    // are true:
+                    //
+                    // 1. The higher precedent search path contained a namespace
+                    //    package and the lower precedent search path contained
+                    //    a "regular" module/package.
+                    // 2. The new module is from a stub package (`foo-stubs`),
+                    //    which has priority regardless of search path ordering
+                    //    per the typing spec's import resolution ordering.
+                    let existing = entry.get();
+                    let existing_is_namespace = existing.module(db).search_path(db).is_none();
+                    let new_is_non_namespace = new.module(db).search_path(db).is_some();
+                    if (existing_is_namespace && new_is_non_namespace)
+                        || (!existing.is_stub_package(db) && new.is_stub_package(db))
+                    {
+                        entry.insert(new);
                     }
                 }
             }
         }
     }
-    modules.into_values().collect()
+    modules
+        .into_values()
+        .map(|listed| listed.module(db))
+        .collect()
 }
 
 #[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
@@ -60,7 +72,7 @@ struct SearchPathIngredient<'db> {
 fn list_modules_in<'db>(
     db: &'db dyn Db,
     search_path: SearchPathIngredient<'db>,
-) -> Vec<Module<'db>> {
+) -> Vec<ListedModule<'db>> {
     tracing::debug!("Listing modules in search path '{}'", search_path.path(db));
     let mut lister = Lister::new(db, search_path.path(db));
     match search_path.path(db).as_path() {
@@ -89,6 +101,15 @@ fn list_modules_in<'db>(
     lister.into_modules()
 }
 
+/// A module paired with whether it came from a stub package.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+struct ListedModule<'db> {
+    module: Module<'db>,
+    is_stub_package: bool,
+}
+
+impl get_size2::GetSize for ListedModule<'_> {}
+
 /// An implementation helper for "list all modules."
 ///
 /// This is responsible for accumulating modules indexed by
@@ -99,7 +120,7 @@ fn list_modules_in<'db>(
 struct Lister<'db> {
     db: &'db dyn Db,
     search_path: &'db SearchPath,
-    modules: BTreeMap<&'db ModuleName, Module<'db>>,
+    modules: BTreeMap<&'db ModuleName, ListedModule<'db>>,
 }
 
 impl<'db> Lister<'db> {
@@ -114,7 +135,7 @@ impl<'db> Lister<'db> {
     }
 
     /// Returns the modules collected, sorted by module name.
-    fn into_modules(self) -> Vec<Module<'db>> {
+    fn into_modules(self) -> Vec<ListedModule<'db>> {
         self.modules.into_values().collect()
     }
 
@@ -246,22 +267,23 @@ impl<'db> Lister<'db> {
     /// existing entry, then this is a no-op. That is, this assumes that the
     /// caller looks for modules in search path priority order.
     fn add_module(&mut self, path: &ModulePath, module: Module<'db>) {
+        let listed = ListedModule::new(self.db, module, path.is_stub_package());
         let mut entry = match self.modules.entry(module.name(self.db)) {
             Entry::Vacant(entry) => {
-                entry.insert(module);
+                entry.insert(listed);
                 return;
             }
             Entry::Occupied(entry) => entry,
         };
 
-        let existing = entry.get();
+        let existing = entry.get().module(self.db);
         match (existing.search_path(self.db), module.search_path(self.db)) {
             // When we had a namespace package and now try to
             // insert a non-namespace package, the latter always
             // takes precedent, even if it's in a lower priority
             // search path.
             (None, Some(_)) => {
-                entry.insert(module);
+                entry.insert(listed);
             }
             (Some(_), Some(_)) => {
                 // Merging across search paths is only necessary for
@@ -278,7 +300,7 @@ impl<'db> Lister<'db> {
                 if existing.kind(self.db) == ModuleKind::Module
                     && module.kind(self.db) == ModuleKind::Package
                 {
-                    entry.insert(module);
+                    entry.insert(listed);
                     return;
                 }
                 // Or if we have two file modules and the new one
@@ -287,13 +309,13 @@ impl<'db> Lister<'db> {
                     && module.kind(self.db) == ModuleKind::Module
                     && path.is_stub_file()
                 {
-                    entry.insert(module);
+                    entry.insert(listed);
                     return;
                 }
                 // Or... if we have a stub package, the stub package
                 // always gets priority.
                 if path.is_stub_package() {
-                    entry.insert(module);
+                    entry.insert(listed);
                 }
             }
             _ => {}
