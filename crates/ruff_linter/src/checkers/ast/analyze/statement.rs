@@ -7,11 +7,12 @@ use crate::checkers::ast::Checker;
 use crate::preview::is_standalone_mock_non_existent_enabled;
 use crate::registry::Rule;
 use crate::rules::{
-    airflow, fastapi, flake8_async, flake8_bandit, flake8_boolean_trap, flake8_bugbear,
-    flake8_builtins, flake8_debugger, flake8_django, flake8_errmsg, flake8_import_conventions,
-    flake8_pie, flake8_pyi, flake8_pytest_style, flake8_raise, flake8_return, flake8_simplify,
-    flake8_slots, flake8_tidy_imports, flake8_type_checking, mccabe, pandas_vet, pep8_naming,
-    perflint, pycodestyle, pyflakes, pygrep_hooks, pylint, pyupgrade, refurb, ruff, tryceratops,
+    airflow, fastapi, flake8_annotation_complexity, flake8_async, flake8_bandit,
+    flake8_boolean_trap, flake8_bugbear, flake8_builtins, flake8_debugger, flake8_django,
+    flake8_errmsg, flake8_import_conventions, flake8_pie, flake8_pyi, flake8_pytest_style,
+    flake8_raise, flake8_return, flake8_simplify, flake8_slots, flake8_tidy_imports,
+    flake8_type_checking, mccabe, pandas_vet, pep8_naming, perflint, pycodestyle, pyflakes,
+    pygrep_hooks, pylint, pyupgrade, refurb, ruff, tryceratops,
 };
 use ruff_python_ast::PythonVersion;
 
@@ -353,6 +354,12 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.is_rule_enabled(Rule::PropertyWithoutReturn) {
                 ruff::rules::property_without_return(checker, function_def);
+            }
+            if checker.is_rule_enabled(Rule::ComplexAnnotation) {
+                flake8_annotation_complexity::rules::complex_annotation_function(
+                    checker,
+                    function_def,
+                );
             }
         }
         Stmt::Return(_) => {
@@ -1574,6 +1581,12 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 if checker.is_rule_enabled(Rule::RedundantFinalLiteral) {
                     flake8_pyi::rules::redundant_final_literal(checker, assign_stmt);
                 }
+            }
+            if checker.is_rule_enabled(Rule::ComplexAnnotation) {
+                flake8_annotation_complexity::rules::complex_annotation_assignment(
+                    checker,
+                    assign_stmt,
+                );
             }
         }
         Stmt::TypeAlias(ast::StmtTypeAlias { name, .. }) => {
