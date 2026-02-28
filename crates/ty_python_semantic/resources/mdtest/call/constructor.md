@@ -21,11 +21,6 @@ Since every class has `object` in its MRO, the default implementations are `obje
     `object`), no arguments are accepted and `TypeError` is raised if any are passed.
 - If `__new__` is defined but `__init__` is not, `object.__init__` will allow arbitrary arguments!
 
-As of today there are a number of behaviors that we do not support:
-
-- `__new__` is assumed to return an instance of the class on which it is called
-- User defined `__call__` on metaclass is ignored
-
 ## Creating an instance of the `object` class itself
 
 Test the behavior of the `object` class itself. As implementation has to ignore `object` own methods
@@ -259,6 +254,271 @@ class Box(Generic[T]):
     def __init__(self, x: T) -> None: ...
 
 reveal_type(Box(1))  # revealed: Box[int]
+```
+
+## `__new__` with method-level type variables mapping to class specialization
+
+When `__new__` has its own type parameters that map to the class's type parameter through the return
+type, we should correctly infer the class specialization.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+class C[T]:
+    x: T
+
+    def __new__[S](cls, x: S) -> "C[tuple[S, S]]":
+        return object.__new__(cls)
+
+reveal_type(C(1))  # revealed: C[tuple[int, int]]
+reveal_type(C("hello"))  # revealed: C[tuple[str, str]]
+```
+
+## `__new__` with arbitrary generic return types
+
+When `__new__` has method-level type variables in the return type that don't map to the class's type
+parameters, the resolved return type should be used directly.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+class C:
+    def __new__[S](cls, x: S) -> S:
+        return x
+
+reveal_type(C("foo"))  # revealed: Literal["foo"]
+reveal_type(C(1))  # revealed: Literal[1]
+```
+
+## `__new__` returning non-instance generic containers
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+class C:
+    def __new__[S](cls, x: S) -> list[S]:
+        return [x]
+
+reveal_type(C("foo"))  # revealed: list[Literal["foo"]]
+reveal_type(C(1))  # revealed: list[Literal[1]]
+```
+
+## Overloaded `__new__` with generic return types
+
+Overloaded `__new__` methods should correctly resolve to the matching overload and infer the class
+specialization from the overload's return type.
+
+```py
+from typing import Generic, Iterable, TypeVar, overload
+
+T = TypeVar("T")
+T1 = TypeVar("T1")
+T2 = TypeVar("T2")
+
+class MyZip(Generic[T]):
+    @overload
+    def __new__(cls) -> "MyZip[object]": ...
+    @overload
+    def __new__(cls, iter1: Iterable[T1], iter2: Iterable[T2]) -> "MyZip[tuple[T1, T2]]": ...
+    def __new__(cls, *args, **kwargs) -> "MyZip[object]":
+        raise NotImplementedError
+
+def check(a: tuple[int, ...], b: tuple[str, ...]) -> None:
+    reveal_type(MyZip(a, b))  # revealed: MyZip[tuple[int, str]]
+    reveal_type(MyZip())  # revealed: MyZip[object]
+```
+
+## Overloaded `__new__` with mixed instance and non-instance return types
+
+When `__new__` is overloaded and some overloads return the class instance type while others return a
+different type, the decision of whether to skip `__init__` should be made per-overload based on
+which overload matched at the call site. Non-instance-returning overloads use `__new__` directly,
+while instance-returning overloads additionally validate `__init__`.
+
+```py
+from typing import overload
+from typing_extensions import Self
+
+class C:
+    @overload
+    def __new__(cls, x: int) -> int: ...
+    @overload
+    def __new__(cls, x: str) -> Self: ...
+    def __new__(cls, x: int | str) -> object: ...
+    def __init__(self, x: str) -> None: ...
+
+# The `int` overload is selected; its return type is not an instance of `C`,
+# so `__init__` is skipped and the return type is `int`.
+reveal_type(C(1))  # revealed: int
+
+# The `str -> Self` overload would return an instance of `C`, so `__init__` is
+# also checked. `__init__` accepts `x: str`, so the call succeeds.
+reveal_type(C("foo"))  # revealed: C
+```
+
+## `__init__` incompatible with instance-returning `__new__` overloads
+
+When `__init__` parameters are incompatible with the arguments that would match instance-returning
+`__new__` overloads, `__init__` errors are reported. The return type still comes from `__new__`.
+
+```py
+from typing import overload
+from typing_extensions import Self
+
+class D:
+    @overload
+    def __new__(cls, x: int) -> int: ...
+    @overload
+    def __new__(cls, x: str) -> Self: ...
+    def __new__(cls, x: int | str) -> object: ...
+    def __init__(self) -> None: ...
+
+# The `int` overload is selected; its return type is not an instance of `D`,
+# so `__init__` is skipped and the return type is `int`.
+reveal_type(D(1))  # revealed: int
+
+# The `str -> Self` overload returns an instance of `D`, so `__init__` is also
+# checked. `__init__` takes no args, so it reports an error.
+# error: [too-many-positional-arguments]
+reveal_type(D("foo"))  # revealed: D
+```
+
+## Overloaded non-instance `__new__` should preserve matched return type
+
+When all `__new__` overloads return non-instance types, constructor return typing should still use
+the matched overload's return type at each call site.
+
+```py
+from typing import overload
+
+class F:
+    @overload
+    def __new__(cls, x: int) -> int: ...
+    @overload
+    def __new__(cls, x: str) -> str: ...
+    def __new__(cls, x: int | str) -> object: ...
+
+reveal_type(F(1))  # revealed: int
+reveal_type(F("foo"))  # revealed: str
+```
+
+## Mixed generic `__new__` overloads should still validate `__init__`
+
+For generic classes, if an instance-returning `__new__` overload matches, we still need to validate
+`__init__` even when another overload returns a non-instance type.
+
+```py
+from typing import Generic, TypeVar, overload
+from typing_extensions import Self
+
+T = TypeVar("T")
+
+class E(Generic[T]):
+    @overload
+    def __new__(cls, x: int) -> int: ...
+    @overload
+    def __new__(cls, x: T) -> Self: ...
+    def __new__(cls, x: object) -> object: ...
+    def __init__(self, x: T, y: str) -> None: ...
+
+# The `T -> Self` overload is instance-returning, so `__init__` must also be checked.
+# error: [missing-argument]
+reveal_type(E("foo"))  # revealed: E[str]
+```
+
+## Mixed overloaded `__new__` should preserve constructor literal promotion
+
+When mixed `__new__` overloads defer `__init__` validation, the inferred constructor specialization
+should still apply literal promotion from `__init__`.
+
+```py
+from typing import Generic, TypeVar, overload
+from typing_extensions import Self
+
+T = TypeVar("T")
+
+class E(Generic[T]):
+    @overload
+    def __new__(cls, tag: int, y: object) -> int: ...
+    @overload
+    def __new__(cls, tag: str, y: object) -> Self: ...
+    def __new__(cls, tag: int | str, y: object) -> object: ...
+    def __init__(self, tag: str, y: T) -> None: ...
+
+reveal_type(E("ok", 1))  # revealed: E[int]
+reveal_type(E(1, 1))  # revealed: int
+```
+
+## Union of mixed constructors should preserve deferred `__init__` checks
+
+```py
+from typing import overload
+from typing_extensions import Self
+
+class C:
+    @overload
+    def __new__(cls, x: int) -> int: ...
+    @overload
+    def __new__(cls, x: str) -> Self: ...
+    def __new__(cls, x: int | str) -> object: ...
+    def __init__(self, x: str, y: str) -> None: ...
+
+class D:
+    @overload
+    def __new__(cls, x: int) -> int: ...
+    @overload
+    def __new__(cls, x: str) -> Self: ...
+    def __new__(cls, x: int | str) -> object: ...
+    def __init__(self, x: str) -> None: ...
+
+def f(flag: bool) -> None:
+    ctor = C if flag else D
+
+    # `str -> Self` is selected on both constructor branches. `C.__init__` still
+    # requires `y`, so this should fail even after unioning constructor bindings.
+    # error: [missing-argument]
+    ctor("foo")
+```
+
+## `__new__` returning a strict subclass preserves that return type
+
+```py
+class C:
+    def __new__(cls) -> "D":
+        return object.__new__(D)
+
+class D(C): ...
+
+# Preserve explicit strict-subclass constructor returns.
+reveal_type(C())  # revealed: D
+```
+
+## Mixed overloaded `__new__` preserving strict-subclass return
+
+```py
+from typing import overload
+
+class Base:
+    @overload
+    def __new__(cls, x: int) -> int: ...
+    @overload
+    def __new__(cls, x: str) -> "Child": ...
+    def __new__(cls, x: int | str) -> object: ...
+    def __init__(self, x: str) -> None: ...
+
+class Child(Base): ...
+
+reveal_type(Base(1))  # revealed: int
+reveal_type(Base("foo"))  # revealed: Child
 ```
 
 ## Constructor calls through `type[T]` with a bound TypeVar

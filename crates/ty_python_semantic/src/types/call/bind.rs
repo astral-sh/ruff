@@ -157,6 +157,41 @@ impl<'db> BindingsElement<'db> {
     }
 }
 
+/// Deferred `__init__` validation for constructors with mixed `__new__` overloads.
+///
+/// When `__new__` is overloaded with a mix of instance-returning and non-instance-returning
+/// overloads (e.g., one overload returns `int` and another returns `Self`), we can't validate
+/// `__init__` at binding time because we don't yet know which `__new__` overload will match.
+/// Instead, we store the `__init__` bindings here and validate them after overload resolution,
+/// only when the matched `__new__` overload is instance-returning.
+#[derive(Debug, Clone)]
+struct MixedConstructorInit<'db> {
+    /// The class literal of the class being constructed, used to determine whether
+    /// the matched `__new__` overload is instance-returning by checking if its return
+    /// type is an instance of this class (or a subclass thereof).
+    constructor_class_literal: ClassLiteral<'db>,
+    /// The `__init__` bindings to validate conditionally.
+    init_bindings: Bindings<'db>,
+}
+
+impl<'db> MixedConstructorInit<'db> {
+    /// Returns `true` if any matched overload is instance-returning (i.e., its return type
+    /// is an instance of the constructor class).
+    fn is_instance_returning(&self, db: &'db dyn Db, binding: &CallableBinding<'db>) -> bool {
+        let constructor_class = self.constructor_class_literal.default_specialization(db);
+        binding.matching_overloads().any(|(_, overload)| {
+            overload
+                .return_ty
+                .as_nominal_instance()
+                .is_some_and(|inst| {
+                    let returned_class = inst.class(db);
+                    returned_class.class_literal(db) == self.constructor_class_literal
+                        || returned_class.is_subclass_of(db, constructor_class)
+                })
+        })
+    }
+}
+
 /// Binding information for a union of callables, where each union element may be an intersection.
 ///
 /// This structure represents a union (possibly size one) of callable elements, where each element
@@ -275,8 +310,24 @@ impl<'db> Bindings<'db> {
 
         for binding in self.iter_flat_mut() {
             binding.constructor_instance_type = Some(constructor_instance_type);
-            for overload in &mut binding.overloads {
-                overload.constructor_instance_type = Some(constructor_instance_type);
+
+            // For mixed constructor overloads, preserve per-overload return behavior in `__new__`
+            // while still enabling constructor-level return-type synthesis on `Bindings`.
+            if binding.mixed_constructor_init.is_none() {
+                for overload in &mut binding.overloads {
+                    overload.constructor_instance_type = Some(constructor_instance_type);
+                }
+            }
+
+            // Deferred `__init__` bindings in mixed constructor overloads still need constructor
+            // instance context for generic specialization inference (including literal promotion).
+            if let Some(mixed_init) = binding.mixed_constructor_init.as_mut() {
+                for init_binding in mixed_init.init_bindings.iter_flat_mut() {
+                    init_binding.constructor_instance_type = Some(constructor_instance_type);
+                    for overload in &mut init_binding.overloads {
+                        overload.constructor_instance_type = Some(constructor_instance_type);
+                    }
+                }
             }
         }
 
@@ -299,8 +350,31 @@ impl<'db> Bindings<'db> {
                     Some(generic_context),
                 );
             }
+            if let Some(mixed_init) = binding.mixed_constructor_init.as_mut() {
+                for element in &mut mixed_init.init_bindings.elements {
+                    for init_binding in &mut element.bindings {
+                        for overload in &mut init_binding.overloads {
+                            overload.signature.generic_context = GenericContext::merge_optional(
+                                db,
+                                overload.signature.generic_context,
+                                Some(generic_context),
+                            );
+                        }
+                    }
+                }
+            }
         }
         self
+    }
+
+    pub(crate) fn set_mixed_constructor_init(
+        &mut self,
+        constructor_class_literal: ClassLiteral<'db>,
+        init_bindings: &Bindings<'db>,
+    ) {
+        for binding in self.iter_flat_mut() {
+            binding.set_mixed_constructor_init(constructor_class_literal, init_bindings.clone());
+        }
     }
 
     pub(crate) fn set_dunder_call_is_possibly_unbound(&mut self) {
@@ -473,7 +547,20 @@ impl<'db> Bindings<'db> {
             element.retain_successful();
         }
 
-        // Apply union semantics at the outer level:
+        // For mixed `__new__` overloads: check `__init__` if matched overload is instance-returning.
+        let mut init_error = false;
+        for binding in self.iter_flat_mut() {
+            if binding.check_mixed_constructor_init(
+                db,
+                constraints,
+                argument_types,
+                call_expression_tcx,
+                dataclass_field_specifiers,
+            ) {
+                init_error = true;
+            }
+        }
+
         // In order of precedence:
         //
         // - If every union element is Ok, then the union is too.
@@ -502,6 +589,10 @@ impl<'db> Bindings<'db> {
             all_ok &= result.is_ok();
             any_binding_error |= matches!(result, Err(CallErrorKind::BindingError));
             all_not_callable &= matches!(result, Err(CallErrorKind::NotCallable));
+        }
+        if init_error {
+            any_binding_error = true;
+            all_ok = false;
         }
 
         if all_ok {
@@ -539,32 +630,147 @@ impl<'db> Bindings<'db> {
     // Constructor calls should combine `__new__`/`__init__` specializations instead of unioning.
     fn constructor_return_type(&self, db: &'db dyn Db) -> Option<Type<'db>> {
         let constructor_instance_type = self.constructor_instance_type?;
+        let class_literal = constructor_instance_type
+            .as_nominal_instance()
+            .and_then(|inst| inst.class(db).static_class_literal(db))
+            .map(|(lit, _)| lit);
+        let has_mixed_constructor_inits = self
+            .iter_flat()
+            .any(|binding| binding.mixed_constructor_init.is_some());
+
+        // If any matched overload's signature return type, when resolved with the inferred
+        // specialization, is a non-instance type (e.g. `__new__[S] -> S` with `S` inferred as
+        // `str`), use that resolved type directly. This handles arbitrary `__new__` return
+        // types like `S`, `list[S]`, etc.
+        let constructor_class = constructor_instance_type
+            .as_nominal_instance()
+            .map(|inst| inst.class(db));
+        for binding in self.iter_flat() {
+            if has_mixed_constructor_inits && binding.mixed_constructor_init.is_none() {
+                continue;
+            }
+
+            let Some((_, overload)) = binding.matching_overloads().next() else {
+                continue;
+            };
+            let sig_return = overload.signature.return_ty;
+            if !has_mixed_constructor_inits && !sig_return.has_typevar(db) {
+                continue;
+            }
+            // Fast path: if the declared return is already a specialization of the
+            // constructed class, this overload is instance-returning and cannot trigger
+            // the non-instance early return.
+            if class_literal
+                .and_then(|lit| sig_return.specialization_of(db, lit))
+                .is_some()
+            {
+                continue;
+            }
+            let resolved = overload
+                .specialization
+                .map(|specialization| sig_return.apply_specialization(db, specialization))
+                .unwrap_or(overload.return_ty);
+            if resolved.has_typevar(db) || resolved.is_unknown() {
+                continue;
+            }
+            // Check if the resolved type is an instance of the constructing class or a
+            // base class. If so, it's a normal instance-returning `__new__` and should be
+            // handled by the standard constructor return logic below.
+            let is_instance_return =
+                resolved
+                    .as_nominal_instance()
+                    .is_some_and(|inst: NominalInstanceType<'db>| {
+                        constructor_class.is_some_and(|cc| {
+                            cc.class_literal(db) == inst.class(db).class_literal(db)
+                                || cc.is_subclass_of(db, inst.class(db))
+                        })
+                    });
+            if !is_instance_return {
+                return Some(resolved);
+            }
+        }
+
+        // Preserve explicit strict-subclass constructor returns, e.g. constructing `C` from
+        // `__new__ -> D` where `D` is a subclass of `C`.
+        if let Some(constructor_class) = constructor_class {
+            for binding in self.iter_flat() {
+                if has_mixed_constructor_inits && binding.mixed_constructor_init.is_none() {
+                    continue;
+                }
+                let Some((_, overload)) = binding.matching_overloads().next() else {
+                    continue;
+                };
+
+                let sig_return = overload.signature.return_ty;
+                if sig_return.has_typevar(db) || sig_return.is_unknown() {
+                    continue;
+                }
+
+                let Some(returned_instance) = sig_return.as_nominal_instance() else {
+                    continue;
+                };
+                let returned_class = returned_instance.class(db);
+
+                if returned_class.class_literal(db) != constructor_class.class_literal(db)
+                    && returned_class.is_subclass_of(db, constructor_class)
+                {
+                    return Some(sig_return);
+                }
+            }
+        }
+
         let Some(class_specialization) = constructor_instance_type.class_specialization(db) else {
             return Some(constructor_instance_type);
         };
         let class_context = class_specialization.generic_context(db);
 
         let mut combined: Option<Specialization<'db>> = None;
-
-        // TODO this loops over all bindings, flattening union/intersection
-        // shape. As we improve our constraint solver, there may be an
-        // improvement needed here.
-        for binding in self.iter_flat() {
+        let mut combine_binding_specialization = |binding: &CallableBinding<'db>| {
             // For constructors, use the first matching overload (declaration order) to avoid
             // merging incompatible constructor specializations.
             let Some((_, overload)) = binding.matching_overloads().next() else {
-                continue;
+                return;
             };
-            let Some(specialization) = overload.specialization else {
-                continue;
-            };
-            let Some(specialization) = specialization.restrict(db, class_context) else {
-                continue;
+            // Prefer extracting the class specialization from the resolved overload return type.
+            // Fall back to restricting the inferred specialization to class-level type
+            // variables.
+            let specialization = class_literal
+                // Fast path: use the already-resolved overload return type when possible.
+                .and_then(|lit| overload.return_ty.specialization_of(db, lit))
+                .or_else(|| {
+                    overload
+                        .specialization
+                        .and_then(|s| s.restrict(db, class_context))
+                });
+            let Some(specialization) = specialization else {
+                return;
             };
             combined = Some(match combined {
                 None => specialization,
                 Some(previous) => previous.combine(db, specialization),
             });
+        };
+
+        // TODO this loops over all bindings, flattening union/intersection
+        // shape. As we improve our constraint solver, there may be an
+        // improvement needed here.
+        for binding in self.iter_flat() {
+            combine_binding_specialization(binding);
+        }
+
+        // Mixed constructor overloads keep `__init__` bindings out-of-band for deferred
+        // validation. If a matched overload is instance-returning, include inferred
+        // specializations from those deferred `__init__` bindings as well.
+        for binding in self.iter_flat() {
+            let Some(mixed_init) = binding.mixed_constructor_init.as_ref() else {
+                continue;
+            };
+            if !mixed_init.is_instance_returning(db, binding) {
+                continue;
+            }
+            for init_binding in mixed_init.init_bindings.iter_flat() {
+                combine_binding_specialization(init_binding);
+            }
         }
 
         // If constructor inference doesn't yield a specialization, fall back to the default
@@ -636,16 +842,28 @@ impl<'db> Bindings<'db> {
             }
         }
 
-        // If this is a single callable (not a union or intersection), report its diagnostics.
         if let Some(binding) = self.single_element() {
             binding.report_diagnostics(context, node, None);
-            return;
+        } else {
+            // Report diagnostics for each element (union variant).
+            // Each element may be a single binding or an intersection of bindings.
+            for element in &self.elements {
+                self.report_element_diagnostics(context, node, element);
+            }
         }
 
-        // Report diagnostics for each element (union variant).
-        // Each element may be a single binding or an intersection of bindings.
-        for element in &self.elements {
-            self.report_element_diagnostics(context, node, element);
+        // Report `__init__` diagnostics for mixed constructor overloads.
+        let mut reported_mixed_init_callables = FxHashSet::default();
+        for binding in self.iter_flat() {
+            let Some(mixed_init) = binding.mixed_constructor_init.as_ref() else {
+                continue;
+            };
+            if mixed_init.is_instance_returning(context.db(), binding) {
+                if !reported_mixed_init_callables.insert(mixed_init.init_bindings.callable_type()) {
+                    continue;
+                }
+                mixed_init.init_bindings.report_diagnostics(context, node);
+            }
         }
     }
 
@@ -1993,6 +2211,7 @@ impl<'db> From<Binding<'db>> for Bindings<'db> {
             dunder_call_is_possibly_unbound: false,
             bound_type: None,
             constructor_instance_type: None,
+            mixed_constructor_init: None,
             overload_call_return_type: None,
             matching_overload_before_type_checking: None,
             overloads: smallvec_inline![from],
@@ -2039,6 +2258,9 @@ pub(crate) struct CallableBinding<'db> {
 
     /// The type of the instance being constructed, if this signature is for a constructor.
     pub(crate) constructor_instance_type: Option<Type<'db>>,
+
+    /// Deferred `__init__` validation for constructors with mixed return-type overloads.
+    mixed_constructor_init: Option<Box<MixedConstructorInit<'db>>>,
 
     /// The return type of this overloaded callable.
     ///
@@ -2089,6 +2311,7 @@ impl<'db> CallableBinding<'db> {
             dunder_call_is_possibly_unbound: false,
             bound_type: None,
             constructor_instance_type: None,
+            mixed_constructor_init: None,
             overload_call_return_type: None,
             matching_overload_before_type_checking: None,
             overloads,
@@ -2102,6 +2325,7 @@ impl<'db> CallableBinding<'db> {
             dunder_call_is_possibly_unbound: false,
             bound_type: None,
             constructor_instance_type: None,
+            mixed_constructor_init: None,
             overload_call_return_type: None,
             matching_overload_before_type_checking: None,
             overloads: smallvec![],
@@ -2131,6 +2355,17 @@ impl<'db> CallableBinding<'db> {
         }
     }
 
+    fn set_mixed_constructor_init(
+        &mut self,
+        constructor_class_literal: ClassLiteral<'db>,
+        init_bindings: Bindings<'db>,
+    ) {
+        self.mixed_constructor_init = Some(Box::new(MixedConstructorInit {
+            constructor_class_literal,
+            init_bindings,
+        }));
+    }
+
     fn match_parameters(
         &mut self,
         db: &'db dyn Db,
@@ -2143,6 +2378,15 @@ impl<'db> CallableBinding<'db> {
 
         for overload in &mut self.overloads {
             overload.match_parameters(db, arguments.as_ref(), argument_forms);
+        }
+
+        // Deferred `__init__` bindings participate in argument matching so they can be type-checked
+        // later if a matched overload returns a constructor instance.
+        if let Some(mixed_init) = self.mixed_constructor_init.as_mut() {
+            let mut init_forms = ArgumentForms::new(arguments.len());
+            for init_binding in mixed_init.init_bindings.iter_flat_mut() {
+                init_binding.match_parameters(db, arguments.as_ref(), &mut init_forms);
+            }
         }
     }
 
@@ -2481,6 +2725,37 @@ impl<'db> CallableBinding<'db> {
         snapshotter.restore(self, post_evaluation_snapshot);
 
         None
+    }
+
+    fn check_mixed_constructor_init(
+        &mut self,
+        db: &'db dyn Db,
+        constraints: &ConstraintSetBuilder<'db>,
+        argument_types: &CallArguments<'_, 'db>,
+        call_expression_tcx: TypeContext<'db>,
+        dataclass_field_specifiers: &[Type<'db>],
+    ) -> bool {
+        let should_check = self
+            .mixed_constructor_init
+            .as_ref()
+            .is_some_and(|mixed_init| mixed_init.is_instance_returning(db, self));
+
+        if !should_check {
+            return false;
+        }
+
+        self.mixed_constructor_init
+            .as_mut()
+            .expect("checked above")
+            .init_bindings
+            .check_types_impl(
+                db,
+                constraints,
+                argument_types,
+                call_expression_tcx,
+                dataclass_field_specifiers,
+            )
+            .is_err()
     }
 
     /// Filter overloads based on variadic argument to variadic parameter match.
@@ -3735,7 +4010,8 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 return ty;
             }
 
-            let return_ty = self.constructor_instance_type.unwrap_or(self.return_ty);
+            let return_ty = self.return_ty;
+
             let mut variance_in_return = TypeVarVariance::Bivariant;
 
             // Find all occurrences of the type variable in the return type.
@@ -4373,9 +4649,27 @@ impl<'db> Binding<'db> {
             matcher.match_keyword_variadic(db, keywords_index, keywords_type);
         }
         // For constructor calls, return the constructed instance type (not `__init__`'s `None`).
-        self.return_ty = self
-            .constructor_instance_type
-            .unwrap_or(self.signature.return_ty);
+        // If `__new__` declares a return type that is a specialization of the class being
+        // constructed (e.g. `C[tuple[S, S]]`), prefer that over the generic constructor instance
+        // type (`C[T]`), so that method-level type variables are properly solved.
+        self.return_ty = if let Some(cit) = self.constructor_instance_type {
+            let sig_return_is_same_class = cit
+                .as_nominal_instance()
+                .and_then(|inst| inst.class(db).static_class_literal(db))
+                .is_some_and(|(lit, _)| {
+                    self.signature
+                        .return_ty
+                        .specialization_of(db, lit)
+                        .is_some()
+                });
+            if sig_return_is_same_class {
+                self.signature.return_ty
+            } else {
+                cit
+            }
+        } else {
+            self.signature.return_ty
+        };
         self.parameter_tys = vec![None; parameters.len()].into_boxed_slice();
         self.variadic_argument_matched_to_variadic_parameter =
             matcher.variadic_argument_matched_to_variadic_parameter;
