@@ -1100,6 +1100,7 @@ impl<'db> Bindings<'db> {
                         let init = get_argument_type("init", true);
                         let kw_only = get_argument_type("kw_only", true);
                         let alias = get_argument_type("alias", true);
+                        let converter = get_argument_type("converter", true);
 
                         // `dataclasses.field` and field-specifier functions of commonly used
                         // libraries like `pydantic`, `attrs`, and `SQLAlchemy` all return
@@ -1136,6 +1137,33 @@ impl<'db> Bindings<'db> {
                             .and_then(Type::as_string_literal)
                             .map(|literal| Box::from(literal.value(db)));
 
+                        // Extract the first positional parameter type from the converter callable. This
+                        // will determine the "input type" for this field in the `__init__` signature and
+                        // when assigning to this field on instances (`my_model.field = …`).
+                        let converter_input_type = converter.and_then(|converter_ty| {
+                            let mut input_types = UnionBuilder::new(db);
+                            let mut found_any = false;
+                            for binding in converter_ty.bindings(db).iter_flat() {
+                                // The index of the "actual" first parameters depends on whether or not there
+                                // is a bound `self` parameter in the converter callable.
+                                let first_index = usize::from(binding.bound_type.is_some());
+                                for overload in binding {
+                                    let params = overload.signature.parameters();
+                                    if let Some(first_param) = params.get_positional(first_index) {
+                                        input_types = input_types.add(first_param.annotated_type());
+                                        found_any = true;
+                                    } else if let Some((_, variadic)) = params.variadic() {
+                                        input_types = input_types.add(variadic.annotated_type());
+                                        found_any = true;
+                                    } else if params.is_gradual() {
+                                        input_types = input_types.add(Type::unknown());
+                                        found_any = true;
+                                    }
+                                }
+                            }
+                            found_any.then(|| input_types.build())
+                        });
+
                         // `typeshed` pretends that `dataclasses.field()` returns the type of the
                         // default value directly. At runtime, however, this function returns an
                         // instance of `dataclasses.Field`. We also model it this way and return
@@ -1144,7 +1172,14 @@ impl<'db> Bindings<'db> {
                         // are assignable to `T` if the default type of the field is assignable
                         // to `T`. Otherwise, we would error on `name: str = field(default="")`.
                         overload.set_return_type(Type::KnownInstance(KnownInstanceType::Field(
-                            FieldInstance::new(db, default_ty, init, kw_only, alias),
+                            FieldInstance::new(
+                                db,
+                                default_ty,
+                                init,
+                                kw_only,
+                                alias,
+                                converter_input_type,
+                            ),
                         )));
                     }
 
