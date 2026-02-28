@@ -1130,6 +1130,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Airflow, "301") => rules::airflow::rules::Airflow3Removal,
         (Airflow, "302") => rules::airflow::rules::Airflow3MovedToProvider,
         (Airflow, "303") => rules::airflow::rules::Airflow3IncompatibleFunctionSignature,
+        (Airflow, "304") => rules::airflow::rules::Airflow3DagDynamicValue,
         (Airflow, "311") => rules::airflow::rules::Airflow3SuggestedUpdate,
         (Airflow, "312") => rules::airflow::rules::Airflow3SuggestedToMoveToProvider,
         (Airflow, "321") => rules::airflow::rules::Airflow31Moved,
