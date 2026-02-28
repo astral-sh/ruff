@@ -50,6 +50,7 @@ mod tests {
     #[test_case(Rule::Airflow3MovedToProvider, Path::new("AIR302_standard.py"))]
     #[test_case(Rule::Airflow3MovedToProvider, Path::new("AIR302_try.py"))]
     #[test_case(Rule::Airflow3IncompatibleFunctionSignature, Path::new("AIR303.py"))]
+    #[test_case(Rule::Airflow3DagDynamicValue, Path::new("AIR304.py"))]
     #[test_case(Rule::Airflow3SuggestedUpdate, Path::new("AIR311_args.py"))]
     #[test_case(Rule::Airflow3SuggestedUpdate, Path::new("AIR311_names.py"))]
     #[test_case(Rule::Airflow3SuggestedUpdate, Path::new("AIR311_try.py"))]
