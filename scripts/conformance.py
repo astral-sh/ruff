@@ -75,9 +75,10 @@ CONFORMANCE_DIR_WITH_README = (
 CONFORMANCE_URL = CONFORMANCE_DIR_WITH_README + "tests/{filename}#L{line}"
 
 GITHUB_HEADER = [
-    "| Δ | Location | Name | Message |",
-    "|---|----------|------|---------|",
+    "<table>",
+    "<tr><th>Test case</th><th>Δ</th><th>Location</th><th>Name</th><th>Message</th></tr>",
 ]
+GITHUB_FOOTER = ["</table>"]
 # Priority order for section headings: improvements first, regressions last.
 TITLE_PRIORITY: dict[str, int] = {
     "True positives added": 0,
@@ -162,6 +163,11 @@ class Location:
         file = self.path.name
         link = CONFORMANCE_URL.format(filename=file, line=self.positions.begin.line)
         return f"[{file}:{self.positions.begin.line}:{self.positions.begin.column}]({link})"
+
+    def as_html_link(self) -> str:
+        file = self.path.name
+        link = CONFORMANCE_URL.format(filename=file, line=self.positions.begin.line)
+        return f'<a href="{link}">{file}:{self.positions.begin.line}:{self.positions.begin.column}</a>'
 
 
 @dataclass(kw_only=True, slots=True)
@@ -361,15 +367,42 @@ class TestCase:
             )
 
 
-def render_github_row(diagnostics: list[TyDiagnostic], *, delta: str = "") -> str:
-    locs = []
-    check_names = []
-    descriptions = []
-    for d in diagnostics:
-        locs.append(d.location.as_link())
-        check_names.append(d.check_name)
-        descriptions.append(d.description)
-    return f"| {delta} | {'<br>'.join(locs)} | {'<br>'.join(check_names)} | {'<br>'.join(descriptions)} |"
+def tc_location_cell(tc: TestCase, *, rowspan: int, source: Source | None) -> str:
+    """Build a <td> for the test-case-level location, spanning ``rowspan`` rows."""
+    all_diags = tc.old + tc.new if source is None else tc.diagnostics_by_source(source)
+
+    if not all_diags:
+        return f'<td rowspan="{rowspan}"></td>' if rowspan > 1 else "<td></td>"
+
+    min_line = min(d.location.positions.begin.line for d in all_diags)
+    max_line = max(d.location.positions.begin.line for d in all_diags)
+    filename = all_diags[0].location.path.name
+
+    if min_line == max_line:
+        url = CONFORMANCE_URL.format(filename=filename, line=min_line)
+        display = f"{filename}:{min_line}"
+    else:
+        url = f"{CONFORMANCE_DIR_WITH_README}tests/{filename}#L{min_line}-L{max_line}"
+        display = f"{filename}:{min_line}:{max_line}"
+
+    rowspan_attr = f' rowspan="{rowspan}"' if rowspan > 1 else ""
+    return f'<td{rowspan_attr} align="center" valign="middle"><a href="{url}">{display}</a></td>'
+
+
+def render_github_row(
+    diagnostics: list[TyDiagnostic], *, delta: str = "", location_cell: str = ""
+) -> str:
+    locs = "<br>".join(d.location.as_html_link() for d in diagnostics)
+    names = "<br>".join(d.check_name for d in diagnostics)
+    messages = "<br>".join(d.description for d in diagnostics)
+    return (
+        f"<tr>{location_cell}"
+        f'<td align="center" valign="middle">{delta}</td>'
+        f"<td>{locs}</td>"
+        f"<td>{names}</td>"
+        f"<td>{messages}</td>"
+        f"</tr>"
+    )
 
 
 def render_diff_row(diagnostics: list[TyDiagnostic], *, removed: bool = False) -> str:
@@ -619,7 +652,10 @@ def render_test_cases(
                     lines.append(render_diff_row(tc.old, removed=True))
                     lines.append(render_diff_row(tc.new, removed=False))
                 else:
-                    lines.append(render_github_row(tc.old, delta="-"))
+                    loc = tc_location_cell(tc, rowspan=2, source=None)
+                    lines.append(
+                        render_github_row(tc.old, delta="-", location_cell=loc)
+                    )
                     lines.append(render_github_row(tc.new, delta="+"))
             else:
                 diagnostics = tc.diagnostics_by_source(source)
@@ -627,12 +663,19 @@ def render_test_cases(
                 if format == "diff":
                     lines.append(render_diff_row(diagnostics, removed=removed))
                 else:
+                    loc = tc_location_cell(tc, rowspan=1, source=source)
                     lines.append(
-                        render_github_row(diagnostics, delta="-" if removed else "+")
+                        render_github_row(
+                            diagnostics,
+                            delta="-" if removed else "+",
+                            location_cell=loc,
+                        )
                     )
 
         if format == "diff":
             lines.append("```")
+        else:
+            lines.extend(GITHUB_FOOTER)
         lines.extend(["", "</details>", ""])
 
     return "\n".join(lines)
@@ -718,10 +761,14 @@ def render_file_stats_table(test_cases: list[TestCase]) -> str:
     lines = [
         "### Per-file breakdown",
         "",
-        "| File | TP | FP | FN | Status |",
+        '<div align="center">',
+        "",
+        "| File | True Positives | False Positives | False Negatives | Status |",
         "|------|----|----|----|--------|",
         *rows,
         totals_row,
+        "",
+        "</div>",
         "",
     ]
     return "\n".join(lines)
@@ -816,6 +863,112 @@ def render_summary(test_cases: list[TestCase], *, force_summary_table: bool) -> 
         f"(precision **{old.precision:.1%}**)."
     )
 
+    summary_note = " ".join(
+        [
+            "Each",
+            "test",
+            "case",
+            "represents",
+            "one",
+            "expected",
+            "error",
+            "annotation",
+            "or",
+            "a",
+            "group",
+            "of",
+            "annotations",
+            "sharing",
+            "a",
+            "tag.",
+            "Counts",
+            "are",
+            "per",
+            "test",
+            "case,",
+            "not",
+            "per",
+            "diagnostic",
+            "—",
+            "multiple",
+            "diagnostics",
+            "on",
+            "the",
+            "same",
+            "line",
+            "count",
+            "as",
+            "one.",
+            "Required",
+            "annotations",
+            "(`E`)",
+            "are",
+            "true",
+            "positives",
+            "when",
+            "ty",
+            "flags",
+            "the",
+            "expected",
+            "location",
+            "and",
+            "false",
+            "negatives",
+            "when",
+            "it",
+            "does",
+            "not.",
+            "Optional",
+            "annotations",
+            "(`E?`)",
+            "are",
+            "true",
+            "positives",
+            "when",
+            "flagged",
+            "but",
+            "true",
+            "negatives",
+            "(not",
+            "false",
+            "negatives)",
+            "when",
+            "not.",
+            "Tagged",
+            "annotations",
+            "(`E[tag]`)",
+            "require",
+            "ty",
+            "to",
+            "flag",
+            "exactly",
+            "one",
+            "of",
+            "the",
+            "tagged",
+            "lines;",
+            "tagged",
+            "multi-annotations",
+            "(`E[tag+]`)",
+            "allow",
+            "any",
+            "number",
+            "up",
+            "to",
+            "the",
+            "tag",
+            "count.",
+            "Flagging",
+            "unexpected",
+            "locations",
+            "counts",
+            "as",
+            "a",
+            "false",
+            "positive.",
+        ]
+    )
+
     return dedent(
         f"""
         ## {header}
@@ -823,14 +976,9 @@ def render_summary(test_cases: list[TestCase], *, force_summary_table: bool) -> 
 
         ### Summary
 
-        Each test case represents one expected error annotation or a group of annotations
-        sharing a tag. Counts are per test case, not per diagnostic — multiple diagnostics
-        on the same line count as one. Required annotations (`E`) are true positives when
-        ty flags the expected location and false negatives when it does not. Optional
-        annotations (`E?`) are true positives when flagged but true negatives (not false
-        negatives) when not. Tagged annotations (`E[tag]`) require ty to flag exactly one
-        of the tagged lines; tagged multi-annotations (`E[tag+]`) allow any number up to
-        the tag count. Flagging unexpected locations counts as a false positive.
+        {summary_note}
+
+        <div align="center">
 
         | Metric | Old | New | Diff | Outcome |
         |--------|-----|-----|------|---------|
@@ -840,6 +988,8 @@ def render_summary(test_cases: list[TestCase], *, force_summary_table: bool) -> 
         | Total Diagnostics | {old.total_diagnostics} | {new.total_diagnostics} | {total_change:+} | {total_diff} |
         | Precision | {old.precision:.2%} | {new.precision:.2%} | {precision_change:+.2%} | {precision_diff} |
         | Recall | {old.recall:.2%} | {new.recall:.2%} | {recall_change:+.2%} | {recall_diff} |
+
+        </div>
 
         {summary_paragraph}
 
