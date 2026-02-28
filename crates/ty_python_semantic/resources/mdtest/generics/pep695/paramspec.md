@@ -103,31 +103,39 @@ def foo[**P](c: Callable[P, int]) -> None:
     # error: [invalid-type-form] "`P.args` is valid only in `*args` annotation: Did you mean `P.kwargs`?"
     def nested2(*args: P.kwargs, **kwargs: P.args) -> None: ...
 
-    # TODO: error
+    # error: [invalid-paramspec] "`*args: P.args` must be accompanied by `**kwargs: P.kwargs`"
     def nested3(*args: P.args) -> None: ...
 
-    # TODO: error
+    # error: [invalid-paramspec] "`**kwargs: P.kwargs` must be accompanied by `*args: P.args`"
     def nested4(**kwargs: P.kwargs) -> None: ...
 
-    # TODO: error
+    # error: [invalid-paramspec] "When using `P.args` and `P.kwargs`, no other parameters can appear between `*args` and `**kwargs`"
     def nested5(*args: P.args, x: int, **kwargs: P.kwargs) -> None: ...
+
+    # error: [invalid-paramspec] "`P.args` is not valid in this position; it can only be used to annotate `*args` or `**kwargs`"
+    def nested6(x: P.args) -> None: ...
+    def nested7(
+        *args: P.args,
+        # error: [invalid-paramspec] "`**kwargs` must be annotated with `P.kwargs` (to match `*args: P.args`)"
+        **kwargs: int,
+    ) -> None: ...
 ```
 
 And, they need to be used together.
 
 ```py
 def foo[**P](c: Callable[P, int]) -> None:
-    # TODO: error
+    # error: [invalid-paramspec] "`*args: P.args` must be accompanied by `**kwargs: P.kwargs`"
     def nested1(*args: P.args) -> None: ...
 
-    # TODO: error
+    # error: [invalid-paramspec] "`**kwargs: P.kwargs` must be accompanied by `*args: P.args`"
     def nested2(**kwargs: P.kwargs) -> None: ...
 
 class Foo[**P]:
-    # TODO: error
+    # error: [invalid-paramspec] "`P.args` is not valid in this position"
     args: P.args
 
-    # TODO: error
+    # error: [invalid-paramspec] "`P.kwargs` is not valid in this position"
     kwargs: P.kwargs
 ```
 
@@ -152,9 +160,9 @@ It isn't allowed to annotate an instance attribute either:
 class Foo4[**P]:
     def __init__(self, fn: Callable[P, int], *args: P.args, **kwargs: P.kwargs) -> None:
         self.fn = fn
-        # TODO: error
+        # error: [invalid-paramspec] "`P.args` is not valid in this position"
         self.args: P.args = args
-        # TODO: error
+        # error: [invalid-paramspec] "`P.kwargs` is not valid in this position"
         self.kwargs: P.kwargs = kwargs
 ```
 
