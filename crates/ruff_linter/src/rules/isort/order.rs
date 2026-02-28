@@ -82,7 +82,7 @@ pub(crate) fn order_imports<'a>(
                     .map(Import),
             )
             .collect()
-    } else if settings.force_sort_within_sections {
+    } else if settings.force_sort_within_sections || settings.lexicographical {
         straight_imports
             .map(Import)
             .chain(from_imports.map(ImportFrom))
