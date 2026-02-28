@@ -1,27 +1,25 @@
 import classNames from "classnames";
 import RepoButton from "./RepoButton";
 import ThemeButton from "./ThemeButton";
-import ShareButton from "./ShareButton";
 import { Theme } from "./theme";
 import VersionTag from "./VersionTag";
 import AstralButton from "./AstralButton";
+import type { ReactNode } from "react";
 
 export default function Header({
-  edit,
   theme,
   tool,
   version,
   onChangeTheme,
   onReset,
-  onShare,
+  shareContent,
 }: {
-  edit: number | null;
   theme: Theme;
   tool: "ruff" | "ty";
   version: string | null;
   onChangeTheme: (theme: Theme) => void;
   onReset?(): void;
-  onShare: () => Promise<void>;
+  shareContent: ReactNode;
 }) {
   return (
     <div
@@ -51,9 +49,7 @@ export default function Header({
         <div className="max-sm:hidden flex">
           <ResetButton onClicked={onReset} />
         </div>
-        <div className="max-sm:hidden flex">
-          <ShareButton key={edit} onShare={onShare} />
-        </div>
+        <div className="max-sm:hidden flex">{shareContent}</div>
         <Divider />
 
         <ThemeButton theme={theme} onChange={onChangeTheme} />
