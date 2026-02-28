@@ -8006,12 +8006,7 @@ impl TypeVarKind {
 /// This represents the core identity of a typevar, independent of its bounds or constraints. Two
 /// typevars have the same identity if they represent the same logical typevar, even if their
 /// bounds have been materialized differently.
-///
-/// # Ordering
-/// Ordering is based on the identity's salsa-assigned id and not on its values.
-/// The id may change between runs, or when the identity was garbage collected and recreated.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
-#[derive(PartialOrd, Ord)]
 pub struct TypeVarIdentity<'db> {
     /// The name of this TypeVar (e.g. `T`)
     #[returns(ref)]
@@ -8547,9 +8542,7 @@ fn lazy_default_cycle_recover<'db>(
 }
 
 /// Where a type variable is bound and usable.
-#[derive(
-    Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, salsa::Update, get_size2::GetSize,
-)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
 pub enum BindingContext<'db> {
     /// The definition of the generic class, function, or type alias that binds this typevar.
     Definition(Definition<'db>),
@@ -8577,7 +8570,7 @@ impl<'db> BindingContext<'db> {
     }
 }
 
-#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord, get_size2::GetSize)]
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, get_size2::GetSize)]
 pub enum ParamSpecAttrKind {
     Args,
     Kwargs,
@@ -8598,9 +8591,7 @@ impl std::fmt::Display for ParamSpecAttrKind {
 /// independent of the typevar's bounds or constraints. Two bound typevars have the same identity
 /// if they represent the same logical typevar bound in the same context, even if their bounds
 /// have been materialized differently.
-#[derive(
-    Debug, Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd, get_size2::GetSize, salsa::Update,
-)]
+#[derive(Debug, Clone, Copy, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
 pub struct BoundTypeVarIdentity<'db> {
     pub(crate) identity: TypeVarIdentity<'db>,
     pub(crate) binding_context: BindingContext<'db>,
