@@ -289,6 +289,14 @@ class TestCase:
     def multi(self) -> bool:
         return bool(self.expected) and all(e.multi for e in self.expected)
 
+    @property
+    def path(self) -> Path:
+        """Return the source file path for this test case."""
+        for diags in (self.new, self.old, self.expected):
+            if diags:
+                return diags[0].location.path
+        raise ValueError(f"No diagnostics in test case {self.key}")
+
     def diagnostics_by_source(self, source: Source) -> list[TyDiagnostic]:
         return self.old if source == Source.OLD else self.new
 
@@ -632,58 +640,96 @@ def render_test_cases(
     return "\n".join(lines)
 
 
-def file_is_fully_passing(test_cases: list[TestCase], source: Source) -> bool:
-    """Return True if every test case for a file classifies as TP or TN for source."""
-    return all(
-        tc.classify(source).classification
-        not in (Classification.FALSE_POSITIVE, Classification.FALSE_NEGATIVE)
-        for tc in test_cases
-    )
-
-
-def render_file_status_changes(test_cases: list[TestCase]) -> str:
-    """Render a section listing files that newly achieve or lose fully-passing status."""
-
-    def get_path(tc: TestCase) -> Path:
-        for diags in (tc.new, tc.old, tc.expected):
-            if diags:
-                return diags[0].location.path
-        raise ValueError(f"No diagnostics in test case {tc.key}")
-
+def render_file_stats_table(test_cases: list[TestCase]) -> str:
+    """Render a per-file breakdown showing only files whose TP/FP/FN counts changed."""
     path_to_cases: dict[Path, list[TestCase]] = {}
     for tc in test_cases:
-        path_to_cases.setdefault(get_path(tc), []).append(tc)
+        path_to_cases.setdefault(tc.path, []).append(tc)
 
-    newly_passing: list[Path] = []
-    newly_failing: list[Path] = []
+    def fmt(old: int, new: int) -> str:
+        if old == new:
+            return str(new)
+        diff = new - old
+        return f"{new} ({diff:+})"
 
-    for path, cases in sorted(path_to_cases.items()):
-        old_passing = file_is_fully_passing(cases, Source.OLD)
-        new_passing = file_is_fully_passing(cases, Source.NEW)
-        if not old_passing and new_passing:
-            newly_passing.append(path)
-        elif old_passing and not new_passing:
-            newly_failing.append(path)
+    # Collect per-file data; track totals across all files regardless of change.
+    changed: list[tuple[int, Path, Statistics, Statistics, bool, bool]] = []
+    old_totals = Statistics()
+    new_totals = Statistics()
+    passing = 0
+    total_files = 0
 
-    if not newly_passing and not newly_failing:
+    for path, cases in path_to_cases.items():
+        old_stats = compute_stats(cases, Source.OLD)
+        new_stats = compute_stats(cases, Source.NEW)
+
+        old_totals.true_positives += old_stats.true_positives
+        old_totals.false_positives += old_stats.false_positives
+        old_totals.false_negatives += old_stats.false_negatives
+        new_totals.true_positives += new_stats.true_positives
+        new_totals.false_positives += new_stats.false_positives
+        new_totals.false_negatives += new_stats.false_negatives
+
+        old_passes = old_stats.false_positives == 0 and old_stats.false_negatives == 0
+        new_passes = new_stats.false_positives == 0 and new_stats.false_negatives == 0
+        passing += new_passes
+        total_files += 1
+
+        total_change = (
+            abs(new_stats.true_positives - old_stats.true_positives)
+            + abs(new_stats.false_positives - old_stats.false_positives)
+            + abs(new_stats.false_negatives - old_stats.false_negatives)
+        )
+        if total_change > 0:
+            changed.append(
+                (total_change, path, old_stats, new_stats, old_passes, new_passes)
+            )
+
+    if not changed:
         return ""
 
-    lines = []
-    if newly_passing:
-        lines.append("### Files now fully passing 🎉")
-        lines.append("")
-        for path in newly_passing:
-            url = CONFORMANCE_DIR_WITH_README + f"tests/{path.name}"
-            lines.append(f"- [{path.name}]({url})")
-        lines.append("")
-    if newly_failing:
-        lines.append("### Files now failing ❌")
-        lines.append("")
-        for path in newly_failing:
-            url = CONFORMANCE_DIR_WITH_README + f"tests/{path.name}"
-            lines.append(f"- [{path.name}]({url})")
-        lines.append("")
+    changed.sort(key=lambda x: (-x[0], x[1].name))
 
+    rows = []
+    for _, path, old_stats, new_stats, old_passes, new_passes in changed:
+        if new_passes and not old_passes:
+            status = "✅ Newly Passing 🎉"
+        elif old_passes and not new_passes:
+            status = "❌ Regressed"
+        elif new_passes:
+            status = "✅"
+        else:
+            status = "❌"
+        url = CONFORMANCE_DIR_WITH_README + f"tests/{path.name}"
+        rows.append(
+            f"| [{path.name}]({url})"
+            f" | {fmt(old_stats.true_positives, new_stats.true_positives)}"
+            f" | {fmt(old_stats.false_positives, new_stats.false_positives)}"
+            f" | {fmt(old_stats.false_negatives, new_stats.false_negatives)}"
+            f" | {status} |"
+        )
+
+    totals_row = (
+        f"| **Total**"
+        f" | **{fmt(old_totals.true_positives, new_totals.true_positives)}**"
+        f" | **{fmt(old_totals.false_positives, new_totals.false_positives)}**"
+        f" | **{fmt(old_totals.false_negatives, new_totals.false_negatives)}**"
+        f" | {passing}/{total_files} |"
+    )
+
+    lines = [
+        "### Per-file breakdown (this branch)",
+        "",
+        "<details>",
+        "",
+        "| File | TP | FP | FN | Status |",
+        "|------|----|----|----|--------|",
+        *rows,
+        totals_row,
+        "",
+        "</details>",
+        "",
+    ]
     return "\n".join(lines)
 
 
@@ -783,7 +829,6 @@ def render_summary(test_cases: list[TestCase], *, force_summary_table: bool) -> 
         f"""
         ## {header}
 
-        {summary_paragraph}
 
         ### Summary
 
@@ -795,6 +840,8 @@ def render_summary(test_cases: list[TestCase], *, force_summary_table: bool) -> 
         | Total Diagnostics | {old.total_diagnostics} | {new.total_diagnostics} | {total_change:+} | {total_diff} |
         | Precision | {old.precision:.2%} | {new.precision:.2%} | {precision_change:+.2%} | {precision_diff} |
         | Recall | {old.recall:.2%} | {new.recall:.2%} | {recall_change:+.2%} | {recall_diff} |
+
+        {summary_paragraph}
 
         """
     )
@@ -915,7 +962,7 @@ def main():
             None,
             [
                 render_summary(grouped, force_summary_table=args.force_summary_table),
-                render_file_status_changes(grouped),
+                render_file_stats_table(grouped),
                 render_test_cases(grouped, format=args.format),
             ],
         )
