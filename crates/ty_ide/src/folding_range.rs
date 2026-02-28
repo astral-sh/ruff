@@ -2,7 +2,7 @@ use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_db::source::source_text;
 use ruff_python_ast::visitor::source_order::{SourceOrderVisitor, TraversalSignal, walk_body};
-use ruff_python_ast::{AnyNodeRef, Stmt};
+use ruff_python_ast::{AnyNodeRef, Decorator, Stmt, StmtClassDef, StmtFunctionDef};
 use ruff_source_file::{Line, UniversalNewlines};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
@@ -48,9 +48,12 @@ pub fn folding_ranges(db: &dyn Db, file: File) -> Vec<FoldingRange> {
     let parsed = parsed_module(db, file).load(db);
     let source = source_text(db, file);
 
+    let line_index = ruff_db::source::line_index(db, file);
+
     let mut visitor = FoldingRangeVisitor {
         source: source.as_str(),
         ranges: vec![],
+        line_index: &line_index,
     };
     visitor.visit_body(parsed.suite());
 
@@ -67,6 +70,7 @@ pub fn folding_ranges(db: &dyn Db, file: File) -> Vec<FoldingRange> {
 struct FoldingRangeVisitor<'a> {
     source: &'a str,
     ranges: Vec<FoldingRange>,
+    line_index: &'a ruff_source_file::LineIndex,
 }
 
 impl<'a> FoldingRangeVisitor<'a> {
@@ -223,6 +227,43 @@ impl<'a> FoldingRangeVisitor<'a> {
         }
         self.add_range(FoldingRange::from(first_stmt.range()).with_kind(FoldingRangeKind::Comment));
     }
+
+    /// Add a folding range for decorators applied to a class or function.
+    fn add_decorator_range(&mut self, decorator_list: &[Decorator]) {
+        if let (Some(first), Some(last)) = (decorator_list.first(), decorator_list.last()) {
+            self.add_range(TextRange::new(first.start(), last.end()));
+        }
+    }
+
+    /// Add a folding range for the function or class definition.
+    fn add_def_range(
+        &mut self,
+        range: TextRange,
+        decorator_list: &[Decorator],
+        name_start: TextSize,
+    ) {
+        if decorator_list.last().is_some() {
+            // get the the beginning of the line containing the function or class name
+            let line = self.line_index.line_index(name_start);
+            let start = self.line_index.line_start(line, self.source);
+            let range = TextRange::new(start, range.end());
+            self.add_range(range);
+        } else {
+            self.add_range(range);
+        }
+    }
+
+    /// Add a folding range for function definitions, excluding decorators.
+    fn add_function_def_range(&mut self, func: &StmtFunctionDef) {
+        self.add_decorator_range(&func.decorator_list);
+        self.add_def_range(func.range(), &func.decorator_list, func.name.start());
+    }
+
+    /// Add a folding range for class definitions, excluding decorators.
+    fn add_class_def_range(&mut self, class: &StmtClassDef) {
+        self.add_decorator_range(&class.decorator_list);
+        self.add_def_range(class.range(), &class.decorator_list, class.name.start());
+    }
 }
 
 impl SourceOrderVisitor<'_> for FoldingRangeVisitor<'_> {
@@ -230,7 +271,7 @@ impl SourceOrderVisitor<'_> for FoldingRangeVisitor<'_> {
         match node {
             // Compound statements that create folding regions
             AnyNodeRef::StmtFunctionDef(func) => {
-                self.add_range(func.range());
+                self.add_function_def_range(func);
                 // Note that this may be duplicative with folding
                 // ranges added for string literals. But I don't think
                 // the LSP protocol specifies that this is a problem.
@@ -241,7 +282,7 @@ impl SourceOrderVisitor<'_> for FoldingRangeVisitor<'_> {
                 self.add_docstring_range(&func.body);
             }
             AnyNodeRef::StmtClassDef(class) => {
-                self.add_range(class.range());
+                self.add_class_def_range(class);
                 // See comment above for class docstrings about this
                 // being duplicative with adding folding ranges for
                 // string literals.
@@ -1681,6 +1722,241 @@ with open("file.txt") as f:
 
             self.render_diagnostics(diagnostics)
         }
+    }
+
+    #[test]
+    fn test_folding_range_decorated_function_single() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+@decorator
+def my_function():
+    pass
+<CURSOR>
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.folding_ranges(), @r"
+        info[folding-range]: Folding Range
+         --> main.py:3:1
+          |
+        2 |   @decorator
+        3 | / def my_function():
+        4 | |     pass
+          | |________^
+          |
+        ");
+    }
+
+    #[test]
+    fn test_folding_range_decorated_function_multiple() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+@first
+@second
+@third
+def my_function():
+    pass
+<CURSOR>
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.folding_ranges(), @"
+        info[folding-range]: Folding Range
+         --> main.py:2:1
+          |
+        2 | / @first
+        3 | | @second
+        4 | | @third
+          | |______^
+        5 |   def my_function():
+        6 |       pass
+          |
+
+        info[folding-range]: Folding Range
+         --> main.py:5:1
+          |
+        3 |   @second
+        4 |   @third
+        5 | / def my_function():
+        6 | |     pass
+          | |________^
+          |
+        ");
+    }
+
+    #[test]
+    fn test_folding_range_decorated_class_single() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+@dataclass
+class MyClass:
+    value: int
+    name: str
+<CURSOR>
+"#,
+            )
+            .build();
+
+        // Single decorator is one line, so no decorator folding range is emitted.
+        assert_snapshot!(test.folding_ranges(), @r"
+        info[folding-range]: Folding Range
+         --> main.py:3:1
+          |
+        2 |   @dataclass
+        3 | / class MyClass:
+        4 | |     value: int
+        5 | |     name: str
+          | |_____________^
+          |
+        ");
+    }
+
+    #[test]
+    fn test_folding_range_decorated_class_multiple() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+@decorator_a
+@decorator_b
+class MyClass:
+    value: int
+<CURSOR>
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.folding_ranges(), @"
+        info[folding-range]: Folding Range
+         --> main.py:2:1
+          |
+        2 | / @decorator_a
+        3 | | @decorator_b
+          | |____________^
+        4 |   class MyClass:
+        5 |       value: int
+          |
+
+        info[folding-range]: Folding Range
+         --> main.py:4:1
+          |
+        2 |   @decorator_a
+        3 |   @decorator_b
+        4 | / class MyClass:
+        5 | |     value: int
+          | |______________^
+          |
+        ");
+    }
+
+    #[test]
+    fn test_folding_range_decorated_async_function() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+@decorator
+async def my_async_function():
+    pass
+<CURSOR>
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.folding_ranges(), @r"
+        info[folding-range]: Folding Range
+         --> main.py:3:1
+          |
+        2 |   @decorator
+        3 | / async def my_async_function():
+        4 | |     pass
+          | |________^
+          |
+        ");
+    }
+
+    #[test]
+    fn test_folding_range_decorated_nested_function() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+def outer_function():
+    @decorator
+    def inner_function():
+        pass
+<CURSOR>
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.folding_ranges(), @"
+        info[folding-range]: Folding Range
+         --> main.py:2:1
+          |
+        2 | / def outer_function():
+        3 | |     @decorator
+        4 | |     def inner_function():
+        5 | |         pass
+          | |____________^
+          |
+
+        info[folding-range]: Folding Range
+         --> main.py:4:1
+          |
+        2 |   def outer_function():
+        3 |       @decorator
+        4 | /     def inner_function():
+        5 | |         pass
+          | |____________^
+          |
+        ");
+    }
+
+    #[test]
+    fn test_folding_range_decorated_async_method() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+class MyClass:
+    @decorator
+    async def my_async_method(self):
+        pass
+<CURSOR>
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.folding_ranges(), @"
+        info[folding-range]: Folding Range
+         --> main.py:2:1
+          |
+        2 | / class MyClass:
+        3 | |     @decorator
+        4 | |     async def my_async_method(self):
+        5 | |         pass
+          | |____________^
+          |
+
+        info[folding-range]: Folding Range
+         --> main.py:4:1
+          |
+        2 |   class MyClass:
+        3 |       @decorator
+        4 | /     async def my_async_method(self):
+        5 | |         pass
+          | |____________^
+          |
+        ");
     }
 
     struct FoldingRangeDiagnostic {
