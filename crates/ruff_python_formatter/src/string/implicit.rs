@@ -300,7 +300,10 @@ impl Format<PyFormatContext<'_>> for FormatImplicitConcatenatedStringFlat<'_> {
             for part in self.string.parts().rev() {
                 assert!(part.is_string_literal());
 
-                if f.context().source()[part.content_range()].trim().is_empty() {
+                if f.context().source()[part.content_range()]
+                    .chars()
+                    .all(char::is_whitespace)
+                {
                     // Don't format the part.
                     parts.next_back();
                 } else {

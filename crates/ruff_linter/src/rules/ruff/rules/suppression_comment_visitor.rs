@@ -128,6 +128,7 @@ where
                 // We want to make sure that `# fmt: skip` is associated with the `pass` statement,
                 // even though it comes after the end of that node.
                 if SimpleTokenizer::new(self.locator.contents(), between)
+                    .kinds()
                     .skip_trivia()
                     .next()
                     .is_some()
