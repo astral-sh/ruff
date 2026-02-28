@@ -160,7 +160,7 @@ export default function Editor({
         contextmenu: true,
         "semanticHighlighting.enabled": true,
       }}
-      language={fileName.endsWith(".pyi") ? "python" : undefined}
+      language={getEditorLanguage(fileName)}
       path={fileName}
       wrapperProps={visible ? {} : { style: { display: "none" } }}
       theme={theme === "light" ? "Ayu-Light" : "Ayu-Dark"}
@@ -1050,4 +1050,24 @@ function mapDocumentHighlightKind(
     default:
       return languages.DocumentHighlightKind.Text;
   }
+}
+
+/**
+ * Maps a file name to the Monaco editor language id.
+ *
+ * Monaco auto-detects most languages from the file extension via the `path`
+ * prop, but some extensions need an explicit override:
+ *   - `.pyi`  → `"python"` (not recognised by Monaco's extension map)
+ *   - `.toml` → `"ruby"` (Monaco has no built-in TOML grammar; Ruby gives
+ *               reasonable highlighting for TOML's key = value / [section] syntax)
+ *   - `undefined` -> fallback to Monoco auto-detection
+ */
+function getEditorLanguage(fileName: string): string | undefined {
+  if (fileName.endsWith(".pyi")) {
+    return "python";
+  }
+  if (fileName.endsWith(".toml")) {
+    return "ruby";
+  }
+  return undefined;
 }

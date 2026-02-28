@@ -148,6 +148,8 @@ function FileEntry({ name, onClicked, onRenamed, selected }: FileEntryProps) {
       <Icons.Json width={12} height={12} />
     ) : extension === "ipynb" ? (
       <Icons.Jupyter width={12} height={12} />
+    ) : extension === "toml" ? (
+      <Icons.Toml width={12} height={12} />
     ) : (
       <Icons.File width={12} height={12} />
     );
