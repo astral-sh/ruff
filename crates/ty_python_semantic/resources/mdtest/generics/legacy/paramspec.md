@@ -260,6 +260,23 @@ class Foo3(Generic[P]):
     ) -> None: ...
 ```
 
+Error messages for `invalid-paramspec` also use the actual parameter names:
+
+```py
+def bar(c: Callable[P, int]) -> None:
+    # error: [invalid-paramspec] "`*my_args: P.args` must be accompanied by `**my_kwargs: P.kwargs`"
+    def f1(*my_args: P.args, **my_kwargs: int) -> None: ...
+
+    # error: [invalid-paramspec] "`*positional: P.args` must be accompanied by `**kwargs: P.kwargs`"
+    def f2(*positional: P.args) -> None: ...
+
+    # error: [invalid-paramspec] "`**keyword: P.kwargs` must be accompanied by `*args: P.args`"
+    def f3(**keyword: P.kwargs) -> None: ...
+
+    # error: [invalid-paramspec] "No parameters may appear between `*a: P.args` and `**kw: P.kwargs`"
+    def f4(*a: P.args, x: int, **kw: P.kwargs) -> None: ...
+```
+
 ## Specializing generic classes explicitly
 
 ```py
