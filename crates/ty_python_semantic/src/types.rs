@@ -3493,7 +3493,28 @@ impl<'db> Type<'db> {
                 // attribute access falls back to `__getattr__`/`__getattribute__` on the
                 // class. `try_call_dunder` adds `NO_INSTANCE_FALLBACK`, which causes the
                 // lookup to hit the catch-all that only checks the meta-type (the metaclass).
-                self.fallback_to_getattr(db, &name, result, policy)
+                let result = self.fallback_to_getattr(db, &name, result, policy);
+
+                // `type[Any]`/`type[Unknown]` are gradual forms with an unknown metaclass
+                // (which is at least `type`). Attributes resolved via `type`'s descriptors
+                // are intersected with `Unknown` to reflect uncertainty about whether the
+                // unknown metaclass overrides them.
+                if let Type::SubclassOf(subclass_of) = self
+                    && subclass_of.is_dynamic()
+                {
+                    result.map_type(|ty| {
+                        if ty.is_dynamic() {
+                            ty
+                        } else {
+                            IntersectionBuilder::new(db)
+                                .add_positive(ty)
+                                .add_positive(Type::unknown())
+                                .build()
+                        }
+                    })
+                } else {
+                    result
+                }
             }
 
             // Unlike other objects, `super` has a unique member lookup behavior.
