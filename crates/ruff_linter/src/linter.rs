@@ -1224,4 +1224,45 @@ mod tests {
         .0;
         assert_diagnostics!(snapshot, diagnostics);
     }
+
+    #[test_case(
+		"noqa_on_same_line",
+		r#"#!/usr/bin/env python #noqa:D100"#,
+		&LinterSettings::for_rule(Rule::UndocumentedPublicModule)
+	)]
+    #[test_case(
+		"noqa_on_line_two",
+		r#"#!/usr/bin/env python
+        #noqa: D100"#,
+		&LinterSettings::for_rule(Rule::UndocumentedPublicModule)
+	)]
+    #[test_case(
+		"noqa_on_line_three",
+		r#"#!/usr/bin/env python
+
+        #noqa: D100"#,
+		&LinterSettings::for_rule(Rule::UndocumentedPublicModule)
+	)]
+    #[test_case(
+		"noqa_but_no_shebang",
+		r#"#/usr/bin/env python
+        #noqa: D100"#,
+		&LinterSettings::for_rule(Rule::UndocumentedPublicModule)
+	)]
+    #[test_case(
+		"noqa_same_line_for_rule_not_at_0_0",
+		r#"#!/usr/bin/env bash #noqa: EXE003"#,
+		&LinterSettings::for_rule(Rule::ShebangMissingPython)
+	)]
+    #[test_case(
+		"noqa_line_2_for_rule_not_at_0_0",
+		r#"#!/usr/bin/env bash
+        #noqa: EXE003"#,
+		&LinterSettings::for_rule(Rule::ShebangMissingPython)
+	)]
+    fn test_shebang_noqa(name: &str, contents: &str, settings: &LinterSettings) {
+        let snapshot = format!("shebang_noqa_{name}");
+        let diagnostics = test_snippet(contents, settings);
+        assert_diagnostics!(snapshot, diagnostics);
+    }
 }
