@@ -78,13 +78,16 @@ When working on ty, PR titles should start with `[ty]` and be tagged with the `t
 ## Development Guidelines
 
 - All changes must be tested. If you're not testing your changes, you're not done.
+- Look to see if your tests could go in an existing file before adding a new file for your tests.
 - Get your tests to pass. If you didn't run the tests, your code does not work.
 - Follow existing code style. Check neighboring files for patterns.
-- Always run `uvx prek run -a` at the end of a task.
+- Rust imports should always go at the top of the file, never locally in functions.
+- Always run `uvx prek run -a` at the end of a task, and after every rebase.
 - Avoid writing significant amounts of new code. This is often a sign that we're missing an existing method or mechanism that could help solve the problem. Look for existing utilities first.
-- Avoid falling back to patterns that require `panic!`, `unreachable!`, or `.unwrap()`. Instead, try to encode those constraints in the type system.
-- Prefer let chains (`if let` combined with `&&`) over nested `if let` statements to reduce indentation and improve readability.
-- If you *have* to suppress a Clippy lint, prefer to use `#[expect()]` over `[allow()]`, where possible.
+- Try hard to avoid patterns that require `panic!`, `unreachable!`, or `.unwrap()`. Instead, try to encode those constraints in the type system. Don't be afraid to write code that's more verbose or requires largeish refactors if it enables you to avoid these unsafe calls.
+- Prefer let chains (`if let` combined with `&&`) over nested `if let` statements to reduce indentation and improve readability. At the end of a task, always check your work to see if you missed opportunities to use `let` chains.
+- If you *have* to suppress a Clippy lint, prefer to use `#[expect()]` over `[allow()]`, where possible. But if a lint is complaining about unused/dead code, it's usually best to just delete the unused code.
 - Use comments purposefully. Don't use comments to narrate code, but do use them to explain invariants and why something unusual was done a particular way.
+- When adding new ty checks, it's important to make error messages concise. Think about how an error message would look on a narrow terminal screen. Sometimes more detail can be provided in subdiagnostics or secondary annotations, but it's also important to make sure that the diagnostic is understandable if the user has passed `--output-format=concise`.
 - **Salsa incrementality (ty):** Any method that accesses `.node()` must be `#[salsa::tracked]`, or it will break incrementality. Prefer higher-level semantic APIs over raw AST access.
 - Run `cargo dev generate-all` after changing configuration options, CLI arguments, lint rules, or environment variable definitions, as these changes require regeneration of schemas, docs, and CLI references.
