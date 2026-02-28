@@ -132,10 +132,10 @@ def foo[**P](c: Callable[P, int]) -> None:
     def nested2(**kwargs: P.kwargs) -> None: ...
 
 class Foo[**P]:
-    # error: [invalid-paramspec] "`P.args` is only valid for annotating `*args`"
+    # error: [invalid-paramspec] "`P.args` is only valid for annotating `*args` function parameters"
     args: P.args
 
-    # error: [invalid-paramspec] "`P.kwargs` is only valid for annotating `**kwargs`"
+    # error: [invalid-paramspec] "`P.kwargs` is only valid for annotating `**kwargs` function parameters"
     kwargs: P.kwargs
 ```
 
@@ -160,9 +160,9 @@ It isn't allowed to annotate an instance attribute either:
 class Foo4[**P]:
     def __init__(self, fn: Callable[P, int], *args: P.args, **kwargs: P.kwargs) -> None:
         self.fn = fn
-        # error: [invalid-paramspec] "`P.args` is only valid for annotating `*args`"
+        # error: [invalid-paramspec] "`P.args` is only valid for annotating `*args` function parameters"
         self.args: P.args = args
-        # error: [invalid-paramspec] "`P.kwargs` is only valid for annotating `**kwargs`"
+        # error: [invalid-paramspec] "`P.kwargs` is only valid for annotating `**kwargs` function parameters"
         self.kwargs: P.kwargs = kwargs
 ```
 

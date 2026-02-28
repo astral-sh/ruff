@@ -238,10 +238,10 @@ def foo2(c: Callable[P, int]) -> None:
     def nested2(**kwargs: P.kwargs) -> None: ...
 
 class Foo2:
-    # error: [invalid-paramspec] "`P.args` is only valid for annotating `*args`"
+    # error: [invalid-paramspec] "`P.args` is only valid for annotating `*args` function parameters"
     args: P.args
 
-    # error: [invalid-paramspec] "`P.kwargs` is only valid for annotating `**kwargs`"
+    # error: [invalid-paramspec] "`P.kwargs` is only valid for annotating `**kwargs` function parameters"
     kwargs: P.kwargs
 ```
 

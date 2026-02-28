@@ -9209,7 +9209,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .report_lint(&INVALID_PARAMSPEC, annotation.as_ref())
                 {
                     builder.into_diagnostic(format_args!(
-                        "`{name}.{attr_name}` is only valid for annotating `{variadic}`",
+                        "`{name}.{attr_name}` is only valid for annotating `{variadic}` function parameters",
                     ));
                 }
             } else if let ast::Expr::Attribute(attr_expr) = annotation.as_ref()
@@ -9227,7 +9227,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         .report_lint(&INVALID_PARAMSPEC, annotation.as_ref())
                     {
                         builder.into_diagnostic(format_args!(
-                            "`{name}.{attr_name}` is only valid for annotating `{variadic}`",
+                            "`{name}.{attr_name}` is only valid for annotating `{variadic}` function parameters",
                         ));
                     }
                 }
@@ -9390,7 +9390,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             };
             if let Some(builder) = self.context.report_lint(&INVALID_PARAMSPEC, annotation) {
                 builder.into_diagnostic(format_args!(
-                    "`{name}.{attr_name}` is only valid for annotating `{variadic}`",
+                    "`{name}.{attr_name}` is only valid for annotating `{variadic}` function parameters",
                 ));
             }
         } else if let ast::Expr::Attribute(attr_expr) = annotation
@@ -9407,7 +9407,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let variadic = if attr_name == "args" { "*args" } else { "**kwargs" };
                 if let Some(builder) = self.context.report_lint(&INVALID_PARAMSPEC, annotation) {
                     builder.into_diagnostic(format_args!(
-                        "`{name}.{attr_name}` is only valid for annotating `{variadic}`",
+                        "`{name}.{attr_name}` is only valid for annotating `{variadic}` function parameters",
                     ));
                 }
             }
