@@ -1806,7 +1806,7 @@ impl<'db> Bindings<'db> {
                             ty_a.when_subtype_of_assuming(
                                 db,
                                 *ty_b,
-                                constraints.load(tracked.constraints(db)),
+                                constraints.load(db, tracked.constraints(db)),
                                 constraints,
                                 InferableTypeVars::None,
                             )
@@ -1830,8 +1830,8 @@ impl<'db> Bindings<'db> {
 
                         let constraints = ConstraintSetBuilder::new();
                         let result = constraints.into_owned(|constraints| {
-                            let lhs = constraints.load(tracked.constraints(db));
-                            let rhs = constraints.load(other.constraints(db));
+                            let lhs = constraints.load(db, tracked.constraints(db));
+                            let rhs = constraints.load(db, other.constraints(db));
                             lhs.implies(db, constraints, || rhs)
                         });
                         let tracked = InternedConstraintSet::new(db, result);
@@ -1871,9 +1871,12 @@ impl<'db> Bindings<'db> {
                         };
 
                         let constraints = ConstraintSetBuilder::new();
-                        let set = constraints.load(tracked.constraints(db));
-                        let result =
-                            set.satisfied_by_all_typevars(db, InferableTypeVars::One(&inferable));
+                        let set = constraints.load(db, tracked.constraints(db));
+                        let result = set.satisfied_by_all_typevars(
+                            db,
+                            &constraints,
+                            InferableTypeVars::One(&inferable),
+                        );
                         overload.set_return_type(Type::bool_literal(result));
                     }
 
@@ -1887,7 +1890,7 @@ impl<'db> Bindings<'db> {
                             continue;
                         };
                         let constraints = ConstraintSetBuilder::new();
-                        let set = constraints.load(set.constraints(db));
+                        let set = constraints.load(db, set.constraints(db));
                         let specialization =
                             generic_context.specialize_constrained(db, &constraints, set);
                         let result = match specialization {
