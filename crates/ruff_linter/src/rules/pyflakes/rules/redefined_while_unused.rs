@@ -1,14 +1,17 @@
+use rustc_hash::FxHashMap;
+
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_semantic::analyze::visibility;
-use ruff_python_semantic::{BindingKind, Imported, Scope, ScopeId};
+use ruff_python_semantic::{
+    Binding, BindingKind, Imported, NodeId, Scope, ScopeId, ShadowedBinding,
+    analyze::{typing::is_type_checking_block, visibility},
+};
 use ruff_source_file::SourceRow;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits;
+use crate::preview::is_f811_shadowing_in_type_checking_enabled;
 use crate::{Fix, FixAvailability, Violation};
-
-use rustc_hash::FxHashMap;
 
 /// ## What it does
 /// Checks for variable definitions that redefine (or "shadow") unused
@@ -61,7 +64,7 @@ impl Violation for RedefinedWhileUnused {
 /// F811
 pub(crate) fn redefined_while_unused(checker: &Checker, scope_id: ScopeId, scope: &Scope) {
     // Index the redefined bindings by statement.
-    let mut redefinitions = FxHashMap::default();
+    let mut redefinitions: FxHashMap<Option<NodeId>, Vec<EntryInfo<'_>>> = FxHashMap::default();
 
     for (name, binding_id) in scope.bindings() {
         for shadow in checker.semantic().shadowed_bindings(scope_id, binding_id) {
@@ -82,6 +85,21 @@ pub(crate) fn redefined_while_unused(checker: &Checker, scope_id: ScopeId, scope
             // shadowed binding, abort.
             if !binding.redefines(shadowed) {
                 continue;
+            }
+
+            if !is_f811_shadowing_in_type_checking_enabled(checker.settings()) {
+                let shadowed_in_type_checking = shadowed
+                    .source
+                    .is_some_and(|source| is_in_type_checking_block(checker, source));
+                let binding_in_type_checking = binding
+                    .source
+                    .is_some_and(|source| is_in_type_checking_block(checker, source));
+
+                if (shadowed_in_type_checking || binding_in_type_checking)
+                    && !(shadowed_in_type_checking && binding_in_type_checking)
+                {
+                    continue;
+                }
             }
 
             if shadow.same_scope() {
@@ -139,30 +157,30 @@ pub(crate) fn redefined_while_unused(checker: &Checker, scope_id: ScopeId, scope
             if shadowed.source.is_none_or(|left| {
                 binding
                     .source
-                    .is_none_or(|right| !checker.semantic().same_branch(left, right))
+                    .is_none_or(|right| bindings_in_different_forks(checker, &shadow, left, right))
             }) {
                 continue;
             }
 
             redefinitions
                 .entry(binding.source)
-                .or_insert_with(Vec::new)
-                .push((shadowed, binding));
+                .or_default()
+                .push(EntryInfo::new(shadowed, binding));
         }
     }
 
     // Create a fix for each source statement.
     let mut fixes = FxHashMap::default();
-    for (source, entries) in &redefinitions {
-        let Some(source) = source else {
+    for entries in redefinitions.values() {
+        let Some(source) = entries.iter().find_map(|info| info.runtime_import) else {
             continue;
         };
 
         let member_names = entries
             .iter()
-            .filter_map(|(shadowed, binding)| {
-                if let Some(shadowed_import) = shadowed.as_any_import() {
-                    if let Some(import) = binding.as_any_import() {
+            .filter_map(|info| {
+                if let Some(shadowed_import) = info.shadowed.as_any_import() {
+                    if let Some(import) = info.binding.as_any_import() {
                         if shadowed_import.qualified_name() == import.qualified_name() {
                             return Some(import.member_name());
                         }
@@ -173,10 +191,10 @@ pub(crate) fn redefined_while_unused(checker: &Checker, scope_id: ScopeId, scope
             .collect::<Vec<_>>();
 
         if !member_names.is_empty() {
-            let statement = checker.semantic().statement(*source);
-            let parent = checker.semantic().parent_statement(*source);
+            let statement = checker.semantic().statement(source);
+            let parent = checker.semantic().parent_statement(source);
             let Ok(edit) = edits::remove_unused_imports(
-                member_names.iter().map(std::convert::AsRef::as_ref),
+                member_names.iter().map(AsRef::as_ref),
                 statement,
                 parent,
                 checker.locator(),
@@ -185,42 +203,97 @@ pub(crate) fn redefined_while_unused(checker: &Checker, scope_id: ScopeId, scope
             ) else {
                 continue;
             };
+
             fixes.insert(
-                *source,
+                source,
                 Fix::safe_edit(edit).isolate(Checker::isolation(
-                    checker.semantic().parent_statement_id(*source),
+                    checker.semantic().parent_statement_id(source),
                 )),
             );
         }
     }
 
     // Create diagnostics for each statement.
-    for (source, entries) in &redefinitions {
-        for (shadowed, binding) in entries {
-            let name = binding.name(checker.source());
+    for entries in redefinitions.values() {
+        for info in entries {
+            let name = info.binding.name(checker.source());
+
             let mut diagnostic = checker.report_diagnostic(
                 RedefinedWhileUnused {
                     name: name.to_string(),
-                    row: checker.compute_source_row(shadowed.start()),
+                    row: checker.compute_source_row(info.shadowed.start()),
                 },
-                binding.range(),
+                info.binding.range(),
             );
             diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Unnecessary);
 
             diagnostic.secondary_annotation(
                 format_args!("previous definition of `{name}` here"),
-                shadowed,
+                info.shadowed,
             );
 
             diagnostic.set_primary_message(format_args!("`{name}` redefined here"));
 
-            if let Some(range) = binding.parent_range(checker.semantic()) {
+            if let Some(range) = info.binding.parent_range(checker.semantic()) {
                 diagnostic.set_parent(range.start());
             }
 
-            if let Some(fix) = source.as_ref().and_then(|source| fixes.get(source)) {
-                diagnostic.set_fix(fix.clone());
+            if let Some(source) = info.runtime_import {
+                if let Some(fix) = fixes.get(&source) {
+                    diagnostic.set_fix(fix.clone());
+                }
             }
         }
     }
+}
+
+struct EntryInfo<'a> {
+    shadowed: &'a Binding<'a>,
+    binding: &'a Binding<'a>,
+    runtime_import: Option<NodeId>,
+}
+
+impl<'a> EntryInfo<'a> {
+    fn new(shadowed: &'a Binding<'a>, binding: &'a Binding<'a>) -> Self {
+        let runtime_import = binding.source.or(shadowed.source);
+
+        Self {
+            shadowed,
+            binding,
+            runtime_import,
+        }
+    }
+}
+
+fn bindings_in_different_forks(
+    checker: &Checker,
+    shadow: &ShadowedBinding,
+    left: NodeId,
+    right: NodeId,
+) -> bool {
+    let left_ = is_in_type_checking_block(checker, left);
+    let right_ = is_in_type_checking_block(checker, right);
+
+    if left_ ^ right_ {
+        let left_binding = &checker.semantic().bindings[shadow.shadowed_id()];
+        let right_binding = &checker.semantic().bindings[shadow.binding_id()];
+
+        if left_binding.scope == right_binding.scope
+            && let (Some(left_import), Some(right_import)) =
+                (left_binding.as_any_import(), right_binding.as_any_import())
+            && left_import.qualified_name() == right_import.qualified_name()
+        {
+            return false;
+        }
+    }
+
+    !checker.semantic().same_branch(left, right)
+}
+
+#[inline]
+fn is_in_type_checking_block(checker: &Checker, node_id: NodeId) -> bool {
+    checker.semantic().statements(node_id).any(|stmt| {
+        stmt.as_if_stmt()
+            .is_some_and(|if_stmt| is_type_checking_block(if_stmt, checker.semantic()))
+    })
 }
