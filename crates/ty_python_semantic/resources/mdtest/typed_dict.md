@@ -1883,6 +1883,47 @@ def bad(
 ): ...
 ```
 
+### `Required` and `NotRequired` not allowed outside `TypedDict`
+
+```py
+from typing_extensions import Required, NotRequired
+
+# error: [invalid-type-form] "`Required` is only allowed in TypedDict fields"
+x: Required[int]
+# error: [invalid-type-form] "`NotRequired` is only allowed in TypedDict fields"
+y: NotRequired[str]
+
+class MyClass:
+    # error: [invalid-type-form] "`Required` is only allowed in TypedDict fields"
+    x: Required[int]
+    # error: [invalid-type-form] "`NotRequired` is only allowed in TypedDict fields"
+    y: NotRequired[str]
+
+def f():
+    # error: [invalid-type-form] "`Required` is only allowed in TypedDict fields"
+    x: Required[int] = 1
+    # error: [invalid-type-form] "`NotRequired` is only allowed in TypedDict fields"
+    y: NotRequired[str] = ""
+```
+
+### Nested `Required` and `NotRequired`
+
+`Required` and `NotRequired` cannot be nested inside each other:
+
+```py
+from typing_extensions import TypedDict, Required, NotRequired
+
+class TD(TypedDict):
+    # error: [invalid-type-form] "`typing.Required` cannot be nested inside `Required` or `NotRequired`"
+    a: Required[Required[int]]
+    # error: [invalid-type-form] "`typing.NotRequired` cannot be nested inside `Required` or `NotRequired`"
+    b: NotRequired[NotRequired[int]]
+    # error: [invalid-type-form] "`typing.Required` cannot be nested inside `Required` or `NotRequired`"
+    c: Required[NotRequired[int]]
+    # error: [invalid-type-form] "`typing.NotRequired` cannot be nested inside `Required` or `NotRequired`"
+    d: NotRequired[Required[int]]
+```
+
 ### `dict`-subclass inhabitants
 
 Values that inhabit a `TypedDict` type must be instances of `dict` itself, not a subclass:
