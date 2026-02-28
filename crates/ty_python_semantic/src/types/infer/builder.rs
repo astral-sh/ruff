@@ -1284,7 +1284,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            // (10) Check that the class arguments matches the arguments of the
+            // (10) Check that the metaclass is not generic.
+            // The typing spec states that generic metaclasses are not supported.
+            if class.generic_context(self.db()).is_some()
+                && Type::from(class)
+                    .is_subtype_of(self.db(), KnownClass::Type.to_subclass_of(self.db()))
+            {
+                if let Some(builder) = self.context.report_lint(&INVALID_METACLASS, class_node) {
+                    builder.into_diagnostic(format_args!(
+                        "Generic metaclass `{}` is not supported",
+                        class.name(self.db())
+                    ));
+                }
+            }
+
+            // (11) Check that the class arguments matches the arguments of the
             // base class `__init_subclass__` method.
             if let Some(args) = class_node.arguments.as_deref() {
                 if class_kind == Some(CodeGeneratorKind::TypedDict) {

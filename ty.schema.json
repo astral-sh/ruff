@@ -836,8 +836,8 @@
           ]
         },
         "invalid-metaclass": {
-          "title": "detects invalid `metaclass=` arguments",
-          "description": "## What it does\nChecks for arguments to `metaclass=` that are invalid.\n\n## Why is this bad?\nPython allows arbitrary expressions to be used as the argument to `metaclass=`.\nThese expressions, however, need to be callable and accept the same arguments\nas `type.__new__`.\n\n## Example\n\n```python\ndef f(): ...\n\n# TypeError: f() takes 0 positional arguments but 3 were given\nclass B(metaclass=f): ...\n```\n\n## References\n- [Python documentation: Metaclasses](https://docs.python.org/3/reference/datamodel.html#metaclasses)",
+          "title": "detects invalid `metaclass=` arguments and generic metaclasses",
+          "description": "## What it does\nChecks for arguments to `metaclass=` that are invalid, and for metaclasses\nthat are themselves generic.\n\n## Why is this bad?\nPython allows arbitrary expressions to be used as the argument to `metaclass=`.\nThese expressions, however, need to be callable and accept the same arguments\nas `type.__new__`.\n\nAdditionally, the typing spec states that generic metaclasses are not supported.\n\n## Examples\n\n```python\ndef f(): ...\n\n# TypeError: f() takes 0 positional arguments but 3 were given\nclass B(metaclass=f): ...\n```\n\n```python\nfrom typing import Generic, TypeVar\nT = TypeVar(\"T\")\n\nclass Meta(type, Generic[T]): ...  # Generic metaclasses are not supported\n```\n\n## References\n- [Python documentation: Metaclasses](https://docs.python.org/3/reference/datamodel.html#metaclasses)\n- [Typing spec: User-defined generic types](https://typing.python.org/en/latest/spec/generics.html#user-defined-generic-types)",
           "default": "error",
           "oneOf": [
             {

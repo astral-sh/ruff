@@ -1364,14 +1364,17 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
-    /// Checks for arguments to `metaclass=` that are invalid.
+    /// Checks for arguments to `metaclass=` that are invalid, and for metaclasses
+    /// that are themselves generic.
     ///
     /// ## Why is this bad?
     /// Python allows arbitrary expressions to be used as the argument to `metaclass=`.
     /// These expressions, however, need to be callable and accept the same arguments
     /// as `type.__new__`.
     ///
-    /// ## Example
+    /// Additionally, the typing spec states that generic metaclasses are not supported.
+    ///
+    /// ## Examples
     ///
     /// ```python
     /// def f(): ...
@@ -1380,10 +1383,18 @@ declare_lint! {
     /// class B(metaclass=f): ...
     /// ```
     ///
+    /// ```python
+    /// from typing import Generic, TypeVar
+    /// T = TypeVar("T")
+    ///
+    /// class Meta(type, Generic[T]): ...  # Generic metaclasses are not supported
+    /// ```
+    ///
     /// ## References
     /// - [Python documentation: Metaclasses](https://docs.python.org/3/reference/datamodel.html#metaclasses)
+    /// - [Typing spec: User-defined generic types](https://typing.python.org/en/latest/spec/generics.html#user-defined-generic-types)
     pub(crate) static INVALID_METACLASS = {
-        summary: "detects invalid `metaclass=` arguments",
+        summary: "detects invalid `metaclass=` arguments and generic metaclasses",
         status: LintStatus::stable("0.0.1-alpha.1"),
         default_level: Level::Error,
     }

@@ -269,3 +269,39 @@ def test(x: Spam):
     # revealed: type[type]
     reveal_type(x.__class__.__class__.__class__.__class__.__class__.__class__.__class__.__class__)
 ```
+
+## Generic metaclass (PEP 695)
+
+The typing spec states that generic metaclasses are not supported.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+class Meta[T](type): ...  # error: [invalid-metaclass] "Generic metaclass `Meta` is not supported"
+```
+
+## Generic metaclass (legacy)
+
+The typing spec states that generic metaclasses are not supported.
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Meta(type, Generic[T]): ...  # error: [invalid-metaclass] "Generic metaclass `Meta` is not supported"
+```
+
+## Non-generic metaclass
+
+A metaclass that does not introduce its own type parameters is fine.
+
+```py
+class Meta(type): ...
+class A(metaclass=Meta): ...
+
+reveal_type(A.__class__)  # revealed: <class 'Meta'>
+```
