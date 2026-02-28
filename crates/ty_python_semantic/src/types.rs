@@ -2538,6 +2538,27 @@ impl<'db> Type<'db> {
                 inner: Protocol::Synthesized(_),
                 ..
             }) => self.instance_member(db, &name),
+
+            // `type[Any]` (or `type[Unknown]`, etc.) has an unknown metaclass, but all
+            // metaclasses inherit from `type`. Check `type`'s class-level attributes
+            // first so that data descriptors like `__mro__` and `__bases__` resolve to
+            // their correct types instead of collapsing to `Any`/`Unknown`.
+            Type::SubclassOf(subclass_of) if subclass_of.is_dynamic() => {
+                let type_result = KnownClass::Type
+                    .to_class_literal(db)
+                    .find_name_in_mro_with_policy(db, name.as_str(), policy)
+                    .expect("`find_name_in_mro` should return `Some` for a class literal");
+                if !type_result.place.is_undefined() {
+                    type_result
+                } else {
+                    self.to_meta_type(db)
+                        .find_name_in_mro_with_policy(db, name.as_str(), policy)
+                        .expect(
+                            "`Type::find_name_in_mro()` should return `Some()` when called on a meta-type",
+                        )
+                }
+            }
+
             _ => self
                 .to_meta_type(db)
                 .find_name_in_mro_with_policy(db, name.as_str(), policy)
