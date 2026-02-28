@@ -311,4 +311,58 @@ help: Convert to `X | None`
    -     # text
    - ] = None
 81 + foo: int | None = None
+82 | 
+83 | 
+84 | # Regression test for: https://github.com/astral-sh/ruff/issues/23429
 note: This is an unsafe fix and may change runtime behavior
+
+UP045 [*] Use `X | None` for type annotations
+  --> UP045.py:89:13
+   |
+87 | # Regression test for: https://github.com/astral-sh/ruff/issues/23429
+88 | # Optional wrapping a union that already contains None should not duplicate None
+89 | foo: None | Optional[None | int] = None
+   |             ^^^^^^^^^^^^^^^^^^^^
+90 | bar: Optional[None | int] = None
+91 | baz: Optional[int | None] = None
+   |
+help: Convert to `X | None`
+86 | 
+87 | # Regression test for: https://github.com/astral-sh/ruff/issues/23429
+88 | # Optional wrapping a union that already contains None should not duplicate None
+   - foo: None | Optional[None | int] = None
+89 + foo: None | None | int = None
+90 | bar: Optional[None | int] = None
+91 | baz: Optional[int | None] = None
+
+UP045 [*] Use `X | None` for type annotations
+  --> UP045.py:90:6
+   |
+88 | # Optional wrapping a union that already contains None should not duplicate None
+89 | foo: None | Optional[None | int] = None
+90 | bar: Optional[None | int] = None
+   |      ^^^^^^^^^^^^^^^^^^^^
+91 | baz: Optional[int | None] = None
+   |
+help: Convert to `X | None`
+87 | # Regression test for: https://github.com/astral-sh/ruff/issues/23429
+88 | # Optional wrapping a union that already contains None should not duplicate None
+89 | foo: None | Optional[None | int] = None
+   - bar: Optional[None | int] = None
+90 + bar: None | int = None
+91 | baz: Optional[int | None] = None
+
+UP045 [*] Use `X | None` for type annotations
+  --> UP045.py:91:6
+   |
+89 | foo: None | Optional[None | int] = None
+90 | bar: Optional[None | int] = None
+91 | baz: Optional[int | None] = None
+   |      ^^^^^^^^^^^^^^^^^^^^
+   |
+help: Convert to `X | None`
+88 | # Optional wrapping a union that already contains None should not duplicate None
+89 | foo: None | Optional[None | int] = None
+90 | bar: Optional[None | int] = None
+   - baz: Optional[int | None] = None
+91 + baz: int | None = None

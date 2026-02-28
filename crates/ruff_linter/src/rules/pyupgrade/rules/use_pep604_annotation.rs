@@ -190,10 +190,19 @@ pub(crate) fn non_pep604_annotation(
                             }
                         }
 
+                        // If the inner expression already contains `None`
+                        // (e.g., `Optional[None | int]`), don't add another
+                        // `| None` to avoid duplicates like `None | int | None`.
+                        let fixed = if contains_none(inner) {
+                            inner.clone()
+                        } else {
+                            pep_604_optional(inner)
+                        };
+
                         diagnostic.set_fix(Fix::applicable_edit(
                             Edit::range_replacement(
                                 pad(
-                                    checker.generator().expr(&pep_604_optional(inner)),
+                                    checker.generator().expr(&fixed),
                                     expr.range(),
                                     checker.locator(),
                                 ),
@@ -331,4 +340,19 @@ fn is_named_tuple(checker: &Checker, expr: &Expr) -> bool {
 /// Return `true` if this is an `Optional[None]` annotation.
 fn is_optional_none(operator: Pep604Operator, slice: &Expr) -> bool {
     matches!(operator, Pep604Operator::Optional) && matches!(slice, Expr::NoneLiteral(_))
+}
+
+/// Return `true` if the expression contains a `None` literal, walking
+/// through `X | Y` unions.
+fn contains_none(expr: &Expr) -> bool {
+    match expr {
+        Expr::NoneLiteral(_) => true,
+        Expr::BinOp(ast::ExprBinOp {
+            left,
+            op: ast::Operator::BitOr,
+            right,
+            ..
+        }) => contains_none(left) || contains_none(right),
+        _ => false,
+    }
 }
