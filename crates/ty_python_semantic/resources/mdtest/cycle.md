@@ -155,3 +155,52 @@ class Cyclic:
 # revealed: Unknown | str | dict[Unknown, Unknown] | dict[Unknown | str, Unknown | str]
 reveal_type(Cyclic("").data)
 ```
+
+## Decorator defined on a base class with constrained typevars, accessed from a subclass with decorated generic parameters
+
+This example was minimized from
+[a real issue in `robotframework`](https://github.com/astral-sh/ty/issues/2637#issuecomment-3807037935).
+It created
+[a complicated cycle with multiple cycle heads](https://gist.github.com/oconnor663/c996ed2cc97d172dd4b9a8d8207dc7ac),
+which also involved
+[a tricky Salsa behavior that comes up when a query oscillates between being a cycle head and not being one](https://gist.github.com/oconnor663/c2a7662e3d88048b691754da957121d1).
+
+`entry.py`:
+
+```py
+from derived import Derived
+
+Derived.decorate
+```
+
+`derived.py`:
+
+```py
+import bases
+
+class Derived(bases.GenericBase["Foo", "Bar"]): ...
+
+@Derived.decorate
+class Foo(bases.Foo): ...
+
+@Derived.decorate
+class Bar(bases.Bar): ...
+```
+
+`bases.py`:
+
+```py
+from typing import Generic, TypeVar, Type
+
+T = TypeVar("T")
+B1 = TypeVar("B1", bound="Foo")
+B2 = TypeVar("B2", bound="Bar")
+
+class GenericBase(Generic[B1, B2]):
+    @classmethod
+    def decorate(cls, item_class: Type[T]) -> Type[T]:
+        return item_class
+
+class Foo: ...
+class Bar: ...
+```
