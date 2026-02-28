@@ -25,3 +25,4 @@ TC010 Invalid string member in `X | Y`-style union type
 7 | b: TypeAlias = 'int' | None  # TC010
   |                ^^^^^
   |
+help: Add `from __future__ import annotations`
