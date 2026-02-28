@@ -574,9 +574,75 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             self.record_eager_snapshots(popped_scope_id);
         } else {
             self.record_lazy_snapshots(popped_scope_id);
+            // Only lazily-evaluated scopes (functions, classes) can contain `nonlocal`.
+            // Eagerly-evaluated scopes (comprehensions, generator expressions) cannot
+            // have `nonlocal` declarations — Python disallows this syntactically.
+            self.record_nonlocal_modifications(popped_scope_id);
         }
 
         popped_scope_id
+    }
+
+    /// For each `nonlocal` symbol in the popped scope, add an `ExternallyModified` binding
+    /// in the enclosing scope where the symbol is actually bound. This ensures the enclosing
+    /// scope's type for that symbol is widened to include `Unknown`, reflecting that the
+    /// nested scope may modify it.
+    fn record_nonlocal_modifications(&mut self, popped_scope_id: FileScopeId) {
+        // Collect (enclosing_scope_id, enclosing_symbol_id) tuples first to avoid borrow conflicts.
+        let mut modifications: Vec<(FileScopeId, ScopedSymbolId)> = Vec::new();
+
+        // Only symbols (simple names) need to be checked here; Python's `nonlocal` statement
+        // only applies to simple names, not attributes or subscripts.
+        for symbol in self.place_tables[popped_scope_id].symbols() {
+            if !symbol.is_nonlocal() {
+                continue;
+            }
+
+            let name = symbol.name();
+
+            // Walk up the scope stack to find the enclosing scope where this symbol
+            // is bound AND not itself nonlocal. Class and module scopes are skipped,
+            // mirroring Python's nonlocal resolution semantics.
+            for scope_info in self.scope_stack.iter().rev() {
+                let enclosing_scope_id = scope_info.file_scope_id;
+
+                if !self.scopes[enclosing_scope_id].kind().is_function_like() {
+                    continue;
+                }
+
+                let enclosing_place_table = &self.place_tables[enclosing_scope_id];
+
+                let Some(enclosing_symbol_id) = enclosing_place_table.symbol_id(name) else {
+                    continue;
+                };
+                let enclosing_symbol = enclosing_place_table.symbol(enclosing_symbol_id);
+
+                // Skip scopes where the symbol is itself nonlocal (keep walking up).
+                if enclosing_symbol.is_nonlocal() {
+                    continue;
+                }
+
+                // A `global` declaration is a resolution barrier; stop walking.
+                if enclosing_symbol.is_global() {
+                    break;
+                }
+
+                // Skip scopes where the symbol is only a free variable (used but
+                // not bound or declared); the real target is further out.
+                if !enclosing_symbol.is_bound() && !enclosing_symbol.is_declared() {
+                    continue;
+                }
+
+                // Found the scope where the symbol is locally bound or declared.
+                modifications.push((enclosing_scope_id, enclosing_symbol_id));
+                break;
+            }
+        }
+
+        for (enclosing_scope_id, enclosing_symbol_id) in modifications {
+            self.use_def_maps[enclosing_scope_id]
+                .record_externally_modified_binding(enclosing_symbol_id);
+        }
     }
 
     fn current_place_table(&self) -> &PlaceTableBuilder {

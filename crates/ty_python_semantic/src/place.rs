@@ -1298,6 +1298,7 @@ fn place_from_bindings_impl<'db>(
         _ => None,
     };
     let mut deleted_reachability = Truthiness::AlwaysFalse;
+    let mut has_externally_modified = false;
 
     // Evaluate this lazily because we don't always need it (for example, if there are no visible
     // bindings at all, we don't need it), and it can cause us to evaluate reachability constraint
@@ -1327,6 +1328,18 @@ fn place_from_bindings_impl<'db>(
                         reachability_constraints.evaluate(db, predicates, reachability_constraint)
                     );
                     return None;
+                }
+                DefinitionState::ExternallyModified => {
+                    has_externally_modified = true;
+                    let static_reachability =
+                        reachability_constraints.evaluate(db, predicates, reachability_constraint);
+                    if static_reachability.is_always_false() {
+                        if unbound_visibility().is_none_or(Truthiness::is_always_false) {
+                            return Some(Type::Never);
+                        }
+                        return None;
+                    }
+                    return Some(Type::unknown());
                 }
             };
 
@@ -1439,9 +1452,17 @@ fn place_from_bindings_impl<'db>(
                     Definedness::PossiblyUndefined
                 }
                 Some(Truthiness::AlwaysTrue) => {
-                    unreachable!(
-                        "If we have at least one binding, the implicit `unbound` binding should not be definitely visible"
-                    )
+                    // An `ExternallyModified` binding can coexist with a definitely-visible
+                    // unbound path when it's added (via snapshot-merge) to a symbol that had
+                    // no prior bindings (e.g. declaration-only like `x: int`).
+                    assert!(
+                        has_externally_modified,
+                        "Unbound is definitely visible alongside bindings, \
+                         but no `ExternallyModified` binding was found. \
+                         This is only expected when an `ExternallyModified` binding \
+                         is merged into a symbol with no prior bindings."
+                    );
+                    Definedness::PossiblyUndefined
                 }
                 Some(Truthiness::AlwaysFalse) | None => Definedness::AlwaysDefined,
                 Some(Truthiness::Ambiguous) => Definedness::PossiblyUndefined,

@@ -1319,6 +1319,38 @@ impl<'db> UseDefMapBuilder<'db> {
         );
     }
 
+    /// Record that a place may have been externally modified by a nested scope via `nonlocal`.
+    ///
+    /// This uses the snapshot-merge technique: we snapshot the current flow state, then
+    /// record a new `ExternallyModified` binding that shadows the previous bindings,
+    /// and finally merge with the snapshot. The result is that the place has both the
+    /// original bindings and the `ExternallyModified` binding as live, producing a union
+    /// type like `Unknown | <original type>`.
+    ///
+    /// Note: we intentionally do NOT add `ExternallyModified` to `reachable_symbol_definitions`,
+    /// because the nested scope that declares `nonlocal` resolves its own reference to the
+    /// variable via the enclosing scope's reachable bindings. Adding it there would cause the
+    /// nested scope to see `Unknown` for its own nonlocal variable.
+    pub(super) fn record_externally_modified_binding(&mut self, symbol: ScopedSymbolId) {
+        let def_id = self
+            .all_definitions
+            .push(DefinitionState::ExternallyModified);
+
+        // Snapshot the current state before the ExternallyModified binding.
+        let snapshot = self.snapshot();
+
+        // Record the ExternallyModified binding, which shadows previous bindings on this path.
+        self.symbol_states[symbol].record_binding(
+            def_id,
+            self.reachability,
+            self.is_class_scope,
+            true,
+        );
+
+        // Merge with the snapshot, so the result is: original bindings | ExternallyModified.
+        self.merge(snapshot);
+    }
+
     pub(super) fn delete_binding(&mut self, place: ScopedPlaceId) {
         let def_id = self.all_definitions.push(DefinitionState::Deleted);
         let place_state = match place {

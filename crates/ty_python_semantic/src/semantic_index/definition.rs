@@ -241,6 +241,10 @@ pub(crate) enum DefinitionState<'db> {
     /// Represents a definition that has been deleted.
     /// This used when an attribute/subscript definition (such as `x.y = ...`, `x[0] = ...`) becomes obsolete due to a reassignment of the root place.
     Deleted,
+    /// Represents a place that may have been modified by a nested scope via `nonlocal`.
+    /// The type of this binding is `Unknown`, because we cannot know what value the
+    /// nested scope may assign to the place.
+    ExternallyModified,
 }
 
 impl<'db> DefinitionState<'db> {
@@ -257,7 +261,9 @@ impl<'db> DefinitionState<'db> {
     pub(crate) fn definition(self) -> Option<Definition<'db>> {
         match self {
             DefinitionState::Defined(def) => Some(def),
-            DefinitionState::Deleted | DefinitionState::Undefined => None,
+            DefinitionState::Deleted
+            | DefinitionState::Undefined
+            | DefinitionState::ExternallyModified => None,
         }
     }
 }
