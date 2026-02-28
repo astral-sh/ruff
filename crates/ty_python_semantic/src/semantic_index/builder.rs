@@ -481,10 +481,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     ///     inner()
     ///     inner2()
     /// ```
-    fn update_lazy_snapshots(&mut self, symbol: ScopedSymbolId) {
-        let current_scope = self.current_scope();
-        let current_place_table = &self.place_tables[current_scope];
-        let symbol = current_place_table.symbol(symbol);
+    fn update_lazy_snapshots(&mut self, scope: FileScopeId, symbol: ScopedSymbolId) {
+        let symbol = self.place_tables[scope].symbol(symbol);
         // Optimization: if this is the first binding of the symbol we've seen, there can't be any
         // lazy snapshots of it to update.
         if !symbol.is_reassigned() {
@@ -499,7 +497,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     for (ancestor, _) in
                         VisibleAncestorsIter::new(&self.scopes, key.enclosing_scope)
                     {
-                        if ancestor == current_scope {
+                        if ancestor == scope {
                             return true;
                         }
                         let ancestor_table = &self.place_tables[ancestor];
@@ -680,8 +678,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         definition
     }
 
-    fn delete_associated_bindings(&mut self, place: ScopedPlaceId) {
-        let scope = self.current_scope();
+    fn delete_associated_bindings_in_scope(&mut self, scope: FileScopeId, place: ScopedPlaceId) {
         // Don't delete associated bindings if the scope is a class scope & place is a name (it's never visible to nested scopes)
         if self.scopes[scope].kind() == ScopeKind::Class && place.is_symbol() {
             return;
@@ -699,21 +696,21 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.current_use_def_map_mut().delete_binding(place);
     }
 
-    /// Push a new [`Definition`] onto the list of definitions
-    /// associated with the `definition_node` AST node.
+    /// Create a [`Definition`] for `definition_node` in the given `scope`, recording it in
+    /// that scope's place table and use-def map.
     ///
-    /// Returns a 2-element tuple, where the first element is the newly created [`Definition`]
-    /// and the second element is the number of definitions that are now associated with
-    /// `definition_node`.
+    /// Returns a 3-element tuple: the newly created [`Definition`], the total number of
+    /// definitions now associated with the AST node, and the [`DefinitionCategory`].
     ///
-    /// Most AST nodes can only be associated with at most one [`Definition`]. Generally prefer
-    /// `add_definition` above, which enforces that. This method should currently only be used with
-    /// `*` imports and loop headers.
-    fn push_additional_definition(
+    /// This is the low-level helper; callers that add definitions to the **current** scope
+    /// should normally use [`Self::push_additional_definition`] or [`Self::add_definition`],
+    /// which also update lazy snapshots and the try-node context stack.
+    fn add_definition_in_scope(
         &mut self,
+        scope: FileScopeId,
         place: ScopedPlaceId,
         definition_node: impl Into<DefinitionNodeRef<'ast, 'db>>,
-    ) -> (Definition<'db>, usize) {
+    ) -> (Definition<'db>, usize, DefinitionCategory) {
         let definition_node: DefinitionNodeRef<'ast, 'db> = definition_node.into();
 
         // Note `definition_node` is guaranteed to be a child of `self.module`
@@ -723,14 +720,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         let category = kind.category(self.source_type.is_stub(), self.module);
         let is_reexported = kind.is_reexported();
 
-        let definition: Definition<'db> = Definition::new(
-            self.db,
-            self.file,
-            self.current_scope(),
-            place,
-            kind,
-            is_reexported,
-        );
+        let definition: Definition<'db> =
+            Definition::new(self.db, self.file, scope, place, kind, is_reexported);
 
         let num_definitions = {
             let definitions = self.add_entry_for_definition_key(definition_node.key());
@@ -747,19 +738,20 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         //     x = 1
         // ```
         if category.is_binding() && !is_loop_header {
-            self.mark_place_bound(place);
+            self.place_tables[scope].mark_bound(place);
         }
         if category.is_declaration() {
-            self.mark_place_declared(place);
+            self.place_tables[scope].mark_declared(place);
         }
 
-        let use_def = self.current_use_def_map_mut();
         match category {
             DefinitionCategory::DeclarationAndBinding => {
-                use_def.record_declaration_and_binding(place, definition);
-                self.delete_associated_bindings(place);
+                self.use_def_maps[scope].record_declaration_and_binding(place, definition);
+                self.delete_associated_bindings_in_scope(scope, place);
             }
-            DefinitionCategory::Declaration => use_def.record_declaration(place, definition),
+            DefinitionCategory::Declaration => {
+                self.use_def_maps[scope].record_declaration(place, definition);
+            }
             DefinitionCategory::Binding => {
                 // Loop-header bindings don't shadow prior bindings.
                 let previous_definitions = if is_loop_header {
@@ -767,22 +759,56 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 } else {
                     PreviousDefinitions::AreShadowed
                 };
-                use_def.record_binding(place, definition, previous_definitions);
+                self.use_def_maps[scope].record_binding(place, definition, previous_definitions);
                 if !is_loop_header {
-                    self.delete_associated_bindings(place);
+                    self.delete_associated_bindings_in_scope(scope, place);
                 }
             }
         }
 
+        (definition, num_definitions, category)
+    }
+
+    /// Push a new [`Definition`] onto the list of definitions
+    /// associated with the `definition_node` AST node in the **current** scope.
+    ///
+    /// Returns a 2-element tuple, where the first element is the newly created [`Definition`]
+    /// and the second element is the number of definitions that are now associated with
+    /// `definition_node`.
+    ///
+    /// Most AST nodes can only be associated with at most one [`Definition`]. Generally prefer
+    /// `add_definition` above, which enforces that. This method should currently only be used with
+    /// `*` imports and loop headers.
+    fn push_additional_definition(
+        &mut self,
+        place: ScopedPlaceId,
+        definition_node: impl Into<DefinitionNodeRef<'ast, 'db>>,
+    ) -> (Definition<'db>, usize) {
+        let scope = self.current_scope();
+        let scope_index = self.scope_stack.len() - 1;
+        self.push_additional_definition_in_scope(scope, scope_index, place, definition_node)
+    }
+
+    /// Like [`Self::push_additional_definition`], but targets an explicit `scope`
+    /// (at `scope_index` in the scope stack) instead of the current scope.
+    fn push_additional_definition_in_scope(
+        &mut self,
+        scope: FileScopeId,
+        scope_index: usize,
+        place: ScopedPlaceId,
+        definition_node: impl Into<DefinitionNodeRef<'ast, 'db>>,
+    ) -> (Definition<'db>, usize) {
+        let (definition, num_definitions, category) =
+            self.add_definition_in_scope(scope, place, definition_node);
+
         if category.is_binding() {
             if let Some(id) = place.as_symbol() {
-                self.update_lazy_snapshots(id);
+                self.update_lazy_snapshots(scope, id);
             }
         }
 
-        let mut try_node_stack_manager = std::mem::take(&mut self.try_node_context_stack_manager);
-        try_node_stack_manager.record_definition(self);
-        self.try_node_context_stack_manager = try_node_stack_manager;
+        self.try_node_context_stack_manager
+            .record_definition(scope_index, &self.use_def_maps[scope]);
 
         (definition, num_definitions)
     }
