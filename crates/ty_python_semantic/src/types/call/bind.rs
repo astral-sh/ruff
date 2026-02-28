@@ -42,13 +42,17 @@ use crate::types::generics::{
 };
 use crate::types::signatures::{Parameter, ParameterForm, ParameterKind, Parameters};
 use crate::types::tuple::{TupleLength, TupleSpec, TupleType};
+use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
-    BoundMethodType, BoundTypeVarIdentity, BoundTypeVarInstance, CallableSignature, CallableType,
-    CallableTypeKind, ClassLiteral, DATACLASS_FLAGS, DataclassFlags, DataclassParams,
-    FieldInstance, GenericAlias, InternedConstraintSet, IntersectionType, KnownBoundMethodType,
-    KnownClass, KnownInstanceType, LiteralValueTypeKind, MemberLookupPolicy, NominalInstanceType,
-    PropertyInstanceType, SpecialFormType, TypeAliasType, TypeContext, TypeVarBoundOrConstraints,
-    TypeVarVariance, UnionBuilder, UnionType, WrapperDescriptorKind, enums, list_members,
+    ApplySpecialization, BindingContext, BoundMethodType, BoundTypeVarIdentity,
+    BoundTypeVarInstance, CallableSignature, CallableType, CallableTypeKind, ClassLiteral,
+    DATACLASS_FLAGS, DataclassFlags, DataclassParams, FieldInstance, GenericAlias,
+    InternedConstraintSet, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
+    LiteralValueTypeKind, MemberLookupPolicy, NominalInstanceType, ParamSpecAttrKind,
+    PropertyInstanceType, SpecialFormType, TypeAliasType, TypeContext, TypeMapping,
+    TypeVarBoundOrConstraints, TypeVarBoundOrConstraintsEvaluation, TypeVarDefaultEvaluation,
+    TypeVarIdentity, TypeVarInstance, TypeVarKind, TypeVarVariance, UnionBuilder, UnionType,
+    WrapperDescriptorKind, enums, list_members,
 };
 use crate::unpack::EvaluationMode;
 use crate::{DisplaySettings, Program};
@@ -3569,6 +3573,48 @@ struct ArgumentTypeChecker<'a, 'db> {
     constraint_set_errors: Vec<bool>,
 }
 
+struct InferenceInstantiation<'db> {
+    generic_context: GenericContext<'db>,
+    specialization: Specialization<'db>,
+    typevars: Box<[BoundTypeVarInstance<'db>]>,
+    instantiated_to_original: FxHashMap<BoundTypeVarIdentity<'db>, BoundTypeVarInstance<'db>>,
+}
+
+struct InferenceInputs<'a, 'db> {
+    parameter_types: &'a [Type<'db>],
+    instantiation: Specialization<'db>,
+    preferred_type_mappings: &'a FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>>,
+    partially_specialized_declared_type: &'a FxHashSet<BoundTypeVarIdentity<'db>>,
+    instantiated_to_original: &'a FxHashMap<BoundTypeVarIdentity<'db>, BoundTypeVarInstance<'db>>,
+}
+
+struct TypeVarIdentityCollector<'a, 'db> {
+    identities: &'a FxHashSet<BoundTypeVarIdentity<'db>>,
+    recursion_guard: TypeCollector<'db>,
+    found: std::cell::Cell<bool>,
+}
+
+impl<'db> TypeVisitor<'db> for TypeVarIdentityCollector<'_, 'db> {
+    fn should_visit_lazy_type_attributes(&self) -> bool {
+        false
+    }
+
+    fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+        if self.found.get() {
+            return;
+        }
+
+        if let Type::TypeVar(bound_typevar) = ty
+            && self.identities.contains(&bound_typevar.identity(db))
+        {
+            self.found.set(true);
+            return;
+        }
+
+        walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
+    }
+}
+
 impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
     #[expect(clippy::too_many_arguments)]
     fn new(
@@ -3598,6 +3644,261 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             specialization: None,
             constraint_set_errors: vec![false; arguments.len()],
         }
+    }
+
+    fn instantiate_generic_context_for_inference(
+        &self,
+        generic_context: GenericContext<'db>,
+        original_typevars: &[BoundTypeVarInstance<'db>],
+    ) -> InferenceInstantiation<'db> {
+        let db = self.db;
+
+        // This prefix is updated incrementally so bounds/defaults of later type variables can
+        // refer to already-instantiated earlier type variables.
+        let mut instantiation_prefix_types: Vec<Type<'db>> = original_typevars
+            .iter()
+            .copied()
+            .map(Type::TypeVar)
+            .collect();
+
+        let mut instantiated_typevars_vec: Vec<BoundTypeVarInstance<'db>> =
+            Vec::with_capacity(original_typevars.len());
+
+        for (index, original_typevar) in original_typevars.iter().copied().enumerate() {
+            let kind = match original_typevar.kind(db) {
+                TypeVarKind::ParamSpec | TypeVarKind::Pep695ParamSpec => {
+                    TypeVarKind::Pep695ParamSpec
+                }
+                TypeVarKind::TypingSelf => TypeVarKind::TypingSelf,
+                _ => TypeVarKind::Pep695,
+            };
+            let name = Name::from(format!(
+                "__ty_infer_{}_{}",
+                original_typevar.name(db),
+                index
+            ));
+
+            let apply = ApplySpecialization::Partial {
+                generic_context,
+                types: &instantiation_prefix_types,
+                skip: None,
+            };
+            let mapping = TypeMapping::ApplySpecialization(apply);
+
+            let map_ty =
+                |ty: Type<'db>| ty.apply_type_mapping(db, &mapping, TypeContext::default());
+
+            // Preserve semantic constraints/defaults while rebinding identities to this call.
+            let bound_or_constraints = original_typevar
+                .typevar(db)
+                .bound_or_constraints(db)
+                .map(|bound_or_constraints| match bound_or_constraints {
+                    TypeVarBoundOrConstraints::UpperBound(bound) => {
+                        TypeVarBoundOrConstraints::UpperBound(map_ty(bound))
+                    }
+                    TypeVarBoundOrConstraints::Constraints(constraints) => {
+                        TypeVarBoundOrConstraints::Constraints(
+                            constraints.map(db, |ty| map_ty(*ty)),
+                        )
+                    }
+                })
+                .map(TypeVarBoundOrConstraintsEvaluation::Eager);
+
+            let default = original_typevar
+                .default_type(db)
+                .map(map_ty)
+                .map(TypeVarDefaultEvaluation::Eager);
+
+            let explicit_variance = if kind.is_paramspec() {
+                None
+            } else {
+                Some(original_typevar.variance(db))
+            };
+
+            let identity = TypeVarIdentity::new(db, name, None, kind);
+            let instantiated_typevar = TypeVarInstance::new(
+                db,
+                identity,
+                bound_or_constraints,
+                explicit_variance,
+                default,
+            );
+
+            let instantiated_bound = BoundTypeVarInstance::new(
+                db,
+                instantiated_typevar,
+                BindingContext::Synthetic,
+                None,
+            );
+
+            instantiation_prefix_types[index] = Type::TypeVar(instantiated_bound);
+            instantiated_typevars_vec.push(instantiated_bound);
+        }
+
+        let instantiated_typevars: Box<[BoundTypeVarInstance<'db>]> =
+            instantiated_typevars_vec.into_boxed_slice();
+
+        let instantiated_context =
+            GenericContext::from_typevar_instances(db, instantiated_typevars.iter().copied());
+
+        let instantiation_types: Vec<Type<'db>> = instantiated_typevars
+            .iter()
+            .map(|typevar| Type::TypeVar(*typevar))
+            .collect();
+        let instantiation = generic_context.specialize(db, instantiation_types);
+
+        let mut instantiated_to_original: FxHashMap<
+            BoundTypeVarIdentity<'db>,
+            BoundTypeVarInstance<'db>,
+        > = FxHashMap::default();
+
+        for (original, instantiated) in original_typevars.iter().zip(instantiated_typevars.iter()) {
+            instantiated_to_original.insert(instantiated.identity(db), *original);
+
+            if original.is_paramspec(db) {
+                // ParamSpecs carry companion `P.args`/`P.kwargs` identities that also need
+                // reverse mapping for diagnostics and final specialization projection.
+                let original_args = original.with_paramspec_attr(db, ParamSpecAttrKind::Args);
+                let instantiated_args =
+                    instantiated.with_paramspec_attr(db, ParamSpecAttrKind::Args);
+                instantiated_to_original.insert(instantiated_args.identity(db), original_args);
+
+                let original_kwargs = original.with_paramspec_attr(db, ParamSpecAttrKind::Kwargs);
+                let instantiated_kwargs =
+                    instantiated.with_paramspec_attr(db, ParamSpecAttrKind::Kwargs);
+                instantiated_to_original.insert(instantiated_kwargs.identity(db), original_kwargs);
+            }
+        }
+
+        InferenceInstantiation {
+            generic_context: instantiated_context,
+            specialization: instantiation,
+            typevars: instantiated_typevars,
+            instantiated_to_original,
+        }
+    }
+
+    fn map_specialization_error_to_original_context(
+        &self,
+        error: &SpecializationError<'db>,
+        instantiated_to_original: &FxHashMap<BoundTypeVarIdentity<'db>, BoundTypeVarInstance<'db>>,
+    ) -> SpecializationError<'db> {
+        let deinstantiate = |bound_typevar: BoundTypeVarInstance<'db>| {
+            instantiated_to_original
+                .get(&bound_typevar.identity(self.db))
+                .copied()
+                .unwrap_or(bound_typevar)
+        };
+
+        match error {
+            SpecializationError::MismatchedBound {
+                bound_typevar,
+                argument,
+            } => SpecializationError::MismatchedBound {
+                bound_typevar: deinstantiate(*bound_typevar),
+                argument: *argument,
+            },
+            SpecializationError::MismatchedConstraint {
+                bound_typevar,
+                argument,
+            } => SpecializationError::MismatchedConstraint {
+                bound_typevar: deinstantiate(*bound_typevar),
+                argument: *argument,
+            },
+        }
+    }
+
+    fn type_mentions_any_identity(
+        &self,
+        ty: Type<'db>,
+        identities: &FxHashSet<BoundTypeVarIdentity<'db>>,
+    ) -> bool {
+        if !ty.has_typevar(self.db) {
+            return false;
+        }
+
+        let collector = TypeVarIdentityCollector {
+            identities,
+            recursion_guard: TypeCollector::default(),
+            found: std::cell::Cell::new(false),
+        };
+        collector.visit_type(self.db, ty);
+        collector.found.get()
+    }
+
+    fn callable_mentions_any_identity(
+        &self,
+        ty: Type<'db>,
+        identities: &FxHashSet<BoundTypeVarIdentity<'db>>,
+    ) -> bool {
+        let signatures_contain_identity = |signatures: &CallableSignature<'db>| {
+            signatures.overloads.iter().any(|overload| {
+                overload.generic_context.is_some_and(|generic_context| {
+                    generic_context
+                        .variables(self.db)
+                        .any(|typevar| identities.contains(&typevar.identity(self.db)))
+                })
+            })
+        };
+
+        match ty {
+            Type::FunctionLiteral(function) => {
+                signatures_contain_identity(function.signature(self.db))
+            }
+            Type::BoundMethod(bound_method) => {
+                signatures_contain_identity(bound_method.function(self.db).signature(self.db))
+            }
+            Type::Callable(callable) => signatures_contain_identity(callable.signatures(self.db)),
+            Type::Union(union) => union
+                .elements(self.db)
+                .iter()
+                .copied()
+                .any(|element| self.callable_mentions_any_identity(element, identities)),
+            _ => false,
+        }
+    }
+
+    /// Call-site instantiation is only needed when a call can directly mention the callee's bound
+    /// type variables. Keeping all other calls on the original path preserves the steady-state
+    /// performance profile.
+    fn should_instantiate_call_site_typevars(
+        &self,
+        original_typevars: &[BoundTypeVarInstance<'db>],
+    ) -> bool {
+        let mut identities: FxHashSet<BoundTypeVarIdentity<'db>> = FxHashSet::default();
+
+        for typevar in original_typevars {
+            identities.insert(typevar.identity(self.db));
+            if typevar.is_paramspec(self.db) {
+                identities.insert(
+                    typevar
+                        .with_paramspec_attr(self.db, ParamSpecAttrKind::Args)
+                        .identity(self.db),
+                );
+                identities.insert(
+                    typevar
+                        .with_paramspec_attr(self.db, ParamSpecAttrKind::Kwargs)
+                        .identity(self.db),
+                );
+            }
+        }
+
+        let arguments_mention_typevar = self.arguments.iter().any(|(argument, argument_type)| {
+            if matches!(argument, Argument::Synthetic) {
+                return false;
+            }
+            argument_type.is_some_and(|ty| {
+                self.type_mentions_any_identity(ty, &identities)
+                    || self.callable_mentions_any_identity(ty, &identities)
+            })
+        });
+
+        let tcx_mentions_typevar = self.call_expression_tcx.annotation.is_some_and(|ty| {
+            self.type_mentions_any_identity(ty, &identities)
+                || self.callable_mentions_any_identity(ty, &identities)
+        });
+
+        arguments_mention_typevar || tcx_mentions_typevar
     }
 
     fn enumerate_argument_types(
@@ -3632,13 +3933,75 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             return;
         };
 
+        self.inferable_typevars = generic_context.inferable_typevars(self.db);
+
+        let original_typevars: Box<[BoundTypeVarInstance<'db>]> =
+            generic_context.variables(self.db).collect();
+
+        let parameters = self.signature.parameters();
+        let use_call_site_instantiation =
+            self.should_instantiate_call_site_typevars(&original_typevars);
+
+        let (
+            inference_context,
+            instantiation,
+            inferred_typevars,
+            instantiated_to_original,
+            parameter_types,
+        ) = if use_call_site_instantiation {
+            let instantiation_result =
+                self.instantiate_generic_context_for_inference(generic_context, &original_typevars);
+
+            let parameter_types = parameters
+                .iter()
+                .map(|parameter| {
+                    parameter
+                        .annotated_type()
+                        .apply_specialization(self.db, instantiation_result.specialization)
+                })
+                .collect::<Vec<_>>();
+
+            (
+                instantiation_result.generic_context,
+                instantiation_result.specialization,
+                instantiation_result.typevars,
+                instantiation_result.instantiated_to_original,
+                parameter_types,
+            )
+        } else {
+            let parameter_types = parameters
+                .iter()
+                .map(Parameter::annotated_type)
+                .collect::<Vec<_>>();
+
+            (
+                generic_context,
+                generic_context.identity_specialization(self.db),
+                original_typevars.clone(),
+                FxHashMap::default(),
+                parameter_types,
+            )
+        };
+
+        // Keep the upstream inference path for calls that do not alias callee-bound identities.
+        let inferable_typevars = if use_call_site_instantiation {
+            inference_context.inferable_typevars(self.db)
+        } else {
+            self.inferable_typevars
+        };
+        let mut builder = SpecializationBuilder::new(self.db, inferable_typevars);
+
         let return_with_tcx = self
             .constructor_instance_type
             .or(Some(self.return_ty))
-            .zip(self.call_expression_tcx.annotation);
-
-        self.inferable_typevars = generic_context.inferable_typevars(self.db);
-        let mut builder = SpecializationBuilder::new(self.db, self.inferable_typevars);
+            .zip(self.call_expression_tcx.annotation)
+            .map(|(return_ty, tcx)| {
+                if use_call_site_instantiation {
+                    (return_ty.apply_specialization(self.db, instantiation), tcx)
+                } else {
+                    (return_ty, tcx)
+                }
+            });
 
         // Type variables for which we inferred a declared type based on a partially specialized
         // type from an outer generic context. For these type variables, we may infer types that
@@ -3693,11 +4056,17 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             .unwrap_or_default();
 
         let mut specialization_errors = Vec::new();
+        let inference_inputs = InferenceInputs {
+            parameter_types: &parameter_types,
+            instantiation,
+            preferred_type_mappings: &preferred_type_mappings,
+            partially_specialized_declared_type: &partially_specialized_declared_type,
+            instantiated_to_original: &instantiated_to_original,
+        };
         let assignable_to_declared_type = self.infer_argument_types(
             constraints,
             &mut builder,
-            &preferred_type_mappings,
-            &partially_specialized_declared_type,
+            &inference_inputs,
             &mut specialization_errors,
         );
 
@@ -3707,14 +4076,22 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         // Note that this will still lead to an invalid specialization, but may
         // produce more precise diagnostics.
         if !assignable_to_declared_type {
-            builder = SpecializationBuilder::new(self.db, self.inferable_typevars);
+            builder = SpecializationBuilder::new(self.db, inferable_typevars);
             specialization_errors.clear();
 
+            let empty_preferred_type_mappings = FxHashMap::default();
+            let empty_partially_specialized_declared_type = FxHashSet::default();
+            let retry_inputs = InferenceInputs {
+                parameter_types: &parameter_types,
+                instantiation,
+                preferred_type_mappings: &empty_preferred_type_mappings,
+                partially_specialized_declared_type: &empty_partially_specialized_declared_type,
+                instantiated_to_original: &instantiated_to_original,
+            };
             self.infer_argument_types(
                 constraints,
                 &mut builder,
-                &FxHashMap::default(),
-                &FxHashSet::default(),
+                &retry_inputs,
                 &mut specialization_errors,
             );
         }
@@ -3768,9 +4145,43 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             promoted
         };
 
-        let specialization = builder
-            .mapped(generic_context, maybe_promote)
-            .build(generic_context);
+        if !use_call_site_instantiation {
+            let specialization = builder
+                .mapped(generic_context, maybe_promote)
+                .build(generic_context);
+
+            self.return_ty = self.return_ty.apply_specialization(self.db, specialization);
+            self.specialization = Some(specialization);
+            return;
+        }
+
+        let specialization = builder.build(inference_context);
+        let mut types: Vec<Type<'db>> = inferred_typevars
+            .iter()
+            .map(|typevar| Type::TypeVar(*typevar).apply_specialization(self.db, specialization))
+            .collect();
+
+        // Project solved instantiated variables back onto the original signature variables before
+        // storing the final specialization.
+        let deinstantiation_context =
+            GenericContext::from_typevar_instances(self.db, inferred_typevars.iter().copied());
+        let deinstantiation = deinstantiation_context.specialize(
+            self.db,
+            original_typevars
+                .iter()
+                .map(|typevar| Type::TypeVar(*typevar))
+                .collect::<Vec<_>>(),
+        );
+
+        for ty in &mut types {
+            *ty = ty.apply_specialization(self.db, deinstantiation);
+        }
+
+        for (typevar, ty) in original_typevars.iter().copied().zip(types.iter_mut()) {
+            *ty = maybe_promote(typevar, *ty);
+        }
+
+        let specialization = generic_context.specialize(self.db, types);
 
         self.return_ty = self.return_ty.apply_specialization(self.db, specialization);
         self.specialization = Some(specialization);
@@ -3780,34 +4191,47 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         &mut self,
         constraints: &ConstraintSetBuilder<'db>,
         builder: &mut SpecializationBuilder<'db>,
-        preferred_type_mappings: &FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>>,
-        partially_specialized_declared_type: &FxHashSet<BoundTypeVarIdentity<'_>>,
+        inference_inputs: &InferenceInputs<'_, 'db>,
         specialization_errors: &mut Vec<BindingError<'db>>,
     ) -> bool {
         let mut assignable_to_declared_type = true;
 
-        let parameters = self.signature.parameters();
-        for (argument_index, adjusted_argument_index, _, argument_type) in
+        for (argument_index, adjusted_argument_index, argument_kind, argument_type) in
             self.enumerate_argument_types()
         {
             for (parameter_index, variadic_argument_type) in
                 self.argument_matches[argument_index].iter()
             {
+                let parameter_ty = inference_inputs.parameter_types[parameter_index];
+                let argument_ty = variadic_argument_type.unwrap_or(argument_type);
+                // Synthetic constructor arguments were computed before optional call-site
+                // instantiation, so they must be mapped into the instantiated context explicitly.
+                let argument_ty = if matches!(argument_kind, Argument::Synthetic) {
+                    argument_ty.apply_specialization(self.db, inference_inputs.instantiation)
+                } else {
+                    argument_ty
+                };
+
                 let specialization_result = builder.infer_map(
                     constraints,
-                    parameters[parameter_index].annotated_type(),
-                    variadic_argument_type.unwrap_or(argument_type),
+                    parameter_ty,
+                    argument_ty,
                     |(identity, _, inferred_ty)| {
                         // Avoid widening the inferred type if it is already assignable to the
                         // preferred declared type.
-                        if let Some(preferred_ty) = preferred_type_mappings.get(&identity) {
+                        if let Some(preferred_ty) =
+                            inference_inputs.preferred_type_mappings.get(&identity)
+                        {
                             if inferred_ty.is_assignable_to(self.db, *preferred_ty) {
                                 return None;
                             }
 
                             // If this is a partially specialized type, the type we infer may still
                             // be assignable to it once fully specialized.
-                            if !partially_specialized_declared_type.contains(&identity) {
+                            if !inference_inputs
+                                .partially_specialized_declared_type
+                                .contains(&identity)
+                            {
                                 assignable_to_declared_type = false;
                             }
                         }
@@ -3817,6 +4241,10 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 );
 
                 if let Err(error) = specialization_result {
+                    let error = self.map_specialization_error_to_original_context(
+                        &error,
+                        inference_inputs.instantiated_to_original,
+                    );
                     specialization_errors.push(BindingError::SpecializationError {
                         error,
                         argument_index: adjusted_argument_index,
