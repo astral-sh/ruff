@@ -1,6 +1,6 @@
 use itertools::Itertools;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::helpers::{map_callable, map_subscript};
+use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, Expr, Stmt, visitor};
