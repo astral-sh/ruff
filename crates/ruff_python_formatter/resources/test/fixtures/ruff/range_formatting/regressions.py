@@ -83,3 +83,9 @@ def test_start ():
 <RANGE_START>
 def new_function_inserted_after_test_start ():
     print("This should get formatted" )<RANGE_END>
+
+# Regression test for https://github.com/astral-sh/ruff/issues/22494
+# Range formatting of semicolon-separated statements should not introduce
+# spurious indentation whitespace when the range starts mid-line.
+class Foo:
+    x=1;<RANGE_START>x=2<RANGE_END>
