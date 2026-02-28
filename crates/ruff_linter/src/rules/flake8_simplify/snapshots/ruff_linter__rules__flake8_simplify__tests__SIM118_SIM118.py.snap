@@ -260,48 +260,6 @@ help: Remove `.keys()`
 35 | 
 
 SIM118 [*] Use `key in dict` instead of `key in dict.keys()`
-  --> SIM118.py:34:1
-   |
-32 | (k for k in obj.keys())  # SIM118
-33 |
-34 | key in (obj or {}).keys()  # SIM118
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^
-35 |
-36 | (key) in (obj or {}).keys()  # SIM118
-   |
-help: Remove `.keys()`
-31 | 
-32 | (k for k in obj.keys())  # SIM118
-33 | 
-   - key in (obj or {}).keys()  # SIM118
-34 + key in (obj or {})  # SIM118
-35 | 
-36 | (key) in (obj or {}).keys()  # SIM118
-37 | 
-note: This is an unsafe fix and may change runtime behavior
-
-SIM118 [*] Use `key in dict` instead of `key in dict.keys()`
-  --> SIM118.py:36:1
-   |
-34 | key in (obj or {}).keys()  # SIM118
-35 |
-36 | (key) in (obj or {}).keys()  # SIM118
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-37 |
-38 | from typing import KeysView
-   |
-help: Remove `.keys()`
-33 | 
-34 | key in (obj or {}).keys()  # SIM118
-35 | 
-   - (key) in (obj or {}).keys()  # SIM118
-36 + (key) in (obj or {})  # SIM118
-37 | 
-38 | from typing import KeysView
-39 | 
-note: This is an unsafe fix and may change runtime behavior
-
-SIM118 [*] Use `key in dict` instead of `key in dict.keys()`
   --> SIM118.py:50:1
    |
 49 | # Regression test for: https://github.com/astral-sh/ruff/issues/7124
@@ -360,35 +318,13 @@ help: Remove `.keys()`
 55 | for key in (
 
 SIM118 [*] Use `key in dict` instead of `key in dict.keys()`
-  --> SIM118.py:55:5
-   |
-54 |   # Regression test for: https://github.com/astral-sh/ruff/issues/7200
-55 |   for key in (
-   |  _____^
-56 | |     self.experiment.surveys[0]
-57 | |         .stations[0]
-58 | |         .keys()
-59 | | ):
-   | |_^
-60 |       continue
-   |
-help: Remove `.keys()`
-55 | for key in (
-56 |     self.experiment.surveys[0]
-57 |         .stations[0]
-   -         .keys()
-58 +         
-59 | ):
-60 |     continue
-61 | 
-note: This is an unsafe fix and may change runtime behavior
-
-SIM118 [*] Use `key in dict` instead of `key in dict.keys()`
   --> SIM118.py:65:1
    |
 64 | d = SneakyDict()
 65 | key in d.keys()  # SIM118
    | ^^^^^^^^^^^^^^^
+66 |
+67 | # Regression test for: https://github.com/astral-sh/ruff/issues/4481
    |
 help: Remove `.keys()`
 62 | from builtins import dict as SneakyDict
@@ -396,3 +332,6 @@ help: Remove `.keys()`
 64 | d = SneakyDict()
    - key in d.keys()  # SIM118
 65 + key in d  # SIM118
+66 | 
+67 | # Regression test for: https://github.com/astral-sh/ruff/issues/4481
+68 | class FooNoIter:
