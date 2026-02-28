@@ -53,7 +53,7 @@ pub(crate) fn check(
                 SourceType::Python(_) | SourceType::Toml(TomlSourceType::Pyproject)
             )
         } else {
-            false
+            true
         }
     });
 
