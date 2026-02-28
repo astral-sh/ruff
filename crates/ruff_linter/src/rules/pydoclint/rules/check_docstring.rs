@@ -1,9 +1,9 @@
 use itertools::Itertools;
-use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::{map_callable, map_subscript};
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::visitor::Visitor;
-use ruff_python_ast::{self as ast, Expr, Stmt, visitor};
+use ruff_python_ast::{self as ast, visitor, Expr, Stmt};
 use ruff_python_semantic::analyze::{function_type, visibility};
 use ruff_python_semantic::{Definition, SemanticModel};
 use ruff_python_stdlib::identifiers::is_identifier;
@@ -11,13 +11,239 @@ use ruff_source_file::{LineRanges, NewlineWithTrailingNewline};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use rustc_hash::FxHashMap;
 
-use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::docstrings::Docstring;
 use crate::docstrings::sections::{SectionContext, SectionContexts, SectionKind};
 use crate::docstrings::styles::SectionStyle;
+use crate::docstrings::Docstring;
 use crate::registry::Rule;
 use crate::rules::pydocstyle::settings::Convention;
+use crate::Violation;
+
+/// ## What it does
+/// Check that class docstring does not have Yields section.
+///
+/// ## Why is this bad?
+/// Class magic method __init__ cannot yield anything value. So, Yields section may be confuse.
+///
+/// ## Example
+/// ```python
+/// class Physics:
+///     """
+///     Class docstring
+///
+///     Yields:
+///         str: Some yield value
+///     """
+///
+///     def __init__(self, distance: float, time: float) -> None:
+///         self.distance = distance
+///         self.time = time
+/// ```
+///
+/// Use instead:
+/// ```python
+/// class Physics:
+///     """Class docstring"""
+///
+///     def __init__(self, distance: float, time: float) -> None:
+///         self.distance = distance
+///         self.time = time
+/// ```
+///
+/// ## Options
+///
+/// - `lint.pydoclint.ignore-one-line-docstrings`
+/// - `lint.pydocstyle.convention`
+#[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "NEXT_RUFF_VERSION")]
+pub(crate) struct DocstringClassExtraneousYields;
+
+impl Violation for DocstringClassExtraneousYields {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        "The class docstring does not need a `Yields` section, because __init__() cannot yield anything".to_string()
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        Some("Please remove `Yields` section from class docstring".to_string())
+    }
+}
+
+/// ## What it does
+/// Check that class docstring does not have Raises section.
+///
+/// ## Why is this bad?
+/// Class docstrings should not contain a "Raises" section because the class itself
+/// does not raise exceptions. Exceptions should be documented in the `__init__` method
+/// docstring, which is where they are actually raised. Having a "Raises" section in a
+/// class docstring can be confusing and misleading to users.
+///
+/// ## Example
+/// ```python
+/// class Physics:
+///     """
+///     Class docstring
+///
+///     Raises:
+///         ValueError
+///     """
+///
+///     def __init__(self, distance: float, time: float) -> None:
+///         self.distance = distance
+///         self.time = time
+///         raise ValueError
+/// ```
+///
+/// Use instead:
+/// ```python
+/// class Physics:
+///     """Class docstring"""
+///
+///     def __init__(self, distance: float, time: float) -> None:
+///         """
+///         Initialize class
+///
+///         Args:
+///             distance: Distance traveled.
+///             time: Time spent traveling.
+///
+///         Raises:
+///             ValueError
+///         """
+///         self.distance = distance
+///         self.time = time
+///         raise ValueError
+/// ```
+///
+/// ## Options
+///
+/// - `lint.pydoclint.ignore-one-line-docstrings`
+/// - `lint.pydocstyle.convention`
+#[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "NEXT_RUFF_VERSION")]
+pub(crate) struct DocstringClassExtraneousRaises;
+
+impl Violation for DocstringClassExtraneousRaises {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        "Class docstring has a `Raises` section".to_string()
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        Some("Please put `Raises` section in the __init__() docstring".to_string())
+    }
+}
+
+/// ## What it does
+/// Check that class docstring does not have argument/parameter section.
+///
+/// ## Why is this bad?
+/// Class docstrings should not contain argument/parameter sections because the class
+/// itself does not take parameters in the same way that functions do. Arguments and
+/// parameters should be documented in the `__init__` method docstring, which describes
+/// the constructor's interface.
+///
+/// ## Example
+/// ```python
+/// class Physics:
+///     """
+///     Class docstring
+///
+///     Args:
+///         distance (float): Distance traveled.
+///         time (float): Time spent traveling.
+///     """
+///
+///     def __init__(self, distance: float, time: float) -> None:
+///         self.distance = distance
+///         self.time = time
+/// ```
+///
+/// Use instead:
+/// ```python
+/// class Physics:
+///     """Class docstring"""
+///
+///     def __init__(self, distance: float, time: float) -> None:
+///         """
+///         Initialize class
+///
+///         Args:
+///             distance: Distance traveled.
+///             time: Time spent traveling.
+///         """
+///         self.distance = distance
+///         self.time = time
+/// ```
+///
+/// ## Options
+///
+/// - `lint.pydoclint.ignore-one-line-docstrings`
+/// - `lint.pydocstyle.convention`
+#[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "NEXT_RUFF_VERSION")]
+pub(crate) struct DocstringClassExtraneousArguments;
+
+impl Violation for DocstringClassExtraneousArguments {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        "Class docstring has an argument/parameter section".to_string()
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        Some("Please put arguments/parameter section in the __init__() docstring".to_string())
+    }
+}
+
+/// ## What it does
+/// Check that class docstring does not have Returns section.
+///
+/// ## Why is this bad?
+/// Class magic method __init__ cannot return anything. So, Returns section may be confuse.
+///
+/// ## Example
+/// ```python
+/// class Physics:
+///     """
+///     Class docstring
+///
+///     Returns:
+///         self: Self instance.
+///     """
+///
+///     def __init__(self, distance: float, time: float) -> None:
+///         self.distance = distance
+///         self.time = time
+/// ```
+///
+/// Use instead:
+/// ```python
+/// class Physics:
+///     """Class docstring"""
+///
+///     def __init__(self, distance: float, time: float) -> None:
+///         self.distance = distance
+///         self.time = time
+/// ```
+///
+/// ## Options
+///
+/// - `lint.pydoclint.ignore-one-line-docstrings`
+/// - `lint.pydocstyle.convention`
+#[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "NEXT_RUFF_VERSION")]
+pub(crate) struct DocstringClassExtraneousReturns;
+
+impl Violation for DocstringClassExtraneousReturns {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        "The class docstring does not need a `Returns` section, because `__init__()` cannot return anything".to_string()
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        Some("Remove `Returns` section from class docstring".to_string())
+    }
+}
 
 /// ## What it does
 /// Checks for function docstrings that include parameters which are not
@@ -1156,24 +1382,16 @@ fn generator_annotation_arguments<'a>(
 ) -> Option<GeneratorOrIteratorArguments<'a>> {
     let qualified_name = semantic.resolve_qualified_name(map_subscript(expr))?;
     match qualified_name.segments() {
-        [
-            "typing" | "typing_extensions",
-            "Iterable" | "AsyncIterable" | "Iterator" | "AsyncIterator",
-        ]
-        | [
-            "collections",
-            "abc",
-            "Iterable" | "AsyncIterable" | "Iterator" | "AsyncIterator",
-        ] => match expr {
-            Expr::Subscript(ast::ExprSubscript { slice, .. }) => {
-                Some(GeneratorOrIteratorArguments::Single(slice))
+        ["typing" | "typing_extensions", "Iterable" | "AsyncIterable" | "Iterator" | "AsyncIterator"]
+        | ["collections", "abc", "Iterable" | "AsyncIterable" | "Iterator" | "AsyncIterator"] => {
+            match expr {
+                Expr::Subscript(ast::ExprSubscript { slice, .. }) => {
+                    Some(GeneratorOrIteratorArguments::Single(slice))
+                }
+                _ => Some(GeneratorOrIteratorArguments::Unparameterized),
             }
-            _ => Some(GeneratorOrIteratorArguments::Unparameterized),
-        },
-        [
-            "typing" | "typing_extensions",
-            "Generator" | "AsyncGenerator",
-        ]
+        }
+        ["typing" | "typing_extensions", "Generator" | "AsyncGenerator"]
         | ["collections", "abc", "Generator" | "AsyncGenerator"] => match expr {
             Expr::Subscript(ast::ExprSubscript { slice, .. }) => {
                 if let Expr::Tuple(tuple) = &**slice {
@@ -1226,6 +1444,51 @@ fn is_one_line(docstring: &Docstring) -> bool {
     true
 }
 
+// DOC302, DOC304, DOC305, DOC306
+fn check_class_docstring(
+    checker: &Checker,
+    section_contexts: &SectionContexts,
+    convention: Option<Convention>,
+) {
+    let docstring_sections = match convention {
+        Some(Convention::Google) => {
+            DocstringSections::from_sections(section_contexts, Some(SectionStyle::Google))
+        }
+        Some(Convention::Numpy) => {
+            DocstringSections::from_sections(section_contexts, Some(SectionStyle::Numpy))
+        }
+        Some(Convention::Pep257) | None => DocstringSections::from_sections(section_contexts, None),
+    };
+
+    // DOC302
+    if checker.is_rule_enabled(Rule::DocstringClassExtraneousReturns) {
+        if let Some(returns_section) = docstring_sections.returns {
+            checker.report_diagnostic(DocstringClassExtraneousReturns, returns_section.range);
+        };
+    };
+
+    // DOC304
+    if checker.is_rule_enabled(Rule::DocstringClassExtraneousArguments) {
+        if let Some(params_section) = docstring_sections.parameters {
+            checker.report_diagnostic(DocstringClassExtraneousArguments, params_section.range);
+        };
+    };
+
+    // DOC305
+    if checker.is_rule_enabled(Rule::DocstringClassExtraneousRaises) {
+        if let Some(raises_section) = docstring_sections.raises {
+            checker.report_diagnostic(DocstringClassExtraneousRaises, raises_section.range);
+        };
+    };
+
+    // DOC306
+    if checker.is_rule_enabled(Rule::DocstringClassExtraneousYields) {
+        if let Some(yields_section) = docstring_sections.yields {
+            checker.report_diagnostic(DocstringClassExtraneousYields, yields_section.range);
+        };
+    };
+}
+
 /// DOC102, DOC201, DOC202, DOC402, DOC403, DOC501, DOC502
 pub(crate) fn check_docstring(
     checker: &Checker,
@@ -1234,14 +1497,17 @@ pub(crate) fn check_docstring(
     section_contexts: &SectionContexts,
     convention: Option<Convention>,
 ) {
-    // Only check function docstrings.
-    let Some(function_def) = definition.as_function_def() else {
-        return;
-    };
-
     if checker.settings().pydoclint.ignore_one_line_docstrings && is_one_line(docstring) {
         return;
     }
+
+    // Only check function or class docstrings.
+    let Some(function_def) = definition.as_function_def() else {
+        if definition.as_class_def().is_some() {
+            check_class_docstring(checker, section_contexts, convention)
+        }
+        return;
+    };
 
     let semantic = checker.semantic();
 
@@ -1360,7 +1626,7 @@ pub(crate) fn check_docstring(
     if checker.is_rule_enabled(Rule::DocstringExtraneousParameter) {
         // Don't report extraneous parameters if the signature defines *args or **kwargs
         if function_def.parameters.vararg.is_none() && function_def.parameters.kwarg.is_none() {
-            if let Some(docstring_params) = docstring_sections.parameters {
+            if let Some(ref docstring_params) = docstring_sections.parameters {
                 for docstring_param in &docstring_params.parameters {
                     if !signature_parameters.contains(&docstring_param.name) {
                         checker.report_diagnostic(
