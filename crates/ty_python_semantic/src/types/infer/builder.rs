@@ -117,7 +117,7 @@ use crate::types::generics::{
     GenericContext, InferableTypeVars, SpecializationBuilder, bind_typevar,
     enclosing_generic_contexts, typing_self,
 };
-use crate::types::infer::nearest_enclosing_function;
+use crate::types::infer::{nearest_enclosing_class, nearest_enclosing_function};
 use crate::types::mro::{DynamicMroErrorKind, StaticMroErrorKind};
 use crate::types::newtype::NewType;
 use crate::types::special_form::AliasSpec;
@@ -9222,6 +9222,32 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             "`{name}` annotations are only allowed in class-body scopes",
                             name = qualifier.name()
                         ));
+                    }
+                }
+            }
+
+            // `Required`, `NotRequired`, and `ReadOnly` are only valid inside TypedDict classes.
+            if declared.qualifiers.intersects(
+                TypeQualifiers::REQUIRED | TypeQualifiers::NOT_REQUIRED | TypeQualifiers::READ_ONLY,
+            ) {
+                let in_typed_dict = current_scope.kind() == ScopeKind::Class
+                    && nearest_enclosing_class(self.db(), self.index, self.scope())
+                        .is_some_and(|class| class.is_typed_dict(self.db()));
+                if !in_typed_dict {
+                    for qualifier in [
+                        TypeQualifiers::REQUIRED,
+                        TypeQualifiers::NOT_REQUIRED,
+                        TypeQualifiers::READ_ONLY,
+                    ] {
+                        if declared.qualifiers.contains(qualifier)
+                            && let Some(builder) =
+                                self.context.report_lint(&INVALID_TYPE_FORM, annotation)
+                        {
+                            builder.into_diagnostic(format_args!(
+                                "`{name}` is only allowed in TypedDict fields",
+                                name = qualifier.name()
+                            ));
+                        }
                     }
                 }
             }

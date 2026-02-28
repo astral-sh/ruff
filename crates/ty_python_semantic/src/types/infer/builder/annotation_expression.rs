@@ -309,6 +309,23 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                         "`ClassVar` cannot contain type variables",
                                     );
                                 }
+
+                                // Reject nested `Required`/`NotRequired`, e.g.
+                                // `Required[Required[int]]` or `Required[NotRequired[int]]`.
+                                if matches!(
+                                    qualifier,
+                                    TypeQualifier::Required | TypeQualifier::NotRequired
+                                ) && type_and_qualifiers.qualifiers.intersects(
+                                    TypeQualifiers::REQUIRED | TypeQualifiers::NOT_REQUIRED,
+                                ) && let Some(builder) =
+                                    self.context.report_lint(&INVALID_TYPE_FORM, subscript)
+                                {
+                                    builder.into_diagnostic(format_args!(
+                                        "`{qualifier}` cannot be nested inside \
+                                        `Required` or `NotRequired`",
+                                    ));
+                                }
+
                                 type_and_qualifiers.with_qualifier(TypeQualifiers::from(qualifier))
                             } else {
                                 for element in arguments {
