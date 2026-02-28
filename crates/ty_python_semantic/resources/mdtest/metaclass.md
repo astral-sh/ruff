@@ -247,6 +247,21 @@ class A[T: str](metaclass=M): ...
 reveal_type(A.__class__)  # revealed: <class 'M'>
 ```
 
+## Generic metaclass
+
+Generic metaclasses are not supported.
+
+```py
+from typing import TypeVar, Generic
+
+T = TypeVar("T")
+
+class GenericMeta(type, Generic[T]): ...
+
+# error: [invalid-metaclass]
+class GenericMetaInstance(metaclass=GenericMeta[T]): ...
+```
+
 ## Metaclasses of metaclasses
 
 ```py

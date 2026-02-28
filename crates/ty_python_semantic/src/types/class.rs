@@ -2883,6 +2883,15 @@ impl<'db> StaticClassLiteral<'db> {
         let module = parsed_module(db, self.file(db)).load(db);
 
         let explicit_metaclass = self.explicit_metaclass(db, &module);
+
+        // Generic metaclasses are not supported.
+        // See: https://typing.python.org/en/latest/spec/generics.html#generic-metaclasses
+        if let Some(Type::GenericAlias(alias)) = explicit_metaclass {
+            return Err(MetaclassError {
+                kind: MetaclassErrorKind::GenericMetaclass(Type::GenericAlias(alias)),
+            });
+        }
+
         let (metaclass, class_metaclass_was_from) = if let Some(metaclass) = explicit_metaclass {
             (metaclass, self)
         } else if let Some(base_class) = base_classes.next() {
@@ -8276,6 +8285,8 @@ pub(super) enum MetaclassErrorKind<'db> {
         /// inferred metaclass of a base class. This helps us give better error messages in diagnostics.
         candidate1_is_base_class: bool,
     },
+    /// The metaclass is a parameterized generic class, which is not supported.
+    GenericMetaclass(Type<'db>),
     /// The metaclass is not callable
     NotCallable(Type<'db>),
     /// The metaclass is of a union type whose some members are not callable
