@@ -9231,8 +9231,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 TypeQualifiers::REQUIRED | TypeQualifiers::NOT_REQUIRED | TypeQualifiers::READ_ONLY,
             ) {
                 let in_typed_dict = current_scope.kind() == ScopeKind::Class
-                    && nearest_enclosing_class(self.db(), self.index, self.scope())
-                        .is_some_and(|class| class.is_typed_dict(self.db()));
+                    && nearest_enclosing_class(self.db(), self.index, self.scope()).is_some_and(
+                        |class| {
+                            class.iter_mro(self.db(), None).any(|base| {
+                                matches!(
+                                    base,
+                                    ClassBase::TypedDict
+                                        | ClassBase::Dynamic(DynamicType::TodoFunctionalTypedDict)
+                                )
+                            })
+                        },
+                    );
                 if !in_typed_dict {
                     for qualifier in [
                         TypeQualifiers::REQUIRED,
@@ -11634,7 +11643,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // Avoid false positives for the functional `TypedDict` form, which is currently
         // unsupported.
-        if let Some(Type::Dynamic(DynamicType::Todo(_))) = tcx.annotation {
+        if let Some(Type::Dynamic(DynamicType::TodoFunctionalTypedDict)) = tcx.annotation {
             return KnownClass::Dict
                 .to_specialized_instance(self.db(), &[Type::unknown(), Type::unknown()]);
         }
@@ -14343,6 +14352,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             (typevar @ Type::Dynamic(DynamicType::UnspecializedTypeVar), _, _)
             | (_, typevar @ Type::Dynamic(DynamicType::UnspecializedTypeVar), _) => Some(typevar),
+
+            (todo @ Type::Dynamic(DynamicType::TodoFunctionalTypedDict), _, _)
+            | (_, todo @ Type::Dynamic(DynamicType::TodoFunctionalTypedDict), _) => Some(todo),
 
             // When both operands are the same constrained TypeVar (e.g., `T: (int, str)`),
             // we check if the operation is valid for each constraint paired with itself.

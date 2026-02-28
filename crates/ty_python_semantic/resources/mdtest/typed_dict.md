@@ -1849,7 +1849,7 @@ msg = Message(id=1, content="Hello")
 # No errors for yet-unsupported features (`closed`):
 OtherMessage = TypedDict("OtherMessage", {"id": int, "content": str}, closed=True)
 
-reveal_type(Message.__required_keys__)  # revealed: @Todo(Support for functional `TypedDict`)
+reveal_type(Message.__required_keys__)  # revealed: @Todo(Functional TypedDicts)
 
 # TODO: this should be an error
 msg.content
@@ -1886,7 +1886,7 @@ def bad(
 ### `Required` and `NotRequired` not allowed outside `TypedDict`
 
 ```py
-from typing_extensions import Required, NotRequired
+from typing_extensions import Required, NotRequired, TypedDict
 
 # error: [invalid-type-form] "`Required` is only allowed in TypedDict fields"
 x: Required[int]
@@ -1904,6 +1904,12 @@ def f():
     x: Required[int] = 1
     # error: [invalid-type-form] "`NotRequired` is only allowed in TypedDict fields"
     y: NotRequired[str] = ""
+
+# fine
+MyFunctionalTypedDict = TypedDict("MyFunctionalTypedDict", {"not-an-identifier": Required[int]})
+
+class FunctionalTypedDictSubclass(MyFunctionalTypedDict):
+    y: NotRequired[int]  # fine
 ```
 
 ### Nested `Required` and `NotRequired`
