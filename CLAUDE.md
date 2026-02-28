@@ -81,6 +81,7 @@ When working on ty, PR titles should start with `[ty]` and be tagged with the `t
 - Look to see if your tests could go in an existing file before adding a new file for your tests.
 - Get your tests to pass. If you didn't run the tests, your code does not work.
 - Follow existing code style. Check neighboring files for patterns.
+- Rust imports should always go at the top of the file, never locally in functions.
 - Always run `uvx prek run -a` at the end of a task, and after every rebase.
 - Avoid writing significant amounts of new code. This is often a sign that we're missing an existing method or mechanism that could help solve the problem. Look for existing utilities first.
 - Try hard to avoid patterns that require `panic!`, `unreachable!`, or `.unwrap()`. Instead, try to encode those constraints in the type system. Don't be afraid to write code that's more verbose or requires largeish refactors if it enables you to avoid these unsafe calls.
