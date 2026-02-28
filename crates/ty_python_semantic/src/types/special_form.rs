@@ -143,6 +143,9 @@ impl SpecialFormType {
             | Self::Bottom
             | Self::Intersection
             | Self::CallableTypeOf
+            | Self::Unknown
+            | Self::AlwaysTruthy
+            | Self::AlwaysFalsy
             | Self::TypeQualifier(_) => KnownClass::SpecialForm,
 
             // Typeshed says it's an instance of `_SpecialForm`,
@@ -153,8 +156,6 @@ impl SpecialFormType {
             Self::Generic | Self::Any => KnownClass::Type,
 
             Self::LegacyStdlibAlias(_) => KnownClass::StdlibAlias,
-
-            Self::Unknown | Self::AlwaysTruthy | Self::AlwaysFalsy => KnownClass::Object,
 
             Self::NamedTuple => KnownClass::FunctionType,
         }

@@ -2025,7 +2025,7 @@ from dataclasses import dataclass
 
 @dataclass
 class A:
-    x: "A" | None
+    x: "A | None"
 
 static_assert(is_subtype_of(type[A], Callable[[A], A]))
 static_assert(is_subtype_of(type[A], Callable[[None], A]))

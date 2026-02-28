@@ -310,13 +310,13 @@ def _(x: IntOrStr):
 from typing import TypeAlias, TypeVar, Union
 from types import UnionType
 
-RecursiveTuple: TypeAlias = tuple[int | "RecursiveTuple", str]
+RecursiveTuple: TypeAlias = tuple["int | RecursiveTuple", str]
 
 def _(rec: RecursiveTuple):
     # TODO should be `tuple[int | RecursiveTuple, str]`
     reveal_type(rec)  # revealed: tuple[Divergent, str]
 
-RecursiveHomogeneousTuple: TypeAlias = tuple[int | "RecursiveHomogeneousTuple", ...]
+RecursiveHomogeneousTuple: TypeAlias = tuple["int | RecursiveHomogeneousTuple", ...]
 
 def _(rec: RecursiveHomogeneousTuple):
     # TODO should be `tuple[int | RecursiveHomogeneousTuple, ...]`

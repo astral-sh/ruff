@@ -2324,10 +2324,10 @@ mod tests {
           --> stdlib/ty_extensions.pyi:14:1
            |
         13 | # Types
-        14 | Unknown = object()
+        14 | Unknown: _SpecialForm
            | ^^^^^^^
-        15 | AlwaysTruthy = object()
-        16 | AlwaysFalsy = object()
+        15 | AlwaysTruthy: _SpecialForm
+        16 | AlwaysFalsy: _SpecialForm
            |
         info: Source
          --> main2.py:5:18
@@ -2700,10 +2700,10 @@ mod tests {
           --> stdlib/ty_extensions.pyi:14:1
            |
         13 | # Types
-        14 | Unknown = object()
+        14 | Unknown: _SpecialForm
            | ^^^^^^^
-        15 | AlwaysTruthy = object()
-        16 | AlwaysFalsy = object()
+        15 | AlwaysTruthy: _SpecialForm
+        16 | AlwaysFalsy: _SpecialForm
            |
         info: Source
          --> main2.py:2:10
@@ -2754,10 +2754,10 @@ mod tests {
           --> stdlib/ty_extensions.pyi:14:1
            |
         13 | # Types
-        14 | Unknown = object()
+        14 | Unknown: _SpecialForm
            | ^^^^^^^
-        15 | AlwaysTruthy = object()
-        16 | AlwaysFalsy = object()
+        15 | AlwaysTruthy: _SpecialForm
+        16 | AlwaysFalsy: _SpecialForm
            |
         info: Source
          --> main2.py:3:10
@@ -2829,10 +2829,10 @@ mod tests {
           --> stdlib/ty_extensions.pyi:14:1
            |
         13 | # Types
-        14 | Unknown = object()
+        14 | Unknown: _SpecialForm
            | ^^^^^^^
-        15 | AlwaysTruthy = object()
-        16 | AlwaysFalsy = object()
+        15 | AlwaysTruthy: _SpecialForm
+        16 | AlwaysFalsy: _SpecialForm
            |
         info: Source
          --> main2.py:4:10
@@ -2888,10 +2888,10 @@ mod tests {
           --> stdlib/ty_extensions.pyi:14:1
            |
         13 | # Types
-        14 | Unknown = object()
+        14 | Unknown: _SpecialForm
            | ^^^^^^^
-        15 | AlwaysTruthy = object()
-        16 | AlwaysFalsy = object()
+        15 | AlwaysTruthy: _SpecialForm
+        16 | AlwaysFalsy: _SpecialForm
            |
         info: Source
          --> main2.py:5:10
@@ -2947,10 +2947,10 @@ mod tests {
           --> stdlib/ty_extensions.pyi:14:1
            |
         13 | # Types
-        14 | Unknown = object()
+        14 | Unknown: _SpecialForm
            | ^^^^^^^
-        15 | AlwaysTruthy = object()
-        16 | AlwaysFalsy = object()
+        15 | AlwaysTruthy: _SpecialForm
+        16 | AlwaysFalsy: _SpecialForm
            |
         info: Source
          --> main2.py:6:10
@@ -3006,10 +3006,10 @@ mod tests {
           --> stdlib/ty_extensions.pyi:14:1
            |
         13 | # Types
-        14 | Unknown = object()
+        14 | Unknown: _SpecialForm
            | ^^^^^^^
-        15 | AlwaysTruthy = object()
-        16 | AlwaysFalsy = object()
+        15 | AlwaysTruthy: _SpecialForm
+        16 | AlwaysFalsy: _SpecialForm
            |
         info: Source
          --> main2.py:7:10
@@ -3065,10 +3065,10 @@ mod tests {
           --> stdlib/ty_extensions.pyi:14:1
            |
         13 | # Types
-        14 | Unknown = object()
+        14 | Unknown: _SpecialForm
            | ^^^^^^^
-        15 | AlwaysTruthy = object()
-        16 | AlwaysFalsy = object()
+        15 | AlwaysTruthy: _SpecialForm
+        16 | AlwaysFalsy: _SpecialForm
            |
         info: Source
           --> main2.py:8:10
@@ -3124,10 +3124,10 @@ mod tests {
           --> stdlib/ty_extensions.pyi:14:1
            |
         13 | # Types
-        14 | Unknown = object()
+        14 | Unknown: _SpecialForm
            | ^^^^^^^
-        15 | AlwaysTruthy = object()
-        16 | AlwaysFalsy = object()
+        15 | AlwaysTruthy: _SpecialForm
+        16 | AlwaysFalsy: _SpecialForm
            |
         info: Source
           --> main2.py:9:10
@@ -3182,10 +3182,10 @@ mod tests {
           --> stdlib/ty_extensions.pyi:14:1
            |
         13 | # Types
-        14 | Unknown = object()
+        14 | Unknown: _SpecialForm
            | ^^^^^^^
-        15 | AlwaysTruthy = object()
-        16 | AlwaysFalsy = object()
+        15 | AlwaysTruthy: _SpecialForm
+        16 | AlwaysFalsy: _SpecialForm
            |
         info: Source
           --> main2.py:10:10
@@ -3240,10 +3240,10 @@ mod tests {
           --> stdlib/ty_extensions.pyi:14:1
            |
         13 | # Types
-        14 | Unknown = object()
+        14 | Unknown: _SpecialForm
            | ^^^^^^^
-        15 | AlwaysTruthy = object()
-        16 | AlwaysFalsy = object()
+        15 | AlwaysTruthy: _SpecialForm
+        16 | AlwaysFalsy: _SpecialForm
            |
         info: Source
           --> main2.py:11:10
@@ -3313,10 +3313,10 @@ mod tests {
           --> stdlib/ty_extensions.pyi:14:1
            |
         13 | # Types
-        14 | Unknown = object()
+        14 | Unknown: _SpecialForm
            | ^^^^^^^
-        15 | AlwaysTruthy = object()
-        16 | AlwaysFalsy = object()
+        15 | AlwaysTruthy: _SpecialForm
+        16 | AlwaysFalsy: _SpecialForm
            |
         info: Source
           --> main2.py:12:10
@@ -3637,10 +3637,10 @@ mod tests {
           --> stdlib/ty_extensions.pyi:14:1
            |
         13 | # Types
-        14 | Unknown = object()
+        14 | Unknown: _SpecialForm
            | ^^^^^^^
-        15 | AlwaysTruthy = object()
-        16 | AlwaysFalsy = object()
+        15 | AlwaysTruthy: _SpecialForm
+        16 | AlwaysFalsy: _SpecialForm
            |
         info: Source
          --> main2.py:7:13
@@ -3773,10 +3773,10 @@ mod tests {
           --> stdlib/ty_extensions.pyi:14:1
            |
         13 | # Types
-        14 | Unknown = object()
+        14 | Unknown: _SpecialForm
            | ^^^^^^^
-        15 | AlwaysTruthy = object()
-        16 | AlwaysFalsy = object()
+        15 | AlwaysTruthy: _SpecialForm
+        16 | AlwaysFalsy: _SpecialForm
            |
         info: Source
           --> main2.py:8:19
@@ -3848,10 +3848,10 @@ mod tests {
           --> stdlib/ty_extensions.pyi:14:1
            |
         13 | # Types
-        14 | Unknown = object()
+        14 | Unknown: _SpecialForm
            | ^^^^^^^
-        15 | AlwaysTruthy = object()
-        16 | AlwaysFalsy = object()
+        15 | AlwaysTruthy: _SpecialForm
+        16 | AlwaysFalsy: _SpecialForm
            |
         info: Source
           --> main2.py:8:48
@@ -3999,10 +3999,10 @@ mod tests {
           --> stdlib/ty_extensions.pyi:14:1
            |
         13 | # Types
-        14 | Unknown = object()
+        14 | Unknown: _SpecialForm
            | ^^^^^^^
-        15 | AlwaysTruthy = object()
-        16 | AlwaysFalsy = object()
+        15 | AlwaysTruthy: _SpecialForm
+        16 | AlwaysFalsy: _SpecialForm
            |
         info: Source
           --> main2.py:9:13
@@ -4074,10 +4074,10 @@ mod tests {
           --> stdlib/ty_extensions.pyi:14:1
            |
         13 | # Types
-        14 | Unknown = object()
+        14 | Unknown: _SpecialForm
            | ^^^^^^^
-        15 | AlwaysTruthy = object()
-        16 | AlwaysFalsy = object()
+        15 | AlwaysTruthy: _SpecialForm
+        16 | AlwaysFalsy: _SpecialForm
            |
         info: Source
           --> main2.py:9:47
@@ -4224,10 +4224,10 @@ mod tests {
           --> stdlib/ty_extensions.pyi:14:1
            |
         13 | # Types
-        14 | Unknown = object()
+        14 | Unknown: _SpecialForm
            | ^^^^^^^
-        15 | AlwaysTruthy = object()
-        16 | AlwaysFalsy = object()
+        15 | AlwaysTruthy: _SpecialForm
+        16 | AlwaysFalsy: _SpecialForm
            |
         info: Source
           --> main2.py:10:13
@@ -4295,10 +4295,10 @@ mod tests {
           --> stdlib/ty_extensions.pyi:14:1
            |
         13 | # Types
-        14 | Unknown = object()
+        14 | Unknown: _SpecialForm
            | ^^^^^^^
-        15 | AlwaysTruthy = object()
-        16 | AlwaysFalsy = object()
+        15 | AlwaysTruthy: _SpecialForm
+        16 | AlwaysFalsy: _SpecialForm
            |
         info: Source
           --> main2.py:10:47
@@ -4765,10 +4765,10 @@ mod tests {
           --> stdlib/ty_extensions.pyi:14:1
            |
         13 | # Types
-        14 | Unknown = object()
+        14 | Unknown: _SpecialForm
            | ^^^^^^^
-        15 | AlwaysTruthy = object()
-        16 | AlwaysFalsy = object()
+        15 | AlwaysTruthy: _SpecialForm
+        16 | AlwaysFalsy: _SpecialForm
            |
         info: Source
          --> main2.py:3:10
@@ -4820,10 +4820,10 @@ mod tests {
           --> stdlib/ty_extensions.pyi:14:1
            |
         13 | # Types
-        14 | Unknown = object()
+        14 | Unknown: _SpecialForm
            | ^^^^^^^
-        15 | AlwaysTruthy = object()
-        16 | AlwaysFalsy = object()
+        15 | AlwaysTruthy: _SpecialForm
+        16 | AlwaysFalsy: _SpecialForm
            |
         info: Source
          --> main2.py:4:10
@@ -5912,10 +5912,10 @@ mod tests {
           --> stdlib/ty_extensions.pyi:14:1
            |
         13 | # Types
-        14 | Unknown = object()
+        14 | Unknown: _SpecialForm
            | ^^^^^^^
-        15 | AlwaysTruthy = object()
-        16 | AlwaysFalsy = object()
+        15 | AlwaysTruthy: _SpecialForm
+        16 | AlwaysFalsy: _SpecialForm
            |
         info: Source
          --> main2.py:2:14
@@ -5930,10 +5930,10 @@ mod tests {
           --> stdlib/ty_extensions.pyi:14:1
            |
         13 | # Types
-        14 | Unknown = object()
+        14 | Unknown: _SpecialForm
            | ^^^^^^^
-        15 | AlwaysTruthy = object()
-        16 | AlwaysFalsy = object()
+        15 | AlwaysTruthy: _SpecialForm
+        16 | AlwaysFalsy: _SpecialForm
            |
         info: Source
          --> main2.py:3:17
@@ -6917,10 +6917,10 @@ mod tests {
           --> stdlib/ty_extensions.pyi:14:1
            |
         13 | # Types
-        14 | Unknown = object()
+        14 | Unknown: _SpecialForm
            | ^^^^^^^
-        15 | AlwaysTruthy = object()
-        16 | AlwaysFalsy = object()
+        15 | AlwaysTruthy: _SpecialForm
+        16 | AlwaysFalsy: _SpecialForm
            |
         info: Source
          --> main2.py:4:63
@@ -7647,10 +7647,10 @@ mod tests {
           --> stdlib/ty_extensions.pyi:14:1
            |
         13 | # Types
-        14 | Unknown = object()
+        14 | Unknown: _SpecialForm
            | ^^^^^^^
-        15 | AlwaysTruthy = object()
-        16 | AlwaysFalsy = object()
+        15 | AlwaysTruthy: _SpecialForm
+        16 | AlwaysFalsy: _SpecialForm
            |
         info: Source
          --> main2.py:4:22

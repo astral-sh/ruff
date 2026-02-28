@@ -276,7 +276,7 @@ in a tuple unpacking is not supported.
 from typing_extensions import TypeAliasType
 
 # error: [invalid-type-alias-type] "A `TypeAliasType` definition must be a simple variable assignment"
-TypeAliasType("IntOrStr", int | str)
+TypeAliasType("IntOrStr", "int | str")
 ```
 
 ### Mutually recursive `TypeAliasType` definitions
@@ -469,7 +469,7 @@ def f(x: A):
 #### With new-style union
 
 ```py
-type A = list["A" | str]
+type A = list[A | str]
 
 def f(x: A):
     reveal_type(x)  # revealed: list[A | str]

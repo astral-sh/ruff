@@ -11,9 +11,9 @@ from typing_extensions import LiteralString, Self  # noqa: UP035
 def static_assert(condition: object, msg: LiteralString | None = None) -> None: ...
 
 # Types
-Unknown = object()
-AlwaysTruthy = object()
-AlwaysFalsy = object()
+Unknown: _SpecialForm
+AlwaysTruthy: _SpecialForm
+AlwaysFalsy: _SpecialForm
 
 # Special forms
 Not: _SpecialForm
