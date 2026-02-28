@@ -1300,6 +1300,11 @@ impl<'db> Type<'db> {
         matches!(self, Type::TypedDict(..))
     }
 
+    /// Returns `true` if this is a structural type (callable or protocol).
+    pub(crate) const fn is_structural(&self) -> bool {
+        matches!(self, Type::Callable(_) | Type::ProtocolInstance(_))
+    }
+
     pub(crate) const fn as_typed_dict(self) -> Option<TypedDictType<'db>> {
         match self {
             Type::TypedDict(typed_dict) => Some(typed_dict),
