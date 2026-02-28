@@ -58,10 +58,10 @@ class NoDefaultSpecificClass(SomeClass):
 reveal_type(NoDefaultSpecificClass(SpecificConfiguration()).config)  # revealed: SpecificConfiguration | None
 ```
 
-## Descriptor-typed fields with defaults
+## Descriptor-typed fields
 
 A dataclass field whose declared type is a descriptor should still resolve through the descriptor
-protocol on instance access, even when the field has a default value.
+protocol on instance access, regardless of whether the field has a default value.
 
 `Desc2` has `__get__` but no `__set__`, making it a non-data descriptor.
 
@@ -88,9 +88,13 @@ class DC2:
 dc2 = DC2(Desc2(), Desc2(), Desc2())
 
 # On the class, __get__(None, owner) is called, returning list[T].
+reveal_type(DC2.x)  # revealed: list[int]
+reveal_type(DC2.y)  # revealed: list[str]
 reveal_type(DC2.z)  # revealed: list[str]
 
 # On instances, __get__(instance, owner) is called, returning T.
+reveal_type(dc2.x)  # revealed: int
+reveal_type(dc2.y)  # revealed: str
 # The default value should not cause the declared descriptor type
 # to leak into the instance attribute type.
 reveal_type(dc2.z)  # revealed: str

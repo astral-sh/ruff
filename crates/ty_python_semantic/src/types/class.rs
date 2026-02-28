@@ -4771,6 +4771,17 @@ impl<'db> StaticClassLiteral<'db> {
 
                             Member::unbound()
                         }
+                    } else if self.is_own_dataclass_instance_field(db, name)
+                        && !declared_ty
+                            .class_member(db, "__get__".into())
+                            .place
+                            .is_undefined()
+                    {
+                        // For dataclass-like classes with descriptor-typed fields
+                        // that have no default value, return unbound so that the
+                        // descriptor protocol in `member_lookup_with_policy` can
+                        // resolve the attribute type through `__get__`.
+                        Member::unbound()
                     } else {
                         // The attribute is declared but not bound in the class body.
                         // We take this as a sign that this is intended to be a pure
