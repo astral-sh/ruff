@@ -2532,6 +2532,7 @@ pub struct IsortOptions {
         value_type = r#"dict["future" | "standard-library" | "third-party" | "first-party" | "local-folder" | str, str]"#,
         scope = "import-heading",
         example = r#"
+            [lint.isort.import-heading]
             future = "Future imports"
             standard-library = "Standard library imports"
             third-party = "Third party imports"
