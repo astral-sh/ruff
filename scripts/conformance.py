@@ -358,25 +358,18 @@ class TestCase:
             )
 
 
-def render_github_row(diagnostics: list[TyDiagnostic]) -> str:
+def render_github_row(
+    diagnostics: list[TyDiagnostic], *, msg_tag: str | None = None
+) -> str:
     locs = []
     check_names = []
     descriptions = []
     for d in diagnostics:
         locs.append(d.location.as_link())
         check_names.append(d.check_name)
-        descriptions.append(d.description)
+        desc = f"<{msg_tag}>{d.description}</{msg_tag}>" if msg_tag else d.description
+        descriptions.append(desc)
     return f"| {'<br>'.join(locs)} | {'<br>'.join(check_names)} | {'<br>'.join(descriptions)} |"
-
-
-def render_github_changed_row(old: list[TyDiagnostic], new: list[TyDiagnostic]) -> str:
-    """Render old/new diagnostics as a single row with <del>/<ins> markup on the message."""
-    primary = new or old
-    locs = "<br>".join(d.location.as_link() for d in primary)
-    check_names = "<br>".join(d.check_name for d in primary)
-    old_part = "<br>".join(f"<del>{d.description}</del>" for d in old)
-    new_part = "<br>".join(f"<ins>{d.description}</ins>" for d in new)
-    return f"| {locs} | {check_names} | {old_part}<br>{new_part} |"
 
 
 def render_diff_row(diagnostics: list[TyDiagnostic], *, removed: bool = False) -> str:
@@ -615,12 +608,13 @@ def render_test_cases(
 
         for _, tc, source in group_list:
             if source is None:
-                # "Changed" entry: render old/new as a merged row with del/ins markup.
+                # "Changed" entry: render old then new rows with del/ins on the message.
                 if format == "diff":
                     lines.append(render_diff_row(tc.old, removed=True))
                     lines.append(render_diff_row(tc.new, removed=False))
                 else:
-                    lines.append(render_github_changed_row(tc.old, tc.new))
+                    lines.append(render_github_row(tc.old, msg_tag="del"))
+                    lines.append(render_github_row(tc.new, msg_tag="ins"))
             else:
                 diagnostics = tc.diagnostics_by_source(source)
                 removed = source == Source.OLD
@@ -646,7 +640,7 @@ def render_file_stats_table(test_cases: list[TestCase]) -> str:
         if old == new:
             return str(new)
         diff = new - old
-        return f"{new} <sub>({diff:+})</sub>"
+        return f"{new} ({diff:+})"
 
     # Collect per-file data; track totals across all files regardless of change.
     changed: list[tuple[int, Path, Statistics, Statistics, bool, bool]] = []
@@ -714,16 +708,12 @@ def render_file_stats_table(test_cases: list[TestCase]) -> str:
     )
 
     lines = [
-        "### Per-file breakdown (this branch)",
-        "",
-        "<details>",
+        "### Per-file breakdown",
         "",
         "| File | TP | FP | FN | Status |",
         "|------|----|----|----|--------|",
         *rows,
         totals_row,
-        "",
-        "</details>",
         "",
     ]
     return "\n".join(lines)
