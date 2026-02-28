@@ -7764,6 +7764,9 @@ enum InvalidTypeExpression<'db> {
     TypeQualifierRequiresOneArgument(TypeQualifier),
     /// Some types are always invalid in type expressions
     InvalidType(Type<'db>, ScopeId<'db>),
+    /// `typing.Self` cannot be used in a method whose `self`/`cls` parameter has a type
+    /// annotation other than `Self` or `type[Self]`
+    SelfWithNonSelfParam,
 }
 
 impl<'db> InvalidTypeExpression<'db> {
@@ -7846,6 +7849,11 @@ impl<'db> InvalidTypeExpression<'db> {
                         f,
                         "Variable of type `{ty}` is not allowed in a type expression",
                         ty = ty.display(self.db)
+                    ),
+                    InvalidTypeExpression::SelfWithNonSelfParam => write!(
+                        f,
+                        "`typing.Self` cannot be used in a method whose `self` or `cls` \
+                        parameter has a type annotation other than `Self`",
                     ),
                 }
             }

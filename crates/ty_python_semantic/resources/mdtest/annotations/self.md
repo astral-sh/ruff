@@ -755,11 +755,32 @@ def x(s: Self): ...
 # error: [invalid-type-form]
 b: Self
 
-# TODO: "Self" cannot be used in a function with a `self` or `cls` parameter that has a type annotation other than "Self"
 class Foo:
-    # TODO: This `self: T` annotation should be rejected because `T` is not `Self`
+    # error: [invalid-type-form] "`typing.Self` cannot be used in a method whose `self` or `cls` parameter has a type annotation other than `Self`"
     def has_existing_self_annotation(self: T) -> Self:
-        return self  # error: [invalid-return-type]
+        return self
+
+    # error: [invalid-type-form]
+    def has_non_self_annotation_in_param(self: T, other: Self) -> None:
+        pass
+
+    def has_non_self_annotation_no_self_usage(self: T) -> None:
+        pass
+
+    # `Self` in a nested function is fine, even when the enclosing method has a typevar annotation
+    def has_typevar_annotation_nested(self: T) -> None:
+        def inner(x: Self) -> Self:
+            return x
+
+    # Annotating `self` with a concrete type (not a TypeVar) still allows `Self` usage
+    def has_concrete_self_annotation(self: "Foo") -> Self:
+        # error: [invalid-return-type]
+        return self
+
+    @classmethod
+    # error: [invalid-type-form]
+    def has_typevar_cls_annotation(cls: type[T]) -> Self:
+        return cls()
 
     def return_concrete_type(self) -> Self:
         # TODO: We could emit a hint that suggests annotating with `Foo` instead of `Self`
