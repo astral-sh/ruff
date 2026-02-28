@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
-input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/fluent.py
 ---
 ## Input
 ```python
@@ -55,6 +54,7 @@ docstring-code-line-width  = "dynamic"
 preview                    = Disabled
 target_version             = 3.10
 source_type                = Python
+f-string-consistent-quotes = Disabled
 ```
 
 ```python

@@ -1563,6 +1563,13 @@
             "type": "string"
           }
         },
+        "f-string-consistent-quotes": {
+          "description": "Controls the quote style for f-strings in Python 3.12+. When enabled,\nf-strings will use consistent quotes (following quote-style) even when nesting strings inside\nf-string expressions, leveraging Python 3.12's PEP 701 which allows using the same quote character\nin expressions as the outer f-string.\nWhen disabled (default), Ruff will alternate quotes inside f-strings for compatibility with\nolder Python versions.\n\nFor example, with `f-string-consistent-quotes = true` and `quote-style = \"double\"` in Python 3.12+:\n\n```python\nf\"Result: {data[\"key\"]}\"  # Same quotes in f-string and expression\n```\n\nWith `f-string-consistent-quotes = false` (default):\n\n```python\nf\"Result: {data['key']}\"  # Alternate quotes for compatibility\n```\n\nNote: This setting has no effect when targeting Python versions below 3.12.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
         "indent-style": {
           "description": "Whether to use spaces or tabs for indentation.\n\n`indent-style = \"space\"` (default):\n\n```python\ndef f():\n    print(\"Hello\") #  Spaces indent the `print` statement.\n```\n\n`indent-style = \"tab\"`:\n\n```python\ndef f():\n    print(\"Hello\") #  A tab `\\t` indents the `print` statement.\n```\n\nPEP 8 recommends using spaces for [indentation](https://peps.python.org/pep-0008/#indentation).\nWe care about accessibility; if you do not need tabs for accessibility, we do not recommend you use them.\n\nSee [`indent-width`](#indent-width) to configure the number of spaces per indentation and the tab width.",
           "anyOf": [

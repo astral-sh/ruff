@@ -576,7 +576,8 @@ f'{1=:"foo}'
 f"{1=:"foo}"
 ```
 
-For nested f-strings, Ruff alternates quote styles, starting with the [configured quote style] for the
+By default, or when targeting Python versions below 3.12, Ruff alternates quote
+styles for nested f-strings, starting with the [configured quote style] for the
 outermost f-string. For example, consider the following f-string:
 
 ```python
@@ -585,10 +586,17 @@ outermost f-string. For example, consider the following f-string:
 f"outer f-string {f"nested f-string {f"another nested f-string"} end"} end"
 ```
 
-Ruff formats it as:
+With default settings, Ruff formats it as:
 
 ```python
 f"outer f-string {f'nested f-string {f"another nested f-string"} end'} end"
+```
+
+When targeting Python 3.12+ and with
+`f-string-consistent-quotes = true`, Ruff will maintain consistent quote styles:
+
+```python
+f"outer f-string {f"nested f-string {f"another nested f-string"} end"} end"
 ```
 
 #### Line breaks

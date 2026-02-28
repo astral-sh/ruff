@@ -237,6 +237,7 @@ docstring-code-line-width  = "dynamic"
 preview                    = Disabled
 target_version             = 3.13
 source_type                = Python
+f-string-consistent-quotes = Disabled
 ```
 
 ```python
@@ -523,6 +524,7 @@ docstring-code-line-width  = "dynamic"
 preview                    = Disabled
 target_version             = 3.14
 source_type                = Python
+f-string-consistent-quotes = Disabled
 ```
 
 ```python
