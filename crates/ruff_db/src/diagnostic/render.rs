@@ -13,6 +13,7 @@ use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use crate::{
     Db,
+    diagnostic::CodeRank,
     files::File,
     source::{SourceText, line_index, source_text},
 };
@@ -237,14 +238,20 @@ impl<'a> ResolvedDiagnostic<'a> {
             })
             .collect();
 
-        let id = if config.hide_severity {
+        let id = if matches!(config.display_code, CodeRank::Secondary) {
             // Either the rule code alone (e.g. `F401`), or the lint id with a colon (e.g.
             // `invalid-syntax:`). When Ruff gets real severities, we should put the colon back in
             // `DisplaySet::format_annotation` for both cases, but this is a small hack to improve
             // the formatting of syntax errors for now. This should also be kept consistent with the
             // concise formatting.
             diag.secondary_code().map_or_else(
-                || format!("{id}:", id = diag.inner.id),
+                || {
+                    format!(
+                        "{id}{maybe_colon}",
+                        id = diag.inner.id,
+                        maybe_colon = if config.hide_severity { ":" } else { "" }
+                    )
+                },
                 |code| code.to_string(),
             )
         } else {
@@ -2575,6 +2582,12 @@ watermelon
         pub(super) fn hide_severity(&mut self, yes: bool) {
             let config = self.config.clone();
             self.config = config.hide_severity(yes);
+        }
+
+        /// Which code (primary or secondary) to display.
+        pub(super) fn display_code(&mut self, rank: CodeRank) {
+            let config = self.config.clone();
+            self.config = config.display_code(rank);
         }
 
         /// Show fix availability when rendering.

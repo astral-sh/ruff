@@ -1,5 +1,5 @@
 use crate::diagnostic::{
-    Diagnostic, DisplayDiagnosticConfig, Severity,
+    CodeRank, Diagnostic, DisplayDiagnosticConfig, Severity,
     stylesheet::{DiagnosticStylesheet, fmt_styled, fmt_with_hyperlink},
 };
 
@@ -68,7 +68,9 @@ impl<'a> ConciseRenderer<'a> {
             }
 
             if self.config.hide_severity {
-                if let Some(code) = diag.secondary_code() {
+                if let Some(code) = diag.secondary_code()
+                    && matches!(self.config.display_code, CodeRank::Secondary)
+                {
                     write!(
                         f,
                         "{code} ",
@@ -104,15 +106,29 @@ impl<'a> ConciseRenderer<'a> {
                     Severity::Error => ("error", stylesheet.error),
                     Severity::Fatal => ("fatal", stylesheet.error),
                 };
-                write!(
-                    f,
-                    "{severity}[{id}] ",
-                    severity = fmt_styled(severity, severity_style),
-                    id = fmt_styled(
-                        fmt_with_hyperlink(&diag.id(), diag.documentation_url(), &stylesheet),
-                        stylesheet.emphasis
-                    )
-                )?;
+                if matches!(self.config.display_code, CodeRank::Secondary)
+                    && let Some(code) = diag.secondary_code()
+                {
+                    write!(
+                        f,
+                        "{severity}[{id}] ",
+                        severity = fmt_styled(severity, severity_style),
+                        id = fmt_styled(
+                            fmt_with_hyperlink(&code, diag.documentation_url(), &stylesheet),
+                            stylesheet.emphasis
+                        )
+                    )?;
+                } else {
+                    write!(
+                        f,
+                        "{severity}[{id}] ",
+                        severity = fmt_styled(severity, severity_style),
+                        id = fmt_styled(
+                            fmt_with_hyperlink(&diag.id(), diag.documentation_url(), &stylesheet),
+                            stylesheet.emphasis
+                        )
+                    )?;
+                }
             }
 
             writeln!(f, "{message}", message = diag.concise_message())?;
@@ -127,7 +143,7 @@ mod tests {
     use ruff_diagnostics::Applicability;
 
     use crate::diagnostic::{
-        DiagnosticFormat,
+        CodeRank, DiagnosticFormat,
         render::tests::{
             TestEnvironment, create_diagnostics, create_notebook_diagnostics,
             create_syntax_error_diagnostics,
@@ -149,6 +165,7 @@ mod tests {
     fn show_fixes() {
         let (mut env, diagnostics) = create_diagnostics(DiagnosticFormat::Concise);
         env.hide_severity(true);
+        env.display_code(CodeRank::Secondary);
         env.show_fix_status(true);
         env.fix_applicability(Applicability::DisplayOnly);
         insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @"
@@ -163,6 +180,7 @@ mod tests {
     fn show_fixes_preview() {
         let (mut env, diagnostics) = create_diagnostics(DiagnosticFormat::Concise);
         env.hide_severity(true);
+        env.display_code(CodeRank::Secondary);
         env.show_fix_status(true);
         env.fix_applicability(Applicability::DisplayOnly);
         env.preview(true);
@@ -178,6 +196,7 @@ mod tests {
     fn show_fixes_syntax_errors() {
         let (mut env, diagnostics) = create_syntax_error_diagnostics(DiagnosticFormat::Concise);
         env.hide_severity(true);
+        env.display_code(CodeRank::Secondary);
         env.show_fix_status(true);
         env.fix_applicability(Applicability::DisplayOnly);
         insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @"

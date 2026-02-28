@@ -65,8 +65,10 @@ use crate::settings::{
 #[derive(Clone, Debug, Default)]
 pub struct RuleSelection {
     pub select: Option<Vec<RuleSelector>>,
+    pub warn: Option<Vec<RuleSelector>>,
     pub ignore: Vec<RuleSelector>,
     pub extend_select: Vec<RuleSelector>,
+    pub extend_warn: Vec<RuleSelector>,
     pub fixable: Option<Vec<RuleSelector>>,
     pub unfixable: Vec<RuleSelector>,
     pub extend_fixable: Vec<RuleSelector>,
@@ -95,6 +97,12 @@ impl RuleSelection {
                     .map(|selector| (RuleSelectorKind::Modify, selector)),
             )
             .chain(
+                self.warn
+                    .iter()
+                    .flatten()
+                    .map(|selector| (RuleSelectorKind::Enable, selector)),
+            )
+            .chain(
                 self.ignore
                     .iter()
                     .map(|selector| (RuleSelectorKind::Disable, selector)),
@@ -113,6 +121,11 @@ impl RuleSelection {
                 self.extend_fixable
                     .iter()
                     .map(|selector| (RuleSelectorKind::Modify, selector)),
+            )
+            .chain(
+                self.extend_warn
+                    .iter()
+                    .map(|selector| (RuleSelectorKind::Enable, selector)),
             )
     }
 }
@@ -761,6 +774,8 @@ impl LintConfiguration {
 
             rule_selections: vec![RuleSelection {
                 select: options.common.select,
+                warn: options.warn,
+                extend_warn: options.extend_warn.unwrap_or_default(),
                 ignore,
                 extend_select: options.common.extend_select.unwrap_or_default(),
                 fixable: options.common.fixable,
@@ -857,6 +872,9 @@ impl LintConfiguration {
         // The fixable set keeps track of which rules are fixable.
         let mut fixable_set: RuleSet = RuleSelector::All.all_rules().collect();
 
+        // The warn set keeps track of which rules have severity `Warning`.
+        let mut warn_set: RuleSet = RuleSet::empty();
+
         // Ignores normally only subtract from the current set of selected
         // rules.  By that logic the ignore in `select = [], ignore = ["E501"]`
         // would be effectless. Instead we carry over the ignores to the next
@@ -887,6 +905,7 @@ impl LintConfiguration {
             // whether to enable or disable the given rule.
             let mut select_map_updates: FxHashMap<Rule, bool> = FxHashMap::default();
             let mut fixable_map_updates: FxHashMap<Rule, bool> = FxHashMap::default();
+            let mut warn_map_updates: FxHashMap<Rule, bool> = FxHashMap::default();
 
             let mut docstring_override_updates: FxHashSet<Rule> = FxHashSet::default();
 
@@ -910,6 +929,18 @@ impl LintConfiguration {
                         }
                     }
                 }
+                // Apply the same logic to `fixable`, `unfixable`, and `warn`
+                for selector in selection
+                    .warn
+                    .iter()
+                    .flatten()
+                    .chain(&selection.extend_warn)
+                    .filter(|s| s.specificity() == spec)
+                {
+                    for rule in selector.rules(&preview) {
+                        warn_map_updates.insert(rule, true);
+                    }
+                }
                 for selector in selection
                     .ignore
                     .iter()
@@ -918,10 +949,9 @@ impl LintConfiguration {
                 {
                     for rule in selector.rules(&preview) {
                         select_map_updates.insert(rule, false);
+                        warn_map_updates.insert(rule, false);
                     }
                 }
-
-                // Apply the same logic to `fixable` and `unfixable`.
                 for selector in selection
                     .fixable
                     .iter()
@@ -971,8 +1001,24 @@ impl LintConfiguration {
                     docstring_overrides.insert(rule);
                 }
             }
+            // Apply the same logic to `fixable`, `unfixable`, and `warn`
+            if let Some(warn) = &selection.warn {
+                warn_set = warn_map_updates
+                    .into_iter()
+                    .filter_map(|(rule, enabled)| enabled.then_some(rule))
+                    .collect();
 
-            // Apply the same logic to `fixable` and `unfixable`.
+                if warn.is_empty()
+                    && selection.extend_warn.is_empty()
+                    && !selection.ignore.is_empty()
+                {
+                    carryover_ignores = Some(&selection.ignore);
+                }
+            } else {
+                for (rule, enabled) in warn_map_updates {
+                    warn_set.set(rule, enabled);
+                }
+            }
             if let Some(fixable) = &selection.fixable {
                 fixable_set = fixable_map_updates
                     .into_iter()
@@ -1135,6 +1181,11 @@ impl LintConfiguration {
         for rule in select_set {
             let fix = fixable_set.contains(rule);
             rules.enable(rule, fix);
+        }
+
+        for rule in warn_set {
+            let fix = fixable_set.contains(rule);
+            rules.warn(rule, fix);
         }
 
         // If a docstring convention is specified, disable any incompatible error

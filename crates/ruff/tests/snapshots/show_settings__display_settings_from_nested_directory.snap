@@ -129,6 +129,9 @@ linter.rules.enabled = [
 	unused-annotation (F842),
 	raise-not-implemented (F901),
 ]
+linter.rules.warn = [
+	unsorted-imports (I001),
+]
 linter.rules.should_fix = [
 	unsorted-imports (I001),
 	missing-required-import (I002),

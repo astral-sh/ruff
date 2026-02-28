@@ -130,7 +130,11 @@ pub(crate) fn check(
                         SourceFileBuilder::new(path.to_string_lossy().as_ref(), "").finish();
 
                     Diagnostics::new(
-                        vec![IOError { message }.into_diagnostic(TextRange::default(), &dummy)],
+                        vec![IOError { message }.into_diagnostic(
+                            TextRange::default(),
+                            &dummy,
+                            settings.linter.rules.severity(Rule::IOError),
+                        )],
                         FxHashMap::default(),
                     )
                 } else {
@@ -210,7 +214,9 @@ mod test {
     use rustc_hash::FxHashMap;
     use tempfile::TempDir;
 
-    use ruff_db::diagnostic::{DiagnosticFormat, DisplayDiagnosticConfig, DisplayDiagnostics};
+    use ruff_db::diagnostic::{
+        CodeRank, DiagnosticFormat, DisplayDiagnosticConfig, DisplayDiagnostics,
+    };
     use ruff_linter::message::EmitterContext;
     use ruff_linter::registry::Rule;
     use ruff_linter::settings::types::UnsafeFixes;
@@ -267,7 +273,8 @@ mod test {
 
         let config = DisplayDiagnosticConfig::new("ruff")
             .format(DiagnosticFormat::Concise)
-            .hide_severity(true);
+            .hide_severity(true)
+            .display_code(CodeRank::Secondary);
         let messages = DisplayDiagnostics::new(
             &EmitterContext::new(&FxHashMap::default()),
             &config,

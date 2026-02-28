@@ -12,7 +12,7 @@ use log::{error, warn};
 use rayon::iter::Either::{Left, Right};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use ruff_db::diagnostic::{
-    Annotation, Diagnostic, DiagnosticId, DisplayDiagnosticConfig, Severity, Span,
+    Annotation, CodeRank, Diagnostic, DiagnosticId, DisplayDiagnosticConfig, Severity, Span,
 };
 use ruff_linter::message::{EmitterContext, create_panic_diagnostic, render_diagnostics};
 use ruff_linter::settings::types::OutputFormat;
@@ -626,6 +626,7 @@ impl<'a> FormatResults<'a> {
         let context = EmitterContext::new(&notebook_index);
         let config = DisplayDiagnosticConfig::new("ruff")
             .hide_severity(true)
+            .display_code(CodeRank::Secondary)
             .show_fix_diff(true)
             .color(!cfg!(test) && colored::control::SHOULD_COLORIZE.should_colorize());
 

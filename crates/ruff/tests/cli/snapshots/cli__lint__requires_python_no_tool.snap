@@ -72,6 +72,7 @@ linter.project_root = "[TMP]/"
 linter.rules.enabled = [
 	non-pep604-annotation-union (UP007),
 ]
+linter.rules.warn = []
 linter.rules.should_fix = [
 	non-pep604-annotation-union (UP007),
 ]
