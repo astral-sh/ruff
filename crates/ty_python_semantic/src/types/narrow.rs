@@ -1051,28 +1051,6 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
     ) -> Option<Type<'db>> {
         let op = if is_positive { op } else { op.negate() };
 
-        // `Divergent` shows up as an initial value in cycle recovery. If it appears on either side
-        // of a potentially narrowing comparison, we don't want it to turn that comparison into a
-        // no-op (e.g. because `Divergent` is not a singleton in the `IsNot` branch below), because
-        // that could result in an initial type inference result that's too wide. Then, even if the
-        // next cycle iteration resolved all the `Divergent` values and correctly narrowed the
-        // type, we'd be stuck with the too-wide answer from the first iteration, because
-        // `Type::cycle_normalized` only ever widens and never narrows from one iteration to the
-        // next (to avoid oscillations). To prevent this, we have `Divergent` "poison" any value
-        // that's compared to it, so that `Type::cycle_normalized` can see it and skip the widening
-        // union step.
-        //
-        // For an extended discussion of the case that originally encountered this problem, see the
-        // "`Divergent` in narrowing conditions doesn't run afoul of 'monotonic widening' in cycle
-        // recovery" mdtest case in `while_loop.md`. See also
-        // https://github.com/astral-sh/ruff/pull/22794#issuecomment-3852095578.
-        if lhs_ty.is_divergent() {
-            return Some(lhs_ty);
-        }
-        if rhs_ty.is_divergent() {
-            return Some(rhs_ty);
-        }
-
         match op {
             ast::CmpOp::IsNot => {
                 if rhs_ty.is_singleton(self.db) {
