@@ -305,3 +305,15 @@ def f():
         result = []
         for NL_INDEX in range(3):
             result.append(NL_INDEX)
+
+def main1():
+    ret = []
+    for x in range(8):
+        for i in range(x):
+            ret.append(i)  # PERF401
+
+def main3():
+    ret = []
+    for x in range(8):
+        for i in range(x):
+            ret.append(str(i))
