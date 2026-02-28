@@ -908,7 +908,7 @@ def render_summary(test_cases: list[TestCase], *, force_summary_table: bool) -> 
 
         ### Summary
 
-        {summary_note}
+        <details><summary>How are test cases classified?</summary>{summary_note}</details>
 
         <div align="center">
 
