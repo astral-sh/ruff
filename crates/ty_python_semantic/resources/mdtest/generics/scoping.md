@@ -5,8 +5,7 @@
 python-version = "3.12"
 ```
 
-Most of these tests come from the [Scoping rules for type variables][scoping] section of the typing
-spec.
+Most of these tests come from the [Scoping rules for type variables] section of the typing spec.
 
 ## Typevar used outside of generic function or class
 
@@ -372,6 +371,131 @@ class C[T]:
     ok2: Inner[T]
 ```
 
+## Type parameter defaults cannot reference outer-scope type parameters
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+Per the [typing spec][scoping rules], the default of a type parameter must not reference type
+parameters from an outer scope. Out-of-scope defaults on class type parameters are validated as part
+of `invalid-generic-class`; the tests here cover the remaining cases for PEP 695 function and type
+alias scopes, as well as legacy `TypeVar`s used in function/method signatures.
+
+### Nested functions
+
+<!-- snapshot-diagnostics -->
+
+```py
+def outer[T]():
+    # error: [invalid-type-variable-default] "Type parameter `U` cannot use outer-scope type parameter `T` as its default"
+    def inner[U = T](): ...
+    def ok[U = int](): ...  # OK
+```
+
+### Function nested in class
+
+<!-- snapshot-diagnostics -->
+
+```py
+class C[T]:
+    # error: [invalid-type-variable-default]
+    def f[U = T](self): ...
+    def g[U = int](self): ...  # OK
+```
+
+### Type alias nested in class
+
+<!-- snapshot-diagnostics -->
+
+```py
+class C[T]:
+    # error: [invalid-type-variable-default]
+    type Alias[U = T] = list[U]
+
+    type Ok[U = int] = list[U]  # OK
+```
+
+### Legacy TypeVar in method with outer-scope class TypeVar
+
+<!-- snapshot-diagnostics -->
+
+```py
+from typing import TypeVar, Generic
+
+T1 = TypeVar("T1")
+T2 = TypeVar("T2", default=T1)
+
+class Foo(Generic[T1]):
+    # error: [invalid-type-variable-default] "Invalid use of type variable `T2`: default of `T2` refers to out-of-scope type variable `T1`"
+    def method(self, x: T2) -> T2:
+        return x
+```
+
+### Legacy TypeVar in nested function
+
+<!-- snapshot-diagnostics -->
+
+```py
+from typing import TypeVar, Generic
+
+T = TypeVar("T")
+U = TypeVar("U", default=T)
+
+def outer(x: T) -> T:
+    # error: [invalid-type-variable-default]
+    def inner(y: U) -> U:
+        return y
+    return x
+```
+
+### Legacy TypeVar with default referring to later Typevar
+
+<!-- snapshot-diagnostics -->
+
+```py
+from typing import TypeVar, Generic
+
+T = TypeVar("T", default=int)
+U = TypeVar("U", default=T)
+
+# error: [invalid-type-variable-default]
+def inner(y: U, z: T) -> tuple[U, T]:
+    return y, z
+```
+
+### Legacy TypeVar ordering: default before non-default in function
+
+<!-- snapshot-diagnostics -->
+
+```py
+from typing import TypeVar
+
+T1 = TypeVar("T1", default=int)
+T2 = TypeVar("T2")
+T3 = TypeVar("T3")
+DefaultStrT = TypeVar("DefaultStrT", default=str)
+
+# error: [invalid-type-variable-default]
+def f(x: T1, y: T2) -> tuple[T1, T2]:
+    return x, y
+
+# error: [invalid-type-variable-default]
+def g(x: T2, y: T1, z: T3) -> tuple[T2, T1, T3]:
+    return x, y, z
+
+# error: [invalid-type-variable-default]
+def h(x: T1, y: T2, z: DefaultStrT, w: T3) -> tuple[T1, T2, DefaultStrT, T3]:
+    return x, y, z, w
+
+def ok(x: T2, y: T1) -> tuple[T2, T1]:
+    return x, y
+
+def ok2(x: T1, y: DefaultStrT) -> tuple[T1, DefaultStrT]:
+    return x, y
+```
+
 ## Mixed-scope type parameters
 
 Methods can have type parameters that are scoped to the method itself, while also referring to type
@@ -395,4 +519,5 @@ def f(x: type[Foo[T]]) -> T:
     raise NotImplementedError
 ```
 
-[scoping]: https://typing.python.org/en/latest/spec/generics.html#scoping-rules-for-type-variables
+[scoping rules]: https://typing.python.org/en/latest/spec/generics.html#scoping-rules
+[scoping rules for type variables]: https://typing.python.org/en/latest/spec/generics.html#scoping-rules-for-type-variables
