@@ -329,7 +329,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
             ast::Expr::Lambda(lambda_expression) => {
                 if !self.deferred_state.in_string_annotation() {
-                    self.infer_lambda_expression(lambda_expression);
+                    self.infer_lambda_expression(lambda_expression, TypeContext::default());
                 }
                 self.report_invalid_type_expression(
                     expression,
