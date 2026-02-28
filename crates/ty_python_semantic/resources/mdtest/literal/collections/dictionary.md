@@ -121,4 +121,20 @@ x6 = x7 = {"a": 1}
 # TODO: This should reveal `Literal[1]`.
 reveal_type(x6["a"])  # revealed: Unknown | int
 reveal_type(x7["a"])  # revealed: Unknown | int
+
+x8: list[dict[str, int | str]] = [{"a": 1, "b": "2"}, {"a": 3, "b": "4"}]
+reveal_type(x8[0]["a"])  # revealed: Literal[1]
+reveal_type(x8[1]["b"])  # revealed: Literal["4"]
+
+x9: dict[str, list[dict[str, int | str]]] = {"a": [{"a": 1, "b": "2"}, {"a": 3, "b": "4"}]}
+reveal_type(x9["a"][0]["a"])  # revealed: Literal[1]
+reveal_type(x9["a"][1]["b"])  # revealed: Literal["4"]
+
+x10: tuple[dict[str, int | str], ...] = ({"a": 1, "b": "2"}, {"a": 3, "b": "4"})
+reveal_type(x10[0]["a"])  # revealed: Literal[1]
+reveal_type(x10[1]["b"])  # revealed: Literal["4"]
+
+x11: dict[str, tuple[dict[str, int | str], ...]] = {"a": ({"a": 1, "b": "2"}, {"a": 3, "b": "4"})}
+reveal_type(x11["a"][0]["a"])  # revealed: Literal[1]
+reveal_type(x11["a"][1]["b"])  # revealed: Literal["4"]
 ```
