@@ -3787,7 +3787,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         let mut assignable_to_declared_type = true;
 
         let parameters = self.signature.parameters();
-        for (argument_index, adjusted_argument_index, _, argument_type) in
+        for (argument_index, adjusted_argument_index, argument, argument_type) in
             self.enumerate_argument_types()
         {
             for (parameter_index, variadic_argument_type) in
@@ -3817,6 +3817,16 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 );
 
                 if let Err(error) = specialization_result {
+                    if Self::should_ignore_synthetic_self_specialization_error(
+                        self.db,
+                        argument,
+                        parameter_index,
+                        &parameters[parameter_index],
+                        argument_type,
+                        &error,
+                    ) {
+                        continue;
+                    }
                     specialization_errors.push(BindingError::SpecializationError {
                         error,
                         argument_index: adjusted_argument_index,
@@ -3826,6 +3836,113 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         }
 
         assignable_to_declared_type
+    }
+
+    fn should_ignore_synthetic_self_specialization_error(
+        db: &'db dyn Db,
+        argument: Argument<'_>,
+        parameter_index: usize,
+        parameter: &Parameter<'db>,
+        argument_type: Type<'db>,
+        error: &SpecializationError<'db>,
+    ) -> bool {
+        Self::should_ignore_synthetic_self_error(
+            db,
+            argument,
+            parameter_index,
+            parameter,
+            argument_type,
+        ) && matches!(
+            error,
+            SpecializationError::MismatchedBound { .. }
+                | SpecializationError::MismatchedConstraint { .. }
+        )
+    }
+
+    fn should_ignore_synthetic_self_invalid_argument_error(
+        &self,
+        argument: Argument<'_>,
+        parameter_index: usize,
+        parameter: &Parameter<'db>,
+        argument_type: Type<'db>,
+        expected_ty: Type<'db>,
+        constraints: &ConstraintSetBuilder<'db>,
+    ) -> bool {
+        Self::should_ignore_synthetic_self_error(
+            self.db,
+            argument,
+            parameter_index,
+            parameter,
+            argument_type,
+        ) && Self::synthetic_self_receiver_has_compatible_variant(
+            self.db,
+            argument_type,
+            expected_ty,
+            constraints,
+            self.inferable_typevars,
+        )
+    }
+
+    fn synthetic_self_receiver_has_compatible_variant(
+        db: &'db dyn Db,
+        argument_type: Type<'db>,
+        expected_ty: Type<'db>,
+        constraints: &ConstraintSetBuilder<'db>,
+        inferable_typevars: InferableTypeVars<'_, 'db>,
+    ) -> bool {
+        Self::synthetic_self_receiver_matches_variant(db, argument_type, |candidate| {
+            !candidate
+                .when_assignable_to(db, expected_ty, constraints, inferable_typevars)
+                .is_never_satisfied(db)
+        })
+    }
+
+    fn synthetic_self_receiver_matches_variant(
+        db: &'db dyn Db,
+        argument_type: Type<'db>,
+        mut predicate: impl FnMut(Type<'db>) -> bool,
+    ) -> bool {
+        let Some(bound_typevar) = argument_type.as_typevar() else {
+            return false;
+        };
+
+        match bound_typevar.typevar(db).bound_or_constraints(db) {
+            Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                let Type::Union(union) = bound.resolve_type_alias(db) else {
+                    return false;
+                };
+                union.elements(db).iter().copied().any(&mut predicate)
+            }
+            Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                constraints.elements(db).iter().copied().any(predicate)
+            }
+            None => false,
+        }
+    }
+
+    /// `CallArguments::with_self` prepends synthetic receivers, so they always map to parameter 0.
+    fn is_synthetic_self_receiver_argument(argument: Argument<'_>, parameter_index: usize) -> bool {
+        matches!(argument, Argument::Synthetic) && parameter_index == 0
+    }
+
+    fn is_union_or_constrained_typevar_receiver(db: &'db dyn Db, argument_type: Type<'db>) -> bool {
+        Self::synthetic_self_receiver_matches_variant(db, argument_type, |_| true)
+    }
+
+    // For implicit `self`, bound-method calls prepend a synthetic receiver argument.
+    // Union/constrained TypeVars can hit a specialization mismatch on that synthetic argument
+    // before overload argument checking runs; we suppress only this shape to avoid duplicate or
+    // misleading diagnostics while preserving explicit `self` checks.
+    fn should_ignore_synthetic_self_error(
+        db: &'db dyn Db,
+        argument: Argument<'_>,
+        parameter_index: usize,
+        parameter: &Parameter<'db>,
+        argument_type: Type<'db>,
+    ) -> bool {
+        Self::is_synthetic_self_receiver_argument(argument, parameter_index)
+            && parameter.has_inferred_annotation()
+            && Self::is_union_or_constrained_typevar_receiver(db, argument_type)
     }
 
     fn check_argument_type(
@@ -3863,6 +3980,14 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             && argument_type
                 .when_assignable_to(self.db, expected_ty, constraints, self.inferable_typevars)
                 .is_never_satisfied(self.db)
+            && !self.should_ignore_synthetic_self_invalid_argument_error(
+                argument,
+                parameter_index,
+                parameter,
+                argument_type,
+                expected_ty,
+                constraints,
+            )
         {
             let positional = matches!(argument, Argument::Positional | Argument::Synthetic)
                 && !parameter.is_variadic();

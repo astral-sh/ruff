@@ -2218,8 +2218,8 @@ pub(crate) struct Parameter<'db> {
     /// Does the type of this parameter come from an explicit annotation, or was it inferred from
     /// the context, like `Unknown` for any normal un-annotated parameter, `Self` for the `self`
     /// parameter of instance method, or `type[Self]` for `cls` parameter of classmethods. This
-    /// field is only used to decide whether to display the annotated type; it has no effect on the
-    /// type semantics of the parameter.
+    /// field is primarily used to decide whether to display the annotated type; call binding also
+    /// uses it to distinguish implicit receiver annotations from explicit `self` annotations.
     pub(crate) inferred_annotation: bool,
 
     /// Variadic parameters can have starred annotations, e.g.
@@ -2511,6 +2511,11 @@ impl<'db> Parameter<'db> {
     /// Whether or not the type of this parameter should be displayed.
     pub(crate) fn should_annotation_be_displayed(&self) -> bool {
         !self.inferred_annotation
+    }
+
+    /// Returns `true` when this parameter's annotation was inferred rather than explicit.
+    pub(crate) fn has_inferred_annotation(&self) -> bool {
+        self.inferred_annotation
     }
 
     /// Name of the parameter (if it has one).
