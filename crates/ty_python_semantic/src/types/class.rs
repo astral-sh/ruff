@@ -2884,12 +2884,20 @@ impl<'db> StaticClassLiteral<'db> {
 
         let explicit_metaclass = self.explicit_metaclass(db, &module);
 
-        // Generic metaclasses are not supported.
+        // Generic metaclasses parameterized by type variables are not supported.
+        // `metaclass=Meta[int]` is fine, but `metaclass=Meta[T]` is not.
         // See: https://typing.python.org/en/latest/spec/generics.html#generic-metaclasses
-        if let Some(Type::GenericAlias(alias)) = explicit_metaclass {
-            return Err(MetaclassError {
-                kind: MetaclassErrorKind::GenericMetaclass(Type::GenericAlias(alias)),
-            });
+        if let Some(ty @ Type::GenericAlias(alias)) = explicit_metaclass {
+            let specialization_has_typevars = alias
+                .specialization(db)
+                .types(db)
+                .iter()
+                .any(|ty| ty.has_typevar_or_typevar_instance(db));
+            if specialization_has_typevars {
+                return Err(MetaclassError {
+                    kind: MetaclassErrorKind::GenericMetaclass(ty),
+                });
+            }
         }
 
         let (metaclass, class_metaclass_was_from) = if let Some(metaclass) = explicit_metaclass {

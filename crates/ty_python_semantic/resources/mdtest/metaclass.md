@@ -249,7 +249,27 @@ reveal_type(A.__class__)  # revealed: <class 'M'>
 
 ## Generic metaclass
 
-Generic metaclasses are not supported.
+### Fully specialized
+
+A generic metaclass fully specialized with concrete types is fine:
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+class Foo[T](type):
+    x: T
+
+class Bar(metaclass=Foo[int]): ...
+
+reveal_type(Bar.__class__)  # revealed: <class 'Foo[int]'>
+```
+
+### Parameterized by type variables (legacy)
+
+A generic metaclass parameterized by type variables is not supported:
 
 ```py
 from typing import TypeVar, Generic
@@ -260,6 +280,23 @@ class GenericMeta(type, Generic[T]): ...
 
 # error: [invalid-metaclass]
 class GenericMetaInstance(metaclass=GenericMeta[T]): ...
+```
+
+### Parameterized by type variables (PEP 695)
+
+The same applies using PEP 695 syntax:
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+class Foo[T](type):
+    x: T
+
+# error: [invalid-metaclass]
+class Bar[T](metaclass=Foo[T]): ...
 ```
 
 ## Metaclasses of metaclasses
