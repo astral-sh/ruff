@@ -78,7 +78,7 @@ use crate::types::special_form::TypeQualifier;
 use crate::types::tuple::TupleSpec;
 use crate::types::type_alias::TypeAliasType;
 pub(crate) use crate::types::typed_dict::TypedDictType;
-use crate::types::typevar::TypeVarInstance;
+use crate::types::typevar::{TypeVarIdentity, TypeVarInstance};
 pub use crate::types::typevar::{
     BindingContext, BoundTypeVarInstance, ParamSpecAttrKind, TypeVarBoundOrConstraints, TypeVarKind,
 };
@@ -790,6 +790,20 @@ impl<'db> Type<'db> {
     pub(crate) fn contains_self(&self, db: &'db dyn Db) -> bool {
         any_over_type(db, *self, false, |ty| {
             ty.as_typevar().is_some_and(|tv| tv.typevar(db).is_self(db))
+        })
+    }
+
+    pub(crate) fn references_typevar(
+        self,
+        db: &'db dyn Db,
+        typevar_id: TypeVarIdentity<'db>,
+    ) -> bool {
+        any_over_type(db, self, false, |ty| match ty {
+            Type::TypeVar(bound_typevar) => typevar_id == bound_typevar.typevar(db).identity(db),
+            Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) => {
+                typevar_id == typevar.identity(db)
+            }
+            _ => false,
         })
     }
 
