@@ -142,8 +142,8 @@ fn is_incorrect_order(outer: KnownDecorator, inner: KnownDecorator) -> bool {
         // @abstractmethod must be innermost when combined with descriptors
         (KnownDecorator::AbstractMethod, KnownDecorator::Property | KnownDecorator::ClassMethod | KnownDecorator::StaticMethod)
         // @contextmanager / @asynccontextmanager must wrap the raw function,
-        // not a classmethod/staticmethod descriptor
-        | (KnownDecorator::ContextManager | KnownDecorator::AsyncContextManager, KnownDecorator::StaticMethod | KnownDecorator::ClassMethod)
+        // not a classmethod descriptor
+        | (KnownDecorator::ContextManager | KnownDecorator::AsyncContextManager, KnownDecorator::ClassMethod)
         // Caching decorators must not wrap descriptors
         | (KnownDecorator::FunctoolsCache | KnownDecorator::FunctoolsLruCache, KnownDecorator::Property | KnownDecorator::ClassMethod | KnownDecorator::FunctoolsCachedProperty)
         // @classmethod conflicts with @cached_property

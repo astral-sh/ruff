@@ -25,22 +25,12 @@ class AbstractAboveStaticmethod:
     @staticmethod
     def foo(): ...
 
-# --- Core: contextmanager above descriptors ---
-
-class ContextManagerAboveStaticmethod:
-    @contextmanager  # RUF071
-    @staticmethod
-    def foo(): ...
+# --- Core: contextmanager above classmethod ---
 
 class ContextManagerAboveClassmethod:
     @contextmanager  # RUF071
     @classmethod
     def foo(cls): ...
-
-class AsyncContextManagerAboveStaticmethod:
-    @asynccontextmanager  # RUF071
-    @staticmethod
-    def foo(): ...
 
 class AsyncContextManagerAboveClassmethod:
     @asynccontextmanager  # RUF071
@@ -151,6 +141,16 @@ class CorrectClassmethodAboveAbstractmethod:
 class CorrectStaticmethodAboveAbstractmethod:
     @staticmethod
     @abstractmethod
+    def foo(): ...
+
+class CorrectContextmanagerAboveStaticmethod:
+    @contextmanager
+    @staticmethod
+    def foo(): ...
+
+class CorrectAsyncContextmanagerAboveStaticmethod:
+    @asynccontextmanager
+    @staticmethod
     def foo(): ...
 
 class CorrectStaticmethodAboveContextmanager:
