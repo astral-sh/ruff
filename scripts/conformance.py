@@ -75,11 +75,6 @@ CONFORMANCE_DIR_WITH_README = (
 CONFORMANCE_URL = CONFORMANCE_DIR_WITH_README + "tests/{filename}#L{line}"
 
 GITHUB_HEADER = ["| Location | Name | Message |", "|----------|------|---------|"]
-GITHUB_CHANGED_HEADER = [
-    "| Δ | Location | Name | Message |",
-    "|---|----------|------|---------|",
-]
-
 # Priority order for section headings: improvements first, regressions last.
 TITLE_PRIORITY: dict[str, int] = {
     "True positives added": 0,
@@ -374,17 +369,14 @@ def render_github_row(diagnostics: list[TyDiagnostic]) -> str:
     return f"| {'<br>'.join(locs)} | {'<br>'.join(check_names)} | {'<br>'.join(descriptions)} |"
 
 
-def render_github_changed_row(diagnostics: list[TyDiagnostic], *, removed: bool) -> str:
-    """Like render_github_row but prepends a sign column for use in 'changed' sections."""
-    sign = "-" if removed else "+"
-    locs = []
-    check_names = []
-    descriptions = []
-    for d in diagnostics:
-        locs.append(d.location.as_link())
-        check_names.append(d.check_name)
-        descriptions.append(d.description)
-    return f"| {sign} | {'<br>'.join(locs)} | {'<br>'.join(check_names)} | {'<br>'.join(descriptions)} |"
+def render_github_changed_row(old: list[TyDiagnostic], new: list[TyDiagnostic]) -> str:
+    """Render old/new diagnostics as a single row with <del>/<ins> markup on the message."""
+    primary = new or old
+    locs = "<br>".join(d.location.as_link() for d in primary)
+    check_names = "<br>".join(d.check_name for d in primary)
+    old_part = "<br>".join(f"<del>{d.description}</del>" for d in old)
+    new_part = "<br>".join(f"<ins>{d.description}</ins>" for d in new)
+    return f"| {locs} | {check_names} | {old_part}<br>{new_part} |"
 
 
 def render_diff_row(diagnostics: list[TyDiagnostic], *, removed: bool = False) -> str:
@@ -604,27 +596,31 @@ def render_test_cases(
     lines = []
     for title, group in groupby(entries, key=lambda e: e[0]):
         group_list = list(group)
-        is_changed_section = group_list[0][2] is None
+        n = len(group_list)
 
-        lines.append(f"### {title}")
-        lines.extend(["", "<details>", ""])
+        lines.append(f"### {title} ({n})")
+        lines.extend(
+            [
+                "",
+                "<details>",
+                f"<summary>{n} {'diagnostic' if n == 1 else 'diagnostics'}</summary>",
+                "",
+            ]
+        )
 
         if format == "diff":
             lines.append("```diff")
-        elif is_changed_section:
-            lines.extend(GITHUB_CHANGED_HEADER)
         else:
             lines.extend(GITHUB_HEADER)
 
         for _, tc, source in group_list:
             if source is None:
-                # "Changed" entry: render old diagnostics (-) then new diagnostics (+).
+                # "Changed" entry: render old/new as a merged row with del/ins markup.
                 if format == "diff":
                     lines.append(render_diff_row(tc.old, removed=True))
                     lines.append(render_diff_row(tc.new, removed=False))
                 else:
-                    lines.append(render_github_changed_row(tc.old, removed=True))
-                    lines.append(render_github_changed_row(tc.new, removed=False))
+                    lines.append(render_github_changed_row(tc.old, tc.new))
             else:
                 diagnostics = tc.diagnostics_by_source(source)
                 removed = source == Source.OLD
@@ -650,7 +646,7 @@ def render_file_stats_table(test_cases: list[TestCase]) -> str:
         if old == new:
             return str(new)
         diff = new - old
-        return f"{new} ({diff:+})"
+        return f"{new} <sub>({diff:+})</sub>"
 
     # Collect per-file data; track totals across all files regardless of change.
     changed: list[tuple[int, Path, Statistics, Statistics, bool, bool]] = []
