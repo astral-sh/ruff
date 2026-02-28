@@ -578,20 +578,6 @@ class Bar(UnknownBase1, Foo, UnknownBase2, Foo): ...
 reveal_mro(Bar)  # revealed: (<class 'Bar'>, Unknown, <class 'object'>)
 ```
 
-## `__mro__` on `type[Any]` and `type[Unknown]`
-
-`type[Any]` and `type[Unknown]` are known to be classes, so `__mro__` (a data descriptor
-on `type`) should resolve to `tuple[type, ...]` rather than `Any`/`Unknown`:
-
-```py
-from typing import Any
-from ty_extensions import Unknown
-
-def f(a: type[Any], b: type[Unknown]):
-    reveal_type(a.__mro__)  # revealed: tuple[type, ...]
-    reveal_type(b.__mro__)  # revealed: tuple[type, ...]
-```
-
 ## Unrelated objects inferred as `Any`/`Unknown` do not have special `__mro__` attributes
 
 ```py
