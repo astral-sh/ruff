@@ -132,6 +132,7 @@ def _(x: ProtoInt[int]):
 
 # TODO: TypedDict is just a function object at runtime, we should emit an error
 class LegacyDict(TypedDict[T]):
+    # error: [unbound-type-variable]
     x: T
 
 type LegacyDictInt = LegacyDict[int]

@@ -103,6 +103,7 @@ from typing_extensions import Self, TypeAlias, TypeVar
 T = TypeVar("T")
 
 # error: [invalid-type-form] "Special form `typing.TypeAlias` expected no type parameter"
+# error: [unbound-type-variable]
 X: TypeAlias[T] = int
 
 class Foo[T]:

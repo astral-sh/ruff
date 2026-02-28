@@ -95,13 +95,26 @@ pub(crate) fn bind_typevar<'db>(
             return Some(typevar.with_binding_context(db, definition));
         }
     }
-    enclosing_generic_contexts(db, index, containing_scope)
-        .find_map(|enclosing_context| enclosing_context.binds_typevar(db, typevar))
-        .or_else(|| {
-            typevar_binding_context.map(|typevar_binding_context| {
-                typevar.with_binding_context(db, typevar_binding_context)
-            })
-        })
+    // Walk ancestor scopes, tracking whether we've crossed a class scope boundary.
+    // Class-scoped type variables are not visible from inner class scopes.
+    let mut crossed_class_scope = false;
+    for (_, ancestor_scope) in index.ancestor_scopes(containing_scope) {
+        let is_class_scope = ancestor_scope.kind().is_class();
+        if let Some(generic_context) = ancestor_scope.node().generic_context(db, index) {
+            // If we've already crossed a class boundary, skip class-scoped generic contexts.
+            // This prevents inner classes from accessing type parameters of outer classes.
+            if !is_class_scope || !crossed_class_scope {
+                if let Some(bound) = generic_context.binds_typevar(db, typevar) {
+                    return Some(bound);
+                }
+            }
+        }
+        if is_class_scope {
+            crossed_class_scope = true;
+        }
+    }
+    typevar_binding_context
+        .map(|typevar_binding_context| typevar.with_binding_context(db, typevar_binding_context))
 }
 
 /// Create a `typing.Self` type variable for a given class.
