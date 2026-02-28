@@ -705,6 +705,61 @@ def render_test_cases(
     return "\n".join(lines)
 
 
+def file_is_fully_passing(test_cases: list[TestCase], source: Source) -> bool:
+    """Return True if every test case for a file classifies as TP or TN for source."""
+    return all(
+        tc.classify(source).classification
+        in (Classification.TRUE_POSITIVE, Classification.TRUE_NEGATIVE)
+        for tc in test_cases
+    )
+
+
+def render_file_status_changes(test_cases: list[TestCase]) -> str:
+    """Render a section listing files that newly achieve or lose fully-passing status."""
+
+    def get_path(tc: TestCase) -> Path:
+        for diags in (tc.new, tc.old, tc.expected):
+            if diags:
+                return diags[0].location.path
+        raise ValueError(f"No diagnostics in test case {tc.key}")
+
+    path_to_cases: dict[Path, list[TestCase]] = {}
+    for tc in test_cases:
+        path_to_cases.setdefault(get_path(tc), []).append(tc)
+
+    newly_passing: list[Path] = []
+    newly_failing: list[Path] = []
+
+    for path, cases in sorted(path_to_cases.items()):
+        old_passing = file_is_fully_passing(cases, Source.OLD)
+        new_passing = file_is_fully_passing(cases, Source.NEW)
+        if not old_passing and new_passing:
+            newly_passing.append(path)
+        elif old_passing and not new_passing:
+            newly_failing.append(path)
+
+    if not newly_passing and not newly_failing:
+        return ""
+
+    lines = []
+    if newly_passing:
+        lines.append("### Files now fully passing 🎉")
+        lines.append("")
+        for path in newly_passing:
+            url = CONFORMANCE_DIR_WITH_README + f"tests/{path.name}"
+            lines.append(f"- [{path.name}]({url})")
+        lines.append("")
+    if newly_failing:
+        lines.append("### Files now failing ❌")
+        lines.append("")
+        for path in newly_failing:
+            url = CONFORMANCE_DIR_WITH_README + f"tests/{path.name}"
+            lines.append(f"- [{path.name}]({url})")
+        lines.append("")
+
+    return "\n".join(lines)
+
+
 def diff_format(
     diff: float,
     *,
@@ -929,10 +984,14 @@ def main():
     )
 
     rendered = "\n\n".join(
-        [
-            render_summary(grouped, force_summary_table=args.force_summary_table),
-            render_test_cases(grouped, format=args.format),
-        ]
+        filter(
+            None,
+            [
+                render_summary(grouped, force_summary_table=args.force_summary_table),
+                render_file_status_changes(grouped),
+                render_test_cases(grouped, format=args.format),
+            ],
+        )
     )
 
     if args.output:
