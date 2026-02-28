@@ -711,11 +711,13 @@ def render_file_stats_table(test_cases: list[TestCase]) -> str:
     for tc in test_cases:
         path_to_cases.setdefault(tc.path, []).append(tc)
 
-    def fmt(old: int, new: int) -> str:
+    def fmt(old: int, new: int, *, greater_is_better: bool = True) -> str:
         if old == new:
             return str(new)
         diff = new - old
-        return f"{new} ({diff:+})"
+        improved = diff > 0 if greater_is_better else diff < 0
+        indicator = " ✅" if improved else " ❌"
+        return f"{new} ({diff:+}){indicator}"
 
     # Collect per-file data; track totals across all files regardless of change.
     changed: list[tuple[int, Path, Statistics, Statistics, bool, bool]] = []
@@ -768,9 +770,9 @@ def render_file_stats_table(test_cases: list[TestCase]) -> str:
         url = CONFORMANCE_DIR_WITH_README + f"tests/{path.name}"
         rows.append(
             f"| [{path.name}]({url})"
-            f" | {fmt(old_stats.true_positives, new_stats.true_positives)}"
-            f" | {fmt(old_stats.false_positives, new_stats.false_positives)}"
-            f" | {fmt(old_stats.false_negatives, new_stats.false_negatives)}"
+            f" | {fmt(old_stats.true_positives, new_stats.true_positives, greater_is_better=True)}"
+            f" | {fmt(old_stats.false_positives, new_stats.false_positives, greater_is_better=False)}"
+            f" | {fmt(old_stats.false_negatives, new_stats.false_negatives, greater_is_better=False)}"
             f" | {status} |"
         )
 
@@ -783,7 +785,7 @@ def render_file_stats_table(test_cases: list[TestCase]) -> str:
     )
 
     lines = [
-        "### Per-file breakdown",
+        "### Files changed",
         "",
         '<div align="center">',
         "",
@@ -876,17 +878,6 @@ def render_summary(test_cases: list[TestCase], *, force_summary_table: bool) -> 
     else:
         header = base_header
 
-    total_expected = new.true_positives + new.false_negatives
-    summary_paragraph = (
-        f"ty correctly handles **{new.true_positives}** of **{total_expected}** "
-        f"expected error locations (recall **{new.recall:.1%}**), with "
-        f"**{new.false_positives}** unexpected diagnostics "
-        f"(precision **{new.precision:.1%}**) — previously "
-        f"**{old.true_positives}** of **{total_expected}** correct "
-        f"(recall **{old.recall:.1%}**) with **{old.false_positives}** unexpected "
-        f"(precision **{old.precision:.1%}**)."
-    )
-
     summary_note = " ".join(SUMMARY_NOTE.split())
 
     return dedent(
@@ -910,8 +901,6 @@ def render_summary(test_cases: list[TestCase], *, force_summary_table: bool) -> 
         | Recall | {old.recall:.2%} | {new.recall:.2%} | {recall_change:+.2%} | {recall_diff} |
 
         </div>
-
-        {summary_paragraph}
 
         """
     )
