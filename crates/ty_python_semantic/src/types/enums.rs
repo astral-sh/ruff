@@ -111,6 +111,15 @@ pub(crate) fn enum_metadata<'db>(
     let use_def_map = use_def_map(db, scope_id);
     let table = place_table(db, scope_id);
 
+    // When an enum has a custom `__new__`, the raw assignment type doesn't represent the
+    // member's value — `__new__` unpacks the arguments and explicitly sets `_value_`.
+    // Fall back to `Any` for the member's value type.
+    let custom_new_value_ty = if has_custom_enum_new(db, class) {
+        Some(Type::any())
+    } else {
+        None
+    };
+
     let mut enum_values: FxHashMap<Type<'db>, Name> = FxHashMap::default();
     let mut auto_counter = 0;
     let mut auto_members = FxHashSet::default();
@@ -312,7 +321,8 @@ pub(crate) fn enum_metadata<'db>(
                 }
             }
 
-            Some((name.clone(), value_ty))
+            let final_value_ty = custom_new_value_ty.unwrap_or(value_ty);
+            Some((name.clone(), final_value_ty))
         })
         .collect::<FxIndexMap<_, _>>();
 
@@ -455,4 +465,54 @@ pub(crate) fn try_unwrap_nonmember_value<'db>(db: &'db dyn Db, ty: Type<'db>) ->
         }
         _ => None,
     }
+}
+
+/// Returns `true` if the enum class (or a class in its MRO) defines a custom `__new__` method.
+///
+/// When an enum has a custom `__new__`, the assigned tuple values are unpacked as arguments to
+/// `__new__`, and `_value_` is explicitly set inside the method body. This means we can't infer
+/// the member's value type from the raw assignment — we fall back to `Any`.
+fn has_custom_enum_new<'db>(db: &'db dyn Db, class: StaticClassLiteral<'db>) -> bool {
+    // Check the enum class itself
+    if has_own_dunder_new(db, class) {
+        return true;
+    }
+
+    // Walk the MRO (skipping the class itself) looking for a custom `__new__`
+    class
+        .iter_mro(db, None)
+        .skip(1)
+        .filter_map(ClassBase::into_class)
+        .any(|mro_class| {
+            let Some(static_class) = mro_class.class_literal(db).as_static() else {
+                return false;
+            };
+
+            // Skip classes defined in vendored typeshed (e.g. `object.__new__`,
+            // `int.__new__`, `IntEnum.__new__`, `IntFlag.__new__`). These `__new__`
+            // definitions exist for typing purposes and don't represent custom value
+            // transformations. We specifically check for vendored paths rather than all
+            // stub files, because a user-provided `.pyi` stub for a library with a
+            // custom `__new__` should still be recognized.
+            if static_class
+                .body_scope(db)
+                .file(db)
+                .path(db)
+                .is_vendored_path()
+            {
+                return false;
+            }
+
+            has_own_dunder_new(db, static_class)
+        })
+}
+
+/// Returns `true` if the class defines `__new__` directly in its own body scope.
+fn has_own_dunder_new<'db>(db: &'db dyn Db, class: StaticClassLiteral<'db>) -> bool {
+    let scope = class.body_scope(db);
+    let table = place_table(db, scope);
+    table.symbol_id("__new__").is_some_and(|symbol_id| {
+        let bindings = use_def_map(db, scope).reachable_symbol_bindings(symbol_id);
+        matches!(place_from_bindings(db, bindings).place, Place::Defined(_))
+    })
 }

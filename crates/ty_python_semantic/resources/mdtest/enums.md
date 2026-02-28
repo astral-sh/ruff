@@ -1347,6 +1347,142 @@ class MyEnum[T](MyEnumBase):
     A = 1
 ```
 
+## Custom `__new__`
+
+When an enum defines a custom `__new__` method, the raw assignment values are unpacked as arguments
+to `__new__`, and `_value_` is explicitly set inside the method body. The member's `.value` type
+falls back to `Any`.
+
+### Custom `__new__` with tuple values
+
+```py
+from enum import Enum
+
+class Planet(Enum):
+    def __new__(cls, mass: float, radius: float) -> "Planet":
+        obj = object.__new__(cls)
+        obj._value_ = mass
+        return obj
+    MERCURY = (3.303e23, 2.4397e6)
+    VENUS = (4.869e24, 6.0518e6)
+    EARTH = (5.976e24, 6.37814e6)
+
+# Without a `_value_` annotation, values fall back to `Any`
+reveal_type(Planet.MERCURY.value)  # revealed: Any
+reveal_type(Planet.VENUS.value)  # revealed: Any
+reveal_type(Planet.EARTH.value)  # revealed: Any
+
+# `.name` still works correctly
+reveal_type(Planet.MERCURY.name)  # revealed: Literal["MERCURY"]
+```
+
+### Custom `__init__` without `__new__`
+
+Custom `__init__` does **not** change `_value_` — the raw assignment is the value.
+
+```py
+from enum import Enum
+
+class Mood(Enum):
+    def __init__(self, value: int):
+        self._mood_level = value
+    HAPPY = 1
+    SAD = 2
+    NEUTRAL = 3
+
+reveal_type(Mood.HAPPY.value)  # revealed: Literal[1]
+reveal_type(Mood.SAD.value)  # revealed: Literal[2]
+```
+
+### Inherited custom `__new__` from a base class
+
+```py
+from enum import Enum
+
+class AutoNameEnum(Enum):
+    def __new__(cls, display_name: str) -> "AutoNameEnum":
+        obj = object.__new__(cls)
+        obj._value_ = display_name.lower()
+        return obj
+
+class Color(AutoNameEnum):
+    RED = "Red"
+    GREEN = "Green"
+    BLUE = "Blue"
+
+reveal_type(Color.RED.value)  # revealed: Any
+reveal_type(Color.GREEN.value)  # revealed: Any
+```
+
+### Standard enums are not affected
+
+```py
+from enum import Enum
+
+class Color(Enum):
+    RED = 1
+    GREEN = 2
+    BLUE = 3
+
+reveal_type(Color.RED.value)  # revealed: Literal[1]
+reveal_type(Color.GREEN.value)  # revealed: Literal[2]
+reveal_type(Color.BLUE.value)  # revealed: Literal[3]
+```
+
+### `IntEnum` not affected by `int.__new__`
+
+```py
+from enum import IntEnum
+
+class Status(IntEnum):
+    ACTIVE = 1
+    INACTIVE = 2
+
+reveal_type(Status.ACTIVE.value)  # revealed: Literal[1]
+reveal_type(Status.INACTIVE.value)  # revealed: Literal[2]
+```
+
+### Member detection still works with custom `__new__`
+
+```py
+from enum import Enum
+from typing_extensions import reveal_type
+
+class Planet(Enum):
+    def __new__(cls, mass: float, radius: float) -> "Planet":
+        obj = object.__new__(cls)
+        obj._value_ = mass
+        return obj
+    MERCURY = (3.303e23, 2.4397e6)
+    VENUS = (4.869e24, 6.0518e6)
+
+reveal_type(Planet.MERCURY)  # revealed: Literal[Planet.MERCURY]
+reveal_type(Planet.VENUS)  # revealed: Literal[Planet.VENUS]
+```
+
+### Exhaustiveness with custom `__new__`
+
+```py
+from enum import Enum
+from typing_extensions import assert_never
+
+class Planet(Enum):
+    def __new__(cls, mass: float, radius: float) -> "Planet":
+        obj = object.__new__(cls)
+        obj._value_ = mass
+        return obj
+    MERCURY = (3.303e23, 2.4397e6)
+    VENUS = (4.869e24, 6.0518e6)
+
+def check(planet: Planet) -> str:
+    if planet is Planet.MERCURY:
+        return "Mercury"
+    elif planet is Planet.VENUS:
+        return "Venus"
+    else:
+        assert_never(planet)
+```
+
 ## References
 
 - Typing spec: <https://typing.python.org/en/latest/spec/enums.html>
