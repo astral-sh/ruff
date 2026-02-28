@@ -297,6 +297,12 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     /// Whether we are in a context that binds unbound typevars.
     typevar_binding_context: Option<Definition<'db>>,
 
+    /// Whether to check for unbound type variables in type expressions.
+    /// This is set to `true` when processing annotation expressions, where unbound type variables
+    /// are an error. It is `false` in other contexts (e.g., `TypeVar` defaults, explicit class
+    /// specialization) where unbound type variables are expected.
+    check_unbound_typevars: bool,
+
     /// The deferred state of inferring types of certain expressions within the region.
     ///
     /// This is different from [`InferenceRegion::Deferred`] which works on the entire definition
@@ -363,6 +369,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             bindings: VecMap::default(),
             declarations: VecMap::default(),
             typevar_binding_context: None,
+            check_unbound_typevars: false,
             deferred: VecSet::default(),
             undecorated_type: None,
             cycle_recovery: None,
@@ -14603,6 +14610,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // builder only state
             typevar_binding_context: _,
+            check_unbound_typevars: _,
             deferred_state: _,
             multi_inference_state: _,
             inner_expression_inference_state: _,
@@ -14672,6 +14680,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             dataclass_field_specifiers: _,
             all_definitely_bound: _,
             typevar_binding_context: _,
+            check_unbound_typevars: _,
             deferred_state: _,
             inferring_vararg_annotation: _,
             multi_inference_state: _,
@@ -14754,6 +14763,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             dataclass_field_specifiers: _,
             all_definitely_bound: _,
             typevar_binding_context: _,
+            check_unbound_typevars: _,
             deferred_state: _,
             multi_inference_state: _,
             inner_expression_inference_state: _,

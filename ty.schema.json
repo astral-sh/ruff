@@ -1325,6 +1325,16 @@
             }
           ]
         },
+        "unbound-type-variable": {
+          "title": "detects type variables used outside of their bound scope",
+          "description": "## What it does\nChecks for type variables that are used in a scope where they are not bound\nto any enclosing generic context.\n\n## Why is this bad?\nA type variable must be used within a generic function or class that binds it.\nUsing it outside of any such scope, or in a scope where the type variable is not\npart of the generic context, has no well-defined meaning.\n\n## Examples\n```python\nfrom typing import TypeVar, Generic\n\nT = TypeVar(\"T\")\nS = TypeVar(\"S\")\n\nx: T  # error: unbound type variable in module scope\n\nclass C(Generic[T]):\n    x: list[S] = []  # error: S is not in this class's generic context\n```\n\n## References\n- [Typing spec: Scoping rules for type variables](https://typing.python.org/en/latest/spec/generics.html#scoping-rules-for-type-variables)",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "undefined-reveal": {
           "title": "detects usages of `reveal_type` without importing it",
           "description": "## What it does\nChecks for calls to `reveal_type` without importing it.\n\n## Why is this bad?\nUsing `reveal_type` without importing it will raise a `NameError` at runtime.\n\n## Examples\n```python\nreveal_type(1)  # NameError: name 'reveal_type' is not defined\n```",

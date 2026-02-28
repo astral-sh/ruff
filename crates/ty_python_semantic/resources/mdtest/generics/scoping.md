@@ -17,15 +17,15 @@ from typing import TypeVar
 
 T = TypeVar("T")
 
-# TODO: error
+# error: [unbound-type-variable]
 x: T
 
 class C:
-    # TODO: error
+    # error: [unbound-type-variable]
     x: T
 
 def f() -> None:
-    # TODO: error
+    # error: [unbound-type-variable]
     x: T
 ```
 
@@ -186,11 +186,11 @@ S = TypeVar("S")
 
 def f(x: T) -> None:
     x: list[T] = []
-    # TODO: invalid-assignment error
+    # error: [unbound-type-variable]
     y: list[S] = []
 
 class C(Generic[T]):
-    # TODO: error: cannot use S if it's not in the current generic context
+    # error: [unbound-type-variable]
     x: list[S] = []
 
     # This is not an error, as shown in the previous test
@@ -210,11 +210,11 @@ S = TypeVar("S")
 
 def f[T](x: T) -> None:
     x: list[T] = []
-    # TODO: invalid assignment error
+    # error: [unbound-type-variable]
     y: list[S] = []
 
 class C[T]:
-    # TODO: error: cannot use S if it's not in the current generic context
+    # error: [unbound-type-variable]
     x: list[S] = []
 
     def m1(self, x: S) -> S:
@@ -365,7 +365,7 @@ class C[T]:
     ok1: list[T] = []
 
     class Bad:
-        # TODO: error: cannot refer to T in nested scope
+        # error: [unbound-type-variable]
         bad: list[T] = []
 
     class Inner[S]: ...
