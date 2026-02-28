@@ -8481,7 +8481,7 @@ impl<'db> TypeVarInstance<'db> {
     fn lazy_default(self, db: &'db dyn Db) -> Option<Type<'db>> {
         let default = self.lazy_default_unchecked(db)?;
 
-        // Unlike bounds/constraints, default types are allowed to be generic (https://peps.python.org/pep-0696/#using-another-type-parameter-as-default).
+        // Unlike bounds/constraints, default types are allowed to be generic (https://typing.python.org/en/latest/spec/generics.html#defaults-for-type-parameters).
         // Here we simply check for non-self-referential.
         // TODO: We should also check for non-forward references.
         if self.type_is_self_referential(db, default) {

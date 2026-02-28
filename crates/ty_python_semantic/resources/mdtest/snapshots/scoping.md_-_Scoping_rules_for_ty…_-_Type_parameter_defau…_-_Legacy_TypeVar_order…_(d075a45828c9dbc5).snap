@@ -1,0 +1,120 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: scoping.md - Scoping rules for type variables - Type parameter defaults cannot reference outer-scope type parameters - Legacy TypeVar ordering: default before non-default in function
+mdtest path: crates/ty_python_semantic/resources/mdtest/generics/scoping.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from typing import TypeVar
+ 2 | 
+ 3 | T1 = TypeVar("T1", default=int)
+ 4 | T2 = TypeVar("T2")
+ 5 | T3 = TypeVar("T3")
+ 6 | DefaultStrT = TypeVar("DefaultStrT", default=str)
+ 7 | 
+ 8 | # error: [invalid-type-variable-default]
+ 9 | def f(x: T1, y: T2) -> tuple[T1, T2]:
+10 |     return x, y
+11 | 
+12 | # error: [invalid-type-variable-default]
+13 | def g(x: T2, y: T1, z: T3) -> tuple[T2, T1, T3]:
+14 |     return x, y, z
+15 | 
+16 | # error: [invalid-type-variable-default]
+17 | def h(x: T1, y: T2, z: DefaultStrT, w: T3) -> tuple[T1, T2, DefaultStrT, T3]:
+18 |     return x, y, z, w
+19 | 
+20 | def ok(x: T2, y: T1) -> tuple[T2, T1]:
+21 |     return x, y
+22 | 
+23 | def ok2(x: T1, y: DefaultStrT) -> tuple[T1, DefaultStrT]:
+24 |     return x, y
+```
+
+# Diagnostics
+
+```
+error[invalid-type-variable-default]: Type parameters without defaults cannot follow type parameters with defaults
+  --> src/mdtest_snippet.py:9:10
+   |
+ 8 | # error: [invalid-type-variable-default]
+ 9 | def f(x: T1, y: T2) -> tuple[T1, T2]:
+   |          --     ^^ Type variable `T2` does not have a default
+   |          |
+   |          Earlier TypeVar `T1` has a default
+10 |     return x, y
+   |
+  ::: src/mdtest_snippet.py:3:1
+   |
+ 1 | from typing import TypeVar
+ 2 |
+ 3 | T1 = TypeVar("T1", default=int)
+   | ------------------------------- `T1` defined here
+ 4 | T2 = TypeVar("T2")
+   | ------------------ `T2` defined here
+ 5 | T3 = TypeVar("T3")
+ 6 | DefaultStrT = TypeVar("DefaultStrT", default=str)
+   |
+info: rule `invalid-type-variable-default` is enabled by default
+
+```
+
+```
+error[invalid-type-variable-default]: Type parameters without defaults cannot follow type parameters with defaults
+  --> src/mdtest_snippet.py:13:17
+   |
+12 | # error: [invalid-type-variable-default]
+13 | def g(x: T2, y: T1, z: T3) -> tuple[T2, T1, T3]:
+   |                 --     ^^ Type variable `T3` does not have a default
+   |                 |
+   |                 Earlier TypeVar `T1` has a default
+14 |     return x, y, z
+   |
+  ::: src/mdtest_snippet.py:3:1
+   |
+ 1 | from typing import TypeVar
+ 2 |
+ 3 | T1 = TypeVar("T1", default=int)
+   | ------------------------------- `T1` defined here
+ 4 | T2 = TypeVar("T2")
+ 5 | T3 = TypeVar("T3")
+   | ------------------ `T3` defined here
+ 6 | DefaultStrT = TypeVar("DefaultStrT", default=str)
+   |
+info: rule `invalid-type-variable-default` is enabled by default
+
+```
+
+```
+error[invalid-type-variable-default]: Type parameters without defaults cannot follow type parameters with defaults
+  --> src/mdtest_snippet.py:17:10
+   |
+16 | # error: [invalid-type-variable-default]
+17 | def h(x: T1, y: T2, z: DefaultStrT, w: T3) -> tuple[T1, T2, DefaultStrT, T3]:
+   |          --     ^^ Type variables `T2` and `T3` do not have defaults
+   |          |
+   |          Earlier TypeVar `T1` has a default
+18 |     return x, y, z, w
+   |
+  ::: src/mdtest_snippet.py:3:1
+   |
+ 1 | from typing import TypeVar
+ 2 |
+ 3 | T1 = TypeVar("T1", default=int)
+   | ------------------------------- `T1` defined here
+ 4 | T2 = TypeVar("T2")
+   | ------------------ `T2` defined here
+ 5 | T3 = TypeVar("T3")
+ 6 | DefaultStrT = TypeVar("DefaultStrT", default=str)
+   |
+info: rule `invalid-type-variable-default` is enabled by default
+
+```

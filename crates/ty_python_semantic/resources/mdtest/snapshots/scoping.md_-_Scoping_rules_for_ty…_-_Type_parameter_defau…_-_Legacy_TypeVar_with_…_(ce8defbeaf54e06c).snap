@@ -1,0 +1,44 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: scoping.md - Scoping rules for type variables - Type parameter defaults cannot reference outer-scope type parameters - Legacy TypeVar with default referring to later Typevar
+mdtest path: crates/ty_python_semantic/resources/mdtest/generics/scoping.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | from typing import TypeVar, Generic
+2 | 
+3 | T = TypeVar("T", default=int)
+4 | U = TypeVar("U", default=T)
+5 | 
+6 | # error: [invalid-type-variable-default]
+7 | def inner(y: U, z: T) -> tuple[U, T]:
+8 |     return y, z
+```
+
+# Diagnostics
+
+```
+error[invalid-type-variable-default]: Invalid use of type variable `U`
+ --> src/mdtest_snippet.py:4:1
+  |
+3 | T = TypeVar("T", default=int)
+4 | U = TypeVar("U", default=T)
+  | --------------------------- `U` defined here
+5 |
+6 | # error: [invalid-type-variable-default]
+7 | def inner(y: U, z: T) -> tuple[U, T]:
+  |              ^ Default of `U` references later type parameter `T`
+8 |     return y, z
+  |
+info: See https://typing.python.org/en/latest/spec/generics.html#scoping-rules
+info: rule `invalid-type-variable-default` is enabled by default
+
+```
