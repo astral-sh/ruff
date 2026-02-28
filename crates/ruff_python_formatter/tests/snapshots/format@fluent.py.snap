@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
-input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/fluent.py
 ---
 ## Input
 ```python
@@ -150,14 +149,29 @@ x = (
      .d.e()
      .f.g()
  )
-@@ -34,7 +36,8 @@
+@@ -26,20 +28,15 @@
+ # calls/subscripts, but that is unrelated to the fluent format.)
+ 
+ x = (
+-    a()[
+-        0
+-    ]()
++    a()[0]()
+     .b()
+     .c()
  )
  
  x = (
 -    a.b()[
+-        0
+-    ]
+-    .c.d()[
+-        1
+-    ]()
 +    a
-+    .b()[
-         0
-     ]
-     .c.d()[
++    .b()[0]
++    .c.d()[1]()
+     .e
+ )
+ 
 ```

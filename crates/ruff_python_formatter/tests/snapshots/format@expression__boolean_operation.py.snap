@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
-input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression/boolean_operation.py
 ---
 ## Input
 ```python
@@ -400,4 +399,30 @@ if (
     + self._proc.poll()
 ):
     pass
+```
+
+
+## Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -135,11 +135,13 @@
+     if False:
+         if True:
+             if (
+-                self.validate_max
+-                and self.total_form_count() - len(self.deleted_forms) > self.max_num
+-            ) or self.management_form.cleaned_data[
+-                TOTAL_FORM_COUNT
+-            ] > self.absolute_max:
++                (
++                    self.validate_max
++                    and self.total_form_count() - len(self.deleted_forms) > self.max_num
++                )
++                or self.management_form.cleaned_data[TOTAL_FORM_COUNT]
++                > self.absolute_max
++            ):
+                 pass
+ 
+ 
 ```
