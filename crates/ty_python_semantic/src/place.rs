@@ -1208,13 +1208,15 @@ fn loop_header_reachability_impl<'db>(
 
         match use_def.definition(live_binding.binding) {
             DefinitionState::Defined(def) => {
+                debug_assert_ne!(
+                    def, definition,
+                    "loop headers only include bindings from within the loop"
+                );
                 has_defined_bindings = true;
-                if def != definition {
-                    reachable_bindings.insert(ReachableLoopBinding {
-                        definition: def,
-                        narrowing_constraint: live_binding.narrowing_constraint,
-                    });
-                }
+                reachable_bindings.insert(ReachableLoopBinding {
+                    definition: def,
+                    narrowing_constraint: live_binding.narrowing_constraint,
+                });
             }
             // `del` in the loop body is always visible to code after the loop via the
             // normal control flow merge. Updating `deleted_reachability` here is
@@ -1222,10 +1224,9 @@ fn loop_header_reachability_impl<'db>(
             DefinitionState::Deleted => {
                 deleted_reachability = deleted_reachability.or(reachability);
             }
-            // If UNBOUND is visible at loop-back, then it was visible before the loop.
-            // Loop header definitions don't shadow preexisting bindings, so we don't
-            // need to do anything with this.
-            DefinitionState::Undefined => {}
+            DefinitionState::Undefined => {
+                unreachable!("loop headers only include bindings from within the loop")
+            }
         }
     }
 
@@ -1242,7 +1243,7 @@ pub(crate) struct LoopHeaderReachability<'db> {
     /// Whether any reachable loop-back binding is a defined binding.
     pub(crate) has_defined_bindings: bool,
     pub(crate) deleted_reachability: Truthiness,
-    /// Reachable, defined loop-back bindings (excluding the loop header definition itself).
+    /// Reachable loop-back bindings that are not `del`s.
     pub(crate) reachable_bindings: FxIndexSet<ReachableLoopBinding<'db>>,
 }
 

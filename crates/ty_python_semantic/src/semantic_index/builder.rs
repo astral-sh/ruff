@@ -48,8 +48,8 @@ use crate::semantic_index::scope::{
 use crate::semantic_index::scope::{Scope, ScopeId, ScopeKind, ScopeLaziness};
 use crate::semantic_index::symbol::{ScopedSymbolId, Symbol};
 use crate::semantic_index::use_def::{
-    EnclosingSnapshotKey, FlowSnapshot, PreviousDefinitions, ScopedEnclosingSnapshotId,
-    UseDefMapBuilder,
+    EnclosingSnapshotKey, FlowSnapshot, PreviousDefinitions, ScopedDefinitionId,
+    ScopedEnclosingSnapshotId, UseDefMapBuilder,
 };
 use crate::semantic_index::{
     ExpressionsScopeMap, LoopHeader, LoopToken, SemanticIndex, VisibleAncestorsIter,
@@ -845,12 +845,13 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     }
 
     /// Create loop header definitions for all places that are bound within a loop. Return the
-    /// `LoopToken` referenced by those definitions, and the set of bound place IDs.
+    /// `LoopToken` referenced by those definitions, the set of bound place IDs, and the lower
+    /// bound `ScopedDefinitionId` for definitions created within the loop.
     fn synthesize_loop_header_definitions(
         &mut self,
         loop_stmt: LoopStmtRef<'ast>,
         bound_places: Vec<PlaceExpr>,
-    ) -> (LoopToken<'db>, FxHashSet<ScopedPlaceId>) {
+    ) -> (LoopToken<'db>, FxHashSet<ScopedPlaceId>, ScopedDefinitionId) {
         let loop_token = LoopToken::new(self.db);
         let mut bound_place_ids: FxHashSet<ScopedPlaceId> = FxHashSet::default();
         for place_expr in bound_places {
@@ -865,7 +866,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 self.push_additional_definition(place_id, loop_header_ref);
             }
         }
-        (loop_token, bound_place_ids)
+        let loop_min_definition_id = self.current_use_def_map_mut().next_definition_id();
+        (loop_token, bound_place_ids, loop_min_definition_id)
     }
 
     /// Build a `LoopHeader` that tracks all the variables bound in a loop, which will be visible
@@ -876,13 +878,18 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         &mut self,
         loop_header_places: &FxHashSet<ScopedPlaceId>,
         loop_token: LoopToken<'db>,
+        loop_min_definition_id: ScopedDefinitionId,
     ) {
         let mut loop_header = LoopHeader::new();
         let use_def = self.current_use_def_map_mut();
-        // Collect bindings.
+        // Collect all the bindings within the loop that reached a loop back edge. Use the minimum
+        // definition ID to filter out all the pre-loop bindings. The loop header doesn't shadow
+        // them, so there's no need to duplicate them.
         for place_id in loop_header_places {
             for live_binding in use_def.loop_back_bindings(*place_id) {
-                loop_header.add_binding(*place_id, live_binding);
+                if live_binding.binding >= loop_min_definition_id {
+                    loop_header.add_binding(*place_id, live_binding);
+                }
             }
         }
         // Mark the reachability and narrowing constraints as used.
@@ -2225,8 +2232,10 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
 
                 // Collect all the loop-back bindings (including the `continue` states we just
                 // merged) and populate the `LoopHeader`.
-                if let Some((loop_token, bound_place_ids)) = maybe_loop_header_info {
-                    self.populate_loop_header(&bound_place_ids, loop_token);
+                if let Some((loop_token, bound_place_ids, loop_min_definition_id)) =
+                    maybe_loop_header_info
+                {
+                    self.populate_loop_header(&bound_place_ids, loop_token, loop_min_definition_id);
                 }
 
                 // We execute the `else` branch once the condition evaluates to false. This could
@@ -2333,8 +2342,10 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
 
                 // Collect all the loop-back bindings (including the `continue` states we just
                 // merged) and populate the `LoopHeader`.
-                if let Some((loop_token, bound_place_ids)) = maybe_loop_header_info {
-                    self.populate_loop_header(&bound_place_ids, loop_token);
+                if let Some((loop_token, bound_place_ids, loop_min_definition_id)) =
+                    maybe_loop_header_info
+                {
+                    self.populate_loop_header(&bound_place_ids, loop_token, loop_min_definition_id);
                 }
 
                 // We may execute the `else` clause without ever executing the body, so merge in

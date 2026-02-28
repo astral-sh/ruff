@@ -990,6 +990,10 @@ impl<'db> UseDefMapBuilder<'db> {
         }
     }
 
+    pub(super) fn next_definition_id(&self) -> ScopedDefinitionId {
+        self.all_definitions.next_index()
+    }
+
     pub(super) fn record_binding(
         &mut self,
         place: ScopedPlaceId,
