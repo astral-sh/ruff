@@ -3497,16 +3497,16 @@ impl<'db> Type<'db> {
 
                 // `type[Any]`/`type[Unknown]` are gradual forms with an unknown metaclass
                 // (which is at least `type`). Attributes resolved via `type`'s descriptors
-                // are intersected with `Unknown` to reflect uncertainty about whether the
-                // unknown metaclass overrides them.
+                // are intersected with the dynamic type to reflect uncertainty about
+                // whether the unknown metaclass overrides them.
                 if let Type::SubclassOf(subclass_of) = self
-                    && subclass_of.is_dynamic()
+                    && let SubclassOfInner::Dynamic(dynamic) = subclass_of.subclass_of()
                 {
                     result.map_type(|ty| {
                         if ty.is_dynamic() {
                             ty
                         } else {
-                            IntersectionType::from_two_elements(db, ty, Type::unknown())
+                            IntersectionType::from_two_elements(db, ty, Type::Dynamic(dynamic))
                         }
                     })
                 } else {

@@ -500,7 +500,7 @@ from typing import Any
 from ty_extensions import Unknown
 
 def f(a: type[Any], b: type[Unknown]):
-    reveal_type(a.__mro__)  # revealed: tuple[type, ...] & Unknown
+    reveal_type(a.__mro__)  # revealed: tuple[type, ...] & Any
     reveal_type(b.__mro__)  # revealed: tuple[type, ...] & Unknown
 ```
 
