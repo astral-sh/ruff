@@ -101,6 +101,7 @@ use crate::types::diagnostic::{
     report_invalid_generator_function_return_type, report_invalid_key_on_typed_dict,
     report_invalid_or_unsupported_base, report_invalid_return_type, report_invalid_total_ordering,
     report_invalid_type_checking_constant, report_invalid_type_param_order,
+    report_invalid_typevar_default_reference,
     report_match_pattern_against_non_runtime_checkable_protocol,
     report_match_pattern_against_typed_dict, report_named_tuple_field_with_leading_underscore,
     report_namedtuple_field_without_default_after_field_with_default, report_not_subscriptable,
@@ -128,6 +129,7 @@ use crate::types::typed_dict::{
     TypedDictAssignmentKind, TypedDictKeyAssignment, validate_typed_dict_constructor,
     validate_typed_dict_dict_literal,
 };
+use crate::types::visitor::find_over_type;
 use crate::types::{
     BoundTypeVarIdentity, BoundTypeVarInstance, CallDunderError, CallableBinding, CallableType,
     CallableTypeKind, ClassType, DataclassParams, DynamicType, InternedConstraintSet, InternedType,
@@ -1443,6 +1445,47 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             state.typevar_with_default,
                             &state.invalid_later_tvars,
                         );
+                    }
+                }
+
+                // Check that type variable defaults only reference type variables
+                // that precede them in the type parameter list.
+                if let Some(generic_context) = class
+                    .pep695_generic_context(self.db())
+                    .or(class.legacy_generic_context(self.db()))
+                {
+                    let db = self.db();
+                    let typevars = generic_context.variables(db).map(|btv| btv.typevar(db));
+
+                    // `variables` should be fairly cheap to clone; it's just several cheap wrappers around
+                    // a `std::slice::Iter` under the hood.
+                    for (i, typevar) in typevars.clone().enumerate() {
+                        let Some(default_ty) = typevar.default_type(db) else {
+                            continue;
+                        };
+
+                        let first_bad_tvar = find_over_type(db, default_ty, false, |t| {
+                            let tvar = match t {
+                                Type::TypeVar(tvar) => tvar.typevar(db),
+                                Type::KnownInstance(KnownInstanceType::TypeVar(tvar)) => tvar,
+                                _ => return None,
+                            };
+                            if !typevars.clone().take(i).contains(&tvar) {
+                                Some(tvar)
+                            } else {
+                                None
+                            }
+                        });
+                        if let Some(bad_typevar) = first_bad_tvar {
+                            let is_later_in_list = typevars.clone().skip(i).contains(&bad_typevar);
+                            report_invalid_typevar_default_reference(
+                                &self.context,
+                                class,
+                                typevar,
+                                bad_typevar,
+                                is_later_in_list,
+                            );
+                        }
                     }
                 }
 

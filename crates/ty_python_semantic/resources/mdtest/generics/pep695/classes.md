@@ -763,6 +763,8 @@ def protocol_case(x: GenericProtocol[[int], str]) -> None:
 
 ### No back-references
 
+<!-- snapshot-diagnostics -->
+
 Typevar bounds/constraints/defaults are lazy, but cannot refer to later typevars. Furthermore,
 bounds/constraints cannot refer to other type variables, i.e. they must be non-generic.
 
@@ -783,6 +785,19 @@ class F[S: X]:
     pass
 
 X = int
+```
+
+Type variable defaults can reference earlier type variables, but not later ones:
+
+```py
+# This is fine: U's default references T, which comes before U
+class Good[T, U = T]: ...
+
+# error: [invalid-generic-class] "Default of `S` cannot reference later type parameter `T`"
+class Bad[S = T, T = int]: ...
+
+# error: [invalid-generic-class]
+class AlsoBad[S = list[T], T = int]: ...
 ```
 
 ## Cyclic class definitions

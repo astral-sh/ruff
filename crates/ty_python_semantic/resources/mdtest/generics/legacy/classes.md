@@ -137,6 +137,8 @@ reveal_type(generic_context(ExplicitInheritedGenericPartiallySpecializedExtraTyp
 
 ## Specializing generic classes explicitly
 
+<!-- snapshot-diagnostics -->
+
 The type parameter can be specified explicitly:
 
 ```py
@@ -217,6 +219,41 @@ class WithDefault(Generic[T, WithDefaultU]): ...
 
 reveal_type(WithDefault[str, str]())  # revealed: WithDefault[str, str]
 reveal_type(WithDefault[str]())  # revealed: WithDefault[str, int]
+```
+
+Type variable defaults can reference earlier type variables, but not later ones:
+
+```py
+from typing_extensions import TypeVar, Generic
+
+WithDefaultT1 = TypeVar("WithDefaultT1", default=int)
+WithDefaultT2 = TypeVar("WithDefaultT2", default=WithDefaultT1)
+
+# This is fine: WithDefaultT2's default references WithDefaultT1, which comes before it
+class GoodOrder(Generic[WithDefaultT1, WithDefaultT2]): ...
+
+# error: [invalid-generic-class] "Default of `WithDefaultT2` cannot reference later type parameter `WithDefaultT1`"
+class BadOrder(Generic[WithDefaultT2, WithDefaultT1]): ...
+
+WithDefaultU = TypeVar("WithDefaultU", default=int)
+
+# error: [invalid-generic-class]
+class AlsoBadOrder(Generic[WithDefaultT2, WithDefaultT1, WithDefaultU]): ...
+```
+
+A type variable default cannot reference a type variable that is not a type parameter of the class:
+
+```py
+from typing_extensions import TypeVar, Generic
+
+StartT = TypeVar("StartT", default=int)
+StopT = TypeVar("StopT", default=StartT)
+StepT = TypeVar("StepT", default=int | None)
+Start2T = TypeVar("Start2T", default="StopT")
+Stop2T = TypeVar("Stop2T", default=int)
+
+# error: [invalid-generic-class] "Default of `Start2T` cannot reference out-of-scope type variable `StopT`"
+class Bad(Generic[Start2T, Stop2T, StepT]): ...
 ```
 
 ## Diagnostics for bad specializations
