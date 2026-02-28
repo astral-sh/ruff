@@ -100,7 +100,7 @@ reveal_type(union_bound(Multiply))  # revealed: Multiply
 from ty_extensions import Intersection, Unknown
 
 def _[T: int](x: type | type[T]):
-    reveal_type(x())  # revealed: Any
+    reveal_type(x())  # revealed: object
 
 def _[T: int](x: type[int] | type[T]):
     reveal_type(x())  # revealed: int
@@ -523,22 +523,22 @@ def f[
     type_t_union_bound: type[T3],
     type_t_constrained: type[T4],
 ):
-    # TODO: these are all `Any` because of typeshed's signature for `type.__call__`.
-    # We could consider overriding that.
-    reveal_type(bare_type())  # revealed: Any
-    reveal_type(type_object())  # revealed: Any
+    # typeshed has a very dynamic signature for `type.__call__`,
+    # but we override that.
+    reveal_type(bare_type())  # revealed: object
+    reveal_type(type_object())  # revealed: object
 
-    # TODO: we could consider emitting errors for these two, but don't currently,
-    # for the same reason
-    reveal_type(bare_type(""))  # revealed: Any
-    reveal_type(type_object(""))  # revealed: Any
+    # error: [too-many-positional-arguments]
+    reveal_type(bare_type(""))  # revealed: object
+    # error: [too-many-positional-arguments]
+    reveal_type(type_object(""))  # revealed: object
 
     reveal_type(type_t_unbound())  # revealed: T@f
-    # TODO: we could consider emitting an error here as well
+    # error: [too-many-positional-arguments]
     reveal_type(type_t_unbound(""))  # revealed: T@f
 
     reveal_type(type_t_object_bound())  # revealed: T1@f
-    # TODO: we could consider emitting an error here as well
+    # error: [too-many-positional-arguments]
     reveal_type(type_t_object_bound(""))  # revealed: T1@f
 
     reveal_type(type_int())  # revealed: int
@@ -576,16 +576,13 @@ def f[
     ):
         reveal_type(object_class_upcast)  # revealed: () -> object
 
-        # TODO: these two could arguably be `() -> object`,
-        # but have more dynamic signatures due to typeshed's `type.__call__` annotations.
-        # We could consider overriding those.
-        reveal_type(bare_type_upcast)  # revealed: (...) -> Any
-        reveal_type(type_object_upcast)  # revealed: (...) -> Any
+        # typeshed's has a very dynamic signature for `type.__call__`,
+        # but we override that for better consistency with other `type[]` types
+        reveal_type(bare_type_upcast)  # revealed: () -> object
+        reveal_type(type_object_upcast)  # revealed: () -> object
 
-        # TODO: if we did decide to override typeshed's `type.__call__` annotations (see above),
-        # we should also turn these two into `() -> T@f` / `() -> T1@f`
-        reveal_type(type_t_unbound_upcast)  # revealed: (...) -> T@f
-        reveal_type(type_t_object_bound_upcast)  # revealed: (...) -> T1@f
+        reveal_type(type_t_unbound_upcast)  # revealed: () -> T@f
+        reveal_type(type_t_object_bound_upcast)  # revealed: () -> T1@f
 
         # revealed: Overload[(x: str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = 0, /) -> int, (x: str | bytes | bytearray, /, base: SupportsIndex) -> int]
         reveal_type(type_int_upcast)
