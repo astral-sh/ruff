@@ -201,6 +201,9 @@ impl Configuration {
             magic_trailing_comma: format
                 .magic_trailing_comma
                 .unwrap_or(format_defaults.magic_trailing_comma),
+            ignore_excess_whitespace_before_trailing_comments: format
+                .ignore_excess_whitespace_before_trailing_comments
+                .unwrap_or(format_defaults.ignore_excess_whitespace_before_trailing_comments),
             docstring_code_format: format
                 .docstring_code_format
                 .unwrap_or(format_defaults.docstring_code_format),
@@ -1251,6 +1254,7 @@ pub struct FormatConfiguration {
     pub indent_style: Option<IndentStyle>,
     pub quote_style: Option<QuoteStyle>,
     pub magic_trailing_comma: Option<MagicTrailingComma>,
+    pub ignore_excess_whitespace_before_trailing_comments: Option<bool>,
     pub line_ending: Option<LineEnding>,
     pub docstring_code_format: Option<DocstringCode>,
     pub docstring_code_line_width: Option<DocstringCodeLineWidth>,
@@ -1281,6 +1285,8 @@ impl FormatConfiguration {
                     MagicTrailingComma::Respect
                 }
             }),
+            ignore_excess_whitespace_before_trailing_comments: options
+                .ignore_excess_whitespace_before_trailing_comments,
             line_ending: options.line_ending,
             docstring_code_format: options.docstring_code_format.map(|yes| {
                 if yes {
@@ -1302,6 +1308,9 @@ impl FormatConfiguration {
             indent_style: self.indent_style.or(config.indent_style),
             quote_style: self.quote_style.or(config.quote_style),
             magic_trailing_comma: self.magic_trailing_comma.or(config.magic_trailing_comma),
+            ignore_excess_whitespace_before_trailing_comments: self
+                .ignore_excess_whitespace_before_trailing_comments
+                .or(config.ignore_excess_whitespace_before_trailing_comments),
             line_ending: self.line_ending.or(config.line_ending),
             docstring_code_format: self.docstring_code_format.or(config.docstring_code_format),
             docstring_code_line_width: self

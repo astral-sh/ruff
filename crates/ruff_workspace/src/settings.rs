@@ -191,6 +191,7 @@ pub struct FormatterSettings {
     pub quote_style: QuoteStyle,
 
     pub magic_trailing_comma: MagicTrailingComma,
+    pub ignore_excess_whitespace_before_trailing_comments: bool,
 
     pub line_ending: LineEnding,
 
@@ -236,6 +237,9 @@ impl FormatterSettings {
             .with_indent_width(self.indent_width)
             .with_quote_style(self.quote_style)
             .with_magic_trailing_comma(self.magic_trailing_comma)
+            .with_ignore_excess_whitespace_before_trailing_comments(
+                self.ignore_excess_whitespace_before_trailing_comments,
+            )
             .with_preview(self.preview)
             .with_line_ending(line_ending)
             .with_line_width(self.line_width)
@@ -271,6 +275,8 @@ impl Default for FormatterSettings {
             indent_width: default_options.indent_width(),
             quote_style: default_options.quote_style(),
             magic_trailing_comma: default_options.magic_trailing_comma(),
+            ignore_excess_whitespace_before_trailing_comments: default_options
+                .ignore_excess_whitespace_before_trailing_comments(),
             docstring_code_format: default_options.docstring_code(),
             docstring_code_line_width: default_options.docstring_code_line_width(),
         }
@@ -294,6 +300,7 @@ impl fmt::Display for FormatterSettings {
                 self.indent_width,
                 self.quote_style,
                 self.magic_trailing_comma,
+                self.ignore_excess_whitespace_before_trailing_comments,
                 self.docstring_code_format,
                 self.docstring_code_line_width,
             ]

@@ -45,6 +45,10 @@ pub struct PyFormatOptions {
     /// Whether to expand lists or elements if they have a trailing comma such as `(a, b,)`.
     magic_trailing_comma: MagicTrailingComma,
 
+    /// Whether trailing end-of-line comments with more than two leading spaces
+    /// should preserve their extra spacing.
+    ignore_excess_whitespace_before_trailing_comments: bool,
+
     /// Should the formatter generate a source map that allows mapping source positions to positions
     /// in the formatted document.
     source_map_generation: SourceMapGeneration,
@@ -87,6 +91,7 @@ impl Default for PyFormatOptions {
             quote_style: QuoteStyle::default(),
             line_ending: LineEnding::default(),
             magic_trailing_comma: MagicTrailingComma::default(),
+            ignore_excess_whitespace_before_trailing_comments: false,
             source_map_generation: SourceMapGeneration::default(),
             docstring_code: DocstringCode::default(),
             docstring_code_line_width: DocstringCodeLineWidth::default(),
@@ -128,6 +133,10 @@ impl PyFormatOptions {
         self.source_map_generation
     }
 
+    pub const fn ignore_excess_whitespace_before_trailing_comments(&self) -> bool {
+        self.ignore_excess_whitespace_before_trailing_comments
+    }
+
     pub const fn line_ending(&self) -> LineEnding {
         self.line_ending
     }
@@ -165,6 +174,12 @@ impl PyFormatOptions {
     #[must_use]
     pub fn with_magic_trailing_comma(mut self, trailing_comma: MagicTrailingComma) -> Self {
         self.magic_trailing_comma = trailing_comma;
+        self
+    }
+
+    #[must_use]
+    pub fn with_ignore_excess_whitespace_before_trailing_comments(mut self, ignore: bool) -> Self {
+        self.ignore_excess_whitespace_before_trailing_comments = ignore;
         self
     }
 

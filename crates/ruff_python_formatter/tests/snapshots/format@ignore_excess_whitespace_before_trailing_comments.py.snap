@@ -1,0 +1,60 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+assertion_line: 303
+---
+## Input
+```python
+def f():
+    short = 1           # keep these spaces when enabled
+    medium_name = 2      # keep these too when enabled
+    tight = 3  # already normalized
+    one = 4 # should normalize to two spaces
+```
+
+## Outputs
+### Output 1
+```
+indent-style               = space
+line-width                 = 88
+indent-width               = 4
+quote-style                = Double
+line-ending                = LineFeed
+magic-trailing-comma       = Respect
+docstring-code             = Disabled
+docstring-code-line-width  = "dynamic"
+preview                    = Disabled
+target_version             = 3.10
+source_type                = Python
+```
+
+```python
+def f():
+    short = 1  # keep these spaces when enabled
+    medium_name = 2  # keep these too when enabled
+    tight = 3  # already normalized
+    one = 4  # should normalize to two spaces
+```
+
+
+### Output 2
+```
+indent-style               = space
+line-width                 = 88
+indent-width               = 4
+quote-style                = Double
+line-ending                = LineFeed
+magic-trailing-comma       = Respect
+docstring-code             = Disabled
+docstring-code-line-width  = "dynamic"
+preview                    = Disabled
+target_version             = 3.10
+source_type                = Python
+```
+
+```python
+def f():
+    short = 1           # keep these spaces when enabled
+    medium_name = 2      # keep these too when enabled
+    tight = 3  # already normalized
+    one = 4  # should normalize to two spaces
+```
