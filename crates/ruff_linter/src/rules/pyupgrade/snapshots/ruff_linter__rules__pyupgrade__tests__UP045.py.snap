@@ -311,4 +311,93 @@ help: Convert to `X | None`
    -     # text
    - ] = None
 81 + foo: int | None = None
+82 | 
+83 | 
+84 | # Regression test for: https://github.com/astral-sh/ruff/issues/23429
 note: This is an unsafe fix and may change runtime behavior
+
+UP045 [*] Use `X | None` for type annotations
+  --> UP045.py:89:13
+   |
+87 | # Regression test for: https://github.com/astral-sh/ruff/issues/23429
+88 | # Optional[None | X] should not produce None | None
+89 | bar: None | Optional[None | int] = None
+   |             ^^^^^^^^^^^^^^^^^^^^
+90 | bar: Optional[None | int] = None
+91 | bar: Optional[int | None] = None
+   |
+help: Convert to `X | None`
+86 | 
+87 | # Regression test for: https://github.com/astral-sh/ruff/issues/23429
+88 | # Optional[None | X] should not produce None | None
+   - bar: None | Optional[None | int] = None
+89 + bar: None | int | None = None
+90 | bar: Optional[None | int] = None
+91 | bar: Optional[int | None] = None
+92 | bar: Optional[None | int | str] = None
+
+UP045 [*] Use `X | None` for type annotations
+  --> UP045.py:90:6
+   |
+88 | # Optional[None | X] should not produce None | None
+89 | bar: None | Optional[None | int] = None
+90 | bar: Optional[None | int] = None
+   |      ^^^^^^^^^^^^^^^^^^^^
+91 | bar: Optional[int | None] = None
+92 | bar: Optional[None | int | str] = None
+   |
+help: Convert to `X | None`
+87 | # Regression test for: https://github.com/astral-sh/ruff/issues/23429
+88 | # Optional[None | X] should not produce None | None
+89 | bar: None | Optional[None | int] = None
+   - bar: Optional[None | int] = None
+90 + bar: int | None = None
+91 | bar: Optional[int | None] = None
+92 | bar: Optional[None | int | str] = None
+93 | bar: Optional[None | None] = None
+
+UP045 [*] Use `X | None` for type annotations
+  --> UP045.py:91:6
+   |
+89 | bar: None | Optional[None | int] = None
+90 | bar: Optional[None | int] = None
+91 | bar: Optional[int | None] = None
+   |      ^^^^^^^^^^^^^^^^^^^^
+92 | bar: Optional[None | int | str] = None
+93 | bar: Optional[None | None] = None
+   |
+help: Convert to `X | None`
+88 | # Optional[None | X] should not produce None | None
+89 | bar: None | Optional[None | int] = None
+90 | bar: Optional[None | int] = None
+   - bar: Optional[int | None] = None
+91 + bar: int | None = None
+92 | bar: Optional[None | int | str] = None
+93 | bar: Optional[None | None] = None
+
+UP045 [*] Use `X | None` for type annotations
+  --> UP045.py:92:6
+   |
+90 | bar: Optional[None | int] = None
+91 | bar: Optional[int | None] = None
+92 | bar: Optional[None | int | str] = None
+   |      ^^^^^^^^^^^^^^^^^^^^^^^^^^
+93 | bar: Optional[None | None] = None
+   |
+help: Convert to `X | None`
+89 | bar: None | Optional[None | int] = None
+90 | bar: Optional[None | int] = None
+91 | bar: Optional[int | None] = None
+   - bar: Optional[None | int | str] = None
+92 + bar: int | str | None = None
+93 | bar: Optional[None | None] = None
+
+UP045 Use `X | None` for type annotations
+  --> UP045.py:93:6
+   |
+91 | bar: Optional[int | None] = None
+92 | bar: Optional[None | int | str] = None
+93 | bar: Optional[None | None] = None
+   |      ^^^^^^^^^^^^^^^^^^^^^
+   |
+help: Convert to `X | None`
