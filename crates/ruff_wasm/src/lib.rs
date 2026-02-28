@@ -244,7 +244,12 @@ impl Workspace {
             &indexer,
         );
 
-        let suppressions = Suppressions::from_tokens(locator.contents(), parsed.tokens(), &indexer);
+        let suppressions = Suppressions::from_tokens(
+            locator.contents(),
+            parsed.tokens(),
+            &indexer,
+            &self.settings.linter,
+        );
 
         // Generate checks.
         let diagnostics = check_path(
