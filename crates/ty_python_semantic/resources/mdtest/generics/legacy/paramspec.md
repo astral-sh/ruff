@@ -207,14 +207,14 @@ def foo1(c: Callable[P, int]) -> None:
     # error: [invalid-paramspec] "`**kwargs: P.kwargs` must be accompanied by `*args: P.args`"
     def nested4(**kwargs: P.kwargs) -> None: ...
 
-    # error: [invalid-paramspec] "When using `P.args` and `P.kwargs`, no other parameters can appear between `*args` and `**kwargs`"
+    # error: [invalid-paramspec] "No parameters may appear between `*args: P.args` and `**kwargs: P.kwargs`"
     def nested5(*args: P.args, x: int, **kwargs: P.kwargs) -> None: ...
 
-    # error: [invalid-paramspec] "`P.args` is not valid in this position; it can only be used to annotate `*args` or `**kwargs`"
+    # error: [invalid-paramspec] "`P.args` is only valid for annotating `*args`"
     def nested6(x: P.args) -> None: ...
     def nested7(
         *args: P.args,
-        # error: [invalid-paramspec] "`**kwargs` must be annotated with `P.kwargs` (to match `*args: P.args`)"
+        # error: [invalid-paramspec] "`*args: P.args` must be accompanied by `**kwargs: P.kwargs`"
         **kwargs: int,
     ) -> None: ...
 
@@ -238,10 +238,10 @@ def foo2(c: Callable[P, int]) -> None:
     def nested2(**kwargs: P.kwargs) -> None: ...
 
 class Foo2:
-    # error: [invalid-paramspec] "`P.args` is not valid in this position"
+    # error: [invalid-paramspec] "`P.args` is only valid for annotating `*args`"
     args: P.args
 
-    # error: [invalid-paramspec] "`P.kwargs` is not valid in this position"
+    # error: [invalid-paramspec] "`P.kwargs` is only valid for annotating `**kwargs`"
     kwargs: P.kwargs
 ```
 
