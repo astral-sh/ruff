@@ -74,7 +74,10 @@ CONFORMANCE_DIR_WITH_README = (
 )
 CONFORMANCE_URL = CONFORMANCE_DIR_WITH_README + "tests/{filename}#L{line}"
 
-GITHUB_HEADER = ["| Location | Name | Message |", "|----------|------|---------|"]
+GITHUB_HEADER = [
+    "| Δ | Location | Name | Message |",
+    "|---|----------|------|---------|",
+]
 # Priority order for section headings: improvements first, regressions last.
 TITLE_PRIORITY: dict[str, int] = {
     "True positives added": 0,
@@ -358,18 +361,15 @@ class TestCase:
             )
 
 
-def render_github_row(
-    diagnostics: list[TyDiagnostic], *, msg_tag: str | None = None
-) -> str:
+def render_github_row(diagnostics: list[TyDiagnostic], *, delta: str = "") -> str:
     locs = []
     check_names = []
     descriptions = []
     for d in diagnostics:
         locs.append(d.location.as_link())
         check_names.append(d.check_name)
-        desc = f"<{msg_tag}>{d.description}</{msg_tag}>" if msg_tag else d.description
-        descriptions.append(desc)
-    return f"| {'<br>'.join(locs)} | {'<br>'.join(check_names)} | {'<br>'.join(descriptions)} |"
+        descriptions.append(d.description)
+    return f"| {delta} | {'<br>'.join(locs)} | {'<br>'.join(check_names)} | {'<br>'.join(descriptions)} |"
 
 
 def render_diff_row(diagnostics: list[TyDiagnostic], *, removed: bool = False) -> str:
@@ -520,9 +520,15 @@ def compute_stats(test_cases: list[TestCase], source: Source) -> Statistics:
     stats = Statistics()
     for tc in test_cases:
         evaluation = tc.classify(source)
-        stats.true_positives += evaluation.true_positives
-        stats.false_positives += evaluation.false_positives
-        stats.false_negatives += evaluation.false_negatives
+        match evaluation.classification:
+            case Classification.TRUE_POSITIVE:
+                stats.true_positives += 1
+            case Classification.FALSE_POSITIVE:
+                stats.false_positives += 1
+            case Classification.FALSE_NEGATIVE:
+                stats.false_negatives += 1
+            case Classification.TRUE_NEGATIVE:
+                pass
         stats.total_diagnostics += len(tc.diagnostics_by_source(source))
     return stats
 
@@ -608,20 +614,22 @@ def render_test_cases(
 
         for _, tc, source in group_list:
             if source is None:
-                # "Changed" entry: render old then new rows with del/ins on the message.
+                # "Changed" entry: interleave old (-) and new (+) rows per test case.
                 if format == "diff":
                     lines.append(render_diff_row(tc.old, removed=True))
                     lines.append(render_diff_row(tc.new, removed=False))
                 else:
-                    lines.append(render_github_row(tc.old, msg_tag="del"))
-                    lines.append(render_github_row(tc.new, msg_tag="ins"))
+                    lines.append(render_github_row(tc.old, delta="-"))
+                    lines.append(render_github_row(tc.new, delta="+"))
             else:
                 diagnostics = tc.diagnostics_by_source(source)
                 removed = source == Source.OLD
                 if format == "diff":
                     lines.append(render_diff_row(diagnostics, removed=removed))
                 else:
-                    lines.append(render_github_row(diagnostics))
+                    lines.append(
+                        render_github_row(diagnostics, delta="-" if removed else "+")
+                    )
 
         if format == "diff":
             lines.append("```")
@@ -751,13 +759,6 @@ def diff_format(
 
 
 def render_summary(test_cases: list[TestCase], *, force_summary_table: bool) -> str:
-    def format_metric(diff: float, old: float, new: float):
-        if diff > 0:
-            return f"increased from {old:.2%} to {new:.2%}"
-        if diff < 0:
-            return f"decreased from {old:.2%} to {new:.2%}"
-        return f"held steady at {old:.2%}"
-
     old = compute_stats(test_cases, Source.OLD)
     new = compute_stats(test_cases, Source.NEW)
 
@@ -804,11 +805,15 @@ def render_summary(test_cases: list[TestCase], *, force_summary_table: bool) -> 
     else:
         header = base_header
 
+    total_expected = new.true_positives + new.false_negatives
     summary_paragraph = (
-        f"The percentage of diagnostics emitted that were expected errors "
-        f"{format_metric(precision_change, old.precision, new.precision)}. "
-        f"The percentage of expected errors that received a diagnostic "
-        f"{format_metric(recall_change, old.recall, new.recall)}."
+        f"ty correctly handles **{new.true_positives}** of **{total_expected}** "
+        f"expected error locations (recall **{new.recall:.1%}**), with "
+        f"**{new.false_positives}** unexpected diagnostics "
+        f"(precision **{new.precision:.1%}**) — previously "
+        f"**{old.true_positives}** of **{total_expected}** correct "
+        f"(recall **{old.recall:.1%}**) with **{old.false_positives}** unexpected "
+        f"(precision **{old.precision:.1%}**)."
     )
 
     return dedent(
@@ -817,6 +822,15 @@ def render_summary(test_cases: list[TestCase], *, force_summary_table: bool) -> 
 
 
         ### Summary
+
+        Each test case represents one expected error annotation or a group of annotations
+        sharing a tag. Counts are per test case, not per diagnostic — multiple diagnostics
+        on the same line count as one. Required annotations (`E`) are true positives when
+        ty flags the expected location and false negatives when it does not. Optional
+        annotations (`E?`) are true positives when flagged but true negatives (not false
+        negatives) when not. Tagged annotations (`E[tag]`) require ty to flag exactly one
+        of the tagged lines; tagged multi-annotations (`E[tag+]`) allow any number up to
+        the tag count. Flagging unexpected locations counts as a false positive.
 
         | Metric | Old | New | Diff | Outcome |
         |--------|-----|-----|------|---------|
