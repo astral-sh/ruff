@@ -1,0 +1,59 @@
+---
+source: crates/ruff_linter/src/rules/pydoclint/mod.rs
+---
+DOC104 Arguments are the same in the docstring and the function signature, but are in a different order.
+  --> DOC104_google.py:3:5
+   |
+ 1 |   # DOC104
+ 2 |   def add_with_violation(a, b) -> int:
+ 3 | /     """
+ 4 | |     Adds two numbers and returns the result.
+ 5 | |
+ 6 | |     Args:
+ 7 | |         b (int): The second number to add.
+ 8 | |         a (int): The first number to add.
+ 9 | |
+10 | |     Returns:
+11 | |         int: The sum of the two numbers.
+12 | |     """
+   | |_______^
+13 |       return a + b
+   |
+help: Arrange the arguments in the same order as in the function signature
+
+DOC104 Arguments are the same in the docstring and the function signature, but are in a different order.
+  --> DOC104_google.py:35:9
+   |
+33 |       # DOC104
+34 |       def add_numbers_incorrect(self, a, b) -> int:
+35 | /         """
+36 | |         Adds two numbers and returns the result.
+37 | |
+38 | |         Args:
+39 | |             b (int): The second number to add.
+40 | |             a (int): The first number to add.
+41 | |
+42 | |         Returns:
+43 | |             int: The sum of the two numbers.
+44 | |         """
+   | |___________^
+45 |           return a + b
+   |
+help: Arrange the arguments in the same order as in the function signature
+
+DOC104 Arguments are the same in the docstring and the function signature, but are in a different order.
+  --> DOC104_google.py:73:9
+   |
+71 |       # DOC104
+72 |       def nested(a, b):
+73 | /         """
+74 | |         Do something nested.
+75 | |
+76 | |         Args:
+77 | |             b (int): Another number.
+78 | |             a (int): Some number.
+79 | |         """
+   | |___________^
+80 |           print('Do something')
+   |
+help: Arrange the arguments in the same order as in the function signature
