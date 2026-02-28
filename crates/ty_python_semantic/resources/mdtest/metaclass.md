@@ -384,7 +384,9 @@ class Meta(type):
     def __call__(cls, x: int) -> int: ...
     @overload
     def __call__(cls, x: str) -> "D": ...
-    def __call__(cls, x: int | str) -> Any:
+    @overload
+    def __call__(cls, x: float) -> "D": ...
+    def __call__(cls, x: int | str | float) -> Any:
         raise NotImplementedError
 
 class D(metaclass=Meta):
@@ -398,9 +400,13 @@ class D(metaclass=Meta):
     def __init__(self, x: Literal["ok"]) -> None:
         pass
 
-# `__new__` rejects `int` even though metaclass `__call__` accepts it.
+# Non-instance metaclass `__call__` path bypasses `__new__` and `__init__`.
+# The `int -> int` metaclass overload is selected.
+reveal_type(D(1))  # revealed: int
+
+# `__new__` rejects `float` even though metaclass `__call__` accepts it and returns `D`.
 # error: [no-matching-overload]
-D(1)
+D(1.5)
 
 # `__init__` rejects the argument after both `__call__` and `__new__` match `str -> D`.
 # error: [invalid-argument-type]
@@ -408,7 +414,7 @@ D("bad")
 
 # Metaclass `__call__` rejects `bytes` even though `__new__` accepts it.
 # error: [no-matching-overload]
-reveal_type(D(b"hello"))  # revealed: int
+D(b"hello")
 
 reveal_type(D("ok"))  # revealed: D
 ```

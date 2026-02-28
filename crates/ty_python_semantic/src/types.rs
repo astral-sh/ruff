@@ -4983,13 +4983,60 @@ impl<'db> Type<'db> {
             (Place::Undefined, true) => None,
         };
 
+        // Three-layer constructor handling for mixed metaclass `__call__`:
+        // - Non-instance-returning metaclass overloads bypass `__new__`/`__init__`.
+        // - Instance-returning metaclass overloads must satisfy downstream constructor checks.
+        if let Some(metaclass_mixed_sigs) = metaclass_mixed_non_instance_sigs {
+            let downstream_bindings = if let Some(bindings) = missing_init_bindings {
+                Some(bindings)
+            } else if new_is_all_non_instance {
+                // `__new__` is still relevant for instance-returning metaclass paths, but
+                // `__init__` is skipped when `__new__` is all non-instance.
+                new_bindings.map(|(new_bindings, _)| new_bindings)
+            } else if let Some(new_mixed_sigs) = new_mixed_non_instance_sigs {
+                let mut bindings: Bindings<'db> =
+                    CallableBinding::from_overloads(self_type, Vec::from(new_mixed_sigs)).into();
+                if let Some((init_bindings, _)) = init_bindings.as_ref() {
+                    bindings.set_mixed_constructor_init(class.class_literal(db), init_bindings);
+                }
+                Some(bindings)
+            } else {
+                let mut all_bindings: SmallVec<[Bindings<'db>; 2]> = SmallVec::new();
+                let mut callable_type_builder = UnionBuilder::new(db);
+
+                if let Some((new_bindings, new_callable)) = new_bindings {
+                    all_bindings.push(new_bindings);
+                    callable_type_builder = callable_type_builder.add(new_callable);
+                }
+                if let Some((init_bindings, init_callable)) = init_bindings {
+                    all_bindings.push(init_bindings);
+                    callable_type_builder = callable_type_builder.add(init_callable);
+                }
+
+                match all_bindings.len() {
+                    0 => None,
+                    1 => Some(all_bindings.into_iter().next().unwrap()),
+                    _ => {
+                        let callable_type = callable_type_builder.build();
+                        Some(Bindings::from_union(callable_type, all_bindings))
+                    }
+                }
+            };
+
+            let mut bindings: Bindings<'db> =
+                CallableBinding::from_overloads(self, Vec::from(metaclass_mixed_sigs)).into();
+            if let Some(downstream_bindings) = downstream_bindings.as_ref() {
+                bindings.set_mixed_constructor_init(class.class_literal(db), downstream_bindings);
+            }
+            return bindings
+                .with_generic_context(db, class_generic_context)
+                .with_constructor_instance_type(constructor_instance_ty);
+        }
+
         // Preserve legacy behavior when `__new__` always returns a non-instance and there are no
         // metaclass constraints to additionally enforce: skip constructor synthesis and use the
         // raw `__new__` return type directly.
-        if new_is_all_non_instance
-            && metaclass_instance_bindings.is_none()
-            && metaclass_mixed_non_instance_sigs.is_none()
-        {
+        if new_is_all_non_instance && metaclass_instance_bindings.is_none() {
             let (new_bindings, _) = new_bindings.unwrap();
             return new_bindings.with_generic_context(db, class_generic_context);
         }
@@ -5004,9 +5051,8 @@ impl<'db> Type<'db> {
         } else {
             // Collect all bindings that must accept the constructor call.
             // This may include `__new__`, `__init__`, and/or a metaclass `__call__`.
-            let has_mixed_constructor_paths = new_mixed_non_instance_sigs.is_some()
-                || metaclass_mixed_non_instance_sigs.is_some();
-            let mut all_bindings: SmallVec<[Bindings<'db>; 4]> = SmallVec::new();
+            let has_mixed_constructor_paths = new_mixed_non_instance_sigs.is_some();
+            let mut all_bindings: SmallVec<[Bindings<'db>; 3]> = SmallVec::new();
             let mut callable_type_builder = UnionBuilder::new(db);
 
             if let Some((metaclass_bindings, metaclass_ty)) = metaclass_instance_bindings {
@@ -5014,18 +5060,6 @@ impl<'db> Type<'db> {
                 callable_type_builder = callable_type_builder.add(metaclass_ty);
             }
 
-            // If `__new__` or metaclass `__call__` had mixed return types (some non-instance,
-            // some instance), keep all overloads with per-overload return types and attach
-            // deferred `__init__` validation. If both are mixed, both constraint sets apply.
-            if let Some(combined_sigs) = metaclass_mixed_non_instance_sigs {
-                let mut bindings: Bindings<'db> =
-                    CallableBinding::from_overloads(self, Vec::from(combined_sigs)).into();
-                if let Some((init_bindings, _)) = init_bindings.as_ref() {
-                    bindings.set_mixed_constructor_init(class.class_literal(db), init_bindings);
-                }
-                all_bindings.push(bindings);
-                callable_type_builder = callable_type_builder.add(self);
-            }
             if let Some(combined_sigs) = new_mixed_non_instance_sigs {
                 let mut bindings: Bindings<'db> =
                     CallableBinding::from_overloads(self_type, Vec::from(combined_sigs)).into();
