@@ -3506,10 +3506,7 @@ impl<'db> Type<'db> {
                         if ty.is_dynamic() {
                             ty
                         } else {
-                            IntersectionBuilder::new(db)
-                                .add_positive(ty)
-                                .add_positive(Type::unknown())
-                                .build()
+                            IntersectionType::from_two_elements(db, ty, Type::unknown())
                         }
                     })
                 } else {
