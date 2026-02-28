@@ -1,0 +1,28 @@
+---
+source: crates/ruff_linter/src/rules/ssort/mod.rs
+---
+SS001 [*] Statements are unsorted
+ --> async_function.py:1:1
+  |
+1 | / def function():
+2 | |     return dependency()
+3 | |
+4 | | def dependency():
+5 | |     return True
+6 | |
+7 | | async def async_function():
+8 | |     return function()
+  | |_____________________^
+  |
+help: Organize statements
+1 + async def async_function():
+2 +     return function()
+3 + 
+4 | def function():
+5 |     return dependency()
+6 | 
+7 | def dependency():
+8 |     return True
+  - 
+  - async def async_function():
+  -     return function()

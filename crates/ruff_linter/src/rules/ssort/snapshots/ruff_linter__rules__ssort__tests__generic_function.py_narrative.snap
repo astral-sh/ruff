@@ -1,0 +1,16 @@
+---
+source: crates/ruff_linter/src/rules/ssort/mod.rs
+---
+SS001 [*] Statements are unsorted
+ --> generic_function.py:1:1
+  |
+1 | / func(4)
+2 | | def func[T](a: T) -> T:
+3 | |     return a
+  | |____________^
+  |
+help: Organize statements
+  - func(4)
+1 | def func[T](a: T) -> T:
+2 |     return a
+3 + func(4)

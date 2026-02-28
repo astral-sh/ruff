@@ -1,0 +1,27 @@
+---
+source: crates/ruff_linter/src/rules/ssort/mod.rs
+---
+SS001 [*] Statements are unsorted
+ --> dependency_order.py:1:1
+  |
+1 | / def _step2():
+2 | |     ...
+3 | | def _step1():
+4 | |     ...
+5 | | def main():
+6 | |     _step1()
+7 | |     _step2()
+  | |____________^
+  |
+help: Organize statements
+  - def _step2():
+  -     ...
+  - def _step1():
+  -     ...
+1 | def main():
+2 |     _step1()
+3 |     _step2()
+4 + def _step1():
+5 +     ...
+6 + def _step2():
+7 +     ...
