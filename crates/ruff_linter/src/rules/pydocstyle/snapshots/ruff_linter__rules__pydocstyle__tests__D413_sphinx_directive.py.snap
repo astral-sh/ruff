@@ -1,0 +1,57 @@
+---
+source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
+---
+D413 [*] Missing blank line after last section ("Returns")
+  --> sphinx_directive.py:24:5
+   |
+22 |         notes = "also not a section"
+23 |
+24 |     Returns:
+   |     ^^^^^^^
+25 |         None
+26 |     """
+   |
+help: Add blank line after "Returns"
+23 | 
+24 |     Returns:
+25 |         None
+26 + 
+27 |     """
+28 | 
+29 | 
+
+D413 [*] Missing blank line after last section ("Returns")
+  --> sphinx_directive.py:50:5
+   |
+48 |             warnings = "not a section"
+49 |
+50 |     Returns:
+   |     ^^^^^^^
+51 |         None
+52 |     """
+   |
+help: Add blank line after "Returns"
+49 | 
+50 |     Returns:
+51 |         None
+52 + 
+53 |     """
+54 | 
+55 | 
+
+D413 [*] Missing blank line after last section ("Notes")
+  --> sphinx_directive.py:62:5
+   |
+60 |         example = "code"
+61 |
+62 |     Notes:
+   |     ^^^^^
+63 |         This IS a real section and should still be detected.
+64 |     """
+   |
+help: Add blank line after "Notes"
+61 | 
+62 |     Notes:
+63 |         This IS a real section and should still be detected.
+64 + 
+65 |     """
