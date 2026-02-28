@@ -82,3 +82,10 @@ foo: Optional[
     int
     # text
 ] = None
+
+
+# Regression test for: https://github.com/astral-sh/ruff/issues/23429
+# Optional wrapping a union that already contains None should not duplicate None
+foo: None | Optional[None | int] = None
+bar: Optional[None | int] = None
+baz: Optional[int | None] = None
