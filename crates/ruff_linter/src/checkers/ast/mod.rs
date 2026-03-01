@@ -192,7 +192,7 @@ impl ExpectedDocstringKind {
 
 pub(crate) struct Checker<'a> {
     /// The [`Parsed`] output for the source code.
-    parsed: &'a Parsed<ModModule>,
+    pub(crate) parsed: &'a Parsed<ModModule>,
     /// An internal cache for parsed string annotations
     parsed_annotations_cache: ParsedAnnotationsCache<'a>,
     /// The [`Parsed`] output for the type annotation the checker is currently in.

@@ -88,7 +88,7 @@ pub(crate) fn read_whole_file(checker: &Checker, with: &ast::StmtWith) {
     }
 
     // First we go through all the items in the statement and find all `open` operations.
-    let candidates = find_file_opens(with, checker.semantic(), true, checker.target_version());
+    let candidates = find_file_opens(with, checker, true);
     if candidates.is_empty() {
         return;
     }
