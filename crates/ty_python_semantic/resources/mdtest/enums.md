@@ -107,6 +107,7 @@ type of an enum member is the enum class itself, not the annotated type.
 
 ```py
 from enum import Enum
+from typing import Final
 
 class Pet(Enum):
     CAT = 1
@@ -117,10 +118,7 @@ class Pet(Enum):
 Bare `Final` annotations are allowed (they don't specify a type):
 
 ```py
-from enum import Enum
-from typing import Final
-
-class Pet(Enum):
+class Pet2(Enum):
     CAT: Final = 1  # OK
     DOG: Final = 2  # OK
 ```
@@ -128,10 +126,7 @@ class Pet(Enum):
 But `Final` with a type argument is not allowed:
 
 ```py
-from enum import Enum
-from typing import Final
-
-class Pet(Enum):
+class Pet3(Enum):
     CAT: Final[int] = 1  # error: [invalid-enum-member-annotation]
     DOG: Final[str] = "woof"  # error: [invalid-enum-member-annotation]
 ```
@@ -155,9 +150,10 @@ class Pet(Enum):
 Dunder and private names are not enum members, so they don't trigger the diagnostic:
 
 ```py
-from enum import Enum
+from enum import Enum, IntEnum, StrEnum
+from typing import Callable
 
-class Pet(Enum):
+class Pet4(Enum):
     CAT = 1
     __private: int = 2  # OK: dunder/private names are never members
     __module__: str = "my_module"  # OK
@@ -166,9 +162,7 @@ class Pet(Enum):
 Pure declarations (annotations without values) are non-members and are fine:
 
 ```py
-from enum import Enum
-
-class Pet(Enum):
+class Pet5(Enum):
     CAT = 1
     species: str  # OK: no value, so this is a non-member declaration
 ```
@@ -176,13 +170,10 @@ class Pet(Enum):
 Callable values are never enum members at runtime, so annotating them is fine:
 
 ```py
-from enum import Enum
-from typing import Callable
-
 def identity(x: int) -> int:
     return x
 
-class Pet(Enum):
+class Pet6(Enum):
     CAT = 1
     declared_callable: Callable[[int], int] = identity  # OK: callables are never members
 ```
@@ -190,8 +181,6 @@ class Pet(Enum):
 The check also works for subclasses of `Enum`:
 
 ```py
-from enum import IntEnum, StrEnum
-
 class Status(IntEnum):
     OK: int = 200  # error: [invalid-enum-member-annotation]
     NOT_FOUND = 404  # OK
@@ -204,9 +193,7 @@ class Color(StrEnum):
 Special sunder names like `_value_` and `_ignore_` are not flagged:
 
 ```py
-from enum import Enum
-
-class Pet(Enum):
+class Pet7(Enum):
     _value_: int = 0  # OK: `_value_` is a special enum name
     _ignore_: str = "TEMP"  # OK: `_ignore_` is a special enum name
     CAT = 1
