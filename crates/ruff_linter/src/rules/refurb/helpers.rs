@@ -114,14 +114,6 @@ impl OpenMode {
             OpenMode::WriteBytes => Name::new_static("write_bytes"),
         }
     }
-
-    fn is_read(self) -> bool {
-        matches!(self, OpenMode::ReadText | OpenMode::ReadBytes)
-    }
-
-    fn is_binary(self) -> bool {
-        matches!(self, OpenMode::ReadBytes | OpenMode::WriteBytes)
-    }
 }
 
 /// A grab bag struct that joins together every piece of information we need to track
@@ -227,45 +219,43 @@ pub(super) fn find_file_opens<'a>(
         .collect()
 }
 
+#[warn(clippy::too_many_arguments)]
 fn resolve_file_open<'a>(
     item: &'a ast::WithItem,
     with: &'a ast::StmtWith,
     checker: &Checker,
     following_statements: Option<&[ast::Stmt]>,
+    read_mode: bool,
     mode: OpenMode,
     keywords: Vec<&'a ast::Keyword>,
     argument: OpenArgument<'a>,
 ) -> Option<FileOpen<'a>> {
+    match mode {
+        OpenMode::ReadText | OpenMode::ReadBytes => {
+            if !read_mode {
+                return None;
+            }
+        }
+        OpenMode::WriteText | OpenMode::WriteBytes => {
+            if read_mode {
+                return None;
+            }
+        }
+    }
+
+    if matches!(mode, OpenMode::ReadBytes | OpenMode::WriteBytes) && !keywords.is_empty() {
+        return None;
+    }
+
     let semantic = checker.semantic();
     let var = item.optional_vars.as_deref()?.as_name_expr()?;
     let scope = semantic.current_scope();
-    let binding_id = semantic.only_binding(var).or_else(|| {
-        scope.get_all(var.id.as_str()).find(|id| {
-            let binding = semantic.binding(*id);
-            binding.range() == var.range()
-        })
+    let binding_id = scope.get_all(var.id.as_str()).find(|id| {
+        let binding = semantic.binding(*id);
+        binding.range() == var.range()
     })?;
 
     let binding = semantic.binding(binding_id);
-    let next_binding_after_with = scope
-        .get_all(var.id.as_str())
-        .filter(|id| *id != binding_id)
-        .map(|id| semantic.binding(id).start())
-        .filter(|start| *start > with.end())
-        .min();
-
-    let used_after_with = binding
-        .references()
-        .map(|id| semantic.reference(id))
-        .any(|reference| {
-            reference.start() > with.end()
-                && next_binding_after_with
-                    .is_none_or(|next_binding_start| reference.start() < next_binding_start)
-        });
-
-    if used_after_with {
-        return None;
-    }
 
     if use_after_with_before_unconditional_rebind(var.id.as_str(), following_statements) {
         return None;
@@ -276,6 +266,7 @@ fn resolve_file_open<'a>(
         .map(|id| semantic.reference(id))
         .filter(|reference| with.range().contains_range(reference.range()));
 
+    let reference = with_references.next()?;
     if with_references.next().is_some() {
         return None;
     }
@@ -284,115 +275,9 @@ fn resolve_file_open<'a>(
         item,
         mode,
         keywords,
-        reference: with_references.next()?.range(),
+        reference: reference.range(),
         argument,
     })
-}
-
-/// Find `open` operation in the given `with` item.
-fn find_file_open<'a>(
-    item: &'a ast::WithItem,
-    with: &'a ast::StmtWith,
-    checker: &Checker,
-    read_mode: bool,
-    python_version: PythonVersion,
-    following_statements: Option<&[ast::Stmt]>,
-) -> Option<FileOpen<'a>> {
-    let semantic = checker.semantic();
-
-    // We want to match `open(...) as var`.
-    let ast::ExprCall {
-        func,
-        arguments: ast::Arguments { args, keywords, .. },
-        ..
-    } = item.context_expr.as_call_expr()?;
-
-    // Ignore calls with `*args` and `**kwargs`. In the exact case of `open(*filename, mode="w")`,
-    // it could be a match; but in all other cases, the call _could_ contain unsupported keyword
-    // arguments, like `buffering`.
-    if args.iter().any(Expr::is_starred_expr)
-        || keywords.iter().any(|keyword| keyword.arg.is_none())
-    {
-        return None;
-    }
-
-    if !semantic.match_builtin_expr(func, "open") {
-        return None;
-    }
-
-    // Match positional arguments, get filename and mode.
-    let (filename, pos_mode) = match_open_args(args)?;
-
-    // Match keyword arguments, get keyword arguments to forward and possibly mode.
-    let (keywords, kw_mode) = match_open_keywords(keywords, read_mode, python_version)?;
-
-    let mode = kw_mode.unwrap_or(pos_mode);
-
-    if !is_supported_mode(mode, &keywords, read_mode) {
-        return None;
-    }
-
-    resolve_file_open(
-        item,
-        with,
-        checker,
-        following_statements,
-        mode,
-        keywords,
-        OpenArgument::Builtin { filename },
-    )
-}
-
-fn find_path_open<'a>(
-    item: &'a ast::WithItem,
-    with: &'a ast::StmtWith,
-    checker: &Checker,
-    read_mode: bool,
-    python_version: PythonVersion,
-    following_statements: Option<&[ast::Stmt]>,
-) -> Option<FileOpen<'a>> {
-    let semantic = checker.semantic();
-
-    let ast::ExprCall {
-        func,
-        arguments: ast::Arguments { args, keywords, .. },
-        ..
-    } = item.context_expr.as_call_expr()?;
-    if args.iter().any(Expr::is_starred_expr)
-        || keywords.iter().any(|keyword| keyword.arg.is_none())
-    {
-        return None;
-    }
-
-    if !is_open_call_from_pathlib(func, semantic) {
-        return None;
-    }
-
-    let attr = func.as_attribute_expr()?;
-    let mode = if args.is_empty() {
-        OpenMode::ReadText
-    } else {
-        match_open_mode(args.first()?)?
-    };
-
-    let (keywords, kw_mode) = match_open_keywords(keywords, read_mode, python_version)?;
-    let mode = kw_mode.unwrap_or(mode);
-
-    if !is_supported_mode(mode, &keywords, read_mode) {
-        return None;
-    }
-
-    resolve_file_open(
-        item,
-        with,
-        checker,
-        following_statements,
-        mode,
-        keywords,
-        OpenArgument::Pathlib {
-            path: attr.value.as_ref(),
-        },
-    )
 }
 
 fn use_after_with_before_unconditional_rebind(
@@ -425,7 +310,6 @@ fn statement_unconditionally_rebinds_name(stmt: &ast::Stmt, name: &str) -> bool 
         | ast::Stmt::AugAssign(ast::StmtAugAssign { target, .. }) => {
             expr_contains_name(target, name)
         }
-        ast::Stmt::With(ast::StmtWith { items, .. }) => with_items_bind_name(items, name),
         ast::Stmt::FunctionDef(ast::StmtFunctionDef {
             name: stmt_name, ..
         })
@@ -440,6 +324,7 @@ fn statement_unconditionally_rebinds_name(stmt: &ast::Stmt, name: &str) -> bool 
                 .map_or(alias.name.id.as_str(), |asname| asname.as_str())
                 == name
         }),
+        ast::Stmt::With(ast::StmtWith { items, .. }) => with_items_bind_name(items, name),
         _ => false,
     }
 }
@@ -460,14 +345,7 @@ fn expr_contains_name(expr: &Expr, name: &str) -> bool {
 }
 
 fn is_name_load(expr: &Expr, name: &str) -> bool {
-    matches!(
-        expr,
-        Expr::Name(ast::ExprName {
-            id,
-            ctx: ast::ExprContext::Load,
-            ..
-        }) if id.as_str() == name
-    )
+    matches!(expr, Expr::Name(ast::ExprName { id, ctx: ast::ExprContext::Load, .. }) if id.as_str() == name)
 }
 
 struct NameUseVisitor<'a> {
@@ -517,6 +395,106 @@ impl<'a> Visitor<'a> for NameUseVisitor<'_> {
         }
         visitor::walk_expr(self, expr);
     }
+}
+
+/// Find `open` operation in the given `with` item.
+fn find_file_open<'a>(
+    item: &'a ast::WithItem,
+    with: &'a ast::StmtWith,
+    checker: &Checker,
+    read_mode: bool,
+    python_version: PythonVersion,
+    following_statements: Option<&[ast::Stmt]>,
+) -> Option<FileOpen<'a>> {
+    let semantic = checker.semantic();
+
+    // We want to match `open(...) as var`.
+    let ast::ExprCall {
+        func,
+        arguments: ast::Arguments { args, keywords, .. },
+        ..
+    } = item.context_expr.as_call_expr()?;
+
+    // Ignore calls with `*args` and `**kwargs`. In the exact case of `open(*filename, mode="w")`,
+    // it could be a match; but in all other cases, the call _could_ contain unsupported keyword
+    // arguments, like `buffering`.
+    if args.iter().any(Expr::is_starred_expr)
+        || keywords.iter().any(|keyword| keyword.arg.is_none())
+    {
+        return None;
+    }
+
+    if !semantic.match_builtin_expr(func, "open") {
+        return None;
+    }
+
+    // Match positional arguments, get filename and mode.
+    let (filename, pos_mode) = match_open_args(args)?;
+
+    // Match keyword arguments, get keyword arguments to forward and possibly mode.
+    let (keywords, kw_mode) = match_open_keywords(keywords, read_mode, python_version)?;
+
+    let mode = kw_mode.unwrap_or(pos_mode);
+
+    resolve_file_open(
+        item,
+        with,
+        checker,
+        following_statements,
+        read_mode,
+        mode,
+        keywords,
+        OpenArgument::Builtin { filename },
+    )
+}
+
+fn find_path_open<'a>(
+    item: &'a ast::WithItem,
+    with: &'a ast::StmtWith,
+    checker: &Checker,
+    read_mode: bool,
+    python_version: PythonVersion,
+    following_statements: Option<&[ast::Stmt]>,
+) -> Option<FileOpen<'a>> {
+    let semantic = checker.semantic();
+
+    let ast::ExprCall {
+        func,
+        arguments: ast::Arguments { args, keywords, .. },
+        ..
+    } = item.context_expr.as_call_expr()?;
+    if args.iter().any(Expr::is_starred_expr)
+        || keywords.iter().any(|keyword| keyword.arg.is_none())
+    {
+        return None;
+    }
+
+    if !is_open_call_from_pathlib(func, semantic) {
+        return None;
+    }
+
+    let attr = func.as_attribute_expr()?;
+    let mode = if args.is_empty() {
+        OpenMode::ReadText
+    } else {
+        match_open_mode(args.first()?)?
+    };
+
+    let (keywords, kw_mode) = match_open_keywords(keywords, read_mode, python_version)?;
+    let mode = kw_mode.unwrap_or(mode);
+
+    resolve_file_open(
+        item,
+        with,
+        checker,
+        following_statements,
+        read_mode,
+        mode,
+        keywords,
+        OpenArgument::Pathlib {
+            path: attr.value.as_ref(),
+        },
+    )
 }
 
 /// Match positional arguments. Return expression for the file name and open mode.
@@ -584,10 +562,6 @@ fn match_open_mode(mode: &Expr) -> Option<OpenMode> {
         "wb" => Some(OpenMode::WriteBytes),
         _ => None,
     }
-}
-
-fn is_supported_mode(mode: OpenMode, keywords: &[&ast::Keyword], read_mode: bool) -> bool {
-    mode.is_read() == read_mode && (!mode.is_binary() || keywords.is_empty())
 }
 
 /// A helper function that extracts the `iter` from a [`ast::StmtFor`] node and
