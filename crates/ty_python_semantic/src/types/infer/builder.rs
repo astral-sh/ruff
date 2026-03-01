@@ -116,7 +116,9 @@ use crate::types::function::{
 use crate::types::generics::{
     InferableTypeVars, SpecializationBuilder, bind_typevar, enclosing_generic_contexts, typing_self,
 };
-use crate::types::infer::builder::paramspec_validation::validate_paramspec_components;
+use crate::types::infer::builder::paramspec_validation::{
+    check_for_bare_paramspec, validate_paramspec_components,
+};
 use crate::types::infer::{nearest_enclosing_class, nearest_enclosing_function};
 use crate::types::mro::{DynamicMroErrorKind, StaticMroErrorKind};
 use crate::types::newtype::NewType;
@@ -3014,7 +3016,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let value_ty =
             self.infer_annotation_expression(&type_alias.value, DeferredExpressionState::None);
 
-        self.check_for_bare_paramspec(value_ty.inner_type(), &type_alias.value);
+        check_for_bare_paramspec(&self.context, value_ty.inner_type(), &type_alias.value);
 
         // A type alias where a value type points to itself, i.e. the expanded type is `Divergent` is meaningless
         // (but a type alias that expands to something like `list[Divergent]` may be a valid recursive type alias)
@@ -3493,7 +3495,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
         let annotated = self.infer_annotation_expression(returns, deferred_expression_state);
 
-        self.check_for_bare_paramspec(annotated.inner_type(), returns);
+        check_for_bare_paramspec(&self.context, annotated.inner_type(), returns);
 
         if annotated.qualifiers.is_empty() {
             return;
@@ -3554,7 +3556,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         if let Some(annotation) = parameter.annotation.as_deref() {
-            self.check_for_bare_paramspec(annotated.inner_type(), annotation);
+            check_for_bare_paramspec(&self.context, annotated.inner_type(), annotation);
         }
 
         let qualifiers = annotated.qualifiers;
@@ -9434,7 +9436,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
-        self.check_for_bare_paramspec(declared.inner_type(), annotation);
+        check_for_bare_paramspec(&self.context, declared.inner_type(), annotation);
 
         let is_pep_613_type_alias = declared.inner_type().is_typealias_special_form();
 

@@ -10,6 +10,7 @@ use crate::types::diagnostic::{
 };
 use crate::types::generics::bind_typevar;
 use crate::types::infer::builder::InnerExpressionInferenceState;
+use crate::types::infer::builder::paramspec_validation::check_for_bare_paramspec;
 use crate::types::signatures::Signature;
 use crate::types::special_form::{AliasSpec, LegacyStdlibAlias};
 use crate::types::string_annotation::parse_string_annotation;
@@ -1292,7 +1293,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         let return_type = arguments.next().map(|arg| {
             let ty = self.infer_type_expression(arg);
-            self.check_for_bare_paramspec(ty, arg);
+            check_for_bare_paramspec(&self.context, ty, arg);
             ty
         });
 
@@ -1880,46 +1881,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         })
     }
 
-    /// Report a diagnostic if `ty` is a `ParamSpec` that is not valid in this context.
-    ///
-    /// `ParamSpec` is only valid as the first argument to `Callable` or the last argument to
-    /// `Concatenate`. In all other type expression positions, a bare `ParamSpec` is invalid.
-    ///
-    /// Returns `true` if the type was a `ParamSpec` and a diagnostic was reported.
-    pub(crate) fn check_for_bare_paramspec(&self, ty: Type<'db>, node: &ast::Expr) -> bool {
-        let db = self.db();
-        let paramspec_name = match ty {
-            Type::TypeVar(typevar)
-                if typevar.is_paramspec(db) && typevar.paramspec_attr(db).is_none() =>
-            {
-                Some(typevar.typevar(db).name(db))
-            }
-            Type::KnownInstance(KnownInstanceType::TypeVar(typevar))
-                if typevar.is_paramspec(db) =>
-            {
-                Some(typevar.name(db))
-            }
-            _ => None,
-        };
-        if let Some(name) = paramspec_name {
-            if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, node) {
-                let mut diagnostic = builder.into_diagnostic(format_args!(
-                    "Bare ParamSpec `{name}` is not valid in this context",
-                ));
-                diagnostic.info("A bare ParamSpec is only valid:");
-                diagnostic.info(" - as the first argument to `Callable`");
-                diagnostic.info(" - as the last argument to `Concatenate`");
-                diagnostic
-                    .info(" - as part of a type parameter list when defining a generic class");
-                diagnostic
-                    .info(" - or as part of an argument list when specializing a generic class");
-            }
-            true
-        } else {
-            false
-        }
-    }
-
     /// Infer the first argument to a `typing.Callable` type expression and returns the
     /// corresponding [`Parameters`].
     ///
@@ -1946,7 +1907,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
                 for param in params {
                     let param_type = self.infer_type_expression(param);
-                    self.check_for_bare_paramspec(param_type, param);
+                    check_for_bare_paramspec(&self.context, param_type, param);
                     // This is similar to what we currently do for inferring tuple type expression.
                     // We currently infer `Todo` for the parameters to avoid invalid diagnostics
                     // when trying to check for assignability or any other relation. For example,

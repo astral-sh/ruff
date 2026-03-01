@@ -1,4 +1,8 @@
-use crate::types::{ParamSpecAttrKind, Type, context::InferContext, diagnostic::INVALID_PARAMSPEC};
+use crate::types::{
+    KnownInstanceType, ParamSpecAttrKind, Type,
+    context::InferContext,
+    diagnostic::{INVALID_PARAMSPEC, INVALID_TYPE_FORM},
+};
 use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
 
@@ -131,5 +135,45 @@ pub(super) fn validate_paramspec_components<'db>(
 
         // No ParamSpec components in either position
         (None, None) => {}
+    }
+}
+
+/// Report a diagnostic if `ty` is a `ParamSpec` that is not valid in this context.
+///
+/// `ParamSpec` is only valid as the first argument to `Callable` or the last argument to
+/// `Concatenate`. In all other type expression positions, a bare `ParamSpec` is invalid.
+///
+/// Returns `true` if the type was a `ParamSpec` and a diagnostic was reported.
+pub(crate) fn check_for_bare_paramspec<'db>(
+    context: &InferContext<'db, '_>,
+    ty: Type<'db>,
+    node: &ast::Expr,
+) -> bool {
+    let db = context.db();
+    let paramspec_name = match ty {
+        Type::TypeVar(typevar)
+            if typevar.is_paramspec(db) && typevar.paramspec_attr(db).is_none() =>
+        {
+            Some(typevar.typevar(db).name(db))
+        }
+        Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) if typevar.is_paramspec(db) => {
+            Some(typevar.name(db))
+        }
+        _ => None,
+    };
+    if let Some(name) = paramspec_name {
+        if let Some(builder) = context.report_lint(&INVALID_TYPE_FORM, node) {
+            let mut diagnostic = builder.into_diagnostic(format_args!(
+                "Bare ParamSpec `{name}` is not valid in this context",
+            ));
+            diagnostic.info("A bare ParamSpec is only valid:");
+            diagnostic.info(" - as the first argument to `Callable`");
+            diagnostic.info(" - as the last argument to `Concatenate`");
+            diagnostic.info(" - as part of a type parameter list when defining a generic class");
+            diagnostic.info(" - or as part of an argument list when specializing a generic class");
+        }
+        true
+    } else {
+        false
     }
 }
