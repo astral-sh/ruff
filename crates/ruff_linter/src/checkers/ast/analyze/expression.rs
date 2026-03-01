@@ -1299,6 +1299,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.is_rule_enabled(Rule::FalsyDictGetFallback) {
                 ruff::rules::falsy_dict_get_fallback(checker, expr);
             }
+            if checker.is_rule_enabled(Rule::DictUpdateWithSingleItem) {
+                ruff::rules::dict_update_with_single_item(checker, call);
+            }
             if checker.is_rule_enabled(Rule::UnnecessaryRound) {
                 ruff::rules::unnecessary_round(checker, call);
             }

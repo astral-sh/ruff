@@ -1066,6 +1066,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "068") => rules::ruff::rules::DuplicateEntryInDunderAll,
         (Ruff, "069") => rules::ruff::rules::FloatEqualityComparison,
         (Ruff, "070") => rules::ruff::rules::UnnecessaryAssignBeforeYield,
+        (Ruff, "071") => rules::ruff::rules::DictUpdateWithSingleItem,
 
         (Ruff, "100") => rules::ruff::rules::UnusedNOQA,
         (Ruff, "101") => rules::ruff::rules::RedirectedNOQA,
