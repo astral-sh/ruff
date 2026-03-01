@@ -36,7 +36,10 @@ use crate::types::{KnownInstanceType, MemberLookupPolicy, UnionType};
 use crate::{Db, DisplaySettings, FxIndexMap, Program, declare_lint};
 use itertools::Itertools;
 use ruff_db::{
-    diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity},
+    diagnostic::{
+        Annotation, Diagnostic, DiagnosticId, Span, SubDiagnostic, SubDiagnosticSeverity,
+        UnifiedFile,
+    },
     parsed::parsed_module,
 };
 use ruff_diagnostics::{Edit, Fix};
@@ -44,8 +47,9 @@ use ruff_python_ast::name::Name;
 use ruff_python_ast::token::parentheses_iterator;
 use ruff_python_ast::{self as ast, AnyNodeRef, PythonVersion, StringFlags};
 use ruff_text_size::{Ranged, TextRange};
-use rustc_hash::FxHashSet;
+use rustc_hash::{FxHashMap, FxHashSet, FxHasher};
 use std::fmt::{self, Formatter};
+use std::hash::{Hash, Hasher};
 use ty_module_resolver::{KnownModule, Module, ModuleName, file_to_module};
 
 const RUNTIME_CHECKABLE_DOCS_URL: &str =
@@ -3230,6 +3234,66 @@ pub struct TypeCheckDiagnostics {
     used_suppressions: FxHashSet<FileSuppressionId>,
 }
 
+#[derive(Eq, PartialEq, Hash)]
+enum DiagnosticFileKey {
+    Ty(ruff_db::files::File),
+    Ruff(Box<str>),
+}
+
+#[derive(Eq, PartialEq, Hash)]
+struct PrimarySpanDiagnosticKey {
+    id: DiagnosticId,
+    file: DiagnosticFileKey,
+    range: Option<TextRange>,
+}
+
+impl PrimarySpanDiagnosticKey {
+    fn from_diagnostic(diagnostic: &Diagnostic) -> Option<Self> {
+        let span = diagnostic.primary_span_ref()?;
+        let file = match span.file() {
+            UnifiedFile::Ty(file) => DiagnosticFileKey::Ty(*file),
+            UnifiedFile::Ruff(file) => DiagnosticFileKey::Ruff(file.name().into()),
+        };
+        Some(Self {
+            id: diagnostic.id(),
+            file,
+            range: span.range(),
+        })
+    }
+}
+
+type DiagnosticHashBuckets = FxHashMap<u64, Vec<usize>>;
+
+fn diagnostic_hash(diagnostic: &Diagnostic) -> u64 {
+    let mut hasher = FxHasher::default();
+    diagnostic.hash(&mut hasher);
+    hasher.finish()
+}
+
+fn build_diagnostic_hash_buckets(diagnostics: &[Diagnostic]) -> DiagnosticHashBuckets {
+    let mut buckets = DiagnosticHashBuckets::default();
+    for (index, diagnostic) in diagnostics.iter().enumerate() {
+        buckets
+            .entry(diagnostic_hash(diagnostic))
+            .or_default()
+            .push(index);
+    }
+    buckets
+}
+
+fn contains_diagnostic_exact(
+    diagnostics: &[Diagnostic],
+    buckets: &DiagnosticHashBuckets,
+    candidate: &Diagnostic,
+) -> bool {
+    let hash = diagnostic_hash(candidate);
+    buckets.get(&hash).is_some_and(|indices| {
+        indices
+            .iter()
+            .any(|&index| diagnostics[index] == *candidate)
+    })
+}
+
 impl TypeCheckDiagnostics {
     pub(crate) fn push(&mut self, diagnostic: Diagnostic) {
         self.diagnostics.push(diagnostic);
@@ -3237,6 +3301,70 @@ impl TypeCheckDiagnostics {
 
     pub(super) fn extend(&mut self, other: &TypeCheckDiagnostics) {
         self.diagnostics.extend_from_slice(&other.diagnostics);
+        self.used_suppressions.extend(&other.used_suppressions);
+    }
+
+    /// Extend diagnostics while skipping exact duplicates.
+    ///
+    /// Use this when the new diagnostics should be additive, but repeated diagnostics from
+    /// independent inference paths should only be emitted once.
+    pub(super) fn extend_dedup_exact(&mut self, other: &TypeCheckDiagnostics) {
+        let mut seen = build_diagnostic_hash_buckets(&self.diagnostics);
+        for diagnostic in &other.diagnostics {
+            if contains_diagnostic_exact(&self.diagnostics, &seen, diagnostic) {
+                continue;
+            }
+
+            let index = self.diagnostics.len();
+            self.diagnostics.push(diagnostic.clone());
+            seen.entry(diagnostic_hash(diagnostic))
+                .or_default()
+                .push(index);
+        }
+        self.used_suppressions.extend(&other.used_suppressions);
+    }
+
+    /// Extend diagnostics with entries not already represented in a baseline set.
+    ///
+    /// A diagnostic is considered already represented if it has the same lint id and primary span.
+    /// Diagnostics without a primary span fall back to exact diagnostic equality.
+    pub(super) fn extend_missing_by_primary_span(
+        &mut self,
+        other: &TypeCheckDiagnostics,
+        baseline: &TypeCheckDiagnostics,
+    ) {
+        let baseline_exact = build_diagnostic_hash_buckets(&baseline.diagnostics);
+        let baseline_primary_span: FxHashSet<PrimarySpanDiagnosticKey> = baseline
+            .diagnostics
+            .iter()
+            .filter_map(PrimarySpanDiagnosticKey::from_diagnostic)
+            .collect();
+        let mut seen = build_diagnostic_hash_buckets(&self.diagnostics);
+        let mut seen_primary_span: FxHashSet<PrimarySpanDiagnosticKey> = self
+            .diagnostics
+            .iter()
+            .filter_map(PrimarySpanDiagnosticKey::from_diagnostic)
+            .collect();
+        for diagnostic in &other.diagnostics {
+            if let Some(key) = PrimarySpanDiagnosticKey::from_diagnostic(diagnostic) {
+                if baseline_primary_span.contains(&key) || !seen_primary_span.insert(key) {
+                    continue;
+                }
+            } else if contains_diagnostic_exact(&baseline.diagnostics, &baseline_exact, diagnostic)
+            {
+                continue;
+            }
+
+            if contains_diagnostic_exact(&self.diagnostics, &seen, diagnostic) {
+                continue;
+            }
+
+            let index = self.diagnostics.len();
+            self.diagnostics.push(diagnostic.clone());
+            seen.entry(diagnostic_hash(diagnostic))
+                .or_default()
+                .push(index);
+        }
         self.used_suppressions.extend(&other.used_suppressions);
     }
 

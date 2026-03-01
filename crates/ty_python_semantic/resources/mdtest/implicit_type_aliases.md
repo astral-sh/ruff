@@ -1249,7 +1249,7 @@ from typing import Literal
 # error: [invalid-type-form]
 InvalidSubclassOf1 = type[1]
 
-# TODO: This should be an error
+# error: [invalid-type-form]
 InvalidSubclassOfLiteral = type[Literal[42]]
 
 def _(
@@ -1559,6 +1559,57 @@ reveal_type(InvalidCallable2)  # revealed: <typing.Callable special-form '(...) 
 def _(invalid_callable1: InvalidCallable1, invalid_callable2: InvalidCallable2):
     reveal_type(invalid_callable1)  # revealed: (...) -> Unknown
     reveal_type(invalid_callable2)  # revealed: (...) -> Unknown
+```
+
+## Annotation-expression name resolution
+
+Assignment-backed names are resolved through the same type-context path in annotation expressions:
+
+```py
+AliasValue = list["int"] | None
+
+class C:
+    field: AliasValue
+
+def _(x: AliasValue, c: C):
+    reveal_type(x)  # revealed: list[int] | None
+    reveal_type(c.field)  # revealed: list[int] | None
+```
+
+## Mixed binding resolution
+
+If one binding is eligible for assignment type-expression resolution and another is not, we resolve
+them per-binding rather than falling back all-or-nothing:
+
+```py
+import random
+
+if random.random():
+    Mixed = list[int]
+else:
+    from nonexistent import Mixed  # error: [unresolved-import]
+
+def _(x: Mixed):
+    reveal_type(x)  # revealed: list[int] | Unknown
+```
+
+## Multi-inference cache ordering
+
+If an alias is first resolved in a type-form argument while diagnostics are suppressed for
+multi-inference, a later non-multi-inference lookup should still report type-form diagnostics.
+
+```py
+from typing import Annotated, Literal
+from typing_extensions import assert_type
+
+# error: [invalid-type-form] "Special form `typing.Annotated` expected at least 2 arguments (one type and at least one metadata element)"
+BadAlias = Annotated[Literal[1]]
+
+typed_int: int = 1
+value: int | str = assert_type(typed_int, BadAlias)
+
+def _(x: BadAlias):
+    reveal_type(x)  # revealed: Literal[1]
 ```
 
 ## Stringified annotations

@@ -103,6 +103,24 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
         }
     }
 
+    pub(crate) fn extend_dedup_exact(&mut self, other: &TypeCheckDiagnostics) {
+        if !self.is_in_multi_inference() {
+            self.diagnostics.get_mut().extend_dedup_exact(other);
+        }
+    }
+
+    pub(crate) fn extend_missing_by_primary_span(
+        &mut self,
+        other: &TypeCheckDiagnostics,
+        existing: &TypeCheckDiagnostics,
+    ) {
+        if !self.is_in_multi_inference() {
+            self.diagnostics
+                .get_mut()
+                .extend_missing_by_primary_span(other, existing);
+        }
+    }
+
     pub(super) fn is_lint_enabled(&self, lint: &'static LintMetadata) -> bool {
         LintDiagnosticGuardBuilder::severity_and_source(self, LintId::of(lint)).is_some()
     }

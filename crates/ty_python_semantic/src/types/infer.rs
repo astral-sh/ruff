@@ -142,6 +142,51 @@ fn deferred_cycle_initial<'db>(
     DefinitionInference::cycle_initial(definition.scope(db), Type::divergent(id))
 }
 
+/// Infer the RHS of an assignment definition as a type expression.
+///
+/// This is used when resolving names in type-expression context: for implicit aliases we infer
+/// the assignment RHS separately from normal value-expression inference.
+#[salsa::tracked(
+    returns(ref),
+    cycle_initial=assignment_type_expression_cycle_initial,
+    cycle_fn=|db, cycle, previous: &ExpressionInference<'db>, inference: ExpressionInference<'db>, _| {
+        inference.cycle_normalized(db, previous, cycle)
+    },
+    heap_size=ruff_memory_usage::heap_size
+)]
+pub(super) fn infer_assignment_definition_type_expression<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+) -> ExpressionInference<'db> {
+    let file = definition.file(db);
+    let module = parsed_module(db, file).load(db);
+    let _span = tracing::trace_span!(
+        "infer_assignment_definition_type_expression",
+        definition = ?definition.as_id(),
+        range = ?definition.kind(db).target_range(&module),
+        ?file
+    )
+    .entered();
+
+    let index = semantic_index(db, file);
+
+    TypeInferenceBuilder::new(
+        db,
+        InferenceRegion::AssignmentTypeExpression(definition),
+        index,
+        &module,
+    )
+    .finish_expression()
+}
+
+fn assignment_type_expression_cycle_initial<'db>(
+    db: &'db dyn Db,
+    id: salsa::Id,
+    definition: Definition<'db>,
+) -> ExpressionInference<'db> {
+    ExpressionInference::cycle_initial(definition.scope(db), Type::divergent(id))
+}
+
 /// Infer all types for a [`ScopeId`], including all definitions and expressions in that scope.
 /// Use when checking a scope, or needing to provide a type for an arbitrary expression in the
 /// scope.
@@ -511,6 +556,8 @@ pub(crate) enum InferenceRegion<'db> {
     Expression(Expression<'db>, TypeContext<'db>),
     /// infer types for a [`Definition`]
     Definition(Definition<'db>),
+    /// infer an assignment RHS as a type expression for a [`Definition`]
+    AssignmentTypeExpression(Definition<'db>),
     /// infer deferred types for a [`Definition`]
     Deferred(Definition<'db>),
     /// infer types for an entire [`ScopeId`]
@@ -521,9 +568,9 @@ impl<'db> InferenceRegion<'db> {
     fn scope(self, db: &'db dyn Db) -> ScopeId<'db> {
         match self {
             InferenceRegion::Expression(expression, _) => expression.scope(db),
-            InferenceRegion::Definition(definition) | InferenceRegion::Deferred(definition) => {
-                definition.scope(db)
-            }
+            InferenceRegion::Definition(definition)
+            | InferenceRegion::AssignmentTypeExpression(definition)
+            | InferenceRegion::Deferred(definition) => definition.scope(db),
             InferenceRegion::Scope(scope, _) => scope,
         }
     }
