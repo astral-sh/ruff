@@ -173,6 +173,20 @@ class Pet(Enum):
     species: str  # OK: no value, so this is a non-member declaration
 ```
 
+Callable values are never enum members at runtime, so annotating them is fine:
+
+```py
+from enum import Enum
+from typing import Callable
+
+def identity(x: int) -> int:
+    return x
+
+class Pet(Enum):
+    CAT = 1
+    declared_callable: Callable[[int], int] = identity  # OK: callables are never members
+```
+
 The check also works for subclasses of `Enum`:
 
 ```py
