@@ -1,6 +1,9 @@
 use std::borrow::Cow;
 
 use ruff_python_ast::PythonVersion;
+use ruff_python_ast::helpers::any_over_expr;
+use ruff_python_ast::traversal::{EnclosingSuite, suite};
+use ruff_python_ast::visitor::{self, Visitor};
 use ruff_python_ast::{self as ast, Expr, name::Name, token::parenthesized_range};
 use ruff_python_codegen::Generator;
 use ruff_text_size::{Ranged, TextRange};
@@ -189,13 +192,37 @@ pub(super) fn find_file_opens<'a>(
     checker: &Checker<'_>,
     read_mode: bool,
 ) -> Vec<FileOpen<'a>> {
+    let semantic = checker.semantic();
     let python_version = checker.target_version();
+    let with_parent = semantic.current_statement_parent();
+    let module_body = checker.parsed.suite();
+    let following_statements = with_parent
+        .and_then(|parent| suite(with, parent).map(|enclosing| enclosing.next_siblings()))
+        .or_else(|| {
+            EnclosingSuite::new(module_body, with.into()).map(|enclosing| enclosing.next_siblings())
+        });
 
     with.items
         .iter()
         .filter_map(|item| {
-            find_file_open(item, with, checker, read_mode, python_version)
-                .or_else(|| find_path_open(item, with, checker, read_mode, python_version))
+            find_file_open(
+                item,
+                with,
+                checker,
+                read_mode,
+                python_version,
+                following_statements,
+            )
+            .or_else(|| {
+                find_path_open(
+                    item,
+                    with,
+                    checker,
+                    read_mode,
+                    python_version,
+                    following_statements,
+                )
+            })
         })
         .collect()
 }
@@ -204,28 +231,53 @@ fn resolve_file_open<'a>(
     item: &'a ast::WithItem,
     with: &'a ast::StmtWith,
     checker: &Checker,
+    following_statements: Option<&[ast::Stmt]>,
     mode: OpenMode,
     keywords: Vec<&'a ast::Keyword>,
     argument: OpenArgument<'a>,
 ) -> Option<FileOpen<'a>> {
     let semantic = checker.semantic();
     let var = item.optional_vars.as_deref()?.as_name_expr()?;
-    let binding_id = semantic.only_binding(var)?;
+    let scope = semantic.current_scope();
+    let binding_id = semantic.only_binding(var).or_else(|| {
+        scope.get_all(var.id.as_str()).find(|id| {
+            let binding = semantic.binding(*id);
+            binding.range() == var.range()
+        })
+    })?;
 
     let binding = semantic.binding(binding_id);
-    let runtime_loads: Vec<_> = binding
+    let references: Vec<_> = binding
         .references()
         .map(|id| semantic.reference(id))
-        .filter(|reference| reference.is_load() && reference.in_runtime_context())
         .collect();
+    let next_binding_after_with = scope
+        .get_all(var.id.as_str())
+        .filter(|id| *id != binding_id)
+        .map(|id| semantic.binding(id).start())
+        .filter(|start| *start > with.end())
+        .min();
 
-    let [reference] = runtime_loads.as_slice() else {
-        return None;
-    };
-
-    if !with.range().contains_range(reference.range()) {
+    if references.iter().any(|reference| {
+        reference.start() > with.end()
+            && next_binding_after_with
+                .is_none_or(|next_binding_start| reference.start() < next_binding_start)
+    }) {
         return None;
     }
+
+    if use_after_with_before_unconditional_rebind(var.id.as_str(), following_statements) {
+        return None;
+    }
+
+    let with_references: Vec<_> = references
+        .into_iter()
+        .filter(|reference| with.range().contains_range(reference.range()))
+        .collect();
+
+    let [reference] = with_references.as_slice() else {
+        return None;
+    };
 
     Some(FileOpen {
         item,
@@ -243,6 +295,7 @@ fn find_file_open<'a>(
     checker: &Checker,
     read_mode: bool,
     python_version: PythonVersion,
+    following_statements: Option<&[ast::Stmt]>,
 ) -> Option<FileOpen<'a>> {
     let semantic = checker.semantic();
 
@@ -282,6 +335,7 @@ fn find_file_open<'a>(
         item,
         with,
         checker,
+        following_statements,
         mode,
         keywords,
         OpenArgument::Builtin { filename },
@@ -294,6 +348,7 @@ fn find_path_open<'a>(
     checker: &Checker,
     read_mode: bool,
     python_version: PythonVersion,
+    following_statements: Option<&[ast::Stmt]>,
 ) -> Option<FileOpen<'a>> {
     let semantic = checker.semantic();
 
@@ -330,12 +385,137 @@ fn find_path_open<'a>(
         item,
         with,
         checker,
+        following_statements,
         mode,
         keywords,
         OpenArgument::Pathlib {
             path: attr.value.as_ref(),
         },
     )
+}
+
+fn use_after_with_before_unconditional_rebind(
+    name: &str,
+    following_statements: Option<&[ast::Stmt]>,
+) -> bool {
+    for stmt in following_statements.unwrap_or_default() {
+        if statement_unconditionally_rebinds_name(stmt, name) {
+            return false;
+        }
+        if statement_uses_name(stmt, name) {
+            return true;
+        }
+    }
+    false
+}
+
+fn statement_uses_name(stmt: &ast::Stmt, name: &str) -> bool {
+    let mut visitor = NameUseVisitor { name, found: false };
+    visitor.visit_stmt(stmt);
+    visitor.found
+}
+
+fn statement_unconditionally_rebinds_name(stmt: &ast::Stmt, name: &str) -> bool {
+    match stmt {
+        ast::Stmt::Assign(ast::StmtAssign { targets, .. }) => targets
+            .iter()
+            .any(|target| expr_contains_name(target, name)),
+        ast::Stmt::AnnAssign(ast::StmtAnnAssign { target, .. })
+        | ast::Stmt::AugAssign(ast::StmtAugAssign { target, .. }) => {
+            expr_contains_name(target, name)
+        }
+        ast::Stmt::With(ast::StmtWith { items, .. }) => with_items_bind_name(items, name),
+        ast::Stmt::FunctionDef(ast::StmtFunctionDef {
+            name: stmt_name, ..
+        })
+        | ast::Stmt::ClassDef(ast::StmtClassDef {
+            name: stmt_name, ..
+        }) => stmt_name.as_str() == name,
+        ast::Stmt::Import(ast::StmtImport { names, .. })
+        | ast::Stmt::ImportFrom(ast::StmtImportFrom { names, .. }) => names.iter().any(|alias| {
+            alias
+                .asname
+                .as_ref()
+                .map_or(alias.name.id.as_str(), |asname| asname.as_str())
+                == name
+        }),
+        _ => false,
+    }
+}
+
+fn with_items_bind_name(items: &[ast::WithItem], name: &str) -> bool {
+    items.iter().any(|item| {
+        item.optional_vars
+            .as_deref()
+            .is_some_and(|target| expr_contains_name(target, name))
+    })
+}
+
+fn expr_contains_name(expr: &Expr, name: &str) -> bool {
+    any_over_expr(
+        expr,
+        &|expr| matches!(expr, Expr::Name(ast::ExprName { id, .. }) if id.as_str() == name),
+    )
+}
+
+fn is_name_load(expr: &Expr, name: &str) -> bool {
+    matches!(
+        expr,
+        Expr::Name(ast::ExprName {
+            id,
+            ctx: ast::ExprContext::Load,
+            ..
+        }) if id.as_str() == name
+    )
+}
+
+struct NameUseVisitor<'a> {
+    name: &'a str,
+    found: bool,
+}
+
+impl<'a> Visitor<'a> for NameUseVisitor<'_> {
+    fn visit_stmt(&mut self, stmt: &'a ast::Stmt) {
+        if self.found {
+            return;
+        }
+        if let ast::Stmt::With(ast::StmtWith { items, .. }) = stmt
+            && with_items_bind_name(items, self.name)
+        {
+            for item in items {
+                self.visit_expr(&item.context_expr);
+                if self.found {
+                    return;
+                }
+            }
+            return;
+        }
+        if matches!(stmt, ast::Stmt::FunctionDef(_) | ast::Stmt::ClassDef(_)) {
+            return;
+        }
+        visitor::walk_stmt(self, stmt);
+    }
+
+    fn visit_expr(&mut self, expr: &'a Expr) {
+        if self.found {
+            return;
+        }
+        if matches!(
+            expr,
+            Expr::Lambda(_)
+                | Expr::ListComp(_)
+                | Expr::SetComp(_)
+                | Expr::DictComp(_)
+                | Expr::Generator(_)
+        ) {
+            return;
+        }
+        if is_name_load(expr, self.name) {
+            self.found = true;
+            return;
+        }
+        visitor::walk_expr(self, expr);
+    }
 }
 
 /// Match positional arguments. Return expression for the file name and open mode.
