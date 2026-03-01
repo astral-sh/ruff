@@ -9663,10 +9663,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             .context
                             .report_lint(&INVALID_ENUM_MEMBER_ANNOTATION, annotation)
                     {
-                        builder.into_diagnostic(format_args!(
+                        let mut diag = builder.into_diagnostic(format_args!(
                             "Type annotation on enum member `{}` is not allowed",
                             &name_expr.id
                         ));
+                        diag.info("See: https://typing.python.org/en/latest/spec/enums.html#enum-members");
                     }
                 }
 
