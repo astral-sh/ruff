@@ -8048,6 +8048,64 @@ from collections import ChainMap as ChainMap
     }
 
     #[test]
+    fn auto_import_keeps_sys_below_third_party() {
+        let builder = CursorTest::builder()
+            .with_site_packages()
+            .source("main.py", "argv<CURSOR>")
+            .site_packages(
+                "thirdparty/__init__.py",
+                r#"
+from sys import argv as argv
+"#,
+            )
+            .completion_test_builder()
+            .module_names();
+        let test = builder.build();
+        let third_party_idx = test
+            .completions()
+            .iter()
+            .position(|c| {
+                c.name == "argv" && c.module_name.map(ModuleName::as_str) == Some("thirdparty")
+            })
+            .expect("expected `argv` completion from `thirdparty`");
+        let sys_idx = test
+            .completions()
+            .iter()
+            .position(|c| c.name == "argv" && c.module_name.map(ModuleName::as_str) == Some("sys"))
+            .expect("expected `argv` completion from `sys`");
+        assert!(third_party_idx < sys_idx);
+    }
+
+    #[test]
+    fn auto_import_keeps_os_below_third_party() {
+        let builder = CursorTest::builder()
+            .with_site_packages()
+            .source("main.py", "getpid<CURSOR>")
+            .site_packages(
+                "thirdparty/__init__.py",
+                r#"
+from os import getpid as getpid
+"#,
+            )
+            .completion_test_builder()
+            .module_names();
+        let test = builder.build();
+        let third_party_idx = test
+            .completions()
+            .iter()
+            .position(|c| {
+                c.name == "getpid" && c.module_name.map(ModuleName::as_str) == Some("thirdparty")
+            })
+            .expect("expected `getpid` completion from `thirdparty`");
+        let os_idx = test
+            .completions()
+            .iter()
+            .position(|c| c.name == "getpid" && c.module_name.map(ModuleName::as_str) == Some("os"))
+            .expect("expected `getpid` completion from `os`");
+        assert!(third_party_idx < os_idx);
+    }
+
+    #[test]
     fn reexport_simple_import_noauto() {
         let snapshot = CursorTest::builder()
             .source(
