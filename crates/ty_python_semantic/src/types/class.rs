@@ -5097,8 +5097,9 @@ impl<'db> VarianceInferable<'db> for ClassLiteral<'db> {
 ///
 /// # Salsa interning
 ///
-/// This is a Salsa-interned struct. Two different `type()` calls always produce
-/// distinct `DynamicClassLiteral` instances, even if they have the same name and bases:
+/// This is a Salsa-interned struct. Two different `type()` / `types.new_class()` calls
+/// always produce distinct `DynamicClassLiteral` instances, even if they have the same
+/// name and bases:
 ///
 /// ```python
 /// Foo1 = type("Foo", (Base,), {})
@@ -5107,32 +5108,32 @@ impl<'db> VarianceInferable<'db> for ClassLiteral<'db> {
 /// ```
 ///
 /// The `anchor` field provides stable identity:
-/// - For assigned `type()` calls, the `Definition` uniquely identifies the class.
-/// - For dangling `type()` calls, a relative node offset anchored to the enclosing scope
+/// - For assigned calls, the `Definition` uniquely identifies the class.
+/// - For dangling calls, a relative node offset anchored to the enclosing scope
 ///   provides stable identity that only changes when the scope itself changes.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct DynamicClassLiteral<'db> {
-    /// The name of the class (from the first argument to `type()`).
+    /// The name of the class (from the first argument).
     #[returns(ref)]
     pub name: Name,
 
     /// The anchor for this dynamic class, providing stable identity.
     ///
-    /// - `Definition`: The `type()` call is assigned to a variable. The definition
-    ///   uniquely identifies this class and can be used to find the `type()` call.
-    /// - `ScopeOffset`: The `type()` call is "dangling" (not assigned). The offset
+    /// - `Definition`: The call is assigned to a variable. The definition
+    ///   uniquely identifies this class and can be used to find the call expression.
+    /// - `ScopeOffset`: The call is "dangling" (not assigned). The offset
     ///   is relative to the enclosing scope's anchor node index.
     #[returns(ref)]
     pub anchor: DynamicClassAnchor<'db>,
 
-    /// The class members from the namespace dict (third argument to `type()`).
+    /// The class members extracted from the namespace argument.
     /// Each entry is a (name, type) pair extracted from the dict literal.
     #[returns(deref)]
     pub members: Box<[(Name, Type<'db>)]>,
 
-    /// Whether the namespace dict (third argument) is dynamic (not a literal dict,
-    /// or contains non-string-literal keys). When true, attribute lookups on this
-    /// class and its instances return `Unknown` instead of failing.
+    /// Whether the namespace is dynamic (not a literal dict, or contains
+    /// non-string-literal keys). When true, attribute lookups on this class
+    /// and its instances return `Unknown` instead of failing.
     pub has_dynamic_namespace: bool,
 
     /// Dataclass parameters if this class has been wrapped with `@dataclass` decorator
@@ -5147,13 +5148,13 @@ pub struct DynamicClassLiteral<'db> {
 /// - For dangling calls, a relative offset provides stable identity.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 pub enum DynamicClassAnchor<'db> {
-    /// The `type()` call is assigned to a variable.
+    /// The call is assigned to a variable.
     ///
-    /// The `Definition` uniquely identifies this class. The `type()` call expression
+    /// The `Definition` uniquely identifies this class. The call expression
     /// is the `value` of the assignment, so we can get its range from the definition.
     Definition(Definition<'db>),
 
-    /// The `type()` call is "dangling" (not assigned to a variable).
+    /// The call is "dangling" (not assigned to a variable).
     ///
     /// The offset is relative to the enclosing scope's anchor node index.
     /// For module scope, this is equivalent to an absolute index (anchor is 0).
@@ -5189,12 +5190,12 @@ impl<'db> DynamicClassLiteral<'db> {
 
     /// Returns the explicit base classes of this dynamic class.
     ///
-    /// For assigned `type()` calls, bases are computed lazily using deferred inference
-    /// to handle forward references (e.g., `X = type("X", (tuple["X | None"],), {})`).
+    /// For assigned calls, bases are computed lazily using deferred inference to handle
+    /// forward references (e.g., `X = type("X", (tuple["X | None"],), {})`).
     ///
-    /// For dangling `type()` calls, bases are computed eagerly at creation time and
-    /// stored directly on the anchor, since dangling calls cannot recursively reference
-    /// the class being defined.
+    /// For dangling calls, bases are computed eagerly at creation time and stored
+    /// directly on the anchor, since dangling calls cannot recursively reference the
+    /// class being defined.
     ///
     /// Returns an empty slice if the bases cannot be computed (e.g., due to a cycle)
     /// or if the bases argument is not a tuple.
@@ -5202,7 +5203,7 @@ impl<'db> DynamicClassLiteral<'db> {
     /// Returns `[Unknown]` if the bases tuple is variable-length (like `tuple[type, ...]`).
     pub(crate) fn explicit_bases(self, db: &'db dyn Db) -> &'db [Type<'db>] {
         /// Inner cached function for deferred inference of bases.
-        /// Only called for assigned `type()` calls where inference was deferred.
+        /// Only called for assigned calls where inference was deferred.
         #[salsa::tracked(returns(deref), cycle_initial=|_, _, _| Box::default(), heap_size=ruff_memory_usage::heap_size)]
         fn deferred_explicit_bases<'db>(
             db: &'db dyn Db,
@@ -5218,8 +5219,16 @@ impl<'db> DynamicClassLiteral<'db> {
                 .as_call_expr()
                 .expect("Definition value should be a call expression");
 
-            // The `bases` argument is the second positional argument.
-            let Some(bases_arg) = call_expr.arguments.args.get(1) else {
+            // The `bases` argument is the second positional argument, or the `bases=` keyword.
+            let bases_arg = call_expr.arguments.args.get(1).or_else(|| {
+                call_expr
+                    .arguments
+                    .keywords
+                    .iter()
+                    .find(|kw| kw.arg.as_deref() == Some("bases"))
+                    .map(|kw| &kw.value)
+            });
+            let Some(bases_arg) = bases_arg else {
                 return Box::default();
             };
 
