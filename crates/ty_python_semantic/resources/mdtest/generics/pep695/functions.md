@@ -530,6 +530,11 @@ reveal_type(invoke(identity, 1))  # revealed: Literal[1]
 
 # TODO: this should be `Unknown | int`
 reveal_type(invoke(head, [1, 2, 3]))  # revealed: Unknown
+
+def noop[T](x: T) -> T:
+    return x
+
+reveal_type(noop(noop))  # revealed: def noop[T](x: T) -> T
 ```
 
 ## Protocols as TypeVar bounds
