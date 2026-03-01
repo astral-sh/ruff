@@ -105,9 +105,14 @@ The [typing spec] states that enum members should not have explicit type annotat
 should report an error for annotated enum members because the annotation is misleading — the actual
 type of an enum member is the enum class itself, not the annotated type.
 
+```toml
+[environment]
+python-version = "3.11"
+```
+
 ```py
-from enum import Enum
-from typing import Final
+from enum import Enum, IntEnum, StrEnum, member
+from typing import Callable, Final
 
 class Pet(Enum):
     CAT = 1
@@ -131,18 +136,11 @@ class Pet3(Enum):
     DOG: Final[str] = "woof"  # error: [invalid-enum-member-annotation]
 ```
 
-`enum.member` used as value wrapper is the standard way to declare members explicitly.
-Using `member` as a type annotation also does not trigger the diagnostic:
-
-```toml
-[environment]
-python-version = "3.11"
-```
+`enum.member` used as value wrapper is the standard way to declare members explicitly. Using
+`member` as a type annotation also does not trigger the diagnostic:
 
 ```py
-from enum import Enum, member
-
-class Pet(Enum):
+class Pet4(Enum):
     CAT = member(1)  # OK
     DOG: member = 2  # error: [invalid-assignment]
 ```
@@ -150,10 +148,7 @@ class Pet(Enum):
 Dunder and private names are not enum members, so they don't trigger the diagnostic:
 
 ```py
-from enum import Enum, IntEnum, StrEnum
-from typing import Callable
-
-class Pet4(Enum):
+class Pet5(Enum):
     CAT = 1
     __private: int = 2  # OK: dunder/private names are never members
     __module__: str = "my_module"  # OK
@@ -162,7 +157,7 @@ class Pet4(Enum):
 Pure declarations (annotations without values) are non-members and are fine:
 
 ```py
-class Pet5(Enum):
+class Pet6(Enum):
     CAT = 1
     species: str  # OK: no value, so this is a non-member declaration
 ```
@@ -173,7 +168,7 @@ Callable values are never enum members at runtime, so annotating them is fine:
 def identity(x: int) -> int:
     return x
 
-class Pet6(Enum):
+class Pet7(Enum):
     CAT = 1
     declared_callable: Callable[[int], int] = identity  # OK: callables are never members
 ```
@@ -193,7 +188,7 @@ class Color(StrEnum):
 Special sunder names like `_value_` and `_ignore_` are not flagged:
 
 ```py
-class Pet7(Enum):
+class Pet8(Enum):
     _value_: int = 0  # OK: `_value_` is a special enum name
     _ignore_: str = "TEMP"  # OK: `_ignore_` is a special enum name
     CAT = 1
