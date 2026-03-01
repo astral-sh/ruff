@@ -219,7 +219,7 @@ pub(super) fn find_file_opens<'a>(
         .collect()
 }
 
-#[warn(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments)]
 fn resolve_file_open<'a>(
     item: &'a ast::WithItem,
     with: &'a ast::StmtWith,
