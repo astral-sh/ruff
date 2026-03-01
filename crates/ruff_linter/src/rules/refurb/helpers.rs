@@ -247,10 +247,6 @@ fn resolve_file_open<'a>(
     })?;
 
     let binding = semantic.binding(binding_id);
-    let references: Vec<_> = binding
-        .references()
-        .map(|id| semantic.reference(id))
-        .collect();
     let next_binding_after_with = scope
         .get_all(var.id.as_str())
         .filter(|id| *id != binding_id)
@@ -258,11 +254,16 @@ fn resolve_file_open<'a>(
         .filter(|start| *start > with.end())
         .min();
 
-    if references.iter().any(|reference| {
-        reference.start() > with.end()
-            && next_binding_after_with
-                .is_none_or(|next_binding_start| reference.start() < next_binding_start)
-    }) {
+    let used_after_with = binding
+        .references()
+        .map(|id| semantic.reference(id))
+        .any(|reference| {
+            reference.start() > with.end()
+                && next_binding_after_with
+                    .is_none_or(|next_binding_start| reference.start() < next_binding_start)
+        });
+
+    if used_after_with {
         return None;
     }
 
@@ -270,20 +271,20 @@ fn resolve_file_open<'a>(
         return None;
     }
 
-    let with_references: Vec<_> = references
-        .into_iter()
-        .filter(|reference| with.range().contains_range(reference.range()))
-        .collect();
+    let mut with_references = binding
+        .references()
+        .map(|id| semantic.reference(id))
+        .filter(|reference| with.range().contains_range(reference.range()));
 
-    let [reference] = with_references.as_slice() else {
+    if with_references.next().is_some() {
         return None;
-    };
+    }
 
     Some(FileOpen {
         item,
         mode,
         keywords,
-        reference: reference.range(),
+        reference: with_references.next()?.range(),
         argument,
     })
 }
