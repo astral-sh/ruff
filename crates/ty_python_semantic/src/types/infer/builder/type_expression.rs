@@ -660,58 +660,22 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     return_todo |=
                         element_could_alter_type_of_whole_tuple(element, element_ty, self);
 
-                    if let ast::Expr::Starred(ast::ExprStarred {
-                        value: starred_value,
-                        ..
+                    // Determine if this element unpacks a tuple: either `*expr` or `Unpack[expr]`
+                    let unpack_inner = if let ast::Expr::Starred(ast::ExprStarred {
+                        value, ..
                     }) = element
                     {
-                        let mut report_too_many_unpacked_tuples = || {
-                            if let Some(first_unpacked_variadic_tuple) =
-                                first_unpacked_variadic_tuple
-                            {
-                                if let Some(builder) =
-                                    self.context.report_lint(&INVALID_TYPE_FORM, tuple)
-                                {
-                                    let mut diagnostic = builder.into_diagnostic(
-                                        "Multiple unpacked variadic tuples \
-                                            are not allowed in a `tuple` specialization",
-                                    );
-                                    diagnostic.annotate(
-                                        self.context
-                                            .secondary(first_unpacked_variadic_tuple)
-                                            .message("First unpacked variadic tuple"),
-                                    );
-                                    diagnostic.annotate(
-                                        self.context
-                                            .secondary(element)
-                                            .message("Later unpacked variadic tuple"),
-                                    );
-                                }
-                            } else {
-                                first_unpacked_variadic_tuple = Some(element);
-                            }
-                        };
-
-                        if let Some(inner_tuple) = element_ty.exact_tuple_instance_spec(self.db()) {
-                            element_types = element_types.concat(self.db(), &inner_tuple);
-
-                            if inner_tuple.is_variadic() {
-                                report_too_many_unpacked_tuples();
-                            }
-                        } else if self.expression_type(starred_value)
-                            == Type::Dynamic(DynamicType::TodoTypeVarTuple)
-                        {
-                            report_too_many_unpacked_tuples();
-                        } else {
-                            // TODO: emit a diagnostic
-                        }
-                    } else if let ast::Expr::Subscript(ast::ExprSubscript {
-                        value,
-                        slice: unpack_arg,
-                        ..
-                    }) = element
+                        Some(&**value)
+                    } else if let ast::Expr::Subscript(ast::ExprSubscript { value, slice, .. }) =
+                        element
                         && self.expression_type(value) == Type::SpecialForm(SpecialFormType::Unpack)
                     {
+                        Some(&**slice)
+                    } else {
+                        None
+                    };
+
+                    if let Some(unpack_inner) = unpack_inner {
                         let mut report_too_many_unpacked_tuples = || {
                             if let Some(first_unpacked_variadic_tuple) =
                                 first_unpacked_variadic_tuple
@@ -745,7 +709,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             if inner_tuple.is_variadic() {
                                 report_too_many_unpacked_tuples();
                             }
-                        } else if self.expression_type(unpack_arg)
+                        } else if self.expression_type(unpack_inner)
                             == Type::Dynamic(DynamicType::TodoTypeVarTuple)
                         {
                             report_too_many_unpacked_tuples();
