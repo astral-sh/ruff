@@ -242,3 +242,10 @@ ty doesn't report invalid `type: ignore` comments:
 ```py
 a = 10 + 4  # type: ignoreee
 ```
+
+## `# type: ignore` appearing inside other comments should not raise unused ignore
+
+```py
+# A comment discussing # type: ignore should not raise `unused-type-ignore-comment`
+
+```

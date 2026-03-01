@@ -9,13 +9,21 @@ use thiserror::Error;
 pub(super) struct SuppressionParser<'src> {
     cursor: Cursor<'src>,
     range: TextRange,
+    /// Whether we are parsing the first `#`-delimited section of the comment.
+    /// When `false`, we are in a "sub-comment" (e.g. the `# type: ignore` in
+    /// `# fmt: off # type: ignore`) and trailing free-form text is not allowed.
+    in_first_pragma: bool,
 }
 
 impl<'src> SuppressionParser<'src> {
     pub(super) fn new(source: &'src str, range: TextRange) -> Self {
         let cursor = Cursor::new(&source[range]);
 
-        Self { cursor, range }
+        Self {
+            cursor,
+            range,
+            in_first_pragma: true,
+        }
     }
 
     fn parse_comment(&mut self) -> Result<SuppressionComment, ParseError> {
@@ -43,7 +51,14 @@ impl<'src> SuppressionParser<'src> {
         //             ^^^^^^
         let codes = self.eat_codes(kind)?;
 
-        if self.cursor.is_eof() || codes.is_some() || has_trailing_whitespace {
+        // For sub-comments (not the first `#` section), only accept trailing text
+        // if followed by EOF or another `#` delimiter. This avoids treating
+        // `# type: ignore` mentions in prose (e.g. `# A comment about # type: ignore should...`)
+        // as actual suppressions.
+        let valid_trailing = has_trailing_whitespace
+            && (self.in_first_pragma || self.cursor.is_eof() || self.cursor.first() == '#');
+
+        if self.cursor.is_eof() || codes.is_some() || valid_trailing {
             // Consume the comment until its end or until the next "sub-comment" starts.
             self.cursor.eat_while(|c| c != '#');
             Ok(SuppressionComment {
@@ -51,6 +66,12 @@ impl<'src> SuppressionParser<'src> {
                 codes,
                 range: TextRange::at(comment_start, self.cursor.token_len()),
             })
+        } else if has_trailing_whitespace {
+            // Sub-comment with trailing non-`#` text; not a real suppression.
+            Err(ParseError::new(
+                ParseErrorKind::NotASuppression,
+                TextRange::new(comment_start, self.offset()),
+            ))
         } else {
             self.syntax_error(ParseErrorKind::NoWhitespaceAfterIgnore(kind))
         }
@@ -168,7 +189,10 @@ impl Iterator for SuppressionParser<'_> {
             return None;
         }
 
-        match self.parse_comment() {
+        let result = self.parse_comment();
+        self.in_first_pragma = false;
+
+        match result {
             Ok(result) => Some(Ok(result)),
             Err(error) => {
                 self.cursor.eat_while(|c| c != '#');
@@ -411,6 +435,18 @@ mod tests {
                 ],
             },
         ]
+        "##
+        );
+    }
+
+    #[test]
+    fn type_ignore_inside_other_comment() {
+        assert_debug_snapshot!(
+            SuppressionComments::new(
+                "# A comment discussing # type: ignore should not raise",
+            ),
+            @r##"
+        []
         "##
         );
     }
