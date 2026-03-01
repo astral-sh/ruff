@@ -344,7 +344,7 @@ def f1():
                     y = "string"  # allowed, because `f3`'s `y` is untyped
 ```
 
-## TODO: `nonlocal` affects the inferred type in the outer scope
+## `nonlocal` affects the inferred type in the outer scope
 
 Without `nonlocal`, `g` can't write to `x`, and the inferred type of `x` in `f`'s scope isn't
 affected by `g`:
@@ -368,8 +368,7 @@ def f():
         reveal_type(x)  # revealed: Literal[1]
         x += 1
         reveal_type(x)  # revealed: Literal[2]
-    # TODO: should be `Unknown | Literal[1]`
-    reveal_type(x)  # revealed: Literal[1]
+    reveal_type(x)  # revealed: Literal[1] | Unknown
 ```
 
 Without a write:
@@ -380,8 +379,79 @@ def f():
     def g():
         nonlocal x
         reveal_type(x)  # revealed: Literal[1]
-    # TODO: should be `Unknown | Literal[1]`
-    reveal_type(x)  # revealed: Literal[1]
+    reveal_type(x)  # revealed: Literal[1] | Unknown
+```
+
+With an async pattern (from the original issue):
+
+```py
+async def main() -> None:
+    count = 0
+    async def bump() -> None:
+        nonlocal count
+        count += 1
+    await bump()
+    reveal_type(count)  # revealed: Literal[0] | Unknown
+```
+
+With an intermediate scope that only uses (but doesn't bind) the name:
+
+```py
+def f():
+    x = 1
+    def g():
+        # `g` only reads `x`; it's a free variable here, not a binding.
+        reveal_type(x)  # revealed: Literal[1]
+        def h():
+            nonlocal x
+            x += 1
+    reveal_type(x)  # revealed: Literal[1] | Unknown
+```
+
+With a class scope between the inner and outer functions, `nonlocal` skips the class scope and
+targets the outer function's binding:
+
+```py
+def outer():
+    x = 1
+
+    class C:
+        x = "c"
+
+        @staticmethod
+        def g():
+            nonlocal x
+            x += 1
+
+    reveal_type(x)  # revealed: Literal[1] | Unknown
+```
+
+When an intermediate scope declares the symbol `global`, it acts as a resolution barrier for the
+`nonlocal` upward walk. The outer function's type is not widened:
+
+```py
+x = 1
+
+def outer():
+    x = 2
+
+    def middle():
+        global x
+        def inner():
+            nonlocal x  # error: [invalid-syntax] "no binding for nonlocal `x` found"
+    reveal_type(x)  # revealed: Literal[2]
+```
+
+With a declaration-only nonlocal target (annotation without binding), the `ExternallyModified`
+binding widens the type:
+
+```py
+def f():
+    x: int
+    def g():
+        nonlocal x
+        x = 1
+    x  # error: [possibly-unresolved-reference]
 ```
 
 ## Annotating a `nonlocal` binding is a syntax error

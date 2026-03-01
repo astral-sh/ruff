@@ -4493,11 +4493,9 @@ impl<'db> StaticClassLiteral<'db> {
             }
 
             for attribute_assignment in attribute_assignments {
-                if let DefinitionState::Undefined = attribute_assignment.binding {
-                    continue;
-                }
-
                 let DefinitionState::Defined(binding) = attribute_assignment.binding else {
+                    // Skip `Undefined`, `Deleted`, and `ExternallyModified` bindings:
+                    // only concrete definitions contribute to the attribute type.
                     continue;
                 };
 
