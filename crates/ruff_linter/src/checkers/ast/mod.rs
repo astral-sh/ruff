@@ -232,7 +232,7 @@ pub(crate) struct Checker<'a> {
     /// A set of deferred nodes to be visited after the current traversal (e.g., function bodies).
     visit: deferred::Visit<'a>,
     /// A set of deferred nodes to be analyzed after the AST traversal (e.g., `for` loops).
-    analyze: deferred::Analyze,
+    analyze: deferred::Analyze<'a>,
     /// The list of names already seen by flake8-bugbear diagnostics, to avoid duplicate violations.
     flake8_bugbear_seen: RefCell<FxHashSet<TextRange>>,
     /// The end offset of the last visited statement.
@@ -3309,6 +3309,7 @@ pub(crate) fn check_ast(
     // Check docstrings, bindings, and unresolved references.
     analyze::deferred_lambdas(&mut checker);
     analyze::deferred_for_loops(&mut checker);
+    analyze::deferred_comprehensions(&mut checker);
     analyze::definitions(&mut checker);
     analyze::bindings(&checker);
     analyze::unresolved_references(&checker);
