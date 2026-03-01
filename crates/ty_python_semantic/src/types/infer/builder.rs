@@ -85,8 +85,8 @@ use crate::types::diagnostic::{
     POSSIBLY_MISSING_ATTRIBUTE, POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_IMPORT,
     SUBCLASS_OF_FINAL_CLASS, TOO_MANY_POSITIONAL_ARGUMENTS, TypedDictDeleteErrorKind,
     UNDEFINED_REVEAL, UNKNOWN_ARGUMENT, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_IMPORT,
-    UNRESOLVED_REFERENCE, UNSUPPORTED_DYNAMIC_BASE, UNSUPPORTED_OPERATOR, USELESS_OVERLOAD_BODY,
-    hint_if_stdlib_attribute_exists_on_other_versions,
+    UNRESOLVED_REFERENCE, UNSUPPORTED_DYNAMIC_BASE, UNSUPPORTED_OPERATOR, UNUSED_AWAITABLE,
+    USELESS_OVERLOAD_BODY, hint_if_stdlib_attribute_exists_on_other_versions,
     hint_if_stdlib_submodule_exists_on_other_versions, report_attempted_protocol_instantiation,
     report_bad_dunder_set_call, report_bad_frozen_dataclass_inheritance,
     report_call_to_abstract_method, report_cannot_delete_typed_dict_key,
@@ -559,6 +559,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn in_stub(&self) -> bool {
         self.context.in_stub()
+    }
+
+    /// Returns `true` if `expr` is a call to a known diagnostic function
+    /// (e.g., `reveal_type` or `assert_type`) whose return value should not
+    /// trigger the `unused-awaitable` lint.
+    fn is_known_function_call(&self, expr: &ast::Expr) -> bool {
+        let ast::Expr::Call(call) = expr else {
+            return false;
+        };
+        matches!(
+            self.expression_type(&call.func),
+            Type::FunctionLiteral(f)
+                if matches!(
+                    f.known(self.db()),
+                    Some(KnownFunction::RevealType | KnownFunction::AssertType)
+                )
+        )
     }
 
     /// Get the already-inferred type of an expression node, or Unknown.
@@ -3267,7 +3284,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }) => {
                 // If this is a call expression, we would have added a `ReturnsNever` constraint,
                 // meaning this will be a standalone expression.
-                self.infer_maybe_standalone_expression(value, TypeContext::default());
+                let ty = self.infer_maybe_standalone_expression(value, TypeContext::default());
+
+                if ty.is_awaitable(self.db()) && !self.is_known_function_call(value) {
+                    if let Some(builder) =
+                        self.context.report_lint(&UNUSED_AWAITABLE, value.as_ref())
+                    {
+                        builder.into_diagnostic(format_args!(
+                            "Object of type `{}` is not awaited",
+                            ty.display(self.db()),
+                        ));
+                    }
+                }
             }
             ast::Stmt::If(if_statement) => self.infer_if_statement(if_statement),
             ast::Stmt::Try(try_statement) => self.infer_try_statement(try_statement),
