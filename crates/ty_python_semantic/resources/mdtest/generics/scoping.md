@@ -224,6 +224,36 @@ class C[T]:
         return x
 ```
 
+## Should `Callable` annotations create an implicit generic context?
+
+There is disagreement among type checkers around how to handle this case. For now, we do not emit an
+error on the following snippet, but we may change this in the future.
+
+```py
+from typing import TypeVar, Callable
+
+T = TypeVar("T")
+
+x: Callable[[T], T] = lambda obj: obj
+
+# TODO: if we decide that `Callable` annotations always create an implicit generic context,
+# all of these revealed types and `invalid-argument-type` diagnostics are incorrect.
+# If we decide that they do not, we should emit `unbound-type-variable` on both the
+# declaration of `x` in the global scope and the parameter annotation of `y`.
+def test(y: Callable[[T], T]):
+    # revealed: (TypeVar, /) -> TypeVar
+    reveal_type(x)
+    # error: [invalid-argument-type]
+    # revealed: TypeVar
+    reveal_type(x(42))
+
+    # revealed: (T@test, /) -> T@test
+    reveal_type(y)
+    # error: [invalid-argument-type]
+    # revealed: T@test
+    reveal_type(y(42))
+```
+
 ## Nested formal typevars must be distinct
 
 Generic functions and classes can be nested in each other, but it is an error for the same typevar
