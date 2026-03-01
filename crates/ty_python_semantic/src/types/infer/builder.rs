@@ -9671,7 +9671,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             "Type annotation on enum member `{}` is not allowed",
                             &name_expr.id
                         ));
-                        diag.info("See: https://typing.python.org/en/latest/spec/enums.html#enum-members");
+                        diag.info(
+                            "See: https://typing.python.org/en/latest/spec/enums.html#enum-members",
+                        );
                     }
                 }
 
