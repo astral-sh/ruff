@@ -103,10 +103,10 @@ pub(crate) fn bind_typevar<'db>(
         if let Some(generic_context) = ancestor_scope.node().generic_context(db, index) {
             // If we've already crossed a class boundary, skip class-scoped generic contexts.
             // This prevents inner classes from accessing type parameters of outer classes.
-            if !is_class_scope || !crossed_class_scope {
-                if let Some(bound) = generic_context.binds_typevar(db, typevar) {
-                    return Some(bound);
-                }
+            if (!is_class_scope || !crossed_class_scope)
+                && let Some(bound) = generic_context.binds_typevar(db, typevar)
+            {
+                return Some(bound);
             }
         }
         if is_class_scope {

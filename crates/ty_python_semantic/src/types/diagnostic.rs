@@ -1815,9 +1815,7 @@ declare_lint! {
     /// to any enclosing generic context.
     ///
     /// ## Why is this bad?
-    /// A type variable must be used within a generic function or class that binds it.
-    /// Using it outside of any such scope, or in a scope where the type variable is not
-    /// part of the generic context, has no well-defined meaning.
+    /// Using a type variable outside of a scope that binds it has no well-defined meaning.
     ///
     /// ## Examples
     /// ```python
