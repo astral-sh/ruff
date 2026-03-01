@@ -1290,7 +1290,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         let parameters = first_argument.and_then(|arg| self.infer_callable_parameter_types(arg));
 
-        let return_type = arguments.next().map(|arg| self.infer_type_expression(arg));
+        let return_type = arguments.next().map(|arg| {
+            let ty = self.infer_type_expression(arg);
+            self.check_for_bare_paramspec(ty, arg);
+            ty
+        });
 
         let callable_type = if parameters.is_none()
             && let Some(first_argument) = first_argument
@@ -1876,6 +1880,46 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         })
     }
 
+    /// Report a diagnostic if `ty` is a `ParamSpec` that is not valid in this context.
+    ///
+    /// `ParamSpec` is only valid as the first argument to `Callable` or the last argument to
+    /// `Concatenate`. In all other type expression positions, a bare `ParamSpec` is invalid.
+    ///
+    /// Returns `true` if the type was a `ParamSpec` and a diagnostic was reported.
+    pub(crate) fn check_for_bare_paramspec(&self, ty: Type<'db>, node: &ast::Expr) -> bool {
+        let db = self.db();
+        let paramspec_name = match ty {
+            Type::TypeVar(typevar)
+                if typevar.is_paramspec(db) && typevar.paramspec_attr(db).is_none() =>
+            {
+                Some(typevar.typevar(db).name(db))
+            }
+            Type::KnownInstance(KnownInstanceType::TypeVar(typevar))
+                if typevar.is_paramspec(db) =>
+            {
+                Some(typevar.name(db))
+            }
+            _ => None,
+        };
+        if let Some(name) = paramspec_name {
+            if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, node) {
+                let mut diagnostic = builder.into_diagnostic(format_args!(
+                    "Bare ParamSpec `{name}` is not valid in this context",
+                ));
+                diagnostic.info("A bare ParamSpec is only valid:");
+                diagnostic.info(" - as the first argument to `Callable`");
+                diagnostic.info(" - as the last argument to `Concatenate`");
+                diagnostic
+                    .info(" - as part of a type parameter list when defining a generic class");
+                diagnostic
+                    .info(" - or as part of an argument list when specializing a generic class");
+            }
+            true
+        } else {
+            false
+        }
+    }
+
     /// Infer the first argument to a `typing.Callable` type expression and returns the
     /// corresponding [`Parameters`].
     ///
@@ -1902,6 +1946,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
                 for param in params {
                     let param_type = self.infer_type_expression(param);
+                    self.check_for_bare_paramspec(param_type, param);
                     // This is similar to what we currently do for inferring tuple type expression.
                     // We currently infer `Todo` for the parameters to avoid invalid diagnostics
                     // when trying to check for assignability or any other relation. For example,
@@ -1952,6 +1997,20 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         return None;
                     };
                     return Some(Parameters::paramspec(self.db(), bound_typevar));
+                }
+            }
+            ast::Expr::StringLiteral(string) => {
+                if let Some(parsed) = parse_string_annotation(&self.context, string) {
+                    self.string_annotations
+                        .insert(ruff_python_ast::ExprRef::StringLiteral(string).into());
+                    let node_key = self.enclosing_node_key(string.into());
+                    let previous_deferred_state = std::mem::replace(
+                        &mut self.deferred_state,
+                        DeferredExpressionState::InStringAnnotation(node_key),
+                    );
+                    let result = self.infer_callable_parameter_types(parsed.expr());
+                    self.deferred_state = previous_deferred_state;
+                    return result;
                 }
             }
             _ => {}

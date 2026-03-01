@@ -153,8 +153,10 @@ class B: ...
 In type annotations, `ParamSpec` is only valid as the first element to `Callable`, the final element
 to `Concatenate`, or as a type parameter to `Protocol` or `Generic`.
 
+<!-- snapshot-diagnostics -->
+
 ```py
-from typing import ParamSpec, Callable, Concatenate, Protocol, Generic
+from typing import Any, Final, ParamSpec, Callable, Concatenate, Protocol, Generic
 
 P = ParamSpec("P")
 
@@ -167,19 +169,45 @@ class ValidGeneric(Generic[P]):
 def valid(
     a1: Callable[P, int],
     a2: Callable[Concatenate[int, P], int],
+    a3: Callable["P", int],
+    a4: Callable[Concatenate[int, "P"], int],
 ) -> None: ...
 def invalid(
-    # TODO: error
+    # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
     a1: P,
-    # TODO: error
+    # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
     a2: list[P],
-    # TODO: error
+    # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
     a3: Callable[[P], int],
-    # TODO: error
+    # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
     a4: Callable[..., P],
     # TODO: error
     a5: Callable[Concatenate[P, ...], int],
 ) -> None: ...
+
+# error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
+def invalid_return() -> P:
+    raise NotImplementedError
+
+def invalid_variable_annotation(y: Any) -> None:
+    # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
+    x: P = y
+
+def invalid_with_qualifier(y: Any) -> None:
+    # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
+    x: Final[P] = y
+
+# error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
+def invalid_stringified_return() -> "P":
+    raise NotImplementedError
+
+def invalid_stringified_annotation(
+    # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
+    a: "P",
+) -> None: ...
+def invalid_stringified_variable_annotation(y: Any) -> None:
+    # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
+    x: "P" = y
 ```
 
 ## Validating `P.args` and `P.kwargs` usage

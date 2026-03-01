@@ -3066,6 +3066,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let value_ty =
             self.infer_annotation_expression(&type_alias.value, DeferredExpressionState::None);
 
+        self.check_for_bare_paramspec(value_ty.inner_type(), &type_alias.value);
+
         // A type alias where a value type points to itself, i.e. the expanded type is `Divergent` is meaningless
         // (but a type alias that expands to something like `list[Divergent]` may be a valid recursive type alias)
         // and would lead to infinite recursion. Therefore, such type aliases should not be exposed.
@@ -3538,6 +3540,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
         let annotated = self.infer_annotation_expression(returns, deferred_expression_state);
 
+        self.check_for_bare_paramspec(annotated.inner_type(), returns);
+
         if annotated.qualifiers.is_empty() {
             return;
         }
@@ -3595,6 +3599,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let Some(annotated) = annotated else {
             return;
         };
+
+        if let Some(annotation) = parameter.annotation.as_deref() {
+            self.check_for_bare_paramspec(annotated.inner_type(), annotation);
+        }
 
         let qualifiers = annotated.qualifiers;
 
@@ -9367,6 +9375,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             annotation,
             DeferredExpressionState::from(self.defer_annotations()),
         );
+
+        self.check_for_bare_paramspec(declared.inner_type(), annotation);
 
         let is_pep_613_type_alias = declared.inner_type().is_typealias_special_form();
 
@@ -16728,7 +16738,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             }
                         }
                     } else {
-                        self.infer_type_expression(expr)
+                        let ty = self.infer_type_expression(expr);
+                        self.check_for_bare_paramspec(ty, expr);
+                        ty
                     };
 
                     inferred_type_arguments.push(provided_type);
