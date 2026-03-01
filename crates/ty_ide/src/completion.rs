@@ -1322,8 +1322,8 @@ enum ModuleDependencyKind {
     /// `TypeVar` in `ast`, `cast` in `ctypes` and
     /// `Protocol` in `asyncio`.
     ///
-    /// We also include `abc`, `collections` and
-    /// `typing_extensions` for similar reasons.
+    /// We also include `abc` and `collections`
+    /// for similar reasons.
     StdlibSpecial,
     /// A namespace package somewhat defies classification, since
     /// it can exist over multiple search paths. Since std doesn't
@@ -1359,10 +1359,6 @@ impl ModuleDependencyKind {
         if module.is_known(db, KnownModule::Builtins) {
             return ModuleDependencyKind::Builtin;
         }
-        if module.name(db).as_str() == "typing_extensions" {
-            return ModuleDependencyKind::StdlibSpecial;
-        }
-
         let Some(sp) = module.search_path(db) else {
             return ModuleDependencyKind::Namespace;
         };
@@ -8017,34 +8013,6 @@ from collections import ChainMap as ChainMap
             })
             .expect("expected `ChainMap` completion from `thirdparty`");
         assert!(collections_idx < third_party_idx);
-    }
-
-    #[test]
-    fn auto_import_prefers_typing_extensions_over_third_party_reexport() {
-        let builder = CursorTest::builder()
-            .with_site_packages()
-            .source("main.pyi", "depreca<CURSOR>")
-            .site_packages("thirdparty/__init__.pyi", "deprecated: int")
-            .completion_test_builder()
-            .module_names();
-        let test = builder.build();
-        let typing_extensions_idx = test
-            .completions()
-            .iter()
-            .position(|c| {
-                c.name == "deprecated"
-                    && c.module_name.map(ModuleName::as_str) == Some("typing_extensions")
-            })
-            .expect("expected `deprecated` completion from `typing_extensions`");
-        let third_party_idx = test
-            .completions()
-            .iter()
-            .position(|c| {
-                c.name == "deprecated"
-                    && c.module_name.map(ModuleName::as_str) == Some("thirdparty")
-            })
-            .expect("expected `deprecated` completion from `thirdparty`");
-        assert!(typing_extensions_idx < third_party_idx);
     }
 
     #[test]
