@@ -51,6 +51,7 @@ pub(crate) use static_key_dict_comprehension::*;
 #[cfg(any(feature = "test-rules", test))]
 pub(crate) use test_rules::*;
 pub(crate) use unmatched_suppression_comment::*;
+pub(crate) use unnecessary_assign_before_yield::*;
 pub(crate) use unnecessary_cast_to_int::*;
 pub(crate) use unnecessary_iterable_allocation_for_first_element::*;
 pub(crate) use unnecessary_key_check::*;
@@ -123,6 +124,7 @@ mod suppression_comment_visitor;
 #[cfg(any(feature = "test-rules", test))]
 pub(crate) mod test_rules;
 mod unmatched_suppression_comment;
+mod unnecessary_assign_before_yield;
 mod unnecessary_cast_to_int;
 mod unnecessary_iterable_allocation_for_first_element;
 mod unnecessary_key_check;

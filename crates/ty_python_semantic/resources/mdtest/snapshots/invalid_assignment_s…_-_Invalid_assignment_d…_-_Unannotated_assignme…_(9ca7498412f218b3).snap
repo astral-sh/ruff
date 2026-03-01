@@ -4,8 +4,8 @@ expression: snapshot
 ---
 
 ---
-mdtest name: invalid_assignment.md - Invalid assignment diagnostics - Unannotated assignment
-mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/invalid_assignment.md
+mdtest name: invalid_assignment_syntactic_variants.md - Invalid assignment diagnostics - Unannotated assignment
+mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/invalid_assignment_syntactic_variants.md
 ---
 
 # Python source files

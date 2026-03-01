@@ -1,0 +1,85 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: invalid_assignment_details.md - Invalid assignment diagnostics - `TypedDict`
+mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/invalid_assignment_details.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from typing import Any, TypedDict
+ 2 | 
+ 3 | class Person(TypedDict):
+ 4 |     name: str
+ 5 | 
+ 6 | class Other(TypedDict):
+ 7 |     name: bytes
+ 8 | 
+ 9 | def _(source: Person):
+10 |     target: Other = source  # error: [invalid-assignment]
+11 | class PersonWithAge(TypedDict):
+12 |     name: str
+13 |     age: int
+14 | 
+15 | def _(source: Person):
+16 |     target: PersonWithAge = source  # error: [invalid-assignment]
+17 | class Person(TypedDict):
+18 |     name: str
+19 | 
+20 | def _(source: Person):
+21 |     target: dict[str, Any] = source  # error: [invalid-assignment]
+```
+
+# Diagnostics
+
+```
+error[invalid-assignment]: Object of type `Person` is not assignable to `Other`
+  --> src/mdtest_snippet.py:10:13
+   |
+ 9 | def _(source: Person):
+10 |     target: Other = source  # error: [invalid-assignment]
+   |             -----   ^^^^^^ Incompatible value of type `Person`
+   |             |
+   |             Declared type
+11 | class PersonWithAge(TypedDict):
+12 |     name: str
+   |
+info: rule `invalid-assignment` is enabled by default
+
+```
+
+```
+error[invalid-assignment]: Object of type `Person` is not assignable to `PersonWithAge`
+  --> src/mdtest_snippet.py:16:13
+   |
+15 | def _(source: Person):
+16 |     target: PersonWithAge = source  # error: [invalid-assignment]
+   |             -------------   ^^^^^^ Incompatible value of type `Person`
+   |             |
+   |             Declared type
+17 | class Person(TypedDict):
+18 |     name: str
+   |
+info: rule `invalid-assignment` is enabled by default
+
+```
+
+```
+error[invalid-assignment]: Object of type `Person` is not assignable to `dict[str, Any]`
+  --> src/mdtest_snippet.py:21:13
+   |
+20 | def _(source: Person):
+21 |     target: dict[str, Any] = source  # error: [invalid-assignment]
+   |             --------------   ^^^^^^ Incompatible value of type `Person`
+   |             |
+   |             Declared type
+   |
+info: rule `invalid-assignment` is enabled by default
+
+```

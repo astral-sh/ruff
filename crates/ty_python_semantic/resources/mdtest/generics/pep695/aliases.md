@@ -11,14 +11,15 @@ At its simplest, to define a type alias using PEP 695 syntax, you add a list of 
 `ParamSpec`s or `TypeVarTuple`s after the alias name.
 
 ```py
+from typing import Callable
 from ty_extensions import generic_context
 
-type SingleTypevar[T] = ...
-type MultipleTypevars[T, S] = ...
-type SingleParamSpec[**P] = ...
-type TypeVarAndParamSpec[T, **P] = ...
-type SingleTypeVarTuple[*Ts] = ...
-type TypeVarAndTypeVarTuple[T, *Ts] = ...
+type SingleTypevar[T] = list[T]
+type MultipleTypevars[T, S] = tuple[T, S]
+type SingleParamSpec[**P] = Callable[P, int]
+type TypeVarAndParamSpec[T, **P] = Callable[P, T]
+type SingleTypeVarTuple[*Ts] = tuple[*Ts]
+type TypeVarAndTypeVarTuple[T, *Ts] = tuple[T, *Ts]
 
 # revealed: ty_extensions.GenericContext[T@SingleTypevar]
 reveal_type(generic_context(SingleTypevar))
@@ -41,7 +42,7 @@ You cannot use the same typevar more than once.
 
 ```py
 # error: [invalid-syntax] "duplicate type parameter"
-type RepeatedTypevar[T, T] = ...
+type RepeatedTypevar[T, T] = tuple[T, T]
 ```
 
 ## Specializing type aliases explicitly
@@ -70,34 +71,34 @@ And non-generic types cannot be specialized:
 ```py
 from typing import TypeVar, Protocol, TypedDict
 
-type B = ...
+type B = int
 
-# error: [not-subscriptable] "Cannot subscript non-generic type alias"
+# error: [not-subscriptable] "Cannot subscript non-generic type alias `B`"
 reveal_type(B[int])  # revealed: Unknown
 
-# error: [not-subscriptable] "Cannot subscript non-generic type alias"
+# error: [not-subscriptable] "Cannot specialize non-generic type alias `B`"
 def _(b: B[int]):
     reveal_type(b)  # revealed: Unknown
 
 type IntOrStr = int | str
 
-# error: [not-subscriptable] "Cannot subscript non-generic type alias"
+# error: [not-subscriptable] "Cannot specialize non-generic type alias `IntOrStr`"
 def _(c: IntOrStr[int]):
     reveal_type(c)  # revealed: Unknown
 
 type ListOfInts = list[int]
 
-# error: [not-subscriptable] "Cannot subscript non-generic type alias: `list[int]` is already specialized"
+# error: [not-subscriptable] "Cannot specialize non-generic type alias `ListOfInts`"
 def _(l: ListOfInts[int]):
     reveal_type(l)  # revealed: Unknown
 
 type List[T] = list[T]
 
-# error: [not-subscriptable] "Cannot subscript non-generic type alias: Double specialization is not allowed"
+# error: [not-subscriptable] "Cannot specialize non-generic type alias: Double specialization is not allowed"
 def _(l: List[int][int]):
     reveal_type(l)  # revealed: Unknown
 
-# error: [not-subscriptable] "Cannot subscript non-generic type: `<class 'list[T@DoubleSpecialization]'>` is already specialized"
+# error: [not-subscriptable] "Cannot subscript non-generic type `<class 'list[T@DoubleSpecialization]'>`"
 type DoubleSpecialization[T] = list[T][T]
 
 def _(d: DoubleSpecialization[int]):
@@ -105,7 +106,7 @@ def _(d: DoubleSpecialization[int]):
 
 type Tuple = tuple[int, str]
 
-# error: [not-subscriptable] "Cannot subscript non-generic type alias: `tuple[int, str]` is already specialized"
+# error: [not-subscriptable] "Cannot specialize non-generic type alias `Tuple`"
 def _(doubly_specialized: Tuple[int]):
     reveal_type(doubly_specialized)  # revealed: Unknown
 
@@ -116,7 +117,7 @@ class LegacyProto(Protocol[T]):
 
 type LegacyProtoInt = LegacyProto[int]
 
-# error: [not-subscriptable] "Cannot subscript non-generic type alias: `LegacyProto[int]` is already specialized"
+# error: [not-subscriptable] "Cannot specialize non-generic type alias `LegacyProtoInt`"
 def _(x: LegacyProtoInt[int]):
     reveal_type(x)  # revealed: Unknown
 
@@ -125,7 +126,7 @@ class Proto[T](Protocol):
 
 type ProtoInt = Proto[int]
 
-# error: [not-subscriptable] "Cannot subscript non-generic type alias: `Proto[int]` is already specialized"
+# error: [not-subscriptable] "Cannot specialize non-generic type alias `ProtoInt`"
 def _(x: ProtoInt[int]):
     reveal_type(x)  # revealed: Unknown
 
@@ -135,7 +136,7 @@ class LegacyDict(TypedDict[T]):
 
 type LegacyDictInt = LegacyDict[int]
 
-# error: [not-subscriptable] "Cannot subscript non-generic type alias"
+# error: [not-subscriptable] "Cannot specialize non-generic type alias `LegacyDictInt`"
 def _(x: LegacyDictInt[int]):
     reveal_type(x)  # revealed: Unknown
 
@@ -144,13 +145,13 @@ class Dict[T](TypedDict):
 
 type DictInt = Dict[int]
 
-# error: [not-subscriptable] "Cannot subscript non-generic type alias: `Dict[int]` is already specialized"
+# error: [not-subscriptable] "Cannot specialize non-generic type alias `DictInt`"
 def _(x: DictInt[int]):
     reveal_type(x)  # revealed: Unknown
 
 type Union = list[str] | list[int]
 
-# error: [not-subscriptable] "Cannot subscript non-generic type alias: `list[str] | list[int]` is already specialized"
+# error: [not-subscriptable] "Cannot specialize non-generic type alias `Union`"
 def _(x: Union[int]):
     reveal_type(x)  # revealed: Unknown
 ```
@@ -158,8 +159,8 @@ def _(x: Union[int]):
 If the type variable has an upper bound, the specialized type must satisfy that bound:
 
 ```py
-type Bounded[T: int] = ...
-type BoundedByUnion[T: int | str] = ...
+type Bounded[T: int] = list[T]
+type BoundedByUnion[T: int | str] = list[T]
 
 class IntSubclass(int): ...
 
@@ -190,7 +191,7 @@ def _(x: TupleOfIntAndStr[int, int]):
 If the type variable is constrained, the specialized type must satisfy those constraints:
 
 ```py
-type Constrained[T: (int, str)] = ...
+type Constrained[T: (int, str)] = list[T]
 
 reveal_type(Constrained[int])  # revealed: <type alias 'Constrained[int]'>
 
@@ -220,7 +221,7 @@ def _(x: TupleOfIntOrStr[int, object]):
 If the type variable has a default, it can be omitted:
 
 ```py
-type WithDefault[T, U = int] = ...
+type WithDefault[T, U = int] = dict[T, U]
 
 reveal_type(WithDefault[str, str])  # revealed: <type alias 'WithDefault[str, str]'>
 reveal_type(WithDefault[str])  # revealed: <type alias 'WithDefault[str, int]'>
@@ -242,6 +243,27 @@ type G[T = int] = list[T]
 
 def _(g: G):
     reveal_type(g)  # revealed: list[int]
+```
+
+## Snapshots of verbose diagnostics
+
+<!-- snapshot-diagnostics -->
+
+```py
+class A: ...
+class B[T]: ...
+
+type AliasA = A
+type AliasB = B[int]
+
+# fmt: off
+
+def f(
+    a: AliasA[int],  # error: [not-subscriptable]
+    b: AliasB[int],  # error: [not-subscriptable]
+): ...
+
+# fmt: on
 ```
 
 ## Aliases are not callable

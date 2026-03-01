@@ -428,6 +428,29 @@ class D(B):  # error: [subclass-of-final-class]
     def method(self): ...  # error: [override-of-final-variable]
 ```
 
+## `@final` cannot be applied to non-method functions
+
+The `@final` decorator is only valid on methods and classes. Using it on a module-level or nested
+function is an error.
+
+```py
+from typing import final
+
+@final  # error: [final-on-non-method] "`@final` cannot be applied to non-method function `func1`"
+def func1(): ...
+
+# Nested function decorated with `@final` is also invalid
+def outer():
+    @final  # error: [final-on-non-method]
+    def inner(): ...
+
+# A function nested inside a method is also not a method
+class F:
+    def method(self):
+        @final  # error: [final-on-non-method]
+        def not_a_method(): ...
+```
+
 ## An `@final` method is overridden by an implicit instance attribute
 
 ```py
@@ -646,7 +669,7 @@ class Base(ABC):
         raise NotImplementedError
 
 @final
-class Derived(Base):  # error: [abstract-method-in-final-class] "Final class `Derived` does not implement abstract method `foo`"
+class Derived(Base):  # error: [abstract-method-in-final-class] "Final class `Derived` has unimplemented abstract method `foo`"
     pass
 ```
 
@@ -1018,6 +1041,31 @@ class Final(DynamicMiddle):  # No error; `foo` is implemented by `DynamicMiddle`
     pass
 ```
 
+### Abstract method implemented via a synthesized method
+
+```py
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from functools import total_ordering
+from typing import final
+
+class AbstractOrdered(ABC):
+    @abstractmethod
+    def __lt__(self, other): ...
+
+@final
+@dataclass(order=True)
+class ConcreteOrdered(AbstractOrdered): ...  # fine
+
+# total_ordering does not override a comparison method
+# if it already exists in the MRO, even if the one that
+# exists in the MRO is abstract!
+@final
+@total_ordering
+class AlsoConreteOrdered(AbstractOrdered):  # error: [abstract-method-in-final-class]
+    def __gt__(self, other): ...
+```
+
 ### Non-final class with unimplemented abstract methods is fine
 
 Non-final classes are allowed to have unimplemented abstract methods, as they can be implemented by
@@ -1200,6 +1248,17 @@ class BadChild(Base):  # error: [abstract-method-in-final-class]
     f: int
 ```
 
+But we make an exception here for `ClassVar` annotations: we assume in this case that the user will
+dynamically patch the attribute onto the class (e.g., using a metaclass):
+
+```py
+from typing import ClassVar
+
+@final
+class GoodChild(Base):  # fine
+    f: ClassVar[int]
+```
+
 ### Abstract classmethod
 
 A `@final` class must also implement abstract classmethods.
@@ -1279,4 +1338,84 @@ class Base(ABC):
 # TODO: should emit [abstract-method-in-final-class] for `value`, `make`, and `create`
 class Bad(Base):
     pass
+```
+
+### Diagnostic when there are many abstract methods
+
+<!-- snapshot-diagnostics -->
+
+If the class has many unimplemented abstract methods, we do not list them all unless the user has
+specified `--verbose`:
+
+```toml
+verbose = false
+```
+
+```py
+from abc import ABC, abstractmethod
+from typing import final
+
+@final
+# error: [abstract-method-in-final-class] "Final class `Abstract` has 10 unimplemented abstract methods, including `aaaaaaaaaa`, `bbbbbbbb` and `cccccccc`"
+class Abstract(ABC):
+    @abstractmethod
+    def aaaaaaaaaa(self) -> int: ...
+    @abstractmethod
+    def bbbbbbbb(self) -> int: ...
+    @abstractmethod
+    def cccccccc(self) -> int: ...
+    @abstractmethod
+    def ddddddddd(self) -> int: ...
+    @abstractmethod
+    def eeeeeeeee(self) -> int: ...
+    @abstractmethod
+    def ffffffff(self) -> int: ...
+    @abstractmethod
+    def ggggggg(self) -> int: ...
+    @abstractmethod
+    def hhhhhhhh(self) -> int: ...
+    @abstractmethod
+    def iiiiiiiii(self) -> int: ...
+    @abstractmethod
+    def kkkkkkkkkk(self) -> int: ...
+```
+
+### Diagnostic when there are many abstract methods and `--verbose` has been specified
+
+<!-- snapshot-diagnostics -->
+
+If the class has many unimplemented abstract methods, we still list them all if the user has
+specified `--verbose`:
+
+```toml
+verbose = true
+```
+
+```py
+from abc import ABC, abstractmethod
+from typing import final
+
+@final
+# error: [abstract-method-in-final-class] "Final class `Abstract` has unimplemented abstract methods `aaaaaaaaaa`, `bbbbbbbb`, `cccccccc`, `ddddddddd`, `eeeeeeeee`, `ffffffff`, `ggggggg`, `hhhhhhhh`, `iiiiiiiii` and `kkkkkkkkkk`"
+class Abstract(ABC):
+    @abstractmethod
+    def aaaaaaaaaa(self) -> int: ...
+    @abstractmethod
+    def bbbbbbbb(self) -> int: ...
+    @abstractmethod
+    def cccccccc(self) -> int: ...
+    @abstractmethod
+    def ddddddddd(self) -> int: ...
+    @abstractmethod
+    def eeeeeeeee(self) -> int: ...
+    @abstractmethod
+    def ffffffff(self) -> int: ...
+    @abstractmethod
+    def ggggggg(self) -> int: ...
+    @abstractmethod
+    def hhhhhhhh(self) -> int: ...
+    @abstractmethod
+    def iiiiiiiii(self) -> int: ...
+    @abstractmethod
+    def kkkkkkkkkk(self) -> int: ...
 ```

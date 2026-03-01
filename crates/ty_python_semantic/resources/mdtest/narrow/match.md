@@ -118,6 +118,39 @@ def f(x: Covariant[int]):
             assert_never(x)
 ```
 
+## Mapping patterns
+
+```py
+from collections.abc import Mapping
+
+def test_isinstance(x: dict | int) -> None:
+    if isinstance(x, Mapping):
+        reveal_type(x)  # revealed: dict[Unknown, Unknown] | (int & Top[Mapping[Unknown, object]])
+    else:
+        reveal_type(x)  # revealed: int & ~Top[Mapping[Unknown, object]]
+
+def test_match(x: dict | int) -> None:
+    match x:
+        case {}:
+            reveal_type(x)  # revealed: dict[Unknown, Unknown] | (int & Top[Mapping[Unknown, object]])
+        case _:
+            reveal_type(x)  # revealed: int & ~Top[Mapping[Unknown, object]]
+
+def test_match_double_star(x: dict | int) -> None:
+    match x:
+        case {**rest}:
+            reveal_type(x)  # revealed: dict[Unknown, Unknown] | (int & Top[Mapping[Unknown, object]])
+        case _:
+            reveal_type(x)  # revealed: int & ~Top[Mapping[Unknown, object]]
+
+def test_match_refutable(x: dict | int) -> None:
+    match x:
+        case {"k": _}:
+            reveal_type(x)  # revealed: dict[Unknown, Unknown] | (int & Top[Mapping[Unknown, object]])
+        case _:
+            reveal_type(x)  # revealed: dict[Unknown, Unknown] | int
+```
+
 ## Value patterns
 
 Value patterns are evaluated by equality, which is overridable. Therefore successfully matching on
@@ -228,12 +261,14 @@ def _(x: A | B | C):
         case _:
             reveal_type(x)  # revealed: Never
 
+def _(x: A | B | C):
     match x:
         case A() | B() | C():
             reveal_type(x)  # revealed: A | B | C
         case _:
             reveal_type(x)  # revealed: Never
 
+def _(x: A | B | C):
     match x:
         case A():
             reveal_type(x)  # revealed: A

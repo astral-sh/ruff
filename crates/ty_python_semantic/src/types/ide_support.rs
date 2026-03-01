@@ -6,15 +6,19 @@ use crate::semantic_index::definition::Definition;
 use crate::semantic_index::definition::DefinitionKind;
 use crate::semantic_index::{attribute_scopes, global_scope, semantic_index, use_def_map};
 use crate::types::call::{CallArguments, CallError, MatchedArgument};
+use crate::types::class::{DynamicClassAnchor, DynamicNamedTupleAnchor};
+use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::signatures::{ParameterKind, Signature};
 use crate::types::{
-    CallDunderError, CallableTypes, ClassBase, ClassLiteral, ClassType, KnownUnion, Type,
-    TypeContext, UnionType,
+    CallDunderError, CallableTypes, ClassBase, ClassLiteral, ClassType, KnownClass, KnownUnion,
+    Type, TypeContext, UnionType,
 };
 use crate::{Db, DisplaySettings, HasDefinition, HasType, SemanticModel};
 use itertools::Either;
 use ruff_db::files::FileRange;
 use ruff_db::parsed::parsed_module;
+use ruff_db::source::source_text;
+use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
@@ -95,13 +99,17 @@ pub fn definitions_for_name<'db>(
 
                 for binding in global_bindings {
                     if let Some(def) = binding.binding.definition() {
-                        all_definitions.insert(def);
+                        if def.kind(db).is_user_visible() {
+                            all_definitions.insert(def);
+                        }
                     }
                 }
 
                 for declaration in global_declarations {
                     if let Some(def) = declaration.declaration.definition() {
-                        all_definitions.insert(def);
+                        if def.kind(db).is_user_visible() {
+                            all_definitions.insert(def);
+                        }
                     }
                 }
             }
@@ -122,13 +130,17 @@ pub fn definitions_for_name<'db>(
 
         for binding in bindings {
             if let Some(def) = binding.binding.definition() {
-                all_definitions.insert(def);
+                if def.kind(db).is_user_visible() {
+                    all_definitions.insert(def);
+                }
             }
         }
 
         for declaration in declarations {
             if let Some(def) = declaration.declaration.definition() {
-                all_definitions.insert(def);
+                if def.kind(db).is_user_visible() {
+                    all_definitions.insert(def);
+                }
             }
         }
 
@@ -582,12 +594,22 @@ pub struct CallSignatureDetails<'db> {
 impl<'db> CallSignatureDetails<'db> {
     fn from_binding(db: &'db dyn Db, binding: &crate::types::call::Binding<'db>) -> Self {
         let argument_to_parameter_mapping = binding.argument_matches().to_vec();
+        let specialization = binding.specialization();
         let signature = binding.signature.clone();
         let display_details = signature.display(db).to_string_parts();
         let (parameter_kinds, parameter_types): (Vec<ParameterKind>, Vec<Type>) = signature
             .parameters()
             .iter()
-            .map(|param| (param.kind().clone(), param.annotated_type()))
+            .map(|param| {
+                // Apply the inferred specialization (if any) to resolve TypeVars
+                // in the annotated type. For example, if `_KT` was inferred as
+                // `str` from the call arguments, this turns `_KT` into `str`.
+                let mut ty = param.annotated_type();
+                if let Some(spec) = specialization {
+                    ty = ty.apply_specialization(db, spec);
+                }
+                (param.kind().clone(), ty)
+            })
             .unzip();
 
         CallSignatureDetails {
@@ -636,21 +658,36 @@ pub fn call_signature_details<'db>(
         .try_upcast_to_callable(db)
         .map(|callables| callables.into_type(db))
     {
+        // Use from_arguments_typed so that check_types can infer TypeVar
+        // specializations from the actual argument types at this call site.
         let call_arguments =
-            CallArguments::from_arguments(&call_expr.arguments, |_, splatted_value| {
+            CallArguments::from_arguments_typed(&call_expr.arguments, |splatted_value| {
                 splatted_value
                     .inferred_type(model)
                     .unwrap_or(Type::unknown())
             });
-        let bindings = callable_type
+        let mut bindings = callable_type
             .bindings(db)
             .match_parameters(db, &call_arguments);
 
+        // Run type checking to resolve TypeVar bindings from argument types.
+        // For example, calling `dict[str, int].get("a")` resolves the `_KT`
+        // TypeVar to `str`. We ignore errors since we still want signature
+        // details even if the call has type errors.
+        let constraints = ConstraintSetBuilder::new();
+        let _ = bindings.check_types_impl(
+            db,
+            &constraints,
+            &call_arguments,
+            TypeContext::default(),
+            &[],
+        );
+
         // Extract signature details from all callable bindings
         bindings
-            .into_iter()
+            .iter_flat()
             .flatten()
-            .map(|binding| CallSignatureDetails::from_binding(db, &binding))
+            .map(|binding| CallSignatureDetails::from_binding(db, binding))
             .collect()
     } else {
         // Type is not callable, return empty signatures
@@ -695,12 +732,13 @@ pub fn call_type_simplified_by_overloads(
     });
 
     // Try to resolve overloads with the arguments/types we have
+    let constraints = ConstraintSetBuilder::new();
     let mut resolved = bindings
         .match_parameters(db, &args)
-        .check_types(db, &args, TypeContext::default(), &[])
+        .check_types(db, &constraints, &args, TypeContext::default(), &[])
         // Only use the Ok
         .iter()
-        .flatten()
+        .flat_map(super::call::bind::Bindings::iter_flat)
         .flat_map(|binding| {
             binding.matching_overloads().map(|(_, overload)| {
                 overload
@@ -734,7 +772,7 @@ pub fn definitions_for_bin_op<'db>(
     let callable_type = promote_literals_for_self(model.db(), bindings.callable_type());
 
     let definitions: Vec<_> = bindings
-        .into_iter()
+        .iter_flat()
         .flatten()
         .filter_map(|binding| {
             Some(ResolvedDefinition::Definition(
@@ -792,7 +830,7 @@ pub fn definitions_for_unary_op<'db>(
     let callable_type = promote_literals_for_self(model.db(), bindings.callable_type());
 
     let definitions = bindings
-        .into_iter()
+        .iter_flat()
         .flatten()
         .filter_map(|binding| {
             Some(ResolvedDefinition::Definition(
@@ -882,15 +920,16 @@ fn resolve_call_signature<'db>(
     });
 
     // Extract the `Bindings` regardless of whether type checking succeeded or failed.
+    let constraints = ConstraintSetBuilder::new();
     let bindings = callable_type
         .bindings(db)
         .match_parameters(db, &args)
-        .check_types(db, &args, TypeContext::default(), &[])
+        .check_types(db, &constraints, &args, TypeContext::default(), &[])
         .unwrap_or_else(|CallError(_, bindings)| *bindings);
 
     // First, try to find the matching overload after full type checking.
     let type_checked_details: Vec<_> = bindings
-        .iter()
+        .iter_flat()
         .flat_map(|binding| binding.matching_overloads().map(|(_, overload)| overload))
         .map(|binding| CallSignatureDetails::from_binding(db, binding))
         .collect();
@@ -904,7 +943,7 @@ fn resolve_call_signature<'db>(
     // `matching_overloads()` returns empty. Fall back to arity-based matching
     // across all overloads to pick the best candidate for showing hints.
     let all_details: Vec<_> = bindings
-        .iter()
+        .iter_flat()
         .flatten()
         .map(|binding| CallSignatureDetails::from_binding(db, binding))
         .collect();
@@ -1537,5 +1576,242 @@ mod resolve_definition {
         };
 
         Ok(component)
+    }
+}
+
+/// Information about a class in the type hierarchy.
+#[derive(Debug, Clone)]
+pub struct TypeHierarchyClass {
+    /// The name of the class.
+    pub name: Name,
+    /// The file containing the class definition.
+    pub file: ruff_db::files::File,
+    /// The range covering the full class definition header.
+    pub full_range: TextRange,
+    /// The range of the class name (for selection/focus).
+    pub selection_range: TextRange,
+}
+
+/// Return a type hierarchy item for the class type given.
+///
+/// When the type given doesn't correspond to a class literal, then this always
+/// returns `None`.
+///
+/// This is meant to be used to "prepare" for a subtype or supertype request.
+/// That is, this effectively validates whether the given type can be used in
+/// subsequent requests for supertypes or subtypes.
+pub fn type_hierarchy_prepare(db: &dyn Db, ty: Type<'_>) -> Option<TypeHierarchyClass> {
+    let class_literal = extract_class_literal(db, ty)?;
+    Some(class_literal_to_hierarchy_info(db, class_literal))
+}
+
+/// Get the direct base classes for the class type given.
+///
+/// When the type given doesn't correspond to a class literal, then this always
+/// returns an empty sequence.
+///
+/// This includes `object` when the given class has no direct base classes.
+pub fn type_hierarchy_supertypes(db: &dyn Db, ty: Type<'_>) -> Vec<TypeHierarchyClass> {
+    let Some(class_literal) = extract_class_literal(db, ty) else {
+        return vec![];
+    };
+    if class_literal.is_known(db, KnownClass::Object) {
+        return vec![];
+    }
+
+    let mut supertypes: Vec<TypeHierarchyClass> = class_literal
+        .explicit_bases(db)
+        .into_iter()
+        .filter_map(|base| extract_class_literal(db, base))
+        .map(|class_literal| class_literal_to_hierarchy_info(db, class_literal))
+        .collect();
+    // Every class implicitly inherits from `object` when no explicit
+    // bases are declared.
+    if supertypes.is_empty() {
+        supertypes.push(class_literal_to_hierarchy_info(
+            db,
+            ClassLiteral::object(db),
+        ));
+    }
+    supertypes
+}
+
+/// Get the direct subtypes of the class given.
+///
+/// When the type given doesn't correspond to a class literal, then this always
+/// returns an empty sequence.
+///
+/// Note that this scans all modules in `db` to find classes that directly
+/// inherit from the given class. This could be quite expensive in large
+/// projects.
+pub fn type_hierarchy_subtypes(db: &dyn Db, ty: Type<'_>) -> Vec<TypeHierarchyClass> {
+    let Some(target_class) = extract_class_literal(db, ty) else {
+        return vec![];
+    };
+    let target_name = target_class.name(db);
+    let target_is_object = target_class.is_known(db, KnownClass::Object);
+    let mut subtypes = vec![];
+
+    // Scan all modules in the workspace
+    for module in ty_module_resolver::all_modules(db) {
+        let Some(file) = module.file(db) else {
+            continue;
+        };
+
+        // Note that this will always consider namespace
+        // packages to be "not firsty party." This isn't
+        // necessarily correct, and we can probably improve
+        // on this in response to user feedback.
+        let is_non_first_party = module.search_path(db).is_none_or(|sp| !sp.is_first_party());
+        let name = module.name(db);
+        // Filter out non-first-party modules that are conventionally
+        // regarded as private or tests.
+        if is_non_first_party && (name.is_private() || name.is_test_module()) {
+            continue;
+        }
+
+        // Skip files that don't contain the class name. This avoids expensive
+        // semantic analysis for files that can't possibly contain a subclass
+        // of the target. We can't do this when looking for subtypes of
+        // `object` since `object` can be implicit.
+        if !target_is_object && !source_text(db, file).contains(target_name.as_str()) {
+            continue;
+        }
+
+        let index = semantic_index(db, file);
+        for scope_id in index.scope_ids() {
+            let scope = scope_id.node(db);
+            let Some(class_node) = scope.as_class() else {
+                continue;
+            };
+
+            let def = index.expect_single_definition(class_node);
+            if !matches!(def.kind(db), DefinitionKind::Class(_)) {
+                continue;
+            }
+
+            let file_scope_id = scope_id.file_scope_id(db);
+            if !index.is_scope_reachable(db, file_scope_id) {
+                continue;
+            }
+
+            let ty = crate::types::binding_type(db, def);
+            let Some(class_ty) = extract_class_literal(db, ty) else {
+                continue;
+            };
+
+            let bases = class_ty.explicit_bases(db);
+            let is_subtype = if target_is_object
+                && bases.is_empty()
+                && !class_ty.is_known(db, KnownClass::Object)
+            {
+                true
+            } else {
+                bases.iter().any(|base| {
+                    extract_class_literal(db, *base)
+                        .is_some_and(|base_literal| base_literal == target_class)
+                })
+            };
+            if is_subtype {
+                subtypes.push(class_literal_to_hierarchy_info(db, class_ty));
+            }
+        }
+    }
+    subtypes
+}
+
+/// Extract a `ClassLiteral` from a `Type`, handling various type forms.
+fn extract_class_literal<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<ClassLiteral<'db>> {
+    match ty {
+        Type::ClassLiteral(class_literal) => Some(class_literal),
+        Type::SubclassOf(subclass_of) => {
+            let inner = subclass_of.subclass_of();
+            match inner {
+                crate::types::SubclassOfInner::Class(class_type) => {
+                    Some(class_type.class_literal(db))
+                }
+                crate::types::SubclassOfInner::Dynamic(_)
+                | crate::types::SubclassOfInner::TypeVar(_) => None,
+            }
+        }
+        Type::GenericAlias(generic_alias) => Some(ClassLiteral::Static(generic_alias.origin(db))),
+        Type::NominalInstance(instance) => Some(instance.class(db).class_literal(db)),
+        Type::Union(union) => union
+            .elements(db)
+            .iter()
+            .find_map(|elem| extract_class_literal(db, *elem)),
+
+        _ => None,
+    }
+}
+
+/// Convert a `ClassLiteral` to `TypeHierarchyClass` info.
+///
+/// For the most part, this is about extracting the right
+/// text ranges.
+fn class_literal_to_hierarchy_info(
+    db: &dyn Db,
+    class_literal: ClassLiteral<'_>,
+) -> TypeHierarchyClass {
+    let name = class_literal.name(db).clone();
+    let file = class_literal.file(db);
+
+    let (full_range, selection_range) = match class_literal {
+        ClassLiteral::Static(static_class) => {
+            let parsed = parsed_module(db, file).load(db);
+            let header_range = static_class.header_range(db);
+            let body_scope = static_class.body_scope(db);
+
+            let selection_range = body_scope
+                .node(db)
+                .as_class()
+                .map(|c| c.node(&parsed))
+                .map(|class_def| class_def.name.range())
+                .unwrap_or(header_range);
+            (header_range, selection_range)
+        }
+        // For the dynamic cases, we special case a variable definition
+        // like this:
+        //
+        //     Dynamic = type("Dynamic", (object,), {})
+        //
+        // In this case, the range for the element we return will correspond to
+        // the left hand side of the variable assignment. This works better as
+        // an "anchor" point because it avoids ambiguity with asking for the
+        // type hierarchy of `type` itself.
+        //
+        // If there is not a variable definition, then we fall back to the
+        // class definition's "header" range, which will be the `type` (or
+        // `namedtuple`) call. Subsequent type hierarchy requests will then
+        // (likely incorrectly) return the type hierarchy for `type` itself.
+        ClassLiteral::Dynamic(dynamic_class) => {
+            if let DynamicClassAnchor::Definition(definition) = dynamic_class.anchor(db) {
+                let parsed = parsed_module(db, file).load(db);
+                let kind = definition.kind(db);
+                (kind.full_range(&parsed), kind.target_range(&parsed))
+            } else {
+                let header_range = dynamic_class.header_range(db);
+                (header_range, header_range)
+            }
+        }
+        ClassLiteral::DynamicNamedTuple(namedtuple) => {
+            if let DynamicNamedTupleAnchor::CollectionsDefinition { definition, .. }
+            | DynamicNamedTupleAnchor::TypingDefinition(definition) = namedtuple.anchor(db)
+            {
+                let parsed = parsed_module(db, file).load(db);
+                let kind = definition.kind(db);
+                (kind.full_range(&parsed), kind.target_range(&parsed))
+            } else {
+                let header_range = namedtuple.header_range(db);
+                (header_range, header_range)
+            }
+        }
+    };
+
+    TypeHierarchyClass {
+        name,
+        file,
+        full_range,
+        selection_range,
     }
 }

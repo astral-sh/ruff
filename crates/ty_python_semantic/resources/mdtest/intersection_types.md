@@ -313,24 +313,29 @@ class P: ...
 class Q: ...
 class R(Generic[T_co]): ...
 
-def _(
-    i1: Intersection[P, Not[P]],
-    i2: Intersection[Not[P], P],
-    i3: Intersection[P, Q, Not[P]],
-    i4: Intersection[Not[P], Q, P],
-    i5: Intersection[P, Any, Not[P]],
-    i6: Intersection[Not[P], Any, P],
-    i7: Intersection[R[P], Not[R[P]]],
-    i8: Intersection[R[P], Not[R[Q]]],
-) -> None:
-    reveal_type(i1)  # revealed: Never
-    reveal_type(i2)  # revealed: Never
-    reveal_type(i3)  # revealed: Never
-    reveal_type(i4)  # revealed: Never
-    reveal_type(i5)  # revealed: Never
-    reveal_type(i6)  # revealed: Never
-    reveal_type(i7)  # revealed: Never
-    reveal_type(i8)  # revealed: R[P] & ~R[Q]
+def _(i: Intersection[P, Not[P]]) -> None:
+    reveal_type(i)  # revealed: Never
+
+def _(i: Intersection[Not[P], P]) -> None:
+    reveal_type(i)  # revealed: Never
+
+def _(i: Intersection[P, Q, Not[P]]) -> None:
+    reveal_type(i)  # revealed: Never
+
+def _(i: Intersection[Not[P], Q, P]) -> None:
+    reveal_type(i)  # revealed: Never
+
+def _(i: Intersection[P, Any, Not[P]]) -> None:
+    reveal_type(i)  # revealed: Never
+
+def _(i: Intersection[Not[P], Any, P]) -> None:
+    reveal_type(i)  # revealed: Never
+
+def _(i: Intersection[R[P], Not[R[P]]]) -> None:
+    reveal_type(i)  # revealed: Never
+
+def _(i: Intersection[R[P], Not[R[Q]]]) -> None:
+    reveal_type(i)  # revealed: R[P] & ~R[Q]
 ```
 
 ### Union of a type and its negation
@@ -784,41 +789,49 @@ type Red = Literal[Color.RED]
 type Green = Literal[Color.GREEN]
 type Blue = Literal[Color.BLUE]
 
-def f(
-    a: Intersection[Color, Red],
-    b: Intersection[Color, Not[Red]],
-    c: Intersection[Color, Not[Red | Green]],
-    d: Intersection[Color, Not[Red | Green | Blue]],
-    e: Intersection[Red, Not[Color]],
-    f: Intersection[Red | Green, Not[Color]],
-    g: Intersection[Not[Red], Color],
-    h: Intersection[Red, Green],
-    i: Intersection[Red | Green, Green | Blue],
-):
+def _(a: Intersection[Color, Red]) -> None:
     reveal_type(a)  # revealed: Literal[Color.RED]
+
+def _(b: Intersection[Color, Not[Red]]) -> None:
     reveal_type(b)  # revealed: Literal[Color.GREEN, Color.BLUE]
+
+def _(c: Intersection[Color, Not[Red | Green]]) -> None:
     reveal_type(c)  # revealed: Literal[Color.BLUE]
+
+def _(d: Intersection[Color, Not[Red | Green | Blue]]) -> None:
     reveal_type(d)  # revealed: Never
+
+def _(e: Intersection[Red, Not[Color]]) -> None:
     reveal_type(e)  # revealed: Never
+
+def _(f: Intersection[Red | Green, Not[Color]]) -> None:
     reveal_type(f)  # revealed: Never
+
+def _(g: Intersection[Not[Red], Color]) -> None:
     reveal_type(g)  # revealed: Literal[Color.GREEN, Color.BLUE]
+
+def _(h: Intersection[Red, Green]) -> None:
     reveal_type(h)  # revealed: Never
+
+def _(i: Intersection[Red | Green, Green | Blue]) -> None:
     reveal_type(i)  # revealed: Literal[Color.GREEN]
 
 class Single(Enum):
     VALUE = 0
 
-def g(
-    a: Intersection[Single, Literal[Single.VALUE]],
-    b: Intersection[Single, Not[Literal[Single.VALUE]]],
-    c: Intersection[Not[Literal[Single.VALUE]], Single],
-    d: Intersection[Single, Not[Single]],
-    e: Intersection[Single | int, Not[Single]],
-):
+def _(a: Intersection[Single, Literal[Single.VALUE]]) -> None:
     reveal_type(a)  # revealed: Single
+
+def _(b: Intersection[Single, Not[Literal[Single.VALUE]]]) -> None:
     reveal_type(b)  # revealed: Never
+
+def _(c: Intersection[Not[Literal[Single.VALUE]], Single]) -> None:
     reveal_type(c)  # revealed: Never
+
+def _(d: Intersection[Single, Not[Single]]) -> None:
     reveal_type(d)  # revealed: Never
+
+def _(e: Intersection[Single | int, Not[Single]]) -> None:
     reveal_type(e)  # revealed: int
 ```
 
@@ -944,6 +957,341 @@ def mixed(
     reveal_type(i2)  # revealed: Any
     reveal_type(i3)  # revealed: Any
     reveal_type(i4)  # revealed: Any
+```
+
+## Calling intersection types
+
+### Basic intersection calls
+
+When calling an intersection type, we try to call each positive element with the given arguments.
+Elements where the call fails (wrong arguments, not callable, etc.) are discarded. The return type
+is the intersection of return types from the elements where the call succeeded.
+
+```py
+from ty_extensions import Intersection
+from typing import Callable
+
+class Foo: ...
+
+def _(
+    x: Intersection[type[Foo], Callable[[], str]],
+) -> None:
+    # Both `type[Foo]` and `Callable[[], str]` are callable with no arguments.
+    # `x()` returns `Foo` if `x` has type `type[Foo]`,
+    # and `str` if `x` has type `Callable[[], str]()`.
+    # The return type is the intersection of `Foo` and `str`.
+    reveal_type(x())  # revealed: Foo & str
+```
+
+### Partial success in intersection calls
+
+If one element accepts the call but another rejects it (e.g., due to incompatible arguments), the
+call still succeeds using only the element that accepts:
+
+```py
+from ty_extensions import Intersection
+from typing import Callable
+
+class Bar: ...
+
+def _(
+    x: Intersection[type[Bar], Callable[[int], str]],
+) -> None:
+    # `type[Bar]` accepts no arguments and returns `Bar`.
+    # `Callable[[int], str]` requires an int argument, so it fails for this call.
+    # We discard the failing element and use only `type[Bar]`.
+    reveal_type(x())  # revealed: Bar
+```
+
+### All intersection elements reject the call
+
+If all elements are callable but all reject the specific call (e.g., incompatible arguments), we
+show errors for each failing element:
+
+```py
+from ty_extensions import Intersection
+from typing import Callable
+
+def _(
+    x: Intersection[Callable[[int], str], Callable[[str], int]],
+) -> None:
+    # Both callables reject a `float` argument:
+    # - `Callable[[int], str]` expects `int`
+    # - `Callable[[str], int]` expects `str`
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    x(1.0)
+```
+
+### Error priority: binding error over top-callable
+
+When intersection elements fail with different error types, we use a priority hierarchy to determine
+which errors to show. More specific errors (like `invalid-argument-type`) take precedence over less
+specific ones (like `call-top-callable` or `call-non-callable`).
+
+A specific argument error takes priority over a top-callable error:
+
+```py
+from ty_extensions import Intersection, Top
+from typing import Callable
+
+def _(
+    x: Intersection[Callable[[int], str], Top[Callable[..., object]]],
+) -> None:
+    # `Callable[[int], str]` fails with invalid-argument-type (expects int, got str)
+    # `Top[Callable[..., object]]` would fail with call-top-callable
+    # We only show the more specific invalid-argument-type error
+    # error: [invalid-argument-type]
+    x("hello")
+```
+
+### Error priority: binding error over not-callable
+
+A specific argument error takes priority over a not-callable error:
+
+```py
+from ty_extensions import Intersection
+from typing import Callable
+
+class NotCallable: ...
+
+def _(
+    x: Intersection[Callable[[int], str], NotCallable],
+) -> None:
+    # `Callable[[int], str]` fails with invalid-argument-type (expects int, got str)
+    # `NotCallable` would fail with call-non-callable
+    # We only show the more specific invalid-argument-type error
+    # error: [invalid-argument-type]
+    x("hello")
+```
+
+### Error priority: top-callable over not-callable
+
+A top-callable error takes priority over a not-callable error:
+
+```py
+from ty_extensions import Intersection, Top
+from typing import Callable
+
+class NotCallable: ...
+
+def _(
+    x: Intersection[Top[Callable[..., object]], NotCallable],
+) -> None:
+    # `Top[Callable[..., object]]` fails with call-top-callable
+    # `NotCallable` would fail with call-non-callable
+    # We only show the call-top-callable error (it's more specific)
+    # error: [call-top-callable]
+    x()
+```
+
+### Keyword arguments
+
+```py
+from ty_extensions import Intersection
+
+class RetA: ...
+class RetB: ...
+
+class Foo:
+    def __call__(self, *, name: str) -> RetA:
+        return RetA()
+
+class Bar:
+    def __call__(self, *, name: str) -> RetB:
+        return RetB()
+
+def _(x: Intersection[Foo, Bar]) -> None:
+    reveal_type(x(name="hello"))  # revealed: RetA & RetB
+```
+
+### Three or more elements with partial success
+
+When an intersection has three or more callable elements, some of which accept the call and some of
+which reject it, the failing elements are discarded:
+
+```py
+from ty_extensions import Intersection
+
+class RetA: ...
+class RetB: ...
+
+class A:
+    def __call__(self) -> RetA:
+        return RetA()
+
+class B:
+    def __call__(self) -> RetB:
+        return RetB()
+
+class C:
+    def __call__(self, x: int) -> int:
+        return 1
+
+def _(x: Intersection[A, B, C]) -> None:
+    # A() succeeds, B() succeeds, C() fails (needs int arg) -> discarded
+    reveal_type(x())  # revealed: RetA & RetB
+```
+
+### Class constructors
+
+```py
+from ty_extensions import Intersection
+
+class A: ...
+class B: ...
+
+def _(x: Intersection[type[A], type[B]]) -> None:
+    reveal_type(x())  # revealed: A & B
+```
+
+### Intersection with `Any`
+
+When one intersection element is `Any`, both elements are called. `Any` is callable and returns
+`Any`:
+
+```py
+from ty_extensions import Intersection
+from typing import Any
+
+class Foo: ...
+
+def _(x: Intersection[type[Foo], Any]) -> None:
+    reveal_type(x())  # revealed: Foo & Any
+```
+
+### Element returning `Never`
+
+When one element returns `Never`, the intersection of return types simplifies to `Never`:
+
+```py
+from ty_extensions import Intersection
+from typing import Callable, NoReturn
+
+def _(x: Intersection[Callable[[], NoReturn], Callable[[], str]]) -> None:
+    reveal_type(x())  # revealed: Never
+```
+
+### Variadic arguments
+
+When one intersection element accepts variadic arguments, it can succeed alongside more specific
+elements:
+
+```py
+from ty_extensions import Intersection
+
+class RetA: ...
+class RetB: ...
+
+class AcceptsAnything:
+    def __call__(self, *args: object, **kwargs: object) -> RetA:
+        return RetA()
+
+class SpecificArgs:
+    def __call__(self, x: int) -> RetB:
+        return RetB()
+
+def _(x: Intersection[AcceptsAnything, SpecificArgs]) -> None:
+    reveal_type(x(42))  # revealed: RetA & RetB
+    reveal_type(x("foo"))  # revealed: RetA
+```
+
+### No callable elements
+
+If no positive element is callable, the intersection is not callable:
+
+```py
+from ty_extensions import Intersection
+
+class A: ...
+class B: ...
+
+def _(x: Intersection[A, B]) -> None:
+    # error: [call-non-callable] "Object of type `A & B` is not callable"
+    reveal_type(x())  # revealed: Unknown
+```
+
+## Unions containing intersections
+
+### Intersection element fails, union element succeeds
+
+When a union contains intersection elements, we properly handle each union element. If an
+intersection element succeeds, it contributes to the result. If all elements within an intersection
+fail, the priority hierarchy is used for diagnostics:
+
+```py
+from ty_extensions import Intersection, Top
+from typing import Callable
+
+class A: ...
+class B: ...
+
+def _(
+    f: Intersection[Callable[[int], A], Top[Callable[..., B]]] | Callable[[str], int],
+) -> None:
+    reveal_type(f)  # revealed: (((int, /) -> A) & Top[(...) -> B]) | ((str, /) -> int)
+
+    # When called with a string argument:
+    # - The intersection element: Callable[[int], A] fails (wrong type),
+    #   Top[...] would fail with call-top-callable. Due to priority hierarchy,
+    #   only the invalid-argument-type error is shown for the intersection.
+    # - The Callable[[str], int] element succeeds.
+    # The return type includes both elements' return types:
+    # error: [invalid-argument-type]
+    reveal_type(f("hello"))  # revealed: (A & B) | int
+```
+
+### All union elements succeed
+
+When all union elements succeed, the return type is the union of each element's return type. For
+intersection elements, the return type is itself an intersection of the successful bindings:
+
+```py
+from ty_extensions import Intersection
+from typing import Callable
+
+class A: ...
+class B: ...
+
+class ReturnsA:
+    def __call__(self, x: int) -> A:
+        return A()
+
+class ReturnsB:
+    def __call__(self, x: int) -> B:
+        return B()
+
+def _(
+    f: Intersection[ReturnsA, ReturnsB] | Callable[[int], str],
+) -> None:
+    reveal_type(f)  # revealed: (ReturnsA & ReturnsB) | ((int, /) -> str)
+    reveal_type(f(42))  # revealed: (A & B) | str
+```
+
+### All union elements fail
+
+When all union elements fail (including intersection elements), errors are reported for each:
+
+```py
+from ty_extensions import Intersection, Top
+from typing import Callable
+
+class A: ...
+class B: ...
+
+def _(
+    f: Intersection[Callable[[int], A], Top[Callable[..., B]]] | Callable[[str], int],
+) -> None:
+    reveal_type(f)  # revealed: (((int, /) -> A) & Top[(...) -> B]) | ((str, /) -> int)
+
+    # When called with no arguments:
+    # - The intersection element: Callable[[int], A] fails (missing argument),
+    #   Top[...] would fail with call-top-callable. Due to priority hierarchy,
+    #   only the missing-argument error is shown.
+    # - The Callable[[str], int] also fails (missing argument).
+    # error: [missing-argument]
+    # error: [missing-argument]
+    f()
 ```
 
 ## Invalid

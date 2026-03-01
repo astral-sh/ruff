@@ -1,0 +1,63 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: final.md - Tests for the `@typing(_extensions).final` decorator - A `@final` class must implement all abstract methods - Diagnostic when there are many abstract methods
+mdtest path: crates/ty_python_semantic/resources/mdtest/final.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from abc import ABC, abstractmethod
+ 2 | from typing import final
+ 3 | 
+ 4 | @final
+ 5 | # error: [abstract-method-in-final-class] "Final class `Abstract` has 10 unimplemented abstract methods, including `aaaaaaaaaa`, `bbbbbbbb` and `cccccccc`"
+ 6 | class Abstract(ABC):
+ 7 |     @abstractmethod
+ 8 |     def aaaaaaaaaa(self) -> int: ...
+ 9 |     @abstractmethod
+10 |     def bbbbbbbb(self) -> int: ...
+11 |     @abstractmethod
+12 |     def cccccccc(self) -> int: ...
+13 |     @abstractmethod
+14 |     def ddddddddd(self) -> int: ...
+15 |     @abstractmethod
+16 |     def eeeeeeeee(self) -> int: ...
+17 |     @abstractmethod
+18 |     def ffffffff(self) -> int: ...
+19 |     @abstractmethod
+20 |     def ggggggg(self) -> int: ...
+21 |     @abstractmethod
+22 |     def hhhhhhhh(self) -> int: ...
+23 |     @abstractmethod
+24 |     def iiiiiiiii(self) -> int: ...
+25 |     @abstractmethod
+26 |     def kkkkkkkkkk(self) -> int: ...
+```
+
+# Diagnostics
+
+```
+error[abstract-method-in-final-class]: Final class `Abstract` has unimplemented abstract methods
+  --> src/mdtest_snippet.py:6:7
+   |
+ 4 | @final
+ 5 | # error: [abstract-method-in-final-class] "Final class `Abstract` has 10 unimplemented abstract methods, including `aaaaaaaaaa`, `bbbb…
+ 6 | class Abstract(ABC):
+   |       ^^^^^^^^ 10 abstract methods are unimplemented, including `aaaaaaaaaa`, `bbbbbbbb` and `cccccccc`
+ 7 |     @abstractmethod
+ 8 |     def aaaaaaaaaa(self) -> int: ...
+   |         ---------- `aaaaaaaaaa` declared as abstract
+ 9 |     @abstractmethod
+10 |     def bbbbbbbb(self) -> int: ...
+   |
+info: Use `--verbose` to see all 10 unimplemented abstract methods
+info: rule `abstract-method-in-final-class` is enabled by default
+
+```

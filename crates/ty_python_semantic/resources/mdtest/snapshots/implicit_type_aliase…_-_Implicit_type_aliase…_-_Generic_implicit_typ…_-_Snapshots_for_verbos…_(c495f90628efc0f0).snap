@@ -1,0 +1,81 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: implicit_type_aliases.md - Implicit type aliases - Generic implicit type aliases - Snapshots for verbose diagnostics
+mdtest path: crates/ty_python_semantic/resources/mdtest/implicit_type_aliases.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | type ListOfInts2 = list[int]
+ 2 | 
+ 3 | # error: [not-subscriptable] "Cannot subscript non-generic type alias `ListOfInts2`"
+ 4 | DoublySpecialized = ListOfInts2[int]
+ 5 | 
+ 6 | ThreeInts = tuple[int, int, int]
+ 7 | 
+ 8 | class A[T]: ...
+ 9 | 
+10 | AliasForA = A[int]
+11 | 
+12 | def f(
+13 |     a: AliasForA[int],  # error: [not-subscriptable]
+14 |     b: ThreeInts[int],  # error: [not-subscriptable]
+15 | ): ...
+```
+
+# Diagnostics
+
+```
+error[not-subscriptable]: Cannot subscript non-generic type alias `ListOfInts2`
+ --> src/mdtest_snippet.py:4:21
+  |
+3 | # error: [not-subscriptable] "Cannot subscript non-generic type alias `ListOfInts2`"
+4 | DoublySpecialized = ListOfInts2[int]
+  |                     -----------^^^^^
+  |                     |
+  |                     Alias to `list[int]`, which is already specialized
+5 |
+6 | ThreeInts = tuple[int, int, int]
+  |
+info: rule `not-subscriptable` is enabled by default
+
+```
+
+```
+error[not-subscriptable]: Cannot subscript non-generic type `<class 'A[int]'>`
+  --> src/mdtest_snippet.py:13:8
+   |
+12 | def f(
+13 |     a: AliasForA[int],  # error: [not-subscriptable]
+   |        ---------^^^^^
+   |        |
+   |        Type is already specialized
+14 |     b: ThreeInts[int],  # error: [not-subscriptable]
+15 | ): ...
+   |
+info: rule `not-subscriptable` is enabled by default
+
+```
+
+```
+error[not-subscriptable]: Cannot subscript non-generic type `<class 'tuple[int, int, int]'>`
+  --> src/mdtest_snippet.py:14:8
+   |
+12 | def f(
+13 |     a: AliasForA[int],  # error: [not-subscriptable]
+14 |     b: ThreeInts[int],  # error: [not-subscriptable]
+   |        ---------^^^^^
+   |        |
+   |        Type is already specialized
+15 | ): ...
+   |
+info: rule `not-subscriptable` is enabled by default
+
+```

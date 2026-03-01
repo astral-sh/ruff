@@ -106,7 +106,7 @@ fn substitution_cost(char_a: char, char_b: char) -> CharacterMatch {
 }
 
 /// The result of comparing two characters.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum CharacterMatch {
     Exact,
     CaseInsensitive,

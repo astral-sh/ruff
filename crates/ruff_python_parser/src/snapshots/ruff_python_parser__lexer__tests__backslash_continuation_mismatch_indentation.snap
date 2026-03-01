@@ -1,0 +1,62 @@
+---
+source: crates/ruff_python_parser/src/lexer.rs
+expression: "lex_invalid(&source, Mode::Module)"
+---
+## Tokens
+```
+[
+    (
+        If,
+        0..2,
+    ),
+    (
+        True,
+        3..7,
+    ),
+    (
+        Colon,
+        7..8,
+    ),
+    (
+        Newline,
+        8..9,
+    ),
+    (
+        Indent,
+        9..13,
+    ),
+    (
+        Int(
+            1,
+        ),
+        13..14,
+    ),
+    (
+        Newline,
+        14..15,
+    ),
+    (
+        Unknown,
+        15..23,
+    ),
+    (
+        Int(
+            2,
+        ),
+        23..24,
+    ),
+    (
+        Newline,
+        24..25,
+    ),
+]
+```
+## Errors
+```
+[
+    LexicalError {
+        error: IndentationError,
+        location: 15..23,
+    },
+]
+```

@@ -2798,6 +2798,16 @@ watermelon
             self
         }
 
+        /// Adds a sub-diagnostic constructed with this diagnostic's environment.
+        fn sub(
+            mut self,
+            f: impl Fn(&mut TestEnvironment) -> SubDiagnostic,
+        ) -> DiagnosticBuilder<'e> {
+            let sub = f(self.env);
+            self.diag.sub(sub);
+            self
+        }
+
         /// Set the documentation URL for the diagnostic.
         pub(super) fn documentation_url(mut self, url: impl Into<String>) -> DiagnosticBuilder<'e> {
             self.diag.set_documentation_url(Some(url.into()));
@@ -2901,7 +2911,7 @@ def fibonacci(n):
     elif n == 1:
         return 1
     else:
-        return fibonacci(n - 1) + fibonacci(n - 2)
+        return fibonaccii(n - 1) + fibonacci(n - 2)
 "#,
         );
         env.add("undef.py", r"if a == 1: pass");
@@ -2940,6 +2950,26 @@ def fibonacci(n):
                 .noqa_offset(TextSize::from(3))
                 .documentation_url("https://docs.astral.sh/ruff/rules/undefined-name")
                 .build(),
+            env.builder(
+                "undefined-name",
+                Severity::Error,
+                "Undefined name `fibonaccii`",
+            )
+            .primary("fib.py", "12:15", "12:25", "")
+            .secondary_code("F821")
+            .noqa_offset(ruff_text_size::TextSize::from(0))
+            .documentation_url("https://docs.astral.sh/ruff/rules/undefined-name")
+            .secondary("fib.py", "12:35", "12:36", "")
+            .sub(|env| {
+                env.sub_builder(
+                    SubDiagnosticSeverity::Info,
+                    "Did you mean to import it from `/some/path/def.py`?",
+                )
+                .primary("fib.py", "4:4", "4:13", "`fibonacci` is defined here")
+                .secondary("fib.py", "5:4", "5", "`fibonacci` is documented here")
+                .build()
+            })
+            .build(),
         ];
 
         (env, diagnostics)
@@ -2971,36 +3001,6 @@ if call(foo
         ];
 
         (env, diagnostics)
-    }
-
-    /// Create Ruff-style diagnostics with sub-diagnostics for testing the various output formats.
-    pub(crate) fn create_sub_diagnostics(
-        format: DiagnosticFormat,
-    ) -> (TestEnvironment, Vec<Diagnostic>) {
-        let mut env = TestEnvironment::new();
-        env.add("/some/path/def.py", "def f(): pass");
-        env.add("call.py", "f()");
-        env.format(format);
-
-        let mut primary_diagnostic = env
-            .builder("undefined-name", Severity::Error, "Undefined name `f`")
-            .primary("call.py", "1:0", "1:1", "")
-            .secondary_code("F821")
-            .noqa_offset(ruff_text_size::TextSize::from(0))
-            .documentation_url("https://docs.astral.sh/ruff/rules/undefined-name")
-            .build();
-
-        let sub_diagnostic = env
-            .sub_builder(
-                SubDiagnosticSeverity::Info,
-                "Did you mean to import it from `/some/path/def.py`?",
-            )
-            .primary("/some/path/def.py", "1:4", "1:5", "`f` is defined here")
-            .build();
-
-        primary_diagnostic.sub(sub_diagnostic);
-
-        (env, vec![primary_diagnostic])
     }
 
     /// A Jupyter notebook for testing diagnostics.

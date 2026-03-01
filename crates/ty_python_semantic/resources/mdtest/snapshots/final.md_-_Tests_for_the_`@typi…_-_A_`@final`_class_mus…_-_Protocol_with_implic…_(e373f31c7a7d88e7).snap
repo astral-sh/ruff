@@ -168,17 +168,17 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/final.md
 # Diagnostics
 
 ```
-error[abstract-method-in-final-class]: Final class `Q` does not implement abstract method `still_abstractmethod`
+error[abstract-method-in-final-class]: Final class `Q` has unimplemented abstract methods
   --> src/mdtest_snippet.py:11:9
    |
  9 |     # would probably be subtle and surprising to many users. This also matches the
 10 |     # behaviour of all other type checkers
 11 |     def still_abstractmethod(self): ...
-   |         -------------------- `still_abstractmethod` defined as abstract on superclass `P`
+   |         -------------------- `still_abstractmethod` declared as abstract on superclass `P`
 12 |
 13 | @final
 14 | class Q(P): ...  # error: [abstract-method-in-final-class]
-   |       ^
+   |       ^ `still_abstractmethod` is unimplemented
 15 |
 16 | class R(Protocol):
    |
@@ -188,7 +188,7 @@ info: `P.still_abstractmethod` is implicitly abstract because `P` is a `Protocol
 1 | from typing_extensions import Protocol, final, Never, overload
 2 |
 3 | class P(Protocol):
-  |       ^^^^^^^^^^^ `P` declared here
+  |       ----------- `P` declared here
 4 |     # There'd be no unsoundness here if a subclass of this
 5 |     # class were to be instantiated without the method having been overridden:
   |
@@ -198,17 +198,17 @@ info: rule `abstract-method-in-final-class` is enabled by default
 ```
 
 ```
-error[abstract-method-in-final-class]: Final class `S` does not implement abstract method `also_still_abstractmethod`
+error[abstract-method-in-final-class]: Final class `S` has unimplemented abstract methods
   --> src/mdtest_snippet.py:18:9
    |
 16 | class R(Protocol):
 17 |     # same here
 18 |     def also_still_abstractmethod(self) -> None: ...
-   |         ------------------------- `also_still_abstractmethod` defined as abstract on superclass `R`
+   |         ------------------------- `also_still_abstractmethod` declared as abstract on superclass `R`
 19 |
 20 | @final
 21 | class S(R): ...  # error: [abstract-method-in-final-class]
-   |       ^
+   |       ^ `also_still_abstractmethod` is unimplemented
 22 |
 23 | class Raises(Protocol):
    |
@@ -218,7 +218,7 @@ info: `R.also_still_abstractmethod` is implicitly abstract because `R` is a `Pro
 14 | class Q(P): ...  # error: [abstract-method-in-final-class]
 15 |
 16 | class R(Protocol):
-   |       ^^^^^^^^^^^ `R` declared here
+   |       ----------- `R` declared here
 17 |     # same here
 18 |     def also_still_abstractmethod(self) -> None: ...
    |
@@ -228,12 +228,12 @@ info: rule `abstract-method-in-final-class` is enabled by default
 ```
 
 ```
-error[abstract-method-in-final-class]: Final class `RaisesSub` does not implement abstract method `even_this_is_abstract`
+error[abstract-method-in-final-class]: Final class `RaisesSub` has unimplemented abstract methods
   --> src/mdtest_snippet.py:28:7
    |
 27 | @final
 28 | class RaisesSub(Raises): ...  # error: [abstract-method-in-final-class]
-   |       ^^^^^^^^^
+   |       ^^^^^^^^^ `even_this_is_abstract` is unimplemented
 29 |
 30 | class AlsoRaises(Protocol):
    |
@@ -241,7 +241,7 @@ error[abstract-method-in-final-class]: Final class `RaisesSub` does not implemen
    |
 23 | class Raises(Protocol):
 24 |     def even_this_is_abstract(self):
-   |         --------------------- `even_this_is_abstract` defined as abstract on superclass `Raises`
+   |         --------------------- `even_this_is_abstract` declared as abstract on superclass `Raises`
 25 |         raise NotImplementedError
    |
 info: `Raises.even_this_is_abstract` is implicitly abstract because `Raises` is a `Protocol` class and `even_this_is_abstract` lacks an implementation
@@ -250,7 +250,7 @@ info: `Raises.even_this_is_abstract` is implicitly abstract because `Raises` is 
 21 | class S(R): ...  # error: [abstract-method-in-final-class]
 22 |
 23 | class Raises(Protocol):
-   |       ^^^^^^^^^^^^^^^^ `Raises` declared here
+   |       ---------------- `Raises` declared here
 24 |     def even_this_is_abstract(self):
 25 |         raise NotImplementedError
    |
@@ -259,12 +259,12 @@ info: rule `abstract-method-in-final-class` is enabled by default
 ```
 
 ```
-error[abstract-method-in-final-class]: Final class `AlsoRaisesSub` does not implement abstract method `also_abstractmethod`
+error[abstract-method-in-final-class]: Final class `AlsoRaisesSub` has unimplemented abstract methods
   --> src/mdtest_snippet.py:35:7
    |
 34 | @final
 35 | class AlsoRaisesSub(AlsoRaises): ...  # error: [abstract-method-in-final-class]
-   |       ^^^^^^^^^^^^^
+   |       ^^^^^^^^^^^^^ `also_abstractmethod` is unimplemented
 36 |
 37 | type NotImplementedErrorAlias = NotImplementedError
    |
@@ -272,7 +272,7 @@ error[abstract-method-in-final-class]: Final class `AlsoRaisesSub` does not impl
    |
 30 | class AlsoRaises(Protocol):
 31 |     def also_abstractmethod(self) -> Never:
-   |         ------------------- `also_abstractmethod` defined as abstract on superclass `AlsoRaises`
+   |         ------------------- `also_abstractmethod` declared as abstract on superclass `AlsoRaises`
 32 |         raise NotImplementedError
    |
 info: `AlsoRaises.also_abstractmethod` is implicitly abstract because `AlsoRaises` is a `Protocol` class and `also_abstractmethod` lacks an implementation
@@ -281,7 +281,7 @@ info: `AlsoRaises.also_abstractmethod` is implicitly abstract because `AlsoRaise
 28 | class RaisesSub(Raises): ...  # error: [abstract-method-in-final-class]
 29 |
 30 | class AlsoRaises(Protocol):
-   |       ^^^^^^^^^^^^^^^^^^^^ `AlsoRaises` declared here
+   |       -------------------- `AlsoRaises` declared here
 31 |     def also_abstractmethod(self) -> Never:
 32 |         raise NotImplementedError
    |
@@ -290,12 +290,12 @@ info: rule `abstract-method-in-final-class` is enabled by default
 ```
 
 ```
-error[abstract-method-in-final-class]: Final class `StrangeSub` does not implement abstract method `weird_abstractmethod`
+error[abstract-method-in-final-class]: Final class `StrangeSub` has unimplemented abstract methods
   --> src/mdtest_snippet.py:45:11
    |
 44 |     @final
 45 |     class StrangeSub(Strange): ...  # error: [abstract-method-in-final-class]
-   |           ^^^^^^^^^^
+   |           ^^^^^^^^^^ `weird_abstractmethod` is unimplemented
 46 |
 47 | class HasOverloads(Protocol):
    |
@@ -304,7 +304,7 @@ error[abstract-method-in-final-class]: Final class `StrangeSub` does not impleme
 39 | def _(x: NotImplementedErrorAlias):
 40 |     class Strange(Protocol):
 41 |         def weird_abstractmethod(self):
-   |             -------------------- `weird_abstractmethod` defined as abstract on superclass `Strange`
+   |             -------------------- `weird_abstractmethod` declared as abstract on superclass `Strange`
 42 |             raise x
    |
 info: `Strange.weird_abstractmethod` is implicitly abstract because `Strange` is a `Protocol` class and `weird_abstractmethod` lacks an implementation
@@ -312,7 +312,7 @@ info: `Strange.weird_abstractmethod` is implicitly abstract because `Strange` is
    |
 39 | def _(x: NotImplementedErrorAlias):
 40 |     class Strange(Protocol):
-   |           ^^^^^^^^^^^^^^^^^ `Strange` declared here
+   |           ----------------- `Strange` declared here
 41 |         def weird_abstractmethod(self):
 42 |             raise x
    |
@@ -321,17 +321,17 @@ info: rule `abstract-method-in-final-class` is enabled by default
 ```
 
 ```
-error[abstract-method-in-final-class]: Final class `HasOverloadSub` does not implement abstract method `foo`
+error[abstract-method-in-final-class]: Final class `HasOverloadSub` has unimplemented abstract methods
   --> src/mdtest_snippet.py:51:9
    |
 49 |     def foo(self) -> int: ...
 50 |     @overload
 51 |     def foo(self, x: int) -> str: ...
-   |         --- `foo` defined as abstract on superclass `HasOverloads`
+   |         --- `foo` declared as abstract on superclass `HasOverloads`
 52 |
 53 | @final
 54 | class HasOverloadSub(HasOverloads): ...  # error: [abstract-method-in-final-class]
-   |       ^^^^^^^^^^^^^^
+   |       ^^^^^^^^^^^^^^ `foo` is unimplemented
 55 |
 56 | class RaisesDifferentException(Protocol):
    |
@@ -341,7 +341,7 @@ info: `HasOverloads.foo` is implicitly abstract because `HasOverloads` is a `Pro
 45 |     class StrangeSub(Strange): ...  # error: [abstract-method-in-final-class]
 46 |
 47 | class HasOverloads(Protocol):
-   |       ^^^^^^^^^^^^^^^^^^^^^^ `HasOverloads` declared here
+   |       ---------------------- `HasOverloads` declared here
 48 |     @overload
 49 |     def foo(self) -> int: ...
    |
@@ -350,12 +350,12 @@ info: rule `abstract-method-in-final-class` is enabled by default
 ```
 
 ```
-error[abstract-method-in-final-class]: Final class `HasAbstractSub` does not implement abstract method `a`
+error[abstract-method-in-final-class]: Final class `HasAbstractSub` has unimplemented abstract methods
    --> src/mdtest_snippet.py:123:7
     |
 122 | @final
 123 | class HasAbstractSub(HasAbstract): ...  # error: [abstract-method-in-final-class]
-    |       ^^^^^^^^^^^^^^
+    |       ^^^^^^^^^^^^^^ `a` is unimplemented
 124 |
 125 | @final
     |
@@ -363,7 +363,7 @@ error[abstract-method-in-final-class]: Final class `HasAbstractSub` does not imp
     |
  71 | class HasAbstract(Protocol):
  72 |     def a(self) -> int: ...
-    |         - `a` defined as abstract on superclass `HasAbstract`
+    |         - `a` declared as abstract on superclass `HasAbstract`
  73 |
  74 | class HasAbstract2(Protocol):
     |
@@ -373,7 +373,7 @@ info: `HasAbstract.a` is implicitly abstract because `HasAbstract` is a `Protoco
 69 | class RaisesMultipleSub(RaisesMultiple): ...
 70 |
 71 | class HasAbstract(Protocol):
-   |       ^^^^^^^^^^^^^^^^^^^^^ `HasAbstract` declared here
+   |       --------------------- `HasAbstract` declared here
 72 |     def a(self) -> int: ...
    |
 info: rule `abstract-method-in-final-class` is enabled by default
@@ -381,12 +381,12 @@ info: rule `abstract-method-in-final-class` is enabled by default
 ```
 
 ```
-error[abstract-method-in-final-class]: Final class `HasAbstract2Sub` does not implement abstract method `a`
+error[abstract-method-in-final-class]: Final class `HasAbstract2Sub` has unimplemented abstract methods
    --> src/mdtest_snippet.py:126:7
     |
 125 | @final
 126 | class HasAbstract2Sub(HasAbstract2): ...  # error: [abstract-method-in-final-class]
-    |       ^^^^^^^^^^^^^^^
+    |       ^^^^^^^^^^^^^^^ `a` is unimplemented
 127 |
 128 | @final
     |
@@ -394,7 +394,7 @@ error[abstract-method-in-final-class]: Final class `HasAbstract2Sub` does not im
     |
  74 | class HasAbstract2(Protocol):
  75 |     def a(self) -> int:
-    |         - `a` defined as abstract on superclass `HasAbstract2`
+    |         - `a` declared as abstract on superclass `HasAbstract2`
  76 |         pass
     |
 info: `HasAbstract2.a` is implicitly abstract because `HasAbstract2` is a `Protocol` class and `a` lacks an implementation
@@ -403,7 +403,7 @@ info: `HasAbstract2.a` is implicitly abstract because `HasAbstract2` is a `Proto
 72 |     def a(self) -> int: ...
 73 |
 74 | class HasAbstract2(Protocol):
-   |       ^^^^^^^^^^^^^^^^^^^^^^ `HasAbstract2` declared here
+   |       ---------------------- `HasAbstract2` declared here
 75 |     def a(self) -> int:
 76 |         pass
    |
@@ -412,12 +412,12 @@ info: rule `abstract-method-in-final-class` is enabled by default
 ```
 
 ```
-error[abstract-method-in-final-class]: Final class `HasAbstract3Sub` does not implement abstract method `a`
+error[abstract-method-in-final-class]: Final class `HasAbstract3Sub` has unimplemented abstract methods
    --> src/mdtest_snippet.py:129:7
     |
 128 | @final
 129 | class HasAbstract3Sub(HasAbstract4): ...  # error: [abstract-method-in-final-class]
-    |       ^^^^^^^^^^^^^^^
+    |       ^^^^^^^^^^^^^^^ `a` is unimplemented
 130 |
 131 | @final
     |
@@ -425,7 +425,7 @@ error[abstract-method-in-final-class]: Final class `HasAbstract3Sub` does not im
     |
  82 | class HasAbstract4(Protocol):
  83 |     def a(self) -> int:
-    |         - `a` defined as abstract on superclass `HasAbstract4`
+    |         - `a` declared as abstract on superclass `HasAbstract4`
  84 |         """My awesome docs"""
  85 |         ...
     |
@@ -435,7 +435,7 @@ info: `HasAbstract4.a` is implicitly abstract because `HasAbstract4` is a `Proto
 80 |         """My awesome docs"""
 81 |
 82 | class HasAbstract4(Protocol):
-   |       ^^^^^^^^^^^^^^^^^^^^^^ `HasAbstract4` declared here
+   |       ---------------------- `HasAbstract4` declared here
 83 |     def a(self) -> int:
 84 |         """My awesome docs"""
    |
@@ -444,12 +444,12 @@ info: rule `abstract-method-in-final-class` is enabled by default
 ```
 
 ```
-error[abstract-method-in-final-class]: Final class `HasAbstract4Sub` does not implement abstract method `a`
+error[abstract-method-in-final-class]: Final class `HasAbstract4Sub` has unimplemented abstract methods
    --> src/mdtest_snippet.py:132:7
     |
 131 | @final
 132 | class HasAbstract4Sub(HasAbstract4): ...  # error: [abstract-method-in-final-class]
-    |       ^^^^^^^^^^^^^^^
+    |       ^^^^^^^^^^^^^^^ `a` is unimplemented
 133 |
 134 | @final
     |
@@ -457,7 +457,7 @@ error[abstract-method-in-final-class]: Final class `HasAbstract4Sub` does not im
     |
  82 | class HasAbstract4(Protocol):
  83 |     def a(self) -> int:
-    |         - `a` defined as abstract on superclass `HasAbstract4`
+    |         - `a` declared as abstract on superclass `HasAbstract4`
  84 |         """My awesome docs"""
  85 |         ...
     |
@@ -467,7 +467,7 @@ info: `HasAbstract4.a` is implicitly abstract because `HasAbstract4` is a `Proto
 80 |         """My awesome docs"""
 81 |
 82 | class HasAbstract4(Protocol):
-   |       ^^^^^^^^^^^^^^^^^^^^^^ `HasAbstract4` declared here
+   |       ---------------------- `HasAbstract4` declared here
 83 |     def a(self) -> int:
 84 |         """My awesome docs"""
    |
@@ -476,12 +476,12 @@ info: rule `abstract-method-in-final-class` is enabled by default
 ```
 
 ```
-error[abstract-method-in-final-class]: Final class `HasAbstract5Sub` does not implement abstract method `a`
+error[abstract-method-in-final-class]: Final class `HasAbstract5Sub` has unimplemented abstract methods
    --> src/mdtest_snippet.py:135:7
     |
 134 | @final
 135 | class HasAbstract5Sub(HasAbstract5): ...  # error: [abstract-method-in-final-class]
-    |       ^^^^^^^^^^^^^^^
+    |       ^^^^^^^^^^^^^^^ `a` is unimplemented
 136 |
 137 | @final
     |
@@ -489,7 +489,7 @@ error[abstract-method-in-final-class]: Final class `HasAbstract5Sub` does not im
     |
  87 | class HasAbstract5(Protocol):
  88 |     def a(self) -> int:
-    |         - `a` defined as abstract on superclass `HasAbstract5`
+    |         - `a` declared as abstract on superclass `HasAbstract5`
  89 |         """My awesome docs"""
  90 |         pass
     |
@@ -499,7 +499,7 @@ info: `HasAbstract5.a` is implicitly abstract because `HasAbstract5` is a `Proto
 85 |         ...
 86 |
 87 | class HasAbstract5(Protocol):
-   |       ^^^^^^^^^^^^^^^^^^^^^^ `HasAbstract5` declared here
+   |       ---------------------- `HasAbstract5` declared here
 88 |     def a(self) -> int:
 89 |         """My awesome docs"""
    |
@@ -508,12 +508,12 @@ info: rule `abstract-method-in-final-class` is enabled by default
 ```
 
 ```
-error[abstract-method-in-final-class]: Final class `HasAbstract6Sub` does not implement abstract method `a`
+error[abstract-method-in-final-class]: Final class `HasAbstract6Sub` has unimplemented abstract methods
    --> src/mdtest_snippet.py:138:7
     |
 137 | @final
 138 | class HasAbstract6Sub(HasAbstract6): ...  # error: [abstract-method-in-final-class]
-    |       ^^^^^^^^^^^^^^^
+    |       ^^^^^^^^^^^^^^^ `a` is unimplemented
 139 |
 140 | @final
     |
@@ -521,7 +521,7 @@ error[abstract-method-in-final-class]: Final class `HasAbstract6Sub` does not im
     |
  92 | class HasAbstract6(Protocol):
  93 |     def a(self) -> int:
-    |         - `a` defined as abstract on superclass `HasAbstract6`
+    |         - `a` declared as abstract on superclass `HasAbstract6`
  94 |         """My awesome docs"""
  95 |         pass
     |
@@ -531,7 +531,7 @@ info: `HasAbstract6.a` is implicitly abstract because `HasAbstract6` is a `Proto
 90 |         pass
 91 |
 92 | class HasAbstract6(Protocol):
-   |       ^^^^^^^^^^^^^^^^^^^^^^ `HasAbstract6` declared here
+   |       ---------------------- `HasAbstract6` declared here
 93 |     def a(self) -> int:
 94 |         """My awesome docs"""
    |
@@ -540,12 +540,12 @@ info: rule `abstract-method-in-final-class` is enabled by default
 ```
 
 ```
-error[abstract-method-in-final-class]: Final class `HasAbstract7Sub` does not implement abstract method `a`
+error[abstract-method-in-final-class]: Final class `HasAbstract7Sub` has unimplemented abstract methods
    --> src/mdtest_snippet.py:141:7
     |
 140 | @final
 141 | class HasAbstract7Sub(HasAbstract7): ...  # error: [abstract-method-in-final-class]
-    |       ^^^^^^^^^^^^^^^
+    |       ^^^^^^^^^^^^^^^ `a` is unimplemented
 142 |
 143 | @final
     |
@@ -553,7 +553,7 @@ error[abstract-method-in-final-class]: Final class `HasAbstract7Sub` does not im
     |
 104 | class HasAbstract7(Protocol):
 105 |     def a(self) -> int:
-    |         - `a` defined as abstract on superclass `HasAbstract7`
+    |         - `a` declared as abstract on superclass `HasAbstract7`
 106 |         raise NotImplementedError
     |
 info: `HasAbstract7.a` is implicitly abstract because `HasAbstract7` is a `Protocol` class and `a` lacks an implementation
@@ -562,7 +562,7 @@ info: `HasAbstract7.a` is implicitly abstract because `HasAbstract7` is a `Proto
 102 |         ...
 103 |
 104 | class HasAbstract7(Protocol):
-    |       ^^^^^^^^^^^^^^^^^^^^^^ `HasAbstract7` declared here
+    |       ---------------------- `HasAbstract7` declared here
 105 |     def a(self) -> int:
 106 |         raise NotImplementedError
     |
@@ -571,12 +571,12 @@ info: rule `abstract-method-in-final-class` is enabled by default
 ```
 
 ```
-error[abstract-method-in-final-class]: Final class `HasAbstract8Sub` does not implement abstract method `a`
+error[abstract-method-in-final-class]: Final class `HasAbstract8Sub` has unimplemented abstract methods
    --> src/mdtest_snippet.py:144:7
     |
 143 | @final
 144 | class HasAbstract8Sub(HasAbstract8): ...  # error: [abstract-method-in-final-class]
-    |       ^^^^^^^^^^^^^^^
+    |       ^^^^^^^^^^^^^^^ `a` is unimplemented
 145 |
 146 | @final
     |
@@ -584,7 +584,7 @@ error[abstract-method-in-final-class]: Final class `HasAbstract8Sub` does not im
     |
 108 | class HasAbstract8(Protocol):
 109 |     def a(self) -> int:
-    |         - `a` defined as abstract on superclass `HasAbstract8`
+    |         - `a` declared as abstract on superclass `HasAbstract8`
 110 |         raise NotImplementedError()
     |
 info: `HasAbstract8.a` is implicitly abstract because `HasAbstract8` is a `Protocol` class and `a` lacks an implementation
@@ -593,7 +593,7 @@ info: `HasAbstract8.a` is implicitly abstract because `HasAbstract8` is a `Proto
 106 |         raise NotImplementedError
 107 |
 108 | class HasAbstract8(Protocol):
-    |       ^^^^^^^^^^^^^^^^^^^^^^ `HasAbstract8` declared here
+    |       ---------------------- `HasAbstract8` declared here
 109 |     def a(self) -> int:
 110 |         raise NotImplementedError()
     |
@@ -602,12 +602,12 @@ info: rule `abstract-method-in-final-class` is enabled by default
 ```
 
 ```
-error[abstract-method-in-final-class]: Final class `HasAbstract9Sub` does not implement abstract method `a`
+error[abstract-method-in-final-class]: Final class `HasAbstract9Sub` has unimplemented abstract methods
    --> src/mdtest_snippet.py:147:7
     |
 146 | @final
 147 | class HasAbstract9Sub(HasAbstract9): ...  # error: [abstract-method-in-final-class]
-    |       ^^^^^^^^^^^^^^^
+    |       ^^^^^^^^^^^^^^^ `a` is unimplemented
 148 |
 149 | @final
     |
@@ -615,7 +615,7 @@ error[abstract-method-in-final-class]: Final class `HasAbstract9Sub` does not im
     |
 112 | class HasAbstract9(Protocol):
 113 |     def a(self) -> int:
-    |         - `a` defined as abstract on superclass `HasAbstract9`
+    |         - `a` declared as abstract on superclass `HasAbstract9`
 114 |         """My awesome docs"""
 115 |         raise NotImplementedError
     |
@@ -625,7 +625,7 @@ info: `HasAbstract9.a` is implicitly abstract because `HasAbstract9` is a `Proto
 110 |         raise NotImplementedError()
 111 |
 112 | class HasAbstract9(Protocol):
-    |       ^^^^^^^^^^^^^^^^^^^^^^ `HasAbstract9` declared here
+    |       ---------------------- `HasAbstract9` declared here
 113 |     def a(self) -> int:
 114 |         """My awesome docs"""
     |
@@ -634,18 +634,18 @@ info: rule `abstract-method-in-final-class` is enabled by default
 ```
 
 ```
-error[abstract-method-in-final-class]: Final class `HasAbstract10Sub` does not implement abstract method `a`
+error[abstract-method-in-final-class]: Final class `HasAbstract10Sub` has unimplemented abstract methods
    --> src/mdtest_snippet.py:150:7
     |
 149 | @final
 150 | class HasAbstract10Sub(HasAbstract10): ...  # error: [abstract-method-in-final-class]
-    |       ^^^^^^^^^^^^^^^^
+    |       ^^^^^^^^^^^^^^^^ `a` is unimplemented
     |
    ::: src/mdtest_snippet.py:118:9
     |
 117 | class HasAbstract10(Protocol):
 118 |     def a(self) -> int:
-    |         - `a` defined as abstract on superclass `HasAbstract10`
+    |         - `a` declared as abstract on superclass `HasAbstract10`
 119 |         """My awesome docs"""
 120 |         raise NotImplementedError()
     |
@@ -655,7 +655,7 @@ info: `HasAbstract10.a` is implicitly abstract because `HasAbstract10` is a `Pro
 115 |         raise NotImplementedError
 116 |
 117 | class HasAbstract10(Protocol):
-    |       ^^^^^^^^^^^^^^^^^^^^^^^ `HasAbstract10` declared here
+    |       ----------------------- `HasAbstract10` declared here
 118 |     def a(self) -> int:
 119 |         """My awesome docs"""
     |

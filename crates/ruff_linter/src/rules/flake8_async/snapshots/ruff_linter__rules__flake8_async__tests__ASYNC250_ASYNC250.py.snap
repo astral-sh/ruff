@@ -27,3 +27,12 @@ ASYNC250 Blocking call to `input()` in async context
    |     ^^^^^^^^^^^^^^
 22 |     fake.input("whatever")  # Ok
    |
+
+ASYNC250 Blocking call to `input()` in async context
+  --> ASYNC250.py:28:5
+   |
+27 | async def main() -> None:
+28 |     input("sync") # should emit here
+   |     ^^^^^
+29 |     await asyncio.to_thread(lambda: input("async")) # but not here
+   |

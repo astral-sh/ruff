@@ -217,6 +217,13 @@ class D(C):
     def get(self, my_default): ...
 ```
 
+Unannotated overrides of overloaded dunder methods should remain accepted.
+
+```pyi
+class C(list[int]):
+    def __getitem__(self, key): ...
+```
+
 ## Non-generic methods on generic classes work as expected
 
 ```toml

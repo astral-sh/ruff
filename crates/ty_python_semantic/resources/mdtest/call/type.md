@@ -490,6 +490,20 @@ reveal_type(T.__bases__)  # revealed: tuple[type, ...]
 reveal_type(T.__mro__)  # revealed: tuple[type, ...]
 ```
 
+`type[Any]` and `type[Unknown]` are gradual forms with an unknown metaclass that is at least `type`.
+Attributes defined as data descriptors on `type` (like `__mro__`) resolve to their declared types
+intersected with `Unknown`, reflecting uncertainty about whether the unknown metaclass overrides
+them:
+
+```py
+from typing import Any
+from ty_extensions import Unknown
+
+def f(a: type[Any], b: type[Unknown]):
+    reveal_type(a.__mro__)  # revealed: tuple[type, ...] & Any
+    reveal_type(b.__mro__)  # revealed: tuple[type, ...] & Unknown
+```
+
 ## Invalid calls
 
 Other numbers of arguments are invalid:
@@ -1049,7 +1063,7 @@ from ty_extensions import reveal_mro
 class MyProtocol(Protocol):
     def method(self) -> int: ...
 
-ProtoImpl = type("ProtoImpl", (MyProtocol,), {})
+ProtoImpl = type("ProtoImpl", (MyProtocol,), {"method": lambda self: 42})
 reveal_type(ProtoImpl)  # revealed: <class 'ProtoImpl'>
 reveal_mro(ProtoImpl)  # revealed: (<class 'ProtoImpl'>, <class 'MyProtocol'>, typing.Protocol, typing.Generic, <class 'object'>)
 
