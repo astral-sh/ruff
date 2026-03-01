@@ -64,8 +64,9 @@ use crate::types::call::bind::{CallableDescription, MatchingOverloadIndex};
 use crate::types::call::{Argument, Binding, Bindings, CallArguments, CallError, CallErrorKind};
 use crate::types::class::{
     AbstractMethod, ClassLiteral, CodeGeneratorKind, DynamicClassAnchor, DynamicClassLiteral,
-    DynamicMetaclassConflict, DynamicNamedTupleAnchor, DynamicNamedTupleLiteral, FieldKind,
-    MetaclassErrorKind, MethodDecorator, NamedTupleField, NamedTupleSpec,
+    DynamicEnumAnchor, DynamicEnumLiteral, DynamicMetaclassConflict, DynamicNamedTupleAnchor,
+    DynamicNamedTupleLiteral, EnumSpec, FieldKind, MetaclassErrorKind, MethodDecorator,
+    NamedTupleField, NamedTupleSpec,
 };
 use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::context::{InNoTypeCheck, InferContext};
@@ -6951,6 +6952,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             Some(definition),
                             namedtuple_kind,
                         )
+                    } else if enum_functional_call_base(self.db(), callable_type).is_some()
+                        && call_expr.arguments.args.len() >= 2
+                    {
+                        self.infer_enum_call_expression(call_expr, Some(definition))
                     } else {
                         match callable_type
                             .as_class_literal()
@@ -8677,6 +8682,135 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let namedtuple = DynamicNamedTupleLiteral::new(db, name, anchor);
 
         Type::ClassLiteral(ClassLiteral::DynamicNamedTuple(namedtuple))
+    }
+
+    fn infer_enum_call_expression(
+        &mut self,
+        call_expr: &ast::ExprCall,
+        definition: Option<Definition<'db>>,
+    ) -> Type<'db> {
+        let db = self.db();
+        let args = &call_expr.arguments.args;
+
+        // infer the name arg
+        let name_type = self.infer_expression(&args[0], TypeContext::default());
+        let name = if let Some(lit) = name_type.as_string_literal() {
+            Name::new(lit.value(db))
+        } else {
+            Name::new_static("<unknown>")
+        };
+
+        // parse the member names from the remaining args
+        let extra_args = &args[1..];
+        let (spec, has_known_members) = self.parse_enum_members(extra_args);
+
+        let spec = EnumSpec::new(db, spec.into_boxed_slice(), has_known_members);
+
+        let anchor = match definition {
+            Some(def) => DynamicEnumAnchor::Definition {
+                definition: def,
+                spec,
+            },
+            None => {
+                let call_node_index = call_expr.node_index.load();
+                let scope = self.scope();
+                let scope_anchor = scope.node(db).node_index().unwrap_or(NodeIndex::from(0));
+                let anchor_u32 = scope_anchor
+                    .as_u32()
+                    .expect("scope anchor should not be NodeIndex::NONE");
+                let call_u32 = call_node_index
+                    .as_u32()
+                    .expect("call node should not be NodeIndex::NONE");
+                DynamicEnumAnchor::ScopeOffset {
+                    scope,
+                    offset: call_u32 - anchor_u32,
+                    spec,
+                }
+            }
+        };
+
+        let enum_lit = DynamicEnumLiteral::new(db, name, anchor);
+        Type::ClassLiteral(ClassLiteral::DynamicEnum(enum_lit))
+    }
+
+    fn parse_enum_members(&mut self, extra_args: &[ast::Expr]) -> (Vec<(Name, Type<'db>)>, bool) {
+        let db = self.db();
+
+        // Enum('Name', 'A B C') or Enum('Name', 'A, B, C') - single string
+        // Enum('Name', ['A', 'B', 'C']) - list/tuple of string literals
+        if extra_args.len() == 1 {
+            let arg = &extra_args[0];
+            // infer the whole arg first (stores sub-expressions for list/tuple elements)
+            let ty = self.infer_expression(arg, TypeContext::default());
+
+            if let Some(string_lit) = ty.as_string_literal() {
+                let s = string_lit.value(db);
+                let names: Vec<Name> = s
+                    .split(|c: char| c == ',' || c.is_whitespace())
+                    .map(str::trim)
+                    .filter(|s| !s.is_empty())
+                    .map(Name::new)
+                    .collect();
+                if names.is_empty() {
+                    return (vec![], false);
+                }
+                let members = names
+                    .into_iter()
+                    .enumerate()
+                    .map(|(i, n)| {
+                        let v = Type::int_literal(i64::try_from(i + 1).unwrap_or(1));
+                        (n, v)
+                    })
+                    .collect();
+                return (members, true);
+            }
+
+            // list/tuple - elements already inferred, use expression_type to retrieve
+            let elts = match arg {
+                ast::Expr::List(list) => Some(list.elts.as_slice()),
+                ast::Expr::Tuple(tup) => Some(tup.elts.as_slice()),
+                _ => None,
+            };
+            if let Some(elts) = elts {
+                return self.parse_enum_members_from_already_inferred(elts);
+            }
+
+            return (vec![], false);
+        }
+
+        // Enum('Name', 'A', 'B', 'C') - multiple string args
+        let mut members = Vec::with_capacity(extra_args.len());
+        for (i, arg) in extra_args.iter().enumerate() {
+            let ty = self.infer_expression(arg, TypeContext::default());
+            if let Some(string_lit) = ty.as_string_literal() {
+                let member_name = Name::new(string_lit.value(db));
+                let v = Type::int_literal(i64::try_from(i + 1).unwrap_or(1));
+                members.push((member_name, v));
+            } else {
+                return (vec![], false);
+            }
+        }
+        (members, true)
+    }
+
+    // retrieve member names from list/tuple elements that have already been inferred
+    fn parse_enum_members_from_already_inferred(
+        &mut self,
+        elts: &[ast::Expr],
+    ) -> (Vec<(Name, Type<'db>)>, bool) {
+        let db = self.db();
+        let mut members = Vec::with_capacity(elts.len());
+        for (i, elt) in elts.iter().enumerate() {
+            let ty = self.expression_type(elt);
+            if let Some(string_lit) = ty.as_string_literal() {
+                let member_name = Name::new(string_lit.value(db));
+                let v = Type::int_literal(i64::try_from(i + 1).unwrap_or(1));
+                members.push((member_name, v));
+            } else {
+                return (vec![], false);
+            }
+        }
+        (members, true)
     }
 
     fn infer_collections_namedtuple_fields(
@@ -12701,6 +12835,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Handle `typing.NamedTuple(typename, fields)` and `collections.namedtuple(typename, field_names)`.
         if let Some(namedtuple_kind) = NamedTupleKind::from_type(self.db(), callable_type) {
             return self.infer_namedtuple_call_expression(call_expression, None, namedtuple_kind);
+        }
+
+        // Handle enum functional form: `Enum('Name', 'A B C')`.
+        if enum_functional_call_base(self.db(), callable_type).is_some()
+            && call_expression.arguments.args.len() >= 2
+        {
+            return self.infer_enum_call_expression(call_expression, None);
         }
 
         // We don't call `Type::try_call`, because we want to perform type inference on the
@@ -18044,6 +18185,14 @@ impl std::fmt::Display for NamedTupleKind {
             NamedTupleKind::Typing => "NamedTuple",
         })
     }
+}
+
+fn enum_functional_call_base<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<KnownClass> {
+    let ClassLiteral::Static(cls) = ty.as_class_literal()? else {
+        return None;
+    };
+    cls.known(db)
+        .filter(|k| matches!(k, KnownClass::Enum | KnownClass::StrEnum))
 }
 
 #[derive(Copy, Clone, Debug)]
