@@ -1083,7 +1083,7 @@ jobs:
         uses: CodSpeedHQ/action@4deb3275dd364fb96fb074c953133d29ec96f80f # v4.10.6
         with:
           mode: simulation
-          run: cargo codspeed run --bench ty ${{ matrix.benchmark }}
+          run: cargo codspeed run --bench ty "${{ matrix.benchmark }}"
 
   benchmarks-walltime-build:
     name: "benchmarks walltime (build)"
@@ -1183,4 +1183,4 @@ jobs:
           CODSPEED_PERF_ENABLED: false
         with:
           mode: walltime
-          run: cargo codspeed run --bench ty_walltime -m walltime ${{ matrix.benchmark }}
+          run: cargo codspeed run --bench ty_walltime -m walltime "${{ matrix.benchmark }}"
