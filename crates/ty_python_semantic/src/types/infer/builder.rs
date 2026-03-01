@@ -9659,16 +9659,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         && let Some(class) =
                             nearest_enclosing_class(self.db(), self.index, self.scope())
                         && is_enum_class_by_inheritance(self.db(), class)
-                    {
-                        if let Some(builder) = self
+                        && let Some(builder) = self
                             .context
                             .report_lint(&INVALID_ENUM_MEMBER_ANNOTATION, annotation)
-                        {
-                            builder.into_diagnostic(format_args!(
-                                "Type annotation on enum member `{}` is not allowed",
-                                &name_expr.id
-                            ));
-                        }
+                    {
+                        builder.into_diagnostic(format_args!(
+                            "Type annotation on enum member `{}` is not allowed",
+                            &name_expr.id
+                        ));
                     }
                 }
 

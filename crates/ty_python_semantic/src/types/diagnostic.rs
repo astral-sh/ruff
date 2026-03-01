@@ -1205,8 +1205,7 @@ declare_lint! {
     /// runtime type is the enum class itself, not the annotated type.
     ///
     /// In CPython's `enum` module, annotated assignments with values are still
-    /// treated as members at runtime, but the annotation is meaningless and
-    /// will confuse readers of the code.
+    /// treated as members at runtime, but the annotation will confuse readers of the code.
     ///
     /// ## Examples
     /// ```python
@@ -1232,8 +1231,8 @@ declare_lint! {
     /// [typing spec]: https://typing.python.org/en/latest/spec/enums.html#enum-members
     pub(crate) static INVALID_ENUM_MEMBER_ANNOTATION = {
         summary: "detects type annotations on enum members",
-        status: LintStatus::stable("0.0.16"),
-        default_level: Level::Error,
+        status: LintStatus::stable("0.0.20"),
+        default_level: Level::Warn,
     }
 }
 
