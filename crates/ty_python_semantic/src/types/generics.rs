@@ -4,14 +4,18 @@ use std::collections::hash_map::Entry;
 use std::fmt::Display;
 
 use itertools::{Either, Itertools};
+use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::node_key::NodeKey;
 use crate::semantic_index::definition::{Definition, DefinitionKind};
-use crate::semantic_index::scope::{FileScopeId, NodeWithScopeKey, NodeWithScopeKind, ScopeId};
-use crate::semantic_index::{SemanticIndex, semantic_index};
+use crate::semantic_index::place::ScopedPlaceId;
+use crate::semantic_index::scope::{
+    FileScopeId, NodeWithScopeKey, NodeWithScopeKind, NodeWithScopeRef, ScopeId,
+};
+use crate::semantic_index::{SemanticIndex, place_table, semantic_index, use_def_map};
 use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
 use crate::types::constraints::{
@@ -27,7 +31,7 @@ use crate::types::{
     CallableType, CallableTypes, ClassLiteral, FindLegacyTypeVarsVisitor, IntersectionType,
     KnownClass, KnownInstanceType, MaterializationKind, Type, TypeAliasType, TypeContext,
     TypeMapping, TypeVarBoundOrConstraints, TypeVarIdentity, TypeVarInstance, TypeVarKind,
-    TypeVarVariance, UnionType, declaration_type, walk_callable_type,
+    TypeVarVariance, UnionType, binding_type, declaration_type, walk_callable_type,
     walk_manual_pep_695_type_alias, walk_pep_695_type_alias, walk_type_var_bounds,
 };
 use crate::{Db, FxIndexMap, FxOrderMap, FxOrderSet};
@@ -2561,4 +2565,135 @@ impl<'db> SpecializationError<'db> {
             Self::MismatchedConstraint { argument, .. } => *argument,
         }
     }
+}
+
+/// Returns `true` if the enclosing method's `self`/`cls` parameter is annotated with a type
+/// variable other than `typing.Self`.
+///
+/// According to the typing spec, `Self` cannot be used in a method whose `self`/`cls` parameter
+/// has a type annotation that is a type variable other than `Self` or `type[Self]`.
+///
+/// This mirrors the same scope-walking strategy used by [`typing_self`] / [`bind_typevar`].
+pub(crate) fn enclosing_method_has_typevar_self_annotation<'db>(
+    db: &'db dyn Db,
+    index: &SemanticIndex<'db>,
+    scope_id: ScopeId<'db>,
+    typevar_binding_context: Option<Definition<'db>>,
+) -> bool {
+    let Some(typevar_binding_context) = typevar_binding_context else {
+        return false;
+    };
+
+    let DefinitionKind::Function(func_ref) = typevar_binding_context.kind(db) else {
+        return false;
+    };
+
+    // Start from the function body scope so the function itself appears in the ancestor chain.
+    let containing_scope =
+        index.node_scope_by_key(NodeWithScopeKey::Function(NodeKey::from_node_ref(func_ref)));
+
+    let file = scope_id.file(db);
+    let module = parsed_module(db, file).load(db);
+
+    for ((_, inner), (outer_id, outer)) in index.ancestor_scopes(containing_scope).tuple_windows() {
+        if !outer.kind().is_class() {
+            continue;
+        }
+
+        let (NodeWithScopeKind::Function(function_ref)
+        | NodeWithScopeKind::FunctionTypeParameters(function_ref)) = inner.node()
+        else {
+            continue;
+        };
+
+        // Verify that `Self` appears directly in this method's signature and not in a
+        // nested function: the function definition found via the scope walk must match
+        // the typevar binding context.
+        let method_definition = index.expect_single_definition(function_ref);
+        if method_definition != typevar_binding_context {
+            return false;
+        }
+
+        let func_node = function_ref.node(&module);
+        let class_scope = outer_id.to_scope_id(db, file);
+        return first_param_is_non_self_typevar(db, index, func_node, file, class_scope);
+    }
+
+    false
+}
+
+/// Returns `true` if the first parameter's annotation resolves to a `TypeVar` whose
+/// [`TypeVarKind`] is not [`TypeVarKind::TypingSelf`].
+///
+/// Handles both PEP 695 type parameters and legacy `TypeVar()` definitions by resolving the
+/// annotation name through the scope hierarchy and checking the inferred binding type.
+fn first_param_is_non_self_typevar<'db>(
+    db: &'db dyn Db,
+    index: &SemanticIndex<'db>,
+    func_node: &ast::StmtFunctionDef,
+    file: ruff_db::files::File,
+    class_scope: ScopeId<'db>,
+) -> bool {
+    let Some(first_param) = func_node.parameters.iter_non_variadic_params().next() else {
+        return false;
+    };
+    let Some(annotation) = first_param.annotation() else {
+        return false;
+    };
+
+    // Extract the name to look up. For `self: T`, that's `T`; for `cls: type[T]`, that's `T`.
+    let name_to_resolve = match annotation {
+        ast::Expr::Name(name) => &name.id,
+        ast::Expr::Subscript(sub) => match sub.slice.as_ref() {
+            ast::Expr::Name(name) => &name.id,
+            _ => return false,
+        },
+        _ => return false,
+    };
+
+    // For PEP 695 functions, the type parameter is defined in the function's own type-params
+    // scope. For legacy TypeVars, it's defined at an outer scope (e.g. module level). Walk
+    // from the scope where the annotation name could be defined.
+    let start_scope = if func_node.type_params.is_some() {
+        index.node_scope(NodeWithScopeRef::FunctionTypeParameters(func_node))
+    } else {
+        class_scope.file_scope_id(db)
+    };
+
+    resolve_name_to_non_self_typevar(db, index, name_to_resolve, file, start_scope)
+}
+
+/// Walks the scope hierarchy starting from `scope` to resolve `name` to its definition,
+/// then checks whether the binding type is a `TypeVar` that is not `typing.Self`.
+fn resolve_name_to_non_self_typevar(
+    db: &dyn Db,
+    index: &SemanticIndex<'_>,
+    name: &str,
+    file: ruff_db::files::File,
+    scope: FileScopeId,
+) -> bool {
+    let mut current_scope = scope;
+    loop {
+        let scope_id = current_scope.to_scope_id(db, file);
+        let pt = place_table(db, scope_id);
+        if let Some(symbol_id) = pt.symbol_id(name) {
+            let use_def = use_def_map(db, scope_id);
+            for binding in use_def.end_of_scope_bindings(ScopedPlaceId::Symbol(symbol_id)) {
+                if let Some(def) = binding.binding.definition() {
+                    let ty = binding_type(db, def);
+                    if let Type::KnownInstance(KnownInstanceType::TypeVar(tv)) = ty {
+                        return !tv.kind(db).is_self();
+                    }
+                    return false;
+                }
+            }
+            // Symbol exists but has no definition in this scope; continue to parent.
+        }
+        let Some(parent) = index.scope(current_scope).parent() else {
+            break;
+        };
+        current_scope = parent;
+    }
+
+    false
 }

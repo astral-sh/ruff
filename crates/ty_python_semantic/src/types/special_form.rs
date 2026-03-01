@@ -1,12 +1,9 @@
 //! An enumeration of special forms in the Python type system.
 //! Each of these is considered to inhabit a unique type in our model of the type system.
 
-use itertools::Itertools;
-
 use super::{ClassType, Type, class::KnownClass};
 use crate::db::Db;
 use crate::semantic_index::place::ScopedPlaceId;
-use crate::semantic_index::scope::NodeWithScopeKind;
 use crate::semantic_index::{
     FileScopeId, definition::Definition, place_table, scope::ScopeId, semantic_index, use_def_map,
 };
@@ -16,8 +13,6 @@ use crate::types::{
     TypeQualifiers, generics::typing_self, infer::nearest_enclosing_class,
 };
 use ruff_db::files::File;
-use ruff_db::parsed::parsed_module;
-use ruff_python_ast::{self as ast, Expr};
 use strum_macros::EnumString;
 use ty_module_resolver::{KnownModule, file_to_module, resolve_module_confident};
 
@@ -675,7 +670,7 @@ impl SpecialFormType {
                 // Check if the enclosing method's `self`/`cls` parameter is annotated with a
                 // type variable other than `Self`. If it is, `Self` cannot be used elsewhere
                 // in the method signature.
-                if enclosing_method_has_typevar_self_annotation(
+                if super::generics::enclosing_method_has_typevar_self_annotation(
                     db,
                     index,
                     scope_id,
@@ -869,136 +864,4 @@ impl std::fmt::Display for TypeQualifier {
 pub(super) struct AliasSpec {
     pub(super) class: KnownClass,
     pub(super) expected_argument_number: usize,
-}
-
-/// Check if the first parameter's annotation name is a type variable, either via
-/// PEP 695 type parameters or via a legacy `TypeVar` definition.
-fn first_param_annotation_is_typevar(
-    db: &dyn Db,
-    func_node: &ast::StmtFunctionDef,
-    definition_scope: ScopeId<'_>,
-) -> bool {
-    use crate::types::{KnownInstanceType, binding_type};
-
-    let Some(first_param) = func_node.parameters.iter_non_variadic_params().next() else {
-        return false;
-    };
-    let Some(annotation) = first_param.annotation() else {
-        return false;
-    };
-
-    // Get the annotation name. Handle plain names, `type[T]` subscripts, and skip
-    // anything more complex (attributes, etc.).
-    let annotation_name = match annotation {
-        Expr::Name(ast::ExprName { id, .. }) => id.as_str(),
-        Expr::Subscript(ast::ExprSubscript { slice, .. }) => {
-            // Handle `type[T]` for classmethods
-            match slice.as_ref() {
-                Expr::Name(ast::ExprName { id, .. }) => id.as_str(),
-                _ => return false,
-            }
-        }
-        _ => return false,
-    };
-
-    // `Self` annotation is fine
-    if annotation_name == "Self" {
-        return false;
-    }
-
-    // Check PEP 695 type parameters
-    if let Some(type_params) = &func_node.type_params {
-        for param in &type_params.type_params {
-            if param.name().as_str() == annotation_name {
-                return true;
-            }
-        }
-    }
-
-    // Check if the name resolves to a legacy TypeVar/ParamSpec/TypeVarTuple by looking
-    // up the name in the scope hierarchy and checking its inferred type.
-    let file = definition_scope.file(db);
-    let index = semantic_index(db, file);
-    let mut scope = definition_scope.file_scope_id(db);
-    loop {
-        let scope_id = scope.to_scope_id(db, file);
-        let pt = place_table(db, scope_id);
-        if let Some(symbol_id) = pt.symbol_id(annotation_name) {
-            let use_def = use_def_map(db, scope_id);
-            for binding in use_def.end_of_scope_bindings(ScopedPlaceId::Symbol(symbol_id)) {
-                if let Some(def) = binding.binding.definition() {
-                    let ty = binding_type(db, def);
-                    return matches!(ty, Type::KnownInstance(KnownInstanceType::TypeVar(_)));
-                }
-            }
-            // Symbol exists in this scope but has no definition here;
-            // continue to parent scope to find the actual definition.
-        }
-        let Some(parent) = index.scope(scope).parent() else {
-            break;
-        };
-        scope = parent;
-    }
-
-    false
-}
-
-/// Returns `true` if the `Self` usage is directly in a method's signature (not in a nested
-/// function) where the first parameter (`self` or `cls`) is annotated with a type variable
-/// other than `Self`.
-///
-/// According to the typing spec, `Self` cannot be used in a method whose `self`/`cls` parameter
-/// has a type annotation that is a type variable other than `Self`. This walks ancestor scopes
-/// to find the innermost method (a function directly inside a class), matching the same logic
-/// used by [`bind_typevar`][crate::types::generics::bind_typevar] for `typing.Self`.
-fn enclosing_method_has_typevar_self_annotation<'db>(
-    db: &'db dyn Db,
-    index: &crate::semantic_index::SemanticIndex<'db>,
-    scope_id: ScopeId<'db>,
-    typevar_binding_context: Option<Definition<'db>>,
-) -> bool {
-    use crate::node_key::NodeKey;
-    use crate::semantic_index::definition::DefinitionKind;
-    use crate::semantic_index::scope::NodeWithScopeKey;
-
-    // Use the same scope-walking start point as `typing_self` to find the enclosing method.
-    let containing_scope = typevar_binding_context
-        .and_then(|def| {
-            let DefinitionKind::Function(func_ref) = def.kind(db) else {
-                return None;
-            };
-            Some(
-                index.node_scope_by_key(NodeWithScopeKey::Function(NodeKey::from_node_ref(
-                    func_ref,
-                ))),
-            )
-        })
-        .unwrap_or_else(|| scope_id.file_scope_id(db));
-
-    let file = scope_id.file(db);
-    let module = parsed_module(db, file).load(db);
-
-    for ((inner_id, inner), (outer_id, outer)) in
-        index.ancestor_scopes(containing_scope).tuple_windows()
-    {
-        if outer.kind().is_class() {
-            let (NodeWithScopeKind::Function(function_ref)
-            | NodeWithScopeKind::FunctionTypeParameters(function_ref)) = inner.node()
-            else {
-                continue;
-            };
-
-            // Only apply the check if `Self` appears directly in this method's signature,
-            // not in a nested function or class.
-            if containing_scope != inner_id {
-                return false;
-            }
-
-            let func_node = function_ref.node(&module);
-            let class_scope = outer_id.to_scope_id(db, file);
-            return first_param_annotation_is_typevar(db, func_node, class_scope);
-        }
-    }
-
-    false
 }

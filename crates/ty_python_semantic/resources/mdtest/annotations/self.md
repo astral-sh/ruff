@@ -782,6 +782,11 @@ class Foo:
     def has_typevar_cls_annotation(cls: type[T]) -> Self:
         return cls()
 
+    # PEP 695 type parameter on `self` also rejects `Self`
+    # error: [invalid-type-form]
+    def has_pep695_typevar_annotation[U](self: U) -> Self:
+        return self
+
     def return_concrete_type(self) -> Self:
         # TODO: We could emit a hint that suggests annotating with `Foo` instead of `Self`
         # error: [invalid-return-type]
