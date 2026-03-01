@@ -116,24 +116,61 @@ help: Replace with `dict.get`
 21 | v = "k" in d and d["k"]
 
 RUF019 [*] Unnecessary key check before dictionary access
-  --> RUF019.py:28:9
+  --> RUF019.py:39:4
    |
-27 |   if (
-28 | /         "key" in d
-29 | |         and  # text
-30 | |         d ["key"]
-   | |_________________^
-31 |   ):
-32 |       ...
+38 | # side_effect -> Maybe: formatting may call user code; unsafe fix.
+39 | if f"{c}" in d and d[f"{c}"]:
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^
+40 |     pass
    |
 help: Replace with `dict.get`
-25 | 
-26 | 
-27 | if (
+36 |     pass
+37 | 
+38 | # side_effect -> Maybe: formatting may call user code; unsafe fix.
+   - if f"{c}" in d and d[f"{c}"]:
+39 + if d.get(f"{c}"):
+40 |     pass
+41 | 
+42 | # side_effect -> No: literal-only interpolation; safe fix.
+note: This is an unsafe fix and may change runtime behavior
+
+RUF019 [*] Unnecessary key check before dictionary access
+  --> RUF019.py:43:4
+   |
+42 | # side_effect -> No: literal-only interpolation; safe fix.
+43 | if f"{1}" in d and d[f"{1}"]:
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^
+44 |     pass
+   |
+help: Replace with `dict.get`
+40 |     pass
+41 | 
+42 | # side_effect -> No: literal-only interpolation; safe fix.
+   - if f"{1}" in d and d[f"{1}"]:
+43 + if d.get(f"{1}"):
+44 |     pass
+45 | 
+46 | 
+
+RUF019 [*] Unnecessary key check before dictionary access
+  --> RUF019.py:48:9
+   |
+47 |   if (
+48 | /         "key" in d
+49 | |         and  # text
+50 | |         d ["key"]
+   | |_________________^
+51 |   ):
+52 |       ...
+   |
+help: Replace with `dict.get`
+45 | 
+46 | 
+47 | if (
    -         "key" in d
    -         and  # text
    -         d ["key"]
-28 +         d.get("key")
-29 | ):
-30 |     ...
+48 +         d.get("key")
+49 | ):
+50 |     ...
 note: This is an unsafe fix and may change runtime behavior
