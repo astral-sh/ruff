@@ -705,6 +705,53 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         } else {
                             // TODO: emit a diagnostic
                         }
+                    } else if let ast::Expr::Subscript(ast::ExprSubscript {
+                        value,
+                        slice: unpack_arg,
+                        ..
+                    }) = element
+                        && self.expression_type(value) == Type::SpecialForm(SpecialFormType::Unpack)
+                    {
+                        let mut report_too_many_unpacked_tuples = || {
+                            if let Some(first_unpacked_variadic_tuple) =
+                                first_unpacked_variadic_tuple
+                            {
+                                if let Some(builder) =
+                                    self.context.report_lint(&INVALID_TYPE_FORM, tuple)
+                                {
+                                    let mut diagnostic = builder.into_diagnostic(
+                                        "Multiple unpacked variadic tuples \
+                                            are not allowed in a `tuple` specialization",
+                                    );
+                                    diagnostic.annotate(
+                                        self.context
+                                            .secondary(first_unpacked_variadic_tuple)
+                                            .message("First unpacked variadic tuple"),
+                                    );
+                                    diagnostic.annotate(
+                                        self.context
+                                            .secondary(element)
+                                            .message("Later unpacked variadic tuple"),
+                                    );
+                                }
+                            } else {
+                                first_unpacked_variadic_tuple = Some(element);
+                            }
+                        };
+
+                        if let Some(inner_tuple) = element_ty.exact_tuple_instance_spec(self.db()) {
+                            element_types = element_types.concat(self.db(), &inner_tuple);
+
+                            if inner_tuple.is_variadic() {
+                                report_too_many_unpacked_tuples();
+                            }
+                        } else if self.expression_type(unpack_arg)
+                            == Type::Dynamic(DynamicType::TodoTypeVarTuple)
+                        {
+                            report_too_many_unpacked_tuples();
+                        } else {
+                            // TODO: emit a diagnostic
+                        }
                     } else {
                         element_types.push(element_ty);
                     }
@@ -1672,8 +1719,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 inferred_type
             }
             SpecialFormType::Unpack => {
-                self.infer_type_expression(arguments_slice);
-                todo_type!("`Unpack[]` special form")
+                let inner_ty = self.infer_type_expression(arguments_slice);
+                // When the argument is a tuple type, return it directly so that
+                // `Unpack[tuple[int, ...]]` behaves identically to `*tuple[int, ...]`.
+                if inner_ty.exact_tuple_instance_spec(self.db()).is_some() {
+                    inner_ty
+                } else {
+                    todo_type!("`Unpack[]` special form")
+                }
             }
             SpecialFormType::NoReturn
             | SpecialFormType::Never
