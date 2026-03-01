@@ -48,7 +48,7 @@ use crate::semantic_index::definition::{
 };
 use crate::semantic_index::expression::{Expression, ExpressionKind};
 use crate::semantic_index::narrowing_constraints::ConstraintKey;
-use crate::semantic_index::place::{PlaceExpr, PlaceExprRef};
+use crate::semantic_index::place::{PlaceExpr, PlaceExprRef, ScopedPlaceId};
 use crate::semantic_index::scope::{
     FileScopeId, NodeWithScopeKind, NodeWithScopeRef, ScopeId, ScopeKind,
 };
@@ -11783,7 +11783,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // If we're inferring types of deferred expressions, look them up from end-of-scope.
         if self.is_deferred() {
             let place = if let Some(place_id) = place_table.place_id(expr) {
-                place_from_bindings(db, use_def.reachable_bindings(place_id)).place
+                if self.scope().node(db).scope_kind().is_class()
+                    && self.has_only_stub_annotated_assignment_bindings(file_scope_id, place_id)
+                {
+                    Place::Undefined
+                } else {
+                    place_from_bindings(db, use_def.reachable_bindings(place_id)).place
+                }
             } else {
                 assert!(
                     self.deferred_state.in_string_annotation(),
@@ -12125,6 +12131,39 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         (place, constraint_keys)
+    }
+
+    fn has_only_stub_annotated_assignment_bindings(
+        &self,
+        scope_id: FileScopeId,
+        place_id: ScopedPlaceId,
+    ) -> bool {
+        if !self.in_stub() {
+            return false;
+        }
+
+        let mut saw_stub_annotated_assignment = false;
+        for binding in self
+            .index
+            .use_def_map(scope_id)
+            .reachable_bindings(place_id)
+        {
+            let DefinitionState::Defined(definition) = binding.binding else {
+                continue;
+            };
+
+            let DefinitionKind::AnnotatedAssignment(assignment) = definition.kind(self.db()) else {
+                return false;
+            };
+
+            if assignment.value(self.module()).is_some() {
+                return false;
+            }
+
+            saw_stub_annotated_assignment = true;
+        }
+
+        saw_stub_annotated_assignment
     }
 
     pub(super) fn report_unresolved_reference(&self, expr_name_node: &ast::ExprName) {

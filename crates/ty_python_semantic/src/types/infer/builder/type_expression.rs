@@ -3,24 +3,298 @@ use ruff_python_ast as ast;
 
 use super::{DeferredExpressionState, TypeInferenceBuilder};
 use crate::FxOrderSet;
+use crate::semantic_index::definition::{Definition, DefinitionKind, DefinitionState};
+use crate::semantic_index::place::{PlaceExpr, PlaceExprRef};
 use crate::types::diagnostic::{
     self, INVALID_TYPE_FORM, NOT_SUBSCRIPTABLE, UNBOUND_TYPE_VARIABLE,
     report_invalid_argument_number_to_special_form, report_invalid_arguments_to_callable,
 };
+use crate::types::infer::InferenceRegion;
 use crate::types::infer::builder::{InferenceFlags, InnerExpressionInferenceState};
 use crate::types::signatures::Signature;
 use crate::types::special_form::{AliasSpec, LegacyStdlibAlias};
 use crate::types::string_annotation::parse_string_annotation;
 use crate::types::tuple::{TupleSpecBuilder, TupleType};
 use crate::types::{
-    BindingContext, CallableType, DynamicType, GenericContext, IntersectionBuilder, KnownClass,
-    KnownInstanceType, LintDiagnosticGuard, LiteralValueTypeKind, Parameter, Parameters,
-    SpecialFormType, SubclassOfType, Type, TypeAliasType, TypeContext, TypeGuardType, TypeIsType,
-    TypeMapping, TypeVarKind, UnionBuilder, UnionType, any_over_type, todo_type,
+    BindingContext, CallableType, DynamicType, GenericContext, IntersectionBuilder,
+    InvalidTypeExpressionError, KnownClass, KnownInstanceType, LintDiagnosticGuard,
+    LiteralValueTypeKind, Parameter, Parameters, SpecialFormType, SubclassOfType, Type,
+    TypeAliasType, TypeContext, TypeGuardType, TypeIsType, TypeMapping, TypeVarKind, UnionBuilder,
+    UnionType, any_over_type, binding_type, definition_expression_type, todo_type,
 };
 
 /// Type expressions
 impl<'db> TypeInferenceBuilder<'db, '_> {
+    /// Convert a value-expression type into its type-expression meaning.
+    ///
+    /// This centralizes fallback conversion for type-context lookups that are still rooted in
+    /// value-expression inference.
+    pub(super) fn resolve_value_as_type_expression(
+        &self,
+        expression: &ast::Expr,
+        value_ty: Type<'db>,
+    ) -> Type<'db> {
+        if matches!(self.region, InferenceRegion::AssignmentTypeExpression(_))
+            && matches!(value_ty, Type::Never)
+        {
+            return Type::Never;
+        }
+        self.try_resolve_value_as_type_expression(value_ty)
+            .unwrap_or_else(|error| {
+                error.into_fallback_type(&self.context, expression, self.is_reachable(expression))
+            })
+    }
+
+    pub(super) fn try_resolve_value_as_type_expression(
+        &self,
+        value_ty: Type<'db>,
+    ) -> Result<Type<'db>, InvalidTypeExpressionError<'db>> {
+        value_ty.default_specialize(self.db()).in_type_expression(
+            self.db(),
+            self.scope(),
+            self.typevar_binding_context,
+            self.inference_flags,
+        )
+    }
+
+    pub(super) fn infer_name_load_in_type_context(
+        &mut self,
+        name: &ast::ExprName,
+        expression: &ast::Expr,
+    ) -> (Type<'db>, Type<'db>) {
+        let value_ty = self.infer_name_expression(name);
+        let type_expression_ty =
+            self.infer_name_type_in_type_context_from_value(name, expression, value_ty);
+        (value_ty, type_expression_ty)
+    }
+
+    pub(super) fn infer_name_type_in_type_context_from_value(
+        &mut self,
+        name: &ast::ExprName,
+        expression: &ast::Expr,
+        value_ty: Type<'db>,
+    ) -> Type<'db> {
+        self.try_infer_name_as_assignment_type_expression(name, expression, value_ty)
+            .unwrap_or_else(|| self.resolve_value_as_type_expression(expression, value_ty))
+    }
+
+    pub(super) fn infer_attribute_load_in_type_context(
+        &mut self,
+        attribute: &ast::ExprAttribute,
+        expression: &ast::Expr,
+    ) -> (Type<'db>, Type<'db>) {
+        let value_ty = self.infer_attribute_expression(attribute);
+        let type_expression_ty =
+            self.infer_attribute_type_in_type_context_from_value(expression, value_ty);
+        (value_ty, type_expression_ty)
+    }
+
+    pub(super) fn infer_attribute_type_in_type_context_from_value(
+        &self,
+        expression: &ast::Expr,
+        value_ty: Type<'db>,
+    ) -> Type<'db> {
+        self.resolve_value_as_type_expression(expression, value_ty)
+    }
+
+    fn definition_type_fallback_in_type_context_silent(
+        &self,
+        definition: Definition<'db>,
+    ) -> Type<'db> {
+        let value_ty = match definition.kind(self.db()) {
+            DefinitionKind::Assignment(assignment) => {
+                definition_expression_type(self.db(), definition, assignment.value(self.module()))
+            }
+            DefinitionKind::AnnotatedAssignment(assignment) => assignment
+                .value(self.module())
+                .map(|value| definition_expression_type(self.db(), definition, value))
+                .unwrap_or_else(|| binding_type(self.db(), definition)),
+            _ => binding_type(self.db(), definition),
+        };
+        self.try_resolve_value_as_type_expression(value_ty)
+            .unwrap_or(Type::unknown())
+    }
+
+    fn try_infer_name_as_assignment_type_expression(
+        &mut self,
+        name: &ast::ExprName,
+        expression: &ast::Expr,
+        fallback_value_ty: Type<'db>,
+    ) -> Option<Type<'db>> {
+        let db = self.db();
+        let expr = PlaceExpr::from_expr_name(name);
+        let (_, use_id) =
+            self.infer_local_place_load(PlaceExprRef::from(&expr), ast::ExprRef::Name(name));
+        let use_id = use_id?;
+        let use_def = self.index.use_def_map(self.scope().file_scope_id(db));
+
+        let mut has_eligible_assignment_binding = false;
+        let mut has_non_assignment_binding = false;
+        for binding in use_def.bindings_at_use(use_id) {
+            let DefinitionState::Defined(definition) = binding.binding else {
+                continue;
+            };
+            if self.should_use_assignment_type_expression(definition) {
+                has_eligible_assignment_binding = true;
+            } else {
+                has_non_assignment_binding = true;
+            }
+        }
+        if !has_eligible_assignment_binding {
+            return None;
+        }
+
+        let mut saw_eligible_assignment_binding = false;
+        let mut needs_fallback_for_undefined_binding = false;
+        let mut builder = UnionBuilder::new(db);
+        for binding in use_def.bindings_at_use(use_id) {
+            let (base_ty, place) = match binding.binding {
+                DefinitionState::Defined(definition) => {
+                    let base_ty = if self.should_use_assignment_type_expression(definition) {
+                        let base_ty = self
+                            .assignment_definition_type_expression_type(definition)
+                            .default_specialize(db);
+                        // In mixed binding sets, skip assignment-backed branches that collapse to
+                        // broad runtime fallback types (`object`/dynamic). Keeping those branches
+                        // would widen otherwise precise annotation meaning.
+                        if has_non_assignment_binding
+                            && (base_ty.is_object() || base_ty.is_dynamic())
+                        {
+                            continue;
+                        }
+                        saw_eligible_assignment_binding = true;
+                        base_ty
+                    } else {
+                        self.definition_type_fallback_in_type_context_silent(definition)
+                    };
+                    (base_ty, definition.place(db))
+                }
+                DefinitionState::Undefined | DefinitionState::Deleted => {
+                    needs_fallback_for_undefined_binding = true;
+                    continue;
+                }
+            };
+
+            let narrowed_ty = binding.narrowing_constraint.narrow(db, base_ty, place);
+            builder.add_in_place(narrowed_ty);
+        }
+
+        if !saw_eligible_assignment_binding {
+            return None;
+        }
+
+        if needs_fallback_for_undefined_binding {
+            let fallback_type_expression_ty =
+                self.resolve_value_as_type_expression(expression, fallback_value_ty);
+            builder.add_in_place(fallback_type_expression_ty);
+        }
+
+        Some(builder.build())
+    }
+
+    /// Fast syntax gate for assignment RHS forms that can be interpreted as implicit type aliases.
+    ///
+    /// This only answers "is this worth attempting through assignment type-expression inference?".
+    /// Semantic validity is still checked by regular type-expression inference.
+    fn is_candidate_implicit_alias_rhs(expr: &ast::Expr) -> bool {
+        const fn inner(expr: &ast::Expr, allow_literal_arguments: bool) -> bool {
+            match expr {
+                ast::Expr::Name(_) | ast::Expr::StringLiteral(_) | ast::Expr::NoneLiteral(_) => {
+                    true
+                }
+                ast::Expr::Attribute(ast::ExprAttribute { value, .. }) => {
+                    inner(value, allow_literal_arguments)
+                }
+                ast::Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
+                    if !inner(value, allow_literal_arguments) {
+                        return false;
+                    }
+                    match &**slice {
+                        ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => match elts.as_slice() {
+                            [first, ..] => inner(first, true),
+                            _ => true,
+                        },
+                        _ => inner(slice, true),
+                    }
+                }
+                ast::Expr::BinOp(ast::ExprBinOp {
+                    left, op, right, ..
+                }) => {
+                    op.is_bit_or()
+                        && inner(left, allow_literal_arguments)
+                        && inner(right, allow_literal_arguments)
+                }
+                ast::Expr::UnaryOp(ast::ExprUnaryOp { op, operand, .. }) => {
+                    allow_literal_arguments
+                        && matches!(op, ast::UnaryOp::UAdd | ast::UnaryOp::USub)
+                        && matches!(
+                            &**operand,
+                            ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
+                                value: ast::Number::Int(_),
+                                ..
+                            })
+                        )
+                }
+                ast::Expr::NumberLiteral(ast::ExprNumberLiteral { value, .. }) => {
+                    allow_literal_arguments && value.is_int()
+                }
+                ast::Expr::EllipsisLiteral(_)
+                | ast::Expr::BytesLiteral(_)
+                | ast::Expr::BooleanLiteral(_)
+                | ast::Expr::Starred(_)
+                | ast::Expr::List(_) => allow_literal_arguments,
+                _ => false,
+            }
+        }
+
+        inner(expr, false)
+    }
+
+    fn should_use_assignment_type_expression(&self, definition: Definition<'db>) -> bool {
+        let DefinitionKind::Assignment(assignment) = definition.kind(self.db()) else {
+            return false;
+        };
+        let value = assignment.value(self.module());
+        // Keep routing syntax-driven: local, conditional, and loop assignments are allowed through
+        // this path when their RHS matches an implicit-alias form. Call expressions are excluded
+        // by `is_candidate_implicit_alias_rhs`, so constructor assignments (e.g. `TypeVar(...)`)
+        // stay on the value-definition path.
+        if !Self::is_candidate_implicit_alias_rhs(value) {
+            return false;
+        }
+
+        // A subscripted runtime value (for example `dict_value[key]`) is syntactically similar to
+        // a type form but should not route through assignment-backed type-expression inference.
+        // Keep subscript routing to cases where the subscript base is plausibly type-like.
+        if let ast::Expr::Subscript(ast::ExprSubscript {
+            value: subscript_value,
+            ..
+        }) = value
+        {
+            let subscript_value_ty =
+                definition_expression_type(self.db(), definition, subscript_value);
+            return matches!(
+                subscript_value_ty,
+                Type::SpecialForm(_)
+                    | Type::ClassLiteral(_)
+                    | Type::SubclassOf(_)
+                    | Type::GenericAlias(_)
+                    | Type::TypeAlias(_)
+                    | Type::Union(_)
+                    | Type::KnownInstance(
+                        KnownInstanceType::TypeAliasType(_)
+                            | KnownInstanceType::UnionType(_)
+                            | KnownInstanceType::Callable(_)
+                            | KnownInstanceType::Annotated(_)
+                            | KnownInstanceType::TypeGenericAlias(_)
+                            | KnownInstanceType::TypeVar(_)
+                    )
+            );
+        }
+
+        true
+    }
+
     /// Infer the type of a type expression.
     pub(super) fn infer_type_expression(&mut self, expression: &ast::Expr) -> Type<'db> {
         if self.inner_expression_inference_state.is_get() {
@@ -81,22 +355,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         match expression {
             ast::Expr::Name(name) => match name.ctx {
                 ast::ExprContext::Load => {
-                    let ty = self
-                        .infer_name_expression(name)
-                        .default_specialize(self.db())
-                        .in_type_expression(
-                            self.db(),
-                            self.scope(),
-                            self.typevar_binding_context,
-                            self.inference_flags,
-                        )
-                        .unwrap_or_else(|error| {
-                            error.into_fallback_type(
-                                &self.context,
-                                expression,
-                                self.is_reachable(expression),
-                            )
-                        });
+                    let ty = self.infer_name_load_in_type_context(name, expression).1;
                     self.check_for_unbound_type_variable(expression, ty)
                 }
                 ast::ExprContext::Invalid => Type::unknown(),
@@ -106,22 +365,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             },
 
             ast::Expr::Attribute(attribute_expression) => match attribute_expression.ctx {
-                ast::ExprContext::Load => self
-                    .infer_attribute_expression(attribute_expression)
-                    .default_specialize(self.db())
-                    .in_type_expression(
-                        self.db(),
-                        self.scope(),
-                        self.typevar_binding_context,
-                        self.inference_flags,
-                    )
-                    .unwrap_or_else(|error| {
-                        error.into_fallback_type(
-                            &self.context,
-                            expression,
-                            self.is_reachable(expression),
-                        )
-                    }),
+                ast::ExprContext::Load => {
+                    self.infer_attribute_load_in_type_context(attribute_expression, expression)
+                        .1
+                }
                 ast::ExprContext::Invalid => Type::unknown(),
                 ast::ExprContext::Store | ast::ExprContext::Del => {
                     todo_type!("Attribute expression annotation in Store/Del context")
@@ -784,19 +1031,23 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             );
             SubclassOfType::subclass_of_unknown()
         };
+        let in_assignment_type_expression =
+            matches!(self.region, InferenceRegion::AssignmentTypeExpression(_));
+        let infer_subclass_of_slice = |builder: &mut Self, slice: &ast::Expr| {
+            let db = builder.db();
+            let ty = builder.infer_type_expression(slice);
+            if in_assignment_type_expression && let Type::ProtocolInstance(protocol) = ty {
+                return protocol.to_meta_type(db);
+            }
 
-        let infer_type_argument = |builder: &mut Self, slice: &ast::Expr| {
-            let slice_ty = builder.infer_type_expression(slice);
-            SubclassOfType::try_from_instance(builder.db(), slice_ty).unwrap_or_else(|| {
-                match slice_ty {
-                    Type::Callable(_) => invalid_type_argument(builder, slice),
-                    _ => todo_type!("unsupported type[X] special form"),
-                }
+            SubclassOfType::try_from_instance(db, ty).unwrap_or_else(|| match ty {
+                Type::Callable(_) => invalid_type_argument(builder, slice),
+                _ => SubclassOfType::subclass_of_unknown(),
             })
         };
 
         match slice {
-            ast::Expr::Name(_) | ast::Expr::Attribute(_) => infer_type_argument(self, slice),
+            ast::Expr::Name(_) | ast::Expr::Attribute(_) => infer_subclass_of_slice(self, slice),
             ast::Expr::BinOp(binary) if binary.op == ast::Operator::BitOr => {
                 let union_ty = UnionType::from_elements_leave_aliases(
                     self.db(),
@@ -842,7 +1093,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         _ => self.infer_subclass_of_type_expression(parameters),
                     },
                     value_ty @ Type::ClassLiteral(class_literal) => {
-                        if class_literal.is_protocol(self.db()) {
+                        if class_literal.is_protocol(self.db())
+                            && !matches!(self.region, InferenceRegion::AssignmentTypeExpression(_))
+                        {
                             SubclassOfType::from(
                                 self.db(),
                                 todo_type!("type[T] for protocols").expect_dynamic(),
@@ -889,8 +1142,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         invalid_type_argument(self, slice)
                     }
                     _ => {
-                        self.infer_type_expression(parameters);
-                        todo_type!("unsupported nested subscript in type[X]")
+                        if in_assignment_type_expression {
+                            infer_subclass_of_slice(self, parameters)
+                        } else {
+                            self.infer_type_expression(parameters);
+                            todo_type!("unsupported nested subscript in type[X]")
+                        }
                     }
                 };
                 self.store_expression_type(slice, parameters_ty);
@@ -898,8 +1155,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
             // TODO: subscripts, etc.
             _ => {
-                self.infer_type_expression(slice);
-                todo_type!("unsupported type[X] special form")
+                if in_assignment_type_expression {
+                    infer_subclass_of_slice(self, slice)
+                } else {
+                    self.infer_type_expression(slice);
+                    todo_type!("unsupported type[X] special form")
+                }
             }
         }
     }
@@ -926,7 +1187,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let mut variables = FxOrderSet::default();
         value_ty.find_legacy_typevars(db, None, &mut variables);
         let generic_context = GenericContext::from_typevar_instances(db, variables);
-
         let scope_id = self.scope();
         let current_typevar_binding_context = self.typevar_binding_context;
         let current_inference_flags = self.inference_flags;
@@ -959,7 +1219,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         current_typevar_binding_context,
                         current_inference_flags,
                     )
-                    .unwrap_or_else(|_| Type::unknown())
+                    .unwrap_or(Type::unknown())
             } else {
                 value_ty
             };
@@ -979,7 +1239,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         current_typevar_binding_context,
                         current_inference_flags,
                     )
-                    .unwrap_or_else(|_| Type::unknown())
+                    .unwrap_or(Type::unknown())
             } else {
                 specialized
             }

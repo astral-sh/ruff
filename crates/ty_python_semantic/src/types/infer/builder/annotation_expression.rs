@@ -92,13 +92,43 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         annotation: &ast::Expr,
         pep_613_policy: PEP613Policy,
     ) -> TypeAndQualifiers<'db> {
+        fn should_skip_type_context_resolution<'db>(
+            value_ty: Type<'db>,
+            pep_613_policy: PEP613Policy,
+            db: &'db dyn crate::Db,
+        ) -> bool {
+            match value_ty {
+                Type::SpecialForm(SpecialFormType::TypeQualifier(_)) => true,
+                Type::SpecialForm(SpecialFormType::TypeAlias)
+                    if pep_613_policy == PEP613Policy::Allowed =>
+                {
+                    true
+                }
+                Type::Union(union)
+                    if pep_613_policy == PEP613Policy::Allowed
+                        && union.elements(db).iter().all(|ty| {
+                            matches!(
+                                ty,
+                                Type::SpecialForm(SpecialFormType::TypeAlias) | Type::Dynamic(_)
+                            )
+                        }) =>
+                {
+                    true
+                }
+                Type::ClassLiteral(class) if class.is_known(db, KnownClass::InitVar) => true,
+                Type::TypeVar(typevar) if typevar.paramspec_attr(db).is_some() => true,
+                _ => false,
+            }
+        }
+
         fn infer_name_or_attribute<'db>(
-            ty: Type<'db>,
+            value_ty: Type<'db>,
+            type_context_ty: Type<'db>,
             annotation: &ast::Expr,
             builder: &TypeInferenceBuilder<'db, '_>,
             pep_613_policy: PEP613Policy,
         ) -> TypeAndQualifiers<'db> {
-            let special_case = match ty {
+            let special_case = match value_ty {
                 Type::SpecialForm(special_form) => match special_form {
                     SpecialFormType::TypeQualifier(qualifier) => Some(TypeAndQualifiers::new(
                         Type::unknown(),
@@ -106,7 +136,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         TypeQualifiers::from(qualifier),
                     )),
                     SpecialFormType::TypeAlias if pep_613_policy == PEP613Policy::Allowed => {
-                        Some(TypeAndQualifiers::declared(ty))
+                        Some(TypeAndQualifiers::declared(value_ty))
                     }
                     _ => None,
                 },
@@ -142,22 +172,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             };
 
             special_case.unwrap_or_else(|| {
-                let result_ty = ty
-                    .default_specialize(builder.db())
-                    .in_type_expression(
-                        builder.db(),
-                        builder.scope(),
-                        builder.typevar_binding_context,
-                        builder.inference_flags,
-                    )
-                    .unwrap_or_else(|error| {
-                        error.into_fallback_type(
-                            &builder.context,
-                            annotation,
-                            builder.is_reachable(annotation),
-                        )
-                    });
-                let result_ty = builder.check_for_unbound_type_variable(annotation, result_ty);
+                let result_ty =
+                    builder.check_for_unbound_type_variable(annotation, type_context_ty);
                 TypeAndQualifiers::declared(result_ty)
             })
         }
@@ -192,13 +208,31 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
             ast::Expr::Attribute(attribute) => match attribute.ctx {
                 ast::ExprContext::Load => {
-                    let attribute_type = self.infer_attribute_expression(attribute);
-                    if let Type::TypeVar(typevar) = attribute_type
+                    let attribute_value_ty = self.infer_attribute_expression(attribute);
+                    let attribute_type_in_type_context = if should_skip_type_context_resolution(
+                        attribute_value_ty,
+                        pep_613_policy,
+                        self.db(),
+                    ) {
+                        attribute_value_ty
+                    } else {
+                        self.infer_attribute_type_in_type_context_from_value(
+                            annotation,
+                            attribute_value_ty,
+                        )
+                    };
+                    if let Type::TypeVar(typevar) = attribute_value_ty
                         && typevar.paramspec_attr(self.db()).is_some()
                     {
-                        TypeAndQualifiers::declared(attribute_type)
+                        TypeAndQualifiers::declared(attribute_value_ty)
                     } else {
-                        infer_name_or_attribute(attribute_type, annotation, self, pep_613_policy)
+                        infer_name_or_attribute(
+                            attribute_value_ty,
+                            attribute_type_in_type_context,
+                            annotation,
+                            self,
+                            pep_613_policy,
+                        )
                     }
                 }
                 ast::ExprContext::Invalid => TypeAndQualifiers::declared(Type::unknown()),
@@ -208,12 +242,29 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             },
 
             ast::Expr::Name(name) => match name.ctx {
-                ast::ExprContext::Load => infer_name_or_attribute(
-                    self.infer_name_expression(name),
-                    annotation,
-                    self,
-                    pep_613_policy,
-                ),
+                ast::ExprContext::Load => {
+                    let name_value_ty = self.infer_name_expression(name);
+                    let name_type_in_type_context = if should_skip_type_context_resolution(
+                        name_value_ty,
+                        pep_613_policy,
+                        self.db(),
+                    ) {
+                        name_value_ty
+                    } else {
+                        self.infer_name_type_in_type_context_from_value(
+                            name,
+                            annotation,
+                            name_value_ty,
+                        )
+                    };
+                    infer_name_or_attribute(
+                        name_value_ty,
+                        name_type_in_type_context,
+                        annotation,
+                        self,
+                        pep_613_policy,
+                    )
+                }
                 ast::ExprContext::Invalid => TypeAndQualifiers::declared(Type::unknown()),
                 ast::ExprContext::Store | ast::ExprContext::Del => TypeAndQualifiers::declared(
                     todo_type!("Name expression annotation in Store/Del context"),
