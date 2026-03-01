@@ -107,7 +107,7 @@ use crate::types::diagnostic::{
     report_shadowed_type_variable, report_unsupported_augmented_assignment,
     report_unsupported_base, report_unsupported_comparison,
 };
-use crate::types::enums::is_enum_class_by_inheritance;
+use crate::types::enums::{enum_ignored_names, is_enum_class_by_inheritance};
 use crate::types::function::{
     FunctionBodyKind, FunctionDecorators, FunctionLiteral, FunctionType, KnownFunction,
     OverloadLiteral, function_body_kind, is_implicit_classmethod,
@@ -9657,6 +9657,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         && let Some(class) =
                             nearest_enclosing_class(self.db(), self.index, self.scope())
                         && is_enum_class_by_inheritance(self.db(), class)
+                        && !enum_ignored_names(self.db(), self.scope()).contains(&name_expr.id)
                         && let Some(builder) = self
                             .context
                             .report_lint(&INVALID_ENUM_MEMBER_ANNOTATION, annotation)

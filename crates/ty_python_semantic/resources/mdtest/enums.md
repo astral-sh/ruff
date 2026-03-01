@@ -192,6 +192,16 @@ class Pet8(Enum):
     CAT = 1
 ```
 
+Names listed in `_ignore_` are not members, so annotating them is fine:
+
+```py
+class Pet9(Enum):
+    _ignore_ = "A B"
+    A: int = 42  # OK: `A` is listed in `_ignore_`
+    B: str = "hello"  # OK: `B` is listed in `_ignore_`
+    C: int = 3  # error: [invalid-enum-member-annotation]
+```
+
 ### Declared `_value_` annotation
 
 If a `_value_` annotation is defined on an `Enum` class, all enum member values must be compatible
