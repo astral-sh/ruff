@@ -136,13 +136,11 @@ class Pet3(Enum):
     DOG: Final[str] = "woof"  # error: [invalid-enum-member-annotation]
 ```
 
-`enum.member` used as value wrapper is the standard way to declare members explicitly. Using
-`member` as a type annotation also does not trigger the diagnostic:
+`enum.member` used as value wrapper is the standard way to declare members explicitly:
 
 ```py
 class Pet4(Enum):
     CAT = member(1)  # OK
-    DOG: member = 2  # error: [invalid-assignment]
 ```
 
 Dunder and private names are not enum members, so they don't trigger the diagnostic:

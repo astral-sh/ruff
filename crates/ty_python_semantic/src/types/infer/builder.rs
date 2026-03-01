@@ -9643,12 +9643,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // Not bare Final (bare Final is allowed on enum members)
                     && !(declared.qualifiers.contains(TypeQualifiers::FINAL)
                         && matches!(declared.inner_type(), Type::Dynamic(DynamicType::Unknown)))
-                    // Not enum.member annotation
-                    && !matches!(
-                        declared.inner_type(),
-                        Type::NominalInstance(instance)
-                            if instance.has_known_class(self.db(), KnownClass::Member)
-                    )
                     // Value type would be an enum member at runtime (exclude callables,
                     // which are never members)
                     && !inferred_ty.is_subtype_of(
