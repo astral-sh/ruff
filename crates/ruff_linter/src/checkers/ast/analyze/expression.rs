@@ -1284,6 +1284,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.is_rule_enabled(Rule::Airflow3IncompatibleFunctionSignature) {
                 airflow::rules::airflow_3_incompatible_function_signature(checker, expr);
             }
+            if checker.is_rule_enabled(Rule::Airflow3DagDynamicValue) {
+                airflow::rules::airflow_3_dag_dynamic_value(checker, call);
+            }
             if checker.is_rule_enabled(Rule::UnnecessaryCastToInt) {
                 ruff::rules::unnecessary_cast_to_int(checker, call);
             }

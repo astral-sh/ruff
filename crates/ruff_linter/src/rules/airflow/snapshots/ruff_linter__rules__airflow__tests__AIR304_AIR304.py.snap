@@ -1,0 +1,177 @@
+---
+source: crates/ruff_linter/src/rules/airflow/mod.rs
+---
+AIR304 `datetime.now()` produces a value that changes at runtime; using it in a DAG or task argument causes infinite DAG version creation
+  --> AIR304.py:15:28
+   |
+13 | # Violations
+14 |
+15 | DAG(dag_id="a", start_date=datetime.now())
+   |                            ^^^^^^^^^^^^^^
+16 | DAG(dag_id="b", start_date=datetime.now() - timedelta(days=1))
+17 | DAG(dag_id="c", default_args={"start_date": datetime.now()})
+   |
+
+AIR304 `datetime.now()` produces a value that changes at runtime; using it in a DAG or task argument causes infinite DAG version creation
+  --> AIR304.py:16:28
+   |
+15 | DAG(dag_id="a", start_date=datetime.now())
+16 | DAG(dag_id="b", start_date=datetime.now() - timedelta(days=1))
+   |                            ^^^^^^^^^^^^^^
+17 | DAG(dag_id="c", default_args={"start_date": datetime.now()})
+18 | DAG(dag_id="d", start_date=datetime.utcnow())
+   |
+
+AIR304 `datetime.now()` produces a value that changes at runtime; using it in a DAG or task argument causes infinite DAG version creation
+  --> AIR304.py:17:45
+   |
+15 | DAG(dag_id="a", start_date=datetime.now())
+16 | DAG(dag_id="b", start_date=datetime.now() - timedelta(days=1))
+17 | DAG(dag_id="c", default_args={"start_date": datetime.now()})
+   |                                             ^^^^^^^^^^^^^^
+18 | DAG(dag_id="d", start_date=datetime.utcnow())
+19 | DAG(dag_id="e", start_date=datetime.today())
+   |
+
+AIR304 `datetime.utcnow()` produces a value that changes at runtime; using it in a DAG or task argument causes infinite DAG version creation
+  --> AIR304.py:18:28
+   |
+16 | DAG(dag_id="b", start_date=datetime.now() - timedelta(days=1))
+17 | DAG(dag_id="c", default_args={"start_date": datetime.now()})
+18 | DAG(dag_id="d", start_date=datetime.utcnow())
+   |                            ^^^^^^^^^^^^^^^^^
+19 | DAG(dag_id="e", start_date=datetime.today())
+20 | DAG(dag_id="f", start_date=date.today())
+   |
+
+AIR304 `datetime.today()` produces a value that changes at runtime; using it in a DAG or task argument causes infinite DAG version creation
+  --> AIR304.py:19:28
+   |
+17 | DAG(dag_id="c", default_args={"start_date": datetime.now()})
+18 | DAG(dag_id="d", start_date=datetime.utcnow())
+19 | DAG(dag_id="e", start_date=datetime.today())
+   |                            ^^^^^^^^^^^^^^^^
+20 | DAG(dag_id="f", start_date=date.today())
+21 | DAG(dag_id="g", tags=[f"v{random.randint(1, 9)}"])
+   |
+
+AIR304 `date.today()` produces a value that changes at runtime; using it in a DAG or task argument causes infinite DAG version creation
+  --> AIR304.py:20:28
+   |
+18 | DAG(dag_id="d", start_date=datetime.utcnow())
+19 | DAG(dag_id="e", start_date=datetime.today())
+20 | DAG(dag_id="f", start_date=date.today())
+   |                            ^^^^^^^^^^^^
+21 | DAG(dag_id="g", tags=[f"v{random.randint(1, 9)}"])
+22 | DAG(dag_id="h", start_date=pendulum.now())
+   |
+
+AIR304 `random.randint()` produces a value that changes at runtime; using it in a DAG or task argument causes infinite DAG version creation
+  --> AIR304.py:21:27
+   |
+19 | DAG(dag_id="e", start_date=datetime.today())
+20 | DAG(dag_id="f", start_date=date.today())
+21 | DAG(dag_id="g", tags=[f"v{random.randint(1, 9)}"])
+   |                           ^^^^^^^^^^^^^^^^^^^^
+22 | DAG(dag_id="h", start_date=pendulum.now())
+23 | DAG(dag_id="i", start_date=pendulum.yesterday())
+   |
+
+AIR304 `pendulum.now()` produces a value that changes at runtime; using it in a DAG or task argument causes infinite DAG version creation
+  --> AIR304.py:22:28
+   |
+20 | DAG(dag_id="f", start_date=date.today())
+21 | DAG(dag_id="g", tags=[f"v{random.randint(1, 9)}"])
+22 | DAG(dag_id="h", start_date=pendulum.now())
+   |                            ^^^^^^^^^^^^^^
+23 | DAG(dag_id="i", start_date=pendulum.yesterday())
+24 | DAG(dag_id="j", start_date=pendulum.tomorrow())
+   |
+
+AIR304 `pendulum.yesterday()` produces a value that changes at runtime; using it in a DAG or task argument causes infinite DAG version creation
+  --> AIR304.py:23:28
+   |
+21 | DAG(dag_id="g", tags=[f"v{random.randint(1, 9)}"])
+22 | DAG(dag_id="h", start_date=pendulum.now())
+23 | DAG(dag_id="i", start_date=pendulum.yesterday())
+   |                            ^^^^^^^^^^^^^^^^^^^^
+24 | DAG(dag_id="j", start_date=pendulum.tomorrow())
+25 | DAG(dag_id="k", start_date=pendulum.today())
+   |
+
+AIR304 `pendulum.tomorrow()` produces a value that changes at runtime; using it in a DAG or task argument causes infinite DAG version creation
+  --> AIR304.py:24:28
+   |
+22 | DAG(dag_id="h", start_date=pendulum.now())
+23 | DAG(dag_id="i", start_date=pendulum.yesterday())
+24 | DAG(dag_id="j", start_date=pendulum.tomorrow())
+   |                            ^^^^^^^^^^^^^^^^^^^
+25 | DAG(dag_id="k", start_date=pendulum.today())
+26 | DAG(dag_id="l", owner=f"team-{uuid.uuid4()}")
+   |
+
+AIR304 `pendulum.today()` produces a value that changes at runtime; using it in a DAG or task argument causes infinite DAG version creation
+  --> AIR304.py:25:28
+   |
+23 | DAG(dag_id="i", start_date=pendulum.yesterday())
+24 | DAG(dag_id="j", start_date=pendulum.tomorrow())
+25 | DAG(dag_id="k", start_date=pendulum.today())
+   |                            ^^^^^^^^^^^^^^^^
+26 | DAG(dag_id="l", owner=f"team-{uuid.uuid4()}")
+27 | DAG(dag_id="m", description=f"built at {time.time()}")
+   |
+
+AIR304 `uuid.uuid4()` produces a value that changes at runtime; using it in a DAG or task argument causes infinite DAG version creation
+  --> AIR304.py:26:31
+   |
+24 | DAG(dag_id="j", start_date=pendulum.tomorrow())
+25 | DAG(dag_id="k", start_date=pendulum.today())
+26 | DAG(dag_id="l", owner=f"team-{uuid.uuid4()}")
+   |                               ^^^^^^^^^^^^
+27 | DAG(dag_id="m", description=f"built at {time.time()}")
+   |
+
+AIR304 `time.time()` produces a value that changes at runtime; using it in a DAG or task argument causes infinite DAG version creation
+  --> AIR304.py:27:41
+   |
+25 | DAG(dag_id="k", start_date=pendulum.today())
+26 | DAG(dag_id="l", owner=f"team-{uuid.uuid4()}")
+27 | DAG(dag_id="m", description=f"built at {time.time()}")
+   |                                         ^^^^^^^^^^^
+   |
+
+AIR304 `pendulum.now()` produces a value that changes at runtime; using it in a DAG or task argument causes infinite DAG version creation
+  --> AIR304.py:30:17
+   |
+30 | @dag(start_date=pendulum.now())
+   |                 ^^^^^^^^^^^^^^
+31 | def my_dag():
+32 |     pass
+   |
+
+AIR304 `datetime.today()` produces a value that changes at runtime; using it in a DAG or task argument causes infinite DAG version creation
+  --> AIR304.py:35:62
+   |
+35 | BashOperator(task_id="t", bash_command="echo hi", start_date=datetime.today())
+   |                                                              ^^^^^^^^^^^^^^^^
+36 |
+37 | PythonSensor(task_id="s", start_date=datetime.now())
+   |
+
+AIR304 `datetime.now()` produces a value that changes at runtime; using it in a DAG or task argument causes infinite DAG version creation
+  --> AIR304.py:37:38
+   |
+35 | BashOperator(task_id="t", bash_command="echo hi", start_date=datetime.today())
+36 |
+37 | PythonSensor(task_id="s", start_date=datetime.now())
+   |                                      ^^^^^^^^^^^^^^
+   |
+
+AIR304 `datetime.utcnow()` produces a value that changes at runtime; using it in a DAG or task argument causes infinite DAG version creation
+  --> AIR304.py:40:18
+   |
+40 | @task(start_date=datetime.utcnow())
+   |                  ^^^^^^^^^^^^^^^^^
+41 | def my_task():
+42 |     pass
+   |
