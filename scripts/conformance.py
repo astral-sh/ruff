@@ -799,7 +799,7 @@ def render_file_stats_table(test_cases: list[TestCase]) -> str:
         )
 
     totals_row = (
-        f"| **Total**"
+        f"| **Total (all files)**"
         f" | **{fmt(old_totals.true_positives, new_totals.true_positives, greater_is_better=True)}**"
         f" | **{fmt(old_totals.false_positives, new_totals.false_positives, greater_is_better=False)}**"
         f" | **{fmt(old_totals.false_negatives, new_totals.false_negatives, greater_is_better=False)}**"
