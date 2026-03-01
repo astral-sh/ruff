@@ -1468,8 +1468,13 @@ pub(crate) struct DisplayFunctionType<'db> {
 
 impl<'db> FmtDetailed<'db> for DisplayFunctionType<'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
-        // Detect self-referential function types to prevent infinite recursion.
-        if self.settings.visited_function_types.contains(&self.ty) {
+        // Detect self-referential function types to prevent infinite recursion,
+        // and limit display depth for chains of different function types
+        // (e.g. multiple redefinitions with `TypeOf[foo]` return types).
+        const MAX_FUNCTION_TYPE_DISPLAY_DEPTH: usize = 4;
+        if self.settings.visited_function_types.contains(&self.ty)
+            || self.settings.visited_function_types.len() >= MAX_FUNCTION_TYPE_DISPLAY_DEPTH
+        {
             f.set_invalid_type_annotation();
             f.write_str("def ")?;
             write!(f, "{}", self.ty.name(self.db))?;
