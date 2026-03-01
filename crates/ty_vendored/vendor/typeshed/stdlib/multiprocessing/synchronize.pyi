@@ -60,9 +60,9 @@ class Semaphore(SemLock):
     def get_value(self) -> int:
         """Returns current value of Semaphore.
 
-Raises NotImplementedError on Mac OSX
-because of broken sem_getvalue().
-"""
+        Raises NotImplementedError on Mac OSX
+        because of broken sem_getvalue().
+        """
 
 class BoundedSemaphore(Semaphore):
     def __init__(self, value: int = 1, *, ctx: BaseContext) -> None: ...

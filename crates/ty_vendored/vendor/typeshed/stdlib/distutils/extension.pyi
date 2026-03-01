@@ -3,6 +3,7 @@
 Provides the Extension class, used to describe C/C++ extension
 modules in setup scripts.
 """
+
 class Extension:
     """Just a collection of attributes that describes an extension
     module and everything needed to build it (hopefully in a portable
@@ -67,6 +68,7 @@ class Extension:
         specifies that a build failure in the extension should not abort the
         build process, but simply not install the failing extension.
     """
+
     name: str
     sources: list[str]
     include_dirs: list[str]

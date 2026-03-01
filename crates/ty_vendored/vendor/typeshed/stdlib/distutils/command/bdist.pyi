@@ -3,6 +3,7 @@
 Implements the Distutils 'bdist' command (create a built [binary]
 distribution).
 """
+
 from _typeshed import Incomplete, Unused
 from collections.abc import Callable
 from typing import ClassVar
