@@ -72,7 +72,8 @@ impl<'db> EnumMetadata<'db> {
 }
 
 /// Returns the set of names listed in an enum's `_ignore_` attribute.
-pub(crate) fn enum_ignored_names(db: &dyn Db, scope_id: ScopeId) -> FxHashSet<Name> {
+#[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
+pub(crate) fn enum_ignored_names<'db>(db: &'db dyn Db, scope_id: ScopeId<'db>) -> FxHashSet<Name> {
     let use_def_map = use_def_map(db, scope_id);
     let table = place_table(db, scope_id);
 
