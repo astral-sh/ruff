@@ -1,4 +1,4 @@
-use ruff_python_ast::{Expr, ExprStringLiteral};
+use ruff_python_ast::{Comprehension, Expr, ExprStringLiteral};
 use ruff_python_semantic::{ScopeId, Snapshot};
 
 /// A collection of AST nodes that are deferred for later visitation. Used to, e.g., store
@@ -30,8 +30,9 @@ impl Visit<'_> {
 /// A collection of AST nodes to be analyzed after the AST traversal. Used to, e.g., store
 /// all `for` loops, so that they can be analyzed after the entire AST has been visited.
 #[derive(Debug, Default)]
-pub(crate) struct Analyze {
+pub(crate) struct Analyze<'a> {
     pub(crate) scopes: Vec<ScopeId>,
     pub(crate) lambdas: Vec<Snapshot>,
     pub(crate) for_loops: Vec<Snapshot>,
+    pub(crate) comprehensions: Vec<(&'a Comprehension, Snapshot)>,
 }

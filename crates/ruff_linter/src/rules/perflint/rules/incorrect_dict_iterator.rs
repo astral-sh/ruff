@@ -3,7 +3,7 @@ use std::fmt;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_ast::{Arguments, Expr};
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::pad;
@@ -64,12 +64,7 @@ impl AlwaysFixableViolation for IncorrectDictIterator {
 
 /// PERF102 for `for` loops.
 pub(crate) fn incorrect_dict_iterator(checker: &Checker, stmt_for: &ast::StmtFor) {
-    check_dict_items_usage(
-        checker,
-        stmt_for.target.as_ref(),
-        stmt_for.iter.as_ref(),
-        stmt_for.target.range(),
-    );
+    check_dict_items_usage(checker, stmt_for.target.as_ref(), stmt_for.iter.as_ref());
 }
 
 /// PERF102 for comprehensions and generators.
@@ -77,15 +72,10 @@ pub(crate) fn incorrect_dict_iterator_comprehension(
     checker: &Checker,
     comprehension: &ast::Comprehension,
 ) {
-    check_dict_items_usage(
-        checker,
-        &comprehension.target,
-        &comprehension.iter,
-        comprehension.target.range(),
-    );
+    check_dict_items_usage(checker, &comprehension.target, &comprehension.iter);
 }
 
-fn check_dict_items_usage(checker: &Checker, target: &Expr, iter: &Expr, target_range: TextRange) {
+fn check_dict_items_usage(checker: &Checker, target: &Expr, iter: &Expr) {
     let Expr::Tuple(ast::ExprTuple { elts, .. }) = target else {
         return;
     };
@@ -114,7 +104,12 @@ fn check_dict_items_usage(checker: &Checker, target: &Expr, iter: &Expr, target_
         checker.semantic().is_unused(key),
         checker.semantic().is_unused(value),
     ) {
-        (true, true) | (false, false) => {}
+        (true, true) => {
+            // Both the key and the value are unused.
+        }
+        (false, false) => {
+            // Neither the key nor the value are unused.
+        }
         (true, false) => {
             // The key is unused, so replace with `dict.values()`.
             let mut diagnostic = checker.report_diagnostic(
@@ -127,10 +122,10 @@ fn check_dict_items_usage(checker: &Checker, target: &Expr, iter: &Expr, target_
             let replace_target = Edit::range_replacement(
                 pad(
                     checker.locator().slice(value).to_string(),
-                    target_range,
+                    target.range(),
                     checker.locator(),
                 ),
-                target_range,
+                target.range(),
             );
             diagnostic.set_fix(Fix::unsafe_edits(replace_attribute, [replace_target]));
         }
@@ -146,10 +141,10 @@ fn check_dict_items_usage(checker: &Checker, target: &Expr, iter: &Expr, target_
             let replace_target = Edit::range_replacement(
                 pad(
                     checker.locator().slice(key).to_string(),
-                    target_range,
+                    target.range(),
                     checker.locator(),
                 ),
-                target_range,
+                target.range(),
             );
             diagnostic.set_fix(Fix::unsafe_edits(replace_attribute, [replace_target]));
         }

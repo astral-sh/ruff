@@ -79,7 +79,7 @@ use crate::rules::pylint::rules::{
     AwaitOutsideAsync, LoadBeforeGlobalDeclaration, NonlocalWithoutBinding,
     YieldFromInAsyncFunction,
 };
-use crate::rules::{flake8_pyi, flake8_type_checking, perflint, pyflakes, pyupgrade};
+use crate::rules::{flake8_pyi, flake8_type_checking, pyflakes, pyupgrade};
 use crate::settings::rule_table::RuleTable;
 use crate::settings::{LinterSettings, TargetVersion, flags};
 use crate::{Edit, Violation};
@@ -232,7 +232,7 @@ pub(crate) struct Checker<'a> {
     /// A set of deferred nodes to be visited after the current traversal (e.g., function bodies).
     visit: deferred::Visit<'a>,
     /// A set of deferred nodes to be analyzed after the AST traversal (e.g., `for` loops).
-    analyze: deferred::Analyze,
+    analyze: deferred::Analyze<'a>,
     /// The list of names already seen by flake8-bugbear diagnostics, to avoid duplicate violations.
     flake8_bugbear_seen: RefCell<FxHashSet<TextRange>>,
     /// The end offset of the last visited statement.
@@ -2159,21 +2159,6 @@ impl<'a> Visitor<'a> for Checker<'a> {
             _ => visitor::walk_expr(self, expr),
         }
 
-        // Unlike most comprehension checks (which run in `analyze::expression`, after scope pop),
-        // PERF102 needs `is_unused()` which requires the generator scope to still be active.
-        if self.is_rule_enabled(Rule::IncorrectDictIterator) {
-            let generators = match expr {
-                Expr::ListComp(comp) => comp.generators.as_slice(),
-                Expr::SetComp(comp) => comp.generators.as_slice(),
-                Expr::Generator(comp) => comp.generators.as_slice(),
-                Expr::DictComp(comp) => comp.generators.as_slice(),
-                _ => &[],
-            };
-            for generator in generators {
-                perflint::rules::incorrect_dict_iterator_comprehension(self, generator);
-            }
-        }
-
         // Step 3: Clean-up
         match expr {
             Expr::Lambda(_)
@@ -3324,6 +3309,7 @@ pub(crate) fn check_ast(
     // Check docstrings, bindings, and unresolved references.
     analyze::deferred_lambdas(&mut checker);
     analyze::deferred_for_loops(&mut checker);
+    analyze::deferred_comprehensions(&mut checker);
     analyze::definitions(&mut checker);
     analyze::bindings(&checker);
     analyze::unresolved_references(&checker);

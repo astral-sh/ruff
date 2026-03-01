@@ -1,5 +1,6 @@
 pub(super) use bindings::bindings;
 pub(super) use comprehension::comprehension;
+pub(super) use deferred_comprehensions::deferred_comprehensions;
 pub(super) use deferred_for_loops::deferred_for_loops;
 pub(super) use deferred_lambdas::deferred_lambdas;
 pub(super) use deferred_scopes::deferred_scopes;
@@ -16,6 +17,7 @@ pub(super) use unresolved_references::unresolved_references;
 
 mod bindings;
 mod comprehension;
+mod deferred_comprehensions;
 mod deferred_for_loops;
 mod deferred_lambdas;
 mod deferred_scopes;
