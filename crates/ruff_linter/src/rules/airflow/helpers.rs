@@ -3,6 +3,7 @@ use crate::fix::edits::remove_unused_imports;
 use crate::importer::ImportRequest;
 use crate::rules::numpy::helpers::{AttributeSearcher, ImportSearcher};
 use ruff_diagnostics::{Edit, Fix};
+use ruff_python_ast::helpers::map_callable;
 use ruff_python_ast::name::{QualifiedName, QualifiedNameBuilder};
 use ruff_python_ast::statement_visitor::StatementVisitor;
 use ruff_python_ast::visitor::Visitor;
@@ -289,4 +290,39 @@ where
     };
 
     any_qualified_base_class(class_def, semantic, &is_base_class)
+}
+
+/// Returns `true` if the given function is decorated with `@airflow.decorators.task`
+/// (or `@airflow.sdk.task`), including variant forms like `@task.branch` and
+/// `@task.short_circuit`.
+pub(crate) fn is_airflow_task(function_def: &StmtFunctionDef, semantic: &SemanticModel) -> bool {
+    function_def.decorator_list.iter().any(|decorator| {
+        let expr = map_callable(&decorator.expression);
+
+        // Match `@task` and `@task()` directly.
+        if semantic
+            .resolve_qualified_name(expr)
+            .is_some_and(|qn| matches!(qn.segments(), ["airflow", "decorators" | "sdk", "task"]))
+        {
+            return true;
+        }
+
+        // Match `@task.<variant>` (e.g., `@task.branch`, `@task.short_circuit`).
+        if let Expr::Attribute(ExprAttribute { value, .. }) = expr {
+            return semantic.resolve_qualified_name(value).is_some_and(|qn| {
+                matches!(qn.segments(), ["airflow", "decorators" | "sdk", "task"])
+            });
+        }
+
+        false
+    })
+}
+
+/// Returns `true` if the current statement hierarchy has a function that's decorated with
+/// `@airflow.decorators.task` or `@airflow.sdk.task`.
+pub(crate) fn in_airflow_task_function(semantic: &SemanticModel) -> bool {
+    semantic
+        .current_statements()
+        .find_map(|stmt| stmt.as_function_def_stmt())
+        .is_some_and(|function_def| is_airflow_task(function_def, semantic))
 }
