@@ -3208,6 +3208,8 @@ S = TypeVar("S")
 class Bar(Protocol[S]):
     def x(self) -> "S | Bar[S]": ...
 
+# error: [unbound-type-variable]
+# error: [unbound-type-variable]
 z: S | Bar[S]
 ```
 

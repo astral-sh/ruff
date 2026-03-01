@@ -5,8 +5,8 @@ use super::{DeferredExpressionState, TypeInferenceBuilder};
 use crate::FxOrderSet;
 use crate::semantic_index::semantic_index;
 use crate::types::diagnostic::{
-    self, INVALID_TYPE_FORM, NOT_SUBSCRIPTABLE, report_invalid_argument_number_to_special_form,
-    report_invalid_arguments_to_callable,
+    self, INVALID_TYPE_FORM, NOT_SUBSCRIPTABLE, UNBOUND_TYPE_VARIABLE,
+    report_invalid_argument_number_to_special_form, report_invalid_arguments_to_callable,
 };
 use crate::types::generics::bind_typevar;
 use crate::types::infer::builder::InnerExpressionInferenceState;
@@ -82,17 +82,20 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // https://typing.python.org/en/latest/spec/annotations.html#grammar-token-expression-grammar-type_expression
         match expression {
             ast::Expr::Name(name) => match name.ctx {
-                ast::ExprContext::Load => self
-                    .infer_name_expression(name)
-                    .default_specialize(self.db())
-                    .in_type_expression(self.db(), self.scope(), self.typevar_binding_context)
-                    .unwrap_or_else(|error| {
-                        error.into_fallback_type(
-                            &self.context,
-                            expression,
-                            self.is_reachable(expression),
-                        )
-                    }),
+                ast::ExprContext::Load => {
+                    let ty = self
+                        .infer_name_expression(name)
+                        .default_specialize(self.db())
+                        .in_type_expression(self.db(), self.scope(), self.typevar_binding_context)
+                        .unwrap_or_else(|error| {
+                            error.into_fallback_type(
+                                &self.context,
+                                expression,
+                                self.is_reachable(expression),
+                            )
+                        });
+                    self.check_for_unbound_type_variable(expression, ty)
+                }
                 ast::ExprContext::Invalid => Type::unknown(),
                 ast::ExprContext::Store | ast::ExprContext::Del => {
                     todo_type!("Name expression annotation in Store/Del context")
@@ -1964,5 +1967,30 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             diagnostic::add_type_expression_reference_link(diag);
         }
         None
+    }
+
+    /// Checks if the inferred type is an unbound type variable and reports a diagnostic if so.
+    ///
+    /// Returns `Unknown` as a fallback if the type variable is unbound, otherwise returns the
+    /// original type unchanged.
+    pub(super) fn check_for_unbound_type_variable(
+        &self,
+        expression: &ast::Expr,
+        ty: Type<'db>,
+    ) -> Type<'db> {
+        if !self.check_unbound_typevars {
+            return ty;
+        }
+        if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = ty {
+            if let Some(builder) = self.context.report_lint(&UNBOUND_TYPE_VARIABLE, expression) {
+                builder.into_diagnostic(format_args!(
+                    "Type variable `{name}` is not bound to any outer generic context",
+                    name = typevar.name(self.db())
+                ));
+            }
+            Type::unknown()
+        } else {
+            ty
+        }
     }
 }

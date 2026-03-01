@@ -709,6 +709,7 @@ def _(doubly_specialized: ProtoInt[int]):
 
 # TODO: TypedDict is just a function object at runtime, we should emit an error
 class LegacyDict(TypedDict[T]):
+    # error: [unbound-type-variable]
     x: T
 
 # TODO: should be a `not-subscriptable` error
@@ -784,7 +785,13 @@ def _(
 Similarly, if you try to specialize a union type without a binding context, we emit an error:
 
 ```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
 # error: [not-subscriptable] "Cannot subscript non-generic type"
+# error: [unbound-type-variable]
+# error: [unbound-type-variable]
 x: (list[T] | set[T])[int]
 
 def _():
