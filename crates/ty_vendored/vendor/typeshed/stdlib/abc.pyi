@@ -37,10 +37,10 @@ class ABCMeta(type):
             mcls: type[_typeshed.Self], name: str, bases: tuple[type, ...], namespace: dict[str, Any], **kwargs: Any
         ) -> _typeshed.Self: ...
 
-    def __instancecheck__(cls: ABCMeta, instance: Any) -> bool:
+    def __instancecheck__(cls: ABCMeta, instance: Any, /) -> bool:
         """Override for isinstance(instance, cls)."""
 
-    def __subclasscheck__(cls: ABCMeta, subclass: type) -> bool:
+    def __subclasscheck__(cls: ABCMeta, subclass: type, /) -> bool:
         """Override for issubclass(subclass, cls)."""
 
     def _dump_registry(cls: ABCMeta, file: SupportsWrite[str] | None = None) -> None:

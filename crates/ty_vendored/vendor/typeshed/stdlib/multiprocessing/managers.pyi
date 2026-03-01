@@ -26,6 +26,8 @@ from .util import Finalize as _Finalize
 __all__ = ["BaseManager", "SyncManager", "BaseProxy", "Token", "SharedMemoryManager"]
 
 _T = TypeVar("_T")
+_T1 = TypeVar("_T1")
+_T2 = TypeVar("_T2")
 _KT = TypeVar("_KT")
 _VT = TypeVar("_VT")
 _S = TypeVar("_S")
@@ -114,6 +116,25 @@ if sys.version_info >= (3, 13):
         def keys(self) -> list[_KT]: ...  # type: ignore[override]
         def items(self) -> list[tuple[_KT, _VT]]: ...  # type: ignore[override]
         def values(self) -> list[_VT]: ...  # type: ignore[override]
+        if sys.version_info >= (3, 14):
+            # Next methods are copied from builtins.dict
+            @overload
+            def fromkeys(self, iterable: Iterable[_T], value: None = None, /) -> dict[_T, Any | None]: ...
+            @overload
+            def fromkeys(self, iterable: Iterable[_T], value: _S, /) -> dict[_T, _S]: ...
+            def __reversed__(self) -> Iterator[_KT]: ...
+            @overload
+            def __or__(self, value: dict[_KT, _VT], /) -> dict[_KT, _VT]: ...
+            @overload
+            def __or__(self, value: dict[_T1, _T2], /) -> dict[_KT | _T1, _VT | _T2]: ...
+            @overload
+            def __ror__(self, value: dict[_KT, _VT], /) -> dict[_KT, _VT]: ...
+            @overload
+            def __ror__(self, value: dict[_T1, _T2], /) -> dict[_KT | _T1, _VT | _T2]: ...
+            @overload  # type: ignore[misc]
+            def __ior__(self, value: SupportsKeysAndGetItem[_KT, _VT], /) -> Self: ...
+            @overload
+            def __ior__(self, value: Iterable[tuple[_KT, _VT]], /) -> Self: ...
 
     class DictProxy(_BaseDictProxy[_KT, _VT]):
         def __class_getitem__(cls, args: Any, /) -> GenericAlias:
@@ -217,6 +238,8 @@ class BaseListProxy(BaseProxy, MutableSequence[_T]):
     def insert(self, index: SupportsIndex, object: _T, /) -> None: ...
     def remove(self, value: _T, /) -> None: ...
     if sys.version_info >= (3, 14):
+        # Next methods are copied from builtins.list
+        def clear(self) -> None: ...
         def copy(self) -> list[_T]: ...
     # Use BaseListProxy[SupportsRichComparisonT] for the first overload rather than [SupportsRichComparison]
     # to work around invariance

@@ -1304,19 +1304,15 @@ def makeLogRecord(dict: Mapping[str, object]) -> LogRecord:
     instance.
     """
 
+@overload  # handlers is non-None
 def basicConfig(
     *,
-    filename: StrPath | None = ...,
-    filemode: str = ...,
-    format: str = ...,
-    datefmt: str | None = ...,
-    style: _FormatStyle = ...,
-    level: _Level | None = ...,
-    stream: SupportsWrite[str] | None = ...,
-    handlers: Iterable[Handler] | None = ...,
-    force: bool | None = ...,
-    encoding: str | None = ...,
-    errors: str | None = ...,
+    format: str = ...,  # default value depends on the value of `style`
+    datefmt: str | None = None,
+    style: _FormatStyle = "%",
+    level: _Level | None = None,
+    handlers: Iterable[Handler],
+    force: bool | None = False,
 ) -> None:
     """
     Do basic configuration for the logging system.
@@ -1386,6 +1382,31 @@ def basicConfig(
        Added the ``encoding`` and ``errors`` parameters.
     """
 
+@overload  # handlers is None, filename is passed (but possibly None)
+def basicConfig(
+    *,
+    filename: StrPath | None,
+    filemode: str = "a",
+    format: str = ...,  # default value depends on the value of `style`
+    datefmt: str | None = None,
+    style: _FormatStyle = "%",
+    level: _Level | None = None,
+    handlers: None = None,
+    force: bool | None = False,
+    encoding: str | None = None,
+    errors: str | None = "backslashreplace",
+) -> None: ...
+@overload  # handlers is None, filename is not passed
+def basicConfig(
+    *,
+    format: str = ...,  # default value depends on the value of `style`
+    datefmt: str | None = None,
+    style: _FormatStyle = "%",
+    level: _Level | None = None,
+    stream: SupportsWrite[str] | None = None,
+    handlers: None = None,
+    force: bool | None = False,
+) -> None: ...
 def shutdown(handlerList: Sequence[Any] = ...) -> None:  # handlerList is undocumented
     """
     Perform any cleanup actions in the logging system (e.g. flushing

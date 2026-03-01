@@ -46,8 +46,8 @@ if sys.version_info >= (3, 13):
 opname: Final[list[str]]
 
 opmap: Final[dict[str, int]]
-HAVE_ARGUMENT: Final = 43
-EXTENDED_ARG: Final = 69
+HAVE_ARGUMENT: Final[int]
+EXTENDED_ARG: Final[int]
 
 def stack_effect(opcode: int, oparg: int | None = None, /, *, jump: bool | None = None) -> int:
     """Compute the stack effect of the opcode."""
