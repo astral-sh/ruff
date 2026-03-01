@@ -1465,6 +1465,110 @@ def f(func: Callable[P, int], *args: P.args, **kwargs: P.kwargs) -> None:
     static_assert(not is_assignable_to(dict[str, Unknown], TypeOf[kwargs]))
 ```
 
+## `Concatenate`
+
+### Self-assignability
+
+A `Callable` with `Concatenate` should be assignable to itself.
+
+```py
+from ty_extensions import static_assert, is_assignable_to
+from typing import Callable, Concatenate
+
+static_assert(is_assignable_to(Callable[Concatenate[int, ...], None], Callable[Concatenate[int, ...], None]))
+static_assert(is_assignable_to(Callable[Concatenate[int, str, ...], None], Callable[Concatenate[int, str, ...], None]))
+```
+
+### Assignable to gradual callable
+
+A callable with `Concatenate` parameters should be assignable to the gradual callable form, since
+the gradual form is consistent with any input signature.
+
+```py
+from ty_extensions import static_assert, is_assignable_to
+from typing import Callable, Concatenate
+
+static_assert(is_assignable_to(Callable[Concatenate[int, ...], None], Callable[..., None]))
+static_assert(is_assignable_to(Callable[Concatenate[int, str, ...], None], Callable[..., None]))
+```
+
+And the gradual callable should also be assignable to one with `Concatenate` parameters.
+
+```py
+static_assert(is_assignable_to(Callable[..., None], Callable[Concatenate[int, ...], None]))
+static_assert(is_assignable_to(Callable[..., None], Callable[Concatenate[int, str, ...], None]))
+```
+
+### Contravariance of parameters
+
+Callable parameters are contravariant: a callable accepting a wider type (`A`) is assignable to one
+expecting a narrower type (`B`), because any call valid for `B` is also valid for `A`.
+
+```py
+from ty_extensions import static_assert, is_assignable_to
+from typing import Callable, Concatenate
+
+class Parent: ...
+class Child(Parent): ...
+
+static_assert(is_assignable_to(Callable[Concatenate[Parent, ...], None], Callable[Concatenate[Child, ...], None]))
+# TODO: should not be assignable (`Parent` is not assignable to `Child`)
+static_assert(is_assignable_to(Callable[Concatenate[Child, ...], None], Callable[Concatenate[Parent, ...], None]))
+```
+
+### Different parameter types
+
+```py
+from ty_extensions import static_assert, is_assignable_to
+from typing import Callable, Concatenate, final
+
+class A: ...
+class B: ...
+
+# TODO: should not be assignable (`A` and `B` are disjoint)
+static_assert(is_assignable_to(Callable[Concatenate[A, ...], None], Callable[Concatenate[B, ...], None]))
+# TODO: should not be assignable
+static_assert(is_assignable_to(Callable[Concatenate[B, ...], None], Callable[Concatenate[A, ...], None]))
+```
+
+### Different number of prepended parameters
+
+Callables with different numbers of prepended parameters should be assignable.
+
+```py
+from ty_extensions import static_assert, is_assignable_to
+from typing import Callable, Concatenate
+
+static_assert(is_assignable_to(Callable[Concatenate[int, ...], None], Callable[Concatenate[int, str, ...], None]))
+static_assert(is_assignable_to(Callable[Concatenate[int, str, ...], None], Callable[Concatenate[int, ...], None]))
+```
+
+### `Concatenate` with ellipsis vs explicit parameter list
+
+```py
+from ty_extensions import static_assert, is_assignable_to
+from typing import Callable, Concatenate
+
+static_assert(is_assignable_to(Callable[Concatenate[int, ...], None], Callable[[int], None]))
+static_assert(is_assignable_to(Callable[[int], None], Callable[Concatenate[int, ...], None]))
+
+static_assert(is_assignable_to(Callable[Concatenate[int, ...], None], Callable[[int, str], None]))
+static_assert(is_assignable_to(Callable[[int, str], None], Callable[Concatenate[int, ...], None]))
+```
+
+### `Concatenate` with `ParamSpec`
+
+```py
+from ty_extensions import static_assert, is_assignable_to
+from typing import Callable, Concatenate
+
+class A: ...
+
+def with_paramspec[**P](_: Callable[P, None]):
+    static_assert(is_assignable_to(Callable[Concatenate[int, P], None], Callable[..., None]))
+    static_assert(is_assignable_to(Callable[..., None], Callable[Concatenate[int, P], None]))
+```
+
 [gradual form]: https://typing.python.org/en/latest/spec/glossary.html#term-gradual-form
 [gradual tuple]: https://typing.python.org/en/latest/spec/tuples.html#tuple-type-form
 [typing documentation]: https://typing.python.org/en/latest/spec/concepts.html#the-assignable-to-or-consistent-subtyping-relation
