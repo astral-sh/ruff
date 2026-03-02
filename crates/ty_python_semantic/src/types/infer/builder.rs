@@ -59,7 +59,6 @@ use crate::semantic_index::{
     ApplicableConstraints, EnclosingSnapshotResult, SemanticIndex, attribute_assignments,
     place_table,
 };
-use crate::types::builder::RecursivelyDefined;
 use crate::types::call::bind::MatchingOverloadIndex;
 use crate::types::call::{Argument, Binding, Bindings, CallArguments, CallError, CallErrorKind};
 use crate::types::class::{
@@ -120,6 +119,7 @@ use crate::types::infer::builder::paramspec_validation::validate_paramspec_compo
 use crate::types::infer::{nearest_enclosing_class, nearest_enclosing_function};
 use crate::types::mro::{DynamicMroErrorKind, StaticMroErrorKind};
 use crate::types::newtype::NewType;
+use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::subclass_of::SubclassOfInner;
 use crate::types::tuple::{Tuple, TupleLength, TupleSpecBuilder, TupleType};
 use crate::types::typed_dict::{
