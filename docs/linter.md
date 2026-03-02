@@ -306,7 +306,7 @@ i = 1
 ```
 
 To cover an entire multi-line statement or header, the comment must either be
-placed above the first line, or as a trailing comment on the first or last line:
+placed above the first line, or as a trailing comment on the last line:
 
 ```python
 # ruff: ignore[ARG001]  # Covers the entire function signature
@@ -315,11 +315,6 @@ def foo(
     arg2,
 ):
     pass
-
-things = [  # ruff: ignore[E501]  # Covers the entire list literal
-    "really long string literal ...",
-    "really long string literal ...",
-]
 
 def bar():
     """
