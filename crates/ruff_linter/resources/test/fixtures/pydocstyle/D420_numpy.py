@@ -13,6 +13,14 @@ def correct_order():
     x : int
         Description.
 
+    Attributes
+    ----------
+    attr : int
+
+    Methods
+    -------
+    method
+
     Returns
     -------
     int
@@ -57,14 +65,6 @@ def correct_order():
     Examples
     --------
     >>> correct_order()
-
-    Attributes
-    ----------
-    attr : int
-
-    Methods
-    -------
-    method
     """
 
 
