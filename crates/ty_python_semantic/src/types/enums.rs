@@ -10,8 +10,8 @@ use crate::{
     semantic_index::{place_table, scope::ScopeId, use_def_map},
     types::{
         ClassBase, ClassLiteral, DynamicType, EnumLiteralType, KnownClass, LiteralValueTypeKind,
-        MemberLookupPolicy, StaticClassLiteral, Type, TypeQualifiers, set_theoretic::builder::UnionBuilder,
-        function::FunctionType,
+        MemberLookupPolicy, StaticClassLiteral, Type, TypeQualifiers, function::FunctionType,
+        set_theoretic::builder::UnionBuilder,
     },
 };
 
