@@ -97,6 +97,43 @@ class MaybeAny:
 reveal_type(MaybeAny(1))  # revealed: MaybeAny | Any
 ```
 
+### Mixed `__new__` overloads
+
+If some `__new__` overloads are instance-returning and some are not, the return type (and `__init__`
+validation) are resolved correctly for each call site:
+
+```py
+from __future__ import annotations
+from typing import Any, Literal, overload
+
+class A: ...
+class B: ...
+class C: ...
+class D: ...
+
+class Test:
+    @overload
+    def __new__(cls, x: A) -> A: ...
+    @overload
+    def __new__(cls, x: str) -> Test: ...
+    def __new__(cls, x: A | str) -> A | Test:
+        raise NotImplementedError()
+
+    def __init__(self, x: Literal["ok"]) -> None:
+        pass
+
+# `A` matches the first `__new__` overload, which returns `A`, bypassing `__init__` since `A` is
+# not a subtype of `Test`.
+reveal_type(Test(A()))  # revealed: A
+
+# `str` returns `Test` from `__new__`, but `__init__` rejects `Literal["bad"]`.
+# error: [invalid-argument-type]
+reveal_type(Test("bad"))  # revealed: Test
+
+# `Literal["ok"]` returns `Test` from `__new__`, and is accepted by `__init__`.
+reveal_type(Test("ok"))  # revealed: Test
+```
+
 ## Deferred resolution of bases
 
 ### Only the stringified name is deferred

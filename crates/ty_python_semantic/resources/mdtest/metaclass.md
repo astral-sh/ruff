@@ -349,10 +349,7 @@ reveal_type(Baz(1))  # revealed: () -> int
 reveal_type(Baz("hello"))  # revealed: () -> str
 ```
 
-### Metaclass `__call__` is still checked when `__new__` is all non-instance
-
-When `__new__` always returns a non-instance type, `__init__` should be skipped, but metaclass
-`__call__` argument validation should still apply.
+### If metaclass `__call__` fails, `__new__` is irrelevant
 
 ```py
 class Meta(type):
@@ -373,11 +370,6 @@ If both metaclass `__call__` and `__new__` are mixed (some overloads instance-re
 non-instance), the fallback chain works as expected: `__new__` is only considered if metaclass
 `__call__` is instance-returning, and `__init__` is only considered if both `__call__` and `__new__`
 are instance-returning.
-
-```toml
-[environment]
-python-version = "3.13"
-```
 
 ```py
 from __future__ import annotations
