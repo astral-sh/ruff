@@ -641,8 +641,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             ) => {
                 let constraints = ConstraintSetBuilder::new();
                 let result = constraints.into_owned(|constraints| {
-                    let left = constraints.load(left.constraints(db));
-                    let right = constraints.load(right.constraints(db));
+                    let left = constraints.load(db, left.constraints(db));
+                    let right = constraints.load(db, right.constraints(db));
                     left.and(db, constraints, || right)
                 });
                 Some(Type::KnownInstance(KnownInstanceType::ConstraintSet(
@@ -657,8 +657,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             ) => {
                 let constraints = ConstraintSetBuilder::new();
                 let result = constraints.into_owned(|constraints| {
-                    let left = constraints.load(left.constraints(db));
-                    let right = constraints.load(right.constraints(db));
+                    let left = constraints.load(db, left.constraints(db));
+                    let right = constraints.load(db, right.constraints(db));
                     left.or(db, constraints, || right)
                 });
                 Some(Type::KnownInstance(KnownInstanceType::ConstraintSet(
