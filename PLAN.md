@@ -5,21 +5,21 @@
 ### Overall
 - **Planning/documentation:** ✅ completed
 - **Code implementation:** 🟡 in progress
-- **Testing for implementation changes:** ⏳ not started
+- **Testing for implementation changes:** 🟡 in progress
 
 ### Phase status
 - **Phase A (compile-stabilization):** ✅ completed
-- **Phase B (semantic split-constraint migration):** ⏳ not started
+- **Phase B (semantic split-constraint migration):** 🟡 in progress
 
 ### Step status (for cross-agent continuation)
 - [x] A1. Reintroduce compatibility wrapper `ConstraintSet::constrain_typevar`
 - [x] A2. Mechanical compile-fix pass (`constraint.typevar()` + constructor replacements + temporary compatibility views)
 - [x] A3. Update implication/intersection/display enough to restore compile with minimal churn
 - [x] A4. Reach compile-clean baseline (`cargo check -p ty_python_semantic`)
-- [ ] B5. Rework `SequentMap` for true split-constraint semantics
+- [x] B5. Rework `SequentMap` for true split-constraint semantics
 - [ ] B6. Rework `solutions` / `exists_one` / remaining range assumptions to explicit variant logic
-- [ ] B7. Run focused tests (`cargo nextest run -p ty_python_semantic`, plus targeted mdtests if needed)
-- [ ] B8. Final formatting/lint validation
+
+> Note: formatting + full-crate tests are ongoing acceptance criteria and must be rerun after each remaining implementation step.
 
 ### Notes on what has been completed so far
 - ✅ Reviewed `constraints.rs` in full
@@ -30,24 +30,28 @@
 - ✅ Added temporary compatibility helpers on `Constraint` (`as_lower_upper`, `lower`, `upper`) and mechanically migrated remaining field accesses
 - ✅ Replaced all remaining `ConstraintId::new(...)` and `Constraint::new_node(...)` call sites
 - ✅ Updated implication/intersection/display and related call paths enough to compile under split constraints
-- ✅ `cargo check -p ty_python_semantic` now passes
+- ✅ Reworked `SequentMap` derivation to operate on split constraints with explicit variant-based propagation
+- ✅ Simplified pair sequent derivation into a unified path (same/different typevar cases handled as stanzas in one method)
+- ✅ Fixed regressions found by mdtests (notably `generics/*/functions.md` and `type_properties/implies_subtype_of.md`) while keeping the unified structure
+- ✅ `cargo fmt --package ty_python_semantic` run
+- ✅ `cargo check -p ty_python_semantic` passes
+- ✅ `cargo nextest run -p ty_python_semantic` passes (502 passed, 34 skipped)
+
+### Handoff notes for next agent
+- In `SequentMap::add_sequents_for_pair`, impossibility for `(L ≤ T) ∧ (T ≤ U)` is intentionally limited to **concrete** `L`/`U` (non-typevar bounds). Making this unconditional regressed `implies_subtype_of` mdtests by over-pruning satisfiable paths.
+- `add_relation_propagation_sequents` and `add_concrete_pivot_sequents` are both required:
+  - removing explicit relation+relation handling regressed `generics/*/functions.md`
+  - removing concrete-pivot handling regressed `type_properties/implies_subtype_of.md`
+- Next step B6 should avoid introducing new uses of the temporary compatibility helpers (`as_lower_upper`, `lower`, `upper`) and instead prefer explicit variant matching where feasible.
+- After B6, rerun both acceptance criteria from this file (`cargo fmt --package ty_python_semantic` and `cargo nextest run -p ty_python_semantic`).
 
 ## Context and current state
 
-I reviewed:
-- `crates/ty_python_semantic/src/types/constraints.rs` (entire file)
-- `jj diff --from main --to @` (current branch delta)
-
-The branch has started the refactor by:
-- changing `Constraint` from a range struct to an enum:
-  - `Constraint::LowerBound(BoundTypeVarInstance, Type)`
-  - `Constraint::UpperBound(BoundTypeVarInstance, Type)`
-- adding constructors:
-  - `Constraint::new_lower_bound_node(...)`
-  - `Constraint::new_upper_bound_node(...)`
-- changing some call sites to use the new constructors
-
-But most of `constraints.rs` still assumes range fields (`constraint.lower`, `constraint.upper`, `constraint.typevar`) and old constructors (`Constraint::new_node`, `ConstraintId::new(...)` with 5 args).
+The refactor is now in the semantic-migration stage:
+- `Constraint` is split (`LowerBound` / `UpperBound`) and compile-stable.
+- Constructor and field-access migration is complete.
+- `SequentMap` has been migrated to a unified pair-derivation flow with explicit split-constraint rules.
+- Full crate tests currently pass at this point in the branch.
 
 ## What is currently broken
 
@@ -55,9 +59,8 @@ But most of `constraints.rs` still assumes range fields (`constraint.lower`, `co
 
 Remaining work is semantic migration quality, not compile breakage:
 
-1. **Sequent and propagation logic is still compatibility-oriented** in places (using temporary lower/upper views).
-2. **Solution/existential logic still contains range-era assumptions** that should be rewritten to explicit variant handling.
-3. **Behavioral validation** (focused tests/mdtests) has not yet been run for these migration changes.
+1. **Solution/existential logic still contains range-era assumptions** that should be rewritten to explicit variant handling.
+2. **After B6, re-run formatting and full crate tests** to reconfirm behavior on the final migration state.
 
 ## Required additional changes
 
@@ -165,20 +168,21 @@ Similarly update/keep tests in `constraints.rs` that currently call `constrain_t
 **Phase B: semantic migration to true split-constraint logic**
 5. Rework `SequentMap` methods (biggest semantic piece).
 6. Rework `solutions` + `exists_one` + any remaining range assumptions, replacing compatibility views with explicit variant logic.
-7. Run focused tests:
-   - `cargo nextest run -p ty_python_semantic`
-   - if needed, specific constraint/mdtests
-8. Validate formatting/lints as required by repo workflow.
+
+(Formatting and full-crate tests are enforced as ongoing acceptance criteria after each remaining step.)
 
 ## Validation checklist
 
-- [ ] `cargo check -p ty_python_semantic` passes
-- [ ] no remaining `Constraint::new_node` references
-- [ ] no remaining `ConstraintId::new(db, builder, ...)` references
-- [ ] no remaining `constraint.lower/upper/typevar` field accesses on `Constraint`
-- [ ] external callers compile without forced broad API churn
-- [ ] existing constraint display tests pass (or snapshots updated intentionally)
-- [ ] mdtests for constraint behavior still pass / are updated for intended semantic changes
+- [x] `cargo check -p ty_python_semantic` passes
+- [x] no remaining `Constraint::new_node` references
+- [x] no remaining `ConstraintId::new(db, builder, ...)` references
+- [x] no remaining `constraint.lower/upper/typevar` field accesses on `Constraint`
+- [x] external callers compile without forced broad API churn
+
+## Ongoing acceptance criteria (must hold after each remaining step)
+
+- `cargo fmt --package ty_python_semantic`
+- `cargo nextest run -p ty_python_semantic`
 
 ## Notes / risk areas
 
