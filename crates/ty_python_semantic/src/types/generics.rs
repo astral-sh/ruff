@@ -100,14 +100,13 @@ pub(crate) fn bind_typevar<'db>(
     let mut crossed_class_scope = false;
     for (_, ancestor_scope) in index.ancestor_scopes(containing_scope) {
         let is_class_scope = ancestor_scope.kind().is_class();
-        if let Some(generic_context) = ancestor_scope.node().generic_context(db, index) {
-            // If we've already crossed a class boundary, skip class-scoped generic contexts.
-            // This prevents inner classes from accessing type parameters of outer classes.
-            if (!is_class_scope || !crossed_class_scope)
-                && let Some(bound) = generic_context.binds_typevar(db, typevar)
-            {
-                return Some(bound);
-            }
+        // If we've already crossed a class boundary, skip class-scoped generic contexts.
+        // This prevents inner classes from accessing type parameters of outer classes.
+        if (!is_class_scope || !crossed_class_scope)
+            && let Some(generic_context) = ancestor_scope.node().generic_context(db, index)
+            && let Some(bound) = generic_context.binds_typevar(db, typevar)
+        {
+            return Some(bound);
         }
         if is_class_scope {
             crossed_class_scope = true;
