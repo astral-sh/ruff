@@ -106,6 +106,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_TYPE_VARIABLE_CONSTRAINTS);
     registry.register_lint(&INVALID_TYPE_VARIABLE_BOUND);
     registry.register_lint(&INVALID_TYPE_VARIABLE_DEFAULT);
+    registry.register_lint(&UNBOUND_TYPE_VARIABLE);
     registry.register_lint(&MISSING_ARGUMENT);
     registry.register_lint(&NO_MATCHING_OVERLOAD);
     registry.register_lint(&NOT_SUBSCRIPTABLE);
@@ -1804,6 +1805,36 @@ declare_lint! {
     pub(crate) static INVALID_TYPE_VARIABLE_DEFAULT = {
         summary: "detects invalid type variable defaults",
         status: LintStatus::stable("0.0.16"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for type variables that are used in a scope where they are not bound
+    /// to any enclosing generic context.
+    ///
+    /// ## Why is this bad?
+    /// Using a type variable outside of a scope that binds it has no well-defined meaning.
+    ///
+    /// ## Examples
+    /// ```python
+    /// from typing import TypeVar, Generic
+    ///
+    /// T = TypeVar("T")
+    /// S = TypeVar("S")
+    ///
+    /// x: T  # error: unbound type variable in module scope
+    ///
+    /// class C(Generic[T]):
+    ///     x: list[S] = []  # error: S is not in this class's generic context
+    /// ```
+    ///
+    /// ## References
+    /// - [Typing spec: Scoping rules for type variables](https://typing.python.org/en/latest/spec/generics.html#scoping-rules-for-type-variables)
+    pub(crate) static UNBOUND_TYPE_VARIABLE = {
+        summary: "detects type variables used outside of their bound scope",
+        status: LintStatus::stable("0.0.20"),
         default_level: Level::Error,
     }
 }

@@ -5,8 +5,8 @@ use super::{DeferredExpressionState, TypeInferenceBuilder};
 use crate::FxOrderSet;
 use crate::semantic_index::semantic_index;
 use crate::types::diagnostic::{
-    self, INVALID_TYPE_FORM, NOT_SUBSCRIPTABLE, report_invalid_argument_number_to_special_form,
-    report_invalid_arguments_to_callable,
+    self, INVALID_TYPE_FORM, NOT_SUBSCRIPTABLE, UNBOUND_TYPE_VARIABLE,
+    report_invalid_argument_number_to_special_form, report_invalid_arguments_to_callable,
 };
 use crate::types::generics::bind_typevar;
 use crate::types::infer::builder::InnerExpressionInferenceState;
@@ -82,17 +82,20 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // https://typing.python.org/en/latest/spec/annotations.html#grammar-token-expression-grammar-type_expression
         match expression {
             ast::Expr::Name(name) => match name.ctx {
-                ast::ExprContext::Load => self
-                    .infer_name_expression(name)
-                    .default_specialize(self.db())
-                    .in_type_expression(self.db(), self.scope(), self.typevar_binding_context)
-                    .unwrap_or_else(|error| {
-                        error.into_fallback_type(
-                            &self.context,
-                            expression,
-                            self.is_reachable(expression),
-                        )
-                    }),
+                ast::ExprContext::Load => {
+                    let ty = self
+                        .infer_name_expression(name)
+                        .default_specialize(self.db())
+                        .in_type_expression(self.db(), self.scope(), self.typevar_binding_context)
+                        .unwrap_or_else(|error| {
+                            error.into_fallback_type(
+                                &self.context,
+                                expression,
+                                self.is_reachable(expression),
+                            )
+                        });
+                    self.check_for_unbound_type_variable(expression, ty)
+                }
                 ast::ExprContext::Invalid => Type::unknown(),
                 ast::ExprContext::Store | ast::ExprContext::Del => {
                     todo_type!("Name expression annotation in Store/Del context")
@@ -1285,81 +1288,99 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
     /// Infer the type of a `Callable[...]` type expression.
     pub(crate) fn infer_callable_type(&mut self, subscript: &ast::ExprSubscript) -> Type<'db> {
-        let db = self.db();
+        fn inner<'db>(
+            builder: &mut TypeInferenceBuilder<'db, '_>,
+            subscript: &ast::ExprSubscript,
+        ) -> Type<'db> {
+            let db = builder.db();
 
-        let arguments_slice = &*subscript.slice;
+            let arguments_slice = &*subscript.slice;
 
-        let mut arguments = match arguments_slice {
-            ast::Expr::Tuple(tuple) => Either::Left(tuple.iter()),
-            _ => {
-                self.infer_callable_parameter_types(arguments_slice);
-                Either::Right(std::iter::empty::<&ast::Expr>())
-            }
-        };
-
-        let first_argument = arguments.next();
-
-        let parameters = first_argument.and_then(|arg| self.infer_callable_parameter_types(arg));
-
-        let return_type = arguments.next().map(|arg| self.infer_type_expression(arg));
-
-        let callable_type = if parameters.is_none()
-            && let Some(first_argument) = first_argument
-            && let ast::Expr::List(list) = first_argument
-            && let [single_param] = &list.elts[..]
-            && single_param.is_ellipsis_literal_expr()
-        {
-            self.store_expression_type(single_param, Type::unknown());
-            if let Some(mut diagnostic) = self.report_invalid_type_expression(
-                first_argument,
-                "`[...]` is not a valid parameter list for `Callable`",
-            ) {
-                if let Some(returns) = return_type {
-                    diagnostic.set_primary_message(format_args!(
-                        "Did you mean `Callable[..., {}]`?",
-                        returns.display(db)
-                    ));
+            let mut arguments = match arguments_slice {
+                ast::Expr::Tuple(tuple) => Either::Left(tuple.iter()),
+                _ => {
+                    builder.infer_callable_parameter_types(arguments_slice);
+                    Either::Right(std::iter::empty::<&ast::Expr>())
                 }
-            }
-            Type::single_callable(
-                db,
-                Signature::new(
-                    Parameters::unknown(),
-                    return_type.unwrap_or_else(Type::unknown),
-                ),
-            )
-        } else {
-            let correct_argument_number = if let Some(third_argument) = arguments.next() {
-                self.infer_type_expression(third_argument);
-                for argument in arguments {
-                    self.infer_type_expression(argument);
-                }
-                false
-            } else {
-                return_type.is_some()
             };
 
-            if !correct_argument_number {
-                report_invalid_arguments_to_callable(&self.context, subscript);
-            }
+            let first_argument = arguments.next();
 
-            if correct_argument_number
-                && let (Some(parameters), Some(return_type)) = (parameters, return_type)
+            let parameters =
+                first_argument.and_then(|arg| builder.infer_callable_parameter_types(arg));
+
+            let return_type = arguments
+                .next()
+                .map(|arg| builder.infer_type_expression(arg));
+
+            let callable_type = if parameters.is_none()
+                && let Some(first_argument) = first_argument
+                && let ast::Expr::List(list) = first_argument
+                && let [single_param] = &list.elts[..]
+                && single_param.is_ellipsis_literal_expr()
             {
-                Type::single_callable(db, Signature::new(parameters, return_type))
+                builder.store_expression_type(single_param, Type::unknown());
+                if let Some(mut diagnostic) = builder.report_invalid_type_expression(
+                    first_argument,
+                    "`[...]` is not a valid parameter list for `Callable`",
+                ) {
+                    if let Some(returns) = return_type {
+                        diagnostic.set_primary_message(format_args!(
+                            "Did you mean `Callable[..., {}]`?",
+                            returns.display(db)
+                        ));
+                    }
+                }
+                Type::single_callable(
+                    db,
+                    Signature::new(
+                        Parameters::unknown(),
+                        return_type.unwrap_or_else(Type::unknown),
+                    ),
+                )
             } else {
-                Type::Callable(CallableType::unknown(db))
-            }
-        };
+                let correct_argument_number = if let Some(third_argument) = arguments.next() {
+                    builder.infer_type_expression(third_argument);
+                    for argument in arguments {
+                        builder.infer_type_expression(argument);
+                    }
+                    false
+                } else {
+                    return_type.is_some()
+                };
 
-        // `Signature` / `Parameters` are not a `Type` variant, so we're storing
-        // the outer callable type on these expressions instead.
-        self.store_expression_type(arguments_slice, callable_type);
-        if let Some(first_argument) = first_argument {
-            self.store_expression_type(first_argument, callable_type);
+                if !correct_argument_number {
+                    report_invalid_arguments_to_callable(&builder.context, subscript);
+                }
+
+                if correct_argument_number
+                    && let (Some(parameters), Some(return_type)) = (parameters, return_type)
+                {
+                    Type::single_callable(db, Signature::new(parameters, return_type))
+                } else {
+                    Type::Callable(CallableType::unknown(db))
+                }
+            };
+
+            // `Signature` / `Parameters` are not a `Type` variant, so we're storing
+            // the outer callable type on these expressions instead.
+            builder.store_expression_type(arguments_slice, callable_type);
+            if let Some(first_argument) = first_argument {
+                builder.store_expression_type(first_argument, callable_type);
+            }
+
+            callable_type
         }
 
-        callable_type
+        // There is disagreement among type checkers about whether `Callable` annotations
+        // in the global scope or similar should be considered to create an implicit generic context.
+        // For now, we do not report unbound type variables in any `Callable` contexts, but we may
+        // decide to revisit this in the future.
+        let previous_check_unbound_typevars =
+            std::mem::replace(&mut self.check_unbound_typevars, false);
+        let result = inner(self, subscript);
+        self.check_unbound_typevars = previous_check_unbound_typevars;
+        result
     }
 
     fn infer_parameterized_special_form_type_expression(
@@ -1988,5 +2009,30 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             diagnostic::add_type_expression_reference_link(diag);
         }
         None
+    }
+
+    /// Checks if the inferred type is an unbound type variable and reports a diagnostic if so.
+    ///
+    /// Returns `Unknown` as a fallback if the type variable is unbound, otherwise returns the
+    /// original type unchanged.
+    pub(super) fn check_for_unbound_type_variable(
+        &self,
+        expression: &ast::Expr,
+        ty: Type<'db>,
+    ) -> Type<'db> {
+        if !self.check_unbound_typevars {
+            return ty;
+        }
+        if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = ty {
+            if let Some(builder) = self.context.report_lint(&UNBOUND_TYPE_VARIABLE, expression) {
+                builder.into_diagnostic(format_args!(
+                    "Type variable `{name}` is not bound to any outer generic context",
+                    name = typevar.name(self.db())
+                ));
+            }
+            Type::unknown()
+        } else {
+            ty
+        }
     }
 }
