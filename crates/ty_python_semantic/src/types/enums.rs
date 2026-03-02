@@ -78,6 +78,27 @@ pub(crate) fn enum_metadata<'db>(
     db: &'db dyn Db,
     class: ClassLiteral<'db>,
 ) -> Option<EnumMetadata<'db>> {
+    if let ClassLiteral::DynamicEnum(enum_lit) = class {
+        let spec = enum_lit.spec(db);
+        if !spec.has_known_members(db) {
+            return None;
+        }
+        let members: FxIndexMap<Name, Type<'db>> = spec
+            .members(db)
+            .iter()
+            .map(|(name, ty)| (name.clone(), *ty))
+            .collect();
+        if members.is_empty() {
+            return None;
+        }
+        return Some(EnumMetadata {
+            members,
+            aliases: FxHashMap::default(),
+            auto_members: FxHashSet::default(),
+            value_annotation: None,
+            init_function: None,
+        });
+    }
     let class = match class {
         ClassLiteral::Static(class) => class,
         ClassLiteral::Dynamic(..) => {
@@ -93,6 +114,7 @@ pub(crate) fn enum_metadata<'db>(
             return None;
         }
         ClassLiteral::DynamicNamedTuple(..) => return None,
+        ClassLiteral::DynamicEnum(..) => unreachable!("handled above"),
     };
 
     // This is a fast path to avoid traversing the MRO of known classes

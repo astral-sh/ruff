@@ -534,6 +534,9 @@ impl<'db> MroIterator<'db> {
             ClassLiteral::DynamicNamedTuple(literal) => {
                 ClassBase::Class(ClassType::NonGeneric(literal.into()))
             }
+            ClassLiteral::DynamicEnum(literal) => {
+                ClassBase::Class(ClassType::NonGeneric(literal.into()))
+            }
         }
     }
 
@@ -559,6 +562,11 @@ impl<'db> MroIterator<'db> {
                     full_mro_iter
                 }
                 ClassLiteral::DynamicNamedTuple(literal) => {
+                    let mut full_mro_iter = literal.mro(self.db).iter();
+                    full_mro_iter.next();
+                    full_mro_iter
+                }
+                ClassLiteral::DynamicEnum(literal) => {
                     let mut full_mro_iter = literal.mro(self.db).iter();
                     full_mro_iter.next();
                     full_mro_iter
