@@ -40,17 +40,17 @@ use crate::types::function::{
 use crate::types::generics::{
     GenericContext, InferableTypeVars, Specialization, SpecializationBuilder, SpecializationError,
 };
+use crate::types::known_instance::FieldInstance;
 use crate::types::signatures::{Parameter, ParameterForm, ParameterKind, Parameters};
 use crate::types::tuple::{TupleLength, TupleSpec, TupleType};
 use crate::types::{
     BoundMethodType, BoundTypeVarIdentity, BoundTypeVarInstance, CallableSignature, CallableType,
     CallableTypeKind, ClassLiteral, DATACLASS_FLAGS, DataclassFlags, DataclassParams,
-    FieldInstance, GenericAlias, InternedConstraintSet, IntersectionType, KnownBoundMethodType,
+    EvaluationMode, GenericAlias, InternedConstraintSet, IntersectionType, KnownBoundMethodType,
     KnownClass, KnownInstanceType, LiteralValueTypeKind, MemberLookupPolicy, NominalInstanceType,
     PropertyInstanceType, SpecialFormType, TypeAliasType, TypeContext, TypeVarBoundOrConstraints,
     TypeVarVariance, UnionBuilder, UnionType, WrapperDescriptorKind, enums, list_members,
 };
-use crate::unpack::EvaluationMode;
 use crate::{DisplaySettings, Program};
 use ruff_db::diagnostic::{Annotation, Diagnostic, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_python_ast::{self as ast, ArgOrKeyword, PythonVersion};
@@ -2093,28 +2093,6 @@ impl<'db> Bindings<'db> {
                         let result =
                             set.satisfied_by_all_typevars(db, InferableTypeVars::One(&inferable));
                         overload.set_return_type(Type::bool_literal(result));
-                    }
-
-                    Type::KnownBoundMethod(
-                        KnownBoundMethodType::GenericContextSpecializeConstrained(generic_context),
-                    ) => {
-                        let [Some(set)] = overload.parameter_types() else {
-                            continue;
-                        };
-                        let Type::KnownInstance(KnownInstanceType::ConstraintSet(set)) = set else {
-                            continue;
-                        };
-                        let constraints = ConstraintSetBuilder::new();
-                        let set = constraints.load(set.constraints(db));
-                        let specialization =
-                            generic_context.specialize_constrained(db, &constraints, set);
-                        let result = match specialization {
-                            Ok(specialization) => Type::KnownInstance(
-                                KnownInstanceType::Specialization(specialization),
-                            ),
-                            Err(()) => Type::none(db),
-                        };
-                        overload.set_return_type(result);
                     }
 
                     Type::ClassLiteral(class) => match class.known(db) {

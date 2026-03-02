@@ -33,6 +33,7 @@ use crate::types::generics::{
     GenericContext, InferableTypeVars, Specialization, walk_specialization,
 };
 use crate::types::infer::{infer_expression_type, infer_unpack_types, nearest_enclosing_class};
+use crate::types::known_instance::DeprecatedInstance;
 use crate::types::member::{Member, class_member};
 use crate::types::mro::DynamicMroError;
 use crate::types::relation::{HasRelationToVisitor, IsDisjointVisitor, TypeRelation};
@@ -43,9 +44,9 @@ use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion
 use crate::types::{
     ApplyTypeMappingVisitor, Binding, BindingContext, BoundSuperType, CallableType,
     CallableTypeKind, CallableTypes, DATACLASS_FLAGS, DataclassFlags, DataclassParams,
-    DeprecatedInstance, FindLegacyTypeVarsVisitor, IntersectionBuilder, KnownInstanceType,
-    MaterializationKind, PropertyInstanceType, TypeContext, TypeMapping, TypedDictParams,
-    UnionBuilder, VarianceInferable, binding_type, declaration_type, determine_upper_bound,
+    FindLegacyTypeVarsVisitor, IntersectionBuilder, KnownInstanceType, MaterializationKind,
+    PropertyInstanceType, TypeContext, TypeMapping, TypedDictParams, UnionBuilder,
+    VarianceInferable, binding_type, declaration_type, determine_upper_bound,
 };
 use crate::{
     Db, FxIndexMap, FxIndexSet, FxOrderSet, Program,
@@ -125,6 +126,43 @@ fn try_metaclass_cycle_initial<'db>(
     Err(MetaclassError {
         kind: MetaclassErrorKind::Cycle,
     })
+}
+
+fn explicit_bases_cycle_initial<'db>(
+    db: &'db dyn Db,
+    id: salsa::Id,
+    literal: StaticClassLiteral<'db>,
+) -> Box<[Type<'db>]> {
+    let module = parsed_module(db, literal.file(db)).load(db);
+    let class_stmt = literal.node(db, &module);
+    // Try to produce a list of `Divergent` types of the right length. However, if one or more of
+    // the bases is a starred expression, we don't know how many entries that will eventually
+    // expand to.
+    vec![Type::divergent(id); class_stmt.bases().len()].into_boxed_slice()
+}
+
+fn explicit_bases_cycle_fn<'db>(
+    db: &'db dyn Db,
+    cycle: &salsa::Cycle,
+    previous: &[Type<'db>],
+    current: Box<[Type<'db>]>,
+    _literal: StaticClassLiteral<'db>,
+) -> Box<[Type<'db>]> {
+    if previous.len() == current.len() {
+        // As long as the length of bases hasn't changed, use the same "monotonic widening"
+        // strategy that we use with most types, to avoid oscillations.
+        current
+            .iter()
+            .zip(previous.iter())
+            .map(|(curr, prev)| curr.cycle_normalized(db, *prev, cycle))
+            .collect()
+    } else {
+        // The length of bases has changed, presumably because we expanded a starred expression. We
+        // don't do "monotonic widening" here, because we don't want to make assumptions about
+        // which previous entries correspond to which current ones. An oscillation here would be
+        // unfortunate, but maybe only pathological programs can trigger such a thing.
+        current
+    }
 }
 
 #[expect(clippy::unnecessary_wraps)]
@@ -2475,7 +2513,7 @@ impl<'db> StaticClassLiteral<'db> {
     ///
     /// Were this not a salsa query, then the calling query
     /// would depend on the class's AST and rerun for every change in that file.
-    #[salsa::tracked(returns(deref), cycle_initial=|_, _, _| Box::default(), heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(returns(deref), cycle_initial=explicit_bases_cycle_initial, cycle_fn=explicit_bases_cycle_fn, heap_size=ruff_memory_usage::heap_size)]
     pub(super) fn explicit_bases(self, db: &'db dyn Db) -> Box<[Type<'db>]> {
         tracing::trace!(
             "StaticClassLiteral::explicit_bases_query: {}",

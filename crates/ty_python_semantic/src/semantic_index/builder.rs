@@ -56,8 +56,8 @@ use crate::semantic_index::{
     get_loop_header,
 };
 use crate::semantic_model::HasTrackedScope;
-use crate::types::PossiblyNarrowedPlaces;
-use crate::unpack::{EvaluationMode, Unpack, UnpackKind, UnpackPosition, UnpackValue};
+use crate::types::{EvaluationMode, PossiblyNarrowedPlaces};
+use crate::unpack::{Unpack, UnpackKind, UnpackPosition, UnpackValue};
 use crate::{Db, Program};
 
 mod except_handlers;

@@ -55,7 +55,7 @@
       groupName: "Artifact GitHub Actions dependencies",
       matchManagers: ["github-actions"],
       matchDatasources: ["gitea-tags", "github-tags"],
-      matchPackageNames: ["actions/.*-artifact"],
+      matchPackageNames: ["actions/upload-artifact", "actions/download-artifact"],
       description: "Weekly update of artifact-related GitHub Actions dependencies",
     },
     {
@@ -95,7 +95,7 @@
     {
       groupName: "strum",
       matchManagers: ["cargo"],
-      matchPackageNames: ["strum"],
+      matchPackageNames: ["strum", "strum_macros"],
       description: "Weekly update of strum dependencies",
     }
   ],
