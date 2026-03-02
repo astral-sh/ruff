@@ -13,15 +13,8 @@ use crate::fix::edits;
 use crate::preview::is_f811_shadowing_in_type_checking_enabled;
 use crate::{Fix, FixAvailability, Violation};
 
-/// ## What it does
-/// Checks for variable definitions that redefine (or "shadow") unused
-/// variables.
-///
-/// ## Why is this bad?
-/// Redefinitions of unused names are unnecessary and often indicative of a
-/// mistake.
-///
 /// ## Example
+///
 /// ```python
 /// import foo
 /// import bar
@@ -29,6 +22,7 @@ use crate::{Fix, FixAvailability, Violation};
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// import foo
 /// import bar
@@ -42,11 +36,12 @@ use crate::{Fix, FixAvailability, Violation};
 /// from collections.abc import Sequence
 ///
 /// if typing.TYPE_CHECKING:
-///    # Redefinition of unused `Sequence` from line 2
-///    from collections.abc import Sequence
+///     # Redefinition of unused `Sequence` from line 2
+///     from collections.abc import Sequence
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// from collections.abc import Sequence
 /// ```
