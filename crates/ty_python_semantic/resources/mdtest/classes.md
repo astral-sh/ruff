@@ -3,7 +3,8 @@
 ## `__new__` return type
 
 Python's `__new__` method can return any type, not just an instance of the class. When `__new__`
-returns a type that is not assignable to the class instance type, we use that return type directly.
+returns a type that is not a subtype of the class instance type, we use the returned type directly,
+without checking `__init__`.
 
 ### `__new__` returning a different type
 
@@ -16,6 +17,19 @@ reveal_type(ReturnsInt())  # revealed: int
 
 x: int = ReturnsInt()  # OK
 y: ReturnsInt = ReturnsInt()  # error: [invalid-assignment]
+```
+
+In this case, we don't validate `__init__`:
+
+```py
+class ReturnsIntWithInit:
+    def __new__(cls) -> int:
+        return 42
+
+    def __init__(self, x: str) -> None: ...
+
+# No error from missing argument to `__init__`:
+reveal_type(ReturnsIntWithInit())  # revealed: int
 ```
 
 ### `__new__` returning a union type
@@ -36,7 +50,7 @@ b: int = MaybeInt("42")  # error: [invalid-assignment]
 
 ### `__new__` returning the class type
 
-When `__new__` returns the class type (or `Self`), the normal instance type is used.
+When `__new__` returns the type of the instance being constructed, we use that type:
 
 ```py
 class Normal:
@@ -44,6 +58,19 @@ class Normal:
         return object.__new__(cls)
 
 reveal_type(Normal())  # revealed: Normal
+```
+
+And we do validate `__init__`:
+
+```py
+class NormalWithInit:
+    def __new__(cls) -> "NormalWithInit":
+        return object.__new__(cls)
+
+    def __init__(self, x: int) -> None: ...
+
+# error: [missing-argument]
+reveal_type(NormalWithInit())  # revealed: NormalWithInit
 ```
 
 ### `__new__` with no return type annotation
@@ -79,8 +106,8 @@ reveal_type(ReturnsAny())  # revealed: Any
 
 ### `__new__` returning a union containing `Any`
 
-When `__new__` returns a union containing `Any`, `Any` is not a subtype of the instance type, so
-`__init__` is skipped.
+When `__new__` returns a union containing `Any`, since we don't consider `Any` a subtype of the
+instance type, `__init__` is skipped.
 
 ```py
 from typing import Any
@@ -91,7 +118,7 @@ class MaybeAny:
             return object.__new__(cls)
         return None
 
-    def __init__(self, value: int) -> None:
+    def __init__(self) -> None:
         pass
 
 reveal_type(MaybeAny(1))  # revealed: MaybeAny | Any

@@ -1,10 +1,12 @@
 ## Custom `__call__` on metaclass
 
 When a metaclass defines a custom `__call__` method, it controls what happens when the class is
-called. The return type and parameter types of the metaclass `__call__` are used instead of the
-class's `__new__` and `__init__` methods.
+called. If the metaclass `__call__` returns an "instance type" (subtype of the class being
+constructed), then the class' `__new__` and `__init__` are checked as usual (see `classes.md`). But
+if the metaclass `__call__` returns a non-instance type, then `__new__` and `__init__` are skipped
+and the return type of `__call__` is used directly.
 
-### Basic metaclass `__call__`
+### Metaclass `__call__` returning non-instance type
 
 ```py
 class Meta(type):
@@ -16,23 +18,6 @@ class Foo(metaclass=Meta): ...
 reveal_type(Foo(1, "hello"))  # revealed: str
 
 a: str = Foo(1, "hello")  # OK
-```
-
-### Metaclass `__call__` with wrong arguments
-
-```py
-class Meta(type):
-    def __call__(cls, x: int) -> int:
-        return x
-
-class Foo(metaclass=Meta): ...
-
-# error: [invalid-argument-type]
-reveal_type(Foo("wrong"))  # revealed: int
-# error: [missing-argument]
-reveal_type(Foo())  # revealed: int
-# error: [too-many-positional-arguments]
-reveal_type(Foo(1, 2))  # revealed: int
 ```
 
 ### Metaclass `__call__` takes precedence over `__init__` and `__new__`
@@ -52,6 +37,23 @@ class Foo(metaclass=Meta):
 # The metaclass __call__ takes precedence, so no arguments are needed
 # and the return type is str, not Foo.
 reveal_type(Foo())  # revealed: str
+```
+
+### Metaclass `__call__` with wrong arguments
+
+```py
+class Meta(type):
+    def __call__(cls, x: int) -> int:
+        return x
+
+class Foo(metaclass=Meta): ...
+
+# error: [invalid-argument-type]
+reveal_type(Foo("wrong"))  # revealed: int
+# error: [missing-argument]
+reveal_type(Foo())  # revealed: int
+# error: [too-many-positional-arguments]
+reveal_type(Foo(1, 2))  # revealed: int
 ```
 
 ### Metaclass `__call__` with TypeVar return type
@@ -81,7 +83,7 @@ reveal_type(Foo(1))  # revealed: Foo
 ### Metaclass `__call__` with no return type annotation
 
 When the metaclass `__call__` has no return type annotation (returns `Unknown`), we should still
-check the `__new__` and `__init__` signatures.
+check the `__new__` and `__init__` signatures, and infer the instance return type.
 
 ```py
 class Meta(type):
@@ -179,41 +181,6 @@ reveal_type(Foo(1))  # revealed: Foo
 # used directly.
 reveal_type(Bar())  # revealed: Foo
 reveal_type(Bar("hello"))  # revealed: Foo
-```
-
-### Metaclass `__call__` returning bare `type`
-
-When the metaclass `__call__` is annotated as returning `type`, we use that return type. This is
-stricter than mypy and pyright, which ignore the `-> type` annotation in this case. `__init__` is
-skipped because the return type is not an instance of the class being constructed.
-
-```py
-from typing import Any
-
-class Singleton(type):
-    _instances: dict["Singleton", object] = {}
-
-    def __call__(cls, *args: Any, **kwargs: Any) -> type:
-        if cls not in cls._instances:
-            cls._instances[cls] = super().__call__(*args, **kwargs)
-        # error: [invalid-return-type]
-        return cls._instances[cls]
-
-class MyConfig(metaclass=Singleton):
-    def __init__(self, x: int) -> None:
-        pass
-
-    def get(self, key: str) -> str:
-        return key
-
-# The metaclass `__call__` returns `type`, so that's what we infer.
-# `__init__` is not checked: `MyConfig()` would violate `__init__(self, x: int)`,
-# but we skip it because the return type is `type`, not `MyConfig`.
-reveal_type(MyConfig())  # revealed: type
-
-# Instance methods are not available on `type`.
-# error: [unresolved-attribute]
-MyConfig().get("key")
 ```
 
 ### Metaclass `__call__` returning `Any`
