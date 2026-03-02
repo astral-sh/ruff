@@ -3338,7 +3338,7 @@ dependencies = [
  "similar",
  "smallvec",
  "strum",
- "strum_macros 0.27.2",
+ "strum_macros",
  "tempfile",
  "test-case",
  "thiserror 2.0.18",
@@ -4119,19 +4119,7 @@ version = "0.28.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9628de9b8791db39ceda2b119bbe13134770b56c138ec1d3af810d045c04f9bd"
 dependencies = [
- "strum_macros 0.28.0",
-]
-
-[[package]]
-name = "strum_macros"
-version = "0.27.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7695ce3845ea4b33927c055a39dc438a45b059f7c1b3d91d38d10355fb8cbca7"
-dependencies = [
- "heck",
- "proc-macro2",
- "quote",
- "syn",
+ "strum_macros",
 ]
 
 [[package]]
@@ -4707,7 +4695,7 @@ dependencies = [
  "rustc-hash",
  "salsa",
  "strum",
- "strum_macros 0.27.2",
+ "strum_macros",
  "tempfile",
  "thiserror 2.0.18",
  "tracing",
@@ -4800,7 +4788,7 @@ dependencies = [
  "smallvec",
  "static_assertions",
  "strum",
- "strum_macros 0.27.2",
+ "strum_macros",
  "test-case",
  "thiserror 2.0.18",
  "tracing",
@@ -4865,7 +4853,7 @@ dependencies = [
  "ruff_source_file",
  "ruff_text_size",
  "strum",
- "strum_macros 0.27.2",
+ "strum_macros",
  "tracing",
  "ty_static",
  "which",
