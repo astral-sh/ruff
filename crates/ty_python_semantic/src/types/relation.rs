@@ -346,6 +346,39 @@ impl<'db> Type<'db> {
             return true;
         }
 
+        // Fast path for intersection types: use set-based subset check instead of
+        // the full `has_relation_to` machinery. This is critical for narrowing where
+        // many intersection types with overlapping positive elements are produced.
+        if let (Type::Intersection(self_inter), Type::Intersection(other_inter)) = (self, other) {
+            let self_pos = self_inter.positive(db);
+            let other_pos = other_inter.positive(db);
+            let self_neg = self_inter.negative(db);
+            let other_neg = other_inter.negative(db);
+            let other_pos_subset = other_pos.iter().all(|p| self_pos.contains(p));
+            let other_neg_subset = other_neg.iter().all(|n| self_neg.contains(n));
+
+            // Intersection(pos_self, neg_self) is redundant with Intersection(pos_other, neg_other) if:
+            //   pos_other ⊆ pos_self AND neg_other ⊆ neg_self
+            // Conversely, if pos_other ⊄ pos_self (some positive of other is missing from self),
+            // then self is NOT redundant with other.
+            if other_pos_subset && other_neg_subset {
+                return true;
+            }
+
+            // If all positive elements are `NominalInstance` types and some positive
+            // of `other` is not contained in `self`'s positives, we can assume
+            // non-redundancy without the full `has_relation_to` check.
+            // This is not strictly correct for classes with inheritance relationship,
+            // but such a false negative is safe: it only causes the union to retain
+            // an extra element without affecting correctness.
+            if !other_pos_subset
+                && self_pos.iter().all(|t| t.is_nominal_instance())
+                && other_pos.iter().all(|t| t.is_nominal_instance())
+            {
+                return false;
+            }
+        }
+
         is_redundant_with_impl(db, self, other)
     }
 
