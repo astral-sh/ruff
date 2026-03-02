@@ -39,7 +39,9 @@ pub enum LanguageId {
 impl From<&str> for LanguageId {
     fn from(language_id: &str) -> Self {
         match language_id {
-            "python" => Self::Python,
+            // `python-base` is sent by Emacs eglot, which derives the language ID from the major
+            // mode name `python-base-mode` by stripping the `-mode` suffix.
+            "python" | "python-base" => Self::Python,
             _ => Self::Other,
         }
     }

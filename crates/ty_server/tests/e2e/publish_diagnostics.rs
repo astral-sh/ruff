@@ -147,6 +147,43 @@ def foo() -> str:
     Ok(())
 }
 
+/// Tests that we get diagnostics when the client sends `python-base` as the language ID.
+///
+/// Emacs eglot derives the language ID from the major mode name `python-base-mode` by stripping the
+/// `-mode` suffix, resulting in `python-base` instead of `python`.
+///
+/// Ref: <https://github.com/astral-sh/ty/issues/2937>
+#[test]
+fn on_did_open_python_base_language_id() -> Result<()> {
+    let workspace_root = SystemPath::new("src");
+    let foo = SystemPath::new("src/foo.py");
+    let foo_content = "\
+def foo() -> str:
+    return 42
+";
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(workspace_root, None)?
+        .with_file(foo, foo_content)?
+        .enable_pull_diagnostics(false)
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.send_notification::<DidOpenTextDocument>(DidOpenTextDocumentParams {
+        text_document: TextDocumentItem {
+            uri: server.file_uri(foo),
+            language_id: "python-base".to_string(),
+            version: 1,
+            text: foo_content.to_string(),
+        },
+    });
+    let diagnostics = server.await_notification::<PublishDiagnostics>();
+
+    insta::assert_debug_snapshot!(diagnostics);
+
+    Ok(())
+}
+
 #[test]
 fn on_did_open_diagnostics_off() -> Result<()> {
     let workspace_root = SystemPath::new("src");
