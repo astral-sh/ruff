@@ -129,8 +129,8 @@ use crate::types::typed_dict::{
 use crate::types::visitor::find_over_type;
 use crate::types::{
     BoundTypeVarIdentity, CallDunderError, CallableBinding, CallableType, CallableTypeKind,
-    ClassType, DataclassParams, DynamicType, GenericAlias, InternedConstraintSet, InternedType,
-    IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, KnownUnion,
+    ClassType, DataclassParams, DynamicType, EvaluationMode, GenericAlias, InternedConstraintSet,
+    InternedType, IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, KnownUnion,
     LintDiagnosticGuard, LiteralValueTypeKind, ManualPEP695TypeAliasType, MemberLookupPolicy,
     MetaclassCandidate, PEP695TypeAliasType, ParamSpecAttrKind, Parameter, ParameterForm,
     Parameters, Signature, SpecialFormType, StaticClassLiteral, SubclassOfType, Truthiness, Type,
@@ -142,7 +142,7 @@ use crate::types::{
 };
 use crate::types::{CallableTypes, overrides};
 use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
-use crate::unpack::{EvaluationMode, UnpackPosition};
+use crate::unpack::UnpackPosition;
 use crate::{AnalysisSettings, Db, FxIndexSet, Program};
 
 mod annotation_expression;
