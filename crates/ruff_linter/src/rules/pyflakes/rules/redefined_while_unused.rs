@@ -21,7 +21,7 @@ use crate::{Fix, FixAvailability, Violation};
 /// Redefinitions of unused names are unnecessary and often indicative of a
 /// mistake.
 ///
-/// ## Example
+/// ## Examples
 /// ```python
 /// import foo
 /// import bar
@@ -32,6 +32,19 @@ use crate::{Fix, FixAvailability, Violation};
 /// ```python
 /// import foo
 /// import bar
+/// ```
+///
+/// ```python
+/// import typing
+/// from collections.abc import Sequence
+///
+/// if typing.TYPE_CHECKING:
+///    from collections.abc import Sequence  # Redefinition of unused `Sequence` from line 2
+/// ```
+///
+/// Use instead:
+/// ```python
+/// from collections.abc import Sequence
 /// ```
 ///
 /// ## Options
