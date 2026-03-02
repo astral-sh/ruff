@@ -7085,6 +7085,10 @@ impl<'db> TypeVarInstance<'db> {
             .unwrap_or_else(|| TypeVarBoundOrConstraints::UpperBound(Type::object()))
     }
 
+    pub(crate) fn has_default(self, db: &'db dyn Db) -> bool {
+        self._default(db).is_some()
+    }
+
     pub(crate) fn default_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
         self._default(db).and_then(|d| match d {
             TypeVarDefaultEvaluation::Eager(ty) => Some(ty),
@@ -7773,6 +7777,11 @@ impl<'db> BoundTypeVarInstance<'db> {
     /// In the first case, the use of `U` is unbound, and so we have a [`TypeVarInstance`], and its
     /// default value (`T`) is also unbound.
     ///
+    /// Returns whether this typevar has an explicitly provided default.
+    pub(crate) fn has_default(self, db: &'db dyn Db) -> bool {
+        self.typevar(db).has_default(db)
+    }
+
     /// By using `U` in the generic class, it becomes bound, and so we have a
     /// `BoundTypeVarInstance`. As part of binding `U` we must also bind its default value
     /// (resulting in `T@C`).

@@ -253,6 +253,16 @@ Self-referential defaults should not crash type inference:
 type A[T = A] = A[int]
 ```
 
+A self-referential default that does not reference itself in the alias body should also not crash,
+even when the default is evaluated (e.g., by omitting the type argument):
+
+```py
+type B[T = B] = list[T]
+
+def _(x: B) -> None:
+    pass
+```
+
 ## Snapshots of verbose diagnostics
 
 <!-- snapshot-diagnostics -->
