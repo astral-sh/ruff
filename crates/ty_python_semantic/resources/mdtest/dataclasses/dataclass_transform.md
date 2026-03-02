@@ -1693,5 +1693,167 @@ User(id=1, name="Test")
 User()
 ```
 
+## Converters
+
+When a field specifier uses a `converter` parameter, the synthesized `__init__` parameter type
+should be the converter's input type (i.e. the type of its first positional parameter), not the
+field's declared type.
+
+```py
+from typing_extensions import Any, Callable, dataclass_transform
+
+def field[T, R](*, converter: Callable[[T], R], default: T | None = None) -> R:
+    raise NotImplementedError
+
+@dataclass_transform(field_specifiers=(field,))
+def my_model[T](cls: type[T]) -> type[T]:
+    return cls
+
+def str_to_int(x: str) -> int:
+    return int(x)
+
+@my_model
+class Basic:
+    a: int = field(converter=str_to_int)
+    b: int = field(converter=str_to_int, default="0")
+
+reveal_type(Basic.__init__)  # revealed: (self: Basic, a: str, b: str = ...) -> None
+
+Basic("1", "2")
+Basic("1")
+Basic(a="1", b="2")
+Basic(a="1")
+
+Basic("1", 2)  # error: [invalid-argument-type]
+Basic(1, "2")  # error: [invalid-argument-type]
+```
+
+Reading an attribute returns the field's declared type, but writes to an attribute are verified
+against the converter's input type:
+
+```py
+basic = Basic("1", "2")
+reveal_type(basic.a)  # revealed: int
+reveal_type(basic.b)  # revealed: int
+
+basic.a = "2"
+basic.a = 3  # error: [invalid-assignment]
+
+basic.b = "1"
+basic.b = 1  # error: [invalid-assignment]
+```
+
+The default parameter for a converter field should also be verified against the converter's input
+type:
+
+```py
+@my_model
+class WrongDefault:
+    # Note: It is plausible that changes to the generics solver could make this error message better, but it's
+    # hard to come up with a good heuristic on what the rule should be. From looking at the code, it looks like
+    # the type of the `default` parameter is just wrong, but the error message wants you to change the converter
+    # function instead. And in principle, that is just as likely to be the issue. But especially since we expand
+    # `T` to a `str | Literal[0]` union here, this is a bit confusing:
+    # error: [invalid-argument-type] "Argument to function `field` is incorrect: Expected `(str | Literal[0], /) -> int`, found `def str_to_int(x: str) -> int`"
+    a: int = field(converter=str_to_int, default=0)
+```
+
+Classes can also be used as converters:
+
+```py
+class PermissiveNumber:
+    def __init__(self, x: int | str):
+        self.value = int(x)
+
+@my_model
+class WithClassConverter:
+    a: int = field(converter=PermissiveNumber)
+    b: float = field(converter=float)
+
+# revealed: (self: WithClassConverter, a: int | str, b: str | Buffer | SupportsFloat | SupportsIndex) -> None
+reveal_type(WithClassConverter.__init__)
+
+WithClassConverter(1, 2.5)
+WithClassConverter("1", "2.5")
+
+with_class_converter = WithClassConverter("1", "2.5")
+reveal_type(with_class_converter.a)  # revealed: int
+reveal_type(with_class_converter.b)  # revealed: int | float
+
+with_class_converter.a = "2"
+with_class_converter.a = 1.5  # error: [invalid-assignment]
+
+with_class_converter.b = "3.5"
+with_class_converter.b = None  # error: [invalid-assignment]
+```
+
+When a converter function is overloaded, the input type is the union of all first parameter types:
+
+```py
+from typing import overload
+
+@overload
+def serialize(x: str, /) -> bytes: ...
+@overload
+def serialize(x: list[str], /) -> bytes: ...
+def serialize(x: str | list[str], /) -> bytes:
+    raise NotImplementedError
+
+@my_model
+class WithOverloadedConverter:
+    data: bytes = field(converter=serialize)
+
+reveal_type(WithOverloadedConverter.__init__)  # revealed: (self: WithOverloadedConverter, data: str | list[str]) -> None
+
+WithOverloadedConverter("string")
+WithOverloadedConverter(["a", "b", "c"])
+
+WithOverloadedConverter(123)  # error: [invalid-argument-type]
+
+with_overloaded_converter = WithOverloadedConverter("string")
+reveal_type(with_overloaded_converter.data)  # revealed: bytes
+
+with_overloaded_converter.data = ["new", "data"]
+
+with_overloaded_converter.data = 123  # error: [invalid-assignment]
+```
+
+A variadic converter (`*args`) uses the variadic parameter's element type as the input type:
+
+```py
+def variadic_converter(*args: str) -> int:
+    return int(args[0])
+
+@my_model
+class WithVariadicConverter:
+    x: int = field(converter=variadic_converter)
+
+reveal_type(WithVariadicConverter.__init__)  # revealed: (self: WithVariadicConverter, x: str) -> None
+
+WithVariadicConverter("1")
+WithVariadicConverter(1)  # error: [invalid-argument-type]
+```
+
+We also validate writes to unions of converter fields:
+
+```py
+def str_or_bytes_to_int(x: str | bytes) -> int:
+    raise NotImplementedError
+
+@my_model
+class ModelA:
+    x: int = field(converter=str_to_int)
+
+@my_model
+class ModelB:
+    x: int = field(converter=str_or_bytes_to_int)
+
+def _(m: ModelA | ModelB):
+    # Allowed, since both converters accept str
+    m.x = "1"
+
+    m.x = b"1"  # error: [invalid-assignment]
+```
+
 [pyright's behavior]: https://github.com/microsoft/pyright/blob/1.1.396/packages/pyright-internal/src/analyzer/dataClasses.ts#L1024-L1033
 [`typing.dataclass_transform`]: https://docs.python.org/3/library/typing.html#typing.dataclass_transform
