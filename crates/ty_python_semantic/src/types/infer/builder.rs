@@ -11155,28 +11155,40 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ast_arguments
         );
 
-        let overloads_with_binding = bindings
-            .iter_flat()
-            .filter_map(|binding| {
-                match binding.matching_overload_index() {
-                    MatchingOverloadIndex::Single(_) | MatchingOverloadIndex::Multiple(_) => {
-                        let overloads = binding
-                            .matching_overloads()
-                            .map(move |(_, overload)| (overload, binding));
-
-                        Some(Either::Right(overloads))
-                    }
-
-                    // If there is a single overload that does not match, we still infer the argument
-                    // types for better diagnostics.
-                    MatchingOverloadIndex::None => match binding.overloads() {
-                        [overload] => Some(Either::Left(std::iter::once((overload, binding)))),
-                        _ => None,
-                    },
+        fn add_overloads_from_binding<'a, 'db>(
+            overloads_with_binding: &mut Vec<(&'a Binding<'db>, &'a CallableBinding<'db>)>,
+            binding: &'a CallableBinding<'db>,
+        ) {
+            match binding.matching_overload_index() {
+                MatchingOverloadIndex::Single(_) | MatchingOverloadIndex::Multiple(_) => {
+                    overloads_with_binding
+                        .extend(binding.matching_overloads().map(|(_, overload)| (overload, binding)));
                 }
-            })
-            .flatten()
-            .collect::<Vec<_>>();
+
+                // If there is a single overload that does not match, we still infer the argument
+                // types for better diagnostics.
+                MatchingOverloadIndex::None => {
+                    if let [overload] = binding.overloads() {
+                        overloads_with_binding.push((overload, binding));
+                    }
+                }
+            }
+        }
+
+        let mut overloads_with_binding: Vec<(&Binding<'db>, &CallableBinding<'db>)> = Vec::new();
+
+        for binding in bindings.iter_flat() {
+            add_overloads_from_binding(&mut overloads_with_binding, binding);
+
+            // Constructors may defer `__init__` validation under `__new__`/metaclass `__call__`.
+            // Include those deferred bindings for argument type context when they are relevant.
+            if let Some(deferred_bindings) = binding.deferred_constructor_type_context_bindings(db)
+            {
+                for deferred in deferred_bindings.iter_flat() {
+                    add_overloads_from_binding(&mut overloads_with_binding, deferred);
+                }
+            }
+        }
 
         let old_multi_inference_state = self.set_multi_inference_state(multi_inference_state);
 
