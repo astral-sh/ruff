@@ -1838,15 +1838,16 @@ impl<'db> SpecializationBuilder<'db> {
     fn add_type_mappings_from_constraint_set<'c>(
         &mut self,
         formal: Type<'db>,
-        constraints: ConstraintSet<'db, 'c>,
+        set: ConstraintSet<'db, 'c>,
+        constraints: &'c ConstraintSetBuilder<'db>,
         mut f: impl FnMut(TypeVarAssignment<'db>) -> Option<Type<'db>>,
     ) -> Result<(), ()> {
-        let solutions = match constraints.solutions(self.db) {
+        let solutions = match set.solutions(self.db, constraints) {
             Solutions::Unsatisfiable => return Err(()),
             Solutions::Unconstrained => return Ok(()),
             Solutions::Constrained(solutions) => solutions,
         };
-        for solution in solutions {
+        for solution in solutions.iter() {
             for binding in solution {
                 let variance = formal.variance_of(self.db, binding.bound_typevar);
                 self.add_type_mapping(binding.bound_typevar, binding.solution, variance, &mut f);
@@ -1876,7 +1877,7 @@ impl<'db> SpecializationBuilder<'db> {
                         &constraints,
                         self.inferable,
                     );
-                self.add_type_mappings_from_constraint_set(formal, when, &mut *f)?;
+                self.add_type_mappings_from_constraint_set(formal, when, &constraints, &mut *f)?;
             } else {
                 // An overloaded actual callable is compatible with the formal signature if at
                 // least one of its overloads is. We collect type mappings from all satisfiable
@@ -1890,7 +1891,7 @@ impl<'db> SpecializationBuilder<'db> {
                         self.inferable,
                     );
                     if self
-                        .add_type_mappings_from_constraint_set(formal, when, &mut *f)
+                        .add_type_mappings_from_constraint_set(formal, when, &constraints, &mut *f)
                         .is_ok()
                     {
                         any_satisfiable = true;
@@ -2328,7 +2329,12 @@ impl<'db> SpecializationBuilder<'db> {
                         // unsatisfied comparisons simply produced no type mappings), and avoids
                         // false positives for callable-wrapper patterns while this path is still
                         // a hybrid of old and new solver logic.
-                        let _ = self.add_type_mappings_from_constraint_set(formal, when, &mut f);
+                        let _ = self.add_type_mappings_from_constraint_set(
+                            formal,
+                            when,
+                            constraints,
+                            &mut f,
+                        );
                         return Ok(());
                     }
 

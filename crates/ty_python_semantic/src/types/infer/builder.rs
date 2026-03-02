@@ -14328,7 +14328,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             (ast::UnaryOp::Invert, Type::KnownInstance(KnownInstanceType::ConstraintSet(set))) => {
                 let constraints = ConstraintSetBuilder::new();
                 let result = constraints.into_owned(|constraints| {
-                    let set = constraints.load(set.constraints(self.db()));
+                    let set = constraints.load(self.db(), set.constraints(self.db()));
                     set.negate(self.db(), constraints)
                 });
                 Type::KnownInstance(KnownInstanceType::ConstraintSet(
