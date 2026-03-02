@@ -180,7 +180,7 @@ snapbox = { version = "1.0.0", features = [
     "examples",
 ] }
 static_assertions = "1.1.0"
-strum = { version = "0.27.0", features = ["strum_macros"] }
+strum = { version = "0.28.0", features = ["strum_macros"] }
 strum_macros = { version = "0.27.0" }
 supports-hyperlinks = { version = "3.1.0" }
 syn = { version = "2.0.55" }
