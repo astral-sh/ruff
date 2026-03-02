@@ -4370,6 +4370,7 @@ fn warn_rules() -> Result<()> {
         "ruff.toml",
         r#"
 lint.warn = ["ARG001"]
+lint.preview = true
 "#,
     )?;
 
@@ -4382,7 +4383,7 @@ lint.warn = ["ARG001"]
     success: true
     exit_code: 0
     ----- stdout -----
-    test.py:1:9: ARG001 Unused function argument: `x`
+    test.py:1:9: warning[ARG001] Unused function argument: `x`
     Found 1 error.
 
     ----- stderr -----
