@@ -3,6 +3,7 @@ use std::borrow::Cow;
 use ruff_python_ast::PythonVersion;
 use ruff_python_ast::{self as ast, Expr, name::Name, token::parenthesized_range};
 use ruff_python_codegen::Generator;
+use ruff_python_semantic::{ResolvedReference, SemanticModel};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -124,7 +125,7 @@ pub(super) struct FileOpen<'a> {
     /// The file open keywords.
     pub(super) keywords: Vec<&'a ast::Keyword>,
     /// We only check `open` operations whose file handles are used exactly once.
-    pub(super) reference: TextRange,
+    pub(super) reference: &'a ResolvedReference,
     pub(super) argument: OpenArgument<'a>,
 }
 
@@ -132,7 +133,7 @@ impl FileOpen<'_> {
     /// Determine whether an expression is a reference to the file handle, by comparing
     /// their ranges. If two expressions have the same range, they must be the same expression.
     pub(super) fn is_ref(&self, expr: &Expr) -> bool {
-        expr.range() == self.reference
+        expr.range() == self.reference.range()
     }
 }
 
@@ -178,16 +179,15 @@ impl Ranged for OpenArgument<'_> {
 /// Find and return all `open` operations in the given `with` statement.
 pub(super) fn find_file_opens<'a>(
     with: &'a ast::StmtWith,
-    checker: &Checker<'_>,
+    semantic: &'a SemanticModel<'a>,
     read_mode: bool,
+    python_version: PythonVersion,
 ) -> Vec<FileOpen<'a>> {
-    let python_version = checker.target_version();
-
     with.items
         .iter()
         .filter_map(|item| {
-            find_file_open(item, with, checker, read_mode, python_version)
-                .or_else(|| find_path_open(item, with, checker, read_mode, python_version))
+            find_file_open(item, with, semantic, read_mode, python_version)
+                .or_else(|| find_path_open(item, with, semantic, read_mode, python_version))
         })
         .collect()
 }
@@ -195,7 +195,7 @@ pub(super) fn find_file_opens<'a>(
 fn resolve_file_open<'a>(
     item: &'a ast::WithItem,
     with: &'a ast::StmtWith,
-    checker: &Checker,
+    semantic: &'a SemanticModel<'a>,
     read_mode: bool,
     mode: OpenMode,
     keywords: Vec<&'a ast::Keyword>,
@@ -218,7 +218,6 @@ fn resolve_file_open<'a>(
         return None;
     }
 
-    let semantic = checker.semantic();
     let var = item.optional_vars.as_deref()?.as_name_expr()?;
     let scope = semantic.current_scope();
     let binding = scope.get_all(var.id.as_str()).find_map(|id| {
@@ -246,7 +245,7 @@ fn resolve_file_open<'a>(
         item,
         mode,
         keywords,
-        reference: reference.range(),
+        reference,
         argument,
     })
 }
@@ -255,7 +254,7 @@ fn resolve_file_open<'a>(
 fn find_file_open<'a>(
     item: &'a ast::WithItem,
     with: &'a ast::StmtWith,
-    checker: &Checker,
+    semantic: &'a SemanticModel<'a>,
     read_mode: bool,
     python_version: PythonVersion,
 ) -> Option<FileOpen<'a>> {
@@ -275,7 +274,7 @@ fn find_file_open<'a>(
         return None;
     }
 
-    if !checker.semantic().match_builtin_expr(func, "open") {
+    if !semantic.match_builtin_expr(func, "open") {
         return None;
     }
 
@@ -290,7 +289,7 @@ fn find_file_open<'a>(
     resolve_file_open(
         item,
         with,
-        checker,
+        semantic,
         read_mode,
         mode,
         keywords,
@@ -301,7 +300,7 @@ fn find_file_open<'a>(
 fn find_path_open<'a>(
     item: &'a ast::WithItem,
     with: &'a ast::StmtWith,
-    checker: &Checker,
+    semantic: &'a SemanticModel<'a>,
     read_mode: bool,
     python_version: PythonVersion,
 ) -> Option<FileOpen<'a>> {
@@ -316,7 +315,7 @@ fn find_path_open<'a>(
         return None;
     }
 
-    if !is_open_call_from_pathlib(func, checker.semantic()) {
+    if !is_open_call_from_pathlib(func, semantic) {
         return None;
     }
 
@@ -333,7 +332,7 @@ fn find_path_open<'a>(
     resolve_file_open(
         item,
         with,
-        checker,
+        semantic,
         read_mode,
         mode,
         keywords,
