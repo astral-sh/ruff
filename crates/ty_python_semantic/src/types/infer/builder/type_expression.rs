@@ -660,11 +660,22 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     return_todo |=
                         element_could_alter_type_of_whole_tuple(element, element_ty, self);
 
-                    if let ast::Expr::Starred(ast::ExprStarred {
-                        value: starred_value,
-                        ..
+                    // Determine if this element unpacks a tuple: either `*expr` or `Unpack[expr]`
+                    let unpack_inner = if let ast::Expr::Starred(ast::ExprStarred {
+                        value, ..
                     }) = element
                     {
+                        Some(&**value)
+                    } else if let ast::Expr::Subscript(ast::ExprSubscript { value, slice, .. }) =
+                        element
+                        && self.expression_type(value) == Type::SpecialForm(SpecialFormType::Unpack)
+                    {
+                        Some(&**slice)
+                    } else {
+                        None
+                    };
+
+                    if let Some(unpack_inner) = unpack_inner {
                         let mut report_too_many_unpacked_tuples = || {
                             if let Some(first_unpacked_variadic_tuple) =
                                 first_unpacked_variadic_tuple
@@ -698,7 +709,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             if inner_tuple.is_variadic() {
                                 report_too_many_unpacked_tuples();
                             }
-                        } else if self.expression_type(starred_value)
+                        } else if self.expression_type(unpack_inner)
                             == Type::Dynamic(DynamicType::TodoTypeVarTuple)
                         {
                             report_too_many_unpacked_tuples();
@@ -1672,8 +1683,21 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 inferred_type
             }
             SpecialFormType::Unpack => {
-                self.infer_type_expression(arguments_slice);
-                todo_type!("`Unpack[]` special form")
+                let inner_ty = self.infer_type_expression(arguments_slice);
+
+                // When the argument is a tuple type, return it directly so that
+                // `Unpack[tuple[int, ...]]` behaves identically to `*tuple[int, ...]`.
+                //
+                // However, we still need a Todo type for things like
+                // `def f(*args: Unpack[tuple[int, Unpack[tuple[str, ...]]]]): ...`,
+                // which we don't yet support.
+                if self.inferring_vararg_annotation
+                    || inner_ty.exact_tuple_instance_spec(self.db()).is_none()
+                {
+                    todo_type!("`Unpack[]` special form")
+                } else {
+                    inner_ty
+                }
             }
             SpecialFormType::NoReturn
             | SpecialFormType::Never
