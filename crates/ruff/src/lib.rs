@@ -499,14 +499,10 @@ https://github.com/astral-sh/ruff/issues/new?title=%5BLinter%20panic%5D
                 // If we're running the linter (not just fixing), we want to exit non-zero if
                 // there are any violations, unless we're explicitly asked to exit zero on
                 // fix.
-                if cli.exit_non_zero_on_fix {
-                    if !diagnostics.fixed.is_empty() || !diagnostics.inner.is_empty() {
-                        return Ok(ExitStatus::Failure);
-                    }
-                } else {
-                    if !diagnostics.inner.is_empty() {
-                        return Ok(ExitStatus::Failure);
-                    }
+                if max_severity >= Severity::Error
+                    || (cli.exit_non_zero_on_fix && !diagnostics.fixed.is_empty())
+                {
+                    return Ok(ExitStatus::Failure);
                 }
             }
         }

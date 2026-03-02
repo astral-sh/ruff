@@ -294,6 +294,17 @@ pub struct CheckCommand {
         hide_possible_values = true
     )]
     pub select: Option<Vec<RuleSelector>>,
+    /// Comma-separated list of rule codes to enable (or ALL, to enable all
+    /// rules) with severity `warning`
+    #[arg(
+        long,
+        value_delimiter = ',',
+        value_name = "RULE_CODE",
+        value_parser = RuleSelectorParser,
+        help_heading = "Rule selection",
+        hide_possible_values = true
+    )]
+    pub warn: Option<Vec<RuleSelector>>,
     /// Comma-separated list of rule codes to disable.
     #[arg(
         long,
@@ -314,6 +325,16 @@ pub struct CheckCommand {
         hide_possible_values = true
     )]
     pub extend_select: Option<Vec<RuleSelector>>,
+    /// Like --warn, but adds additional rule codes on top of those already specified.
+    #[arg(
+        long,
+        value_delimiter = ',',
+        value_name = "RULE_CODE",
+        value_parser = RuleSelectorParser,
+        help_heading = "Rule selection",
+        hide_possible_values = true
+    )]
+    pub extend_warn: Option<Vec<RuleSelector>>,
     /// Like --ignore. (Deprecated: You can just use --ignore instead.)
     #[arg(
         long,
@@ -786,6 +807,7 @@ impl CheckCommand {
             extend_ignore: self.extend_ignore,
             extend_per_file_ignores: self.extend_per_file_ignores,
             extend_select: self.extend_select,
+            extend_warn: self.extend_warn,
             extend_unfixable: self.extend_unfixable,
             fixable: self.fixable,
             ignore: self.ignore,
@@ -794,6 +816,7 @@ impl CheckCommand {
             preview: resolve_bool_arg(self.preview, self.no_preview).map(PreviewMode::from),
             respect_gitignore: resolve_bool_arg(self.respect_gitignore, self.no_respect_gitignore),
             select: self.select,
+            warn: self.warn,
             target_version: self.target_version.map(ast::PythonVersion::from),
             unfixable: self.unfixable,
             // TODO(charlie): Included in `pyproject.toml`, but not inherited.
@@ -1349,6 +1372,7 @@ struct ExplicitConfigOverrides {
     extend_fixable: Option<Vec<RuleSelector>>,
     extend_ignore: Option<Vec<RuleSelector>>,
     extend_select: Option<Vec<RuleSelector>>,
+    extend_warn: Option<Vec<RuleSelector>>,
     extend_unfixable: Option<Vec<RuleSelector>>,
     fixable: Option<Vec<RuleSelector>>,
     ignore: Option<Vec<RuleSelector>>,
@@ -1358,6 +1382,7 @@ struct ExplicitConfigOverrides {
     preview: Option<PreviewMode>,
     respect_gitignore: Option<bool>,
     select: Option<Vec<RuleSelector>>,
+    warn: Option<Vec<RuleSelector>>,
     target_version: Option<ast::PythonVersion>,
     unfixable: Option<Vec<RuleSelector>>,
     // TODO(charlie): Captured in pyproject.toml as a default, but not part of `Settings`.
@@ -1405,6 +1430,7 @@ impl ConfigurationTransformer for ExplicitConfigOverrides {
         }
         config.lint.rule_selections.push(RuleSelection {
             select: self.select.clone(),
+            warn: self.warn.clone(),
             ignore: self
                 .ignore
                 .iter()
@@ -1413,6 +1439,7 @@ impl ConfigurationTransformer for ExplicitConfigOverrides {
                 .flatten()
                 .collect(),
             extend_select: self.extend_select.clone().unwrap_or_default(),
+            extend_warn: self.extend_warn.clone().unwrap_or_default(),
             fixable: self.fixable.clone(),
             unfixable: self
                 .unfixable
