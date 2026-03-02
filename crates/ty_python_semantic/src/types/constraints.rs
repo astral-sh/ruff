@@ -1542,7 +1542,7 @@ impl ConstraintId {
 /// BDD nodes are also _ordered_, meaning that every path from the root of a BDD to a terminal node
 /// visits variables in the same order. [`ConstraintId::ordering`] defines the variable
 /// ordering that we use for constraint set BDDs.
-#[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd, get_size2::GetSize, salsa::Update)]
+#[derive(Clone, Copy, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
 struct NodeId(u32);
 
 /// A special ID that is used for an "always true" / "always visible" constraint.
@@ -2669,13 +2669,19 @@ impl InteriorNode {
         result
     }
 
-    fn or(self, builder: &ConstraintSetBuilder<'_>, other: Self) -> NodeId {
-        // OR is commutative, which lets us halve our cache requirements
-        let key = if self.node() < other.node() {
-            (self.node(), other.node())
+    /// Returns a cache key for a commutative binary operator
+    fn commutative_key(a: Self, b: Self) -> (NodeId, NodeId) {
+        let a = a.node();
+        let b = b.node();
+        if a.index() < b.index() {
+            (a, b)
         } else {
-            (other.node(), self.node())
-        };
+            (b, a)
+        }
+    }
+
+    fn or(self, builder: &ConstraintSetBuilder<'_>, other: Self) -> NodeId {
+        let key = Self::commutative_key(self, other);
         let storage = builder.storage.borrow();
         if let Some(result) = storage.or_cache.get(&key) {
             return *result;
@@ -2713,12 +2719,7 @@ impl InteriorNode {
     }
 
     fn and(self, builder: &ConstraintSetBuilder<'_>, other: Self) -> NodeId {
-        // AND is commutative, which lets us halve our cache requirements
-        let key = if self.node() < other.node() {
-            (self.node(), other.node())
-        } else {
-            (other.node(), self.node())
-        };
+        let key = Self::commutative_key(self, other);
         let storage = builder.storage.borrow();
         if let Some(result) = storage.and_cache.get(&key) {
             return *result;
@@ -2756,12 +2757,7 @@ impl InteriorNode {
     }
 
     fn iff(self, builder: &ConstraintSetBuilder<'_>, other: Self) -> NodeId {
-        // IFF is commutative, which lets us halve our cache requirements
-        let key = if self.node() < other.node() {
-            (self.node(), other.node())
-        } else {
-            (other.node(), self.node())
-        };
+        let key = Self::commutative_key(self, other);
         let storage = builder.storage.borrow();
         if let Some(result) = storage.iff_cache.get(&key) {
             return *result;
