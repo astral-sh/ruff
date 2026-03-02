@@ -4,12 +4,12 @@
 
 ### Overall
 - **Planning/documentation:** ✅ completed
-- **Code implementation:** 🟡 in progress
-- **Testing for implementation changes:** 🟡 in progress
+- **Code implementation:** ✅ completed
+- **Testing for implementation changes:** ✅ completed
 
 ### Phase status
 - **Phase A (compile-stabilization):** ✅ completed
-- **Phase B (semantic split-constraint migration):** 🟡 in progress
+- **Phase B (semantic split-constraint migration):** ✅ completed
 
 ### Step status (for cross-agent continuation)
 - [x] A1. Reintroduce compatibility wrapper `ConstraintSet::constrain_typevar`
@@ -17,11 +17,13 @@
 - [x] A3. Update implication/intersection/display enough to restore compile with minimal churn
 - [x] A4. Reach compile-clean baseline (`cargo check -p ty_python_semantic`)
 - [x] B5. Rework `SequentMap` for true split-constraint semantics
-- [ ] B6. Rework `solutions` / `exists_one` / remaining range assumptions to explicit variant logic
+- [x] B6. Rework `solutions` / `exists_one` / remaining range assumptions to explicit variant logic
 
 > Note: formatting + full-crate tests are ongoing acceptance criteria and must be rerun after each remaining implementation step.
 
 ### Notes on what has been completed so far
+
+> Update: B6 is now complete; any unchecked/todo language in historical sections below should be treated as archival context.
 - ✅ Reviewed `constraints.rs` in full
 - ✅ Reviewed branch diff vs `main`
 - ✅ Identified breakage categories and required migration steps
@@ -36,6 +38,10 @@
 - ✅ `cargo fmt --package ty_python_semantic` run
 - ✅ `cargo check -p ty_python_semantic` passes
 - ✅ `cargo nextest run -p ty_python_semantic` passes (502 passed, 34 skipped)
+- ✅ Reworked `exists_one` filtering to explicit split-constraint matching (`LowerBound` / `UpperBound`)
+- ✅ Reworked `solutions` path aggregation to explicit split-constraint matching (no compatibility lower/upper view)
+- ✅ Updated cross-typevar display-simplification propagation to explicit split-constraint rules
+- ✅ Re-ran acceptance checks after B6 (`cargo fmt --package ty_python_semantic`, `cargo nextest run -p ty_python_semantic`)
 
 ### Handoff notes for next agent
 - In `SequentMap::add_sequents_for_pair`, impossibility for `(L ≤ T) ∧ (T ≤ U)` is intentionally limited to **concrete** `L`/`U` (non-typevar bounds). Making this unconditional regressed `implies_subtype_of` mdtests by over-pruning satisfiable paths.
