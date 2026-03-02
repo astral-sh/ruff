@@ -8,14 +8,14 @@
 - **Testing for implementation changes:** ⏳ not started
 
 ### Phase status
-- **Phase A (compile-stabilization):** 🟡 in progress
+- **Phase A (compile-stabilization):** ✅ completed
 - **Phase B (semantic split-constraint migration):** ⏳ not started
 
 ### Step status (for cross-agent continuation)
 - [x] A1. Reintroduce compatibility wrapper `ConstraintSet::constrain_typevar`
-- [ ] A2. Mechanical compile-fix pass (`constraint.typevar()` + constructor replacements + temporary compatibility views)
-- [ ] A3. Update implication/intersection/display enough to restore compile with minimal churn
-- [ ] A4. Reach compile-clean baseline (`cargo check -p ty_python_semantic`)
+- [x] A2. Mechanical compile-fix pass (`constraint.typevar()` + constructor replacements + temporary compatibility views)
+- [x] A3. Update implication/intersection/display enough to restore compile with minimal churn
+- [x] A4. Reach compile-clean baseline (`cargo check -p ty_python_semantic`)
 - [ ] B5. Rework `SequentMap` for true split-constraint semantics
 - [ ] B6. Rework `solutions` / `exists_one` / remaining range assumptions to explicit variant logic
 - [ ] B7. Run focused tests (`cargo nextest run -p ty_python_semantic`, plus targeted mdtests if needed)
@@ -27,7 +27,10 @@
 - ✅ Identified breakage categories and required migration steps
 - ✅ Wrote this handoff plan and clarified that `as_lower_upper` is temporary bridge logic only
 - ✅ Reintroduced `ConstraintSet::constrain_typevar(...)` as a compatibility wrapper (`lower_bound(...).and(...upper_bound(...))`)
-- ✅ Verified with `cargo check -p ty_python_semantic` that external `constrain_typevar` API errors are resolved
+- ✅ Added temporary compatibility helpers on `Constraint` (`as_lower_upper`, `lower`, `upper`) and mechanically migrated remaining field accesses
+- ✅ Replaced all remaining `ConstraintId::new(...)` and `Constraint::new_node(...)` call sites
+- ✅ Updated implication/intersection/display and related call paths enough to compile under split constraints
+- ✅ `cargo check -p ty_python_semantic` now passes
 
 ## Context and current state
 
@@ -48,14 +51,13 @@ But most of `constraints.rs` still assumes range fields (`constraint.lower`, `co
 
 ## What is currently broken
 
-`cargo check -p ty_python_semantic` currently fails with many errors (79), now primarily in one category:
+`cargo check -p ty_python_semantic` now passes.
 
-1. **Internal `constraints.rs` logic still range-based**
-   - field accesses on enum values (`.lower`, `.upper`, `.typevar`)
-   - old constructor calls (`ConstraintId::new(db, builder, ...)`, `Constraint::new_node(...)`)
-   - old range-based simplification / sequent code paths
+Remaining work is semantic migration quality, not compile breakage:
 
-✅ **Previously broken external API restored:** `ConstraintSet::constrain_typevar(...)` has been reintroduced, and call sites in `relation.rs`, `signatures.rs`, `call/bind.rs`, and tests now resolve.
+1. **Sequent and propagation logic is still compatibility-oriented** in places (using temporary lower/upper views).
+2. **Solution/existential logic still contains range-era assumptions** that should be rewritten to explicit variant handling.
+3. **Behavioral validation** (focused tests/mdtests) has not yet been run for these migration changes.
 
 ## Required additional changes
 
