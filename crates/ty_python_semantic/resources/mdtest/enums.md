@@ -991,8 +991,7 @@ def _(red_or_blue: Literal[Color.RED, Color.BLUE]):
     reveal_type(red_or_blue.name)  # revealed: Literal["RED", "BLUE"]
 
 def _(any_color: Color):
-    # TODO: Literal["RED", "GREEN", "BLUE"]
-    reveal_type(any_color.name)  # revealed: Any
+    reveal_type(any_color.name)  # revealed: Literal["RED", "GREEN", "BLUE"]
 ```
 
 ### `value` and `_value_`
@@ -1195,6 +1194,56 @@ EnumWithSubclassOfEnumMetaMetaclass.NO.value
 ## Function syntax
 
 To do: <https://typing.python.org/en/latest/spec/enums.html#enum-definition>
+
+### `value` and `_value_`
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from enum import Enum, StrEnum
+from typing import Literal
+
+class Color(Enum):
+    RED = 1
+    GREEN = 2
+    BLUE = 3
+
+reveal_type(Color.RED.value)  # revealed: Literal[1]
+reveal_type(Color.RED._value_)  # revealed: Literal[1]
+
+reveal_type(Color.GREEN.value)  # revealed: Literal[2]
+reveal_type(Color.GREEN._value_)  # revealed: Literal[2]
+
+class Answer(StrEnum):
+    YES = "yes"
+    NO = "no"
+
+reveal_type(Answer.YES.value)  # revealed: Literal["yes"]
+reveal_type(Answer.YES._value_)  # revealed: Literal["yes"]
+
+reveal_type(Answer.NO.value)  # revealed: Literal["no"]
+reveal_type(Answer.NO._value_)  # revealed: Literal["no"]
+
+def _(any_color: Color):
+    reveal_type(any_color.value)  # revealed: Literal[1, 2, 3]
+
+def _(any_answer: Answer):
+    reveal_type(any_answer.value)  # revealed: Literal["yes", "no"]
+
+def f(x: Answer) -> None:
+    pass
+
+def g(x: Answer) -> None:
+    # error: [invalid-argument-type]
+    f(x.value)
+
+def h(x: Answer) -> None:
+    # error: [invalid-argument-type]
+    f(x._value_)
+```
 
 ## Exhaustiveness checking
 
