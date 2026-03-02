@@ -1691,7 +1691,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 // However, we still need a Todo type for things like
                 // `def f(*args: Unpack[tuple[int, Unpack[tuple[str, ...]]]]): ...`,
                 // which we don't yet support.
-                if self.inferring_vararg_annotation || inner_ty.exact_tuple_instance_spec(self.db()).is_none() {
+                if self.inferring_vararg_annotation
+                    || inner_ty.exact_tuple_instance_spec(self.db()).is_none()
+                {
                     todo_type!("`Unpack[]` special form")
                 } else {
                     inner_ty
