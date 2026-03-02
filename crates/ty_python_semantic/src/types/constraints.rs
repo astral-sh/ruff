@@ -622,14 +622,21 @@ impl Debug for ConstraintSet<'_, '_> {
 /// This is usually passed around by shared reference to avoid convoluted APIs that thread mutable
 /// references to the builder back and forth.
 ///
-/// Most core type inference algorithms create one of these, create one or more constraint sets in
-/// the builder, interrogate those constraint sets, and then throw the builder away.
-///
 /// All of our BDD algorithms rely heavily on interning and memoization, for both correctness and
 /// efficiency. These caches are only unique within the context of a particular builder. We do not
 /// cache globally across the entire ty process. (The main reason is to avoid any dependencies on
 /// the particular order in which files or expressions are visited during type checking. A minor
 /// additional benefit is that the builder does not need to be thread-safe or impl [`Sync`].)
+///
+/// Most core type inference algorithms create a builder, create one or more constraint sets in the
+/// builder, interrogate those constraint sets, and then throw the builder away.
+///
+/// TODO: We are considering creating a single builder in `TypeInferenceBuilder` that would be
+/// shared across an entire inference region. That would give us even more sharing opportunities,
+/// which could be highly impactful, since it's likely that there will be types and constraints
+/// that are repeated within a region. It should still give us the stability that we need, because
+/// once we determine that we need _something_ from an inference regions, we always infer _all_ of
+/// the definitions and expressions in that region, in a stable order.
 #[derive(Default)]
 pub(crate) struct ConstraintSetBuilder<'db> {
     storage: RefCell<ConstraintSetStorage<'db>>,
