@@ -1,0 +1,111 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: classes.md - Generic classes: PEP 695 syntax - Scoping of typevars - No back-references
+mdtest path: crates/ty_python_semantic/resources/mdtest/generics/pep695/classes.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | # error: [invalid-type-variable-bound]
+ 2 | class C[S: T, T]:
+ 3 |     pass
+ 4 | 
+ 5 | # error: [invalid-type-variable-bound]
+ 6 | class D[S, T: S]:
+ 7 |     pass
+ 8 | 
+ 9 | # error: [invalid-type-variable-constraints]
+10 | class E[S: (int, T), T]:
+11 |     pass
+12 | 
+13 | class F[S: X]:
+14 |     pass
+15 | 
+16 | X = int
+17 | # This is fine: U's default references T, which comes before U
+18 | class Good[T, U = T]: ...
+19 | 
+20 | # error: [invalid-generic-class] "Default of `S` cannot reference later type parameter `T`"
+21 | class Bad[S = T, T = int]: ...
+22 | 
+23 | # error: [invalid-generic-class]
+24 | class AlsoBad[S = list[T], T = int]: ...
+```
+
+# Diagnostics
+
+```
+error[invalid-type-variable-bound]: TypeVar upper bound cannot be generic
+ --> src/mdtest_snippet.py:2:12
+  |
+1 | # error: [invalid-type-variable-bound]
+2 | class C[S: T, T]:
+  |            ^
+3 |     pass
+  |
+info: rule `invalid-type-variable-bound` is enabled by default
+
+```
+
+```
+error[invalid-type-variable-bound]: TypeVar upper bound cannot be generic
+ --> src/mdtest_snippet.py:6:15
+  |
+5 | # error: [invalid-type-variable-bound]
+6 | class D[S, T: S]:
+  |               ^
+7 |     pass
+  |
+info: rule `invalid-type-variable-bound` is enabled by default
+
+```
+
+```
+error[invalid-type-variable-constraints]: TypeVar constraint cannot be generic
+  --> src/mdtest_snippet.py:10:18
+   |
+ 9 | # error: [invalid-type-variable-constraints]
+10 | class E[S: (int, T), T]:
+   |                  ^
+11 |     pass
+   |
+info: rule `invalid-type-variable-constraints` is enabled by default
+
+```
+
+```
+error[invalid-generic-class]: Default of `S` cannot reference later type parameter `T`
+  --> src/mdtest_snippet.py:21:7
+   |
+20 | # error: [invalid-generic-class] "Default of `S` cannot reference later type parameter `T`"
+21 | class Bad[S = T, T = int]: ...
+   |       ^^^ -----  ------- `T` defined here
+   |           |
+   |           `S` defined here
+22 |
+23 | # error: [invalid-generic-class]
+   |
+info: rule `invalid-generic-class` is enabled by default
+
+```
+
+```
+error[invalid-generic-class]: Default of `S` cannot reference later type parameter `T`
+  --> src/mdtest_snippet.py:24:7
+   |
+23 | # error: [invalid-generic-class]
+24 | class AlsoBad[S = list[T], T = int]: ...
+   |       ^^^^^^^ -----------  ------- `T` defined here
+   |               |
+   |               `S` defined here
+   |
+info: rule `invalid-generic-class` is enabled by default
+
+```

@@ -65,7 +65,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     fn report_invalid_type_expression(
         &self,
         expression: &ast::Expr,
-        message: std::fmt::Arguments,
+        message: impl std::fmt::Display,
     ) -> Option<LintDiagnosticGuard<'_, '_>> {
         self.context
             .report_lint(&INVALID_TYPE_FORM, expression)
@@ -514,7 +514,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             ast::Expr::IpyEscapeCommand(_) => todo!("Implement Ipy escape command support"),
 
             ast::Expr::EllipsisLiteral(_) => {
-                todo_type!("ellipsis literal in type expression")
+                self.report_invalid_type_expression(
+                    expression,
+                    "`...` is not allowed in this context in a type expression",
+                );
+                Type::unknown()
             }
 
             ast::Expr::Starred(starred) => self.infer_starred_type_expression(starred),
@@ -639,15 +643,18 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 let mut first_unpacked_variadic_tuple = None;
 
                 for element in elements {
-                    if element.is_ellipsis_literal_expr()
-                        && let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, tuple)
-                    {
-                        let mut diagnostic =
-                            builder.into_diagnostic("Invalid `tuple` specialization");
-                        diagnostic.set_primary_message(
-                            "`...` can only be used as the second element \
-                            in a two-element `tuple` specialization",
-                        );
+                    if element.is_ellipsis_literal_expr() {
+                        if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, tuple) {
+                            let mut diagnostic =
+                                builder.into_diagnostic("Invalid `tuple` specialization");
+                            diagnostic.set_primary_message(
+                                "`...` can only be used as the second element \
+                                in a two-element `tuple` specialization",
+                            );
+                        }
+                        self.store_expression_type(element, Type::unknown());
+                        element_types.push(Type::unknown());
+                        continue;
                     }
                     let element_ty = self.infer_type_expression(element);
                     return_todo |=
@@ -720,14 +727,17 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 ty
             }
             single_element => {
-                if single_element.is_ellipsis_literal_expr()
-                    && let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, tuple)
-                {
-                    let mut diagnostic = builder.into_diagnostic("Invalid `tuple` specialization");
-                    diagnostic.set_primary_message(
-                        "`...` can only be used as the second element \
-                            in a two-element `tuple` specialization",
-                    );
+                if single_element.is_ellipsis_literal_expr() {
+                    if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, tuple) {
+                        let mut diagnostic =
+                            builder.into_diagnostic("Invalid `tuple` specialization");
+                        diagnostic.set_primary_message(
+                            "`...` can only be used as the second element \
+                                in a two-element `tuple` specialization",
+                        );
+                    }
+                    self.store_expression_type(single_element, Type::unknown());
+                    return TupleType::heterogeneous(self.db(), std::iter::once(Type::unknown()));
                 }
                 let single_element_ty = self.infer_type_expression(single_element);
                 if element_could_alter_type_of_whole_tuple(single_element, single_element_ty, self)
@@ -1282,26 +1292,53 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         let return_type = arguments.next().map(|arg| self.infer_type_expression(arg));
 
-        let correct_argument_number = if let Some(third_argument) = arguments.next() {
-            self.infer_type_expression(third_argument);
-            for argument in arguments {
-                self.infer_type_expression(argument);
-            }
-            false
-        } else {
-            return_type.is_some()
-        };
-
-        if !correct_argument_number {
-            report_invalid_arguments_to_callable(&self.context, subscript);
-        }
-
-        let callable_type = if let (Some(parameters), Some(return_type), true) =
-            (parameters, return_type, correct_argument_number)
+        let callable_type = if parameters.is_none()
+            && let Some(first_argument) = first_argument
+            && let ast::Expr::List(list) = first_argument
+            && let [single_param] = &list.elts[..]
+            && single_param.is_ellipsis_literal_expr()
         {
-            Type::single_callable(db, Signature::new(parameters, return_type))
+            self.store_expression_type(single_param, Type::unknown());
+            if let Some(mut diagnostic) = self.report_invalid_type_expression(
+                first_argument,
+                "`[...]` is not a valid parameter list for `Callable`",
+            ) {
+                if let Some(returns) = return_type {
+                    diagnostic.set_primary_message(format_args!(
+                        "Did you mean `Callable[..., {}]`?",
+                        returns.display(db)
+                    ));
+                }
+            }
+            Type::single_callable(
+                db,
+                Signature::new(
+                    Parameters::unknown(),
+                    return_type.unwrap_or_else(Type::unknown),
+                ),
+            )
         } else {
-            Type::Callable(CallableType::unknown(db))
+            let correct_argument_number = if let Some(third_argument) = arguments.next() {
+                self.infer_type_expression(third_argument);
+                for argument in arguments {
+                    self.infer_type_expression(argument);
+                }
+                false
+            } else {
+                return_type.is_some()
+            };
+
+            if !correct_argument_number {
+                report_invalid_arguments_to_callable(&self.context, subscript);
+            }
+
+            if correct_argument_number
+                && let (Some(parameters), Some(return_type)) = (parameters, return_type)
+            {
+                Type::single_callable(db, Signature::new(parameters, return_type))
+            } else {
+                Type::Callable(CallableType::unknown(db))
+            }
         };
 
         // `Signature` / `Parameters` are not a `Type` variant, so we're storing
@@ -1610,7 +1647,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     std::slice::from_ref(arguments_slice)
                 };
                 for argument in arguments {
-                    self.infer_type_expression(argument);
+                    if argument.is_ellipsis_literal_expr() {
+                        // The trailing `...` in `Concatenate[int, str, ...]` is valid;
+                        // store without going through type-expression inference.
+                        self.store_expression_type(argument, Type::unknown());
+                    } else {
+                        self.infer_type_expression(argument);
+                    }
                 }
                 let num_arguments = arguments.len();
                 let inferred_type = if num_arguments < 2 {
@@ -1847,6 +1890,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 return Some(Parameters::gradual_form());
             }
             ast::Expr::List(ast::ExprList { elts: params, .. }) => {
+                if let [ast::Expr::EllipsisLiteral(_)] = &params[..] {
+                    // Return `None` here so that we emit a specific diagnostic at the callsite.
+                    return None;
+                }
+
                 let mut parameter_types = Vec::with_capacity(params.len());
 
                 // Whether to infer `Todo` for the parameters

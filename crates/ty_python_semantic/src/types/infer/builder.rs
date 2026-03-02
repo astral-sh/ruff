@@ -69,26 +69,25 @@ use crate::types::class::{
 };
 use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::context::{InNoTypeCheck, InferContext};
-use crate::types::cyclic::CycleDetector;
 use crate::types::diagnostic::{
     self, ABSTRACT_METHOD_IN_FINAL_CLASS, CALL_NON_CALLABLE, CONFLICTING_DECLARATIONS,
     CONFLICTING_METACLASS, CYCLIC_CLASS_DEFINITION, CYCLIC_TYPE_ALIAS_DEFINITION,
-    DATACLASS_FIELD_ORDER, DIVISION_BY_ZERO, DUPLICATE_BASE, DUPLICATE_KW_ONLY,
-    FINAL_ON_NON_METHOD, FINAL_WITHOUT_VALUE, INCONSISTENT_MRO, INEFFECTIVE_FINAL,
-    INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, INVALID_BASE,
-    INVALID_DATACLASS, INVALID_DECLARATION, INVALID_GENERIC_CLASS, INVALID_GENERIC_ENUM,
-    INVALID_KEY, INVALID_LEGACY_POSITIONAL_PARAMETER, INVALID_LEGACY_TYPE_VARIABLE,
-    INVALID_METACLASS, INVALID_NAMED_TUPLE, INVALID_NEWTYPE, INVALID_OVERLOAD,
-    INVALID_PARAMETER_DEFAULT, INVALID_PARAMSPEC, INVALID_PROTOCOL, INVALID_TYPE_ALIAS_TYPE,
-    INVALID_TYPE_ARGUMENTS, INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL,
-    INVALID_TYPE_GUARD_DEFINITION, INVALID_TYPE_VARIABLE_BOUND, INVALID_TYPE_VARIABLE_CONSTRAINTS,
-    INVALID_TYPE_VARIABLE_DEFAULT, INVALID_TYPED_DICT_HEADER, INVALID_TYPED_DICT_STATEMENT,
-    IncompatibleBases, MISSING_ARGUMENT, NO_MATCHING_OVERLOAD, NOT_SUBSCRIPTABLE,
-    PARAMETER_ALREADY_ASSIGNED, POSSIBLY_MISSING_ATTRIBUTE, POSSIBLY_MISSING_IMPLICIT_CALL,
-    POSSIBLY_MISSING_IMPORT, SUBCLASS_OF_FINAL_CLASS, TOO_MANY_POSITIONAL_ARGUMENTS,
-    TypedDictDeleteErrorKind, UNDEFINED_REVEAL, UNKNOWN_ARGUMENT, UNRESOLVED_ATTRIBUTE,
-    UNRESOLVED_GLOBAL, UNRESOLVED_IMPORT, UNRESOLVED_REFERENCE, UNSUPPORTED_DYNAMIC_BASE,
-    UNSUPPORTED_OPERATOR, USELESS_OVERLOAD_BODY, hint_if_stdlib_attribute_exists_on_other_versions,
+    DATACLASS_FIELD_ORDER, DUPLICATE_BASE, DUPLICATE_KW_ONLY, FINAL_ON_NON_METHOD,
+    FINAL_WITHOUT_VALUE, INCONSISTENT_MRO, INEFFECTIVE_FINAL, INVALID_ARGUMENT_TYPE,
+    INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, INVALID_BASE, INVALID_DATACLASS,
+    INVALID_DECLARATION, INVALID_GENERIC_CLASS, INVALID_GENERIC_ENUM, INVALID_KEY,
+    INVALID_LEGACY_POSITIONAL_PARAMETER, INVALID_LEGACY_TYPE_VARIABLE, INVALID_METACLASS,
+    INVALID_NAMED_TUPLE, INVALID_NEWTYPE, INVALID_OVERLOAD, INVALID_PARAMETER_DEFAULT,
+    INVALID_PARAMSPEC, INVALID_PROTOCOL, INVALID_TYPE_ALIAS_TYPE, INVALID_TYPE_ARGUMENTS,
+    INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL, INVALID_TYPE_GUARD_DEFINITION,
+    INVALID_TYPE_VARIABLE_BOUND, INVALID_TYPE_VARIABLE_CONSTRAINTS, INVALID_TYPE_VARIABLE_DEFAULT,
+    INVALID_TYPED_DICT_HEADER, INVALID_TYPED_DICT_STATEMENT, IncompatibleBases, MISSING_ARGUMENT,
+    NO_MATCHING_OVERLOAD, NOT_SUBSCRIPTABLE, PARAMETER_ALREADY_ASSIGNED,
+    POSSIBLY_MISSING_ATTRIBUTE, POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_IMPORT,
+    SUBCLASS_OF_FINAL_CLASS, TOO_MANY_POSITIONAL_ARGUMENTS, TypedDictDeleteErrorKind,
+    UNDEFINED_REVEAL, UNKNOWN_ARGUMENT, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_IMPORT,
+    UNRESOLVED_REFERENCE, UNSUPPORTED_DYNAMIC_BASE, UNSUPPORTED_OPERATOR, USELESS_OVERLOAD_BODY,
+    hint_if_stdlib_attribute_exists_on_other_versions,
     hint_if_stdlib_submodule_exists_on_other_versions, report_attempted_protocol_instantiation,
     report_bad_dunder_set_call, report_bad_frozen_dataclass_inheritance,
     report_call_to_abstract_method, report_cannot_delete_typed_dict_key,
@@ -101,12 +100,13 @@ use crate::types::diagnostic::{
     report_invalid_generator_function_return_type, report_invalid_key_on_typed_dict,
     report_invalid_or_unsupported_base, report_invalid_return_type, report_invalid_total_ordering,
     report_invalid_type_checking_constant, report_invalid_type_param_order,
+    report_invalid_typevar_default_reference,
     report_match_pattern_against_non_runtime_checkable_protocol,
     report_match_pattern_against_typed_dict, report_named_tuple_field_with_leading_underscore,
     report_namedtuple_field_without_default_after_field_with_default, report_not_subscriptable,
     report_possibly_missing_attribute, report_possibly_unresolved_reference,
-    report_rebound_typevar, report_unsupported_augmented_assignment, report_unsupported_base,
-    report_unsupported_binary_operation, report_unsupported_comparison,
+    report_shadowed_type_variable, report_unsupported_augmented_assignment,
+    report_unsupported_base, report_unsupported_comparison,
 };
 use crate::types::enums::is_enum_class_by_inheritance;
 use crate::types::function::{
@@ -117,29 +117,31 @@ use crate::types::generics::{
     GenericContext, InferableTypeVars, SpecializationBuilder, bind_typevar,
     enclosing_generic_contexts, typing_self,
 };
-use crate::types::infer::nearest_enclosing_function;
+use crate::types::infer::builder::paramspec_validation::validate_paramspec_components;
+use crate::types::infer::{nearest_enclosing_class, nearest_enclosing_function};
 use crate::types::mro::{DynamicMroErrorKind, StaticMroErrorKind};
 use crate::types::newtype::NewType;
 use crate::types::special_form::AliasSpec;
 use crate::types::subclass_of::SubclassOfInner;
 use crate::types::subscript::{LegacyGenericOrigin, SubscriptError, SubscriptErrorKind};
-use crate::types::tuple::{Tuple, TupleLength, TupleSpec, TupleSpecBuilder, TupleType};
+use crate::types::tuple::{Tuple, TupleLength, TupleSpecBuilder, TupleType};
 use crate::types::typed_dict::{
     TypedDictAssignmentKind, TypedDictKeyAssignment, validate_typed_dict_constructor,
     validate_typed_dict_dict_literal,
 };
+use crate::types::visitor::find_over_type;
 use crate::types::{
     BoundTypeVarIdentity, BoundTypeVarInstance, CallDunderError, CallableBinding, CallableType,
-    CallableTypeKind, ClassType, DataclassParams, DynamicType, InternedConstraintSet, InternedType,
-    IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, KnownUnion,
-    LintDiagnosticGuard, LiteralValueType, LiteralValueTypeKind, ManualPEP695TypeAliasType,
-    MemberLookupPolicy, MetaclassCandidate, PEP695TypeAliasType, ParamSpecAttrKind, Parameter,
-    ParameterForm, Parameters, Signature, SpecialFormType, StaticClassLiteral, SubclassOfType,
-    Truthiness, Type, TypeAliasType, TypeAndQualifiers, TypeContext, TypeQualifiers,
-    TypeVarBoundOrConstraints, TypeVarBoundOrConstraintsEvaluation, TypeVarConstraints,
-    TypeVarDefaultEvaluation, TypeVarIdentity, TypeVarInstance, TypeVarKind, TypeVarVariance,
-    TypedDictType, UnionBuilder, UnionType, UnionTypeInstance, any_over_type, binding_type,
-    definition_expression_type, infer_complete_scope_types, infer_scope_types, todo_type,
+    CallableTypeKind, ClassType, DataclassParams, DynamicType, GenericAlias, InternedConstraintSet,
+    InternedType, IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, KnownUnion,
+    LintDiagnosticGuard, LiteralValueTypeKind, ManualPEP695TypeAliasType, MemberLookupPolicy,
+    MetaclassCandidate, PEP695TypeAliasType, ParamSpecAttrKind, Parameter, ParameterForm,
+    Parameters, Signature, SpecialFormType, StaticClassLiteral, SubclassOfType, Truthiness, Type,
+    TypeAliasType, TypeAndQualifiers, TypeContext, TypeQualifiers, TypeVarBoundOrConstraints,
+    TypeVarBoundOrConstraintsEvaluation, TypeVarConstraints, TypeVarDefaultEvaluation,
+    TypeVarIdentity, TypeVarInstance, TypeVarKind, TypeVarVariance, TypedDictType, UnionBuilder,
+    UnionType, UnionTypeInstance, any_over_type, binding_type, definition_expression_type,
+    infer_complete_scope_types, infer_scope_types, todo_type,
 };
 use crate::types::{CallableTypes, overrides};
 use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
@@ -147,14 +149,11 @@ use crate::unpack::{EvaluationMode, UnpackPosition};
 use crate::{AnalysisSettings, Db, FxIndexSet, FxOrderSet, Program};
 
 mod annotation_expression;
+mod binary_expressions;
+mod paramspec_validation;
 mod type_expression;
 
-/// Whether the intersection type is on the left or right side of the comparison.
-#[derive(Debug, Clone, Copy)]
-enum IntersectionOn {
-    Left,
-    Right,
-}
+use super::comparisons::{self, BinaryComparisonVisitor};
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 struct TypeAndRange<'db> {
@@ -183,13 +182,6 @@ impl<'db> DeclaredAndInferredType<'db> {
         ))
     }
 }
-
-/// A [`CycleDetector`] that is used in `infer_binary_type_comparison`.
-type BinaryComparisonVisitor<'db> = CycleDetector<
-    ast::CmpOp,
-    (Type<'db>, ast::CmpOp, Type<'db>),
-    Result<Type<'db>, UnsupportedComparisonError<'db>>,
->;
 
 /// We currently store one dataclass field-specifiers inline, because that covers standard
 /// dataclasses. attrs uses 2 specifiers, pydantic and strawberry use 3 specifiers. SQLAlchemy
@@ -1186,6 +1178,133 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             &disjoint_bases,
                         );
                     }
+
+                    // Check for inconsistent specializations of the same generic
+                    // base class. This detects when different explicit bases
+                    // contribute conflicting specializations of a common generic
+                    // ancestor to the MRO. For example:
+                    //
+                    //   class Grandparent(Generic[T1, T2]): ...
+                    //   class Parent(Grandparent[T1, T2]): ...
+                    //   class BadChild(Parent[T1, T2], Grandparent[T2, T1]): ...  # Error
+                    let explicit_bases = class.explicit_bases(self.db());
+                    let can_annotate_bases = || {
+                        class_node.bases().len() == explicit_bases.len()
+                            && !class_node.bases().iter().any(ast::Expr::is_starred_expr)
+                    };
+
+                    // Maps each generic ancestor's class literal to the first
+                    // specialization seen and the index of the explicit base it
+                    // came from.
+                    let mut ancestor_specs =
+                        FxHashMap::<StaticClassLiteral<'db>, (GenericAlias<'db>, usize)>::default();
+
+                    'outer: for (i, base) in explicit_bases.iter().enumerate() {
+                        let base_class = match base {
+                            Type::GenericAlias(c) => ClassType::Generic(*c),
+                            Type::ClassLiteral(c) if c.generic_context(self.db()).is_none() => {
+                                ClassType::NonGeneric(*c)
+                            }
+                            _ => continue,
+                        };
+
+                        for supercls in base_class.iter_mro(self.db()) {
+                            let ClassBase::Class(ClassType::Generic(supercls_alias)) = supercls
+                            else {
+                                continue;
+                            };
+                            let origin = supercls_alias.origin(self.db());
+
+                            if let Some(&(earlier_alias, earlier_idx)) = ancestor_specs.get(&origin)
+                            {
+                                if earlier_idx != i
+                                    && earlier_alias
+                                        .specialization(self.db())
+                                        .types(self.db())
+                                        .iter()
+                                        .zip(
+                                            supercls_alias
+                                                .specialization(self.db())
+                                                .types(self.db()),
+                                        )
+                                        .any(|(t1, t2)| {
+                                            !t1.is_dynamic() && !t2.is_dynamic() && t1 != t2
+                                        })
+                                {
+                                    let Some(builder) = self.context.report_lint(
+                                        &INVALID_GENERIC_CLASS,
+                                        class.header_range(self.db()),
+                                    ) else {
+                                        break 'outer;
+                                    };
+                                    let mut diagnostic = builder.into_diagnostic(format_args!(
+                                        "Inconsistent type arguments for `{}` among class bases",
+                                        origin.name(self.db())
+                                    ));
+
+                                    let later_is_direct = matches!(
+                                        base,
+                                        Type::GenericAlias(a)
+                                            if a.origin(self.db()) == origin
+                                    );
+
+                                    if can_annotate_bases() {
+                                        diagnostic.annotate(
+                                            self.context
+                                                .secondary(&class_node.bases()[earlier_idx])
+                                                .message(format_args!(
+                                                    "Earlier class base inherits from `{}`",
+                                                    earlier_alias.display(self.db())
+                                                )),
+                                        );
+                                        let later_annotation =
+                                            self.context.secondary(&class_node.bases()[i]);
+                                        diagnostic.annotate(if later_is_direct {
+                                            later_annotation.message(format_args!(
+                                                "Later class base is `{}`",
+                                                supercls_alias.display(self.db())
+                                            ))
+                                        } else {
+                                            later_annotation.message(format_args!(
+                                                "Later class base inherits from `{}`",
+                                                supercls_alias.display(self.db())
+                                            ))
+                                        });
+                                    } else {
+                                        diagnostic.info(format_args!(
+                                            "Earlier class base inherits from `{}`",
+                                            earlier_alias.display(self.db())
+                                        ));
+                                        if later_is_direct {
+                                            diagnostic.info(format_args!(
+                                                "Later class base is `{}`",
+                                                supercls_alias.display(self.db())
+                                            ));
+                                        } else {
+                                            diagnostic.info(format_args!(
+                                                "Later class base inherits from `{}`",
+                                                supercls_alias.display(self.db())
+                                            ));
+                                        }
+                                    }
+                                    diagnostic.set_concise_message(format_args!(
+                                        "Inconsistent type arguments: class cannot \
+                                        inherit from both `{}` and `{}`",
+                                        supercls_alias.display(self.db()),
+                                        earlier_alias.display(self.db())
+                                    ));
+                                    break 'outer;
+                                }
+                            } else if !supercls_alias
+                                .specialization(self.db())
+                                .types(self.db())
+                                .iter()
+                                .all(Type::is_dynamic)
+                            {
+                                ancestor_specs.insert(origin, (supercls_alias, i));
+                            }
+                        }
+                    }
                 }
             }
 
@@ -1220,6 +1339,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 "Cyclic definition of `{}`",
                                 class.name(self.db())
                             ));
+                        }
+                    }
+                    MetaclassErrorKind::GenericMetaclass => {
+                        if let Some(builder) =
+                            self.context.report_lint(&INVALID_METACLASS, class_node)
+                        {
+                            builder.into_diagnostic("Generic metaclasses are not supported");
                         }
                     }
                     MetaclassErrorKind::NotCallable(ty) => {
@@ -1439,6 +1565,47 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                 }
 
+                // Check that type variable defaults only reference type variables
+                // that precede them in the type parameter list.
+                if let Some(generic_context) = class
+                    .pep695_generic_context(self.db())
+                    .or(class.legacy_generic_context(self.db()))
+                {
+                    let db = self.db();
+                    let typevars = generic_context.variables(db).map(|btv| btv.typevar(db));
+
+                    // `variables` should be fairly cheap to clone; it's just several cheap wrappers around
+                    // a `std::slice::Iter` under the hood.
+                    for (i, typevar) in typevars.clone().enumerate() {
+                        let Some(default_ty) = typevar.default_type(db) else {
+                            continue;
+                        };
+
+                        let first_bad_tvar = find_over_type(db, default_ty, false, |t| {
+                            let tvar = match t {
+                                Type::TypeVar(tvar) => tvar.typevar(db),
+                                Type::KnownInstance(KnownInstanceType::TypeVar(tvar)) => tvar,
+                                _ => return None,
+                            };
+                            if !typevars.clone().take(i).contains(&tvar) {
+                                Some(tvar)
+                            } else {
+                                None
+                            }
+                        });
+                        if let Some(bad_typevar) = first_bad_tvar {
+                            let is_later_in_list = typevars.clone().skip(i).contains(&bad_typevar);
+                            report_invalid_typevar_default_reference(
+                                &self.context,
+                                class,
+                                typevar,
+                                bad_typevar,
+                                is_later_in_list,
+                            );
+                        }
+                    }
+                }
+
                 let scope = class.body_scope(self.db()).scope(self.db());
                 if let Some(parent) = scope.parent() {
                     // Check that the class's own type parameters don't shadow
@@ -1452,11 +1619,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 if let Some(other_typevar) =
                                     enclosing.binds_named_typevar(self.db(), name)
                                 {
-                                    report_rebound_typevar(
+                                    report_shadowed_type_variable(
                                         &self.context,
                                         name,
-                                        class,
-                                        class_node,
+                                        "class",
+                                        &class_node.name.id,
+                                        class.header_range(self.db()),
                                         other_typevar,
                                     );
                                 }
@@ -1471,11 +1639,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         for enclosing in enclosing_generic_contexts(self.db(), self.index, parent) {
                             if let Some(other_typevar) = enclosing.binds_typevar(self.db(), typevar)
                             {
-                                report_rebound_typevar(
+                                report_shadowed_type_variable(
                                     &self.context,
                                     typevar.name(self.db()),
-                                    class,
-                                    class_node,
+                                    "class",
+                                    &class_node.name.id,
+                                    class.header_range(self.db()),
                                     other_typevar,
                                 );
                             }
@@ -2436,46 +2605,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    /// Raise a diagnostic if the given type cannot be divided by zero.
-    ///
-    /// Expects the resolved type of the left side of the binary expression.
-    fn check_division_by_zero(
-        &mut self,
-        node: AnyNodeRef<'_>,
-        op: ast::Operator,
-        left: Type<'db>,
-    ) -> bool {
-        match left {
-            Type::LiteralValue(literal)
-                if matches!(
-                    literal.kind(),
-                    LiteralValueTypeKind::Bool(_) | LiteralValueTypeKind::Int(_)
-                ) => {}
-            Type::NominalInstance(instance)
-                if matches!(
-                    instance.known_class(self.db()),
-                    Some(KnownClass::Float | KnownClass::Int | KnownClass::Bool)
-                ) => {}
-            _ => return false,
-        }
-
-        let (op, by_zero) = match op {
-            ast::Operator::Div => ("divide", "by zero"),
-            ast::Operator::FloorDiv => ("floor divide", "by zero"),
-            ast::Operator::Mod => ("reduce", "modulo zero"),
-            _ => return false,
-        };
-
-        if let Some(builder) = self.context.report_lint(&DIVISION_BY_ZERO, node) {
-            builder.into_diagnostic(format_args!(
-                "Cannot {op} object of type `{}` {by_zero}",
-                left.display(self.db())
-            ));
-        }
-
-        true
-    }
-
     /// Add a binding for the given definition.
     ///
     /// Returns the result of the `infer_value_ty` closure, which is called with the declared type
@@ -2997,6 +3126,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         for parameter in &function.parameters {
             self.infer_definition(parameter);
         }
+
+        validate_paramspec_components(&self.context, &function.parameters, |expr| {
+            self.file_expression_type(expr)
+        });
+
         self.infer_body(&function.body);
 
         if let Some(returns) = function.returns.as_deref() {
@@ -3284,6 +3418,29 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             Type::FunctionLiteral(FunctionType::new(self.db(), function_literal, None, None));
         self.undecorated_type = Some(inferred_ty);
 
+        // Check that the function's own type parameters don't shadow
+        // type variables from enclosing scopes (by name).
+        if let Some(type_params) = &function.type_params {
+            let current_scope = self.scope().file_scope_id(self.db());
+            for type_param in type_params.iter() {
+                let param_name = type_param.name();
+                for enclosing in enclosing_generic_contexts(self.db(), self.index, current_scope) {
+                    if let Some(other_typevar) =
+                        enclosing.binds_named_typevar(self.db(), &param_name.id)
+                    {
+                        report_shadowed_type_variable(
+                            &self.context,
+                            &param_name.id,
+                            "function",
+                            &function.name.id,
+                            function.name.range(),
+                            other_typevar,
+                        );
+                    }
+                }
+            }
+        }
+
         for (decorator_ty, decorator_node) in decorator_types_and_nodes.iter().rev() {
             inferred_ty = self.apply_decorator(*decorator_ty, inferred_ty, decorator_node);
         }
@@ -3466,6 +3623,28 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let default_expr = default.as_ref();
         if let Some(annotation) = parameter.annotation.as_ref() {
             let declared_ty = self.file_expression_type(annotation);
+
+            // P.args and P.kwargs are only valid as annotations on *args and **kwargs,
+            // not on regular parameters.
+            if let Type::TypeVar(typevar) = declared_ty
+                && typevar.is_paramspec(self.db())
+                && let Some(attr) = typevar.paramspec_attr(self.db())
+            {
+                let name = typevar.name(self.db());
+                let (attr_name, variadic) = match attr {
+                    ParamSpecAttrKind::Args => ("args", "*args"),
+                    ParamSpecAttrKind::Kwargs => ("kwargs", "**kwargs"),
+                };
+                if let Some(builder) = self
+                    .context
+                    .report_lint(&INVALID_PARAMSPEC, annotation.as_ref())
+                {
+                    builder.into_diagnostic(format_args!(
+                        "`{name}.{attr_name}` is only valid for annotating `{variadic}`",
+                    ));
+                }
+            }
+
             if let Some(default_expr) = default_expr {
                 let default_expr = default_expr.as_ref();
                 let default_ty = self.file_expression_type(default_expr);
@@ -9022,6 +9201,49 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
+            // P.args and P.kwargs are only valid as annotations on *args and **kwargs.
+            if let Type::TypeVar(typevar) = annotated.inner_type()
+                && typevar.is_paramspec(self.db())
+                && let Some(attr) = typevar.paramspec_attr(self.db())
+            {
+                let name = typevar.name(self.db());
+                let (attr_name, variadic) = match attr {
+                    ParamSpecAttrKind::Args => ("args", "*args"),
+                    ParamSpecAttrKind::Kwargs => ("kwargs", "**kwargs"),
+                };
+                if let Some(builder) = self
+                    .context
+                    .report_lint(&INVALID_PARAMSPEC, annotation.as_ref())
+                {
+                    builder.into_diagnostic(format_args!(
+                        "`{name}.{attr_name}` is only valid for annotating `{variadic}` function parameters",
+                    ));
+                }
+            } else if let ast::Expr::Attribute(attr_expr) = annotation.as_ref()
+                && matches!(attr_expr.attr.as_str(), "args" | "kwargs")
+            {
+                let value_ty = self.expression_type(&attr_expr.value);
+                if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = value_ty
+                    && typevar.is_paramspec(self.db())
+                {
+                    let name = typevar.name(self.db());
+                    let attr_name = &attr_expr.attr;
+                    let variadic = if attr_name == "args" {
+                        "*args"
+                    } else {
+                        "**kwargs"
+                    };
+                    if let Some(builder) = self
+                        .context
+                        .report_lint(&INVALID_PARAMSPEC, annotation.as_ref())
+                    {
+                        builder.into_diagnostic(format_args!(
+                            "`{name}.{attr_name}` is only valid for annotating `{variadic}` function parameters",
+                        ));
+                    }
+                }
+            }
+
             let value_ty = value.as_ref().map(|value| {
                 self.infer_maybe_standalone_expression(
                     value,
@@ -9166,6 +9388,46 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             DeferredExpressionState::from(self.defer_annotations()),
         );
 
+        // P.args and P.kwargs are only valid as annotations on *args and **kwargs,
+        // not as variable annotations. Check both resolved type and AST form.
+        if let Type::TypeVar(typevar) = declared.inner_type()
+            && typevar.is_paramspec(self.db())
+            && let Some(attr) = typevar.paramspec_attr(self.db())
+        {
+            let name = typevar.name(self.db());
+            let (attr_name, variadic) = match attr {
+                ParamSpecAttrKind::Args => ("args", "*args"),
+                ParamSpecAttrKind::Kwargs => ("kwargs", "**kwargs"),
+            };
+            if let Some(builder) = self.context.report_lint(&INVALID_PARAMSPEC, annotation) {
+                builder.into_diagnostic(format_args!(
+                    "`{name}.{attr_name}` is only valid for annotating `{variadic}` function parameters",
+                ));
+            }
+        } else if let ast::Expr::Attribute(attr_expr) = annotation
+            && matches!(attr_expr.attr.as_str(), "args" | "kwargs")
+        {
+            // Also check the AST form for cases where P isn't bound (e.g., class body
+            // annotations). In this case, the type might not resolve to a TypeVar.
+            let value_ty = self.expression_type(&attr_expr.value);
+            if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = value_ty
+                && typevar.is_paramspec(self.db())
+            {
+                let name = typevar.name(self.db());
+                let attr_name = &attr_expr.attr;
+                let variadic = if attr_name == "args" {
+                    "*args"
+                } else {
+                    "**kwargs"
+                };
+                if let Some(builder) = self.context.report_lint(&INVALID_PARAMSPEC, annotation) {
+                    builder.into_diagnostic(format_args!(
+                        "`{name}.{attr_name}` is only valid for annotating `{variadic}` function parameters",
+                    ));
+                }
+            }
+        }
+
         let is_pep_613_type_alias = declared.inner_type().is_typealias_special_form();
 
         if is_pep_613_type_alias
@@ -9197,6 +9459,41 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             "`{name}` annotations are only allowed in class-body scopes",
                             name = qualifier.name()
                         ));
+                    }
+                }
+            }
+
+            // `Required`, `NotRequired`, and `ReadOnly` are only valid inside TypedDict classes.
+            if declared.qualifiers.intersects(
+                TypeQualifiers::REQUIRED | TypeQualifiers::NOT_REQUIRED | TypeQualifiers::READ_ONLY,
+            ) {
+                let in_typed_dict = current_scope.kind() == ScopeKind::Class
+                    && nearest_enclosing_class(self.db(), self.index, self.scope()).is_some_and(
+                        |class| {
+                            class.iter_mro(self.db(), None).any(|base| {
+                                matches!(
+                                    base,
+                                    ClassBase::TypedDict
+                                        | ClassBase::Dynamic(DynamicType::TodoFunctionalTypedDict)
+                                )
+                            })
+                        },
+                    );
+                if !in_typed_dict {
+                    for qualifier in [
+                        TypeQualifiers::REQUIRED,
+                        TypeQualifiers::NOT_REQUIRED,
+                        TypeQualifiers::READ_ONLY,
+                    ] {
+                        if declared.qualifiers.contains(qualifier)
+                            && let Some(builder) =
+                                self.context.report_lint(&INVALID_TYPE_FORM, annotation)
+                        {
+                            builder.into_diagnostic(format_args!(
+                                "`{name}` is only allowed in TypedDict fields",
+                                name = qualifier.name()
+                            ));
+                        }
                     }
                 }
             }
@@ -11583,7 +11880,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // Avoid false positives for the functional `TypedDict` form, which is currently
         // unsupported.
-        if let Some(Type::Dynamic(DynamicType::Todo(_))) = tcx.annotation {
+        if let Some(Type::Dynamic(DynamicType::TodoFunctionalTypedDict)) = tcx.annotation {
             return KnownClass::Dict
                 .to_specialized_instance(self.db(), &[Type::unknown(), Type::unknown()]);
         }
@@ -14118,809 +14415,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    fn infer_binary_expression(
-        &mut self,
-        binary: &ast::ExprBinOp,
-        tcx: TypeContext<'db>,
-    ) -> Type<'db> {
-        if tcx.is_typealias() {
-            return self.infer_pep_604_union_type_alias(binary, tcx);
-        }
-
-        let ast::ExprBinOp {
-            left,
-            op,
-            right,
-            range: _,
-            node_index: _,
-        } = binary;
-
-        let left_ty = self.infer_expression(left, TypeContext::default());
-        let right_ty = self.infer_expression(right, TypeContext::default());
-
-        self.infer_binary_expression_type(binary.into(), false, left_ty, right_ty, *op)
-            .unwrap_or_else(|| {
-                report_unsupported_binary_operation(&self.context, binary, left_ty, right_ty, *op);
-                Type::unknown()
-            })
-    }
-
-    fn infer_pep_604_union_type_alias(
-        &mut self,
-        node: &ast::ExprBinOp,
-        tcx: TypeContext<'db>,
-    ) -> Type<'db> {
-        let ast::ExprBinOp {
-            left,
-            op,
-            right,
-            range: _,
-            node_index: _,
-        } = node;
-
-        if *op != ast::Operator::BitOr {
-            // TODO diagnostic?
-            return Type::unknown();
-        }
-
-        let left_ty = self.infer_expression(left, tcx);
-        let right_ty = self.infer_expression(right, tcx);
-
-        // TODO this is overly aggressive; if the operands' `__or__` does not actually return a
-        // `UnionType` at runtime, we should ideally not infer one here. But this is unlikely to be
-        // a problem in practice: it would require someone having an explicitly annotated
-        // `TypeAlias`, which uses `X | Y` syntax, where the returned type is not actually a union.
-        // And attempting to enforce this more tightly showed a lot of potential false positives in
-        // the ecosystem.
-        if left_ty.is_equivalent_to(self.db(), right_ty) {
-            left_ty
-        } else {
-            UnionTypeInstance::from_value_expression_types(
-                self.db(),
-                [left_ty, right_ty],
-                self.scope(),
-                self.typevar_binding_context,
-            )
-        }
-    }
-
-    /// Maps an operation over each constraint of a constrained `TypeVar`.
-    ///
-    /// Returns the original `TypeVar` if each result is equivalent to its input constraint;
-    /// otherwise returns the union of all results.
-    fn map_constrained_typevar_constraints(
-        db: &'db dyn Db,
-        typevar: Type<'db>,
-        constraints: TypeVarConstraints<'db>,
-        mut op: impl FnMut(Type<'db>) -> Option<Type<'db>>,
-    ) -> Option<Type<'db>> {
-        let mut builder = UnionBuilder::new(db);
-        let mut any_different = false;
-
-        for constraint in constraints.elements(db) {
-            let result = op(*constraint)?;
-            if !result.is_equivalent_to(db, *constraint) {
-                any_different = true;
-            }
-            builder = builder.add(result);
-        }
-
-        Some(if any_different {
-            builder.build()
-        } else {
-            typevar
-        })
-    }
-
-    fn infer_binary_expression_type(
-        &mut self,
-        node: AnyNodeRef<'_>,
-        mut emitted_division_by_zero_diagnostic: bool,
-        left_ty: Type<'db>,
-        right_ty: Type<'db>,
-        op: ast::Operator,
-    ) -> Option<Type<'db>> {
-        // Check for division by zero; this doesn't change the inferred type for the expression, but
-        // may emit a diagnostic
-        if !emitted_division_by_zero_diagnostic
-            && matches!(
-                op,
-                ast::Operator::Div | ast::Operator::FloorDiv | ast::Operator::Mod
-            )
-            && right_ty.as_literal_value().is_some_and(|literal| {
-                literal.as_bool() == Some(false) || literal.as_int() == Some(0)
-            })
-        {
-            emitted_division_by_zero_diagnostic = self.check_division_by_zero(node, op, left_ty);
-        }
-
-        let pep_604_unions_allowed = || {
-            Program::get(self.db()).python_version(self.db()) >= PythonVersion::PY310
-                || self.file().is_stub(self.db())
-                || self.scope().scope(self.db()).in_type_checking_block()
-        };
-
-        match (left_ty, right_ty, op) {
-            (Type::Union(lhs_union), rhs, _) => lhs_union.try_map(self.db(), |lhs_element| {
-                self.infer_binary_expression_type(
-                    node,
-                    emitted_division_by_zero_diagnostic,
-                    *lhs_element,
-                    rhs,
-                    op,
-                )
-            }),
-            (lhs, Type::Union(rhs_union), _) => rhs_union.try_map(self.db(), |rhs_element| {
-                self.infer_binary_expression_type(
-                    node,
-                    emitted_division_by_zero_diagnostic,
-                    lhs,
-                    *rhs_element,
-                    op,
-                )
-            }),
-
-            (Type::TypeAlias(alias), rhs, _) => self.infer_binary_expression_type(
-                node,
-                emitted_division_by_zero_diagnostic,
-                alias.value_type(self.db()),
-                rhs,
-                op,
-            ),
-
-            (lhs, Type::TypeAlias(alias), _) => self.infer_binary_expression_type(
-                node,
-                emitted_division_by_zero_diagnostic,
-                lhs,
-                alias.value_type(self.db()),
-                op,
-            ),
-
-            // When both operands are the same constrained TypeVar (e.g., `T: (int, str)`),
-            // we check if the operation is valid for each constraint paired with itself.
-            // This is different from treating it as a union, where we'd check all combinations.
-            // For example, `T + T` where `T: (int, str)` should check `int + int` and `str + str`,
-            // not `int + str` which would fail.
-            //
-            // If each constraint's operation returns the same type as the constraint (e.g.,
-            // `int + int -> int`), we return the TypeVar to preserve the generic relationship.
-            // Otherwise, we return the union of the return types.
-            //
-            // TODO: We expect to replace this with more general support for handling constrained TypeVars
-            // in arbitrary method/function calls.
-            (Type::TypeVar(left_tvar), Type::TypeVar(right_tvar), _)
-                if left_tvar.identity(self.db()) == right_tvar.identity(self.db()) =>
-            {
-                match left_tvar.typevar(self.db()).bound_or_constraints(self.db()) {
-                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                        Self::map_constrained_typevar_constraints(
-                            self.db(),
-                            left_ty,
-                            constraints,
-                            |constraint| {
-                                self.infer_binary_expression_type(
-                                    node,
-                                    emitted_division_by_zero_diagnostic,
-                                    constraint,
-                                    constraint,
-                                    op,
-                                )
-                            },
-                        )
-                    }
-                    // For bounded TypeVars or unconstrained TypeVars, fall through to the default handling.
-                    _ => Type::try_call_bin_op(self.db(), left_ty, op, right_ty)
-                        .map(|outcome| outcome.return_type(self.db()))
-                        .ok(),
-                }
-            }
-
-            // When the left operand is a constrained TypeVar (e.g., `T: (int, float)`) and the
-            // right operand is not a TypeVar, we check if each constraint supports the operation
-            // with the right operand. For example, `T * 2` where `T: (int, float)` should check
-            // `int * 2` and `float * 2`, both of which work.
-            //
-            // TODO: We expect to replace this with more general support once we migrate to the new
-            // solver.
-            (Type::TypeVar(left_tvar), rhs, _) if !rhs.is_type_var() => {
-                match left_tvar.typevar(self.db()).bound_or_constraints(self.db()) {
-                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                        Self::map_constrained_typevar_constraints(
-                            self.db(),
-                            left_ty,
-                            constraints,
-                            |constraint| {
-                                self.infer_binary_expression_type(
-                                    node,
-                                    emitted_division_by_zero_diagnostic,
-                                    constraint,
-                                    rhs,
-                                    op,
-                                )
-                            },
-                        )
-                    }
-                    // For bounded TypeVars or unconstrained TypeVars, fall through to the default handling.
-                    _ => Type::try_call_bin_op(self.db(), left_ty, op, right_ty)
-                        .map(|outcome| outcome.return_type(self.db()))
-                        .ok(),
-                }
-            }
-
-            // When the right operand is a constrained TypeVar and the left operand is not a TypeVar,
-            // we check if each constraint supports the operation with the left operand.
-            (lhs, Type::TypeVar(right_tvar), _) if !lhs.is_type_var() => {
-                match right_tvar
-                    .typevar(self.db())
-                    .bound_or_constraints(self.db())
-                {
-                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                        Self::map_constrained_typevar_constraints(
-                            self.db(),
-                            right_ty,
-                            constraints,
-                            |constraint| {
-                                self.infer_binary_expression_type(
-                                    node,
-                                    emitted_division_by_zero_diagnostic,
-                                    lhs,
-                                    constraint,
-                                    op,
-                                )
-                            },
-                        )
-                    }
-                    // For bounded TypeVars or unconstrained TypeVars, fall through to the default handling.
-                    _ => Type::try_call_bin_op(self.db(), left_ty, op, right_ty)
-                        .map(|outcome| outcome.return_type(self.db()))
-                        .ok(),
-                }
-            }
-
-            // `try_call_bin_op` works for almost all `NewType`s, but not for `NewType`s of `float`
-            // and `complex`, where the concrete base type is a union. In that case it turns out
-            // the `self` types of the dunder methods in typeshed don't match, because they don't
-            // get the same `int | float` and `int | float | complex` special treatment that the
-            // positional arguments get. In those cases we need to explicitly delegate to the base
-            // type, so that it hits the `Type::Union` branches above.
-            (Type::NewTypeInstance(newtype), rhs, _) => {
-                Type::try_call_bin_op(self.db(), left_ty, op, right_ty)
-                    .map(|outcome| outcome.return_type(self.db()))
-                    .ok()
-                    .or_else(|| {
-                        self.infer_binary_expression_type(
-                            node,
-                            emitted_division_by_zero_diagnostic,
-                            newtype.concrete_base_type(self.db()),
-                            rhs,
-                            op,
-                        )
-                    })
-            }
-            (lhs, Type::NewTypeInstance(newtype), _) => {
-                Type::try_call_bin_op(self.db(), left_ty, op, right_ty)
-                    .map(|outcome| outcome.return_type(self.db()))
-                    .ok()
-                    .or_else(|| {
-                        self.infer_binary_expression_type(
-                            node,
-                            emitted_division_by_zero_diagnostic,
-                            lhs,
-                            newtype.concrete_base_type(self.db()),
-                            op,
-                        )
-                    })
-            }
-
-            // Non-todo Anys take precedence over Todos (as if we fix this `Todo` in the future,
-            // the result would then become Any or Unknown, respectively).
-            (div @ Type::Dynamic(DynamicType::Divergent(_)), _, _)
-            | (_, div @ Type::Dynamic(DynamicType::Divergent(_)), _) => Some(div),
-
-            (any @ Type::Dynamic(DynamicType::Any), _, _)
-            | (_, any @ Type::Dynamic(DynamicType::Any), _) => Some(any),
-
-            (unknown @ Type::Dynamic(DynamicType::Unknown), _, _)
-            | (_, unknown @ Type::Dynamic(DynamicType::Unknown), _) => Some(unknown),
-
-            (unknown @ Type::Dynamic(DynamicType::UnknownGeneric(_)), _, _)
-            | (_, unknown @ Type::Dynamic(DynamicType::UnknownGeneric(_)), _) => Some(unknown),
-
-            (typevar @ Type::Dynamic(DynamicType::UnspecializedTypeVar), _, _)
-            | (_, typevar @ Type::Dynamic(DynamicType::UnspecializedTypeVar), _) => Some(typevar),
-
-            (
-                todo @ Type::Dynamic(
-                    DynamicType::Todo(_)
-                    | DynamicType::TodoUnpack
-                    | DynamicType::TodoStarredExpression
-                    | DynamicType::TodoTypeVarTuple,
-                ),
-                _,
-                _,
-            )
-            | (
-                _,
-                todo @ Type::Dynamic(
-                    DynamicType::Todo(_)
-                    | DynamicType::TodoUnpack
-                    | DynamicType::TodoStarredExpression
-                    | DynamicType::TodoTypeVarTuple,
-                ),
-                _,
-            ) => Some(todo),
-
-            (Type::Never, _, _) | (_, Type::Never, _) => Some(Type::Never),
-
-            (Type::LiteralValue(left), Type::LiteralValue(right), _) => {
-                match (left.kind(), right.kind(), op) {
-                    (
-                        LiteralValueTypeKind::Int(n),
-                        LiteralValueTypeKind::Int(m),
-                        ast::Operator::Add,
-                    ) => Some(
-                        n.as_i64()
-                            .checked_add(m.as_i64())
-                            .map(Type::int_literal)
-                            .unwrap_or_else(|| KnownClass::Int.to_instance(self.db())),
-                    ),
-
-                    (
-                        LiteralValueTypeKind::Int(n),
-                        LiteralValueTypeKind::Int(m),
-                        ast::Operator::Sub,
-                    ) => Some(
-                        n.as_i64()
-                            .checked_sub(m.as_i64())
-                            .map(Type::int_literal)
-                            .unwrap_or_else(|| KnownClass::Int.to_instance(self.db())),
-                    ),
-
-                    (
-                        LiteralValueTypeKind::Int(n),
-                        LiteralValueTypeKind::Int(m),
-                        ast::Operator::Mult,
-                    ) => Some(
-                        n.as_i64()
-                            .checked_mul(m.as_i64())
-                            .map(Type::int_literal)
-                            .unwrap_or_else(|| KnownClass::Int.to_instance(self.db())),
-                    ),
-
-                    (
-                        LiteralValueTypeKind::Int(_),
-                        LiteralValueTypeKind::Int(_),
-                        ast::Operator::Div,
-                    ) => Some(KnownClass::Float.to_instance(self.db())),
-
-                    (
-                        LiteralValueTypeKind::Int(n),
-                        LiteralValueTypeKind::Int(m),
-                        ast::Operator::FloorDiv,
-                    ) => Some({
-                        let mut q = n.as_i64().checked_div(m.as_i64());
-                        let r = n.as_i64().checked_rem(m.as_i64());
-                        // Division works differently in Python than in Rust. If the result is negative and
-                        // there is a remainder, the division rounds down (instead of towards zero):
-                        if n.as_i64().is_negative() != m.as_i64().is_negative()
-                            && r.unwrap_or(0) != 0
-                        {
-                            q = q.map(|q| q - 1);
-                        }
-                        q.map(Type::int_literal)
-                            .unwrap_or_else(|| KnownClass::Int.to_instance(self.db()))
-                    }),
-
-                    (
-                        LiteralValueTypeKind::Int(n),
-                        LiteralValueTypeKind::Int(m),
-                        ast::Operator::Mod,
-                    ) => Some({
-                        let mut r = n.as_i64().checked_rem(m.as_i64());
-                        // Division works differently in Python than in Rust. If the result is negative and
-                        // there is a remainder, the division rounds down (instead of towards zero). Adjust
-                        // the remainder to compensate so that q * m + r == n:
-                        if n.as_i64().is_negative() != m.as_i64().is_negative()
-                            && r.unwrap_or(0) != 0
-                        {
-                            r = r.map(|x| x + m.as_i64());
-                        }
-                        r.map(Type::int_literal)
-                            .unwrap_or_else(|| KnownClass::Int.to_instance(self.db()))
-                    }),
-
-                    (
-                        LiteralValueTypeKind::Int(n),
-                        LiteralValueTypeKind::Int(m),
-                        ast::Operator::Pow,
-                    ) => Some({
-                        if m.as_i64() < 0 {
-                            KnownClass::Float.to_instance(self.db())
-                        } else {
-                            u32::try_from(m.as_i64())
-                                .ok()
-                                .and_then(|m| n.as_i64().checked_pow(m))
-                                .map(Type::int_literal)
-                                .unwrap_or_else(|| KnownClass::Int.to_instance(self.db()))
-                        }
-                    }),
-
-                    (
-                        LiteralValueTypeKind::Int(n),
-                        LiteralValueTypeKind::Int(m),
-                        ast::Operator::BitOr,
-                    ) => Some(Type::int_literal(n.as_i64() | m.as_i64())),
-
-                    (
-                        LiteralValueTypeKind::Int(n),
-                        LiteralValueTypeKind::Int(m),
-                        ast::Operator::BitAnd,
-                    ) => Some(Type::int_literal(n.as_i64() & m.as_i64())),
-
-                    (
-                        LiteralValueTypeKind::Int(n),
-                        LiteralValueTypeKind::Int(m),
-                        ast::Operator::BitXor,
-                    ) => Some(Type::int_literal(n.as_i64() ^ m.as_i64())),
-
-                    (
-                        LiteralValueTypeKind::Bytes(lhs),
-                        LiteralValueTypeKind::Bytes(rhs),
-                        ast::Operator::Add,
-                    ) => {
-                        let bytes = [lhs.value(self.db()), rhs.value(self.db())].concat();
-                        Some(Type::bytes_literal(self.db(), &bytes))
-                    }
-
-                    (
-                        LiteralValueTypeKind::String(lhs),
-                        LiteralValueTypeKind::String(rhs),
-                        ast::Operator::Add,
-                    ) => {
-                        let lhs_value = lhs.value(self.db()).to_string();
-                        let rhs_value = rhs.value(self.db());
-                        let ty =
-                            if lhs_value.len() + rhs_value.len() <= Self::MAX_STRING_LITERAL_SIZE {
-                                Type::string_literal(self.db(), &(lhs_value + rhs_value))
-                            } else {
-                                Type::literal_string()
-                            };
-                        Some(ty)
-                    }
-
-                    (
-                        LiteralValueTypeKind::String(_) | LiteralValueTypeKind::LiteralString,
-                        LiteralValueTypeKind::String(_) | LiteralValueTypeKind::LiteralString,
-                        ast::Operator::Add,
-                    ) => Some(Type::literal_string()),
-
-                    (
-                        LiteralValueTypeKind::String(s),
-                        LiteralValueTypeKind::Int(n),
-                        ast::Operator::Mult,
-                    )
-                    | (
-                        LiteralValueTypeKind::Int(n),
-                        LiteralValueTypeKind::String(s),
-                        ast::Operator::Mult,
-                    ) => {
-                        let ty = if n.as_i64() < 1 {
-                            Type::string_literal(self.db(), "")
-                        } else if let Ok(n) = usize::try_from(n.as_i64())
-                            && n.checked_mul(s.value(self.db()).len())
-                                .is_some_and(|new_length| {
-                                    new_length <= Self::MAX_STRING_LITERAL_SIZE
-                                })
-                        {
-                            let new_literal = s.value(self.db()).repeat(n);
-                            Type::string_literal(self.db(), &new_literal)
-                        } else {
-                            Type::literal_string()
-                        };
-                        Some(ty)
-                    }
-
-                    (
-                        LiteralValueTypeKind::LiteralString,
-                        LiteralValueTypeKind::Int(n),
-                        ast::Operator::Mult,
-                    )
-                    | (
-                        LiteralValueTypeKind::Int(n),
-                        LiteralValueTypeKind::LiteralString,
-                        ast::Operator::Mult,
-                    ) => {
-                        let ty = if n.as_i64() < 1 {
-                            Type::string_literal(self.db(), "")
-                        } else {
-                            Type::literal_string()
-                        };
-                        Some(ty)
-                    }
-
-                    (
-                        LiteralValueTypeKind::Bool(b1),
-                        LiteralValueTypeKind::Bool(b2),
-                        ast::Operator::BitOr,
-                    ) => Some(Type::bool_literal(b1 | b2)),
-
-                    (
-                        LiteralValueTypeKind::Bool(b1),
-                        LiteralValueTypeKind::Bool(b2),
-                        ast::Operator::BitAnd,
-                    ) => Some(Type::bool_literal(b1 & b2)),
-
-                    (
-                        LiteralValueTypeKind::Bool(b1),
-                        LiteralValueTypeKind::Bool(b2),
-                        ast::Operator::BitXor,
-                    ) => Some(Type::bool_literal(b1 ^ b2)),
-
-                    (
-                        LiteralValueTypeKind::Bool(b1),
-                        LiteralValueTypeKind::Bool(_) | LiteralValueTypeKind::Int(_),
-                        op,
-                    ) => self.infer_binary_expression_type(
-                        node,
-                        emitted_division_by_zero_diagnostic,
-                        Type::int_literal(i64::from(b1)),
-                        right_ty,
-                        op,
-                    ),
-
-                    (LiteralValueTypeKind::Int(_), LiteralValueTypeKind::Bool(b2), op) => self
-                        .infer_binary_expression_type(
-                            node,
-                            emitted_division_by_zero_diagnostic,
-                            left_ty,
-                            Type::int_literal(i64::from(b2)),
-                            op,
-                        ),
-
-                    (
-                        LiteralValueTypeKind::Int(n),
-                        LiteralValueTypeKind::Int(m),
-                        ast::Operator::LShift,
-                    ) if n.as_i64() == 0 && m.as_i64() >= 0 => Some(Type::int_literal(0)),
-
-                    (
-                        LiteralValueTypeKind::Int(n),
-                        LiteralValueTypeKind::Int(m),
-                        ast::Operator::LShift,
-                    ) => {
-                        let n = n.as_i64();
-
-                        // An additional overflow check beyond `checked_shl` is necessary
-                        // here, because `checked_shl` only rejects shift amounts >= 64;
-                        // it does not detect when significant bits are shifted into (or
-                        // past) the sign bit. For example, `1i64.checked_shl(63)` returns
-                        // `Some(i64::MIN)`, but Python's `1 << 63` is a large positive int.
-                        //
-                        // We compute the "headroom": the number of redundant sign-extension
-                        // bits minus one (for the sign bit itself). A shift is safe iff
-                        // `m <= headroom`.
-                        let headroom = if n >= 0 {
-                            n.leading_zeros().saturating_sub(1)
-                        } else {
-                            n.leading_ones().saturating_sub(1)
-                        };
-                        Some(
-                            u32::try_from(m.as_i64())
-                                .ok()
-                                .filter(|&m| m <= headroom)
-                                .and_then(|m| n.checked_shl(m))
-                                .map(Type::int_literal)
-                                .unwrap_or_else(|| KnownClass::Int.to_instance(self.db())),
-                        )
-                    }
-
-                    (
-                        LiteralValueTypeKind::Int(n),
-                        LiteralValueTypeKind::Int(m),
-                        ast::Operator::RShift,
-                    ) => {
-                        let n = n.as_i64();
-                        let result = match u32::try_from(m.as_i64()) {
-                            Ok(m) => Type::int_literal(n >> m.clamp(0, 63)),
-                            Err(_) if m.as_i64() > 0 => {
-                                Type::int_literal(if n >= 0 { 0 } else { -1 })
-                            }
-                            Err(_) => KnownClass::Int.to_instance(self.db()),
-                        };
-                        Some(result)
-                    }
-
-                    _ => Type::try_call_bin_op(self.db(), left_ty, op, right_ty)
-                        .map(|outcome| outcome.return_type(self.db()))
-                        .ok(),
-                }
-            }
-
-            (
-                Type::KnownInstance(KnownInstanceType::ConstraintSet(left)),
-                Type::KnownInstance(KnownInstanceType::ConstraintSet(right)),
-                ast::Operator::BitAnd,
-            ) => {
-                let constraints = ConstraintSetBuilder::new();
-                let result = constraints.into_owned(|constraints| {
-                    let left = constraints.load(left.constraints(self.db()));
-                    let right = constraints.load(right.constraints(self.db()));
-                    left.and(self.db(), constraints, || right)
-                });
-                Some(Type::KnownInstance(KnownInstanceType::ConstraintSet(
-                    InternedConstraintSet::new(self.db(), result),
-                )))
-            }
-
-            (
-                Type::KnownInstance(KnownInstanceType::ConstraintSet(left)),
-                Type::KnownInstance(KnownInstanceType::ConstraintSet(right)),
-                ast::Operator::BitOr,
-            ) => {
-                let constraints = ConstraintSetBuilder::new();
-                let result = constraints.into_owned(|constraints| {
-                    let left = constraints.load(left.constraints(self.db()));
-                    let right = constraints.load(right.constraints(self.db()));
-                    left.or(self.db(), constraints, || right)
-                });
-                Some(Type::KnownInstance(KnownInstanceType::ConstraintSet(
-                    InternedConstraintSet::new(self.db(), result),
-                )))
-            }
-
-            // PEP 604-style union types using the `|` operator.
-            (
-                Type::ClassLiteral(..)
-                | Type::SubclassOf(..)
-                | Type::GenericAlias(..)
-                | Type::SpecialForm(_)
-                | Type::KnownInstance(
-                    KnownInstanceType::UnionType(_)
-                    | KnownInstanceType::Literal(_)
-                    | KnownInstanceType::Annotated(_)
-                    | KnownInstanceType::TypeGenericAlias(_)
-                    | KnownInstanceType::Callable(_)
-                    | KnownInstanceType::TypeVar(_),
-                ),
-                Type::ClassLiteral(..)
-                | Type::SubclassOf(..)
-                | Type::GenericAlias(..)
-                | Type::SpecialForm(_)
-                | Type::KnownInstance(
-                    KnownInstanceType::UnionType(_)
-                    | KnownInstanceType::Literal(_)
-                    | KnownInstanceType::Annotated(_)
-                    | KnownInstanceType::TypeGenericAlias(_)
-                    | KnownInstanceType::Callable(_)
-                    | KnownInstanceType::TypeVar(_),
-                ),
-                ast::Operator::BitOr,
-            ) if pep_604_unions_allowed() => {
-                if left_ty.is_equivalent_to(self.db(), right_ty) {
-                    Some(left_ty)
-                } else {
-                    Some(UnionTypeInstance::from_value_expression_types(
-                        self.db(),
-                        [left_ty, right_ty],
-                        self.scope(),
-                        self.typevar_binding_context,
-                    ))
-                }
-            }
-            (
-                Type::ClassLiteral(..)
-                | Type::SubclassOf(..)
-                | Type::GenericAlias(..)
-                | Type::KnownInstance(..)
-                | Type::SpecialForm(..),
-                Type::NominalInstance(instance),
-                ast::Operator::BitOr,
-            )
-            | (
-                Type::NominalInstance(instance),
-                Type::ClassLiteral(..)
-                | Type::SubclassOf(..)
-                | Type::GenericAlias(..)
-                | Type::KnownInstance(..)
-                | Type::SpecialForm(..),
-                ast::Operator::BitOr,
-            ) if pep_604_unions_allowed()
-                && instance.has_known_class(self.db(), KnownClass::NoneType) =>
-            {
-                Some(UnionTypeInstance::from_value_expression_types(
-                    self.db(),
-                    [left_ty, right_ty],
-                    self.scope(),
-                    self.typevar_binding_context,
-                ))
-            }
-
-            // We avoid calling `type.__(r)or__`, as typeshed annotates these methods as
-            // accepting `Any` (since typeforms are inexpressable in the type system currently).
-            // This means that many common errors would not be caught if we fell back to typeshed's stubs here.
-            //
-            // Note that if a class had a custom metaclass that overrode `__(r)or__`, we would also ignore
-            // that custom method as we'd take one of the earlier branches.
-            // This seems like it's probably rare enough that it's acceptable, however.
-            (
-                Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..),
-                _,
-                ast::Operator::BitOr,
-            )
-            | (
-                _,
-                Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..),
-                ast::Operator::BitOr,
-            ) if pep_604_unions_allowed() => Type::try_call_bin_op_with_policy(
-                self.db(),
-                left_ty,
-                ast::Operator::BitOr,
-                right_ty,
-                MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
-            )
-            .ok()
-            .map(|binding| binding.return_type(self.db())),
-
-            // We've handled all of the special cases that we support for literals, so we need to
-            // fall back on looking for dunder methods on one of the operand types.
-            (
-                Type::FunctionLiteral(_)
-                | Type::Callable(..)
-                | Type::BoundMethod(_)
-                | Type::WrapperDescriptor(_)
-                | Type::KnownBoundMethod(_)
-                | Type::DataclassDecorator(_)
-                | Type::DataclassTransformer(_)
-                | Type::ModuleLiteral(_)
-                | Type::ClassLiteral(_)
-                | Type::GenericAlias(_)
-                | Type::SubclassOf(_)
-                | Type::NominalInstance(_)
-                | Type::ProtocolInstance(_)
-                | Type::SpecialForm(_)
-                | Type::KnownInstance(_)
-                | Type::PropertyInstance(_)
-                | Type::Intersection(_)
-                | Type::AlwaysTruthy
-                | Type::AlwaysFalsy
-                | Type::LiteralValue(_)
-                | Type::BoundSuper(_)
-                | Type::TypeVar(_)
-                | Type::TypeIs(_)
-                | Type::TypeGuard(_)
-                | Type::TypedDict(_),
-                Type::FunctionLiteral(_)
-                | Type::Callable(..)
-                | Type::BoundMethod(_)
-                | Type::WrapperDescriptor(_)
-                | Type::KnownBoundMethod(_)
-                | Type::DataclassDecorator(_)
-                | Type::DataclassTransformer(_)
-                | Type::ModuleLiteral(_)
-                | Type::ClassLiteral(_)
-                | Type::GenericAlias(_)
-                | Type::SubclassOf(_)
-                | Type::NominalInstance(_)
-                | Type::ProtocolInstance(_)
-                | Type::SpecialForm(_)
-                | Type::KnownInstance(_)
-                | Type::PropertyInstance(_)
-                | Type::Intersection(_)
-                | Type::AlwaysTruthy
-                | Type::AlwaysFalsy
-                | Type::LiteralValue(_)
-                | Type::BoundSuper(_)
-                | Type::TypeVar(_)
-                | Type::TypeIs(_)
-                | Type::TypeGuard(_)
-                | Type::TypedDict(_),
-                op,
-            ) => Type::try_call_bin_op(self.db(), left_ty, op, right_ty)
-                .map(|outcome| outcome.return_type(self.db()))
-                .ok(),
-        }
-    }
-
     fn infer_boolean_expression(&mut self, bool_op: &ast::ExprBoolOp) -> Type<'db> {
         let ast::ExprBoolOp {
             range: _,
@@ -15037,914 +14531,38 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 let range = TextRange::new(left.start(), right.end());
 
-                let ty = builder
-                    .infer_binary_type_comparison(
-                        left_ty,
-                        *op,
-                        right_ty,
+                let ty = comparisons::infer_binary_type_comparison(
+                    &builder.context,
+                    left_ty,
+                    *op,
+                    right_ty,
+                    range,
+                    &BinaryComparisonVisitor::new(Ok(Type::bool_literal(true))),
+                )
+                .unwrap_or_else(|error| {
+                    report_unsupported_comparison(
+                        &builder.context,
+                        &error,
                         range,
-                        &BinaryComparisonVisitor::new(Ok(Type::bool_literal(true))),
-                    )
-                    .unwrap_or_else(|error| {
-                        report_unsupported_comparison(
-                            &builder.context,
-                            &error,
-                            range,
-                            left,
-                            right,
-                            left_ty,
-                            right_ty,
-                        );
+                        left,
+                        right,
+                        left_ty,
+                        right_ty,
+                    );
 
-                        match op {
-                            // `in, not in, is, is not` always return bool instances
-                            ast::CmpOp::In
-                            | ast::CmpOp::NotIn
-                            | ast::CmpOp::Is
-                            | ast::CmpOp::IsNot => KnownClass::Bool.to_instance(builder.db()),
-                            // Other operators can return arbitrary types
-                            _ => Type::unknown(),
+                    match op {
+                        // `in, not in, is, is not` always return bool instances
+                        ast::CmpOp::In | ast::CmpOp::NotIn | ast::CmpOp::Is | ast::CmpOp::IsNot => {
+                            KnownClass::Bool.to_instance(builder.db())
                         }
-                    });
+                        // Other operators can return arbitrary types
+                        _ => Type::unknown(),
+                    }
+                });
 
                 (ty, range)
             },
         )
-    }
-
-    fn infer_binary_intersection_type_comparison(
-        &mut self,
-        intersection: IntersectionType<'db>,
-        op: ast::CmpOp,
-        other: Type<'db>,
-        intersection_on: IntersectionOn,
-        range: TextRange,
-        visitor: &BinaryComparisonVisitor<'db>,
-    ) -> Result<Type<'db>, UnsupportedComparisonError<'db>> {
-        enum State<'db> {
-            // We have not seen any positive elements (yet)
-            NoPositiveElements,
-            // The operator was unsupported on all elements that we have seen so far.
-            // Contains the first error we encountered.
-            UnsupportedOnAllElements(UnsupportedComparisonError<'db>),
-            // The operator was supported on at least one positive element.
-            Supported,
-        }
-
-        // If a comparison yields a definitive true/false answer on a (positive) part
-        // of an intersection type, it will also yield a definitive answer on the full
-        // intersection type, which is even more specific.
-        for pos in intersection.positive(self.db()) {
-            let result = match intersection_on {
-                IntersectionOn::Left => {
-                    self.infer_binary_type_comparison(*pos, op, other, range, visitor)
-                }
-                IntersectionOn::Right => {
-                    self.infer_binary_type_comparison(other, op, *pos, range, visitor)
-                }
-            };
-
-            if result
-                .ok()
-                .and_then(Type::as_literal_value)
-                .is_some_and(LiteralValueType::is_bool)
-            {
-                return result;
-            }
-        }
-
-        // For negative contributions to the intersection type, there are only a few
-        // special cases that allow us to narrow down the result type of the comparison.
-        for neg in intersection.negative(self.db()) {
-            let result = match intersection_on {
-                IntersectionOn::Left => self
-                    .infer_binary_type_comparison(*neg, op, other, range, visitor)
-                    .ok(),
-                IntersectionOn::Right => self
-                    .infer_binary_type_comparison(other, op, *neg, range, visitor)
-                    .ok(),
-            }
-            .and_then(Type::as_literal_value_kind);
-
-            match (op, result) {
-                (ast::CmpOp::Is, Some(LiteralValueTypeKind::Bool(true))) => {
-                    return Ok(Type::bool_literal(false));
-                }
-                (ast::CmpOp::IsNot, Some(LiteralValueTypeKind::Bool(false))) => {
-                    return Ok(Type::bool_literal(true));
-                }
-                _ => {}
-            }
-        }
-
-        // If none of the simplifications above apply, we still need to return *some*
-        // result type for the comparison 'T_inter `op` T_other' (or reversed), where
-        //
-        //    T_inter = P1 & P2 & ... & Pn & ~N1 & ~N2 & ... & ~Nm
-        //
-        // is the intersection type. If f(T) is the function that computes the result
-        // type of a `op`-comparison with `T_other`, we are interested in f(T_inter).
-        // Since we can't compute it exactly, we return the following approximation:
-        //
-        //   f(T_inter) = f(P1) & f(P2) & ... & f(Pn)
-        //
-        // The reason for this is the following: In general, for any function 'f', the
-        // set f(A) & f(B) is *larger than or equal to* the set f(A & B). This means
-        // that we will return a type that is possibly wider than it could be, but
-        // never wrong.
-        //
-        // However, we do have to leave out the negative contributions. If we were to
-        // add a contribution like ~f(N1), we would potentially infer result types
-        // that are too narrow.
-        //
-        // As an example for this, consider the intersection type `int & ~Literal[1]`.
-        // If 'f' would be the `==`-comparison with 2, we obviously can't tell if that
-        // answer would be true or false, so we need to return `bool`. And indeed, we
-        // we have (glossing over notational details):
-        //
-        //   f(int & ~1)
-        //       = f({..., -1, 0, 2, 3, ...})
-        //       = {..., False, False, True, False, ...}
-        //       = bool
-        //
-        // On the other hand, if we were to compute
-        //
-        //   f(int) & ~f(1)
-        //       = bool & ~False
-        //       = True
-        //
-        // we would get a result type `Literal[True]` which is too narrow.
-        //
-        let mut builder = IntersectionBuilder::new(self.db());
-
-        builder = builder.add_positive(KnownClass::Bool.to_instance(self.db()));
-
-        let mut state = State::NoPositiveElements;
-
-        for pos in intersection.positive(self.db()) {
-            let result = match intersection_on {
-                IntersectionOn::Left => {
-                    self.infer_binary_type_comparison(*pos, op, other, range, visitor)
-                }
-                IntersectionOn::Right => {
-                    self.infer_binary_type_comparison(other, op, *pos, range, visitor)
-                }
-            };
-
-            match result {
-                Ok(ty) => {
-                    state = State::Supported;
-                    builder = builder.add_positive(ty);
-                }
-                Err(error) => {
-                    match state {
-                        State::NoPositiveElements => {
-                            // This is the first positive element, but the operation is not supported.
-                            // Store the error and continue.
-                            state = State::UnsupportedOnAllElements(error);
-                        }
-                        State::UnsupportedOnAllElements(_) => {
-                            // We already have an error stored, and continue to see elements on which
-                            // the operator is not supported. Continue with the same state (only keep
-                            // the first error).
-                        }
-                        State::Supported => {
-                            // We previously saw a positive element that supported the operator,
-                            // so the overall operation is still supported.
-                        }
-                    }
-                }
-            }
-        }
-
-        match state {
-            State::Supported => Ok(builder.build()),
-            State::NoPositiveElements => {
-                // We didn't see any positive elements, check if the operation is supported on `object`:
-                match intersection_on {
-                    IntersectionOn::Left => {
-                        self.infer_binary_type_comparison(Type::object(), op, other, range, visitor)
-                    }
-                    IntersectionOn::Right => {
-                        self.infer_binary_type_comparison(other, op, Type::object(), range, visitor)
-                    }
-                }
-            }
-            State::UnsupportedOnAllElements(error) => Err(error),
-        }
-    }
-
-    /// Infers the type of a binary comparison (e.g. 'left == right'). See
-    /// `infer_compare_expression` for the higher level logic dealing with multi-comparison
-    /// expressions.
-    ///
-    /// If the operation is not supported, return None (we need upstream context to emit a
-    /// diagnostic).
-    fn infer_binary_type_comparison(
-        &mut self,
-        left: Type<'db>,
-        op: ast::CmpOp,
-        right: Type<'db>,
-        range: TextRange,
-        visitor: &BinaryComparisonVisitor<'db>,
-    ) -> Result<Type<'db>, UnsupportedComparisonError<'db>> {
-        // Note: identity (is, is not) for equal builtin types is unreliable and not part of the
-        // language spec.
-        // - `[ast::CompOp::Is]`: return `false` if unequal, `bool` if equal
-        // - `[ast::CompOp::IsNot]`: return `true` if unequal, `bool` if equal
-        let db = self.db();
-        let try_dunder = |inference: &mut Self, policy: MemberLookupPolicy| {
-            let rich_comparison = |op| inference.infer_rich_comparison(left, right, op, policy);
-            let membership_test_comparison = |op, range: TextRange| {
-                inference.infer_membership_test_comparison(left, right, op, range)
-            };
-
-            match op {
-                ast::CmpOp::Eq => rich_comparison(RichCompareOperator::Eq),
-                ast::CmpOp::NotEq => rich_comparison(RichCompareOperator::Ne),
-                ast::CmpOp::Lt => rich_comparison(RichCompareOperator::Lt),
-                ast::CmpOp::LtE => rich_comparison(RichCompareOperator::Le),
-                ast::CmpOp::Gt => rich_comparison(RichCompareOperator::Gt),
-                ast::CmpOp::GtE => rich_comparison(RichCompareOperator::Ge),
-                ast::CmpOp::In => {
-                    membership_test_comparison(MembershipTestCompareOperator::In, range)
-                }
-                ast::CmpOp::NotIn => {
-                    membership_test_comparison(MembershipTestCompareOperator::NotIn, range)
-                }
-                ast::CmpOp::Is => {
-                    if left.is_disjoint_from(db, right) {
-                        Ok(Type::bool_literal(false))
-                    } else if left.is_singleton(db) && left.is_equivalent_to(db, right) {
-                        Ok(Type::bool_literal(true))
-                    } else {
-                        Ok(KnownClass::Bool.to_instance(db))
-                    }
-                }
-                ast::CmpOp::IsNot => {
-                    if left.is_disjoint_from(db, right) {
-                        Ok(Type::bool_literal(true))
-                    } else if left.is_singleton(db) && left.is_equivalent_to(db, right) {
-                        Ok(Type::bool_literal(false))
-                    } else {
-                        Ok(KnownClass::Bool.to_instance(db))
-                    }
-                }
-            }
-        };
-
-        let comparison_result = match (left, right) {
-            (Type::Union(union), other) => {
-                let mut builder = UnionBuilder::new(self.db());
-                for element in union.elements(self.db()) {
-                    builder =
-                        builder.add(self.infer_binary_type_comparison(*element, op, other, range, visitor)?);
-                }
-                Some(Ok(builder.build()))
-            }
-            (other, Type::Union(union)) => {
-                let mut builder = UnionBuilder::new(self.db());
-                for element in union.elements(self.db()) {
-                    builder =
-                        builder.add(self.infer_binary_type_comparison(other, op, *element, range, visitor)?);
-                }
-                Some(Ok(builder.build()))
-            }
-
-            (Type::Intersection(intersection), right) => {
-                Some(self.infer_binary_intersection_type_comparison(
-                    intersection,
-                    op,
-                    right,
-                    IntersectionOn::Left,
-                    range,
-                    visitor,
-                ).map_err(|err|UnsupportedComparisonError { op, left_ty: left, right_ty: err.right_ty }))
-            }
-            (left, Type::Intersection(intersection)) => {
-                Some(self.infer_binary_intersection_type_comparison(
-                    intersection,
-                    op,
-                    left,
-                    IntersectionOn::Right,
-                    range,
-                    visitor,
-                ).map_err(|err|UnsupportedComparisonError { op, left_ty: err.left_ty, right_ty: right }))
-            }
-
-            (Type::TypeAlias(alias), right) => Some(
-                visitor.visit((left, op, right), || { self.infer_binary_type_comparison(
-                    alias.value_type(self.db()),
-                    op,
-                    right,
-                    range,
-                    visitor,
-                )
-            })),
-
-            (left, Type::TypeAlias(alias)) => Some(
-                visitor.visit((left, op, right), || { self.infer_binary_type_comparison(
-                    left,
-                    op,
-                    alias.value_type(self.db()),
-                    range,
-                    visitor,
-                )
-            })),
-
-            // `try_dunder` works for almost all `NewType`s, but not for `NewType`s of `float` and
-            // `complex`, where the concrete base type is a union. In that case it turns out the
-            // `self` types of the dunder methods in typeshed don't match, because they don't get
-            // the same `int | float` and `int | float | complex` special treatment that the
-            // positional arguments get. In those cases we need to explicitly delegate to the base
-            // type, so that it hits the `Type::Union` branches above.
-            (Type::NewTypeInstance(newtype), right) => Some(
-                try_dunder(self, MemberLookupPolicy::default()).or_else(|_| {
-                    visitor.visit((left, op, right), || {
-                        self.infer_binary_type_comparison(
-                            newtype.concrete_base_type(self.db()),
-                            op,
-                            right,
-                            range,
-                            visitor,
-                        )
-                    })
-                }),
-            ),
-            (left, Type::NewTypeInstance(newtype)) => Some(
-                try_dunder(self, MemberLookupPolicy::default()).or_else(|_| {
-                    visitor.visit((left, op, right), || {
-                        self.infer_binary_type_comparison(
-                            left,
-                            op,
-                            newtype.concrete_base_type(self.db()),
-                            range,
-                            visitor,
-                        )
-                    })
-                }),
-            ),
-
-            // Similar to `NewType`s, `TypeVar`s with union bounds (like `bound=float` which becomes
-            // `int | float`) need to delegate to the bound type.
-            //
-            // When both operands are the same bounded TypeVar, we check the comparison on the bound
-            // type paired with itself.
-            (Type::TypeVar(left_tvar), Type::TypeVar(right_tvar))
-                if left_tvar.identity(self.db()) == right_tvar.identity(self.db()) =>
-            {
-                match left_tvar.typevar(self.db()).bound_or_constraints(self.db()) {
-                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => Some(
-                        try_dunder(self, MemberLookupPolicy::default()).or_else(|_| {
-                            visitor.visit((left, op, right), || {
-                                self.infer_binary_type_comparison(bound, op, bound, range, visitor)
-                            })
-                        }),
-                    ),
-                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                        // For constrained TypeVars, check each constraint paired with itself.
-                        let mut builder = UnionBuilder::new(self.db());
-                        for &constraint in constraints.elements(self.db()) {
-                            builder = builder.add(self.infer_binary_type_comparison(
-                                constraint,
-                                op,
-                                constraint,
-                                range,
-                                visitor,
-                            )?);
-                        }
-                        Some(Ok(builder.build()))
-                    }
-                    None => None, // Fall through to default handling
-                }
-            }
-            // When the left operand is a bounded TypeVar and the right is not a TypeVar,
-            // delegate to the bound type.
-            (Type::TypeVar(left_tvar), right) if !right.is_type_var() => {
-                match left_tvar.typevar(self.db()).bound_or_constraints(self.db()) {
-                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => Some(
-                        try_dunder(self, MemberLookupPolicy::default()).or_else(|_| {
-                            visitor.visit((left, op, right), || {
-                                self.infer_binary_type_comparison(bound, op, right, range, visitor)
-                            })
-                        }),
-                    ),
-                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                        let mut builder = UnionBuilder::new(self.db());
-                        for &constraint in constraints.elements(self.db()) {
-                            builder = builder.add(self.infer_binary_type_comparison(
-                                constraint, op, right, range, visitor,
-                            )?);
-                        }
-                        Some(Ok(builder.build()))
-                    }
-                    None => None,
-                }
-            }
-            // When the right operand is a bounded TypeVar and the left is not a TypeVar,
-            // delegate to the bound type.
-            (left, Type::TypeVar(right_tvar)) if !left.is_type_var() => {
-                match right_tvar.typevar(self.db()).bound_or_constraints(self.db()) {
-                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => Some(
-                        try_dunder(self, MemberLookupPolicy::default()).or_else(|_| {
-                            visitor.visit((left, op, right), || {
-                                self.infer_binary_type_comparison(left, op, bound, range, visitor)
-                            })
-                        }),
-                    ),
-                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                        let mut builder = UnionBuilder::new(self.db());
-                        for &constraint in constraints.elements(self.db()) {
-                            builder = builder.add(self.infer_binary_type_comparison(
-                                left, op, constraint, range, visitor,
-                            )?);
-                        }
-                        Some(Ok(builder.build()))
-                    }
-                    None => None,
-                }
-            }
-
-            (Type::LiteralValue(left_literal), Type::LiteralValue(right_literal)) => match (left_literal.kind(), right_literal.kind()) {
-                (LiteralValueTypeKind::Int(n), LiteralValueTypeKind::Int(m)) => Some(match op {
-                    ast::CmpOp::Eq => Ok(Type::bool_literal(n == m)),
-                    ast::CmpOp::NotEq => Ok(Type::bool_literal(n != m)),
-                    ast::CmpOp::Lt => Ok(Type::bool_literal(n < m)),
-                    ast::CmpOp::LtE => Ok(Type::bool_literal(n <= m)),
-                    ast::CmpOp::Gt => Ok(Type::bool_literal(n > m)),
-                    ast::CmpOp::GtE => Ok(Type::bool_literal(n >= m)),
-                    // We cannot say that two equal int Literals will return True from an `is` or `is not` comparison.
-                    // Even if they are the same value, they may not be the same object.
-                    ast::CmpOp::Is => {
-                        if n == m {
-                            Ok(KnownClass::Bool.to_instance(self.db()))
-                        } else {
-                            Ok(Type::bool_literal(false))
-                        }
-                    }
-                    ast::CmpOp::IsNot => {
-                        if n == m {
-                            Ok(KnownClass::Bool.to_instance(self.db()))
-                        } else {
-                            Ok(Type::bool_literal(true))
-                        }
-                    }
-                    // Undefined for (int, int)
-                    ast::CmpOp::In | ast::CmpOp::NotIn => Err(UnsupportedComparisonError {
-                        op,
-                        left_ty: left,
-                        right_ty: right,
-                    }),
-                }),
-                // Booleans are coded as integers (False = 0, True = 1)
-                (LiteralValueTypeKind::Int(n), LiteralValueTypeKind::Bool(b)) => {
-                    Some(self.infer_binary_type_comparison(
-                        Type::int_literal(n.as_i64()),
-                        op,
-                        Type::int_literal(i64::from(b)),
-                        range,
-                        visitor,
-                    ).map_err(|_|UnsupportedComparisonError {op, left_ty: left, right_ty: right}))
-                }
-                (LiteralValueTypeKind::Bool(b), LiteralValueTypeKind::Int(m)) => {
-                    Some(self.infer_binary_type_comparison(
-                        Type::int_literal(i64::from(b)),
-                        op,
-                        Type::int_literal(m.as_i64()),
-                        range,
-                        visitor,
-                    ).map_err(|_|UnsupportedComparisonError {op, left_ty: left, right_ty: right}))
-                }
-                (LiteralValueTypeKind::Bool(a), LiteralValueTypeKind::Bool(b)) => {
-                    Some(self.infer_binary_type_comparison(
-                        Type::int_literal(i64::from(a)),
-                        op,
-                        Type::int_literal(i64::from(b)),
-                        range,
-                        visitor,
-                    ).map_err(|_|UnsupportedComparisonError {op, left_ty: left, right_ty: right}))
-                }
-
-                (LiteralValueTypeKind::String(salsa_s1), LiteralValueTypeKind::String(salsa_s2)) => {
-                    let s1 = salsa_s1.value(self.db());
-                    let s2 = salsa_s2.value(self.db());
-                    let result = match op {
-                        ast::CmpOp::Eq => Type::bool_literal(s1 == s2),
-                        ast::CmpOp::NotEq => Type::bool_literal(s1 != s2),
-                        ast::CmpOp::Lt => Type::bool_literal(s1 < s2),
-                        ast::CmpOp::LtE => Type::bool_literal(s1 <= s2),
-                        ast::CmpOp::Gt => Type::bool_literal(s1 > s2),
-                        ast::CmpOp::GtE => Type::bool_literal(s1 >= s2),
-                        ast::CmpOp::In => Type::bool_literal(s2.contains(s1)),
-                        ast::CmpOp::NotIn => Type::bool_literal(!s2.contains(s1)),
-                        ast::CmpOp::Is => {
-                            if s1 == s2 {
-                                KnownClass::Bool.to_instance(self.db())
-                            } else {
-                                Type::bool_literal(false)
-                            }
-                        }
-                        ast::CmpOp::IsNot => {
-                            if s1 == s2 {
-                                KnownClass::Bool.to_instance(self.db())
-                            } else {
-                                Type::bool_literal(true)
-                            }
-                        }
-                    };
-                    Some(Ok(result))
-                }
-
-                (LiteralValueTypeKind::Bytes(salsa_b1), LiteralValueTypeKind::Bytes(salsa_b2)) => {
-                    let b1 = salsa_b1.value(self.db());
-                    let b2 = salsa_b2.value(self.db());
-                    let result = match op {
-                        ast::CmpOp::Eq => Type::bool_literal(b1 == b2),
-                        ast::CmpOp::NotEq => Type::bool_literal(b1 != b2),
-                        ast::CmpOp::Lt => Type::bool_literal(b1 < b2),
-                        ast::CmpOp::LtE => Type::bool_literal(b1 <= b2),
-                        ast::CmpOp::Gt => Type::bool_literal(b1 > b2),
-                        ast::CmpOp::GtE => Type::bool_literal(b1 >= b2),
-                        ast::CmpOp::In => {
-                            Type::bool_literal(memchr::memmem::find(b2, b1).is_some())
-                        }
-                        ast::CmpOp::NotIn => {
-                            Type::bool_literal(memchr::memmem::find(b2, b1).is_none())
-                        }
-                        ast::CmpOp::Is => {
-                            if b1 == b2 {
-                                KnownClass::Bool.to_instance(self.db())
-                            } else {
-                                Type::bool_literal(false)
-                            }
-                        }
-                        ast::CmpOp::IsNot => {
-                            if b1 == b2 {
-                                KnownClass::Bool.to_instance(self.db())
-                            } else {
-                                Type::bool_literal(true)
-                            }
-                        }
-                    };
-                    Some(Ok(result))
-                }
-
-                (LiteralValueTypeKind::Enum(literal_1), LiteralValueTypeKind::Enum(literal_2))
-                    if op == ast::CmpOp::Eq =>
-                {
-                    Some(Ok(match try_dunder(self, MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK) {
-                        Ok(ty) => ty,
-                        Err(_) => Type::bool_literal(literal_1 == literal_2),
-                    }))
-                }
-                (LiteralValueTypeKind::Enum(literal_1), LiteralValueTypeKind::Enum(literal_2))
-                    if op == ast::CmpOp::NotEq =>
-                {
-                    Some(Ok(match try_dunder(self, MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK) {
-                        Ok(ty) => ty,
-                        Err(_) => Type::bool_literal(literal_1 != literal_2),
-                    }))
-                }
-
-                _ => None
-            }
-
-            (
-                Type::KnownInstance(KnownInstanceType::ConstraintSet(left)),
-                Type::KnownInstance(KnownInstanceType::ConstraintSet(right)),
-            ) => {
-                let constraints = ConstraintSetBuilder::new();
-                let left = constraints.load(left.constraints(self.db()));
-                let right = constraints.load(right.constraints(self.db()));
-                let result = left.iff(self.db(), &constraints, right);
-                let equivalent = result.is_always_satisfied(self.db());
-                match op {
-                    ast::CmpOp::Eq => Some(Ok(Type::bool_literal(equivalent))),
-                    ast::CmpOp::NotEq => Some(Ok(Type::bool_literal(!equivalent))),
-                    _ => None,
-                }
-            }
-
-            (
-                Type::NominalInstance(nominal1),
-                Type::NominalInstance(nominal2),
-            ) => nominal1.tuple_spec(self.db())
-                .and_then(|lhs_tuple| Some((lhs_tuple, nominal2.tuple_spec(self.db())?)))
-                .map(|(lhs_tuple, rhs_tuple)| {
-                    let mut tuple_rich_comparison =
-                        |rich_op| visitor.visit((left, op, right), || {
-                            self.infer_tuple_rich_comparison(&lhs_tuple, rich_op, &rhs_tuple, range, visitor)
-                        });
-
-                    match op {
-                        ast::CmpOp::Eq => tuple_rich_comparison(RichCompareOperator::Eq),
-                        ast::CmpOp::NotEq => tuple_rich_comparison(RichCompareOperator::Ne),
-                        ast::CmpOp::Lt => tuple_rich_comparison(RichCompareOperator::Lt),
-                        ast::CmpOp::LtE => tuple_rich_comparison(RichCompareOperator::Le),
-                        ast::CmpOp::Gt => tuple_rich_comparison(RichCompareOperator::Gt),
-                        ast::CmpOp::GtE => tuple_rich_comparison(RichCompareOperator::Ge),
-                        ast::CmpOp::In | ast::CmpOp::NotIn => {
-                            let mut any_eq = false;
-                            let mut any_ambiguous = false;
-
-                            for ty in rhs_tuple.iter_all_elements() {
-                                let eq_result = self.infer_binary_type_comparison(
-                                left,
-                                ast::CmpOp::Eq,
-                                ty,
-                                range,
-                                visitor
-                            ).expect("infer_binary_type_comparison should never return None for `CmpOp::Eq`");
-
-                                match eq_result {
-                                    todo @ Type::Dynamic(DynamicType::Todo(_)) => return Ok(todo),
-                                    // It's okay to ignore errors here because Python doesn't call `__bool__`
-                                    // for different union variants. Instead, this is just for us to
-                                    // evaluate a possibly truthy value to `false` or `true`.
-                                    ty => match ty.bool(self.db()) {
-                                        Truthiness::AlwaysTrue => any_eq = true,
-                                        Truthiness::AlwaysFalse => (),
-                                        Truthiness::Ambiguous => any_ambiguous = true,
-                                    },
-                                }
-                            }
-
-                            if any_eq {
-                                Ok(Type::bool_literal(op.is_in()))
-                            } else if !any_ambiguous {
-                                Ok(Type::bool_literal(op.is_not_in()))
-                            } else {
-                                Ok(KnownClass::Bool.to_instance(self.db()))
-                            }
-                        }
-                        ast::CmpOp::Is | ast::CmpOp::IsNot => {
-                            // - `[ast::CmpOp::Is]`: returns `false` if the elements are definitely unequal, otherwise `bool`
-                            // - `[ast::CmpOp::IsNot]`: returns `true` if the elements are definitely unequal, otherwise `bool`
-                            let eq_result = tuple_rich_comparison(RichCompareOperator::Eq).expect(
-                            "infer_binary_type_comparison should never return None for `CmpOp::Eq`",
-                        );
-
-                            Ok(match eq_result {
-                                todo @ Type::Dynamic(DynamicType::Todo(_)) => todo,
-                                // It's okay to ignore errors here because Python doesn't call `__bool__`
-                                // for `is` and `is not` comparisons. This is an implementation detail
-                                // for how we determine the truthiness of a type.
-                                ty => match ty.bool(self.db()) {
-                                    Truthiness::AlwaysFalse => Type::bool_literal(op.is_is_not()),
-                                    _ => KnownClass::Bool.to_instance(self.db()),
-                                },
-                            })
-                        }
-                    }
-                }
-            ),
-
-            _ => None,
-        };
-
-        if let Some(result) = comparison_result {
-            return result;
-        }
-
-        // Final generalized fallback: lookup the rich comparison `__dunder__` methods
-        try_dunder(self, MemberLookupPolicy::default())
-    }
-
-    /// Rich comparison in Python are the operators `==`, `!=`, `<`, `<=`, `>`, and `>=`. Their
-    /// behaviour can be edited for classes by implementing corresponding dunder methods.
-    /// This function performs rich comparison between two types and returns the resulting type.
-    /// see `<https://docs.python.org/3/reference/datamodel.html#object.__lt__>`
-    fn infer_rich_comparison(
-        &self,
-        left: Type<'db>,
-        right: Type<'db>,
-        op: RichCompareOperator,
-        policy: MemberLookupPolicy,
-    ) -> Result<Type<'db>, UnsupportedComparisonError<'db>> {
-        let db = self.db();
-        // The following resource has details about the rich comparison algorithm:
-        // https://snarky.ca/unravelling-rich-comparison-operators/
-        let call_dunder = |op: RichCompareOperator, left: Type<'db>, right: Type<'db>| {
-            left.try_call_dunder_with_policy(
-                db,
-                op.dunder(),
-                &mut CallArguments::positional([right]),
-                TypeContext::default(),
-                policy,
-            )
-            .map(|outcome| outcome.return_type(db))
-            .ok()
-        };
-
-        // The reflected dunder has priority if the right-hand side is a strict subclass of the left-hand side.
-        if left != right && right.is_subtype_of(db, left) {
-            call_dunder(op.reflect(), right, left).or_else(|| call_dunder(op, left, right))
-        } else {
-            call_dunder(op, left, right).or_else(|| call_dunder(op.reflect(), right, left))
-        }
-        .or_else(|| {
-            // When no appropriate method returns any value other than NotImplemented,
-            // the `==` and `!=` operators will fall back to `is` and `is not`, respectively.
-            // refer to `<https://docs.python.org/3/reference/datamodel.html#object.__eq__>`
-            if matches!(op, RichCompareOperator::Eq | RichCompareOperator::Ne)
-                // This branch implements specific behavior of the `__eq__` and `__ne__` methods
-                // on `object`, so it does not apply if we skip looking up attributes on `object`.
-                && !policy.mro_no_object_fallback()
-            {
-                Some(KnownClass::Bool.to_instance(db))
-            } else {
-                None
-            }
-        })
-        .ok_or_else(|| UnsupportedComparisonError {
-            op: op.into(),
-            left_ty: left,
-            right_ty: right,
-        })
-    }
-
-    /// Performs a membership test (`in` and `not in`) between two instances and returns the resulting type, or `None` if the test is unsupported.
-    /// The behavior can be customized in Python by implementing `__contains__`, `__iter__`, or `__getitem__` methods.
-    /// See `<https://docs.python.org/3/reference/datamodel.html#object.__contains__>`
-    /// and `<https://docs.python.org/3/reference/expressions.html#membership-test-details>`
-    fn infer_membership_test_comparison(
-        &self,
-        left: Type<'db>,
-        right: Type<'db>,
-        op: MembershipTestCompareOperator,
-        range: TextRange,
-    ) -> Result<Type<'db>, UnsupportedComparisonError<'db>> {
-        let db = self.db();
-
-        let compare_result_opt = match right.try_call_dunder(
-            db,
-            "__contains__",
-            CallArguments::positional([left]),
-            TypeContext::default(),
-        ) {
-            // If `__contains__` is available, it is used directly for the membership test.
-            Ok(bindings) => Some(bindings.return_type(db)),
-            // If `__contains__` is not available or possibly unbound,
-            // fall back to iteration-based membership test.
-            Err(CallDunderError::MethodNotAvailable | CallDunderError::PossiblyUnbound(_)) => right
-                .try_iterate(db)
-                .map(|_| KnownClass::Bool.to_instance(db))
-                .ok(),
-            // `__contains__` exists but can't be called with the given arguments.
-            Err(CallDunderError::CallError(..)) => None,
-        };
-
-        compare_result_opt
-            .map(|ty| {
-                if matches!(ty, Type::Dynamic(DynamicType::Todo(_))) {
-                    return ty;
-                }
-
-                let truthiness = ty.try_bool(db).unwrap_or_else(|err| {
-                    err.report_diagnostic(&self.context, range);
-                    err.fallback_truthiness()
-                });
-
-                match op {
-                    MembershipTestCompareOperator::In => truthiness.into_type(db),
-                    MembershipTestCompareOperator::NotIn => truthiness.negate().into_type(db),
-                }
-            })
-            .ok_or_else(|| UnsupportedComparisonError {
-                op: op.into(),
-                left_ty: left,
-                right_ty: right,
-            })
-    }
-
-    /// Simulates rich comparison between tuples and returns the inferred result.
-    /// This performs a lexicographic comparison, returning a union of all possible return types that could result from the comparison.
-    ///
-    /// basically it's based on cpython's `tuple_richcompare`
-    /// see `<https://github.com/python/cpython/blob/9d6366b60d01305fc5e45100e0cd13e358aa397d/Objects/tupleobject.c#L637>`
-    fn infer_tuple_rich_comparison(
-        &mut self,
-        left: &TupleSpec<'db>,
-        op: RichCompareOperator,
-        right: &TupleSpec<'db>,
-        range: TextRange,
-        visitor: &BinaryComparisonVisitor<'db>,
-    ) -> Result<Type<'db>, UnsupportedComparisonError<'db>> {
-        match (left, right) {
-            // Both fixed-length: perform full lexicographic comparison.
-            (TupleSpec::Fixed(left), TupleSpec::Fixed(right)) => {
-                let left_iter = left.iter_all_elements();
-                let right_iter = right.iter_all_elements();
-
-                let mut builder = UnionBuilder::new(self.db());
-
-                for (l_ty, r_ty) in left_iter.zip(right_iter) {
-                    let pairwise_eq_result = self
-                        .infer_binary_type_comparison(l_ty, ast::CmpOp::Eq, r_ty, range, visitor)
-                        .expect(
-                            "infer_binary_type_comparison should never return None for `CmpOp::Eq`",
-                        );
-
-                    match pairwise_eq_result
-                        .try_bool(self.db())
-                        .unwrap_or_else(|err| {
-                            // TODO: We should, whenever possible, pass the range of the left and right elements
-                            //   instead of the range of the whole tuple.
-                            err.report_diagnostic(&self.context, range);
-                            err.fallback_truthiness()
-                        }) {
-                        // - AlwaysTrue : Continue to the next pair for lexicographic comparison
-                        Truthiness::AlwaysTrue => continue,
-                        // - AlwaysFalse:
-                        // Lexicographic comparisons will always terminate with this pair.
-                        // Complete the comparison and return the result.
-                        // - Ambiguous:
-                        // Lexicographic comparisons might continue to the next pair (if eq_result is true),
-                        // or terminate here (if eq_result is false).
-                        // To account for cases where the comparison terminates here, add the pairwise comparison result to the union builder.
-                        eq_truthiness @ (Truthiness::AlwaysFalse | Truthiness::Ambiguous) => {
-                            let pairwise_compare_result = match op {
-                                RichCompareOperator::Lt
-                                | RichCompareOperator::Le
-                                | RichCompareOperator::Gt
-                                | RichCompareOperator::Ge => self.infer_binary_type_comparison(
-                                    l_ty,
-                                    op.into(),
-                                    r_ty,
-                                    range,
-                                    visitor,
-                                )?,
-                                // For `==` and `!=`, we already figure out the result from `pairwise_eq_result`
-                                // NOTE: The CPython implementation does not account for non-boolean return types
-                                // or cases where `!=` is not the negation of `==`, we also do not consider these cases.
-                                RichCompareOperator::Eq => Type::bool_literal(false),
-                                RichCompareOperator::Ne => Type::bool_literal(true),
-                            };
-
-                            builder = builder.add(pairwise_compare_result);
-
-                            if eq_truthiness.is_ambiguous() {
-                                continue;
-                            }
-
-                            return Ok(builder.build());
-                        }
-                    }
-                }
-
-                // if no more items to compare, we just compare sizes
-                let (left_len, right_len) = (left.len(), right.len());
-
-                builder = builder.add(Type::bool_literal(match op {
-                    RichCompareOperator::Eq => left_len == right_len,
-                    RichCompareOperator::Ne => left_len != right_len,
-                    RichCompareOperator::Lt => left_len < right_len,
-                    RichCompareOperator::Le => left_len <= right_len,
-                    RichCompareOperator::Gt => left_len > right_len,
-                    RichCompareOperator::Ge => left_len >= right_len,
-                }));
-
-                Ok(builder.build())
-            }
-
-            // At least one tuple is variable-length. We can make no assumptions about
-            // the relative lengths of the tuples, and therefore neither about how they
-            // compare lexicographically. However, we still need to verify that the
-            // element types are comparable for ordering comparisons.
-
-            // For equality comparisons (==, !=), any two objects can be compared,
-            // and tuple equality always returns bool regardless of element __eq__ return types.
-            (TupleSpec::Variable(_), _) | (_, TupleSpec::Variable(_))
-                if matches!(op, RichCompareOperator::Eq | RichCompareOperator::Ne) =>
-            {
-                Ok(KnownClass::Bool.to_instance(self.db()))
-            }
-
-            // At least one variable-length: check all elements that could potentially be compared.
-            // We use `try_for_each_element_pair` to iterate over all possible pairings.
-            (left @ TupleSpec::Variable(_), right) | (left, right @ TupleSpec::Variable(_)) => {
-                let mut results = smallvec::SmallVec::<[Type<'db>; 8]>::new();
-                left.try_for_each_element_pair(right, |l_ty, r_ty| {
-                    results.push(self.infer_binary_type_comparison(
-                        l_ty,
-                        op.into(),
-                        r_ty,
-                        range,
-                        visitor,
-                    )?);
-                    Ok::<_, UnsupportedComparisonError<'db>>(())
-                })?;
-
-                let mut builder = UnionBuilder::new(self.db());
-                for result in results {
-                    builder = builder.add(result);
-                }
-                // Length comparison (when all elements are equal) returns bool.
-                builder = builder.add(KnownClass::Bool.to_instance(self.db()));
-
-                Ok(builder.build())
-            }
-        }
     }
 
     fn infer_subscript_expression(&mut self, subscript: &ast::ExprSubscript) -> Type<'db> {
@@ -17277,88 +15895,6 @@ impl From<bool> for DeferredExpressionState {
             DeferredExpressionState::None
         }
     }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum RichCompareOperator {
-    Eq,
-    Ne,
-    Gt,
-    Ge,
-    Lt,
-    Le,
-}
-
-impl From<RichCompareOperator> for ast::CmpOp {
-    fn from(value: RichCompareOperator) -> Self {
-        match value {
-            RichCompareOperator::Eq => ast::CmpOp::Eq,
-            RichCompareOperator::Ne => ast::CmpOp::NotEq,
-            RichCompareOperator::Lt => ast::CmpOp::Lt,
-            RichCompareOperator::Le => ast::CmpOp::LtE,
-            RichCompareOperator::Gt => ast::CmpOp::Gt,
-            RichCompareOperator::Ge => ast::CmpOp::GtE,
-        }
-    }
-}
-
-impl RichCompareOperator {
-    #[must_use]
-    const fn dunder(self) -> &'static str {
-        match self {
-            RichCompareOperator::Eq => "__eq__",
-            RichCompareOperator::Ne => "__ne__",
-            RichCompareOperator::Lt => "__lt__",
-            RichCompareOperator::Le => "__le__",
-            RichCompareOperator::Gt => "__gt__",
-            RichCompareOperator::Ge => "__ge__",
-        }
-    }
-
-    #[must_use]
-    const fn reflect(self) -> Self {
-        match self {
-            RichCompareOperator::Eq => RichCompareOperator::Eq,
-            RichCompareOperator::Ne => RichCompareOperator::Ne,
-            RichCompareOperator::Lt => RichCompareOperator::Gt,
-            RichCompareOperator::Le => RichCompareOperator::Ge,
-            RichCompareOperator::Gt => RichCompareOperator::Lt,
-            RichCompareOperator::Ge => RichCompareOperator::Le,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum MembershipTestCompareOperator {
-    In,
-    NotIn,
-}
-
-impl From<MembershipTestCompareOperator> for ast::CmpOp {
-    fn from(value: MembershipTestCompareOperator) -> Self {
-        match value {
-            MembershipTestCompareOperator::In => ast::CmpOp::In,
-            MembershipTestCompareOperator::NotIn => ast::CmpOp::NotIn,
-        }
-    }
-}
-
-/// Context for a failed comparison operation.
-///
-/// `left_ty` and `right_ty` are the "low-level" types
-/// that cannot be compared using `op`. For example,
-/// when evaluating `(1, "foo") < (2, 3)`, the "high-level"
-/// types of the operands are `tuple[Literal[1], Literal["foo"]]`
-/// and `tuple[Literal[2], Literal[3]]`. Those aren't captured
-/// in this struct, but the "low-level" types that mean that
-/// the high-level types cannot be compared *are* captured in
-/// this struct. In this case, those would be `Literal["foo"]`
-/// and `Literal[3]`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct UnsupportedComparisonError<'db> {
-    pub(crate) op: ast::CmpOp,
-    pub(crate) left_ty: Type<'db>,
-    pub(crate) right_ty: Type<'db>,
 }
 
 fn format_import_from_module(level: u32, module: Option<&str>) -> String {

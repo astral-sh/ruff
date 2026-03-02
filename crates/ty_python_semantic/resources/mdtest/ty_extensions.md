@@ -439,6 +439,36 @@ def foo(x: "TypeOf[foo]"):
     reveal_type(x)  # revealed: def foo(x: def foo(...)) -> Unknown
 ```
 
+## Deeply nested `TypeOf` chains
+
+Multiple redefinitions of a function with `TypeOf[foo]` as the return type create a chain of
+distinct function types. The display of such chains is truncated to prevent extremely long output:
+
+```py
+from ty_extensions import TypeOf
+
+def foo() -> TypeOf[foo]:  # error: [unresolved-reference]
+    return foo
+
+def foo() -> TypeOf[foo]:
+    return foo  # error: [invalid-return-type]
+
+def foo() -> TypeOf[foo]:
+    return foo  # error: [invalid-return-type]
+
+def foo() -> TypeOf[foo]:
+    return foo  # error: [invalid-return-type]
+
+def foo() -> TypeOf[foo]:
+    return foo  # error: [invalid-return-type]
+
+def foo() -> TypeOf[foo]:
+    return foo  # error: [invalid-return-type]
+
+# Truncated after 4 levels of function type nesting:
+reveal_type(foo)  # revealed: def foo() -> def foo() -> def foo() -> def foo() -> def foo(...)
+```
+
 ## `CallableTypeOf`
 
 The `CallableTypeOf` special form can be used to extract the `Callable` structural type inhabited by

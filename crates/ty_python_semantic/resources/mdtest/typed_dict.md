@@ -1849,7 +1849,7 @@ msg = Message(id=1, content="Hello")
 # No errors for yet-unsupported features (`closed`):
 OtherMessage = TypedDict("OtherMessage", {"id": int, "content": str}, closed=True)
 
-reveal_type(Message.__required_keys__)  # revealed: @Todo(Support for functional `TypedDict`)
+reveal_type(Message.__required_keys__)  # revealed: @Todo(Functional TypedDicts)
 
 # TODO: this should be an error
 msg.content
@@ -1881,6 +1881,53 @@ def bad(
     # error: [invalid-type-form] "`ReadOnly` is not allowed in function parameter annotations"
     c: ReadOnly[int],
 ): ...
+```
+
+### `Required` and `NotRequired` not allowed outside `TypedDict`
+
+```py
+from typing_extensions import Required, NotRequired, TypedDict
+
+# error: [invalid-type-form] "`Required` is only allowed in TypedDict fields"
+x: Required[int]
+# error: [invalid-type-form] "`NotRequired` is only allowed in TypedDict fields"
+y: NotRequired[str]
+
+class MyClass:
+    # error: [invalid-type-form] "`Required` is only allowed in TypedDict fields"
+    x: Required[int]
+    # error: [invalid-type-form] "`NotRequired` is only allowed in TypedDict fields"
+    y: NotRequired[str]
+
+def f():
+    # error: [invalid-type-form] "`Required` is only allowed in TypedDict fields"
+    x: Required[int] = 1
+    # error: [invalid-type-form] "`NotRequired` is only allowed in TypedDict fields"
+    y: NotRequired[str] = ""
+
+# fine
+MyFunctionalTypedDict = TypedDict("MyFunctionalTypedDict", {"not-an-identifier": Required[int]})
+
+class FunctionalTypedDictSubclass(MyFunctionalTypedDict):
+    y: NotRequired[int]  # fine
+```
+
+### Nested `Required` and `NotRequired`
+
+`Required` and `NotRequired` cannot be nested inside each other:
+
+```py
+from typing_extensions import TypedDict, Required, NotRequired
+
+class TD(TypedDict):
+    # error: [invalid-type-form] "`typing.Required` cannot be nested inside `Required` or `NotRequired`"
+    a: Required[Required[int]]
+    # error: [invalid-type-form] "`typing.NotRequired` cannot be nested inside `Required` or `NotRequired`"
+    b: NotRequired[NotRequired[int]]
+    # error: [invalid-type-form] "`typing.Required` cannot be nested inside `Required` or `NotRequired`"
+    c: Required[NotRequired[int]]
+    # error: [invalid-type-form] "`typing.NotRequired` cannot be nested inside `Required` or `NotRequired`"
+    d: NotRequired[Required[int]]
 ```
 
 ### `dict`-subclass inhabitants
