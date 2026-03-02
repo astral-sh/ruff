@@ -1533,10 +1533,8 @@ impl ConstraintId {
 /// construction, interior nodes can only refer to nodes with smaller indexes (since the nodes that
 /// outgoing edges point at must already exist).
 ///
-/// BDD nodes are _quasi-reduced_, which means that there are no duplicate nodes (which we handle
-/// via Salsa interning). Unlike the typical BDD representation, which is (fully) reduced, we do
-/// allow redundant nodes, with `if_true` and `if_false` edges that point at the same node. That
-/// means that our BDDs "remember" all of the individual constraints that they were created with.
+/// BDD nodes are _reduced_, which means that there are no duplicate nodes or redundant nodes
+/// (those with `if_true` and `if_false` edges that point at the same node).
 ///
 /// BDD nodes are also _ordered_, meaning that every path from the root of a BDD to a terminal node
 /// visits variables in the same order. [`ConstraintId::ordering`] defines the variable
@@ -1559,7 +1557,7 @@ enum Node {
 }
 
 impl NodeId {
-    /// Creates a new BDD node, ensuring that it is quasi-reduced.
+    /// Creates a new BDD node, ensuring that it is fully reduced.
     fn new(
         builder: &ConstraintSetBuilder<'_>,
         constraint: ConstraintId,
@@ -1580,8 +1578,8 @@ impl NodeId {
                     root_constraint.ordering() > constraint.ordering()
                 })
         );
-        if if_true == ALWAYS_FALSE && if_false == ALWAYS_FALSE {
-            return ALWAYS_FALSE;
+        if if_true == if_false {
+            return if_true;
         }
         builder.intern_interior_node(InteriorNodeData {
             constraint,
@@ -1848,15 +1846,7 @@ impl NodeId {
     /// Returns the `or` or union of two BDDs.
     fn or(self, builder: &ConstraintSetBuilder<'_>, other: Self) -> Self {
         match (self.node(), other.node()) {
-            (Node::AlwaysTrue, Node::AlwaysTrue) => ALWAYS_TRUE,
-            (Node::AlwaysTrue, Node::Interior(_)) => {
-                let other_interior = builder.interior_node_data(other);
-                NodeId::new(builder, other_interior.constraint, ALWAYS_TRUE, ALWAYS_TRUE)
-            }
-            (Node::Interior(_), Node::AlwaysTrue) => {
-                let self_interior = builder.interior_node_data(self);
-                NodeId::new(builder, self_interior.constraint, ALWAYS_TRUE, ALWAYS_TRUE)
-            }
+            (Node::AlwaysTrue, _) | (_, Node::AlwaysTrue) => ALWAYS_TRUE,
             (Node::AlwaysFalse, _) => other,
             (_, Node::AlwaysFalse) => self,
             (Node::Interior(self_interior), Node::Interior(other_interior)) => {
@@ -1985,25 +1975,7 @@ impl NodeId {
     /// Returns the `and` or intersection of two BDDs.
     fn and(self, builder: &ConstraintSetBuilder<'_>, other: Self) -> Self {
         match (self.node(), other.node()) {
-            (Node::AlwaysFalse, Node::AlwaysFalse) => ALWAYS_FALSE,
-            (Node::AlwaysFalse, Node::Interior(_)) => {
-                let other_interior = builder.interior_node_data(other);
-                NodeId::new(
-                    builder,
-                    other_interior.constraint,
-                    ALWAYS_FALSE,
-                    ALWAYS_FALSE,
-                )
-            }
-            (Node::Interior(_), Node::AlwaysFalse) => {
-                let self_interior = builder.interior_node_data(self);
-                NodeId::new(
-                    builder,
-                    self_interior.constraint,
-                    ALWAYS_FALSE,
-                    ALWAYS_FALSE,
-                )
-            }
+            (Node::AlwaysFalse, _) | (_, Node::AlwaysFalse) => ALWAYS_FALSE,
             (Node::AlwaysTrue, _) => other,
             (_, Node::AlwaysTrue) => self,
             (Node::Interior(self_interior), Node::Interior(other_interior)) => {
@@ -5032,17 +5004,13 @@ mod tests {
     fn test_display_graph_output() {
         let expected = indoc! {r#"
             <0> (U = bool)
-            ┡━₁ <1> (U = str)
-            │   ┡━₁ <2> (T = bool)
-            │   │   ┡━₁ <3> (T = str)
-            │   │   │   ┡━₁ always
-            │   │   │   └─₀ always
-            │   │   └─₀ <4> (T = str)
-            │   │       ┡━₁ always
-            │   │       └─₀ never
-            │   └─₀ <2> SHARED
-            └─₀ <5> (U = str)
-                ┡━₁ <2> SHARED
+            ┡━₁ <1> (T = bool)
+            │   ┡━₁ always
+            │   └─₀ <2> (T = str)
+            │       ┡━₁ always
+            │       └─₀ never
+            └─₀ <3> (U = str)
+                ┡━₁ <1> SHARED
                 └─₀ never
         "#}
         .trim_end();
