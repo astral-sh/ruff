@@ -3697,7 +3697,7 @@ fn rule_panic_mixed_results_concise() -> Result<()> {
     exit_code: 2
     ----- stdout -----
     normal.py:1:1: error[RUF900] Hey this is a stable test rule.
-    normal.py:1:1: error[RUF901] Hey this is a stable test rule with a safe fix.
+    normal.py:1:1: error[RUF901] [*] Hey this is a stable test rule with a safe fix.
     normal.py:1:1: error[RUF902] Hey this is a stable test rule with an unsafe fix.
     normal.py:1:1: error[RUF903] Hey this is a stable test rule with a display only fix.
     normal.py:1:1: error[RUF911] Hey this is a preview test rule.
@@ -3920,10 +3920,10 @@ fn supported_file_extensions_preview_enabled() -> Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    src/thing.ipynb:cell 1:1:8: error[F401] `os` imported but unused
-    src/thing.py:1:8: error[F401] `os` imported but unused
-    src/thing.pyi:1:8: error[F401] `os` imported but unused
-    src/thing.pyw:1:8: error[F401] `os` imported but unused
+    src/thing.ipynb:cell 1:1:8: error[F401] [*] `os` imported but unused
+    src/thing.py:1:8: error[F401] [*] `os` imported but unused
+    src/thing.pyi:1:8: error[F401] [*] `os` imported but unused
+    src/thing.pyw:1:8: error[F401] [*] `os` imported but unused
     Found 4 errors.
     [*] 4 fixable with the `--fix` option.
 

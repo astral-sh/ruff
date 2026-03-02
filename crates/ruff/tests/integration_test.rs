@@ -1259,7 +1259,7 @@ fn preview_enabled_prefix() {
     exit_code: 1
     ----- stdout -----
     -:1:1: error[RUF900] Hey this is a stable test rule.
-    -:1:1: error[RUF901] Hey this is a stable test rule with a safe fix.
+    -:1:1: error[RUF901] [*] Hey this is a stable test rule with a safe fix.
     -:1:1: error[RUF902] Hey this is a stable test rule with an unsafe fix.
     -:1:1: error[RUF903] Hey this is a stable test rule with a display only fix.
     -:1:1: error[RUF911] Hey this is a preview test rule.
@@ -1283,7 +1283,7 @@ fn preview_enabled_all() {
     -:1:1: error[D100] Missing docstring in public module
     -:1:1: error[CPY001] Missing copyright notice at top of file
     -:1:1: error[RUF900] Hey this is a stable test rule.
-    -:1:1: error[RUF901] Hey this is a stable test rule with a safe fix.
+    -:1:1: error[RUF901] [*] Hey this is a stable test rule with a safe fix.
     -:1:1: error[RUF902] Hey this is a stable test rule with an unsafe fix.
     -:1:1: error[RUF903] Hey this is a stable test rule with a display only fix.
     -:1:1: error[RUF911] Hey this is a preview test rule.
@@ -1422,7 +1422,7 @@ fn preview_enabled_group_ignore() {
     exit_code: 1
     ----- stdout -----
     -:1:1: error[RUF900] Hey this is a stable test rule.
-    -:1:1: error[RUF901] Hey this is a stable test rule with a safe fix.
+    -:1:1: error[RUF901] [*] Hey this is a stable test rule with a safe fix.
     -:1:1: error[RUF902] Hey this is a stable test rule with an unsafe fix.
     -:1:1: error[RUF903] Hey this is a stable test rule with a display only fix.
     -:1:1: error[RUF911] Hey this is a preview test rule.

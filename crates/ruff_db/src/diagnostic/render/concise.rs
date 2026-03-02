@@ -91,12 +91,6 @@ impl<'a> ConciseRenderer<'a> {
                         )
                     )?;
                 }
-                if self.config.show_fix_status {
-                    // Do not display an indicator for inapplicable fixes
-                    if diag.has_applicable_fix(self.config) {
-                        write!(f, "[{fix}] ", fix = fmt_styled("*", stylesheet.separator))?;
-                    }
-                }
             } else {
                 let (severity, severity_style) = match diag.severity() {
                     Severity::Info => ("info", stylesheet.info),
@@ -117,6 +111,12 @@ impl<'a> ConciseRenderer<'a> {
                         stylesheet.emphasis
                     )
                 )?;
+            }
+            if self.config.show_fix_status {
+                // Do not display an indicator for inapplicable fixes
+                if diag.has_applicable_fix(self.config) {
+                    write!(f, "[{fix}] ", fix = fmt_styled("*", stylesheet.separator))?;
+                }
             }
 
             writeln!(f, "{message}", message = diag.concise_message())?;
