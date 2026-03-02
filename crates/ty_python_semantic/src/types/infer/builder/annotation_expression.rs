@@ -71,8 +71,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         };
 
         let previous_deferred_state = std::mem::replace(&mut self.deferred_state, state);
-        let previous_check_unbound_typevars = self.check_unbound_typevars;
-        self.check_unbound_typevars = true;
+        let previous_check_unbound_typevars =
+            std::mem::replace(&mut self.check_unbound_typevars, true);
         let annotation_ty = self.infer_annotation_expression_impl(annotation, pep_613_policy);
         self.check_unbound_typevars = previous_check_unbound_typevars;
         self.deferred_state = previous_deferred_state;

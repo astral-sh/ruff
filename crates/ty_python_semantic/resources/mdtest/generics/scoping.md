@@ -231,6 +231,7 @@ error on the following snippet, but we may change this in the future.
 
 ```py
 from typing import TypeVar, Callable
+from ty_extensions import generic_context
 
 T = TypeVar("T")
 
@@ -240,13 +241,20 @@ x: Callable[[T], T] = lambda obj: obj
 # all of these revealed types and `invalid-argument-type` diagnostics are incorrect.
 # If we decide that they do not, we should emit `unbound-type-variable` on both the
 # declaration of `x` in the global scope and the parameter annotation of `y`.
+#
+# NOTE: all the `reveal_type`s are inside a function here so that we test the behaviour
+# of the declared type (from the annotation) rather than the local inferred type
 def test(y: Callable[[T], T]):
+    # revealed: None
+    reveal_type(generic_context(x))
     # revealed: (TypeVar, /) -> TypeVar
     reveal_type(x)
     # error: [invalid-argument-type]
     # revealed: TypeVar
     reveal_type(x(42))
 
+    # revealed: None
+    reveal_type(generic_context(y))
     # revealed: (T@test, /) -> T@test
     reveal_type(y)
     # error: [invalid-argument-type]

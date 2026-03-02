@@ -1376,8 +1376,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // in the global scope or similar should be considered to create an implicit generic context.
         // For now, we do not report unbound type variables in any `Callable` contexts, but we may
         // decide to revisit this in the future.
-        let previous_check_unbound_typevars = self.check_unbound_typevars;
-        self.check_unbound_typevars = false;
+        let previous_check_unbound_typevars =
+            std::mem::replace(&mut self.check_unbound_typevars, false);
         let result = inner(self, subscript);
         self.check_unbound_typevars = previous_check_unbound_typevars;
         result
