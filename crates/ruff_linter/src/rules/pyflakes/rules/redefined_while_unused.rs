@@ -34,7 +34,7 @@ use crate::{Fix, FixAvailability, Violation};
 /// import bar
 /// ```
 ///
-/// In [preview](https://docs.astral.sh/ruff/preview/), this rule will 
+/// In [preview](https://docs.astral.sh/ruff/preview/), this rule will
 /// also flag redefinitions in `typing.TYPE_CHECKING` blocks:
 ///
 /// ```python
