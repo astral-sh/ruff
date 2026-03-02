@@ -916,11 +916,11 @@ fn full_output_preview() {
         .args(["--preview", "--select=E741"])
         .build();
     assert_cmd_snapshot!(cmd
-        .pass_stdin("l = 1"), @"
+        .pass_stdin("l = 1"), @r###"
     success: false
     exit_code: 1
     ----- stdout -----
-    E741 Ambiguous variable name: `l`
+    error[E741]: Ambiguous variable name: `l`
      --> -:1:1
       |
     1 | l = 1
@@ -930,7 +930,7 @@ fn full_output_preview() {
     Found 1 error.
 
     ----- stderr -----
-    ");
+    "###);
 }
 
 #[test]
@@ -945,11 +945,11 @@ preview = true
 ",
     )?;
     let mut cmd = RuffCheck::default().config(&pyproject_toml).build();
-    assert_cmd_snapshot!(cmd.arg("--select=E741").pass_stdin("l = 1"), @"
+    assert_cmd_snapshot!(cmd.arg("--select=E741").pass_stdin("l = 1"), @r###"
     success: false
     exit_code: 1
     ----- stdout -----
-    E741 Ambiguous variable name: `l`
+    error[E741]: Ambiguous variable name: `l`
      --> -:1:1
       |
     1 | l = 1
@@ -959,7 +959,7 @@ preview = true
     Found 1 error.
 
     ----- stderr -----
-    ");
+    "###);
     Ok(())
 }
 
@@ -1254,21 +1254,21 @@ fn preview_enabled_prefix() {
     let mut cmd = RuffCheck::default()
         .args(["--select", "RUF9", "--output-format=concise", "--preview"])
         .build();
-    assert_cmd_snapshot!(cmd, @"
+    assert_cmd_snapshot!(cmd, @r###"
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:1: RUF900 Hey this is a stable test rule.
-    -:1:1: RUF901 [*] Hey this is a stable test rule with a safe fix.
-    -:1:1: RUF902 Hey this is a stable test rule with an unsafe fix.
-    -:1:1: RUF903 Hey this is a stable test rule with a display only fix.
-    -:1:1: RUF911 Hey this is a preview test rule.
-    -:1:1: RUF950 Hey this is a test rule that was redirected from another.
+    -:1:1: error[RUF900] Hey this is a stable test rule.
+    -:1:1: error[RUF901] Hey this is a stable test rule with a safe fix.
+    -:1:1: error[RUF902] Hey this is a stable test rule with an unsafe fix.
+    -:1:1: error[RUF903] Hey this is a stable test rule with a display only fix.
+    -:1:1: error[RUF911] Hey this is a preview test rule.
+    -:1:1: error[RUF950] Hey this is a test rule that was redirected from another.
     Found 6 errors.
     [*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
 
     ----- stderr -----
-    ");
+    "###);
 }
 
 #[test]
@@ -1276,25 +1276,25 @@ fn preview_enabled_all() {
     let mut cmd = RuffCheck::default()
         .args(["--select", "ALL", "--output-format=concise", "--preview"])
         .build();
-    assert_cmd_snapshot!(cmd, @"
+    assert_cmd_snapshot!(cmd, @r###"
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:1: D100 Missing docstring in public module
-    -:1:1: CPY001 Missing copyright notice at top of file
-    -:1:1: RUF900 Hey this is a stable test rule.
-    -:1:1: RUF901 [*] Hey this is a stable test rule with a safe fix.
-    -:1:1: RUF902 Hey this is a stable test rule with an unsafe fix.
-    -:1:1: RUF903 Hey this is a stable test rule with a display only fix.
-    -:1:1: RUF911 Hey this is a preview test rule.
-    -:1:1: RUF950 Hey this is a test rule that was redirected from another.
+    -:1:1: error[D100] Missing docstring in public module
+    -:1:1: error[CPY001] Missing copyright notice at top of file
+    -:1:1: error[RUF900] Hey this is a stable test rule.
+    -:1:1: error[RUF901] Hey this is a stable test rule with a safe fix.
+    -:1:1: error[RUF902] Hey this is a stable test rule with an unsafe fix.
+    -:1:1: error[RUF903] Hey this is a stable test rule with a display only fix.
+    -:1:1: error[RUF911] Hey this is a preview test rule.
+    -:1:1: error[RUF950] Hey this is a test rule that was redirected from another.
     Found 8 errors.
     [*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
 
     ----- stderr -----
     warning: `incorrect-blank-line-before-class` (D203) and `no-blank-line-before-class` (D211) are incompatible. Ignoring `incorrect-blank-line-before-class`.
     warning: `multi-line-summary-first-line` (D212) and `multi-line-summary-second-line` (D213) are incompatible. Ignoring `multi-line-summary-second-line`.
-    ");
+    "###);
 }
 
 #[test]
@@ -1303,15 +1303,15 @@ fn preview_enabled_direct() {
     let mut cmd = RuffCheck::default()
         .args(["--select", "RUF911", "--output-format=concise", "--preview"])
         .build();
-    assert_cmd_snapshot!(cmd, @"
+    assert_cmd_snapshot!(cmd, @r###"
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:1: RUF911 Hey this is a preview test rule.
+    -:1:1: error[RUF911] Hey this is a preview test rule.
     Found 1 error.
 
     ----- stderr -----
-    ");
+    "###);
 }
 
 #[test]
@@ -1417,21 +1417,21 @@ fn preview_enabled_group_ignore() {
             "--output-format=concise",
         ])
         .build();
-    assert_cmd_snapshot!(cmd, @"
+    assert_cmd_snapshot!(cmd, @r###"
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:1: RUF900 Hey this is a stable test rule.
-    -:1:1: RUF901 [*] Hey this is a stable test rule with a safe fix.
-    -:1:1: RUF902 Hey this is a stable test rule with an unsafe fix.
-    -:1:1: RUF903 Hey this is a stable test rule with a display only fix.
-    -:1:1: RUF911 Hey this is a preview test rule.
-    -:1:1: RUF950 Hey this is a test rule that was redirected from another.
+    -:1:1: error[RUF900] Hey this is a stable test rule.
+    -:1:1: error[RUF901] Hey this is a stable test rule with a safe fix.
+    -:1:1: error[RUF902] Hey this is a stable test rule with an unsafe fix.
+    -:1:1: error[RUF903] Hey this is a stable test rule with a display only fix.
+    -:1:1: error[RUF911] Hey this is a preview test rule.
+    -:1:1: error[RUF950] Hey this is a test rule that was redirected from another.
     Found 6 errors.
     [*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
 
     ----- stderr -----
-    ");
+    "###);
 }
 
 #[test]
@@ -2397,11 +2397,11 @@ select = ["RUF017"]
     let mut cmd = RuffCheck::default().config(&ruff_toml).build();
     assert_cmd_snapshot!(cmd
         .pass_stdin("x = [1, 2, 3]\ny = [4, 5, 6]\nsum([x, y], [])"),
-            @"
+            @r###"
     success: false
     exit_code: 1
     ----- stdout -----
-    RUF017 Avoid quadratic list summation
+    error[RUF017]: Avoid quadratic list summation
      --> -:3:1
       |
     1 | x = [1, 2, 3]
@@ -2415,7 +2415,7 @@ select = ["RUF017"]
     No fixes available (1 hidden fix can be enabled with the `--unsafe-fixes` option).
 
     ----- stderr -----
-    ");
+    "###);
 
     Ok(())
 }
@@ -2438,11 +2438,11 @@ unfixable = ["RUF"]
     let mut cmd = RuffCheck::default().config(&ruff_toml).build();
     assert_cmd_snapshot!(cmd
         .pass_stdin("x = [1, 2, 3]\ny = [4, 5, 6]\nsum([x, y], [])"),
-            @"
+            @r###"
     success: false
     exit_code: 1
     ----- stdout -----
-    RUF017 Avoid quadratic list summation
+    error[RUF017]: Avoid quadratic list summation
      --> -:3:1
       |
     1 | x = [1, 2, 3]
@@ -2455,7 +2455,7 @@ unfixable = ["RUF"]
     Found 1 error.
 
     ----- stderr -----
-    ");
+    "###);
 
     Ok(())
 }

@@ -68,6 +68,7 @@ line-length = 100
 
 [tool.ruff.lint]
 select = ["E", "F"]
+warn = ["F401"]
 "#,
     )?;
 
@@ -83,6 +84,7 @@ line-length = 120
 
 [tool.ruff.lint]
 select = ["E", "F", "I"]
+warn = ["I001"]
 "#,
     )?;
 
