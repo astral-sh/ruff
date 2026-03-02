@@ -45,13 +45,12 @@ use crate::types::signatures::{Parameter, ParameterForm, ParameterKind, Paramete
 use crate::types::tuple::{TupleLength, TupleSpec, TupleType};
 use crate::types::{
     BoundMethodType, BoundTypeVarIdentity, BoundTypeVarInstance, CallableSignature, CallableType,
-    CallableTypeKind, ClassLiteral, DATACLASS_FLAGS, DataclassFlags, DataclassParams, GenericAlias,
-    InternedConstraintSet, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
-    LiteralValueTypeKind, MemberLookupPolicy, NominalInstanceType, PropertyInstanceType,
-    SpecialFormType, TypeAliasType, TypeContext, TypeVarBoundOrConstraints, TypeVarVariance,
-    UnionBuilder, UnionType, WrapperDescriptorKind, enums, list_members,
+    CallableTypeKind, ClassLiteral, DATACLASS_FLAGS, DataclassFlags, DataclassParams,
+    EvaluationMode, GenericAlias, InternedConstraintSet, IntersectionType, KnownBoundMethodType,
+    KnownClass, KnownInstanceType, LiteralValueTypeKind, MemberLookupPolicy, NominalInstanceType,
+    PropertyInstanceType, SpecialFormType, TypeAliasType, TypeContext, TypeVarBoundOrConstraints,
+    TypeVarVariance, UnionBuilder, UnionType, WrapperDescriptorKind, enums, list_members,
 };
-use crate::unpack::EvaluationMode;
 use crate::{DisplaySettings, Program};
 use ruff_db::diagnostic::{Annotation, Diagnostic, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_python_ast::{self as ast, ArgOrKeyword, PythonVersion};
