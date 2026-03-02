@@ -246,6 +246,13 @@ def _(g: G):
     reveal_type(g)  # revealed: list[int]
 ```
 
+Self-referential defaults should not crash type inference:
+
+```py
+# error: [cyclic-type-alias-definition] "Cyclic definition of `A`"
+type A[T = A] = A[int]
+```
+
 ## Snapshots of verbose diagnostics
 
 <!-- snapshot-diagnostics -->

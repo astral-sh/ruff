@@ -515,6 +515,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         let typevars = generic_context.variables(db);
         let typevars_len = typevars.len();
+        // Only check whether a default was syntactically provided; eager default evaluation can
+        // recurse through the generic itself (for example `type A[T = A] = ...`).
+        let has_default =
+            |typevar: BoundTypeVarInstance<'db>| typevar.typevar(db)._default(db).is_some();
 
         let mut specialization_types = Vec::with_capacity(typevars_len);
         let mut typevar_with_defaults = 0;
@@ -537,7 +541,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         for (index, item) in typevars.zip_longest(type_arguments.iter()).enumerate() {
             match item {
                 EitherOrBoth::Both(typevar, expr) => {
-                    if typevar.default_type(db).is_some() {
+                    if has_default(typevar) {
                         typevar_with_defaults += 1;
                     }
 
@@ -633,7 +637,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }
                 }
                 EitherOrBoth::Left(typevar) => {
-                    if typevar.default_type(db).is_none() {
+                    if !has_default(typevar) {
                         // This is an error case, so no need to push into the specialization types.
                         missing_typevars.push(typevar);
                     } else {
