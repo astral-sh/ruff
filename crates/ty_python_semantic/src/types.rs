@@ -58,7 +58,7 @@ use crate::types::constraints::{
 use crate::types::context::{LintDiagnosticGuard, LintDiagnosticGuardBuilder};
 use crate::types::diagnostic::{INVALID_AWAIT, INVALID_TYPE_FORM};
 pub use crate::types::display::{DisplaySettings, TypeDetail, TypeDisplayDetails};
-use crate::types::enums::{enum_metadata, is_single_member_enum};
+use crate::types::enums::enum_metadata;
 use crate::types::function::{
     DataclassTransformerFlags, DataclassTransformerParams, FunctionDecorators, FunctionSpans,
     FunctionType, KnownFunction,
@@ -3391,14 +3391,21 @@ impl<'db> Type<'db> {
             }
 
             Type::NominalInstance(instance)
-                if matches!(name_str, "value" | "_value_")
-                    && is_single_member_enum(db, instance.class_literal(db)) =>
+                if matches!(name_str, "name" | "_name_")
+                    && enum_metadata(db, instance.class_literal(db)).is_some() =>
             {
                 enum_metadata(db, instance.class_literal(db))
-                    .and_then(|metadata| {
-                        let (name, _) = metadata.members.get_index(0)?;
-                        metadata.value_type(name)
-                    })
+                    .and_then(|metadata| metadata.instance_name_type(db))
+                    .map_or_else(Place::default, Place::bound)
+                    .into()
+            }
+
+            Type::NominalInstance(instance)
+                if matches!(name_str, "value" | "_value_")
+                    && enum_metadata(db, instance.class_literal(db)).is_some() =>
+            {
+                enum_metadata(db, instance.class_literal(db))
+                    .and_then(|metadata| metadata.instance_value_type(db))
                     .map_or_else(Place::default, Place::bound)
                     .into()
             }

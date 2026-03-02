@@ -10,7 +10,8 @@ use crate::{
     semantic_index::{place_table, scope::ScopeId, use_def_map},
     types::{
         ClassBase, ClassLiteral, DynamicType, EnumLiteralType, KnownClass, LiteralValueTypeKind,
-        MemberLookupPolicy, StaticClassLiteral, Type, TypeQualifiers, function::FunctionType,
+        MemberLookupPolicy, StaticClassLiteral, Type, TypeQualifiers, set_theoretic::builder::UnionBuilder,
+        function::FunctionType,
     },
 };
 
@@ -60,6 +61,48 @@ impl<'db> EnumMetadata<'db> {
         } else {
             self.members.get(member_name).copied()
         }
+    }
+
+    /// Returns the type of `.value`/`._value_` for an enum instance that is not
+    /// narrowed to a specific member (e.g. `x: MyEnum` where `MyEnum` has multiple members).
+    ///
+    /// If there is an explicit `_value_` annotation, returns that.
+    /// If there is a custom `__init__`, returns `Any`.
+    /// Otherwise, returns the union of all member value types.
+    pub(crate) fn instance_value_type(&self, db: &'db dyn Db) -> Option<Type<'db>> {
+        if self.members.is_empty() {
+            return None;
+        }
+        if let Some(annotation) = self.value_annotation {
+            Some(annotation)
+        } else if self.init_function.is_some() {
+            Some(Type::Dynamic(DynamicType::Any))
+        } else {
+            let union = self
+                .members
+                .values()
+                .copied()
+                .fold(UnionBuilder::new(db), UnionBuilder::add)
+                .build();
+            Some(union)
+        }
+    }
+
+    /// Returns the type of `.name`/`._name_` for an enum instance that is not
+    /// narrowed to a specific member (e.g. `x: MyEnum` where `MyEnum` has multiple members).
+    ///
+    /// Returns the union of all member name string literals.
+    pub(crate) fn instance_name_type(&self, db: &'db dyn Db) -> Option<Type<'db>> {
+        if self.members.is_empty() {
+            return None;
+        }
+        let union = self
+            .members
+            .keys()
+            .map(|name| Type::string_literal(db, name.as_str()))
+            .fold(UnionBuilder::new(db), UnionBuilder::add)
+            .build();
+        Some(union)
     }
 
     pub(crate) fn resolve_member<'a>(&'a self, name: &'a Name) -> Option<&'a Name> {
