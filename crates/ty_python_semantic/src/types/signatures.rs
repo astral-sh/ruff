@@ -1404,9 +1404,15 @@ impl<'db> Signature<'db> {
 
         loop {
             let Some(next_parameter) = parameters.next() else {
-                // All parameters have been checked or both the parameter lists were empty. In
-                // either case, `self` is a subtype of `other`.
-                return result;
+                if other_keywords.is_empty() {
+                    // All parameters have been checked or both the parameter lists were empty.
+                    // In either case, `self` is a subtype of `other`.
+                    return result;
+                }
+                // There are keyword parameters in `other` that were only matched positionally
+                // against a variadic parameter in `self`. We need to verify that they can also
+                // be matched as keyword arguments, which is done after this loop.
+                break;
             };
 
             match next_parameter {

@@ -59,6 +59,21 @@ def _(c: Callable[[int, 42, str, False], None]):
     reveal_type(c)
 ```
 
+Or, when an ellipsis literal is used as a parameter type in the list (note that the valid gradual
+form uses `...` as the entire first argument, not inside a list):
+
+```py
+# error: [invalid-type-form] "`[...]` is not a valid parameter list for `Callable`: Did you mean `Callable[..., int]`?"
+def _(c: Callable[[...], int]):
+    reveal_type(c)  # revealed: (...) -> int
+```
+
+```py
+# error: [invalid-type-form] "`...` is not allowed in this context in a type expression"
+def _(c: Callable[[int, ...], int]):
+    reveal_type(c)  # revealed: (int, Unknown, /) -> int
+```
+
 ### Missing return type
 
 Using a parameter list:

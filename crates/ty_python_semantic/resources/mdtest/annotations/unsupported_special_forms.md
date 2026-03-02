@@ -41,6 +41,12 @@ def ex3(msg: str):
             return fn(*args, **kwargs)
         return wrapped
     return wrapper
+
+def first_arg_int(*args: Unpack[tuple[int, Unpack[tuple[str, ...]]]]): ...
+
+first_arg_int(42, "42", "42")  # fine
+first_arg_int("not an int", "42", "42")  # TODO: should error
+first_arg_int(56, "42", 56)  # TODO: should error
 ```
 
 ## Type expressions

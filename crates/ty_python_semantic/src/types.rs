@@ -939,6 +939,7 @@ impl<'db> Type<'db> {
             DynamicType::Todo(_)
             | DynamicType::TodoStarredExpression
             | DynamicType::TodoUnpack
+            | DynamicType::TodoFunctionalTypedDict
             | DynamicType::TodoTypeVarTuple => true,
         })
     }
@@ -2538,6 +2539,27 @@ impl<'db> Type<'db> {
                 inner: Protocol::Synthesized(_),
                 ..
             }) => self.instance_member(db, &name),
+
+            // `type[Any]` (or `type[Unknown]`, etc.) has an unknown metaclass, but all
+            // metaclasses inherit from `type`. Check `type`'s class-level attributes
+            // first so that data descriptors like `__mro__` and `__bases__` resolve to
+            // their correct types instead of collapsing to `Any`/`Unknown`.
+            Type::SubclassOf(subclass_of) if subclass_of.is_dynamic() => {
+                let type_result = KnownClass::Type
+                    .to_class_literal(db)
+                    .find_name_in_mro_with_policy(db, name.as_str(), policy)
+                    .expect("`find_name_in_mro` should return `Some` for a class literal");
+                if !type_result.place.is_undefined() {
+                    type_result
+                } else {
+                    self.to_meta_type(db)
+                        .find_name_in_mro_with_policy(db, name.as_str(), policy)
+                        .expect(
+                            "`Type::find_name_in_mro()` should return `Some()` when called on a meta-type",
+                        )
+                }
+            }
+
             _ => self
                 .to_meta_type(db)
                 .find_name_in_mro_with_policy(db, name.as_str(), policy)
@@ -3190,14 +3212,6 @@ impl<'db> Type<'db> {
                 ))
                 .into()
             }
-            Type::KnownInstance(KnownInstanceType::GenericContext(tracked))
-                if name == "specialize_constrained" =>
-            {
-                Place::bound(Type::KnownBoundMethod(
-                    KnownBoundMethodType::GenericContextSpecializeConstrained(tracked),
-                ))
-                .into()
-            }
 
             Type::ClassLiteral(class)
                 if name == "__get__" && class.is_known(db, KnownClass::FunctionType) =>
@@ -3472,7 +3486,25 @@ impl<'db> Type<'db> {
                 // attribute access falls back to `__getattr__`/`__getattribute__` on the
                 // class. `try_call_dunder` adds `NO_INSTANCE_FALLBACK`, which causes the
                 // lookup to hit the catch-all that only checks the meta-type (the metaclass).
-                self.fallback_to_getattr(db, &name, result, policy)
+                let result = self.fallback_to_getattr(db, &name, result, policy);
+
+                // `type[Any]`/`type[Unknown]` are gradual forms with an unknown metaclass
+                // (which is at least `type`). Attributes resolved via `type`'s descriptors
+                // are intersected with the dynamic type to reflect uncertainty about
+                // whether the unknown metaclass overrides them.
+                if let Type::SubclassOf(subclass_of) = self
+                    && let SubclassOfInner::Dynamic(dynamic) = subclass_of.subclass_of()
+                {
+                    result.map_type(|ty| {
+                        if ty.is_dynamic() {
+                            ty
+                        } else {
+                            IntersectionType::from_two_elements(db, ty, Type::Dynamic(dynamic))
+                        }
+                    })
+                } else {
+                    result
+                }
             }
 
             // Unlike other objects, `super` has a unique member lookup behavior.
@@ -4221,7 +4253,7 @@ impl<'db> Type<'db> {
                                     .with_annotated_type(Type::any()),
                             ],
                         ),
-                        Type::unknown(),
+                        Type::Dynamic(DynamicType::TodoFunctionalTypedDict),
                     ),
                 )
                 .into()
@@ -6398,7 +6430,6 @@ impl<'db> Type<'db> {
                 | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)
                 | KnownBoundMethodType::ConstraintSetSatisfies(_)
                 | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_)
-                | KnownBoundMethodType::GenericContextSpecializeConstrained(_)
             )
             | Type::DataclassDecorator(_)
             | Type::DataclassTransformer(_)
@@ -6628,8 +6659,7 @@ impl<'db> Type<'db> {
                 | KnownBoundMethodType::ConstraintSetNever
                 | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)
                 | KnownBoundMethodType::ConstraintSetSatisfies(_)
-                | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_)
-                | KnownBoundMethodType::GenericContextSpecializeConstrained(_),
+                | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_),
             )
             | Type::DataclassDecorator(_)
             | Type::DataclassTransformer(_)
@@ -6817,7 +6847,15 @@ impl<'db> Type<'db> {
             Self::AlwaysFalsy => Type::SpecialForm(SpecialFormType::AlwaysFalsy).definition(db),
 
             // These types have no definition
-            Self::Dynamic(DynamicType::Divergent(_) | DynamicType::Todo(_) | DynamicType::TodoUnpack | DynamicType::TodoStarredExpression | DynamicType::TodoTypeVarTuple | DynamicType::UnspecializedTypeVar)
+            Self::Dynamic(
+                DynamicType::Divergent(_)
+                | DynamicType::Todo(_)
+                | DynamicType::TodoUnpack
+                | DynamicType::TodoStarredExpression
+                | DynamicType::TodoTypeVarTuple
+                | DynamicType::UnspecializedTypeVar
+                | DynamicType::TodoFunctionalTypedDict
+            )
             | Self::Callable(_)
             | Self::TypeIs(_)
             | Self::TypeGuard(_) => None,
@@ -7538,6 +7576,8 @@ pub enum DynamicType<'db> {
     TodoStarredExpression,
     /// A special Todo-variant for `TypeVarTuple` instances encountered in type expressions
     TodoTypeVarTuple,
+    /// A special Todo-variant for functional `TypedDict`s.
+    TodoFunctionalTypedDict,
     /// A type that is determined to be divergent during recursive type inference.
     Divergent(DivergentType),
 }
@@ -7564,6 +7604,7 @@ impl std::fmt::Display for DynamicType<'_> {
             DynamicType::TodoUnpack => f.write_str("@Todo(typing.Unpack)"),
             DynamicType::TodoStarredExpression => f.write_str("@Todo(StarredExpression)"),
             DynamicType::TodoTypeVarTuple => f.write_str("@Todo(TypeVarTuple)"),
+            DynamicType::TodoFunctionalTypedDict => f.write_str("@Todo(Functional TypedDicts)"),
             DynamicType::Divergent(_) => f.write_str("Divergent"),
         }
     }
@@ -8411,6 +8452,7 @@ impl<'db> TypeVarInstance<'db> {
                     DynamicType::Todo(_)
                     | DynamicType::TodoUnpack
                     | DynamicType::TodoStarredExpression
+                    | DynamicType::TodoFunctionalTypedDict
                     | DynamicType::TodoTypeVarTuple => Parameters::todo(),
                     DynamicType::Any
                     | DynamicType::Unknown
@@ -10696,9 +10738,6 @@ pub enum KnownBoundMethodType<'db> {
     ConstraintSetImpliesSubtypeOf(InternedConstraintSet<'db>),
     ConstraintSetSatisfies(InternedConstraintSet<'db>),
     ConstraintSetSatisfiedByAllTypeVars(InternedConstraintSet<'db>),
-
-    // GenericContext methods
-    GenericContextSpecializeConstrained(GenericContext<'db>),
 }
 
 pub(super) fn walk_method_wrapper_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -10730,8 +10769,7 @@ pub(super) fn walk_method_wrapper_type<'db, V: visitor::TypeVisitor<'db> + ?Size
         | KnownBoundMethodType::ConstraintSetNever
         | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)
         | KnownBoundMethodType::ConstraintSetSatisfies(_)
-        | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_)
-        | KnownBoundMethodType::GenericContextSpecializeConstrained(_) => {}
+        | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_) => {}
     }
 }
 
@@ -10816,10 +10854,6 @@ impl<'db> KnownBoundMethodType<'db> {
             | (
                 KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_),
                 KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_),
-            )
-            | (
-                KnownBoundMethodType::GenericContextSpecializeConstrained(_),
-                KnownBoundMethodType::GenericContextSpecializeConstrained(_),
             ) => ConstraintSet::from_bool(constraints, true),
 
             (
@@ -10833,8 +10867,7 @@ impl<'db> KnownBoundMethodType<'db> {
                 | KnownBoundMethodType::ConstraintSetNever
                 | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)
                 | KnownBoundMethodType::ConstraintSetSatisfies(_)
-                | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_)
-                | KnownBoundMethodType::GenericContextSpecializeConstrained(_),
+                | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_),
                 KnownBoundMethodType::FunctionTypeDunderGet(_)
                 | KnownBoundMethodType::FunctionTypeDunderCall(_)
                 | KnownBoundMethodType::PropertyDunderGet(_)
@@ -10845,8 +10878,7 @@ impl<'db> KnownBoundMethodType<'db> {
                 | KnownBoundMethodType::ConstraintSetNever
                 | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)
                 | KnownBoundMethodType::ConstraintSetSatisfies(_)
-                | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_)
-                | KnownBoundMethodType::GenericContextSpecializeConstrained(_),
+                | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_),
             ) => ConstraintSet::from_bool(constraints, false),
         }
     }
@@ -10884,8 +10916,7 @@ impl<'db> KnownBoundMethodType<'db> {
             | KnownBoundMethodType::ConstraintSetNever
             | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)
             | KnownBoundMethodType::ConstraintSetSatisfies(_)
-            | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_)
-            | KnownBoundMethodType::GenericContextSpecializeConstrained(_) => Some(self),
+            | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_) => Some(self),
         }
     }
 
@@ -10902,8 +10933,7 @@ impl<'db> KnownBoundMethodType<'db> {
             | KnownBoundMethodType::ConstraintSetNever
             | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)
             | KnownBoundMethodType::ConstraintSetSatisfies(_)
-            | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_)
-            | KnownBoundMethodType::GenericContextSpecializeConstrained(_) => {
+            | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_) => {
                 KnownClass::ConstraintSet
             }
         }
@@ -11086,23 +11116,6 @@ impl<'db> KnownBoundMethodType<'db> {
                             .with_default_type(Type::none(db))],
                     ),
                     KnownClass::Bool.to_instance(db),
-                )))
-            }
-
-            KnownBoundMethodType::GenericContextSpecializeConstrained(_) => {
-                Either::Right(std::iter::once(Signature::new(
-                    Parameters::new(
-                        db,
-                        [
-                            Parameter::positional_only(Some(Name::new_static("constraints")))
-                                .with_annotated_type(KnownClass::ConstraintSet.to_instance(db)),
-                        ],
-                    ),
-                    UnionType::from_two_elements(
-                        db,
-                        KnownClass::Specialization.to_instance(db),
-                        Type::none(db),
-                    ),
                 )))
             }
         }

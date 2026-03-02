@@ -49,7 +49,6 @@ use crate::types::{
     KnownClass, KnownInstanceType, LiteralValueTypeKind, MemberLookupPolicy, NominalInstanceType,
     PropertyInstanceType, SpecialFormType, TypeAliasType, TypeContext, TypeVarBoundOrConstraints,
     TypeVarVariance, UnionBuilder, UnionType, WrapperDescriptorKind, enums, list_members,
-    todo_type,
 };
 use crate::unpack::EvaluationMode;
 use crate::{DisplaySettings, Program};
@@ -1881,28 +1880,6 @@ impl<'db> Bindings<'db> {
                         overload.set_return_type(Type::bool_literal(result));
                     }
 
-                    Type::KnownBoundMethod(
-                        KnownBoundMethodType::GenericContextSpecializeConstrained(generic_context),
-                    ) => {
-                        let [Some(set)] = overload.parameter_types() else {
-                            continue;
-                        };
-                        let Type::KnownInstance(KnownInstanceType::ConstraintSet(set)) = set else {
-                            continue;
-                        };
-                        let constraints = ConstraintSetBuilder::new();
-                        let set = constraints.load(db, set.constraints(db));
-                        let specialization =
-                            generic_context.specialize_constrained(db, &constraints, set);
-                        let result = match specialization {
-                            Ok(specialization) => Type::KnownInstance(
-                                KnownInstanceType::Specialization(specialization),
-                            ),
-                            Err(()) => Type::none(db),
-                        };
-                        overload.set_return_type(result);
-                    }
-
                     Type::ClassLiteral(class) => match class.known(db) {
                         Some(KnownClass::Bool) => match overload.parameter_types() {
                             [Some(arg)] => overload.set_return_type(arg.bool(db).into_type(db)),
@@ -1959,7 +1936,9 @@ impl<'db> Bindings<'db> {
                     },
 
                     Type::SpecialForm(SpecialFormType::TypedDict) => {
-                        overload.set_return_type(todo_type!("Support for functional `TypedDict`"));
+                        overload.set_return_type(Type::Dynamic(
+                            crate::types::DynamicType::TodoFunctionalTypedDict,
+                        ));
                     }
 
                     // Not a special case
