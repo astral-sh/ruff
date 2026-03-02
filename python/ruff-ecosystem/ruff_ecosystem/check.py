@@ -560,10 +560,8 @@ async def ruff_check(
         raise ToolError(err.decode("utf8"))
 
     # Strip summary lines so the diff is only diagnostic lines
-    lines = [
+    return [
         line
         for line in result.decode("utf8").splitlines()
         if not CHECK_SUMMARY_LINE_RE.match(line)
     ]
-
-    return lines

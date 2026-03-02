@@ -183,7 +183,7 @@ async def format_then_format(
             options=options,
         )
         # Then get the diff from stdout
-        diff = await format(
+        return await format(
             formatter=Formatter.ruff,
             executable=ruff_comparison_executable.resolve(),
             path=cloned_repo.path,
@@ -191,7 +191,6 @@ async def format_then_format(
             options=options,
             diff=True,
         )
-    return diff
 
 
 async def format_and_format(
@@ -230,9 +229,7 @@ async def format_and_format(
         )
 
     # Then get the diff from the commit
-    diff = await cloned_repo.diff(commit)
-
-    return diff
+    return await cloned_repo.diff(commit)
 
 
 async def format(
@@ -272,8 +269,7 @@ async def format(
     if proc.returncode not in [0, 1]:
         raise ToolError(err.decode("utf8"))
 
-    lines = result.decode("utf8").splitlines()
-    return lines
+    return result.decode("utf8").splitlines()
 
 
 class FormatComparison(Enum):

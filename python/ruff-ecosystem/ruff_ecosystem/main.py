@@ -98,7 +98,6 @@ async def main(
             raise ValueError(f"Unknown output format {format}")
 
 
-
 async def clone_and_compare(
     command: RuffCommand,
     baseline_executable: Path,
