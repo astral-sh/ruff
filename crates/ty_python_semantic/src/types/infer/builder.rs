@@ -74,18 +74,18 @@ use crate::types::diagnostic::{
     DATACLASS_FIELD_ORDER, DUPLICATE_BASE, DUPLICATE_KW_ONLY, FINAL_ON_NON_METHOD,
     FINAL_WITHOUT_VALUE, INCONSISTENT_MRO, INEFFECTIVE_FINAL, INVALID_ARGUMENT_TYPE,
     INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, INVALID_BASE, INVALID_DATACLASS,
-    INVALID_DECLARATION, INVALID_GENERIC_CLASS, INVALID_GENERIC_ENUM, INVALID_KEY,
-    INVALID_LEGACY_POSITIONAL_PARAMETER, INVALID_LEGACY_TYPE_VARIABLE, INVALID_METACLASS,
-    INVALID_NAMED_TUPLE, INVALID_NEWTYPE, INVALID_OVERLOAD, INVALID_PARAMETER_DEFAULT,
-    INVALID_PARAMSPEC, INVALID_PROTOCOL, INVALID_TYPE_ALIAS_TYPE, INVALID_TYPE_ARGUMENTS,
-    INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL, INVALID_TYPE_GUARD_DEFINITION,
-    INVALID_TYPE_VARIABLE_BOUND, INVALID_TYPE_VARIABLE_CONSTRAINTS, INVALID_TYPE_VARIABLE_DEFAULT,
-    INVALID_TYPED_DICT_HEADER, INVALID_TYPED_DICT_STATEMENT, IncompatibleBases, MISSING_ARGUMENT,
-    NO_MATCHING_OVERLOAD, PARAMETER_ALREADY_ASSIGNED, POSSIBLY_MISSING_ATTRIBUTE,
-    POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_IMPORT, SUBCLASS_OF_FINAL_CLASS,
-    TOO_MANY_POSITIONAL_ARGUMENTS, TypedDictDeleteErrorKind, UNDEFINED_REVEAL, UNKNOWN_ARGUMENT,
-    UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_IMPORT, UNRESOLVED_REFERENCE,
-    UNSUPPORTED_DYNAMIC_BASE, UNSUPPORTED_OPERATOR, USELESS_OVERLOAD_BODY,
+    INVALID_DECLARATION, INVALID_ENUM_MEMBER_ANNOTATION, INVALID_GENERIC_CLASS,
+    INVALID_GENERIC_ENUM, INVALID_KEY, INVALID_LEGACY_POSITIONAL_PARAMETER,
+    INVALID_LEGACY_TYPE_VARIABLE, INVALID_METACLASS, INVALID_NAMED_TUPLE, INVALID_NEWTYPE,
+    INVALID_OVERLOAD, INVALID_PARAMETER_DEFAULT, INVALID_PARAMSPEC, INVALID_PROTOCOL,
+    INVALID_TYPE_ALIAS_TYPE, INVALID_TYPE_ARGUMENTS, INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL,
+    INVALID_TYPE_GUARD_DEFINITION, INVALID_TYPE_VARIABLE_BOUND, INVALID_TYPE_VARIABLE_CONSTRAINTS,
+    INVALID_TYPE_VARIABLE_DEFAULT, INVALID_TYPED_DICT_HEADER, INVALID_TYPED_DICT_STATEMENT,
+    IncompatibleBases, MISSING_ARGUMENT, NO_MATCHING_OVERLOAD, PARAMETER_ALREADY_ASSIGNED,
+    POSSIBLY_MISSING_ATTRIBUTE, POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_IMPORT,
+    SUBCLASS_OF_FINAL_CLASS, TOO_MANY_POSITIONAL_ARGUMENTS, TypedDictDeleteErrorKind,
+    UNDEFINED_REVEAL, UNKNOWN_ARGUMENT, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_IMPORT,
+    UNRESOLVED_REFERENCE, UNSUPPORTED_DYNAMIC_BASE, UNSUPPORTED_OPERATOR, USELESS_OVERLOAD_BODY,
     hint_if_stdlib_attribute_exists_on_other_versions,
     hint_if_stdlib_submodule_exists_on_other_versions, report_attempted_protocol_instantiation,
     report_bad_dunder_set_call, report_bad_frozen_dataclass_inheritance,
@@ -107,7 +107,7 @@ use crate::types::diagnostic::{
     report_shadowed_type_variable, report_unsupported_augmented_assignment,
     report_unsupported_base, report_unsupported_comparison,
 };
-use crate::types::enums::is_enum_class_by_inheritance;
+use crate::types::enums::{enum_ignored_names, is_enum_class_by_inheritance};
 use crate::types::function::{
     FunctionBodyKind, FunctionDecorators, FunctionLiteral, FunctionType, KnownFunction,
     OverloadLiteral, function_body_kind, is_implicit_classmethod,
@@ -9635,6 +9635,43 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     &DeclaredAndInferredType::AreTheSame(TypeAndQualifiers::declared(inferred_ty)),
                 );
             } else {
+                // Check for annotated enum members. The typing spec states that enum
+                // members should not have explicit type annotations.
+                if let Some(name_expr) = target.as_name_expr()
+                    && !name_expr.id.starts_with("__")
+                    && !matches!(name_expr.id.as_str(), "_ignore_" | "_value_" | "_name_")
+                    // Not bare Final (bare Final is allowed on enum members)
+                    && !(declared.qualifiers.contains(TypeQualifiers::FINAL)
+                        && matches!(declared.inner_type(), Type::Dynamic(DynamicType::Unknown)))
+                    // Value type would be an enum member at runtime (exclude callables,
+                    // which are never members)
+                    && !inferred_ty.is_subtype_of(
+                        self.db(),
+                        Type::Callable(CallableType::unknown(self.db()))
+                            .top_materialization(self.db()),
+                    )
+                {
+                    let current_scope_id = self.scope().file_scope_id(self.db());
+                    let current_scope = self.index.scope(current_scope_id);
+                    if current_scope.kind() == ScopeKind::Class
+                        && let Some(class) =
+                            nearest_enclosing_class(self.db(), self.index, self.scope())
+                        && is_enum_class_by_inheritance(self.db(), class)
+                        && !enum_ignored_names(self.db(), self.scope()).contains(&name_expr.id)
+                        && let Some(builder) = self
+                            .context
+                            .report_lint(&INVALID_ENUM_MEMBER_ANNOTATION, annotation)
+                    {
+                        let mut diag = builder.into_diagnostic(format_args!(
+                            "Type annotation on enum member `{}` is not allowed",
+                            &name_expr.id
+                        ));
+                        diag.info(
+                            "See: https://typing.python.org/en/latest/spec/enums.html#enum-members",
+                        );
+                    }
+                }
+
                 self.add_declaration_with_binding(
                     target.into(),
                     definition,
