@@ -71,6 +71,36 @@ impl<'db> EnumMetadata<'db> {
     }
 }
 
+/// Returns the set of names listed in an enum's `_ignore_` attribute.
+#[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
+pub(crate) fn enum_ignored_names<'db>(db: &'db dyn Db, scope_id: ScopeId<'db>) -> FxHashSet<Name> {
+    let use_def_map = use_def_map(db, scope_id);
+    let table = place_table(db, scope_id);
+
+    let Some(ignore) = table.symbol_id("_ignore_") else {
+        return FxHashSet::default();
+    };
+
+    let ignore_bindings = use_def_map.reachable_symbol_bindings(ignore);
+    let ignore_place = place_from_bindings(db, ignore_bindings).place;
+
+    match ignore_place {
+        Place::Defined(DefinedPlace { ty, .. }) => ty
+            .as_string_literal()
+            .map(|ignored_names| {
+                ignored_names
+                    .value(db)
+                    .split_ascii_whitespace()
+                    .map(Name::new)
+                    .collect()
+            })
+            .unwrap_or_default(),
+
+        // TODO: support the list-variant of `_ignore_`.
+        Place::Undefined => FxHashSet::default(),
+    }
+}
+
 /// List all members of an enum.
 #[allow(clippy::ref_option, clippy::unnecessary_wraps)]
 #[salsa::tracked(returns(as_ref), cycle_initial=|_, _, _| Some(EnumMetadata::empty()), heap_size=ruff_memory_usage::heap_size)]
@@ -114,21 +144,7 @@ pub(crate) fn enum_metadata<'db>(
     let mut enum_values: FxHashMap<Type<'db>, Name> = FxHashMap::default();
     let mut auto_counter = 0;
     let mut auto_members = FxHashSet::default();
-    let ignored_names: Option<Vec<&str>> = if let Some(ignore) = table.symbol_id("_ignore_") {
-        let ignore_bindings = use_def_map.reachable_symbol_bindings(ignore);
-        let ignore_place = place_from_bindings(db, ignore_bindings).place;
-
-        match ignore_place {
-            Place::Defined(DefinedPlace { ty, .. }) => ty
-                .as_string_literal()
-                .map(|ignored_names| ignored_names.value(db).split_ascii_whitespace().collect()),
-
-            // TODO: support the list-variant of `_ignore_`.
-            Place::Undefined => None,
-        }
-    } else {
-        None
-    };
+    let ignored_names = enum_ignored_names(db, scope_id);
 
     let mut aliases = FxHashMap::default();
 
@@ -143,11 +159,7 @@ pub(crate) fn enum_metadata<'db>(
                 return None;
             }
 
-            if name == "_ignore_"
-                || ignored_names
-                    .as_ref()
-                    .is_some_and(|names| names.contains(&name.as_str()))
-            {
+            if name == "_ignore_" || ignored_names.contains(name) {
                 // Skip ignored attributes
                 return None;
             }

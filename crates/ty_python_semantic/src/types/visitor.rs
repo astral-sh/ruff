@@ -11,12 +11,13 @@ use crate::{
         class::walk_generic_alias,
         function::{FunctionType, walk_function_type},
         instance::{walk_nominal_instance_type, walk_protocol_instance_type},
+        known_instance::walk_known_instance_type,
         newtype::{NewType, walk_newtype_instance_type},
         subclass_of::walk_subclass_of_type,
         walk_bound_method_type, walk_bound_type_var_type, walk_callable_type,
-        walk_intersection_type, walk_known_instance_type, walk_method_wrapper_type,
-        walk_property_instance_type, walk_type_alias_type, walk_type_var_type,
-        walk_typed_dict_type, walk_typeguard_type, walk_typeis_type, walk_union,
+        walk_intersection_type, walk_method_wrapper_type, walk_property_instance_type,
+        walk_type_alias_type, walk_type_var_type, walk_typed_dict_type, walk_typeguard_type,
+        walk_typeis_type, walk_union,
     },
 };
 use std::cell::{Cell, RefCell};

@@ -3,11 +3,11 @@ use ruff_python_ast::name::Name;
 use rustc_hash::FxHashSet;
 
 use crate::place::{DefinedPlace, Place};
-use crate::types::builder::RecursivelyDefined;
 use crate::types::constraints::{
     ConstraintSetBuilder, IteratorConstraintsExtension, OptionConstraintsExtension,
 };
 use crate::types::enums::is_single_member_enum;
+use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::{
     CallableType, ClassBase, ClassType, CycleDetector, DynamicType, KnownClass, KnownInstanceType,
     LiteralValueTypeKind, MemberLookupPolicy, PairVisitor, ProtocolInstanceType, SubclassOfInner,
