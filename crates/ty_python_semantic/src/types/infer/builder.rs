@@ -1546,7 +1546,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                     for bound_typevar in generic_context.variables(self.db()) {
                         let typevar = bound_typevar.typevar(self.db());
-                        let has_default = typevar.has_default(self.db());
+                        let has_default = typevar.default_type(self.db()).is_some();
 
                         if let Some(state) = state.as_mut() {
                             if !has_default {

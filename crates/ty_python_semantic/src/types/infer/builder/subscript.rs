@@ -537,10 +537,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         for (index, item) in typevars.zip_longest(type_arguments.iter()).enumerate() {
             match item {
                 EitherOrBoth::Both(typevar, expr) => {
-                    if typevar.has_default(db) {
-                        typevar_with_defaults += 1;
-                    }
-
                     let provided_type = if typevar.is_paramspec(db) {
                         self.infer_paramspec_explicit_specialization_value(
                             expr,
@@ -633,7 +629,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }
                 }
                 EitherOrBoth::Left(typevar) => {
-                    if !typevar.has_default(db) {
+                    if typevar.default_type(db).is_none() {
                         // This is an error case, so no need to push into the specialization types.
                         missing_typevars.push(typevar);
                     } else {
