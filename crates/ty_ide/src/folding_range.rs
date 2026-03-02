@@ -1,8 +1,9 @@
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_db::source::source_text;
+use ruff_python_ast::token::{TokenKind, Tokens};
 use ruff_python_ast::visitor::source_order::{SourceOrderVisitor, TraversalSignal, walk_body};
-use ruff_python_ast::{AnyNodeRef, Decorator, Stmt, StmtClassDef, StmtFunctionDef};
+use ruff_python_ast::{AnyNodeRef, Stmt, StmtClassDef, StmtFunctionDef};
 use ruff_source_file::{Line, UniversalNewlines};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
@@ -48,12 +49,10 @@ pub fn folding_ranges(db: &dyn Db, file: File) -> Vec<FoldingRange> {
     let parsed = parsed_module(db, file).load(db);
     let source = source_text(db, file);
 
-    let line_index = ruff_db::source::line_index(db, file);
-
     let mut visitor = FoldingRangeVisitor {
         source: source.as_str(),
         ranges: vec![],
-        line_index: &line_index,
+        tokens: parsed.tokens(),
     };
     visitor.visit_body(parsed.suite());
 
@@ -70,7 +69,7 @@ pub fn folding_ranges(db: &dyn Db, file: File) -> Vec<FoldingRange> {
 struct FoldingRangeVisitor<'a> {
     source: &'a str,
     ranges: Vec<FoldingRange>,
-    line_index: &'a ruff_source_file::LineIndex,
+    tokens: &'a Tokens,
 }
 
 impl<'a> FoldingRangeVisitor<'a> {
@@ -228,41 +227,44 @@ impl<'a> FoldingRangeVisitor<'a> {
         self.add_range(FoldingRange::from(first_stmt.range()).with_kind(FoldingRangeKind::Comment));
     }
 
-    /// Add a folding range for decorators applied to a class or function.
-    fn add_decorator_range(&mut self, decorator_list: &[Decorator]) {
-        if let (Some(first), Some(last)) = (decorator_list.first(), decorator_list.last()) {
-            self.add_range(TextRange::new(first.start(), last.end()));
-        }
-    }
-
     /// Add a folding range for the function or class definition.
-    fn add_def_range(
-        &mut self,
-        range: TextRange,
-        decorator_list: &[Decorator],
-        name_start: TextSize,
-    ) {
-        if decorator_list.last().is_some() {
-            // get the the beginning of the line containing the function or class name
-            let line = self.line_index.line_index(name_start);
-            let start = self.line_index.line_start(line, self.source);
-            let range = TextRange::new(start, range.end());
-            self.add_range(range);
-        } else {
+    ///
+    /// `target` is checked for in `search_range`, and is used as the start if found.
+    fn add_def_range(&mut self, target: TokenKind, search_range: TextRange, end: TextSize) {
+        let target_token = self
+            .tokens
+            .in_range(search_range)
+            .iter()
+            .find(|tok| tok.kind() == target);
+        if let Some(tok) = target_token {
+            let range = TextRange::new(tok.start(), end);
             self.add_range(range);
         }
     }
 
     /// Add a folding range for function definitions, excluding decorators.
     fn add_function_def_range(&mut self, func: &StmtFunctionDef) {
-        self.add_decorator_range(&func.decorator_list);
-        self.add_def_range(func.range(), &func.decorator_list, func.name.start());
+        if let Some(decorator) = func.decorator_list.last() {
+            let target = if func.is_async {
+                TokenKind::Async
+            } else {
+                TokenKind::Def
+            };
+            let search_range = TextRange::new(decorator.end(), func.name.start());
+            self.add_def_range(target, search_range, func.end());
+        } else {
+            self.add_range(func.range());
+        }
     }
 
     /// Add a folding range for class definitions, excluding decorators.
     fn add_class_def_range(&mut self, class: &StmtClassDef) {
-        self.add_decorator_range(&class.decorator_list);
-        self.add_def_range(class.range(), &class.decorator_list, class.name.start());
+        if let Some(decorator) = class.decorator_list.last() {
+            let search_range = TextRange::new(decorator.end(), class.name.start());
+            self.add_def_range(TokenKind::Class, search_range, class.end());
+        } else {
+            self.add_range(class.range());
+        }
     }
 }
 
@@ -1738,7 +1740,7 @@ def my_function():
             )
             .build();
 
-        assert_snapshot!(test.folding_ranges(), @r"
+        assert_snapshot!(test.folding_ranges(), @"
         info[folding-range]: Folding Range
          --> main.py:3:1
           |
@@ -1768,17 +1770,6 @@ def my_function():
 
         assert_snapshot!(test.folding_ranges(), @"
         info[folding-range]: Folding Range
-         --> main.py:2:1
-          |
-        2 | / @first
-        3 | | @second
-        4 | | @third
-          | |______^
-        5 |   def my_function():
-        6 |       pass
-          |
-
-        info[folding-range]: Folding Range
          --> main.py:5:1
           |
         3 |   @second
@@ -1806,7 +1797,7 @@ class MyClass:
             .build();
 
         // Single decorator is one line, so no decorator folding range is emitted.
-        assert_snapshot!(test.folding_ranges(), @r"
+        assert_snapshot!(test.folding_ranges(), @"
         info[folding-range]: Folding Range
          --> main.py:3:1
           |
@@ -1836,16 +1827,6 @@ class MyClass:
 
         assert_snapshot!(test.folding_ranges(), @"
         info[folding-range]: Folding Range
-         --> main.py:2:1
-          |
-        2 | / @decorator_a
-        3 | | @decorator_b
-          | |____________^
-        4 |   class MyClass:
-        5 |       value: int
-          |
-
-        info[folding-range]: Folding Range
          --> main.py:4:1
           |
         2 |   @decorator_a
@@ -1871,7 +1852,7 @@ async def my_async_function():
             )
             .build();
 
-        assert_snapshot!(test.folding_ranges(), @r"
+        assert_snapshot!(test.folding_ranges(), @"
         info[folding-range]: Folding Range
          --> main.py:3:1
           |
@@ -1910,7 +1891,7 @@ def outer_function():
           |
 
         info[folding-range]: Folding Range
-         --> main.py:4:1
+         --> main.py:4:5
           |
         2 |   def outer_function():
         3 |       @decorator
@@ -1948,7 +1929,7 @@ class MyClass:
           |
 
         info[folding-range]: Folding Range
-         --> main.py:4:1
+         --> main.py:4:5
           |
         2 |   class MyClass:
         3 |       @decorator
