@@ -78,8 +78,7 @@ class Answer(Enum):
 
     non_member_1: int
 
-    # TODO: this could be considered an error:
-    non_member_1: str = "some value"
+    non_member_1: str = "some value"  # error: [invalid-enum-member-annotation]
 
 # revealed: tuple[Literal["YES"], Literal["NO"]]
 reveal_type(enum_members(Answer))
@@ -98,6 +97,103 @@ class Answer(Enum):
 
 # revealed: tuple[Literal["YES"], Literal["NO"]]
 reveal_type(enum_members(Answer))
+```
+
+### Annotated enum members
+
+The [typing spec] states that enum members should not have explicit type annotations. Type checkers
+should report an error for annotated enum members because the annotation is misleading — the actual
+type of an enum member is the enum class itself, not the annotated type.
+
+```py
+from enum import Enum
+
+class Pet(Enum):
+    CAT = 1
+    DOG: int = 2  # error: [invalid-enum-member-annotation] "Type annotation on enum member `DOG` is not allowed"
+    BIRD: str = "bird"  # error: [invalid-enum-member-annotation]
+```
+
+Bare `Final` annotations are allowed (they don't specify a type):
+
+```py
+from enum import Enum
+from typing import Final
+
+class Pet(Enum):
+    CAT: Final = 1  # OK
+    DOG: Final = 2  # OK
+```
+
+But `Final` with a type argument is not allowed:
+
+```py
+from enum import Enum
+from typing import Final
+
+class Pet(Enum):
+    CAT: Final[int] = 1  # error: [invalid-enum-member-annotation]
+    DOG: Final[str] = "woof"  # error: [invalid-enum-member-annotation]
+```
+
+`enum.member` used as value wrapper is the standard way to declare members explicitly:
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from enum import Enum, member
+
+class Pet(Enum):
+    CAT = member(1)  # OK
+```
+
+Dunder and private names are not enum members, so they don't trigger the diagnostic:
+
+```py
+from enum import Enum
+
+class Pet(Enum):
+    CAT = 1
+    __private: int = 2  # OK: dunder/private names are never members
+    __module__: str = "my_module"  # OK
+```
+
+Pure declarations (annotations without values) are non-members and are fine:
+
+```py
+from enum import Enum
+
+class Pet(Enum):
+    CAT = 1
+    species: str  # OK: no value, so this is a non-member declaration
+```
+
+The check also works for subclasses of `Enum`:
+
+```py
+from enum import IntEnum, StrEnum
+
+class Status(IntEnum):
+    OK: int = 200  # error: [invalid-enum-member-annotation]
+    NOT_FOUND = 404  # OK
+
+class Color(StrEnum):
+    RED: str = "red"  # error: [invalid-enum-member-annotation]
+    GREEN = "green"  # OK
+```
+
+Special sunder names like `_value_` and `_ignore_` are not flagged:
+
+```py
+from enum import Enum
+
+class Pet(Enum):
+    _value_: int = 0  # OK: `_value_` is a special enum name
+    _ignore_: str = "TEMP"  # OK: `_ignore_` is a special enum name
+    CAT = 1
 ```
 
 ### Declared `_value_` annotation
@@ -814,7 +910,7 @@ class Answer(Enum):
 
     def is_yes(self) -> bool:
         return self == Answer.YES
-    constant: int = 1
+    constant: int = 1  # error: [invalid-enum-member-annotation]
 
 reveal_type(Answer.YES.is_yes())  # revealed: bool
 reveal_type(Answer.YES.constant)  # revealed: int
@@ -1353,3 +1449,4 @@ class MyEnum[T](MyEnumBase):
 - Documentation: <https://docs.python.org/3/library/enum.html>
 
 [class-private names]: https://docs.python.org/3/reference/lexical_analysis.html#reserved-classes-of-identifiers
+[typing spec]: https://typing.python.org/en/latest/spec/enums.html#enum-members

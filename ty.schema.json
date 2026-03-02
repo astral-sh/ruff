@@ -735,6 +735,16 @@
             }
           ]
         },
+        "invalid-enum-member-annotation": {
+          "title": "detects type annotations on enum members",
+          "description": "## What it does\nChecks for enum members that have explicit type annotations.\n\n## Why is this bad?\nThe [typing spec] states that type checkers should infer a literal type\nfor all enum members. An explicit type annotation on an enum member is\nmisleading because the annotated type will be incorrect — the actual\nruntime type is the enum class itself, not the annotated type.\n\nIn CPython's `enum` module, annotated assignments with values are still\ntreated as members at runtime, but the annotation is meaningless and\nwill confuse readers of the code.\n\n## Examples\n```python\nfrom enum import Enum\n\nclass Pet(Enum):\n    CAT = 1       # OK\n    DOG: int = 2  # Error: enum members should not be annotated\n```\n\nUse instead:\n```python\nfrom enum import Enum\n\nclass Pet(Enum):\n    CAT = 1\n    DOG = 2\n```\n\n## References\n- [Typing spec: Enum members](https://typing.python.org/en/latest/spec/enums.html#enum-members)\n\n[typing spec]: https://typing.python.org/en/latest/spec/enums.html#enum-members",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "invalid-exception-caught": {
           "title": "detects exception handlers that catch classes that do not inherit from `BaseException`",
           "description": "## What it does\nChecks for exception handlers that catch non-exception classes.\n\n## Why is this bad?\nCatching classes that do not inherit from `BaseException` will raise a `TypeError` at runtime.\n\n## Example\n```python\ntry:\n    1 / 0\nexcept 1:\n    ...\n```\n\nUse instead:\n```python\ntry:\n    1 / 0\nexcept ZeroDivisionError:\n    ...\n```\n\n## References\n- [Python documentation: except clause](https://docs.python.org/3/reference/compound_stmts.html#except-clause)\n- [Python documentation: Built-in Exceptions](https://docs.python.org/3/library/exceptions.html#built-in-exceptions)\n\n## Ruff rule\n This rule corresponds to Ruff's [`except-with-non-exception-classes` (`B030`)](https://docs.astral.sh/ruff/rules/except-with-non-exception-classes)",
