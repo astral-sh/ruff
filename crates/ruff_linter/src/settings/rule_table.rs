@@ -58,6 +58,11 @@ impl RuleTable {
         self.enabled.iter()
     }
 
+    /// Returns an iterator over all enabled rules.
+    pub fn iter_warn(&self) -> RuleSetIterator {
+        self.warn.iter()
+    }
+
     /// Enables the given rule.
     #[inline]
     pub fn enable(&mut self, rule: Rule, should_fix: bool) {

@@ -364,6 +364,21 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
     //   is resolved.
     let preview = pyproject_config.settings.linter.preview.is_enabled();
 
+    if !preview
+        && pyproject_config
+            .settings
+            .linter
+            .rules
+            .iter_warn()
+            // TODO use `exact_size_is_empty` if that API stabilizes
+            .len()
+            .ne(&0)
+    {
+        warn_user_once!(
+            "Enabling rules with severity 'warning' requires preview mode, otherwise all rules are interpreted with severity 'error'."
+        );
+    }
+
     if cli.watch {
         // Configure the file watcher.
         let (tx, rx) = channel();
@@ -496,10 +511,11 @@ https://github.com/astral-sh/ruff/issues/new?title=%5BLinter%20panic%5D
                     }
                 }
             } else {
-                // If we're running the linter (not just fixing), we want to exit non-zero if
-                // there are any violations, unless we're explicitly asked to exit zero on
-                // fix.
+                // If we're running the linter (not just fixing), we want to
+                // exit non-zero if there are any (error level) violations,
+                // unless we're explicitly asked to exit zero on fix.
                 if max_severity >= Severity::Error
+                    || (!preview && !diagnostics.inner.is_empty())
                     || (cli.exit_non_zero_on_fix && !diagnostics.fixed.is_empty())
                 {
                     return Ok(ExitStatus::Failure);
