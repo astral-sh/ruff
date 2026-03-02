@@ -171,11 +171,14 @@ which also involved
 from derived import Derived
 
 Derived.decorate
+# revealed: bound method <class 'Derived'>.decorate[T](item_class: type[T]) -> type[T]
+reveal_type(Derived.decorate)
 ```
 
 `derived.py`:
 
 ```py
+from ty_extensions import reveal_mro
 import bases
 
 class Derived(bases.GenericBase["Foo", "Bar"]): ...
@@ -183,14 +186,25 @@ class Derived(bases.GenericBase["Foo", "Bar"]): ...
 @Derived.decorate
 class Foo(bases.Foo): ...
 
+# revealed: <class 'Foo'>
+reveal_type(Foo)
+# revealed: (<class 'derived.Foo'>, <class 'bases.Foo'>, <class 'object'>)
+reveal_mro(Foo)
+
 @Derived.decorate
 class Bar(bases.Bar): ...
+
+# revealed: <class 'Bar'>
+reveal_type(Bar)
+# revealed: (<class 'derived.Bar'>, <class 'bases.Bar'>, <class 'object'>)
+reveal_mro(Bar)
 ```
 
 `bases.py`:
 
 ```py
 from typing import Generic, TypeVar, Type
+from ty_extensions import reveal_mro
 
 T = TypeVar("T")
 B1 = TypeVar("B1", bound="Foo")
@@ -200,6 +214,13 @@ class GenericBase(Generic[B1, B2]):
     @classmethod
     def decorate(cls, item_class: Type[T]) -> Type[T]:
         return item_class
+
+# revealed: <class 'GenericBase'>
+reveal_type(GenericBase)
+# revealed: (<class 'GenericBase[Unknown, Unknown]'>, typing.Generic, <class 'object'>)
+reveal_mro(GenericBase)
+# revealed: (<class 'GenericBase[Foo, Bar]'>, typing.Generic, <class 'object'>)
+reveal_mro(GenericBase["Foo", "Bar"])
 
 class Foo: ...
 class Bar: ...
