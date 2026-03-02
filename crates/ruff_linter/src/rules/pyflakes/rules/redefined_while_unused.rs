@@ -21,7 +21,7 @@ use crate::{Fix, FixAvailability, Violation};
 /// Redefinitions of unused names are unnecessary and often indicative of a
 /// mistake.
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// import foo
 /// import bar
@@ -33,6 +33,9 @@ use crate::{Fix, FixAvailability, Violation};
 /// import foo
 /// import bar
 /// ```
+///
+/// In [preview](https://docs.astral.sh/ruff/preview/), this rule will 
+/// also flag redefinitions in `typing.TYPE_CHECKING` blocks:
 ///
 /// ```python
 /// import typing
