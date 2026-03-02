@@ -192,7 +192,6 @@ pub(super) fn find_file_opens<'a>(
         .collect()
 }
 
-#[allow(clippy::too_many_arguments)]
 fn resolve_file_open<'a>(
     item: &'a ast::WithItem,
     with: &'a ast::StmtWith,
@@ -222,12 +221,10 @@ fn resolve_file_open<'a>(
     let semantic = checker.semantic();
     let var = item.optional_vars.as_deref()?.as_name_expr()?;
     let scope = semantic.current_scope();
-    let binding_id = scope.get_all(var.id.as_str()).find(|id| {
-        let binding = semantic.binding(*id);
-        binding.range() == var.range()
+    let binding = scope.get_all(var.id.as_str()).find_map(|id| {
+        let binding = semantic.binding(id);
+        (binding.range() == var.range()).then_some(binding)
     })?;
-
-    let binding = semantic.binding(binding_id);
     let mut binding_references = binding
         .references()
         .map(|id| semantic.reference(id))
@@ -262,8 +259,6 @@ fn find_file_open<'a>(
     read_mode: bool,
     python_version: PythonVersion,
 ) -> Option<FileOpen<'a>> {
-    let semantic = checker.semantic();
-
     // We want to match `open(...) as var`.
     let ast::ExprCall {
         func,
@@ -280,7 +275,7 @@ fn find_file_open<'a>(
         return None;
     }
 
-    if !semantic.match_builtin_expr(func, "open") {
+    if !checker.semantic().match_builtin_expr(func, "open") {
         return None;
     }
 
@@ -310,8 +305,6 @@ fn find_path_open<'a>(
     read_mode: bool,
     python_version: PythonVersion,
 ) -> Option<FileOpen<'a>> {
-    let semantic = checker.semantic();
-
     let ast::ExprCall {
         func,
         arguments: ast::Arguments { args, keywords, .. },
@@ -323,7 +316,7 @@ fn find_path_open<'a>(
         return None;
     }
 
-    if !is_open_call_from_pathlib(func, semantic) {
+    if !is_open_call_from_pathlib(func, checker.semantic()) {
         return None;
     }
 
