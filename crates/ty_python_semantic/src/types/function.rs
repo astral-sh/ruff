@@ -78,6 +78,7 @@ use crate::types::diagnostic::{
 use crate::types::display::DisplaySettings;
 use crate::types::generics::{GenericContext, InferableTypeVars, typing_self};
 use crate::types::infer::nearest_enclosing_class;
+use crate::types::known_instance::DeprecatedInstance;
 use crate::types::list_members::all_members;
 use crate::types::narrow::ClassInfoConstraintFunction;
 use crate::types::relation::{HasRelationToVisitor, IsDisjointVisitor, TypeRelation};
@@ -85,10 +86,10 @@ use crate::types::signatures::{CallableSignature, Signature};
 use crate::types::visitor::any_over_type;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundMethodType, BoundTypeVarInstance, CallableType, CallableTypeKind,
-    ClassBase, ClassLiteral, ClassType, DeprecatedInstance, DynamicType, FindLegacyTypeVarsVisitor,
-    KnownClass, KnownInstanceType, SpecialFormType, SubclassOfInner, SubclassOfType, Truthiness,
-    Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints, UnionBuilder, UnionType,
-    binding_type, definition_expression_type, infer_definition_types, walk_signature,
+    ClassBase, ClassLiteral, ClassType, DynamicType, FindLegacyTypeVarsVisitor, KnownClass,
+    KnownInstanceType, SpecialFormType, SubclassOfInner, SubclassOfType, Truthiness, Type,
+    TypeContext, TypeMapping, TypeVarBoundOrConstraints, UnionBuilder, UnionType, binding_type,
+    definition_expression_type, infer_definition_types, walk_signature,
 };
 use crate::{Db, FxOrderSet};
 

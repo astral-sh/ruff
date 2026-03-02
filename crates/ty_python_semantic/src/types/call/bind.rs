@@ -40,15 +40,16 @@ use crate::types::function::{
 use crate::types::generics::{
     GenericContext, InferableTypeVars, Specialization, SpecializationBuilder, SpecializationError,
 };
+use crate::types::known_instance::FieldInstance;
 use crate::types::signatures::{Parameter, ParameterForm, ParameterKind, Parameters};
 use crate::types::tuple::{TupleLength, TupleSpec, TupleType};
 use crate::types::{
     BoundMethodType, BoundTypeVarIdentity, BoundTypeVarInstance, CallableSignature, CallableType,
-    CallableTypeKind, ClassLiteral, DATACLASS_FLAGS, DataclassFlags, DataclassParams,
-    FieldInstance, GenericAlias, InternedConstraintSet, IntersectionType, KnownBoundMethodType,
-    KnownClass, KnownInstanceType, LiteralValueTypeKind, MemberLookupPolicy, NominalInstanceType,
-    PropertyInstanceType, SpecialFormType, TypeAliasType, TypeContext, TypeVarBoundOrConstraints,
-    TypeVarVariance, UnionBuilder, UnionType, WrapperDescriptorKind, enums, list_members,
+    CallableTypeKind, ClassLiteral, DATACLASS_FLAGS, DataclassFlags, DataclassParams, GenericAlias,
+    InternedConstraintSet, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
+    LiteralValueTypeKind, MemberLookupPolicy, NominalInstanceType, PropertyInstanceType,
+    SpecialFormType, TypeAliasType, TypeContext, TypeVarBoundOrConstraints, TypeVarVariance,
+    UnionBuilder, UnionType, WrapperDescriptorKind, enums, list_members,
 };
 use crate::unpack::EvaluationMode;
 use crate::{DisplaySettings, Program};
