@@ -301,6 +301,19 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         )
     }
 
+    /// Returns a constraint set that constrains a typevar to a particular range.
+    pub(crate) fn constrain_typevar(
+        db: &'db dyn Db,
+        builder: &'c ConstraintSetBuilder<'db>,
+        typevar: BoundTypeVarInstance<'db>,
+        lower: Type<'db>,
+        upper: Type<'db>,
+    ) -> Self {
+        Self::lower_bound(db, builder, typevar, lower).and(db, builder, || {
+            Self::upper_bound(db, builder, typevar, upper)
+        })
+    }
+
     /// Verifies that this constraint set was created by `builder`
     #[track_caller]
     fn verify_builder(self, builder: &'c ConstraintSetBuilder<'db>) {

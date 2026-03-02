@@ -4,15 +4,15 @@
 
 ### Overall
 - **Planning/documentation:** ✅ completed
-- **Code implementation:** ⏳ not started
+- **Code implementation:** 🟡 in progress
 - **Testing for implementation changes:** ⏳ not started
 
 ### Phase status
-- **Phase A (compile-stabilization):** ⏳ not started
+- **Phase A (compile-stabilization):** 🟡 in progress
 - **Phase B (semantic split-constraint migration):** ⏳ not started
 
 ### Step status (for cross-agent continuation)
-- [ ] A1. Reintroduce compatibility wrapper `ConstraintSet::constrain_typevar`
+- [x] A1. Reintroduce compatibility wrapper `ConstraintSet::constrain_typevar`
 - [ ] A2. Mechanical compile-fix pass (`constraint.typevar()` + constructor replacements + temporary compatibility views)
 - [ ] A3. Update implication/intersection/display enough to restore compile with minimal churn
 - [ ] A4. Reach compile-clean baseline (`cargo check -p ty_python_semantic`)
@@ -26,7 +26,8 @@
 - ✅ Reviewed branch diff vs `main`
 - ✅ Identified breakage categories and required migration steps
 - ✅ Wrote this handoff plan and clarified that `as_lower_upper` is temporary bridge logic only
-- ❌ No production code changes made yet
+- ✅ Reintroduced `ConstraintSet::constrain_typevar(...)` as a compatibility wrapper (`lower_bound(...).and(...upper_bound(...))`)
+- ✅ Verified with `cargo check -p ty_python_semantic` that external `constrain_typevar` API errors are resolved
 
 ## Context and current state
 
@@ -47,15 +48,14 @@ But most of `constraints.rs` still assumes range fields (`constraint.lower`, `co
 
 ## What is currently broken
 
-`cargo check -p ty_python_semantic` currently fails with many errors (89), in two broad categories:
+`cargo check -p ty_python_semantic` currently fails with many errors (79), now primarily in one category:
 
 1. **Internal `constraints.rs` logic still range-based**
    - field accesses on enum values (`.lower`, `.upper`, `.typevar`)
    - old constructor calls (`ConstraintId::new(db, builder, ...)`, `Constraint::new_node(...)`)
    - old range-based simplification / sequent code paths
 
-2. **External API breakage from removing `ConstraintSet::constrain_typevar`**
-   - callers in `relation.rs`, `signatures.rs`, `call/bind.rs`, and tests still call `ConstraintSet::constrain_typevar(...)`
+✅ **Previously broken external API restored:** `ConstraintSet::constrain_typevar(...)` has been reintroduced, and call sites in `relation.rs`, `signatures.rs`, `call/bind.rs`, and tests now resolve.
 
 ## Required additional changes
 
