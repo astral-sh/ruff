@@ -218,9 +218,10 @@ MyConfig().get("key")
 
 ### Metaclass `__call__` returning `Any`
 
-When a metaclass `__call__` returns `Any`, the return type is not an instance of the class being
-constructed, so we use the metaclass `__call__` signature directly and skip `__new__`/`__init__`
-validation. This is consistent with the treatment of `-> Any` on `__new__`, and matches pyright.
+When a metaclass `__call__` returns `Any`, the spec says to assume that the return type is not an
+instance of the class being constructed, so we use the metaclass `__call__` signature directly and
+skip `__new__`/`__init__` validation. It's a bit odd to have different behavior for `-> Any` than
+for no annotation, but that's what the spec says, and for now we follow it.
 
 ```py
 from typing import Any
