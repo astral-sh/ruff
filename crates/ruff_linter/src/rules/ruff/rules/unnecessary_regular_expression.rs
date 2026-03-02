@@ -120,14 +120,8 @@ pub(crate) fn unnecessary_regular_expression(checker: &Checker, call: &ExprCall)
 
     // `str.split("")` raises `ValueError: empty separator` while `re.split("", s)` succeeds,
     // so skip the diagnostic for `re.split` with an empty pattern.
-    if matches!(re_func.kind, ReFuncKind::Split) {
-        let is_empty = match &literal {
-            Literal::Str(str_lit) => str_lit.value.to_str().is_empty(),
-            Literal::Bytes(bytes_lit) => bytes_lit.value.iter().all(|part| part.is_empty()),
-        };
-        if is_empty {
-            return;
-        }
+    if matches!(re_func.kind, ReFuncKind::Split) && literal.is_empty() {
+        return;
     }
 
     // Now we know the pattern is a string literal with no metacharacters, so
@@ -372,6 +366,15 @@ impl<'a> ReFunc<'a> {
 enum Literal<'a> {
     Str(&'a ExprStringLiteral),
     Bytes(&'a ExprBytesLiteral),
+}
+
+impl Literal<'_> {
+    fn is_empty(&self) -> bool {
+        match self {
+            Literal::Str(str_lit) => str_lit.value.is_empty(),
+            Literal::Bytes(bytes_lit) => bytes_lit.value.is_empty(),
+        }
+    }
 }
 
 /// Try to resolve `name` to either a string or bytes literal in `semantic`.
