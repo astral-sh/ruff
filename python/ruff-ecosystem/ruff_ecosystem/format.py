@@ -6,10 +6,11 @@ from __future__ import annotations
 
 import time
 from asyncio import create_subprocess_exec
+from collections.abc import Sequence
 from enum import Enum
 from pathlib import Path
 from subprocess import PIPE
-from typing import TYPE_CHECKING, Sequence
+from typing import TYPE_CHECKING
 
 from unidiff import PatchSet
 

@@ -3,8 +3,9 @@ from __future__ import annotations
 import abc
 import dataclasses
 import difflib
+from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass, is_dataclass
-from typing import TYPE_CHECKING, Any, Generator, Iterable, Sequence
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from ruff_ecosystem.projects import ClonedRepository, Project
@@ -46,7 +47,7 @@ class Diff(Serializable):
     def __bool__(self) -> bool:
         return bool(self.added or self.removed)
 
-    def __iter__(self) -> Generator[str, None, None]:
+    def __iter__(self) -> Iterator[str]:
         yield from self.lines
 
     @property
