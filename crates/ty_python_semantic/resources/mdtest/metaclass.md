@@ -378,46 +378,61 @@ python-version = "3.13"
 ```
 
 ```py
+from __future__ import annotations
 from typing import Any, Literal, overload
+
+class A: ...
+class B: ...
+class C: ...
+class D: ...
 
 class Meta(type):
     @overload
-    def __call__(cls, x: int) -> int: ...
+    def __call__(cls, x: A) -> A: ...
     @overload
-    def __call__(cls, x: str) -> "D": ...
+    def __call__(cls, x: B) -> Test: ...
     @overload
-    def __call__(cls, x: float) -> "D": ...
-    def __call__(cls, x: int | str | float) -> Any:
-        raise NotImplementedError
+    def __call__(cls, x: C) -> Test: ...
+    @overload
+    def __call__(cls, x: str) -> Test: ...
+    def __call__(cls, x: A | B | C | str) -> A | Test:
+        raise NotImplementedError()
 
-class D(metaclass=Meta):
+class Test(metaclass=Meta):
     @overload
-    def __new__(cls, x: bytes) -> int: ...
+    def __new__(cls, x: B) -> B: ...
     @overload
-    def __new__(cls, x: str) -> "D": ...
-    def __new__(cls, x: object) -> Any:
-        return 1
+    def __new__(cls, x: D) -> D: ...
+    @overload
+    def __new__(cls, x: str) -> Test: ...
+    def __new__(cls, x: B | D | str) -> B | D | Test:
+        raise NotImplementedError()
 
     def __init__(self, x: Literal["ok"]) -> None:
         pass
 
-# Non-instance metaclass `__call__` path bypasses `__new__` and `__init__`.
-# The `int -> int` metaclass overload is selected.
-reveal_type(D(1))  # revealed: int
+# `A` matches the first metaclass overload, which returns `A`, bypassing `__new__` and `__init__`
+# since `A` is not a subtype of `Test`.
+reveal_type(Test(A()))  # revealed: A
 
-# `__new__` rejects `float` even though metaclass `__call__` accepts it and returns `D`.
+# `B` returns `Test` from metaclass `__call__` and returns `B` from `__new__`, bypassing `__init__`
+# since `B` is not a subtype of `Test`.
+reveal_type(Test(B()))  # revealed: B
+
+# `C` returns `Test` from metaclass `__call__` and fails the call to `__new__`.
 # error: [no-matching-overload]
-D(1.5)
+reveal_type(Test(C()))  # revealed: Test
 
-# `__init__` rejects the argument after both `__call__` and `__new__` match `str -> D`.
+# `D` fails metaclass `__call__`, so never reaches `__new__` or `__init__`.
+# error: [no-matching-overload]
+reveal_type(Test(D()))  # revealed: Test
+
+# `str` returns `Test` from both `__call__` and `__new__`, but `__init__` rejects `Literal["bad"]`.
 # error: [invalid-argument-type]
-D("bad")
+reveal_type(Test("bad"))  # revealed: Test
 
-# Metaclass `__call__` rejects `bytes` even though `__new__` accepts it.
-# error: [no-matching-overload]
-D(b"hello")
-
-reveal_type(D("ok"))  # revealed: D
+# `Literal["ok"]` returns `Test` from both `__call__` and `__new__`, and is accepted by `__init__`.
+reveal_type(Test("ok"))  # revealed: Test
 ```
 
 ## Default
