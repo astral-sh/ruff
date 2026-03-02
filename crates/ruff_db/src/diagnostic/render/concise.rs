@@ -109,7 +109,11 @@ impl<'a> ConciseRenderer<'a> {
                     "{severity}[{id}] ",
                     severity = fmt_styled(severity, severity_style),
                     id = fmt_styled(
-                        fmt_with_hyperlink(&diag.id(), diag.documentation_url(), &stylesheet),
+                        fmt_with_hyperlink(
+                            &diag.secondary_code_or_id(),
+                            diag.documentation_url(),
+                            &stylesheet
+                        ),
                         stylesheet.emphasis
                     )
                 )?;
