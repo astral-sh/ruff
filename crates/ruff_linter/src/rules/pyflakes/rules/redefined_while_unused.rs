@@ -39,7 +39,8 @@ use crate::{Fix, FixAvailability, Violation};
 /// from collections.abc import Sequence
 ///
 /// if typing.TYPE_CHECKING:
-///    from collections.abc import Sequence  # Redefinition of unused `Sequence` from line 2
+///    # Redefinition of unused `Sequence` from line 2
+///    from collections.abc import Sequence
 /// ```
 ///
 /// Use instead:
