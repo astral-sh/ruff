@@ -796,16 +796,10 @@ impl<'a> SuppressionsBuilder<'a> {
 
     /// Find the relevant range to cover for trailing end-of-line suppression comments
     ///
-    /// When placed at the end of the first or last line of a multi-line statement or suite header,
+    /// When placed at the end of the last line of a multi-line statement or suite header,
     /// this should return the entire range of the logical line, including any trailing comments:
     ///
     /// ```py
-    ///
-    /// # V--- from here
-    /// foo = [  # ruff:ignore[code]
-    ///     1,
-    /// ]
-    /// # ^--- to here
     ///
     /// # V--- from here
     /// value = """
@@ -836,63 +830,38 @@ impl<'a> SuppressionsBuilder<'a> {
     ) -> TextRange {
         let mut start = range.start();
         let mut end = range.end();
-        let mut seen_nonlogical_newline = false;
-        let mut has_line_above = false;
-        let mut has_line_below = false;
 
-        // Look backward to find the previous logical newline. If there is a non-logical newline,
-        // and any non-trivia tokens before it, then this comment is not on the first line of
-        // the statement or header.
-        for prev_token in before.iter().rev() {
-            match prev_token.kind() {
-                TokenKind::Comment => {}
+        // Look forward for the next newline. If there is any non-trivia tokens, then this comment
+        // is not on the last line of the statement or header.
+        for next_token in after {
+            match next_token.kind() {
+                TokenKind::Comment => {
+                    end = next_token.end();
+                }
+                TokenKind::NonLogicalNewline => {}
                 TokenKind::Newline => {
                     break;
                 }
-                TokenKind::NonLogicalNewline => {
-                    seen_nonlogical_newline = true;
-                }
                 _ => {
-                    if seen_nonlogical_newline {
-                        has_line_above = true;
-                    }
+                    return self.source.line_range(range.start());
+                }
+            }
+        }
 
+        // The comment is on the last line. Look backward to find the previous newline.
+        for prev_token in before.iter().rev() {
+            match prev_token.kind() {
+                TokenKind::Newline => {
+                    break;
+                }
+                TokenKind::NonLogicalNewline => {}
+                _ => {
                     start = prev_token.start();
                 }
             }
         }
 
-        // Look forward for the next logical newline. If there is a non-logical newline with
-        // any non-trivia tokens after it, then this comment is not on the last line of the
-        // statement or header.
-        seen_nonlogical_newline = false;
-        for next_token in after {
-            match next_token.kind() {
-                TokenKind::Comment => {}
-                TokenKind::Newline => {
-                    break;
-                }
-                TokenKind::NonLogicalNewline => {
-                    seen_nonlogical_newline = true;
-                }
-                _ => {
-                    if seen_nonlogical_newline {
-                        has_line_below = true;
-                    }
-
-                    end = next_token.end();
-                }
-            }
-        }
-
-        // If the comment is not on the first line, and also not on the last line, then it is
-        // "inside" the logical line, and the range should only be the physical line the comment
-        // appears on. Otherwise, the range should be the entire logical statement or header.
-        if has_line_above && has_line_below {
-            self.source.line_range(range.start())
-        } else {
-            TextRange::new(start, end)
-        }
+        TextRange::new(start, end)
     }
 }
 
@@ -1846,7 +1815,7 @@ print(  # ruff:ignore[code]
         Suppressions {
             valid: [
                 Suppression {
-                    covered_source: "print(  # ruff:ignore[code]\n    'hello'\n)",
+                    covered_source: "print(  # ruff:ignore[code]",
                     code: "code",
                     disable_comment: SuppressionComment {
                         text: "# ruff:ignore[code]",
@@ -2146,7 +2115,7 @@ bar = [
                     enable_comment: None,
                 },
                 Suppression {
-                    covered_source: "    print(  # ruff:ignore[delta]\n        'hello'\n    )",
+                    covered_source: "    print(  # ruff:ignore[delta]",
                     code: "delta",
                     disable_comment: SuppressionComment {
                         text: "# ruff:ignore[delta]",
