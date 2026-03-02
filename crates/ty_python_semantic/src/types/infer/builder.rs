@@ -329,6 +329,8 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     /// While this is `Get`, any expressions will be considered to have already been inferred.
     inner_expression_inference_state: InnerExpressionInferenceState,
 
+    inferring_vararg_annotation: bool,
+
     /// For function definitions, the undecorated type of the function.
     undecorated_type: Option<Type<'db>>,
 
@@ -367,6 +369,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return_types_and_ranges: vec![],
             called_functions: FxIndexSet::default(),
             deferred_state: DeferredExpressionState::None,
+            inferring_vararg_annotation: false,
             multi_inference_state: MultiInferenceState::Panic,
             inner_expression_inference_state: InnerExpressionInferenceState::Infer,
             expressions: FxHashMap::default(),
@@ -3579,7 +3582,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.infer_parameter_with_default(param_with_default);
         }
         if let Some(vararg) = vararg {
+            self.inferring_vararg_annotation = true;
             self.infer_parameter(vararg);
+            self.inferring_vararg_annotation = false;
         }
         if let Some(kwarg) = kwarg {
             self.infer_parameter(kwarg);
@@ -17323,6 +17328,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             deferred_state: _,
             multi_inference_state: _,
             inner_expression_inference_state: _,
+            inferring_vararg_annotation: _,
             called_functions: _,
             index: _,
             region: _,
@@ -17389,6 +17395,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             all_definitely_bound: _,
             typevar_binding_context: _,
             deferred_state: _,
+            inferring_vararg_annotation: _,
             multi_inference_state: _,
             inner_expression_inference_state: _,
             index: _,
@@ -17472,6 +17479,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             deferred_state: _,
             multi_inference_state: _,
             inner_expression_inference_state: _,
+            inferring_vararg_annotation: _,
             called_functions: _,
             index: _,
             region: _,
