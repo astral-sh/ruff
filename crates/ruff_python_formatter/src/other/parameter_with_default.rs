@@ -45,18 +45,13 @@ impl FormatNodeRule<ParameterWithDefault> for FormatParameterWithDefault {
                         f.context().source(),
                         TextRange::new(parameter.end(), default_leading_comment.start()),
                     )
+                    .kinds()
                     .skip_trivia()
-                    .skip_while(|token| token.kind == SimpleTokenKind::RParen);
+                    .skip_while(|&token| token == SimpleTokenKind::RParen);
                     let equals = tokenizer.next();
-                    debug_assert!(
-                        equals.is_some_and(|token| token.kind == SimpleTokenKind::Equals)
-                    );
+                    debug_assert!(equals.is_some_and(|token| token == SimpleTokenKind::Equals));
                     let lparens = tokenizer.next();
-                    debug_assert!(
-                        lparens
-                            .as_ref()
-                            .is_none_or(|token| token.kind == SimpleTokenKind::LParen)
-                    );
+                    debug_assert!(lparens.is_none_or(|token| token == SimpleTokenKind::LParen));
                     lparens.is_none()
                 });
             let needs_line_break = needs_line_break_trailing || needs_line_break_leading;

@@ -536,7 +536,8 @@ fn check_values(checker: &Checker, names: &Expr, values: &Expr) {
                             checker.locator().contents(),
                             TextRange::new(item.end(), values.end()),
                         )
-                        .all(|token| token.kind != SimpleTokenKind::Comma)
+                        .kinds()
+                        .all(|token| token != SimpleTokenKind::Comma)
                     } else {
                         false
                     };
@@ -829,7 +830,8 @@ fn handle_value_rows(
                                 checker.locator().contents(),
                                 TextRange::new(item.end(), elt.end()),
                             )
-                            .all(|token| token.kind != SimpleTokenKind::Comma)
+                            .kinds()
+                            .all(|token| token != SimpleTokenKind::Comma)
                         } else {
                             false
                         };
