@@ -874,7 +874,7 @@ impl<'db> BoundTypeVarInstance<'db> {
         builder: &ConstraintSetBuilder<'db>,
         typevar: Self,
     ) -> bool {
-        builder.typevar_id(db, self) < builder.typevar_id(db, typevar)
+        builder.typevar_id(db, self).index() < builder.typevar_id(db, typevar).index()
     }
 }
 
@@ -893,12 +893,12 @@ impl IntersectionResult<'_> {
 
 /// The index of a bound typevar within a [`ConstraintSetStorage`].
 #[newtype_index]
-#[derive(Ord, PartialOrd, salsa::Update, get_size2::GetSize)]
+#[derive(salsa::Update, get_size2::GetSize)]
 pub struct TypeVarId;
 
 /// The index of an individual constraint (i.e. a BDD variable) within a [`ConstraintSetStorage`].
 #[newtype_index]
-#[derive(Ord, PartialOrd, salsa::Update, get_size2::GetSize)]
+#[derive(salsa::Update, get_size2::GetSize)]
 pub struct ConstraintId;
 
 /// An individual constraint in a constraint set. This restricts a single typevar to be within a
@@ -1156,7 +1156,7 @@ impl ConstraintId {
     /// empirically that we get smaller BDDs with an ordering that is more aligned with source
     /// order.
     fn ordering(self) -> impl Ord {
-        std::cmp::Reverse(self)
+        std::cmp::Reverse(self.index())
     }
 
     /// Returns whether this constraint implies another — i.e., whether every type that
