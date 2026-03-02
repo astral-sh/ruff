@@ -79,7 +79,7 @@ use salsa::plumbing::AsId;
 use smallvec::SmallVec;
 
 use crate::types::class::GenericAlias;
-use crate::types::generics::{GenericContext, InferableTypeVars, Specialization};
+use crate::types::generics::InferableTypeVars;
 use crate::types::visitor::{
     TypeCollector, TypeVisitor, any_over_type, walk_type_with_recursion_guard,
 };
@@ -1638,16 +1638,6 @@ impl<'db> Node<'db> {
         }
     }
 
-    /// Returns a new BDD that is the _existential abstraction_ of `self` for a set of typevars.
-    /// All typevars _other_ than the one given will be removed and abstracted away.
-    fn retain_one(self, db: &'db dyn Db, bound_typevar: BoundTypeVarIdentity<'db>) -> Self {
-        match self {
-            Node::AlwaysTrue => Node::AlwaysTrue,
-            Node::AlwaysFalse => Node::AlwaysFalse,
-            Node::Interior(interior) => interior.retain_one(db, bound_typevar),
-        }
-    }
-
     fn abstract_one_inner(
         self,
         db: &'db dyn Db,
@@ -1658,103 +1648,6 @@ impl<'db> Node<'db> {
             Node::AlwaysTrue => Node::AlwaysTrue,
             Node::AlwaysFalse => Node::AlwaysFalse,
             Node::Interior(interior) => interior.abstract_one_inner(db, should_remove, path),
-        }
-    }
-
-    /// Invokes a callback for each of the representative types of a particular typevar for this
-    /// constraint set.
-    ///
-    /// We first abstract the BDD so that it only mentions constraints on the requested typevar. We
-    /// then invoke your callback for each distinct path from the BDD root to the `AlwaysTrue`
-    /// terminal. Each of those paths can be viewed as the conjunction of the individual
-    /// constraints of each internal node that we traverse as we walk that path. We provide the
-    /// lower/upper bound of this conjunction to your callback, allowing you to choose any suitable
-    /// type in the range.
-    ///
-    /// If the abstracted BDD does not mention the typevar at all (i.e., it leaves the typevar
-    /// completely unconstrained), we will invoke your callback once with `None`.
-    fn find_representative_types(
-        self,
-        db: &'db dyn Db,
-        bound_typevar: BoundTypeVarIdentity<'db>,
-        mut f: impl FnMut(Option<&[RepresentativeBounds<'db>]>),
-    ) {
-        self.retain_one(db, bound_typevar)
-            .find_representative_types_inner(db, &mut Vec::default(), &mut f);
-    }
-
-    fn find_representative_types_inner(
-        self,
-        db: &'db dyn Db,
-        current_bounds: &mut Vec<RepresentativeBounds<'db>>,
-        f: &mut dyn FnMut(Option<&[RepresentativeBounds<'db>]>),
-    ) {
-        match self {
-            Node::AlwaysTrue => {
-                // If we reach the `true` terminal, the path we've been following represents one
-                // representative type.
-                if current_bounds.is_empty() {
-                    f(None);
-                    return;
-                }
-
-                // If `lower ≰ upper`, then this path somehow represents in invalid specialization.
-                // That should have been removed from the BDD domain as part of the simplification
-                // process. (Here we are just checking assignability, so we don't need to construct
-                // the lower and upper bounds in a consistent order.)
-                debug_assert!({
-                    let greatest_lower_bound = UnionType::from_elements(
-                        db,
-                        current_bounds.iter().map(|bounds| bounds.lower),
-                    );
-                    let least_upper_bound = IntersectionType::from_elements(
-                        db,
-                        current_bounds.iter().map(|bounds| bounds.upper),
-                    );
-                    greatest_lower_bound.is_constraint_set_assignable_to(db, least_upper_bound)
-                });
-
-                // We've been tracking the lower and upper bound that the types for this path must
-                // satisfy. Pass those bounds along and let the caller choose a representative type
-                // from within that range.
-                f(Some(current_bounds));
-            }
-
-            Node::AlwaysFalse => {
-                // If we reach the `false` terminal, the path we've been following represents an
-                // invalid specialization, so we skip it.
-            }
-
-            Node::Interior(interior) => {
-                let reset_point = current_bounds.len();
-
-                // For an interior node, there are two outgoing paths: one for the `if_true`
-                // branch, and one for the `if_false` branch.
-                //
-                // For the `if_true` branch, this node's constraint places additional restrictions
-                // on the types that satisfy the current path through the BDD. So we intersect the
-                // current glb/lub with the constraint's bounds to get the new glb/lub for the
-                // recursive call.
-                current_bounds.push(RepresentativeBounds::from_interior_node(db, interior));
-                interior
-                    .if_true(db)
-                    .find_representative_types_inner(db, current_bounds, f);
-                current_bounds.truncate(reset_point);
-
-                // For the `if_false` branch, then the types that satisfy the current path through
-                // the BDD do _not_ satisfy the node's constraint. Because we used `retain_one` to
-                // abstract the BDD to a single typevar, we don't need to worry about how that
-                // negative constraint affects the lower/upper bound that we're tracking. The
-                // abstraction process will have compared the negative constraint with all of the
-                // other constraints in the BDD, and added new interior nodes to handle the
-                // combination of those constraints. So we can recurse down the `if_false` branch
-                // without updating the lower/upper bounds, relying on the other constraints along
-                // the path to incorporate that negative "hole" in the set of valid types for this
-                // path.
-                interior
-                    .if_false(db)
-                    .find_representative_types_inner(db, current_bounds, f);
-            }
         }
     }
 
@@ -2101,27 +1994,6 @@ impl<'db> Node<'db> {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
-struct RepresentativeBounds<'db> {
-    lower: Type<'db>,
-    upper: Type<'db>,
-    source_order: usize,
-}
-
-impl<'db> RepresentativeBounds<'db> {
-    fn from_interior_node(db: &'db dyn Db, interior: InteriorNode<'db>) -> Self {
-        let constraint = interior.constraint(db);
-        let lower = constraint.lower(db);
-        let upper = constraint.upper(db);
-        let source_order = interior.source_order(db);
-        Self {
-            lower,
-            upper,
-            source_order,
-        }
-    }
-}
-
 /// An interior node of a BDD
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 struct InteriorNode<'db> {
@@ -2279,28 +2151,6 @@ impl<'db> InteriorNode<'db> {
                     return true;
                 }
                 if any_over_type(db, constraint.upper(db), false, mentions_typevar) {
-                    return true;
-                }
-                false
-            },
-            &mut path,
-        )
-    }
-
-    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
-    fn retain_one(self, db: &'db dyn Db, bound_typevar: BoundTypeVarIdentity<'db>) -> Node<'db> {
-        let mut path = self.path_assignments(db);
-        self.abstract_one_inner(
-            db,
-            // Remove any node that constrains some other typevar than `bound_typevar`, and any
-            // node that constrains `bound_typevar` with a lower/upper bound of some other typevar.
-            // (For the latter, if there are any derived facts that we can infer from the typevar
-            // bound, those will be automatically added to the result.)
-            &mut |constraint| {
-                if constraint.typevar(db).identity(db) != bound_typevar {
-                    return true;
-                }
-                if constraint.lower(db).has_typevar(db) || constraint.upper(db).has_typevar(db) {
                     return true;
                 }
                 false
@@ -4296,149 +4146,6 @@ impl<'db> BoundTypeVarInstance<'db> {
                 (non_gradual_constraints, gradual_constraints)
             }
         }
-    }
-}
-
-impl<'db> GenericContext<'db> {
-    pub(crate) fn specialize_constrained<'c>(
-        self,
-        db: &'db dyn Db,
-        _builder: &'c ConstraintSetBuilder<'db>,
-        constraints: ConstraintSet<'db, 'c>,
-    ) -> Result<Specialization<'db>, ()> {
-        tracing::trace!(
-            target: "ty_python_semantic::types::constraints::specialize_constrained",
-            generic_context = %self.display_full(db),
-            constraints = %constraints.node.display(db),
-            "create specialization for constraint set",
-        );
-
-        // If the constraint set is cyclic, don't even try to construct a specialization.
-        if constraints.is_cyclic(db) {
-            tracing::error!(
-                target: "ty_python_semantic::types::constraints::specialize_constrained",
-                constraints = %constraints.node.display(db),
-                "constraint set is cyclic",
-            );
-            // TODO: Better error
-            return Err(());
-        }
-
-        // First we intersect with the valid specializations of all of the typevars. We need all of
-        // valid specializations to hold simultaneously, so we do this once before abstracting over
-        // each typevar.
-        let abstracted = self
-            .variables(db)
-            .fold(Node::AlwaysTrue, |constraints, bound_typevar| {
-                constraints.and_with_offset(db, bound_typevar.valid_specializations(db))
-            })
-            .and_with_offset(db, constraints.node);
-        tracing::trace!(
-            target: "ty_python_semantic::types::constraints::specialize_constrained",
-            valid = %abstracted.display(db),
-            "limited to valid specializations",
-        );
-
-        // Then we find all of the "representative types" for each typevar in the constraint set.
-        let mut error_occurred = false;
-        let mut representatives = Vec::new();
-        let types =
-            self.variables(db).map(|bound_typevar| {
-                // Each representative type represents one of the ways that the typevar can satisfy the
-                // constraint, expressed as a lower/upper bound on the types that the typevar can
-                // specialize to.
-                //
-                // If there are multiple paths in the BDD, they technically represent independent
-                // possible specializations. If there's a type that satisfies all of them, we will
-                // return that as the specialization. If not, then the constraint set is ambiguous.
-                // (This happens most often with constrained typevars.) We could in the future turn
-                // _each_ of the paths into separate specializations, but it's not clear what we would
-                // do with that, so instead we just report the ambiguity as a specialization failure.
-                let mut unconstrained = false;
-                let identity = bound_typevar.identity(db);
-                tracing::trace!(
-                    target: "ty_python_semantic::types::constraints::specialize_constrained",
-                    bound_typevar = %identity.display(db),
-                    abstracted = %abstracted.retain_one(db, identity).display(db),
-                    "find specialization for typevar",
-                );
-                representatives.clear();
-                abstracted.find_representative_types(db, identity, |representative| {
-                    match representative {
-                        Some(representative) => {
-                            representatives.extend_from_slice(representative);
-                        }
-                        None => {
-                            unconstrained = true;
-                        }
-                    }
-                });
-
-                // The BDD is satisfiable, but the typevar is unconstrained, then we use `None` to tell
-                // specialize_recursive to fall back on the typevar's default.
-                if unconstrained {
-                    tracing::trace!(
-                        target: "ty_python_semantic::types::constraints::specialize_constrained",
-                        bound_typevar = %identity.display(db),
-                        "typevar is unconstrained",
-                    );
-                    return None;
-                }
-
-                // If there are no satisfiable paths in the BDD, then there is no valid specialization
-                // for this constraint set.
-                if representatives.is_empty() {
-                    // TODO: Construct a useful error here
-                    tracing::trace!(
-                        target: "ty_python_semantic::types::constraints::specialize_constrained",
-                        bound_typevar = %identity.display(db),
-                        "typevar cannot be satisfied",
-                    );
-                    error_occurred = true;
-                    return None;
-                }
-
-                // Before constructing the final lower and upper bound, sort the constraints by
-                // their source order. This should give us a consistently ordered specialization,
-                // regardless of the variable ordering of the original BDD.
-                representatives.sort_unstable_by_key(|bounds| bounds.source_order);
-                let greatest_lower_bound =
-                    UnionType::from_elements(db, representatives.iter().map(|bounds| bounds.lower));
-                let least_upper_bound = IntersectionType::from_elements(
-                    db,
-                    representatives.iter().map(|bounds| bounds.upper),
-                );
-
-                // If `lower ≰ upper`, then there is no type that satisfies all of the paths in the
-                // BDD. That's an ambiguous specialization, as described above.
-                if !greatest_lower_bound.is_constraint_set_assignable_to(db, least_upper_bound) {
-                    tracing::trace!(
-                        target: "ty_python_semantic::types::constraints::specialize_constrained",
-                        bound_typevar = %identity.display(db),
-                        greatest_lower_bound = %greatest_lower_bound.display(db),
-                        least_upper_bound = %least_upper_bound.display(db),
-                        "typevar bounds are incompatible",
-                    );
-                    error_occurred = true;
-                    return None;
-                }
-
-                // Of all of the types that satisfy all of the paths in the BDD, we choose the
-                // "largest" one (i.e., "closest to `object`") as the specialization.
-                tracing::trace!(
-                    target: "ty_python_semantic::types::constraints::specialize_constrained",
-                    bound_typevar = %identity.display(db),
-                    specialization = %least_upper_bound.display(db),
-                    "found specialization for typevar",
-                );
-                Some(least_upper_bound)
-            });
-
-        let specialization = self.specialize_recursive(db, types);
-        if error_occurred {
-            return Err(());
-        }
-        Ok(specialization)
     }
 }
 

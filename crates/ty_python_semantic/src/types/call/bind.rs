@@ -1877,28 +1877,6 @@ impl<'db> Bindings<'db> {
                         overload.set_return_type(Type::bool_literal(result));
                     }
 
-                    Type::KnownBoundMethod(
-                        KnownBoundMethodType::GenericContextSpecializeConstrained(generic_context),
-                    ) => {
-                        let [Some(set)] = overload.parameter_types() else {
-                            continue;
-                        };
-                        let Type::KnownInstance(KnownInstanceType::ConstraintSet(set)) = set else {
-                            continue;
-                        };
-                        let constraints = ConstraintSetBuilder::new();
-                        let set = constraints.load(set.constraints(db));
-                        let specialization =
-                            generic_context.specialize_constrained(db, &constraints, set);
-                        let result = match specialization {
-                            Ok(specialization) => Type::KnownInstance(
-                                KnownInstanceType::Specialization(specialization),
-                            ),
-                            Err(()) => Type::none(db),
-                        };
-                        overload.set_return_type(result);
-                    }
-
                     Type::ClassLiteral(class) => match class.known(db) {
                         Some(KnownClass::Bool) => match overload.parameter_types() {
                             [Some(arg)] => overload.set_return_type(arg.bool(db).into_type(db)),

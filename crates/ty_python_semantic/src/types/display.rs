@@ -1082,9 +1082,6 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                         return f
                             .write_str("bound method `ConstraintSet.satisfied_by_all_typevars`");
                     }
-                    KnownBoundMethodType::GenericContextSpecializeConstrained(_) => {
-                        return f.write_str("bound method `GenericContext.specialize_constrained`");
-                    }
                 };
 
                 let class_ty = cls.to_class_literal(self.db);
