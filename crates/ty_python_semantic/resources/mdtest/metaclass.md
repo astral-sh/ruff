@@ -367,10 +367,12 @@ class C(metaclass=Meta):
 reveal_type(C(b"hello"))  # revealed: C
 ```
 
-### Mixed `__new__` and mixed metaclass `__call__` both constrain calls
+### Mixed `__new__` and mixed metaclass `__call__`
 
-If both constructor systems are mixed (some overloads instance-returning and some non-instance),
-their argument constraints should both be enforced.
+If both metaclass `__call__` and `__new__` are mixed (some overloads instance-returning and some
+non-instance), the fallback chain works as expected: `__new__` is only considered if metaclass
+`__call__` is instance-returning, and `__init__` is only considered if both `__call__` and `__new__`
+are instance-returning.
 
 ```toml
 [environment]
