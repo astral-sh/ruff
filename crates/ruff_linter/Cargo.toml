@@ -16,6 +16,7 @@ license = { workspace = true }
 ruff_cache = { workspace = true }
 ruff_db = { workspace = true, features = ["junit", "serde"] }
 ruff_diagnostics = { workspace = true, features = ["serde"] }
+ruff_index = { workspace = true }
 ruff_macros = { workspace = true }
 ruff_notebook = { workspace = true }
 ruff_python_ast = { workspace = true, features = ["serde", "cache"] }
