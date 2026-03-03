@@ -226,6 +226,53 @@ impl TypeRelation {
 
 #[salsa::tracked]
 impl<'db> Type<'db> {
+    /// Return `true` if subtyping is always reflexive for this type; `T <: T` is always true for
+    /// any `T` of this type.
+    ///
+    /// This is true for fully static types, but also for some types that may not be fully static.
+    /// For example, a `ClassLiteral` may inherit `Any`, but its subtyping is still reflexive.
+    ///
+    /// This method may have false negatives, but it should not have false positives. It should be
+    /// a cheap shallow check, not an exhaustive recursive check.
+    const fn subtyping_is_always_reflexive(self) -> bool {
+        match self {
+            Type::Never
+            | Type::FunctionLiteral(..)
+            | Type::BoundMethod(_)
+            | Type::WrapperDescriptor(_)
+            | Type::KnownBoundMethod(_)
+            | Type::DataclassDecorator(_)
+            | Type::DataclassTransformer(_)
+            | Type::ModuleLiteral(..)
+            | Type::LiteralValue(_)
+            | Type::SpecialForm(_)
+            | Type::KnownInstance(_)
+            | Type::AlwaysFalsy
+            | Type::AlwaysTruthy
+            | Type::PropertyInstance(_)
+            // `T` is always a subtype of itself,
+            // and `T` is always a subtype of `T | None`
+            | Type::TypeVar(_)
+            // might inherit `Any`, but subtyping is still reflexive
+            | Type::ClassLiteral(_)
+             => true,
+            Type::Dynamic(_)
+            | Type::NominalInstance(_)
+            | Type::ProtocolInstance(_)
+            | Type::GenericAlias(_)
+            | Type::SubclassOf(_)
+            | Type::Union(_)
+            | Type::Intersection(_)
+            | Type::Callable(_)
+            | Type::BoundSuper(_)
+            | Type::TypeIs(_)
+            | Type::TypeGuard(_)
+            | Type::TypedDict(_)
+            | Type::TypeAlias(_)
+            | Type::NewTypeInstance(_) => false,
+        }
+    }
+
     /// Return true if this type is a subtype of type `target`.
     ///
     /// See [`TypeRelation::Subtyping`] for more details.
