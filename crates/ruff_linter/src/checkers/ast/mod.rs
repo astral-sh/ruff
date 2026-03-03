@@ -68,7 +68,9 @@ use crate::docstrings::extraction::ExtractionTarget;
 use crate::importer::{ImportRequest, Importer, ResolutionError};
 use crate::noqa::NoqaMapping;
 use crate::package::PackageRoot;
-use crate::preview::is_undefined_export_in_dunder_init_enabled;
+use crate::preview::{
+    is_incorrect_dict_iterator_comprehension_enabled, is_undefined_export_in_dunder_init_enabled,
+};
 use crate::registry::Rule;
 use crate::rules::flake8_bugbear::rules::ReturnInGenerator;
 use crate::rules::pyflakes::rules::{
@@ -232,7 +234,7 @@ pub(crate) struct Checker<'a> {
     /// A set of deferred nodes to be visited after the current traversal (e.g., function bodies).
     visit: deferred::Visit<'a>,
     /// A set of deferred nodes to be analyzed after the AST traversal (e.g., `for` loops).
-    analyze: deferred::Analyze<'a>,
+    analyze: deferred::Analyze,
     /// The list of names already seen by flake8-bugbear diagnostics, to avoid duplicate violations.
     flake8_bugbear_seen: RefCell<FxHashSet<TextRange>>,
     /// The end offset of the last visited statement.
@@ -2464,6 +2466,12 @@ impl<'a> Checker<'a> {
         // Step 4: Analysis
         for generator in generators {
             analyze::comprehension(generator, self);
+        }
+
+        if self.is_rule_enabled(Rule::IncorrectDictIterator)
+            && is_incorrect_dict_iterator_comprehension_enabled(self.settings())
+        {
+            self.analyze.comprehensions.push(self.semantic.snapshot());
         }
     }
 
