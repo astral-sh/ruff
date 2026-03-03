@@ -1,10 +1,11 @@
 use anyhow::{Context, Result};
+use std::panic::RefUnwindSafe;
 use std::sync::Arc;
 use zip::CompressionMethod;
 
 use ruff_db::Db as SourceDb;
 use ruff_db::files::Files;
-use ruff_db::system::{OsSystem, System, SystemPathBuf};
+use ruff_db::system::{System, SystemPathBuf};
 use ruff_db::vendored::{VendoredFileSystem, VendoredFileSystemBuilder};
 use ruff_python_ast::PythonVersion;
 use ty_module_resolver::{SearchPathSettings, SearchPaths};
@@ -21,19 +22,22 @@ static EMPTY_VENDORED: std::sync::LazyLock<VendoredFileSystem> = std::sync::Lazy
 pub struct ModuleDb {
     storage: salsa::Storage<Self>,
     files: Files,
-    system: OsSystem,
+    system: Arc<dyn System + Send + Sync + RefUnwindSafe>,
     search_paths: Arc<SearchPaths>,
     python_version: PythonVersion,
 }
 
 impl ModuleDb {
     /// Initialize a [`ModuleDb`] from the given source root.
-    pub fn from_src_roots(
-        system: OsSystem,
+    pub fn from_src_roots<S>(
+        system: S,
         src_roots: Vec<SystemPathBuf>,
         python_version: PythonVersion,
         venv_path: Option<SystemPathBuf>,
-    ) -> Result<Self> {
+    ) -> Result<Self>
+    where
+        S: System + 'static + Send + Sync + RefUnwindSafe,
+    {
         let mut search_path_settings = SearchPathSettings::new(src_roots);
         // TODO: Consider calling `PythonEnvironment::discover` if the `venv_path` is not provided.
         if let Some(venv_path) = venv_path {
@@ -51,7 +55,7 @@ impl ModuleDb {
         let db = Self {
             storage: salsa::Storage::new(None),
             files: Files::default(),
-            system,
+            system: Arc::new(system),
             search_paths: Arc::new(search_paths),
             python_version,
         };
@@ -70,7 +74,7 @@ impl SourceDb for ModuleDb {
     }
 
     fn system(&self) -> &dyn System {
-        &self.system
+        &*self.system
     }
 
     fn files(&self) -> &Files {
