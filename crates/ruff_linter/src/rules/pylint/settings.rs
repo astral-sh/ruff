@@ -8,7 +8,6 @@ use crate::display_settings;
 use ruff_cache::{CacheKey, CacheKeyHasher};
 use ruff_macros::CacheKey;
 use ruff_python_ast::{ExprNumberLiteral, LiteralExpressionRef, Number};
-use std::hash::Hasher;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, CacheKey)]
 #[serde(untagged)]
@@ -68,21 +67,8 @@ impl PartialEq for AllowedFloatValue {
 
 impl Eq for AllowedFloatValue {}
 
-impl From<f64> for AllowedFloatValue {
-    fn from(value: f64) -> Self {
-        Self(value)
-    }
-}
-
-impl From<AllowedFloatValue> for f64 {
-    fn from(value: AllowedFloatValue) -> Self {
-        value.0
-    }
-}
-
 impl CacheKey for AllowedFloatValue {
     fn cache_key(&self, state: &mut CacheKeyHasher) {
-        state.write_usize(2);
         self.0.to_bits().cache_key(state);
     }
 }
@@ -96,7 +82,7 @@ impl fmt::Display for AllowedValue {
                 let value = fl.value();
                 // Ensure floats always display with decimal point
                 if value.fract() == 0.0 {
-                    write!(f, "{value:.1}")
+                    write!(f, "{value:.?}")
                 } else {
                     write!(f, "{value}")
                 }
@@ -169,9 +155,6 @@ impl Default for Settings {
                 AllowedValue::Int(0),
                 AllowedValue::Int(1),
                 AllowedValue::Int(-1),
-                AllowedValue::Float(AllowedFloatValue::new(0.0)),
-                AllowedValue::Float(AllowedFloatValue::new(1.0)),
-                AllowedValue::Float(AllowedFloatValue::new(-1.0)),
                 AllowedValue::String(String::new()),
                 AllowedValue::String("__main__".to_string()),
             ],
