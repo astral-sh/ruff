@@ -7874,14 +7874,7 @@ impl<'db> BoundTypeVarInstance<'db> {
     /// `BoundTypeVarInstance`. As part of binding `U` we must also bind its default value
     /// (resulting in `T@C`).
     pub(crate) fn default_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
-        let binding_context = self.binding_context(db);
-        self.typevar(db).default_type(db).map(|ty| {
-            ty.apply_type_mapping(
-                db,
-                &TypeMapping::BindLegacyTypevars(binding_context),
-                TypeContext::default(),
-            )
-        })
+        bound_typevar_default_type(db, self)
     }
 
     fn materialize_impl(
@@ -7907,6 +7900,36 @@ impl<'db> BoundTypeVarInstance<'db> {
             self.paramspec_attr(db),
         ))
     }
+}
+
+#[salsa::tracked(
+    cycle_initial=|_, _, _| None,
+    cycle_fn=bound_typevar_default_type_cycle_recover,
+    heap_size=ruff_memory_usage::heap_size
+)]
+fn bound_typevar_default_type<'db>(
+    db: &'db dyn Db,
+    bound_typevar: BoundTypeVarInstance<'db>,
+) -> Option<Type<'db>> {
+    let binding_context = bound_typevar.binding_context(db);
+    bound_typevar.typevar(db).default_type(db).map(|ty| {
+        ty.apply_type_mapping(
+            db,
+            &TypeMapping::BindLegacyTypevars(binding_context),
+            TypeContext::default(),
+        )
+    })
+}
+
+#[expect(clippy::ref_option)]
+fn bound_typevar_default_type_cycle_recover<'db>(
+    _db: &'db dyn Db,
+    _cycle: &salsa::Cycle,
+    _previous_default: &Option<Type<'db>>,
+    _default: Option<Type<'db>>,
+    _bound_typevar: BoundTypeVarInstance<'db>,
+) -> Option<Type<'db>> {
+    None
 }
 
 /// Whether a typevar default is eagerly specified or lazily evaluated.
