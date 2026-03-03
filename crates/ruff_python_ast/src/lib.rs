@@ -51,7 +51,7 @@ impl SourceType {
     pub fn from_extension(ext: &str) -> Self {
         match ext {
             "toml" => Self::Toml(TomlSourceType::Unrecognized),
-            "md" | "qmd" => Self::Markdown,
+            "md" => Self::Markdown,
             _ => Self::Python(PySourceType::from_extension(ext)),
         }
     }

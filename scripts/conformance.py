@@ -470,6 +470,7 @@ def collect_ty_diagnostics(
             f"--python-version={python_version}",
             "--output-format=gitlab",
             "--ignore=assert-type-unspellable-subtype",
+            "--error=invalid-enum-member-annotation",
             "--error=invalid-legacy-positional-parameter",
             "--error=deprecated",
             "--error=redundant-final-classvar",

@@ -274,7 +274,6 @@ impl Suppressions {
                                     .iter()
                                     .map(ToString::to_string)
                                     .collect_vec(),
-                                ..Default::default()
                             }),
                             kind: UnusedNOQAKind::Suppression,
                         },
