@@ -492,24 +492,38 @@ function DependenciesContent({
 
   if (packages.length > 0) {
     return (
-      <ul className="space-y-0.5">
-        {packages.map((pkg) => (
-          <li
-            key={pkg.name}
-            className="flex items-baseline gap-2 text-sm select-text"
-          >
-            <span>{pkg.name}</span>
-            <span
-              className={classNames(
-                "text-xs",
-                theme === "dark" ? "text-gray-500" : "text-gray-400",
-              )}
+      <div className="space-y-2">
+        {status.warnings.length > 0 && (
+          <ul className="space-y-0.5">
+            {status.warnings.map((warning, i) => (
+              <li
+                key={i}
+                className="text-xs text-ayu-accent select-text"
+              >
+                {warning}
+              </li>
+            ))}
+          </ul>
+        )}
+        <ul className="space-y-0.5">
+          {packages.map((pkg) => (
+            <li
+              key={pkg.name}
+              className="flex items-baseline gap-2 text-sm select-text"
             >
-              {pkg.version}
-            </span>
-          </li>
-        ))}
-      </ul>
+              <span>{pkg.name}</span>
+              <span
+                className={classNames(
+                  "text-xs",
+                  theme === "dark" ? "text-gray-500" : "text-gray-400",
+                )}
+              >
+                {pkg.version}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </div>
     );
   }
 

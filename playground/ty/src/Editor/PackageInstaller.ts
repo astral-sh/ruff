@@ -13,6 +13,7 @@ export interface InstallationStatus {
   progress: number | null;
   installedPackages: InstalledPackageInfo[];
   writtenFiles: string[];
+  warnings: string[];
 }
 
 export const IDLE_STATUS: InstallationStatus = {
@@ -21,6 +22,7 @@ export const IDLE_STATUS: InstallationStatus = {
   progress: null,
   installedPackages: [],
   writtenFiles: [],
+  warnings: [],
 };
 
 export const PACKAGES_ROOT = "/packages";
@@ -96,11 +98,15 @@ export async function installPackages(
     progress: null,
     installedPackages: [],
     writtenFiles: [],
+    warnings: [],
   });
 
   try {
     // Resolve all transitive dependencies
-    const resolved = await resolveAllDeps(packages, signal);
+    const { packages: resolved, warnings } = await resolveAllDeps(
+      packages,
+      signal,
+    );
 
     if (signal?.aborted) {
       return IDLE_STATUS;
@@ -131,6 +137,7 @@ export async function installPackages(
         progress: pct,
         installedPackages: installed,
         writtenFiles: allWrittenFiles,
+        warnings,
       });
 
       const files = await downloadAndExtractWheel(pkg.wheelUrl, signal);
@@ -165,6 +172,7 @@ export async function installPackages(
       progress: 100,
       installedPackages: installed,
       writtenFiles: allWrittenFiles,
+      warnings,
     };
 
     onProgress(result);
@@ -176,6 +184,7 @@ export async function installPackages(
       progress: null,
       installedPackages: [],
       writtenFiles: previousFiles,
+      warnings: [],
     };
     onProgress(result);
     return result;
@@ -274,19 +283,133 @@ async function downloadAndExtractWheel(
   return files;
 }
 
+interface VersionConstraint {
+  op: "==" | "!=" | ">=" | "<=" | ">" | "<" | "~=";
+  version: string;
+}
+
+interface DependencyWithConstraints {
+  name: string;
+  constraints: VersionConstraint[];
+}
+
+/**
+ * Parse version constraint string like ">=2.0,<4.0,!=3.0.1" into individual constraints.
+ */
+function parseVersionConstraints(specifier: string): VersionConstraint[] {
+  if (specifier.length === 0) {
+    return [];
+  }
+
+  const constraints: VersionConstraint[] = [];
+  const parts = specifier.split(",");
+
+  for (const part of parts) {
+    const trimmed = part.trim();
+    const match = trimmed.match(/^(~=|==|!=|>=|<=|>|<)\s*([A-Za-z0-9.*_-]+)$/);
+    if (match) {
+      constraints.push({
+        op: match[1] as VersionConstraint["op"],
+        version: match[2],
+      });
+    }
+  }
+
+  return constraints;
+}
+
+/**
+ * Compare two PEP 440 version strings numerically.
+ * Returns negative if a < b, 0 if equal, positive if a > b.
+ */
+function compareVersions(a: string, b: string): number {
+  const partsA = a.split(".").map((s) => parseInt(s, 10) || 0);
+  const partsB = b.split(".").map((s) => parseInt(s, 10) || 0);
+  const len = Math.max(partsA.length, partsB.length);
+
+  for (let i = 0; i < len; i++) {
+    const numA = partsA[i] ?? 0;
+    const numB = partsB[i] ?? 0;
+    if (numA !== numB) {
+      return numA - numB;
+    }
+  }
+  return 0;
+}
+
+/**
+ * Check if a resolved version satisfies a single version constraint.
+ */
+function satisfiesConstraint(
+  resolved: string,
+  constraint: VersionConstraint,
+): boolean {
+  // Wildcard matches (e.g. ==3.*) — just check prefix
+  if (constraint.version.includes("*")) {
+    const prefix = constraint.version.replace(/\.\*$/, "");
+    const resolvedPrefix = resolved
+      .split(".")
+      .slice(0, prefix.split(".").length)
+      .join(".");
+    const matches = compareVersions(resolvedPrefix, prefix) === 0;
+    return constraint.op === "==" ? matches : constraint.op === "!=" ? !matches : true;
+  }
+
+  const cmp = compareVersions(resolved, constraint.version);
+
+  switch (constraint.op) {
+    case "==":
+      return cmp === 0;
+    case "!=":
+      return cmp !== 0;
+    case ">=":
+      return cmp >= 0;
+    case "<=":
+      return cmp <= 0;
+    case ">":
+      return cmp > 0;
+    case "<":
+      return cmp < 0;
+    case "~=":
+      // ~=X.Y is equivalent to >=X.Y,<(X+1).0
+      // ~=X.Y.Z is equivalent to >=X.Y.Z,<X.(Y+1).0
+      if (cmp < 0) {
+        return false;
+      }
+      {
+        const parts = constraint.version.split(".");
+        const upperParts = parts.slice(0, -1);
+        upperParts[upperParts.length - 1] = String(
+          parseInt(upperParts[upperParts.length - 1], 10) + 1,
+        );
+        return compareVersions(resolved, upperParts.join(".")) < 0;
+      }
+  }
+}
+
+/**
+ * Format version constraints as a human-readable string.
+ */
+function formatConstraints(constraints: VersionConstraint[]): string {
+  return constraints.map((c) => `${c.op}${c.version}`).join(",");
+}
+
 function normalizePackageName(name: string): string {
   return name.toLowerCase().replace(/[-_.]+/g, "-");
 }
 
 /**
  * Parse mandatory dependencies from requires_dist, excluding extras.
+ * Returns package names with their version constraints.
  */
-function parseMandatoryDeps(requiresDist: string[] | null): string[] {
+function parseMandatoryDeps(
+  requiresDist: string[] | null,
+): DependencyWithConstraints[] {
   if (requiresDist == null) {
     return [];
   }
 
-  const deps: string[] = [];
+  const deps: DependencyWithConstraints[] = [];
 
   for (const spec of requiresDist) {
     // Skip entries with extra conditions like: 'foo ; extra == "dev"'
@@ -296,7 +419,11 @@ function parseMandatoryDeps(requiresDist: string[] | null): string[] {
     // Extract the package name (before any version specifier or semicolon)
     const match = spec.match(/^([A-Za-z0-9]([A-Za-z0-9._-]*[A-Za-z0-9])?)/);
     if (match) {
-      deps.push(normalizePackageName(match[1]));
+      const name = normalizePackageName(match[1]);
+      // Extract version constraints from the remainder (before any semicolon for env markers)
+      const afterName = spec.slice(match[0].length).split(";")[0].trim();
+      const constraints = parseVersionConstraints(afterName);
+      deps.push({ name, constraints });
     }
   }
 
@@ -306,17 +433,26 @@ function parseMandatoryDeps(requiresDist: string[] | null): string[] {
 /**
  * Resolve all transitive dependencies using BFS with depth limit.
  */
+interface ResolveResult {
+  packages: ResolvedPackage[];
+  warnings: string[];
+}
+
 async function resolveAllDeps(
   packages: string[],
   signal?: AbortSignal,
-): Promise<ResolvedPackage[]> {
+): Promise<ResolveResult> {
   const resolved: ResolvedPackage[] = [];
-  const seen = new Set<string>();
+  const warnings: string[] = [];
+  // Maps normalized name → installed version string
+  const seen = new Map<string, string>();
 
   interface QueueEntry {
     name: string;
     version: string | null;
+    constraints: VersionConstraint[];
     depth: number;
+    requestedBy: string | null;
   }
 
   const queue: QueueEntry[] = packages.map((spec) => {
@@ -324,18 +460,34 @@ async function resolveAllDeps(
     return {
       name: normalizePackageName(parsed.name),
       version: parsed.version,
+      constraints: parsed.version != null ? [{ op: "==" as const, version: parsed.version }] : [],
       depth: 0,
+      requestedBy: null,
     };
   });
 
   while (queue.length > 0) {
     if (signal?.aborted) {
-      return resolved;
+      return { packages: resolved, warnings };
     }
 
     const entry = queue.shift()!;
-
-    if (seen.has(entry.name)) {
+    // entry.name is already normalized (by queue producers)
+    const existingVersion = seen.get(entry.name);
+    if (existingVersion != null) {
+      // Check if the resolved version satisfies the constraints
+      for (const constraint of entry.constraints) {
+        if (!satisfiesConstraint(existingVersion, constraint)) {
+          const source =
+            entry.requestedBy != null
+              ? ` (required by ${entry.requestedBy})`
+              : "";
+          warnings.push(
+            `${entry.name} ${formatConstraints(entry.constraints)}${source} conflicts with installed ${existingVersion}`,
+          );
+          break;
+        }
+      }
       continue;
     }
 
@@ -363,7 +515,7 @@ async function resolveAllDeps(
       continue;
     }
 
-    seen.add(entry.name);
+    seen.set(entry.name, info.info.version);
     resolved.push({
       name: info.info.name,
       version: info.info.version,
@@ -375,18 +527,34 @@ async function resolveAllDeps(
     if (entry.depth < MAX_DEPENDENCY_DEPTH) {
       const deps = parseMandatoryDeps(info.info.requires_dist);
       for (const dep of deps) {
-        if (!seen.has(dep)) {
+        // Find the exact pin version if there is one (==X.Y.Z)
+        const exactPin = dep.constraints.find((c) => c.op === "==" && !c.version.includes("*"));
+
+        if (!seen.has(dep.name)) {
           queue.push({
-            name: dep,
-            version: null,
+            name: dep.name,
+            version: exactPin?.version ?? null,
+            constraints: dep.constraints,
             depth: entry.depth + 1,
+            requestedBy: info.info.name,
           });
+        } else if (dep.constraints.length > 0) {
+          // Already resolved — check constraints against the resolved version
+          const resolvedVersion = seen.get(dep.name)!;
+          for (const constraint of dep.constraints) {
+            if (!satisfiesConstraint(resolvedVersion, constraint)) {
+              warnings.push(
+                `${dep.name} ${formatConstraints(dep.constraints)} (required by ${info.info.name}) conflicts with installed ${resolvedVersion}`,
+              );
+              break;
+            }
+          }
         }
       }
     }
   }
 
-  return resolved;
+  return { packages: resolved, warnings };
 }
 
 export function formatError(error: unknown): string {
