@@ -63,6 +63,15 @@ impl<'db> EnumMetadata<'db> {
         }
     }
 
+    /// Returns the type of `.name`/`._name_` for a given enum member.
+    ///
+    /// This is always a string literal of the member name.
+    pub(crate) fn name_type(&self, db: &'db dyn Db, member_name: &Name) -> Option<Type<'db>> {
+        self.members
+            .contains_key(member_name)
+            .then(|| Type::string_literal(db, member_name.as_str()))
+    }
+
     /// Returns the type of `.value`/`._value_` for an enum instance that is not
     /// narrowed to a specific member (e.g. `x: MyEnum` where `MyEnum` has multiple members).
     ///
