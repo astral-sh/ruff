@@ -546,18 +546,13 @@ reveal_type(Test("bad"))  # revealed: Test
 reveal_type(Test("ok"))  # revealed: Test
 ```
 
-### Overloaded `__new__` with mixed instance and non-instance return types
-
-When `__new__` is overloaded and some overloads return the class instance type while others return a
-different type, the decision of whether to skip `__init__` should be made per-overload based on
-which overload matched at the call site. Non-instance-returning overloads use `__new__` directly,
-while instance-returning overloads additionally validate `__init__`.
+The same mechanism should also hold for a `Self`-returning overload:
 
 ```py
 from typing import overload
 from typing_extensions import Self
 
-class C:
+class SimpleMixed:
     @overload
     def __new__(cls, x: int) -> int: ...
     @overload
@@ -565,40 +560,8 @@ class C:
     def __new__(cls, x: int | str) -> object: ...
     def __init__(self, x: str) -> None: ...
 
-# The `int` overload is selected; its return type is not an instance of `C`,
-# so `__init__` is skipped and the return type is `int`.
-reveal_type(C(1))  # revealed: int
-
-# The `str -> Self` overload would return an instance of `C`, so `__init__` is
-# also checked. `__init__` accepts `x: str`, so the call succeeds.
-reveal_type(C("foo"))  # revealed: C
-```
-
-### `__init__` incompatible with instance-returning `__new__` overloads
-
-When `__init__` parameters are incompatible with the arguments that would match instance-returning
-`__new__` overloads, `__init__` errors are reported. The return type still comes from `__new__`.
-
-```py
-from typing import overload
-from typing_extensions import Self
-
-class D:
-    @overload
-    def __new__(cls, x: int) -> int: ...
-    @overload
-    def __new__(cls, x: str) -> Self: ...
-    def __new__(cls, x: int | str) -> object: ...
-    def __init__(self) -> None: ...
-
-# The `int` overload is selected; its return type is not an instance of `D`,
-# so `__init__` is skipped and the return type is `int`.
-reveal_type(D(1))  # revealed: int
-
-# The `str -> Self` overload returns an instance of `D`, so `__init__` is also
-# checked. `__init__` takes no args, so it reports an error.
-# error: [too-many-positional-arguments]
-reveal_type(D("foo"))  # revealed: D
+reveal_type(SimpleMixed(1))  # revealed: int
+reveal_type(SimpleMixed("foo"))  # revealed: SimpleMixed
 ```
 
 ### Overloaded non-instance `__new__` should preserve matched return type
