@@ -202,7 +202,7 @@ impl Suppressions {
         settings: &LinterSettings,
     ) -> Suppressions {
         let builder = SuppressionsBuilder::new(source, settings);
-        builder.load_from_tokens(tokens, indexer)
+        dbg!(builder.load_from_tokens(tokens, indexer))
     }
 
     pub(crate) fn is_empty(&self) -> bool {
@@ -229,6 +229,7 @@ impl Suppressions {
             let suppression_code =
                 get_redirect_target(suppression.code.as_str()).unwrap_or(suppression.code.as_str());
             if *code == suppression_code && suppression.range.contains_range(range) {
+                dbg!(&suppression);
                 suppression.used.set(true);
                 return true;
             }
@@ -325,7 +326,8 @@ impl Suppressions {
                 // UnusedNOQA
                 let Ok(rule) = Rule::from_code(
                     get_redirect_target(&suppression.code).unwrap_or(&suppression.code),
-                ) else {
+                )
+                .or_else(|_| Rule::from_name(&suppression.code)) else {
                     continue; // "external" lint code, don't treat it as unused
                 };
 
