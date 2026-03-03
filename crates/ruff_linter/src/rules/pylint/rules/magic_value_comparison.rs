@@ -87,7 +87,10 @@ fn is_magic_value(
     }
 
     // Check if the literal value is in the allowed values list
-    if AllowedValue::matches(literal_expr, allowed_values) {
+    if allowed_values
+        .iter()
+        .any(|value| value.matches_literal(literal_expr))
+    {
         return false;
     }
 

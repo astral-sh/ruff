@@ -7,7 +7,7 @@ use std::fmt;
 use crate::display_settings;
 use ruff_cache::{CacheKey, CacheKeyHasher};
 use ruff_macros::CacheKey;
-use ruff_python_ast::{ExprNumberLiteral, ExprStringLiteral, LiteralExpressionRef, Number};
+use ruff_python_ast::{ExprNumberLiteral, LiteralExpressionRef, Number};
 use std::hash::Hasher;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, CacheKey)]
@@ -20,10 +20,7 @@ pub enum AllowedValue {
 }
 
 impl AllowedValue {
-    pub fn matches(
-        literal_expr: LiteralExpressionRef<'_>,
-        allowed_values: &[AllowedValue],
-    ) -> bool {
+    pub fn matches_literal(&self, literal_expr: LiteralExpressionRef<'_>) -> bool {
         fn float_as_i64(value: f64) -> Option<i64> {
             #[expect(clippy::cast_precision_loss)]
             if value.is_finite()
@@ -38,50 +35,27 @@ impl AllowedValue {
             }
         }
 
-        match literal_expr {
-            LiteralExpressionRef::StringLiteral(ExprStringLiteral { value, .. }) => {
-                let string_value = value.to_str();
-                allowed_values.iter().any(|allowed| {
-                    if let AllowedValue::String(s) = allowed {
-                        s.as_str() == string_value
-                    } else {
-                        false
-                    }
-                })
+        match (self, literal_expr) {
+            (
+                AllowedValue::String(allowed),
+                LiteralExpressionRef::StringLiteral(string_literal),
+            ) => allowed.as_str() == string_literal.value.to_str(),
+            (AllowedValue::Int(allowed), LiteralExpressionRef::NumberLiteral(number_literal)) => {
+                match &number_literal.value {
+                    Number::Int(i) => i.as_i64() == Some(*allowed),
+                    Number::Float(f) => float_as_i64(*f) == Some(*allowed),
+                    Number::Complex { .. } => false,
+                }
             }
-            LiteralExpressionRef::NumberLiteral(ExprNumberLiteral { value, .. }) => match value {
-                Number::Int(i) => {
-                    if let Some(int_value) = i.as_i64() {
-                        allowed_values.iter().any(|allowed| {
-                            if let AllowedValue::Int(allowed_int) = allowed {
-                                *allowed_int == int_value
-                            } else if let AllowedValue::Float(allowed_float) = allowed {
-                                float_as_i64(allowed_float.value()) == Some(int_value)
-                            } else {
-                                false
-                            }
-                        })
-                    } else {
-                        false
-                    }
+            (AllowedValue::Float(allowed), LiteralExpressionRef::NumberLiteral(number_literal)) => {
+                match &number_literal.value {
+                    Number::Int(i) => i
+                        .as_i64()
+                        .is_some_and(|v| float_as_i64(allowed.value()) == Some(v)),
+                    Number::Float(f) => *allowed == AllowedFloatValue::new(*f),
+                    Number::Complex { .. } => false,
                 }
-                Number::Float(f) => {
-                    let float_value = AllowedFloatValue::new(*f);
-                    let float_as_int = float_as_i64(*f);
-                    allowed_values.iter().any(|allowed| {
-                        if let AllowedValue::Float(allowed_float) = allowed {
-                            *allowed_float == float_value
-                        } else if let (AllowedValue::Int(allowed_int), Some(int_value)) =
-                            (allowed, float_as_int)
-                        {
-                            *allowed_int == int_value
-                        } else {
-                            false
-                        }
-                    })
-                }
-                Number::Complex { .. } => false,
-            },
+            }
             _ => false,
         }
     }
