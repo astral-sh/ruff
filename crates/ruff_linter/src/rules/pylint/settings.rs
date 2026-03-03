@@ -15,44 +15,29 @@ use std::hash::Hasher;
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub enum AllowedValue {
     String(String),
-    Int(i64),
+    Int(i32),
     Float(AllowedFloatValue),
 }
 
 impl AllowedValue {
     pub fn matches_literal(&self, literal_expr: LiteralExpressionRef<'_>) -> bool {
-        fn float_as_i64(value: f64) -> Option<i64> {
-            #[expect(clippy::cast_precision_loss)]
-            if value.is_finite()
-                && value.fract() == 0.0
-                && value >= i64::MIN as f64
-                && value <= i64::MAX as f64
-            {
-                #[expect(clippy::cast_possible_truncation)]
-                Some(value as i64)
-            } else {
-                None
-            }
-        }
-
         match (self, literal_expr) {
             (
                 AllowedValue::String(allowed),
                 LiteralExpressionRef::StringLiteral(string_literal),
             ) => allowed.as_str() == string_literal.value.to_str(),
             (AllowedValue::Int(allowed), LiteralExpressionRef::NumberLiteral(number_literal)) => {
+                #[expect(clippy::cast_possible_truncation)]
                 match &number_literal.value {
-                    Number::Int(i) => i.as_i64() == Some(*allowed),
-                    Number::Float(f) => float_as_i64(*f) == Some(*allowed),
+                    Number::Int(i) => i.as_i32() == Some(*allowed), // allowed int vs found int
+                    Number::Float(f) => f.fract() == 0.0 && *f as i32 == *allowed, // allowed int vs found float
                     Number::Complex { .. } => false,
                 }
             }
             (AllowedValue::Float(allowed), LiteralExpressionRef::NumberLiteral(number_literal)) => {
                 match &number_literal.value {
-                    Number::Int(i) => i
-                        .as_i64()
-                        .is_some_and(|v| float_as_i64(allowed.value()) == Some(v)),
-                    Number::Float(f) => *allowed == AllowedFloatValue::new(*f),
+                    Number::Float(f) => *allowed == AllowedFloatValue::new(*f), //allowed float vs found float
+                    Number::Int(i) => i.as_i32().map(f64::from) == Some(allowed.value()), //allowed float vs found int
                     Number::Complex { .. } => false,
                 }
             }

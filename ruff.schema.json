@@ -792,7 +792,7 @@
         },
         {
           "type": "integer",
-          "format": "int64"
+          "format": "int32"
         },
         {
           "$ref": "#/definitions/AllowedFloatValue"
