@@ -1202,23 +1202,6 @@ impl<'db> Constraint<'db> {
             _ => None,
         }
     }
-
-    /// Temporary compatibility view for refactor-in-progress code paths that still
-    /// expect a combined range constraint.
-    fn as_lower_upper(self) -> (Type<'db>, Type<'db>) {
-        match self {
-            Constraint::LowerBound(_, lower) => (lower, Type::object()),
-            Constraint::UpperBound(_, upper) => (Type::Never, upper),
-        }
-    }
-
-    fn lower(self) -> Type<'db> {
-        self.as_lower_upper().0
-    }
-
-    fn upper(self) -> Type<'db> {
-        self.as_lower_upper().1
-    }
 }
 
 impl ConstraintId {
@@ -1276,76 +1259,95 @@ impl ConstraintId {
         {
             return false;
         }
-        other_constraint
-            .lower()
-            .is_constraint_set_assignable_to(db, self_constraint.lower())
-            && self_constraint
-                .upper()
-                .is_constraint_set_assignable_to(db, other_constraint.upper())
+
+        match (self_constraint, other_constraint) {
+            // (s₁ ≤ α) → (s₂ ≤ α) <=> (s₂ ≤ s₁)
+            (Constraint::LowerBound(_, self_lower), Constraint::LowerBound(_, other_lower)) => {
+                other_lower.is_constraint_set_assignable_to(db, self_lower)
+            }
+
+            // (α ≤ t₁) → (α ≤ t₂) <=> (t₁ ≤ t₂)
+            (Constraint::UpperBound(_, self_upper), Constraint::UpperBound(_, other_upper)) => {
+                self_upper.is_constraint_set_assignable_to(db, other_upper)
+            }
+
+            // (α ≤ t₁) → (Never ≤ α)   [anything implies true]
+            (Constraint::UpperBound(_, _), Constraint::LowerBound(_, other_lower)) => {
+                other_lower.is_never()
+            }
+
+            // (s₁ ≤ α) → (α ≤ object)  [anything implies true]
+            (Constraint::LowerBound(_, _), Constraint::UpperBound(_, other_upper)) => {
+                other_upper.is_object()
+            }
+        }
     }
 
-    /// Returns the intersection of two range constraints, or `None` if the intersection is empty.
+    /// Returns the intersection of two individual constraints, or `None` if the intersection is
+    /// empty.
     fn intersect<'db>(
         self,
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
         other: Self,
     ) -> IntersectionResult<'db> {
-        /// TODO: For now, we treat some upper bounds as unsimplifiable if they become "too big".
-        /// When intersecting constraints, the upper bounds are also intersected together. If the
-        /// lhs and rhs upper bounds are unions of intersections (e.g. `(a & b) | (c & d)`), then
-        /// intersecting them together will require distributing across every pair of union
-        /// elements. That can quickly balloon in size. We are looking at a better representation
-        /// that would let us model this case more directly, but for now, we punt.
-        const MAX_UPPER_BOUND_SIZE: usize = 4;
-
         let self_constraint = builder.constraint_data(self);
         let other_constraint = builder.constraint_data(other);
-        let estimated_upper_bound_size = self_constraint
-            .upper()
-            .union_size(db)
-            .saturating_mul(other_constraint.upper().union_size(db))
-            .saturating_mul(
-                self_constraint
-                    .upper()
-                    .intersection_size(db)
-                    .saturating_add(other_constraint.upper().intersection_size(db)),
-            );
-        if estimated_upper_bound_size >= MAX_UPPER_BOUND_SIZE {
-            return IntersectionResult::CannotSimplify;
-        }
+        let typevar = self_constraint.typevar();
+        debug_assert!(typevar.is_same_typevar_as(db, other_constraint.typevar()));
 
-        // (s₁ ≤ α ≤ t₁) ∧ (s₂ ≤ α ≤ t₂) = (s₁ ∪ s₂) ≤ α ≤ (t₁ ∩ t₂))
-        let lower =
-            UnionType::from_two_elements(db, self_constraint.lower(), other_constraint.lower());
-        let upper = IntersectionType::from_two_elements(
-            db,
-            self_constraint.upper(),
-            other_constraint.upper(),
-        );
-
-        // If `lower ≰ upper`, then the intersection is empty, since there is no type that is both
-        // greater than `lower`, and less than `upper`.
-        if !lower.is_constraint_set_assignable_to(db, upper) {
-            return IntersectionResult::Disjoint;
-        }
-
-        // We do not create lower bounds that are unions, or upper bounds that are intersections,
-        // since those can be broken apart into BDDs over simpler constraints.
-        if lower.is_union() || upper.is_nontrivial_intersection(db) {
-            return IntersectionResult::CannotSimplify;
-        }
-
-        // Temporary compatibility: only same-polarity intersections can simplify to
-        // a single individual constraint under the split representation.
         match (self_constraint, other_constraint) {
-            (Constraint::LowerBound(typevar, _), Constraint::LowerBound(_, _)) => {
+            (Constraint::LowerBound(_, self_lower), Constraint::LowerBound(_, other_lower)) => {
+                // (s₁ ≤ α) ∧ (s₂ ≤ α) = (s₁ ∪ s₂) ≤ α
+                let lower = UnionType::from_two_elements(db, self_lower, other_lower);
+                // We do not create lower bounds that are unions, since those can be broken apart
+                // into BDDs over simpler constraints.
+                if lower.is_union() {
+                    return IntersectionResult::CannotSimplify;
+                }
                 IntersectionResult::Simplified(Constraint::LowerBound(typevar, lower))
             }
-            (Constraint::UpperBound(typevar, _), Constraint::UpperBound(_, _)) => {
+
+            (Constraint::UpperBound(_, self_upper), Constraint::UpperBound(_, other_upper)) => {
+                /// TODO: For now, we treat some upper bounds as unsimplifiable if they become "too big".
+                /// When intersecting constraints, the upper bounds are also intersected together. If the
+                /// lhs and rhs upper bounds are unions of intersections (e.g. `(a & b) | (c & d)`), then
+                /// intersecting them together will require distributing across every pair of union
+                /// elements. That can quickly balloon in size. We are looking at a better representation
+                /// that would let us model this case more directly, but for now, we punt.
+                const MAX_UPPER_BOUND_SIZE: usize = 4;
+
+                let estimated_upper_bound_size = self_upper
+                    .union_size(db)
+                    .saturating_mul(other_upper.union_size(db))
+                    .saturating_mul(
+                        self_upper
+                            .intersection_size(db)
+                            .saturating_add(other_upper.intersection_size(db)),
+                    );
+                if estimated_upper_bound_size >= MAX_UPPER_BOUND_SIZE {
+                    return IntersectionResult::CannotSimplify;
+                }
+
+                // (α ≤ t₁) ∧ (α ≤ t₂) = α ≤ (t₁ ∩ t₂)
+                let upper = IntersectionType::from_two_elements(db, self_upper, other_upper);
+                // We do not create upper bounds that are intersections, since those can be broken
+                // apart into BDDs over simpler constraints.
+                if upper.is_nontrivial_intersection(db) {
+                    return IntersectionResult::CannotSimplify;
+                }
                 IntersectionResult::Simplified(Constraint::UpperBound(typevar, upper))
             }
-            _ => IntersectionResult::CannotSimplify,
+
+            (Constraint::LowerBound(_, lower), Constraint::UpperBound(_, upper))
+            | (Constraint::UpperBound(_, upper), Constraint::LowerBound(_, lower)) => {
+                // If `lower ≰ upper`, then the intersection is empty, since there is no type that is both
+                // greater than `lower`, and less than `upper`.
+                if !lower.is_constraint_set_assignable_to(db, upper) {
+                    return IntersectionResult::Disjoint;
+                }
+                IntersectionResult::CannotSimplify
+            }
         }
     }
 
@@ -1379,59 +1381,30 @@ impl ConstraintId {
 
         impl Display for DisplayConstrainedTypeVar<'_> {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                let (lower, upper) = self.constraint.as_lower_upper();
-                let typevar = self.constraint.typevar();
-                if lower.is_equivalent_to(self.db, upper) {
-                    // If this typevar is equivalent to another, output the constraint in a
-                    // consistent alphabetical order, regardless of the salsa ordering that we are
-                    // using the in BDD.
-                    if let Type::TypeVar(bound) = lower {
-                        let bound = bound.identity(self.db).display(self.db).to_string();
-                        let typevar = typevar.identity(self.db).display(self.db).to_string();
-                        let (smaller, larger) = if bound < typevar {
-                            (bound, typevar)
-                        } else {
-                            (typevar, bound)
-                        };
-                        return write!(
+                match self.constraint {
+                    Constraint::LowerBound(typevar, lower) => {
+                        if self.negated {
+                            f.write_str("¬")?;
+                        }
+                        write!(
                             f,
-                            "({} {} {})",
-                            smaller,
-                            if self.negated { "≠" } else { "=" },
-                            larger,
-                        );
+                            "({} ≤ {})",
+                            lower.display(self.db),
+                            typevar.identity(self.db).display(self.db),
+                        )
                     }
-
-                    return write!(
-                        f,
-                        "({} {} {})",
-                        typevar.identity(self.db).display(self.db),
-                        if self.negated { "≠" } else { "=" },
-                        lower.display(self.db)
-                    );
+                    Constraint::UpperBound(typevar, upper) => {
+                        if self.negated {
+                            f.write_str("¬")?;
+                        }
+                        write!(
+                            f,
+                            "({} ≤ {})",
+                            typevar.identity(self.db).display(self.db),
+                            upper.display(self.db),
+                        )
+                    }
                 }
-
-                if lower.is_never() && upper.is_object() {
-                    return write!(
-                        f,
-                        "({} {} *)",
-                        typevar.identity(self.db).display(self.db),
-                        if self.negated { "≠" } else { "=" }
-                    );
-                }
-
-                if self.negated {
-                    f.write_str("¬")?;
-                }
-                f.write_str("(")?;
-                if !lower.is_never() {
-                    write!(f, "{} ≤ ", lower.display(self.db))?;
-                }
-                typevar.identity(self.db).display(self.db).fmt(f)?;
-                if !upper.is_object() {
-                    write!(f, " ≤ {}", upper.display(self.db))?;
-                }
-                f.write_str(")")
             }
         }
 
