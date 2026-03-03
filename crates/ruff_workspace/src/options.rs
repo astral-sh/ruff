@@ -3314,10 +3314,10 @@ pub struct PylintOptions {
         default = r#"[]"#,
         value_type = r#"list[str | int | float]"#,
         example = r#"
-            extend-allowed-magic-values = [42, 3.14, "special"]
+            extend-allow-magic-values = [42, 3.14, "magic"]
         "#
     )]
-    pub extend_allowed_magic_values: Option<Vec<AllowedValue>>,
+    pub extend_allow_magic_values: Option<Vec<AllowedValue>>,
 
     /// Dunder methods name to allow, in addition to the default set from the
     /// Python standard library (see `PLW3201`).
@@ -3389,18 +3389,12 @@ pub struct PylintOptions {
 impl PylintOptions {
     pub fn into_settings(self) -> pylint::settings::Settings {
         let defaults = pylint::settings::Settings::default();
-        let allow_magic_values = if let Some(values) = self.allow_magic_values {
-            // If allow_magic_values is set, use it (replaces defaults)
-            values
-        } else if let Some(extend) = self.extend_allowed_magic_values {
-            // If extend_allowed_magic_values is set, combine with defaults
-            let mut combined = defaults.allow_magic_values.clone();
-            combined.extend(extend);
-            combined
-        } else {
-            // Otherwise use defaults
-            defaults.allow_magic_values
-        };
+        let mut allow_magic_values = self
+            .allow_magic_values
+            .unwrap_or_else(|| defaults.allow_magic_values.clone());
+        if let Some(extend) = self.extend_allow_magic_values {
+            allow_magic_values.extend(extend);
+        }
         pylint::settings::Settings {
             allow_magic_value_types: self
                 .allow_magic_value_types

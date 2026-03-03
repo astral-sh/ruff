@@ -2818,7 +2818,7 @@
             "$ref": "#/definitions/AllowedValue"
           }
         },
-        "extend-allowed-magic-values": {
+        "extend-allow-magic-values": {
           "description": "Additional literal values to ignore when used as \"magic values\" (see `PLR2004`),\nin addition to the default set.\n\nThis option is used to extend the default set without replacing it.\nIf `allow-magic-values` is set, this option is ignored.",
           "type": [
             "array",

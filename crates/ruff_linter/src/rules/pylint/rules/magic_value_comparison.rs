@@ -43,7 +43,7 @@ use crate::rules::pylint::settings::{AllowedValue, ConstantType};
 /// ## Options
 /// - `lint.pylint.allow-magic-value-types`
 /// - `lint.pylint.allow-magic-values`
-/// - `lint.pylint.extend-allowed-magic-values`
+/// - `lint.pylint.extend-allow-magic-values`
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#constants
 #[derive(ViolationMetadata)]
