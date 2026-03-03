@@ -127,7 +127,7 @@ Add methods on `ConstraintSetBuilder`:
   - `add_derived_support(base: SupportId, origin: ConstraintId, derived: ConstraintId) -> SupportId`
 
 - flattening/materialization:
-  - `build_support(expr: SupportId) -> Box<[ConstraintId]>`
+  - `build_support(expr: SupportId) -> FxIndexSet<ConstraintId>`
 
 `build_support` behavior:
 
@@ -332,7 +332,7 @@ Expectation:
 - [x] Update `distributed_or`/`distributed_and` and `when_any`/`when_all` to combine support in balanced-tree order.
 - [x] Remove temporary `support_from_node` reconstruction path entirely.
 - [x] Encode abstraction-derived ordering via `Remove`/`AddDerived` support nodes.
-- [ ] Convert ordering consumers to flattened support rank maps.
+- [x] Convert ordering consumers to flattened support rank maps. _(load-bearing consumer complete: `NodeId::solutions`; remaining `source_order` uses are bookkeeping/debug paths removed in Step H)_
 - [ ] Remove node `source_order` fields and offset APIs.
 - [x] Run tests and update snapshots if needed.
 
@@ -357,7 +357,7 @@ File: `crates/ty_python_semantic/src/types/constraints.rs`
 File: `crates/ty_python_semantic/src/types/constraints.rs`
 
 1. Add support constructors (`empty`, `singleton`, `ordered_union`, `remove`, `add_derived`).
-2. Implement `build_support(expr) -> Box<[ConstraintId]>`:
+2. Implement `build_support(expr) -> FxIndexSet<ConstraintId>`:
    - iterative walk,
    - `FxIndexSet` accumulator for dedupe/order,
    - deterministic lhs-before-rhs.
@@ -427,13 +427,19 @@ File: `crates/ty_python_semantic/src/types/constraints.rs`
    - avoid temporary accumulator structs/collections for support deltas,
    - in remove paths, record `AddDerived` before `Remove` so `origin` exists when `AddDerived` nodes are created.
 
-### Step G — migrate ordering consumers
+### Step G — migrate ordering consumers (**completed for load-bearing consumers**)
 
 File: `crates/ty_python_semantic/src/types/constraints.rs`
 
 1. `NodeId::solutions` sorting.
 2. `NodeId::path_assignments` ordering logic.
 3. Any other display/simplify sorting based on `source_order`.
+
+Current status:
+
+- ✅ `NodeId::solutions` now uses support-aware path traversal (`for_each_path_with_support`) and support-rank ordering.
+- ✅ No additional load-bearing ordering consumers require migration in Step G.
+- ℹ️ Remaining `source_order`-dependent code paths (`PathAssignments` bookkeeping, simplification/display ordering, graph-debug output) are tied to interior-node `source_order` fields and are expected to be removed in Step H.
 
 Pattern:
 
@@ -499,4 +505,4 @@ For any materialized support list from `build_support`:
 - Keep fully reduced BDD work separate after migration stabilizes.
 - Keep support-expression ID types private to `constraints.rs`.
 - Consider flatten memoization only if profiling indicates repeated-flatten overhead.
-- `retain_one_cache` currently appears to be stale/dead state from earlier code paths; dead-field cleanup may require manual audit since compiler/lints may not flag it.
+

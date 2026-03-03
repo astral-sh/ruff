@@ -700,7 +700,7 @@ struct ConstraintSetStorage<'db> {
     exists_one_cache:
         FxHashMap<(NodeId, SupportId, BoundTypeVarIdentity<'db>), (NodeId, SupportId)>,
     restrict_one_cache: FxHashMap<(NodeId, ConstraintAssignment), (NodeId, bool)>,
-    solutions_cache: FxHashMap<NodeId, Vec<Solution<'db>>>,
+    solutions_cache: FxHashMap<(NodeId, SupportId), Vec<Solution<'db>>>,
     simplify_cache: FxHashMap<NodeId, NodeId>,
 
     single_sequent_cache: FxHashMap<ConstraintId, SequentMap>,
@@ -726,7 +726,7 @@ impl<'db> ConstraintSetBuilder<'db> {
         // the original builder aren't relevant to the new builder, and don't need to be retained.
         let constraint = f(&self);
         let node = constraint.node;
-        let support = self.build_support(constraint.support);
+        let support = self.build_support(constraint.support).into_iter().collect();
         let storage = self.storage.into_inner();
         OwnedConstraintSet {
             node,
@@ -951,7 +951,7 @@ impl<'db> ConstraintSetBuilder<'db> {
         SupportId::AddDerived(id)
     }
 
-    fn build_support(&self, support: SupportId) -> Box<[ConstraintId]> {
+    fn build_support(&self, support: SupportId) -> FxIndexSet<ConstraintId> {
         fn build_into(
             builder: &ConstraintSetBuilder<'_>,
             support: SupportId,
@@ -1009,7 +1009,7 @@ impl<'db> ConstraintSetBuilder<'db> {
 
         let mut constraints = FxIndexSet::default();
         build_into(self, support, &mut constraints);
-        constraints.into_iter().collect()
+        constraints
     }
 }
 
@@ -1732,31 +1732,33 @@ impl NodeId {
         }
     }
 
-    fn for_each_path<'db>(
+    fn for_each_path_with_support<'db>(
         self,
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
-        mut f: impl FnMut(&PathAssignments),
+        support: SupportId,
+        mut f: impl FnMut(&PathAssignments, SupportId),
     ) {
         match self.node() {
             Node::AlwaysTrue => {}
             Node::AlwaysFalse => {}
             Node::Interior(interior) => {
                 let mut path = interior.path_assignments(builder);
-                self.for_each_path_inner(db, builder, &mut f, &mut path);
+                self.for_each_path_inner_with_support(db, builder, support, &mut f, &mut path);
             }
         }
     }
 
-    fn for_each_path_inner<'db>(
+    fn for_each_path_inner_with_support<'db>(
         self,
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
-        f: &mut dyn FnMut(&PathAssignments),
+        support: SupportId,
+        f: &mut dyn FnMut(&PathAssignments, SupportId),
         path: &mut PathAssignments,
     ) {
         match self.node() {
-            Node::AlwaysTrue => f(path),
+            Node::AlwaysTrue => f(path, support),
             Node::AlwaysFalse => {}
             Node::Interior(_) => {
                 let interior = builder.interior_node_data(self);
@@ -1765,14 +1767,42 @@ impl NodeId {
                     builder,
                     interior.constraint.when_true(),
                     interior.source_order,
-                    |path, _| interior.if_true.for_each_path_inner(db, builder, f, path),
+                    |path, new_range| {
+                        let support = path.assignments[new_range]
+                            .iter()
+                            .rev() // add_derived supports are applied in reverse order
+                            .fold(support, |support, (assignment, _)| {
+                                builder.add_derived_support(
+                                    support,
+                                    interior.constraint,
+                                    assignment.constraint(),
+                                )
+                            });
+                        interior
+                            .if_true
+                            .for_each_path_inner_with_support(db, builder, support, f, path);
+                    },
                 );
                 path.walk_edge(
                     db,
                     builder,
                     interior.constraint.when_false(),
                     interior.source_order,
-                    |path, _| interior.if_false.for_each_path_inner(db, builder, f, path),
+                    |path, new_range| {
+                        let support = path.assignments[new_range]
+                            .iter()
+                            .rev() // add_derived supports are applied in reverse order
+                            .fold(support, |support, (assignment, _)| {
+                                builder.add_derived_support(
+                                    support,
+                                    interior.constraint,
+                                    assignment.constraint(),
+                                )
+                            });
+                        interior
+                            .if_false
+                            .for_each_path_inner_with_support(db, builder, support, f, path);
+                    },
                 );
             }
         }
@@ -3277,8 +3307,9 @@ impl InteriorNode {
             db: &'db dyn Db,
             builder: &'c ConstraintSetBuilder<'db>,
             interior: NodeId,
+            support: SupportId,
         ) -> Ref<'c, Vec<Solution<'db>>> {
-            let key = interior;
+            let key = (interior, support);
             let storage = builder.storage.borrow();
             if let Ok(solutions) =
                 Ref::filter_map(storage, |storage| storage.solutions_cache.get(&key))
@@ -3292,8 +3323,17 @@ impl InteriorNode {
             // "tied" constraints will still be ordered in a stable way. So we need a stable sort to
             // retain that stable per-tie ordering.
             let mut sorted_paths = Vec::new();
-            interior.for_each_path(db, builder, |path| {
-                let mut path: Vec<_> = path.positive_constraints().collect();
+            interior.for_each_path_with_support(db, builder, support, |path, path_support| {
+                let support_order = builder.build_support(path_support);
+                let mut path: Vec<_> = path
+                    .positive_constraints()
+                    .map(|(constraint, _source_order)| {
+                        let source_order = support_order
+                            .get_index_of(&constraint)
+                            .expect("constraint should exist in support order");
+                        (constraint, source_order)
+                    })
+                    .collect();
                 path.sort_by_key(|(_, source_order)| *source_order);
                 sorted_paths.push(path);
             });
@@ -3411,8 +3451,7 @@ impl InteriorNode {
             Ref::map(storage, |storage| &storage.solutions_cache[&key])
         }
 
-        let _ = support;
-        let solutions = solutions_inner(db, builder, self.node());
+        let solutions = solutions_inner(db, builder, self.node(), support);
         if solutions.is_empty() {
             return Solutions::Unsatisfiable;
         }
