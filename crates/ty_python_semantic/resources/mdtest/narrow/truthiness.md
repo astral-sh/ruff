@@ -438,7 +438,9 @@ def f():
 
 ## Narrowing the value of a named expression
 
-The value expression on the right-hand side of the walrus operator should also be narrowed:
+The value expression on the right-hand side of the walrus operator should also be narrowed.
+
+### Truthiness
 
 ```py
 def foo(value: int | None):
@@ -446,6 +448,76 @@ def foo(value: int | None):
         reveal_type(value)  # revealed: int & ~AlwaysFalsy
     else:
         reveal_type(value)  # revealed: (int & ~AlwaysTruthy) | None
+```
+
+### Comparisons
+
+When the walrus operator is used as a comparand, the value should be narrowed by the comparison:
+
+```py
+def is_not_none(value: int | None):
+    if (x := value) is not None:
+        reveal_type(value)  # revealed: int
+    else:
+        reveal_type(value)  # revealed: None
+
+def is_none(value: int | None):
+    if (x := value) is None:
+        reveal_type(value)  # revealed: None
+    else:
+        reveal_type(value)  # revealed: int
+```
+
+### Equality
+
+```py
+from typing import Literal
+
+def equality(value: Literal[1, 2, 3]):
+    if (x := value) == 1:
+        reveal_type(value)  # revealed: Literal[1]
+    else:
+        reveal_type(value)  # revealed: Literal[2, 3]
+
+def inequality(value: Literal[1, 2, 3]):
+    if (x := value) != 1:
+        reveal_type(value)  # revealed: Literal[2, 3]
+    else:
+        reveal_type(value)  # revealed: Literal[1]
+```
+
+### Membership
+
+```py
+from typing import Literal
+
+def membership(value: Literal[1, 2, 3]):
+    if (x := value) in (1, 2):
+        reveal_type(value)  # revealed: Literal[1, 2]
+```
+
+### `isinstance` and `issubclass`
+
+```py
+def isinstance_walrus(value: int | str):
+    if isinstance(x := value, int):
+        reveal_type(value)  # revealed: int
+    else:
+        reveal_type(value)  # revealed: str
+
+def issubclass_walrus(value: type[int] | type[str]):
+    if issubclass(x := value, int):
+        reveal_type(value)  # revealed: type[int]
+    else:
+        reveal_type(value)  # revealed: type[str]
+```
+
+### `hasattr`
+
+```py
+def hasattr_walrus(value: object):
+    if hasattr(x := value, "foo"):
+        reveal_type(value)  # revealed: <Protocol with members 'foo'>
 ```
 
 ## Narrowing a union of a `TypedDict` and `None`
