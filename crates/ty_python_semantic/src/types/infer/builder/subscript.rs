@@ -537,6 +537,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         for (index, item) in typevars.zip_longest(type_arguments.iter()).enumerate() {
             match item {
                 EitherOrBoth::Both(typevar, expr) => {
+                    if typevar.default_type(db).is_some() {
+                        typevar_with_defaults += 1;
+                    }
+
                     let provided_type = if typevar.is_paramspec(db) {
                         self.infer_paramspec_explicit_specialization_value(
                             expr,

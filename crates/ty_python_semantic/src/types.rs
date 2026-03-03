@@ -7181,108 +7181,65 @@ impl<'db> TypeVarInstance<'db> {
         ty: Type<'db>,
         visitor: &TypeVarDefaultVisitor<'db>,
     ) -> bool {
-        fn typevar_default_is_self_referential<'db>(
+        #[derive(Copy, Clone)]
+        struct State<'db, 'a> {
             db: &'db dyn Db,
+            visitor: &'a TypeVarDefaultVisitor<'db>,
+            seen_typevars: &'a RefCell<FxHashSet<TypeVarInstance<'db>>>,
+            seen_type_aliases: &'a RefCell<FxHashSet<TypeAliasType<'db>>>,
+        }
+
+        fn typevar_default_is_self_referential<'db>(
+            state: State<'db, '_>,
             typevar: TypeVarInstance<'db>,
             self_identity: TypeVarIdentity<'db>,
-            visitor: &TypeVarDefaultVisitor<'db>,
-            seen_typevars: &RefCell<FxHashSet<TypeVarInstance<'db>>>,
-            seen_type_aliases: &RefCell<FxHashSet<TypeAliasType<'db>>>,
         ) -> bool {
-            if typevar.identity(db) == self_identity {
+            if typevar.identity(state.db) == self_identity {
                 return true;
             }
 
-            {
-                let mut seen_typevars = seen_typevars.borrow_mut();
-                if !seen_typevars.insert(typevar) {
-                    return false;
-                }
+            if !state.seen_typevars.borrow_mut().insert(typevar) {
+                return false;
             }
 
             typevar
-                .default_type_impl(db, visitor)
+                .default_type_impl(state.db, state.visitor)
                 .is_some_and(|default_ty| {
-                    type_is_self_referential_impl(
-                        db,
-                        default_ty,
-                        self_identity,
-                        visitor,
-                        seen_typevars,
-                        seen_type_aliases,
-                    )
+                    type_is_self_referential_impl(state, default_ty, self_identity)
                 })
         }
 
         fn type_alias_is_self_referential<'db>(
-            db: &'db dyn Db,
+            state: State<'db, '_>,
             type_alias: TypeAliasType<'db>,
             self_identity: TypeVarIdentity<'db>,
-            visitor: &TypeVarDefaultVisitor<'db>,
-            seen_typevars: &RefCell<FxHashSet<TypeVarInstance<'db>>>,
-            seen_type_aliases: &RefCell<FxHashSet<TypeAliasType<'db>>>,
         ) -> bool {
-            {
-                let mut seen_type_aliases = seen_type_aliases.borrow_mut();
-                if !seen_type_aliases.insert(type_alias) {
-                    return false;
-                }
+            if !state.seen_type_aliases.borrow_mut().insert(type_alias) {
+                return false;
             }
 
-            type_is_self_referential_impl(
-                db,
-                type_alias.raw_value_type(db),
-                self_identity,
-                visitor,
-                seen_typevars,
-                seen_type_aliases,
-            )
+            type_is_self_referential_impl(state, type_alias.raw_value_type(state.db), self_identity)
         }
 
         fn type_is_self_referential_impl<'db>(
-            db: &'db dyn Db,
+            state: State<'db, '_>,
             ty: Type<'db>,
             self_identity: TypeVarIdentity<'db>,
-            visitor: &TypeVarDefaultVisitor<'db>,
-            seen_typevars: &RefCell<FxHashSet<TypeVarInstance<'db>>>,
-            seen_type_aliases: &RefCell<FxHashSet<TypeAliasType<'db>>>,
         ) -> bool {
-            any_over_type(db, ty, false, |inner_ty| match inner_ty {
+            any_over_type(state.db, ty, false, |inner_ty| match inner_ty {
                 Type::TypeVar(bound_typevar) => typevar_default_is_self_referential(
-                    db,
-                    bound_typevar.typevar(db),
+                    state,
+                    bound_typevar.typevar(state.db),
                     self_identity,
-                    visitor,
-                    seen_typevars,
-                    seen_type_aliases,
                 ),
                 Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) => {
-                    typevar_default_is_self_referential(
-                        db,
-                        typevar,
-                        self_identity,
-                        visitor,
-                        seen_typevars,
-                        seen_type_aliases,
-                    )
+                    typevar_default_is_self_referential(state, typevar, self_identity)
                 }
-                Type::TypeAlias(alias) => type_alias_is_self_referential(
-                    db,
-                    alias,
-                    self_identity,
-                    visitor,
-                    seen_typevars,
-                    seen_type_aliases,
-                ),
+                Type::TypeAlias(alias) => {
+                    type_alias_is_self_referential(state, alias, self_identity)
+                }
                 Type::KnownInstance(KnownInstanceType::TypeAliasType(alias)) => {
-                    type_alias_is_self_referential(
-                        db,
-                        alias,
-                        self_identity,
-                        visitor,
-                        seen_typevars,
-                        seen_type_aliases,
-                    )
+                    type_alias_is_self_referential(state, alias, self_identity)
                 }
                 _ => false,
             })
@@ -7290,14 +7247,15 @@ impl<'db> TypeVarInstance<'db> {
 
         let seen_typevars = RefCell::new(FxHashSet::default());
         let seen_type_aliases = RefCell::new(FxHashSet::default());
-        type_is_self_referential_impl(
+
+        let state = State {
             db,
-            ty,
-            self.identity(db),
             visitor,
-            &seen_typevars,
-            &seen_type_aliases,
-        )
+            seen_typevars: &seen_typevars,
+            seen_type_aliases: &seen_type_aliases,
+        };
+
+        type_is_self_referential_impl(state, ty, self.identity(db))
     }
 
     /// Returns the "unchecked" upper bound of a type variable instance.
