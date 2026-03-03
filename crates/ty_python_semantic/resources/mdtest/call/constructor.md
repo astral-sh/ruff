@@ -291,6 +291,24 @@ a: int | MaybeInt = MaybeInt("42")  # OK
 b: int = MaybeInt("42")  # error: [invalid-assignment]
 ```
 
+### `__new__` returning an intersection type
+
+```py
+from __future__ import annotations
+from ty_extensions import Intersection
+
+class Mixin: pass
+
+class A:
+    def __new__(cls) -> Intersection[A, Mixin]:
+        raise NotImplementedError()
+
+    def __init__(self, x: int) -> None: ...
+
+# error: [missing-argument]
+reveal_type(A())  # revealed: A & Mixin
+```
+
 ### `__new__` returning the class type
 
 When `__new__` returns the type of the instance being constructed, we use that type:
