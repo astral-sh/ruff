@@ -11,15 +11,18 @@ pub(crate) fn deferred_comprehensions(checker: &mut Checker) {
         for snapshot in comprehensions {
             checker.semantic.restore(snapshot);
 
-            let Some(generators) = checker.semantic.current_expression().and_then(|expr| {
-                match expr {
-                    Expr::ListComp(comp) => Some(comp.generators.as_slice()),
-                    Expr::SetComp(comp) => Some(comp.generators.as_slice()),
-                    Expr::DictComp(comp) => Some(comp.generators.as_slice()),
-                    Expr::Generator(generator) => Some(generator.generators.as_slice()),
-                    _ => None,
-                }
-            }) else {
+            let Some(generators) =
+                checker
+                    .semantic
+                    .current_expression()
+                    .and_then(|expr| match expr {
+                        Expr::ListComp(comp) => Some(comp.generators.as_slice()),
+                        Expr::SetComp(comp) => Some(comp.generators.as_slice()),
+                        Expr::DictComp(comp) => Some(comp.generators.as_slice()),
+                        Expr::Generator(generator) => Some(generator.generators.as_slice()),
+                        _ => None,
+                    })
+            else {
                 continue;
             };
 
