@@ -305,9 +305,11 @@ fn bindings_in_different_forks(
         {
             let (runtime_import, type_checking_import) =
                 if left_ { (right, left) } else { (left, right) };
-            return !checker
+            return !(checker
                 .semantic()
-                .dominates(runtime_import, type_checking_import);
+                .dominates(runtime_import, type_checking_import)
+                && checker.semantic().statement(runtime_import).start()
+                    < checker.semantic().statement(type_checking_import).start());
         }
     }
 

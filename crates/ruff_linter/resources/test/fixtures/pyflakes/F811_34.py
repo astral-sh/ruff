@@ -25,3 +25,10 @@ if HAS_THING:
 
 if TYPE_CHECKING:
     from foo import Bar
+
+if TYPE_CHECKING:
+    from langchain_huggingface.llms.huggingface_endpoint import HuggingFaceEndpoint
+    from langchain_huggingface.llms.huggingface_pipeline import HuggingFacePipeline
+
+from langchain_huggingface.llms.huggingface_endpoint import HuggingFaceEndpoint
+from langchain_huggingface.llms.huggingface_pipeline import HuggingFacePipeline
