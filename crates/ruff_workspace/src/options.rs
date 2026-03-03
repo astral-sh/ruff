@@ -20,7 +20,7 @@ use ruff_linter::rules::flake8_pytest_style::settings::SettingsError;
 use ruff_linter::rules::flake8_pytest_style::types;
 use ruff_linter::rules::flake8_quotes::settings::Quote;
 use ruff_linter::rules::flake8_tidy_imports::settings::{ApiBan, Strictness};
-use ruff_linter::rules::isort::settings::RelativeImportsOrder;
+use ruff_linter::rules::isort::settings::{ImportStrategy, RelativeImportsOrder};
 use ruff_linter::rules::isort::{ImportSection, ImportType};
 use ruff_linter::rules::pep8_naming::settings::IgnoreNames;
 use ruff_linter::rules::pydocstyle::settings::Convention;
@@ -2673,6 +2673,23 @@ pub struct IsortOptions {
     )]
     pub from_first: Option<bool>,
 
+    /// The strategy to use when sorting imports.
+    ///
+    /// - `path`: Sort imports by their module path (the default). For `from` imports, sorts by
+    ///   the module name (e.g., `foo` in `from foo import bar`).
+    /// - `length`: Sort imports by their string length, placing shorter imports before longer ones.
+    ///   Applies to both straight imports (`import foo`) and `from` imports (`from foo import bar`).
+    /// - `length-straight`: Sort straight imports by their string length, leaving `from` imports
+    ///   sorted by path.
+    #[option(
+        default = r#""path""#,
+        value_type = r#""path" | "length" | "length-straight""#,
+        example = r#"
+            import-strategy = "length"
+        "#
+    )]
+    pub import_strategy: Option<ImportStrategy>,
+
     /// Sort imports by their string length, such that shorter imports appear
     /// before longer imports. For example, by default, imports will be sorted
     /// alphabetically, as in:
@@ -2687,6 +2704,9 @@ pub struct IsortOptions {
     /// import os
     /// import collections
     /// ```
+    ///
+    /// Deprecated: Use [`import-strategy = "length"`](#lint_isort_import-strategy) instead.
+    #[deprecated(note = "Use `import-strategy = \"length\"` instead.")]
     #[option(
         default = r#"false"#,
         value_type = "bool",
@@ -2698,6 +2718,9 @@ pub struct IsortOptions {
 
     /// Sort straight imports by their string length. Similar to [`length-sort`](#lint_isort_length-sort),
     /// but applies only to straight imports and doesn't affect `from` imports.
+    ///
+    /// Deprecated: Use [`import-strategy = "length-straight"`](#lint_isort_import-strategy) instead.
+    #[deprecated(note = "Use `import-strategy = \"length-straight\"` instead.")]
     #[option(
         default = r#"false"#,
         value_type = "bool",
@@ -2949,8 +2972,31 @@ impl IsortOptions {
             default_section,
             no_sections,
             from_first,
-            length_sort: self.length_sort.unwrap_or(false),
-            length_sort_straight: self.length_sort_straight.unwrap_or(false),
+            import_strategy: {
+                #[expect(deprecated)]
+                let has_length_sort = self.length_sort.is_some_and(|v| v);
+                #[expect(deprecated)]
+                let has_length_sort_straight = self.length_sort_straight.is_some_and(|v| v);
+
+                if let Some(strategy) = self.import_strategy {
+                    if has_length_sort || has_length_sort_straight {
+                        return Err(isort::settings::SettingsError::ConflictingImportStrategy);
+                    }
+                    strategy
+                } else if has_length_sort {
+                    warn_user_once!(
+                        "`length-sort` is deprecated. Use `import-strategy = \"length\"` instead."
+                    );
+                    ImportStrategy::Length
+                } else if has_length_sort_straight {
+                    warn_user_once!(
+                        "`length-sort-straight` is deprecated. Use `import-strategy = \"length-straight\"` instead."
+                    );
+                    ImportStrategy::LengthStraight
+                } else {
+                    ImportStrategy::default()
+                }
+            },
         })
     }
 }
@@ -4169,7 +4215,7 @@ impl From<LintOptionsWire> for LintOptions {
 
 #[cfg(test)]
 mod tests {
-    use crate::options::Flake8SelfOptions;
+    use crate::options::{Flake8SelfOptions, IsortOptions};
     use ruff_linter::rules::flake8_self;
     use ruff_python_ast::name::Name;
 
@@ -4218,5 +4264,46 @@ mod tests {
             settings.ignore_names,
             vec![Name::new_static("_foo"), Name::new_static("_bar")]
         );
+    }
+
+    #[test]
+    fn import_strategy_via_options() {
+        use ruff_linter::rules::isort::settings::ImportStrategy;
+
+        let settings = IsortOptions {
+            import_strategy: Some(ImportStrategy::Length),
+            ..IsortOptions::default()
+        }
+        .try_into_settings()
+        .expect("settings should be valid");
+        assert_eq!(settings.import_strategy, ImportStrategy::Length);
+    }
+
+    #[test]
+    fn import_strategy_conflicts_with_length_sort() {
+        use ruff_linter::rules::isort::settings::ImportStrategy;
+
+        #[expect(deprecated)]
+        let result = IsortOptions {
+            import_strategy: Some(ImportStrategy::Length),
+            length_sort: Some(true),
+            ..IsortOptions::default()
+        }
+        .try_into_settings();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn import_strategy_conflicts_with_length_sort_straight() {
+        use ruff_linter::rules::isort::settings::ImportStrategy;
+
+        #[expect(deprecated)]
+        let result = IsortOptions {
+            import_strategy: Some(ImportStrategy::Path),
+            length_sort_straight: Some(true),
+            ..IsortOptions::default()
+        }
+        .try_into_settings();
+        assert!(result.is_err());
     }
 }

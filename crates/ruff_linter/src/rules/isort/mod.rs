@@ -1634,7 +1634,7 @@ mod tests {
             Path::new("isort").join(path).as_path(),
             &LinterSettings {
                 isort: super::settings::Settings {
-                    length_sort: true,
+                    import_strategy: super::settings::ImportStrategy::Length,
                     ..super::settings::Settings::default()
                 },
                 src: vec![test_resource_path("fixtures/isort")],
@@ -1654,7 +1654,7 @@ mod tests {
             Path::new("isort").join(path).as_path(),
             &LinterSettings {
                 isort: super::settings::Settings {
-                    length_sort_straight: true,
+                    import_strategy: super::settings::ImportStrategy::LengthStraight,
                     ..super::settings::Settings::default()
                 },
                 src: vec![test_resource_path("fixtures/isort")],

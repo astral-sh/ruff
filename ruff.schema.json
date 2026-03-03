@@ -1623,6 +1623,25 @@
         }
       ]
     },
+    "ImportStrategy": {
+      "oneOf": [
+        {
+          "description": "Sort imports by their module path, using the module name for `from` imports (the default).",
+          "type": "string",
+          "const": "path"
+        },
+        {
+          "description": "Sort imports by their string length, placing shorter imports before longer ones.\n\nThis strategy applies to both straight imports (`import foo`) and `from` imports\n(`from foo import bar`).",
+          "type": "string",
+          "const": "length"
+        },
+        {
+          "description": "Sort straight imports by their string length, leaving `from` imports sorted by path.",
+          "type": "string",
+          "const": "length-straight"
+        }
+      ]
+    },
     "ImportType": {
       "type": "string",
       "enum": [
@@ -1795,6 +1814,17 @@
             "type": "string"
           }
         },
+        "import-strategy": {
+          "description": "The strategy to use when sorting imports.\n\n- `path`: Sort imports by their module path (the default). For `from` imports, sorts by\n  the module name (e.g., `foo` in `from foo import bar`).\n- `length`: Sort imports by their string length, placing shorter imports before longer ones.\n  Applies to both straight imports (`import foo`) and `from` imports (`from foo import bar`).\n- `length-straight`: Sort straight imports by their string length, leaving `from` imports\n  sorted by path.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ImportStrategy"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "known-first-party": {
           "description": "A list of modules to consider first-party, regardless of whether they\ncan be identified as such via introspection of the local filesystem.\n\nSupports glob patterns. For more information on the glob syntax, refer\nto the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).",
           "type": [
@@ -1826,18 +1856,20 @@
           }
         },
         "length-sort": {
-          "description": "Sort imports by their string length, such that shorter imports appear\nbefore longer imports. For example, by default, imports will be sorted\nalphabetically, as in:\n```python\nimport collections\nimport os\n```\n\nSetting `length-sort = true` will instead sort such that shorter imports\nappear before longer imports, as in:\n```python\nimport os\nimport collections\n```",
+          "description": "Sort imports by their string length, such that shorter imports appear\nbefore longer imports. For example, by default, imports will be sorted\nalphabetically, as in:\n```python\nimport collections\nimport os\n```\n\nSetting `length-sort = true` will instead sort such that shorter imports\nappear before longer imports, as in:\n```python\nimport os\nimport collections\n```\n\nDeprecated: Use [`import-strategy = \"length\"`](#lint_isort_import-strategy) instead.",
           "type": [
             "boolean",
             "null"
-          ]
+          ],
+          "deprecated": true
         },
         "length-sort-straight": {
-          "description": "Sort straight imports by their string length. Similar to [`length-sort`](#lint_isort_length-sort),\nbut applies only to straight imports and doesn't affect `from` imports.",
+          "description": "Sort straight imports by their string length. Similar to [`length-sort`](#lint_isort_length-sort),\nbut applies only to straight imports and doesn't affect `from` imports.\n\nDeprecated: Use [`import-strategy = \"length-straight\"`](#lint_isort_import-strategy) instead.",
           "type": [
             "boolean",
             "null"
-          ]
+          ],
+          "deprecated": true
         },
         "lines-after-imports": {
           "description": "The number of blank lines to place after imports.\nUse `-1` for automatic determination.\n\nRuff uses at most one blank line after imports in typing stub files (files with `.pyi` extension) in accordance to\nthe typing style recommendations ([source](https://typing.python.org/en/latest/guides/writing_stubs.html#blank-lines)).\n\nWhen using the formatter, only the values `-1`, `1`, and `2` are compatible because\nit enforces at least one empty and at most two empty lines after imports.",
