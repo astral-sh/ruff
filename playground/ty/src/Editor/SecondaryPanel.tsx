@@ -2,10 +2,11 @@ import MonacoEditor from "@monaco-editor/react";
 import { AstralButton, Theme } from "shared";
 import { ReadonlyFiles } from "../Playground";
 import { Suspense, use, useState } from "react";
-import { loadPyodide } from "pyodide";
+import { loadPyodide, version as pyodideVersion } from "pyodide";
 import classNames from "classnames";
 import {
   getExtractedPackageFiles,
+  getRuntimePackages,
   PACKAGES_ROOT,
 } from "./PackageInstaller";
 
@@ -113,10 +114,19 @@ function Run({ files, theme }: { files: ReadonlyFiles; theme: Theme }) {
   const [runOutput, setRunOutput] = useState<Promise<string> | null>(null);
   const handleRun = () => {
     const output = (async () => {
+      // The pyodide npm package doesn't ship .whl files, so loadPackage()
+      // must fetch from CDN. Set packageBaseUrl when C extension packages
+      // are needed.
+      const runtimePkgs = getRuntimePackages();
       const pyodide = await loadPyodide({
         env: {
           HOME: SANDBOX_BASE_DIRECTORY,
         },
+        ...(runtimePkgs.length > 0
+          ? {
+              packageBaseUrl: `https://cdn.jsdelivr.net/pyodide/v${pyodideVersion}/full/`,
+            }
+          : {}),
       });
 
       // Write extracted pure-Python package files to Pyodide's filesystem
@@ -130,6 +140,11 @@ function Run({ files, theme }: { files: ReadonlyFiles; theme: Theme }) {
           pyodide.FS.writeFile(path, contents);
         }
         pyodide.runPython(`import sys; sys.path.insert(0, '${PACKAGES_ROOT}')`);
+      }
+
+      // Load C extension packages via Pyodide (pre-filtered to available ones)
+      if (runtimePkgs.length > 0) {
+        await pyodide.loadPackage(runtimePkgs);
       }
 
       let combined_output = "";

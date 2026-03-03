@@ -32,6 +32,7 @@ import { FileId, ReadonlyFiles, SETTINGS_FILE_NAME } from "../Playground";
 import {
   formatError,
   type InstallationStatus,
+  type PackageKind,
 } from "./PackageInstaller";
 import type { editor } from "monaco-editor";
 import type { Monaco } from "@monaco-editor/react";
@@ -520,6 +521,7 @@ function DependenciesContent({
               >
                 {pkg.version}
               </span>
+              <PackageKindBadge kind={pkg.kind} stubsSource={pkg.stubsSource} />
             </li>
           ))}
         </ul>
@@ -531,5 +533,37 @@ function DependenciesContent({
     <div className="flex flex-auto flex-col justify-center items-center text-gray-400 dark:text-gray-500 text-sm">
       Add packages to &quot;dependencies&quot; and click Install.
     </div>
+  );
+}
+
+function PackageKindBadge({
+  kind,
+  stubsSource,
+}: {
+  kind: PackageKind;
+  stubsSource?: string;
+}) {
+  if (kind === "pure-python") {
+    return null;
+  }
+
+  if (kind === "stubs-only") {
+    return (
+      <span
+        className="inline-block px-1.5 py-0 text-[10px] font-medium rounded bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300"
+        title={stubsSource ? `Stubs from ${stubsSource}` : "Type stubs only"}
+      >
+        stubs
+      </span>
+    );
+  }
+
+  return (
+    <span
+      className="inline-block px-1.5 py-0 text-[10px] font-medium rounded bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300"
+      title="No type information available — runtime execution only"
+    >
+      runtime
+    </span>
   );
 }

@@ -1,9 +1,14 @@
 import { unzipSync } from "fflate";
+import { version as pyodideVersion } from "pyodide";
 import type { Workspace } from "ty_wasm";
+
+export type PackageKind = "pure-python" | "stubs-only" | "runtime-only";
 
 export interface InstalledPackageInfo {
   name: string;
   version: string;
+  kind: PackageKind;
+  stubsSource?: string;
 }
 
 export interface InstallationStatus {
@@ -41,12 +46,48 @@ export function getExtractedPackageFiles(): Array<{
 }
 
 /**
+ * C extension packages that need pyodide.loadPackage() at runtime.
+ */
+let runtimePackages: string[] = [];
+
+export function getRuntimePackages(): string[] {
+  return runtimePackages;
+}
+/**
  * Cheap guard to prevent runaway BFS over the dependency graph.
  * Without this, transitive deps can explode (flask alone pulls 7 direct deps,
  * each with their own trees) and cyclic or deep chains can stall the installer.
  */
 const MAX_DEPENDENCY_DEPTH = 3;
 const PYPI_API = "https://pypi.org/pypi";
+
+/**
+ * Cached set of package names available in the Pyodide CDN.
+ * Fetched once from pyodide-lock.json (~25 KB gzip) on first use, only when
+ * C extension packages are present. The result is cached for the session.
+ */
+let pyodidePackagesPromise: Promise<Set<string>> | null = null;
+
+function fetchPyodidePackages(): Promise<Set<string>> {
+  if (pyodidePackagesPromise == null) {
+    pyodidePackagesPromise = (async () => {
+      try {
+        const url = `https://cdn.jsdelivr.net/pyodide/v${pyodideVersion}/full/pyodide-lock.json`;
+        const resp = await fetch(url);
+        if (!resp.ok) {
+          pyodidePackagesPromise = null;
+          return new Set<string>();
+        }
+        const data = await resp.json();
+        return new Set<string>(Object.keys(data.packages ?? {}));
+      } catch {
+        pyodidePackagesPromise = null;
+        return new Set<string>();
+      }
+    })();
+  }
+  return pyodidePackagesPromise;
+}
 
 interface PyPIInfo {
   info: {
@@ -58,14 +99,17 @@ interface PyPIInfo {
     filename: string;
     url: string;
     packagetype: string;
+    size?: number;
   }>;
 }
 
 interface ResolvedPackage {
   name: string;
   version: string;
-  wheelUrl: string;
+  wheelUrl: string | null;
   requiresDist: string[] | null;
+  kind: PackageKind;
+  stubsSource?: string;
 }
 
 /**
@@ -89,6 +133,7 @@ export async function installPackages(
       workspace.removePackageFiles(previousFiles);
     }
     extractedPackageFiles = [];
+    runtimePackages = [];
     return IDLE_STATUS;
   }
 
@@ -140,31 +185,80 @@ export async function installPackages(
         warnings,
       });
 
-      const files = await downloadAndExtractWheel(pkg.wheelUrl, signal);
+      if (pkg.wheelUrl != null) {
+        const files = await downloadAndExtractWheel(pkg.wheelUrl, signal);
 
-      if (signal?.aborted) {
-        return IDLE_STATUS;
-      }
+        if (signal?.aborted) {
+          return IDLE_STATUS;
+        }
 
-      const packageFiles = files.map(({ path, contents }) => ({
-        path: `${PACKAGES_ROOT}/${path}`,
-        contents,
-      }));
+        // For stubs-only, only extract .pyi and py.typed (no .py runtime files)
+        let filteredFiles: typeof files;
+        if (pkg.kind === "stubs-only") {
+          filteredFiles = files.filter(
+            (f) => f.path.endsWith(".pyi") || f.path.endsWith("/py.typed"),
+          );
+          // Wheel had no .pyi files — downgrade to runtime-only
+          if (filteredFiles.length === 0) {
+            pkg.kind = "runtime-only";
+            pkg.stubsSource = undefined;
+            warnings.push(
+              `No type stubs found for '${pkg.name}' — runtime execution only`,
+            );
+          }
+        } else {
+          filteredFiles = files;
+        }
 
-      if (packageFiles.length > 0) {
-        workspace.writePackageFiles(packageFiles);
-        allWrittenFiles.push(...packageFiles.map((f) => f.path));
-        allExtractedFiles.push(...packageFiles);
+        const packageFiles = filteredFiles.map(({ path, contents }) => ({
+          path: `${PACKAGES_ROOT}/${path}`,
+          contents,
+        }));
+
+        if (packageFiles.length > 0) {
+          // Always write to ty MemoryFS for type checking
+          workspace.writePackageFiles(packageFiles);
+          allWrittenFiles.push(...packageFiles.map((f) => f.path));
+
+          // Only store pure-python files for Pyodide FS (stubs don't need runtime)
+          if (pkg.kind === "pure-python") {
+            allExtractedFiles.push(...packageFiles);
+          }
+        }
       }
 
       installed.push({
         name: pkg.name,
         version: pkg.version,
+        kind: pkg.kind,
+        stubsSource: pkg.stubsSource,
       });
     }
 
-    // Store extracted files for Pyodide runtime
+    // Store extracted files for Pyodide runtime (pure-python only)
     extractedPackageFiles = allExtractedFiles;
+
+    // Track C extension packages for pyodide.loadPackage() at runtime,
+    // but only those actually available in Pyodide's CDN.
+    const candidateRuntimePkgs = resolved.filter(
+      (pkg) => pkg.kind !== "pure-python",
+    );
+    if (candidateRuntimePkgs.length > 0) {
+      const pyodidePkgs = await fetchPyodidePackages();
+      runtimePackages = [];
+      for (const pkg of candidateRuntimePkgs) {
+        const normalized = normalizePackageName(pkg.name);
+        if (pyodidePkgs.has(normalized)) {
+          runtimePackages.push(normalized);
+        } else {
+          warnings.push(
+            `'${pkg.name}' is not available in Pyodide — it cannot be imported at runtime`,
+          );
+        }
+      }
+    } else {
+      runtimePackages = [];
+    }
 
     const result: InstallationStatus = {
       state: "success",
@@ -241,6 +335,82 @@ function findPureWheel(
     }
   }
   return null;
+}
+
+interface StubResolution {
+  kind: PackageKind;
+  wheelUrl: string | null;
+  stubsSource?: string;
+}
+
+/**
+ * Try to find type stubs for a C extension package.
+ *
+ * Strategy (in priority order):
+ * 1. {name}-stubs package on PyPI (e.g. pandas-stubs)
+ * 2. types-{name} package on PyPI (e.g. types-psutil)
+ * 3. Extract .pyi files from the smallest available wheel
+ * 4. Give up → runtime-only
+ */
+async function resolveStubs(
+  name: string,
+  info: PyPIInfo,
+  signal?: AbortSignal,
+): Promise<StubResolution> {
+  // Fetch {name}-stubs and types-{name} in parallel
+  const stubsCandidates = [`${name}-stubs`, `types-${name}`];
+  const results = await Promise.allSettled(
+    stubsCandidates.map((pkg) => fetchPackageInfo(pkg, null, signal)),
+  );
+
+  for (let i = 0; i < results.length; i++) {
+    const result = results[i];
+    if (result.status === "fulfilled") {
+      const wheel = findPureWheel(result.value);
+      if (wheel != null) {
+        return {
+          kind: "stubs-only",
+          wheelUrl: wheel.url,
+          stubsSource: `${stubsCandidates[i]} ${result.value.info.version}`,
+        };
+      }
+    }
+  }
+
+  // Strategy 3: Try extracting .pyi from the smallest wheel of the original package.
+  // Whether the wheel actually contains .pyi files is verified at install time —
+  // if none are found, the package is downgraded to runtime-only.
+  const smallestWheel = findSmallestWheel(info);
+  if (smallestWheel != null) {
+    return {
+      kind: "stubs-only",
+      wheelUrl: smallestWheel.url,
+      stubsSource: "from wheel",
+    };
+  }
+
+  // Strategy 4: No stubs available
+  return { kind: "runtime-only", wheelUrl: null };
+}
+
+/**
+ * Find the smallest wheel (by file size) for a package, regardless of platform.
+ * Used to extract .pyi type stubs from C extension packages.
+ */
+function findSmallestWheel(
+  info: PyPIInfo,
+): { filename: string; url: string } | null {
+  let best: { filename: string; url: string; size: number } | null = null;
+  for (const url of info.urls) {
+    if (url.packagetype !== "bdist_wheel") {
+      continue;
+    }
+    const size = url.size ?? Number.MAX_SAFE_INTEGER;
+    if (best == null || size < best.size) {
+      best = { filename: url.filename, url: url.url, size };
+    }
+  }
+  return best != null ? { filename: best.filename, url: best.url } : null;
 }
 
 const textDecoder = new TextDecoder();
@@ -504,26 +674,41 @@ async function resolveAllDeps(
     }
 
     const wheel = findPureWheel(info);
-    if (wheel == null) {
-      if (entry.depth === 0) {
-        throw new Error(
-          `No pure-Python wheel available for '${entry.name}'. ` +
-            `Only pure-Python packages (py3-none-any wheels) are supported.`,
+    if (wheel != null) {
+      // Pure-Python package
+      seen.set(entry.name, info.info.version);
+      resolved.push({
+        name: info.info.name,
+        version: info.info.version,
+        wheelUrl: wheel.url,
+        requiresDist: info.info.requires_dist,
+        kind: "pure-python",
+      });
+    } else {
+      // C extension package (any depth): try to find type stubs
+      const stubs = await resolveStubs(entry.name, info, signal);
+      if (signal?.aborted) {
+        return { packages: resolved, warnings };
+      }
+      seen.set(entry.name, info.info.version);
+      resolved.push({
+        name: info.info.name,
+        version: info.info.version,
+        wheelUrl: stubs.wheelUrl,
+        requiresDist: null,
+        kind: stubs.kind,
+        stubsSource: stubs.stubsSource,
+      });
+      if (stubs.kind === "runtime-only") {
+        warnings.push(
+          `No type stubs found for '${entry.name}' — runtime execution only`,
         );
       }
-      // Transitive dep without pure wheel — skip
+      // Do not enqueue transitive deps: Pyodide handles them
       continue;
     }
 
-    seen.set(entry.name, info.info.version);
-    resolved.push({
-      name: info.info.name,
-      version: info.info.version,
-      wheelUrl: wheel.url,
-      requiresDist: info.info.requires_dist,
-    });
-
-    // Enqueue transitive dependencies (with depth limit)
+    // Enqueue transitive dependencies (with depth limit) — only for pure-python
     if (entry.depth < MAX_DEPENDENCY_DEPTH) {
       const deps = parseMandatoryDeps(info.info.requires_dist);
       for (const dep of deps) {

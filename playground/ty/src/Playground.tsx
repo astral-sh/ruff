@@ -147,7 +147,9 @@ export default function Playground() {
       if (!abortController.signal.aborted && result.state === "success") {
         // Auto-clear success message after 5 seconds
         setTimeout(() => {
-          setInstallStatus({ ...result, state: "idle" });
+          if (!abortController.signal.aborted) {
+            setInstallStatus({ ...result, state: "idle" });
+          }
         }, 5000);
       }
     });
