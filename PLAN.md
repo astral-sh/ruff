@@ -328,7 +328,7 @@ Expectation:
 - [x] Add `build_support` with `FxIndexSet` accumulator dedupe.
 - [x] Add `support` to `ConstraintSet` and flattened support payload to `OwnedConstraintSet`.
 - [x] Thread support expressions through constructors/combinators.
-- [ ] NEXT: Replace `Quantified` support payload with flattened `Remove`/`AddDerived` node types and builder APIs.
+- [x] Replace `Quantified` support payload with flattened `Remove`/`AddDerived` node types and builder APIs.
 - [ ] Update `distributed_or`/`distributed_and` and `when_any`/`when_all` to combine support in balanced-tree order.
 - [ ] Remove temporary `support_from_node` reconstruction path entirely.
 - [ ] Encode abstraction-derived ordering via `Remove`/`AddDerived` support nodes.
@@ -403,7 +403,7 @@ File: `crates/ty_python_semantic/src/types/constraints.rs`
 - Add support-aware equivalents of distributed folding so support is combined in the same balanced shape (instead of reconstructing via `support_from_node`).
 - `support_from_node` is a strict temporary migration bridge and **must be removed** before final landing.
 
-### Step E.2 — flatten quantified support representation (**do this next before other pending steps**)
+### Step E.2 — flatten quantified support representation (**completed**)
 
 File: `crates/ty_python_semantic/src/types/constraints.rs`
 

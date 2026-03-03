@@ -590,12 +590,8 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
     ) -> Self {
         self.verify_builder(builder);
         let node = self.node.exists(db, builder, to_remove);
-        let support = builder.quantified_support(QuantifiedSupportData {
-            base: self.support,
-            removed: Box::default(),
-            derived: Box::default(),
-        });
-        Self::from_node_and_support(builder, node, support)
+        // TODO: During quantification support wiring, represent this via Remove/AddDerived nodes.
+        Self::from_node_and_support(builder, node, self.support)
     }
 
     pub(crate) fn solutions(
@@ -691,8 +687,11 @@ struct ConstraintSetStorage<'db> {
     /// Support expression nodes that represent ordered unions of supports.
     union_supports: IndexVec<UnionSupportId, UnionSupportData>,
 
-    /// Support expression nodes that represent quantified support transforms.
-    quantified_supports: IndexVec<QuantifiedSupportId, QuantifiedSupportData>,
+    /// Support expression nodes that remove a single constraint from a base support.
+    remove_supports: IndexVec<RemoveSupportId, RemoveSupportData>,
+
+    /// Support expression nodes that add one derived constraint next to an origin.
+    add_derived_supports: IndexVec<AddDerivedSupportId, AddDerivedSupportData>,
 
     // Everything below are the memoization tables for the arenas and for our BDD operations.
     constraint_cache: FxHashMap<Constraint<'db>, ConstraintId>,
@@ -914,13 +913,12 @@ impl<'db> ConstraintSetBuilder<'db> {
         self.storage.borrow().union_supports[support]
     }
 
-    fn quantified_support_data(
-        &self,
-        support: QuantifiedSupportId,
-    ) -> Ref<'_, QuantifiedSupportData> {
-        Ref::map(self.storage.borrow(), |storage| {
-            &storage.quantified_supports[support]
-        })
+    fn remove_support_data(&self, support: RemoveSupportId) -> RemoveSupportData {
+        self.storage.borrow().remove_supports[support]
+    }
+
+    fn add_derived_support_data(&self, support: AddDerivedSupportId) -> AddDerivedSupportData {
+        self.storage.borrow().add_derived_supports[support]
     }
 
     fn ordered_union_support(&self, lhs: SupportId, rhs: SupportId) -> SupportId {
@@ -935,10 +933,29 @@ impl<'db> ConstraintSetBuilder<'db> {
         }
     }
 
-    fn quantified_support(&self, data: QuantifiedSupportData) -> SupportId {
+    #[expect(dead_code)] // Wired in Step F quantification support construction
+    fn remove_support(&self, base: SupportId, constraint: ConstraintId) -> SupportId {
         let mut storage = self.storage.borrow_mut();
-        let id = storage.quantified_supports.push(data);
-        SupportId::Quantified(id)
+        let id = storage
+            .remove_supports
+            .push(RemoveSupportData { base, constraint });
+        SupportId::Remove(id)
+    }
+
+    #[expect(dead_code)] // Wired in Step F quantification support construction
+    fn add_derived_support(
+        &self,
+        base: SupportId,
+        origin: ConstraintId,
+        derived: ConstraintId,
+    ) -> SupportId {
+        let mut storage = self.storage.borrow_mut();
+        let id = storage.add_derived_supports.push(AddDerivedSupportData {
+            base,
+            origin,
+            derived,
+        });
+        SupportId::AddDerived(id)
     }
 
     /// TEMPORARY MIGRATION HELPER.
@@ -983,14 +1000,14 @@ impl<'db> ConstraintSetBuilder<'db> {
                     build_into(builder, union_support.rhs, constraints);
                 }
 
-                SupportId::Quantified(quantified_support) => {
-                    let quantified_support = builder.quantified_support_data(quantified_support);
+                SupportId::Remove(remove_support) => {
+                    let remove_support = builder.remove_support_data(remove_support);
 
                     // We should not remove any constraints that were already present before
                     // building this node's base. That happens if e.g. we're going to union the
-                    // result of this quantified node with some other node:
+                    // result of this remove node with some other node:
                     //
-                    //       union([a], quantified([a,b], remove=[a]))
+                    //       union([a], remove(base=[a,b], constraint=a))
                     //    -> union([a], [b])
                     //    -> [a,b]
                     //
@@ -998,24 +1015,23 @@ impl<'db> ConstraintSetBuilder<'db> {
                     // base. But since [a] is already present in the lhs of the union, it will
                     // still be in the final result.
                     let base_index = constraints.len();
-                    build_into(builder, quantified_support.base, constraints);
-
-                    for removed in &quantified_support.removed {
-                        let removed_index = constraints
-                            .get_index_of(removed)
-                            .expect("constraint should exist in support");
-                        if removed_index >= base_index {
-                            constraints.shift_remove_index(removed_index);
-                        }
+                    build_into(builder, remove_support.base, constraints);
+                    let removed_index = constraints
+                        .get_index_of(&remove_support.constraint)
+                        .expect("constraint should exist in support");
+                    if removed_index >= base_index {
+                        constraints.shift_remove_index(removed_index);
                     }
+                }
 
-                    for derived in quantified_support.derived.iter().rev() {
-                        let origin_index = constraints
-                            .get_index_of(&derived.origin)
-                            .expect("constraint should exist in support");
-                        if !constraints.contains(&derived.derived) {
-                            constraints.shift_insert(origin_index + 1, derived.derived);
-                        }
+                SupportId::AddDerived(add_derived) => {
+                    let add_derived = builder.add_derived_support_data(add_derived);
+                    build_into(builder, add_derived.base, constraints);
+                    let origin_index = constraints
+                        .get_index_of(&add_derived.origin)
+                        .expect("constraint should exist in support");
+                    if !constraints.contains(&add_derived.derived) {
+                        constraints.shift_insert(origin_index + 1, add_derived.derived);
                     }
                 }
             }
@@ -1076,14 +1092,19 @@ struct UnionSupportId;
 
 #[newtype_index]
 #[derive(salsa::Update, get_size2::GetSize)]
-struct QuantifiedSupportId;
+struct RemoveSupportId;
+
+#[newtype_index]
+#[derive(salsa::Update, get_size2::GetSize)]
+struct AddDerivedSupportId;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
 enum SupportId {
     Empty,
     Singleton(ConstraintId),
     OrderedUnion(UnionSupportId),
-    Quantified(QuantifiedSupportId),
+    Remove(RemoveSupportId),
+    AddDerived(AddDerivedSupportId),
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
@@ -1092,15 +1113,15 @@ struct UnionSupportData {
     rhs: SupportId,
 }
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
-struct QuantifiedSupportData {
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
+struct RemoveSupportData {
     base: SupportId,
-    removed: Box<[ConstraintId]>,
-    derived: Box<[DerivedConstraintRecord]>,
+    constraint: ConstraintId,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
-struct DerivedConstraintRecord {
+struct AddDerivedSupportData {
+    base: SupportId,
     origin: ConstraintId,
     derived: ConstraintId,
 }
