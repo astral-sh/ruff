@@ -463,6 +463,30 @@ class Box(Generic[T]):
 reveal_type(Box(1))  # revealed: Box[int]
 ```
 
+## `__init__` can remap constructor generic arguments via `self` annotation
+
+```py
+from typing import Generic, TypeVar
+
+T1 = TypeVar("T1")
+T2 = TypeVar("T2")
+
+V1 = TypeVar("V1")
+V2 = TypeVar("V2")
+
+class Class6(Generic[T1, T2]):
+    def __init__(self: "Class6[V1, V2]", value1: V1, value2: V2) -> None: ...
+
+reveal_type(Class6(0, ""))  # revealed: Class6[int, str]
+reveal_type(Class6[int, str](0, ""))  # revealed: Class6[int, str]
+
+class Class7(Generic[T1, T2]):
+    def __init__(self: "Class7[V2, V1]", value1: V1, value2: V2) -> None: ...
+
+reveal_type(Class7(0, ""))  # revealed: Class7[str, int]
+reveal_type(Class7[str, int](0, ""))  # revealed: Class7[str, int]
+```
+
 ## `__new__` can remap an explicit generic specialization
 
 ```py

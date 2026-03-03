@@ -945,17 +945,66 @@ impl<'db> Bindings<'db> {
             let Some(overload) = overload else {
                 return;
             };
-            // Prefer extracting the class specialization from the resolved overload return type.
-            // Fall back to restricting the inferred specialization to class-level type
-            // variables.
-            let specialization = class_literal
+            let self_parameter_specialization = class_literal.and_then(|lit| {
+                let self_param_ty = overload.signature.parameters().get(0)?.annotated_type();
+                let resolved_self_param_ty = overload
+                    .specialization
+                    .map(|specialization| self_param_ty.apply_specialization(db, specialization))
+                    .unwrap_or(self_param_ty);
+                resolved_self_param_ty.specialization_of(db, lit)
+            });
+            let return_specialization = class_literal
                 // Fast path: use the already-resolved overload return type when possible.
-                .and_then(|lit| overload.return_ty.specialization_of(db, lit))
-                .or_else(|| {
-                    overload
-                        .specialization
-                        .and_then(|s| s.restrict(db, class_context))
+                .and_then(|lit| overload.return_ty.specialization_of(db, lit));
+            let return_specialization_is_informative =
+                return_specialization.is_some_and(|specialization| {
+                    class_context.variables(db).any(|class_typevar| {
+                        specialization
+                            .get(db, class_typevar)
+                            .is_some_and(|mapped_ty| {
+                                !mapped_ty.is_unknown() && mapped_ty != Type::TypeVar(class_typevar)
+                            })
+                    })
                 });
+            let refined_self_parameter_specialization =
+                self_parameter_specialization.map(|specialization| {
+                    let types: Box<[_]> = specialization
+                        .types(db)
+                        .iter()
+                        .copied()
+                        .map(|mapped_ty| {
+                            let without_unknown =
+                                mapped_ty.filter_union(db, |element| !element.is_unknown());
+                            let mapped_ty = if without_unknown.is_never() {
+                                mapped_ty
+                            } else {
+                                without_unknown
+                            };
+                            mapped_ty.promote_literals(db)
+                        })
+                        .collect();
+                    Specialization::new(
+                        db,
+                        specialization.generic_context(db),
+                        types,
+                        specialization.materialization_kind(db),
+                        None,
+                    )
+                });
+            // Prefer extracting the class specialization from the resolved overload return type.
+            // Fall back to specialization inferred from annotated `self`, then to class-level
+            // type variable mappings from the overload specialization.
+            let specialization = if return_specialization_is_informative {
+                return_specialization
+            } else {
+                refined_self_parameter_specialization
+                    .or(return_specialization)
+                    .or_else(|| {
+                        overload
+                            .specialization
+                            .and_then(|s| s.restrict(db, class_context))
+                    })
+            };
             let Some(specialization) = specialization else {
                 return;
             };
