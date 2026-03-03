@@ -1425,14 +1425,26 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 && let Some(narrowable) = PlaceExpr::try_from_expr(left)
                 && let Some(ty) = self.evaluate_expr_compare_op(lhs_ty, rhs_ty, *op, is_positive)
             {
-                let place = self.expect_place(&narrowable);
                 let constraint = NarrowingConstraint::intersection(ty);
+                let place = self.expect_place(&narrowable);
                 constraints
                     .entry(place)
                     .and_modify(|existing| {
                         *existing = existing.merge_constraint_and(constraint.clone());
                     })
-                    .or_insert(constraint);
+                    .or_insert(constraint.clone());
+                // For named expressions (walrus operator), also narrow the value.
+                if let ast::Expr::Named(named) = left
+                    && let Some(value_place) = PlaceExpr::try_from_expr(&named.value)
+                {
+                    let place = self.expect_place(&value_place);
+                    constraints
+                        .entry(place)
+                        .and_modify(|existing| {
+                            *existing = existing.merge_constraint_and(constraint.clone());
+                        })
+                        .or_insert(constraint);
+                }
             }
 
             // Right-hand side narrowing for:
@@ -1447,14 +1459,26 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 && let Some(narrowable) = PlaceExpr::try_from_expr(right)
                 && let Some(ty) = self.evaluate_expr_compare_op(rhs_ty, lhs_ty, *op, is_positive)
             {
-                let place = self.expect_place(&narrowable);
                 let constraint = NarrowingConstraint::intersection(ty);
+                let place = self.expect_place(&narrowable);
                 constraints
                     .entry(place)
                     .and_modify(|existing| {
                         *existing = existing.merge_constraint_and(constraint.clone());
                     })
-                    .or_insert(constraint);
+                    .or_insert(constraint.clone());
+                // For named expressions (walrus operator), also narrow the value.
+                if let ast::Expr::Named(named) = right
+                    && let Some(value_place) = PlaceExpr::try_from_expr(&named.value)
+                {
+                    let place = self.expect_place(&value_place);
+                    constraints
+                        .entry(place)
+                        .and_modify(|existing| {
+                            *existing = existing.merge_constraint_and(constraint.clone());
+                        })
+                        .or_insert(constraint);
+                }
 
                 // Use the narrowed type for subsequent comparisons in a chain.
                 last_rhs_ty = Some(IntersectionType::from_two_elements(self.db, rhs_ty, ty));
@@ -1498,19 +1522,26 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 if let Some(narrowed_ty) = Self::narrow_type_by_len(self.db, arg_ty, is_positive) {
                     let target = PlaceExpr::try_from_expr(arg)?;
                     let place = self.expect_place(&target);
-                    Some(NarrowingConstraints::from_iter([(
-                        place,
-                        NarrowingConstraint::intersection(narrowed_ty),
-                    )]))
+                    let constraint = NarrowingConstraint::intersection(narrowed_ty);
+                    let mut constraints =
+                        NarrowingConstraints::from_iter([(place, constraint.clone())]);
+                    // For named expressions (walrus operator), also narrow the value.
+                    if let ast::Expr::Named(named) = arg
+                        && let Some(value_place) = PlaceExpr::try_from_expr(&named.value)
+                    {
+                        let place = self.expect_place(&value_place);
+                        constraints.insert(place, constraint);
+                    }
+                    Some(constraints)
                 } else {
                     None
                 }
             }
             Type::FunctionLiteral(function_type) if expr_call.arguments.keywords.is_empty() => {
-                let [first_arg, second_arg] = &*expr_call.arguments.args else {
+                let [first_arg_expr, second_arg] = &*expr_call.arguments.args else {
                     return None;
                 };
-                let first_arg = PlaceExpr::try_from_expr(first_arg)?;
+                let first_arg = PlaceExpr::try_from_expr(first_arg_expr)?;
                 let function = function_type.known(self.db)?;
                 let place = self.expect_place(&first_arg);
 
@@ -1529,12 +1560,19 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     let constraint =
                         Type::protocol_with_readonly_members(self.db, [(attr, Type::object())]);
 
-                    return Some(NarrowingConstraints::from_iter([(
-                        place,
-                        NarrowingConstraint::intersection(
-                            constraint.negate_if(self.db, !is_positive),
-                        ),
-                    )]));
+                    let narrowing_constraint = NarrowingConstraint::intersection(
+                        constraint.negate_if(self.db, !is_positive),
+                    );
+                    let mut constraints =
+                        NarrowingConstraints::from_iter([(place, narrowing_constraint.clone())]);
+                    // For named expressions (walrus operator), also narrow the value.
+                    if let ast::Expr::Named(named) = first_arg_expr
+                        && let Some(value_place) = PlaceExpr::try_from_expr(&named.value)
+                    {
+                        let place = self.expect_place(&value_place);
+                        constraints.insert(place, narrowing_constraint);
+                    }
+                    return Some(constraints);
                 }
 
                 let function = function.into_classinfo_constraint_function()?;
@@ -1544,12 +1582,21 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 function
                     .generate_constraint(self.db, class_info_ty, is_positive)
                     .map(|constraint| {
-                        NarrowingConstraints::from_iter([(
+                        let narrowing_constraint = NarrowingConstraint::intersection(
+                            constraint.negate_if(self.db, !is_positive),
+                        );
+                        let mut constraints = NarrowingConstraints::from_iter([(
                             place,
-                            NarrowingConstraint::intersection(
-                                constraint.negate_if(self.db, !is_positive),
-                            ),
-                        )])
+                            narrowing_constraint.clone(),
+                        )]);
+                        // For named expressions (walrus operator), also narrow the value.
+                        if let ast::Expr::Named(named) = first_arg_expr
+                            && let Some(value_place) = PlaceExpr::try_from_expr(&named.value)
+                        {
+                            let place = self.expect_place(&value_place);
+                            constraints.insert(place, narrowing_constraint);
+                        }
+                        constraints
                     })
             }
             // for the expression `bool(E)`, we further narrow the type based on `E`
@@ -2246,6 +2293,8 @@ impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
                     places.insert(place);
                 }
             }
+            // For named expressions, also track the value.
+            self.add_walrus_value_place(first_arg, &mut places);
         }
 
         // `bool(expr)` can delegate to narrowing `expr` itself, e.g. `bool(x is not None)`
@@ -2279,6 +2328,8 @@ impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
                         places.insert(place);
                     }
                 }
+                // For named expressions, also track the value.
+                self.add_walrus_value_place(expr, places);
             }
             // type(x) is Y can narrow x
             ast::Expr::Call(call) if call.arguments.args.len() == 1 => {
@@ -2288,9 +2339,22 @@ impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
                             places.insert(place);
                         }
                     }
+                    // For named expressions, also track the value.
+                    self.add_walrus_value_place(first_arg, places);
                 }
             }
             _ => {}
+        }
+    }
+
+    /// If `expr` is a named expression (walrus operator), add the value's place
+    /// to the set of possibly narrowed places.
+    fn add_walrus_value_place(&self, expr: &ast::Expr, places: &mut PossiblyNarrowedPlaces) {
+        if let ast::Expr::Named(named) = expr
+            && let Some(value_place) = PlaceExpr::try_from_expr(&named.value)
+            && let Some(place) = self.places.place_id((&value_place).into())
+        {
+            places.insert(place);
         }
     }
 
