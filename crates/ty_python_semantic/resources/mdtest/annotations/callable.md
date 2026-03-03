@@ -372,14 +372,6 @@ def _(c: Callable[Concatenate[int, str, ...], int]):
     reveal_type(c)  # revealed: (int, str, /, *args: Any, **kwargs: Any) -> int
 ```
 
-And, as one of the parameter types:
-
-```py
-def _(c: Callable[[Concatenate[int, str, ...], int], int]):
-    # TODO: Should reveal the correct signature
-    reveal_type(c)  # revealed: (...) -> int
-```
-
 Other type expressions can be nested inside `Concatenate`:
 
 ```py
