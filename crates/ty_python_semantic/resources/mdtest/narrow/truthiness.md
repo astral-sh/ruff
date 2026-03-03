@@ -364,6 +364,18 @@ def f():
         reveal_type(x)  # revealed: (str & ~AlwaysTruthy) | None
 ```
 
+## Narrowing the value of a named expression
+
+The value expression on the right-hand side of the walrus operator should also be narrowed:
+
+```py
+def foo(value: int | None):
+    if foo := value:
+        reveal_type(value)  # revealed: int & ~AlwaysFalsy
+    else:
+        reveal_type(value)  # revealed: (int & ~AlwaysTruthy) | None
+```
+
 ## Narrowing a union of a `TypedDict` and `None`
 
 ```py
