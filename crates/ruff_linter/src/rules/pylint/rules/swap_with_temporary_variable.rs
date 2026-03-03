@@ -39,7 +39,7 @@ use crate::checkers::ast::Checker;
 /// The rule's fix is marked as safe, unless the replacement range contains comments
 /// that would be removed.
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "NEXT_RUFF_VERSION")]
+#[violation_metadata(preview_since = "0.15.3")]
 pub(crate) struct SwapWithTemporaryVariable<'a> {
     first: &'a Name,
     second: &'a Name,

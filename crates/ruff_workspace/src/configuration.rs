@@ -249,11 +249,14 @@ impl Configuration {
             .unwrap_or_default();
         let flake8_import_conventions = lint
             .flake8_import_conventions
-            .map(Flake8ImportConventionsOptions::try_into_settings)
+            .map(|options| options.try_into_settings(lint_preview))
             .transpose()?
-            .unwrap_or_default();
+            .unwrap_or_else(|| {
+                ruff_linter::rules::flake8_import_conventions::settings::Settings::new(lint_preview)
+            });
 
         conflicting_import_settings(&isort, &flake8_import_conventions)?;
+        conflicting_required_import_pyi025(&isort, &rules)?;
 
         let future_annotations = lint.future_annotations.unwrap_or_default();
 
@@ -279,9 +282,19 @@ impl Configuration {
                     PreviewMode::Disabled => FilePatternSet::try_from_iter(
                         self.include.unwrap_or_else(|| INCLUDE.to_vec()),
                     )?,
-                    PreviewMode::Enabled => FilePatternSet::try_from_iter(
-                        self.include.unwrap_or_else(|| INCLUDE_PREVIEW.to_vec()),
-                    )?,
+                    PreviewMode::Enabled => {
+                        FilePatternSet::try_from_iter(self.include.unwrap_or_else(|| {
+                            let mut patterns = INCLUDE_PREVIEW.to_vec();
+                            if let Some(extension_map) = &self.extension {
+                                patterns.extend(
+                                    extension_map
+                                        .extensions()
+                                        .map(|ext| FilePattern::Config(format!("*.{ext}"))),
+                                );
+                            }
+                            patterns
+                        }))?
+                    }
                 },
                 respect_gitignore: self.respect_gitignore.unwrap_or(true),
                 project_root: project_root.to_path_buf(),
@@ -1678,6 +1691,40 @@ fn conflicting_import_settings(
                 \n{err_body}\n\
             Help: Remove the required import or alias from your configuration."
         ));
+    }
+
+    Ok(())
+}
+
+/// Detect conflicts between I002 (missing-required-import) and PYI025
+/// (unaliased-collections-abc-set-import).
+///
+/// If `required-imports` includes `from collections.abc import Set` (without
+/// aliasing it as `AbstractSet`) and PYI025 is enabled, the configuration is
+/// contradictory: I002 requires the unaliased import, while PYI025 forbids it.
+fn conflicting_required_import_pyi025(
+    isort: &isort::settings::Settings,
+    rules: &RuleTable,
+) -> Result<()> {
+    if !rules.enabled(Rule::UnaliasedCollectionsAbcSetImport) {
+        return Ok(());
+    }
+
+    for required_import in &isort.required_imports {
+        let qualified_name = required_import.qualified_name();
+        if qualified_name.segments() == ["collections", "abc", "Set"]
+            && required_import.bound_name() != "AbstractSet"
+        {
+            return Err(anyhow!(
+                "Required import `from collections.abc import Set` specified in \
+                `lint.isort.required-imports` (I002) conflicts with \
+                `unaliased-collections-abc-set-import` (PYI025), which requires \
+                this import to be aliased as `AbstractSet`.\n\n\
+                Help: Either alias the required import \
+                (`from collections.abc import Set as AbstractSet`), \
+                or disable PYI025."
+            ));
+        }
     }
 
     Ok(())

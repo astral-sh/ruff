@@ -245,3 +245,155 @@ reveal_type(generic_context(outside_callable(int_identity)))
 # error: [invalid-argument-type]
 outside_callable(int_identity)("string")
 ```
+
+## Overloaded callable as generic `Callable` argument
+
+An overloaded callable should be assignable to a non-overloaded callable type when the overload set
+as a whole is compatible with the target callable.
+
+The type variable should be inferred from the first matching overload, rather than unioning
+parameter types across all overloads (which would create an unsatisfiable expected type for
+contravariant type variables).
+
+```py
+from typing import Callable, TypeVar, overload
+
+T = TypeVar("T")
+
+def accepts_callable(converter: Callable[[T], None]) -> T:
+    raise NotImplementedError
+
+@overload
+def f(val: str) -> None: ...
+@overload
+def f(val: bytes) -> None: ...
+def f(val: str | bytes) -> None:
+    pass
+
+reveal_type(accepts_callable(f))  # revealed: str | bytes
+```
+
+When `T` is constrained to a union by other arguments, the overloaded callable must still be treated
+as a whole to satisfy `Callable[[T], T]`.
+
+```py
+from typing import Callable, TypeVar, overload
+
+T = TypeVar("T")
+
+def apply_twice(converter: Callable[[T], T], left: T, right: T) -> tuple[T, T]:
+    return converter(left), converter(right)
+
+@overload
+def f(val: int) -> int: ...
+@overload
+def f(val: str) -> str: ...
+def f(val: int | str) -> int | str:
+    return val
+
+x: int | str = 1
+y: int | str = "a"
+
+result = apply_twice(f, x, y)
+# revealed: tuple[int | str, int | str]
+reveal_type(result)
+```
+
+An overloaded callable returned from a generic callable factory should still be assignable to the
+declared generic callable return type.
+
+```py
+from collections.abc import Callable, Coroutine
+from typing import Any, TypeVar, overload
+
+S = TypeVar("S")
+T = TypeVar("T")
+U = TypeVar("U")
+
+def singleton(flag: bool = False) -> Callable[[Callable[[int], S]], Callable[[int], S]]:
+    @overload
+    def wrapper(func: Callable[[int], Coroutine[Any, Any, T]]) -> Callable[[int], Coroutine[Any, Any, T]]: ...
+    @overload
+    def wrapper(func: Callable[[int], U]) -> Callable[[int], U]: ...
+    def wrapper(func: Callable[[int], Coroutine[Any, Any, T] | U]) -> Callable[[int], Coroutine[Any, Any, T] | U]:
+        return func
+
+    return wrapper
+```
+
+## SymPy one-import MRE scaffold (multi-file)
+
+Reduced regression lock for a SymPy overload/protocol shape that can panic in the
+overload-assignability path.
+
+```py
+from __future__ import annotations
+
+from sympy.polys.compatibility import Domain, IPolys
+from typing import Generic, TypeVar, overload
+
+T = TypeVar("T")
+
+class DefaultPrinting:
+    pass
+
+class PolyRing(DefaultPrinting, IPolys[T], Generic[T]):
+    symbols: tuple[object, ...]
+    domain: Domain[T]
+
+    def clone(
+        self,
+        symbols: object | None = None,
+        domain: object | None = None,
+        order: object | None = None,
+    ) -> PolyRing[T]:
+        return self
+
+    @overload
+    def __getitem__(self, key: int) -> PolyRing[T]: ...
+    @overload
+    def __getitem__(self, key: slice) -> PolyRing[T] | Domain[T]: ...
+    def __getitem__(self, key: slice | int) -> PolyRing[T] | Domain[T]:
+        symbols = self.symbols[key]
+        if not symbols:
+            return self.domain
+        return self.clone(symbols=symbols)
+
+def takes_ring(x: PolyRing[int]) -> None:
+    reveal_type(x[0])  # revealed: PolyRing[int]
+    reveal_type(x[:])  # revealed: PolyRing[int] | Domain[int]
+```
+
+`sympy/polys/compatibility.pyi`:
+
+```pyi
+from __future__ import annotations
+
+from typing import Generic, Protocol, TypeVar, overload
+
+T = TypeVar("T")
+S = TypeVar("S")
+
+class Domain(Generic[T]): ...
+
+class IPolys(Protocol[T]):
+    @overload
+    def clone(
+        self,
+        symbols: object | None = None,
+        domain: None = None,
+        order: None = None,
+    ) -> IPolys[T]: ...
+    @overload
+    def clone(
+        self,
+        symbols: object | None = None,
+        *,
+        domain: Domain[S],
+        order: None = None,
+    ) -> IPolys[S]: ...
+    @overload
+    def __getitem__(self, key: int) -> IPolys[T]: ...
+    @overload
+    def __getitem__(self, key: slice) -> IPolys[T] | Domain[T]: ...
+```

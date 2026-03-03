@@ -7,6 +7,7 @@ use crate::Db;
 use crate::ast_node_ref::AstNodeRef;
 use crate::semantic_index::expression::Expression;
 use crate::semantic_index::scope::{FileScopeId, ScopeId};
+use crate::types::EvaluationMode;
 
 /// This ingredient represents a single unpacking.
 ///
@@ -99,26 +100,6 @@ impl<'db> UnpackValue<'db> {
 
     pub(crate) const fn kind(self) -> UnpackKind {
         self.kind
-    }
-}
-
-#[derive(Clone, Copy, Debug, Hash, salsa::Update, get_size2::GetSize)]
-pub(crate) enum EvaluationMode {
-    Sync,
-    Async,
-}
-
-impl EvaluationMode {
-    pub(crate) const fn from_is_async(is_async: bool) -> Self {
-        if is_async {
-            EvaluationMode::Async
-        } else {
-            EvaluationMode::Sync
-        }
-    }
-
-    pub(crate) const fn is_async(self) -> bool {
-        matches!(self, EvaluationMode::Async)
     }
 }
 

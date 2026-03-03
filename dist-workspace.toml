@@ -5,7 +5,7 @@ packages = ["ruff"]
 # Config for 'dist'
 [dist]
 # The preferred dist version to use in CI (Cargo.toml SemVer syntax)
-cargo-dist-version = "0.30.2"
+cargo-dist-version = "0.31.0"
 # Whether to consider the binaries in a package for distribution (defaults true)
 dist = false
 # CI backends to support
@@ -60,9 +60,9 @@ local-artifacts-jobs = ["./build-binaries", "./build-docker", "./build-wasm"]
 # Publish jobs to run in CI
 publish-jobs = ["./publish-pypi", "./publish-wasm"]
 # Post-announce jobs to run in CI
-post-announce-jobs = ["./notify-dependents", "./publish-docs", "./publish-playground", "./publish-versions"]
+post-announce-jobs = ["./notify-dependents", "./publish-docs", "./publish-playground", "./publish-versions", "./publish-mirror"]
 # Custom permissions for GitHub Jobs
-github-custom-job-permissions = { "build-docker" = { packages = "write", contents = "read", id-token = "write", attestations = "write" }, "publish-wasm" = { contents = "read", id-token = "write", packages = "write" } }
+github-custom-job-permissions = { "build-docker" = { packages = "write", contents = "read", id-token = "write", attestations = "write" }, "publish-wasm" = { contents = "read", id-token = "write", packages = "write" }, "publish-mirror" = { contents = "read" } }
 # Whether to install an updater program
 install-updater = false
 # Path that installers should place binaries in
@@ -73,6 +73,6 @@ global = "depot-ubuntu-latest-4"
 
 [dist.github-action-commits]
 "actions/checkout" = "de0fac2e4500dabe0009e67214ff5f5447ce83dd" # v6.0.2
-"actions/upload-artifact" = "b7c566a772e6b6bfb58ed0dc250532a479d7789f" # v6.0.0
-"actions/download-artifact" = "37930b1c2abaa49bbe596cd826c3c89aef350131" # v7.0.0
-"actions/attest-build-provenance" = "00014ed6ed5efc5b1ab7f7f34a39eb55d41aa4f8" # v3.1.0
+"actions/upload-artifact" = "bbbca2ddaa5d8feaa63e36b76fdaad77386f024f" # v7.0.0
+"actions/download-artifact" = "70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3" # v8.0.0
+"actions/attest-build-provenance" = "a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32" # v4.1.0

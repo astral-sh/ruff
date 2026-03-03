@@ -6,6 +6,7 @@ use ty_module_resolver::{
 
 use crate::dunder_all::dunder_all_names;
 use crate::semantic_index::definition::{Definition, DefinitionKind, DefinitionState};
+use crate::semantic_index::narrowing_constraints::ScopedNarrowingConstraint;
 use crate::semantic_index::place::{PlaceExprRef, ScopedPlaceId};
 use crate::semantic_index::scope::ScopeId;
 use crate::semantic_index::{
@@ -18,7 +19,7 @@ use crate::types::{
     Truthiness, Type, TypeAndQualifiers, TypeQualifiers, UnionBuilder, UnionType, binding_type,
     declaration_type,
 };
-use crate::{Db, FxOrderSet, Program};
+use crate::{Db, FxIndexSet, FxOrderSet, Program};
 
 pub(crate) use implicit_globals::{
     module_type_implicit_global_declaration, module_type_implicit_global_symbol,
@@ -84,7 +85,7 @@ impl Widening {
     pub(crate) fn apply_if_needed<'db>(self, db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
         match self {
             Self::None => ty,
-            Self::WithUnknown => UnionType::from_elements(db, [Type::unknown(), ty]),
+            Self::WithUnknown => UnionType::from_two_elements(db, Type::unknown(), ty),
         }
     }
 }
@@ -325,13 +326,13 @@ impl<'db> LookupError<'db> {
             (LookupError::Undefined(_), _) => fallback,
             (LookupError::PossiblyUndefined { .. }, Err(LookupError::Undefined(_))) => Err(self),
             (LookupError::PossiblyUndefined(ty), Ok(ty2)) => Ok(TypeAndQualifiers::new(
-                UnionType::from_elements(db, [ty.inner_type(), ty2.inner_type()]),
+                UnionType::from_two_elements(db, ty.inner_type(), ty2.inner_type()),
                 ty.origin().merge(ty2.origin()),
                 ty.qualifiers().union(ty2.qualifiers()),
             )),
             (LookupError::PossiblyUndefined(ty), Err(LookupError::PossiblyUndefined(ty2))) => {
                 Err(LookupError::PossiblyUndefined(TypeAndQualifiers::new(
-                    UnionType::from_elements(db, [ty.inner_type(), ty2.inner_type()]),
+                    UnionType::from_two_elements(db, ty.inner_type(), ty2.inner_type()),
                     ty.origin().merge(ty2.origin()),
                     ty.qualifiers().union(ty2.qualifiers()),
                 )))
@@ -919,7 +920,7 @@ pub(crate) fn place_by_id<'db>(
                     definedness: boundness,
                     ..
                 }) => Place::Defined(DefinedPlace {
-                    ty: UnionType::from_elements(db, [Type::unknown(), inferred]),
+                    ty: UnionType::from_two_elements(db, Type::unknown(), inferred),
                     origin,
                     definedness: boundness,
                     widening: Widening::None,
@@ -978,7 +979,7 @@ pub(crate) fn place_by_id<'db>(
                     definedness: boundness,
                     ..
                 }) => Place::Defined(DefinedPlace {
-                    ty: UnionType::from_elements(db, [inferred_ty, declared_ty]),
+                    ty: UnionType::from_two_elements(db, inferred_ty, declared_ty),
                     origin,
                     definedness: if boundness_analysis == BoundnessAnalysis::AssumeBound {
                         Definedness::AlwaysDefined
@@ -1153,6 +1154,122 @@ fn place_impl<'db>(
         .unwrap_or_default()
 }
 
+/// Pre-computed reachability analysis for loop-back bindings in a loop header.
+#[salsa::tracked(
+    cycle_initial=|db, _, definition| loop_header_reachability_impl(db, definition, true),
+    cycle_fn=loop_header_reachability_cycle_recover,
+    heap_size = ruff_memory_usage::heap_size,
+)]
+pub(crate) fn loop_header_reachability<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+) -> LoopHeaderReachability<'db> {
+    loop_header_reachability_impl(db, definition, false)
+}
+
+fn loop_header_reachability_cycle_recover<'db>(
+    _db: &'db dyn Db,
+    _cycle: &salsa::Cycle,
+    previous: &LoopHeaderReachability<'db>,
+    result: LoopHeaderReachability<'db>,
+    _definition: Definition<'db>,
+) -> LoopHeaderReachability<'db> {
+    result.cycle_normalized(previous)
+}
+
+fn loop_header_reachability_impl<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+    is_cycle_initial: bool,
+) -> LoopHeaderReachability<'db> {
+    let DefinitionKind::LoopHeader(loop_header_definition) = definition.kind(db) else {
+        unreachable!("`loop_header_reachability` called with non-loop-header definition");
+    };
+
+    let scope = definition.scope(db);
+    let use_def = use_def_map(db, scope);
+    let loop_header = get_loop_header(db, loop_header_definition.loop_token());
+    let place = loop_header_definition.place();
+
+    let mut has_defined_bindings = false;
+    let mut deleted_reachability = Truthiness::AlwaysFalse;
+    let mut reachable_bindings = FxIndexSet::default();
+
+    for live_binding in loop_header.bindings_for_place(place) {
+        let reachability = if is_cycle_initial {
+            Truthiness::Ambiguous
+        } else {
+            use_def.evaluate_reachability(db, live_binding.reachability_constraint)
+        };
+        // Skip unreachable bindings.
+        if reachability.is_always_false() {
+            continue;
+        }
+
+        match use_def.definition(live_binding.binding) {
+            DefinitionState::Defined(def) => {
+                has_defined_bindings = true;
+                if def != definition {
+                    reachable_bindings.insert(ReachableLoopBinding {
+                        definition: def,
+                        narrowing_constraint: live_binding.narrowing_constraint,
+                    });
+                }
+            }
+            // `del` in the loop body is always visible to code after the loop via the
+            // normal control flow merge. Updating `deleted_reachability` here is
+            // necessary for prior uses in the loop to see it.
+            DefinitionState::Deleted => {
+                deleted_reachability = deleted_reachability.or(reachability);
+            }
+            // If UNBOUND is visible at loop-back, then it was visible before the loop.
+            // Loop header definitions don't shadow preexisting bindings, so we don't
+            // need to do anything with this.
+            DefinitionState::Undefined => {}
+        }
+    }
+
+    LoopHeaderReachability {
+        has_defined_bindings,
+        deleted_reachability,
+        reachable_bindings,
+    }
+}
+
+/// Result of [`loop_header_reachability`]: pre-computed reachability info for loop-back bindings.
+#[derive(Debug, Clone, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+pub(crate) struct LoopHeaderReachability<'db> {
+    /// Whether any reachable loop-back binding is a defined binding.
+    pub(crate) has_defined_bindings: bool,
+    pub(crate) deleted_reachability: Truthiness,
+    /// Reachable, defined loop-back bindings (excluding the loop header definition itself).
+    pub(crate) reachable_bindings: FxIndexSet<ReachableLoopBinding<'db>>,
+}
+
+impl<'db> LoopHeaderReachability<'db> {
+    fn cycle_normalized(
+        self,
+        previous: &LoopHeaderReachability<'db>,
+    ) -> LoopHeaderReachability<'db> {
+        let mut reachable_bindings = FxIndexSet::default();
+        reachable_bindings.extend(previous.reachable_bindings.iter().copied());
+        reachable_bindings.extend(self.reachable_bindings);
+
+        LoopHeaderReachability {
+            has_defined_bindings: self.has_defined_bindings,
+            deleted_reachability: self.deleted_reachability,
+            reachable_bindings,
+        }
+    }
+}
+
+/// A single reachable loop-back binding with its narrowing constraint.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+pub(crate) struct ReachableLoopBinding<'db> {
+    pub(crate) definition: Definition<'db>,
+    pub(crate) narrowing_constraint: ScopedNarrowingConstraint,
+}
+
 /// Implementation of [`place_from_bindings`].
 ///
 /// ## Implementation Note
@@ -1163,7 +1280,6 @@ fn place_from_bindings_impl<'db>(
     bindings_with_constraints: BindingWithConstraintsIterator<'_, 'db>,
     requires_explicit_reexport: RequiresExplicitReExport,
 ) -> PlaceWithDefinition<'db> {
-    let all_definitions = bindings_with_constraints.all_definitions;
     let predicates = bindings_with_constraints.predicates;
     let reachability_constraints = bindings_with_constraints.reachability_constraints;
     let boundness_analysis = bindings_with_constraints.boundness_analysis;
@@ -1278,48 +1394,14 @@ fn place_from_bindings_impl<'db>(
             // We need to "look through" loop header definitions to do boundness analysis. The
             // actual type is computed by `infer_loop_header_definition` via `binding_type` below,
             // like all other bindings, so that it can participate in fixpoint iteration.
-            if let DefinitionKind::LoopHeader(loop_header_kind) = binding.kind(db) {
-                let loop_header = get_loop_header(db, loop_header_kind.loop_token());
-                let place = loop_header_kind.place();
-                let mut has_defined_bindings = false;
-                for loop_back in loop_header.bindings_for_place(place) {
-                    // Skip unreachable bindings.
-                    if reachability_constraints
-                        .evaluate(db, predicates, loop_back.reachability_constraint)
-                        .is_always_false()
-                    {
-                        continue;
-                    }
-
-                    // Resolve the definition state from the binding ID.
-                    let def_state = all_definitions[loop_back.binding];
-
-                    match def_state {
-                        DefinitionState::Defined(_) => {
-                            has_defined_bindings = true;
-                        }
-                        // `del` in the loop body is always visible to code after the loop via the
-                        // normal control flow merge. Updating `deleted_reachability` here is
-                        // necessary for prior uses in the loop to see it.
-                        DefinitionState::Deleted => {
-                            deleted_reachability =
-                                deleted_reachability.or(reachability_constraints.evaluate(
-                                    db,
-                                    predicates,
-                                    loop_back.reachability_constraint,
-                                ));
-                        }
-                        // If UNBOUND is visible at loop-back, then it was visible before the loop.
-                        // Loop header definitions don't shadow preexisting bindings, so we don't
-                        // need to do anything with this.
-                        DefinitionState::Undefined => {}
-                    }
-                }
+            if binding.kind(db).is_loop_header() {
+                let loop_header = loop_header_reachability(db, binding);
+                deleted_reachability = deleted_reachability.or(loop_header.deleted_reachability);
                 // If all the bindings in the loop are in statically false branches, it might be
                 // that none of them loop-back. In that case short-circuit, so that we don't
                 // produce an `Unknown` fallback type, and so that `Place::Undefined` is still a
                 // possibility below.
-                if !has_defined_bindings {
+                if !loop_header.has_defined_bindings {
                     return None;
                 }
             } else {
@@ -1886,9 +1968,10 @@ pub(crate) fn class_body_implicit_symbol<'db>(
         "__qualname__" => Place::bound(KnownClass::Str.to_instance(db)).into(),
         "__module__" => Place::bound(KnownClass::Str.to_instance(db)).into(),
         // __doc__ is `str` if there's a docstring, `None` if there isn't
-        "__doc__" => Place::bound(UnionType::from_elements(
+        "__doc__" => Place::bound(UnionType::from_two_elements(
             db,
-            [KnownClass::Str.to_instance(db), Type::none(db)],
+            KnownClass::Str.to_instance(db),
+            Type::none(db),
         ))
         .into(),
         // __firstlineno__ was added in Python 3.13
