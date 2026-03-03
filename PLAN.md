@@ -41,8 +41,10 @@ This plan covers Phases 1 and 2.
 
 In `crates/ty_python_semantic/src/types/constraints.rs`:
 
-- Add new index type:
+- Add new index types:
   - `#[newtype_index] struct UnionSupportId;`
+  - `#[newtype_index] struct RemoveSupportId;`
+  - `#[newtype_index] struct AddDerivedSupportId;`
 - Add a support-expression identifier enum:
 
 ```rust
@@ -50,8 +52,8 @@ enum SupportId {
     Empty,
     Singleton(ConstraintId),
     OrderedUnion(UnionSupportId),
-    // Quantification/abstraction support transform node (details below)
-    Quantified(QuantifiedSupportId),
+    Remove(RemoveSupportId),
+    AddDerived(AddDerivedSupportId),
 }
 ```
 
@@ -66,44 +68,40 @@ struct UnionSupportData {
 
 - Extend `ConstraintSetStorage` with:
   - `union_supports: IndexVec<UnionSupportId, UnionSupportData>`
-  - `quantified_supports: IndexVec<QuantifiedSupportId, QuantifiedSupportData>`
+  - `remove_supports: IndexVec<RemoveSupportId, RemoveSupportData>`
+  - `add_derived_supports: IndexVec<AddDerivedSupportId, AddDerivedSupportData>`
 
 Important initial policy:
 
-- **Do not hash-cons any support-expression nodes** in Phase 1 (including `OrderedUnion` and `Quantified`/quantified nodes).
+- **Do not hash-cons any support-expression nodes** in Phase 1 (including `OrderedUnion`, `Remove`, and `AddDerived` nodes).
 - Always append fresh support-expression nodes as operations are recorded.
 
-### 2) Quantification/derived-support node
+### 2) Quantification/derived-support nodes (flattened form)
 
-For existential abstraction and related flows, add a support node kind that records:
-
-- base support expression,
-- removed constraints,
-- derived constraints tied to origin constraints (rank provenance),
-- optional encounter index if needed to stabilize ties.
-
-Proposed payload sketch:
+Replace the single quantified-support payload with two explicit node kinds:
 
 ```rust
-struct QuantifiedSupportData {
+struct RemoveSupportData {
     base: SupportId,
-    removed: Box<[ConstraintId]>,
-    derived: Box<[DerivedConstraintRecord]>,
+    constraint: ConstraintId,
 }
 
-struct DerivedConstraintRecord {
+struct AddDerivedSupportData {
+    base: SupportId,
     origin: ConstraintId,
     derived: ConstraintId,
 }
 ```
 
-Note:
+Semantics:
 
-- We may later flatten/simplify `QuantifiedSupportData` and/or `DerivedConstraintRecord` if profiling or implementation experience suggests it.
+- `Remove`: remove one constraint from the base support (with existing accumulator semantics for duplicates/outer preexisting entries).
+- `AddDerived`: insert `derived` immediately after `origin` in rank order (if not already present).
 
-Invariant:
+Invariants:
 
-- Every `origin` used in `derived` **must** appear in the flattened base support (after removals are interpreted per algorithm). If not, treat as programmer error and **hard panic**.
+- `origin` used by `AddDerived` must exist in support at build time; missing origin is programmer error (hard panic).
+- When constructing multiple `AddDerived` nodes for one abstraction result, create them in **reverse encounter order** so final support order matches intended forward encounter order.
 
 ### 3) Make support expression explicit on `ConstraintSet`
 
@@ -125,7 +123,8 @@ Add methods on `ConstraintSetBuilder`:
   - `empty_support() -> SupportId`
   - `singleton_support(c: ConstraintId) -> SupportId`
   - `ordered_union_support(lhs: SupportId, rhs: SupportId) -> SupportId`
-  - `quantified_support(data: QuantifiedSupportData) -> SupportId`
+  - `remove_support(base: SupportId, constraint: ConstraintId) -> SupportId`
+  - `add_derived_support(base: SupportId, origin: ConstraintId, derived: ConstraintId) -> SupportId`
 
 - flattening/materialization:
   - `build_support(expr: SupportId) -> Box<[ConstraintId]>`
@@ -137,7 +136,8 @@ Add methods on `ConstraintSetBuilder`:
 - `OrderedUnion`: flatten lhs then rhs (graph structure defines ordering),
 - dedupe comes from `FxIndexSet` insertion semantics (first occurrence wins),
 - deterministic order,
-- `Quantified`: apply explicit remove/derive operations over the accumulator.
+- `Remove`: remove the recorded constraint from the accumulator according to node semantics.
+- `AddDerived`: insert derived constraint immediately after origin (if not already present).
 
 Implementation notes:
 
@@ -151,7 +151,8 @@ Implementation notes:
 - `union` / `intersect` / `iff` / `implies`: record ordered-union support node (`lhs`, `rhs`) only.
 - `negate`: support unchanged.
 - existential/reduction operations:
-  - record a `Quantified` support transform node; do not eagerly compute flattened order.
+  - record `Remove` and `AddDerived` transform nodes; do not eagerly compute flattened order.
+  - for multiple derived additions, build `AddDerived` nodes in reverse encounter order.
 
 ---
 
@@ -199,7 +200,7 @@ Apply to:
 In abstraction/simplification flows:
 
 - stop synthesizing/propagating node `source_order` values.
-- represent derived-support semantics via `Quantified` support node.
+- represent derived-support semantics via `Remove`/`AddDerived` support nodes.
 
 For relative ordering among derived constraints from the same origin:
 
@@ -266,7 +267,7 @@ Add tests for:
 - dedupe with first occurrence winning,
 - deterministic flatten for deep trees,
 - deterministic flatten behavior for large/deep support graphs,
-- `Quantified` semantics (remove + derive + tie behavior),
+- `Remove`/`AddDerived` semantics (remove + derive + tie behavior),
 - panic path when derived origin is missing,
 - `into_owned`/`load` support remap.
 
@@ -288,7 +289,7 @@ Then broader checks per repo conventions.
 
 Collect before/after metrics:
 
-- support-expression node counts (`OrderedUnion`, `Quantified`),
+- support-expression node counts (`OrderedUnion`, `Remove`, `AddDerived`),
 - flattened support lengths at consumption sites,
 - flatten invocation counts,
 - wall time in representative mdtests/code-nav runs,
@@ -322,14 +323,15 @@ Expectation:
 
 ## Concrete implementation checklist
 
-- [x] Add `SupportId`, `UnionSupportId`, `QuantifiedSupportId` and storage tables.
+- [x] Add `SupportId` and initial support-node storage tables.
 - [x] Add support-expression constructors on builder (no support-node hash-consing).
 - [x] Add `build_support` with `FxIndexSet` accumulator dedupe.
 - [x] Add `support` to `ConstraintSet` and flattened support payload to `OwnedConstraintSet`.
 - [x] Thread support expressions through constructors/combinators.
+- [ ] NEXT: Replace `Quantified` support payload with flattened `Remove`/`AddDerived` node types and builder APIs.
 - [ ] Update `distributed_or`/`distributed_and` and `when_any`/`when_all` to combine support in balanced-tree order.
 - [ ] Remove temporary `support_from_node` reconstruction path entirely.
-- [ ] Encode abstraction-derived ordering via `Quantified` support node.
+- [ ] Encode abstraction-derived ordering via `Remove`/`AddDerived` support nodes.
 - [ ] Convert ordering consumers to flattened support rank maps.
 - [ ] Remove node `source_order` fields and offset APIs.
 - [x] Run tests and update snapshots if needed.
@@ -342,23 +344,24 @@ Expectation:
 
 File: `crates/ty_python_semantic/src/types/constraints.rs`
 
-1. Add `UnionSupportId` and `QuantifiedSupportId` (`#[newtype_index]`).
-2. Add `SupportId` enum (`Empty`, `Singleton`, `OrderedUnion`, `Quantified`).
+1. Add `UnionSupportId`, `RemoveSupportId`, and `AddDerivedSupportId` (`#[newtype_index]`).
+2. Add `SupportId` enum (`Empty`, `Singleton`, `OrderedUnion`, `Remove`, `AddDerived`).
 3. Extend `ConstraintSetStorage` with:
    - `union_supports: IndexVec<UnionSupportId, UnionSupportData>`
-   - `quantified_supports: IndexVec<QuantifiedSupportId, QuantifiedSupportData>`
+   - `remove_supports: IndexVec<RemoveSupportId, RemoveSupportData>`
+   - `add_derived_supports: IndexVec<AddDerivedSupportId, AddDerivedSupportData>`
 4. If needed, add lightweight scratch state for iterative flatten traversal (e.g., reusable explicit stack buffers).
 
 ### Step B — builder APIs and flatten implementation
 
 File: `crates/ty_python_semantic/src/types/constraints.rs`
 
-1. Add support constructors (`empty`, `singleton`, `ordered_union`, `quantified`).
+1. Add support constructors (`empty`, `singleton`, `ordered_union`, `remove`, `add_derived`).
 2. Implement `build_support(expr) -> Box<[ConstraintId]>`:
    - iterative walk,
    - `FxIndexSet` accumulator for dedupe/order,
    - deterministic lhs-before-rhs.
-3. Implement clear per-node accumulator operations (`Empty`, `Singleton`, `OrderedUnion`, `Quantified`).
+3. Implement clear per-node accumulator operations (`Empty`, `Singleton`, `OrderedUnion`, `Remove`, `AddDerived`).
 4. Add/adjust reusable traversal scratch only if profiling indicates allocation churn in flatten.
 
 ### Step C — thread support through structs and constructors
@@ -400,13 +403,24 @@ File: `crates/ty_python_semantic/src/types/constraints.rs`
 - Add support-aware equivalents of distributed folding so support is combined in the same balanced shape (instead of reconstructing via `support_from_node`).
 - `support_from_node` is a strict temporary migration bridge and **must be removed** before final landing.
 
+### Step E.2 — flatten quantified support representation (**do this next before other pending steps**)
+
+File: `crates/ty_python_semantic/src/types/constraints.rs`
+
+1. Replace `Quantified` support node representation with two node kinds:
+   - `Remove(base, constraint)`
+   - `AddDerived(base, origin, derived)`
+2. Replace corresponding storage/index types and builder constructors.
+3. Update `build_support` operations to handle `Remove` and `AddDerived` directly.
+4. Ensure missing origin is a hard panic in `AddDerived` handling.
+
 ### Step F — quantification support node wiring
 
 File: `crates/ty_python_semantic/src/types/constraints.rs`
 
-1. In abstraction/reduction flows, build `Quantified` support nodes rather than eagerly computing ranks.
-2. Record origins and derived constraints; rely on support-graph structure for relative ordering.
-3. Enforce invariant that origins must be present at flatten time (hard panic otherwise).
+1. In abstraction/reduction flows, build `Remove` and `AddDerived` support nodes rather than eagerly computing ranks.
+2. For multiple derived additions from one transform, create `AddDerived` nodes in reverse encounter order.
+3. Enforce invariant that origins must be present at build time (hard panic otherwise).
 
 ### Step G — migrate ordering consumers
 
@@ -445,7 +459,7 @@ File: `crates/ty_python_semantic/src/types/constraints.rs`
 ### Confirmed design decisions
 
 1. Support construction should be cheap; defer support calculation until needed.
-2. No support-expression nodes are **hash-consed** in Phase 1 (`OrderedUnion` and `Quantified`/quantified included).
+2. No support-expression nodes are **hash-consed** in Phase 1 (`OrderedUnion`, `Remove`, and `AddDerived` included).
 3. Flattening is centralized in builder (`build_support`) and uses an `FxIndexSet<ConstraintId>` accumulator.
 4. `OwnedConstraintSet` persists flattened support, not support-expression graph.
 5. `load` rebuilds support as a left-associated `OrderedUnion` chain of singleton nodes.
