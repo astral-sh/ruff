@@ -357,7 +357,7 @@ impl<'db> OverloadLiteral<'db> {
 
     /// Returns the overload immediately before this one in the AST. Returns `None` if there is no
     /// previous overload.
-    fn previous_overload(self, db: &'db dyn Db) -> Option<FunctionLiteral<'db>> {
+    pub(crate) fn previous_overload(self, db: &'db dyn Db) -> Option<FunctionLiteral<'db>> {
         // The semantic model records a use for each function on the name node. This is used
         // here to get the previous function definition with the same name.
         let scope = self.definition(db).scope(db);

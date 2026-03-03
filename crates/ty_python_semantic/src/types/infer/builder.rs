@@ -3453,6 +3453,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             inferred_ty = self.apply_decorator(*decorator_ty, inferred_ty, decorator_node);
         }
 
+        // If the implementation of an overloaded function is wrapped in a decorator that
+        // transforms it to a non-`FunctionLiteral` type, restore the pre-decoration
+        // `FunctionLiteral`. Per PEP 484, the implementation "should be ignored by a type
+        // checker" — only the `@overload` stubs govern dispatch. We need a `FunctionLiteral`
+        // here so the overload chain is preserved in the public type.
+        if !matches!(inferred_ty, Type::FunctionLiteral(_))
+            && !overload_literal.is_overload(self.db())
+            && overload_literal.previous_overload(self.db()).is_some()
+        {
+            inferred_ty = self
+                .undecorated_type
+                .expect("undecorated_type is set before the decorator loop");
+        }
+
         self.add_declaration_with_binding(
             function.into(),
             definition,
