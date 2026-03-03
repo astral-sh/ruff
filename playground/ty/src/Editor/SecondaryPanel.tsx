@@ -4,6 +4,10 @@ import { ReadonlyFiles } from "../Playground";
 import { Suspense, use, useState } from "react";
 import { loadPyodide } from "pyodide";
 import classNames from "classnames";
+import {
+  getExtractedPackageFiles,
+  PACKAGES_ROOT,
+} from "./PackageInstaller";
 
 export enum SecondaryTool {
   "AST" = "AST",
@@ -114,6 +118,19 @@ function Run({ files, theme }: { files: ReadonlyFiles; theme: Theme }) {
           HOME: SANDBOX_BASE_DIRECTORY,
         },
       });
+
+      // Write extracted pure-Python package files to Pyodide's filesystem
+      const packageFiles = getExtractedPackageFiles();
+      if (packageFiles.length > 0) {
+        for (const { path, contents } of packageFiles) {
+          const lastSlash = path.lastIndexOf("/");
+          if (lastSlash > 0) {
+            pyodide.FS.mkdirTree(path.slice(0, lastSlash));
+          }
+          pyodide.FS.writeFile(path, contents);
+        }
+        pyodide.runPython(`import sys; sys.path.insert(0, '${PACKAGES_ROOT}')`);
+      }
 
       let combined_output = "";
 

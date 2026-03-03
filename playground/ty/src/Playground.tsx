@@ -14,7 +14,14 @@ import { FileHandle, PositionEncoding, Workspace } from "ty_wasm";
 import { persist, persistLocal, restore } from "./Editor/persist";
 import { loader } from "@monaco-editor/react";
 import tySchema from "../../../ty.schema.json";
-import Chrome, { formatError } from "./Editor/Chrome";
+import Chrome from "./Editor/Chrome";
+import {
+  formatError,
+  type InstallationStatus,
+  IDLE_STATUS,
+  installPackages,
+  PACKAGES_ROOT,
+} from "./Editor/PackageInstaller";
 
 export const SETTINGS_FILE_NAME = "ty.json";
 
@@ -24,13 +31,21 @@ export default function Playground() {
   const [error, setError] = useState<string | null>(null);
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [files, dispatchFiles] = useReducer(filesReducer, INIT_FILES_STATE);
+  const [installStatus, setInstallStatus] =
+    useState<InstallationStatus>(IDLE_STATUS);
+  const installAbortRef = useRef<AbortController | null>(null);
 
   const workspacePromiseRef = useRef<Promise<Workspace> | null>(null);
   if (workspacePromiseRef.current == null) {
     workspacePromiseRef.current = startPlayground().then((fetched) => {
       setVersion(fetched.version);
       const workspace = new Workspace("/", PositionEncoding.Utf16, {});
-      restoreWorkspace(workspace, fetched.workspace, dispatchFiles, setError);
+      restoreWorkspace(
+        workspace,
+        fetched.workspace,
+        dispatchFiles,
+        setError,
+      );
       setWorkspace(workspace);
       return workspace;
     });
@@ -92,6 +107,51 @@ export default function Playground() {
     },
     [fileName, files.handles, files.selected],
   );
+
+  const handleInstallDependencies = useCallback(() => {
+    if (workspace == null) {
+      return;
+    }
+
+    // Find the ty.json file and extract dependencies
+    const settingsFile = files.index.find(
+      (f) => f.name === SETTINGS_FILE_NAME,
+    );
+    if (settingsFile == null) {
+      return;
+    }
+
+    const content = files.contents[settingsFile.id];
+    let deps: string[] = [];
+    try {
+      const parsed = JSON.parse(content);
+      deps = Array.isArray(parsed.dependencies) ? parsed.dependencies : [];
+    } catch {
+      return;
+    }
+
+    // Abort any previous install
+    installAbortRef.current?.abort();
+    const abortController = new AbortController();
+    installAbortRef.current = abortController;
+
+    const previousFiles = installStatus.writtenFiles;
+
+    installPackages(
+      workspace,
+      deps,
+      previousFiles,
+      setInstallStatus,
+      abortController.signal,
+    ).then((result) => {
+      if (!abortController.signal.aborted && result.state === "success") {
+        // Auto-clear success message after 5 seconds
+        setTimeout(() => {
+          setInstallStatus({ ...result, state: "idle" });
+        }, 5000);
+      }
+    });
+  }, [workspace, files.index, files.contents, installStatus.writtenFiles]);
 
   const handleFileRenamed = useCallback(
     (workspace: Workspace, file: FileId, newName: string) => {
@@ -190,6 +250,7 @@ export default function Playground() {
           workspacePromise={workspacePromise}
           theme={theme}
           selectedFileName={fileName}
+          installStatus={installStatus}
           onAddFile={handleFileAdded}
           onRenameFile={handleFileRenamed}
           onRemoveFile={handleFileRemoved}
@@ -197,6 +258,7 @@ export default function Playground() {
           onChangeFile={handleFileChanged}
           onSelectVendoredFile={handleVendoredFileSelected}
           onClearVendoredFile={handleVendoredFileCleared}
+          onInstallDependencies={handleInstallDependencies}
         />
       </Suspense>
       {error ? (
@@ -223,6 +285,7 @@ export const DEFAULT_SETTINGS = JSON.stringify(
     rules: {
       "undefined-reveal": "ignore",
     },
+    dependencies: [],
   },
   null,
   4,
@@ -517,10 +580,24 @@ async function startPlayground(): Promise<InitializedPlayground> {
   const version = ty.version();
   const monaco = await loader.init();
 
+  // Extend the schema to allow "dependencies" (playground-only field, not a ty option)
+  const playgroundSchema = {
+    ...tySchema,
+    properties: {
+      ...(tySchema as Record<string, unknown>).properties as Record<string, unknown>,
+      dependencies: {
+        type: "array",
+        items: { type: "string" },
+        description:
+          "External Python packages to install from PyPI (playground only)",
+      },
+    },
+  };
+
   setupMonaco(monaco, {
     uri: "https://raw.githubusercontent.com/astral-sh/ruff/main/ty.schema.json",
     fileMatch: ["ty.json"],
-    schema: tySchema,
+    schema: playgroundSchema,
   });
 
   const restored = await restore();
@@ -537,15 +614,34 @@ function updateOptions(
   workspace: Workspace | null,
   content: string | null,
   setError: (error: string | null) => void,
-) {
+): string[] {
   content = content ?? DEFAULT_SETTINGS;
 
   try {
-    const settings = JSON.parse(content);
+    const parsed = JSON.parse(content);
+
+    // Extract dependencies (not a ty option, would cause deny_unknown_fields error)
+    const dependencies: string[] = Array.isArray(parsed.dependencies)
+      ? parsed.dependencies
+      : [];
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { dependencies: _, ...settings } = parsed;
+
+    // If there are dependencies, inject /packages into extra-paths
+    if (dependencies.length > 0) {
+      settings.environment = settings.environment ?? {};
+      const extraPaths: string[] = settings.environment["extra-paths"] ?? [];
+      if (!extraPaths.includes(PACKAGES_ROOT)) {
+        settings.environment["extra-paths"] = [PACKAGES_ROOT, ...extraPaths];
+      }
+    }
+
     workspace?.updateOptions(settings);
     setError(null);
+    return dependencies;
   } catch (error) {
     setError(`Failed to update 'ty.json' options: ${formatError(error)}`);
+    return [];
   }
 }
 
@@ -614,4 +710,5 @@ function restoreWorkspace(
     type: "selectFileByName",
     name: selected,
   });
+
 }

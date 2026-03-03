@@ -67,6 +67,15 @@ html,
   -moz-osx-font-smoothing: grayscale;
 }
 
+@keyframes indeterminate {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(400%);
+  }
+}
+
 .shadow-copied {
   --tw-shadow: 0 0 0 1px var(--color-white), inset 0 0 0 1px var(--color-white);
   --tw-shadow-colored:
