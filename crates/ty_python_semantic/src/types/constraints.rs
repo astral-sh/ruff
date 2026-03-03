@@ -762,7 +762,7 @@ impl<'db> ConstraintSetBuilder<'db> {
 
             let old_interior = other.nodes[old_node];
             let condition = match other.constraints[old_interior.constraint] {
-                Constraint::LowerBound(old_typevar, old_lower_bound) => {
+                Constraint::LowerBound(old_lower_bound, old_typevar) => {
                     Constraint::new_lower_bound_node(db, builder, old_typevar, old_lower_bound)
                 }
                 Constraint::UpperBound(old_typevar, old_upper_bound) => {
@@ -934,7 +934,7 @@ pub struct ConstraintId;
 /// lower and upper bound.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
 pub(crate) enum Constraint<'db> {
-    LowerBound(BoundTypeVarInstance<'db>, Type<'db>),
+    LowerBound(Type<'db>, BoundTypeVarInstance<'db>),
     UpperBound(BoundTypeVarInstance<'db>, Type<'db>),
 }
 
@@ -945,7 +945,7 @@ impl ConstraintId {
         typevar: BoundTypeVarInstance<'db>,
         lower: Type<'db>,
     ) -> ConstraintId {
-        builder.intern_constraint(db, Constraint::LowerBound(typevar, lower))
+        builder.intern_constraint(db, Constraint::LowerBound(lower, typevar))
     }
 
     fn new_upper_bound<'db>(
@@ -1175,14 +1175,14 @@ impl<'db> Constraint<'db> {
 
     fn typevar(self) -> BoundTypeVarInstance<'db> {
         match self {
-            Constraint::LowerBound(typevar, _) => typevar,
+            Constraint::LowerBound(_, typevar) => typevar,
             Constraint::UpperBound(typevar, _) => typevar,
         }
     }
 
     fn bound(self) -> Type<'db> {
         match self {
-            Constraint::LowerBound(_, bound) => bound,
+            Constraint::LowerBound(bound, _) => bound,
             Constraint::UpperBound(_, bound) => bound,
         }
     }
@@ -1192,7 +1192,7 @@ impl<'db> Constraint<'db> {
     fn typevar_relation(self) -> Option<(BoundTypeVarInstance<'db>, BoundTypeVarInstance<'db>)> {
         match self {
             // `L ≤ T`
-            Constraint::LowerBound(typevar, Type::TypeVar(lower_typevar)) => {
+            Constraint::LowerBound(Type::TypeVar(lower_typevar), typevar) => {
                 Some((lower_typevar, typevar))
             }
             // `T ≤ U`
@@ -1262,7 +1262,7 @@ impl ConstraintId {
 
         match (self_constraint, other_constraint) {
             // (s₁ ≤ α) → (s₂ ≤ α) <=> (s₂ ≤ s₁)
-            (Constraint::LowerBound(_, self_lower), Constraint::LowerBound(_, other_lower)) => {
+            (Constraint::LowerBound(self_lower, _), Constraint::LowerBound(other_lower, _)) => {
                 other_lower.is_constraint_set_assignable_to(db, self_lower)
             }
 
@@ -1272,7 +1272,7 @@ impl ConstraintId {
             }
 
             // (α ≤ t₁) → (Never ≤ α)   [anything implies true]
-            (Constraint::UpperBound(_, _), Constraint::LowerBound(_, other_lower)) => {
+            (Constraint::UpperBound(_, _), Constraint::LowerBound(other_lower, _)) => {
                 other_lower.is_never()
             }
 
@@ -1297,7 +1297,7 @@ impl ConstraintId {
         debug_assert!(typevar.is_same_typevar_as(db, other_constraint.typevar()));
 
         match (self_constraint, other_constraint) {
-            (Constraint::LowerBound(_, self_lower), Constraint::LowerBound(_, other_lower)) => {
+            (Constraint::LowerBound(self_lower, _), Constraint::LowerBound(other_lower, _)) => {
                 // (s₁ ≤ α) ∧ (s₂ ≤ α) = (s₁ ∪ s₂) ≤ α
                 let lower = UnionType::from_two_elements(db, self_lower, other_lower);
                 // We do not create lower bounds that are unions, since those can be broken apart
@@ -1305,7 +1305,7 @@ impl ConstraintId {
                 if lower.is_union() {
                     return IntersectionResult::CannotSimplify;
                 }
-                IntersectionResult::Simplified(Constraint::LowerBound(typevar, lower))
+                IntersectionResult::Simplified(Constraint::LowerBound(lower, typevar))
             }
 
             (Constraint::UpperBound(_, self_upper), Constraint::UpperBound(_, other_upper)) => {
@@ -1339,8 +1339,8 @@ impl ConstraintId {
                 IntersectionResult::Simplified(Constraint::UpperBound(typevar, upper))
             }
 
-            (Constraint::LowerBound(_, lower), Constraint::UpperBound(_, upper))
-            | (Constraint::UpperBound(_, upper), Constraint::LowerBound(_, lower)) => {
+            (Constraint::LowerBound(lower, _), Constraint::UpperBound(_, upper))
+            | (Constraint::UpperBound(_, upper), Constraint::LowerBound(lower, _)) => {
                 // If `lower ≰ upper`, then the intersection is empty, since there is no type that is both
                 // greater than `lower`, and less than `upper`.
                 if !lower.is_constraint_set_assignable_to(db, upper) {
@@ -1382,7 +1382,7 @@ impl ConstraintId {
         impl Display for DisplayConstrainedTypeVar<'_> {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 match self.constraint {
-                    Constraint::LowerBound(typevar, lower) => {
+                    Constraint::LowerBound(lower, typevar) => {
                         if self.negated {
                             f.write_str("¬")?;
                         }
@@ -2850,7 +2850,7 @@ impl InteriorNode {
             // But that requires `T ≤ int ∧ U ≤ Sequence[T] → U ≤ Sequence[int]` to exist in the
             // sequent map. It doesn't, and so we currently produce `U ≤ Unknown` in this case.
             &mut |constraint| match builder.constraint_data(constraint) {
-                Constraint::LowerBound(typevar, lower) => {
+                Constraint::LowerBound(lower, typevar) => {
                     typevar.identity(db) == bound_typevar
                         || any_over_type(db, lower, false, mentions_typevar)
                 }
@@ -3125,7 +3125,7 @@ impl InteriorNode {
                 mappings.clear();
                 for (constraint, _) in path {
                     match builder.constraint_data(constraint) {
-                        Constraint::LowerBound(typevar, lower) => {
+                        Constraint::LowerBound(lower, typevar) => {
                             let bounds = mappings.entry(typevar).or_default();
                             bounds.add_lower(db, lower);
 
@@ -3331,10 +3331,10 @@ impl InteriorNode {
                     // (B ≤ C) ∧ (BL ≤ B) → (BL ≤ C)
                     (
                         Constraint::LowerBound(
-                            constrained_typevar,
                             Type::TypeVar(constrained_lower),
+                            constrained_typevar,
                         ),
-                        Constraint::LowerBound(_, bound_lower),
+                        Constraint::LowerBound(bound_lower, _),
                     ) if constrained_lower.is_same_typevar_as(db, bound_typevar) => {
                         Some(ConstraintId::new_lower_bound(
                             db,
@@ -4054,7 +4054,7 @@ impl SequentMap {
         // Since each constraint encodes _either_ a lower bound or an upper bound, the only
         // single-constraint sequents we can derive are tautologies.
         match builder.constraint_data(constraint) {
-            Constraint::LowerBound(_, lower) if lower.is_never() => {
+            Constraint::LowerBound(lower, _) if lower.is_never() => {
                 self.add_single_tautology(db, builder, constraint);
             }
             Constraint::UpperBound(_, upper) if upper.is_object() => {
@@ -4081,8 +4081,8 @@ impl SequentMap {
         // U are both concrete types. (If either L or U is a typevar, the conjunction may still be
         // satisfiable depending on how that typevar is specialized.)
         if left_typevar.is_same_typevar_as(db, right_typevar)
-            && let (Constraint::LowerBound(_, lower), Constraint::UpperBound(_, upper))
-            | (Constraint::UpperBound(_, upper), Constraint::LowerBound(_, lower)) =
+            && let (Constraint::LowerBound(lower, _), Constraint::UpperBound(_, upper))
+            | (Constraint::UpperBound(_, upper), Constraint::LowerBound(lower, _)) =
                 (left_constraint_data, right_constraint_data)
             && !lower.is_type_var()
             && !upper.is_type_var()
@@ -4169,7 +4169,7 @@ impl SequentMap {
             };
 
             // `(L ≤ A) ∧ (A ≤ B) -> (L ≤ B)`
-            if let Constraint::LowerBound(typevar, lower) = other
+            if let Constraint::LowerBound(lower, typevar) = other
                 && typevar.is_same_typevar_as(db, relation_lower)
                 && let Some(post_constraint) =
                     ConstraintId::new_canonical_lower_bound(db, builder, relation_upper, lower)
@@ -4221,7 +4221,7 @@ impl SequentMap {
         let mut try_one_direction = |upper: Constraint<'db>, lower: Constraint<'db>| {
             let (
                 Constraint::UpperBound(upper_typevar, upper_bound),
-                Constraint::LowerBound(lower_typevar, lower_bound),
+                Constraint::LowerBound(lower_bound, lower_typevar),
             ) = (upper, lower)
             else {
                 return;
