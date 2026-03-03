@@ -173,18 +173,16 @@ where
         builder: &'c ConstraintSetBuilder<'db>,
         mut f: impl FnMut(T) -> ConstraintSet<'db, 'c>,
     ) -> ConstraintSet<'db, 'c> {
-        let node = NodeId::distributed_or(
+        let (node, support) = NodeId::distributed_or(
             db,
             builder,
             self.map(|element| {
                 let constraint = f(element);
                 constraint.verify_builder(builder);
-                constraint.node
+                (constraint.node, constraint.support)
             }),
         );
-        // TEMPORARY: support reconstruction from BDD nodes must be removed before finalizing
-        // support migration.
-        ConstraintSet::from_node_and_support(builder, node, builder.support_from_node(node))
+        ConstraintSet::from_node_and_support(builder, node, support)
     }
 
     fn when_all<'db, 'c>(
@@ -193,18 +191,16 @@ where
         builder: &'c ConstraintSetBuilder<'db>,
         mut f: impl FnMut(T) -> ConstraintSet<'db, 'c>,
     ) -> ConstraintSet<'db, 'c> {
-        let node = NodeId::distributed_and(
+        let (node, support) = NodeId::distributed_and(
             db,
             builder,
             self.map(|element| {
                 let constraint = f(element);
                 constraint.verify_builder(builder);
-                constraint.node
+                (constraint.node, constraint.support)
             }),
         );
-        // TEMPORARY: support reconstruction from BDD nodes must be removed before finalizing
-        // support migration.
-        ConstraintSet::from_node_and_support(builder, node, builder.support_from_node(node))
+        ConstraintSet::from_node_and_support(builder, node, support)
     }
 }
 
@@ -2027,11 +2023,11 @@ impl NodeId {
     fn tree_fold<'db>(
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
-        nodes: impl Iterator<Item = Self>,
+        nodes: impl Iterator<Item = (Self, SupportId)>,
         zero: Self,
         is_one: impl Fn(Self, &'db dyn Db, &ConstraintSetBuilder<'db>) -> bool,
         mut combine: impl FnMut(Self, &ConstraintSetBuilder<'db>, Self) -> Self,
-    ) -> Self {
+    ) -> (Self, SupportId) {
         // To implement the "linear" shape described above, we could collect the iterator elements
         // into a vector, and then use the fold at the bottom of this method to combine the
         // elements using the operator.
@@ -2056,40 +2052,48 @@ impl NodeId {
         //
         // We use a SmallVec for the accumulator so that we don't have to spill over to the heap
         // until the iterator passes 256 elements.
-        let mut accumulator: SmallVec<[(NodeId, u8); 8]> = SmallVec::default();
-        for node in nodes {
+        let mut accumulator: SmallVec<[((NodeId, SupportId), u8); 8]> = SmallVec::default();
+        for (node, support) in nodes {
             if is_one(node, db, builder) {
-                return node;
+                return (node, support);
             }
 
-            let (mut node, mut depth) = (node, 0);
+            let (mut node, mut support, mut depth) = (node, support, 0);
             while accumulator
                 .last()
                 .is_some_and(|(_, existing)| *existing == depth)
             {
-                let (existing, _) = accumulator.pop().expect("accumulator should not be empty");
-                node = combine(existing, builder, node);
+                let ((existing_node, existing_support), _) =
+                    accumulator.pop().expect("accumulator should not be empty");
+                node = combine(existing_node, builder, node);
+                support = builder.ordered_union_support(existing_support, support);
                 if is_one(node, db, builder) {
-                    return node;
+                    return (node, support);
                 }
                 depth += 1;
             }
-            accumulator.push((node, depth));
+            accumulator.push(((node, support), depth));
         }
 
         // At this point, we've consumed all of the iterator. The length of the accumulator will be
         // the same as the number of 1 bits in the length of the iterator. We do a final fold to
         // produce the overall result.
-        accumulator
-            .into_iter()
-            .fold(zero, |result, (node, _)| combine(result, builder, node))
+        accumulator.into_iter().fold(
+            (zero, SupportId::Empty),
+            |(result_node, result_support), ((node, support), _)| {
+                (
+                    combine(result_node, builder, node),
+                    builder.ordered_union_support(result_support, support),
+                )
+            },
+        )
     }
 
     fn distributed_or<'db>(
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
-        nodes: impl Iterator<Item = NodeId>,
-    ) -> Self {
+        nodes: impl Iterator<Item = (NodeId, SupportId)>,
+    ) -> (NodeId, SupportId) {
         Self::tree_fold(
             db,
             builder,
@@ -2103,8 +2107,8 @@ impl NodeId {
     fn distributed_and<'db>(
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
-        nodes: impl Iterator<Item = NodeId>,
-    ) -> Self {
+        nodes: impl Iterator<Item = (NodeId, SupportId)>,
+    ) -> (NodeId, SupportId) {
         Self::tree_fold(
             db,
             builder,
