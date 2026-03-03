@@ -94,15 +94,13 @@ fn is_magic_value(
         return false;
     }
 
-    match literal_expr {
-        // Ignore `None`, `Bool`, and `Ellipsis` constants.
+    // Ignore `None`, `Bool`, and `Ellipsis` constants.
+    !matches!(
+        literal_expr,
         LiteralExpressionRef::NoneLiteral(_)
-        | LiteralExpressionRef::BooleanLiteral(_)
-        | LiteralExpressionRef::EllipsisLiteral(_) => false,
-        LiteralExpressionRef::StringLiteral(_)
-        | LiteralExpressionRef::NumberLiteral(_)
-        | LiteralExpressionRef::BytesLiteral(_) => true,
-    }
+            | LiteralExpressionRef::BooleanLiteral(_)
+            | LiteralExpressionRef::EllipsisLiteral(_)
+    )
 }
 
 /// PLR2004
