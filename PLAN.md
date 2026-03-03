@@ -128,9 +128,9 @@ Add methods on `ConstraintSetBuilder`:
   - `quantified_support(data: QuantifiedSupportData) -> SupportId`
 
 - flattening/materialization:
-  - `flatten_support(expr: SupportId) -> Box<[ConstraintId]>`
+  - `build_support(expr: SupportId) -> Box<[ConstraintId]>`
 
-`flatten_support` behavior:
+`build_support` behavior:
 
 - uses an `FxIndexSet<ConstraintId>` accumulator (type alias over `indexmap::IndexSet`),
 - iterative traversal (no recursive stack growth risk),
@@ -142,7 +142,7 @@ Add methods on `ConstraintSetBuilder`:
 Implementation notes:
 
 - Keep flatten semantics centralized in this one method; each support node maps to a clear accumulator operation.
-- `flatten_support` should rely on `FxIndexSet` for dedupe and order (no bespoke mark/epoch dedupe logic in this path).
+- `build_support` should rely on `FxIndexSet` for dedupe and order (no bespoke mark/epoch dedupe logic in this path).
 
 ### 5) Support creation rules
 
@@ -186,7 +186,7 @@ Audit all `ConstraintSet::from_node(...)` sites and convert to support-aware con
 
 Replace per-node `source_order` sorting with support-rank sorting:
 
-- Build `constraint -> rank` map from `flatten_support(constraint_set.support)`.
+- Build `constraint -> rank` map from `build_support(constraint_set.support)`.
 - Sort positives by rank (stable; ties should not normally occur once rank map is built from flattened support).
 
 Apply to:
@@ -310,7 +310,7 @@ Expectation:
 1. **Support-expression tree growth (memory)**
    - Mitigation: intentional Phase-1 tradeoff; measure and revisit with optional memo/hash-consing later.
 2. **Flatten correctness subtleties**
-   - Mitigation: single `flatten_support` implementation + strong unit tests.
+   - Mitigation: single `build_support` implementation + strong unit tests.
 3. **Ordering drift in diagnostics/snapshots**
    - Mitigation: all ordering consumers rely on flattened rank map.
 4. **Quantification provenance bugs**
@@ -322,15 +322,17 @@ Expectation:
 
 ## Concrete implementation checklist
 
-- [ ] Add `SupportId`, `UnionSupportId`, `QuantifiedSupportId` and storage tables.
-- [ ] Add support-expression constructors on builder (no support-node hash-consing).
-- [ ] Add `flatten_support` with iterative traversal + `FxIndexSet` accumulator dedupe.
-- [ ] Add `support` to `ConstraintSet` and flattened support payload to `OwnedConstraintSet`.
-- [ ] Thread support expressions through constructors/combinators.
+- [x] Add `SupportId`, `UnionSupportId`, `QuantifiedSupportId` and storage tables.
+- [x] Add support-expression constructors on builder (no support-node hash-consing).
+- [x] Add `build_support` with `FxIndexSet` accumulator dedupe.
+- [x] Add `support` to `ConstraintSet` and flattened support payload to `OwnedConstraintSet`.
+- [x] Thread support expressions through constructors/combinators.
+- [ ] Update `distributed_or`/`distributed_and` and `when_any`/`when_all` to combine support in balanced-tree order.
+- [ ] Remove temporary `support_from_node` reconstruction path entirely.
 - [ ] Encode abstraction-derived ordering via `Quantified` support node.
 - [ ] Convert ordering consumers to flattened support rank maps.
 - [ ] Remove node `source_order` fields and offset APIs.
-- [ ] Run tests and update snapshots if needed.
+- [x] Run tests and update snapshots if needed.
 
 ---
 
@@ -352,7 +354,7 @@ File: `crates/ty_python_semantic/src/types/constraints.rs`
 File: `crates/ty_python_semantic/src/types/constraints.rs`
 
 1. Add support constructors (`empty`, `singleton`, `ordered_union`, `quantified`).
-2. Implement `flatten_support(expr) -> Box<[ConstraintId]>`:
+2. Implement `build_support(expr) -> Box<[ConstraintId]>`:
    - iterative walk,
    - `FxIndexSet` accumulator for dedupe/order,
    - deterministic lhs-before-rhs.
@@ -389,6 +391,14 @@ Rule:
 - unary negate keeps support unchanged.
 
 Then audit all remaining `from_node(...)` sites.
+
+### Step E.1 — restore balanced iterator combining and carry support through it
+
+File: `crates/ty_python_semantic/src/types/constraints.rs`
+
+- Keep `when_any`/`when_all` using `NodeId::distributed_or` / `NodeId::distributed_and` (balanced tree fold behavior).
+- Add support-aware equivalents of distributed folding so support is combined in the same balanced shape (instead of reconstructing via `support_from_node`).
+- `support_from_node` is a strict temporary migration bridge and **must be removed** before final landing.
 
 ### Step F — quantification support node wiring
 
@@ -436,15 +446,17 @@ File: `crates/ty_python_semantic/src/types/constraints.rs`
 
 1. Support construction should be cheap; defer support calculation until needed.
 2. No support-expression nodes are **hash-consed** in Phase 1 (`OrderedUnion` and `Quantified`/quantified included).
-3. Flattening is centralized in builder (`flatten_support`) and uses an `FxIndexSet<ConstraintId>` accumulator.
+3. Flattening is centralized in builder (`build_support`) and uses an `FxIndexSet<ConstraintId>` accumulator.
 4. `OwnedConstraintSet` persists flattened support, not support-expression graph.
 5. `load` rebuilds support as a left-associated `OrderedUnion` chain of singleton nodes.
 6. Missing origin for derived support is a programmer error (hard panic).
 7. Relative ordering/tie-breaking comes from support-graph structure; no extra tie-break metadata initially.
+8. `support_from_node` is temporary-only and must not remain in the final implementation.
+9. Rationale for (8): support is being separated from BDD structure specifically so we can eventually move to fully reduced BDDs, where node shape cannot be relied on to reconstruct support.
 
 ### Invariants to preserve
 
-For any materialized support list from `flatten_support`:
+For any materialized support list from `build_support`:
 
 - each `ConstraintId` appears at most once,
 - ordering is deterministic,

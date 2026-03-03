@@ -182,7 +182,9 @@ where
                 constraint.node
             }),
         );
-        ConstraintSet::from_node(builder, node)
+        // TEMPORARY: support reconstruction from BDD nodes must be removed before finalizing
+        // support migration.
+        ConstraintSet::from_node_and_support(builder, node, builder.support_from_node(node))
     }
 
     fn when_all<'db, 'c>(
@@ -200,7 +202,9 @@ where
                 constraint.node
             }),
         );
-        ConstraintSet::from_node(builder, node)
+        // TEMPORARY: support reconstruction from BDD nodes must be removed before finalizing
+        // support migration.
+        ConstraintSet::from_node_and_support(builder, node, builder.support_from_node(node))
     }
 }
 
@@ -226,6 +230,9 @@ pub struct OwnedConstraintSet<'db> {
     /// The nodes arena for this BDD. This is extracted from the [`ConstraintSetBuilder`] when an
     /// owned constraint set is constructed.
     nodes: IndexVec<NodeId, InteriorNodeData>,
+
+    /// Materialized support for this constraint set, in deterministic order.
+    support: Box<[ConstraintId]>,
 }
 
 /// A set of constraints under which a type property holds.
@@ -243,6 +250,9 @@ pub struct ConstraintSet<'db, 'c> {
     /// The BDD representing this constraint set
     node: NodeId,
 
+    /// Support expression for this constraint set.
+    support: SupportId,
+
     /// A reference to the builder that holds the storage for this constraint set's BDD
     builder: &'c ConstraintSetBuilder<'db>,
 
@@ -251,20 +261,25 @@ pub struct ConstraintSet<'db, 'c> {
 }
 
 impl<'db, 'c> ConstraintSet<'db, 'c> {
-    fn from_node(builder: &'c ConstraintSetBuilder<'db>, node: NodeId) -> Self {
+    fn from_node_and_support(
+        builder: &'c ConstraintSetBuilder<'db>,
+        node: NodeId,
+        support: SupportId,
+    ) -> Self {
         Self {
             node,
+            support,
             builder,
             _invariant: PhantomData,
         }
     }
 
     fn never(builder: &'c ConstraintSetBuilder<'db>) -> Self {
-        Self::from_node(builder, ALWAYS_FALSE)
+        Self::from_node_and_support(builder, ALWAYS_FALSE, SupportId::Empty)
     }
 
     fn always(builder: &'c ConstraintSetBuilder<'db>) -> Self {
-        Self::from_node(builder, ALWAYS_TRUE)
+        Self::from_node_and_support(builder, ALWAYS_TRUE, SupportId::Empty)
     }
 
     pub(crate) fn from_bool(builder: &'c ConstraintSetBuilder<'db>, b: bool) -> Self {
@@ -283,10 +298,8 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         lower: Type<'db>,
         upper: Type<'db>,
     ) -> Self {
-        Self::from_node(
-            builder,
-            Constraint::new_node(db, builder, typevar, lower, upper),
-        )
+        let (node, support) = Constraint::new_node_with_support(db, builder, typevar, lower, upper);
+        Self::from_node_and_support(builder, node, support)
     }
 
     /// Verifies that this constraint set was created by `builder`
@@ -425,7 +438,10 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         rhs: Type<'db>,
     ) -> Self {
         self.verify_builder(builder);
-        Self::from_node(builder, self.node.implies_subtype_of(db, builder, lhs, rhs))
+        let node = self.node.implies_subtype_of(db, builder, lhs, rhs);
+        // TEMPORARY: support reconstruction from BDD nodes must be removed before finalizing
+        // support migration.
+        Self::from_node_and_support(builder, node, builder.support_from_node(node))
     }
 
     /// Returns whether this constraint set is satisfied by all of the typevars that it mentions.
@@ -464,6 +480,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
     ) -> Self {
         self.verify_builder(builder);
         self.node = self.node.or_with_offset(builder, other.node);
+        self.support = builder.ordered_union_support(self.support, other.support);
         *self
     }
 
@@ -479,13 +496,14 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
     ) -> Self {
         self.verify_builder(builder);
         self.node = self.node.and_with_offset(builder, other.node);
+        self.support = builder.ordered_union_support(self.support, other.support);
         *self
     }
 
     /// Returns the negation of this constraint set.
     pub(crate) fn negate(self, _db: &'db dyn Db, builder: &'c ConstraintSetBuilder<'db>) -> Self {
         self.verify_builder(builder);
-        Self::from_node(builder, self.node.negate(builder))
+        Self::from_node_and_support(builder, self.node.negate(builder), self.support)
     }
 
     /// Returns the intersection of this constraint set and another. The other constraint set is
@@ -554,7 +572,9 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         other: Self,
     ) -> Self {
         self.verify_builder(builder);
-        Self::from_node(builder, self.node.iff_with_offset(builder, other.node))
+        let node = self.node.iff_with_offset(builder, other.node);
+        let support = builder.ordered_union_support(self.support, other.support);
+        Self::from_node_and_support(builder, node, support)
     }
 
     /// Reduces the set of inferable typevars for this constraint set. You provide an iterator of
@@ -569,7 +589,13 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         to_remove: impl IntoIterator<Item = BoundTypeVarIdentity<'db>>,
     ) -> Self {
         self.verify_builder(builder);
-        Self::from_node(builder, self.node.exists(db, builder, to_remove))
+        let node = self.node.exists(db, builder, to_remove);
+        let support = builder.quantified_support(QuantifiedSupportData {
+            base: self.support,
+            removed: Box::default(),
+            derived: Box::default(),
+        });
+        Self::from_node_and_support(builder, node, support)
     }
 
     pub(crate) fn solutions(
@@ -585,7 +611,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
             return Solutions::Unsatisfiable;
         }
 
-        self.node.solutions(db, builder)
+        self.node.solutions(db, builder, self.support)
     }
 
     #[expect(dead_code)] // Keep this around for debugging purposes
@@ -662,6 +688,12 @@ struct ConstraintSetStorage<'db> {
     /// The BDD nodes that appear in any of the constraint sets constructed in this builder.
     nodes: IndexVec<NodeId, InteriorNodeData>,
 
+    /// Support expression nodes that represent ordered unions of supports.
+    union_supports: IndexVec<UnionSupportId, UnionSupportData>,
+
+    /// Support expression nodes that represent quantified support transforms.
+    quantified_supports: IndexVec<QuantifiedSupportId, QuantifiedSupportData>,
+
     // Everything below are the memoization tables for the arenas and for our BDD operations.
     constraint_cache: FxHashMap<Constraint<'db>, ConstraintId>,
     typevar_cache: FxHashMap<BoundTypeVarIdentity<'db>, TypeVarId>,
@@ -700,11 +732,13 @@ impl<'db> ConstraintSetBuilder<'db> {
         // the original builder aren't relevant to the new builder, and don't need to be retained.
         let constraint = f(&self);
         let node = constraint.node;
+        let support = self.build_support(constraint.support);
         let storage = self.storage.into_inner();
         OwnedConstraintSet {
             node,
             constraints: storage.constraints,
             nodes: storage.nodes,
+            support,
         }
     }
 
@@ -757,7 +791,19 @@ impl<'db> ConstraintSetBuilder<'db> {
         // Maps NodeIds in the OwnedConstraintSet to the corresponding NodeIds in this builder.
         let mut cache = FxHashMap::default();
         let node = rebuild_node(db, self, other, &mut cache, other.node);
-        ConstraintSet::from_node(self, node)
+
+        let support =
+            other
+                .support
+                .iter()
+                .copied()
+                .fold(SupportId::Empty, |support, old_constraint| {
+                    let old_constraint_data = other.constraints[old_constraint];
+                    let remapped_constraint = self.intern_constraint(db, old_constraint_data);
+                    self.ordered_union_support(support, SupportId::Singleton(remapped_constraint))
+                });
+
+        ConstraintSet::from_node_and_support(self, node, support)
     }
 
     /// Interns a single typevar, giving it a stable order in this builder
@@ -863,6 +909,109 @@ impl<'db> ConstraintSetBuilder<'db> {
     fn interior_node_data(&self, node: NodeId) -> InteriorNodeData {
         self.storage.borrow().nodes[node]
     }
+
+    fn union_support_data(&self, support: UnionSupportId) -> UnionSupportData {
+        self.storage.borrow().union_supports[support]
+    }
+
+    fn quantified_support_data(
+        &self,
+        support: QuantifiedSupportId,
+    ) -> Ref<'_, QuantifiedSupportData> {
+        Ref::map(self.storage.borrow(), |storage| {
+            &storage.quantified_supports[support]
+        })
+    }
+
+    fn ordered_union_support(&self, lhs: SupportId, rhs: SupportId) -> SupportId {
+        match (lhs, rhs) {
+            (SupportId::Empty, rhs) => rhs,
+            (lhs, SupportId::Empty) => lhs,
+            (lhs, rhs) => {
+                let mut storage = self.storage.borrow_mut();
+                let id = storage.union_supports.push(UnionSupportData { lhs, rhs });
+                SupportId::OrderedUnion(id)
+            }
+        }
+    }
+
+    fn quantified_support(&self, data: QuantifiedSupportData) -> SupportId {
+        let mut storage = self.storage.borrow_mut();
+        let id = storage.quantified_supports.push(data);
+        SupportId::Quantified(id)
+    }
+
+    /// TEMPORARY MIGRATION HELPER.
+    ///
+    /// Reconstructs a support expression from the current BDD node shape by walking constraints
+    /// and ordering them by node `source_order`.
+    ///
+    /// This method **must not** remain in the final implementation. One of the goals of this
+    /// migration is to allow fully reduced BDDs, where the node graph is no longer required to
+    /// retain all constraints that contribute to support ordering. In that world, BDD structure
+    /// and support are intentionally decoupled, so support cannot be reconstructed from nodes.
+    fn support_from_node(&self, node: NodeId) -> SupportId {
+        let mut constraints: SmallVec<[_; 8]> = SmallVec::new();
+        node.for_each_constraint(self, &mut |constraint, source_order| {
+            constraints.push((constraint, source_order));
+        });
+        constraints.sort_unstable_by_key(|(_, source_order)| *source_order);
+        constraints
+            .into_iter()
+            .map(|(constraint, _)| SupportId::Singleton(constraint))
+            .fold(SupportId::Empty, |lhs, rhs| {
+                self.ordered_union_support(lhs, rhs)
+            })
+    }
+
+    fn build_support(&self, support: SupportId) -> Box<[ConstraintId]> {
+        fn build_into(
+            builder: &ConstraintSetBuilder<'_>,
+            support: SupportId,
+            constraints: &mut FxIndexSet<ConstraintId>,
+        ) {
+            match support {
+                SupportId::Empty => {}
+                SupportId::Singleton(constraint) => {
+                    constraints.insert(constraint);
+                }
+                SupportId::OrderedUnion(union_support) => {
+                    let union_support = builder.union_support_data(union_support);
+                    build_into(builder, union_support.lhs, constraints);
+                    build_into(builder, union_support.rhs, constraints);
+                }
+                SupportId::Quantified(quantified_support) => {
+                    let quantified_support = builder.quantified_support_data(quantified_support);
+
+                    let mut quantified_constraints = FxIndexSet::default();
+                    build_into(
+                        builder,
+                        quantified_support.base,
+                        &mut quantified_constraints,
+                    );
+
+                    for removed in &quantified_support.removed {
+                        quantified_constraints.shift_remove(removed);
+                    }
+
+                    for derived in &quantified_support.derived {
+                        assert!(
+                            quantified_constraints.contains(&derived.origin),
+                            "derived support origin {origin:?} not present in flattened quantified support",
+                            origin = derived.origin,
+                        );
+                        quantified_constraints.insert(derived.derived);
+                    }
+
+                    constraints.extend(quantified_constraints);
+                }
+            }
+        }
+
+        let mut constraints = FxIndexSet::default();
+        build_into(self, support, &mut constraints);
+        constraints.into_iter().collect()
+    }
 }
 
 impl<'db> BoundTypeVarInstance<'db> {
@@ -908,6 +1057,41 @@ pub struct TypeVarId;
 #[derive(salsa::Update, get_size2::GetSize)]
 pub struct ConstraintId;
 
+#[newtype_index]
+#[derive(salsa::Update, get_size2::GetSize)]
+struct UnionSupportId;
+
+#[newtype_index]
+#[derive(salsa::Update, get_size2::GetSize)]
+struct QuantifiedSupportId;
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
+enum SupportId {
+    Empty,
+    Singleton(ConstraintId),
+    OrderedUnion(UnionSupportId),
+    Quantified(QuantifiedSupportId),
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
+struct UnionSupportData {
+    lhs: SupportId,
+    rhs: SupportId,
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
+struct QuantifiedSupportData {
+    base: SupportId,
+    removed: Box<[ConstraintId]>,
+    derived: Box<[DerivedConstraintRecord]>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
+struct DerivedConstraintRecord {
+    origin: ConstraintId,
+    derived: ConstraintId,
+}
+
 /// An individual constraint in a constraint set. This restricts a single typevar to be within a
 /// lower and upper bound.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
@@ -944,9 +1128,20 @@ impl<'db> Constraint<'db> {
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
         typevar: BoundTypeVarInstance<'db>,
+        lower: Type<'db>,
+        upper: Type<'db>,
+    ) -> NodeId {
+        let (node, _) = Self::new_node_with_support(db, builder, typevar, lower, upper);
+        node
+    }
+
+    fn new_node_with_support(
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        typevar: BoundTypeVarInstance<'db>,
         mut lower: Type<'db>,
         mut upper: Type<'db>,
-    ) -> NodeId {
+    ) -> (NodeId, SupportId) {
         // It's not useful for an upper bound to be an intersection type, or for a lower bound to
         // be a union type. Because the following equivalences hold, we can break these bounds
         // apart and create an equivalent BDD with more nodes but simpler constraints. (Fewer,
@@ -957,13 +1152,14 @@ impl<'db> Constraint<'db> {
         //   (α | β) ≤ T   ⇔ (α ≤ T) ∧ (β ≤ T)
         if let Type::Union(lower_union) = lower {
             let mut result = ALWAYS_TRUE;
+            let mut support = SupportId::Empty;
             for lower_element in lower_union.elements(db) {
-                result = result.and_with_offset(
-                    builder,
-                    Constraint::new_node(db, builder, typevar, *lower_element, upper),
-                );
+                let (next_node, next_support) =
+                    Constraint::new_node_with_support(db, builder, typevar, *lower_element, upper);
+                result = result.and_with_offset(builder, next_node);
+                support = builder.ordered_union_support(support, next_support);
             }
-            return result;
+            return (result, support);
         }
         // A negated type ¬α is represented as an intersection with no positive elements, and a
         // single negative element. We _don't_ want to treat that an "intersection" for the
@@ -972,19 +1168,25 @@ impl<'db> Constraint<'db> {
             && !upper_intersection.is_simple_negation(db)
         {
             let mut result = ALWAYS_TRUE;
+            let mut support = SupportId::Empty;
             for upper_element in upper_intersection.iter_positive(db) {
-                result = result.and_with_offset(
-                    builder,
-                    Constraint::new_node(db, builder, typevar, lower, upper_element),
-                );
+                let (next_node, next_support) =
+                    Constraint::new_node_with_support(db, builder, typevar, lower, upper_element);
+                result = result.and_with_offset(builder, next_node);
+                support = builder.ordered_union_support(support, next_support);
             }
             for upper_element in upper_intersection.iter_negative(db) {
-                result = result.and_with_offset(
+                let (next_node, next_support) = Constraint::new_node_with_support(
+                    db,
                     builder,
-                    Constraint::new_node(db, builder, typevar, lower, upper_element.negate(db)),
+                    typevar,
+                    lower,
+                    upper_element.negate(db),
                 );
+                result = result.and_with_offset(builder, next_node);
+                support = builder.ordered_union_support(support, next_support);
             }
-            return result;
+            return (result, support);
         }
 
         // Two identical typevars must always solve to the same type, so it is not useful to have
@@ -1011,12 +1213,11 @@ impl<'db> Constraint<'db> {
                     })
                 }) =>
             {
-                return Node::new_constraint(
-                    builder,
-                    ConstraintId::new(db, builder, typevar, Type::Never, Type::object()),
-                    1,
-                )
-                .negate(builder);
+                let constraint =
+                    ConstraintId::new(db, builder, typevar, Type::Never, Type::object());
+                let node = Node::new_constraint(builder, constraint, 1).negate(builder);
+                let support = SupportId::Singleton(constraint);
+                return (node, support);
             }
             _ => {}
         }
@@ -1041,7 +1242,7 @@ impl<'db> Constraint<'db> {
         // If `lower ≰ upper`, then the constraint cannot be satisfied, since there is no type that
         // is both greater than `lower`, and less than `upper`.
         if !lower.is_constraint_set_assignable_to(db, upper) {
-            return ALWAYS_FALSE;
+            return (ALWAYS_FALSE, SupportId::Empty);
         }
 
         builder.intern_constraint_typevars(db, typevar, lower, upper);
@@ -1060,17 +1261,16 @@ impl<'db> Constraint<'db> {
                 } else {
                     (typevar, lower)
                 };
-                Node::new_constraint(
+                let constraint = ConstraintId::new(
+                    db,
                     builder,
-                    ConstraintId::new(
-                        db,
-                        builder,
-                        typevar,
-                        Type::TypeVar(bound),
-                        Type::TypeVar(bound),
-                    ),
-                    1,
-                )
+                    typevar,
+                    Type::TypeVar(bound),
+                    Type::TypeVar(bound),
+                );
+                let node = Node::new_constraint(builder, constraint, 1);
+                let support = SupportId::Singleton(constraint);
+                (node, support)
             }
 
             // L ≤ T ≤ U == ([L] ≤ T) && (T ≤ [U])
@@ -1078,54 +1278,58 @@ impl<'db> Constraint<'db> {
                 if typevar.can_be_bound_for(db, builder, lower)
                     && typevar.can_be_bound_for(db, builder, upper) =>
             {
-                let lower = Node::new_constraint(
-                    builder,
-                    ConstraintId::new(db, builder, lower, Type::Never, Type::TypeVar(typevar)),
-                    1,
+                let lower_constraint =
+                    ConstraintId::new(db, builder, lower, Type::Never, Type::TypeVar(typevar));
+                let lower = Node::new_constraint(builder, lower_constraint, 1);
+                let upper_constraint =
+                    ConstraintId::new(db, builder, upper, Type::TypeVar(typevar), Type::object());
+                let upper = Node::new_constraint(builder, upper_constraint, 1);
+                let node = lower.and(builder, upper);
+                let support = builder.ordered_union_support(
+                    SupportId::Singleton(lower_constraint),
+                    SupportId::Singleton(upper_constraint),
                 );
-                let upper = Node::new_constraint(
-                    builder,
-                    ConstraintId::new(db, builder, upper, Type::TypeVar(typevar), Type::object()),
-                    1,
-                );
-                lower.and(builder, upper)
+                (node, support)
             }
 
             // L ≤ T ≤ U == ([L] ≤ T) && ([T] ≤ U)
             (Type::TypeVar(lower), _) if typevar.can_be_bound_for(db, builder, lower) => {
-                let lower = Node::new_constraint(
-                    builder,
-                    ConstraintId::new(db, builder, lower, Type::Never, Type::TypeVar(typevar)),
-                    1,
-                );
-                let upper = if upper.is_object() {
-                    ALWAYS_TRUE
+                let lower_constraint =
+                    ConstraintId::new(db, builder, lower, Type::Never, Type::TypeVar(typevar));
+                let lower = Node::new_constraint(builder, lower_constraint, 1);
+                let (upper, upper_support) = if upper.is_object() {
+                    (ALWAYS_TRUE, SupportId::Empty)
                 } else {
-                    Constraint::new_node(db, builder, typevar, Type::Never, upper)
+                    Constraint::new_node_with_support(db, builder, typevar, Type::Never, upper)
                 };
-                lower.and(builder, upper)
+                let node = lower.and(builder, upper);
+                let support = builder
+                    .ordered_union_support(SupportId::Singleton(lower_constraint), upper_support);
+                (node, support)
             }
 
             // L ≤ T ≤ U == (L ≤ [T]) && (T ≤ [U])
             (_, Type::TypeVar(upper)) if typevar.can_be_bound_for(db, builder, upper) => {
-                let lower = if lower.is_never() {
-                    ALWAYS_TRUE
+                let (lower, lower_support) = if lower.is_never() {
+                    (ALWAYS_TRUE, SupportId::Empty)
                 } else {
-                    Constraint::new_node(db, builder, typevar, lower, Type::object())
+                    Constraint::new_node_with_support(db, builder, typevar, lower, Type::object())
                 };
-                let upper = Node::new_constraint(
-                    builder,
-                    ConstraintId::new(db, builder, upper, Type::TypeVar(typevar), Type::object()),
-                    1,
-                );
-                lower.and(builder, upper)
+                let upper_constraint =
+                    ConstraintId::new(db, builder, upper, Type::TypeVar(typevar), Type::object());
+                let upper = Node::new_constraint(builder, upper_constraint, 1);
+                let node = lower.and(builder, upper);
+                let support = builder
+                    .ordered_union_support(lower_support, SupportId::Singleton(upper_constraint));
+                (node, support)
             }
 
-            _ => Node::new_constraint(
-                builder,
-                ConstraintId::new(db, builder, typevar, lower, upper),
-                1,
-            ),
+            _ => {
+                let constraint = ConstraintId::new(db, builder, typevar, lower, upper);
+                let node = Node::new_constraint(builder, constraint, 1);
+                let support = SupportId::Singleton(constraint);
+                (node, support)
+            }
         }
     }
 }
@@ -1694,11 +1898,12 @@ impl NodeId {
         self,
         db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
+        support: SupportId,
     ) -> Solutions<'db, 'c> {
         match self.node() {
             Node::AlwaysTrue => Solutions::Unconstrained,
             Node::AlwaysFalse => Solutions::Unsatisfiable,
-            Node::Interior(interior) => interior.solutions(db, builder),
+            Node::Interior(interior) => interior.solutions(db, builder, support),
         }
     }
 
@@ -2981,6 +3186,7 @@ impl InteriorNode {
         self,
         db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
+        support: SupportId,
     ) -> Solutions<'db, 'c> {
         #[derive(Default)]
         struct Bounds<'db> {
@@ -3158,6 +3364,7 @@ impl InteriorNode {
             Ref::map(storage, |storage| &storage.solutions_cache[&key])
         }
 
+        let _ = support;
         let solutions = solutions_inner(db, builder, self.node());
         if solutions.is_empty() {
             return Solutions::Unsatisfiable;
