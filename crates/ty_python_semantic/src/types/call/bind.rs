@@ -295,9 +295,9 @@ impl<'db> MixedConstructorInit<'db> {
         db: &'db dyn Db,
         return_ty: Type<'db>,
     ) -> bool {
-        matches!(
+        !matches!(
             self.constructor_return_disposition(db, return_ty),
-            ConstructorReturnDisposition::Instance
+            ConstructorReturnDisposition::NotInstance
         )
     }
 }
