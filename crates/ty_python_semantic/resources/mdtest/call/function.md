@@ -1573,3 +1573,26 @@ def f(a: int = 0, b: int = 0, c: int = 0, fmt: str | None = None) -> None: ...
 def _(args: "Unknown | tuple[int, int, int]"):
     f(*args, fmt="{key}")  # fine
 ```
+
+## Variadic unpacking should stop at max known arity
+
+When unpacking (a union of) fixed-length tuples, variadic matching should stop once the known
+positions are exhausted. Otherwise, optional positional parameters can be incorrectly treated as
+already assigned, causing false positives for `**kwargs`.
+
+(This test uses `**kwargs` unpacking of a `TypedDict` instead of the simpler `c=1` keyword argument,
+because `c=1` is a known keyword argument and we always prevent unpacking `*args` over an
+explicitly-provided keyword argument. The case shown here, without the explicit keyword argument,
+requires instead that we use our knowledge of the tuple length to prevent over-unpacking.)
+
+```py
+from typing import TypedDict
+
+class CKwargs(TypedDict):
+    c: int
+
+def f(a: int = 0, b: int = 0, c: int = 0) -> None: ...
+def _(args_tuple: tuple[int, int], args_union: tuple[int] | tuple[int, int], kwargs: CKwargs) -> None:
+    f(*args_tuple, **kwargs)  # fine
+    f(*args_union, **kwargs)  # fine
+```

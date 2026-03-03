@@ -3437,13 +3437,10 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         };
 
         let mut argument_types = argument_types.iter().copied();
+        // This can be true either if we have a true variable-length tuple (in which case
+        // `variable_element.is_some()`) or if we have a union of different fixed-length tuples (in
+        // which case `variable_element.is_none()`).
         let is_variable = length.is_variable();
-
-        // For union types with no variable element, we know the exact set of possible argument
-        // positions. When argument types are exhausted, we should stop matching rather than
-        // continuing with unknown types.
-        let bounded = variable_element.is_none()
-            && matches!(&variadic_type, VariadicArgumentType::Union { .. });
 
         // We must be able to match up the fixed-length portion of the argument with positional
         // parameters, so we pass on any errors that occur.
@@ -3458,7 +3455,9 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
 
         // If the tuple is variable-length, we assume that it will soak up all remaining positional
         // parameters, stopping only when we reach a parameter that has an explicit keyword argument
-        // or a parameter that can only be provided via keyword argument.
+        // or a parameter that can only be provided via keyword argument, or if we run out of
+        // `argument_types` and have no `variable_element`. (The combination of `is_variable` with
+        // no `variable_element` can only happen with a union of different-fixed-length tuples.)
         if is_variable {
             while self
                 .parameters
@@ -3472,7 +3471,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
                     break;
                 }
                 let arg_type = argument_types.next().or(variable_element);
-                if bounded && arg_type.is_none() {
+                if arg_type.is_none() {
                     break;
                 }
                 self.match_positional(argument_index, argument, arg_type, is_variable)?;
