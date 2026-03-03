@@ -98,10 +98,7 @@ pub fn run(
                     EmbeddedFileSourceMap::new(&md_index, test_failures.backtick_offsets);
 
                 for (relative_line_number, failures) in test_failures.by_line.iter() {
-                    let file = match output_format {
-                        OutputFormat::Cli => relative_fixture_path.as_str(),
-                        OutputFormat::GitHub => absolute_fixture_path.as_str(),
-                    };
+                    let file = relative_fixture_path.as_str();
 
                     let absolute_line_number =
                         match source_map.to_absolute_line_number(relative_line_number) {
@@ -137,7 +134,6 @@ pub fn run(
                 output_format.write_inconsistency(
                     &mut assertion,
                     relative_fixture_path,
-                    absolute_fixture_path,
                     &inconsistency,
                 );
             }
@@ -221,17 +217,16 @@ impl OutputFormat {
     fn write_inconsistency(
         self,
         assertion_buf: &mut String,
-        relative_fixture_path: &Utf8Path,
-        absolute_fixture_path: &Utf8Path,
+        fixture_path: &Utf8Path,
         inconsistency: &impl Display,
     ) {
         match self {
             OutputFormat::Cli => {
-                let info = relative_fixture_path.to_string().cyan();
+                let info = fixture_path.to_string().cyan();
                 let _ = writeln!(assertion_buf, "  {info} {inconsistency}");
             }
             OutputFormat::GitHub => {
-                println!("::error file={absolute_fixture_path}::{inconsistency}");
+                println!("::error file={fixture_path}::{inconsistency}");
             }
         }
     }
