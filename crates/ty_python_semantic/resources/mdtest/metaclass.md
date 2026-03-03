@@ -207,6 +207,29 @@ reveal_type(Foo())  # revealed: Any
 reveal_type(Foo("wrong"))  # revealed: Any
 ```
 
+### Metaclass `__call__` returning `Never`
+
+When metaclass `__call__` returns `Never`, construction is terminal. We use metaclass `__call__`
+directly and skip `__new__` and `__init__`.
+
+```py
+from typing_extensions import Never
+
+class Meta(type):
+    def __call__(cls) -> Never:
+        raise NotImplementedError
+
+class C(metaclass=Meta):
+    def __new__(cls, x: int) -> "C":
+        return object.__new__(cls)
+
+    def __init__(self, x: int) -> None:
+        pass
+
+# `__new__` and `__init__` are skipped because metaclass `__call__` never returns.
+reveal_type(C())  # revealed: Never
+```
+
 ### Overloaded metaclass `__call__` with mixed return types
 
 When a metaclass `__call__` is overloaded and some overloads return the class instance type while

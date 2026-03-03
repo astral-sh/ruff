@@ -104,6 +104,24 @@ class ReturnsAny:
 reveal_type(ReturnsAny())  # revealed: Any
 ```
 
+### `__new__` returning `Never`
+
+When `__new__` returns `Never`, the call is terminal and `__init__` is skipped.
+
+```py
+from typing_extensions import Never
+
+class NewNeverReturns:
+    def __new__(cls) -> Never:
+        raise NotImplementedError
+
+    def __init__(self, x: int) -> None:
+        pass
+
+# `__init__` is skipped because `__new__` never returns.
+reveal_type(NewNeverReturns())  # revealed: Never
+```
+
 ### `__new__` returning a union containing `Any`
 
 When `__new__` returns a union containing `Any`, since we don't consider `Any` a subtype of the

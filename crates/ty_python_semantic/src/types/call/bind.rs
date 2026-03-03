@@ -209,7 +209,8 @@ impl<'db> MixedConstructorInit<'db> {
             }
             Type::Dynamic(DynamicType::Any) => ConstructorReturnDisposition::NotInstance,
             Type::Dynamic(_) | Type::TypeVar(_) => ConstructorReturnDisposition::Uncertain,
-            Type::Never => ConstructorReturnDisposition::Instance,
+            // A `Never` constructor return is terminal and does not run downstream construction.
+            Type::Never => ConstructorReturnDisposition::NotInstance,
             Type::NominalInstance(instance) => {
                 let returned_class = instance.class(db);
                 if returned_class.class_literal(db) == self.constructor_class_literal
@@ -852,9 +853,9 @@ impl<'db> Bindings<'db> {
                 if !is_instance_return {
                     let generic_superclass_return = constructor_class.is_some_and(|cc| {
                         sig_return.has_typevar(db)
-                            && resolved.as_nominal_instance().is_some_and(|inst| {
-                                cc.is_subclass_of(db, inst.class(db))
-                            })
+                            && resolved
+                                .as_nominal_instance()
+                                .is_some_and(|inst| cc.is_subclass_of(db, inst.class(db)))
                     });
                     if generic_superclass_return {
                         continue;
@@ -3327,9 +3328,8 @@ impl<'db> CallableBinding<'db> {
         for overload in &self.overloads {
             match mixed_init.constructor_return_disposition(db, overload.signature.return_ty) {
                 ConstructorReturnDisposition::NotInstance => saw_non_instance = true,
-                ConstructorReturnDisposition::Instance | ConstructorReturnDisposition::Uncertain => {
-                    saw_instance_like = true
-                }
+                ConstructorReturnDisposition::Instance
+                | ConstructorReturnDisposition::Uncertain => saw_instance_like = true,
             }
         }
         saw_instance_like && !saw_non_instance

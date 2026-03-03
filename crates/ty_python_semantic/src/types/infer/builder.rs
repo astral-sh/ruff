@@ -11144,25 +11144,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         call_expression_tcx: TypeContext<'db>,
         multi_inference_state: MultiInferenceState,
     ) {
-        debug_assert_eq!(arguments_types.len(), bindings.argument_forms().len());
-
-        let db = self.db();
-        let constraints = ConstraintSetBuilder::new();
-        let iter = itertools::izip!(
-            0..,
-            arguments_types.iter_mut(),
-            bindings.argument_forms().iter().copied(),
-            ast_arguments
-        );
-
         fn add_overloads_from_binding<'a, 'db>(
             overloads_with_binding: &mut Vec<(&'a Binding<'db>, &'a CallableBinding<'db>)>,
             binding: &'a CallableBinding<'db>,
         ) {
             match binding.matching_overload_index() {
                 MatchingOverloadIndex::Single(_) | MatchingOverloadIndex::Multiple(_) => {
-                    overloads_with_binding
-                        .extend(binding.matching_overloads().map(|(_, overload)| (overload, binding)));
+                    overloads_with_binding.extend(
+                        binding
+                            .matching_overloads()
+                            .map(|(_, overload)| (overload, binding)),
+                    );
                 }
 
                 // If there is a single overload that does not match, we still infer the argument
@@ -11174,6 +11166,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
         }
+
+        debug_assert_eq!(arguments_types.len(), bindings.argument_forms().len());
+
+        let db = self.db();
+        let constraints = ConstraintSetBuilder::new();
+        let iter = itertools::izip!(
+            0..,
+            arguments_types.iter_mut(),
+            bindings.argument_forms().iter().copied(),
+            ast_arguments
+        );
 
         let mut overloads_with_binding: Vec<(&Binding<'db>, &CallableBinding<'db>)> = Vec::new();
 
