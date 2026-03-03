@@ -330,7 +330,7 @@ Expectation:
 - [x] Thread support expressions through constructors/combinators.
 - [x] Replace `Quantified` support payload with flattened `Remove`/`AddDerived` node types and builder APIs.
 - [x] Update `distributed_or`/`distributed_and` and `when_any`/`when_all` to combine support in balanced-tree order.
-- [ ] Remove temporary `support_from_node` reconstruction path entirely.
+- [x] Remove temporary `support_from_node` reconstruction path entirely.
 - [ ] Encode abstraction-derived ordering via `Remove`/`AddDerived` support nodes.
 - [ ] Convert ordering consumers to flattened support rank maps.
 - [ ] Remove node `source_order` fields and offset APIs.

@@ -434,10 +434,8 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         rhs: Type<'db>,
     ) -> Self {
         self.verify_builder(builder);
-        let node = self.node.implies_subtype_of(db, builder, lhs, rhs);
-        // TEMPORARY: support reconstruction from BDD nodes must be removed before finalizing
-        // support migration.
-        Self::from_node_and_support(builder, node, builder.support_from_node(node))
+        let (node, support) = self.node.implies_subtype_of(db, builder, lhs, rhs, self.support);
+        Self::from_node_and_support(builder, node, support)
     }
 
     /// Returns whether this constraint set is satisfied by all of the typevars that it mentions.
@@ -952,29 +950,6 @@ impl<'db> ConstraintSetBuilder<'db> {
             derived,
         });
         SupportId::AddDerived(id)
-    }
-
-    /// TEMPORARY MIGRATION HELPER.
-    ///
-    /// Reconstructs a support expression from the current BDD node shape by walking constraints
-    /// and ordering them by node `source_order`.
-    ///
-    /// This method **must not** remain in the final implementation. One of the goals of this
-    /// migration is to allow fully reduced BDDs, where the node graph is no longer required to
-    /// retain all constraints that contribute to support ordering. In that world, BDD structure
-    /// and support are intentionally decoupled, so support cannot be reconstructed from nodes.
-    fn support_from_node(&self, node: NodeId) -> SupportId {
-        let mut constraints: SmallVec<[_; 8]> = SmallVec::new();
-        node.for_each_constraint(self, &mut |constraint, source_order| {
-            constraints.push((constraint, source_order));
-        });
-        constraints.sort_unstable_by_key(|(_, source_order)| *source_order);
-        constraints
-            .into_iter()
-            .map(|(constraint, _)| SupportId::Singleton(constraint))
-            .fold(SupportId::Empty, |lhs, rhs| {
-                self.ordered_union_support(lhs, rhs)
-            })
     }
 
     fn build_support(&self, support: SupportId) -> Box<[ConstraintId]> {
@@ -2241,24 +2216,25 @@ impl NodeId {
         builder: &ConstraintSetBuilder<'db>,
         lhs: Type<'db>,
         rhs: Type<'db>,
-    ) -> Self {
+        support: SupportId,
+    ) -> (Self, SupportId) {
         // When checking subtyping involving a typevar, we can turn the subtyping check into a
-        // constraint (i.e, "is `T` a subtype of `int` becomes the constraint `T ≤ int`), and then
+        // constraint (i.e, "is `T` a subtype of `int`" becomes the constraint `T ≤ int`), and then
         // check when the BDD implies that constraint.
         //
         // Note that we are NOT guaranteed that `lhs` and `rhs` will always be fully static, since
         // these types are coming in from arbitrary subtyping checks that the caller might want to
         // perform. So we have to take the appropriate materialization when translating the check
         // into a constraint.
-        let constraint = match (lhs, rhs) {
-            (Type::TypeVar(bound_typevar), _) => Constraint::new_node(
+        let (constraint_node, constraint_support) = match (lhs, rhs) {
+            (Type::TypeVar(bound_typevar), _) => Constraint::new_node_with_support(
                 db,
                 builder,
                 bound_typevar,
                 Type::Never,
                 rhs.bottom_materialization(db),
             ),
-            (_, Type::TypeVar(bound_typevar)) => Constraint::new_node(
+            (_, Type::TypeVar(bound_typevar)) => Constraint::new_node_with_support(
                 db,
                 builder,
                 bound_typevar,
@@ -2268,7 +2244,10 @@ impl NodeId {
             _ => panic!("at least one type should be a typevar"),
         };
 
-        self.implies(builder, constraint)
+        (
+            self.implies(builder, constraint_node),
+            builder.ordered_union_support(support, constraint_support),
+        )
     }
 
     fn satisfied_by_all_typevars<'db>(
