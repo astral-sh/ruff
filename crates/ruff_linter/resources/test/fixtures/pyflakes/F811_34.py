@@ -14,3 +14,14 @@ if TYPE_CHECKING:
 
 def foo():
 	import pyarrow_hotfix
+
+# Should NOT detect: the runtime import is itself conditional, so the
+# TYPE_CHECKING import is not redundant (e.g., needed for type checkers
+# when the condition is False).
+HAS_THING = True
+
+if HAS_THING:
+    from foo import Bar
+
+if TYPE_CHECKING:
+    from foo import Bar

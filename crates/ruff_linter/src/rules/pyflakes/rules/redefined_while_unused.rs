@@ -303,7 +303,11 @@ fn bindings_in_different_forks(
                 (left_binding.as_any_import(), right_binding.as_any_import())
             && left_import.qualified_name() == right_import.qualified_name()
         {
-            return false;
+            let (runtime_import, type_checking_import) =
+                if left_ { (right, left) } else { (left, right) };
+            return !checker
+                .semantic()
+                .dominates(runtime_import, type_checking_import);
         }
     }
 
