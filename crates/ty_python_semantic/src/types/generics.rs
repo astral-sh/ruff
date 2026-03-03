@@ -1555,23 +1555,6 @@ impl<'db> Specialization<'db> {
         })
     }
 
-    pub(crate) fn is_disjoint_from<'c>(
-        self,
-        db: &'db dyn Db,
-        other: Self,
-        constraints: &'c ConstraintSetBuilder<'db>,
-        inferable: InferableTypeVars<'_, 'db>,
-    ) -> ConstraintSet<'db, 'c> {
-        self.is_disjoint_from_impl(
-            db,
-            other,
-            constraints,
-            inferable,
-            &IsDisjointVisitor::default(constraints),
-            &HasRelationToVisitor::default(constraints),
-        )
-    }
-
     pub(crate) fn is_disjoint_from_impl<'c>(
         self,
         db: &'db dyn Db,

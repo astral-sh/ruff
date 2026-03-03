@@ -265,8 +265,9 @@ impl<'db> SubclassOfType<'db> {
         db: &'db dyn Db,
         other: Self,
         constraints: &'c ConstraintSetBuilder<'db>,
-        _inferable: InferableTypeVars<'_, 'db>,
-        _visitor: &IsDisjointVisitor<'db, 'c>,
+        inferable: InferableTypeVars<'_, 'db>,
+        disjointness_visitor: &IsDisjointVisitor<'db, 'c>,
+        relation_visitor: &HasRelationToVisitor<'db, 'c>,
     ) -> ConstraintSet<'db, 'c> {
         match (self.subclass_of, other.subclass_of) {
             (SubclassOfInner::Dynamic(_), _) | (_, SubclassOfInner::Dynamic(_)) => {
@@ -275,7 +276,14 @@ impl<'db> SubclassOfType<'db> {
             (SubclassOfInner::Class(self_class), SubclassOfInner::Class(other_class)) => {
                 ConstraintSet::from_bool(
                     constraints,
-                    !self_class.could_coexist_in_mro_with(db, other_class, constraints),
+                    !self_class.could_coexist_in_mro_with(
+                        db,
+                        other_class,
+                        constraints,
+                        inferable,
+                        relation_visitor,
+                        disjointness_visitor,
+                    ),
                 )
             }
             (SubclassOfInner::TypeVar(_), _) | (_, SubclassOfInner::TypeVar(_)) => {

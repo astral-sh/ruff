@@ -113,18 +113,14 @@ impl<Tag, T: Hash + Eq + Clone, R: Clone, Extra> CycleDetector<Tag, T, R, Extra>
             return self.fallback.clone();
         }
 
-        // Check depth limit to prevent stack overflow from recursive generic types
-        // with growing specializations (e.g., C[set[T]] -> C[set[set[T]]] -> ...)
-        let current_depth = self.depth.get();
-        if current_depth >= MAX_RECURSION_DEPTH {
+        let Some(current_depth) = self.enter_depth() else {
             self.seen.borrow_mut().pop();
             return self.fallback.clone();
-        }
-        self.depth.set(current_depth + 1);
+        };
 
         let ret = func();
 
-        self.depth.set(current_depth);
+        self.exit_depth(current_depth);
         self.seen.borrow_mut().pop();
         self.cache.borrow_mut().insert(item, ret.clone());
 
@@ -141,22 +137,48 @@ impl<Tag, T: Hash + Eq + Clone, R: Clone, Extra> CycleDetector<Tag, T, R, Extra>
             return Some(self.fallback.clone());
         }
 
-        // Check depth limit to prevent stack overflow from recursive generic protocols
-        // with growing specializations (e.g., C[set[T]] -> C[set[set[T]]] -> ...)
-        let current_depth = self.depth.get();
-        if current_depth >= MAX_RECURSION_DEPTH {
+        let Some(current_depth) = self.enter_depth() else {
             self.seen.borrow_mut().pop();
             return Some(self.fallback.clone());
-        }
-        self.depth.set(current_depth + 1);
+        };
 
-        let ret = func()?;
+        let ret = func();
 
-        self.depth.set(current_depth);
+        self.exit_depth(current_depth);
         self.seen.borrow_mut().pop();
+        let ret = ret?;
         self.cache.borrow_mut().insert(item, ret.clone());
 
         Some(ret)
+    }
+
+    /// Increment the recursion depth without recording a `seen` key.
+    ///
+    /// This is used for recursive helpers such as callable/signature relations that can recurse
+    /// deeply without passing through the main `Type` relation entrypoint on every step.
+    pub fn guard(&self, func: impl FnOnce() -> R) -> R {
+        let Some(current_depth) = self.enter_depth() else {
+            return self.fallback.clone();
+        };
+
+        let ret = func();
+        self.exit_depth(current_depth);
+        ret
+    }
+
+    fn enter_depth(&self) -> Option<u32> {
+        // Check depth limit to prevent stack overflow from recursive generic types
+        // with growing specializations (e.g., C[set[T]] -> C[set[set[T]]] -> ...)
+        let current_depth = self.depth.get();
+        if current_depth >= MAX_RECURSION_DEPTH {
+            return None;
+        }
+        self.depth.set(current_depth + 1);
+        Some(current_depth)
+    }
+
+    fn exit_depth(&self, previous_depth: u32) {
+        self.depth.set(previous_depth);
     }
 }
 

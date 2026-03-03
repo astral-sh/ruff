@@ -1278,12 +1278,14 @@ impl<'db> ClassType<'db> {
             .find_map(|base| base.as_disjoint_base(db))
     }
 
-    /// Return `true` if this class could exist in the MRO of `other`.
-    pub(super) fn could_exist_in_mro_of(
+    pub(super) fn could_exist_in_mro_of<'c>(
         self,
         db: &'db dyn Db,
         other: Self,
-        constraints: &ConstraintSetBuilder<'db>,
+        constraints: &'c ConstraintSetBuilder<'db>,
+        inferable: InferableTypeVars<'_, 'db>,
+        relation_visitor: &HasRelationToVisitor<'db, 'c>,
+        disjointness_visitor: &IsDisjointVisitor<'db, 'c>,
     ) -> bool {
         other
             .iter_mro(db)
@@ -1296,11 +1298,13 @@ impl<'db> ClassType<'db> {
                     this_alias.origin(db) == other_alias.origin(db)
                         && !this_alias
                             .specialization(db)
-                            .is_disjoint_from(
+                            .is_disjoint_from_impl(
                                 db,
                                 other_alias.specialization(db),
                                 constraints,
-                                InferableTypeVars::None,
+                                inferable,
+                                disjointness_visitor,
+                                relation_visitor,
                             )
                             .is_always_satisfied(db)
                 }
@@ -1314,22 +1318,39 @@ impl<'db> ClassType<'db> {
     /// For two given classes `A` and `B`, it is often possible to say for sure
     /// that there could never exist any class `C` that inherits from both `A` and `B`.
     /// In these situations, this method returns `false`; in all others, it returns `true`.
-    pub(super) fn could_coexist_in_mro_with(
+    pub(super) fn could_coexist_in_mro_with<'c>(
         self,
         db: &'db dyn Db,
         other: Self,
-        constraints: &ConstraintSetBuilder<'db>,
+        constraints: &'c ConstraintSetBuilder<'db>,
+        inferable: InferableTypeVars<'_, 'db>,
+        relation_visitor: &HasRelationToVisitor<'db, 'c>,
+        disjointness_visitor: &IsDisjointVisitor<'db, 'c>,
     ) -> bool {
         if self == other {
             return true;
         }
 
         if self.is_final(db) {
-            return other.could_exist_in_mro_of(db, self, constraints);
+            return other.could_exist_in_mro_of(
+                db,
+                self,
+                constraints,
+                inferable,
+                relation_visitor,
+                disjointness_visitor,
+            );
         }
 
         if other.is_final(db) {
-            return self.could_exist_in_mro_of(db, other, constraints);
+            return self.could_exist_in_mro_of(
+                db,
+                other,
+                constraints,
+                inferable,
+                relation_visitor,
+                disjointness_visitor,
+            );
         }
 
         // Two disjoint bases can only coexist in an MRO if one is a subclass of the other.
@@ -1339,7 +1360,14 @@ impl<'db> ClassType<'db> {
                 other
                     .nearest_disjoint_base(db)
                     .is_some_and(|disjoint_base_2| {
-                        !disjoint_base_1.could_coexist_in_mro_with(db, &disjoint_base_2)
+                        !disjoint_base_1.could_coexist_in_mro_with(
+                            db,
+                            &disjoint_base_2,
+                            constraints,
+                            inferable,
+                            relation_visitor,
+                            disjointness_visitor,
+                        )
                     })
             })
         {
@@ -1367,11 +1395,13 @@ impl<'db> ClassType<'db> {
             return true;
         };
         if self_metaclass_instance
-            .when_disjoint_from(
+            .is_disjoint_from_impl(
                 db,
                 other_metaclass_instance,
                 constraints,
-                InferableTypeVars::None,
+                inferable,
+                disjointness_visitor,
+                relation_visitor,
             )
             .is_always_satisfied(db)
         {
@@ -6514,17 +6544,42 @@ impl<'db> DisjointBase<'db> {
         }
     }
 
-    /// Two disjoint bases can only coexist in a class's MRO if one is a subclass of the other
-    fn could_coexist_in_mro_with(&self, db: &'db dyn Db, other: &Self) -> bool {
+    fn could_coexist_in_mro_with<'c>(
+        &self,
+        db: &'db dyn Db,
+        other: &Self,
+        constraints: &'c ConstraintSetBuilder<'db>,
+        inferable: InferableTypeVars<'_, 'db>,
+        relation_visitor: &HasRelationToVisitor<'db, 'c>,
+        disjointness_visitor: &IsDisjointVisitor<'db, 'c>,
+    ) -> bool {
         self == other
             || self
                 .class
                 .default_specialization(db)
-                .is_subclass_of(db, other.class.default_specialization(db))
+                .has_relation_to_impl(
+                    db,
+                    other.class.default_specialization(db),
+                    constraints,
+                    inferable,
+                    TypeRelation::Subtyping,
+                    relation_visitor,
+                    disjointness_visitor,
+                )
+                .is_always_satisfied(db)
             || other
                 .class
                 .default_specialization(db)
-                .is_subclass_of(db, self.class.default_specialization(db))
+                .has_relation_to_impl(
+                    db,
+                    self.class.default_specialization(db),
+                    constraints,
+                    inferable,
+                    TypeRelation::Subtyping,
+                    relation_visitor,
+                    disjointness_visitor,
+                )
+                .is_always_satisfied(db)
     }
 }
 

@@ -180,6 +180,17 @@ impl<'db> Type<'db> {
             {
                 return result;
             }
+
+            // If both sides are instances of the same class-based protocol, the nominal generic
+            // relation is the full answer. Falling through to structural interface checking here
+            // needlessly re-expands recursive protocol members like
+            // `index() -> Streamable[tuple[int, T]]`, which creates ever-deeper same-shape
+            // protocol comparisons.
+            if let Type::NominalInstance(self_nominal) = type_to_test
+                && self_nominal.class_literal(db) == nominal_instance.class_literal(db)
+            {
+                return result;
+            }
         }
 
         // `Generator` special case: Prior to 3.13, the `_ReturnT_co` type didn't appear in any
@@ -509,9 +520,14 @@ impl<'db> NominalInstanceType<'db> {
         result.or(db, constraints, || {
             ConstraintSet::from_bool(
                 constraints,
-                !self
-                    .class(db)
-                    .could_coexist_in_mro_with(db, other.class(db), constraints),
+                !self.class(db).could_coexist_in_mro_with(
+                    db,
+                    other.class(db),
+                    constraints,
+                    inferable,
+                    relation_visitor,
+                    disjointness_visitor,
+                ),
             )
         })
     }

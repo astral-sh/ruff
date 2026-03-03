@@ -1054,36 +1054,42 @@ impl<'db> Type<'db> {
             // applied to the signature. Different specializations of the same function literal are
             // only subtypes of each other if they result in the same signature.
             (Type::FunctionLiteral(self_function), Type::FunctionLiteral(target_function)) => {
-                self_function.has_relation_to_impl(
-                    db,
-                    target_function,
-                    constraints,
-                    inferable,
-                    relation,
-                    relation_visitor,
-                    disjointness_visitor,
-                )
+                relation_visitor.visit((self, target, relation), || {
+                    self_function.has_relation_to_impl(
+                        db,
+                        target_function,
+                        constraints,
+                        inferable,
+                        relation,
+                        relation_visitor,
+                        disjointness_visitor,
+                    )
+                })
             }
-            (Type::BoundMethod(self_method), Type::BoundMethod(target_method)) => self_method
-                .has_relation_to_impl(
-                    db,
-                    target_method,
-                    constraints,
-                    inferable,
-                    relation,
-                    relation_visitor,
-                    disjointness_visitor,
-                ),
+            (Type::BoundMethod(self_method), Type::BoundMethod(target_method)) => relation_visitor
+                .visit((self, target, relation), || {
+                    self_method.has_relation_to_impl(
+                        db,
+                        target_method,
+                        constraints,
+                        inferable,
+                        relation,
+                        relation_visitor,
+                        disjointness_visitor,
+                    )
+                }),
             (Type::KnownBoundMethod(self_method), Type::KnownBoundMethod(target_method)) => {
-                self_method.has_relation_to_impl(
-                    db,
-                    target_method,
-                    constraints,
-                    inferable,
-                    relation,
-                    relation_visitor,
-                    disjointness_visitor,
-                )
+                relation_visitor.visit((self, target, relation), || {
+                    self_method.has_relation_to_impl(
+                        db,
+                        target_method,
+                        constraints,
+                        inferable,
+                        relation,
+                        relation_visitor,
+                        disjointness_visitor,
+                    )
+                })
             }
 
             // All `StringLiteral` types are a subtype of `LiteralString`.
@@ -1538,17 +1544,18 @@ impl<'db> Type<'db> {
             }
 
             // For generic aliases, we delegate to the underlying class type.
-            (Type::GenericAlias(self_alias), Type::GenericAlias(target_alias)) => {
-                ClassType::Generic(self_alias).has_relation_to_impl(
-                    db,
-                    ClassType::Generic(target_alias),
-                    constraints,
-                    inferable,
-                    relation,
-                    relation_visitor,
-                    disjointness_visitor,
-                )
-            }
+            (Type::GenericAlias(self_alias), Type::GenericAlias(target_alias)) => relation_visitor
+                .visit((self, target, relation), || {
+                    ClassType::Generic(self_alias).has_relation_to_impl(
+                        db,
+                        ClassType::Generic(target_alias),
+                        constraints,
+                        inferable,
+                        relation,
+                        relation_visitor,
+                        disjointness_visitor,
+                    )
+                }),
 
             (Type::GenericAlias(alias), Type::SubclassOf(target_subclass_ty)) => target_subclass_ty
                 .subclass_of()
@@ -1570,15 +1577,17 @@ impl<'db> Type<'db> {
 
             // This branch asks: given two types `type[T]` and `type[S]`, is `type[T]` a subtype of `type[S]`?
             (Type::SubclassOf(self_subclass_ty), Type::SubclassOf(target_subclass_ty)) => {
-                self_subclass_ty.has_relation_to_impl(
-                    db,
-                    target_subclass_ty,
-                    constraints,
-                    inferable,
-                    relation,
-                    relation_visitor,
-                    disjointness_visitor,
-                )
+                relation_visitor.visit((self, target, relation), || {
+                    self_subclass_ty.has_relation_to_impl(
+                        db,
+                        target_subclass_ty,
+                        constraints,
+                        inferable,
+                        relation,
+                        relation_visitor,
+                        disjointness_visitor,
+                    )
+                })
             }
 
             // `Literal[str]` is a subtype of `type` because the `str` class object is an instance of its metaclass `type`.
@@ -2328,19 +2337,21 @@ impl<'db> Type<'db> {
             }
 
             (Type::GenericAlias(left_alias), Type::GenericAlias(right_alias)) => {
-                ConstraintSet::from_bool(
-                    constraints,
-                    left_alias.origin(db) != right_alias.origin(db),
-                )
-                .or(db, constraints, || {
-                    left_alias.specialization(db).is_disjoint_from_impl(
-                        db,
-                        right_alias.specialization(db),
+                disjointness_visitor.visit((self, other), || {
+                    ConstraintSet::from_bool(
                         constraints,
-                        inferable,
-                        disjointness_visitor,
-                        relation_visitor,
+                        left_alias.origin(db) != right_alias.origin(db),
                     )
+                    .or(db, constraints, || {
+                        left_alias.specialization(db).is_disjoint_from_impl(
+                            db,
+                            right_alias.specialization(db),
+                            constraints,
+                            inferable,
+                            disjointness_visitor,
+                            relation_visitor,
+                        )
+                    })
                 })
             }
 
@@ -2369,6 +2380,9 @@ impl<'db> Type<'db> {
                             db,
                             ClassType::NonGeneric(class_b),
                             constraints,
+                            inferable,
+                            relation_visitor,
+                            disjointness_visitor,
                         ),
                     ),
                     SubclassOfInner::TypeVar(_) => unreachable!(),
@@ -2385,6 +2399,9 @@ impl<'db> Type<'db> {
                             db,
                             ClassType::Generic(alias_b),
                             constraints,
+                            inferable,
+                            relation_visitor,
+                            disjointness_visitor,
                         ),
                     ),
                     SubclassOfInner::TypeVar(_) => unreachable!(),
@@ -2392,7 +2409,16 @@ impl<'db> Type<'db> {
             }
 
             (Type::SubclassOf(left), Type::SubclassOf(right)) => {
-                left.is_disjoint_from_impl(db, right, constraints, inferable, disjointness_visitor)
+                disjointness_visitor.visit((self, other), || {
+                    left.is_disjoint_from_impl(
+                        db,
+                        right,
+                        constraints,
+                        inferable,
+                        disjointness_visitor,
+                        relation_visitor,
+                    )
+                })
             }
 
             // for `type[Any]`/`type[Unknown]`/`type[Todo]`, we know the type cannot be any larger than `type`,

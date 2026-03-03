@@ -354,9 +354,9 @@ impl<'db> ProtocolInterface<'db> {
                         (
                             ProtocolMemberKind::Method(our_method),
                             ProtocolMemberKind::Method(other_method),
-                        ) => our_method.bind_self(db, None).has_relation_to_impl(
+                        ) => Type::Callable(our_method.bind_self(db, None)).has_relation_to_impl(
                             db,
-                            protocol_bind_self(db, other_method, None),
+                            Type::Callable(protocol_bind_self(db, other_method, None)),
                             constraints,
                             inferable,
                             relation,
@@ -785,9 +785,14 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
                     |callables| {
                         callables
                             .map(|callable| callable.apply_self(db, fallback_other))
+                            .into_type(db)
                             .has_relation_to_impl(
                                 db,
-                                protocol_bind_self(db, *method, Some(fallback_other)),
+                                Type::Callable(protocol_bind_self(
+                                    db,
+                                    *method,
+                                    Some(fallback_other),
+                                )),
                                 constraints,
                                 inferable,
                                 relation,

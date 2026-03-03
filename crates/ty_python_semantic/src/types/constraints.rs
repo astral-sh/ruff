@@ -66,7 +66,7 @@
 //!
 //! [bdd]: https://en.wikipedia.org/wiki/Binary_decision_diagram
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::cmp::Ordering;
 use std::fmt::{Debug, Display};
 use std::marker::PhantomData;
@@ -80,12 +80,14 @@ use smallvec::SmallVec;
 
 use crate::types::class::GenericAlias;
 use crate::types::generics::{GenericContext, InferableTypeVars, Specialization};
+use crate::types::protocol_class::walk_protocol_interface;
 use crate::types::visitor::{
     TypeCollector, TypeVisitor, any_over_type, walk_type_with_recursion_guard,
 };
 use crate::types::{
-    BoundTypeVarIdentity, BoundTypeVarInstance, IntersectionType, Type, TypeVarBoundOrConstraints,
-    UnionType, walk_bound_type_var_type,
+    BoundTypeVarIdentity, BoundTypeVarInstance, IntersectionType, NegativeIntersectionElements,
+    ProtocolInstanceType, Type, TypeVarBoundOrConstraints, TypeVarInstance, UnionBuilder,
+    UnionType, walk_bound_type_var_type, walk_type_var_type,
 };
 use crate::{Db, FxIndexMap, FxIndexSet, FxOrderSet};
 
@@ -292,10 +294,16 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
     /// neither bound _is_ a typevar. And it's not something we can create a specialization from,
     /// since we would endlessly substitute until we stack overflow.
     pub(crate) fn is_cyclic(self, db: &'db dyn Db) -> bool {
+        const MAX_REACHABILITY_DEPTH: u32 = 64;
+
         #[derive(Default)]
         struct CollectReachability<'db> {
             reachable_typevars: RefCell<FxHashSet<BoundTypeVarIdentity<'db>>>,
+            visited_bound_typevars: RefCell<FxHashSet<BoundTypeVarIdentity<'db>>>,
+            visited_typevars: RefCell<FxHashSet<TypeVarInstance<'db>>>,
             recursion_guard: TypeCollector<'db>,
+            depth: Cell<u32>,
+            hit_depth_limit: Cell<bool>,
         }
 
         impl<'db> TypeVisitor<'db> for CollectReachability<'db> {
@@ -308,10 +316,25 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
                 db: &'db dyn Db,
                 bound_typevar: BoundTypeVarInstance<'db>,
             ) {
-                self.reachable_typevars
-                    .borrow_mut()
-                    .insert(bound_typevar.identity(db));
+                let identity = bound_typevar.identity(db);
+                self.reachable_typevars.borrow_mut().insert(identity);
+
+                // Reachability only depends on which bound typevars are mentioned, not on how
+                // many times we expand the same bound typevar's bounds/defaults. Re-walking the
+                // same bound typevar here can recurse forever through generic callable defaults.
+                if !self.visited_bound_typevars.borrow_mut().insert(identity) {
+                    return;
+                }
+
                 walk_bound_type_var_type(db, bound_typevar, self);
+            }
+
+            fn visit_type_var_type(&self, db: &'db dyn Db, typevar: TypeVarInstance<'db>) {
+                if !self.visited_typevars.borrow_mut().insert(typevar) {
+                    return;
+                }
+
+                walk_type_var_type(db, typevar, self);
             }
 
             fn visit_generic_alias_type(&self, db: &'db dyn Db, alias: GenericAlias<'db>) {
@@ -327,8 +350,34 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
                 }
             }
 
+            fn visit_protocol_instance_type(
+                &self,
+                db: &'db dyn Db,
+                protocol: ProtocolInstanceType<'db>,
+            ) {
+                // Reachability only depends on free typevars that appear in the instantiated
+                // protocol type. For class-based protocols, walking the full lazily-inferred
+                // interface explodes through every member signature and nested protocol, even
+                // though the only free typevars we care about live in the protocol's
+                // specialization. Treat those the same as nominal instances and only fall back
+                // to walking member interfaces for synthesized protocols.
+                if let Some(nominal) = protocol.to_nominal_instance() {
+                    self.visit_nominal_instance_type(db, nominal);
+                } else {
+                    walk_protocol_interface(db, protocol.interface(db), self);
+                }
+            }
+
             fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+                let current_depth = self.depth.get();
+                if current_depth >= MAX_REACHABILITY_DEPTH {
+                    self.hit_depth_limit.set(true);
+                    return;
+                }
+
+                self.depth.set(current_depth + 1);
                 walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
+                self.depth.set(current_depth);
             }
         }
 
@@ -363,15 +412,21 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
             BoundTypeVarIdentity<'db>,
             FxHashSet<BoundTypeVarIdentity<'db>>,
         > = FxHashMap::default();
+        let mut hit_depth_limit = false;
         self.node.for_each_constraint(db, &mut |constraint, _| {
             let visitor = CollectReachability::default();
             visitor.visit_type(db, constraint.lower(db));
             visitor.visit_type(db, constraint.upper(db));
+            hit_depth_limit |= visitor.hit_depth_limit.get();
             reachable_typevars
                 .entry(constraint.typevar(db).identity(db))
                 .or_default()
                 .extend(visitor.reachable_typevars.into_inner());
         });
+
+        if hit_depth_limit {
+            return true;
+        }
 
         // Then perform a depth-first search to see if there are any cycles.
         let mut discovered: FxHashSet<BoundTypeVarIdentity<'db>> = FxHashSet::default();
@@ -563,6 +618,55 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
     pub(crate) fn display_graph(self, db: &'db dyn Db, prefix: &dyn Display) -> impl Display {
         self.node.display_graph(db, prefix)
     }
+}
+
+fn union_from_elements_cycle_recovery<'db>(
+    db: &'db dyn Db,
+    elements: impl IntoIterator<Item = Type<'db>>,
+) -> Type<'db> {
+    elements
+        .into_iter()
+        .fold(UnionBuilder::new(db).cycle_recovery(true), |builder, ty| {
+            builder.add(ty)
+        })
+        .build()
+}
+
+fn intersection_from_elements_without_simplification<'db>(
+    db: &'db dyn Db,
+    elements: impl IntoIterator<Item = Type<'db>>,
+) -> Type<'db> {
+    let positive: FxOrderSet<_> = elements.into_iter().collect();
+    match positive.len() {
+        0 => Type::object(),
+        1 => positive
+            .iter()
+            .next()
+            .copied()
+            .expect("single-element intersection should have one element"),
+        _ => Type::Intersection(IntersectionType::new(
+            db,
+            positive,
+            NegativeIntersectionElements::Empty,
+        )),
+    }
+}
+
+fn is_assignable_to_all<'db>(
+    db: &'db dyn Db,
+    lhs: Type<'db>,
+    rhs: impl IntoIterator<Item = Type<'db>>,
+) -> bool {
+    rhs.into_iter().all(|upper| lhs.is_assignable_to(db, upper))
+}
+
+fn is_constraint_set_assignable_to_all<'db>(
+    db: &'db dyn Db,
+    lhs: Type<'db>,
+    rhs: impl IntoIterator<Item = Type<'db>>,
+) -> bool {
+    rhs.into_iter()
+        .all(|upper| lhs.is_constraint_set_assignable_to(db, upper))
 }
 
 impl Debug for ConstraintSet<'_, '_> {
@@ -1703,15 +1807,15 @@ impl<'db> Node<'db> {
                 // process. (Here we are just checking assignability, so we don't need to construct
                 // the lower and upper bounds in a consistent order.)
                 debug_assert!({
-                    let greatest_lower_bound = UnionType::from_elements(
+                    let greatest_lower_bound = union_from_elements_cycle_recovery(
                         db,
                         current_bounds.iter().map(|bounds| bounds.lower),
                     );
-                    let least_upper_bound = IntersectionType::from_elements(
+                    is_constraint_set_assignable_to_all(
                         db,
+                        greatest_lower_bound,
                         current_bounds.iter().map(|bounds| bounds.upper),
-                    );
-                    greatest_lower_bound.is_constraint_set_assignable_to(db, least_upper_bound)
+                    )
                 });
 
                 // We've been tracking the lower and upper bound that the types for this path must
@@ -2535,7 +2639,7 @@ impl<'db> InteriorNode<'db> {
                     match bound_typevar.typevar(db).require_bound_or_constraints(db) {
                         TypeVarBoundOrConstraints::UpperBound(bound) => {
                             let bound = bound.top_materialization(db);
-                            let lower = UnionType::from_elements(db, bounds.lower);
+                            let lower = union_from_elements_cycle_recovery(db, bounds.lower);
                             if !lower.is_assignable_to(db, bound) {
                                 // This path does not satisfy the typevar's upper bound, and is
                                 // therefore not a valid specialization.
@@ -2553,7 +2657,7 @@ impl<'db> InteriorNode<'db> {
                                 continue;
                             }
 
-                            let upper = IntersectionType::from_elements(
+                            let upper = intersection_from_elements_without_simplification(
                                 db,
                                 std::iter::chain(bounds.upper, [bound]),
                             );
@@ -2567,14 +2671,17 @@ impl<'db> InteriorNode<'db> {
 
                         TypeVarBoundOrConstraints::Constraints(constraints) => {
                             // Filter out the typevar constraints that aren't satisfied by this path.
-                            let lower = UnionType::from_elements(db, bounds.lower);
-                            let upper = IntersectionType::from_elements(db, bounds.upper);
+                            let lower = union_from_elements_cycle_recovery(db, bounds.lower);
                             let compatible_constraints =
                                 constraints.elements(db).iter().filter(|constraint| {
                                     let constraint_lower = constraint.bottom_materialization(db);
                                     let constraint_upper = constraint.top_materialization(db);
                                     lower.is_assignable_to(db, constraint_lower)
-                                        && constraint_upper.is_assignable_to(db, upper)
+                                        && is_assignable_to_all(
+                                            db,
+                                            constraint_upper,
+                                            bounds.upper.iter().copied(),
+                                        )
                                 });
 
                             // If only one constraint remains, that's our specialization for this path.
@@ -4402,16 +4509,22 @@ impl<'db> GenericContext<'db> {
                 // their source order. This should give us a consistently ordered specialization,
                 // regardless of the variable ordering of the original BDD.
                 representatives.sort_unstable_by_key(|bounds| bounds.source_order);
-                let greatest_lower_bound =
-                    UnionType::from_elements(db, representatives.iter().map(|bounds| bounds.lower));
-                let least_upper_bound = IntersectionType::from_elements(
+                let greatest_lower_bound = union_from_elements_cycle_recovery(
+                    db,
+                    representatives.iter().map(|bounds| bounds.lower),
+                );
+                let least_upper_bound = intersection_from_elements_without_simplification(
                     db,
                     representatives.iter().map(|bounds| bounds.upper),
                 );
 
                 // If `lower ≰ upper`, then there is no type that satisfies all of the paths in the
                 // BDD. That's an ambiguous specialization, as described above.
-                if !greatest_lower_bound.is_constraint_set_assignable_to(db, least_upper_bound) {
+                if !is_constraint_set_assignable_to_all(
+                    db,
+                    greatest_lower_bound,
+                    representatives.iter().map(|bounds| bounds.upper),
+                ) {
                     tracing::trace!(
                         target: "ty_python_semantic::types::constraints::specialize_constrained",
                         bound_typevar = %identity.display(db),

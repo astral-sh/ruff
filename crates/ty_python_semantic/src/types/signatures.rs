@@ -299,16 +299,18 @@ impl<'db> CallableSignature<'db> {
         relation_visitor: &HasRelationToVisitor<'db, 'c>,
         disjointness_visitor: &IsDisjointVisitor<'db, 'c>,
     ) -> ConstraintSet<'db, 'c> {
-        Self::has_relation_to_inner(
-            db,
-            &self.overloads,
-            &other.overloads,
-            constraints,
-            inferable,
-            relation,
-            relation_visitor,
-            disjointness_visitor,
-        )
+        relation_visitor.guard(|| {
+            Self::has_relation_to_inner(
+                db,
+                &self.overloads,
+                &other.overloads,
+                constraints,
+                inferable,
+                relation,
+                relation_visitor,
+                disjointness_visitor,
+            )
+        })
     }
 
     pub(crate) fn is_single_paramspec(&self) -> Option<(BoundTypeVarInstance<'db>, Type<'db>)> {
@@ -361,6 +363,8 @@ impl<'db> CallableSignature<'db> {
         other_signature: &Signature<'db>,
         inferable: InferableTypeVars<'_, 'db>,
         relation: TypeRelation,
+        relation_visitor: &HasRelationToVisitor<'db, 'c>,
+        disjointness_visitor: &IsDisjointVisitor<'db, 'c>,
     ) -> Option<ConstraintSet<'db, 'c>> {
         let single_required_positional_parameter_type = |signature: &Signature<'db>| {
             if signature.parameters().len() != 1 {
@@ -410,7 +414,14 @@ impl<'db> CallableSignature<'db> {
                 return None;
             }
             let signatures_are_disjoint = self_parameter_type
-                .when_disjoint_from(db, other_parameter_type, constraints, inferable)
+                .is_disjoint_from_impl(
+                    db,
+                    other_parameter_type,
+                    constraints,
+                    inferable,
+                    disjointness_visitor,
+                    relation_visitor,
+                )
                 .is_always_satisfied(db);
 
             if signatures_are_disjoint {
@@ -427,19 +438,23 @@ impl<'db> CallableSignature<'db> {
         }
 
         // Function assignability here is parameter-contravariant and return-covariant.
-        let parameters_cover_target = other_parameter_type.has_relation_to(
+        let parameters_cover_target = other_parameter_type.has_relation_to_impl(
             db,
             parameter_type_union.build(),
             constraints,
             inferable,
             relation,
+            relation_visitor,
+            disjointness_visitor,
         );
-        let returns_match_target = return_type_union.build().has_relation_to(
+        let returns_match_target = return_type_union.build().has_relation_to_impl(
             db,
             other_signature.return_ty,
             constraints,
             inferable,
             relation,
+            relation_visitor,
+            disjointness_visitor,
         );
         let aggregate_relation =
             parameters_cover_target.and(db, constraints, || returns_match_target);
@@ -597,6 +612,8 @@ impl<'db> CallableSignature<'db> {
                     other_signature,
                     inferable,
                     relation,
+                    relation_visitor,
+                    disjointness_visitor,
                 ) {
                     return aggregate_relation;
                 }
@@ -604,16 +621,18 @@ impl<'db> CallableSignature<'db> {
                 self_signatures
                     .iter()
                     .when_any(db, constraints, |self_signature| {
-                        Self::has_relation_to_inner(
-                            db,
-                            std::slice::from_ref(self_signature),
-                            other_signatures,
-                            constraints,
-                            inferable,
-                            relation,
-                            relation_visitor,
-                            disjointness_visitor,
-                        )
+                        relation_visitor.guard(|| {
+                            Self::has_relation_to_inner(
+                                db,
+                                std::slice::from_ref(self_signature),
+                                other_signatures,
+                                constraints,
+                                inferable,
+                                relation,
+                                relation_visitor,
+                                disjointness_visitor,
+                            )
+                        })
                     })
             }
 
@@ -621,32 +640,36 @@ impl<'db> CallableSignature<'db> {
             ([_], _) => other_signatures
                 .iter()
                 .when_all(db, constraints, |other_signature| {
-                    Self::has_relation_to_inner(
-                        db,
-                        self_signatures,
-                        std::slice::from_ref(other_signature),
-                        constraints,
-                        inferable,
-                        relation,
-                        relation_visitor,
-                        disjointness_visitor,
-                    )
+                    relation_visitor.guard(|| {
+                        Self::has_relation_to_inner(
+                            db,
+                            self_signatures,
+                            std::slice::from_ref(other_signature),
+                            constraints,
+                            inferable,
+                            relation,
+                            relation_visitor,
+                            disjointness_visitor,
+                        )
+                    })
                 }),
 
             // `self` is definitely overloaded while `other` is possibly overloaded.
             (_, _) => other_signatures
                 .iter()
                 .when_all(db, constraints, |other_signature| {
-                    Self::has_relation_to_inner(
-                        db,
-                        self_signatures,
-                        std::slice::from_ref(other_signature),
-                        constraints,
-                        inferable,
-                        relation,
-                        relation_visitor,
-                        disjointness_visitor,
-                    )
+                    relation_visitor.guard(|| {
+                        Self::has_relation_to_inner(
+                            db,
+                            self_signatures,
+                            std::slice::from_ref(other_signature),
+                            constraints,
+                            inferable,
+                            relation,
+                            relation_visitor,
+                            disjointness_visitor,
+                        )
+                    })
                 }),
         }
     }
@@ -1143,15 +1166,17 @@ impl<'db> Signature<'db> {
         let inferable = inferable.merge(&other_inferable);
 
         // `inner` will create a constraint set that references these newly inferable typevars.
-        let when = self.has_relation_to_inner(
-            db,
-            other,
-            constraints,
-            inferable,
-            relation,
-            relation_visitor,
-            disjointness_visitor,
-        );
+        let when = relation_visitor.guard(|| {
+            self.has_relation_to_inner(
+                db,
+                other,
+                constraints,
+                inferable,
+                relation,
+                relation_visitor,
+                disjointness_visitor,
+            )
+        });
 
         // But the caller does not need to consider those extra typevars. Whatever constraint set
         // we produce, we reduce it back down to the inferable set that the caller asked about.
