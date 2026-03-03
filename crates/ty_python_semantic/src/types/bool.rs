@@ -285,9 +285,21 @@ impl<'db> Type<'db> {
 
             Type::Union(union) => try_union(*union)?,
 
-            Type::Intersection(_) => {
-                // TODO
-                Truthiness::Ambiguous
+            Type::Intersection(intersection) => {
+                let has_neg_always_falsy = intersection
+                    .negative(db)
+                    .iter()
+                    .any(|ty| matches!(ty, Type::AlwaysFalsy));
+                let has_neg_always_truthy = intersection
+                    .negative(db)
+                    .iter()
+                    .any(|ty| matches!(ty, Type::AlwaysTruthy));
+
+                match (has_neg_always_falsy, has_neg_always_truthy) {
+                    (true, false) => Truthiness::AlwaysTrue,
+                    (false, true) => Truthiness::AlwaysFalse,
+                    _ => Truthiness::Ambiguous,
+                }
             }
 
             Type::LiteralValue(literal) => match literal.kind() {

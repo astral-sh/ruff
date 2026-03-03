@@ -2309,9 +2309,21 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 let iter_expr = self.add_standalone_expression(iter);
                 self.visit_expr(iter);
 
-                self.record_ambiguous_reachability();
-
+                // Take the pre-loop snapshot before recording the reachability
+                // constraint, so that the "loop didn't execute" path can later
+                // receive the negated constraint.
                 let pre_loop = self.flow_snapshot();
+
+                // Record a reachability constraint based on the iterable's
+                // truthiness. If the iterable is known to be truthy (e.g.
+                // narrowed via `if not l: return`), the loop body is guaranteed
+                // to execute at least once, and variables bound inside the loop
+                // will be considered always-defined after the loop.
+                let iter_predicate = PredicateOrLiteral::Predicate(Predicate {
+                    node: PredicateNode::Expression(iter_expr),
+                    is_positive: true,
+                });
+                self.record_reachability_constraint(iter_predicate);
 
                 // Pre-walk the loop to collect all the bound places, then create a loop header
                 // definition for each bound place. See `struct LoopHeader` for more on this. Loop
@@ -2348,9 +2360,26 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     self.populate_loop_header(&bound_place_ids, loop_token, loop_min_definition_id);
                 }
 
-                // We may execute the `else` clause without ever executing the body, so merge in
-                // the pre-loop state before visiting `else`.
-                self.flow_merge(pre_loop);
+                // Model the "loop didn't execute" path: save the post-body
+                // state, restore to the pre-loop state, apply the negated
+                // constraint (iterable is falsy), then merge the post-body
+                // state back in. This ensures that bindings from the "loop
+                // didn't execute" path (including the implicit unbound binding)
+                // are only visible when the iterable could be falsy.
+                let post_body = self.flow_snapshot();
+                self.flow_restore(pre_loop);
+
+                // Use a separate predicate ID for the negated constraint to
+                // avoid `p AND ~p` simplification (following the while-loop
+                // pattern at line ~2242).
+                let later_predicate_id =
+                    self.current_use_def_map_mut().add_predicate(iter_predicate);
+                let later_reachability = self
+                    .current_reachability_constraints_mut()
+                    .add_atom(later_predicate_id);
+                self.record_negated_reachability_constraint(later_reachability);
+
+                self.flow_merge(post_body);
                 self.visit_body(orelse);
 
                 // Breaking out of a `for` loop bypasses the `else` clause, so merge in the break

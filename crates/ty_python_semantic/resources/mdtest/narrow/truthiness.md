@@ -87,14 +87,16 @@ def f(x: A | B):
         reveal_type(x)  # revealed: (A & ~AlwaysTruthy) | (B & ~AlwaysTruthy)
 
     if x and not x:
-        reveal_type(x)  # revealed: (A & ~AlwaysFalsy & ~AlwaysTruthy) | (B & ~AlwaysFalsy & ~AlwaysTruthy)
+        # Unreachable: after narrowing `x` to truthy, `not x` is always false.
+        reveal_type(x)  # revealed: Never
     else:
         reveal_type(x)  # revealed: A | B
 
     if x or not x:
         reveal_type(x)  # revealed: A | B
     else:
-        reveal_type(x)  # revealed: (A & ~AlwaysTruthy & ~AlwaysFalsy) | (B & ~AlwaysTruthy & ~AlwaysFalsy)
+        # Unreachable: after narrowing `x` to falsy, `not x` is always true.
+        reveal_type(x)  # revealed: Never
 ```
 
 ### Truthiness of Types
@@ -219,7 +221,9 @@ x = A()
 
 if x and not x:
     y = x
-    reveal_type(y)  # revealed: A & ~AlwaysFalsy & ~AlwaysTruthy
+    # The `x and not x` branch is unreachable: after narrowing `x` to be truthy,
+    # `not x` is always false.
+    reveal_type(y)  # revealed: Never
 else:
     y = x
     reveal_type(y)  # revealed: A

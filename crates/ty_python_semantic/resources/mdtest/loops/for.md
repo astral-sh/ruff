@@ -98,9 +98,31 @@ reveal_type(x)
 for x in (1, "a", b"foo"):
     pass
 
-# revealed: Literal[1, "a", b"foo"]
-# error: [possibly-unresolved-reference]
-reveal_type(x)
+# The tuple is non-empty, so the loop is guaranteed to execute.
+reveal_type(x)  # revealed: Literal[1, "a", b"foo"]
+```
+
+## Guaranteed iteration via truthiness narrowing
+
+When the iterable is narrowed to be always truthy (e.g. via `if not l: return`), the loop is
+guaranteed to execute at least once, so the loop variable is always defined after the loop.
+
+```py
+def f(l: list[int]) -> int:
+    if not l:
+        return 0
+    # `l` is narrowed to `list[int] & ~AlwaysFalsy` (non-empty)
+    for i in l:
+        pass
+    return i
+
+def g(l: list[int]) -> None:
+    for i in l:
+        pass
+    # Without narrowing, the loop variable is possibly unresolved
+    # revealed: int
+    # error: [possibly-unresolved-reference]
+    reveal_type(i)
 ```
 
 ## With non-callable iterator
