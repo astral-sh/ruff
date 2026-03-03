@@ -58,7 +58,7 @@ use crate::types::constraints::{
 use crate::types::context::{LintDiagnosticGuard, LintDiagnosticGuardBuilder};
 use crate::types::diagnostic::{INVALID_AWAIT, INVALID_TYPE_FORM};
 pub use crate::types::display::{DisplaySettings, TypeDetail, TypeDisplayDetails};
-use crate::types::enums::{enum_metadata, is_single_member_enum};
+use crate::types::enums::enum_metadata;
 use crate::types::function::{
     DataclassTransformerFlags, DataclassTransformerParams, FunctionDecorators, FunctionSpans,
     FunctionType, KnownFunction,
@@ -3308,26 +3308,22 @@ impl<'db> Type<'db> {
                 .member_lookup_with_policy(db, name, policy),
 
             Type::LiteralValue(literal)
-                if literal.as_enum().is_some_and(|enum_literal| {
-                    matches!(name_str, "name" | "_name_")
-                        && Type::ClassLiteral(enum_literal.enum_class(db))
-                            .is_subtype_of(db, KnownClass::Enum.to_subclass_of(db))
-                }) =>
+                if literal.as_enum().is_some()
+                    && matches!(name_str, "name" | "_name_" | "value" | "_value_") =>
             {
                 let enum_literal = literal.as_enum().unwrap();
-                Place::bound(Type::string_literal(db, enum_literal.name(db))).into()
-            }
+                let enum_class = enum_literal.enum_class(db);
+                let is_enum_subclass = Type::ClassLiteral(enum_class)
+                    .is_subtype_of(db, KnownClass::Enum.to_subclass_of(db));
 
-            Type::LiteralValue(literal)
-                if literal.as_enum().is_some_and(|enum_literal| {
-                    matches!(name_str, "value" | "_value_")
-                        && Type::ClassLiteral(enum_literal.enum_class(db))
-                            .is_subtype_of(db, KnownClass::Enum.to_subclass_of(db))
-                }) =>
-            {
-                let enum_literal = literal.as_enum().unwrap();
-                enum_metadata(db, enum_literal.enum_class(db))
-                    .and_then(|metadata| metadata.value_type(enum_literal.name(db)))
+                enum_metadata(db, enum_class)
+                    .and_then(|metadata| match name_str {
+                        "name" if is_enum_subclass => metadata.name_type(db, enum_literal.name(db)),
+                        "_name_" => metadata.name_type(db, enum_literal.name(db)),
+                        "value" if is_enum_subclass => metadata.value_type(enum_literal.name(db)),
+                        "_value_" => metadata.value_type(enum_literal.name(db)),
+                        _ => None,
+                    })
                     .map_or_else(|| Place::Undefined, Place::bound)
                     .into()
             }
@@ -3346,13 +3342,20 @@ impl<'db> Type<'db> {
             }
 
             Type::NominalInstance(instance)
-                if matches!(name_str, "value" | "_value_")
-                    && is_single_member_enum(db, instance.class_literal(db)) =>
+                if matches!(name_str, "name" | "_name_" | "value" | "_value_")
+                    && enum_metadata(db, instance.class_literal(db)).is_some() =>
             {
-                enum_metadata(db, instance.class_literal(db))
-                    .and_then(|metadata| {
-                        let (name, _) = metadata.members.get_index(0)?;
-                        metadata.value_type(name)
+                let class_literal = instance.class_literal(db);
+                let is_enum_subclass = Type::ClassLiteral(class_literal)
+                    .is_subtype_of(db, KnownClass::Enum.to_subclass_of(db));
+
+                enum_metadata(db, class_literal)
+                    .and_then(|metadata| match name_str {
+                        "name" if is_enum_subclass => metadata.instance_name_type(db),
+                        "_name_" => metadata.instance_name_type(db),
+                        "value" if is_enum_subclass => metadata.instance_value_type(db),
+                        "_value_" => metadata.instance_value_type(db),
+                        _ => None,
                     })
                     .map_or_else(Place::default, Place::bound)
                     .into()
