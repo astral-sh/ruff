@@ -29,11 +29,11 @@ pub struct ModuleDb {
 impl ModuleDb {
     /// Initialize a [`ModuleDb`] from the given source root.
     pub fn from_src_roots(
+        system: OsSystem,
         src_roots: Vec<SystemPathBuf>,
         python_version: PythonVersion,
         venv_path: Option<SystemPathBuf>,
     ) -> Result<Self> {
-        let system = OsSystem::default();
         let mut search_path_settings = SearchPathSettings::new(src_roots);
         // TODO: Consider calling `PythonEnvironment::discover` if the `venv_path` is not provided.
         if let Some(venv_path) = venv_path {

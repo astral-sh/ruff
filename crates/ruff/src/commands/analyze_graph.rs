@@ -5,7 +5,7 @@ use anyhow::Result;
 use indexmap::IndexSet;
 use log::{debug, warn};
 use path_absolutize::CWD;
-use ruff_db::system::{SystemPath, SystemPathBuf};
+use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
 use ruff_graph::{Direction, ImportMap, ModuleDb, ModuleImports};
 use ruff_linter::package::PackageRoot;
 use ruff_linter::source_kind::SourceKind;
@@ -86,7 +86,9 @@ pub(crate) fn analyze_graph(
             .filter_map(|path| SystemPathBuf::from_path_buf(path.to_path_buf()).ok()),
     );
 
+    let system = OsSystem::default();
     let db = ModuleDb::from_src_roots(
+        system,
         src_roots.into_iter().collect(),
         pyproject_config
             .settings

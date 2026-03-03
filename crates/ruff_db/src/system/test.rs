@@ -133,8 +133,8 @@ impl System for TestSystem {
         self.system().cache_dir()
     }
 
-    fn which(&self, name: &str) -> WhichResult {
-        self.system().which(name)
+    fn which(&self, _name: &str) -> WhichResult {
+        Err(WhichError::CannotFindBinaryPath)
     }
 
     fn read_directory<'a>(
@@ -197,10 +197,7 @@ impl System for TestSystem {
 
 impl Default for TestSystem {
     fn default() -> Self {
-        Self {
-            inner: Arc::new(InMemorySystem::default()),
-            env_overrides: Arc::new(Mutex::new(FxHashMap::default())),
-        }
+        Self::new(InMemorySystem::default())
     }
 }
 
