@@ -25,13 +25,13 @@ impl AllowedValue {
         allowed_values: &[AllowedValue],
     ) -> bool {
         fn float_as_i64(value: f64) -> Option<i64> {
-            #[allow(clippy::cast_precision_loss)]
+            #[expect(clippy::cast_precision_loss)]
             if value.is_finite()
                 && value.fract() == 0.0
                 && value >= i64::MIN as f64
                 && value <= i64::MAX as f64
             {
-                #[allow(clippy::cast_possible_truncation)]
+                #[expect(clippy::cast_possible_truncation)]
                 Some(value as i64)
             } else {
                 None
