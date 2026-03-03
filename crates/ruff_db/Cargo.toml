@@ -46,6 +46,7 @@ supports-hyperlinks = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true, optional = true }
+which = { workspace = true, optional = true }
 zip = { workspace = true }
 
 [target.'cfg(not(target_arch="wasm32"))'.dependencies]
@@ -54,9 +55,6 @@ etcetera = { workspace = true, optional = true }
 [target.'cfg(target_arch="wasm32")'.dependencies]
 web-time = { version = "1.1.0" }
 
-[target.'cfg(not(target_family = "wasm"))'.dependencies]
-which = { workspace = true }
-
 [dev-dependencies]
 insta = { workspace = true, features = ["filters"] }
 tempfile = { workspace = true }
@@ -64,7 +62,7 @@ tempfile = { workspace = true }
 [features]
 cache = ["ruff_cache"]
 junit = ["dep:quick-junit"]
-os = ["ignore", "dep:etcetera"]
+os = ["ignore", "dep:etcetera", "dep:which"]
 serde = [
     "camino/serde1",
     "dep:serde",
