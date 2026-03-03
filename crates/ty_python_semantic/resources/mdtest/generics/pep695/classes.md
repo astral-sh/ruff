@@ -393,9 +393,6 @@ wrong_innards: D[int] = D("five")
 
 ### Both present, `__new__` inherited from a generic base class
 
-If either method comes from a generic base class, we don't currently use its inferred specialization
-to specialize the class.
-
 ```py
 from ty_extensions import generic_context, into_callable
 
@@ -411,7 +408,8 @@ reveal_type(generic_context(D))
 # revealed: ty_extensions.GenericContext[V@D]
 reveal_type(generic_context(into_callable(D)))
 
-reveal_type(D(1))  # revealed: D[Literal[1]]
+# Because `C[T, U]` is not an instance of `D`, we never hit `D.__init__` at all.
+reveal_type(D(1))  # revealed: C[Unknown, int]
 ```
 
 ### Generic class inherits `__init__` from generic base class

@@ -291,33 +291,11 @@ impl<'db> MixedConstructorInit<'db> {
                 .specialization
                 .map(|specialization| declared_return.apply_specialization(db, specialization))
                 .unwrap_or(declared_return);
-            let resolved_return = if resolved_return.has_typevar(db) || resolved_return.is_unknown()
-            {
-                overload.return_ty
-            } else {
-                resolved_return
-            };
 
-            // For inherited generic `__new__` methods returning a superclass specialization
-            // (e.g. `C[T, U]` while constructing `D[V]` where `D` subclasses `C`), the
-            // resolved return can look non-instance-like (`C[Unknown, int]`) even though
-            // construction still yields a `D` instance at runtime.
-            let generic_superclass_return = declared_return.has_typevar(db)
-                && resolved_return
-                    .as_nominal_instance()
-                    .is_some_and(|instance| {
-                        class_is_instance_of_class_literal(
-                            db,
-                            self.constructor_class_literal.default_specialization(db),
-                            instance.class(db).class_literal(db),
-                        )
-                    });
-
-            generic_superclass_return
-                || !matches!(
-                    self.constructor_return_disposition(db, resolved_return),
-                    ConstructorReturnDisposition::NotInstance
-                )
+            !matches!(
+                self.constructor_return_disposition(db, resolved_return),
+                ConstructorReturnDisposition::NotInstance
+            )
         })
     }
 
@@ -862,12 +840,9 @@ impl<'db> Bindings<'db> {
                     .specialization
                     .map(|specialization| sig_return.apply_specialization(db, specialization))
                     .unwrap_or(sig_return);
-                let resolved = if resolved.has_typevar(db) || resolved.is_unknown() {
-                    overload.return_ty
-                } else {
-                    resolved
-                };
-                if resolved.has_typevar(db) || resolved.is_unknown() {
+                if resolved.is_unknown()
+                    || (resolved.has_typevar(db) && resolved.as_nominal_instance().is_none())
+                {
                     continue;
                 }
                 // Check if the resolved type is an instance of the constructing class or a
@@ -875,20 +850,6 @@ impl<'db> Bindings<'db> {
                 // handled by the standard constructor return logic below.
                 let is_instance_return = is_instance_of_constructor(resolved);
                 if !is_instance_return {
-                    let generic_superclass_return = constructor_class.is_some_and(|cc| {
-                        sig_return.has_typevar(db)
-                            && resolved.as_nominal_instance().is_some_and(|inst| {
-                                class_is_instance_of_class_literal(
-                                    db,
-                                    cc,
-                                    inst.class(db).class_literal(db),
-                                )
-                            })
-                    });
-                    if generic_superclass_return {
-                        continue;
-                    }
-
                     if matches!(resolved, Type::Dynamic(DynamicType::Any))
                         && (binding.matching_overloads().next().is_none()
                             || constructor_is_subclass_of_any)
