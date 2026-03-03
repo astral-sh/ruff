@@ -23,6 +23,7 @@ pub(crate) fn deferred_comprehensions(checker: &mut Checker) {
                         _ => None,
                     })
             else {
+                debug_assert!(false, "Expected a comprehension");
                 continue;
             };
 
