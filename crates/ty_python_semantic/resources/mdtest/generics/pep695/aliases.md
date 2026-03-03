@@ -263,6 +263,28 @@ def _(x: B) -> None:
     pass
 ```
 
+Mutually-referential defaults (where two type aliases reference each other via their typevar
+defaults) should also not crash:
+
+```py
+type X[T = Y] = list[T]
+type Y[U = X] = list[U]
+
+def _(x: X, y: Y) -> None:
+    pass
+```
+
+Indirect self-references through a chain of type aliases should also not crash:
+
+```py
+type P[T = R] = list[T]
+type Q[T = P] = list[T]
+type R[T = Q] = list[T]
+
+def _(p: P) -> None:
+    pass
+```
+
 ## Snapshots of verbose diagnostics
 
 <!-- snapshot-diagnostics -->
