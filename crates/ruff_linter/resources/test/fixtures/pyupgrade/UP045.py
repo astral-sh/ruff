@@ -82,3 +82,12 @@ foo: Optional[
     int
     # text
 ] = None
+
+
+# Regression test for: https://github.com/astral-sh/ruff/issues/23429
+# Optional[None | X] should not produce None | None
+bar: None | Optional[None | int] = None
+bar: Optional[None | int] = None
+bar: Optional[int | None] = None
+bar: Optional[None | int | str] = None
+bar: Optional[None | None] = None

@@ -428,6 +428,29 @@ class D(B):  # error: [subclass-of-final-class]
     def method(self): ...  # error: [override-of-final-variable]
 ```
 
+## `@final` cannot be applied to non-method functions
+
+The `@final` decorator is only valid on methods and classes. Using it on a module-level or nested
+function is an error.
+
+```py
+from typing import final
+
+@final  # error: [final-on-non-method] "`@final` cannot be applied to non-method function `func1`"
+def func1(): ...
+
+# Nested function decorated with `@final` is also invalid
+def outer():
+    @final  # error: [final-on-non-method]
+    def inner(): ...
+
+# A function nested inside a method is also not a method
+class F:
+    def method(self):
+        @final  # error: [final-on-non-method]
+        def not_a_method(): ...
+```
+
 ## An `@final` method is overridden by an implicit instance attribute
 
 ```py

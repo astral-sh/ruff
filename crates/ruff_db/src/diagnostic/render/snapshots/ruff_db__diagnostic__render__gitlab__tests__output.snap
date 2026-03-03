@@ -59,5 +59,24 @@ expression: env.render_diagnostics(&diagnostics)
         }
       }
     }
+  },
+  {
+    "check_name": "F821",
+    "description": "F821: Undefined name `fibonaccii`",
+    "severity": "major",
+    "fingerprint": "<redacted>",
+    "location": {
+      "path": "fib.py",
+      "positions": {
+        "begin": {
+          "line": 12,
+          "column": 16
+        },
+        "end": {
+          "line": 12,
+          "column": 26
+        }
+      }
+    }
   }
 ]

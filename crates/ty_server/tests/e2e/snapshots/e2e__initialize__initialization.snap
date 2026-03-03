@@ -51,6 +51,7 @@ expression: initialization_result
     "renameProvider": {
       "prepareProvider": true
     },
+    "foldingRangeProvider": true,
     "declarationProvider": true,
     "executeCommandProvider": {
       "commands": [
@@ -93,6 +94,7 @@ expression: initialization_result
       "range": true,
       "full": true
     },
+    "typeHierarchyProvider": true,
     "inlayHintProvider": {},
     "diagnosticProvider": {
       "identifier": "ty",

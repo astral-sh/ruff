@@ -470,8 +470,10 @@ def collect_ty_diagnostics(
             f"--python-version={python_version}",
             "--output-format=gitlab",
             "--ignore=assert-type-unspellable-subtype",
+            "--error=invalid-enum-member-annotation",
             "--error=invalid-legacy-positional-parameter",
             "--error=deprecated",
+            "--error=redundant-final-classvar",
             "--exit-zero",
             *extra_search_path_args,
             *map(str, test_files),
@@ -507,7 +509,10 @@ def group_diagnostics_by_key(
 
     for diag in chain(old, new):
         diag.tag = tagged_lines.get(
-            (diag.location.path.name, diag.location.positions.begin.line)
+            (
+                diag.location.path.name,
+                diag.location.positions.begin.line,
+            )
         )
 
     diagnostics = [

@@ -25,8 +25,8 @@ on:
       - "!crates/ty_python_semantic/resources/corpus/**"
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref_name }}-${{ github.event.pull_request.number || github.sha }}
-  cancel-in-progress: true
+  group: typing-conformance-${{ github.ref_name }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   CARGO_INCREMENTAL: 0
@@ -34,7 +34,7 @@ env:
   CARGO_TERM_COLOR: always
   RUSTUP_MAX_RETRIES: 10
   RUST_BACKTRACE: 1
-  CONFORMANCE_SUITE_COMMIT: ffd520acd116aacbbba793c8f1f1fd51dfda83ae
+  CONFORMANCE_SUITE_COMMIT: e9fccc9dbbd8f1e8b24b4f88911c3d3155059e2a
   PYTHON_VERSION: 3.12
 
 jobs:

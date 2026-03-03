@@ -14,9 +14,7 @@ It can be used anywhere a type is accepted:
 ```py
 from typing_extensions import LiteralString
 
-x: LiteralString
-
-def f():
+def _(x: LiteralString):
     reveal_type(x)  # revealed: LiteralString
 ```
 
@@ -64,54 +62,60 @@ class C(LiteralString): ...  # error: [invalid-base]
 ```py
 from typing_extensions import LiteralString
 
-foo: LiteralString = "foo"
-reveal_type(foo)  # revealed: Literal["foo"]
+def _(literal_a: LiteralString, literal_b: LiteralString, a_str: str):
+    # Addition
+    reveal_type(literal_a + literal_b)  # revealed: LiteralString
+    reveal_type(literal_a + a_str)  # revealed: str
+    reveal_type(a_str + literal_a)  # revealed: str
 
-bar: LiteralString = "bar"
-reveal_type(foo + bar)  # revealed: Literal["foobar"]
+    # In-place addition
+    combined_literal = literal_a
+    combined_literal += literal_b
+    reveal_type(combined_literal)  # revealed: LiteralString
+    combined_non_literal1 = literal_a
+    combined_non_literal1 += a_str
+    reveal_type(combined_non_literal1)  # revealed: str
+    combined_non_literal2 = a_str
+    combined_non_literal2 += literal_a
+    reveal_type(combined_non_literal2)  # revealed: str
 
-baz: LiteralString = "baz"
-baz += foo
-reveal_type(baz)  # revealed: Literal["bazfoo"]
+    # Join
+    reveal_type(literal_a.join(("abc", "foo", literal_a, literal_b)))  # revealed: LiteralString
+    reveal_type(a_str.join(("abc", "foo", literal_a, literal_b)))  # revealed: str
+    reveal_type(literal_a.join(("abc", "foo", a_str)))  # revealed: str
 
-qux = (foo, bar)
-reveal_type(qux)  # revealed: tuple[Literal["foo"], Literal["bar"]]
+    # .format(…)
+    reveal_type("{}, {}".format(literal_a, literal_b))  # revealed: LiteralString
+    reveal_type("{}, {}".format(literal_a, a_str))  # revealed: str
 
-reveal_type(foo.join(qux))  # revealed: LiteralString
+    # f-string
+    reveal_type(f"{literal_a} {literal_b}")  # revealed: LiteralString
+    reveal_type(f"{literal_a} {a_str}")  # revealed: str
 
-template: LiteralString = "{}, {}"
-reveal_type(template)  # revealed: Literal["{}, {}"]
-reveal_type(template.format(foo, bar))  # revealed: LiteralString
+    # Repetition
+    reveal_type(literal_a * 10)  # revealed: LiteralString
 ```
 
 ### Assignability
 
-`Literal[""]` is assignable to `LiteralString`, and `LiteralString` is assignable to `str`, but not
-vice versa.
+`Literal["abc"]` is assignable to `LiteralString`, and `LiteralString` is assignable to `str`, but
+not vice versa.
 
 ```py
 from typing_extensions import Literal, LiteralString
+from ty_extensions import static_assert, is_assignable_to
 
-def _(flag: bool):
-    foo_1: Literal["foo"] = "foo"
-    bar_1: LiteralString = foo_1  # fine
+static_assert(is_assignable_to(Literal[""], LiteralString))
+static_assert(is_assignable_to(Literal["abc"], LiteralString))
+static_assert(is_assignable_to(Literal["abc", "def"], LiteralString))
 
-    foo_2 = "foo" if flag else "bar"
-    reveal_type(foo_2)  # revealed: Literal["foo", "bar"]
-    bar_2: LiteralString = foo_2  # fine
+static_assert(not is_assignable_to(LiteralString, Literal[""]))
+static_assert(not is_assignable_to(LiteralString, Literal["abc"]))
+static_assert(not is_assignable_to(LiteralString, Literal["abc", "def"]))
 
-    foo_3: LiteralString = "foo" * 1_000_000_000
-    bar_3: str = foo_2  # fine
+static_assert(is_assignable_to(LiteralString, str))
 
-    baz_1: str = repr(object())
-    qux_1: LiteralString = baz_1  # error: [invalid-assignment]
-
-    baz_2: LiteralString = "baz" * 1_000_000_000
-    qux_2: Literal["qux"] = baz_2  # error: [invalid-assignment]
-
-    baz_3 = "foo" if flag else 1
-    reveal_type(baz_3)  # revealed: Literal["foo", 1]
-    qux_3: LiteralString = baz_3  # error: [invalid-assignment]
+static_assert(not is_assignable_to(str, LiteralString))
 ```
 
 ### Narrowing
@@ -144,9 +148,7 @@ python-version = "3.11"
 ```py
 from typing import LiteralString
 
-x: LiteralString = "foo"
-
-def f():
+def _(x: LiteralString):
     reveal_type(x)  # revealed: LiteralString
 ```
 

@@ -201,6 +201,117 @@ class Sub(Base): ...
 reveal_type(Sub.all_instances)  # revealed: list[Sub]
 ```
 
+## Combining `ClassVar` and `Final` in normal classes
+
+An attribute on a class body that is annotated as `Final` is implicitly treated as a class variable.
+The error message is different, but these attributes cannot be written to from instances of the
+class:
+
+```py
+from typing import Final
+
+class C:
+    a: Final[int] = 1
+
+reveal_type(C.a)  # revealed: int
+
+c = C()
+c.a = 2  # error: [invalid-assignment] "Cannot assign to final attribute `a` on type `C`"
+```
+
+In this sense, it is redundant to combine `ClassVar` and `Final`. We issue a warning in these cases:
+
+```py
+from typing import Annotated, ClassVar
+
+class D:
+    # error: [redundant-final-classvar] "Combining `ClassVar` and `Final` is redundant"
+    a: ClassVar[Final[int]] = 1
+
+    # error: [redundant-final-classvar] "Combining `ClassVar` and `Final` is redundant"
+    b: Final[ClassVar[int]] = 1
+
+    # error: [redundant-final-classvar] "Combining `ClassVar` and `Final` is redundant"
+    c: Final[ClassVar] = 1
+
+    # error: [redundant-final-classvar] "Combining `ClassVar` and `Final` is redundant"
+    d: Annotated[Final[ClassVar[int]], "metadata"] = 1
+
+    # error: [redundant-final-classvar] "Combining `ClassVar` and `Final` is redundant"
+    e: ClassVar[Final] = 1
+
+    # error: [redundant-final-classvar] "Combining `ClassVar` and `Final` is redundant"
+    f: Annotated[Final[Annotated[Annotated[ClassVar[int], "a"], "b"]], "c"] = 1
+
+reveal_type(D.a)  # revealed: int
+reveal_type(D.b)  # revealed: int
+reveal_type(D.c)  # revealed: Literal[1]
+reveal_type(D.d)  # revealed: int
+reveal_type(D.e)  # revealed: Literal[1]
+reveal_type(D.f)  # revealed: int
+
+d = D()
+d.a = 2  # error: [invalid-attribute-access] "Cannot assign to ClassVar `a` from an instance of type `D`"
+d.b = 2  # error: [invalid-attribute-access] "Cannot assign to ClassVar `b` from an instance of type `D`"
+d.c = 2  # error: [invalid-attribute-access] "Cannot assign to ClassVar `c` from an instance of type `D`"
+d.d = 2  # error: [invalid-attribute-access] "Cannot assign to ClassVar `d` from an instance of type `D`"
+d.e = 2  # error: [invalid-attribute-access] "Cannot assign to ClassVar `e` from an instance of type `D`"
+d.f = 2  # error: [invalid-attribute-access] "Cannot assign to ClassVar `f` from an instance of type `D`"
+```
+
+## Combining `ClassVar` and `Final` in dataclasses
+
+In dataclasses, `ClassVar[Final[int]]` has a distinct meaning from `Final[int]`. The former is a
+final class variable, the latter is a final instance attribute. The warning is therefore not emitted
+when combining `ClassVar[Final[...]]` in dataclasses:
+
+```py
+from dataclasses import dataclass
+from typing import ClassVar, Final
+
+@dataclass
+class D:
+    # No warning:
+    class_attr: ClassVar[Final[int]] = 1
+
+    instance_attr: Final[int] = 1
+```
+
+Note that `class_attr` does not appear in the signature of `__init__`:
+
+```py
+# revealed: (self: D, instance_attr: int = 1) -> None
+reveal_type(D.__init__)
+```
+
+```py
+def _(d: D):
+    reveal_type(d.class_attr)  # revealed: int
+    reveal_type(d.instance_attr)  # revealed: int
+
+    d.class_attr = 2  # error: [invalid-attribute-access]
+```
+
+The reverse direction `Final[ClassVar[...]]` is not recognized by the runtime implementation of
+dataclasses. We could consider emitting a warning in these cases, but for now, we treat is just like
+`ClassVar[Final[...]]` and allow it in dataclasses:
+
+```py
+from dataclasses import dataclass
+
+@dataclass
+class E:
+    class_attr: Final[ClassVar[int]] = 1
+
+# revealed: (self: E) -> None
+reveal_type(E.__init__)
+
+def _(e: E):
+    reveal_type(e.class_attr)  # revealed: int
+
+    e.class_attr = 2  # error: [invalid-attribute-access]
+```
+
 ## Illegal `ClassVar` in type expression
 
 ```py

@@ -19,14 +19,14 @@ use super::diagnostic::{
 use super::{ApplyTypeMappingVisitor, IntersectionBuilder, Type, TypeMapping, visitor};
 use crate::Db;
 use crate::semantic_index::definition::Definition;
+use crate::types::TypeContext;
 use crate::types::TypeDefinition;
 use crate::types::class::FieldKind;
-use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
-use crate::types::generics::InferableTypeVars;
-use crate::types::relation::{
-    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, TypeRelation,
+use crate::types::constraints::{
+    ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
 };
-use crate::types::{NormalizedVisitor, TypeContext};
+use crate::types::generics::InferableTypeVars;
+use crate::types::relation::{HasRelationToVisitor, IsDisjointVisitor, TypeRelation};
 
 bitflags! {
     /// Used for `TypedDict` class parameters.
@@ -49,14 +49,7 @@ impl Default for TypedDictParams {
 
 /// Type that represents the set of all inhabitants (`dict` instances) that conform to
 /// a given `TypedDict` schema.
-///
-/// # Ordering
-/// Ordering is derived from the variant order (`Class` < `Synthesized`) and the inner types.
-/// The Salsa IDs of inner types may change between runs or when the type was garbage collected
-/// and recreated.
-#[derive(
-    Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, salsa::Update, Hash, get_size2::GetSize,
-)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, salsa::Update, Hash, get_size2::GetSize)]
 pub enum TypedDictType<'db> {
     /// A reference to the class (inheriting from `typing.TypedDict`) that specifies the
     /// schema of this `TypedDict`.
@@ -135,15 +128,17 @@ impl<'db> TypedDictType<'db> {
 
     // Subtyping between `TypedDict`s follows the algorithm described at:
     // https://typing.python.org/en/latest/spec/typeddict.html#subtyping-between-typeddict-types
-    pub(super) fn has_relation_to_impl(
+    #[expect(clippy::too_many_arguments)]
+    pub(super) fn has_relation_to_impl<'c>(
         self,
         db: &'db dyn Db,
         target: TypedDictType<'db>,
+        constraints: &'c ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'_, 'db>,
-        relation: TypeRelation<'db>,
-        relation_visitor: &HasRelationToVisitor<'db>,
-        disjointness_visitor: &IsDisjointVisitor<'db>,
-    ) -> ConstraintSet<'db> {
+        relation: TypeRelation,
+        relation_visitor: &HasRelationToVisitor<'db, 'c>,
+        disjointness_visitor: &IsDisjointVisitor<'db, 'c>,
+    ) -> ConstraintSet<'db, 'c> {
         // First do a quick nominal check that (if it succeeds) means that we can avoid
         // materializing the full `TypedDict` schema for either `self` or `target`.
         // This should be cheaper in many cases, and also helps us avoid some cycles.
@@ -151,24 +146,24 @@ impl<'db> TypedDictType<'db> {
             && let Some(target_defining_class) = target.defining_class()
             && defining_class.is_subclass_of(db, target_defining_class)
         {
-            return ConstraintSet::from(true);
+            return ConstraintSet::from_bool(constraints, true);
         }
 
         let self_items = self.items(db);
         let target_items = target.items(db);
         // Many rules violations short-circuit with "never", but asking whether one field is
         // [relation] to/of another can produce more complicated constraints, and we collect those.
-        let mut constraints = ConstraintSet::from(true);
+        let mut result = ConstraintSet::from_bool(constraints, true);
         for (target_item_name, target_item_field) in target_items {
             let field_constraints = if target_item_field.is_required() {
                 // required target fields
                 let Some(self_item_field) = self_items.get(target_item_name) else {
                     // Self is missing a required field.
-                    return ConstraintSet::from(false);
+                    return ConstraintSet::from_bool(constraints, false);
                 };
                 if !self_item_field.is_required() {
                     // A required field is not required in self.
-                    return ConstraintSet::from(false);
+                    return ConstraintSet::from_bool(constraints, false);
                 }
                 if target_item_field.is_read_only() {
                     // For `ReadOnly[]` fields in the target, the corresponding fields in
@@ -178,6 +173,7 @@ impl<'db> TypedDictType<'db> {
                     self_item_field.declared_ty.has_relation_to_impl(
                         db,
                         target_item_field.declared_ty,
+                        constraints,
                         inferable,
                         relation,
                         relation_visitor,
@@ -186,7 +182,7 @@ impl<'db> TypedDictType<'db> {
                 } else {
                     if self_item_field.is_read_only() {
                         // A read-only field can't be assigned to a mutable target.
-                        return ConstraintSet::from(false);
+                        return ConstraintSet::from_bool(constraints, false);
                     }
                     // For mutable fields in the target, the relation needs to apply both
                     // ways, or else mutating the target could violate the structural
@@ -198,15 +194,17 @@ impl<'db> TypedDictType<'db> {
                         .has_relation_to_impl(
                             db,
                             target_item_field.declared_ty,
+                            constraints,
                             inferable,
                             relation,
                             relation_visitor,
                             disjointness_visitor,
                         )
-                        .and(db, || {
+                        .and(db, constraints, || {
                             target_item_field.declared_ty.has_relation_to_impl(
                                 db,
                                 self_item_field.declared_ty,
+                                constraints,
                                 inferable,
                                 relation,
                                 relation_visitor,
@@ -227,6 +225,7 @@ impl<'db> TypedDictType<'db> {
                         self_item_field.declared_ty.has_relation_to_impl(
                             db,
                             target_item_field.declared_ty,
+                            constraints,
                             inferable,
                             relation,
                             relation_visitor,
@@ -242,6 +241,7 @@ impl<'db> TypedDictType<'db> {
                         Type::object().when_assignable_to(
                             db,
                             target_item_field.declared_ty,
+                            constraints,
                             inferable,
                         )
                     }
@@ -252,12 +252,12 @@ impl<'db> TypedDictType<'db> {
                     if let Some(self_item_field) = self_items.get(target_item_name) {
                         if self_item_field.is_read_only() {
                             // A read-only field can't be assigned to a mutable target.
-                            return ConstraintSet::from(false);
+                            return ConstraintSet::from_bool(constraints, false);
                         }
                         if self_item_field.is_required() {
                             // A required field can't be assigned to a not-required, mutable field
                             // in the target, because `del` is allowed on the target field.
-                            return ConstraintSet::from(false);
+                            return ConstraintSet::from_bool(constraints, false);
                         }
 
                         // As above, for mutable fields in the target, the relation needs
@@ -267,15 +267,17 @@ impl<'db> TypedDictType<'db> {
                             .has_relation_to_impl(
                                 db,
                                 target_item_field.declared_ty,
+                                constraints,
                                 inferable,
                                 relation,
                                 relation_visitor,
                                 disjointness_visitor,
                             )
-                            .and(db, || {
+                            .and(db, constraints, || {
                                 target_item_field.declared_ty.has_relation_to_impl(
                                     db,
                                     self_item_field.declared_ty,
+                                    constraints,
                                     inferable,
                                     relation,
                                     relation_visitor,
@@ -289,16 +291,16 @@ impl<'db> TypedDictType<'db> {
                         // interaction between two structural assignability rules prevents
                         // unsoundness" in `typed_dict.md`.
                         // TODO: `closed` and `extra_items` support will go here.
-                        ConstraintSet::from(false)
+                        ConstraintSet::from_bool(constraints, false)
                     }
                 }
             };
-            constraints.intersect(db, field_constraints);
-            if constraints.is_never_satisfied(db) {
-                return constraints;
+            result.intersect(db, constraints, field_constraints);
+            if result.is_never_satisfied(db) {
+                return result;
             }
         }
-        constraints
+        result
     }
 
     pub fn definition(self, db: &'db dyn Db) -> Option<Definition<'db>> {
@@ -313,50 +315,6 @@ impl<'db> TypedDictType<'db> {
             TypedDictType::Class(defining_class) => defining_class.type_definition(db),
             TypedDictType::Synthesized(_) => None,
         }
-    }
-
-    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
-        match self {
-            TypedDictType::Class(_) => {
-                let synthesized = SynthesizedTypedDictType::new(db, self.items(db));
-                TypedDictType::Synthesized(synthesized.normalized_impl(db, visitor))
-            }
-            TypedDictType::Synthesized(synthesized) => {
-                TypedDictType::Synthesized(synthesized.normalized_impl(db, visitor))
-            }
-        }
-    }
-
-    pub(crate) fn is_equivalent_to_impl(
-        self,
-        db: &'db dyn Db,
-        other: TypedDictType<'db>,
-        inferable: InferableTypeVars<'_, 'db>,
-        visitor: &IsEquivalentVisitor<'db>,
-    ) -> ConstraintSet<'db> {
-        // TODO: `closed` and `extra_items` support will go here. Until then we don't look at the
-        // params at all, because `total` is already incorporated into `FieldKind`.
-
-        // Since both sides' fields are pre-sorted into `BTreeMap`s, we can iterate over them in
-        // sorted order instead of paying for a lookup for each field, as long as their lengths are
-        // the same.
-        if self.items(db).len() != other.items(db).len() {
-            return ConstraintSet::from(false);
-        }
-        self.items(db).iter().zip(other.items(db)).when_all(
-            db,
-            |((name, field), (other_name, other_field))| {
-                if name != other_name || field.flags != other_field.flags {
-                    return ConstraintSet::from(false);
-                }
-                field.declared_ty.is_equivalent_to_impl(
-                    db,
-                    other_field.declared_ty,
-                    inferable,
-                    visitor,
-                )
-            },
-        )
     }
 
     /// Two `TypedDict`s `A` and `B` are disjoint if it's impossible to come up with a third
@@ -418,16 +376,17 @@ impl<'db> TypedDictType<'db> {
     ///    be assignable to both.)
     ///
     /// TODO: Adding support for `closed` and `extra_items` will complicate this.
-    pub(crate) fn is_disjoint_from_impl(
+    pub(crate) fn is_disjoint_from_impl<'c>(
         self,
         db: &'db dyn Db,
         other: TypedDictType<'db>,
+        constraints: &'c ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'_, 'db>,
-        disjointness_visitor: &IsDisjointVisitor<'db>,
-        relation_visitor: &HasRelationToVisitor<'db>,
-    ) -> ConstraintSet<'db> {
+        disjointness_visitor: &IsDisjointVisitor<'db, 'c>,
+        relation_visitor: &HasRelationToVisitor<'db, 'c>,
+    ) -> ConstraintSet<'db, 'c> {
         let fields_in_common = btreemap_values_with_same_key(self.items(db), other.items(db));
-        fields_in_common.when_any(db, |(self_field, other_field)| {
+        fields_in_common.when_any(db, constraints, |(self_field, other_field)| {
             // Condition 1 above.
             if self_field.is_required() || other_field.is_required() {
                 if (!self_field.is_required() && !self_field.is_read_only())
@@ -435,7 +394,7 @@ impl<'db> TypedDictType<'db> {
                 {
                     // One side demands a `Required` source field, while the other side demands a
                     // `NotRequired` one. They must be disjoint.
-                    return ConstraintSet::from(true);
+                    return ConstraintSet::from_bool(constraints, true);
                 }
             }
             if !self_field.is_read_only() && !other_field.is_read_only() {
@@ -446,22 +405,24 @@ impl<'db> TypedDictType<'db> {
                     .has_relation_to_impl(
                         db,
                         other_field.declared_ty,
+                        constraints,
                         inferable,
                         TypeRelation::Assignability,
                         relation_visitor,
                         disjointness_visitor,
                     )
-                    .and(db, || {
+                    .and(db, constraints, || {
                         other_field.declared_ty.has_relation_to_impl(
                             db,
                             self_field.declared_ty,
+                            constraints,
                             inferable,
                             TypeRelation::Assignability,
                             relation_visitor,
                             disjointness_visitor,
                         )
                     })
-                    .negate(db)
+                    .negate(db, constraints)
             } else if !self_field.is_read_only() {
                 // Half of condition 3 above.
                 self_field
@@ -469,12 +430,13 @@ impl<'db> TypedDictType<'db> {
                     .has_relation_to_impl(
                         db,
                         other_field.declared_ty,
+                        constraints,
                         inferable,
                         TypeRelation::Assignability,
                         relation_visitor,
                         disjointness_visitor,
                     )
-                    .negate(db)
+                    .negate(db, constraints)
             } else if !other_field.is_read_only() {
                 // The other half of condition 3 above.
                 other_field
@@ -482,17 +444,19 @@ impl<'db> TypedDictType<'db> {
                     .has_relation_to_impl(
                         db,
                         self_field.declared_ty,
+                        constraints,
                         inferable,
                         TypeRelation::Assignability,
                         relation_visitor,
                         disjointness_visitor,
                     )
-                    .negate(db)
+                    .negate(db, constraints)
             } else {
                 // Condition 4 above.
                 self_field.declared_ty.is_disjoint_from_impl(
                     db,
                     other_field.declared_ty,
+                    constraints,
                     inferable,
                     disjointness_visitor,
                     relation_visitor,
@@ -1067,11 +1031,7 @@ pub(super) fn validate_typed_dict_dict_literal<'db>(
     }
 }
 
-/// # Ordering
-/// Ordering is based on the type's salsa-assigned id and not on its values.
-/// The id may change between runs, or when the type was garbage collected and recreated.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
-#[derive(PartialOrd, Ord)]
 pub struct SynthesizedTypedDictType<'db> {
     #[returns(ref)]
     pub(crate) items: TypedDictSchema<'db>,
@@ -1101,18 +1061,6 @@ impl<'db> SynthesizedTypedDictType<'db> {
             .collect::<TypedDictSchema<'db>>();
 
         SynthesizedTypedDictType::new(db, items)
-    }
-
-    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
-        let items = self
-            .items(db)
-            .iter()
-            .map(|(name, field)| {
-                let field = field.clone().normalized_impl(db, visitor);
-                (name.clone(), field)
-            })
-            .collect::<TypedDictSchema<'db>>();
-        Self::new(db, items)
     }
 }
 
@@ -1181,17 +1129,6 @@ impl<'db> TypedDictField<'db> {
                 .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
             flags: self.flags,
             first_declaration: self.first_declaration,
-        }
-    }
-
-    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
-        Self {
-            declared_ty: self.declared_ty.normalized_impl(db, visitor),
-            flags: self.flags,
-            // A normalized typed-dict field does not hold onto the original declaration,
-            // since a normalized typed-dict is an abstract type where equality does not depend
-            // on the source-code definition.
-            first_declaration: None,
         }
     }
 }

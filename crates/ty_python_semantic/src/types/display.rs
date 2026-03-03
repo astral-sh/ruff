@@ -87,6 +87,9 @@ pub struct DisplaySettings<'db> {
     /// whose type parameters are currently being displayed).
     /// Used to suppress redundant `@{scope}` suffixes for type variables.
     pub active_scopes: Rc<FxHashSet<Definition<'db>>>,
+    /// Function types that are currently being displayed.
+    /// Used to prevent infinite recursion when displaying self-referential function types.
+    pub visited_function_types: Rc<FxHashSet<FunctionType<'db>>>,
 }
 
 impl<'db> DisplaySettings<'db> {
@@ -767,14 +770,13 @@ impl<'db> FmtDetailed<'db> for TypeAliasDisplay<'db> {
         }
 
         if qualification_level == Some(&QualificationLevel::FileAndLineNumber) {
-            if let Some(definition) = self.type_alias.definition(self.db) {
-                let file = definition.file(self.db);
-                let offset = definition
-                    .focus_range(self.db, &parsed_module(self.db, file).load(self.db))
-                    .range()
-                    .start();
-                fmt_file_location(self.db, file, offset, f)?;
-            }
+            let definition = self.type_alias.definition(self.db);
+            let file = definition.file(self.db);
+            let offset = definition
+                .focus_range(self.db, &parsed_module(self.db, file).load(self.db))
+                .range()
+                .start();
+            fmt_file_location(self.db, file, offset, f)?;
         }
         Ok(())
     }
@@ -1079,9 +1081,6 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                     KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_) => {
                         return f
                             .write_str("bound method `ConstraintSet.satisfied_by_all_typevars`");
-                    }
-                    KnownBoundMethodType::GenericContextSpecializeConstrained(_) => {
-                        return f.write_str("bound method `GenericContext.specialize_constrained`");
                     }
                 };
 
@@ -1466,6 +1465,24 @@ pub(crate) struct DisplayFunctionType<'db> {
 
 impl<'db> FmtDetailed<'db> for DisplayFunctionType<'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
+        // Detect self-referential function types to prevent infinite recursion,
+        // and limit display depth for chains of different function types
+        // (e.g. multiple redefinitions with `TypeOf[foo]` return types).
+        const MAX_FUNCTION_TYPE_DISPLAY_DEPTH: usize = 4;
+        if self.settings.visited_function_types.contains(&self.ty)
+            || self.settings.visited_function_types.len() >= MAX_FUNCTION_TYPE_DISPLAY_DEPTH
+        {
+            f.set_invalid_type_annotation();
+            f.write_str("def ")?;
+            write!(f, "{}", self.ty.name(self.db))?;
+            return f.write_str("(...)");
+        }
+
+        let mut settings = self.settings.clone();
+        let mut visited = (*settings.visited_function_types).clone();
+        visited.insert(self.ty);
+        settings.visited_function_types = Rc::new(visited);
+
         let signature = self.ty.signature(self.db);
 
         match signature.overloads.as_slice() {
@@ -1475,7 +1492,7 @@ impl<'db> FmtDetailed<'db> for DisplayFunctionType<'db> {
                 let type_parameters = DisplayOptionalGenericContext {
                     generic_context: signature.generic_context.as_ref(),
                     db: self.db,
-                    settings: self.settings.clone(),
+                    settings: settings.clone(),
                     hide_unused_self,
                 };
                 f.set_invalid_type_annotation();
@@ -1483,24 +1500,24 @@ impl<'db> FmtDetailed<'db> for DisplayFunctionType<'db> {
                 write!(f, "{}", self.ty.name(self.db))?;
                 type_parameters.fmt_detailed(f)?;
                 signature
-                    .display_with(self.db, self.settings.disallow_signature_name())
+                    .display_with(self.db, settings.disallow_signature_name())
                     .fmt_detailed(f)
             }
             signatures => {
                 // TODO: How to display overloads?
-                if !self.settings.multiline {
+                if !settings.multiline {
                     // TODO: This should ideally have a TypeDetail but we actually
                     // don't have a type for @overload (we just detect the decorator)
                     f.write_str("Overload")?;
                     f.write_char('[')?;
                 }
-                let separator = if self.settings.multiline { "\n" } else { ", " };
+                let separator = if settings.multiline { "\n" } else { ", " };
                 let mut join = f.join(separator);
                 for signature in signatures {
-                    join.entry(&signature.display_with(self.db, self.settings.clone()));
+                    join.entry(&signature.display_with(self.db, settings.clone()));
                 }
                 join.finish()?;
-                if !self.settings.multiline {
+                if !settings.multiline {
                     f.write_str("]")?;
                 }
                 Ok(())
@@ -2957,11 +2974,7 @@ mod tests {
 
     use crate::Db;
     use crate::db::tests::setup_db;
-    use crate::place::typing_extensions_symbol;
-    use crate::types::typed_dict::{
-        SynthesizedTypedDictType, TypedDictFieldBuilder, TypedDictSchema,
-    };
-    use crate::types::{KnownClass, Parameter, Parameters, Signature, Type, TypedDictType};
+    use crate::types::{KnownClass, Parameter, Parameters, Signature, Type};
 
     #[test]
     fn string_literal_display() {
@@ -2978,62 +2991,6 @@ mod tests {
         assert_eq!(
             Type::string_literal(&db, r#"""#).display(&db).to_string(),
             r#"Literal["\""]"#
-        );
-    }
-
-    #[test]
-    fn synthesized_protocol_display() {
-        let db = setup_db();
-
-        // Call `.normalized()` to turn the class-based protocol into a nameless synthesized one.
-        let supports_index_synthesized = KnownClass::SupportsIndex.to_instance(&db).normalized(&db);
-        assert_eq!(
-            supports_index_synthesized.display(&db).to_string(),
-            "<Protocol with members '__index__'>"
-        );
-
-        let iterator_synthesized = typing_extensions_symbol(&db, "Iterator")
-            .place
-            .ignore_possibly_undefined()
-            .unwrap()
-            .to_instance(&db)
-            .unwrap()
-            .normalized(&db); // Call `.normalized()` to turn the class-based protocol into a nameless synthesized one.
-
-        assert_eq!(
-            iterator_synthesized.display(&db).to_string(),
-            "<Protocol with members '__iter__', '__next__'>"
-        );
-    }
-
-    #[test]
-    fn synthesized_typeddict_display() {
-        let db = setup_db();
-
-        let mut items = TypedDictSchema::default();
-        items.insert(
-            Name::new("foo"),
-            TypedDictFieldBuilder::new(Type::int_literal(42))
-                .required(true)
-                .build(),
-        );
-        items.insert(
-            Name::new("bar"),
-            TypedDictFieldBuilder::new(Type::string_literal(&db, "hello"))
-                .required(true)
-                .build(),
-        );
-
-        let synthesized = SynthesizedTypedDictType::new(&db, items);
-        let type_ = Type::TypedDict(TypedDictType::Synthesized(synthesized));
-        // Fields are sorted internally, even prior to normalization.
-        assert_eq!(
-            type_.display(&db).to_string(),
-            "<TypedDict with items 'bar', 'foo'>",
-        );
-        assert_eq!(
-            type_.normalized(&db).display(&db).to_string(),
-            "<TypedDict with items 'bar', 'foo'>",
         );
     }
 

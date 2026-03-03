@@ -797,17 +797,7 @@ impl SemanticSyntaxContext for Checker<'_> {
     }
 
     fn in_async_context(&self) -> bool {
-        for scope in self.semantic.current_scopes() {
-            match scope.kind {
-                ScopeKind::Class(_) | ScopeKind::Lambda(_) => return false,
-                ScopeKind::Function(ast::StmtFunctionDef { is_async, .. }) => return *is_async,
-                ScopeKind::Generator { .. }
-                | ScopeKind::Module
-                | ScopeKind::Type
-                | ScopeKind::DunderClassCell => {}
-            }
-        }
-        false
+        self.semantic.in_async_context()
     }
 
     fn in_await_allowed_context(&self) -> bool {

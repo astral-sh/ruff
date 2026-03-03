@@ -31,6 +31,7 @@ mod code_actions;
 mod commands;
 mod completions;
 mod configuration;
+mod folding_range;
 mod initialize;
 mod inlay_hints;
 mod notebook;
@@ -39,6 +40,7 @@ mod pull_diagnostics;
 mod rename;
 mod semantic_tokens;
 mod signature_help;
+mod type_hierarchy;
 mod workspace_folders;
 
 use std::collections::{BTreeMap, HashMap, VecDeque};
@@ -67,14 +69,14 @@ use lsp_types::{
     DidChangeTextDocumentParams, DidChangeWatchedFilesClientCapabilities,
     DidChangeWatchedFilesParams, DidChangeWorkspaceFoldersParams, DidCloseTextDocumentParams,
     DidOpenTextDocumentParams, DocumentDiagnosticParams, DocumentDiagnosticReportResult, FileEvent,
-    Hover, HoverParams, InitializeParams, InitializeResult, InitializedParams, InlayHint,
-    InlayHintClientCapabilities, InlayHintParams, NumberOrString, PartialResultParams, Position,
-    PreviousResultId, PublishDiagnosticsClientCapabilities, Range, SemanticTokensResult,
-    SignatureHelp, SignatureHelpParams, SignatureHelpTriggerKind, TextDocumentClientCapabilities,
-    TextDocumentContentChangeEvent, TextDocumentIdentifier, TextDocumentItem,
-    TextDocumentPositionParams, Url, VersionedTextDocumentIdentifier, WorkDoneProgressParams,
-    WorkspaceClientCapabilities, WorkspaceDiagnosticParams, WorkspaceDiagnosticReportResult,
-    WorkspaceEdit, WorkspaceFolder, WorkspaceFoldersChangeEvent,
+    FoldingRange, FoldingRangeParams, Hover, HoverParams, InitializeParams, InitializeResult,
+    InitializedParams, InlayHint, InlayHintClientCapabilities, InlayHintParams, NumberOrString,
+    PartialResultParams, Position, PreviousResultId, PublishDiagnosticsClientCapabilities, Range,
+    SemanticTokensResult, SignatureHelp, SignatureHelpParams, SignatureHelpTriggerKind,
+    TextDocumentClientCapabilities, TextDocumentContentChangeEvent, TextDocumentIdentifier,
+    TextDocumentItem, TextDocumentPositionParams, Url, VersionedTextDocumentIdentifier,
+    WorkDoneProgressParams, WorkspaceClientCapabilities, WorkspaceDiagnosticParams,
+    WorkspaceDiagnosticReportResult, WorkspaceEdit, WorkspaceFolder, WorkspaceFoldersChangeEvent,
 };
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf, TestSystem};
 use rustc_hash::FxHashMap;
@@ -1043,6 +1045,14 @@ impl TestServer {
                 partial_result_params: PartialResultParams::default(),
             },
         )
+    }
+
+    pub(crate) fn folding_range_request(&mut self, uri: &Url) -> Option<Vec<FoldingRange>> {
+        self.send_request_await::<lsp_types::request::FoldingRangeRequest>(FoldingRangeParams {
+            text_document: TextDocumentIdentifier { uri: uri.clone() },
+            work_done_progress_params: WorkDoneProgressParams::default(),
+            partial_result_params: PartialResultParams::default(),
+        })
     }
 
     /// Adds a workspace folder configuration to this wrapper's state.
