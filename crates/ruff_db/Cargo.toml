@@ -32,7 +32,6 @@ filetime = { workspace = true }
 get-size2 = { workspace = true }
 glob = { workspace = true }
 ignore = { workspace = true, optional = true }
-is_executable = { workspace = true }
 matchit = { workspace = true }
 path-slash = { workspace = true }
 pathdiff = { workspace = true }

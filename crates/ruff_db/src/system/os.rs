@@ -7,7 +7,7 @@ use super::walk_directory::{
 use crate::max_parallelism;
 use crate::system::{
     CaseSensitivity, DirectoryEntry, FileType, GlobError, GlobErrorKind, Metadata, Result, System,
-    SystemPath, SystemPathBuf, SystemVirtualPath, WritableSystem,
+    SystemPath, SystemPathBuf, SystemVirtualPath, WhichError, WhichResult, WritableSystem,
 };
 use filetime::FileTime;
 use ruff_notebook::{Notebook, NotebookError};
@@ -129,8 +129,19 @@ impl System for OsSystem {
         self.inner.case_sensitivity
     }
 
-    fn is_executable(&self, path: &SystemPath) -> bool {
-        is_executable::is_executable(path.as_std_path())
+    fn which(&self, name: &str) -> WhichResult {
+        let path = which::which(name).map_err(|err| match err {
+            which::Error::CannotFindBinaryPath => WhichError::CannotFindBinaryPath,
+            which::Error::CannotGetCurrentDirAndPathListEmpty => {
+                WhichError::CannotGetCurrentDirAndPathListEmpty
+            }
+            which::Error::CannotCanonicalize => WhichError::CannotCanonicalize,
+        })?;
+
+        match SystemPathBuf::from_path_buf(path) {
+            Ok(path) => Ok(path),
+            Err(_) => Err(WhichError::NonUtf8Path),
+        }
     }
 
     fn current_directory(&self) -> &SystemPath {
