@@ -7,7 +7,7 @@ use ruff_db::files::Files;
 use ruff_db::system::{OsSystem, System, SystemPathBuf};
 use ruff_db::vendored::{VendoredFileSystem, VendoredFileSystemBuilder};
 use ruff_python_ast::PythonVersion;
-use ty_module_resolver::{SearchPathSettings, SearchPaths};
+use ty_module_resolver::{FailStrategy, SearchPathSettings, SearchPaths};
 use ty_site_packages::{PythonEnvironment, SysPrefixPathOrigin};
 
 static EMPTY_VENDORED: std::sync::LazyLock<VendoredFileSystem> = std::sync::LazyLock::new(|| {
@@ -45,7 +45,7 @@ impl ModuleDb {
                 .into_vec();
         }
         let search_paths = search_path_settings
-            .to_search_paths(&system, &EMPTY_VENDORED)
+            .to_search_paths(&system, &EMPTY_VENDORED, &FailStrategy)
             .context("Invalid search path settings")?;
 
         let db = Self {

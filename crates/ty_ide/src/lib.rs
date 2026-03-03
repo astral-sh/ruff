@@ -562,7 +562,7 @@ mod tests {
     impl SitePackagesCursorTestBuilder {
         pub(super) fn build(&self) -> CursorTest {
             use ty_module_resolver::SearchPathSettings;
-            use ty_python_semantic::{Program, ProgramSettings};
+            use ty_python_semantic::{FailStrategy, Program, ProgramSettings};
 
             let project_root = SystemPathBuf::from("/src");
             let site_packages_path = SystemPathBuf::from("/site-packages");
@@ -593,7 +593,7 @@ mod tests {
                 site_packages_paths: vec![site_packages_path.clone()],
                 ..SearchPathSettings::empty()
             }
-            .to_search_paths(db.system(), db.vendored())
+            .to_search_paths(db.system(), db.vendored(), &FailStrategy)
             .expect("valid search paths");
 
             Program::from_settings(

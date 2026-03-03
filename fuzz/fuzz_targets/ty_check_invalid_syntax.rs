@@ -19,7 +19,7 @@ use ty_module_resolver::{Db as ModuleResolverDb, SearchPathSettings};
 use ty_python_semantic::lint::LintRegistry;
 use ty_python_semantic::types::check_types;
 use ty_python_semantic::{
-    AnalysisSettings, Db as SemanticDb, Program, ProgramSettings, PythonPlatform,
+    AnalysisSettings, Db as SemanticDb, FailStrategy, Program, ProgramSettings, PythonPlatform,
     PythonVersionWithSource, default_lint_registry, lint::RuleSelection,
 };
 
@@ -130,7 +130,7 @@ fn setup_db() -> TestDb {
             python_version: PythonVersionWithSource::default(),
             python_platform: PythonPlatform::default(),
             search_paths: SearchPathSettings::new(vec![src_root])
-                .to_search_paths(db.system(), db.vendored())
+                .to_search_paths(db.system(), db.vendored(), &FailStrategy)
                 .expect("Valid search path settings"),
         },
     );

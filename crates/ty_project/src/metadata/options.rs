@@ -440,13 +440,17 @@ impl Options {
             .or_default()
             .to_settings(db, &mut analysis_diagnostics);
 
-        if let Some(diagnostic) = analysis_diagnostics.into_iter().next() {
-            return Err(ToSettingsError {
-                diagnostic: Box::new(diagnostic),
-                output_format: terminal.output_format,
-                color: colored::control::SHOULD_COLORIZE.should_colorize(),
-            });
-        }
+        let analysis_result: Result<_, ToSettingsError> =
+            if let Some(diagnostic) = analysis_diagnostics.into_iter().next() {
+                Err(ToSettingsError {
+                    diagnostic: Box::new(diagnostic),
+                    output_format: terminal.output_format,
+                    color: colored::control::SHOULD_COLORIZE.should_colorize(),
+                })
+            } else {
+                Ok(analysis)
+            };
+        let analysis = strategy.fallback(analysis_result, |_| AnalysisSettings::default())?;
 
         let overrides = self
             .to_overrides_settings(db, project_root, &mut diagnostics)

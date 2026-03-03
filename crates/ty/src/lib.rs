@@ -27,6 +27,7 @@ use ty_project::metadata::settings::TerminalSettings;
 use ty_project::watch::ProjectWatcher;
 use ty_project::{CollectReporter, Db, suppress_all_diagnostics, watch};
 use ty_project::{ProjectDatabase, ProjectMetadata};
+use ty_python_semantic::FailStrategy;
 use ty_server::run_server;
 use ty_static::EnvVars;
 
@@ -146,7 +147,7 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     let project_options_overrides = ProjectOptionsOverrides::new(config_file, args.into_options());
     project_metadata.apply_overrides(&project_options_overrides);
 
-    let mut db = ProjectDatabase::new(project_metadata, system)?;
+    let mut db = ProjectDatabase::new(project_metadata, system, &FailStrategy)?;
     let project = db.project();
 
     project.set_verbose(&mut db, verbosity >= VerbosityLevel::Verbose);

@@ -23,8 +23,8 @@ use ty_module_resolver::{
 use ty_python_semantic::pull_types::pull_types;
 use ty_python_semantic::types::{UNDEFINED_REVEAL, check_types};
 use ty_python_semantic::{
-    FailStrategy, Program, ProgramSettings, PythonEnvironment, PythonPlatform,
-    PythonVersionSource, PythonVersionWithSource, SysPrefixPathOrigin,
+    FailStrategy, Program, ProgramSettings, PythonEnvironment, PythonPlatform, PythonVersionSource,
+    PythonVersionWithSource, SysPrefixPathOrigin,
 };
 
 mod assertion;

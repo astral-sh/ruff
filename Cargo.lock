@@ -4595,6 +4595,7 @@ dependencies = [
  "ruff_text_size",
  "ty_ide",
  "ty_project",
+ "ty_python_semantic",
 ]
 
 [[package]]
@@ -4614,6 +4615,7 @@ dependencies = [
  "ty_ide",
  "ty_module_resolver",
  "ty_project",
+ "ty_python_semantic",
  "walkdir",
 ]
 

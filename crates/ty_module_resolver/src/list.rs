@@ -387,6 +387,7 @@ mod tests {
         ModuleResolveMode, ModuleResolveModeIngredient, dynamic_resolution_paths,
     };
     use crate::settings::SearchPathSettings;
+    use crate::strategy::FailStrategy;
     use crate::testing::{FileSpec, MockedTypeshed, TestCase, TestCaseBuilder};
 
     use super::list_modules;
@@ -966,7 +967,7 @@ mod tests {
 
         db.set_search_paths(
             settings
-                .to_search_paths(db.system(), db.vendored())
+                .to_search_paths(db.system(), db.vendored(), &FailStrategy)
                 .expect("Valid search path settings"),
         );
 
@@ -1473,7 +1474,7 @@ not_a_directory
 
         db.set_search_paths(
             settings
-                .to_search_paths(db.system(), db.vendored())
+                .to_search_paths(db.system(), db.vendored(), &FailStrategy)
                 .expect("Valid search path settings"),
         );
 
@@ -1524,7 +1525,7 @@ not_a_directory
 
         db.set_search_paths(
             settings
-                .to_search_paths(db.system(), db.vendored())
+                .to_search_paths(db.system(), db.vendored(), &FailStrategy)
                 .expect("Valid search path settings"),
         );
 
@@ -1604,7 +1605,7 @@ not_a_directory
 
         let settings = SearchPathSettings::new(vec![src]);
         let search_paths = settings
-            .to_search_paths(db.system(), db.vendored())
+            .to_search_paths(db.system(), db.vendored(), &FailStrategy)
             .expect("valid search path settings");
         db.set_search_paths(search_paths);
 
@@ -1644,7 +1645,7 @@ not_a_directory
         };
         db.set_search_paths(
             settings
-                .to_search_paths(db.system(), db.vendored())
+                .to_search_paths(db.system(), db.vendored(), &FailStrategy)
                 .unwrap(),
         );
 
@@ -1792,7 +1793,7 @@ not_a_directory
 
         let settings = SearchPathSettings::new(vec![project_directory]);
         let search_paths = settings
-            .to_search_paths(db.system(), db.vendored())
+            .to_search_paths(db.system(), db.vendored(), &FailStrategy)
             .expect("Valid search path settings");
         db.set_search_paths(search_paths);
 

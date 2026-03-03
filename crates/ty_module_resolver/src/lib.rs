@@ -11,7 +11,8 @@ pub use resolve::{
     SearchPaths, file_to_module, resolve_module, resolve_module_confident, resolve_real_module,
     resolve_real_module_confident, resolve_real_shadowable_module,
 };
-pub use settings::{MisconfigurationMode, SearchPathSettings, SearchPathSettingsError};
+pub use settings::{SearchPathSettings, SearchPathSettingsError};
+pub use strategy::{FailStrategy, MisconfigurationStrategy, Never, UseDefaultStrategy};
 pub use typeshed::{
     PyVersionRange, TypeshedVersions, TypeshedVersionsParseError, vendored_typeshed_versions,
 };
@@ -28,6 +29,7 @@ mod module_name;
 mod path;
 mod resolve;
 mod settings;
+mod strategy;
 mod typeshed;
 
 #[cfg(test)]
