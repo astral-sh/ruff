@@ -256,6 +256,21 @@ class Box(Generic[T]):
 reveal_type(Box(1))  # revealed: Box[int]
 ```
 
+## `__new__` can remap an explicit generic specialization
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Class8(Generic[T]):
+    def __new__(cls, *args, **kwargs) -> "Class8[list[T]]":
+        raise NotImplementedError
+
+reveal_type(Class8[int]())  # revealed: Class8[list[int]]
+reveal_type(Class8[str]())  # revealed: Class8[list[str]]
+```
+
 ## `__new__` with method-level type variables mapping to class specialization
 
 When `__new__` has its own type parameters that map to the class's type parameter through the return

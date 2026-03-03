@@ -987,10 +987,22 @@ impl<'db> Bindings<'db> {
             }
         }
 
+        // If constructor inference yields a specialization, rebuild the instance from the class's
+        // identity specialization so explicit aliases like `C[int]` can still be remapped by
+        // `__new__` return types (e.g. `C[list[T]]`).
+        if let Some(specialization) = combined {
+            let specialization =
+                specialization.apply_optional_specialization(db, Some(class_specialization));
+            if let Some(class_literal) = class_literal {
+                let remapped_class = class_literal.apply_specialization(db, |_| specialization);
+                return Some(Type::instance(db, remapped_class));
+            }
+            return Some(constructor_instance_type.apply_specialization(db, specialization));
+        }
+
         // If constructor inference doesn't yield a specialization, fall back to the default
         // specialization to avoid leaking inferable typevars in the constructed instance.
-        let specialization =
-            combined.unwrap_or_else(|| class_context.default_specialization(db, None));
+        let specialization = class_context.default_specialization(db, None);
         Some(constructor_instance_type.apply_specialization(db, specialization))
     }
 
