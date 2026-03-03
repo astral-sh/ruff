@@ -13,6 +13,7 @@ mod requests;
 mod semantic_tokens;
 mod symbols;
 mod traits;
+mod type_hierarchy;
 
 use self::traits::{NotificationHandler, RequestHandler};
 use super::{Result, schedule::BackgroundSchedule};
@@ -105,6 +106,22 @@ pub(super) fn request(req: server::Request) -> Task {
         >(req, BackgroundSchedule::Worker),
         requests::WorkspaceSymbolRequestHandler::METHOD => background_request_task::<
             requests::WorkspaceSymbolRequestHandler,
+        >(
+            req, BackgroundSchedule::Worker
+        ),
+        requests::PrepareTypeHierarchyRequestHandler::METHOD => background_document_request_task::<
+            requests::PrepareTypeHierarchyRequestHandler,
+        >(
+            req, BackgroundSchedule::Worker
+        ),
+        requests::TypeHierarchySupertypesRequestHandler::METHOD => {
+            background_request_task::<requests::TypeHierarchySupertypesRequestHandler>(
+                req,
+                BackgroundSchedule::Worker,
+            )
+        }
+        requests::TypeHierarchySubtypesRequestHandler::METHOD => background_request_task::<
+            requests::TypeHierarchySubtypesRequestHandler,
         >(
             req, BackgroundSchedule::Worker
         ),

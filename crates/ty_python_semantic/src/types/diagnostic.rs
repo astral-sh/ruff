@@ -31,9 +31,7 @@ use crate::types::{
     ProtocolInstanceType, SpecialFormType, SubclassOfInner, Type, TypeContext, binding_type,
     protocol_class::ProtocolClass,
 };
-use crate::types::{
-    DataclassFlags, KnownInstanceType, MemberLookupPolicy, TypeVarInstance, UnionType,
-};
+use crate::types::{KnownInstanceType, MemberLookupPolicy, TypeVarInstance, UnionType};
 use crate::{Db, DisplaySettings, FxIndexMap, Program, declare_lint};
 use itertools::Itertools;
 use ruff_db::{
@@ -85,6 +83,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_CONTEXT_MANAGER);
     registry.register_lint(&INVALID_DECLARATION);
     registry.register_lint(&INVALID_EXCEPTION_CAUGHT);
+    registry.register_lint(&INVALID_ENUM_MEMBER_ANNOTATION);
     registry.register_lint(&INVALID_GENERIC_ENUM);
     registry.register_lint(&INVALID_GENERIC_CLASS);
     registry.register_lint(&INVALID_LEGACY_TYPE_VARIABLE);
@@ -108,6 +107,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_TYPE_VARIABLE_CONSTRAINTS);
     registry.register_lint(&INVALID_TYPE_VARIABLE_BOUND);
     registry.register_lint(&INVALID_TYPE_VARIABLE_DEFAULT);
+    registry.register_lint(&UNBOUND_TYPE_VARIABLE);
     registry.register_lint(&MISSING_ARGUMENT);
     registry.register_lint(&NO_MATCHING_OVERLOAD);
     registry.register_lint(&NOT_SUBSCRIPTABLE);
@@ -117,10 +117,12 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&POSSIBLY_MISSING_ATTRIBUTE);
     registry.register_lint(&POSSIBLY_MISSING_IMPORT);
     registry.register_lint(&POSSIBLY_UNRESOLVED_REFERENCE);
+    registry.register_lint(&SHADOWED_TYPE_VARIABLE);
     registry.register_lint(&SUBCLASS_OF_FINAL_CLASS);
     registry.register_lint(&OVERRIDE_OF_FINAL_METHOD);
     registry.register_lint(&OVERRIDE_OF_FINAL_VARIABLE);
     registry.register_lint(&INEFFECTIVE_FINAL);
+    registry.register_lint(&FINAL_ON_NON_METHOD);
     registry.register_lint(&FINAL_WITHOUT_VALUE);
     registry.register_lint(&ABSTRACT_METHOD_IN_FINAL_CLASS);
     registry.register_lint(&CALL_ABSTRACT_METHOD);
@@ -1194,6 +1196,48 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
+    /// Checks for enum members that have explicit type annotations.
+    ///
+    /// ## Why is this bad?
+    /// The [typing spec] states that type checkers should infer a literal type
+    /// for all enum members. An explicit type annotation on an enum member is
+    /// misleading because the annotated type will be incorrect — the actual
+    /// runtime type is the enum class itself, not the annotated type.
+    ///
+    /// In CPython's `enum` module, annotated assignments with values are still
+    /// treated as members at runtime, but the annotation will confuse readers of the code.
+    ///
+    /// ## Examples
+    /// ```python
+    /// from enum import Enum
+    ///
+    /// class Pet(Enum):
+    ///     CAT = 1       # OK
+    ///     DOG: int = 2  # Error: enum members should not be annotated
+    /// ```
+    ///
+    /// Use instead:
+    /// ```python
+    /// from enum import Enum
+    ///
+    /// class Pet(Enum):
+    ///     CAT = 1
+    ///     DOG = 2
+    /// ```
+    ///
+    /// ## References
+    /// - [Typing spec: Enum members](https://typing.python.org/en/latest/spec/enums.html#enum-members)
+    ///
+    /// [typing spec]: https://typing.python.org/en/latest/spec/enums.html#enum-members
+    pub(crate) static INVALID_ENUM_MEMBER_ANNOTATION = {
+        summary: "detects type annotations on enum members",
+        status: LintStatus::stable("0.0.20"),
+        default_level: Level::Warn,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
     /// Checks for enum classes that are also generic.
     ///
     /// ## Why is this bad?
@@ -1810,6 +1854,36 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
+    /// Checks for type variables that are used in a scope where they are not bound
+    /// to any enclosing generic context.
+    ///
+    /// ## Why is this bad?
+    /// Using a type variable outside of a scope that binds it has no well-defined meaning.
+    ///
+    /// ## Examples
+    /// ```python
+    /// from typing import TypeVar, Generic
+    ///
+    /// T = TypeVar("T")
+    /// S = TypeVar("S")
+    ///
+    /// x: T  # error: unbound type variable in module scope
+    ///
+    /// class C(Generic[T]):
+    ///     x: list[S] = []  # error: S is not in this class's generic context
+    /// ```
+    ///
+    /// ## References
+    /// - [Typing spec: Scoping rules for type variables](https://typing.python.org/en/latest/spec/generics.html#scoping-rules-for-type-variables)
+    pub(crate) static UNBOUND_TYPE_VARIABLE = {
+        summary: "detects type variables used outside of their bound scope",
+        status: LintStatus::stable("0.0.20"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
     /// Checks for missing required arguments in a call.
     ///
     /// ## Why is this bad?
@@ -2161,6 +2235,32 @@ declare_lint! {
         summary: "detects calls to `final()` that type checkers cannot interpret",
         status: LintStatus::stable("0.0.1-alpha.33"),
         default_level: Level::Warn,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for `@final` decorators applied to non-method functions.
+    ///
+    /// ## Why is this bad?
+    /// The `@final` decorator is only meaningful on methods and classes.
+    /// Applying it to a module-level function or a nested function has no
+    /// effect and is likely a mistake.
+    ///
+    /// ## Example
+    ///
+    /// ```python
+    /// from typing import final
+    ///
+    /// # Error: @final is not allowed on non-method functions
+    /// @final
+    /// def my_function() -> int:
+    ///     return 0
+    /// ```
+    pub(crate) static FINAL_ON_NON_METHOD = {
+        summary: "detects `@final` applied to non-method functions",
+        status: LintStatus::stable("0.0.20"),
+        default_level: Level::Error,
     }
 }
 
@@ -2701,6 +2801,33 @@ declare_lint! {
         summary: "detects redundant combinations of `ClassVar` and `Final`",
         status: LintStatus::stable("0.0.18"),
         default_level: Level::Warn,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for type variables in nested generic classes or functions that shadow type variables
+    /// from an enclosing scope.
+    ///
+    /// ## Why is this bad?
+    /// Shadowing type variables makes the code confusing and is disallowed by the typing spec.
+    ///
+    /// ## Examples
+    /// ```python
+    /// class Outer[T]:
+    ///     # Error: `T` is already used by `Outer`
+    ///     class Inner[T]: ...
+    ///
+    ///     # Error: `T` is already used by `Outer`
+    ///     def method[T](self, x: T) -> T: ...
+    /// ```
+    ///
+    /// ## References
+    /// - [Typing spec: Generics](https://typing.python.org/en/latest/spec/generics.html#introduction)
+    pub(crate) static SHADOWED_TYPE_VARIABLE = {
+        summary: "detects type variables that shadow type variables from outer scopes",
+        status: LintStatus::stable("0.0.20"),
+        default_level: Level::Error,
     }
 }
 
@@ -3926,7 +4053,7 @@ pub(crate) fn report_invalid_arguments_to_annotated(
 pub(crate) fn report_invalid_argument_number_to_special_form(
     context: &InferContext,
     subscript: &ast::ExprSubscript,
-    special_form: SpecialFormType,
+    special_form: impl Into<SpecialFormType>,
     received_arguments: usize,
     expected_arguments: u8,
 ) {
@@ -3939,6 +4066,7 @@ pub(crate) fn report_invalid_argument_number_to_special_form(
         builder.into_diagnostic(format_args!(
             "Special form `{special_form}` expected exactly {expected_arguments} {noun}, \
             got {received_arguments}",
+            special_form = special_form.into(),
         ));
     }
 }
@@ -4888,23 +5016,73 @@ pub(crate) fn report_invalid_type_param_order<'db>(
     }
 }
 
-pub(crate) fn report_rebound_typevar<'db>(
+pub(crate) fn report_invalid_typevar_default_reference<'db>(
     context: &InferContext<'db, '_>,
-    typevar_name: &ast::name::Name,
     class: StaticClassLiteral<'db>,
-    class_node: &ast::StmtClassDef,
-    other_typevar: BoundTypeVarInstance<'db>,
+    typevar_with_bad_default: TypeVarInstance<'db>,
+    referenced_typevar: TypeVarInstance<'db>,
+    is_later_in_list: bool,
 ) {
     let db = context.db();
+
     let Some(builder) = context.report_lint(&INVALID_GENERIC_CLASS, class.header_range(db)) else {
         return;
     };
+
+    let mut diagnostic = if is_later_in_list {
+        builder.into_diagnostic(format_args!(
+            "Default of `{}` cannot reference later type parameter `{}`",
+            typevar_with_bad_default.name(db),
+            referenced_typevar.name(db),
+        ))
+    } else {
+        builder.into_diagnostic(format_args!(
+            "Default of `{}` cannot reference out-of-scope type variable `{}`",
+            typevar_with_bad_default.name(db),
+            referenced_typevar.name(db),
+        ))
+    };
+
+    let typevars_to_annotate = if is_later_in_list {
+        &[typevar_with_bad_default, referenced_typevar][..]
+    } else {
+        &[typevar_with_bad_default][..]
+    };
+
+    for tvar in typevars_to_annotate {
+        let Some(definition) = tvar.definition(db) else {
+            continue;
+        };
+        let file = definition.file(db);
+        diagnostic.annotate(
+            Annotation::secondary(Span::from(
+                definition.full_range(db, &parsed_module(db, file).load(db)),
+            ))
+            .message(format_args!("`{}` defined here", tvar.name(db))),
+        );
+    }
+}
+
+pub(crate) fn report_shadowed_type_variable<'db>(
+    context: &InferContext<'db, '_>,
+    typevar_name: &ast::name::Name,
+    kind: &str,
+    name: &ast::name::Name,
+    range: TextRange,
+    other_typevar: BoundTypeVarInstance<'db>,
+) {
+    let db = context.db();
+    let Some(builder) = context.report_lint(&SHADOWED_TYPE_VARIABLE, range) else {
+        return;
+    };
     let mut diagnostic = builder.into_diagnostic(format_args!(
-        "Generic class `{}` must not reference type variables bound in an enclosing scope",
-        class_node.name,
+        "Generic {kind} `{name}` uses type variable `{typevar_name}` already bound by an enclosing scope",
+    ));
+    diagnostic.set_concise_message(format_args!(
+        "Generic {kind} `{name}` uses type variable `{typevar_name}` already bound by an enclosing scope",
     ));
     diagnostic.set_primary_message(format_args!(
-        "`{typevar_name}` referenced in class definition here"
+        "`{typevar_name}` used in {kind} definition here"
     ));
     let Some(other_definition) = other_typevar.binding_context(db).definition() else {
         return;
@@ -5565,7 +5743,7 @@ pub(super) fn report_bad_frozen_dataclass_inheritance<'db>(
     class_node: &ast::StmtClassDef,
     base_class: StaticClassLiteral<'db>,
     base_class_node: &ast::Expr,
-    base_class_params: DataclassFlags,
+    base_is_frozen: bool,
 ) {
     let db = context.db();
 
@@ -5575,7 +5753,7 @@ pub(super) fn report_bad_frozen_dataclass_inheritance<'db>(
         return;
     };
 
-    let mut diagnostic = if base_class_params.is_frozen() {
+    let mut diagnostic = if base_is_frozen {
         let mut diagnostic =
             builder.into_diagnostic("Non-frozen dataclass cannot inherit from frozen dataclass");
         diagnostic.set_concise_message(format_args!(

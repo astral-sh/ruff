@@ -17,15 +17,15 @@ from typing import TypeVar
 
 T = TypeVar("T")
 
-# TODO: error
+# error: [unbound-type-variable]
 x: T
 
 class C:
-    # TODO: error
+    # error: [unbound-type-variable]
     x: T
 
 def f() -> None:
-    # TODO: error
+    # error: [unbound-type-variable]
     x: T
 ```
 
@@ -186,11 +186,11 @@ S = TypeVar("S")
 
 def f(x: T) -> None:
     x: list[T] = []
-    # TODO: invalid-assignment error
+    # error: [unbound-type-variable]
     y: list[S] = []
 
 class C(Generic[T]):
-    # TODO: error: cannot use S if it's not in the current generic context
+    # error: [unbound-type-variable]
     x: list[S] = []
 
     # This is not an error, as shown in the previous test
@@ -210,11 +210,11 @@ S = TypeVar("S")
 
 def f[T](x: T) -> None:
     x: list[T] = []
-    # TODO: invalid assignment error
+    # error: [unbound-type-variable]
     y: list[S] = []
 
 class C[T]:
-    # TODO: error: cannot use S if it's not in the current generic context
+    # error: [unbound-type-variable]
     x: list[S] = []
 
     def m1(self, x: S) -> S:
@@ -222,6 +222,44 @@ class C[T]:
 
     def m2[S](self, x: S) -> S:
         return x
+```
+
+## Should `Callable` annotations create an implicit generic context?
+
+There is disagreement among type checkers around how to handle this case. For now, we do not emit an
+error on the following snippet, but we may change this in the future.
+
+```py
+from typing import TypeVar, Callable
+from ty_extensions import generic_context
+
+T = TypeVar("T")
+
+x: Callable[[T], T] = lambda obj: obj
+
+# TODO: if we decide that `Callable` annotations always create an implicit generic context,
+# all of these revealed types and `invalid-argument-type` diagnostics are incorrect.
+# If we decide that they do not, we should emit `unbound-type-variable` on both the
+# declaration of `x` in the global scope and the parameter annotation of `y`.
+#
+# NOTE: all the `reveal_type`s are inside a function here so that we test the behaviour
+# of the declared type (from the annotation) rather than the local inferred type
+def test(y: Callable[[T], T]):
+    # revealed: None
+    reveal_type(generic_context(x))
+    # revealed: (TypeVar, /) -> TypeVar
+    reveal_type(x)
+    # error: [invalid-argument-type]
+    # revealed: TypeVar
+    reveal_type(x(42))
+
+    # revealed: None
+    reveal_type(generic_context(y))
+    # revealed: (T@test, /) -> T@test
+    reveal_type(y)
+    # error: [invalid-argument-type]
+    # revealed: T@test
+    reveal_type(y(42))
 ```
 
 ## Nested formal typevars must be distinct
@@ -242,21 +280,25 @@ We assume that the more general form holds.
 
 ### Generic function within generic function
 
+<!-- snapshot-diagnostics -->
+
 ```py
 def f[T](x: T, y: T) -> None:
     def ok[S](a: S, b: S) -> None: ...
 
-    # TODO: error
+    # error: [shadowed-type-variable]
     def bad[T](a: T, b: T) -> None: ...
 ```
 
 ### Generic method within generic class
 
+<!-- snapshot-diagnostics -->
+
 ```py
 class C[T]:
     def ok[S](self, a: S, b: S) -> None: ...
 
-    # TODO: error
+    # error: [shadowed-type-variable]
     def bad[T](self, a: T, b: T) -> None: ...
 ```
 
@@ -269,9 +311,9 @@ from typing import Iterable
 
 def f[T](x: T, y: T) -> None:
     class Ok[S]: ...
-    # error: [invalid-generic-class]
+    # error: [shadowed-type-variable]
     class Bad1[T]: ...
-    # error: [invalid-generic-class]
+    # error: [shadowed-type-variable]
     class Bad2(Iterable[T]): ...
 ```
 
@@ -284,9 +326,9 @@ from typing import Iterable
 
 class C[T]:
     class Ok1[S]: ...
-    # error: [invalid-generic-class]
+    # error: [shadowed-type-variable]
     class Bad1[T]: ...
-    # error: [invalid-generic-class]
+    # error: [shadowed-type-variable]
     class Bad2(Iterable[T]): ...
 ```
 
@@ -310,7 +352,7 @@ list:
 
 ```py
 class Outer[T]:
-    # error: [invalid-generic-class]
+    # error: [shadowed-type-variable]
     class Bad(list[T]): ...
 ```
 
@@ -361,7 +403,7 @@ class C[T]:
     ok1: list[T] = []
 
     class Bad:
-        # TODO: error: cannot refer to T in nested scope
+        # error: [unbound-type-variable]
         bad: list[T] = []
 
     class Inner[S]: ...

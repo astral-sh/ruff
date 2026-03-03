@@ -85,7 +85,7 @@ impl Widening {
     pub(crate) fn apply_if_needed<'db>(self, db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
         match self {
             Self::None => ty,
-            Self::WithUnknown => UnionType::from_elements(db, [Type::unknown(), ty]),
+            Self::WithUnknown => UnionType::from_two_elements(db, Type::unknown(), ty),
         }
     }
 }
@@ -326,13 +326,13 @@ impl<'db> LookupError<'db> {
             (LookupError::Undefined(_), _) => fallback,
             (LookupError::PossiblyUndefined { .. }, Err(LookupError::Undefined(_))) => Err(self),
             (LookupError::PossiblyUndefined(ty), Ok(ty2)) => Ok(TypeAndQualifiers::new(
-                UnionType::from_elements(db, [ty.inner_type(), ty2.inner_type()]),
+                UnionType::from_two_elements(db, ty.inner_type(), ty2.inner_type()),
                 ty.origin().merge(ty2.origin()),
                 ty.qualifiers().union(ty2.qualifiers()),
             )),
             (LookupError::PossiblyUndefined(ty), Err(LookupError::PossiblyUndefined(ty2))) => {
                 Err(LookupError::PossiblyUndefined(TypeAndQualifiers::new(
-                    UnionType::from_elements(db, [ty.inner_type(), ty2.inner_type()]),
+                    UnionType::from_two_elements(db, ty.inner_type(), ty2.inner_type()),
                     ty.origin().merge(ty2.origin()),
                     ty.qualifiers().union(ty2.qualifiers()),
                 )))
@@ -920,7 +920,7 @@ pub(crate) fn place_by_id<'db>(
                     definedness: boundness,
                     ..
                 }) => Place::Defined(DefinedPlace {
-                    ty: UnionType::from_elements(db, [Type::unknown(), inferred]),
+                    ty: UnionType::from_two_elements(db, Type::unknown(), inferred),
                     origin,
                     definedness: boundness,
                     widening: Widening::None,
@@ -979,7 +979,7 @@ pub(crate) fn place_by_id<'db>(
                     definedness: boundness,
                     ..
                 }) => Place::Defined(DefinedPlace {
-                    ty: UnionType::from_elements(db, [inferred_ty, declared_ty]),
+                    ty: UnionType::from_two_elements(db, inferred_ty, declared_ty),
                     origin,
                     definedness: if boundness_analysis == BoundnessAnalysis::AssumeBound {
                         Definedness::AlwaysDefined
@@ -1968,9 +1968,10 @@ pub(crate) fn class_body_implicit_symbol<'db>(
         "__qualname__" => Place::bound(KnownClass::Str.to_instance(db)).into(),
         "__module__" => Place::bound(KnownClass::Str.to_instance(db)).into(),
         // __doc__ is `str` if there's a docstring, `None` if there isn't
-        "__doc__" => Place::bound(UnionType::from_elements(
+        "__doc__" => Place::bound(UnionType::from_two_elements(
             db,
-            [KnownClass::Str.to_instance(db), Type::none(db)],
+            KnownClass::Str.to_instance(db),
+            Type::none(db),
         ))
         .into(),
         // __firstlineno__ was added in Python 3.13

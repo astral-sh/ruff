@@ -207,13 +207,17 @@ impl<'db> SubscriptErrorKind<'db> {
             }
             Self::NonGenericTypeAlias { alias } => {
                 if let Some(builder) = context.report_lint(&NOT_SUBSCRIPTABLE, subscript) {
+                    let mut diagnostic = builder.into_diagnostic(format_args!(
+                        "Cannot subscript non-generic type alias `{}`",
+                        alias.name(db)
+                    ));
                     let value_type = alias.raw_value_type(db);
-                    let mut diagnostic =
-                        builder.into_diagnostic("Cannot subscript non-generic type alias");
-                    if value_type.is_definition_generic(db) {
-                        diagnostic.set_primary_message(format_args!(
-                            "`{}` is already specialized",
-                            value_type.display(db)
+                    if value_type.is_specialized_generic(db) {
+                        diagnostic.annotate(context.secondary(&*subscript.value).message(
+                            format_args!(
+                                "Alias to `{}`, which is already specialized",
+                                value_type.display(db)
+                            ),
                         ));
                     }
                 }

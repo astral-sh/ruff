@@ -4,7 +4,7 @@ use rustc_hash::FxHashSet;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, PythonVersion};
 use ruff_python_literal::format::FormatSpec;
-use ruff_python_parser::parse_expression;
+use ruff_python_parser::{UnsupportedSyntaxErrorKind, parse_expression};
 use ruff_python_semantic::analyze::logging::is_logger_candidate;
 use ruff_python_semantic::{Modules, SemanticModel, TypingOnlyBindingsStatus};
 use ruff_text_size::{Ranged, TextRange};
@@ -200,6 +200,18 @@ fn should_be_fstring(
         return false;
     };
 
+    // For Python < 3.12, reject if the parser detected any PEP 701 f-string
+    // features.
+    if target_version < PythonVersion::PY312 {
+        let has_pep701 = parsed
+            .unsupported_syntax_errors()
+            .iter()
+            .any(|e| matches!(e.kind, UnsupportedSyntaxErrorKind::Pep701FString(_)));
+        if has_pep701 {
+            return false;
+        }
+    }
+
     // Note: Range offsets for `value` are based on `fstring_expr`
     let ast::Expr::FString(ast::ExprFString { value, .. }) = parsed.expr() else {
         return false;
@@ -226,13 +238,6 @@ fn should_be_fstring(
     for f_string in value.f_strings() {
         let mut has_name = false;
         for element in f_string.elements.interpolations() {
-            // Check if the interpolation expression contains backslashes
-            // F-strings with backslashes in interpolations are only valid in Python 3.12+
-            let interpolation_text = &fstring_expr[element.range()];
-            if target_version < PythonVersion::PY312 && interpolation_text.contains('\\') {
-                return false;
-            }
-
             if let ast::Expr::Name(ast::ExprName { id, .. }) = element.expression.as_ref() {
                 if arg_names.contains(id) {
                     return false;

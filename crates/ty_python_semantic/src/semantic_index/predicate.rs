@@ -135,6 +135,7 @@ pub(crate) enum PatternPredicateKind<'db> {
     Value(Expression<'db>),
     Or(Vec<PatternPredicateKind<'db>>),
     Class(Expression<'db>, ClassPatternKind),
+    Mapping(ClassPatternKind),
     As(Option<Box<PatternPredicateKind<'db>>>, Option<Name>),
     Unsupported,
 }

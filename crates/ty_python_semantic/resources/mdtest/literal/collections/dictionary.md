@@ -116,4 +116,9 @@ reveal_type(x5["a"])  # revealed: Literal[1]
 reveal_type(x5["b"])  # revealed: dict[str, int | TD]
 reveal_type(x5["b"]["c"])  # revealed: Literal[2]
 reveal_type(x5["b"]["d"])  # revealed: TD
+
+x6 = x7 = {"a": 1}
+# TODO: This should reveal `Literal[1]`.
+reveal_type(x6["a"])  # revealed: Unknown | int
+reveal_type(x7["a"])  # revealed: Unknown | int
 ```

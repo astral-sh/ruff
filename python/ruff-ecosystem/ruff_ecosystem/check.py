@@ -10,10 +10,11 @@ import re
 import time
 from asyncio import create_subprocess_exec
 from collections import Counter
+from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from subprocess import PIPE
-from typing import TYPE_CHECKING, Iterable, Iterator, Self, Sequence
+from typing import TYPE_CHECKING, Self
 
 from ruff_ecosystem import logger
 from ruff_ecosystem.markdown import (
@@ -417,7 +418,7 @@ class DiagnosticLine:
 
         if match is None:
             # Handle case where there are no regex match e.g.
-            # +                 "?application=AIRFLOW&authenticator=TEST_AUTH&role=TEST_ROLE&warehouse=TEST_WAREHOUSE" # noqa: E501, ERA001
+            # +                 "?application=AIRFLOW&authenticator=TEST_AUTH&role=TEST_ROLE&warehouse=TEST_WAREHOUSE"
             # Which was found in local testing
             return None
 
@@ -457,7 +458,7 @@ class CheckDiff(Diff):
         diff = diff.without_unchanged_lines()
 
         # Sort without account for the leading + / -
-        sorted_lines = list(sorted(diff, key=lambda line: line[2:]))
+        sorted_lines = sorted(diff, key=lambda line: line[2:])
 
         # Parse the lines, drop lines that cannot be parsed
         parsed_lines: list[DiagnosticLine] = list(
@@ -559,10 +560,8 @@ async def ruff_check(
         raise ToolError(err.decode("utf8"))
 
     # Strip summary lines so the diff is only diagnostic lines
-    lines = [
+    return [
         line
         for line in result.decode("utf8").splitlines()
         if not CHECK_SUMMARY_LINE_RE.match(line)
     ]
-
-    return lines

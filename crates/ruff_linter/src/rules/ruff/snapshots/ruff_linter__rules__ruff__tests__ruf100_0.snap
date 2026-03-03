@@ -95,25 +95,6 @@ help: Remove unused `noqa` directive
 24 |     # Invalid (but external)
 25 |     d = 1  # noqa: V500
 
-RUF100 [*] Unused `noqa` directive (unknown: `V500`)
-  --> RUF100_0.py:25:12
-   |
-24 |     # Invalid (but external)
-25 |     d = 1  # noqa: V500
-   |            ^^^^^^^^^^^^
-26 |
-27 |     # fmt: off
-   |
-help: Remove unused `noqa` directive
-22 |     d = 1  # noqa: F841, V101
-23 | 
-24 |     # Invalid (but external)
-   -     d = 1  # noqa: V500
-25 +     d = 1
-26 | 
-27 |     # fmt: off
-28 |     # Invalid - no space before #
-
 RUF100 [*] Unused `noqa` directive (unused: `E501`)
   --> RUF100_0.py:29:12
    |
@@ -272,25 +253,6 @@ help: Remove unused `noqa` directive
 95 | 
 96 | def f():
 
-RUF100 [*] Unused `noqa` directive (unknown: `E50`)
-   --> RUF100_0.py:107:12
-    |
-105 | def f():
-106 |     # Invalid - nonexistent error code with multibyte character
-107 |     d = 1  # noqa: F841, E50
-    |            ^^^^^^^^^^^^^^^^^
-108 |     e = 1  # noqa: E50
-    |
-help: Remove unused `noqa` directive
-104 | 
-105 | def f():
-106 |     # Invalid - nonexistent error code with multibyte character
-    -     d = 1  # noqa: F841, E50
-107 +     d = 1  # noqa: F841
-108 |     e = 1  # noqa: E50
-109 | 
-110 | 
-
 F841 [*] Local variable `e` is assigned to but never used
    --> RUF100_0.py:108:5
     |
@@ -309,25 +271,7 @@ help: Remove assignment to unused variable `e`
 110 | def f():
 note: This is an unsafe fix and may change runtime behavior
 
-RUF100 [*] Unused `noqa` directive (unknown: `E50`)
-   --> RUF100_0.py:108:12
-    |
-106 |     # Invalid - nonexistent error code with multibyte character
-107 |     d = 1  # noqa: F841, E50
-108 |     e = 1  # noqa: E50
-    |            ^^^^^^^^^^^
-    |
-help: Remove unused `noqa` directive
-105 | def f():
-106 |     # Invalid - nonexistent error code with multibyte character
-107 |     d = 1  # noqa: F841, E50
-    -     e = 1  # noqa: E50
-108 +     e = 1
-109 | 
-110 | 
-111 | def f():
-
-RUF100 [*] Unused `noqa` directive (duplicated: `F841`; unknown: `X200`)
+RUF100 [*] Unused `noqa` directive (duplicated: `F841`)
    --> RUF100_0.py:118:12
     |
 116 | # Check duplicate code detection

@@ -2,19 +2,15 @@ use compact_str::CompactString;
 use ruff_python_ast::name::Name;
 
 use crate::Db;
-use crate::types::{ClassLiteral, KnownClass, NormalizedVisitor, Type};
+use crate::types::{ClassLiteral, KnownClass, Type};
 
 /// A literal value. See [`LiteralValueTypeKind`] for details.
-#[derive(
-    PartialOrd, Ord, Copy, Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize,
-)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 pub struct LiteralValueType<'db>(LiteralValueTypeInner<'db>);
 
 // This enum effectively contains two variants, `Promotable(LiteralValueKind)` and `Unpromotable(LiteralValueKind)`,
 // but flattened to reduce the size of the type.
-#[derive(
-    PartialOrd, Ord, Copy, Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize,
-)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 enum LiteralValueTypeInner<'db> {
     PromotableInt(IntLiteralType),
     PromotableBool(bool),
@@ -30,9 +26,7 @@ enum LiteralValueTypeInner<'db> {
     UnpromotableLiteralString,
 }
 
-#[derive(
-    PartialOrd, Ord, Copy, Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize,
-)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 pub(crate) enum LiteralValueTypeKind<'db> {
     /// An integer literal
     Int(IntLiteralType),
@@ -88,37 +82,6 @@ impl<'db> LiteralValueType<'db> {
             LiteralValueTypeKind::Enum(e) => LiteralValueTypeInner::UnpromotableEnum(e),
             LiteralValueTypeKind::Bytes(bytes) => LiteralValueTypeInner::UnpromotableBytes(bytes),
             LiteralValueTypeKind::LiteralString => LiteralValueTypeInner::UnpromotableLiteralString,
-        };
-
-        Self(repr)
-    }
-
-    /// Returns the promotable form of this literal value.
-    #[must_use]
-    pub(crate) fn to_promotable(self) -> Self {
-        let repr = match self.0 {
-            LiteralValueTypeInner::UnpromotableInt(int) => {
-                LiteralValueTypeInner::PromotableInt(int)
-            }
-            LiteralValueTypeInner::UnpromotableBool(bool) => {
-                LiteralValueTypeInner::PromotableBool(bool)
-            }
-            LiteralValueTypeInner::UnpromotableString(string) => {
-                LiteralValueTypeInner::PromotableString(string)
-            }
-            LiteralValueTypeInner::UnpromotableEnum(e) => LiteralValueTypeInner::PromotableEnum(e),
-            LiteralValueTypeInner::UnpromotableBytes(bytes) => {
-                LiteralValueTypeInner::PromotableBytes(bytes)
-            }
-            LiteralValueTypeInner::UnpromotableLiteralString => {
-                LiteralValueTypeInner::PromotableLiteralString
-            }
-            LiteralValueTypeInner::PromotableInt(_)
-            | LiteralValueTypeInner::PromotableBool(_)
-            | LiteralValueTypeInner::PromotableString(_)
-            | LiteralValueTypeInner::PromotableEnum(_)
-            | LiteralValueTypeInner::PromotableBytes(_)
-            | LiteralValueTypeInner::PromotableLiteralString => self.0,
         };
 
         Self(repr)
@@ -268,14 +231,6 @@ impl<'db> LiteralValueType<'db> {
             LiteralValueTypeKind::Enum(literal) => literal.enum_class_instance(db),
         }
     }
-
-    pub(crate) fn normalized_impl(
-        self,
-        _db: &'db dyn Db,
-        _visitor: &NormalizedVisitor<'db>,
-    ) -> Self {
-        self.to_promotable()
-    }
 }
 
 impl From<i64> for LiteralValueTypeKind<'_> {
@@ -350,11 +305,7 @@ impl std::fmt::Debug for IntLiteralType {
     }
 }
 
-/// # Ordering
-/// Ordering is based on the string literal's salsa-assigned id and not on its value.
-/// The id may change between runs, or when the string literal was garbage collected and recreated.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
-#[derive(PartialOrd, Ord)]
 pub struct StringLiteralType<'db> {
     #[returns(deref)]
     pub(crate) value: CompactString,
@@ -370,11 +321,7 @@ impl<'db> StringLiteralType<'db> {
     }
 }
 
-/// # Ordering
-/// Ordering is based on the byte literal's salsa-assigned id and not on its value.
-/// The id may change between runs, or when the byte literal was garbage collected and recreated.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
-#[derive(PartialOrd, Ord)]
 pub struct BytesLiteralType<'db> {
     #[returns(deref)]
     pub(crate) value: Box<[u8]>,
@@ -399,7 +346,6 @@ impl<'db> BytesLiteralType<'db> {
 ///     YES = 1
 /// ```
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
-#[derive(PartialOrd, Ord)]
 pub struct EnumLiteralType<'db> {
     /// A reference to the enum class this literal belongs to
     pub(crate) enum_class: ClassLiteral<'db>,
