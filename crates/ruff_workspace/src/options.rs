@@ -2677,15 +2677,18 @@ pub struct IsortOptions {
     ///
     /// - `path`: Sort imports by their module path (the default). For `from` imports, sorts by
     ///   the module name (e.g., `foo` in `from foo import bar`).
+    /// - `full-path`: Sort `from` imports by their fully-qualified name. For example,
+    ///   `from foo import bar` sorts as `foo.bar` rather than `foo`. This means
+    ///   `from foo import baz` sorts after `from foo.bar import wow`, since `foo.bar.wow < foo.baz`.
     /// - `length`: Sort imports by their string length, placing shorter imports before longer ones.
     ///   Applies to both straight imports (`import foo`) and `from` imports (`from foo import bar`).
     /// - `length-straight`: Sort straight imports by their string length, leaving `from` imports
     ///   sorted by path.
     #[option(
         default = r#""path""#,
-        value_type = r#""path" | "length" | "length-straight""#,
+        value_type = r#""path" | "full-path" | "length" | "length-straight""#,
         example = r#"
-            import-strategy = "length"
+            import-strategy = "full-path"
         "#
     )]
     pub import_strategy: Option<ImportStrategy>,

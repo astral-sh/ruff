@@ -25,6 +25,11 @@ pub enum ImportStrategy {
     /// Sort imports by their module path, using the module name for `from` imports (the default).
     #[default]
     Path,
+    /// Sort `from` imports by their fully-qualified name.
+    ///
+    /// For example, `from foo import bar` sorts as `foo.bar` rather than just `foo`. This means
+    /// `from foo import baz` sorts after `from foo.bar import wow`, since `foo.bar.wow < foo.baz`.
+    FullPath,
     /// Sort imports by their string length, placing shorter imports before longer ones.
     ///
     /// This strategy applies to both straight imports (`import foo`) and `from` imports
@@ -38,6 +43,7 @@ impl Display for ImportStrategy {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             Self::Path => write!(f, "path"),
+            Self::FullPath => write!(f, "full_path"),
             Self::Length => write!(f, "length"),
             Self::LengthStraight => write!(f, "length_straight"),
         }

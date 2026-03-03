@@ -87,6 +87,7 @@ pub(crate) struct ModuleKey<'a> {
     force_to_top: bool,
     maybe_length: Option<usize>,
     distance: Distance,
+    qualified_name: Option<NatOrdStr<'a>>,
     maybe_lowercase_name: Option<NatOrdStr<'a>>,
     module_name: Option<NatOrdStr<'a>>,
     first_alias: Option<MemberKey<'a>>,
@@ -107,7 +108,7 @@ impl<'a> ModuleKey<'a> {
         let compute_length = match settings.import_strategy {
             ImportStrategy::Length => true,
             ImportStrategy::LengthStraight => style == ImportStyle::Straight,
-            ImportStrategy::Path => false,
+            ImportStrategy::Path | ImportStrategy::FullPath => false,
         };
         let maybe_length = compute_length.then_some(
             name.map(|name| name.chars().map(|c| c.width().unwrap_or(0)).sum::<usize>())
@@ -127,6 +128,32 @@ impl<'a> ModuleKey<'a> {
             (!settings.case_sensitive).then_some(NatOrdStr(maybe_lowercase(name)))
         });
 
+        // When using the `full-path` strategy, sort `from X import Y` statements by the
+        // fully-qualified name `X.Y` rather than just the module name `X`.
+        let qualified_name =
+            if settings.import_strategy == ImportStrategy::FullPath && style == ImportStyle::From {
+                first_alias.map(|(alias_name, _)| {
+                    let module_part = match (level, name) {
+                        (0, Some(n)) => n.to_string(),
+                        (0, None) => String::new(),
+                        (lvl, Some(n)) => format!("{}{}", ".".repeat(lvl as usize), n),
+                        (lvl, None) => ".".repeat(lvl as usize),
+                    };
+                    let qualified = if module_part.is_empty() {
+                        alias_name.to_string()
+                    } else {
+                        format!("{module_part}.{alias_name}")
+                    };
+                    if settings.case_sensitive {
+                        NatOrdStr::from(qualified)
+                    } else {
+                        NatOrdStr::from(qualified.to_lowercase())
+                    }
+                })
+            } else {
+                None
+            };
+
         let module_name = name.map(NatOrdStr::from);
 
         let asname = asname.map(NatOrdStr::from);
@@ -138,6 +165,7 @@ impl<'a> ModuleKey<'a> {
             force_to_top,
             maybe_length,
             distance,
+            qualified_name,
             maybe_lowercase_name,
             module_name,
             first_alias,
