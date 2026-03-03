@@ -434,7 +434,9 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         rhs: Type<'db>,
     ) -> Self {
         self.verify_builder(builder);
-        let (node, support) = self.node.implies_subtype_of(db, builder, lhs, rhs, self.support);
+        let (node, support) = self
+            .node
+            .implies_subtype_of(db, builder, lhs, rhs, self.support);
         Self::from_node_and_support(builder, node, support)
     }
 
@@ -583,9 +585,8 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         to_remove: impl IntoIterator<Item = BoundTypeVarIdentity<'db>>,
     ) -> Self {
         self.verify_builder(builder);
-        let node = self.node.exists(db, builder, to_remove);
-        // TODO: During quantification support wiring, represent this via Remove/AddDerived nodes.
-        Self::from_node_and_support(builder, node, self.support)
+        let (node, support) = self.node.exists(db, builder, self.support, to_remove);
+        Self::from_node_and_support(builder, node, support)
     }
 
     pub(crate) fn solutions(
@@ -696,8 +697,8 @@ struct ConstraintSetStorage<'db> {
     or_cache: FxHashMap<(NodeId, NodeId, usize), NodeId>,
     and_cache: FxHashMap<(NodeId, NodeId, usize), NodeId>,
     iff_cache: FxHashMap<(NodeId, NodeId, usize), NodeId>,
-    exists_one_cache: FxHashMap<(NodeId, BoundTypeVarIdentity<'db>), NodeId>,
-    retain_one_cache: FxHashMap<(NodeId, BoundTypeVarIdentity<'db>), NodeId>,
+    exists_one_cache:
+        FxHashMap<(NodeId, SupportId, BoundTypeVarIdentity<'db>), (NodeId, SupportId)>,
     restrict_one_cache: FxHashMap<(NodeId, ConstraintAssignment), (NodeId, bool)>,
     solutions_cache: FxHashMap<NodeId, Vec<Solution<'db>>>,
     simplify_cache: FxHashMap<NodeId, NodeId>,
@@ -927,7 +928,6 @@ impl<'db> ConstraintSetBuilder<'db> {
         }
     }
 
-    #[expect(dead_code)] // Wired in Step F quantification support construction
     fn remove_support(&self, base: SupportId, constraint: ConstraintId) -> SupportId {
         let mut storage = self.storage.borrow_mut();
         let id = storage
@@ -936,7 +936,6 @@ impl<'db> ConstraintSetBuilder<'db> {
         SupportId::Remove(id)
     }
 
-    #[expect(dead_code)] // Wired in Step F quantification support construction
     fn add_derived_support(
         &self,
         base: SupportId,
@@ -2329,12 +2328,13 @@ impl NodeId {
         self,
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
+        support: SupportId,
         bound_typevars: impl IntoIterator<Item = BoundTypeVarIdentity<'db>>,
-    ) -> Self {
+    ) -> (Self, SupportId) {
         bound_typevars
             .into_iter()
-            .fold(self, |abstracted, bound_typevar| {
-                abstracted.exists_one(db, builder, bound_typevar)
+            .fold((self, support), |(node, support), bound_typevar| {
+                node.exists_one(db, builder, support, bound_typevar)
             })
     }
 
@@ -2342,12 +2342,12 @@ impl NodeId {
         self,
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
+        support: SupportId,
         bound_typevar: BoundTypeVarIdentity<'db>,
-    ) -> Self {
+    ) -> (Self, SupportId) {
         match self.node() {
-            Node::AlwaysTrue => ALWAYS_TRUE,
-            Node::AlwaysFalse => ALWAYS_FALSE,
-            Node::Interior(interior) => interior.exists_one(db, builder, bound_typevar),
+            Node::AlwaysTrue | Node::AlwaysFalse => (self, support),
+            Node::Interior(interior) => interior.exists_one(db, builder, support, bound_typevar),
         }
     }
 
@@ -2355,14 +2355,14 @@ impl NodeId {
         self,
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
+        support: SupportId,
         should_remove: &mut dyn FnMut(ConstraintId) -> bool,
         path: &mut PathAssignments,
-    ) -> Self {
+    ) -> (Self, SupportId) {
         match self.node() {
-            Node::AlwaysTrue => ALWAYS_TRUE,
-            Node::AlwaysFalse => ALWAYS_FALSE,
+            Node::AlwaysTrue | Node::AlwaysFalse => (self, support),
             Node::Interior(interior) => {
-                interior.abstract_one_inner(db, builder, should_remove, path)
+                interior.abstract_one_inner(db, builder, support, should_remove, path)
             }
         }
     }
@@ -2976,9 +2976,10 @@ impl InteriorNode {
         self,
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
+        support: SupportId,
         bound_typevar: BoundTypeVarIdentity<'db>,
-    ) -> NodeId {
-        let key = (self.node(), bound_typevar);
+    ) -> (NodeId, SupportId) {
+        let key = (self.node(), support, bound_typevar);
         let storage = builder.storage.borrow();
         if let Some(result) = storage.exists_one_cache.get(&key) {
             return *result;
@@ -2993,6 +2994,7 @@ impl InteriorNode {
         let result = self.abstract_one_inner(
             db,
             builder,
+            support,
             // Remove any node that constrains `bound_typevar`, or that has a lower/upper bound
             // that mentions `bound_typevar`.
             // TODO: This will currently remove constraints that mention a typevar, but the sequent
@@ -3025,9 +3027,10 @@ impl InteriorNode {
         self,
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
+        support: SupportId,
         should_remove: &mut dyn FnMut(ConstraintId) -> bool,
         path: &mut PathAssignments,
-    ) -> NodeId {
+    ) -> (NodeId, SupportId) {
         let self_interior = builder.interior_node_data(self.node());
         if should_remove(self_interior.constraint) {
             // If we should remove constraints involving this typevar, then we replace this node
@@ -3042,110 +3045,137 @@ impl InteriorNode {
             // TODO: This might not be stable enough, if we add more than one derived fact for this
             // constraint. If we still see inconsistent test output, we might need a more complex
             // way of tracking source order for derived facts.
-            let if_true = path
+            let (if_true_node, if_true_support) = path
                 .walk_edge(
                     db,
                     builder,
                     self_interior.constraint.when_true(),
                     self_interior.source_order,
                     |path, new_range| {
-                        let branch = self_interior.if_true.abstract_one_inner(
-                            db,
-                            builder,
-                            should_remove,
-                            path,
-                        );
+                        let (branch_node, branch_support) = self_interior
+                            .if_true
+                            .abstract_one_inner(db, builder, support, should_remove, path);
                         path.assignments[new_range]
                             .iter()
+                            .rev() // add_derived supports are applied in reverse order
                             .filter(|(assignment, _)| {
                                 // Don't add back any derived facts if they are ones that we would have
                                 // removed!
                                 !should_remove(assignment.constraint())
                             })
-                            .fold(branch, |branch, (assignment, source_order)| {
-                                branch.and(
-                                    builder,
-                                    Node::new_satisfied_constraint(
+                            .fold(
+                                (branch_node, branch_support),
+                                |(branch_node, branch_support), (assignment, source_order)| {
+                                    let constraint = Node::new_satisfied_constraint(
                                         builder,
                                         *assignment,
                                         *source_order,
-                                    ),
-                                )
-                            })
+                                    );
+                                    (
+                                        branch_node.and(builder, constraint),
+                                        builder.add_derived_support(
+                                            branch_support,
+                                            self_interior.constraint,
+                                            assignment.constraint(),
+                                        ),
+                                    )
+                                },
+                            )
                     },
                 )
-                .unwrap_or(ALWAYS_FALSE);
-            let if_false = path
+                .unwrap_or((ALWAYS_FALSE, SupportId::Empty));
+            let (if_false_node, if_false_support) = path
                 .walk_edge(
                     db,
                     builder,
                     self_interior.constraint.when_false(),
                     self_interior.source_order,
                     |path, new_range| {
-                        let branch = self_interior.if_false.abstract_one_inner(
-                            db,
-                            builder,
-                            should_remove,
-                            path,
-                        );
+                        let (branch_node, branch_support) = self_interior
+                            .if_false
+                            .abstract_one_inner(db, builder, support, should_remove, path);
                         path.assignments[new_range]
                             .iter()
+                            .rev() // add_derived supports are applied in reverse order
                             .filter(|(assignment, _)| {
                                 // Don't add back any derived facts if they are ones that we would have
                                 // removed!
                                 !should_remove(assignment.constraint())
                             })
-                            .fold(branch, |branch, (assignment, source_order)| {
-                                branch.and(
-                                    builder,
-                                    Node::new_satisfied_constraint(
+                            .fold(
+                                (branch_node, branch_support),
+                                |(branch_node, branch_support), (assignment, source_order)| {
+                                    let constraint = Node::new_satisfied_constraint(
                                         builder,
                                         *assignment,
                                         *source_order,
-                                    ),
-                                )
-                            })
+                                    );
+                                    (
+                                        branch_node.and(builder, constraint),
+                                        builder.add_derived_support(
+                                            branch_support,
+                                            self_interior.constraint,
+                                            assignment.constraint(),
+                                        ),
+                                    )
+                                },
+                            )
                     },
                 )
-                .unwrap_or(ALWAYS_FALSE);
-            if_true.or(builder, if_false)
+                .unwrap_or((ALWAYS_FALSE, SupportId::Empty));
+            let node = if_true_node.or(builder, if_false_node);
+            let support = builder.ordered_union_support(if_true_support, if_false_support);
+            let support = builder.remove_support(support, self_interior.constraint);
+            (node, support)
         } else {
             // Otherwise, we abstract the if_false/if_true edges recursively.
-            let if_true = path
+            let (if_true_node, if_true_support) = path
                 .walk_edge(
                     db,
                     builder,
                     self_interior.constraint.when_true(),
                     self_interior.source_order,
                     |path, _| {
-                        self_interior
-                            .if_true
-                            .abstract_one_inner(db, builder, should_remove, path)
+                        self_interior.if_true.abstract_one_inner(
+                            db,
+                            builder,
+                            support,
+                            should_remove,
+                            path,
+                        )
                     },
                 )
-                .unwrap_or(ALWAYS_FALSE);
-            let if_false = path
+                .unwrap_or((ALWAYS_FALSE, SupportId::Empty));
+            let (if_false_node, if_false_support) = path
                 .walk_edge(
                     db,
                     builder,
                     self_interior.constraint.when_false(),
                     self_interior.source_order,
                     |path, _| {
-                        self_interior
-                            .if_false
-                            .abstract_one_inner(db, builder, should_remove, path)
+                        self_interior.if_false.abstract_one_inner(
+                            db,
+                            builder,
+                            support,
+                            should_remove,
+                            path,
+                        )
                     },
                 )
-                .unwrap_or(ALWAYS_FALSE);
+                .unwrap_or((ALWAYS_FALSE, SupportId::Empty));
             // NB: We cannot use `Node::new` here, because the recursive calls might introduce new
             // derived constraints into the result, and those constraints might appear before this
             // one in the BDD ordering.
-            Node::new_constraint(
+            let constraint = Node::new_constraint(
                 builder,
                 self_interior.constraint,
                 self_interior.source_order,
-            )
-            .ite(builder, if_true, if_false)
+            );
+            let node = constraint.ite(builder, if_true_node, if_false_node);
+            let support = builder.ordered_union_support(if_true_support, if_false_support);
+            let support = builder
+                .ordered_union_support(SupportId::Singleton(self_interior.constraint), support);
+            (node, support)
         }
     }
 

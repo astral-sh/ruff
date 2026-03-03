@@ -331,7 +331,7 @@ Expectation:
 - [x] Replace `Quantified` support payload with flattened `Remove`/`AddDerived` node types and builder APIs.
 - [x] Update `distributed_or`/`distributed_and` and `when_any`/`when_all` to combine support in balanced-tree order.
 - [x] Remove temporary `support_from_node` reconstruction path entirely.
-- [ ] Encode abstraction-derived ordering via `Remove`/`AddDerived` support nodes.
+- [x] Encode abstraction-derived ordering via `Remove`/`AddDerived` support nodes.
 - [ ] Convert ordering consumers to flattened support rank maps.
 - [ ] Remove node `source_order` fields and offset APIs.
 - [x] Run tests and update snapshots if needed.
@@ -414,13 +414,18 @@ File: `crates/ty_python_semantic/src/types/constraints.rs`
 3. Update `build_support` operations to handle `Remove` and `AddDerived` directly.
 4. Ensure missing origin is a hard panic in `AddDerived` handling.
 
-### Step F — quantification support node wiring
+### Step F — quantification support node wiring (**completed**)
 
 File: `crates/ty_python_semantic/src/types/constraints.rs`
 
 1. In abstraction/reduction flows, build `Remove` and `AddDerived` support nodes rather than eagerly computing ranks.
 2. For multiple derived additions from one transform, create `AddDerived` nodes in reverse encounter order.
 3. Enforce invariant that origins must be present at build time (hard panic otherwise).
+4. Implementation approach used in landed code:
+   - thread `SupportId` directly through existing `NodeId`/`InteriorNode` quantification methods (instead of adding parallel `*_with_support` APIs),
+   - keep `ConstraintSet` as a thin wrapper,
+   - avoid temporary accumulator structs/collections for support deltas,
+   - in remove paths, record `AddDerived` before `Remove` so `origin` exists when `AddDerived` nodes are created.
 
 ### Step G — migrate ordering consumers
 
@@ -467,6 +472,9 @@ File: `crates/ty_python_semantic/src/types/constraints.rs`
 7. Relative ordering/tie-breaking comes from support-graph structure; no extra tie-break metadata initially.
 8. `support_from_node` is temporary-only and must not remain in the final implementation.
 9. Rationale for (8): support is being separated from BDD structure specifically so we can eventually move to fully reduced BDDs, where node shape cannot be relied on to reconstruct support.
+10. For quantification wiring, prefer updating the existing `NodeId` / `InteriorNode` abstraction methods to return `(NodeId, SupportId)` directly, rather than introducing duplicate `*_with_support` method families.
+11. Avoid allocation-heavy intermediate “support change” aggregators; record support operations (`AddDerived`, `Remove`) inline while walking abstraction paths.
+12. In remove paths, construct derived-support operations before the remove operation so `AddDerived.origin` is guaranteed to be present when each node is created.
 
 ### Invariants to preserve
 
@@ -491,3 +499,4 @@ For any materialized support list from `build_support`:
 - Keep fully reduced BDD work separate after migration stabilizes.
 - Keep support-expression ID types private to `constraints.rs`.
 - Consider flatten memoization only if profiling indicates repeated-flatten overhead.
+- `retain_one_cache` currently appears to be stale/dead state from earlier code paths; dead-field cleanup may require manual audit since compiler/lints may not flag it.
