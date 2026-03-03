@@ -14,13 +14,12 @@ use crate::types::signatures::{ConcatenateTail, Signature};
 use crate::types::special_form::{AliasSpec, LegacyStdlibAlias};
 use crate::types::string_annotation::parse_string_annotation;
 use crate::types::tuple::{TupleSpecBuilder, TupleType};
-use ruff_python_ast::name::Name;
 
 use crate::types::{
     BindingContext, CallableType, DynamicType, GenericContext, IntersectionBuilder, KnownClass,
-    KnownInstanceType, LintDiagnosticGuard, LiteralValueTypeKind, ParamSpecAttrKind, Parameter,
-    Parameters, SpecialFormType, SubclassOfType, Type, TypeAliasType, TypeContext, TypeGuardType,
-    TypeIsType, TypeMapping, TypeVarKind, UnionBuilder, UnionType, any_over_type, todo_type,
+    KnownInstanceType, LintDiagnosticGuard, LiteralValueTypeKind, Parameter, Parameters,
+    SpecialFormType, SubclassOfType, Type, TypeAliasType, TypeContext, TypeGuardType, TypeIsType,
+    TypeMapping, TypeVarKind, UnionBuilder, UnionType, any_over_type, todo_type,
 };
 
 /// Type expressions
@@ -1983,8 +1982,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
                     let num_arguments = arguments.len();
                     if num_arguments < 2 {
-                        // Validation: Concatenate needs at least 2 args.
-                        // Still infer all argument types for side effects.
                         for argument in arguments {
                             self.infer_type_expression(argument);
                         }
@@ -1992,7 +1989,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             self.context.report_lint(&INVALID_TYPE_FORM, subscript)
                         {
                             builder.into_diagnostic(format_args!(
-                                "Special form `typing.Concatenate` expected at least 2 parameters but got {num_arguments}",
+                                "Special form `typing.Concatenate` expected at least 2 parameters \
+                                    but got {num_arguments}",
                             ));
                         }
                         if arguments_slice.is_tuple_expr() {
@@ -2001,33 +1999,26 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         return Some(Parameters::gradual_form());
                     }
 
-                    let (prefix_args, last_arg) = arguments.split_at(arguments.len() - 1);
-                    let last_arg = &last_arg[0];
+                    // SAFETY: `arguments` is guaranteed to have at least two elements from the
+                    // length check above.
+                    let (last_arg, prefix_args) = arguments.split_last().unwrap();
 
-                    // Infer prefix argument types as positional-only parameters.
-                    let mut params: Vec<Parameter<'db>> = Vec::with_capacity(num_arguments);
-                    for arg in prefix_args {
-                        let ty = self.infer_type_expression(arg);
-                        params.push(Parameter::positional_only(None).with_annotated_type(ty));
-                    }
+                    let prefix_params = prefix_args
+                        .iter()
+                        .map(|arg| {
+                            Parameter::positional_only(None)
+                                .with_annotated_type(self.infer_type_expression(arg))
+                        })
+                        .collect();
 
-                    // The last argument must be a ParamSpec or `...`.
-                    let result = match last_arg {
+                    let parameters = match last_arg {
                         ast::Expr::EllipsisLiteral(_) => {
                             self.infer_type_expression(last_arg);
-                            // Gradual form: prefix params + *args: Any, **kwargs: Any
-                            params.push(
-                                Parameter::variadic(Name::new_static("args"))
-                                    .with_annotated_type(Type::Dynamic(DynamicType::Any)),
-                            );
-                            params.push(
-                                Parameter::keyword_variadic(Name::new_static("kwargs"))
-                                    .with_annotated_type(Type::Dynamic(DynamicType::Any)),
-                            );
-                            Some(
-                                Parameters::new(self.db(), params)
-                                    .into_concatenate(ConcatenateTail::Gradual),
-                            )
+                            Some(Parameters::concatenate(
+                                self.db(),
+                                prefix_params,
+                                ConcatenateTail::Gradual,
+                            ))
                         }
                         ast::Expr::Name(name) if !name.is_invalid() => {
                             let name_ty = self.infer_name_load(name);
@@ -2036,41 +2027,21 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                 && typevar.is_paramspec(self.db())
                             {
                                 let index = semantic_index(self.db(), self.scope().file(self.db()));
-                                if let Some(bound_typevar) = bind_typevar(
+                                bind_typevar(
                                     self.db(),
                                     index,
                                     self.scope().file_scope_id(self.db()),
                                     self.typevar_binding_context,
                                     typevar,
-                                ) {
-                                    // Prefix params + *P.args, **P.kwargs
-                                    params.push(
-                                        Parameter::variadic(Name::new_static("args"))
-                                            .with_annotated_type(Type::TypeVar(
-                                                bound_typevar.with_paramspec_attr(
-                                                    self.db(),
-                                                    ParamSpecAttrKind::Args,
-                                                ),
-                                            )),
-                                    );
-                                    params.push(
-                                        Parameter::keyword_variadic(Name::new_static("kwargs"))
-                                            .with_annotated_type(Type::TypeVar(
-                                                bound_typevar.with_paramspec_attr(
-                                                    self.db(),
-                                                    ParamSpecAttrKind::Kwargs,
-                                                ),
-                                            )),
-                                    );
-                                    Some(Parameters::new(self.db(), params).into_concatenate(
+                                )
+                                .map(|bound_typevar| {
+                                    Parameters::concatenate(
+                                        self.db(),
+                                        prefix_params,
                                         ConcatenateTail::ParamSpec(bound_typevar),
-                                    ))
-                                } else {
-                                    None
-                                }
+                                    )
+                                })
                             } else {
-                                // Not a ParamSpec — infer the type expression for side effects
-                                // (it was already inferred via infer_name_load above)
                                 None
                             }
                         }
@@ -2080,15 +2051,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         }
                     };
 
-                    let inferred_type = if result.is_some() {
-                        todo_type!("`Concatenate[]` special form")
-                    } else {
-                        Type::unknown()
-                    };
                     if arguments_slice.is_tuple_expr() {
-                        self.store_expression_type(arguments_slice, inferred_type);
+                        // TODO: What type to store for the argument slice in `Concatenate` because
+                        // `Parameters` is not a `Type` variant?
+                        self.store_expression_type(arguments_slice, Type::unknown());
                     }
-                    return Some(result.unwrap_or_else(Parameters::todo));
+
+                    return parameters;
                 }
 
                 self.infer_subscript_type_expression(subscript, value_ty);

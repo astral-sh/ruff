@@ -130,16 +130,16 @@ use crate::types::typed_dict::{
 use crate::types::visitor::find_over_type;
 use crate::types::{
     BoundTypeVarIdentity, CallDunderError, CallableBinding, CallableType, CallableTypeKind,
-    ClassType, DataclassParams, DynamicType, EvaluationMode, GenericAlias,
-    InternedConstraintSet, InternedType, IntersectionBuilder, IntersectionType, KnownClass,
-    KnownInstanceType, KnownUnion, LintDiagnosticGuard, LiteralValueTypeKind,
-    ManualPEP695TypeAliasType, MemberLookupPolicy, MetaclassCandidate, PEP695TypeAliasType,
-    ParamSpecAttrKind, Parameter, ParameterForm, Parameters, Signature, SpecialFormType,
-    StaticClassLiteral, SubclassOfType, Truthiness, Type, TypeAliasType, TypeAndQualifiers,
-    TypeContext, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarBoundOrConstraintsEvaluation,
-    TypeVarConstraints, TypeVarDefaultEvaluation, TypeVarIdentity, TypeVarInstance, TypeVarKind,
-    TypeVarVariance, TypedDictType, UnionBuilder, UnionType, binding_type,
-    definition_expression_type, infer_complete_scope_types, infer_scope_types, todo_type,
+    ClassType, DataclassParams, DynamicType, EvaluationMode, GenericAlias, InternedConstraintSet,
+    InternedType, IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, KnownUnion,
+    LintDiagnosticGuard, LiteralValueTypeKind, ManualPEP695TypeAliasType, MemberLookupPolicy,
+    MetaclassCandidate, PEP695TypeAliasType, ParamSpecAttrKind, Parameter, ParameterForm,
+    Parameters, Signature, SpecialFormType, StaticClassLiteral, SubclassOfType, Truthiness, Type,
+    TypeAliasType, TypeAndQualifiers, TypeContext, TypeQualifiers, TypeVarBoundOrConstraints,
+    TypeVarBoundOrConstraintsEvaluation, TypeVarConstraints, TypeVarDefaultEvaluation,
+    TypeVarIdentity, TypeVarInstance, TypeVarKind, TypeVarVariance, TypedDictType, UnionBuilder,
+    UnionType, binding_type, definition_expression_type, infer_complete_scope_types,
+    infer_scope_types, todo_type,
 };
 use crate::types::{CallableTypes, overrides};
 use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
@@ -5109,69 +5109,48 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         ));
                     }
 
-                    let (prefix_args, last_arg) = arguments.split_at(arguments.len() - 1);
-                    let last_arg = &last_arg[0];
+                    // SAFETY: `arguments` is guaranteed to have at least two elements from the
+                    // length check above.
+                    let (last_arg, prefix_args) = arguments.split_last().unwrap();
 
-                    let mut params: Vec<Parameter<'db>> = Vec::with_capacity(num_arguments);
-                    for arg in prefix_args {
-                        let ty = self.infer_type_expression(arg);
-                        params.push(Parameter::positional_only(None).with_annotated_type(ty));
-                    }
+                    let prefix_params = prefix_args
+                        .iter()
+                        .map(|arg| {
+                            Parameter::positional_only(None)
+                                .with_annotated_type(self.infer_type_expression(arg))
+                        })
+                        .collect();
 
-                    let result = match last_arg {
+                    let parameters = match last_arg {
                         ast::Expr::EllipsisLiteral(_) => {
                             self.infer_type_expression(last_arg);
-                            params.push(
-                                Parameter::variadic(Name::new_static("args"))
-                                    .with_annotated_type(Type::Dynamic(DynamicType::Any)),
-                            );
-                            params.push(
-                                Parameter::keyword_variadic(Name::new_static("kwargs"))
-                                    .with_annotated_type(Type::Dynamic(DynamicType::Any)),
-                            );
-                            Some(
-                                Parameters::new(db, params)
-                                    .into_concatenate(ConcatenateTail::Gradual),
-                            )
+                            Some(Parameters::concatenate(
+                                self.db(),
+                                prefix_params,
+                                ConcatenateTail::Gradual,
+                            ))
                         }
                         ast::Expr::Name(name) if !name.is_invalid() => {
                             let name_ty = self.infer_name_load(name);
                             if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) =
                                 name_ty
-                                && typevar.is_paramspec(db)
+                                && typevar.is_paramspec(self.db())
                             {
-                                let index = semantic_index(db, self.scope().file(db));
-                                if let Some(bound_typevar) = bind_typevar(
-                                    db,
+                                let index = semantic_index(self.db(), self.scope().file(self.db()));
+                                bind_typevar(
+                                    self.db(),
                                     index,
-                                    self.scope().file_scope_id(db),
+                                    self.scope().file_scope_id(self.db()),
                                     self.typevar_binding_context,
                                     typevar,
-                                ) {
-                                    params.push(
-                                        Parameter::variadic(Name::new_static("args"))
-                                            .with_annotated_type(Type::TypeVar(
-                                                bound_typevar.with_paramspec_attr(
-                                                    db,
-                                                    ParamSpecAttrKind::Args,
-                                                ),
-                                            )),
-                                    );
-                                    params.push(
-                                        Parameter::keyword_variadic(Name::new_static("kwargs"))
-                                            .with_annotated_type(Type::TypeVar(
-                                                bound_typevar.with_paramspec_attr(
-                                                    db,
-                                                    ParamSpecAttrKind::Kwargs,
-                                                ),
-                                            )),
-                                    );
-                                    Some(Parameters::new(db, params).into_concatenate(
+                                )
+                                .map(|bound_typevar| {
+                                    Parameters::concatenate(
+                                        self.db(),
+                                        prefix_params,
                                         ConcatenateTail::ParamSpec(bound_typevar),
-                                    ))
-                                } else {
-                                    None
-                                }
+                                    )
+                                })
                             } else {
                                 None
                             }
@@ -5183,17 +5162,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     };
 
                     if arguments_slice.is_tuple_expr() {
-                        let inferred_type = if result.is_some() {
-                            todo_type!("`Concatenate[]` special form")
-                        } else {
-                            Type::unknown()
-                        };
-                        self.store_expression_type(arguments_slice, inferred_type);
+                        // TODO: What type to store for the argument slice in `Concatenate` because
+                        // `Parameters` is not a `Type` variant?
+                        self.store_expression_type(arguments_slice, Type::unknown());
                     }
 
                     return Ok(Type::paramspec_value_callable(
                         db,
-                        result.unwrap_or_else(Parameters::todo),
+                        parameters.unwrap_or_else(Parameters::unknown),
                     ));
                 }
 

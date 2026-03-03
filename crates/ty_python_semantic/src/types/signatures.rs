@@ -1918,13 +1918,23 @@ impl<'db> Parameters<'db> {
     ) -> Self {
         fn new_impl<'db>(db: &'db dyn Db, value: Vec<Parameter<'db>>) -> Parameters<'db> {
             let mut kind = ParametersKind::Standard;
-            if let [p1, p2] = value.as_slice()
+            if let [prefix_params @ .., p1, p2] = value.as_slice()
                 && p1.is_variadic()
                 && p2.is_keyword_variadic()
             {
+                let has_prefix_params = !prefix_params.is_empty();
+                let prefix_params_are_positional_only =
+                    prefix_params.iter().all(Parameter::is_positional_only);
+
                 match (p1.annotated_type(), p2.annotated_type()) {
                     (Type::Dynamic(_), Type::Dynamic(_)) => {
-                        kind = ParametersKind::Gradual;
+                        if has_prefix_params {
+                            if prefix_params_are_positional_only {
+                                kind = ParametersKind::Concatenate(ConcatenateTail::Gradual);
+                            }
+                        } else {
+                            kind = ParametersKind::Gradual;
+                        }
                     }
                     (Type::TypeVar(args_typevar), Type::TypeVar(kwargs_typevar)) => {
                         if let (Some(ParamSpecAttrKind::Args), Some(ParamSpecAttrKind::Kwargs)) = (
@@ -1935,7 +1945,15 @@ impl<'db> Parameters<'db> {
                             if typevar
                                 .is_same_typevar_as(db, kwargs_typevar.without_paramspec_attr(db))
                             {
-                                kind = ParametersKind::ParamSpec(typevar);
+                                if has_prefix_params {
+                                    if prefix_params_are_positional_only {
+                                        kind = ParametersKind::Concatenate(
+                                            ConcatenateTail::ParamSpec(typevar),
+                                        );
+                                    }
+                                } else {
+                                    kind = ParametersKind::ParamSpec(typevar);
+                                }
                             }
                         }
                     }
@@ -1970,15 +1988,6 @@ impl<'db> Parameters<'db> {
             self.kind,
             ParametersKind::Gradual | ParametersKind::Concatenate(ConcatenateTail::Gradual)
         )
-    }
-
-    /// Set the kind to `Concatenate(tail)`, used for `Concatenate[T, ..., tail]` forms where
-    /// prefix parameters precede either a gradual or `ParamSpec` suffix.
-    pub(crate) fn into_concatenate(self, tail: ConcatenateTail<'db>) -> Self {
-        Self {
-            kind: ParametersKind::Concatenate(tail),
-            ..self
-        }
     }
 
     pub(crate) const fn is_top(&self) -> bool {
@@ -2033,6 +2042,32 @@ impl<'db> Parameters<'db> {
                 ),
             ],
             kind: ParametersKind::ParamSpec(typevar),
+        }
+    }
+
+    pub(crate) fn concatenate(
+        db: &'db dyn Db,
+        mut prefix_params: Vec<Parameter<'db>>,
+        concatenate_tail: ConcatenateTail<'db>,
+    ) -> Self {
+        let (args_type, kwargs_type) = match concatenate_tail {
+            ConcatenateTail::Gradual => (
+                Type::Dynamic(DynamicType::Any),
+                Type::Dynamic(DynamicType::Any),
+            ),
+            ConcatenateTail::ParamSpec(typevar) => (
+                Type::TypeVar(typevar.with_paramspec_attr(db, ParamSpecAttrKind::Args)),
+                Type::TypeVar(typevar.with_paramspec_attr(db, ParamSpecAttrKind::Kwargs)),
+            ),
+        };
+        prefix_params.extend([
+            Parameter::variadic(Name::new_static("args")).with_annotated_type(args_type),
+            Parameter::keyword_variadic(Name::new_static("kwargs"))
+                .with_annotated_type(kwargs_type),
+        ]);
+        Self {
+            value: prefix_params,
+            kind: ParametersKind::Concatenate(concatenate_tail),
         }
     }
 
