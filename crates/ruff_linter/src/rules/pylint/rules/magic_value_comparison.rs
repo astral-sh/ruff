@@ -20,12 +20,9 @@ use crate::rules::pylint::settings::{AllowedValue, ConstantType};
 /// or named constants.
 ///
 /// By default, this rule excludes a variety of common values from the
-/// "magic" value definition, namely `0`, `1`, `0.0`, `1.0`, `""`, and
+/// magic value definition, namely `0`, `1`, `0.0`, `1.0`, `""`, and
 /// `"__main__"`. It also exempts comparisons against `sys.version`,
 /// `sys.version_info`, and `sys.implementation.version`.
-/// These can be configured using the `lint.pylint.allow-magic-values`,
-/// `lint.pylint.extend-allowed-magic-values`, and `lint.pylint.allow-magic-value-types`
-/// settings.
 ///
 /// ## Example
 /// ```python
