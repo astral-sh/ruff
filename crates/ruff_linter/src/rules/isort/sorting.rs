@@ -7,7 +7,7 @@ use unicode_width::UnicodeWidthChar;
 
 use ruff_python_stdlib::str;
 
-use super::settings::{RelativeImportsOrder, Settings};
+use super::settings::{ImportStrategy, RelativeImportsOrder, Settings};
 
 #[derive(Debug, PartialOrd, Ord, PartialEq, Eq, Copy, Clone)]
 pub(crate) enum MemberType {
@@ -104,13 +104,16 @@ impl<'a> ModuleKey<'a> {
     ) -> Self {
         let force_to_top = !name.is_some_and(|name| settings.force_to_top.contains(name)); // `false` < `true` so we get forced to top first
 
-        let maybe_length = (settings.length_sort
-            || (settings.length_sort_straight && style == ImportStyle::Straight))
-            .then_some(
-                name.map(|name| name.chars().map(|c| c.width().unwrap_or(0)).sum::<usize>())
-                    .unwrap_or_default()
-                    + level as usize,
-            );
+        let compute_length = match settings.import_strategy {
+            ImportStrategy::Length => true,
+            ImportStrategy::LengthStraight => style == ImportStyle::Straight,
+            ImportStrategy::Path => false,
+        };
+        let maybe_length = compute_length.then_some(
+            name.map(|name| name.chars().map(|c| c.width().unwrap_or(0)).sum::<usize>())
+                .unwrap_or_default()
+                + level as usize,
+        );
 
         let distance = match level {
             0 => Distance::None,
@@ -161,8 +164,7 @@ impl<'a> MemberKey<'a> {
         let member_type = settings
             .order_by_type
             .then_some(member_type(name, settings));
-        let maybe_length = settings
-            .length_sort
+        let maybe_length = matches!(settings.import_strategy, ImportStrategy::Length)
             .then(|| name.chars().map(|c| c.width().unwrap_or(0)).sum());
         let maybe_lowercase_name =
             (!settings.case_sensitive).then_some(NatOrdStr(maybe_lowercase(name)));
