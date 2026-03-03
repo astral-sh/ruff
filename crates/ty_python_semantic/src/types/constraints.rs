@@ -972,38 +972,51 @@ impl<'db> ConstraintSetBuilder<'db> {
         ) {
             match support {
                 SupportId::Empty => {}
+
                 SupportId::Singleton(constraint) => {
                     constraints.insert(constraint);
                 }
+
                 SupportId::OrderedUnion(union_support) => {
                     let union_support = builder.union_support_data(union_support);
                     build_into(builder, union_support.lhs, constraints);
                     build_into(builder, union_support.rhs, constraints);
                 }
+
                 SupportId::Quantified(quantified_support) => {
                     let quantified_support = builder.quantified_support_data(quantified_support);
 
-                    let mut quantified_constraints = FxIndexSet::default();
-                    build_into(
-                        builder,
-                        quantified_support.base,
-                        &mut quantified_constraints,
-                    );
+                    // We should not remove any constraints that were already present before
+                    // building this node's base. That happens if e.g. we're going to union the
+                    // result of this quantified node with some other node:
+                    //
+                    //       union([a], quantified([a,b], remove=[a]))
+                    //    -> union([a], [b])
+                    //    -> [a,b]
+                    //
+                    // In this example, the base is [a,b], and we do want to remove [a] from that
+                    // base. But since [a] is already present in the lhs of the union, it will
+                    // still be in the final result.
+                    let base_index = constraints.len();
+                    build_into(builder, quantified_support.base, constraints);
 
                     for removed in &quantified_support.removed {
-                        quantified_constraints.shift_remove(removed);
+                        let removed_index = constraints
+                            .get_index_of(removed)
+                            .expect("constraint should exist in support");
+                        if removed_index >= base_index {
+                            constraints.shift_remove_index(removed_index);
+                        }
                     }
 
-                    for derived in &quantified_support.derived {
-                        assert!(
-                            quantified_constraints.contains(&derived.origin),
-                            "derived support origin {origin:?} not present in flattened quantified support",
-                            origin = derived.origin,
-                        );
-                        quantified_constraints.insert(derived.derived);
+                    for derived in quantified_support.derived.iter().rev() {
+                        let origin_index = constraints
+                            .get_index_of(&derived.origin)
+                            .expect("constraint should exist in support");
+                        if !constraints.contains(&derived.derived) {
+                            constraints.shift_insert(origin_index + 1, derived.derived);
+                        }
                     }
-
-                    constraints.extend(quantified_constraints);
                 }
             }
         }
