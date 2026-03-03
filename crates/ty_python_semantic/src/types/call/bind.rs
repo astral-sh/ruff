@@ -45,12 +45,12 @@ use crate::types::signatures::{Parameter, ParameterForm, ParameterKind, Paramete
 use crate::types::tuple::{TupleLength, TupleSpec, TupleType};
 use crate::types::{
     BoundMethodType, BoundTypeVarIdentity, BoundTypeVarInstance, CallableSignature, CallableType,
-    CallableTypeKind, ClassLiteral, ClassType, DATACLASS_FLAGS, DataclassFlags, DataclassParams,
-    DynamicType, EvaluationMode, GenericAlias, InternedConstraintSet, IntersectionType,
-    KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind, MemberLookupPolicy,
-    NominalInstanceType, PropertyInstanceType, SpecialFormType, TypeAliasType, TypeContext,
-    TypeVarBoundOrConstraints, TypeVarVariance, UnionBuilder, UnionType, WrapperDescriptorKind,
-    enums, list_members,
+    CallableTypeKind, ClassBase, ClassLiteral, ClassType, DATACLASS_FLAGS, DataclassFlags,
+    DataclassParams, DynamicType, EvaluationMode, GenericAlias, InternedConstraintSet,
+    IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
+    MemberLookupPolicy, NominalInstanceType, PropertyInstanceType, SpecialFormType, TypeAliasType,
+    TypeContext, TypeVarBoundOrConstraints, TypeVarVariance, UnionBuilder, UnionType,
+    WrapperDescriptorKind, enums, list_members,
 };
 use crate::{DisplaySettings, Program};
 use ruff_db::diagnostic::{Annotation, Diagnostic, SubDiagnostic, SubDiagnosticSeverity};
@@ -182,13 +182,24 @@ enum ConstructorReturnDisposition {
     Uncertain,
 }
 
+fn class_is_instance_of_class_literal<'db>(
+    db: &'db dyn Db,
+    class_ty: ClassType<'db>,
+    class_literal: ClassLiteral<'db>,
+) -> bool {
+    class_ty
+        .iter_mro(db)
+        .filter_map(ClassBase::into_class)
+        .any(|base| base.class_literal(db) == class_literal)
+}
+
 impl<'db> MixedConstructorInit<'db> {
     fn constructor_return_disposition(
         &self,
         db: &'db dyn Db,
         return_ty: Type<'db>,
     ) -> ConstructorReturnDisposition {
-        let constructor_class = self.constructor_class_literal.default_specialization(db);
+        let constructor_class_literal = self.constructor_class_literal;
         match return_ty.resolve_type_alias(db) {
             Type::Union(union) => {
                 let mut saw_uncertain = false;
@@ -213,8 +224,7 @@ impl<'db> MixedConstructorInit<'db> {
             Type::Never => ConstructorReturnDisposition::NotInstance,
             Type::NominalInstance(instance) => {
                 let returned_class = instance.class(db);
-                if returned_class.class_literal(db) == self.constructor_class_literal
-                    || returned_class.is_subclass_of(db, constructor_class)
+                if class_is_instance_of_class_literal(db, returned_class, constructor_class_literal)
                 {
                     ConstructorReturnDisposition::Instance
                 } else {
@@ -222,7 +232,9 @@ impl<'db> MixedConstructorInit<'db> {
                 }
             }
             Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of().into_class(db) {
-                Some(class) if class.is_subclass_of(db, constructor_class) => {
+                Some(class)
+                    if class_is_instance_of_class_literal(db, class, constructor_class_literal) =>
+                {
                     ConstructorReturnDisposition::Instance
                 }
                 Some(_) => ConstructorReturnDisposition::NotInstance,
@@ -232,24 +244,33 @@ impl<'db> MixedConstructorInit<'db> {
                 let meta = ty.to_meta_type(db);
                 match meta {
                     Type::ClassLiteral(class_literal) => {
-                        if class_literal
-                            .default_specialization(db)
-                            .is_subclass_of(db, constructor_class)
-                        {
+                        if class_is_instance_of_class_literal(
+                            db,
+                            class_literal.default_specialization(db),
+                            constructor_class_literal,
+                        ) {
                             ConstructorReturnDisposition::Instance
                         } else {
                             ConstructorReturnDisposition::NotInstance
                         }
                     }
                     Type::GenericAlias(alias) => {
-                        if ClassType::from(alias).is_subclass_of(db, constructor_class) {
+                        if class_is_instance_of_class_literal(
+                            db,
+                            ClassType::from(alias),
+                            constructor_class_literal,
+                        ) {
                             ConstructorReturnDisposition::Instance
                         } else {
                             ConstructorReturnDisposition::NotInstance
                         }
                     }
                     Type::NominalInstance(instance) => {
-                        if instance.class(db).is_subclass_of(db, constructor_class) {
+                        if class_is_instance_of_class_literal(
+                            db,
+                            instance.class(db),
+                            constructor_class_literal,
+                        ) {
                             ConstructorReturnDisposition::Instance
                         } else {
                             ConstructorReturnDisposition::NotInstance
@@ -285,9 +306,11 @@ impl<'db> MixedConstructorInit<'db> {
                 && resolved_return
                     .as_nominal_instance()
                     .is_some_and(|instance| {
-                        self.constructor_class_literal
-                            .default_specialization(db)
-                            .is_subclass_of(db, instance.class(db))
+                        class_is_instance_of_class_literal(
+                            db,
+                            self.constructor_class_literal.default_specialization(db),
+                            instance.class(db).class_literal(db),
+                        )
                     });
 
             generic_superclass_return
@@ -778,6 +801,8 @@ impl<'db> Bindings<'db> {
         let constructor_class = constructor_instance_type
             .as_nominal_instance()
             .map(|inst| inst.class(db));
+        let constructor_class_literal =
+            constructor_class.map(|class_ty| class_ty.class_literal(db));
         let constructor_is_subclass_of_any = constructor_class.is_some_and(|class_ty| {
             class_ty
                 .class_literal(db)
@@ -794,9 +819,8 @@ impl<'db> Bindings<'db> {
             return_ty
                 .as_nominal_instance()
                 .is_some_and(|inst: NominalInstanceType<'db>| {
-                    constructor_class.is_some_and(|cc| {
-                        cc.class_literal(db) == inst.class(db).class_literal(db)
-                            || inst.class(db).is_subclass_of(db, cc)
+                    constructor_class_literal.is_some_and(|cc_literal| {
+                        class_is_instance_of_class_literal(db, inst.class(db), cc_literal)
                     })
                 })
         };
@@ -853,9 +877,13 @@ impl<'db> Bindings<'db> {
                 if !is_instance_return {
                     let generic_superclass_return = constructor_class.is_some_and(|cc| {
                         sig_return.has_typevar(db)
-                            && resolved
-                                .as_nominal_instance()
-                                .is_some_and(|inst| cc.is_subclass_of(db, inst.class(db)))
+                            && resolved.as_nominal_instance().is_some_and(|inst| {
+                                class_is_instance_of_class_literal(
+                                    db,
+                                    cc,
+                                    inst.class(db).class_literal(db),
+                                )
+                            })
                     });
                     if generic_superclass_return {
                         continue;
@@ -894,6 +922,7 @@ impl<'db> Bindings<'db> {
         // Preserve explicit strict-subclass constructor returns, e.g. constructing `C` from
         // `__new__ -> D` where `D` is a subclass of `C`.
         if let Some(constructor_class) = constructor_class {
+            let constructor_class_literal = constructor_class.class_literal(db);
             for binding in self.iter_flat() {
                 if has_mixed_constructor_inits && binding.mixed_constructor_init.is_none() {
                     continue;
@@ -915,8 +944,12 @@ impl<'db> Bindings<'db> {
                 };
                 let returned_class = returned_instance.class(db);
 
-                if returned_class.class_literal(db) != constructor_class.class_literal(db)
-                    && returned_class.is_subclass_of(db, constructor_class)
+                if returned_class.class_literal(db) != constructor_class_literal
+                    && class_is_instance_of_class_literal(
+                        db,
+                        returned_class,
+                        constructor_class_literal,
+                    )
                 {
                     return Some(sig_return);
                 }

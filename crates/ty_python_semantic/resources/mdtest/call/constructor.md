@@ -428,6 +428,30 @@ reveal_type(Class8[int]())  # revealed: Class8[list[int]]
 reveal_type(Class8[str]())  # revealed: Class8[list[str]]
 ```
 
+### `__new__` can fix generic specialization and still validate `__init__`
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+class C[T]:
+    def __new__(cls) -> "C[int]":
+        raise NotImplementedError()
+
+    def __init__(self, x: int) -> None:
+        pass
+
+# error: [missing-argument]
+reveal_type(C())  # revealed: C[int]
+# TODO `C[int]` might be better here?
+# error: [missing-argument]
+reveal_type(C[str]())  # revealed: C[int | str]
+# error: [missing-argument]
+reveal_type(C[int]())  # revealed: C[int]
+```
+
 ### `__new__` with method-level type variables mapping to class specialization
 
 When `__new__` has its own type parameters that map to the class's type parameter through the return
