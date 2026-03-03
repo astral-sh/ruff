@@ -1513,7 +1513,8 @@ class Child(Parent): ...
 
 static_assert(is_assignable_to(Callable[Concatenate[Parent, ...], None], Callable[Concatenate[Child, ...], None]))
 # TODO: should not be assignable (`Parent` is not assignable to `Child`)
-static_assert(is_assignable_to(Callable[Concatenate[Child, ...], None], Callable[Concatenate[Parent, ...], None]))
+# error: [static-assert-error]
+static_assert(not is_assignable_to(Callable[Concatenate[Child, ...], None], Callable[Concatenate[Parent, ...], None]))
 ```
 
 ### Different parameter types
@@ -1526,9 +1527,11 @@ class A: ...
 class B: ...
 
 # TODO: should not be assignable (`A` and `B` are disjoint)
-static_assert(is_assignable_to(Callable[Concatenate[A, ...], None], Callable[Concatenate[B, ...], None]))
+# error: [static-assert-error]
+static_assert(not is_assignable_to(Callable[Concatenate[A, ...], None], Callable[Concatenate[B, ...], None]))
 # TODO: should not be assignable
-static_assert(is_assignable_to(Callable[Concatenate[B, ...], None], Callable[Concatenate[A, ...], None]))
+# error: [static-assert-error]
+static_assert(not is_assignable_to(Callable[Concatenate[B, ...], None], Callable[Concatenate[A, ...], None]))
 ```
 
 ### Different number of prepended parameters

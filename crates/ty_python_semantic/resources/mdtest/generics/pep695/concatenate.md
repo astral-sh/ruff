@@ -260,6 +260,11 @@ def decorator[**P](func: Callable[Concatenate[int, P], bool]) -> Callable[P, boo
     # TODO: no error expected here
     return wrapper  # error: [invalid-return-type]
 
+# TODO: This should be an error because the required `int` parameter is missing
+@decorator
+def f0() -> bool:
+    return True
+
 @decorator
 def f1(a: int) -> bool:
     return True
@@ -400,6 +405,18 @@ def variadic(x: int, *args: str, **kwargs: int) -> None: ...
 
 # TODO: Should reveal `(*args: str, **kwargs: int) -> None`
 reveal_type(variadic)  # revealed: [**P'return](**P'return) -> None
+
+@decorator
+def only_variadic(*args: str, **kwargs: int) -> None: ...
+
+# TODO: Should reveal `(*args: str, **kwargs: int) -> None`
+reveal_type(only_variadic)  # revealed: [**P'return](**P'return) -> None
+
+@decorator
+def unpack_variadic(*args: *tuple[int, *tuple[str, ...]], **kwargs: int) -> None: ...
+
+# TODO: should reveal `(*args: str, **kwargs: int) -> None`
+reveal_type(unpack_variadic)  # revealed: [**P'return](**P'return) -> None
 ```
 
 ## `Concatenate` with `ParamSpec` in generic function calls
@@ -421,6 +438,33 @@ reveal_type(foo(test, y="", x=""))  # revealed: bool
 # TODO: These calls should raise an error
 reveal_type(foo(test, 1, ""))  # revealed: bool
 reveal_type(foo(test, ""))  # revealed: bool
+```
+
+### Prepended type variable
+
+```py
+from typing import Callable, Concatenate
+
+def decorator[T, R, **P](func: Callable[Concatenate[T, P], R], *args: P.args, **kwargs: P.kwargs) -> Callable[[T], R]:
+    def wrapper(arg: T, /) -> R:
+        return func(arg, *args, **kwargs)
+    return wrapper
+
+@decorator
+def test1(x: str, y: str) -> bool:
+    return True
+
+# TODO: should reveal (str, /) -> bool
+reveal_type(test1)  # revealed: [T'return](T'return, /) -> bool
+reveal_type(test1(""))  # revealed: bool
+# error: [too-many-positional-arguments]
+reveal_type(test1("", ""))  # revealed: bool
+
+# TODO: This should be an error since a keyword-only parameter cannot be assigned to positional-only
+# parameter `T`
+@decorator
+def test2(*, x: int) -> bool:
+    return True
 ```
 
 ## `Concatenate` with overloaded functions
