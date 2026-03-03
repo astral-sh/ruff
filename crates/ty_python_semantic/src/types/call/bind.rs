@@ -231,15 +231,6 @@ impl<'db> MixedConstructorInit<'db> {
                     ConstructorReturnDisposition::NotInstance
                 }
             }
-            Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of().into_class(db) {
-                Some(class)
-                    if class_is_instance_of_class_literal(db, class, constructor_class_literal) =>
-                {
-                    ConstructorReturnDisposition::Instance
-                }
-                Some(_) => ConstructorReturnDisposition::NotInstance,
-                None => ConstructorReturnDisposition::Uncertain,
-            },
             ty => {
                 let meta = ty.to_meta_type(db);
                 match meta {
