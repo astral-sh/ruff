@@ -831,7 +831,16 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         expr_named: &ast::ExprNamed,
         is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
-        self.evaluate_simple_expr(&expr_named.target, is_positive)
+        let target_constraints = self.evaluate_simple_expr(&expr_named.target, is_positive);
+        let value_constraints = self.evaluate_simple_expr(&expr_named.value, is_positive);
+        match (target_constraints, value_constraints) {
+            (Some(mut target), Some(value)) => {
+                merge_constraints_and(&mut target, value);
+                Some(target)
+            }
+            (Some(constraints), None) | (None, Some(constraints)) => Some(constraints),
+            (None, None) => None,
+        }
     }
 
     fn evaluate_expr_eq(&mut self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
@@ -2177,8 +2186,12 @@ impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
             }
             // Boolean operations combine places from all sub-expressions
             ast::Expr::BoolOp(bool_op) => self.expr_bool_op(bool_op),
-            // Named expressions narrow the target
-            ast::Expr::Named(expr_named) => self.simple_expr(&expr_named.target),
+            // Named expressions narrow both the target and the value
+            ast::Expr::Named(expr_named) => {
+                let mut places = self.simple_expr(&expr_named.target);
+                places.extend(self.expression_node(&expr_named.value));
+                places
+            }
             _ => PossiblyNarrowedPlaces::default(),
         }
     }

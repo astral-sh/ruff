@@ -83,6 +83,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_CONTEXT_MANAGER);
     registry.register_lint(&INVALID_DECLARATION);
     registry.register_lint(&INVALID_EXCEPTION_CAUGHT);
+    registry.register_lint(&INVALID_ENUM_MEMBER_ANNOTATION);
     registry.register_lint(&INVALID_GENERIC_ENUM);
     registry.register_lint(&INVALID_GENERIC_CLASS);
     registry.register_lint(&INVALID_LEGACY_TYPE_VARIABLE);
@@ -106,6 +107,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_TYPE_VARIABLE_CONSTRAINTS);
     registry.register_lint(&INVALID_TYPE_VARIABLE_BOUND);
     registry.register_lint(&INVALID_TYPE_VARIABLE_DEFAULT);
+    registry.register_lint(&UNBOUND_TYPE_VARIABLE);
     registry.register_lint(&MISSING_ARGUMENT);
     registry.register_lint(&NO_MATCHING_OVERLOAD);
     registry.register_lint(&NOT_SUBSCRIPTABLE);
@@ -137,6 +139,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&UNSUPPORTED_BASE);
     registry.register_lint(&UNSUPPORTED_DYNAMIC_BASE);
     registry.register_lint(&UNSUPPORTED_OPERATOR);
+    registry.register_lint(&UNUSED_AWAITABLE);
     registry.register_lint(&ZERO_STEPSIZE_IN_SLICE);
     registry.register_lint(&STATIC_ASSERT_ERROR);
     registry.register_lint(&INVALID_ATTRIBUTE_ACCESS);
@@ -1194,6 +1197,48 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
+    /// Checks for enum members that have explicit type annotations.
+    ///
+    /// ## Why is this bad?
+    /// The [typing spec] states that type checkers should infer a literal type
+    /// for all enum members. An explicit type annotation on an enum member is
+    /// misleading because the annotated type will be incorrect — the actual
+    /// runtime type is the enum class itself, not the annotated type.
+    ///
+    /// In CPython's `enum` module, annotated assignments with values are still
+    /// treated as members at runtime, but the annotation will confuse readers of the code.
+    ///
+    /// ## Examples
+    /// ```python
+    /// from enum import Enum
+    ///
+    /// class Pet(Enum):
+    ///     CAT = 1       # OK
+    ///     DOG: int = 2  # Error: enum members should not be annotated
+    /// ```
+    ///
+    /// Use instead:
+    /// ```python
+    /// from enum import Enum
+    ///
+    /// class Pet(Enum):
+    ///     CAT = 1
+    ///     DOG = 2
+    /// ```
+    ///
+    /// ## References
+    /// - [Typing spec: Enum members](https://typing.python.org/en/latest/spec/enums.html#enum-members)
+    ///
+    /// [typing spec]: https://typing.python.org/en/latest/spec/enums.html#enum-members
+    pub(crate) static INVALID_ENUM_MEMBER_ANNOTATION = {
+        summary: "detects type annotations on enum members",
+        status: LintStatus::stable("0.0.20"),
+        default_level: Level::Warn,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
     /// Checks for enum classes that are also generic.
     ///
     /// ## Why is this bad?
@@ -1804,6 +1849,36 @@ declare_lint! {
     pub(crate) static INVALID_TYPE_VARIABLE_DEFAULT = {
         summary: "detects invalid type variable defaults",
         status: LintStatus::stable("0.0.16"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for type variables that are used in a scope where they are not bound
+    /// to any enclosing generic context.
+    ///
+    /// ## Why is this bad?
+    /// Using a type variable outside of a scope that binds it has no well-defined meaning.
+    ///
+    /// ## Examples
+    /// ```python
+    /// from typing import TypeVar, Generic
+    ///
+    /// T = TypeVar("T")
+    /// S = TypeVar("S")
+    ///
+    /// x: T  # error: unbound type variable in module scope
+    ///
+    /// class C(Generic[T]):
+    ///     x: list[S] = []  # error: S is not in this class's generic context
+    /// ```
+    ///
+    /// ## References
+    /// - [Typing spec: Scoping rules for type variables](https://typing.python.org/en/latest/spec/generics.html#scoping-rules-for-type-variables)
+    pub(crate) static UNBOUND_TYPE_VARIABLE = {
+        summary: "detects type variables used outside of their bound scope",
+        status: LintStatus::stable("0.0.20"),
         default_level: Level::Error,
     }
 }
@@ -2609,6 +2684,33 @@ declare_lint! {
         summary: "detects binary, unary, or comparison expressions where the operands don't support the operator",
         status: LintStatus::stable("0.0.1-alpha.1"),
         default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for awaitable objects (such as coroutines) used as expression
+    /// statements without being awaited.
+    ///
+    /// ## Why is this bad?
+    /// Calling an `async def` function returns a coroutine object. If the
+    /// coroutine is never awaited, the body of the async function will never
+    /// execute, which is almost always a bug. Python emits a
+    /// `RuntimeWarning: coroutine was never awaited` at runtime in this case.
+    ///
+    /// ## Examples
+    /// ```python
+    /// async def fetch_data() -> str:
+    ///     return "data"
+    ///
+    /// async def main() -> None:
+    ///     fetch_data()  # Warning: coroutine is not awaited
+    ///     await fetch_data()  # OK
+    /// ```
+    pub(crate) static UNUSED_AWAITABLE = {
+        summary: "detects awaitable objects that are used as expression statements without being awaited",
+        status: LintStatus::preview("0.0.21"),
+        default_level: Level::Warn,
     }
 }
 
@@ -4929,6 +5031,53 @@ pub(crate) fn report_invalid_type_param_order<'db>(
     );
 
     for tvar in [typevar_with_default, invalid_later_typevars[0]] {
+        let Some(definition) = tvar.definition(db) else {
+            continue;
+        };
+        let file = definition.file(db);
+        diagnostic.annotate(
+            Annotation::secondary(Span::from(
+                definition.full_range(db, &parsed_module(db, file).load(db)),
+            ))
+            .message(format_args!("`{}` defined here", tvar.name(db))),
+        );
+    }
+}
+
+pub(crate) fn report_invalid_typevar_default_reference<'db>(
+    context: &InferContext<'db, '_>,
+    class: StaticClassLiteral<'db>,
+    typevar_with_bad_default: TypeVarInstance<'db>,
+    referenced_typevar: TypeVarInstance<'db>,
+    is_later_in_list: bool,
+) {
+    let db = context.db();
+
+    let Some(builder) = context.report_lint(&INVALID_GENERIC_CLASS, class.header_range(db)) else {
+        return;
+    };
+
+    let mut diagnostic = if is_later_in_list {
+        builder.into_diagnostic(format_args!(
+            "Default of `{}` cannot reference later type parameter `{}`",
+            typevar_with_bad_default.name(db),
+            referenced_typevar.name(db),
+        ))
+    } else {
+        builder.into_diagnostic(format_args!(
+            "Default of `{}` cannot reference out-of-scope type variable `{}`",
+            typevar_with_bad_default.name(db),
+            referenced_typevar.name(db),
+        ))
+    };
+
+    let typevars_to_annotate = if is_later_in_list {
+        &[typevar_with_bad_default, referenced_typevar][..]
+    } else {
+        &[typevar_with_bad_default][..]
+    };
+
+    for tvar in typevars_to_annotate {
         let Some(definition) = tvar.definition(db) else {
             continue;
         };

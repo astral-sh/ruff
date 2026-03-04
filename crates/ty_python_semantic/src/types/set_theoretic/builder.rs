@@ -36,6 +36,7 @@
 //! shares exactly the same possible super-types, and none of them are subtypes of each other
 //! (unless exactly the same literal type), we can avoid many unnecessary redundancy checks.
 
+use super::RecursivelyDefined;
 use crate::types::enums::{enum_member_literals, enum_metadata};
 use crate::types::{
     BytesLiteralType, ClassLiteral, EnumLiteralType, IntersectionType, KnownClass,
@@ -313,25 +314,6 @@ enum ReduceResult<'db> {
     /// The given `Type` can stand-in for the entire `UnionElement` for further union
     /// simplification checks.
     Type(Type<'db>),
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]
-pub enum RecursivelyDefined {
-    Yes,
-    No,
-}
-
-impl RecursivelyDefined {
-    const fn is_yes(self) -> bool {
-        matches!(self, RecursivelyDefined::Yes)
-    }
-
-    const fn or(self, other: RecursivelyDefined) -> RecursivelyDefined {
-        match (self, other) {
-            (RecursivelyDefined::Yes, _) | (_, RecursivelyDefined::Yes) => RecursivelyDefined::Yes,
-            _ => RecursivelyDefined::No,
-        }
-    }
 }
 
 /// If the value ​​is defined recursively, widening is performed from fewer literal elements,
