@@ -1085,8 +1085,7 @@ finding a solution.
 from typing import Any
 
 def f(l: list[tuple[Any | str, Any | str]]) -> None:
-    # TODO: revealed: dict[Any | str, Any | str]
-    # revealed: dict[str | Any, str | Any]
+    # revealed: dict[Any | str, Any | str]
     reveal_type(dict(l))
 ```
 
