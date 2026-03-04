@@ -29,7 +29,6 @@ Examples:
 from __future__ import annotations
 
 import argparse
-import html
 import json
 import os
 import re
@@ -77,9 +76,13 @@ CONFORMANCE_URL = CONFORMANCE_DIR_WITH_README + "tests/{filename}#L{line}"
 
 GITHUB_HEADER = [
     "<table>",
-    "<tr><th>Test case</th><th>Δ</th><th>Location</th><th>Name</th><th>Message</th></tr>",
+    "",
+    "<tr>",
+    "<th>Test case</th>",
+    "<th>Diff</th>",
+    "</tr>",
 ]
-GITHUB_FOOTER = ["</table>"]
+GITHUB_FOOTER = ["", "</table>"]
 SUMMARY_NOTE = """
     Each test case represents one expected error annotation or a group of annotations
     sharing a tag. Counts are per test case, not per diagnostic — multiple diagnostics
@@ -166,11 +169,6 @@ class Location:
         file = self.path.name
         link = CONFORMANCE_URL.format(filename=file, line=self.positions.begin.line)
         return f"[{file}:{self.positions.begin.line}:{self.positions.begin.column}]({link})"
-
-    def as_html_link(self) -> str:
-        file = self.path.name
-        link = CONFORMANCE_URL.format(filename=file, line=self.positions.begin.line)
-        return f'<a href="{link}">{self.positions.begin.line}:{self.positions.begin.column}</a>'
 
 
 @dataclass(kw_only=True, slots=True)
@@ -334,71 +332,63 @@ class TestCase:
             return Classification.TRUE_NEGATIVE
 
 
-def tc_location_cell(tc: TestCase, *, rowspan: int, source: Source | None) -> str:
-    """Build a <td> for the test-case-level location, spanning ``rowspan`` rows."""
+def render_html_diff_row(tc: TestCase, *, source: Source | None) -> list[str]:
+    """Render a single HTML <tr> with a test-case link and a markdown diff block."""
     all_diags = tc.old + tc.new if source is None else tc.diagnostics_by_source(source)
 
-    if not all_diags:
-        return f'<td rowspan="{rowspan}"></td>' if rowspan > 1 else "<td></td>"
-
-    min_line = min(d.location.positions.begin.line for d in all_diags)
-    max_line = max(d.location.positions.begin.line for d in all_diags)
-    filename = all_diags[0].location.path.name
-
-    if min_line == max_line:
-        url = CONFORMANCE_URL.format(filename=filename, line=min_line)
-        display = f"{filename}:{min_line}"
+    if all_diags:
+        min_line = min(d.location.positions.begin.line for d in all_diags)
+        max_line = max(d.location.positions.begin.line for d in all_diags)
+        filename = all_diags[0].location.path.name
+        if min_line == max_line:
+            url = CONFORMANCE_URL.format(filename=filename, line=min_line)
+            display = f"{filename}:{min_line}"
+        else:
+            url = (
+                f"{CONFORMANCE_DIR_WITH_README}tests/{filename}#L{min_line}-L{max_line}"
+            )
+            display = f"{filename}:{min_line}:{max_line}"
+        location = f"[{display}]({url})"
     else:
-        url = f"{CONFORMANCE_DIR_WITH_README}tests/{filename}#L{min_line}-L{max_line}"
-        display = f"{filename}:{min_line}:{max_line}"
+        location = tc.key
 
-    rowspan_attr = f' rowspan="{rowspan}"' if rowspan > 1 else ""
-    return f'<td{rowspan_attr}><a href="{url}">{display}</a></td>'
-
-
-def render_html_test_case_rows(tc: TestCase, *, source: Source | None) -> list[str]:
-    """Render one HTML <tr> per diagnostic for a test case.
-
-    The test-case location cell spans all rows. The delta cell (-/+) spans
-    the diagnostics for its side. For changed entries, old rows come first,
-    then new rows, each group with its own spanning delta cell.
-    """
-
-    def delta_cell(symbol: str, rowspan: int) -> str:
-        rowspan_attr = f' rowspan="{rowspan}"' if rowspan > 1 else ""
-        return f"<td{rowspan_attr}>{symbol}</td>"
-
-    def diag_row(d: TyDiagnostic, prepend: str = "") -> str:
-        name = html.escape(d.check_name)
-        desc = html.escape(d.description.replace("\\|", "|"))
-        return (
-            f"<tr>{prepend}"
-            f"<td>{d.location.as_html_link()}</td>"
-            f"<td>{name}</td>"
-            f"<td>{desc}</td>"
-            f"</tr>"
-        )
-
-    def render_group(
-        diags: list[TyDiagnostic], symbol: str, loc_prefix: str = ""
-    ) -> None:
-        for i, d in enumerate(diags):
-            prepend = (loc_prefix + delta_cell(symbol, len(diags))) if i == 0 else ""
-            rows.append(diag_row(d, prepend))
-
-    rows: list[str] = []
-
+    diff_lines = []
     if source is None:
-        old_diags, new_diags = tc.old, tc.new
-        loc = tc_location_cell(tc, rowspan=len(old_diags) + len(new_diags), source=None)
-        render_group(old_diags, "-", loc)
-        render_group(new_diags, "+")
+        for d in tc.old:
+            diff_lines.append(
+                f"-{d.severity_for_display}[{d.check_name}] {d.description}"
+            )
+        for d in tc.new:
+            diff_lines.append(
+                f"+{d.severity_for_display}[{d.check_name}] {d.description}"
+            )
     else:
-        diags = tc.diagnostics_by_source(source)
-        loc = tc_location_cell(tc, rowspan=len(diags), source=source)
-        render_group(diags, "-" if source == Source.OLD else "+", loc)
+        sign = "-" if source == Source.OLD else "+"
+        for d in tc.diagnostics_by_source(source):
+            diff_lines.append(
+                f"{sign}{d.severity_for_display}[{d.check_name}] {d.description}"
+            )
 
-    return rows
+    return [
+        "",
+        "<tr>",
+        "",
+        "<td>",
+        "",
+        location,
+        "",
+        "</td>",
+        "",
+        "<td>",
+        "",
+        "```diff",
+        *diff_lines,
+        "```",
+        "",
+        "</td>",
+        "",
+        "</tr>",
+    ]
 
 
 def render_diff_row(diagnostics: list[TyDiagnostic], *, removed: bool = False) -> str:
@@ -715,7 +705,7 @@ def render_test_cases(
                     lines.append(render_diff_row(tc.old, removed=True))
                     lines.append(render_diff_row(tc.new, removed=False))
                 else:
-                    lines.extend(render_html_test_case_rows(tc, source=None))
+                    lines.extend(render_html_diff_row(tc, source=None))
             else:
                 if format == "diff":
                     lines.append(
@@ -725,7 +715,7 @@ def render_test_cases(
                         )
                     )
                 else:
-                    lines.extend(render_html_test_case_rows(tc, source=source))
+                    lines.extend(render_html_diff_row(tc, source=source))
 
         if format == "diff":
             lines.append("```")
