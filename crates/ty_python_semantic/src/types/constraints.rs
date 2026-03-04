@@ -72,6 +72,7 @@ use std::fmt::{Debug, Display};
 use std::marker::PhantomData;
 use std::ops::Range;
 
+use indexmap::map::Slice;
 use itertools::Itertools;
 use ruff_index::{Idx, IndexVec, newtype_index};
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -923,11 +924,11 @@ impl<'db> ConstraintSetBuilder<'db> {
         SupportId::AddDerived(id)
     }
 
-    fn build_support(&self, support: SupportId) -> FxIndexMap<ConstraintId, bool> {
+    fn build_support(&self, support: SupportId) -> BuiltSupport {
         fn build_into(
             builder: &ConstraintSetBuilder<'_>,
             support: SupportId,
-            constraints: &mut FxIndexMap<ConstraintId, bool>,
+            constraints: &mut BuiltSupport,
         ) {
             match support {
                 SupportId::Empty => {}
@@ -979,7 +980,7 @@ impl<'db> ConstraintSetBuilder<'db> {
             }
         }
 
-        let mut constraints = FxIndexMap::default();
+        let mut constraints = BuiltSupport::default();
         build_into(self, support, &mut constraints);
         constraints
     }
@@ -1067,6 +1068,8 @@ struct AddDerivedSupportData {
     origin: ConstraintId,
     derived: ConstraintId,
 }
+
+type BuiltSupport = FxIndexMap<ConstraintId, bool>;
 
 /// An individual constraint in a constraint set. This restricts a single typevar to be within a
 /// lower and upper bound.
@@ -1675,7 +1678,17 @@ impl NodeId {
         path: &mut PathAssignments,
     ) {
         match self.node() {
-            Node::AlwaysTrue => f(path, support),
+            Node::AlwaysTrue => {
+                let built_support = builder.build_support(support);
+                self.for_each_path_with_support_missing(
+                    db,
+                    builder,
+                    support,
+                    built_support.as_slice(),
+                    f,
+                    path,
+                )
+            }
             Node::AlwaysFalse => {}
             Node::Interior(_) => {
                 let interior = builder.interior_node_data(self);
@@ -1721,6 +1734,47 @@ impl NodeId {
                 );
             }
         }
+    }
+
+    fn for_each_path_with_support_missing<'db>(
+        self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        support: SupportId,
+        slice: &Slice<ConstraintId, bool>,
+        f: &mut dyn FnMut(&PathAssignments, SupportId),
+        path: &mut PathAssignments,
+    ) {
+        let Some(((next_constraint, is_derived), rest)) = slice.split_first() else {
+            f(path, support);
+            return;
+        };
+
+        // If the next element of the support is not derived, and not already present in the path,
+        // we need to consider two candidate paths: one with that includes the support constraint,
+        // and one that does not. (The latter is handled below.)
+        if !is_derived && !path.contains_constraint(*next_constraint) {
+            path.walk_edge(
+                db,
+                builder,
+                next_constraint.when_true(),
+                |path, new_range| {
+                    let support = path.assignments[new_range]
+                        .iter()
+                        .rev() // add_derived supports are applied in reverse order
+                        .fold(support, |support, assignment| {
+                            builder.add_derived_support(
+                                support,
+                                *next_constraint,
+                                assignment.constraint(),
+                            )
+                        });
+                    self.for_each_path_with_support_missing(db, builder, support, rest, f, path);
+                },
+            );
+        }
+
+        self.for_each_path_with_support_missing(db, builder, support, rest, f, path);
     }
 
     /// Returns whether this BDD represent the constant function `true`.
@@ -4534,6 +4588,11 @@ impl PathAssignments {
 
     fn assignment_holds(&self, assignment: ConstraintAssignment) -> bool {
         self.assignments.contains(&assignment)
+    }
+
+    fn contains_constraint(&self, constraint: ConstraintId) -> bool {
+        self.assignment_holds(constraint.when_true())
+            || self.assignment_holds(constraint.when_false())
     }
 
     /// Update our sequent map to ensure that it holds all of the sequents that involve the given
