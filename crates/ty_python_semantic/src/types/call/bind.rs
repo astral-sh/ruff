@@ -207,7 +207,6 @@ fn is_subtype_of_class_literal<'db>(
 
 impl<'db> DownstreamConstructor<'db> {
     fn return_kind(&self, db: &'db dyn Db, return_ty: Type<'db>) -> ConstructorReturnKind {
-        let class_literal = self.class_literal;
         match return_ty.resolve_type_alias(db) {
             Type::Union(union) => {
                 for element in union.elements(db) {
@@ -238,44 +237,13 @@ impl<'db> DownstreamConstructor<'db> {
             // A `Never` constructor return is terminal and does not run downstream construction.
             Type::Never => ConstructorReturnKind::NotInstance,
             Type::NominalInstance(instance) => {
-                let returned_class = instance.class(db);
-                if is_subtype_of_class_literal(db, returned_class, class_literal) {
+                if is_subtype_of_class_literal(db, instance.class(db), self.class_literal) {
                     ConstructorReturnKind::Instance
                 } else {
                     ConstructorReturnKind::NotInstance
                 }
             }
-            ty => {
-                let meta = ty.to_meta_type(db);
-                match meta {
-                    Type::ClassLiteral(return_class_literal) => {
-                        if is_subtype_of_class_literal(
-                            db,
-                            return_class_literal.identity_specialization(db),
-                            class_literal,
-                        ) {
-                            ConstructorReturnKind::Instance
-                        } else {
-                            ConstructorReturnKind::NotInstance
-                        }
-                    }
-                    Type::GenericAlias(alias) => {
-                        if is_subtype_of_class_literal(db, ClassType::from(alias), class_literal) {
-                            ConstructorReturnKind::Instance
-                        } else {
-                            ConstructorReturnKind::NotInstance
-                        }
-                    }
-                    Type::NominalInstance(instance) => {
-                        if is_subtype_of_class_literal(db, instance.class(db), class_literal) {
-                            ConstructorReturnKind::Instance
-                        } else {
-                            ConstructorReturnKind::NotInstance
-                        }
-                    }
-                    _ => ConstructorReturnKind::NotInstance,
-                }
-            }
+            _ => ConstructorReturnKind::NotInstance,
         }
     }
 
