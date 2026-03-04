@@ -227,7 +227,7 @@ pub struct OwnedConstraintSet<'db> {
     nodes: IndexVec<NodeId, InteriorNodeData>,
 
     /// Materialized support for this constraint set, in deterministic order.
-    support: Box<[ConstraintId]>,
+    support: Box<[(ConstraintId, bool)]>,
 }
 
 /// A set of constraints under which a type property holds.
@@ -755,16 +755,20 @@ impl<'db> ConstraintSetBuilder<'db> {
         }
 
         let node = remap_node(&nodes, other.node);
-        let support =
-            other
-                .support
-                .iter()
-                .copied()
-                .fold(SupportId::Empty, |support, old_constraint| {
-                    let old_constraint_data = other.constraints[old_constraint];
-                    let remapped_constraint = self.intern_constraint(db, old_constraint_data);
-                    self.ordered_union_support(support, SupportId::Singleton(remapped_constraint))
-                });
+        let mut support = SupportId::Empty;
+        let mut previous_origin_constraint = None;
+        for (old_constraint, derived) in other.support.iter().copied() {
+            let old_constraint_data = other.constraints[old_constraint];
+            let constraint = self.intern_constraint(db, old_constraint_data);
+            if derived {
+                let origin = previous_origin_constraint
+                    .expect("derived constraint should not appear before any origin constraints");
+                support = self.add_derived_support(support, origin, constraint);
+            } else {
+                previous_origin_constraint = Some(constraint);
+                support = self.ordered_union_support(support, SupportId::Singleton(constraint));
+            }
+        }
         ConstraintSet::from_node_and_support(self, node, support)
     }
 
@@ -919,17 +923,17 @@ impl<'db> ConstraintSetBuilder<'db> {
         SupportId::AddDerived(id)
     }
 
-    fn build_support(&self, support: SupportId) -> FxIndexSet<ConstraintId> {
+    fn build_support(&self, support: SupportId) -> FxIndexMap<ConstraintId, bool> {
         fn build_into(
             builder: &ConstraintSetBuilder<'_>,
             support: SupportId,
-            constraints: &mut FxIndexSet<ConstraintId>,
+            constraints: &mut FxIndexMap<ConstraintId, bool>,
         ) {
             match support {
                 SupportId::Empty => {}
 
                 SupportId::Singleton(constraint) => {
-                    constraints.insert(constraint);
+                    constraints.insert(constraint, false);
                 }
 
                 SupportId::OrderedUnion(union_support) => {
@@ -968,14 +972,14 @@ impl<'db> ConstraintSetBuilder<'db> {
                     let origin_index = constraints
                         .get_index_of(&add_derived.origin)
                         .expect("constraint should exist in support");
-                    if !constraints.contains(&add_derived.derived) {
-                        constraints.shift_insert(origin_index + 1, add_derived.derived);
+                    if !constraints.contains_key(&add_derived.derived) {
+                        constraints.shift_insert(origin_index + 1, add_derived.derived, true);
                     }
                 }
             }
         }
 
-        let mut constraints = FxIndexSet::default();
+        let mut constraints = FxIndexMap::default();
         build_into(self, support, &mut constraints);
         constraints
     }
