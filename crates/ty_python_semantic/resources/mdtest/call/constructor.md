@@ -297,7 +297,8 @@ b: int = MaybeInt("42")  # error: [invalid-assignment]
 from __future__ import annotations
 from ty_extensions import Intersection
 
-class Mixin: pass
+class Mixin:
+    pass
 
 class A:
     def __new__(cls) -> Intersection[A, Mixin]:

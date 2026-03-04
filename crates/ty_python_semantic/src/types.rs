@@ -4572,11 +4572,7 @@ impl<'db> Type<'db> {
             // Preserve the full `__new__` signature and defer `__init__` validation until we know
             // which `__new__` overload matched at call time.
             if let Some((init_bindings, _init_callable)) = init_bindings.as_ref() {
-                new_bindings.set_mixed_constructor_init(
-                    constructor_class_literal,
-                    init_bindings,
-                    false,
-                );
+                new_bindings.set_constructor_init(constructor_class_literal, init_bindings, false);
             }
             Some(new_bindings)
         } else {
@@ -4592,7 +4588,7 @@ impl<'db> Type<'db> {
             if let Some(downstream_bindings) = constructor_bindings.as_ref() {
                 // Preserve the full metaclass `__call__` signature and defer whether constructor
                 // downstream checks apply until the matched overload is known.
-                metaclass_bindings.set_mixed_constructor_init(
+                metaclass_bindings.set_constructor_init(
                     constructor_class_literal,
                     downstream_bindings,
                     true,
