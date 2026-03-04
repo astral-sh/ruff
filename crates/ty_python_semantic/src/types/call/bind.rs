@@ -187,6 +187,12 @@ enum ConstructorReturnKind {
     NotInstance,
 }
 
+impl ConstructorReturnKind {
+    fn is_instance(self) -> bool {
+        matches!(self, ConstructorReturnKind::Instance)
+    }
+}
+
 /// Return `true` if `class_ty` is a subtype of (any specialization of) `class_literal`.
 fn is_subtype_of_class_literal<'db>(
     db: &'db dyn Db,
@@ -225,8 +231,10 @@ impl<'db> DownstreamConstructor<'db> {
                 }
                 ConstructorReturnKind::NotInstance
             }
+            // Spec says an explicit `Any` return type should be considered non-instance.
             Type::Dynamic(DynamicType::Any) => ConstructorReturnKind::NotInstance,
-            Type::Dynamic(_) | Type::TypeVar(_) => ConstructorReturnKind::Instance,
+            // But a missing return annotation should be considered instance.
+            Type::Dynamic(_) => ConstructorReturnKind::Instance,
             // A `Never` constructor return is terminal and does not run downstream construction.
             Type::Never => ConstructorReturnKind::NotInstance,
             Type::NominalInstance(instance) => {
@@ -240,10 +248,10 @@ impl<'db> DownstreamConstructor<'db> {
             ty => {
                 let meta = ty.to_meta_type(db);
                 match meta {
-                    Type::ClassLiteral(class_literal) => {
+                    Type::ClassLiteral(return_class_literal) => {
                         if is_subtype_of_class_literal(
                             db,
-                            class_literal.default_specialization(db),
+                            return_class_literal.identity_specialization(db),
                             class_literal,
                         ) {
                             ConstructorReturnKind::Instance
@@ -281,10 +289,7 @@ impl<'db> DownstreamConstructor<'db> {
                 .map(|specialization| declared_return.apply_specialization(db, specialization))
                 .unwrap_or(declared_return);
 
-            !matches!(
-                self.return_kind(db, resolved_return),
-                ConstructorReturnKind::NotInstance
-            )
+            self.return_kind(db, resolved_return).is_instance()
         })
     }
 
@@ -293,10 +298,7 @@ impl<'db> DownstreamConstructor<'db> {
         db: &'db dyn Db,
         return_ty: Type<'db>,
     ) -> bool {
-        !matches!(
-            self.return_kind(db, return_ty),
-            ConstructorReturnKind::NotInstance
-        )
+        self.return_kind(db, return_ty).is_instance()
     }
 }
 
@@ -488,9 +490,9 @@ impl<'db> Bindings<'db> {
         }
     }
 
-    pub(crate) fn set_constructor_init_bindings(&mut self) {
+    pub(crate) fn set_is_init(&mut self) {
         for binding in self.iter_flat_mut() {
-            binding.is_constructor_init_binding = true;
+            binding.is_init = true;
         }
     }
 
@@ -668,7 +670,7 @@ impl<'db> Bindings<'db> {
         // if the matched overload is instance-returning.
         let mut init_error = false;
         for binding in self.iter_flat_mut() {
-            if binding.check_constructor_init(
+            if binding.check_downstream_constructor(
                 db,
                 constraints,
                 argument_types,
@@ -797,7 +799,7 @@ impl<'db> Bindings<'db> {
                     .next()
                     .map(|(_, overload)| overload)
                     .or_else(|| match binding.overloads() {
-                        [overload] if !binding.is_constructor_init_binding => Some(overload),
+                        [overload] if !binding.is_init => Some(overload),
                         _ => None,
                     });
                 let Some(overload) = overload else {
@@ -806,7 +808,7 @@ impl<'db> Bindings<'db> {
 
                 // `__init__` is a post-construction validator and does not determine the
                 // constructor return type.
-                if binding.is_constructor_init_binding {
+                if binding.is_init {
                     continue;
                 }
 
@@ -851,7 +853,7 @@ impl<'db> Bindings<'db> {
                 // downstream constructor logic), if the downstream constructor resolves to a
                 // non-instance return, that becomes the effective constructor return.
                 if let Some(downstream) = binding.downstream_constructor.as_ref() {
-                    if !binding.should_check_deferred_constructor_init(db) {
+                    if !binding.should_check_downstream_constructor(db) {
                         continue;
                     }
                     if let Some(downstream_return) = downstream.bindings.constructor_return_type(db)
@@ -874,7 +876,7 @@ impl<'db> Bindings<'db> {
                 let Some((_, overload)) = binding.matching_overloads().next() else {
                     continue;
                 };
-                if binding.is_constructor_init_binding {
+                if binding.is_init {
                     continue;
                 }
 
@@ -912,7 +914,7 @@ impl<'db> Bindings<'db> {
                 .next()
                 .map(|(_, overload)| overload)
                 .or_else(|| match binding.overloads() {
-                    [overload] if binding.is_constructor_init_binding => Some(overload),
+                    [overload] if binding.is_init => Some(overload),
                     _ => None,
                 });
             let Some(overload) = overload else {
@@ -1106,7 +1108,7 @@ impl<'db> Bindings<'db> {
             let Some(downstream) = binding.downstream_constructor.as_ref() else {
                 continue;
             };
-            if binding.should_check_deferred_constructor_init(context.db()) {
+            if binding.should_check_downstream_constructor(context.db()) {
                 if !reported_ctor_init_callables.insert(downstream.bindings.callable_type()) {
                     continue;
                 }
@@ -2440,7 +2442,7 @@ impl<'db> From<Binding<'db>> for Bindings<'db> {
             dunder_call_is_possibly_unbound: false,
             bound_type: None,
             constructor_instance_type: None,
-            is_constructor_init_binding: false,
+            is_init: false,
             downstream_constructor: None,
             overload_call_return_type: None,
             matching_overload_before_type_checking: None,
@@ -2490,7 +2492,7 @@ pub(crate) struct CallableBinding<'db> {
     pub(crate) constructor_instance_type: Option<Type<'db>>,
 
     /// Whether this binding represents constructor `__init__` validation.
-    is_constructor_init_binding: bool,
+    is_init: bool,
 
     /// Deferred downstream constructor validation.
     downstream_constructor: Option<Box<DownstreamConstructor<'db>>>,
@@ -2544,7 +2546,7 @@ impl<'db> CallableBinding<'db> {
             dunder_call_is_possibly_unbound: false,
             bound_type: None,
             constructor_instance_type: None,
-            is_constructor_init_binding: false,
+            is_init: false,
             downstream_constructor: None,
             overload_call_return_type: None,
             matching_overload_before_type_checking: None,
@@ -2559,7 +2561,7 @@ impl<'db> CallableBinding<'db> {
             dunder_call_is_possibly_unbound: false,
             bound_type: None,
             constructor_instance_type: None,
-            is_constructor_init_binding: false,
+            is_init: false,
             downstream_constructor: None,
             overload_call_return_type: None,
             matching_overload_before_type_checking: None,
@@ -2966,7 +2968,7 @@ impl<'db> CallableBinding<'db> {
         None
     }
 
-    fn check_constructor_init(
+    fn check_downstream_constructor(
         &mut self,
         db: &'db dyn Db,
         constraints: &ConstraintSetBuilder<'db>,
@@ -2974,9 +2976,7 @@ impl<'db> CallableBinding<'db> {
         call_expression_tcx: TypeContext<'db>,
         dataclass_field_specifiers: &[Type<'db>],
     ) -> bool {
-        let should_check = self.should_check_deferred_constructor_init(db);
-
-        if !should_check {
+        if !self.should_check_downstream_constructor(db) {
             return false;
         }
 
@@ -3340,7 +3340,7 @@ impl<'db> CallableBinding<'db> {
             .filter(|(_, overload)| !overload.has_errors_affecting_overload_resolution())
     }
 
-    fn should_check_deferred_constructor_init(&self, db: &'db dyn Db) -> bool {
+    fn should_check_downstream_constructor(&self, db: &'db dyn Db) -> bool {
         let Some(downstream) = self.downstream_constructor.as_ref() else {
             return false;
         };
@@ -3376,7 +3376,7 @@ impl<'db> CallableBinding<'db> {
         db: &'db dyn Db,
     ) -> Option<&Bindings<'db>> {
         let downstream = self.downstream_constructor.as_ref()?;
-        self.should_check_deferred_constructor_init(db)
+        self.should_check_downstream_constructor(db)
             .then_some(&downstream.bindings)
     }
 

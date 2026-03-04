@@ -4519,7 +4519,7 @@ impl<'db> Type<'db> {
                 _,
             ) => {
                 let mut bindings = init_method.bindings(db);
-                bindings.set_constructor_init_bindings();
+                bindings.set_is_init();
                 if *definedness == Definedness::PossiblyUndefined {
                     bindings.set_implicit_dunder_init_is_possibly_unbound();
                 }
@@ -4538,7 +4538,7 @@ impl<'db> Type<'db> {
                         ..
                     }) => {
                         let mut bindings = init_method.bindings(db);
-                        bindings.set_constructor_init_bindings();
+                        bindings.set_is_init();
                         if definedness == Definedness::PossiblyUndefined {
                             bindings.set_implicit_dunder_init_is_possibly_unbound();
                         }

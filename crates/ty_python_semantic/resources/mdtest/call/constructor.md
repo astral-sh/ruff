@@ -404,6 +404,31 @@ class MaybeAny:
 reveal_type(MaybeAny(1))  # revealed: MaybeAny | Any
 ```
 
+### `__new__` returning a non-self typevar
+
+When `__new__` returns a type variable that is not `Self`, we should specialize it before
+categorizing the return type as instance or non-instance.
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class C(Generic[T]):
+    def __new__(cls, x: T) -> T:
+        return x
+
+    def __init__(self) -> None: ...
+
+# `Literal[1]` is not an instance of `C`, so `__init__` is skipped.
+reveal_type(C(1))  # revealed: Literal[1]
+
+def _(c: C[str]):
+    # `C[str]` is an instance of `C`, so `__init__` is checked and fails.
+    # error: [too-many-positional-arguments]
+    reveal_type(C(c))  # revealed: C[str]
+```
+
 ### `__new__` returning a specific class affects subclasses
 
 When `__new__` returns a specific class (e.g., `-> Foo`), this is an instance type for `Foo` itself,
