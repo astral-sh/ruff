@@ -61,6 +61,7 @@ use crate::semantic_index::{
 };
 use crate::types::call::bind::MatchingOverloadIndex;
 use crate::types::call::{Argument, Binding, Bindings, CallArguments, CallError, CallErrorKind};
+use crate::types::callable::CallableTypeKind;
 use crate::types::class::{
     AbstractMethod, ClassLiteral, CodeGeneratorKind, DynamicClassAnchor, DynamicClassLiteral,
     DynamicMetaclassConflict, DynamicNamedTupleAnchor, DynamicNamedTupleLiteral, FieldKind,
@@ -122,6 +123,7 @@ use crate::types::newtype::NewType;
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::subclass_of::SubclassOfInner;
 use crate::types::tuple::{Tuple, TupleLength, TupleSpecBuilder, TupleType};
+use crate::types::type_alias::{ManualPEP695TypeAliasType, PEP695TypeAliasType};
 use crate::types::typed_dict::{
     TypedDictAssignmentKind, TypedDictKeyAssignment, validate_typed_dict_constructor,
     validate_typed_dict_dict_literal,
@@ -132,15 +134,15 @@ use crate::types::typevar::{
 };
 use crate::types::visitor::find_over_type;
 use crate::types::{
-    CallDunderError, CallableBinding, CallableType, CallableTypeKind, ClassType, DataclassParams,
-    DynamicType, EvaluationMode, GenericAlias, InternedConstraintSet, InternedType,
-    IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, KnownUnion,
-    LintDiagnosticGuard, LiteralValueTypeKind, ManualPEP695TypeAliasType, MemberLookupPolicy,
-    MetaclassCandidate, PEP695TypeAliasType, ParamSpecAttrKind, Parameter, ParameterForm,
-    Parameters, Signature, SpecialFormType, StaticClassLiteral, SubclassOfType, Truthiness, Type,
-    TypeAliasType, TypeAndQualifiers, TypeContext, TypeQualifiers, TypeVarBoundOrConstraints,
-    TypeVarKind, TypeVarVariance, TypedDictType, UnionBuilder, UnionType, binding_type,
-    definition_expression_type, infer_complete_scope_types, infer_scope_types, todo_type,
+    CallDunderError, CallableBinding, CallableType, ClassType, DataclassParams, DynamicType,
+    EvaluationMode, GenericAlias, InternedConstraintSet, InternedType, IntersectionBuilder,
+    IntersectionType, KnownClass, KnownInstanceType, KnownUnion, LintDiagnosticGuard,
+    LiteralValueTypeKind, MemberLookupPolicy, MetaclassCandidate, ParamSpecAttrKind, Parameter,
+    ParameterForm, Parameters, Signature, SpecialFormType, StaticClassLiteral, SubclassOfType,
+    Truthiness, Type, TypeAliasType, TypeAndQualifiers, TypeContext, TypeQualifiers,
+    TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, TypedDictType, UnionBuilder,
+    UnionType, binding_type, definition_expression_type, infer_complete_scope_types,
+    infer_scope_types, todo_type,
 };
 use crate::types::{CallableTypes, overrides};
 use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};

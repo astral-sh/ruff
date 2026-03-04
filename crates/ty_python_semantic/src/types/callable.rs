@@ -6,13 +6,14 @@ use crate::{
     place::Place,
     semantic_index::definition::Definition,
     types::{
-        ApplyTypeMappingVisitor, BoundTypeVarInstance, CallableSignature, ClassType,
-        FindLegacyTypeVarsVisitor, KnownInstanceType, LiteralValueTypeKind, MemberLookupPolicy,
-        Parameter, Parameters, Signature, SubclassOfInner, Type, TypeContext, TypeMapping,
-        TypeVarBoundOrConstraints, UnionType,
+        ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassType, FindLegacyTypeVarsVisitor,
+        KnownInstanceType, LiteralValueTypeKind, MemberLookupPolicy, Parameter, Parameters,
+        Signature, SubclassOfInner, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
+        UnionType,
         constraints::{ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension},
         generics::InferableTypeVars,
         relation::{HasRelationToVisitor, IsDisjointVisitor, TypeRelation},
+        signatures::CallableSignature,
         visitor, walk_signature,
     },
 };

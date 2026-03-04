@@ -26,6 +26,7 @@ use crate::dunder_all::dunder_all_names;
 use crate::place::{DefinedPlace, Definedness, Place, known_module_symbol};
 use crate::subscript::PyIndex;
 use crate::types::call::arguments::{Expansion, is_expandable_type};
+use crate::types::callable::CallableTypeKind;
 use crate::types::constraints::{ConstraintSet, ConstraintSetBuilder};
 use crate::types::diagnostic::{
     CALL_NON_CALLABLE, CALL_TOP_CALLABLE, CONFLICTING_ARGUMENT_FORMS, INVALID_ARGUMENT_TYPE,
@@ -42,16 +43,18 @@ use crate::types::generics::{
     GenericContext, InferableTypeVars, Specialization, SpecializationBuilder, SpecializationError,
 };
 use crate::types::known_instance::FieldInstance;
-use crate::types::signatures::{Parameter, ParameterForm, ParameterKind, Parameters};
+use crate::types::signatures::{
+    CallableSignature, Parameter, ParameterForm, ParameterKind, Parameters,
+};
 use crate::types::tuple::{TupleLength, TupleSpec, TupleType};
 use crate::types::typevar::BoundTypeVarIdentity;
 use crate::types::{
-    BoundMethodType, BoundTypeVarInstance, CallableSignature, CallableType, CallableTypeKind,
-    ClassLiteral, DATACLASS_FLAGS, DataclassFlags, DataclassParams, EvaluationMode, GenericAlias,
-    InternedConstraintSet, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
-    LiteralValueTypeKind, MemberLookupPolicy, NominalInstanceType, PropertyInstanceType,
-    SpecialFormType, TypeAliasType, TypeContext, TypeVarBoundOrConstraints, TypeVarVariance,
-    UnionBuilder, UnionType, WrapperDescriptorKind, enums, list_members,
+    BoundMethodType, BoundTypeVarInstance, CallableType, ClassLiteral, DATACLASS_FLAGS,
+    DataclassFlags, DataclassParams, EvaluationMode, GenericAlias, InternedConstraintSet,
+    IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
+    MemberLookupPolicy, NominalInstanceType, PropertyInstanceType, SpecialFormType, TypeAliasType,
+    TypeContext, TypeVarBoundOrConstraints, TypeVarVariance, UnionBuilder, UnionType,
+    WrapperDescriptorKind, enums, list_members,
 };
 use crate::{DisplaySettings, Program};
 use ruff_db::diagnostic::{Annotation, Diagnostic, SubDiagnostic, SubDiagnosticSeverity};

@@ -5,7 +5,6 @@ use rustc_hash::FxHashMap;
 
 use std::borrow::Cow;
 use std::cell::RefCell;
-use std::fmt::Write;
 use std::time::Duration;
 
 use bitflags::bitflags;
@@ -14,16 +13,14 @@ use context::InferContext;
 use ruff_db::Instant;
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span};
 use ruff_db::files::File;
-use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use ruff_text_size::Ranged;
 use smallvec::smallvec_inline;
 use ty_module_resolver::{KnownModule, Module, ModuleName, resolve_module};
 
-pub(crate) use self::class::DynamicClassLiteral;
 pub use self::cyclic::CycleDetector;
-pub(crate) use self::cyclic::{PairVisitor, TypeTransformer};
+pub(crate) use self::cyclic::TypeTransformer;
 pub(crate) use self::diagnostic::register_lints;
 pub use self::diagnostic::{TypeCheckDiagnostics, UNDEFINED_REVEAL, UNRESOLVED_REFERENCE};
 pub(crate) use self::infer::{
@@ -31,27 +28,27 @@ pub(crate) use self::infer::{
     infer_expression_type, infer_expression_types, infer_scope_types,
 };
 pub use self::known_instance::KnownInstanceType;
+use self::set_theoretic::KnownUnion;
 pub(crate) use self::set_theoretic::builder::{IntersectionBuilder, UnionBuilder};
 pub use self::set_theoretic::{
     IntersectionType, NegativeIntersectionElements, NegativeIntersectionElementsIterator, UnionType,
 };
-use self::set_theoretic::{KnownUnion, walk_intersection_type, walk_union};
 pub use self::signatures::ParameterKind;
-pub(crate) use self::signatures::{CallableSignature, Signature};
+pub(crate) use self::signatures::Signature;
 pub(crate) use self::subclass_of::{SubclassOfInner, SubclassOfType};
 pub use crate::diagnostic::add_inferred_python_version_hint_to_diagnostic;
 use crate::place::{
     DefinedPlace, Definedness, Place, PlaceAndQualifiers, TypeOrigin, builtins_module_scope,
     imported_symbol, known_module_symbol,
 };
-use crate::semantic_index::definition::{Definition, DefinitionKind};
+use crate::semantic_index::definition::Definition;
 use crate::semantic_index::place::ScopedPlaceId;
 use crate::semantic_index::scope::ScopeId;
 use crate::semantic_index::{imported_modules, place_table, semantic_index};
 use crate::suppression::check_suppressions;
 use crate::types::bound_super::BoundSuperType;
 use crate::types::call::{Binding, Bindings, CallArguments, CallableBinding};
-pub(crate) use crate::types::callable::{CallableType, CallableTypeKind, CallableTypes};
+pub(crate) use crate::types::callable::{CallableType, CallableTypes};
 pub(crate) use crate::types::class_base::ClassBase;
 use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::context::{LintDiagnosticGuard, LintDiagnosticGuardBuilder};
@@ -78,7 +75,8 @@ pub(crate) use crate::types::signatures::{Parameter, Parameters};
 use crate::types::signatures::{ParameterForm, walk_signature};
 use crate::types::special_form::TypeQualifier;
 use crate::types::tuple::TupleSpec;
-pub(crate) use crate::types::typed_dict::{TypedDictParams, TypedDictType, walk_typed_dict_type};
+use crate::types::type_alias::TypeAliasType;
+pub(crate) use crate::types::typed_dict::TypedDictType;
 pub use crate::types::typevar::{
     BindingContext, BoundTypeVarInstance, ParamSpecAttrKind, TypeVarBoundOrConstraints, TypeVarKind,
 };
@@ -130,7 +128,10 @@ mod signatures;
 mod special_form;
 mod string_annotation;
 mod subclass_of;
+#[cfg(test)]
+pub(crate) mod tests;
 mod tuple;
+mod type_alias;
 mod typed_dict;
 mod typevar;
 mod unpacker;
@@ -7023,314 +7024,6 @@ impl<'db> ModuleLiteralType<'db> {
     }
 }
 
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
-pub struct PEP695TypeAliasType<'db> {
-    #[returns(ref)]
-    pub name: ast::name::Name,
-
-    rhs_scope: ScopeId<'db>,
-
-    specialization: Option<Specialization<'db>>,
-}
-
-// The Salsa heap is tracked separately.
-impl get_size2::GetSize for PEP695TypeAliasType<'_> {}
-
-fn walk_pep_695_type_alias<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
-    db: &'db dyn Db,
-    type_alias: PEP695TypeAliasType<'db>,
-    visitor: &V,
-) {
-    visitor.visit_type(db, type_alias.value_type(db));
-}
-
-#[salsa::tracked]
-impl<'db> PEP695TypeAliasType<'db> {
-    pub(crate) fn definition(self, db: &'db dyn Db) -> Definition<'db> {
-        let scope = self.rhs_scope(db);
-        let type_alias_stmt_node = scope.node(db).expect_type_alias();
-        semantic_index(db, scope.file(db)).expect_single_definition(type_alias_stmt_node)
-    }
-
-    /// The RHS type of a PEP-695 style type alias with specialization applied.
-    pub(crate) fn value_type(self, db: &'db dyn Db) -> Type<'db> {
-        self.apply_function_specialization(db, self.raw_value_type(db))
-    }
-
-    /// The RHS type of a PEP-695 style type alias with *no* specialization applied.
-    /// Returns `Divergent` if the type alias is defined cyclically.
-    #[salsa::tracked(
-        cycle_initial=|_, id, _| Type::divergent(id),
-        cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, _| {
-            value.cycle_normalized(db, *previous, cycle)
-        },
-        heap_size=ruff_memory_usage::heap_size
-    )]
-    fn raw_value_type(self, db: &'db dyn Db) -> Type<'db> {
-        let scope = self.rhs_scope(db);
-        let module = parsed_module(db, scope.file(db)).load(db);
-        let type_alias_stmt_node = scope.node(db).expect_type_alias();
-        let definition = self.definition(db);
-
-        definition_expression_type(db, definition, &type_alias_stmt_node.node(&module).value)
-    }
-
-    fn apply_function_specialization(self, db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
-        if let Some(generic_context) = self.generic_context(db) {
-            let specialization = self
-                .specialization(db)
-                .unwrap_or_else(|| generic_context.default_specialization(db, None));
-            ty.apply_specialization(db, specialization)
-        } else {
-            ty
-        }
-    }
-
-    pub(crate) fn apply_specialization(
-        self,
-        db: &'db dyn Db,
-        f: impl FnOnce(GenericContext<'db>) -> Specialization<'db>,
-    ) -> PEP695TypeAliasType<'db> {
-        match self.generic_context(db) {
-            None => self,
-
-            Some(generic_context) => {
-                // Note that at runtime, a specialized type alias is an instance of `typing.GenericAlias`.
-                // However, the `GenericAlias` type in ty is heavily special cased to refer to specialized
-                // class literals, so we instead represent specialized type aliases as instances of
-                // `typing.TypeAliasType` internally, and pass the specialization through to the value type,
-                // except when resolving to an instance of the type alias, or its display representation.
-                let specialization = f(generic_context);
-                PEP695TypeAliasType::new(
-                    db,
-                    self.name(db),
-                    self.rhs_scope(db),
-                    Some(specialization),
-                )
-            }
-        }
-    }
-
-    pub(crate) fn is_specialized(self, db: &'db dyn Db) -> bool {
-        self.specialization(db).is_some()
-    }
-
-    #[salsa::tracked(cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
-    pub(crate) fn generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
-        let scope = self.rhs_scope(db);
-        let file = scope.file(db);
-        let parsed = parsed_module(db, file).load(db);
-        let type_alias_stmt_node = scope.node(db).expect_type_alias();
-
-        type_alias_stmt_node
-            .node(&parsed)
-            .type_params
-            .as_ref()
-            .map(|type_params| {
-                let index = semantic_index(db, scope.file(db));
-                let definition = index.expect_single_definition(type_alias_stmt_node);
-                GenericContext::from_type_params(db, index, definition, type_params)
-            })
-    }
-}
-
-/// A PEP 695 `types.TypeAliasType` created by manually calling the constructor.
-///
-/// The value type is computed lazily via [`ManualPEP695TypeAliasType::value_type()`]
-/// to avoid cycle non-convergence for mutually recursive definitions.
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
-pub struct ManualPEP695TypeAliasType<'db> {
-    #[returns(ref)]
-    pub name: ast::name::Name,
-    pub definition: Definition<'db>,
-}
-
-// The Salsa heap is tracked separately.
-impl get_size2::GetSize for ManualPEP695TypeAliasType<'_> {}
-
-fn walk_manual_pep_695_type_alias<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
-    db: &'db dyn Db,
-    type_alias: ManualPEP695TypeAliasType<'db>,
-    visitor: &V,
-) {
-    visitor.visit_type(db, type_alias.value_type(db));
-}
-
-#[salsa::tracked]
-impl<'db> ManualPEP695TypeAliasType<'db> {
-    /// The value type of this manual type alias.
-    ///
-    /// Computed lazily from the definition to avoid including the value in the interned
-    /// struct's identity. Returns `Divergent` if the type alias is defined cyclically.
-    #[salsa::tracked(
-        cycle_initial=|_, id, _| Type::divergent(id),
-        cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, _| {
-            value.cycle_normalized(db, *previous, cycle)
-        },
-        heap_size=ruff_memory_usage::heap_size
-    )]
-    pub(crate) fn value_type(self, db: &'db dyn Db) -> Type<'db> {
-        let definition = self.definition(db);
-        let file = definition.file(db);
-        let module = parsed_module(db, file).load(db);
-        let DefinitionKind::Assignment(assignment) = definition.kind(db) else {
-            return Type::unknown();
-        };
-        let value_node = assignment.value(&module);
-        let ast::Expr::Call(call) = value_node else {
-            return Type::unknown();
-        };
-        // The value is the second positional argument to TypeAliasType(name, value).
-        let Some(value_arg) = call.arguments.find_argument_value("value", 1) else {
-            return Type::unknown();
-        };
-        definition_expression_type(db, definition, value_arg)
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
-pub enum TypeAliasType<'db> {
-    /// A type alias defined using the PEP 695 `type` statement.
-    PEP695(PEP695TypeAliasType<'db>),
-    /// A type alias defined by manually instantiating the PEP 695 `types.TypeAliasType`.
-    ManualPEP695(ManualPEP695TypeAliasType<'db>),
-}
-
-fn walk_type_alias_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
-    db: &'db dyn Db,
-    type_alias: TypeAliasType<'db>,
-    visitor: &V,
-) {
-    if !visitor.should_visit_lazy_type_attributes() {
-        return;
-    }
-    match type_alias {
-        TypeAliasType::PEP695(type_alias) => {
-            walk_pep_695_type_alias(db, type_alias, visitor);
-        }
-        TypeAliasType::ManualPEP695(type_alias) => {
-            walk_manual_pep_695_type_alias(db, type_alias, visitor);
-        }
-    }
-}
-
-impl<'db> TypeAliasType<'db> {
-    pub(crate) fn name(self, db: &'db dyn Db) -> &'db str {
-        match self {
-            TypeAliasType::PEP695(type_alias) => type_alias.name(db),
-            TypeAliasType::ManualPEP695(type_alias) => type_alias.name(db),
-        }
-    }
-
-    pub(crate) fn definition(self, db: &'db dyn Db) -> Definition<'db> {
-        match self {
-            TypeAliasType::PEP695(type_alias) => type_alias.definition(db),
-            TypeAliasType::ManualPEP695(type_alias) => type_alias.definition(db),
-        }
-    }
-
-    pub fn value_type(self, db: &'db dyn Db) -> Type<'db> {
-        match self {
-            TypeAliasType::PEP695(type_alias) => type_alias.value_type(db),
-            TypeAliasType::ManualPEP695(type_alias) => type_alias.value_type(db),
-        }
-    }
-
-    pub(crate) fn raw_value_type(self, db: &'db dyn Db) -> Type<'db> {
-        match self {
-            TypeAliasType::PEP695(type_alias) => type_alias.raw_value_type(db),
-            TypeAliasType::ManualPEP695(type_alias) => type_alias.value_type(db),
-        }
-    }
-
-    pub(crate) fn as_pep_695_type_alias(self) -> Option<PEP695TypeAliasType<'db>> {
-        match self {
-            TypeAliasType::PEP695(type_alias) => Some(type_alias),
-            TypeAliasType::ManualPEP695(_) => None,
-        }
-    }
-
-    pub(crate) fn generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
-        // TODO: Add support for generic non-PEP695 type aliases.
-        match self {
-            TypeAliasType::PEP695(type_alias) => type_alias.generic_context(db),
-            TypeAliasType::ManualPEP695(_) => None,
-        }
-    }
-
-    pub(crate) fn specialization(self, db: &'db dyn Db) -> Option<Specialization<'db>> {
-        match self {
-            TypeAliasType::PEP695(type_alias) => type_alias.specialization(db),
-            TypeAliasType::ManualPEP695(_) => None,
-        }
-    }
-
-    fn apply_function_specialization(self, db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
-        match self {
-            TypeAliasType::PEP695(type_alias) => type_alias.apply_function_specialization(db, ty),
-            TypeAliasType::ManualPEP695(_) => ty,
-        }
-    }
-
-    pub(crate) fn apply_specialization(
-        self,
-        db: &'db dyn Db,
-        f: impl FnOnce(GenericContext<'db>) -> Specialization<'db>,
-    ) -> Self {
-        match self {
-            TypeAliasType::PEP695(type_alias) => {
-                TypeAliasType::PEP695(type_alias.apply_specialization(db, f))
-            }
-            TypeAliasType::ManualPEP695(_) => self,
-        }
-    }
-
-    /// Returns a struct that can display the fully qualified name of this type alias.
-    pub(crate) fn qualified_name(self, db: &'db dyn Db) -> QualifiedTypeAliasName<'db> {
-        QualifiedTypeAliasName::from_type_alias(db, self)
-    }
-}
-
-// N.B. It would be incorrect to derive `Eq`, `PartialEq`, or `Hash` for this struct,
-// because two `QualifiedTypeAliasName` instances might refer to different type aliases but
-// have the same components. You'd expect them to compare equal, but they'd compare
-// unequal if `PartialEq`/`Eq` were naively derived.
-#[derive(Clone, Copy)]
-pub(crate) struct QualifiedTypeAliasName<'db> {
-    db: &'db dyn Db,
-    type_alias: TypeAliasType<'db>,
-}
-
-impl<'db> QualifiedTypeAliasName<'db> {
-    pub(crate) fn from_type_alias(db: &'db dyn Db, type_alias: TypeAliasType<'db>) -> Self {
-        Self { db, type_alias }
-    }
-
-    /// Returns the components of the qualified name of this type alias, excluding the alias itself.
-    ///
-    /// For example, calling this method on a type alias `D` inside a class `C` in module `a.b`
-    /// would return `["a", "b", "C"]`.
-    pub(crate) fn components_excluding_self(&self) -> Vec<String> {
-        let definition = self.type_alias.definition(self.db);
-        let file = definition.file(self.db);
-        let file_scope_id = definition.file_scope(self.db);
-
-        // Type aliases are defined directly in their enclosing scope (no body scope like classes),
-        // so we don't skip any ancestor scopes.
-        display::qualified_name_components_from_scope(self.db, file, file_scope_id, 0)
-    }
-}
-
-impl std::fmt::Display for QualifiedTypeAliasName<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for parent in self.components_excluding_self() {
-            f.write_str(&parent)?;
-            f.write_char('.')?;
-        }
-        f.write_str(self.type_alias.name(self.db))
-    }
-}
-
 /// Either the explicit `metaclass=` keyword of the class, or the inferred metaclass of one of its base classes.
 #[derive(Debug, Clone, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub(super) struct MetaclassCandidate<'db> {
@@ -7587,351 +7280,3 @@ impl EvaluationMode {
 #[cfg(not(debug_assertions))]
 #[cfg(target_pointer_width = "64")]
 static_assertions::assert_eq_size!(Type, [u8; 16]);
-
-#[cfg(test)]
-pub(crate) mod tests {
-    use super::*;
-    use crate::db::tests::{TestDbBuilder, setup_db};
-    use crate::place::{typing_extensions_symbol, typing_symbol};
-    use ruff_db::system::DbWithWritableSystem as _;
-    use ruff_python_ast::PythonVersion;
-    use test_case::test_case;
-
-    /// Explicitly test for Python version <3.13 and >=3.13, to ensure that
-    /// the fallback to `typing_extensions` is working correctly.
-    /// See [`KnownClass::canonical_module`] for more information.
-    #[test_case(PythonVersion::PY312)]
-    #[test_case(PythonVersion::PY313)]
-    fn no_default_type_is_singleton(python_version: PythonVersion) {
-        let db = TestDbBuilder::new()
-            .with_python_version(python_version)
-            .build()
-            .unwrap();
-
-        let no_default = KnownClass::NoDefaultType.to_instance(&db);
-
-        assert!(no_default.is_singleton(&db));
-    }
-
-    #[test]
-    fn typing_vs_typeshed_no_default() {
-        let db = TestDbBuilder::new()
-            .with_python_version(PythonVersion::PY313)
-            .build()
-            .unwrap();
-
-        let typing_no_default = typing_symbol(&db, "NoDefault").place.expect_type();
-        let typing_extensions_no_default = typing_extensions_symbol(&db, "NoDefault")
-            .place
-            .expect_type();
-
-        assert_eq!(typing_no_default.display(&db).to_string(), "NoDefault");
-        assert_eq!(
-            typing_extensions_no_default.display(&db).to_string(),
-            "NoDefault"
-        );
-    }
-
-    /// All other tests also make sure that `Type::Todo` works as expected. This particular
-    /// test makes sure that we handle `Todo` types correctly, even if they originate from
-    /// different sources.
-    #[test]
-    fn todo_types() {
-        let db = setup_db();
-
-        let todo1 = todo_type!("1");
-        let todo2 = todo_type!("2");
-
-        let int = KnownClass::Int.to_instance(&db);
-
-        assert!(int.is_assignable_to(&db, todo1));
-
-        assert!(todo1.is_assignable_to(&db, int));
-
-        // We lose information when combining several `Todo` types. This is an
-        // acknowledged limitation of the current implementation. We cannot
-        // easily store the meta information of several `Todo`s in a single
-        // variant, as `TodoType` needs to implement `Copy`, meaning it can't
-        // contain `Vec`/`Box`/etc., and can't be boxed itself.
-        //
-        // Lifting this restriction would require us to intern `TodoType` in
-        // salsa, but that would mean we would have to pass in `db` everywhere.
-
-        // A union of several `Todo` types collapses to a single `Todo` type:
-        assert!(UnionType::from_elements(&db, [todo1, todo2]).is_todo());
-
-        // And similar for intersection types:
-        assert!(IntersectionType::from_elements(&db, [todo1, todo2]).is_todo());
-        assert!(
-            IntersectionBuilder::new(&db)
-                .add_positive(todo1)
-                .add_negative(todo2)
-                .build()
-                .is_todo()
-        );
-    }
-
-    #[test]
-    fn divergent_type() {
-        let db = setup_db();
-        let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
-
-        // The `Divergent` type must not be eliminated in union with other dynamic types,
-        // as this would prevent detection of divergent type inference using `Divergent`.
-        let union = UnionType::from_elements(&db, [Type::unknown(), div]);
-        assert_eq!(union.display(&db).to_string(), "Unknown | Divergent");
-
-        let union = UnionType::from_elements(&db, [div, Type::unknown()]);
-        assert_eq!(union.display(&db).to_string(), "Divergent | Unknown");
-
-        let union = UnionType::from_elements(&db, [div, Type::unknown(), todo_type!("1")]);
-        assert_eq!(union.display(&db).to_string(), "Divergent | Unknown");
-
-        assert!(div.is_equivalent_to(&db, div));
-        assert!(!div.is_equivalent_to(&db, Type::unknown()));
-        assert!(!Type::unknown().is_equivalent_to(&db, div));
-        assert!(!div.is_redundant_with(&db, Type::unknown()));
-        assert!(!Type::unknown().is_redundant_with(&db, div));
-
-        // `Divergent & T` and `Divergent & ~T` both simplify to `Divergent`, except for the
-        // specific case of `Divergent & Never`, which simplifies to `Never`.
-        let divergent_intersection = IntersectionBuilder::new(&db)
-            .add_positive(div)
-            .add_positive(todo_type!("2"))
-            .add_negative(todo_type!("3"))
-            .build();
-        assert_eq!(divergent_intersection, div);
-        let divergent_intersection = IntersectionBuilder::new(&db)
-            .add_positive(todo_type!("2"))
-            .add_negative(todo_type!("3"))
-            .add_positive(div)
-            .build();
-        assert_eq!(divergent_intersection, div);
-        let divergent_never_intersection = IntersectionBuilder::new(&db)
-            .add_positive(div)
-            .add_positive(Type::Never)
-            .build();
-        assert_eq!(divergent_never_intersection, Type::Never);
-        let divergent_never_intersection = IntersectionBuilder::new(&db)
-            .add_positive(Type::Never)
-            .add_positive(div)
-            .build();
-        assert_eq!(divergent_never_intersection, Type::Never);
-
-        // The `object` type has a good convergence property, that is, its union with all other types is `object`.
-        // (e.g. `object | tuple[Divergent] == object`, `object | tuple[object] == object`)
-        // So we can safely eliminate `Divergent`.
-        let union = UnionType::from_elements(&db, [div, KnownClass::Object.to_instance(&db)]);
-        assert_eq!(union.display(&db).to_string(), "object");
-
-        let union = UnionType::from_elements(&db, [KnownClass::Object.to_instance(&db), div]);
-        assert_eq!(union.display(&db).to_string(), "object");
-
-        let recursive = UnionType::from_elements(
-            &db,
-            [
-                KnownClass::List.to_specialized_instance(&db, &[div]),
-                Type::none(&db),
-            ],
-        );
-        let nested_rec = KnownClass::List.to_specialized_instance(&db, &[recursive]);
-        assert_eq!(
-            nested_rec.display(&db).to_string(),
-            "list[list[Divergent] | None]"
-        );
-        let normalized = nested_rec
-            .recursive_type_normalized_impl(&db, div, false)
-            .unwrap();
-        assert_eq!(normalized.display(&db).to_string(), "list[Divergent]");
-
-        let union = UnionType::from_elements(&db, [div, KnownClass::Int.to_instance(&db)]);
-        assert_eq!(union.display(&db).to_string(), "Divergent | int");
-        let normalized = union
-            .recursive_type_normalized_impl(&db, div, false)
-            .unwrap();
-        assert_eq!(normalized.display(&db).to_string(), "int");
-
-        // The same can be said about intersections for the `Never` type.
-        let intersection = IntersectionType::from_elements(&db, [Type::Never, div]);
-        assert_eq!(intersection.display(&db).to_string(), "Never");
-
-        let intersection = IntersectionType::from_elements(&db, [div, Type::Never]);
-        assert_eq!(intersection.display(&db).to_string(), "Never");
-    }
-
-    #[test]
-    fn type_alias_variance() {
-        use crate::db::tests::TestDb;
-        use crate::place::global_symbol;
-
-        fn get_type_alias<'db>(db: &'db TestDb, name: &str) -> PEP695TypeAliasType<'db> {
-            let module = ruff_db::files::system_path_to_file(db, "/src/a.py").unwrap();
-            let ty = global_symbol(db, module, name).place.expect_type();
-            let Type::KnownInstance(KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(
-                type_alias,
-            ))) = ty
-            else {
-                panic!("Expected `{name}` to be a type alias");
-            };
-            type_alias
-        }
-        fn get_bound_typevar<'db>(
-            db: &'db TestDb,
-            type_alias: PEP695TypeAliasType<'db>,
-        ) -> BoundTypeVarInstance<'db> {
-            let generic_context = type_alias.generic_context(db).unwrap();
-            generic_context.variables(db).next().unwrap()
-        }
-
-        let mut db = setup_db();
-        db.write_dedented(
-            "/src/a.py",
-            r#"
-class Covariant[T]:
-    def get(self) -> T:
-        raise ValueError
-
-class Contravariant[T]:
-    def set(self, value: T):
-        pass
-
-class Invariant[T]:
-    def get(self) -> T:
-        raise ValueError
-    def set(self, value: T):
-        pass
-
-class Bivariant[T]:
-    pass
-
-type CovariantAlias[T] = Covariant[T]
-type ContravariantAlias[T] = Contravariant[T]
-type InvariantAlias[T] = Invariant[T]
-type BivariantAlias[T] = Bivariant[T]
-
-type RecursiveAlias[T] = None | list[RecursiveAlias[T]]
-type RecursiveAlias2[T] = None | list[T] | list[RecursiveAlias2[T]]
-"#,
-        )
-        .unwrap();
-        let covariant = get_type_alias(&db, "CovariantAlias");
-        assert_eq!(
-            KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(covariant))
-                .variance_of(&db, get_bound_typevar(&db, covariant)),
-            TypeVarVariance::Covariant
-        );
-
-        let contravariant = get_type_alias(&db, "ContravariantAlias");
-        assert_eq!(
-            KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(contravariant))
-                .variance_of(&db, get_bound_typevar(&db, contravariant)),
-            TypeVarVariance::Contravariant
-        );
-
-        let invariant = get_type_alias(&db, "InvariantAlias");
-        assert_eq!(
-            KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(invariant))
-                .variance_of(&db, get_bound_typevar(&db, invariant)),
-            TypeVarVariance::Invariant
-        );
-
-        let bivariant = get_type_alias(&db, "BivariantAlias");
-        assert_eq!(
-            KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(bivariant))
-                .variance_of(&db, get_bound_typevar(&db, bivariant)),
-            TypeVarVariance::Bivariant
-        );
-
-        let recursive = get_type_alias(&db, "RecursiveAlias");
-        assert_eq!(
-            KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(recursive))
-                .variance_of(&db, get_bound_typevar(&db, recursive)),
-            TypeVarVariance::Bivariant
-        );
-
-        let recursive2 = get_type_alias(&db, "RecursiveAlias2");
-        assert_eq!(
-            KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(recursive2))
-                .variance_of(&db, get_bound_typevar(&db, recursive2)),
-            TypeVarVariance::Invariant
-        );
-    }
-
-    #[test]
-    fn eager_expansion() {
-        use crate::db::tests::TestDb;
-        use crate::place::global_symbol;
-
-        fn get_type_alias<'db>(db: &'db TestDb, name: &str) -> Type<'db> {
-            let module = ruff_db::files::system_path_to_file(db, "/src/a.py").unwrap();
-            let ty = global_symbol(db, module, name).place.expect_type();
-            let Type::KnownInstance(KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(
-                type_alias,
-            ))) = ty
-            else {
-                panic!("Expected `{name}` to be a type alias");
-            };
-            Type::TypeAlias(TypeAliasType::PEP695(type_alias))
-        }
-
-        let mut db = setup_db();
-        db.write_dedented(
-            "/src/a.py",
-            r#"
-
-type IntStr = int | str
-type ListIntStr = list[IntStr]
-type RecursiveList[T] = list[T | RecursiveList[T]]
-type RecursiveIntList = RecursiveList[int]
-type Itself = Itself
-type A = B
-type B = A
-type G[T] = H[T]
-type H[T] = G[T]
-"#,
-        )
-        .unwrap();
-
-        let int_str = get_type_alias(&db, "IntStr");
-        assert_eq!(
-            int_str.expand_eagerly(&db).display(&db).to_string(),
-            "int | str",
-        );
-
-        let list_int_str = get_type_alias(&db, "ListIntStr");
-        assert_eq!(
-            list_int_str.expand_eagerly(&db).display(&db).to_string(),
-            "list[int | str]",
-        );
-
-        let rec_list = get_type_alias(&db, "RecursiveList");
-        assert_eq!(
-            rec_list.expand_eagerly(&db).display(&db).to_string(),
-            "list[Divergent]",
-        );
-
-        let rec_int_list = get_type_alias(&db, "RecursiveIntList");
-        assert_eq!(
-            rec_int_list.expand_eagerly(&db).display(&db).to_string(),
-            "list[Divergent]",
-        );
-
-        let itself = get_type_alias(&db, "Itself");
-        assert_eq!(
-            itself.expand_eagerly(&db).display(&db).to_string(),
-            "Divergent",
-        );
-
-        let a = get_type_alias(&db, "A");
-        assert_eq!(a.expand_eagerly(&db).display(&db).to_string(), "Divergent",);
-
-        let b = get_type_alias(&db, "B");
-        assert_eq!(b.expand_eagerly(&db).display(&db).to_string(), "Divergent",);
-
-        let g = get_type_alias(&db, "G");
-        assert_eq!(g.expand_eagerly(&db).display(&db).to_string(), "Divergent",);
-
-        let h = get_type_alias(&db, "H");
-        assert_eq!(h.expand_eagerly(&db).display(&db).to_string(), "Divergent",);
-    }
-}

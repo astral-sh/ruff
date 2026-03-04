@@ -4,14 +4,15 @@ use ruff_python_ast::name::Name;
 use crate::{
     Db,
     types::{
-        CallableSignature, CallableType, CallableTypeKind, KnownClass, LiteralValueType,
-        LiteralValueTypeKind, Parameter, Parameters, PropertyInstanceType, Signature,
-        StringLiteralType, Type, UnionType,
+        CallableType, KnownClass, LiteralValueType, LiteralValueTypeKind, Parameter, Parameters,
+        PropertyInstanceType, Signature, StringLiteralType, Type, UnionType,
+        callable::CallableTypeKind,
         constraints::{ConstraintSet, ConstraintSetBuilder},
         function::FunctionType,
         generics::InferableTypeVars,
         known_instance::InternedConstraintSet,
         relation::{HasRelationToVisitor, IsDisjointVisitor, TypeRelation},
+        signatures::CallableSignature,
         visitor,
     },
 };

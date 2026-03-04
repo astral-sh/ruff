@@ -5,11 +5,11 @@ use indexmap::IndexMap;
 use rustc_hash::{FxBuildHasher, FxHashSet};
 
 use crate::Db;
+use crate::types::class::DynamicClassLiteral;
 use crate::types::class_base::ClassBase;
 use crate::types::generics::Specialization;
 use crate::types::{
-    ClassLiteral, ClassType, DynamicClassLiteral, KnownInstanceType, SpecialFormType,
-    StaticClassLiteral, Type,
+    ClassLiteral, ClassType, KnownInstanceType, SpecialFormType, StaticClassLiteral, Type,
 };
 
 use itertools::Itertools;
