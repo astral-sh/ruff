@@ -353,7 +353,7 @@ def tc_location_cell(tc: TestCase, *, rowspan: int, source: Source | None) -> st
         display = f"{filename}:{min_line}:{max_line}"
 
     rowspan_attr = f' rowspan="{rowspan}"' if rowspan > 1 else ""
-    return f'<td{rowspan_attr} align="center" valign="middle"><a href="{url}">{display}</a></td>'
+    return f'<td{rowspan_attr}><a href="{url}">{display}</a></td>'
 
 
 def render_html_test_case_rows(tc: TestCase, *, source: Source | None) -> list[str]:
@@ -366,7 +366,7 @@ def render_html_test_case_rows(tc: TestCase, *, source: Source | None) -> list[s
 
     def delta_cell(symbol: str, rowspan: int) -> str:
         rowspan_attr = f' rowspan="{rowspan}"' if rowspan > 1 else ""
-        return f'<td{rowspan_attr} align="center" valign="middle">{symbol}</td>'
+        return f"<td{rowspan_attr}>{symbol}</td>"
 
     def diag_row(d: TyDiagnostic, prepend: str = "") -> str:
         name = html.escape(d.check_name)
@@ -809,14 +809,10 @@ def render_file_stats_table(test_cases: list[TestCase]) -> str:
     lines = [
         "### Files changed",
         "",
-        '<div align="center">',
-        "",
         "| File | True Positives | False Positives | False Negatives | Status |",
         "|------|----|----|----|--------|",
         *rows,
         totals_row,
-        "",
-        "</div>",
         "",
     ]
     return "\n".join(lines)
@@ -911,8 +907,6 @@ def render_summary(test_cases: list[TestCase], *, force_summary_table: bool) -> 
 
         <details><summary>How are test cases classified?</summary>{summary_note}</details>
 
-        <div align="center">
-
         | Metric | Old | New | Diff | Outcome |
         |--------|-----|-----|------|---------|
         | True Positives  | {old.true_positives} | {new.true_positives} | {true_pos_change:+} | {true_pos_diff} |
@@ -921,8 +915,6 @@ def render_summary(test_cases: list[TestCase], *, force_summary_table: bool) -> 
         | Total Diagnostics | {old.total_diagnostics} | {new.total_diagnostics} | {total_change:+} | {total_diff} |
         | Precision | {old.precision:.2%} | {new.precision:.2%} | {precision_change:+.2%} | {precision_diff} |
         | Recall | {old.recall:.2%} | {new.recall:.2%} | {recall_change:+.2%} | {recall_diff} |
-
-        </div>
 
         """
     )
