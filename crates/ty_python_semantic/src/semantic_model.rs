@@ -285,22 +285,25 @@ impl<'db> SemanticModel<'db> {
             // Nodes implementing `HasDefinition`
             ast::AnyNodeRef::StmtFunctionDef(function) => Some(
                 function
-                    .definition(self)
+                    .definition(self)?
                     .scope(self.db)
                     .file_scope_id(self.db),
             ),
-            ast::AnyNodeRef::StmtClassDef(class) => {
-                Some(class.definition(self).scope(self.db).file_scope_id(self.db))
-            }
+            ast::AnyNodeRef::StmtClassDef(class) => Some(
+                class
+                    .definition(self)?
+                    .scope(self.db)
+                    .file_scope_id(self.db),
+            ),
             ast::AnyNodeRef::Parameter(parameter) => Some(
                 parameter
-                    .definition(self)
+                    .definition(self)?
                     .scope(self.db)
                     .file_scope_id(self.db),
             ),
             ast::AnyNodeRef::ParameterWithDefault(parameter) => Some(
                 parameter
-                    .definition(self)
+                    .definition(self)?
                     .scope(self.db)
                     .file_scope_id(self.db),
             ),
@@ -308,7 +311,7 @@ impl<'db> SemanticModel<'db> {
                 if handler.name.is_some() {
                     Some(
                         handler
-                            .definition(self)
+                            .definition(self)?
                             .scope(self.db)
                             .file_scope_id(self.db),
                     )
@@ -323,7 +326,7 @@ impl<'db> SemanticModel<'db> {
                 }
             }
             ast::AnyNodeRef::TypeParamTypeVar(var) => {
-                Some(var.definition(self).scope(self.db).file_scope_id(self.db))
+                Some(var.definition(self)?.scope(self.db).file_scope_id(self.db))
             }
 
             // Fallback
@@ -526,7 +529,7 @@ pub trait HasDefinition {
     ///
     /// ## Panics
     /// May panic if `self` is from another file than `model`.
-    fn definition<'db>(&self, model: &SemanticModel<'db>) -> Definition<'db>;
+    fn definition<'db>(&self, model: &SemanticModel<'db>) -> Option<Definition<'db>>;
 }
 
 impl HasType for ast::ExprRef<'_> {
@@ -633,16 +636,16 @@ macro_rules! impl_binding_has_ty_def {
     ($ty: ty) => {
         impl HasDefinition for $ty {
             #[inline]
-            fn definition<'db>(&self, model: &SemanticModel<'db>) -> Definition<'db> {
+            fn definition<'db>(&self, model: &SemanticModel<'db>) -> Option<Definition<'db>> {
                 let index = semantic_index(model.db, model.file);
-                index.expect_single_definition(self)
+                Some(index.expect_single_definition(self))
             }
         }
 
         impl HasType for $ty {
             #[inline]
             fn inferred_type<'db>(&self, model: &SemanticModel<'db>) -> Option<Type<'db>> {
-                let binding = HasDefinition::definition(self, model);
+                let binding = HasDefinition::definition(self, model)?;
                 Some(binding_type(model.db, binding))
             }
         }
@@ -657,22 +660,17 @@ impl_binding_has_ty_def!(ast::TypeParamTypeVar);
 
 impl HasDefinition for ast::ExceptHandlerExceptHandler {
     #[inline]
-    fn definition<'db>(&self, model: &SemanticModel<'db>) -> Definition<'db> {
-        debug_assert!(
-            self.name.is_some(),
-            "except handlers only have a definition when they bind a name"
-        );
-
+    fn definition<'db>(&self, model: &SemanticModel<'db>) -> Option<Definition<'db>> {
+        self.name.as_ref()?;
         let index = semantic_index(model.db, model.file);
-        index.expect_single_definition(self)
+        Some(index.expect_single_definition(self))
     }
 }
 
 impl HasType for ast::ExceptHandlerExceptHandler {
     #[inline]
     fn inferred_type<'db>(&self, model: &SemanticModel<'db>) -> Option<Type<'db>> {
-        self.name.as_ref()?;
-        let binding = HasDefinition::definition(self, model);
+        let binding = HasDefinition::definition(self, model)?;
         Some(binding_type(model.db, binding))
     }
 }

@@ -554,7 +554,11 @@ pub fn definitions_and_overloads_for_function<'db>(
             .map(ResolvedDefinition::Definition)
             .collect()
     } else {
-        vec![ResolvedDefinition::Definition(function.definition(model))]
+        function
+            .definition(model)
+            .map(ResolvedDefinition::Definition)
+            .into_iter()
+            .collect()
     }
 }
 

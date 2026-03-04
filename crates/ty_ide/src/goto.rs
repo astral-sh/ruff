@@ -459,13 +459,15 @@ impl GotoTarget<'_> {
                 Some(defs)
             }
 
-            GotoTarget::ClassDef(class) => Some(vec![ResolvedDefinition::Definition(
-                class.definition(model),
-            )]),
+            GotoTarget::ClassDef(class) => class
+                .definition(model)
+                .map(ResolvedDefinition::Definition)
+                .map(|definition| vec![definition]),
 
-            GotoTarget::Parameter(parameter) => Some(vec![ResolvedDefinition::Definition(
-                parameter.definition(model),
-            )]),
+            GotoTarget::Parameter(parameter) => parameter
+                .definition(model)
+                .map(ResolvedDefinition::Definition)
+                .map(|definition| vec![definition]),
 
             // For import aliases (offset within 'y' or 'z' in "from x import y as z")
             GotoTarget::ImportSymbolAlias { asname, .. } => Some(definitions_for_name(
@@ -517,7 +519,9 @@ impl GotoTarget<'_> {
             // For exception variables, they are their own definitions (like parameters)
             GotoTarget::ExceptVariable(except_handler) => except_handler.name.as_ref().map(|_| {
                 vec![ResolvedDefinition::Definition(
-                    except_handler.definition(model),
+                    except_handler
+                        .definition(model)
+                        .expect("named except handlers should have a definition"),
                 )]
             }),
 
