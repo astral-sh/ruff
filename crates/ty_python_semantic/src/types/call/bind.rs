@@ -185,7 +185,6 @@ enum ConstructorReturnKind {
     /// Constructor method returns a non-instance type, so downstream constructor methods should be
     /// skipped and this return type should be used as-is.
     NotInstance,
-    Uncertain,
 }
 
 /// Return `true` if `class_ty` is a subtype of (any specialization of) `class_literal`.
@@ -205,24 +204,29 @@ impl<'db> DownstreamConstructor<'db> {
         let class_literal = self.class_literal;
         match return_ty.resolve_type_alias(db) {
             Type::Union(union) => {
-                let mut saw_uncertain = false;
                 for element in union.elements(db) {
                     match self.return_kind(db, *element) {
                         ConstructorReturnKind::NotInstance => {
                             return ConstructorReturnKind::NotInstance;
                         }
                         ConstructorReturnKind::Instance => {}
-                        ConstructorReturnKind::Uncertain => saw_uncertain = true,
                     }
                 }
-                if saw_uncertain {
-                    ConstructorReturnKind::Uncertain
-                } else {
-                    ConstructorReturnKind::Instance
+                ConstructorReturnKind::Instance
+            }
+            Type::Intersection(intersection) => {
+                for element in intersection.iter_positive(db) {
+                    match self.return_kind(db, element) {
+                        ConstructorReturnKind::Instance => {
+                            return ConstructorReturnKind::Instance;
+                        }
+                        ConstructorReturnKind::NotInstance => {}
+                    }
                 }
+                ConstructorReturnKind::NotInstance
             }
             Type::Dynamic(DynamicType::Any) => ConstructorReturnKind::NotInstance,
-            Type::Dynamic(_) | Type::TypeVar(_) => ConstructorReturnKind::Uncertain,
+            Type::Dynamic(_) | Type::TypeVar(_) => ConstructorReturnKind::Instance,
             // A `Never` constructor return is terminal and does not run downstream construction.
             Type::Never => ConstructorReturnKind::NotInstance,
             Type::NominalInstance(instance) => {
@@ -261,7 +265,7 @@ impl<'db> DownstreamConstructor<'db> {
                             ConstructorReturnKind::NotInstance
                         }
                     }
-                    _ => ConstructorReturnKind::Uncertain,
+                    _ => ConstructorReturnKind::NotInstance,
                 }
             }
         }
@@ -3358,7 +3362,7 @@ impl<'db> CallableBinding<'db> {
         for overload in &self.overloads {
             match downstream.return_kind(db, overload.signature.return_ty) {
                 ConstructorReturnKind::NotInstance => saw_non_instance = true,
-                ConstructorReturnKind::Instance | ConstructorReturnKind::Uncertain => {
+                ConstructorReturnKind::Instance => {
                     saw_instance_like = true;
                 }
             }
