@@ -2644,7 +2644,7 @@ class C3:
         self.x = [self.x[0].flip()]
 
 # TODO: should be `Unknown | list[Unknown | Sub] | list[Unknown | Base]`
-reveal_type(C3(Sub()).x)  # revealed: Unknown | list[Unknown | Sub] | list[Divergent]
+reveal_type(C3(Sub()).x)  # revealed: Unknown | list[Unknown | Sub] | Divergent
 ```
 
 And cycles between many attributes:
@@ -2703,7 +2703,9 @@ class ManyCycles2:
 
     def f1(self: "ManyCycles2"):
         # TODO: should be Unknown | list[Unknown | int] | list[Divergent]
-        reveal_type(self.x3)  # revealed: Unknown | list[Unknown | int] | list[Unknown] | list[Divergent]
+        reveal_type(
+            self.x3
+        )  # revealed: Unknown | list[Unknown | int] | list[Unknown | Unknown] | list[Unknown | Unknown | list[Unknown | list[Unknown | int] | list[Unknown | Unknown] | Unknown]] | Unknown
 
         self.x1 = [self.x2] + [self.x3]
         self.x2 = [self.x1] + [self.x3]
@@ -2776,7 +2778,7 @@ class NestedLists:
     def f(self: "NestedLists"):
         self.x = [self.x]
 
-reveal_type(NestedLists().x)  # revealed: Unknown | Literal[1] | list[Divergent]
+reveal_type(NestedLists().x)  # revealed: Unknown | Literal[1] | Divergent
 
 class NestedMixed:
     def f(self: "NestedMixed"):
@@ -2785,7 +2787,7 @@ class NestedMixed:
     def g(self: "NestedMixed"):
         self.x = {self.x}
 
-reveal_type(NestedMixed().x)  # revealed: Unknown | list[Divergent] | set[Divergent]
+reveal_type(NestedMixed().x)  # revealed: Unknown | Divergent
 ```
 
 And cases where the types originate from annotations:
