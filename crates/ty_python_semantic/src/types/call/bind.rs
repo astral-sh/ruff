@@ -174,7 +174,7 @@ struct DownstreamConstructor<'db> {
     /// Downstream constructor bindings to validate conditionally.
     bindings: Bindings<'db>,
     /// Whether the upstream method is a metaclass `__call__`.
-    is_metaclass_call: bool,
+    of_metaclass_call: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -451,10 +451,10 @@ impl<'db> Bindings<'db> {
         &mut self,
         class_literal: ClassLiteral<'db>,
         bindings: &Bindings<'db>,
-        is_metaclass_call: bool,
+        of_metaclass_call: bool,
     ) {
         for binding in self.iter_flat_mut() {
-            binding.set_downstream_constructor(class_literal, bindings.clone(), is_metaclass_call);
+            binding.set_downstream_constructor(class_literal, bindings.clone(), of_metaclass_call);
         }
     }
 
@@ -807,7 +807,7 @@ impl<'db> Bindings<'db> {
                         && (binding.matching_overloads().next().is_none()
                             || constructor_is_subclass_of_any)
                         && let Some(downstream) = binding.downstream_constructor.as_ref()
-                        && !downstream.is_metaclass_call
+                        && !downstream.of_metaclass_call
                         && let Some(downstream_return) =
                             downstream.bindings.constructor_return_type(db)
                     {
@@ -2563,12 +2563,12 @@ impl<'db> CallableBinding<'db> {
         &mut self,
         class_literal: ClassLiteral<'db>,
         bindings: Bindings<'db>,
-        is_metaclass_call: bool,
+        of_metaclass_call: bool,
     ) {
         self.downstream_constructor = Some(Box::new(DownstreamConstructor {
             class_literal,
             bindings,
-            is_metaclass_call,
+            of_metaclass_call,
         }));
     }
 
@@ -3317,7 +3317,7 @@ impl<'db> CallableBinding<'db> {
         }
 
         // If metaclass `__call__` itself doesn't match, constructor dispatch stops there.
-        if downstream.is_metaclass_call {
+        if downstream.of_metaclass_call {
             return false;
         }
 
