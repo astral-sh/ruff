@@ -6,6 +6,8 @@ use crate::rules::{flake8_bugbear, flake8_simplify, perflint, pylint, pyupgrade,
 
 /// Run lint rules over all deferred for-loops in the [`SemanticModel`].
 pub(crate) fn deferred_for_loops(checker: &mut Checker) {
+    // Note that we'll need to check for new statements in a loop if any of the rules below receive
+    // a `&mut Checker` again.
     let for_loops = std::mem::take(&mut checker.analyze.for_loops);
     for snapshot in for_loops {
         checker.semantic.restore(snapshot);
