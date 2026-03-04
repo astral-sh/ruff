@@ -784,11 +784,18 @@ def render_file_stats_table(test_cases: list[TestCase]) -> str:
         if fs.new_passes and not fs.old_passes:
             status = "✅ Newly Passing 🎉"
         elif fs.old_passes and not fs.new_passes:
-            status = "❌ Regressed"
+            status = "❌ Newly Failing"
         elif fs.new_passes:
             status = "✅"
         else:
-            status = "❌"
+            old_errors = fs.old.false_positives + fs.old.false_negatives
+            new_errors = fs.new.false_positives + fs.new.false_negatives
+            if new_errors < old_errors:
+                status = "📈 Improving"
+            elif new_errors > old_errors:
+                status = "📉 Regressing"
+            else:
+                status = "➡️ Neutral"
         url = CONFORMANCE_DIR_WITH_README + f"tests/{fs.path.name}"
         rows.append(
             f"| [{fs.path.name}]({url})"
