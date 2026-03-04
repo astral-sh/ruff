@@ -12,6 +12,7 @@ use crate::node_key::NodeKey;
 use crate::semantic_index::definition::{Definition, DefinitionKind};
 use crate::semantic_index::scope::{FileScopeId, NodeWithScopeKey, NodeWithScopeKind, ScopeId};
 use crate::semantic_index::{SemanticIndex, semantic_index};
+use crate::types::callable::walk_callable_type;
 use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
 use crate::types::constraints::{
@@ -20,15 +21,17 @@ use crate::types::constraints::{
 use crate::types::relation::{HasRelationToVisitor, IsDisjointVisitor, TypeRelation};
 use crate::types::signatures::{CallableSignature, Parameters};
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
+use crate::types::type_alias::{walk_manual_pep_695_type_alias, walk_pep_695_type_alias};
+use crate::types::typevar::{
+    BoundTypeVarIdentity, TypeVarIdentity, TypeVarInstance, walk_type_var_bounds,
+};
 use crate::types::variance::VarianceInferable;
 use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
-    ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
-    CallableType, CallableTypes, ClassLiteral, FindLegacyTypeVarsVisitor, IntersectionType,
-    KnownClass, KnownInstanceType, MaterializationKind, Type, TypeAliasType, TypeContext,
-    TypeMapping, TypeVarBoundOrConstraints, TypeVarIdentity, TypeVarInstance, TypeVarKind,
-    TypeVarVariance, UnionType, declaration_type, walk_callable_type,
-    walk_manual_pep_695_type_alias, walk_pep_695_type_alias, walk_type_var_bounds,
+    ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, CallableTypes,
+    ClassLiteral, FindLegacyTypeVarsVisitor, IntersectionType, KnownClass, KnownInstanceType,
+    MaterializationKind, Type, TypeAliasType, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
+    TypeVarKind, TypeVarVariance, UnionType, declaration_type,
 };
 use crate::{Db, FxIndexMap, FxOrderMap, FxOrderSet};
 
@@ -95,13 +98,25 @@ pub(crate) fn bind_typevar<'db>(
             return Some(typevar.with_binding_context(db, definition));
         }
     }
-    enclosing_generic_contexts(db, index, containing_scope)
-        .find_map(|enclosing_context| enclosing_context.binds_typevar(db, typevar))
-        .or_else(|| {
-            typevar_binding_context.map(|typevar_binding_context| {
-                typevar.with_binding_context(db, typevar_binding_context)
-            })
-        })
+    // Walk ancestor scopes, tracking whether we've crossed a class scope boundary.
+    // Class-scoped type variables are not visible from inner class scopes.
+    let mut crossed_class_scope = false;
+    for (_, ancestor_scope) in index.ancestor_scopes(containing_scope) {
+        let is_class_scope = ancestor_scope.kind().is_class();
+        // If we've already crossed a class boundary, skip class-scoped generic contexts.
+        // This prevents inner classes from accessing type parameters of outer classes.
+        if (!is_class_scope || !crossed_class_scope)
+            && let Some(generic_context) = ancestor_scope.node().generic_context(db, index)
+            && let Some(bound) = generic_context.binds_typevar(db, typevar)
+        {
+            return Some(bound);
+        }
+        if is_class_scope {
+            crossed_class_scope = true;
+        }
+    }
+    typevar_binding_context
+        .map(|typevar_binding_context| typevar.with_binding_context(db, typevar_binding_context))
 }
 
 /// Create a `typing.Self` type variable for a given class.
@@ -1826,15 +1841,16 @@ impl<'db> SpecializationBuilder<'db> {
     fn add_type_mappings_from_constraint_set<'c>(
         &mut self,
         formal: Type<'db>,
-        constraints: ConstraintSet<'db, 'c>,
+        set: ConstraintSet<'db, 'c>,
+        constraints: &'c ConstraintSetBuilder<'db>,
         mut f: impl FnMut(TypeVarAssignment<'db>) -> Option<Type<'db>>,
     ) -> Result<(), ()> {
-        let solutions = match constraints.solutions(self.db) {
+        let solutions = match set.solutions(self.db, constraints) {
             Solutions::Unsatisfiable => return Err(()),
             Solutions::Unconstrained => return Ok(()),
             Solutions::Constrained(solutions) => solutions,
         };
-        for solution in solutions {
+        for solution in solutions.iter() {
             for binding in solution {
                 let variance = formal.variance_of(self.db, binding.bound_typevar);
                 self.add_type_mapping(binding.bound_typevar, binding.solution, variance, &mut f);
@@ -1864,7 +1880,7 @@ impl<'db> SpecializationBuilder<'db> {
                         &constraints,
                         self.inferable,
                     );
-                self.add_type_mappings_from_constraint_set(formal, when, &mut *f)?;
+                self.add_type_mappings_from_constraint_set(formal, when, &constraints, &mut *f)?;
             } else {
                 // An overloaded actual callable is compatible with the formal signature if at
                 // least one of its overloads is. We collect type mappings from all satisfiable
@@ -1878,7 +1894,7 @@ impl<'db> SpecializationBuilder<'db> {
                         self.inferable,
                     );
                     if self
-                        .add_type_mappings_from_constraint_set(formal, when, &mut *f)
+                        .add_type_mappings_from_constraint_set(formal, when, &constraints, &mut *f)
                         .is_ok()
                     {
                         any_satisfiable = true;
@@ -2316,7 +2332,12 @@ impl<'db> SpecializationBuilder<'db> {
                         // unsatisfied comparisons simply produced no type mappings), and avoids
                         // false positives for callable-wrapper patterns while this path is still
                         // a hybrid of old and new solver logic.
-                        let _ = self.add_type_mappings_from_constraint_set(formal, when, &mut f);
+                        let _ = self.add_type_mappings_from_constraint_set(
+                            formal,
+                            when,
+                            constraints,
+                            &mut f,
+                        );
                         return Ok(());
                     }
 

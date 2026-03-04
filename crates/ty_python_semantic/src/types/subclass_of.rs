@@ -1,13 +1,14 @@
 use crate::place::PlaceAndQualifiers;
 use crate::semantic_index::definition::Definition;
+use crate::types::class::DynamicClassLiteral;
 use crate::types::constraints::{ConstraintSet, ConstraintSetBuilder};
 use crate::types::generics::InferableTypeVars;
 use crate::types::protocol_class::ProtocolClass;
 use crate::types::relation::{HasRelationToVisitor, IsDisjointVisitor, TypeRelation};
 use crate::types::variance::VarianceInferable;
 use crate::types::{
-    ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassLiteral, ClassType, DynamicClassLiteral,
-    DynamicType, FindLegacyTypeVarsVisitor, KnownClass, MaterializationKind, MemberLookupPolicy,
+    ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassLiteral, ClassType, DynamicType,
+    FindLegacyTypeVarsVisitor, KnownClass, MaterializationKind, MemberLookupPolicy,
     SpecialFormType, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints, TypeVarVariance,
     TypedDictType, UnionType, todo_type,
 };

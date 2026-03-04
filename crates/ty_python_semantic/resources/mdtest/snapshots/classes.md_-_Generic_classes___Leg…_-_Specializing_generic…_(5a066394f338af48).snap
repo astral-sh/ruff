@@ -70,31 +70,34 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/generics/legacy/classes.
 55 | 
 56 | reveal_type(WithDefault[str, str]())  # revealed: WithDefault[str, str]
 57 | reveal_type(WithDefault[str]())  # revealed: WithDefault[str, int]
-58 | from typing_extensions import TypeVar, Generic
-59 | 
-60 | WithDefaultT1 = TypeVar("WithDefaultT1", default=int)
-61 | WithDefaultT2 = TypeVar("WithDefaultT2", default=WithDefaultT1)
+58 | 
+59 | # error: [invalid-type-arguments] "Too many type arguments to class `WithDefault`: expected between 1 and 2, got 3"
+60 | reveal_type(WithDefault[str, str, str]())  # revealed: WithDefault[Unknown, Unknown]
+61 | from typing_extensions import TypeVar, Generic
 62 | 
-63 | # This is fine: WithDefaultT2's default references WithDefaultT1, which comes before it
-64 | class GoodOrder(Generic[WithDefaultT1, WithDefaultT2]): ...
+63 | WithDefaultT1 = TypeVar("WithDefaultT1", default=int)
+64 | WithDefaultT2 = TypeVar("WithDefaultT2", default=WithDefaultT1)
 65 | 
-66 | # error: [invalid-generic-class] "Default of `WithDefaultT2` cannot reference later type parameter `WithDefaultT1`"
-67 | class BadOrder(Generic[WithDefaultT2, WithDefaultT1]): ...
+66 | # This is fine: WithDefaultT2's default references WithDefaultT1, which comes before it
+67 | class GoodOrder(Generic[WithDefaultT1, WithDefaultT2]): ...
 68 | 
-69 | WithDefaultU = TypeVar("WithDefaultU", default=int)
-70 | 
-71 | # error: [invalid-generic-class]
-72 | class AlsoBadOrder(Generic[WithDefaultT2, WithDefaultT1, WithDefaultU]): ...
-73 | from typing_extensions import TypeVar, Generic
-74 | 
-75 | StartT = TypeVar("StartT", default=int)
-76 | StopT = TypeVar("StopT", default=StartT)
-77 | StepT = TypeVar("StepT", default=int | None)
-78 | Start2T = TypeVar("Start2T", default="StopT")
-79 | Stop2T = TypeVar("Stop2T", default=int)
-80 | 
-81 | # error: [invalid-generic-class] "Default of `Start2T` cannot reference out-of-scope type variable `StopT`"
-82 | class Bad(Generic[Start2T, Stop2T, StepT]): ...
+69 | # error: [invalid-generic-class] "Default of `WithDefaultT2` cannot reference later type parameter `WithDefaultT1`"
+70 | class BadOrder(Generic[WithDefaultT2, WithDefaultT1]): ...
+71 | 
+72 | WithDefaultU = TypeVar("WithDefaultU", default=int)
+73 | 
+74 | # error: [invalid-generic-class]
+75 | class AlsoBadOrder(Generic[WithDefaultT2, WithDefaultT1, WithDefaultU]): ...
+76 | from typing_extensions import TypeVar, Generic
+77 | 
+78 | StartT = TypeVar("StartT", default=int)
+79 | StopT = TypeVar("StopT", default=StartT)
+80 | StepT = TypeVar("StepT", default=int | None)
+81 | Start2T = TypeVar("Start2T", default="StopT")
+82 | Stop2T = TypeVar("Stop2T", default=int)
+83 | 
+84 | # error: [invalid-generic-class] "Default of `Start2T` cannot reference out-of-scope type variable `StopT`"
+85 | class Bad(Generic[Start2T, Stop2T, StepT]): ...
 ```
 
 # Diagnostics
@@ -180,25 +183,38 @@ info: rule `invalid-type-arguments` is enabled by default
 ```
 
 ```
+error[invalid-type-arguments]: Too many type arguments to class `WithDefault`: expected between 1 and 2, got 3
+  --> src/mdtest_snippet.py:60:35
+   |
+59 | # error: [invalid-type-arguments] "Too many type arguments to class `WithDefault`: expected between 1 and 2, got 3"
+60 | reveal_type(WithDefault[str, str, str]())  # revealed: WithDefault[Unknown, Unknown]
+   |                                   ^^^
+61 | from typing_extensions import TypeVar, Generic
+   |
+info: rule `invalid-type-arguments` is enabled by default
+
+```
+
+```
 error[invalid-generic-class]: Default of `WithDefaultT2` cannot reference later type parameter `WithDefaultT1`
-  --> src/mdtest_snippet.py:67:7
+  --> src/mdtest_snippet.py:70:7
    |
-66 | # error: [invalid-generic-class] "Default of `WithDefaultT2` cannot reference later type parameter `WithDefaultT1`"
-67 | class BadOrder(Generic[WithDefaultT2, WithDefaultT1]): ...
+69 | # error: [invalid-generic-class] "Default of `WithDefaultT2` cannot reference later type parameter `WithDefaultT1`"
+70 | class BadOrder(Generic[WithDefaultT2, WithDefaultT1]): ...
    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-68 |
-69 | WithDefaultU = TypeVar("WithDefaultU", default=int)
+71 |
+72 | WithDefaultU = TypeVar("WithDefaultU", default=int)
    |
-  ::: src/mdtest_snippet.py:60:1
+  ::: src/mdtest_snippet.py:63:1
    |
-58 | from typing_extensions import TypeVar, Generic
-59 |
-60 | WithDefaultT1 = TypeVar("WithDefaultT1", default=int)
-   | ----------------------------------------------------- `WithDefaultT1` defined here
-61 | WithDefaultT2 = TypeVar("WithDefaultT2", default=WithDefaultT1)
-   | --------------------------------------------------------------- `WithDefaultT2` defined here
+61 | from typing_extensions import TypeVar, Generic
 62 |
-63 | # This is fine: WithDefaultT2's default references WithDefaultT1, which comes before it
+63 | WithDefaultT1 = TypeVar("WithDefaultT1", default=int)
+   | ----------------------------------------------------- `WithDefaultT1` defined here
+64 | WithDefaultT2 = TypeVar("WithDefaultT2", default=WithDefaultT1)
+   | --------------------------------------------------------------- `WithDefaultT2` defined here
+65 |
+66 | # This is fine: WithDefaultT2's default references WithDefaultT1, which comes before it
    |
 info: rule `invalid-generic-class` is enabled by default
 
@@ -206,23 +222,23 @@ info: rule `invalid-generic-class` is enabled by default
 
 ```
 error[invalid-generic-class]: Default of `WithDefaultT2` cannot reference later type parameter `WithDefaultT1`
-  --> src/mdtest_snippet.py:72:7
+  --> src/mdtest_snippet.py:75:7
    |
-71 | # error: [invalid-generic-class]
-72 | class AlsoBadOrder(Generic[WithDefaultT2, WithDefaultT1, WithDefaultU]): ...
+74 | # error: [invalid-generic-class]
+75 | class AlsoBadOrder(Generic[WithDefaultT2, WithDefaultT1, WithDefaultU]): ...
    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-73 | from typing_extensions import TypeVar, Generic
+76 | from typing_extensions import TypeVar, Generic
    |
-  ::: src/mdtest_snippet.py:60:1
+  ::: src/mdtest_snippet.py:63:1
    |
-58 | from typing_extensions import TypeVar, Generic
-59 |
-60 | WithDefaultT1 = TypeVar("WithDefaultT1", default=int)
-   | ----------------------------------------------------- `WithDefaultT1` defined here
-61 | WithDefaultT2 = TypeVar("WithDefaultT2", default=WithDefaultT1)
-   | --------------------------------------------------------------- `WithDefaultT2` defined here
+61 | from typing_extensions import TypeVar, Generic
 62 |
-63 | # This is fine: WithDefaultT2's default references WithDefaultT1, which comes before it
+63 | WithDefaultT1 = TypeVar("WithDefaultT1", default=int)
+   | ----------------------------------------------------- `WithDefaultT1` defined here
+64 | WithDefaultT2 = TypeVar("WithDefaultT2", default=WithDefaultT1)
+   | --------------------------------------------------------------- `WithDefaultT2` defined here
+65 |
+66 | # This is fine: WithDefaultT2's default references WithDefaultT1, which comes before it
    |
 info: rule `invalid-generic-class` is enabled by default
 
@@ -230,19 +246,19 @@ info: rule `invalid-generic-class` is enabled by default
 
 ```
 error[invalid-generic-class]: Default of `Start2T` cannot reference out-of-scope type variable `StopT`
-  --> src/mdtest_snippet.py:82:7
+  --> src/mdtest_snippet.py:85:7
    |
-81 | # error: [invalid-generic-class] "Default of `Start2T` cannot reference out-of-scope type variable `StopT`"
-82 | class Bad(Generic[Start2T, Stop2T, StepT]): ...
+84 | # error: [invalid-generic-class] "Default of `Start2T` cannot reference out-of-scope type variable `StopT`"
+85 | class Bad(Generic[Start2T, Stop2T, StepT]): ...
    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-  ::: src/mdtest_snippet.py:78:1
+  ::: src/mdtest_snippet.py:81:1
    |
-76 | StopT = TypeVar("StopT", default=StartT)
-77 | StepT = TypeVar("StepT", default=int | None)
-78 | Start2T = TypeVar("Start2T", default="StopT")
+79 | StopT = TypeVar("StopT", default=StartT)
+80 | StepT = TypeVar("StepT", default=int | None)
+81 | Start2T = TypeVar("Start2T", default="StopT")
    | --------------------------------------------- `Start2T` defined here
-79 | Stop2T = TypeVar("Stop2T", default=int)
+82 | Stop2T = TypeVar("Stop2T", default=int)
    |
 info: rule `invalid-generic-class` is enabled by default
 

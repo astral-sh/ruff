@@ -531,8 +531,8 @@ pub(super) fn infer_binary_type_comparison<'db>(
             Type::KnownInstance(KnownInstanceType::ConstraintSet(right)),
         ) => {
             let constraints = ConstraintSetBuilder::new();
-            let left = constraints.load(left.constraints(db));
-            let right = constraints.load(right.constraints(db));
+            let left = constraints.load(db, left.constraints(db));
+            let right = constraints.load(db, right.constraints(db));
             let result = left.iff(db, &constraints, right);
             let equivalent = result.is_always_satisfied(db);
             match op {

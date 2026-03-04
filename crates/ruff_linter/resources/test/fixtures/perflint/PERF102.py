@@ -105,3 +105,18 @@ def f():
 def _create_context(name_to_value):
     for(B,D)in A.items():
         if(C:=name_to_value.get(B.name)):A.run(B.set,C)
+
+
+# Comprehensions and generators — errors (https://github.com/astral-sh/ruff/issues/6638)
+_ = [k for k, _ in some_dict.items()]  # PERF102
+_ = {k for k, _ in some_dict.items()}  # PERF102
+_ = {k: "v" for k, _ in some_dict.items()}  # PERF102
+_ = (k for k, _ in some_dict.items())  # PERF102
+_ = [v for _, v in some_dict.items()]  # PERF102
+_ = [k for k, v in some_dict.items()]  # PERF102 (v unused)
+_ = [v for x in range(1) for _, v in some_dict.items()]  # PERF102
+
+# Comprehensions — no errors
+_ = [(k, v) for k, v in some_dict.items()]  # OK (both used)
+_ = [item for item in some_dict.items()]  # OK (not tuple target)
+_ = [k for k, v in some_dict.items() if v]  # OK (v used in condition)

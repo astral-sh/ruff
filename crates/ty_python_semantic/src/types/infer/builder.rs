@@ -59,9 +59,9 @@ use crate::semantic_index::{
     ApplicableConstraints, EnclosingSnapshotResult, SemanticIndex, attribute_assignments,
     place_table,
 };
-use crate::types::builder::RecursivelyDefined;
 use crate::types::call::bind::MatchingOverloadIndex;
 use crate::types::call::{Argument, Binding, Bindings, CallArguments, CallError, CallErrorKind};
+use crate::types::callable::CallableTypeKind;
 use crate::types::class::{
     AbstractMethod, ClassLiteral, CodeGeneratorKind, DynamicClassAnchor, DynamicClassLiteral,
     DynamicMetaclassConflict, DynamicNamedTupleAnchor, DynamicNamedTupleLiteral, FieldKind,
@@ -75,19 +75,19 @@ use crate::types::diagnostic::{
     DATACLASS_FIELD_ORDER, DUPLICATE_BASE, DUPLICATE_KW_ONLY, FINAL_ON_NON_METHOD,
     FINAL_WITHOUT_VALUE, INCONSISTENT_MRO, INEFFECTIVE_FINAL, INVALID_ARGUMENT_TYPE,
     INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, INVALID_BASE, INVALID_DATACLASS,
-    INVALID_DECLARATION, INVALID_GENERIC_CLASS, INVALID_GENERIC_ENUM, INVALID_KEY,
-    INVALID_LEGACY_POSITIONAL_PARAMETER, INVALID_LEGACY_TYPE_VARIABLE, INVALID_METACLASS,
-    INVALID_NAMED_TUPLE, INVALID_NEWTYPE, INVALID_OVERLOAD, INVALID_PARAMETER_DEFAULT,
-    INVALID_PARAMSPEC, INVALID_PROTOCOL, INVALID_TYPE_ALIAS_TYPE, INVALID_TYPE_ARGUMENTS,
-    INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL, INVALID_TYPE_GUARD_DEFINITION,
-    INVALID_TYPE_VARIABLE_BOUND, INVALID_TYPE_VARIABLE_CONSTRAINTS, INVALID_TYPE_VARIABLE_DEFAULT,
-    INVALID_TYPED_DICT_HEADER, INVALID_TYPED_DICT_STATEMENT, IncompatibleBases, MISSING_ARGUMENT,
-    NO_MATCHING_OVERLOAD, PARAMETER_ALREADY_ASSIGNED, POSSIBLY_MISSING_ATTRIBUTE,
-    POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_IMPORT, SUBCLASS_OF_FINAL_CLASS,
-    TOO_MANY_POSITIONAL_ARGUMENTS, TypedDictDeleteErrorKind, UNDEFINED_REVEAL, UNKNOWN_ARGUMENT,
-    UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_IMPORT, UNRESOLVED_REFERENCE,
-    UNSUPPORTED_DYNAMIC_BASE, UNSUPPORTED_OPERATOR, USELESS_OVERLOAD_BODY,
-    hint_if_stdlib_attribute_exists_on_other_versions,
+    INVALID_DECLARATION, INVALID_ENUM_MEMBER_ANNOTATION, INVALID_GENERIC_CLASS,
+    INVALID_GENERIC_ENUM, INVALID_KEY, INVALID_LEGACY_POSITIONAL_PARAMETER,
+    INVALID_LEGACY_TYPE_VARIABLE, INVALID_METACLASS, INVALID_NAMED_TUPLE, INVALID_NEWTYPE,
+    INVALID_OVERLOAD, INVALID_PARAMETER_DEFAULT, INVALID_PARAMSPEC, INVALID_PROTOCOL,
+    INVALID_TYPE_ALIAS_TYPE, INVALID_TYPE_ARGUMENTS, INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL,
+    INVALID_TYPE_GUARD_DEFINITION, INVALID_TYPE_VARIABLE_BOUND, INVALID_TYPE_VARIABLE_CONSTRAINTS,
+    INVALID_TYPE_VARIABLE_DEFAULT, INVALID_TYPED_DICT_HEADER, INVALID_TYPED_DICT_STATEMENT,
+    IncompatibleBases, MISSING_ARGUMENT, NO_MATCHING_OVERLOAD, PARAMETER_ALREADY_ASSIGNED,
+    POSSIBLY_MISSING_ATTRIBUTE, POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_IMPORT,
+    SUBCLASS_OF_FINAL_CLASS, TOO_MANY_POSITIONAL_ARGUMENTS, TypedDictDeleteErrorKind,
+    UNDEFINED_REVEAL, UNKNOWN_ARGUMENT, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_IMPORT,
+    UNRESOLVED_REFERENCE, UNSUPPORTED_DYNAMIC_BASE, UNSUPPORTED_OPERATOR, UNUSED_AWAITABLE,
+    USELESS_OVERLOAD_BODY, hint_if_stdlib_attribute_exists_on_other_versions,
     hint_if_stdlib_submodule_exists_on_other_versions, report_attempted_protocol_instantiation,
     report_bad_dunder_set_call, report_bad_frozen_dataclass_inheritance,
     report_call_to_abstract_method, report_cannot_delete_typed_dict_key,
@@ -108,7 +108,7 @@ use crate::types::diagnostic::{
     report_shadowed_type_variable, report_unsupported_augmented_assignment,
     report_unsupported_base, report_unsupported_comparison,
 };
-use crate::types::enums::is_enum_class_by_inheritance;
+use crate::types::enums::{enum_ignored_names, is_enum_class_by_inheritance};
 use crate::types::function::{
     FunctionBodyKind, FunctionDecorators, FunctionLiteral, FunctionType, KnownFunction,
     OverloadLiteral, function_body_kind, is_implicit_classmethod,
@@ -122,29 +122,33 @@ use crate::types::infer::builder::paramspec_validation::{
 use crate::types::infer::{nearest_enclosing_class, nearest_enclosing_function};
 use crate::types::mro::{DynamicMroErrorKind, StaticMroErrorKind};
 use crate::types::newtype::NewType;
+use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::subclass_of::SubclassOfInner;
 use crate::types::tuple::{Tuple, TupleLength, TupleSpecBuilder, TupleType};
+use crate::types::type_alias::{ManualPEP695TypeAliasType, PEP695TypeAliasType};
 use crate::types::typed_dict::{
     TypedDictAssignmentKind, TypedDictKeyAssignment, validate_typed_dict_constructor,
     validate_typed_dict_dict_literal,
 };
+use crate::types::typevar::{
+    BoundTypeVarIdentity, TypeVarBoundOrConstraintsEvaluation, TypeVarConstraints,
+    TypeVarDefaultEvaluation, TypeVarIdentity, TypeVarInstance,
+};
 use crate::types::visitor::find_over_type;
 use crate::types::{
-    BoundTypeVarIdentity, CallDunderError, CallableBinding, CallableType, CallableTypeKind,
-    ClassType, DataclassParams, DynamicType, GenericAlias, InternedConstraintSet, InternedType,
-    IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, KnownUnion,
-    LintDiagnosticGuard, LiteralValueTypeKind, ManualPEP695TypeAliasType, MemberLookupPolicy,
-    MetaclassCandidate, PEP695TypeAliasType, ParamSpecAttrKind, Parameter, ParameterForm,
-    Parameters, Signature, SpecialFormType, StaticClassLiteral, SubclassOfType, Truthiness, Type,
-    TypeAliasType, TypeAndQualifiers, TypeContext, TypeQualifiers, TypeVarBoundOrConstraints,
-    TypeVarBoundOrConstraintsEvaluation, TypeVarConstraints, TypeVarDefaultEvaluation,
-    TypeVarIdentity, TypeVarInstance, TypeVarKind, TypeVarVariance, TypedDictType, UnionBuilder,
+    CallDunderError, CallableBinding, CallableType, ClassType, DataclassParams, DynamicType,
+    EvaluationMode, GenericAlias, InternedConstraintSet, InternedType, IntersectionBuilder,
+    IntersectionType, KnownClass, KnownInstanceType, KnownUnion, LintDiagnosticGuard,
+    LiteralValueTypeKind, MemberLookupPolicy, MetaclassCandidate, ParamSpecAttrKind, Parameter,
+    ParameterForm, Parameters, Signature, SpecialFormType, StaticClassLiteral, SubclassOfType,
+    Truthiness, Type, TypeAliasType, TypeAndQualifiers, TypeContext, TypeQualifiers,
+    TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, TypedDictType, UnionBuilder,
     UnionType, binding_type, definition_expression_type, infer_complete_scope_types,
     infer_scope_types, todo_type,
 };
 use crate::types::{CallableTypes, overrides};
 use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
-use crate::unpack::{EvaluationMode, UnpackPosition};
+use crate::unpack::UnpackPosition;
 use crate::{AnalysisSettings, Db, FxIndexSet, Program};
 
 mod annotation_expression;
@@ -299,6 +303,12 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     /// Whether we are in a context that binds unbound typevars.
     typevar_binding_context: Option<Definition<'db>>,
 
+    /// Whether to check for unbound type variables in type expressions.
+    /// This is set to `true` when processing annotation expressions, where unbound type variables
+    /// are an error. It is `false` in other contexts (e.g., `TypeVar` defaults, explicit class
+    /// specialization) where unbound type variables are expected.
+    check_unbound_typevars: bool,
+
     /// The deferred state of inferring types of certain expressions within the region.
     ///
     /// This is different from [`InferenceRegion::Deferred`] which works on the entire definition
@@ -316,6 +326,8 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     /// set this to `Get` after the expression has been inferred for the first time.
     /// While this is `Get`, any expressions will be considered to have already been inferred.
     inner_expression_inference_state: InnerExpressionInferenceState,
+
+    inferring_vararg_annotation: bool,
 
     /// For function definitions, the undecorated type of the function.
     undecorated_type: Option<Type<'db>>,
@@ -355,6 +367,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return_types_and_ranges: vec![],
             called_functions: FxIndexSet::default(),
             deferred_state: DeferredExpressionState::None,
+            inferring_vararg_annotation: false,
             multi_inference_state: MultiInferenceState::Panic,
             inner_expression_inference_state: InnerExpressionInferenceState::Infer,
             expressions: FxHashMap::default(),
@@ -362,6 +375,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             bindings: VecMap::default(),
             declarations: VecMap::default(),
             typevar_binding_context: None,
+            check_unbound_typevars: false,
             deferred: VecSet::default(),
             undecorated_type: None,
             cycle_recovery: None,
@@ -551,6 +565,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn in_stub(&self) -> bool {
         self.context.in_stub()
+    }
+
+    /// Returns `true` if `expr` is a call to a known diagnostic function
+    /// (e.g., `reveal_type` or `assert_type`) whose return value should not
+    /// trigger the `unused-awaitable` lint.
+    fn is_known_function_call(&self, expr: &ast::Expr) -> bool {
+        let ast::Expr::Call(call) = expr else {
+            return false;
+        };
+        matches!(
+            self.expression_type(&call.func),
+            Type::FunctionLiteral(f)
+                if matches!(
+                    f.known(self.db()),
+                    Some(KnownFunction::RevealType | KnownFunction::AssertType)
+                )
+        )
     }
 
     /// Get the already-inferred type of an expression node, or Unknown.
@@ -3261,7 +3292,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }) => {
                 // If this is a call expression, we would have added a `ReturnsNever` constraint,
                 // meaning this will be a standalone expression.
-                self.infer_maybe_standalone_expression(value, TypeContext::default());
+                let ty = self.infer_maybe_standalone_expression(value, TypeContext::default());
+
+                if ty.is_awaitable(self.db()) && !self.is_known_function_call(value) {
+                    if let Some(builder) =
+                        self.context.report_lint(&UNUSED_AWAITABLE, value.as_ref())
+                    {
+                        builder.into_diagnostic(format_args!(
+                            "Object of type `{}` is not awaited",
+                            ty.display(self.db()),
+                        ));
+                    }
+                }
             }
             ast::Stmt::If(if_statement) => self.infer_if_statement(if_statement),
             ast::Stmt::Try(try_statement) => self.infer_try_statement(try_statement),
@@ -3531,7 +3573,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.infer_parameter_with_default(param_with_default);
         }
         if let Some(vararg) = vararg {
+            self.inferring_vararg_annotation = true;
             self.infer_parameter(vararg);
+            self.inferring_vararg_annotation = false;
         }
         if let Some(kwarg) = kwarg {
             self.infer_parameter(kwarg);
@@ -5216,11 +5260,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     /// Infer the type for a loop header definition.
     ///
-    /// The loop header sees all bindings that loop-back, either by reaching the end of the loop
-    /// body or a `continue` statement. This can include bindings from before the loop too, though
-    /// that's technically redundant, since the loop header definition itself doesn't shadow those
-    /// bindings. See `struct LoopHeader` in the semantic index for more on how all this fits
-    /// together.
+    /// The loop header sees all the bindings that originate in the loop and are visible at a
+    /// loop-back edge (either the end of the loop body or a `continue` statement). See `struct
+    /// LoopHeader` in the semantic index for more on how all this fits together.
     fn infer_loop_header_definition(
         &mut self,
         loop_header_kind: &LoopHeaderDefinitionKind<'db>,
@@ -9619,13 +9661,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             typevar.identity(self.db()).definition(self.db()),
                             TypeVarKind::Pep613Alias,
                         );
-                        Type::KnownInstance(KnownInstanceType::TypeVar(TypeVarInstance::new(
-                            self.db(),
-                            identity,
-                            typevar._bound_or_constraints(self.db()),
-                            typevar.explicit_variance(self.db()),
-                            typevar._default(self.db()),
-                        )))
+                        Type::KnownInstance(KnownInstanceType::TypeVar(
+                            typevar.with_identity(self.db(), identity),
+                        ))
                     } else {
                         inferred_ty
                     };
@@ -9635,6 +9673,43 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     &DeclaredAndInferredType::AreTheSame(TypeAndQualifiers::declared(inferred_ty)),
                 );
             } else {
+                // Check for annotated enum members. The typing spec states that enum
+                // members should not have explicit type annotations.
+                if let Some(name_expr) = target.as_name_expr()
+                    && !name_expr.id.starts_with("__")
+                    && !matches!(name_expr.id.as_str(), "_ignore_" | "_value_" | "_name_")
+                    // Not bare Final (bare Final is allowed on enum members)
+                    && !(declared.qualifiers.contains(TypeQualifiers::FINAL)
+                        && matches!(declared.inner_type(), Type::Dynamic(DynamicType::Unknown)))
+                    // Value type would be an enum member at runtime (exclude callables,
+                    // which are never members)
+                    && !inferred_ty.is_subtype_of(
+                        self.db(),
+                        Type::Callable(CallableType::unknown(self.db()))
+                            .top_materialization(self.db()),
+                    )
+                {
+                    let current_scope_id = self.scope().file_scope_id(self.db());
+                    let current_scope = self.index.scope(current_scope_id);
+                    if current_scope.kind() == ScopeKind::Class
+                        && let Some(class) =
+                            nearest_enclosing_class(self.db(), self.index, self.scope())
+                        && is_enum_class_by_inheritance(self.db(), class)
+                        && !enum_ignored_names(self.db(), self.scope()).contains(&name_expr.id)
+                        && let Some(builder) = self
+                            .context
+                            .report_lint(&INVALID_ENUM_MEMBER_ANNOTATION, annotation)
+                    {
+                        let mut diag = builder.into_diagnostic(format_args!(
+                            "Type annotation on enum member `{}` is not allowed",
+                            &name_expr.id
+                        ));
+                        diag.info(
+                            "See: https://typing.python.org/en/latest/spec/enums.html#enum-members",
+                        );
+                    }
+                }
+
                 self.add_declaration_with_binding(
                     target.into(),
                     definition,
@@ -14291,7 +14366,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             (ast::UnaryOp::Invert, Type::KnownInstance(KnownInstanceType::ConstraintSet(set))) => {
                 let constraints = ConstraintSetBuilder::new();
                 let result = constraints.into_owned(|constraints| {
-                    let set = constraints.load(set.constraints(self.db()));
+                    let set = constraints.load(self.db(), set.constraints(self.db()));
                     set.negate(self.db(), constraints)
                 });
                 Type::KnownInstance(KnownInstanceType::ConstraintSet(
@@ -14610,9 +14685,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // builder only state
             typevar_binding_context: _,
+            check_unbound_typevars: _,
             deferred_state: _,
             multi_inference_state: _,
             inner_expression_inference_state: _,
+            inferring_vararg_annotation: _,
             called_functions: _,
             index: _,
             region: _,
@@ -14678,7 +14755,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             dataclass_field_specifiers: _,
             all_definitely_bound: _,
             typevar_binding_context: _,
+            check_unbound_typevars: _,
             deferred_state: _,
+            inferring_vararg_annotation: _,
             multi_inference_state: _,
             inner_expression_inference_state: _,
             index: _,
@@ -14759,9 +14838,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             dataclass_field_specifiers: _,
             all_definitely_bound: _,
             typevar_binding_context: _,
+            check_unbound_typevars: _,
             deferred_state: _,
             multi_inference_state: _,
             inner_expression_inference_state: _,
+            inferring_vararg_annotation: _,
             called_functions: _,
             index: _,
             region: _,

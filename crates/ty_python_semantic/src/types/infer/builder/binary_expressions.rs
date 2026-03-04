@@ -4,10 +4,11 @@ use super::TypeInferenceBuilder;
 use crate::Db;
 use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::diagnostic::{DIVISION_BY_ZERO, report_unsupported_binary_operation};
+use crate::types::typevar::TypeVarConstraints;
 use crate::types::{
     DynamicType, InternedConstraintSet, KnownClass, KnownInstanceType, LiteralValueTypeKind,
-    MemberLookupPolicy, Type, TypeContext, TypeVarBoundOrConstraints, TypeVarConstraints,
-    UnionBuilder, UnionTypeInstance,
+    MemberLookupPolicy, Type, TypeContext, TypeVarBoundOrConstraints, UnionBuilder,
+    UnionTypeInstance,
 };
 use ruff_python_ast::PythonVersion;
 
@@ -641,8 +642,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             ) => {
                 let constraints = ConstraintSetBuilder::new();
                 let result = constraints.into_owned(|constraints| {
-                    let left = constraints.load(left.constraints(db));
-                    let right = constraints.load(right.constraints(db));
+                    let left = constraints.load(db, left.constraints(db));
+                    let right = constraints.load(db, right.constraints(db));
                     left.and(db, constraints, || right)
                 });
                 Some(Type::KnownInstance(KnownInstanceType::ConstraintSet(
@@ -657,8 +658,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             ) => {
                 let constraints = ConstraintSetBuilder::new();
                 let result = constraints.into_owned(|constraints| {
-                    let left = constraints.load(left.constraints(db));
-                    let right = constraints.load(right.constraints(db));
+                    let left = constraints.load(db, left.constraints(db));
+                    let right = constraints.load(db, right.constraints(db));
                     left.or(db, constraints, || right)
                 });
                 Some(Type::KnownInstance(KnownInstanceType::ConstraintSet(
