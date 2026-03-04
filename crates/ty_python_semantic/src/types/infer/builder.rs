@@ -11295,10 +11295,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             } else {
                 // We perform inference once without any type context, emitting any diagnostics that are unrelated
                 // to bidirectional type inference.
-                *argument_type = Some(infer_argument_ty(
-                    self,
-                    (argument_index, ast_argument, TypeContext::default()),
-                ));
+                let inferred_without_tcx =
+                    infer_argument_ty(self, (argument_index, ast_argument, TypeContext::default()));
+                *argument_type = Some(inferred_without_tcx);
 
                 // We then silence any diagnostics emitted during multi-inference, as the type context is only
                 // used as a hint to infer a more assignable argument type, and should not lead to diagnostics
@@ -11319,7 +11318,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                     let tcx = TypeContext::new(Some(parameter_type));
                     let inferred_ty = infer_argument_ty(self, (argument_index, ast_argument, tcx));
-
                     // Ensure the inferred type is assignable to the declared type.
                     //
                     // If not, we want to avoid storing the "failed" inference attempt.

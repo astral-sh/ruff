@@ -2179,6 +2179,61 @@ impl<'db> Type<'db> {
                 ConstraintSet::from_bool(constraints, left.kind() != right.kind())
             }
 
+            (Type::KnownInstance(left), Type::KnownInstance(right)) => {
+                if left == right {
+                    ConstraintSet::from_bool(constraints, false)
+                } else {
+                    let left_ty = Type::KnownInstance(left);
+                    let right_ty = Type::KnownInstance(right);
+                    if left_ty.is_single_valued(db) && right_ty.is_single_valued(db) {
+                        ConstraintSet::from_bool(constraints, true)
+                    } else {
+                        left.instance_fallback(db).is_disjoint_from_impl(
+                            db,
+                            right.instance_fallback(db),
+                            constraints,
+                            inferable,
+                            disjointness_visitor,
+                            relation_visitor,
+                        )
+                    }
+                }
+            }
+
+            (
+                Type::KnownInstance(known_instance),
+                other @ (Type::FunctionLiteral(..)
+                | Type::BoundMethod(..)
+                | Type::KnownBoundMethod(..)
+                | Type::WrapperDescriptor(..)
+                | Type::ModuleLiteral(..)
+                | Type::ClassLiteral(..)
+                | Type::SpecialForm(..)),
+            )
+            | (
+                other @ (Type::FunctionLiteral(..)
+                | Type::BoundMethod(..)
+                | Type::KnownBoundMethod(..)
+                | Type::WrapperDescriptor(..)
+                | Type::ModuleLiteral(..)
+                | Type::ClassLiteral(..)
+                | Type::SpecialForm(..)),
+                Type::KnownInstance(known_instance),
+            ) => {
+                if Type::KnownInstance(known_instance).is_single_valued(db) {
+                    ConstraintSet::from_bool(constraints, true)
+                } else {
+                    known_instance.instance_fallback(db).is_disjoint_from_impl(
+                        db,
+                        other,
+                        constraints,
+                        inferable,
+                        disjointness_visitor,
+                        relation_visitor,
+                    )
+                }
+            }
+
             // any single-valued type is disjoint from another single-valued type
             // iff the two types are nonequal
             (
@@ -2189,16 +2244,14 @@ impl<'db> Type<'db> {
                 | Type::WrapperDescriptor(..)
                 | Type::ModuleLiteral(..)
                 | Type::ClassLiteral(..)
-                | Type::SpecialForm(..)
-                | Type::KnownInstance(..)),
+                | Type::SpecialForm(..)),
                 right @ (Type::FunctionLiteral(..)
                 | Type::BoundMethod(..)
                 | Type::KnownBoundMethod(..)
                 | Type::WrapperDescriptor(..)
                 | Type::ModuleLiteral(..)
                 | Type::ClassLiteral(..)
-                | Type::SpecialForm(..)
-                | Type::KnownInstance(..)),
+                | Type::SpecialForm(..)),
             ) => ConstraintSet::from_bool(constraints, left != right),
 
             (

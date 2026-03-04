@@ -867,8 +867,7 @@ def _(flag: bool):
     x = f({"x": 1})
     reveal_type(x)  # revealed: int
 
-    # TODO: This should be an error; the dict literal `{"y": 1}` doesn't match `T`.
-    # The LiteralDict fallback `dict[str, int]` matches the other overload, masking the error.
+    # error: [invalid-argument-type]
     reveal_type(f({"y": 1}))  # revealed: int
 ```
 

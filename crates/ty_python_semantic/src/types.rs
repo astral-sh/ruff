@@ -1731,6 +1731,12 @@ impl<'db> Type<'db> {
             Type::ModuleLiteral(_) => Some(KnownClass::ModuleType.to_instance(db)),
             Type::FunctionLiteral(_) => Some(KnownClass::FunctionType.to_instance(db)),
             Type::LiteralValue(literal) => Some(literal.fallback_instance(db)),
+            Type::KnownInstance(known) => match known {
+                KnownInstanceType::LiteralList(_)
+                | KnownInstanceType::LiteralSet(_)
+                | KnownInstanceType::LiteralDict(_) => Some(known.instance_fallback(db)),
+                _ => None,
+            },
             _ => None,
         }
     }
