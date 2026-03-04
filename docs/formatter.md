@@ -324,14 +324,14 @@ To *disable* formatting of Markdown files, add them to
     ```toml
     [tool.ruff]
     # Disable formatting in Markdown files
-    extend-include = ["*.md"]
+    extend-exclude = ["*.md"]
     ```
 
 === "ruff.toml"
 
     ```toml
     # Disable formatting in Markdown files
-    extend-include = ["*.md"]
+    extend-exclude = ["*.md"]
     ```
 
 ## Format suppression
