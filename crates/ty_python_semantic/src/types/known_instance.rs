@@ -309,7 +309,12 @@ impl<'db> KnownInstanceType<'db> {
     }
 
     pub(super) fn to_meta_type(self, db: &'db dyn Db) -> Type<'db> {
-        self.class(db).to_class_literal(db)
+        match self {
+            Self::LiteralList(list) => list.fallback(db).to_meta_type(db),
+            Self::LiteralSet(set) => set.fallback(db).to_meta_type(db),
+            Self::LiteralDict(dict) => dict.fallback(db).to_meta_type(db),
+            _ => self.class(db).to_class_literal(db),
+        }
     }
 
     /// Return the instance type which this type is a subtype of.

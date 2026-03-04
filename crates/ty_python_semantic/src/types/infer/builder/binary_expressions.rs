@@ -4,7 +4,6 @@ use super::TypeInferenceBuilder;
 use crate::Db;
 use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::diagnostic::{DIVISION_BY_ZERO, report_unsupported_binary_operation};
-use crate::types::tuple::{TupleSpecBuilder, TupleType};
 use crate::types::typevar::TypeVarConstraints;
 use crate::types::{
     DynamicType, InternedConstraintSet, KnownClass, KnownInstanceType, LiteralDictInstance,
@@ -727,22 +726,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         left.non_empty(db) || right.non_empty(db),
                     )))
                 }),
-
-            (Type::NominalInstance(left), Type::NominalInstance(right), ast::Operator::Add)
-                if left.own_tuple_spec(db).is_some() && right.own_tuple_spec(db).is_some() =>
-            {
-                let left_tuple = left
-                    .own_tuple_spec(db)
-                    .expect("guard ensures `left` is an exact tuple");
-                let right_tuple = right
-                    .own_tuple_spec(db)
-                    .expect("guard ensures `right` is an exact tuple");
-
-                let concatenated_tuple = TupleSpecBuilder::from(&*left_tuple)
-                    .concat(db, &right_tuple)
-                    .build();
-                Some(Type::tuple(TupleType::new(db, &concatenated_tuple)))
-            }
 
             // PEP 604-style union types using the `|` operator.
             (
