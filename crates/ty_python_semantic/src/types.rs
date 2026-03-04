@@ -995,6 +995,30 @@ impl<'db> Type<'db> {
         self.is_dynamic() && !self.is_divergent()
     }
 
+    /// Returns `true` if this type is an awaitable that should be awaited before being discarded.
+    ///
+    /// Currently checks for instances of `types.CoroutineType` (returned by `async def` calls).
+    /// Unions are considered awaitable only if every element is awaitable.
+    /// Intersections are considered awaitable if any positive element is awaitable.
+    pub(crate) fn is_awaitable(self, db: &'db dyn Db) -> bool {
+        match self {
+            Type::NominalInstance(instance) => {
+                matches!(instance.known_class(db), Some(KnownClass::CoroutineType))
+            }
+            Type::Union(union) => {
+                let elements = union.elements(db);
+                // Guard against empty unions (`Never`), since `all()` on an empty
+                // iterator returns `true`.
+                !elements.is_empty() && elements.iter().all(|ty| ty.is_awaitable(db))
+            }
+            Type::Intersection(intersection) => intersection
+                .positive(db)
+                .iter()
+                .any(|ty| ty.is_awaitable(db)),
+            _ => false,
+        }
+    }
+
     /// Is a value of this type only usable in typing contexts?
     pub fn is_type_check_only(&self, db: &'db dyn Db) -> bool {
         match self {

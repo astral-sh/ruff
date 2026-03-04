@@ -1445,6 +1445,16 @@
             }
           ]
         },
+        "unused-awaitable": {
+          "title": "detects awaitable objects that are used as expression statements without being awaited",
+          "description": "## What it does\nChecks for awaitable objects (such as coroutines) used as expression\nstatements without being awaited.\n\n## Why is this bad?\nCalling an `async def` function returns a coroutine object. If the\ncoroutine is never awaited, the body of the async function will never\nexecute, which is almost always a bug. Python emits a\n`RuntimeWarning: coroutine was never awaited` at runtime in this case.\n\n## Examples\n```python\nasync def fetch_data() -> str:\n    return \"data\"\n\nasync def main() -> None:\n    fetch_data()  # Warning: coroutine is not awaited\n    await fetch_data()  # OK\n```",
+          "default": "warn",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "unused-ignore-comment": {
           "title": "detects unused `ty: ignore` comments",
           "description": "## What it does\nChecks for `ty: ignore` directives that are no longer applicable.\n\n## Why is this bad?\nA `ty: ignore` directive that no longer matches any diagnostic violations is likely\nincluded by mistake, and should be removed to avoid confusion.\n\n## Examples\n```py\na = 20 / 2  # ty: ignore[division-by-zero]\n```\n\nUse instead:\n\n```py\na = 20 / 2\n```\n\n## Options\nSet [`analysis.respect-type-ignore-comments`](https://docs.astral.sh/ty/reference/configuration/#respect-type-ignore-comments)\nto `false` to prevent this rule from reporting unused `type: ignore` comments.",
