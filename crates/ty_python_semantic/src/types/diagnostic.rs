@@ -26,12 +26,13 @@ use crate::types::string_annotation::{
 };
 use crate::types::tuple::TupleSpec;
 use crate::types::typed_dict::TypedDictSchema;
+use crate::types::typevar::TypeVarInstance;
 use crate::types::{
     BoundTypeVarInstance, ClassType, DynamicType, LintDiagnosticGuard, Protocol,
     ProtocolInstanceType, SpecialFormType, SubclassOfInner, Type, TypeContext, binding_type,
     protocol_class::ProtocolClass,
 };
-use crate::types::{KnownInstanceType, MemberLookupPolicy, TypeVarInstance, UnionType};
+use crate::types::{KnownInstanceType, MemberLookupPolicy, UnionType};
 use crate::{Db, DisplaySettings, FxIndexMap, Program, declare_lint};
 use itertools::Itertools;
 use ruff_db::{
@@ -139,6 +140,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&UNSUPPORTED_BASE);
     registry.register_lint(&UNSUPPORTED_DYNAMIC_BASE);
     registry.register_lint(&UNSUPPORTED_OPERATOR);
+    registry.register_lint(&UNUSED_AWAITABLE);
     registry.register_lint(&ZERO_STEPSIZE_IN_SLICE);
     registry.register_lint(&STATIC_ASSERT_ERROR);
     registry.register_lint(&INVALID_ATTRIBUTE_ACCESS);
@@ -2683,6 +2685,33 @@ declare_lint! {
         summary: "detects binary, unary, or comparison expressions where the operands don't support the operator",
         status: LintStatus::stable("0.0.1-alpha.1"),
         default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for awaitable objects (such as coroutines) used as expression
+    /// statements without being awaited.
+    ///
+    /// ## Why is this bad?
+    /// Calling an `async def` function returns a coroutine object. If the
+    /// coroutine is never awaited, the body of the async function will never
+    /// execute, which is almost always a bug. Python emits a
+    /// `RuntimeWarning: coroutine was never awaited` at runtime in this case.
+    ///
+    /// ## Examples
+    /// ```python
+    /// async def fetch_data() -> str:
+    ///     return "data"
+    ///
+    /// async def main() -> None:
+    ///     fetch_data()  # Warning: coroutine is not awaited
+    ///     await fetch_data()  # OK
+    /// ```
+    pub(crate) static UNUSED_AWAITABLE = {
+        summary: "detects awaitable objects that are used as expression statements without being awaited",
+        status: LintStatus::preview("0.0.21"),
+        default_level: Level::Warn,
     }
 }
 

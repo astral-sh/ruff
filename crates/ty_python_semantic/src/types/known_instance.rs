@@ -6,11 +6,12 @@ use crate::{
     types::{
         ApplyTypeMappingVisitor, BoundTypeVarInstance, CallableType, ClassType, GenericContext,
         InvalidTypeExpressionError, KnownClass, StringLiteralType, Type, TypeAliasType,
-        TypeContext, TypeMapping, TypeVarInstance, TypeVarVariance, UnionBuilder,
+        TypeContext, TypeMapping, TypeVarVariance, UnionBuilder,
         class::NamedTupleSpec,
         constraints::OwnedConstraintSet,
         generics::{Specialization, walk_generic_context},
         newtype::NewType,
+        typevar::TypeVarInstance,
         variance::VarianceInferable,
         visitor,
     },

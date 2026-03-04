@@ -990,9 +990,8 @@ reveal_type(Color.RED._name_)  # revealed: Literal["RED"]
 def _(red_or_blue: Literal[Color.RED, Color.BLUE]):
     reveal_type(red_or_blue.name)  # revealed: Literal["RED", "BLUE"]
 
-def _(any_color: Color):
-    # TODO: Literal["RED", "GREEN", "BLUE"]
-    reveal_type(any_color.name)  # revealed: Any
+def _(color: Color):
+    reveal_type(color.name)  # revealed: Literal["RED", "GREEN", "BLUE"]
 ```
 
 ### `value` and `_value_`
@@ -1017,6 +1016,9 @@ reveal_type(Color.RED._value_)  # revealed: Literal[1]
 reveal_type(Color.GREEN.value)  # revealed: Literal[2]
 reveal_type(Color.GREEN._value_)  # revealed: Literal[2]
 
+def _(color: Color):
+    reveal_type(color.value)  # revealed: Literal[1, 2, 3]
+
 class Answer(StrEnum):
     YES = "yes"
     NO = "no"
@@ -1026,6 +1028,9 @@ reveal_type(Answer.YES._value_)  # revealed: Literal["yes"]
 
 reveal_type(Answer.NO.value)  # revealed: Literal["no"]
 reveal_type(Answer.NO._value_)  # revealed: Literal["no"]
+
+def _(answer: Answer):
+    reveal_type(answer.value)  # revealed: Literal["yes", "no"]
 ```
 
 ## Properties of enum types
@@ -1140,6 +1145,9 @@ python-version = "3.9"
 from enum import Enum, EnumMeta
 
 class EnumWithEnumMetaMetaclass(metaclass=EnumMeta):
+    # Using `EnumMeta` as a metaclass without inheriting `Enum` requires an `__init__`
+    # method that will accept member values (TODO we could catch the lack of this):
+    def __init__(self, val): ...
     NO = 0
     YES = 1
 
@@ -1148,23 +1156,36 @@ reveal_type(EnumWithEnumMetaMetaclass.NO)  # revealed: Literal[EnumWithEnumMetaM
 class SubclassOfEnumMeta(EnumMeta): ...
 
 class EnumWithSubclassOfEnumMetaMetaclass(metaclass=SubclassOfEnumMeta):
+    def __init__(self, val): ...
     NO = 0
     YES = 1
 
 reveal_type(EnumWithSubclassOfEnumMetaMetaclass.NO)  # revealed: Literal[EnumWithSubclassOfEnumMetaMetaclass.NO]
 
-# Attributes like `.value` can *not* be accessed on members of these enums:
+# Attributes `.value` and `.name` can *not* be accessed on members of these enums:
+
 # error: [unresolved-attribute]
 EnumWithSubclassOfEnumMetaMetaclass.NO.value
 # error: [unresolved-attribute]
-EnumWithSubclassOfEnumMetaMetaclass.NO._value_
-# error: [unresolved-attribute]
 EnumWithSubclassOfEnumMetaMetaclass.NO.name
-# error: [unresolved-attribute]
-EnumWithSubclassOfEnumMetaMetaclass.NO._name_
+
+# But the internal underscore attributes are available:
+
+reveal_type(EnumWithSubclassOfEnumMetaMetaclass.NO._value_)  # revealed: Any
+reveal_type(EnumWithSubclassOfEnumMetaMetaclass.NO._name_)  # revealed: Literal["NO"]
+
+def _(x: EnumWithSubclassOfEnumMetaMetaclass):
+    # error: [unresolved-attribute]
+    x.value
+    # error: [unresolved-attribute]
+    x.name
+    reveal_type(x._value_)  # revealed: Any
+    reveal_type(x._name_)  # revealed: Literal["NO", "YES"]
 ```
 
 ### Enums with (subclasses of) `EnumType` as metaclass
+
+In Python 3.11, the meta-type was renamed to `EnumType`.
 
 ```toml
 [environment]
@@ -1175,6 +1196,7 @@ python-version = "3.11"
 from enum import Enum, EnumType
 
 class EnumWithEnumMetaMetaclass(metaclass=EnumType):
+    def __init__(self, val): ...
     NO = 0
     YES = 1
 
@@ -1183,13 +1205,31 @@ reveal_type(EnumWithEnumMetaMetaclass.NO)  # revealed: Literal[EnumWithEnumMetaM
 class SubclassOfEnumMeta(EnumType): ...
 
 class EnumWithSubclassOfEnumMetaMetaclass(metaclass=SubclassOfEnumMeta):
+    def __init__(self, val): ...
     NO = 0
     YES = 1
 
 reveal_type(EnumWithSubclassOfEnumMetaMetaclass.NO)  # revealed: Literal[EnumWithSubclassOfEnumMetaMetaclass.NO]
 
+# Attributes `.value` and `.name` can *not* be accessed on members of these enums:
+
 # error: [unresolved-attribute]
 EnumWithSubclassOfEnumMetaMetaclass.NO.value
+# error: [unresolved-attribute]
+EnumWithSubclassOfEnumMetaMetaclass.NO.name
+
+# But the internal underscore attributes are available:
+
+reveal_type(EnumWithSubclassOfEnumMetaMetaclass.NO._value_)  # revealed: Any
+reveal_type(EnumWithSubclassOfEnumMetaMetaclass.NO._name_)  # revealed: Literal["NO"]
+
+def _(x: EnumWithSubclassOfEnumMetaMetaclass):
+    # error: [unresolved-attribute]
+    x.value
+    # error: [unresolved-attribute]
+    x.name
+    reveal_type(x._value_)  # revealed: Any
+    reveal_type(x._name_)  # revealed: Literal["NO", "YES"]
 ```
 
 ## Function syntax

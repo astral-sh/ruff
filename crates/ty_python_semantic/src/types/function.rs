@@ -65,6 +65,7 @@ use crate::semantic_index::definition::Definition;
 use crate::semantic_index::scope::ScopeId;
 use crate::semantic_index::{FileScopeId, SemanticIndex, semantic_index};
 use crate::types::call::{Binding, CallArguments};
+use crate::types::callable::CallableTypeKind;
 use crate::types::constraints::{ConstraintSet, ConstraintSetBuilder};
 use crate::types::context::InferContext;
 use crate::types::diagnostic::{
@@ -85,11 +86,11 @@ use crate::types::relation::{HasRelationToVisitor, IsDisjointVisitor, TypeRelati
 use crate::types::signatures::{CallableSignature, Signature};
 use crate::types::visitor::any_over_type;
 use crate::types::{
-    ApplyTypeMappingVisitor, BoundMethodType, BoundTypeVarInstance, CallableType, CallableTypeKind,
-    ClassBase, ClassLiteral, ClassType, DynamicType, FindLegacyTypeVarsVisitor, KnownClass,
-    KnownInstanceType, SpecialFormType, SubclassOfInner, SubclassOfType, Truthiness, Type,
-    TypeContext, TypeMapping, TypeVarBoundOrConstraints, UnionBuilder, UnionType, binding_type,
-    definition_expression_type, infer_definition_types, walk_signature,
+    ApplyTypeMappingVisitor, BoundMethodType, BoundTypeVarInstance, CallableType, ClassBase,
+    ClassLiteral, ClassType, DynamicType, FindLegacyTypeVarsVisitor, KnownClass, KnownInstanceType,
+    SpecialFormType, SubclassOfInner, SubclassOfType, Truthiness, Type, TypeContext, TypeMapping,
+    TypeVarBoundOrConstraints, UnionBuilder, UnionType, binding_type, definition_expression_type,
+    infer_definition_types, walk_signature,
 };
 use crate::{Db, FxOrderSet};
 

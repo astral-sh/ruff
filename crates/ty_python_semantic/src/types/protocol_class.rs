@@ -6,8 +6,9 @@ use itertools::Itertools;
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHashMap;
 
+use crate::types::TypeContext;
+use crate::types::callable::CallableTypeKind;
 use crate::types::relation::{HasRelationToVisitor, IsDisjointVisitor, TypeRelation};
-use crate::types::{CallableTypeKind, TypeContext};
 use crate::{
     Db, FxOrderSet,
     place::{

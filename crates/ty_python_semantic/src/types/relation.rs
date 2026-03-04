@@ -6,11 +6,12 @@ use crate::place::{DefinedPlace, Place};
 use crate::types::constraints::{
     ConstraintSetBuilder, IteratorConstraintsExtension, OptionConstraintsExtension,
 };
+use crate::types::cyclic::PairVisitor;
 use crate::types::enums::is_single_member_enum;
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::{
     CallableType, ClassBase, ClassType, CycleDetector, DynamicType, KnownClass, KnownInstanceType,
-    LiteralValueTypeKind, MemberLookupPolicy, PairVisitor, ProtocolInstanceType, SubclassOfInner,
+    LiteralValueTypeKind, MemberLookupPolicy, ProtocolInstanceType, SubclassOfInner,
     TypeVarBoundOrConstraints, UnionType,
 };
 use crate::{
