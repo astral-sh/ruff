@@ -376,4 +376,43 @@ from shapes import Pentagon
 reveal_type(Pentagon().sides)  # revealed: int
 ```
 
+### Partial stub packages
+
+Because `shapes/bar.pyi` is a stub file, it must take priority over `shapes/foo.py` in the first
+search path even though `shapes/bar.pyi` appears in the second search path. But because
+`shapes/bar.pyi` is a `partial = true` namespace package, when we fail to find the `foo` submodule
+in `/path-two/shapes`, we must fallback to `shapes/foo.py` when resolving the module.
+
+This test exists at the intersection of namespace packages and partial stub packages.
+
+```toml
+[environment]
+extra-paths = ["/path-one", "/path-two"]
+```
+
+`/path-one/shapes/foo.py`:
+
+```py
+X = 42
+```
+
+`/path-two/shapes/bar.pyi`:
+
+```pyi
+```
+
+`/path-two/shapes/py.typed`:
+
+```text
+partial = true
+```
+
+`main.py`:
+
+```py
+from shapes.foo import X
+
+reveal_type(X)  # revealed: Literal[42]
+```
+
 [import resolution ordering]: https://typing.python.org/en/latest/spec/distributing.html#import-resolution-ordering
