@@ -17,6 +17,7 @@ use crate::semantic_index::{
     DeclarationWithConstraint, SemanticIndex, attribute_declarations, attribute_scopes,
 };
 use crate::types::bound_super::BoundSuperError;
+use crate::types::callable::CallableTypeKind;
 use crate::types::constraints::{
     ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
 };
@@ -39,14 +40,14 @@ use crate::types::mro::DynamicMroError;
 use crate::types::relation::{HasRelationToVisitor, IsDisjointVisitor, TypeRelation};
 use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
 use crate::types::tuple::{Tuple, TupleSpec, TupleType};
-use crate::types::typed_dict::typed_dict_params_from_class_def;
+use crate::types::typed_dict::{TypedDictParams, typed_dict_params_from_class_def};
 use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
-    ApplyTypeMappingVisitor, Binding, BindingContext, BoundSuperType, CallableType,
-    CallableTypeKind, CallableTypes, DATACLASS_FLAGS, DataclassFlags, DataclassParams,
-    FindLegacyTypeVarsVisitor, IntersectionBuilder, KnownInstanceType, MaterializationKind,
-    PropertyInstanceType, TypeContext, TypeMapping, TypedDictParams, UnionBuilder,
-    VarianceInferable, binding_type, declaration_type, determine_upper_bound,
+    ApplyTypeMappingVisitor, Binding, BindingContext, BoundSuperType, CallableType, CallableTypes,
+    DATACLASS_FLAGS, DataclassFlags, DataclassParams, FindLegacyTypeVarsVisitor,
+    IntersectionBuilder, KnownInstanceType, MaterializationKind, PropertyInstanceType, TypeContext,
+    TypeMapping, UnionBuilder, VarianceInferable, binding_type, declaration_type,
+    determine_upper_bound,
 };
 use crate::{
     Db, FxIndexMap, FxIndexSet, FxOrderSet, Program,
