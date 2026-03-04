@@ -1,7 +1,7 @@
 use compact_str::ToCompactString;
 use itertools::Itertools;
 use ruff_diagnostics::{Edit, Fix};
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use std::borrow::Cow;
 use std::cell::RefCell;
@@ -237,6 +237,11 @@ pub(crate) struct FindLegacyTypeVars;
 /// A [`CycleDetector`] that is used in `visit_specialization` methods.
 pub(crate) type SpecializationVisitor<'db> = CycleDetector<VisitSpecialization, Type<'db>, ()>;
 pub(crate) struct VisitSpecialization;
+
+/// A [`CycleDetector`] that is used in `TypeVarInstance::default_type`.
+pub(crate) type TypeVarDefaultVisitor<'db> =
+    CycleDetector<VisitTypeVarDefault, TypeVarInstance<'db>, Option<Type<'db>>>;
+pub(crate) struct VisitTypeVarDefault;
 
 /// How a generic type has been specialized.
 ///
@@ -7113,9 +7118,20 @@ impl<'db> TypeVarInstance<'db> {
     }
 
     pub(crate) fn default_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
-        self._default(db).and_then(|d| match d {
-            TypeVarDefaultEvaluation::Eager(ty) => Some(ty),
-            TypeVarDefaultEvaluation::Lazy => self.lazy_default(db),
+        let visitor = TypeVarDefaultVisitor::new(None);
+        self.default_type_impl(db, &visitor)
+    }
+
+    fn default_type_impl(
+        self,
+        db: &'db dyn Db,
+        visitor: &TypeVarDefaultVisitor<'db>,
+    ) -> Option<Type<'db>> {
+        visitor.visit(self, || {
+            self._default(db).and_then(|default| match default {
+                TypeVarDefaultEvaluation::Eager(ty) => Some(ty),
+                TypeVarDefaultEvaluation::Lazy => self.lazy_default_impl(db, visitor),
+            })
         })
     }
 
@@ -7186,15 +7202,87 @@ impl<'db> TypeVarInstance<'db> {
         ))
     }
 
-    fn type_is_self_referential(self, db: &'db dyn Db, ty: Type<'db>) -> bool {
-        let identity = self.identity(db);
-        any_over_type(db, ty, false, |ty| match ty {
-            Type::TypeVar(bound_typevar) => identity == bound_typevar.typevar(db).identity(db),
-            Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) => {
-                identity == typevar.identity(db)
+    fn type_is_self_referential(
+        self,
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        visitor: &TypeVarDefaultVisitor<'db>,
+    ) -> bool {
+        #[derive(Copy, Clone)]
+        struct State<'db, 'a> {
+            db: &'db dyn Db,
+            visitor: &'a TypeVarDefaultVisitor<'db>,
+            seen_typevars: &'a RefCell<FxHashSet<TypeVarInstance<'db>>>,
+            seen_type_aliases: &'a RefCell<FxHashSet<TypeAliasType<'db>>>,
+        }
+
+        fn typevar_default_is_self_referential<'db>(
+            state: State<'db, '_>,
+            typevar: TypeVarInstance<'db>,
+            self_identity: TypeVarIdentity<'db>,
+        ) -> bool {
+            if typevar.identity(state.db) == self_identity {
+                return true;
             }
-            _ => false,
-        })
+
+            if !state.seen_typevars.borrow_mut().insert(typevar) {
+                return false;
+            }
+
+            typevar
+                .default_type_impl(state.db, state.visitor)
+                .is_some_and(|default_ty| {
+                    type_is_self_referential_impl(state, default_ty, self_identity)
+                })
+        }
+
+        fn type_alias_is_self_referential<'db>(
+            state: State<'db, '_>,
+            type_alias: TypeAliasType<'db>,
+            self_identity: TypeVarIdentity<'db>,
+        ) -> bool {
+            if !state.seen_type_aliases.borrow_mut().insert(type_alias) {
+                return false;
+            }
+
+            type_is_self_referential_impl(state, type_alias.raw_value_type(state.db), self_identity)
+        }
+
+        fn type_is_self_referential_impl<'db>(
+            state: State<'db, '_>,
+            ty: Type<'db>,
+            self_identity: TypeVarIdentity<'db>,
+        ) -> bool {
+            any_over_type(state.db, ty, false, |inner_ty| match inner_ty {
+                Type::TypeVar(bound_typevar) => typevar_default_is_self_referential(
+                    state,
+                    bound_typevar.typevar(state.db),
+                    self_identity,
+                ),
+                Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) => {
+                    typevar_default_is_self_referential(state, typevar, self_identity)
+                }
+                Type::TypeAlias(alias) => {
+                    type_alias_is_self_referential(state, alias, self_identity)
+                }
+                Type::KnownInstance(KnownInstanceType::TypeAliasType(alias)) => {
+                    type_alias_is_self_referential(state, alias, self_identity)
+                }
+                _ => false,
+            })
+        }
+
+        let seen_typevars = RefCell::new(FxHashSet::default());
+        let seen_type_aliases = RefCell::new(FxHashSet::default());
+
+        let state = State {
+            db,
+            visitor,
+            seen_typevars: &seen_typevars,
+            seen_type_aliases: &seen_type_aliases,
+        };
+
+        type_is_self_referential_impl(state, ty, self.identity(db))
     }
 
     /// Returns the "unchecked" upper bound of a type variable instance.
@@ -7375,12 +7463,21 @@ impl<'db> TypeVarInstance<'db> {
     }
 
     fn lazy_default(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        let visitor = TypeVarDefaultVisitor::new(None);
+        self.lazy_default_impl(db, &visitor)
+    }
+
+    fn lazy_default_impl(
+        self,
+        db: &'db dyn Db,
+        visitor: &TypeVarDefaultVisitor<'db>,
+    ) -> Option<Type<'db>> {
         let default = self.lazy_default_unchecked(db)?;
 
         // Unlike bounds/constraints, default types are allowed to be generic (https://peps.python.org/pep-0696/#using-another-type-parameter-as-default).
         // Here we simply check for non-self-referential.
         // TODO: We should also check for non-forward references.
-        if self.type_is_self_referential(db, default) {
+        if self.type_is_self_referential(db, default, visitor) {
             return None;
         }
 
@@ -7804,14 +7901,7 @@ impl<'db> BoundTypeVarInstance<'db> {
     /// `BoundTypeVarInstance`. As part of binding `U` we must also bind its default value
     /// (resulting in `T@C`).
     pub(crate) fn default_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
-        let binding_context = self.binding_context(db);
-        self.typevar(db).default_type(db).map(|ty| {
-            ty.apply_type_mapping(
-                db,
-                &TypeMapping::BindLegacyTypevars(binding_context),
-                TypeContext::default(),
-            )
-        })
+        bound_typevar_default_type(db, self)
     }
 
     fn materialize_impl(
@@ -7837,6 +7927,36 @@ impl<'db> BoundTypeVarInstance<'db> {
             self.paramspec_attr(db),
         ))
     }
+}
+
+#[salsa::tracked(
+    cycle_initial=|_, _, _| None,
+    cycle_fn=bound_typevar_default_type_cycle_recover,
+    heap_size=ruff_memory_usage::heap_size
+)]
+fn bound_typevar_default_type<'db>(
+    db: &'db dyn Db,
+    bound_typevar: BoundTypeVarInstance<'db>,
+) -> Option<Type<'db>> {
+    let binding_context = bound_typevar.binding_context(db);
+    bound_typevar.typevar(db).default_type(db).map(|ty| {
+        ty.apply_type_mapping(
+            db,
+            &TypeMapping::BindLegacyTypevars(binding_context),
+            TypeContext::default(),
+        )
+    })
+}
+
+#[expect(clippy::ref_option)]
+fn bound_typevar_default_type_cycle_recover<'db>(
+    _db: &'db dyn Db,
+    _cycle: &salsa::Cycle,
+    _previous_default: &Option<Type<'db>>,
+    _default: Option<Type<'db>>,
+    _bound_typevar: BoundTypeVarInstance<'db>,
+) -> Option<Type<'db>> {
+    None
 }
 
 /// Whether a typevar default is eagerly specified or lazily evaluated.
