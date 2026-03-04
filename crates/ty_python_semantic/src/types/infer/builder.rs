@@ -116,9 +116,7 @@ use crate::types::function::{
 use crate::types::generics::{
     InferableTypeVars, SpecializationBuilder, bind_typevar, enclosing_generic_contexts, typing_self,
 };
-use crate::types::infer::builder::paramspec_validation::{
-    check_for_bare_paramspec, validate_paramspec_components,
-};
+use crate::types::infer::builder::paramspec_validation::validate_paramspec_components;
 use crate::types::infer::{nearest_enclosing_class, nearest_enclosing_function};
 use crate::types::mro::{DynamicMroErrorKind, StaticMroErrorKind};
 use crate::types::newtype::NewType;
@@ -141,9 +139,9 @@ use crate::types::{
     IntersectionType, KnownClass, KnownInstanceType, KnownUnion, LintDiagnosticGuard,
     LiteralValueTypeKind, MemberLookupPolicy, MetaclassCandidate, ParamSpecAttrKind, Parameter,
     ParameterForm, Parameters, Signature, SpecialFormType, StaticClassLiteral, SubclassOfType,
-    Truthiness, Type, TypeAliasType, TypeAndQualifiers, TypeContext, TypeQualifiers,
-    TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, TypedDictType, UnionBuilder,
-    UnionType, binding_type, definition_expression_type, infer_complete_scope_types,
+    Truthiness, Type, TypeAliasType, TypeAndQualifiers, TypeContext, TypeInferenceFlags,
+    TypeQualifiers, TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, TypedDictType,
+    UnionBuilder, UnionType, binding_type, definition_expression_type, infer_complete_scope_types,
     infer_scope_types, todo_type,
 };
 use crate::types::{CallableTypes, overrides};
@@ -303,11 +301,9 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     /// Whether we are in a context that binds unbound typevars.
     typevar_binding_context: Option<Definition<'db>>,
 
-    /// Whether to check for unbound type variables in type expressions.
-    /// This is set to `true` when processing annotation expressions, where unbound type variables
-    /// are an error. It is `false` in other contexts (e.g., `TypeVar` defaults, explicit class
-    /// specialization) where unbound type variables are expected.
-    check_unbound_typevars: bool,
+    /// Type-inference is context-dependent, especially in type expressions.
+    /// This field tracks various flags that control how type inference should behave in the current context.
+    inference_flags: TypeInferenceFlags,
 
     /// The deferred state of inferring types of certain expressions within the region.
     ///
@@ -375,7 +371,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             bindings: VecMap::default(),
             declarations: VecMap::default(),
             typevar_binding_context: None,
-            check_unbound_typevars: false,
+            inference_flags: TypeInferenceFlags::empty(),
             deferred: VecSet::default(),
             undecorated_type: None,
             cycle_recovery: None,
@@ -3047,8 +3043,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let value_ty =
             self.infer_annotation_expression(&type_alias.value, DeferredExpressionState::None);
 
-        check_for_bare_paramspec(&self.context, value_ty.inner_type(), &type_alias.value);
-
         // A type alias where a value type points to itself, i.e. the expanded type is `Divergent` is meaningless
         // (but a type alias that expands to something like `list[Divergent]` may be a valid recursive type alias)
         // and would lead to infinite recursion. Therefore, such type aliases should not be exposed.
@@ -3537,8 +3531,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
         let annotated = self.infer_annotation_expression(returns, deferred_expression_state);
 
-        check_for_bare_paramspec(&self.context, annotated.inner_type(), returns);
-
         if annotated.qualifiers.is_empty() {
             return;
         }
@@ -3598,10 +3590,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let Some(annotated) = annotated else {
             return;
         };
-
-        if let Some(annotation) = parameter.annotation.as_deref() {
-            check_for_bare_paramspec(&self.context, annotated.inner_type(), annotation);
-        }
 
         let qualifiers = annotated.qualifiers;
 
@@ -5028,6 +5016,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn infer_paramspec_default(&mut self, default_expr: &ast::Expr) {
+        let previously_allowed_paramspec = self.inference_flags.replace(
+            TypeInferenceFlags::ALLOW_PARAM_SPEC_IN_TYPE_EXPRESSIONS,
+            true,
+        );
+        self.infer_paramspec_default_impl(default_expr);
+        self.inference_flags.set(
+            TypeInferenceFlags::ALLOW_PARAM_SPEC_IN_TYPE_EXPRESSIONS,
+            previously_allowed_paramspec,
+        );
+    }
+
+    fn infer_paramspec_default_impl(&mut self, default_expr: &ast::Expr) {
         match default_expr {
             ast::Expr::EllipsisLiteral(ellipsis) => {
                 let ty = self.infer_ellipsis_literal_expression(ellipsis);
@@ -9477,8 +9477,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
         }
-
-        check_for_bare_paramspec(&self.context, declared.inner_type(), annotation);
 
         let is_pep_613_type_alias = declared.inner_type().is_typealias_special_form();
 
@@ -14093,6 +14091,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 db,
                                 self.scope(),
                                 self.typevar_binding_context,
+                                self.inference_flags
                             ) && !defined_type.member(db, attr_name).place.is_undefined()
                             {
                                 diag.help(format_args!(
@@ -14685,7 +14684,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // builder only state
             typevar_binding_context: _,
-            check_unbound_typevars: _,
+            inference_flags: _,
             deferred_state: _,
             multi_inference_state: _,
             inner_expression_inference_state: _,
@@ -14755,7 +14754,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             dataclass_field_specifiers: _,
             all_definitely_bound: _,
             typevar_binding_context: _,
-            check_unbound_typevars: _,
+            inference_flags: _,
             deferred_state: _,
             inferring_vararg_annotation: _,
             multi_inference_state: _,
@@ -14838,7 +14837,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             dataclass_field_specifiers: _,
             all_definitely_bound: _,
             typevar_binding_context: _,
-            check_unbound_typevars: _,
+            inference_flags: _,
             deferred_state: _,
             multi_inference_state: _,
             inner_expression_inference_state: _,

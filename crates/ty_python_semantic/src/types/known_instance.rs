@@ -6,7 +6,7 @@ use crate::{
     types::{
         ApplyTypeMappingVisitor, BoundTypeVarInstance, CallableType, ClassType, GenericContext,
         InvalidTypeExpressionError, KnownClass, StringLiteralType, Type, TypeAliasType,
-        TypeContext, TypeMapping, TypeVarVariance, UnionBuilder,
+        TypeContext, TypeInferenceFlags, TypeMapping, TypeVarVariance, UnionBuilder,
         class::NamedTupleSpec,
         constraints::OwnedConstraintSet,
         generics::{Specialization, walk_generic_context},
@@ -426,10 +426,11 @@ impl<'db> UnionTypeInstance<'db> {
         value_expr_types: [Type<'db>; 2],
         scope_id: ScopeId<'db>,
         typevar_binding_context: Option<Definition<'db>>,
+        inference_flags: TypeInferenceFlags,
     ) -> Type<'db> {
         let mut builder = UnionBuilder::new(db);
         for ty in &value_expr_types {
-            match ty.in_type_expression(db, scope_id, typevar_binding_context) {
+            match ty.in_type_expression(db, scope_id, typevar_binding_context, inference_flags) {
                 Ok(ty) => builder.add_in_place(ty),
                 Err(error) => {
                     return Type::KnownInstance(KnownInstanceType::UnionType(

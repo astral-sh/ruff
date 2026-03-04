@@ -70,7 +70,7 @@ def foo[**P = int]() -> None:
 <!-- snapshot-diagnostics -->
 
 ```py
-from typing import Any, Final, ParamSpec, Callable, Concatenate
+from typing import Any, Final, ParamSpec, Callable, Concatenate, Union, Optional, Annotated
 
 def valid[**P](
     a1: Callable[P, int],
@@ -81,14 +81,23 @@ def valid[**P](
 def invalid[**P](
     # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
     a1: P,
-    # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
+    # TODO: this should cause us to emit an error because a `ParamSpec` type argument
+    # cannot be used to specialize a non-`ParamSpec` type parameter
     a2: list[P],
     # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
     a3: Callable[[P], int],
     # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
     a4: Callable[..., P],
-    # TODO: error
+    # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
     a5: Callable[Concatenate[P, ...], int],
+    # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
+    a6: P | int,
+    # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
+    a7: Union[P, int],
+    # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
+    a8: Optional[P],
+    # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
+    a9: Annotated[P, "metadata"],
 ) -> None: ...
 
 # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"

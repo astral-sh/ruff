@@ -155,8 +155,19 @@ to `Concatenate`, or as a type parameter to `Protocol` or `Generic`.
 
 <!-- snapshot-diagnostics -->
 
+`library.py`:
+
 ```py
-from typing import Any, Final, ParamSpec, Callable, Concatenate, Protocol, Generic
+from typing import ParamSpec
+
+LibraryP = ParamSpec("LibraryP")
+```
+
+`main.py`:
+
+```py
+import library
+from typing import Any, Final, ParamSpec, Callable, Concatenate, Protocol, Generic, Union, Optional, Annotated
 
 P = ParamSpec("P")
 
@@ -171,18 +182,28 @@ def valid(
     a2: Callable[Concatenate[int, P], int],
     a3: Callable["P", int],
     a4: Callable[Concatenate[int, "P"], int],
+    a5: Callable[library.LibraryP, int],
 ) -> None: ...
 def invalid(
     # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
     a1: P,
-    # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
+    # TODO: this should cause us to emit an error because a `ParamSpec` type argument
+    # cannot be used to specialize a non-`ParamSpec` type parameter
     a2: list[P],
     # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
     a3: Callable[[P], int],
     # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
     a4: Callable[..., P],
-    # TODO: error
+    # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
     a5: Callable[Concatenate[P, ...], int],
+    # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
+    a6: P | int,
+    # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
+    a7: Union[P, int],
+    # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
+    a8: Optional[P],
+    # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
+    a9: Annotated[P, "metadata"],
 ) -> None: ...
 
 # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"

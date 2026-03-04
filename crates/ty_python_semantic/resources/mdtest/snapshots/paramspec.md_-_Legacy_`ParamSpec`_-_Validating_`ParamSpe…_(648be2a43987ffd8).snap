@@ -10,79 +10,99 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/generics/legacy/paramspe
 
 # Python source files
 
-## mdtest_snippet.py
+## library.py
 
 ```
- 1 | from typing import Any, Final, ParamSpec, Callable, Concatenate, Protocol, Generic
- 2 | 
- 3 | P = ParamSpec("P")
- 4 | 
- 5 | class ValidProtocol(Protocol[P]):
- 6 |     def method(self, c: Callable[P, int]) -> None: ...
- 7 | 
- 8 | class ValidGeneric(Generic[P]):
- 9 |     def method(self, c: Callable[P, int]) -> None: ...
-10 | 
-11 | def valid(
-12 |     a1: Callable[P, int],
-13 |     a2: Callable[Concatenate[int, P], int],
-14 |     a3: Callable["P", int],
-15 |     a4: Callable[Concatenate[int, "P"], int],
-16 | ) -> None: ...
-17 | def invalid(
-18 |     # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
-19 |     a1: P,
+1 | from typing import ParamSpec
+2 | 
+3 | LibraryP = ParamSpec("LibraryP")
+```
+
+## main.py
+
+```
+ 1 | import library
+ 2 | from typing import Any, Final, ParamSpec, Callable, Concatenate, Protocol, Generic, Union, Optional, Annotated
+ 3 | 
+ 4 | P = ParamSpec("P")
+ 5 | 
+ 6 | class ValidProtocol(Protocol[P]):
+ 7 |     def method(self, c: Callable[P, int]) -> None: ...
+ 8 | 
+ 9 | class ValidGeneric(Generic[P]):
+10 |     def method(self, c: Callable[P, int]) -> None: ...
+11 | 
+12 | def valid(
+13 |     a1: Callable[P, int],
+14 |     a2: Callable[Concatenate[int, P], int],
+15 |     a3: Callable["P", int],
+16 |     a4: Callable[Concatenate[int, "P"], int],
+17 |     a5: Callable[library.LibraryP, int],
+18 | ) -> None: ...
+19 | def invalid(
 20 |     # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
-21 |     a2: list[P],
-22 |     # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
-23 |     a3: Callable[[P], int],
-24 |     # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
-25 |     a4: Callable[..., P],
-26 |     # TODO: error
-27 |     a5: Callable[Concatenate[P, ...], int],
-28 | ) -> None: ...
-29 | 
-30 | # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
-31 | def invalid_return() -> P:
-32 |     raise NotImplementedError
-33 | 
-34 | def invalid_variable_annotation(y: Any) -> None:
+21 |     a1: P,
+22 |     # TODO: this should cause us to emit an error because a `ParamSpec` type argument
+23 |     # cannot be used to specialize a non-`ParamSpec` type parameter
+24 |     a2: list[P],
+25 |     # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
+26 |     a3: Callable[[P], int],
+27 |     # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
+28 |     a4: Callable[..., P],
+29 |     # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
+30 |     a5: Callable[Concatenate[P, ...], int],
+31 |     # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
+32 |     a6: P | int,
+33 |     # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
+34 |     a7: Union[P, int],
 35 |     # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
-36 |     x: P = y
-37 | 
-38 | def invalid_with_qualifier(y: Any) -> None:
-39 |     # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
-40 |     x: Final[P] = y
-41 | 
-42 | # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
-43 | def invalid_stringified_return() -> "P":
-44 |     raise NotImplementedError
-45 | 
-46 | def invalid_stringified_annotation(
-47 |     # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
-48 |     a: "P",
-49 | ) -> None: ...
-50 | def invalid_stringified_variable_annotation(y: Any) -> None:
-51 |     # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
-52 |     x: "P" = y
+36 |     a8: Optional[P],
+37 |     # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
+38 |     a9: Annotated[P, "metadata"],
+39 | ) -> None: ...
+40 | 
+41 | # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
+42 | def invalid_return() -> P:
+43 |     raise NotImplementedError
+44 | 
+45 | def invalid_variable_annotation(y: Any) -> None:
+46 |     # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
+47 |     x: P = y
+48 | 
+49 | def invalid_with_qualifier(y: Any) -> None:
+50 |     # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
+51 |     x: Final[P] = y
+52 | 
+53 | # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
+54 | def invalid_stringified_return() -> "P":
+55 |     raise NotImplementedError
+56 | 
+57 | def invalid_stringified_annotation(
+58 |     # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
+59 |     a: "P",
+60 | ) -> None: ...
+61 | def invalid_stringified_variable_annotation(y: Any) -> None:
+62 |     # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
+63 |     x: "P" = y
 ```
 
 # Diagnostics
 
 ```
-error[invalid-type-form]: Bare ParamSpec `P` is not valid in this context
-  --> src/mdtest_snippet.py:19:9
+error[invalid-type-form]: Bare ParamSpec `P` is not valid in this context in a type expression
+  --> src/main.py:21:9
    |
-17 | def invalid(
-18 |     # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
-19 |     a1: P,
+19 | def invalid(
+20 |     # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
+21 |     a1: P,
    |         ^
-20 |     # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
-21 |     a2: list[P],
+22 |     # TODO: this should cause us to emit an error because a `ParamSpec` type argument
+23 |     # cannot be used to specialize a non-`ParamSpec` type parameter
    |
 info: A bare ParamSpec is only valid:
 info:  - as the first argument to `Callable`
 info:  - as the last argument to `Concatenate`
+info:  - as the default type for another ParamSpec
 info:  - as part of a type parameter list when defining a generic class
 info:  - or as part of an argument list when specializing a generic class
 info: rule `invalid-type-form` is enabled by default
@@ -90,39 +110,20 @@ info: rule `invalid-type-form` is enabled by default
 ```
 
 ```
-error[invalid-type-form]: Bare ParamSpec `P` is not valid in this context
-  --> src/mdtest_snippet.py:21:14
+error[invalid-type-form]: Bare ParamSpec `P` is not valid in this context in a type expression
+  --> src/main.py:26:19
    |
-19 |     a1: P,
-20 |     # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
-21 |     a2: list[P],
-   |              ^
-22 |     # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
-23 |     a3: Callable[[P], int],
-   |
-info: A bare ParamSpec is only valid:
-info:  - as the first argument to `Callable`
-info:  - as the last argument to `Concatenate`
-info:  - as part of a type parameter list when defining a generic class
-info:  - or as part of an argument list when specializing a generic class
-info: rule `invalid-type-form` is enabled by default
-
-```
-
-```
-error[invalid-type-form]: Bare ParamSpec `P` is not valid in this context
-  --> src/mdtest_snippet.py:23:19
-   |
-21 |     a2: list[P],
-22 |     # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
-23 |     a3: Callable[[P], int],
+24 |     a2: list[P],
+25 |     # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
+26 |     a3: Callable[[P], int],
    |                   ^
-24 |     # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
-25 |     a4: Callable[..., P],
+27 |     # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
+28 |     a4: Callable[..., P],
    |
 info: A bare ParamSpec is only valid:
 info:  - as the first argument to `Callable`
 info:  - as the last argument to `Concatenate`
+info:  - as the default type for another ParamSpec
 info:  - as part of a type parameter list when defining a generic class
 info:  - or as part of an argument list when specializing a generic class
 info: rule `invalid-type-form` is enabled by default
@@ -130,19 +131,20 @@ info: rule `invalid-type-form` is enabled by default
 ```
 
 ```
-error[invalid-type-form]: Bare ParamSpec `P` is not valid in this context
-  --> src/mdtest_snippet.py:25:23
+error[invalid-type-form]: Bare ParamSpec `P` is not valid in this context in a type expression
+  --> src/main.py:28:23
    |
-23 |     a3: Callable[[P], int],
-24 |     # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
-25 |     a4: Callable[..., P],
+26 |     a3: Callable[[P], int],
+27 |     # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
+28 |     a4: Callable[..., P],
    |                       ^
-26 |     # TODO: error
-27 |     a5: Callable[Concatenate[P, ...], int],
+29 |     # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
+30 |     a5: Callable[Concatenate[P, ...], int],
    |
 info: A bare ParamSpec is only valid:
 info:  - as the first argument to `Callable`
 info:  - as the last argument to `Concatenate`
+info:  - as the default type for another ParamSpec
 info:  - as part of a type parameter list when defining a generic class
 info:  - or as part of an argument list when specializing a generic class
 info: rule `invalid-type-form` is enabled by default
@@ -150,17 +152,20 @@ info: rule `invalid-type-form` is enabled by default
 ```
 
 ```
-error[invalid-type-form]: Bare ParamSpec `P` is not valid in this context
-  --> src/mdtest_snippet.py:31:25
+error[invalid-type-form]: Bare ParamSpec `P` is not valid in this context in a type expression
+  --> src/main.py:30:30
    |
-30 | # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
-31 | def invalid_return() -> P:
-   |                         ^
-32 |     raise NotImplementedError
+28 |     a4: Callable[..., P],
+29 |     # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
+30 |     a5: Callable[Concatenate[P, ...], int],
+   |                              ^
+31 |     # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
+32 |     a6: P | int,
    |
 info: A bare ParamSpec is only valid:
 info:  - as the first argument to `Callable`
 info:  - as the last argument to `Concatenate`
+info:  - as the default type for another ParamSpec
 info:  - as part of a type parameter list when defining a generic class
 info:  - or as part of an argument list when specializing a generic class
 info: rule `invalid-type-form` is enabled by default
@@ -168,19 +173,122 @@ info: rule `invalid-type-form` is enabled by default
 ```
 
 ```
-error[invalid-type-form]: Bare ParamSpec `P` is not valid in this context
-  --> src/mdtest_snippet.py:36:8
+error[invalid-type-form]: Bare ParamSpec `P` is not valid in this context in a type expression
+  --> src/main.py:32:9
    |
-34 | def invalid_variable_annotation(y: Any) -> None:
+30 |     a5: Callable[Concatenate[P, ...], int],
+31 |     # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
+32 |     a6: P | int,
+   |         ^
+33 |     # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
+34 |     a7: Union[P, int],
+   |
+info: A bare ParamSpec is only valid:
+info:  - as the first argument to `Callable`
+info:  - as the last argument to `Concatenate`
+info:  - as the default type for another ParamSpec
+info:  - as part of a type parameter list when defining a generic class
+info:  - or as part of an argument list when specializing a generic class
+info: rule `invalid-type-form` is enabled by default
+
+```
+
+```
+error[invalid-type-form]: Bare ParamSpec `P` is not valid in this context in a type expression
+  --> src/main.py:34:15
+   |
+32 |     a6: P | int,
+33 |     # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
+34 |     a7: Union[P, int],
+   |               ^
 35 |     # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
-36 |     x: P = y
+36 |     a8: Optional[P],
+   |
+info: A bare ParamSpec is only valid:
+info:  - as the first argument to `Callable`
+info:  - as the last argument to `Concatenate`
+info:  - as the default type for another ParamSpec
+info:  - as part of a type parameter list when defining a generic class
+info:  - or as part of an argument list when specializing a generic class
+info: rule `invalid-type-form` is enabled by default
+
+```
+
+```
+error[invalid-type-form]: Bare ParamSpec `P` is not valid in this context in a type expression
+  --> src/main.py:36:18
+   |
+34 |     a7: Union[P, int],
+35 |     # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
+36 |     a8: Optional[P],
+   |                  ^
+37 |     # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
+38 |     a9: Annotated[P, "metadata"],
+   |
+info: A bare ParamSpec is only valid:
+info:  - as the first argument to `Callable`
+info:  - as the last argument to `Concatenate`
+info:  - as the default type for another ParamSpec
+info:  - as part of a type parameter list when defining a generic class
+info:  - or as part of an argument list when specializing a generic class
+info: rule `invalid-type-form` is enabled by default
+
+```
+
+```
+error[invalid-type-form]: Bare ParamSpec `P` is not valid in this context in a type expression
+  --> src/main.py:38:19
+   |
+36 |     a8: Optional[P],
+37 |     # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
+38 |     a9: Annotated[P, "metadata"],
+   |                   ^
+39 | ) -> None: ...
+   |
+info: A bare ParamSpec is only valid:
+info:  - as the first argument to `Callable`
+info:  - as the last argument to `Concatenate`
+info:  - as the default type for another ParamSpec
+info:  - as part of a type parameter list when defining a generic class
+info:  - or as part of an argument list when specializing a generic class
+info: rule `invalid-type-form` is enabled by default
+
+```
+
+```
+error[invalid-type-form]: Bare ParamSpec `P` is not valid in this context in a type expression
+  --> src/main.py:42:25
+   |
+41 | # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
+42 | def invalid_return() -> P:
+   |                         ^
+43 |     raise NotImplementedError
+   |
+info: A bare ParamSpec is only valid:
+info:  - as the first argument to `Callable`
+info:  - as the last argument to `Concatenate`
+info:  - as the default type for another ParamSpec
+info:  - as part of a type parameter list when defining a generic class
+info:  - or as part of an argument list when specializing a generic class
+info: rule `invalid-type-form` is enabled by default
+
+```
+
+```
+error[invalid-type-form]: Bare ParamSpec `P` is not valid in this context in a type expression
+  --> src/main.py:47:8
+   |
+45 | def invalid_variable_annotation(y: Any) -> None:
+46 |     # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
+47 |     x: P = y
    |        ^
-37 |
-38 | def invalid_with_qualifier(y: Any) -> None:
+48 |
+49 | def invalid_with_qualifier(y: Any) -> None:
    |
 info: A bare ParamSpec is only valid:
 info:  - as the first argument to `Callable`
 info:  - as the last argument to `Concatenate`
+info:  - as the default type for another ParamSpec
 info:  - as part of a type parameter list when defining a generic class
 info:  - or as part of an argument list when specializing a generic class
 info: rule `invalid-type-form` is enabled by default
@@ -188,19 +296,20 @@ info: rule `invalid-type-form` is enabled by default
 ```
 
 ```
-error[invalid-type-form]: Bare ParamSpec `P` is not valid in this context
-  --> src/mdtest_snippet.py:40:8
+error[invalid-type-form]: Bare ParamSpec `P` is not valid in this context in a type expression
+  --> src/main.py:51:14
    |
-38 | def invalid_with_qualifier(y: Any) -> None:
-39 |     # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
-40 |     x: Final[P] = y
-   |        ^^^^^^^^
-41 |
-42 | # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
+49 | def invalid_with_qualifier(y: Any) -> None:
+50 |     # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
+51 |     x: Final[P] = y
+   |              ^
+52 |
+53 | # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
    |
 info: A bare ParamSpec is only valid:
 info:  - as the first argument to `Callable`
 info:  - as the last argument to `Concatenate`
+info:  - as the default type for another ParamSpec
 info:  - as part of a type parameter list when defining a generic class
 info:  - or as part of an argument list when specializing a generic class
 info: rule `invalid-type-form` is enabled by default
@@ -208,17 +317,18 @@ info: rule `invalid-type-form` is enabled by default
 ```
 
 ```
-error[invalid-type-form]: Bare ParamSpec `P` is not valid in this context
-  --> src/mdtest_snippet.py:43:37
+error[invalid-type-form]: Bare ParamSpec `P` is not valid in this context in a type expression
+  --> src/main.py:54:38
    |
-42 | # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
-43 | def invalid_stringified_return() -> "P":
-   |                                     ^^^
-44 |     raise NotImplementedError
+53 | # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
+54 | def invalid_stringified_return() -> "P":
+   |                                      ^
+55 |     raise NotImplementedError
    |
 info: A bare ParamSpec is only valid:
 info:  - as the first argument to `Callable`
 info:  - as the last argument to `Concatenate`
+info:  - as the default type for another ParamSpec
 info:  - as part of a type parameter list when defining a generic class
 info:  - or as part of an argument list when specializing a generic class
 info: rule `invalid-type-form` is enabled by default
@@ -226,19 +336,20 @@ info: rule `invalid-type-form` is enabled by default
 ```
 
 ```
-error[invalid-type-form]: Bare ParamSpec `P` is not valid in this context
-  --> src/mdtest_snippet.py:48:8
+error[invalid-type-form]: Bare ParamSpec `P` is not valid in this context in a type expression
+  --> src/main.py:59:9
    |
-46 | def invalid_stringified_annotation(
-47 |     # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
-48 |     a: "P",
-   |        ^^^
-49 | ) -> None: ...
-50 | def invalid_stringified_variable_annotation(y: Any) -> None:
+57 | def invalid_stringified_annotation(
+58 |     # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
+59 |     a: "P",
+   |         ^
+60 | ) -> None: ...
+61 | def invalid_stringified_variable_annotation(y: Any) -> None:
    |
 info: A bare ParamSpec is only valid:
 info:  - as the first argument to `Callable`
 info:  - as the last argument to `Concatenate`
+info:  - as the default type for another ParamSpec
 info:  - as part of a type parameter list when defining a generic class
 info:  - or as part of an argument list when specializing a generic class
 info: rule `invalid-type-form` is enabled by default
@@ -246,17 +357,18 @@ info: rule `invalid-type-form` is enabled by default
 ```
 
 ```
-error[invalid-type-form]: Bare ParamSpec `P` is not valid in this context
-  --> src/mdtest_snippet.py:52:8
+error[invalid-type-form]: Bare ParamSpec `P` is not valid in this context in a type expression
+  --> src/main.py:63:9
    |
-50 | def invalid_stringified_variable_annotation(y: Any) -> None:
-51 |     # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
-52 |     x: "P" = y
-   |        ^^^
+61 | def invalid_stringified_variable_annotation(y: Any) -> None:
+62 |     # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
+63 |     x: "P" = y
+   |         ^
    |
 info: A bare ParamSpec is only valid:
 info:  - as the first argument to `Callable`
 info:  - as the last argument to `Concatenate`
+info:  - as the default type for another ParamSpec
 info:  - as part of a type parameter list when defining a generic class
 info:  - or as part of an argument list when specializing a generic class
 info: rule `invalid-type-form` is enabled by default

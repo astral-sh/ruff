@@ -3,14 +3,11 @@ use ruff_python_ast as ast;
 
 use super::{DeferredExpressionState, TypeInferenceBuilder};
 use crate::FxOrderSet;
-use crate::semantic_index::semantic_index;
 use crate::types::diagnostic::{
     self, INVALID_TYPE_FORM, NOT_SUBSCRIPTABLE, UNBOUND_TYPE_VARIABLE,
     report_invalid_argument_number_to_special_form, report_invalid_arguments_to_callable,
 };
-use crate::types::generics::bind_typevar;
-use crate::types::infer::builder::InnerExpressionInferenceState;
-use crate::types::infer::builder::paramspec_validation::check_for_bare_paramspec;
+use crate::types::infer::builder::{InnerExpressionInferenceState, TypeInferenceFlags};
 use crate::types::signatures::Signature;
 use crate::types::special_form::{AliasSpec, LegacyStdlibAlias};
 use crate::types::string_annotation::parse_string_annotation;
@@ -87,7 +84,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     let ty = self
                         .infer_name_expression(name)
                         .default_specialize(self.db())
-                        .in_type_expression(self.db(), self.scope(), self.typevar_binding_context)
+                        .in_type_expression(
+                            self.db(),
+                            self.scope(),
+                            self.typevar_binding_context,
+                            self.inference_flags,
+                        )
                         .unwrap_or_else(|error| {
                             error.into_fallback_type(
                                 &self.context,
@@ -107,7 +109,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 ast::ExprContext::Load => self
                     .infer_attribute_expression(attribute_expression)
                     .default_specialize(self.db())
-                    .in_type_expression(self.db(), self.scope(), self.typevar_binding_context)
+                    .in_type_expression(
+                        self.db(),
+                        self.scope(),
+                        self.typevar_binding_context,
+                        self.inference_flags,
+                    )
                     .unwrap_or_else(|error| {
                         error.into_fallback_type(
                             &self.context,
@@ -900,6 +907,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         let scope_id = self.scope();
         let current_typevar_binding_context = self.typevar_binding_context;
+        let current_inference_flags = self.inference_flags;
 
         // TODO
         // If we explicitly specialize a recursive generic (PEP-613 or implicit) type alias,
@@ -923,7 +931,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             );
             return if in_type_expression {
                 value_ty
-                    .in_type_expression(db, scope_id, current_typevar_binding_context)
+                    .in_type_expression(
+                        db,
+                        scope_id,
+                        current_typevar_binding_context,
+                        current_inference_flags,
+                    )
                     .unwrap_or_else(|_| Type::unknown())
             } else {
                 value_ty
@@ -938,7 +951,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
             if in_type_expression {
                 specialized
-                    .in_type_expression(db, scope_id, current_typevar_binding_context)
+                    .in_type_expression(
+                        db,
+                        scope_id,
+                        current_typevar_binding_context,
+                        current_inference_flags,
+                    )
                     .unwrap_or_else(|_| Type::unknown())
             } else {
                 specialized
@@ -1069,6 +1087,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                     self.db(),
                                     self.scope(),
                                     self.typevar_binding_context,
+                                    self.inference_flags,
                                 )
                                 .unwrap_or(Type::unknown())
                         }
@@ -1201,6 +1220,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                 self.db(),
                                 self.scope(),
                                 self.typevar_binding_context,
+                                self.inference_flags,
                             )
                             .unwrap_or(Type::unknown())
                     }
@@ -1310,11 +1330,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             let parameters =
                 first_argument.and_then(|arg| builder.infer_callable_parameter_types(arg));
 
-            let return_type = arguments.next().map(|arg| {
-                let ty = builder.infer_type_expression(arg);
-                check_for_bare_paramspec(&builder.context, ty, arg);
-                ty
-            });
+            let return_type = arguments
+                .next()
+                .map(|arg| builder.infer_type_expression(arg));
 
             let callable_type = if parameters.is_none()
                 && let Some(first_argument) = first_argument
@@ -1379,10 +1397,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // in the global scope or similar should be considered to create an implicit generic context.
         // For now, we do not report unbound type variables in any `Callable` contexts, but we may
         // decide to revisit this in the future.
-        let previous_check_unbound_typevars =
-            std::mem::replace(&mut self.check_unbound_typevars, false);
+        let previous_check_unbound_typevars = self
+            .inference_flags
+            .replace(TypeInferenceFlags::CHECK_UNBOUND_TYPEVARS, false);
         let result = inner(self, subscript);
-        self.check_unbound_typevars = previous_check_unbound_typevars;
+        self.inference_flags.set(
+            TypeInferenceFlags::CHECK_UNBOUND_TYPEVARS,
+            previous_check_unbound_typevars,
+        );
         result
     }
 
@@ -1400,7 +1422,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         Type::SpecialForm(SpecialFormType::Annotated),
                         subscript,
                     )
-                    .in_type_expression(db, self.scope(), None)
+                    .in_type_expression(db, self.scope(), None, self.inference_flags)
                     .unwrap_or_else(|err| err.into_fallback_type(&self.context, subscript, true));
                 // Only store on the tuple slice; non-tuple cases are handled by
                 // `infer_subscript_load_impl` via `infer_expression`.
@@ -1681,15 +1703,27 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 } else {
                     std::slice::from_ref(arguments_slice)
                 };
-                for argument in arguments {
+
+                for (i, argument) in arguments.iter().enumerate() {
                     if argument.is_ellipsis_literal_expr() {
                         // The trailing `...` in `Concatenate[int, str, ...]` is valid;
                         // store without going through type-expression inference.
                         self.store_expression_type(argument, Type::unknown());
-                    } else {
+                    } else if i < arguments.len() - 1 {
                         self.infer_type_expression(argument);
+                    } else {
+                        let previously_allowed_paramspec = self.inference_flags.replace(
+                            TypeInferenceFlags::ALLOW_PARAM_SPEC_IN_TYPE_EXPRESSIONS,
+                            true,
+                        );
+                        self.infer_type_expression(argument);
+                        self.inference_flags.set(
+                            TypeInferenceFlags::ALLOW_PARAM_SPEC_IN_TYPE_EXPRESSIONS,
+                            previously_allowed_paramspec,
+                        );
                     }
                 }
+
                 let num_arguments = arguments.len();
                 let inferred_type = if num_arguments < 2 {
                     if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
@@ -1950,7 +1984,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
                 for param in params {
                     let param_type = self.infer_type_expression(param);
-                    check_for_bare_paramspec(&self.context, param_type, param);
                     // This is similar to what we currently do for inferring tuple type expression.
                     // We currently infer `Todo` for the parameters to avoid invalid diagnostics
                     // when trying to check for assignability or any other relation. For example,
@@ -1986,21 +2019,52 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     return None;
                 }
                 let name_ty = self.infer_name_load(name);
-                if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = name_ty
-                    && typevar.is_paramspec(self.db())
+
+                let previously_allowed_paramspec = self.inference_flags.replace(
+                    TypeInferenceFlags::ALLOW_PARAM_SPEC_IN_TYPE_EXPRESSIONS,
+                    true,
+                );
+                let in_type_expr = name_ty.in_type_expression(
+                    self.db(),
+                    self.scope,
+                    self.typevar_binding_context,
+                    self.inference_flags,
+                );
+                self.inference_flags.set(
+                    TypeInferenceFlags::ALLOW_PARAM_SPEC_IN_TYPE_EXPRESSIONS,
+                    previously_allowed_paramspec,
+                );
+
+                if let Type::TypeVar(tvar) = in_type_expr.unwrap_or_else(|err| {
+                    err.into_fallback_type(&self.context, name, self.is_reachable(name))
+                }) && tvar.is_paramspec(self.db())
                 {
-                    let index = semantic_index(self.db(), self.scope().file(self.db()));
-                    let Some(bound_typevar) = bind_typevar(
-                        self.db(),
-                        index,
-                        self.scope().file_scope_id(self.db()),
-                        self.typevar_binding_context,
-                        typevar,
-                    ) else {
-                        // TODO: What to do here?
-                        return None;
-                    };
-                    return Some(Parameters::paramspec(self.db(), bound_typevar));
+                    return Some(Parameters::paramspec(self.db(), tvar));
+                }
+            }
+            ast::Expr::Attribute(attr) => {
+                let attr_ty = self.infer_attribute_load(attr);
+
+                let previously_allowed_paramspec = self.inference_flags.replace(
+                    TypeInferenceFlags::ALLOW_PARAM_SPEC_IN_TYPE_EXPRESSIONS,
+                    true,
+                );
+                let in_type_expr = attr_ty.in_type_expression(
+                    self.db(),
+                    self.scope,
+                    self.typevar_binding_context,
+                    self.inference_flags,
+                );
+                self.inference_flags.set(
+                    TypeInferenceFlags::ALLOW_PARAM_SPEC_IN_TYPE_EXPRESSIONS,
+                    previously_allowed_paramspec,
+                );
+
+                if let Type::TypeVar(tvar) = in_type_expr.unwrap_or_else(|err| {
+                    err.into_fallback_type(&self.context, attr, self.is_reachable(attr))
+                }) && tvar.is_paramspec(self.db())
+                {
+                    return Some(Parameters::paramspec(self.db(), tvar));
                 }
             }
             ast::Expr::StringLiteral(string) => {
@@ -2038,7 +2102,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         expression: &ast::Expr,
         ty: Type<'db>,
     ) -> Type<'db> {
-        if !self.check_unbound_typevars {
+        if !self
+            .inference_flags
+            .contains(TypeInferenceFlags::CHECK_UNBOUND_TYPEVARS)
+        {
             return ty;
         }
         if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = ty {

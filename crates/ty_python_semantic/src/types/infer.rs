@@ -882,3 +882,29 @@ impl<'db> ExpressionInference<'db> {
         self.extra.as_ref().and_then(|extra| extra.cycle_recovery)
     }
 }
+
+bitflags::bitflags! {
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub(crate) struct TypeInferenceFlags: u8 {
+        /// Whether to allow `ParamSpec` in type expressions.
+        ///
+        /// In most contexts inside type expressions, bare `ParamSpec`s are not allowed.
+        /// They are specifically allowed as the first argument to `Callable`,
+        /// the second argument to `Concatenate`, and certain other special cases.
+        const ALLOW_PARAM_SPEC_IN_TYPE_EXPRESSIONS = 1 << 0;
+
+        /// Whether to check for unbound type variables in type expressions.
+        /// This flag is set when processing annotation expressions, where unbound type variables
+        /// are an error. It is unset in other contexts (e.g., `TypeVar` defaults, explicit class
+        /// specialization) where unbound type variables are expected.
+        const CHECK_UNBOUND_TYPEVARS = 1 << 1;
+    }
+}
+
+impl TypeInferenceFlags {
+    fn replace(&mut self, other: Self, set_to: bool) -> bool {
+        let previously_contained_flag = self.contains(other);
+        self.set(other, set_to);
+        previously_contained_flag
+    }
+}

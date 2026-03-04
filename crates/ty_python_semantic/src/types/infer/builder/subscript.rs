@@ -5,7 +5,6 @@ use ruff_python_ast::{self as ast, ExprContext};
 use ruff_text_size::Ranged;
 
 use super::TypeInferenceBuilder;
-use super::paramspec_validation::check_for_bare_paramspec;
 use crate::place::{DefinedPlace, Definedness, Place};
 use crate::semantic_index::SemanticIndex;
 use crate::semantic_index::definition::Definition;
@@ -18,6 +17,7 @@ use crate::types::diagnostic::{
     report_invalid_arguments_to_annotated,
 };
 use crate::types::generics::{GenericContext, InferableTypeVars, bind_typevar};
+use crate::types::infer::TypeInferenceFlags;
 use crate::types::special_form::AliasSpec;
 use crate::types::subscript::{LegacyGenericOrigin, SubscriptError, SubscriptErrorKind};
 use crate::types::tuple::{Tuple, TupleType};
@@ -469,6 +469,30 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         generic_context: GenericContext<'db>,
         specialize: &dyn Fn(&[Option<Type<'db>>]) -> Type<'db>,
     ) -> Type<'db> {
+        let previously_allowed_paramspec = self.inference_flags.replace(
+            TypeInferenceFlags::ALLOW_PARAM_SPEC_IN_TYPE_EXPRESSIONS,
+            true,
+        );
+        let result = self.infer_explicit_callable_specialization_impl(
+            subscript,
+            value_ty,
+            generic_context,
+            specialize,
+        );
+        self.inference_flags.set(
+            TypeInferenceFlags::ALLOW_PARAM_SPEC_IN_TYPE_EXPRESSIONS,
+            previously_allowed_paramspec,
+        );
+        result
+    }
+
+    pub(super) fn infer_explicit_callable_specialization_impl(
+        &mut self,
+        subscript: &ast::ExprSubscript,
+        value_ty: Type<'db>,
+        generic_context: GenericContext<'db>,
+        specialize: &dyn Fn(&[Option<Type<'db>>]) -> Type<'db>,
+    ) -> Type<'db> {
         enum ExplicitSpecializationError {
             InvalidParamSpec,
             UnsatisfiedBound,
@@ -552,9 +576,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             Type::paramspec_value_callable(db, Parameters::unknown())
                         })
                     } else {
-                        let ty = self.infer_type_expression(expr);
-                        check_for_bare_paramspec(&self.context, ty, expr);
-                        ty
+                        self.infer_type_expression(expr)
                     };
 
                     inferred_type_arguments.push(provided_type);

@@ -5,6 +5,7 @@ use crate::place::TypeOrigin;
 use crate::types::diagnostic::{
     INVALID_TYPE_FORM, REDUNDANT_FINAL_CLASSVAR, report_invalid_arguments_to_annotated,
 };
+use crate::types::infer::builder::TypeInferenceFlags;
 use crate::types::infer::nearest_enclosing_class;
 use crate::types::string_annotation::{
     BYTE_STRING_TYPE_ANNOTATION, FSTRING_TYPE_ANNOTATION, parse_string_annotation,
@@ -71,10 +72,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         };
 
         let previous_deferred_state = std::mem::replace(&mut self.deferred_state, state);
-        let previous_check_unbound_typevars =
-            std::mem::replace(&mut self.check_unbound_typevars, true);
+        let previous_check_unbound_typevars = self
+            .inference_flags
+            .replace(TypeInferenceFlags::CHECK_UNBOUND_TYPEVARS, true);
         let annotation_ty = self.infer_annotation_expression_impl(annotation, pep_613_policy);
-        self.check_unbound_typevars = previous_check_unbound_typevars;
+        self.inference_flags.set(
+            TypeInferenceFlags::CHECK_UNBOUND_TYPEVARS,
+            previous_check_unbound_typevars,
+        );
         self.deferred_state = previous_deferred_state;
         annotation_ty
     }
@@ -143,6 +148,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         builder.db(),
                         builder.scope(),
                         builder.typevar_binding_context,
+                        builder.inference_flags,
                     )
                     .unwrap_or_else(|error| {
                         error.into_fallback_type(
