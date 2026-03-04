@@ -497,10 +497,7 @@ function DependenciesContent({
         {status.warnings.length > 0 && (
           <ul className="space-y-0.5">
             {status.warnings.map((warning, i) => (
-              <li
-                key={i}
-                className="text-xs text-ayu-accent select-text"
-              >
+              <li key={i} className="text-xs text-ayu-accent select-text">
                 {warning}
               </li>
             ))}

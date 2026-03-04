@@ -289,8 +289,13 @@ export async function installPackages(
  * Parse a dependency specifier into name and optional pinned version.
  * Supports: "requests", "requests==2.28.0", "requests>=2.0" (version ignored).
  */
-function parseDependencySpec(spec: string): { name: string; version: string | null } {
-  const match = spec.match(/^([A-Za-z0-9]([A-Za-z0-9._-]*[A-Za-z0-9])?)(?:==(.+))?$/);
+function parseDependencySpec(spec: string): {
+  name: string;
+  version: string | null;
+} {
+  const match = spec.match(
+    /^([A-Za-z0-9]([A-Za-z0-9._-]*[A-Za-z0-9])?)(?:==(.+))?$/,
+  );
   if (match) {
     return { name: match[1], version: match[3] ?? null };
   }
@@ -522,7 +527,11 @@ function satisfiesConstraint(
       .slice(0, prefix.split(".").length)
       .join(".");
     const matches = compareVersions(resolvedPrefix, prefix) === 0;
-    return constraint.op === "==" ? matches : constraint.op === "!=" ? !matches : true;
+    return constraint.op === "=="
+      ? matches
+      : constraint.op === "!="
+        ? !matches
+        : true;
   }
 
   const cmp = compareVersions(resolved, constraint.version);
@@ -630,7 +639,10 @@ async function resolveAllDeps(
     return {
       name: normalizePackageName(parsed.name),
       version: parsed.version,
-      constraints: parsed.version != null ? [{ op: "==" as const, version: parsed.version }] : [],
+      constraints:
+        parsed.version != null
+          ? [{ op: "==" as const, version: parsed.version }]
+          : [],
       depth: 0,
       requestedBy: null,
     };
@@ -713,7 +725,9 @@ async function resolveAllDeps(
       const deps = parseMandatoryDeps(info.info.requires_dist);
       for (const dep of deps) {
         // Find the exact pin version if there is one (==X.Y.Z)
-        const exactPin = dep.constraints.find((c) => c.op === "==" && !c.version.includes("*"));
+        const exactPin = dep.constraints.find(
+          (c) => c.op === "==" && !c.version.includes("*"),
+        );
 
         if (!seen.has(dep.name)) {
           queue.push({

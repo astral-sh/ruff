@@ -40,12 +40,7 @@ export default function Playground() {
     workspacePromiseRef.current = startPlayground().then((fetched) => {
       setVersion(fetched.version);
       const workspace = new Workspace("/", PositionEncoding.Utf16, {});
-      restoreWorkspace(
-        workspace,
-        fetched.workspace,
-        dispatchFiles,
-        setError,
-      );
+      restoreWorkspace(workspace, fetched.workspace, dispatchFiles, setError);
       setWorkspace(workspace);
       return workspace;
     });
@@ -114,9 +109,7 @@ export default function Playground() {
     }
 
     // Find the ty.json file and extract dependencies
-    const settingsFile = files.index.find(
-      (f) => f.name === SETTINGS_FILE_NAME,
-    );
+    const settingsFile = files.index.find((f) => f.name === SETTINGS_FILE_NAME);
     if (settingsFile == null) {
       return;
     }
@@ -586,7 +579,10 @@ async function startPlayground(): Promise<InitializedPlayground> {
   const playgroundSchema = {
     ...tySchema,
     properties: {
-      ...(tySchema as Record<string, unknown>).properties as Record<string, unknown>,
+      ...((tySchema as Record<string, unknown>).properties as Record<
+        string,
+        unknown
+      >),
       dependencies: {
         type: "array",
         items: { type: "string" },
@@ -712,5 +708,4 @@ function restoreWorkspace(
     type: "selectFileByName",
     name: selected,
   });
-
 }
