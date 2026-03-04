@@ -8,6 +8,7 @@ use crate::{
         PropertyInstanceType, ProtocolInstanceType, SubclassOfType, Type, TypeAliasType,
         TypeGuardType, TypeIsType, TypeVarInstance, TypedDictType, UnionType,
         bound_super::walk_bound_super_type,
+        callable::walk_callable_type,
         class::walk_generic_alias,
         function::{FunctionType, walk_function_type},
         instance::{walk_nominal_instance_type, walk_protocol_instance_type},
@@ -15,9 +16,9 @@ use crate::{
         method::{walk_bound_method_type, walk_method_wrapper_type},
         newtype::{NewType, walk_newtype_instance_type},
         subclass_of::walk_subclass_of_type,
-        walk_bound_type_var_type, walk_callable_type, walk_intersection_type,
-        walk_property_instance_type, walk_type_alias_type, walk_type_var_type,
-        walk_typed_dict_type, walk_typeguard_type, walk_typeis_type, walk_union,
+        walk_bound_type_var_type, walk_intersection_type, walk_property_instance_type,
+        walk_type_alias_type, walk_type_var_type, walk_typed_dict_type, walk_typeguard_type,
+        walk_typeis_type, walk_union,
     },
 };
 use std::cell::{Cell, RefCell};
