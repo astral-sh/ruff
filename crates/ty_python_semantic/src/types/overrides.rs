@@ -26,6 +26,7 @@ use crate::{
         StaticClassLiteral, Type, TypeContext, TypeQualifiers,
         call::CallArguments,
         class::{CodeGeneratorKind, FieldKind},
+        constraints::ConstraintSetBuilder,
         context::InferContext,
         diagnostic::{
             INVALID_ASSIGNMENT, INVALID_DATACLASS, INVALID_EXPLICIT_OVERRIDE,
@@ -768,10 +769,11 @@ fn check_enum_member_against_init<'db>(
     let call_args = CallArguments::positional(args);
     let call_args = call_args.with_self(Some(self_type));
 
+    let constraints = ConstraintSetBuilder::new();
     let result = Type::FunctionLiteral(init_function)
         .bindings(db)
         .match_parameters(db, &call_args)
-        .check_types(db, &call_args, TypeContext::default(), &[]);
+        .check_types(db, &constraints, &call_args, TypeContext::default(), &[]);
 
     if result.is_err() {
         if let Some(builder) = context.report_lint(

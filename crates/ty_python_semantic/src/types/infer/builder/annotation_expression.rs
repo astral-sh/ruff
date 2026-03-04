@@ -71,7 +71,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         };
 
         let previous_deferred_state = std::mem::replace(&mut self.deferred_state, state);
+        let previous_check_unbound_typevars =
+            std::mem::replace(&mut self.check_unbound_typevars, true);
         let annotation_ty = self.infer_annotation_expression_impl(annotation, pep_613_policy);
+        self.check_unbound_typevars = previous_check_unbound_typevars;
         self.deferred_state = previous_deferred_state;
         annotation_ty
     }
@@ -134,21 +137,22 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             };
 
             special_case.unwrap_or_else(|| {
-                TypeAndQualifiers::declared(
-                    ty.default_specialize(builder.db())
-                        .in_type_expression(
-                            builder.db(),
-                            builder.scope(),
-                            builder.typevar_binding_context,
+                let result_ty = ty
+                    .default_specialize(builder.db())
+                    .in_type_expression(
+                        builder.db(),
+                        builder.scope(),
+                        builder.typevar_binding_context,
+                    )
+                    .unwrap_or_else(|error| {
+                        error.into_fallback_type(
+                            &builder.context,
+                            annotation,
+                            builder.is_reachable(annotation),
                         )
-                        .unwrap_or_else(|error| {
-                            error.into_fallback_type(
-                                &builder.context,
-                                annotation,
-                                builder.is_reachable(annotation),
-                            )
-                        }),
-                )
+                    });
+                let result_ty = builder.check_for_unbound_type_variable(annotation, result_ty);
+                TypeAndQualifiers::declared(result_ty)
             })
         }
 
@@ -309,6 +313,23 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                         "`ClassVar` cannot contain type variables",
                                     );
                                 }
+
+                                // Reject nested `Required`/`NotRequired`, e.g.
+                                // `Required[Required[int]]` or `Required[NotRequired[int]]`.
+                                if matches!(
+                                    qualifier,
+                                    TypeQualifier::Required | TypeQualifier::NotRequired
+                                ) && type_and_qualifiers.qualifiers.intersects(
+                                    TypeQualifiers::REQUIRED | TypeQualifiers::NOT_REQUIRED,
+                                ) && let Some(builder) =
+                                    self.context.report_lint(&INVALID_TYPE_FORM, subscript)
+                                {
+                                    builder.into_diagnostic(format_args!(
+                                        "`{qualifier}` cannot be nested inside \
+                                        `Required` or `NotRequired`",
+                                    ));
+                                }
+
                                 type_and_qualifiers.with_qualifier(TypeQualifiers::from(qualifier))
                             } else {
                                 for element in arguments {

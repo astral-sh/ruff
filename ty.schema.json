@@ -555,6 +555,16 @@
             }
           ]
         },
+        "final-on-non-method": {
+          "title": "detects `@final` applied to non-method functions",
+          "description": "## What it does\nChecks for `@final` decorators applied to non-method functions.\n\n## Why is this bad?\nThe `@final` decorator is only meaningful on methods and classes.\nApplying it to a module-level function or a nested function has no\neffect and is likely a mistake.\n\n## Example\n\n```python\nfrom typing import final\n\n# Error: @final is not allowed on non-method functions\n@final\ndef my_function() -> int:\n    return 0\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "final-without-value": {
           "title": "detects `Final` declarations without a value",
           "description": "## What it does\nChecks for `Final` symbols that are declared without a value and are never\nassigned a value in their scope.\n\n## Why is this bad?\nA `Final` symbol must be initialized with a value at the time of declaration\nor in a subsequent assignment. At module or function scope, the assignment must\noccur in the same scope. In a class body, the assignment may occur in `__init__`.\n\n## Examples\n```python\nfrom typing import Final\n\n# Error: `Final` symbol without a value\nMY_CONSTANT: Final[int]\n\n# OK: `Final` symbol with a value\nMY_CONSTANT: Final[int] = 1\n```",
@@ -719,6 +729,16 @@
           "title": "detects invalid declarations",
           "description": "## What it does\nChecks for declarations where the inferred type of an existing symbol\nis not [assignable to] its post-hoc declared type.\n\n## Why is this bad?\nSuch declarations break the rules of the type system and\nweaken a type checker's ability to accurately reason about your code.\n\n## Examples\n```python\na = 1\na: str\n```\n\n[assignable to]: https://typing.python.org/en/latest/spec/glossary.html#term-assignable",
           "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "invalid-enum-member-annotation": {
+          "title": "detects type annotations on enum members",
+          "description": "## What it does\nChecks for enum members that have explicit type annotations.\n\n## Why is this bad?\nThe [typing spec] states that type checkers should infer a literal type\nfor all enum members. An explicit type annotation on an enum member is\nmisleading because the annotated type will be incorrect — the actual\nruntime type is the enum class itself, not the annotated type.\n\nIn CPython's `enum` module, annotated assignments with values are still\ntreated as members at runtime, but the annotation will confuse readers of the code.\n\n## Examples\n```python\nfrom enum import Enum\n\nclass Pet(Enum):\n    CAT = 1       # OK\n    DOG: int = 2  # Error: enum members should not be annotated\n```\n\nUse instead:\n```python\nfrom enum import Enum\n\nclass Pet(Enum):\n    CAT = 1\n    DOG = 2\n```\n\n## References\n- [Typing spec: Enum members](https://typing.python.org/en/latest/spec/enums.html#enum-members)\n\n[typing spec]: https://typing.python.org/en/latest/spec/enums.html#enum-members",
+          "default": "warn",
           "oneOf": [
             {
               "$ref": "#/definitions/Level"
@@ -1245,6 +1265,16 @@
             }
           ]
         },
+        "shadowed-type-variable": {
+          "title": "detects type variables that shadow type variables from outer scopes",
+          "description": "## What it does\nChecks for type variables in nested generic classes or functions that shadow type variables\nfrom an enclosing scope.\n\n## Why is this bad?\nShadowing type variables makes the code confusing and is disallowed by the typing spec.\n\n## Examples\n```python\nclass Outer[T]:\n    # Error: `T` is already used by `Outer`\n    class Inner[T]: ...\n\n    # Error: `T` is already used by `Outer`\n    def method[T](self, x: T) -> T: ...\n```\n\n## References\n- [Typing spec: Generics](https://typing.python.org/en/latest/spec/generics.html#introduction)",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "static-assert-error": {
           "title": "Failed static assertion",
           "description": "## What it does\nMakes sure that the argument of `static_assert` is statically known to be true.\n\n## Why is this bad?\nA `static_assert` call represents an explicit request from the user\nfor the type checker to emit an error if the argument cannot be verified\nto evaluate to `True` in a boolean context.\n\n## Examples\n```python\nfrom ty_extensions import static_assert\n\nstatic_assert(1 + 1 == 3)  # error: evaluates to `False`\n\nstatic_assert(int(2.0 * 3.0) == 6)  # error: does not have a statically known truthiness\n```",
@@ -1298,6 +1328,16 @@
         "unavailable-implicit-super-arguments": {
           "title": "detects invalid `super()` calls where implicit arguments are unavailable.",
           "description": "## What it does\nDetects invalid `super()` calls where implicit arguments like the enclosing class or first method argument are unavailable.\n\n## Why is this bad?\nWhen `super()` is used without arguments, Python tries to find two things:\nthe nearest enclosing class and the first argument of the immediately enclosing function (typically self or cls).\nIf either of these is missing, the call will fail at runtime with a `RuntimeError`.\n\n## Examples\n```python\nsuper()  # error: no enclosing class or function found\n\ndef func():\n    super()  # error: no enclosing class or first argument exists\n\nclass A:\n    f = super()  # error: no enclosing function to provide the first argument\n\n    def method(self):\n        def nested():\n            super()  # error: first argument does not exist in this nested function\n\n        lambda: super()  # error: first argument does not exist in this lambda\n\n        (super() for _ in range(10))  # error: argument is not available in generator expression\n\n        super()  # okay! both enclosing class and first argument are available\n```\n\n## References\n- [Python documentation: super()](https://docs.python.org/3/library/functions.html#super)",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "unbound-type-variable": {
+          "title": "detects type variables used outside of their bound scope",
+          "description": "## What it does\nChecks for type variables that are used in a scope where they are not bound\nto any enclosing generic context.\n\n## Why is this bad?\nUsing a type variable outside of a scope that binds it has no well-defined meaning.\n\n## Examples\n```python\nfrom typing import TypeVar, Generic\n\nT = TypeVar(\"T\")\nS = TypeVar(\"S\")\n\nx: T  # error: unbound type variable in module scope\n\nclass C(Generic[T]):\n    x: list[S] = []  # error: S is not in this class's generic context\n```\n\n## References\n- [Typing spec: Scoping rules for type variables](https://typing.python.org/en/latest/spec/generics.html#scoping-rules-for-type-variables)",
           "default": "error",
           "oneOf": [
             {
@@ -1399,6 +1439,16 @@
           "title": "detects binary, unary, or comparison expressions where the operands don't support the operator",
           "description": "## What it does\nChecks for binary expressions, comparisons, and unary expressions where\nthe operands don't support the operator.\n\n## Why is this bad?\nAttempting to use an unsupported operator will raise a `TypeError` at\nruntime.\n\n## Examples\n```python\nclass A: ...\n\nA() + A()  # TypeError: unsupported operand type(s) for +: 'A' and 'A'\n```",
           "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "unused-awaitable": {
+          "title": "detects awaitable objects that are used as expression statements without being awaited",
+          "description": "## What it does\nChecks for awaitable objects (such as coroutines) used as expression\nstatements without being awaited.\n\n## Why is this bad?\nCalling an `async def` function returns a coroutine object. If the\ncoroutine is never awaited, the body of the async function will never\nexecute, which is almost always a bug. Python emits a\n`RuntimeWarning: coroutine was never awaited` at runtime in this case.\n\n## Examples\n```python\nasync def fetch_data() -> str:\n    return \"data\"\n\nasync def main() -> None:\n    fetch_data()  # Warning: coroutine is not awaited\n    await fetch_data()  # OK\n```",
+          "default": "warn",
           "oneOf": [
             {
               "$ref": "#/definitions/Level"

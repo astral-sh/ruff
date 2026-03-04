@@ -210,6 +210,9 @@ class WithDefault[T, U = int]: ...
 
 reveal_type(WithDefault[str, str]())  # revealed: WithDefault[str, str]
 reveal_type(WithDefault[str]())  # revealed: WithDefault[str, int]
+
+# error: [invalid-type-arguments] "Too many type arguments to class `WithDefault`: expected between 1 and 2, got 3"
+reveal_type(WithDefault[str, str, str]())  # revealed: WithDefault[Unknown, Unknown]
 ```
 
 ## Diagnostics for bad specializations
@@ -659,7 +662,7 @@ class C[T]:
     # error: [unresolved-reference]
     def cannot_use_outside_of_method(self, u: U): ...
 
-    # TODO: error
+    # error: [shadowed-type-variable]
     def cannot_shadow_class_typevar[T](self, t: T): ...
 
 # revealed: ty_extensions.GenericContext[T@C]
@@ -763,6 +766,8 @@ def protocol_case(x: GenericProtocol[[int], str]) -> None:
 
 ### No back-references
 
+<!-- snapshot-diagnostics -->
+
 Typevar bounds/constraints/defaults are lazy, but cannot refer to later typevars. Furthermore,
 bounds/constraints cannot refer to other type variables, i.e. they must be non-generic.
 
@@ -783,6 +788,19 @@ class F[S: X]:
     pass
 
 X = int
+```
+
+Type variable defaults can reference earlier type variables, but not later ones:
+
+```py
+# This is fine: U's default references T, which comes before U
+class Good[T, U = T]: ...
+
+# error: [invalid-generic-class] "Default of `S` cannot reference later type parameter `T`"
+class Bad[S = T, T = int]: ...
+
+# error: [invalid-generic-class]
+class AlsoBad[S = list[T], T = int]: ...
 ```
 
 ## Cyclic class definitions

@@ -11,14 +11,15 @@ At its simplest, to define a type alias using PEP 695 syntax, you add a list of 
 `ParamSpec`s or `TypeVarTuple`s after the alias name.
 
 ```py
+from typing import Callable
 from ty_extensions import generic_context
 
-type SingleTypevar[T] = ...
-type MultipleTypevars[T, S] = ...
-type SingleParamSpec[**P] = ...
-type TypeVarAndParamSpec[T, **P] = ...
-type SingleTypeVarTuple[*Ts] = ...
-type TypeVarAndTypeVarTuple[T, *Ts] = ...
+type SingleTypevar[T] = list[T]
+type MultipleTypevars[T, S] = tuple[T, S]
+type SingleParamSpec[**P] = Callable[P, int]
+type TypeVarAndParamSpec[T, **P] = Callable[P, T]
+type SingleTypeVarTuple[*Ts] = tuple[*Ts]
+type TypeVarAndTypeVarTuple[T, *Ts] = tuple[T, *Ts]
 
 # revealed: ty_extensions.GenericContext[T@SingleTypevar]
 reveal_type(generic_context(SingleTypevar))
@@ -41,7 +42,7 @@ You cannot use the same typevar more than once.
 
 ```py
 # error: [invalid-syntax] "duplicate type parameter"
-type RepeatedTypevar[T, T] = ...
+type RepeatedTypevar[T, T] = tuple[T, T]
 ```
 
 ## Specializing type aliases explicitly
@@ -70,7 +71,7 @@ And non-generic types cannot be specialized:
 ```py
 from typing import TypeVar, Protocol, TypedDict
 
-type B = ...
+type B = int
 
 # error: [not-subscriptable] "Cannot subscript non-generic type alias `B`"
 reveal_type(B[int])  # revealed: Unknown
@@ -131,6 +132,7 @@ def _(x: ProtoInt[int]):
 
 # TODO: TypedDict is just a function object at runtime, we should emit an error
 class LegacyDict(TypedDict[T]):
+    # error: [unbound-type-variable]
     x: T
 
 type LegacyDictInt = LegacyDict[int]
@@ -158,8 +160,8 @@ def _(x: Union[int]):
 If the type variable has an upper bound, the specialized type must satisfy that bound:
 
 ```py
-type Bounded[T: int] = ...
-type BoundedByUnion[T: int | str] = ...
+type Bounded[T: int] = list[T]
+type BoundedByUnion[T: int | str] = list[T]
 
 class IntSubclass(int): ...
 
@@ -190,7 +192,7 @@ def _(x: TupleOfIntAndStr[int, int]):
 If the type variable is constrained, the specialized type must satisfy those constraints:
 
 ```py
-type Constrained[T: (int, str)] = ...
+type Constrained[T: (int, str)] = list[T]
 
 reveal_type(Constrained[int])  # revealed: <type alias 'Constrained[int]'>
 
@@ -220,7 +222,7 @@ def _(x: TupleOfIntOrStr[int, object]):
 If the type variable has a default, it can be omitted:
 
 ```py
-type WithDefault[T, U = int] = ...
+type WithDefault[T, U = int] = dict[T, U]
 
 reveal_type(WithDefault[str, str])  # revealed: <type alias 'WithDefault[str, str]'>
 reveal_type(WithDefault[str])  # revealed: <type alias 'WithDefault[str, int]'>
@@ -242,6 +244,45 @@ type G[T = int] = list[T]
 
 def _(g: G):
     reveal_type(g)  # revealed: list[int]
+```
+
+Self-referential defaults should not crash type inference:
+
+```py
+# error: [cyclic-type-alias-definition] "Cyclic definition of `A`"
+type A[T = A] = A[int]
+```
+
+A self-referential default that does not reference itself in the alias body should also not crash,
+even when the default is evaluated (e.g., by omitting the type argument):
+
+```py
+type B[T = B] = list[T]
+
+def _(x: B) -> None:
+    pass
+```
+
+Mutually-referential defaults (where two type aliases reference each other via their typevar
+defaults) should also not crash:
+
+```py
+type X[T = Y] = list[T]
+type Y[U = X] = list[U]
+
+def _(x: X, y: Y) -> None:
+    pass
+```
+
+Indirect self-references through a chain of type aliases should also not crash:
+
+```py
+type P[T = R] = list[T]
+type Q[T = P] = list[T]
+type R[T = Q] = list[T]
+
+def _(p: P) -> None:
+    pass
 ```
 
 ## Snapshots of verbose diagnostics

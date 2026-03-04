@@ -78,8 +78,7 @@ class Answer(Enum):
 
     non_member_1: int
 
-    # TODO: this could be considered an error:
-    non_member_1: str = "some value"
+    non_member_1: str = "some value"  # error: [invalid-enum-member-annotation]
 
 # revealed: tuple[Literal["YES"], Literal["NO"]]
 reveal_type(enum_members(Answer))
@@ -98,6 +97,109 @@ class Answer(Enum):
 
 # revealed: tuple[Literal["YES"], Literal["NO"]]
 reveal_type(enum_members(Answer))
+```
+
+### Annotated enum members
+
+The [typing spec] states that enum members should not have explicit type annotations. Type checkers
+should report an error for annotated enum members because the annotation is misleading — the actual
+type of an enum member is the enum class itself, not the annotated type.
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from enum import Enum, IntEnum, StrEnum, member
+from typing import Callable, Final
+
+class Pet(Enum):
+    CAT = 1
+    DOG: int = 2  # error: [invalid-enum-member-annotation] "Type annotation on enum member `DOG` is not allowed"
+    BIRD: str = "bird"  # error: [invalid-enum-member-annotation]
+```
+
+Bare `Final` annotations are allowed (they don't specify a type):
+
+```py
+class Pet2(Enum):
+    CAT: Final = 1  # OK
+    DOG: Final = 2  # OK
+```
+
+But `Final` with a type argument is not allowed:
+
+```py
+class Pet3(Enum):
+    CAT: Final[int] = 1  # error: [invalid-enum-member-annotation]
+    DOG: Final[str] = "woof"  # error: [invalid-enum-member-annotation]
+```
+
+`enum.member` used as value wrapper is the standard way to declare members explicitly:
+
+```py
+class Pet4(Enum):
+    CAT = member(1)  # OK
+```
+
+Dunder and private names are not enum members, so they don't trigger the diagnostic:
+
+```py
+class Pet5(Enum):
+    CAT = 1
+    __private: int = 2  # OK: dunder/private names are never members
+    __module__: str = "my_module"  # OK
+```
+
+Pure declarations (annotations without values) are non-members and are fine:
+
+```py
+class Pet6(Enum):
+    CAT = 1
+    species: str  # OK: no value, so this is a non-member declaration
+```
+
+Callable values are never enum members at runtime, so annotating them is fine:
+
+```py
+def identity(x: int) -> int:
+    return x
+
+class Pet7(Enum):
+    CAT = 1
+    declared_callable: Callable[[int], int] = identity  # OK: callables are never members
+```
+
+The check also works for subclasses of `Enum`:
+
+```py
+class Status(IntEnum):
+    OK: int = 200  # error: [invalid-enum-member-annotation]
+    NOT_FOUND = 404  # OK
+
+class Color(StrEnum):
+    RED: str = "red"  # error: [invalid-enum-member-annotation]
+    GREEN = "green"  # OK
+```
+
+Special sunder names like `_value_` and `_ignore_` are not flagged:
+
+```py
+class Pet8(Enum):
+    _value_: int = 0  # OK: `_value_` is a special enum name
+    _ignore_: str = "TEMP"  # OK: `_ignore_` is a special enum name
+    CAT = 1
+```
+
+Names listed in `_ignore_` are not members, so annotating them is fine:
+
+```py
+class Pet9(Enum):
+    _ignore_ = "A B"
+    A: int = 42  # OK: `A` is listed in `_ignore_`
+    B: str = "hello"  # OK: `B` is listed in `_ignore_`
+    C: int = 3  # error: [invalid-enum-member-annotation]
 ```
 
 ### Declared `_value_` annotation
@@ -814,7 +916,7 @@ class Answer(Enum):
 
     def is_yes(self) -> bool:
         return self == Answer.YES
-    constant: int = 1
+    constant: int = 1  # error: [invalid-enum-member-annotation]
 
 reveal_type(Answer.YES.is_yes())  # revealed: bool
 reveal_type(Answer.YES.constant)  # revealed: int
@@ -888,9 +990,8 @@ reveal_type(Color.RED._name_)  # revealed: Literal["RED"]
 def _(red_or_blue: Literal[Color.RED, Color.BLUE]):
     reveal_type(red_or_blue.name)  # revealed: Literal["RED", "BLUE"]
 
-def _(any_color: Color):
-    # TODO: Literal["RED", "GREEN", "BLUE"]
-    reveal_type(any_color.name)  # revealed: Any
+def _(color: Color):
+    reveal_type(color.name)  # revealed: Literal["RED", "GREEN", "BLUE"]
 ```
 
 ### `value` and `_value_`
@@ -915,6 +1016,9 @@ reveal_type(Color.RED._value_)  # revealed: Literal[1]
 reveal_type(Color.GREEN.value)  # revealed: Literal[2]
 reveal_type(Color.GREEN._value_)  # revealed: Literal[2]
 
+def _(color: Color):
+    reveal_type(color.value)  # revealed: Literal[1, 2, 3]
+
 class Answer(StrEnum):
     YES = "yes"
     NO = "no"
@@ -924,6 +1028,9 @@ reveal_type(Answer.YES._value_)  # revealed: Literal["yes"]
 
 reveal_type(Answer.NO.value)  # revealed: Literal["no"]
 reveal_type(Answer.NO._value_)  # revealed: Literal["no"]
+
+def _(answer: Answer):
+    reveal_type(answer.value)  # revealed: Literal["yes", "no"]
 ```
 
 ## Properties of enum types
@@ -1038,6 +1145,9 @@ python-version = "3.9"
 from enum import Enum, EnumMeta
 
 class EnumWithEnumMetaMetaclass(metaclass=EnumMeta):
+    # Using `EnumMeta` as a metaclass without inheriting `Enum` requires an `__init__`
+    # method that will accept member values (TODO we could catch the lack of this):
+    def __init__(self, val): ...
     NO = 0
     YES = 1
 
@@ -1046,23 +1156,36 @@ reveal_type(EnumWithEnumMetaMetaclass.NO)  # revealed: Literal[EnumWithEnumMetaM
 class SubclassOfEnumMeta(EnumMeta): ...
 
 class EnumWithSubclassOfEnumMetaMetaclass(metaclass=SubclassOfEnumMeta):
+    def __init__(self, val): ...
     NO = 0
     YES = 1
 
 reveal_type(EnumWithSubclassOfEnumMetaMetaclass.NO)  # revealed: Literal[EnumWithSubclassOfEnumMetaMetaclass.NO]
 
-# Attributes like `.value` can *not* be accessed on members of these enums:
+# Attributes `.value` and `.name` can *not* be accessed on members of these enums:
+
 # error: [unresolved-attribute]
 EnumWithSubclassOfEnumMetaMetaclass.NO.value
 # error: [unresolved-attribute]
-EnumWithSubclassOfEnumMetaMetaclass.NO._value_
-# error: [unresolved-attribute]
 EnumWithSubclassOfEnumMetaMetaclass.NO.name
-# error: [unresolved-attribute]
-EnumWithSubclassOfEnumMetaMetaclass.NO._name_
+
+# But the internal underscore attributes are available:
+
+reveal_type(EnumWithSubclassOfEnumMetaMetaclass.NO._value_)  # revealed: Any
+reveal_type(EnumWithSubclassOfEnumMetaMetaclass.NO._name_)  # revealed: Literal["NO"]
+
+def _(x: EnumWithSubclassOfEnumMetaMetaclass):
+    # error: [unresolved-attribute]
+    x.value
+    # error: [unresolved-attribute]
+    x.name
+    reveal_type(x._value_)  # revealed: Any
+    reveal_type(x._name_)  # revealed: Literal["NO", "YES"]
 ```
 
 ### Enums with (subclasses of) `EnumType` as metaclass
+
+In Python 3.11, the meta-type was renamed to `EnumType`.
 
 ```toml
 [environment]
@@ -1073,6 +1196,7 @@ python-version = "3.11"
 from enum import Enum, EnumType
 
 class EnumWithEnumMetaMetaclass(metaclass=EnumType):
+    def __init__(self, val): ...
     NO = 0
     YES = 1
 
@@ -1081,13 +1205,31 @@ reveal_type(EnumWithEnumMetaMetaclass.NO)  # revealed: Literal[EnumWithEnumMetaM
 class SubclassOfEnumMeta(EnumType): ...
 
 class EnumWithSubclassOfEnumMetaMetaclass(metaclass=SubclassOfEnumMeta):
+    def __init__(self, val): ...
     NO = 0
     YES = 1
 
 reveal_type(EnumWithSubclassOfEnumMetaMetaclass.NO)  # revealed: Literal[EnumWithSubclassOfEnumMetaMetaclass.NO]
 
+# Attributes `.value` and `.name` can *not* be accessed on members of these enums:
+
 # error: [unresolved-attribute]
 EnumWithSubclassOfEnumMetaMetaclass.NO.value
+# error: [unresolved-attribute]
+EnumWithSubclassOfEnumMetaMetaclass.NO.name
+
+# But the internal underscore attributes are available:
+
+reveal_type(EnumWithSubclassOfEnumMetaMetaclass.NO._value_)  # revealed: Any
+reveal_type(EnumWithSubclassOfEnumMetaMetaclass.NO._name_)  # revealed: Literal["NO"]
+
+def _(x: EnumWithSubclassOfEnumMetaMetaclass):
+    # error: [unresolved-attribute]
+    x.value
+    # error: [unresolved-attribute]
+    x.name
+    reveal_type(x._value_)  # revealed: Any
+    reveal_type(x._name_)  # revealed: Literal["NO", "YES"]
 ```
 
 ## Function syntax
@@ -1353,3 +1495,4 @@ class MyEnum[T](MyEnumBase):
 - Documentation: <https://docs.python.org/3/library/enum.html>
 
 [class-private names]: https://docs.python.org/3/reference/lexical_analysis.html#reserved-classes-of-identifiers
+[typing spec]: https://typing.python.org/en/latest/spec/enums.html#enum-members

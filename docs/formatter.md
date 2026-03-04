@@ -322,6 +322,25 @@ with [`extend-include`](settings.md#extend-include) in your project settings:
     extend-include = ["docs/*.md"]
     ```
 
+To format Markdown files with extensions other than `.md`, configure custom
+[`extension`](settings.md#extension) mappings. Ruff will automatically include
+these mapped extensions in file discovery:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ruff]
+    # Treat `.mdx` and `.qmd` files as Markdown
+    extension = { mdx = "markdown", qmd = "markdown" }
+    ```
+
+=== "ruff.toml"
+
+    ```toml
+    # Treat `.mdx` and `.qmd` files as Markdown
+    extension = {mdx="markdown", qmd="markdown"}
+    ```
+
 If you run Ruff via [`ruff-pre-commit`](https://github.com/astral-sh/ruff-pre-commit), Markdown
 support needs to be explicitly included by adding it to `types_or`:
 
