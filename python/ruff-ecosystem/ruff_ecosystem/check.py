@@ -49,7 +49,7 @@ CHECK_DIAGNOSTIC_LINE_RE = re.compile(
     r"^(?P<diff>[+-])? ?(?P<location>.*): (?P<code>[A-Z]{1,4}[0-9]{3,4}|[a-z\-]+:)(?P<fixable> \[\*\])? (?P<message>.*)"
 )
 
-PANIC_DIAGNOSTIC_LINE_RE = re.compile(r"^[^:]+: panic: Panicked at crates/")
+PANIC_DIAGNOSTIC_LINE_RE = re.compile(r"^[^:]+: panic: Panicked at ")
 
 CHECK_VIOLATION_FIX_INDICATOR = " [*]"
 
