@@ -354,6 +354,21 @@ class C(metaclass=Meta):
 reveal_type(C(b"hello"))  # revealed: C
 ```
 
+### Metaclass `__call__` is not a simple method
+
+```py
+class MetaCall:
+    def __call__(self) -> int:
+        return 1
+
+class Meta(type):
+    __call__: MetaCall = MetaCall()
+
+class C(metaclass=Meta): ...
+
+reveal_type(C())  # revealed: int
+```
+
 ### Mixed `__new__` and mixed metaclass `__call__`
 
 If both metaclass `__call__` and `__new__` are mixed (some overloads instance-returning and some

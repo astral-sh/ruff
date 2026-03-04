@@ -4580,11 +4580,11 @@ impl<'db> Type<'db> {
         };
 
         let bindings = if let Place::Defined(DefinedPlace {
-            ty: Type::BoundMethod(metaclass_call_method),
+            ty: metaclass_call_method,
             ..
         }) = metaclass_dunder_call.place
         {
-            let mut metaclass_bindings = Type::BoundMethod(metaclass_call_method).bindings(db);
+            let mut metaclass_bindings = metaclass_call_method.bindings(db);
             if let Some(downstream_bindings) = constructor_bindings.as_ref() {
                 // Preserve the full metaclass `__call__` signature and defer whether constructor
                 // downstream checks apply until the matched overload is known.
