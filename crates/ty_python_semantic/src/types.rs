@@ -65,7 +65,7 @@ use crate::types::generics::{
 pub(crate) use crate::types::generics::{GenericContext, SpecializationBuilder};
 use crate::types::known_instance::{InternedConstraintSet, InternedType, UnionTypeInstance};
 pub use crate::types::method::{BoundMethodType, KnownBoundMethodType, WrapperDescriptorKind};
-use crate::types::mro::{Mro, MroIterator, StaticMroError};
+use crate::types::mro::{MroIterator, StaticMroError};
 pub(crate) use crate::types::narrow::{
     NarrowingConstraint, PossiblyNarrowedPlaces, PossiblyNarrowedPlacesBuilder,
     infer_narrowing_constraint,
