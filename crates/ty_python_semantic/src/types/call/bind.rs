@@ -715,7 +715,6 @@ impl<'db> Bindings<'db> {
         self.callable_type
     }
 
-    // Constructor calls should combine `__new__`/`__init__` specializations instead of unioning.
     fn constructor_return_type(&self, db: &'db dyn Db) -> Option<Type<'db>> {
         let constructor_instance_type = self.constructor_instance_type?;
         let class_literal = constructor_instance_type

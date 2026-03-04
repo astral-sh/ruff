@@ -4492,7 +4492,6 @@ impl<'db> Type<'db> {
             MemberLookupPolicy::NO_INSTANCE_FALLBACK | MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
         );
 
-        let mut missing_init_bindings = None;
         let (new_bindings, has_any_new) = match new_method.as_ref().map(|method| method.place) {
             Some(place) => match resolve_dunder_new_callable(db, self_type, place) {
                 Some((new_callable, definedness)) => {
@@ -4501,7 +4500,7 @@ impl<'db> Type<'db> {
                     if definedness == Definedness::PossiblyUndefined {
                         bindings.set_implicit_dunder_new_is_possibly_unbound();
                     }
-                    (Some((bindings, new_callable)), true)
+                    (Some(bindings), true)
                 }
                 None => (None, false),
             },
@@ -4523,7 +4522,7 @@ impl<'db> Type<'db> {
                 if *definedness == Definedness::PossiblyUndefined {
                     bindings.set_implicit_dunder_init_is_possibly_unbound();
                 }
-                Some((bindings, *init_method))
+                Some(bindings)
             }
             (Place::Undefined, false) => {
                 let init_method_with_object = constructor_instance_ty.member_lookup_with_policy(
@@ -4542,7 +4541,7 @@ impl<'db> Type<'db> {
                         if definedness == Definedness::PossiblyUndefined {
                             bindings.set_implicit_dunder_init_is_possibly_unbound();
                         }
-                        Some((bindings, init_method))
+                        Some(bindings)
                     }
                     Place::Undefined => {
                         // If we are using vendored typeshed, it should be impossible to have missing
@@ -4557,8 +4556,7 @@ impl<'db> Type<'db> {
                         )
                         .into();
                         bindings.set_implicit_dunder_init_is_possibly_unbound();
-                        missing_init_bindings = Some(bindings);
-                        None
+                        Some(bindings)
                     }
                 }
             }
@@ -4566,12 +4564,10 @@ impl<'db> Type<'db> {
         };
 
         let constructor_class_literal = class.class_literal(db);
-        let constructor_bindings = if let Some(bindings) = missing_init_bindings {
-            Some(bindings)
-        } else if let Some((mut new_bindings, _new_callable)) = new_bindings {
+        let constructor_bindings = if let Some(mut new_bindings) = new_bindings {
             // Preserve the full `__new__` signature and defer `__init__` validation until we know
             // which `__new__` overload matched at call time.
-            if let Some((init_bindings, _init_callable)) = init_bindings.as_ref() {
+            if let Some(init_bindings) = init_bindings.as_ref() {
                 new_bindings.set_downstream_constructor(
                     constructor_class_literal,
                     init_bindings,
@@ -4580,7 +4576,7 @@ impl<'db> Type<'db> {
             }
             Some(new_bindings)
         } else {
-            init_bindings.map(|(init_bindings, _init_callable)| init_bindings)
+            init_bindings
         };
 
         let bindings = if let Place::Defined(DefinedPlace {
