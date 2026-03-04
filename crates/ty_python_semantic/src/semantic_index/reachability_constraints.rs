@@ -1090,6 +1090,11 @@ impl ReachabilityConstraints {
                     .bool(db)
                     .negate_if(!predicate.is_positive)
             }
+            PredicateNode::ForLoopIterNonEmpty(iter_expr) => {
+                infer_expression_type(db, iter_expr, TypeContext::default())
+                    .for_loop_iter_non_empty_truthiness(db)
+                    .negate_if(!predicate.is_positive)
+            }
             PredicateNode::ReturnsNever(CallableAndCallExpr {
                 callable,
                 call_expr,

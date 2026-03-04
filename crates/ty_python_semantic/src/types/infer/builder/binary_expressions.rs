@@ -4,11 +4,12 @@ use super::TypeInferenceBuilder;
 use crate::Db;
 use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::diagnostic::{DIVISION_BY_ZERO, report_unsupported_binary_operation};
+use crate::types::tuple::{TupleSpecBuilder, TupleType};
 use crate::types::typevar::TypeVarConstraints;
 use crate::types::{
-    DynamicType, InternedConstraintSet, KnownClass, KnownInstanceType, LiteralValueTypeKind,
-    MemberLookupPolicy, Type, TypeContext, TypeVarBoundOrConstraints, UnionBuilder,
-    UnionTypeInstance,
+    DynamicType, InternedConstraintSet, KnownClass, KnownInstanceType, LiteralDictInstance,
+    LiteralListInstance, LiteralSetInstance, LiteralValueTypeKind, MemberLookupPolicy, Type,
+    TypeContext, TypeVarBoundOrConstraints, UnionBuilder, UnionTypeInstance,
 };
 use ruff_python_ast::PythonVersion;
 
@@ -665,6 +666,82 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 Some(Type::KnownInstance(KnownInstanceType::ConstraintSet(
                     InternedConstraintSet::new(db, result),
                 )))
+            }
+
+            (
+                Type::KnownInstance(KnownInstanceType::LiteralList(left)),
+                Type::KnownInstance(KnownInstanceType::LiteralList(right)),
+                ast::Operator::Add,
+            ) => self
+                .infer_binary_expression_type(
+                    node,
+                    emitted_division_by_zero_diagnostic,
+                    left.fallback(db),
+                    right.fallback(db),
+                    ast::Operator::Add,
+                )
+                .map(|fallback| {
+                    Type::KnownInstance(KnownInstanceType::LiteralList(LiteralListInstance::new(
+                        db,
+                        fallback,
+                        left.non_empty(db) || right.non_empty(db),
+                    )))
+                }),
+
+            (
+                Type::KnownInstance(KnownInstanceType::LiteralSet(left)),
+                Type::KnownInstance(KnownInstanceType::LiteralSet(right)),
+                ast::Operator::BitOr,
+            ) => self
+                .infer_binary_expression_type(
+                    node,
+                    emitted_division_by_zero_diagnostic,
+                    left.fallback(db),
+                    right.fallback(db),
+                    ast::Operator::BitOr,
+                )
+                .map(|fallback| {
+                    Type::KnownInstance(KnownInstanceType::LiteralSet(LiteralSetInstance::new(
+                        db,
+                        fallback,
+                        left.non_empty(db) || right.non_empty(db),
+                    )))
+                }),
+
+            (
+                Type::KnownInstance(KnownInstanceType::LiteralDict(left)),
+                Type::KnownInstance(KnownInstanceType::LiteralDict(right)),
+                ast::Operator::BitOr,
+            ) => self
+                .infer_binary_expression_type(
+                    node,
+                    emitted_division_by_zero_diagnostic,
+                    left.fallback(db),
+                    right.fallback(db),
+                    ast::Operator::BitOr,
+                )
+                .map(|fallback| {
+                    Type::KnownInstance(KnownInstanceType::LiteralDict(LiteralDictInstance::new(
+                        db,
+                        fallback,
+                        left.non_empty(db) || right.non_empty(db),
+                    )))
+                }),
+
+            (Type::NominalInstance(left), Type::NominalInstance(right), ast::Operator::Add)
+                if left.own_tuple_spec(db).is_some() && right.own_tuple_spec(db).is_some() =>
+            {
+                let left_tuple = left
+                    .own_tuple_spec(db)
+                    .expect("guard ensures `left` is an exact tuple");
+                let right_tuple = right
+                    .own_tuple_spec(db)
+                    .expect("guard ensures `right` is an exact tuple");
+
+                let concatenated_tuple = TupleSpecBuilder::from(&*left_tuple)
+                    .concat(db, &right_tuple)
+                    .build();
+                Some(Type::tuple(TupleType::new(db, &concatenated_tuple)))
             }
 
             // PEP 604-style union types using the `|` operator.

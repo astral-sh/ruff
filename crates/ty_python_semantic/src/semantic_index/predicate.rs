@@ -111,6 +111,12 @@ pub(crate) struct CallableAndCallExpr<'db> {
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub(crate) enum PredicateNode<'db> {
     Expression(Expression<'db>),
+    /// Predicate that is true iff a `for` loop iterable is definitely non-empty.
+    ///
+    /// This is intentionally more conservative than plain truthiness and is only
+    /// precise for exact built-in containers where non-empty implies at least one
+    /// iteration.
+    ForLoopIterNonEmpty(Expression<'db>),
     ReturnsNever(CallableAndCallExpr<'db>),
     Pattern(PatternPredicate<'db>),
     StarImportPlaceholder(StarImportPlaceholderPredicate<'db>),

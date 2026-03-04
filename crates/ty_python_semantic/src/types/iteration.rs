@@ -2,8 +2,8 @@ use crate::{
     Db,
     types::{
         AwaitError, Bindings, CallArguments, CallDunderError, EvaluationMode, KnownClass,
-        LintDiagnosticGuard, LintDiagnosticGuardBuilder, LiteralValueTypeKind, Type, TypeContext,
-        TypeVarBoundOrConstraints, UnionType,
+        KnownInstanceType, LintDiagnosticGuard, LintDiagnosticGuardBuilder, LiteralValueTypeKind,
+        Type, TypeContext, TypeVarBoundOrConstraints, UnionType,
         call::CallErrorKind,
         context::InferContext,
         diagnostic::NOT_ITERABLE,
@@ -166,6 +166,18 @@ impl<'db> Type<'db> {
                 }
                 // N.B. This special case isn't strictly necessary, it's just an obvious optimization
                 Type::Dynamic(_) => Some(Cow::Owned(TupleSpec::homogeneous(ty))),
+                Type::KnownInstance(KnownInstanceType::LiteralList(list)) => list
+                    .fallback(db)
+                    .try_iterate_with_mode(db, EvaluationMode::Sync)
+                    .ok(),
+                Type::KnownInstance(KnownInstanceType::LiteralSet(set)) => set
+                    .fallback(db)
+                    .try_iterate_with_mode(db, EvaluationMode::Sync)
+                    .ok(),
+                Type::KnownInstance(KnownInstanceType::LiteralDict(dict)) => dict
+                    .fallback(db)
+                    .try_iterate_with_mode(db, EvaluationMode::Sync)
+                    .ok(),
 
                 Type::FunctionLiteral(_)
                 | Type::GenericAlias(_)

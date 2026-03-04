@@ -1020,7 +1020,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         PossiblyNarrowedPlacesBuilder::new(self.db, place_table)
                             .pattern(pattern, module)
                     }
-                    PredicateNode::ReturnsNever(_) | PredicateNode::StarImportPlaceholder(_) => {
+                    PredicateNode::ReturnsNever(_)
+                    | PredicateNode::ForLoopIterNonEmpty(_)
+                    | PredicateNode::StarImportPlaceholder(_) => {
                         // These predicates don't narrow any places
                         PossiblyNarrowedPlaces::default()
                     }
@@ -2309,9 +2311,12 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 let iter_expr = self.add_standalone_expression(iter);
                 self.visit_expr(iter);
 
-                self.record_ambiguous_reachability();
-
                 let pre_loop = self.flow_snapshot();
+                let iter_non_empty_reachability =
+                    self.record_reachability_constraint(PredicateOrLiteral::Predicate(Predicate {
+                        node: PredicateNode::ForLoopIterNonEmpty(iter_expr),
+                        is_positive: true,
+                    }));
 
                 // Pre-walk the loop to collect all the bound places, then create a loop header
                 // definition for each bound place. See `struct LoopHeader` for more on this. Loop
@@ -2348,9 +2353,12 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     self.populate_loop_header(&bound_place_ids, loop_token, loop_min_definition_id);
                 }
 
-                // We may execute the `else` clause without ever executing the body, so merge in
-                // the pre-loop state before visiting `else`.
-                self.flow_merge(pre_loop);
+                // Model the "zero iterations" path by restoring the pre-loop state and applying
+                // the negated non-empty predicate.
+                let post_loop = self.flow_snapshot();
+                self.flow_restore(pre_loop);
+                self.record_negated_reachability_constraint(iter_non_empty_reachability);
+                self.flow_merge(post_loop);
                 self.visit_body(orelse);
 
                 // Breaking out of a `for` loop bypasses the `else` clause, so merge in the break

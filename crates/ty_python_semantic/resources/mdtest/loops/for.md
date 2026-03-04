@@ -99,7 +99,6 @@ for x in (1, "a", b"foo"):
     pass
 
 # revealed: Literal[1, "a", b"foo"]
-# error: [possibly-unresolved-reference]
 reveal_type(x)
 ```
 
@@ -1205,6 +1204,97 @@ for _ in range(1_000_000):
     x = 42
 # error: [possibly-unresolved-reference]
 x
+```
+
+### Exact non-empty builtins guarantee one iteration
+
+```py
+for a in [1]:
+    pass
+reveal_type(a)  # revealed: Unknown | int
+
+for b in {1}:
+    pass
+reveal_type(b)  # revealed: Unknown | int
+
+for c in {"x": 1}:
+    pass
+reveal_type(c)  # revealed: Unknown | str
+
+for d in (1,):
+    pass
+reveal_type(d)  # revealed: Literal[1]
+
+x = [1]
+for a in x:
+    pass
+reveal_type(a)  # revealed: Unknown | int
+
+x = [1]
+y = [2]
+z = x + y
+for e in z:
+    pass
+reveal_type(e)  # revealed: Unknown | int
+
+x = {1}
+y = {2}
+z = x | y
+for e in z:
+    pass
+reveal_type(e)  # revealed: Unknown | int
+
+x = {"a": 1}
+y = {"b": 2}
+z = x | y
+for k in z:
+    pass
+reveal_type(k)  # revealed: Unknown | str
+```
+
+### Non-empty narrowing of non-exact builtins does not guarantee iteration
+
+```py
+def _(l: list[int]) -> int:
+    if not l:
+        return 0
+    for i in l:
+        pass
+    # error: [possibly-unresolved-reference]
+    return i
+```
+
+### Empty containers do not guarantee iteration
+
+```py
+for x in []:
+    pass
+# error: [possibly-unresolved-reference]
+reveal_type(x)  # revealed: Unknown
+```
+
+### Starred elements prevent non-empty guarantee
+
+```py
+other = [1, 2, 3]
+for x in [*other]:
+    pass
+# error: [possibly-unresolved-reference]
+reveal_type(x)  # revealed: Unknown | int
+
+for y in {*other}:
+    pass
+# error: [possibly-unresolved-reference]
+reveal_type(y)  # revealed: Unknown | int
+```
+
+### Comprehensions do not produce literal containers
+
+```py
+for x in [i for i in range(10)]:
+    pass
+# error: [possibly-unresolved-reference]
+reveal_type(x)  # revealed: Unknown | int
 ```
 
 ### Swap bindings converge normally under fixpoint iteration

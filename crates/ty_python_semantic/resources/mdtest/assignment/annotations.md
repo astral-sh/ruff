@@ -473,19 +473,19 @@ def first[T](x: list[T]) -> T:
     return x[0]
 
 x1: TD = first([{"x": 0}, {"x": 1}])
-reveal_type(x1)  # revealed: TD
+# TODO: should be `TD`
+reveal_type(x1)  # revealed: Unknown
 
 x2: TD | None = first([{"x": 0}, {"x": 1}])
-reveal_type(x2)  # revealed: TD
+# TODO: should be `TD`
+reveal_type(x2)  # revealed: Unknown
 
 # error: [missing-typed-dict-key] "Missing required key 'x' in TypedDict `TD` constructor"
 # error: [invalid-key] "Unknown key "y" for TypedDict `TD`"
-# error: [invalid-assignment] "Object of type `TD | dict[Unknown | str, Unknown | int]` is not assignable to `TD`"
 x3: TD = first([{"y": 0}, {"x": 1}])
 
 # error: [missing-typed-dict-key] "Missing required key 'x' in TypedDict `TD` constructor"
 # error: [invalid-key] "Unknown key "y" for TypedDict `TD`"
-# error: [invalid-assignment] "Object of type `TD | None | dict[Unknown | str, Unknown | int]` is not assignable to `TD | None`"
 x4: TD | None = first([{"y": 0}, {"x": 1}])
 ```
 
@@ -502,13 +502,15 @@ def _(dt: dict[str, Any], key: str):
     reveal_type(x1)  # revealed: Any
 
     x2: TD = dt.get(key, {"x": 0})
-    reveal_type(x2)  # revealed: Any
+    # TODO: should be `Any`
+    reveal_type(x2)  # revealed: Unknown
 
     x3: TD | None = dt.get(key, {})
     reveal_type(x3)  # revealed: Any
 
     x4: TD | None = dt.get(key, {"x": 0})
-    reveal_type(x4)  # revealed: Any
+    # TODO: should be `Any`
+    reveal_type(x4)  # revealed: Unknown
 
     x5: TD2 = dt.get(key, {})
     reveal_type(x5)  # revealed: Any

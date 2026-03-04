@@ -32,6 +32,39 @@ pub struct InternedConstraintSet<'db> {
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for InternedConstraintSet<'_> {}
 
+/// A literal `list[...]` instance where we know it is an *exact* built-in list object.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+pub struct LiteralListInstance<'db> {
+    /// The fallback type for this literal container (typically `list[T]`).
+    pub fallback: Type<'db>,
+    /// Whether the literal is definitely non-empty.
+    pub non_empty: bool,
+}
+
+impl get_size2::GetSize for LiteralListInstance<'_> {}
+
+/// A literal `set[...]` instance where we know it is an *exact* built-in set object.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+pub struct LiteralSetInstance<'db> {
+    /// The fallback type for this literal container (typically `set[T]`).
+    pub fallback: Type<'db>,
+    /// Whether the literal is definitely non-empty.
+    pub non_empty: bool,
+}
+
+impl get_size2::GetSize for LiteralSetInstance<'_> {}
+
+/// A literal `dict[...]` instance where we know it is an *exact* built-in dict object.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+pub struct LiteralDictInstance<'db> {
+    /// The fallback type for this literal container (typically `dict[K, V]`).
+    pub fallback: Type<'db>,
+    /// Whether the literal is definitely non-empty.
+    pub non_empty: bool,
+}
+
+impl get_size2::GetSize for LiteralDictInstance<'_> {}
+
 /// Singleton types that are heavily special-cased by ty. Despite its name,
 /// quite a different type to [`super::NominalInstanceType`].
 ///
@@ -104,6 +137,15 @@ pub enum KnownInstanceType<'db> {
 
     /// The inferred spec for a functional `NamedTuple` class.
     NamedTupleSpec(NamedTupleSpec<'db>),
+
+    /// An exact built-in list literal.
+    LiteralList(LiteralListInstance<'db>),
+
+    /// An exact built-in set literal.
+    LiteralSet(LiteralSetInstance<'db>),
+
+    /// An exact built-in dict literal.
+    LiteralDict(LiteralDictInstance<'db>),
 }
 
 pub(super) fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -154,6 +196,15 @@ pub(super) fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Size
             for field in spec.fields(db) {
                 visitor.visit_type(db, field.ty);
             }
+        }
+        KnownInstanceType::LiteralList(list) => {
+            visitor.visit_type(db, list.fallback(db));
+        }
+        KnownInstanceType::LiteralSet(set) => {
+            visitor.visit_type(db, set.fallback(db));
+        }
+        KnownInstanceType::LiteralDict(dict) => {
+            visitor.visit_type(db, dict.fallback(db));
         }
     }
 }
@@ -217,6 +268,13 @@ impl<'db> KnownInstanceType<'db> {
             Self::NamedTupleSpec(spec) => spec
                 .recursive_type_normalized_impl(db, div, true)
                 .map(Self::NamedTupleSpec),
+            // Literal containers are handled directly in
+            // `Type::recursive_type_normalized_impl` by stripping the wrapper.
+            Self::LiteralList(_) | Self::LiteralSet(_) | Self::LiteralDict(_) => {
+                unreachable!(
+                    "literal containers should be handled in Type::recursive_type_normalized_impl"
+                )
+            }
         }
     }
 
@@ -244,6 +302,9 @@ impl<'db> KnownInstanceType<'db> {
             Self::LiteralStringAlias(_) => KnownClass::Str,
             Self::NewType(_) => KnownClass::NewType,
             Self::NamedTupleSpec(_) => KnownClass::Sequence,
+            Self::LiteralList(_) => KnownClass::List,
+            Self::LiteralSet(_) => KnownClass::Set,
+            Self::LiteralDict(_) => KnownClass::Dict,
         }
     }
 
@@ -256,8 +317,13 @@ impl<'db> KnownInstanceType<'db> {
     /// For example, an alias created using the `type` statement is an instance of
     /// `typing.TypeAliasType`, so `KnownInstanceType::TypeAliasType(_).instance_fallback(db)`
     /// returns `Type::NominalInstance(NominalInstanceType { class: <typing.TypeAliasType> })`.
-    pub(super) fn instance_fallback(self, db: &dyn Db) -> Type<'_> {
-        self.class(db).to_instance(db)
+    pub(super) fn instance_fallback(self, db: &'db dyn Db) -> Type<'db> {
+        match self {
+            Self::LiteralList(list) => list.fallback(db),
+            Self::LiteralSet(set) => set.fallback(db),
+            Self::LiteralDict(dict) => dict.fallback(db),
+            _ => self.class(db).to_instance(db),
+        }
     }
 
     /// Return `true` if this symbol is an instance of `class`.
@@ -314,6 +380,30 @@ impl<'db> KnownInstanceType<'db> {
                     db,
                     ty.inner(db)
                         .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                )))
+            }
+            KnownInstanceType::LiteralList(list) => {
+                Type::KnownInstance(KnownInstanceType::LiteralList(LiteralListInstance::new(
+                    db,
+                    list.fallback(db)
+                        .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                    list.non_empty(db),
+                )))
+            }
+            KnownInstanceType::LiteralSet(set) => {
+                Type::KnownInstance(KnownInstanceType::LiteralSet(LiteralSetInstance::new(
+                    db,
+                    set.fallback(db)
+                        .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                    set.non_empty(db),
+                )))
+            }
+            KnownInstanceType::LiteralDict(dict) => {
+                Type::KnownInstance(KnownInstanceType::LiteralDict(LiteralDictInstance::new(
+                    db,
+                    dict.fallback(db)
+                        .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                    dict.non_empty(db),
                 )))
             }
 

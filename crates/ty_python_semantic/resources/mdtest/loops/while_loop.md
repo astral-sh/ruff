@@ -395,6 +395,44 @@ while random():
 x
 ```
 
+### Exact non-empty builtins guarantee one iteration
+
+```py
+while [1]:
+    a = 1
+    break
+reveal_type(a)  # revealed: Literal[1]
+
+while {1}:
+    b = 1
+    break
+reveal_type(b)  # revealed: Literal[1]
+
+while {"x": 1}:
+    c = 1
+    break
+reveal_type(c)  # revealed: Literal[1]
+
+while (1,):
+    d = 1
+    break
+reveal_type(d)  # revealed: Literal[1]
+
+x = [1]
+while x:
+    e = 1
+    break
+reveal_type(e)  # revealed: Literal[1]
+
+x = [1]
+y = [2]
+z = x + y
+while z:
+    f = 1
+    break
+reveal_type(f)  # revealed: Literal[1]
+```
+
 ### Swap bindings converge normally under fixpoint iteration
 
 ```py

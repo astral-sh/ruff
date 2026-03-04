@@ -227,6 +227,15 @@ impl<'db> Type<'db> {
                 let tracked_set = constraints.load(db, tracked_set.constraints(db));
                 Truthiness::from(tracked_set.is_always_satisfied(db))
             }
+            Type::KnownInstance(KnownInstanceType::LiteralList(list)) => {
+                Truthiness::from(list.non_empty(db))
+            }
+            Type::KnownInstance(KnownInstanceType::LiteralSet(set)) => {
+                Truthiness::from(set.non_empty(db))
+            }
+            Type::KnownInstance(KnownInstanceType::LiteralDict(dict)) => {
+                Truthiness::from(dict.non_empty(db))
+            }
 
             Type::FunctionLiteral(_)
             | Type::BoundMethod(_)

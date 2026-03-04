@@ -75,6 +75,7 @@ pub(crate) fn infer_narrowing_constraint<'db>(
                 all_negative_narrowing_constraints_for_pattern(db, pattern)
             }
         }
+        PredicateNode::ForLoopIterNonEmpty(_) => return None,
         PredicateNode::ReturnsNever(_) => return None,
         PredicateNode::StarImportPlaceholder(_) => return None,
     };
@@ -602,6 +603,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             PredicateNode::Pattern(pattern) => {
                 self.evaluate_pattern_predicate(pattern, self.is_positive)
             }
+            PredicateNode::ForLoopIterNonEmpty(_) => return None,
             PredicateNode::ReturnsNever(_) => return None,
             PredicateNode::StarImportPlaceholder(_) => return None,
         };
@@ -695,6 +697,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
     fn scope(&self) -> ScopeId<'db> {
         match self.predicate {
             PredicateNode::Expression(expression) => expression.scope(self.db),
+            PredicateNode::ForLoopIterNonEmpty(expression) => expression.scope(self.db),
             PredicateNode::Pattern(pattern) => pattern.scope(self.db),
             PredicateNode::ReturnsNever(CallableAndCallExpr { callable, .. }) => {
                 callable.scope(self.db)

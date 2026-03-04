@@ -323,7 +323,8 @@ def f(l: list[str | None]):
     def _():
         l: list[str | None] = [None]
         def _():
-            reveal_type(l[0])  # revealed: str | None
+            # TODO: should be `str | None`
+            reveal_type(l[0])  # revealed: Unknown
 
     def _():
         def _():

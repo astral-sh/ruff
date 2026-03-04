@@ -27,7 +27,9 @@ pub(crate) use self::infer::{
     TypeContext, infer_complete_scope_types, infer_deferred_types, infer_definition_types,
     infer_expression_type, infer_expression_types, infer_scope_types,
 };
-pub use self::known_instance::KnownInstanceType;
+pub use self::known_instance::{
+    KnownInstanceType, LiteralDictInstance, LiteralListInstance, LiteralSetInstance,
+};
 use self::set_theoretic::KnownUnion;
 pub(crate) use self::set_theoretic::builder::{IntersectionBuilder, UnionBuilder};
 pub use self::set_theoretic::{
@@ -74,7 +76,7 @@ use crate::types::newtype::NewType;
 pub(crate) use crate::types::signatures::{Parameter, Parameters};
 use crate::types::signatures::{ParameterForm, walk_signature};
 use crate::types::special_form::TypeQualifier;
-use crate::types::tuple::TupleSpec;
+use crate::types::tuple::{Tuple, TupleSpec};
 use crate::types::type_alias::TypeAliasType;
 pub(crate) use crate::types::typed_dict::TypedDictType;
 pub use crate::types::typevar::{
@@ -1134,6 +1136,52 @@ impl<'db> Type<'db> {
             .and_then(|instance| instance.own_tuple_spec(db))
     }
 
+    /// Truthiness for the specific question "does iterating this value execute a `for` body at
+    /// least once?".
+    ///
+    /// This is intentionally stricter than [`Type::bool`]. We only return non-ambiguous results
+    /// for exact built-in containers where non-empty implies at least one iteration.
+    pub(crate) fn for_loop_iter_non_empty_truthiness(self, db: &'db dyn Db) -> Truthiness {
+        match self.resolve_type_alias(db) {
+            Type::Union(union) => {
+                let mut truthiness = None;
+                for element in union.elements(db) {
+                    let element_truthiness = element.for_loop_iter_non_empty_truthiness(db);
+                    if element_truthiness == Truthiness::Ambiguous {
+                        return Truthiness::Ambiguous;
+                    }
+                    if let Some(existing) = truthiness {
+                        if existing != element_truthiness {
+                            return Truthiness::Ambiguous;
+                        }
+                    } else {
+                        truthiness = Some(element_truthiness);
+                    }
+                }
+                truthiness.unwrap_or(Truthiness::Ambiguous)
+            }
+            Type::KnownInstance(KnownInstanceType::LiteralList(list)) => {
+                Truthiness::from(list.non_empty(db))
+            }
+            Type::KnownInstance(KnownInstanceType::LiteralSet(set)) => {
+                Truthiness::from(set.non_empty(db))
+            }
+            Type::KnownInstance(KnownInstanceType::LiteralDict(dict)) => {
+                Truthiness::from(dict.non_empty(db))
+            }
+            Type::Intersection(inter) => inter
+                .positive(db)
+                .iter()
+                .map(|ty| ty.for_loop_iter_non_empty_truthiness(db))
+                .find(|t| *t != Truthiness::Ambiguous)
+                .unwrap_or(Truthiness::Ambiguous),
+            _ => self
+                .exact_tuple_instance_spec(db)
+                .as_deref()
+                .map_or(Truthiness::Ambiguous, Tuple::truthiness),
+        }
+    }
+
     /// If this type is a fixed-length tuple instance, returns a slice of its element types.
     ///
     /// Returns `None` if this is not a tuple instance, or if it's a variable-length tuple.
@@ -1793,6 +1841,17 @@ impl<'db> Type<'db> {
                 .recursive_type_normalized_impl(db, div, nested)
                 .map(Type::SubclassOf),
             Type::TypeVar(_) => Some(self),
+            // Strip the literal-container wrapper during normalization so that
+            // `Divergent` can propagate correctly through cycles.
+            Type::KnownInstance(KnownInstanceType::LiteralList(list)) => list
+                .fallback(db)
+                .recursive_type_normalized_impl(db, div, nested),
+            Type::KnownInstance(KnownInstanceType::LiteralSet(set)) => set
+                .fallback(db)
+                .recursive_type_normalized_impl(db, div, nested),
+            Type::KnownInstance(KnownInstanceType::LiteralDict(dict)) => dict
+                .fallback(db)
+                .recursive_type_normalized_impl(db, div, nested),
             Type::KnownInstance(known_instance) => known_instance
                 .recursive_type_normalized_impl(db, div, nested)
                 .map(Type::KnownInstance),
@@ -2067,8 +2126,14 @@ impl<'db> Type<'db> {
             | Type::ModuleLiteral(..)
             | Type::ClassLiteral(..)
             | Type::GenericAlias(..)
-            | Type::SpecialForm(..)
-            | Type::KnownInstance(..) => true,
+            | Type::SpecialForm(..) => true,
+
+            Type::KnownInstance(known_instance) => !matches!(
+                known_instance,
+                KnownInstanceType::LiteralList(_)
+                    | KnownInstanceType::LiteralSet(_)
+                    | KnownInstanceType::LiteralDict(_)
+            ),
 
             Type::LiteralValue(literal) => match literal.kind() {
                 LiteralValueTypeKind::Enum(..) => !self.overrides_equality(db),
@@ -2434,7 +2499,17 @@ impl<'db> Type<'db> {
                 .to_instance(db)
                 .instance_member(db, name),
 
-            Type::SpecialForm(_) | Type::KnownInstance(_) => Place::Undefined.into(),
+            Type::SpecialForm(_) => Place::Undefined.into(),
+            Type::KnownInstance(KnownInstanceType::LiteralList(list)) => {
+                list.fallback(db).instance_member(db, name)
+            }
+            Type::KnownInstance(KnownInstanceType::LiteralSet(set)) => {
+                set.fallback(db).instance_member(db, name)
+            }
+            Type::KnownInstance(KnownInstanceType::LiteralDict(dict)) => {
+                dict.fallback(db).instance_member(db, name)
+            }
+            Type::KnownInstance(_) => Place::Undefined.into(),
 
             Type::PropertyInstance(_) => KnownClass::Property
                 .to_instance(db)
@@ -4973,6 +5048,14 @@ impl<'db> Type<'db> {
                 }
                 KnownInstanceType::Callable(callable) => Ok(Type::Callable(*callable)),
                 KnownInstanceType::LiteralStringAlias(ty) => Ok(ty.inner(db)),
+                KnownInstanceType::LiteralList(_)
+                | KnownInstanceType::LiteralSet(_)
+                | KnownInstanceType::LiteralDict(_) => Err(InvalidTypeExpressionError {
+                    invalid_expressions: smallvec_inline![InvalidTypeExpression::InvalidType(
+                        *self, scope_id
+                    )],
+                    fallback_type: Type::unknown(),
+                }),
             },
 
             Type::SpecialForm(special_form) => {
@@ -5613,6 +5696,30 @@ impl<'db> Type<'db> {
                     ty.inner(db)
                         .find_legacy_typevars_impl(db, binding_context, typevars, visitor);
                 }
+                KnownInstanceType::LiteralList(list) => {
+                    list.fallback(db).find_legacy_typevars_impl(
+                        db,
+                        binding_context,
+                        typevars,
+                        visitor,
+                    );
+                }
+                KnownInstanceType::LiteralSet(set) => {
+                    set.fallback(db).find_legacy_typevars_impl(
+                        db,
+                        binding_context,
+                        typevars,
+                        visitor,
+                    );
+                }
+                KnownInstanceType::LiteralDict(dict) => {
+                    dict.fallback(db).find_legacy_typevars_impl(
+                        db,
+                        binding_context,
+                        typevars,
+                        visitor,
+                    );
+                }
                 KnownInstanceType::SubscriptedProtocol(_)
                 | KnownInstanceType::SubscriptedGeneric(_)
                 | KnownInstanceType::TypeVar(_)
@@ -5926,6 +6033,15 @@ impl<'db> Type<'db> {
                 } else {
                     None
                 }
+            }
+            Type::KnownInstance(KnownInstanceType::LiteralList(list)) => {
+                list.fallback(db).generic_origin(db)
+            }
+            Type::KnownInstance(KnownInstanceType::LiteralSet(set)) => {
+                set.fallback(db).generic_origin(db)
+            }
+            Type::KnownInstance(KnownInstanceType::LiteralDict(dict)) => {
+                dict.fallback(db).generic_origin(db)
             }
             _ => None,
         }

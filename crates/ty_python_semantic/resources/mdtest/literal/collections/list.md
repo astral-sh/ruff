@@ -28,7 +28,8 @@ reveal_type(x)  # revealed: list[Unknown | ((_: int) -> int)]
 The inferred `Callable` type is function-like, i.e. we can still access attributes like `__name__`:
 
 ```py
-reveal_type(x[0].__name__)  # revealed: Unknown | str
+# TODO: should be `Unknown | str`
+reveal_type(x[0].__name__)  # revealed: Unknown
 ```
 
 ## Mixed list

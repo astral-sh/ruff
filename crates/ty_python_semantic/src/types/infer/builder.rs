@@ -137,12 +137,12 @@ use crate::types::{
     CallDunderError, CallableBinding, CallableType, ClassType, DataclassParams, DynamicType,
     EvaluationMode, GenericAlias, InternedConstraintSet, InternedType, IntersectionBuilder,
     IntersectionType, KnownClass, KnownInstanceType, KnownUnion, LintDiagnosticGuard,
-    LiteralValueTypeKind, MemberLookupPolicy, MetaclassCandidate, ParamSpecAttrKind, Parameter,
-    ParameterForm, Parameters, Signature, SpecialFormType, StaticClassLiteral, SubclassOfType,
-    Truthiness, Type, TypeAliasType, TypeAndQualifiers, TypeContext, TypeQualifiers,
-    TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, TypedDictType, UnionBuilder,
-    UnionType, binding_type, definition_expression_type, infer_complete_scope_types,
-    infer_scope_types, todo_type,
+    LiteralDictInstance, LiteralListInstance, LiteralSetInstance, LiteralValueTypeKind,
+    MemberLookupPolicy, MetaclassCandidate, ParamSpecAttrKind, Parameter, ParameterForm,
+    Parameters, Signature, SpecialFormType, StaticClassLiteral, SubclassOfType, Truthiness, Type,
+    TypeAliasType, TypeAndQualifiers, TypeContext, TypeQualifiers, TypeVarBoundOrConstraints,
+    TypeVarKind, TypeVarVariance, TypedDictType, UnionBuilder, UnionType, binding_type,
+    definition_expression_type, infer_complete_scope_types, infer_scope_types, todo_type,
 };
 use crate::types::{CallableTypes, overrides};
 use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
@@ -11854,14 +11854,25 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ctx: _,
         } = list;
 
-        let mut elts = elts.iter().map(|elt| [Some(elt)]);
+        let mut element_iter = elts.iter().map(|elt| [Some(elt)]);
         let mut infer_elt_ty =
             |builder: &mut Self, (_, elt, tcx)| builder.infer_expression(elt, tcx);
 
-        self.infer_collection_literal(KnownClass::List, &mut elts, &mut infer_elt_ty, tcx)
+        let inferred = self
+            .infer_collection_literal(KnownClass::List, &mut element_iter, &mut infer_elt_ty, tcx)
             .unwrap_or_else(|| {
                 KnownClass::List.to_specialized_instance(self.db(), &[Type::unknown()])
-            })
+            });
+
+        if !elts.is_empty() && elts.iter().all(|elt| !elt.is_starred_expr()) {
+            Type::KnownInstance(KnownInstanceType::LiteralList(LiteralListInstance::new(
+                self.db(),
+                inferred,
+                true,
+            )))
+        } else {
+            inferred
+        }
     }
 
     fn infer_set_expression(&mut self, set: &ast::ExprSet, tcx: TypeContext<'db>) -> Type<'db> {
@@ -11871,14 +11882,25 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             elts,
         } = set;
 
-        let mut elts = elts.iter().map(|elt| [Some(elt)]);
+        let mut element_iter = elts.iter().map(|elt| [Some(elt)]);
         let mut infer_elt_ty =
             |builder: &mut Self, (_, elt, tcx)| builder.infer_expression(elt, tcx);
 
-        self.infer_collection_literal(KnownClass::Set, &mut elts, &mut infer_elt_ty, tcx)
+        let inferred = self
+            .infer_collection_literal(KnownClass::Set, &mut element_iter, &mut infer_elt_ty, tcx)
             .unwrap_or_else(|| {
                 KnownClass::Set.to_specialized_instance(self.db(), &[Type::unknown()])
-            })
+            });
+
+        if !elts.is_empty() && elts.iter().all(|elt| !elt.is_starred_expr()) {
+            Type::KnownInstance(KnownInstanceType::LiteralSet(LiteralSetInstance::new(
+                self.db(),
+                inferred,
+                true,
+            )))
+        } else {
+            inferred
+        }
     }
 
     fn infer_dict_expression(&mut self, dict: &ast::ExprDict, tcx: TypeContext<'db>) -> Type<'db> {
@@ -11958,7 +11980,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .to_specialized_instance(self.db(), &[Type::unknown(), Type::unknown()]);
         }
 
-        let mut items = items
+        let mut item_iter = items
             .iter()
             .map(|item| [item.key.as_ref(), Some(&item.value)]);
 
@@ -11972,11 +11994,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .unwrap_or_else(|| builder.infer_expression(elt, tcx))
         };
 
-        self.infer_collection_literal(KnownClass::Dict, &mut items, &mut infer_elt_ty, tcx)
+        let inferred = self
+            .infer_collection_literal(KnownClass::Dict, &mut item_iter, &mut infer_elt_ty, tcx)
             .unwrap_or_else(|| {
                 KnownClass::Dict
                     .to_specialized_instance(self.db(), &[Type::unknown(), Type::unknown()])
-            })
+            });
+
+        if !items.is_empty() && items.iter().all(|item| item.key.is_some()) {
+            Type::KnownInstance(KnownInstanceType::LiteralDict(LiteralDictInstance::new(
+                self.db(),
+                inferred,
+                true,
+            )))
+        } else {
+            inferred
+        }
     }
 
     fn infer_typed_dict_expression(
@@ -15386,6 +15419,13 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
             KnownClass::Deque,
             KnownClass::OrderedDict,
         ];
+
+        let ty = match ty {
+            Type::KnownInstance(KnownInstanceType::LiteralList(list)) => list.fallback(db),
+            Type::KnownInstance(KnownInstanceType::LiteralSet(set)) => set.fallback(db),
+            Type::KnownInstance(KnownInstanceType::LiteralDict(dict)) => dict.fallback(db),
+            _ => ty,
+        };
 
         SAFE_MUTABLE_CLASSES
             .iter()

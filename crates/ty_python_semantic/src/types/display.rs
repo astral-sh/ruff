@@ -2962,6 +2962,15 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'db> {
                 f.with_type(ty).write_str(declaration.name(self.db))?;
                 f.write_str("'>")
             }
+            KnownInstanceType::LiteralList(list) => {
+                list.fallback(self.db).display(self.db).fmt_detailed(f)
+            }
+            KnownInstanceType::LiteralSet(set) => {
+                set.fallback(self.db).display(self.db).fmt_detailed(f)
+            }
+            KnownInstanceType::LiteralDict(dict) => {
+                dict.fallback(self.db).display(self.db).fmt_detailed(f)
+            }
             KnownInstanceType::NamedTupleSpec(_) => f.write_str("NamedTupleSpec"),
         }
     }

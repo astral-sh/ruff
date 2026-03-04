@@ -99,7 +99,7 @@ async def outer_async():  # avoid unrelated syntax errors on `yield` and `await`
         o: bar(),  # error: [invalid-type-form] "Function calls are not allowed in type expressions"
         p: int | f"foo",  # error: [invalid-type-form] "F-strings are not allowed in type expressions"
         # error: [invalid-type-form] "Slices are not allowed in type expressions"
-        # error: [invalid-type-form] "Invalid subscript"
+        # error: [invalid-type-form] "Container literals cannot be specialized"
         q: [1, 2, 3][1:2],
     ):
         reveal_type(a)  # revealed: Unknown
@@ -236,7 +236,7 @@ async def outer_async():  # avoid unrelated syntax errors on `yield` and `await`
         m: "1 < 2",  # error: [invalid-type-form] "Comparison expressions are not allowed in type expressions"
         n: "bar()",  # error: [invalid-type-form] "Function calls are not allowed in type expressions"
         # error: [invalid-type-form] "Slices are not allowed in type expressions"
-        # error: [invalid-type-form] "Invalid subscript"
+        # error: [invalid-type-form] "Container literals cannot be specialized"
         o: "[1, 2, 3][1:2]",
     ):
         reveal_type(a)  # revealed: Unknown
