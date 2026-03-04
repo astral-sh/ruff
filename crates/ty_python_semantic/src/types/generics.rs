@@ -2256,6 +2256,54 @@ impl<'db> SpecializationBuilder<'db> {
                 );
             }
 
+            (
+                formal @ (Type::NominalInstance(_) | Type::ProtocolInstance(_)),
+                Type::KnownInstance(KnownInstanceType::LiteralList(list)),
+            ) => {
+                // Preserve generic inference for list literals by matching against their
+                // specialized nominal fallback instance.
+                return self.infer_map_impl(
+                    constraints,
+                    formal,
+                    list.fallback(self.db),
+                    polarity,
+                    f,
+                    seen,
+                );
+            }
+
+            (
+                formal @ (Type::NominalInstance(_) | Type::ProtocolInstance(_)),
+                Type::KnownInstance(KnownInstanceType::LiteralSet(set)),
+            ) => {
+                // Preserve generic inference for set literals by matching against their
+                // specialized nominal fallback instance.
+                return self.infer_map_impl(
+                    constraints,
+                    formal,
+                    set.fallback(self.db),
+                    polarity,
+                    f,
+                    seen,
+                );
+            }
+
+            (
+                formal @ (Type::NominalInstance(_) | Type::ProtocolInstance(_)),
+                Type::KnownInstance(KnownInstanceType::LiteralDict(dict)),
+            ) => {
+                // Preserve generic inference for dict literals by matching against their
+                // specialized nominal fallback instance.
+                return self.infer_map_impl(
+                    constraints,
+                    formal,
+                    dict.fallback(self.db),
+                    polarity,
+                    f,
+                    seen,
+                );
+            }
+
             (formal, Type::ProtocolInstance(actual_protocol)) => {
                 // TODO: This will only handle protocol classes that explicit inherit
                 // from other generic protocol classes by listing it as a base class.
