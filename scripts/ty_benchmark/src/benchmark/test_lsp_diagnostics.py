@@ -28,7 +28,13 @@ TOOLS_TO_BENCHMARK: Final = [
     Pyrefly(),
 ]
 
-SEVERITY_LABELS: Final = {1: "Error", 2: "Warning", 3: "Info", 4: "Hint"}
+SEVERITY_LABELS: Final = {
+    None: "Unknown",
+    1: "Error",
+    2: "Warning",
+    3: "Info",
+    4: "Hint",
+}
 
 
 @pytest.fixture(scope="module", params=ALL_PROJECTS, ids=lambda p: p.name)
