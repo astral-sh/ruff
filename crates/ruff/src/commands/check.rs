@@ -23,7 +23,7 @@ use ruff_linter::{IOError, Violation, fs, warn_user_once};
 use ruff_source_file::SourceFileBuilder;
 use ruff_text_size::TextRange;
 use ruff_workspace::resolver::{
-    PyprojectConfig, ResolvedFile, match_exclusion, python_files_in_path,
+    PyprojectConfig, ResolvedFile, match_exclusion, project_files_in_path,
 };
 
 use crate::args::ConfigArguments;
@@ -42,7 +42,7 @@ pub(crate) fn check(
 ) -> Result<Diagnostics> {
     // Collect all the Python files to check.
     let start = Instant::now();
-    let (mut paths, resolver) = python_files_in_path(files, pyproject_config, config_arguments)?;
+    let (mut paths, resolver) = project_files_in_path(files, pyproject_config, config_arguments)?;
     debug!("Identified files to lint in: {:?}", start.elapsed());
 
     // Filter out paths for file types not supported for linting

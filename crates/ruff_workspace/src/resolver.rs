@@ -432,8 +432,8 @@ impl From<ConfigurationOrigin> for Relativity {
     }
 }
 
-/// Find all Python (`.py`, `.pyi`, `.pyw`, and `.ipynb` files) in a set of paths.
-pub fn python_files_in_path<'a>(
+/// Find all project files in a set of paths, following configured include/exclude settings.
+pub fn project_files_in_path<'a>(
     paths: &[PathBuf],
     pyproject_config: &'a PyprojectConfig,
     transformer: &(dyn ConfigurationTransformer + Sync),
@@ -504,7 +504,7 @@ pub fn python_files_in_path<'a>(
 
     let walker = builder.build_parallel();
 
-    // Run the `WalkParallel` to collect all Python files.
+    // Run the `WalkParallel` to collect all files.
     let state = WalkPythonFilesState::new(resolver);
     let mut visitor = PythonFilesVisitorBuilder::new(transformer, &state);
     walker.visit(&mut visitor);
@@ -762,7 +762,7 @@ impl ResolvedFile {
 }
 
 /// Return `true` if the Python file at [`Path`] is _not_ excluded.
-pub fn python_file_at_path(
+pub fn project_file_at_path(
     path: &Path,
     resolver: &mut Resolver,
     transformer: &dyn ConfigurationTransformer,
@@ -962,7 +962,7 @@ mod tests {
     use crate::pyproject::find_settings_toml;
     use crate::resolver::{
         ConfigurationOrigin, ConfigurationTransformer, PyprojectConfig, PyprojectDiscoveryStrategy,
-        ResolvedFile, Resolver, is_file_excluded, match_exclusion, python_files_in_path,
+        ResolvedFile, Resolver, is_file_excluded, match_exclusion, project_files_in_path,
         resolve_root_settings,
     };
     use crate::settings::Settings;
@@ -1024,7 +1024,7 @@ mod tests {
         File::create(&file2)?;
         create_dir(dir2)?;
 
-        let (paths, _) = python_files_in_path(
+        let (paths, _) = project_files_in_path(
             &[root.to_path_buf()],
             &PyprojectConfig::new(PyprojectDiscoveryStrategy::Fixed, Settings::default(), None),
             &NoOpTransformer,
