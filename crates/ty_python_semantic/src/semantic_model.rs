@@ -304,12 +304,24 @@ impl<'db> SemanticModel<'db> {
                     .scope(self.db)
                     .file_scope_id(self.db),
             ),
-            ast::AnyNodeRef::ExceptHandlerExceptHandler(handler) => Some(
-                handler
-                    .definition(self)
-                    .scope(self.db)
-                    .file_scope_id(self.db),
-            ),
+            ast::AnyNodeRef::ExceptHandlerExceptHandler(handler) => {
+                if handler.name.is_some() {
+                    Some(
+                        handler
+                            .definition(self)
+                            .scope(self.db)
+                            .file_scope_id(self.db),
+                    )
+                } else {
+                    handler
+                        .type_
+                        .as_deref()
+                        .and_then(|handled_exceptions| {
+                            index.try_expression_scope_id(handled_exceptions)
+                        })
+                        .or(Some(FileScopeId::global()))
+                }
+            }
             ast::AnyNodeRef::TypeParamTypeVar(var) => {
                 Some(var.definition(self).scope(self.db).file_scope_id(self.db))
             }
@@ -641,8 +653,29 @@ impl_binding_has_ty_def!(ast::StmtFunctionDef);
 impl_binding_has_ty_def!(ast::StmtClassDef);
 impl_binding_has_ty_def!(ast::Parameter);
 impl_binding_has_ty_def!(ast::ParameterWithDefault);
-impl_binding_has_ty_def!(ast::ExceptHandlerExceptHandler);
 impl_binding_has_ty_def!(ast::TypeParamTypeVar);
+
+impl HasDefinition for ast::ExceptHandlerExceptHandler {
+    #[inline]
+    fn definition<'db>(&self, model: &SemanticModel<'db>) -> Definition<'db> {
+        debug_assert!(
+            self.name.is_some(),
+            "except handlers only have a definition when they bind a name"
+        );
+
+        let index = semantic_index(model.db, model.file);
+        index.expect_single_definition(self)
+    }
+}
+
+impl HasType for ast::ExceptHandlerExceptHandler {
+    #[inline]
+    fn inferred_type<'db>(&self, model: &SemanticModel<'db>) -> Option<Type<'db>> {
+        self.name.as_ref()?;
+        let binding = HasDefinition::definition(self, model);
+        Some(binding_type(model.db, binding))
+    }
+}
 
 impl HasType for ast::Alias {
     fn inferred_type<'db>(&self, model: &SemanticModel<'db>) -> Option<Type<'db>> {

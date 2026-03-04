@@ -5334,6 +5334,23 @@ except Type<CURSOR>:
         );
     }
 
+    // Ref: https://github.com/astral-sh/ty/issues/2401
+    #[test]
+    fn no_panic_incomplete_except_handler() {
+        let builder = completion_test_builder(
+            "\
+try:
+    print()
+except <CURSOR># Trigger completion/hover here
+",
+        );
+
+        assert_snapshot!(
+            builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
+            @"<No completions found after filtering out completions>",
+        );
+    }
+
     // Ref: https://github.com/astral-sh/ty/issues/572
     #[test]
     fn scope_id_missing_global1() {

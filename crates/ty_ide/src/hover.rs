@@ -4952,6 +4952,20 @@ def function():
         ");
     }
 
+    // Ref: https://github.com/astral-sh/ty/issues/2401
+    #[test]
+    fn hover_incomplete_except_handler() {
+        let test = cursor_test(
+            "\
+try:
+    print()
+except <CURSOR># Trigger completion/hover here
+",
+        );
+
+        assert_snapshot!(test.hover(), @"Hover provided no content");
+    }
+
     impl CursorTest {
         fn hover(&self) -> String {
             use std::fmt::Write;
