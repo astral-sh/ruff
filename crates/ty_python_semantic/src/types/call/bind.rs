@@ -3346,8 +3346,10 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
                     // We restrict this to cases where all remaining positional parameters are
                     // defaulted and there is no variadic parameter, because the per-position
                     // union loses the correlation between element lengths and per-position types.
-                    // In overloaded contexts, this loss would prevent the expansion step from
-                    // correctly splitting the union into separate argument lists.
+                    // For example, given overloads `f(x: int, y: int)` and `f(x: int, y: str, z: int)`
+                    // with `t: tuple[int, str] | tuple[int, str, int]`, the per-position union
+                    // would collapse the two arities, preventing the expansion step from correctly
+                    // splitting the union into separate argument lists per overload.
                     //
                     // TODO: This is overly conservative. We could also apply this when all
                     // non-defaulted parameters are covered by the shortest union element,
