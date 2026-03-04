@@ -11318,6 +11318,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                     let tcx = TypeContext::new(Some(parameter_type));
                     let inferred_ty = infer_argument_ty(self, (argument_index, ast_argument, tcx));
+
                     // Ensure the inferred type is assignable to the declared type.
                     //
                     // If not, we want to avoid storing the "failed" inference attempt.

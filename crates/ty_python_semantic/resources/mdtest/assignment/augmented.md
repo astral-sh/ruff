@@ -13,7 +13,7 @@ reveal_type(x)  # revealed: int | float
 
 x = (1, 2)
 x += (3, 4)
-reveal_type(x)  # revealed: tuple[Literal[1], Literal[2], Literal[3], Literal[4]]
+reveal_type(x)  # revealed: tuple[Literal[1, 2, 3, 4], ...]
 ```
 
 ## Dunder methods

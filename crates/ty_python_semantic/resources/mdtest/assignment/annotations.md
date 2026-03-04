@@ -473,19 +473,19 @@ def first[T](x: list[T]) -> T:
     return x[0]
 
 x1: TD = first([{"x": 0}, {"x": 1}])
-# TODO: should be `TD`
-reveal_type(x1)  # revealed: Unknown
+reveal_type(x1)  # revealed: TD
 
 x2: TD | None = first([{"x": 0}, {"x": 1}])
-# TODO: should be `TD`
-reveal_type(x2)  # revealed: Unknown
+reveal_type(x2)  # revealed: TD
 
 # error: [missing-typed-dict-key] "Missing required key 'x' in TypedDict `TD` constructor"
 # error: [invalid-key] "Unknown key "y" for TypedDict `TD`"
+# error: [invalid-assignment]
 x3: TD = first([{"y": 0}, {"x": 1}])
 
 # error: [missing-typed-dict-key] "Missing required key 'x' in TypedDict `TD` constructor"
 # error: [invalid-key] "Unknown key "y" for TypedDict `TD`"
+# error: [invalid-assignment]
 x4: TD | None = first([{"y": 0}, {"x": 1}])
 ```
 

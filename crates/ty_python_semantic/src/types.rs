@@ -5905,6 +5905,9 @@ impl<'db> Type<'db> {
                     Some(TypeDefinition::TypeAlias(type_alias.definition(db)))
                 }
                 KnownInstanceType::NewType(newtype) => Some(TypeDefinition::NewType(newtype.definition(db))),
+                KnownInstanceType::LiteralList(list) => list.fallback(db).definition(db),
+                KnownInstanceType::LiteralSet(set) => set.fallback(db).definition(db),
+                KnownInstanceType::LiteralDict(dict) => dict.fallback(db).definition(db),
                 _ => None,
             },
 

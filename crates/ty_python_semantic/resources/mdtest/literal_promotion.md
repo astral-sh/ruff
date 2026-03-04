@@ -272,12 +272,10 @@ x3: Iterable[Literal[1, 2, 3]] = [1, 2, 3]
 reveal_type(x3)  # revealed: list[Literal[1, 2, 3]]
 
 x4: Iterable[Literal[1, 2, 3]] = list([1, 2, 3])
-# TODO: should be `list[Literal[1, 2, 3]]`
-reveal_type(x4)  # revealed: list[Unknown]
+reveal_type(x4)  # revealed: list[Literal[1, 2, 3]]
 
 x5: frozenset[Literal[1]] = frozenset([1])
-# TODO: should be `frozenset[Literal[1]]`
-reveal_type(x5)  # revealed: frozenset[Unknown]
+reveal_type(x5)  # revealed: frozenset[Literal[1]]
 
 class Sup1[T]:
     value: T

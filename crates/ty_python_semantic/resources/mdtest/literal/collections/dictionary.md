@@ -26,14 +26,12 @@ from typing import Mapping, KeysView
 a = {"a": 1, "b": 2}
 b = {"c": 3, "d": 4}
 c = {**a, **b}
-# TODO: should be `dict[Unknown | str, Unknown | int]`
-reveal_type(c)  # revealed: dict[Unknown, Unknown]
+reveal_type(c)  # revealed: dict[Unknown | str, Unknown | int]
 
 # revealed: list[int | str]
 # revealed: list[int | str]
 d: dict[str, list[int | str]] = {"a": reveal_type([1, 2]), **{"b": reveal_type([3, 4])}}
-# TODO: should be `dict[str, list[int | str]]`
-reveal_type(d)  # revealed: dict[str | Unknown, list[int | str] | Unknown]
+reveal_type(d)  # revealed: dict[str, list[int | str]]
 
 class HasKeysAndGetItem:
     def keys(self) -> KeysView[str]:
@@ -121,6 +119,6 @@ reveal_type(x5["b"]["d"])  # revealed: TD
 
 x6 = x7 = {"a": 1}
 # TODO: This should reveal `Literal[1]`.
-reveal_type(x6["a"])  # revealed: Unknown
-reveal_type(x7["a"])  # revealed: Unknown
+reveal_type(x6["a"])  # revealed: Unknown | int
+reveal_type(x7["a"])  # revealed: Unknown | int
 ```

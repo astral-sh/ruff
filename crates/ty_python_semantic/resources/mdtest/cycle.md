@@ -152,7 +152,7 @@ class Cyclic:
         if isinstance(self.data, str):
             self.data = {"url": self.data}
 
-# revealed: Unknown | str | dict[Unknown, Unknown] | Divergent
+# revealed: Unknown | str | dict[Unknown, Unknown] | dict[Unknown | str, Unknown | str]
 reveal_type(Cyclic("").data)
 ```
 

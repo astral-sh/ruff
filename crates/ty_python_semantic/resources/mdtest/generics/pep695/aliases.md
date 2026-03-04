@@ -406,15 +406,11 @@ def head[T](my_list: MyList[T]) -> T:
 def get_value[K, V](my_dict: MyDict[K, V], key: K) -> V:
     return my_dict[key]
 
-# TODO: should be `Unknown | int`
-reveal_type(head([1, 2]))  # revealed: Unknown
-# TODO: should be `Unknown | str`
-reveal_type(head(["a", "b"]))  # revealed: Unknown
+reveal_type(head([1, 2]))  # revealed: Unknown | int
+reveal_type(head(["a", "b"]))  # revealed: Unknown | str
 
 d: dict[str, int] = {"a": 1}
-# TODO: should be `int`
-# error: [invalid-argument-type]
-reveal_type(get_value(d, "a"))  # revealed: Unknown
+reveal_type(get_value(d, "a"))  # revealed: int
 ```
 
 It also works in the reverse direction, where the type alias is used as the argument type:
