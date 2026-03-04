@@ -126,19 +126,21 @@ use crate::types::typed_dict::{
     TypedDictAssignmentKind, TypedDictKeyAssignment, validate_typed_dict_constructor,
     validate_typed_dict_dict_literal,
 };
+use crate::types::typevar::{
+    BoundTypeVarIdentity, TypeVarBoundOrConstraintsEvaluation, TypeVarConstraints,
+    TypeVarDefaultEvaluation, TypeVarIdentity, TypeVarInstance,
+};
 use crate::types::visitor::find_over_type;
 use crate::types::{
-    BoundTypeVarIdentity, CallDunderError, CallableBinding, CallableType, CallableTypeKind,
-    ClassType, DataclassParams, DynamicType, EvaluationMode, GenericAlias, InternedConstraintSet,
-    InternedType, IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, KnownUnion,
+    CallDunderError, CallableBinding, CallableType, CallableTypeKind, ClassType, DataclassParams,
+    DynamicType, EvaluationMode, GenericAlias, InternedConstraintSet, InternedType,
+    IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, KnownUnion,
     LintDiagnosticGuard, LiteralValueTypeKind, ManualPEP695TypeAliasType, MemberLookupPolicy,
     MetaclassCandidate, PEP695TypeAliasType, ParamSpecAttrKind, Parameter, ParameterForm,
     Parameters, Signature, SpecialFormType, StaticClassLiteral, SubclassOfType, Truthiness, Type,
     TypeAliasType, TypeAndQualifiers, TypeContext, TypeQualifiers, TypeVarBoundOrConstraints,
-    TypeVarBoundOrConstraintsEvaluation, TypeVarConstraints, TypeVarDefaultEvaluation,
-    TypeVarIdentity, TypeVarInstance, TypeVarKind, TypeVarVariance, TypedDictType, UnionBuilder,
-    UnionType, binding_type, definition_expression_type, infer_complete_scope_types,
-    infer_scope_types, todo_type,
+    TypeVarKind, TypeVarVariance, TypedDictType, UnionBuilder, UnionType, binding_type,
+    definition_expression_type, infer_complete_scope_types, infer_scope_types, todo_type,
 };
 use crate::types::{CallableTypes, overrides};
 use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
@@ -9645,13 +9647,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             typevar.identity(self.db()).definition(self.db()),
                             TypeVarKind::Pep613Alias,
                         );
-                        Type::KnownInstance(KnownInstanceType::TypeVar(TypeVarInstance::new(
-                            self.db(),
-                            identity,
-                            typevar._bound_or_constraints(self.db()),
-                            typevar.explicit_variance(self.db()),
-                            typevar._default(self.db()),
-                        )))
+                        Type::KnownInstance(KnownInstanceType::TypeVar(
+                            typevar.with_identity(self.db(), identity),
+                        ))
                     } else {
                         inferred_ty
                     };

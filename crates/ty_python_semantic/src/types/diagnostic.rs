@@ -26,12 +26,13 @@ use crate::types::string_annotation::{
 };
 use crate::types::tuple::TupleSpec;
 use crate::types::typed_dict::TypedDictSchema;
+use crate::types::typevar::TypeVarInstance;
 use crate::types::{
     BoundTypeVarInstance, ClassType, DynamicType, LintDiagnosticGuard, Protocol,
     ProtocolInstanceType, SpecialFormType, SubclassOfInner, Type, TypeContext, binding_type,
     protocol_class::ProtocolClass,
 };
-use crate::types::{KnownInstanceType, MemberLookupPolicy, TypeVarInstance, UnionType};
+use crate::types::{KnownInstanceType, MemberLookupPolicy, UnionType};
 use crate::{Db, DisplaySettings, FxIndexMap, Program, declare_lint};
 use itertools::Itertools;
 use ruff_db::{

@@ -10,12 +10,14 @@ use crate::{
     types::{
         BoundTypeVarInstance, ClassBase, ClassType, DynamicType, IntersectionBuilder, KnownClass,
         MemberLookupPolicy, NominalInstanceType, SpecialFormType, SubclassOfInner, SubclassOfType,
-        Type, TypeVarBoundOrConstraints, TypeVarConstraints, TypeVarInstance, UnionBuilder,
+        Type, TypeVarBoundOrConstraints, UnionBuilder,
         constraints::{ConstraintSet, ConstraintSetBuilder},
         context::InferContext,
         diagnostic::{INVALID_SUPER_ARGUMENT, UNAVAILABLE_IMPLICIT_SUPER_ARGUMENTS},
         relation::{HasRelationToVisitor, IsDisjointVisitor},
-        todo_type, visitor,
+        todo_type,
+        typevar::{TypeVarConstraints, TypeVarInstance},
+        visitor,
     },
 };
 

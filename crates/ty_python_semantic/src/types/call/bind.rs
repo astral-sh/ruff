@@ -44,13 +44,14 @@ use crate::types::generics::{
 use crate::types::known_instance::FieldInstance;
 use crate::types::signatures::{Parameter, ParameterForm, ParameterKind, Parameters};
 use crate::types::tuple::{TupleLength, TupleSpec, TupleType};
+use crate::types::typevar::BoundTypeVarIdentity;
 use crate::types::{
-    BoundMethodType, BoundTypeVarIdentity, BoundTypeVarInstance, CallableSignature, CallableType,
-    CallableTypeKind, ClassLiteral, DATACLASS_FLAGS, DataclassFlags, DataclassParams,
-    EvaluationMode, GenericAlias, InternedConstraintSet, IntersectionType, KnownBoundMethodType,
-    KnownClass, KnownInstanceType, LiteralValueTypeKind, MemberLookupPolicy, NominalInstanceType,
-    PropertyInstanceType, SpecialFormType, TypeAliasType, TypeContext, TypeVarBoundOrConstraints,
-    TypeVarVariance, UnionBuilder, UnionType, WrapperDescriptorKind, enums, list_members,
+    BoundMethodType, BoundTypeVarInstance, CallableSignature, CallableType, CallableTypeKind,
+    ClassLiteral, DATACLASS_FLAGS, DataclassFlags, DataclassParams, EvaluationMode, GenericAlias,
+    InternedConstraintSet, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
+    LiteralValueTypeKind, MemberLookupPolicy, NominalInstanceType, PropertyInstanceType,
+    SpecialFormType, TypeAliasType, TypeContext, TypeVarBoundOrConstraints, TypeVarVariance,
+    UnionBuilder, UnionType, WrapperDescriptorKind, enums, list_members,
 };
 use crate::{DisplaySettings, Program};
 use ruff_db::diagnostic::{Annotation, Diagnostic, SubDiagnostic, SubDiagnosticSeverity};
