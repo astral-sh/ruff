@@ -1,4 +1,8 @@
 from airflow.decorators import task
+from airflow.operators.python import BranchPythonOperator, ShortCircuitOperator
+from airflow.providers.standard.operators.python import (
+    BranchPythonOperator as ProviderBranchPythonOperator,
+)
 
 condition1 = True
 condition2 = True
@@ -89,3 +93,53 @@ def already_short_circuit():
     if condition1:
         return True
     return False
+
+
+# BranchPythonOperator violations (should trigger AIR003):
+
+
+def operator_short_circuit_candidate():
+    if condition1:
+        return ["downstream_task"]
+    return []
+
+
+BranchPythonOperator(task_id="task", python_callable=operator_short_circuit_candidate)  # AIR003
+
+
+def provider_short_circuit_candidate():
+    if condition1:
+        return ["downstream_task"]
+    return []
+
+
+ProviderBranchPythonOperator(  # AIR003
+    task_id="task", python_callable=provider_short_circuit_candidate
+)
+
+
+# BranchPythonOperator non-violations:
+
+
+def operator_two_non_empty():
+    if condition1:
+        return ["task_a"]
+    if condition2:
+        return ["task_b"]
+    return []
+
+
+BranchPythonOperator(task_id="task", python_callable=operator_two_non_empty)
+
+
+def operator_single_return():
+    return ["downstream_task"]
+
+
+BranchPythonOperator(task_id="task", python_callable=operator_single_return)
+
+ShortCircuitOperator(task_id="task", python_callable=operator_short_circuit_candidate)
+
+BranchPythonOperator(task_id="task", python_callable=lambda: ["downstream_task"])
+
+BranchPythonOperator(task_id="task")
