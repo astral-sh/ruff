@@ -29,12 +29,13 @@ use crate::types::signatures::{
     CallableSignature, Parameter, Parameters, ParametersKind, Signature,
 };
 use crate::types::tuple::TupleSpec;
+use crate::types::typevar::BoundTypeVarIdentity;
 use crate::types::visitor::TypeVisitor;
 use crate::types::{
-    BindingContext, BoundTypeVarIdentity, CallableType, CallableTypeKind, IntersectionType,
-    KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueType, LiteralValueTypeKind,
-    MaterializationKind, Protocol, ProtocolInstanceType, SpecialFormType, StringLiteralType,
-    SubclassOfInner, SubclassOfType, Type, TypeAliasType, TypeGuardLike, TypedDictType, UnionType,
+    BindingContext, CallableType, CallableTypeKind, IntersectionType, KnownBoundMethodType,
+    KnownClass, KnownInstanceType, LiteralValueType, LiteralValueTypeKind, MaterializationKind,
+    Protocol, ProtocolInstanceType, SpecialFormType, StringLiteralType, SubclassOfInner,
+    SubclassOfType, Type, TypeAliasType, TypeGuardLike, TypedDictType, UnionType,
     WrapperDescriptorKind, visitor,
 };
 

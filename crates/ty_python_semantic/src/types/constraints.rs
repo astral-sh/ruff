@@ -80,12 +80,12 @@ use smallvec::SmallVec;
 
 use crate::types::class::GenericAlias;
 use crate::types::generics::InferableTypeVars;
+use crate::types::typevar::{BoundTypeVarIdentity, walk_bound_type_var_type};
 use crate::types::visitor::{
     TypeCollector, TypeVisitor, any_over_type, walk_type_with_recursion_guard,
 };
 use crate::types::{
-    BoundTypeVarIdentity, BoundTypeVarInstance, IntersectionType, Type, TypeVarBoundOrConstraints,
-    UnionType, walk_bound_type_var_type,
+    BoundTypeVarInstance, IntersectionType, Type, TypeVarBoundOrConstraints, UnionType,
 };
 use crate::{Db, FxIndexMap, FxIndexSet};
 
