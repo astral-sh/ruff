@@ -6,8 +6,6 @@ use crate::rules::perflint;
 
 /// Run lint rules over all deferred comprehensions in the [`SemanticModel`].
 pub(crate) fn deferred_comprehensions(checker: &mut Checker) {
-    // Note that we'll need to check for new statements in a loop if any of the rules below receive
-    // a `&mut Checker` again.
     let comprehensions = std::mem::take(&mut checker.analyze.comprehensions);
     for snapshot in comprehensions {
         checker.semantic.restore(snapshot);
