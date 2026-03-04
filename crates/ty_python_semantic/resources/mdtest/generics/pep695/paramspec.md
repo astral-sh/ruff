@@ -958,7 +958,7 @@ reveal_type(generic_context(c.generic_method))
 
 reveal_type(c.generic_method)  # revealed: [T](value: T) -> T
 reveal_type(c.generic_method(100))  # revealed: Literal[100]
-reveal_type(c.generic_method([1, 2, 3]))  # revealed: list[Unknown | int]
+reveal_type(c.generic_method([1, 2, 3]))  # revealed: list[int]
 ```
 
 ## Callable protocols with `ParamSpec` and class constructors

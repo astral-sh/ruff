@@ -64,7 +64,7 @@ d3: dict[str, int] = {"x": 1}
 d4: TD = dict(x=1)
 d5: TD = dict(x="1")  # error: [invalid-argument-type]
 
-reveal_type(d1)  # revealed: dict[Unknown | str, Unknown | int]
+reveal_type(d1)  # revealed: dict[str, int]
 reveal_type(d2)  # revealed: TD
 reveal_type(d3)  # revealed: dict[str, int]
 reveal_type(d4)  # revealed: TD

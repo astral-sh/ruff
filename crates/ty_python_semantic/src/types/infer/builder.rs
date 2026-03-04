@@ -12144,13 +12144,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 continue;
             }
 
-            // If a valid type annotation was not provided, avoid restricting the type of the
-            // collection by unioning the inferred type with `Unknown`.
-            let elt_tcx = elt_tcx.unwrap_or(Type::unknown());
-
-            builder
-                .infer(&constraints, Type::TypeVar(elt_ty), elt_tcx)
-                .ok()?;
+            // If there is no applicable context for this element type variable, we infer from the
+            // literal elements directly. This violates the gradual guarantee (we don't know that
+            // our inference is compatible with subsequent additions to the collection), but it
+            // matches the behavior of other type checkers and is usually the desired behavior.
+            if let Some(elt_tcx) = elt_tcx {
+                builder
+                    .infer(&constraints, Type::TypeVar(elt_ty), elt_tcx)
+                    .ok()?;
+            }
         }
 
         for elts in elts {
