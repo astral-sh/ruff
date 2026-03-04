@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::helpers::{ReturnStatementVisitor, map_callable};
+use ruff_python_ast::helpers::ReturnStatementVisitor;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, Expr, StmtFunctionDef};
 use ruff_python_semantic::Modules;
@@ -7,6 +7,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::rules::airflow::helpers::is_airflow_task_variant;
 
 /// ## What it does
 /// Checks for `@task.branch` decorated functions that could be replaced
@@ -56,7 +57,7 @@ pub(crate) fn task_branch_as_short_circuit(checker: &Checker, function_def: &Stm
         return;
     }
 
-    if !has_task_branch_decorator(function_def, checker) {
+    if !is_airflow_task_variant(function_def, checker.semantic(), "branch") {
         return;
     }
 
@@ -82,24 +83,4 @@ pub(crate) fn task_branch_as_short_circuit(checker: &Checker, function_def: &Stm
     if non_empty_list_count == 1 {
         checker.report_diagnostic(TaskBranchAsShortCircuit, function_def.range());
     }
-}
-
-/// Returns `true` if the function is decorated with `@task.branch`.
-fn has_task_branch_decorator(function_def: &StmtFunctionDef, checker: &Checker) -> bool {
-    function_def.decorator_list.iter().any(|decorator| {
-        let expr = map_callable(&decorator.expression);
-        let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = expr else {
-            return false;
-        };
-        attr.as_str() == "branch"
-            && checker
-                .semantic()
-                .resolve_qualified_name(value)
-                .is_some_and(|qn| {
-                    matches!(
-                        qn.segments(),
-                        ["airflow", "decorators" | "sdk", "task"]
-                    )
-                })
-    })
 }

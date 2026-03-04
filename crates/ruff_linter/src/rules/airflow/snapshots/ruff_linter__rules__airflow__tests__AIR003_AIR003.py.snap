@@ -39,3 +39,36 @@ AIR003 A `@task.branch` that can be replaced with `@task.short_circuit`
 32 | |     return []
    | |_____________^
    |
+
+AIR003 A `@task.branch` that can be replaced with `@task.short_circuit`
+  --> AIR003.py:35:1
+   |
+35 | / @task.branch()
+36 | | def with_parens():  # AIR003
+37 | |     if condition1:
+38 | |         return ["downstream_task"]
+39 | |     return []
+   | |_____________^
+   |
+
+AIR003 A `@task.branch` that can be replaced with `@task.short_circuit`
+  --> AIR003.py:42:1
+   |
+42 | / @task.branch
+43 | | def bare_return_and_list():  # AIR003
+44 | |     if condition1:
+45 | |         return ["downstream_task"]
+46 | |     return
+   | |__________^
+   |
+
+AIR003 A `@task.branch` that can be replaced with `@task.short_circuit`
+  --> AIR003.py:49:1
+   |
+49 | / @task.branch
+50 | | def none_return_and_list():  # AIR003
+51 | |     if condition1:
+52 | |         return ["downstream_task"]
+53 | |     return None
+   | |_______________^
+   |

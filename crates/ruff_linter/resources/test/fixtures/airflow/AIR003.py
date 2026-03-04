@@ -32,6 +32,27 @@ def nested_returns_one_non_empty():  # AIR003
     return []
 
 
+@task.branch()
+def with_parens():  # AIR003
+    if condition1:
+        return ["downstream_task"]
+    return []
+
+
+@task.branch
+def bare_return_and_list():  # AIR003
+    if condition1:
+        return ["downstream_task"]
+    return
+
+
+@task.branch
+def none_return_and_list():  # AIR003
+    if condition1:
+        return ["downstream_task"]
+    return None
+
+
 # No violations:
 
 @task.branch
