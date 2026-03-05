@@ -13,12 +13,29 @@ use crate::rules::flake8_pytest_style::helpers::is_pytest_hookimpl_wrapper;
 ///
 /// ## Why is this bad?
 /// Using `return {value}` in a generator function was syntactically invalid in
-/// Python 2. In Python 3 `return {value}` _can_ be used in a generator; however,
-/// the combination of `yield` and `return` can lead to confusing behavior, as
-/// the `return` statement will cause the generator to raise `StopIteration`
-/// with the value provided, rather than returning the value to the caller.
+/// Python 2.
 ///
-/// For example, given:
+/// In Python 3 [PEP 380](https://peps.python.org/pep-0380/) added the use of
+/// `return {value}` in a generator as part of implementing delegation to
+/// subgenerators to allow for left-hand-sides in generator delegation:
+///
+/// ```python
+/// def genA():
+///     yield 'a'
+///     yield 'b'
+///     return 2
+///
+/// def genB():
+///     count = yield from genA()
+///     # count == 2
+/// ```
+///
+/// The `return {value}` statement is equivalent to `raise StopIteration({value})`
+/// but results in clearer (sub)generator code.
+///
+/// However, this can lead to valid code where `return` (rather than `yield from`)
+/// is accidentally used for delegation.  For example given:
+///
 /// ```python
 /// from collections.abc import Iterable
 /// from pathlib import Path
@@ -33,10 +50,10 @@ use crate::rules::flake8_pytest_style::helpers::is_pytest_hookimpl_wrapper;
 ///         yield from dir_path.glob(f"*.{file_type}")
 /// ```
 ///
-/// Readers might assume that `get_file_paths()` would return an iterable of
-/// `Path` objects in the directory; in reality, though, `list(get_file_paths())`
-/// evaluates to `[]`, since the `return` statement causes the generator to raise
-/// `StopIteration` with the value `dir_path.glob("*")`:
+/// There is a bug in the `file_types=None` case which will yield no values and
+/// return the `dir_path.glob('*')` iterator as the value of `StopIteration`.
+/// Although this value can be captured by other generator functions, consumers
+/// of `Iterators` will discard it:
 ///
 /// ```shell
 /// >>> list(get_file_paths(file_types=["cfg", "toml"]))
@@ -45,8 +62,8 @@ use crate::rules::flake8_pytest_style::helpers::is_pytest_hookimpl_wrapper;
 /// []
 /// ```
 ///
-/// For intentional uses of `return` in a generator, consider suppressing this
-/// diagnostic.
+/// Consider suppressing this diagnostic unless you are sure that
+/// you will never need this language feature.
 ///
 /// ## Example
 /// ```python
@@ -73,11 +90,17 @@ use crate::rules::flake8_pytest_style::helpers::is_pytest_hookimpl_wrapper;
 /// def get_file_paths(file_types: Iterable[str] | None = None) -> Iterable[Path]:
 ///     dir_path = Path(".")
 ///     if file_types is None:
-///         yield from dir_path.glob("*")
+///         _lhs = yield from dir_path.glob("*")
 ///     else:
 ///         for file_type in file_types:
-///             yield from dir_path.glob(f"*.{file_type}")
+///             _lhs = yield from dir_path.glob(f"*.{file_type}")
+///
+///     # if you need to also forward the return value of the subgenerators
+///     # return _lhs
 /// ```
+///
+/// This examples make use of `yield from` language feature that `return` in
+/// generators is part of.
 #[derive(ViolationMetadata)]
 #[violation_metadata(preview_since = "v0.4.8")]
 pub(crate) struct ReturnInGenerator;
@@ -85,8 +108,7 @@ pub(crate) struct ReturnInGenerator;
 impl Violation for ReturnInGenerator {
     #[derive_message_formats]
     fn message(&self) -> String {
-        "Using `yield` and `return {value}` in a generator function can lead to confusing behavior"
-            .to_string()
+        "Using `return {value}` in a generator function can mask logic errors.".to_string()
     }
 }
 
