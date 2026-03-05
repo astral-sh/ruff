@@ -1181,11 +1181,11 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.is_rule_enabled(Rule::RedefinedLoopName) {
                 pylint::rules::redefined_loop_name(checker, stmt);
             }
-            if checker.is_rule_enabled(Rule::ReadWholeFile) {
-                refurb::rules::read_whole_file(checker, with_stmt);
-            }
-            if checker.is_rule_enabled(Rule::WriteWholeFile) {
-                refurb::rules::write_whole_file(checker, with_stmt);
+            if checker.any_rule_enabled(&[Rule::ReadWholeFile, Rule::WriteWholeFile]) {
+                checker
+                    .analyze
+                    .with_statements
+                    .push(checker.semantic.snapshot());
             }
             if checker.is_rule_enabled(Rule::UselessWithLock) {
                 pylint::rules::useless_with_lock(checker, with_stmt);

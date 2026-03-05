@@ -2530,6 +2530,7 @@ pub struct IsortOptions {
     #[option(
         default = r#"{}"#,
         value_type = r#"dict["future" | "standard-library" | "third-party" | "first-party" | "local-folder" | str, str]"#,
+        scope = "import-heading",
         example = r#"
             future = "Future imports"
             standard-library = "Standard library imports"

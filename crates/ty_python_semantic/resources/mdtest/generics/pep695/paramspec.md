@@ -67,25 +67,65 @@ def foo[**P = int]() -> None:
 
 `ParamSpec` is only valid as the first element to `Callable` or the final element to `Concatenate`.
 
+<!-- snapshot-diagnostics -->
+
 ```py
-from typing import ParamSpec, Callable, Concatenate
+from typing import Any, Final, ParamSpec, Callable, Concatenate, Union, Optional, Annotated
 
 def valid[**P](
     a1: Callable[P, int],
     a2: Callable[Concatenate[int, P], int],
+    a3: Callable["P", int],
+    a4: Callable[Concatenate[int, "P"], int],
 ) -> None: ...
 def invalid[**P](
-    # TODO: error
+    # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
     a1: P,
-    # TODO: error
+    # TODO: this should cause us to emit an error because a `ParamSpec` type argument
+    # cannot be used to specialize a non-`ParamSpec` type parameter
     a2: list[P],
-    # TODO: error
+    # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
     a3: Callable[[P], int],
-    # TODO: error
+    # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
     a4: Callable[..., P],
-    # TODO: error
+    # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
     a5: Callable[Concatenate[P, ...], int],
+    # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
+    a6: P | int,
+    # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
+    a7: Union[P, int],
+    # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
+    a8: Optional[P],
+    # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
+    a9: Annotated[P, "metadata"],
 ) -> None: ...
+
+# error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
+def invalid_return[**P]() -> P:
+    raise NotImplementedError
+
+# error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
+type Alias[**P] = P
+
+def invalid_variable_annotation[**P](y: Any) -> None:
+    # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
+    x: P = y
+
+def invalid_with_qualifier[**P](y: Any) -> None:
+    # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
+    x: Final[P] = y
+
+# error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
+def invalid_stringified_return[**P]() -> "P":
+    raise NotImplementedError
+
+def invalid_stringified_annotation[**P](
+    # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
+    a: "P",
+) -> None: ...
+def invalid_stringified_variable_annotation[**P](y: Any) -> None:
+    # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
+    x: "P" = y
 ```
 
 ## Validating `P.args` and `P.kwargs` usage
@@ -103,31 +143,39 @@ def foo[**P](c: Callable[P, int]) -> None:
     # error: [invalid-type-form] "`P.args` is valid only in `*args` annotation: Did you mean `P.kwargs`?"
     def nested2(*args: P.kwargs, **kwargs: P.args) -> None: ...
 
-    # TODO: error
+    # error: [invalid-paramspec] "`*args: P.args` must be accompanied by `**kwargs: P.kwargs`"
     def nested3(*args: P.args) -> None: ...
 
-    # TODO: error
+    # error: [invalid-paramspec] "`**kwargs: P.kwargs` must be accompanied by `*args: P.args`"
     def nested4(**kwargs: P.kwargs) -> None: ...
 
-    # TODO: error
+    # error: [invalid-paramspec] "No parameters may appear between `*args: P.args` and `**kwargs: P.kwargs`"
     def nested5(*args: P.args, x: int, **kwargs: P.kwargs) -> None: ...
+
+    # error: [invalid-paramspec] "`P.args` is only valid for annotating `*args`"
+    def nested6(x: P.args) -> None: ...
+    def nested7(
+        *args: P.args,
+        # error: [invalid-paramspec] "`*args: P.args` must be accompanied by `**kwargs: P.kwargs`"
+        **kwargs: int,
+    ) -> None: ...
 ```
 
 And, they need to be used together.
 
 ```py
 def foo[**P](c: Callable[P, int]) -> None:
-    # TODO: error
+    # error: [invalid-paramspec] "`*args: P.args` must be accompanied by `**kwargs: P.kwargs`"
     def nested1(*args: P.args) -> None: ...
 
-    # TODO: error
+    # error: [invalid-paramspec] "`**kwargs: P.kwargs` must be accompanied by `*args: P.args`"
     def nested2(**kwargs: P.kwargs) -> None: ...
 
 class Foo[**P]:
-    # TODO: error
+    # error: [invalid-paramspec] "`P.args` is only valid for annotating `*args` function parameters"
     args: P.args
 
-    # TODO: error
+    # error: [invalid-paramspec] "`P.kwargs` is only valid for annotating `**kwargs` function parameters"
     kwargs: P.kwargs
 ```
 
@@ -146,15 +194,32 @@ class Foo3[**P]:
     ) -> None: ...
 ```
 
+Error messages for `invalid-paramspec` also use the actual parameter names:
+
+```py
+def bar[**P](c: Callable[P, int]) -> None:
+    # error: [invalid-paramspec] "`*my_args: P.args` must be accompanied by `**my_kwargs: P.kwargs`"
+    def f1(*my_args: P.args, **my_kwargs: int) -> None: ...
+
+    # error: [invalid-paramspec] "`*positional: P.args` must be accompanied by `**kwargs: P.kwargs`"
+    def f2(*positional: P.args) -> None: ...
+
+    # error: [invalid-paramspec] "`**keyword: P.kwargs` must be accompanied by `*args: P.args`"
+    def f3(**keyword: P.kwargs) -> None: ...
+
+    # error: [invalid-paramspec] "No parameters may appear between `*a: P.args` and `**kw: P.kwargs`"
+    def f4(*a: P.args, x: int, **kw: P.kwargs) -> None: ...
+```
+
 It isn't allowed to annotate an instance attribute either:
 
 ```py
 class Foo4[**P]:
     def __init__(self, fn: Callable[P, int], *args: P.args, **kwargs: P.kwargs) -> None:
         self.fn = fn
-        # TODO: error
+        # error: [invalid-paramspec] "`P.args` is only valid for annotating `*args` function parameters"
         self.args: P.args = args
-        # TODO: error
+        # error: [invalid-paramspec] "`P.kwargs` is only valid for annotating `**kwargs` function parameters"
         self.kwargs: P.kwargs = kwargs
 ```
 
@@ -370,7 +435,7 @@ reveal_type(p3.attr2)  # revealed: (str, /) -> None
 
 P2 = ParamSpec("P2")
 
-# TODO: error: paramspec is out of scope
+# error: [invalid-generic-class] "Default of `P1` cannot reference out-of-scope type variable `P2`"
 class ParamSpecWithDefault5[**P1 = P2]:
     attr: Callable[P1, None]
 ```

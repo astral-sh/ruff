@@ -304,12 +304,15 @@ impl<'db> SemanticModel<'db> {
                     .scope(self.db)
                     .file_scope_id(self.db),
             ),
-            ast::AnyNodeRef::ExceptHandlerExceptHandler(handler) => Some(
-                handler
-                    .definition(self)
-                    .scope(self.db)
-                    .file_scope_id(self.db),
-            ),
+            ast::AnyNodeRef::ExceptHandlerExceptHandler(handler) => self
+                .except_handler_definition(handler)
+                .map(|definition| definition.scope(self.db).file_scope_id(self.db))
+                .or_else(|| {
+                    handler.type_.as_deref().and_then(|handled_exceptions| {
+                        index.try_expression_scope_id(handled_exceptions)
+                    })
+                })
+                .or(Some(FileScopeId::global())),
             ast::AnyNodeRef::TypeParamTypeVar(var) => {
                 Some(var.definition(self).scope(self.db).file_scope_id(self.db))
             }
@@ -323,6 +326,29 @@ impl<'db> SemanticModel<'db> {
                 Some(expr) => index.try_expression_scope_id(&expr),
             },
         }
+    }
+
+    /// Returns the definition for an exception-handler variable.
+    ///
+    /// Exception handlers only have a definition when they bind a name (`except E as name:`).
+    pub fn except_handler_definition(
+        &self,
+        handler: &ast::ExceptHandlerExceptHandler,
+    ) -> Option<Definition<'db>> {
+        handler.name.as_ref()?;
+        let index = semantic_index(self.db, self.file);
+        Some(index.expect_single_definition(handler))
+    }
+
+    /// Returns the inferred type of an exception-handler variable.
+    ///
+    /// Exception handlers only bind a variable when they have a name (`except E as name:`).
+    pub fn except_handler_type(
+        &self,
+        handler: &ast::ExceptHandlerExceptHandler,
+    ) -> Option<Type<'db>> {
+        let definition = self.except_handler_definition(handler)?;
+        Some(binding_type(self.db, definition))
     }
 
     /// Get a "safe" [`ast::AnyNodeRef`] to use for referring to the given (sub-)AST node.
@@ -641,7 +667,6 @@ impl_binding_has_ty_def!(ast::StmtFunctionDef);
 impl_binding_has_ty_def!(ast::StmtClassDef);
 impl_binding_has_ty_def!(ast::Parameter);
 impl_binding_has_ty_def!(ast::ParameterWithDefault);
-impl_binding_has_ty_def!(ast::ExceptHandlerExceptHandler);
 impl_binding_has_ty_def!(ast::TypeParamTypeVar);
 
 impl HasType for ast::Alias {

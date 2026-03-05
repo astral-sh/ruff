@@ -146,14 +146,6 @@ class GenericContext:
     alias.
     """
 
-    def specialize_constrained(
-        self, constraints: ConstraintSet
-    ) -> Specialization | None:
-        """
-        Returns a specialization of this generic context that satisfies the
-        given constraints, or None if the constraints cannot be satisfied.
-        """
-
 class Specialization:
     """A mapping of typevars to specific types"""
 

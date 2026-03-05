@@ -11,6 +11,7 @@ use crate::{
     types::{
         ClassBase, ClassLiteral, DynamicType, EnumLiteralType, KnownClass, LiteralValueTypeKind,
         MemberLookupPolicy, StaticClassLiteral, Type, TypeQualifiers, function::FunctionType,
+        set_theoretic::builder::UnionBuilder,
     },
 };
 
@@ -62,12 +63,93 @@ impl<'db> EnumMetadata<'db> {
         }
     }
 
+    /// Returns the type of `.name`/`._name_` for a given enum member.
+    ///
+    /// This is always a string literal of the member name.
+    pub(crate) fn name_type(&self, db: &'db dyn Db, member_name: &Name) -> Option<Type<'db>> {
+        self.members
+            .contains_key(member_name)
+            .then(|| Type::string_literal(db, member_name.as_str()))
+    }
+
+    /// Returns the type of `.value`/`._value_` for an enum instance that is not
+    /// narrowed to a specific member (e.g. `x: MyEnum` where `MyEnum` has multiple members).
+    ///
+    /// If there is an explicit `_value_` annotation, returns that.
+    /// If there is a custom `__init__`, returns `Any`.
+    /// Otherwise, returns the union of all member value types.
+    pub(crate) fn instance_value_type(&self, db: &'db dyn Db) -> Option<Type<'db>> {
+        if self.members.is_empty() {
+            return None;
+        }
+        if let Some(annotation) = self.value_annotation {
+            Some(annotation)
+        } else if self.init_function.is_some() {
+            Some(Type::Dynamic(DynamicType::Any))
+        } else {
+            let union = self
+                .members
+                .values()
+                .copied()
+                .fold(UnionBuilder::new(db), UnionBuilder::add)
+                .build();
+            Some(union)
+        }
+    }
+
+    /// Returns the type of `.name`/`._name_` for an enum instance that is not
+    /// narrowed to a specific member (e.g. `x: MyEnum` where `MyEnum` has multiple members).
+    ///
+    /// Returns the union of all member name string literals.
+    pub(crate) fn instance_name_type(&self, db: &'db dyn Db) -> Option<Type<'db>> {
+        if self.members.is_empty() {
+            return None;
+        }
+        let union = self
+            .members
+            .keys()
+            .map(|name| Type::string_literal(db, name.as_str()))
+            .fold(UnionBuilder::new(db), UnionBuilder::add)
+            .build();
+        Some(union)
+    }
+
     pub(crate) fn resolve_member<'a>(&'a self, name: &'a Name) -> Option<&'a Name> {
         if self.members.contains_key(name) {
             Some(name)
         } else {
             self.aliases.get(name)
         }
+    }
+}
+
+/// Returns the set of names listed in an enum's `_ignore_` attribute.
+#[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
+pub(crate) fn enum_ignored_names<'db>(db: &'db dyn Db, scope_id: ScopeId<'db>) -> FxHashSet<Name> {
+    let use_def_map = use_def_map(db, scope_id);
+    let table = place_table(db, scope_id);
+
+    let Some(ignore) = table.symbol_id("_ignore_") else {
+        return FxHashSet::default();
+    };
+
+    let ignore_bindings = use_def_map.reachable_symbol_bindings(ignore);
+    let ignore_place = place_from_bindings(db, ignore_bindings).place;
+
+    match ignore_place {
+        Place::Defined(DefinedPlace { ty, .. }) => ty
+            .as_string_literal()
+            .map(|ignored_names| {
+                ignored_names
+                    .value(db)
+                    .split_ascii_whitespace()
+                    .map(Name::new)
+                    .collect()
+            })
+            .unwrap_or_default(),
+
+        // TODO: support the list-variant of `_ignore_`.
+        Place::Undefined => FxHashSet::default(),
     }
 }
 
@@ -114,21 +196,7 @@ pub(crate) fn enum_metadata<'db>(
     let mut enum_values: FxHashMap<Type<'db>, Name> = FxHashMap::default();
     let mut auto_counter = 0;
     let mut auto_members = FxHashSet::default();
-    let ignored_names: Option<Vec<&str>> = if let Some(ignore) = table.symbol_id("_ignore_") {
-        let ignore_bindings = use_def_map.reachable_symbol_bindings(ignore);
-        let ignore_place = place_from_bindings(db, ignore_bindings).place;
-
-        match ignore_place {
-            Place::Defined(DefinedPlace { ty, .. }) => ty
-                .as_string_literal()
-                .map(|ignored_names| ignored_names.value(db).split_ascii_whitespace().collect()),
-
-            // TODO: support the list-variant of `_ignore_`.
-            Place::Undefined => None,
-        }
-    } else {
-        None
-    };
+    let ignored_names = enum_ignored_names(db, scope_id);
 
     let mut aliases = FxHashMap::default();
 
@@ -143,11 +211,7 @@ pub(crate) fn enum_metadata<'db>(
                 return None;
             }
 
-            if name == "_ignore_"
-                || ignored_names
-                    .as_ref()
-                    .is_some_and(|names| names.contains(&name.as_str()))
-            {
+            if name == "_ignore_" || ignored_names.contains(name) {
                 // Skip ignored attributes
                 return None;
             }

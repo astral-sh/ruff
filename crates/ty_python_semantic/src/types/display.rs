@@ -22,6 +22,7 @@ use crate::place::{DefinedPlace, Place};
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::scope::{FileScopeId, ScopeKind};
 use crate::semantic_index::semantic_index;
+use crate::types::callable::CallableTypeKind;
 use crate::types::class::{ClassLiteral, ClassType, GenericAlias};
 use crate::types::function::{FunctionType, OverloadLiteral};
 use crate::types::generics::{GenericContext, Specialization};
@@ -29,13 +30,13 @@ use crate::types::signatures::{
     CallableSignature, Parameter, Parameters, ParametersKind, Signature,
 };
 use crate::types::tuple::TupleSpec;
+use crate::types::typevar::BoundTypeVarIdentity;
 use crate::types::visitor::TypeVisitor;
 use crate::types::{
-    BindingContext, BoundTypeVarIdentity, CallableType, CallableTypeKind, IntersectionType,
-    KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueType, LiteralValueTypeKind,
-    MaterializationKind, Protocol, ProtocolInstanceType, SpecialFormType, StringLiteralType,
-    SubclassOfInner, SubclassOfType, Type, TypeAliasType, TypeGuardLike, TypedDictType, UnionType,
-    WrapperDescriptorKind, visitor,
+    BindingContext, CallableType, IntersectionType, KnownBoundMethodType, KnownClass,
+    KnownInstanceType, LiteralValueType, LiteralValueTypeKind, MaterializationKind, Protocol,
+    ProtocolInstanceType, SpecialFormType, StringLiteralType, SubclassOfInner, SubclassOfType,
+    Type, TypeAliasType, TypeGuardLike, TypedDictType, UnionType, WrapperDescriptorKind, visitor,
 };
 
 /// A named item that can be either a class or a type alias.
@@ -645,8 +646,8 @@ fn fmt_file_location<'db>(
 /// Returns the qualified name components for a scope, excluding the item itself.
 ///
 /// This is the shared logic used by both [`QualifiedClassName`](super::class::QualifiedClassName)
-/// and [`QualifiedTypeAliasName`](super::QualifiedTypeAliasName) to compute the path components
-/// (module, enclosing classes, functions) leading to an item.
+/// and [`QualifiedTypeAliasName`](super::type_alias::QualifiedTypeAliasName) to compute the path
+/// components (module, enclosing classes, functions) leading to an item.
 ///
 /// # Returns
 /// A vector of path components in order (e.g., `["module", "OuterClass", "InnerClass"]`)
@@ -1082,9 +1083,6 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                         return f
                             .write_str("bound method `ConstraintSet.satisfied_by_all_typevars`");
                     }
-                    KnownBoundMethodType::GenericContextSpecializeConstrained(_) => {
-                        return f.write_str("bound method `GenericContext.specialize_constrained`");
-                    }
                 };
 
                 let class_ty = cls.to_class_literal(self.db);
@@ -1468,8 +1466,13 @@ pub(crate) struct DisplayFunctionType<'db> {
 
 impl<'db> FmtDetailed<'db> for DisplayFunctionType<'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
-        // Detect self-referential function types to prevent infinite recursion.
-        if self.settings.visited_function_types.contains(&self.ty) {
+        // Detect self-referential function types to prevent infinite recursion,
+        // and limit display depth for chains of different function types
+        // (e.g. multiple redefinitions with `TypeOf[foo]` return types).
+        const MAX_FUNCTION_TYPE_DISPLAY_DEPTH: usize = 4;
+        if self.settings.visited_function_types.contains(&self.ty)
+            || self.settings.visited_function_types.len() >= MAX_FUNCTION_TYPE_DISPLAY_DEPTH
+        {
             f.set_invalid_type_annotation();
             f.write_str("def ")?;
             write!(f, "{}", self.ty.name(self.db))?;

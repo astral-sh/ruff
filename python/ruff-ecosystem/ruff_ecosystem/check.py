@@ -10,10 +10,11 @@ import re
 import time
 from asyncio import create_subprocess_exec
 from collections import Counter
+from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from subprocess import PIPE
-from typing import TYPE_CHECKING, Iterable, Iterator, Self, Sequence
+from typing import TYPE_CHECKING, Self
 
 from ruff_ecosystem import logger
 from ruff_ecosystem.markdown import (
@@ -47,6 +48,8 @@ CHECK_DIFF_LINE_RE = re.compile(
 CHECK_DIAGNOSTIC_LINE_RE = re.compile(
     r"^(?P<diff>[+-])? ?(?P<location>.*): (?P<code>[A-Z]{1,4}[0-9]{3,4}|[a-z\-]+:)(?P<fixable> \[\*\])? (?P<message>.*)"
 )
+
+PANIC_DIAGNOSTIC_LINE_RE = re.compile(r"^[^:]+: panic: Panicked at ")
 
 CHECK_VIOLATION_FIX_INDICATOR = " [*]"
 
@@ -417,7 +420,7 @@ class DiagnosticLine:
 
         if match is None:
             # Handle case where there are no regex match e.g.
-            # +                 "?application=AIRFLOW&authenticator=TEST_AUTH&role=TEST_ROLE&warehouse=TEST_WAREHOUSE" # noqa: E501, ERA001
+            # +                 "?application=AIRFLOW&authenticator=TEST_AUTH&role=TEST_ROLE&warehouse=TEST_WAREHOUSE"
             # Which was found in local testing
             return None
 
@@ -457,7 +460,7 @@ class CheckDiff(Diff):
         diff = diff.without_unchanged_lines()
 
         # Sort without account for the leading + / -
-        sorted_lines = list(sorted(diff, key=lambda line: line[2:]))
+        sorted_lines = sorted(diff, key=lambda line: line[2:])
 
         # Parse the lines, drop lines that cannot be parsed
         parsed_lines: list[DiagnosticLine] = list(
@@ -529,6 +532,10 @@ async def compare_check(
         comparison_task.result(),
     )
 
+    for line in comparison_output:
+        if PANIC_DIAGNOSTIC_LINE_RE.match(line):
+            raise ToolError(line)
+
     diff = Diff.from_pair(baseline_output, comparison_output)
 
     return Comparison(diff=diff, repo=cloned_repo)
@@ -559,10 +566,8 @@ async def ruff_check(
         raise ToolError(err.decode("utf8"))
 
     # Strip summary lines so the diff is only diagnostic lines
-    lines = [
+    return [
         line
         for line in result.decode("utf8").splitlines()
         if not CHECK_SUMMARY_LINE_RE.match(line)
     ]
-
-    return lines

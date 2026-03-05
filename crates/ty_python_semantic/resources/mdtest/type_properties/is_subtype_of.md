@@ -1313,7 +1313,7 @@ Variadic parameter in a subtype can only be used to match against an unmatched p
 parameters from the supertype, not any other parameter kind.
 
 ```py
-from ty_extensions import CallableTypeOf, is_subtype_of, static_assert
+from ty_extensions import CallableTypeOf, is_subtype_of, is_assignable_to, static_assert
 
 def variadic(*args: int) -> None: ...
 
@@ -1374,6 +1374,16 @@ def variadic_b(*args: int, b: int) -> None: ...
 static_assert(is_subtype_of(CallableTypeOf[variadic_a], CallableTypeOf[standard_int]))
 # The parameter name is different
 static_assert(not is_subtype_of(CallableTypeOf[variadic_b], CallableTypeOf[standard_int]))
+```
+
+A variadic positional parameter alone cannot match a positional-or-keyword parameter because
+variadic positional parameters can only be called positionally.
+
+```py
+def only_variadic(*args: int) -> None: ...
+
+static_assert(not is_subtype_of(CallableTypeOf[only_variadic], CallableTypeOf[standard_int]))
+static_assert(not is_assignable_to(CallableTypeOf[only_variadic], CallableTypeOf[standard_int]))
 ```
 
 #### Keyword-only

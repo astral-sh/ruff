@@ -212,6 +212,7 @@ fn discard_todo_metadata(ty: &str) -> Cow<'_, str> {
             "@Todo(StarredExpression)",
             "@Todo(typing.Unpack)",
             "@Todo(TypeVarTuple)",
+            "@Todo(Functional TypedDicts)",
         ];
 
         static TODO_METADATA_REGEX: LazyLock<regex::Regex> =

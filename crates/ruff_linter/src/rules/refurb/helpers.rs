@@ -217,23 +217,29 @@ fn resolve_file_open<'a>(
     if matches!(mode, OpenMode::ReadBytes | OpenMode::WriteBytes) && !keywords.is_empty() {
         return None;
     }
+
     let var = item.optional_vars.as_deref()?.as_name_expr()?;
     let scope = semantic.current_scope();
-
     let binding = scope.get_all(var.id.as_str()).find_map(|id| {
-        let b = semantic.binding(id);
-        (b.range() == var.range()).then_some(b)
+        let binding = semantic.binding(id);
+        (binding.range() == var.range()).then_some(binding)
     })?;
-    let references: Vec<&ResolvedReference> = binding
-        .references
-        .iter()
-        .map(|id| semantic.reference(*id))
-        .filter(|reference| with.range().contains_range(reference.range()))
-        .collect();
+    let mut binding_references = binding
+        .references()
+        .map(|id| semantic.reference(id))
+        // Reassignments in the same scope can carry forward older references. Ignore anything
+        // that appears before this `with` statement and only consider references from this point.
+        .filter(|reference| {
+            reference.scope_id() == binding.scope && reference.start() >= with.start()
+        });
 
-    let [reference] = references.as_slice() else {
+    let reference = binding_references.next()?;
+    if binding_references.next().is_some() {
         return None;
-    };
+    }
+    if !with.range().contains_range(reference.range()) {
+        return None;
+    }
 
     Some(FileOpen {
         item,
@@ -279,6 +285,7 @@ fn find_file_open<'a>(
     let (keywords, kw_mode) = match_open_keywords(keywords, read_mode, python_version)?;
 
     let mode = kw_mode.unwrap_or(pos_mode);
+
     resolve_file_open(
         item,
         with,
@@ -307,9 +314,11 @@ fn find_path_open<'a>(
     {
         return None;
     }
+
     if !is_open_call_from_pathlib(func, semantic) {
         return None;
     }
+
     let attr = func.as_attribute_expr()?;
     let mode = if args.is_empty() {
         OpenMode::ReadText
@@ -319,6 +328,7 @@ fn find_path_open<'a>(
 
     let (keywords, kw_mode) = match_open_keywords(keywords, read_mode, python_version)?;
     let mode = kw_mode.unwrap_or(mode);
+
     resolve_file_open(
         item,
         with,

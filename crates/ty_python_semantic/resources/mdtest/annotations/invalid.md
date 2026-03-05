@@ -169,20 +169,27 @@ python-version = "3.11"
 ```
 
 ```py
-from typing import TypeVarTuple
+from typing import TypeVarTuple, Unpack
 
 Ts = TypeVarTuple("Ts")
 
 def f(
     # error: [invalid-type-form] "Multiple unpacked variadic tuples are not allowed in a `tuple` specialization"
     x: tuple[*tuple[int, ...], *tuple[str, ...]],
+    # error: [invalid-type-form] "Multiple unpacked variadic tuples are not allowed in a `tuple` specialization"
+    x2: tuple[Unpack[tuple[int, ...]], Unpack[tuple[str, ...]]],
     y: tuple[*tuple[int, ...], str, int, *tuple[str, ...]],  # error: [invalid-type-form]
+    y2: tuple[Unpack[tuple[int, ...]], str, int, Unpack[tuple[str, ...]]],  # error: [invalid-type-form]
     # Multiple unpacked elements are fine, as long as the unpacked elements are not variadic:
     z: tuple[*tuple[int, ...], *tuple[str]],
+    z2: tuple[Unpack[tuple[int, ...]], Unpack[tuple[str]]],
 ):
     reveal_type(x)  # revealed: tuple[int | str, ...]
+    reveal_type(x2)  # revealed: tuple[int | str, ...]
     reveal_type(y)  # revealed: tuple[str | int, ...]
+    reveal_type(y2)  # revealed: tuple[str | int, ...]
     reveal_type(z)  # revealed: tuple[*tuple[int, ...], str]
+    reveal_type(z2)  # revealed: tuple[*tuple[int, ...], str]
 
 T1 = tuple[int, *Ts, str, *Ts]  # error: [invalid-type-form]
 
