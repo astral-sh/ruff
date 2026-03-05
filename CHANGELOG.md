@@ -21,7 +21,7 @@ Released on 2026-03-05.
 
 ### Documentation
 
-- Document extension mapping for markdown code formatting ([#23574](https://github.com/astral-sh/ruff/pull/23574))
+- Document extension mapping for Markdown code formatting ([#23574](https://github.com/astral-sh/ruff/pull/23574))
 - Update default Python version examples ([#23605](https://github.com/astral-sh/ruff/pull/23605))
 
 ### Other changes
