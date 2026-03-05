@@ -135,7 +135,8 @@ class LegacyDict(TypedDict[T]):
     # error: [unbound-type-variable]
     x: T
 
-type LegacyDictInt = LegacyDict[int]
+# TODO: false positive (LegacyDict is generic over T, but TypedDict[T] is not yet supported)
+type LegacyDictInt = LegacyDict[int]  # error: [not-subscriptable] "Cannot subscript non-generic type"
 
 # error: [not-subscriptable] "Cannot specialize non-generic type alias `LegacyDictInt`"
 def _(x: LegacyDictInt[int]):
