@@ -303,8 +303,14 @@ mod tests {
             arg: DeclarationOrNode::Node(Node {
                 uri: Url::parse("file:///test.py").unwrap(),
                 range: Range {
-                    start: Position { line: 0, character: 0 },
-                    end: Position { line: 0, character: 5 },
+                    start: Position {
+                        line: 0,
+                        character: 0,
+                    },
+                    end: Position {
+                        line: 0,
+                        character: 5,
+                    },
                 },
             }),
             snapshot: 1,
@@ -335,7 +341,10 @@ mod tests {
         let parsed: GetComputedTypeParams = serde_json::from_str(json).unwrap();
         assert_eq!(parsed.snapshot, 1);
         // Should be a Declaration, and we can extract the inner Node
-        let node = parsed.arg.node().expect("Regular declaration should have a node");
+        let node = parsed
+            .arg
+            .node()
+            .expect("Regular declaration should have a node");
         assert_eq!(node.uri.as_str(), "file:///test.py");
         assert_eq!(node.range.start.line, 0);
     }
@@ -354,8 +363,13 @@ mod tests {
         // Regular Declaration has "kind": 0
         let json = r#"{"kind": 0, "category": 5, "name": "my_func", "node": {"uri": "file:///test.py", "range": {"start": {"line": 0, "character": 0}, "end": {"line": 0, "character": 7}}}}"#;
         let parsed: DeclarationOrNode = serde_json::from_str(json).unwrap();
-        assert!(matches!(parsed, DeclarationOrNode::Declaration(Declaration::Regular { .. })));
-        let node = parsed.node().expect("Regular declaration should have a node");
+        assert!(matches!(
+            parsed,
+            DeclarationOrNode::Declaration(Declaration::Regular { .. })
+        ));
+        let node = parsed
+            .node()
+            .expect("Regular declaration should have a node");
         assert_eq!(node.uri.as_str(), "file:///test.py");
     }
 
@@ -364,12 +378,11 @@ mod tests {
         // Synthesized Declaration has "kind": 1
         let json = r#"{"kind": 1, "uri": "file:///builtins.pyi"}"#;
         let parsed: DeclarationOrNode = serde_json::from_str(json).unwrap();
-        assert!(matches!(parsed, DeclarationOrNode::Declaration(Declaration::Synthesized { .. })));
+        assert!(matches!(
+            parsed,
+            DeclarationOrNode::Declaration(Declaration::Synthesized { .. })
+        ));
         // Synthesized declarations have no source node
         assert!(parsed.node().is_none());
     }
 }
-
-
-
-

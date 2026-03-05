@@ -7,8 +7,8 @@ use lsp_server::{Request, Response};
 use ty_project::ProjectDatabase;
 use ty_server::{Notifier, RequestExtension};
 
-use crate::handlers;
 use crate::SnapshotManager;
+use crate::handlers;
 
 /// Extension that adds TSP protocol support to `ty_server`.
 ///
@@ -35,7 +35,9 @@ impl TspExtension {
             "new": new_snapshot
         });
         notifier.send_notification(tsp_types::methods::SNAPSHOT_CHANGED, params);
-        tracing::debug!("Sent snapshotChanged notification: old={old_snapshot}, new={new_snapshot}");
+        tracing::debug!(
+            "Sent snapshotChanged notification: old={old_snapshot}, new={new_snapshot}"
+        );
     }
 }
 
@@ -72,9 +74,7 @@ impl RequestExtension for TspExtension {
             "textDocument/didOpen" | "textDocument/didChange" | "textDocument/didClose" => {
                 let old_snapshot = self.snapshot_manager.current();
                 let new_snapshot = self.snapshot_manager.increment();
-                tracing::debug!(
-                    "Notification {method}: snapshot incremented to {new_snapshot}"
-                );
+                tracing::debug!("Notification {method}: snapshot incremented to {new_snapshot}");
                 self.send_snapshot_changed(old_snapshot, new_snapshot, notifier);
             }
             _ => {

@@ -46,13 +46,7 @@ impl Server {
         native_system: Arc<dyn System + 'static + Send + Sync + RefUnwindSafe>,
         in_test: bool,
     ) -> crate::Result<Self> {
-        Self::with_extension(
-            worker_threads,
-            connection,
-            native_system,
-            in_test,
-            None,
-        )
+        Self::with_extension(worker_threads, connection, native_system, in_test, None)
     }
 
     /// Create a new server with a custom request extension.

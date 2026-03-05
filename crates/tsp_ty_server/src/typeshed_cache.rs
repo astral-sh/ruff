@@ -129,9 +129,9 @@ fn extract_directory(
 
                 // Read file content from the vendored FS and write to disk
                 let content = vfs.read_to_string(vendored_path).map_err(|e| {
-                    std::io::Error::other(
-                        format!("Failed to read vendored file {vendored_path}: {e}"),
-                    )
+                    std::io::Error::other(format!(
+                        "Failed to read vendored file {vendored_path}: {e}"
+                    ))
                 })?;
 
                 std::fs::write(&disk_path, content.as_bytes())?;

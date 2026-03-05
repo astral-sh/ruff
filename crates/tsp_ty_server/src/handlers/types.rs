@@ -15,11 +15,14 @@ use ruff_source_file::PositionEncoding as RuffPositionEncoding;
 use ruff_text_size::TextSize;
 use tsp_types::types::{Declaration, DeclarationCategory, Type, TypeId};
 use tsp_types::{GetComputedTypeParams, GetDeclaredTypeParams, GetExpectedTypeParams};
-use ty_ide::{declared_type_info, expected_type_info, type_info, DeclarationInfo, TypeCategory as TyCategory, TypeInfo};
+use ty_ide::{
+    DeclarationInfo, TypeCategory as TyCategory, TypeInfo, declared_type_info, expected_type_info,
+    type_info,
+};
 use ty_project::ProjectDatabase;
 
-use crate::type_serializer::{convert_type_info, ResolvedDeclaration};
-use crate::{typeshed_cache, SnapshotManager};
+use crate::type_serializer::{ResolvedDeclaration, convert_type_info};
+use crate::{SnapshotManager, typeshed_cache};
 
 /// Handle the `typeServer/getComputedType` request.
 ///
@@ -250,13 +253,18 @@ fn resolve_declaration(
     // Map ty category to TSP declaration category
     let decl_category = match category {
         TyCategory::Class | TyCategory::SubclassOf => DeclarationCategory::Class,
-        TyCategory::Instance | TyCategory::Property | TyCategory::TypeGuard
-        | TyCategory::Literal | TyCategory::Tuple | TyCategory::TypedDict
-        | TyCategory::SpecialForm | TyCategory::NewType => DeclarationCategory::Class,
-        TyCategory::Function | TyCategory::BoundMethod | TyCategory::Callable
-        | TyCategory::OverloadedFunction => {
-            DeclarationCategory::Function
-        }
+        TyCategory::Instance
+        | TyCategory::Property
+        | TyCategory::TypeGuard
+        | TyCategory::Literal
+        | TyCategory::Tuple
+        | TyCategory::TypedDict
+        | TyCategory::SpecialForm
+        | TyCategory::NewType => DeclarationCategory::Class,
+        TyCategory::Function
+        | TyCategory::BoundMethod
+        | TyCategory::Callable
+        | TyCategory::OverloadedFunction => DeclarationCategory::Function,
         TyCategory::TypeVar => DeclarationCategory::TypeParam,
         TyCategory::TypeAlias => DeclarationCategory::TypeAlias,
         TyCategory::Module => DeclarationCategory::Import,

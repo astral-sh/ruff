@@ -123,12 +123,7 @@ pub(crate) fn convert_type_info(
     // build an overloaded type with inline overloads and optional implementation.
     if tsp_category == TspCategory::OverloadedFunction {
         if let Some(overloads) = overload_members {
-            return Type::overloaded(
-                id,
-                overloads,
-                implementation_member.map(|b| *b),
-                label,
-            );
+            return Type::overloaded(id, overloads, implementation_member.map(|b| *b), label);
         }
     }
 
@@ -157,7 +152,10 @@ mod tests {
 
     #[test]
     fn test_convert_category_instance() {
-        assert_eq!(convert_category(TyCategory::Instance), TspCategory::Instance);
+        assert_eq!(
+            convert_category(TyCategory::Instance),
+            TspCategory::Instance
+        );
     }
 
     #[test]
@@ -176,7 +174,16 @@ mod tests {
     #[test]
     fn test_convert_type_info_synthesized_instance() {
         // Instance category without declaration should produce a synthesized type with stub content
-        let ty = convert_type_info(1, TyCategory::Instance, "MyClass", None, None, None, None, None);
+        let ty = convert_type_info(
+            1,
+            TyCategory::Instance,
+            "MyClass",
+            None,
+            None,
+            None,
+            None,
+            None,
+        );
         assert_eq!(ty.id, 1);
         // Should be synthesized (has stubContent)
         assert!(ty.details.is_some());
@@ -185,7 +192,16 @@ mod tests {
     #[test]
     fn test_convert_type_info_unknown() {
         // Unknown category should produce a bare type (no stub)
-        let ty = convert_type_info(1, TyCategory::Unknown, "Unknown", None, None, None, None, None);
+        let ty = convert_type_info(
+            1,
+            TyCategory::Unknown,
+            "Unknown",
+            None,
+            None,
+            None,
+            None,
+            None,
+        );
         assert_eq!(ty.id, 1);
         assert!(ty.details.is_none());
     }
@@ -200,8 +216,14 @@ mod tests {
             DeclarationCategory::Class,
             Url::parse("file:///typeshed/stdlib/builtins.pyi").unwrap(),
             Range {
-                start: Position { line: 100, character: 0 },
-                end: Position { line: 100, character: 3 },
+                start: Position {
+                    line: 100,
+                    character: 0,
+                },
+                end: Position {
+                    line: 100,
+                    character: 3,
+                },
             },
             Some("int".to_string()),
         );
@@ -209,7 +231,16 @@ mod tests {
             declaration: decl,
             name: Some("int".to_string()),
         };
-        let ty = convert_type_info(1, TyCategory::Instance, "int", None, Some(resolved), None, None, None);
+        let ty = convert_type_info(
+            1,
+            TyCategory::Instance,
+            "int",
+            None,
+            Some(resolved),
+            None,
+            None,
+            None,
+        );
         assert_eq!(ty.id, 1);
         assert_eq!(ty.kind, TypeKind::Class);
         assert_eq!(ty.flags, TypeFlags::INSTANCE);
@@ -227,8 +258,14 @@ mod tests {
             DeclarationCategory::Function,
             Url::parse("file:///test.pyi").unwrap(),
             Range {
-                start: Position { line: 5, character: 4 },
-                end: Position { line: 5, character: 10 },
+                start: Position {
+                    line: 5,
+                    character: 4,
+                },
+                end: Position {
+                    line: 5,
+                    character: 10,
+                },
             },
             Some("my_func".to_string()),
         );
@@ -236,7 +273,16 @@ mod tests {
             declaration: decl,
             name: Some("my_func".to_string()),
         };
-        let ty = convert_type_info(1, TyCategory::Function, "def my_func(...)", None, Some(resolved), None, None, None);
+        let ty = convert_type_info(
+            1,
+            TyCategory::Function,
+            "def my_func(...)",
+            None,
+            Some(resolved),
+            None,
+            None,
+            None,
+        );
         assert_eq!(ty.id, 1);
         assert_eq!(ty.kind, TypeKind::Function);
         assert!(ty.declaration.is_some());
@@ -282,7 +328,16 @@ mod tests {
         use tsp_types::types::TypeKind;
 
         // Union category without member info falls back to bare type
-        let ty = convert_type_info(1, TyCategory::Union, "int | str", None, None, None, None, None);
+        let ty = convert_type_info(
+            1,
+            TyCategory::Union,
+            "int | str",
+            None,
+            None,
+            None,
+            None,
+            None,
+        );
         assert_eq!(ty.id, 1);
         assert_eq!(ty.kind, TypeKind::Union);
         // Without union_members, should not have union details

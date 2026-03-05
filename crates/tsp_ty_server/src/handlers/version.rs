@@ -27,6 +27,9 @@ mod tests {
     #[test]
     fn test_version_is_string() {
         let result = handle_get_supported_protocol_version().unwrap();
-        assert!(result.is_string(), "Protocol version should be a raw string");
+        assert!(
+            result.is_string(),
+            "Protocol version should be a raw string"
+        );
     }
 }

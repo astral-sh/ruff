@@ -6,12 +6,12 @@ use ruff_db::system::{OsSystem, SystemPathBuf};
 
 pub use crate::logging::{LogLevel, init_logging};
 pub use crate::server::{
-    NoOpExtension, Notifier, PartialWorkspaceProgress, PartialWorkspaceProgressParams, RequestExtension,
-    Server,
+    NoOpExtension, Notifier, PartialWorkspaceProgress, PartialWorkspaceProgressParams,
+    RequestExtension, Server,
 };
 pub use crate::session::{ClientOptions, DiagnosticMode, GlobalOptions, WorkspaceOptions};
-pub use document::{NotebookDocument, PositionEncoding, TextDocument};
 pub(crate) use db::Db;
+pub use document::{NotebookDocument, PositionEncoding, TextDocument};
 pub(crate) use session::Session;
 
 mod capabilities;

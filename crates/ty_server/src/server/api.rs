@@ -174,10 +174,7 @@ pub(super) fn notification(
 ) -> Task {
     match notif.method.as_str() {
         notifications::DidCloseTextDocumentHandler::METHOD => {
-            sync_notification_task::<notifications::DidCloseTextDocumentHandler>(
-                notif,
-                extension,
-            )
+            sync_notification_task::<notifications::DidCloseTextDocumentHandler>(notif, extension)
         }
         notifications::DidOpenTextDocumentHandler::METHOD => {
             sync_notification_task::<notifications::DidOpenTextDocumentHandler>(notif, extension)

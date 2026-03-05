@@ -191,7 +191,12 @@ impl<'de> Deserialize<'de> for Declaration {
 
 impl Declaration {
     /// Create a Regular declaration pointing to a source location.
-    pub fn regular(category: DeclarationCategory, uri: Url, range: Range, name: Option<String>) -> Self {
+    pub fn regular(
+        category: DeclarationCategory,
+        uri: Url,
+        range: Range,
+        name: Option<String>,
+    ) -> Self {
         Declaration::Regular {
             category,
             node: Node { uri, range },
@@ -249,7 +254,9 @@ impl<'de> Deserialize<'de> for TypeKind {
             7 => Ok(TypeKind::Overloaded),
             8 => Ok(TypeKind::Synthesized),
             9 => Ok(TypeKind::TypeReference),
-            _ => Err(serde::de::Error::custom(format!("invalid TypeKind: {value}"))),
+            _ => Err(serde::de::Error::custom(format!(
+                "invalid TypeKind: {value}"
+            ))),
         }
     }
 }
@@ -300,11 +307,15 @@ impl TypeCategory {
     /// Convert to `TypeKind` for TSP protocol serialization.
     pub fn to_type_kind(self) -> TypeKind {
         match self {
-            TypeCategory::Unknown | TypeCategory::Any | TypeCategory::Never | TypeCategory::None => {
-                TypeKind::BuiltIn
-            }
-            TypeCategory::Class | TypeCategory::Instance | TypeCategory::Literal
-            | TypeCategory::Tuple | TypeCategory::TypedDict => TypeKind::Class,
+            TypeCategory::Unknown
+            | TypeCategory::Any
+            | TypeCategory::Never
+            | TypeCategory::None => TypeKind::BuiltIn,
+            TypeCategory::Class
+            | TypeCategory::Instance
+            | TypeCategory::Literal
+            | TypeCategory::Tuple
+            | TypeCategory::TypedDict => TypeKind::Class,
             TypeCategory::Union => TypeKind::Union,
             TypeCategory::Function => TypeKind::Function,
             TypeCategory::OverloadedFunction => TypeKind::Overloaded,
@@ -320,7 +331,9 @@ impl TypeCategory {
     /// Convert to `TypeFlags` for TSP protocol serialization.
     pub fn to_flags(self) -> u32 {
         match self {
-            TypeCategory::Instance | TypeCategory::Literal | TypeCategory::Tuple
+            TypeCategory::Instance
+            | TypeCategory::Literal
+            | TypeCategory::Tuple
             | TypeCategory::TypedDict => TypeFlags::INSTANCE,
             TypeCategory::Class => TypeFlags::INSTANTIABLE,
             TypeCategory::Function | TypeCategory::OverloadedFunction => TypeFlags::CALLABLE,
@@ -932,7 +945,10 @@ mod tests {
             assert_eq!(value["display"], display.as_str());
         }
         // Details fields should be flattened (at top level, not nested under "details")
-        assert!(value.get("details").is_none(), "details should be flattened into top-level fields");
+        assert!(
+            value.get("details").is_none(),
+            "details should be flattened into top-level fields"
+        );
     }
 
     #[test]
@@ -1284,7 +1300,10 @@ mod tests {
         let ty = Type {
             id: 1,
             kind: TypeKind::Function,
-            display: Some("def foo(a: int, b: str = 'default', *args: Any, **kwargs: Any) -> bool".to_string()),
+            display: Some(
+                "def foo(a: int, b: str = 'default', *args: Any, **kwargs: Any) -> bool"
+                    .to_string(),
+            ),
             flags: 0,
             declaration: None,
             type_args: None,
@@ -1430,11 +1449,7 @@ mod tests {
             Type::from_category(4, TypeCategory::Instance, Some("None".to_string())),
             Type::instance(5, "builtins.list"),
         ];
-        let ty = Type::union(
-            1,
-            members,
-            "int | str | None | list[Any]",
-        );
+        let ty = Type::union(1, members, "int | str | None | list[Any]");
         assert_type_serializes(&ty);
         let json = serde_json::to_string(&ty).unwrap();
         let value: serde_json::Value = serde_json::from_str(&json).unwrap();

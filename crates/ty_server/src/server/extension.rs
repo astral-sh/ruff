@@ -73,12 +73,7 @@ pub trait RequestExtension: Send + Sync {
     ///
     /// * `method` - The notification method name (e.g., `"textDocument/didOpen"`)
     /// * `notifier` - A handle for sending custom notifications to the client
-    fn on_notification(
-        &self,
-        _method: &str,
-        _notifier: &dyn Notifier,
-    ) {
-    }
+    fn on_notification(&self, _method: &str, _notifier: &dyn Notifier) {}
 }
 
 /// A no-op extension that doesn't handle any methods.
@@ -92,7 +87,11 @@ impl RequestExtension for NoOpExtension {
         false
     }
 
-    fn handle_request(&self, _request: &Request, _databases: &[ProjectDatabase]) -> Option<Response> {
+    fn handle_request(
+        &self,
+        _request: &Request,
+        _databases: &[ProjectDatabase],
+    ) -> Option<Response> {
         None
     }
 }
@@ -127,10 +126,7 @@ mod tests {
 
     impl Notifier for MockNotifier {
         fn send_notification(&self, method: &str, params: serde_json::Value) {
-            self.sent
-                .lock()
-                .unwrap()
-                .push((method.to_string(), params));
+            self.sent.lock().unwrap().push((method.to_string(), params));
         }
     }
 
@@ -173,15 +169,8 @@ mod tests {
             ))
         }
 
-        fn on_notification(
-            &self,
-            method: &str,
-            _notifier: &dyn Notifier,
-        ) {
-            self.notifications
-                .lock()
-                .unwrap()
-                .push(method.to_string());
+        fn on_notification(&self, method: &str, _notifier: &dyn Notifier) {
+            self.notifications.lock().unwrap().push(method.to_string());
         }
     }
 
@@ -231,8 +220,7 @@ mod tests {
 
     #[test]
     fn extension_works_behind_arc() {
-        let ext: Arc<dyn RequestExtension> =
-            Arc::new(TestExtension::new(vec!["custom/test"]));
+        let ext: Arc<dyn RequestExtension> = Arc::new(TestExtension::new(vec!["custom/test"]));
         assert!(ext.handles_method("custom/test"));
         assert!(!ext.handles_method("other"));
     }
@@ -316,16 +304,10 @@ mod tests {
                 None
             }
 
-            fn on_notification(
-                &self,
-                method: &str,
-                notifier: &dyn Notifier,
-            ) {
+            fn on_notification(&self, method: &str, notifier: &dyn Notifier) {
                 if method == "textDocument/didOpen" {
-                    notifier.send_notification(
-                        "custom/documentTracked",
-                        json!({ "tracked": true }),
-                    );
+                    notifier
+                        .send_notification("custom/documentTracked", json!({ "tracked": true }));
                 }
             }
         }

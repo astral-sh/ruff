@@ -6,7 +6,9 @@ use crate::SnapshotManager;
 ///
 /// Returns the current snapshot number as a raw number (not wrapped in an object).
 /// The protocol expects `number`, not `{ snapshot: number }`.
-pub(crate) fn handle_get_snapshot(snapshot_manager: &SnapshotManager) -> Result<serde_json::Value, String> {
+pub(crate) fn handle_get_snapshot(
+    snapshot_manager: &SnapshotManager,
+) -> Result<serde_json::Value, String> {
     // Return the snapshot as a plain number
     let snapshot = snapshot_manager.current();
     serde_json::to_value(snapshot).map_err(|e| e.to_string())

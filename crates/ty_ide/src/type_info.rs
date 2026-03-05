@@ -5,7 +5,7 @@
 //! like language server protocol implementations (e.g., TSP) without exposing
 //! internal ty type system details.
 
-use crate::goto::{find_goto_target, Definitions, GotoTarget};
+use crate::goto::{Definitions, GotoTarget, find_goto_target};
 use crate::{Db, NavigationTarget, RangedValue};
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
@@ -15,9 +15,7 @@ use ruff_python_ast::token::TokenKind;
 use ruff_text_size::{Ranged, TextSize};
 use ty_python_semantic::types::ide_support::call_signature_details;
 use ty_python_semantic::types::{Type, TypeDefinition};
-use ty_python_semantic::{
-    HasType, ImportAliasResolution, SemanticModel,
-};
+use ty_python_semantic::{HasType, ImportAliasResolution, SemanticModel};
 
 /// The category of a type, providing a high-level classification.
 ///
@@ -180,8 +178,8 @@ pub fn declared_type_info(
     let goto_target = find_goto_target(&model, &parsed, offset)?;
 
     // Get definitions for the target
-    let definitions = goto_target
-        .get_definition_targets(&model, ImportAliasResolution::ResolveAliases)?;
+    let definitions =
+        goto_target.get_definition_targets(&model, ImportAliasResolution::ResolveAliases)?;
 
     // Try to get a declared type from the definitions
     let declared_ty = get_declared_type_from_definitions(db, &definitions)?;
@@ -297,7 +295,8 @@ fn find_expected_type_from_context<'db>(
                 if let Some(value) = &return_stmt.value {
                     if value.range().contains_range(expr_node.range()) {
                         // Find the enclosing function to get its return type
-                        if let Some(return_ty) = find_enclosing_function_return_type(model, covering)
+                        if let Some(return_ty) =
+                            find_enclosing_function_return_type(model, covering)
                         {
                             return Some(return_ty);
                         }
@@ -308,7 +307,6 @@ fn find_expected_type_from_context<'db>(
             // Case 4: Assignment (without annotation but with type hint on target elsewhere)
             // This is less common - we'd need to find the original declaration of the target
             // For now, we skip this case
-
             _ => continue,
         }
     }
@@ -383,9 +381,7 @@ fn extract_type_info(
     use ty_python_semantic::DisplaySettings;
 
     let category = determine_category(&ty);
-    let display = ty
-        .display_with(db, DisplaySettings::default())
-        .to_string();
+    let display = ty.display_with(db, DisplaySettings::default()).to_string();
 
     // Extract additional details based on type
     let (union_member_count, literal_value) = extract_type_details(db, &ty);
@@ -800,7 +796,10 @@ def process(value: int | str) -> int | str:
         );
 
         let info = type_info(&test.db, test.cursor.file, test.cursor.offset);
-        assert!(info.is_some(), "type_info should return Some for an overloaded function");
+        assert!(
+            info.is_some(),
+            "type_info should return Some for an overloaded function"
+        );
         let info = info.unwrap();
 
         // Top-level category should be OverloadedFunction
@@ -909,7 +908,11 @@ def convert(x: str) -> int: ...
         let info = info.unwrap();
         assert_eq!(info.value.category, TypeCategory::OverloadedFunction);
 
-        let overloads = info.value.overload_members.as_ref().expect("should have overloads");
+        let overloads = info
+            .value
+            .overload_members
+            .as_ref()
+            .expect("should have overloads");
         assert_eq!(overloads.len(), 2, "Expected 2 @overload arms");
 
         // Without a concrete implementation def, implementation_member should be None
@@ -940,7 +943,11 @@ def add(x, y):
         assert!(info.is_some());
         let info = info.unwrap();
 
-        let overloads = info.value.overload_members.as_ref().expect("should have overloads");
+        let overloads = info
+            .value
+            .overload_members
+            .as_ref()
+            .expect("should have overloads");
         assert_eq!(overloads.len(), 2);
 
         // Verify each arm has a distinct display string with the correct signature
@@ -956,7 +963,11 @@ def add(x, y):
         );
 
         // Implementation should exist
-        let impl_member = info.value.implementation_member.as_ref().expect("should have implementation");
+        let impl_member = info
+            .value
+            .implementation_member
+            .as_ref()
+            .expect("should have implementation");
         assert!(
             impl_member.display.starts_with("def add"),
             "Implementation display should start with 'def add', got: {}",

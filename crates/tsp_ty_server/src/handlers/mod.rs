@@ -30,31 +30,21 @@ pub(crate) fn dispatch_tsp_request(
             Some(version::handle_get_supported_protocol_version())
         }
         methods::GET_SNAPSHOT => Some(snapshot::handle_get_snapshot(snapshot_manager)),
-        methods::GET_PYTHON_SEARCH_PATHS => {
-            Some(parse_and_call(params, |p| {
-                imports::handle_get_python_search_paths(&p, snapshot_manager, databases)
-            }))
-        }
-        methods::RESOLVE_IMPORT => {
-            Some(parse_and_call(params, |p| {
-                imports::handle_resolve_import(&p, snapshot_manager, databases)
-            }))
-        }
-        methods::GET_COMPUTED_TYPE => {
-            Some(parse_and_call(params, |p| {
-                types::handle_get_computed_type(&p, snapshot_manager, databases)
-            }))
-        }
-        methods::GET_EXPECTED_TYPE => {
-            Some(parse_and_call(params, |p| {
-                types::handle_get_expected_type(&p, snapshot_manager, databases)
-            }))
-        }
-        methods::GET_DECLARED_TYPE => {
-            Some(parse_and_call(params, |p| {
-                types::handle_get_declared_type(&p, snapshot_manager, databases)
-            }))
-        }
+        methods::GET_PYTHON_SEARCH_PATHS => Some(parse_and_call(params, |p| {
+            imports::handle_get_python_search_paths(&p, snapshot_manager, databases)
+        })),
+        methods::RESOLVE_IMPORT => Some(parse_and_call(params, |p| {
+            imports::handle_resolve_import(&p, snapshot_manager, databases)
+        })),
+        methods::GET_COMPUTED_TYPE => Some(parse_and_call(params, |p| {
+            types::handle_get_computed_type(&p, snapshot_manager, databases)
+        })),
+        methods::GET_EXPECTED_TYPE => Some(parse_and_call(params, |p| {
+            types::handle_get_expected_type(&p, snapshot_manager, databases)
+        })),
+        methods::GET_DECLARED_TYPE => Some(parse_and_call(params, |p| {
+            types::handle_get_declared_type(&p, snapshot_manager, databases)
+        })),
         _ if tsp_types::is_tsp_method(method) => {
             // Unknown TSP method
             Some(Err(format!("Unknown TSP method: {method}")))
@@ -75,9 +65,8 @@ where
     T: serde::de::DeserializeOwned,
     F: FnOnce(T) -> Result<serde_json::Value, String>,
 {
-    let parsed: T = serde_json::from_value(params).map_err(|e| {
-        format!("Failed to parse request parameters: {e}")
-    })?;
+    let parsed: T = serde_json::from_value(params)
+        .map_err(|e| format!("Failed to parse request parameters: {e}"))?;
     handler(parsed)
 }
 

@@ -1,7 +1,7 @@
 use crate::Session;
+use crate::server::extension::Notifier;
 use crate::server::{Action, ConnectionSender, SendRequest};
 use crate::server::{Event, MainLoopSender};
-use crate::server::extension::Notifier;
 use lsp_server::{ErrorCode, Message, Notification, RequestId, ResponseError};
 use serde_json::Value;
 use std::any::TypeId;
