@@ -335,10 +335,10 @@ def _(x: type[FalsyClass] | type[TruthyClass]):
 
 ```py
 def _(coinflip_1: bool, coinflip_2: bool):
-    if coinflip_1 if conflip_2 else coinflip_1:
+    if coinflip_1 if coinflip_2 else coinflip_1:
         reveal_type(coinflip_1)  # revealed: Literal[True]
     else:
-        reveal_type(conflip_1)  # revealed: Literal[False]
+        reveal_type(coinflip_1)  # revealed: Literal[False]
 ```
 
 ## Conditional expressions with ambiguous branch constraints
