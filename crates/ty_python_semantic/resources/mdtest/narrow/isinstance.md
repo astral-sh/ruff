@@ -583,6 +583,39 @@ def _(x: object):
         x.push(42)
 ```
 
+When reading attributes from a top-materialized generic, only type parameters should be
+materialized. Unrelated gradual attribute types should be preserved.
+
+```py
+from typing import Any
+
+class InvariantWithAny[T: int]:
+    a: T
+    b: Any
+
+def _(x: object):
+    if isinstance(x, InvariantWithAny):
+        reveal_type(x)  # revealed: Top[InvariantWithAny[Unknown]]
+        reveal_type(x.a)  # revealed: object
+        reveal_type(x.b)  # revealed: Any
+```
+
+The same applies in contravariant positions: `Any` in a parameter type that isn't tied to the
+generic parameter should not be materialized.
+
+```py
+from typing import Any
+
+class ContravariantWithAny[T]:
+    def push(self, x: T, y: Any) -> None: ...
+
+def _(x: object):
+    if isinstance(x, ContravariantWithAny):
+        reveal_type(x)  # revealed: ContravariantWithAny[Never]
+        # error: [invalid-argument-type] "Argument to bound method `push` is incorrect: Expected `Never`, found `Literal[42]`"
+        x.push(42, "hello")
+```
+
 When more complex types are involved, the `Top[]` type may get simplified away.
 
 ```py
