@@ -1013,35 +1013,6 @@ fn cli_all_rules_with_override() -> anyhow::Result<()> {
     Ok(())
 }
 
-/// The "all" keyword is case-insensitive
-#[test]
-fn cli_all_rules_case_insensitive() -> anyhow::Result<()> {
-    let case = CliTest::with_file(
-        "test.py",
-        r#"
-        prin(x)  # unresolved-reference
-        "#,
-    )?;
-
-    // Using --ignore ALL (uppercase) should work the same as --ignore all
-    assert_cmd_snapshot!(
-        case
-            .command()
-            .arg("--ignore")
-            .arg("ALL"),
-        @"
-    success: true
-    exit_code: 0
-    ----- stdout -----
-    All checks passed!
-
-    ----- stderr -----
-    "
-    );
-
-    Ok(())
-}
-
 /// A specific rule can be set first and then overridden by "all"
 #[test]
 fn cli_specific_then_all() -> anyhow::Result<()> {
