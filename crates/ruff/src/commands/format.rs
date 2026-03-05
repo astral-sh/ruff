@@ -38,7 +38,7 @@ use ruff_source_file::{LineIndex, LineRanges, OneIndexed, SourceFileBuilder};
 use ruff_text_size::{TextLen, TextRange, TextSize};
 use ruff_workspace::FormatterSettings;
 use ruff_workspace::resolver::{
-    PyprojectConfig, ResolvedFile, Resolver, match_exclusion, python_files_in_path,
+    PyprojectConfig, ResolvedFile, Resolver, match_exclusion, project_files_in_path,
 };
 
 use crate::args::{ConfigArguments, FormatArguments, FormatRange};
@@ -75,7 +75,7 @@ pub(crate) fn format(
 ) -> Result<ExitStatus> {
     let mode = FormatMode::from_cli(&cli);
     let files = resolve_default_files(cli.files, false);
-    let (paths, resolver) = python_files_in_path(&files, pyproject_config, config_arguments)?;
+    let (paths, resolver) = project_files_in_path(&files, pyproject_config, config_arguments)?;
 
     let output_format = pyproject_config.settings.output_format;
     let preview = pyproject_config.settings.formatter.preview;
