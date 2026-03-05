@@ -5172,12 +5172,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // If this is a generic call, attempt to specialize the parameter type using the
                 // declared type context, if provided.
                 if let Some(generic_context) = overload.signature.generic_context {
-                    let mut builder =
-                        SpecializationBuilder::new(db, generic_context.inferable_typevars(db));
+                    let mut builder = SpecializationBuilder::new(
+                        db,
+                        &constraints,
+                        generic_context.inferable_typevars(db),
+                    );
 
                     if let Some(declared_return_ty) = call_expression_tcx.annotation {
                         let _ = builder.infer_reverse(
-                            &constraints,
                             declared_return_ty,
                             overload
                                 .constructor_instance_type
@@ -6035,7 +6037,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // Collect type constraints from the declared element types.
         let (elt_tcx_constraints, elt_tcx_variance) = {
-            let mut builder = SpecializationBuilder::new(self.db(), inferable);
+            let mut builder = SpecializationBuilder::new(self.db(), &constraints, inferable);
 
             // For a given type variable, we keep track of the variance of any assignments to
             // that type variable in the type context.
@@ -6050,7 +6052,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 builder
                     .infer_reverse_map(
-                        &constraints,
                         tcx,
                         collection_instance,
                         |(typevar, variance, inferred_ty)| {
@@ -6079,7 +6080,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         // Create a set of constraints to infer a precise type for `T`.
-        let mut builder = SpecializationBuilder::new(self.db(), inferable);
+        let mut builder = SpecializationBuilder::new(self.db(), &constraints, inferable);
 
         for elt_ty in elt_tys.clone() {
             let elt_ty_identity = elt_ty.identity(self.db());
@@ -6108,9 +6109,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // our inference is compatible with subsequent additions to the collection), but it
             // matches the behavior of other type checkers and is usually the desired behavior.
             if let Some(elt_tcx) = elt_tcx {
-                builder
-                    .infer(&constraints, Type::TypeVar(elt_ty), elt_tcx)
-                    .ok()?;
+                builder.infer(Type::TypeVar(elt_ty), elt_tcx).ok()?;
             }
         }
 
@@ -6139,12 +6138,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 let mut elt_tys = elt_tys.clone();
                 if let Some((key_ty, value_ty)) = elt_tys.next_tuple() {
-                    builder
-                        .infer(&constraints, Type::TypeVar(key_ty), unpacked_key_ty)
-                        .ok()?;
+                    builder.infer(Type::TypeVar(key_ty), unpacked_key_ty).ok()?;
 
                     builder
-                        .infer(&constraints, Type::TypeVar(value_ty), unpacked_value_ty)
+                        .infer(Type::TypeVar(value_ty), unpacked_value_ty)
                         .ok()?;
                 }
 
@@ -6191,7 +6188,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 builder
                     .infer(
-                        &constraints,
                         Type::TypeVar(elt_ty),
                         if elt.is_starred_expr() {
                             inferred_elt_ty
