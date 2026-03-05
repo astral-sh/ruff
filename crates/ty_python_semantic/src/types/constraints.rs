@@ -260,8 +260,13 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
     fn from_node_and_support(
         builder: &'c ConstraintSetBuilder<'db>,
         node: NodeId,
-        support: SupportId,
+        mut support: SupportId,
     ) -> Self {
+        // The support should only contain constraints that participate in making a constraint set
+        // satisfiable.
+        if node == ALWAYS_FALSE {
+            support = SupportId::Empty;
+        }
         Self {
             node,
             support,
