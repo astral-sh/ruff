@@ -384,11 +384,7 @@ fn user_configuration() -> anyhow::Result<()> {
     ])?;
 
     let config_directory = case.root().join("home/.config");
-    let config_env_var = if cfg!(windows) {
-        "APPDATA"
-    } else {
-        "XDG_CONFIG_HOME"
-    };
+    let config_env_var = user_config_directory_env_var();
 
     assert_cmd_snapshot!(
         case.command().current_dir(case.root().join("project")).env(config_env_var, config_directory.as_os_str()),
@@ -1016,6 +1012,11 @@ impl CliTest {
 
         // Unset all environment variables because they can affect test behavior.
         command.env_clear();
+        // Point user config discovery at a test-local directory to avoid picking up host config.
+        command.env(
+            user_config_directory_env_var(),
+            self.project_dir.join("home/.config"),
+        );
 
         command
     }
@@ -1030,5 +1031,13 @@ fn site_packages_filter(python_version: &str) -> String {
         "Lib/site-packages".to_string()
     } else {
         format!("lib/python{}/site-packages", regex::escape(python_version))
+    }
+}
+
+fn user_config_directory_env_var() -> &'static str {
+    if cfg!(windows) {
+        "APPDATA"
+    } else {
+        "XDG_CONFIG_HOME"
     }
 }
