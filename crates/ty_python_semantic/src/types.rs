@@ -1905,11 +1905,11 @@ impl<'db> Type<'db> {
         // Collect the type mappings used to narrow the type context.
         let tcx_mappings = {
             let mut builder =
-                SpecializationBuilder::new(db, generic_context.inferable_typevars(db));
+                SpecializationBuilder::new(db, constraints, generic_context.inferable_typevars(db));
 
             if let Some(tcx) = tcx.annotation {
                 let alias_instance = Type::instance(db, class_literal.identity_specialization(db));
-                let _ = builder.infer_reverse(constraints, tcx, alias_instance);
+                let _ = builder.infer_reverse(tcx, alias_instance);
             }
 
             builder.into_type_mappings()

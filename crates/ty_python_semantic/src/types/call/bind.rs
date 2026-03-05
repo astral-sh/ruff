@@ -3714,7 +3714,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             .zip(self.call_expression_tcx.annotation);
 
         self.inferable_typevars = generic_context.inferable_typevars(self.db);
-        let mut builder = SpecializationBuilder::new(self.db, self.inferable_typevars);
+        let mut builder = SpecializationBuilder::new(self.db, constraints, self.inferable_typevars);
 
         // Type variables for which we inferred a declared type based on a partially specialized
         // type from an outer generic context. For these type variables, we may infer types that
@@ -3731,37 +3731,32 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     .class_specialization(self.db)?;
 
                 builder
-                    .infer_reverse_map(
-                        constraints,
-                        tcx,
-                        return_ty,
-                        |(identity, variance, inferred_ty)| {
-                            // Avoid unnecessarily widening the return type based on a covariant
-                            // type parameter from the type context, as it can lead to argument
-                            // assignability errors if the type variable is constrained by a narrower
-                            // parameter type.
-                            if variance.is_covariant() {
-                                return None;
-                            }
+                    .infer_reverse_map(tcx, return_ty, |(identity, variance, inferred_ty)| {
+                        // Avoid unnecessarily widening the return type based on a covariant
+                        // type parameter from the type context, as it can lead to argument
+                        // assignability errors if the type variable is constrained by a narrower
+                        // parameter type.
+                        if variance.is_covariant() {
+                            return None;
+                        }
 
-                            // Avoid inferring a preferred type based on partially specialized type context
-                            // from an outer generic call. If the type context is a union, we try to keep
-                            // any concrete elements.
-                            let inferred_ty = inferred_ty.filter_union(self.db, |ty| {
-                                if ty.has_unspecialized_type_var(self.db) {
-                                    partially_specialized_declared_type.insert(identity);
-                                    false
-                                } else {
-                                    true
-                                }
-                            });
-                            if inferred_ty.has_unspecialized_type_var(self.db) {
-                                return None;
+                        // Avoid inferring a preferred type based on partially specialized type context
+                        // from an outer generic call. If the type context is a union, we try to keep
+                        // any concrete elements.
+                        let inferred_ty = inferred_ty.filter_union(self.db, |ty| {
+                            if ty.has_unspecialized_type_var(self.db) {
+                                partially_specialized_declared_type.insert(identity);
+                                false
+                            } else {
+                                true
                             }
+                        });
+                        if inferred_ty.has_unspecialized_type_var(self.db) {
+                            return None;
+                        }
 
-                            Some(inferred_ty)
-                        },
-                    )
+                        Some(inferred_ty)
+                    })
                     .ok()?;
 
                 Some(builder.type_mappings().clone())
@@ -3770,7 +3765,6 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
         let mut specialization_errors = Vec::new();
         let assignable_to_declared_type = self.infer_argument_types(
-            constraints,
             &mut builder,
             &preferred_type_mappings,
             &partially_specialized_declared_type,
@@ -3783,11 +3777,10 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         // Note that this will still lead to an invalid specialization, but may
         // produce more precise diagnostics.
         if !assignable_to_declared_type {
-            builder = SpecializationBuilder::new(self.db, self.inferable_typevars);
+            builder = SpecializationBuilder::new(self.db, constraints, self.inferable_typevars);
             specialization_errors.clear();
 
             self.infer_argument_types(
-                constraints,
                 &mut builder,
                 &FxHashMap::default(),
                 &FxHashSet::default(),
@@ -3852,10 +3845,9 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         self.specialization = Some(specialization);
     }
 
-    fn infer_argument_types(
+    fn infer_argument_types<'c>(
         &mut self,
-        constraints: &ConstraintSetBuilder<'db>,
-        builder: &mut SpecializationBuilder<'db>,
+        builder: &mut SpecializationBuilder<'db, 'c>,
         preferred_type_mappings: &FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>>,
         partially_specialized_declared_type: &FxHashSet<BoundTypeVarIdentity<'_>>,
         specialization_errors: &mut Vec<BindingError<'db>>,
@@ -3870,7 +3862,6 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 self.argument_matches[argument_index].iter()
             {
                 let specialization_result = builder.infer_map(
-                    constraints,
                     parameters[parameter_index].annotated_type(),
                     variadic_argument_type.unwrap_or(argument_type),
                     |(identity, _, inferred_ty)| {
