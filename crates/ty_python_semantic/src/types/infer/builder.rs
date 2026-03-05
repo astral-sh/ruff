@@ -73,16 +73,15 @@ use crate::types::diagnostic::{
     INCONSISTENT_MRO, INEFFECTIVE_FINAL, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT,
     INVALID_ATTRIBUTE_ACCESS, INVALID_BASE, INVALID_DECLARATION, INVALID_ENUM_MEMBER_ANNOTATION,
     INVALID_KEY, INVALID_LEGACY_TYPE_VARIABLE, INVALID_NAMED_TUPLE, INVALID_NEWTYPE,
-    INVALID_OVERLOAD, INVALID_PARAMETER_DEFAULT, INVALID_PARAMSPEC, INVALID_TYPE_ALIAS_TYPE,
-    INVALID_TYPE_ARGUMENTS, INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL,
-    INVALID_TYPE_GUARD_DEFINITION, INVALID_TYPE_VARIABLE_BOUND, INVALID_TYPE_VARIABLE_CONSTRAINTS,
-    INVALID_TYPE_VARIABLE_DEFAULT, IncompatibleBases, MISSING_ARGUMENT, NO_MATCHING_OVERLOAD,
-    PARAMETER_ALREADY_ASSIGNED, POSSIBLY_MISSING_ATTRIBUTE, POSSIBLY_MISSING_IMPLICIT_CALL,
-    POSSIBLY_MISSING_IMPORT, SUBCLASS_OF_FINAL_CLASS, TOO_MANY_POSITIONAL_ARGUMENTS,
-    TypedDictDeleteErrorKind, UNDEFINED_REVEAL, UNKNOWN_ARGUMENT, UNRESOLVED_ATTRIBUTE,
-    UNRESOLVED_GLOBAL, UNRESOLVED_IMPORT, UNRESOLVED_REFERENCE, UNSUPPORTED_DYNAMIC_BASE,
-    UNSUPPORTED_OPERATOR, UNUSED_AWAITABLE, USELESS_OVERLOAD_BODY,
-    hint_if_stdlib_attribute_exists_on_other_versions,
+    INVALID_PARAMETER_DEFAULT, INVALID_PARAMSPEC, INVALID_TYPE_ALIAS_TYPE, INVALID_TYPE_ARGUMENTS,
+    INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL, INVALID_TYPE_GUARD_DEFINITION,
+    INVALID_TYPE_VARIABLE_BOUND, INVALID_TYPE_VARIABLE_CONSTRAINTS, INVALID_TYPE_VARIABLE_DEFAULT,
+    IncompatibleBases, MISSING_ARGUMENT, NO_MATCHING_OVERLOAD, PARAMETER_ALREADY_ASSIGNED,
+    POSSIBLY_MISSING_ATTRIBUTE, POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_IMPORT,
+    SUBCLASS_OF_FINAL_CLASS, TOO_MANY_POSITIONAL_ARGUMENTS, TypedDictDeleteErrorKind,
+    UNDEFINED_REVEAL, UNKNOWN_ARGUMENT, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_IMPORT,
+    UNRESOLVED_REFERENCE, UNSUPPORTED_DYNAMIC_BASE, UNSUPPORTED_OPERATOR, UNUSED_AWAITABLE,
+    USELESS_OVERLOAD_BODY, hint_if_stdlib_attribute_exists_on_other_versions,
     hint_if_stdlib_submodule_exists_on_other_versions, report_attempted_protocol_instantiation,
     report_bad_dunder_set_call, report_call_to_abstract_method,
     report_cannot_delete_typed_dict_key, report_cannot_pop_required_field_on_typed_dict,
@@ -110,6 +109,7 @@ use crate::types::generics::{
 use crate::types::infer::builder::deferred_function::check_function_definition;
 use crate::types::infer::builder::deferred_static_class::check_static_class_definitions;
 use crate::types::infer::builder::dynamic_class_deferred::check_dynamic_class_definition;
+use crate::types::infer::builder::overload_deferred::check_overloaded_function;
 use crate::types::infer::builder::paramspec_validation::validate_paramspec_components;
 use crate::types::infer::{nearest_enclosing_class, nearest_enclosing_function};
 use crate::types::mro::DynamicMroErrorKind;
@@ -146,6 +146,7 @@ mod binary_expressions;
 mod deferred_function;
 mod deferred_static_class;
 mod dynamic_class_deferred;
+mod overload_deferred;
 mod paramspec_validation;
 mod subscript;
 mod type_expression;
@@ -680,12 +681,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         );
 
         if self.db().should_check_file(self.file()) {
+            let mut seen_overloaded_places = FxHashSet::default();
+            let mut seen_public_functions = FxHashSet::default();
+
             for (definition, ty_and_quals) in &self.declarations {
                 match definition.kind(self.db()) {
                     DefinitionKind::Function(_) => {
                         check_function_definition(&self.context, *definition, &|expr| {
                             self.file_expression_type(expr)
                         });
+                        check_overloaded_function(
+                            &self.context,
+                            ty_and_quals.inner_type(),
+                            *definition,
+                            self.scope.scope(self.db()).node(),
+                            self.index,
+                            &mut seen_overloaded_places,
+                            &mut seen_public_functions,
+                        );
                     }
                     DefinitionKind::Class(class_node) => {
                         check_static_class_definitions(
@@ -703,10 +716,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             for definition in &deferred_definitions {
                 check_dynamic_class_definition(&self.context, *definition);
             }
+
+            for function in &self.called_functions {
+                check_overloaded_function(
+                    &self.context,
+                    Type::FunctionLiteral(*function),
+                    function.definition(self.db()),
+                    self.scope.scope(self.db()).node(),
+                    self.index,
+                    &mut seen_overloaded_places,
+                    &mut seen_public_functions,
+                );
+            }
         }
 
         if self.db().should_check_file(self.file()) {
-            self.check_overloaded_functions(node);
             self.check_type_guard_definitions();
             self.check_final_without_value();
         }
@@ -765,268 +789,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     builder.into_diagnostic(format_args!(
                         "`Final` symbol `{place}` is not assigned a value"
                     ));
-                }
-            }
-        }
-    }
-
-    /// Check the overloaded functions in this scope.
-    ///
-    /// This only checks the overloaded functions that are:
-    /// 1. Visible publicly at the end of this scope
-    /// 2. Or, defined and called in this scope
-    ///
-    /// For (1), this has the consequence of not checking an overloaded function that is being
-    /// shadowed by another function with the same name in this scope.
-    fn check_overloaded_functions(&self, scope: &NodeWithScopeKind) {
-        // Collect all the unique overloaded function places in this scope. This requires a set
-        // because an overloaded function uses the same place for each of the overloads and the
-        // implementation.
-        let overloaded_function_places: FxIndexSet<_> = self
-            .declarations
-            .iter()
-            .filter_map(|(definition, ty)| {
-                // Filter out function literals that result from anything other than a function
-                // definition e.g., imports which would create a cross-module AST dependency.
-                if !matches!(definition.kind(self.db()), DefinitionKind::Function(_)) {
-                    return None;
-                }
-                let function = ty.inner_type().as_function_literal()?;
-                if function.has_known_decorator(self.db(), FunctionDecorators::OVERLOAD) {
-                    Some(definition.place(self.db()))
-                } else {
-                    None
-                }
-            })
-            .collect();
-
-        let use_def = self
-            .index
-            .use_def_map(self.scope().file_scope_id(self.db()));
-
-        let mut public_functions = FxIndexSet::default();
-
-        for place in overloaded_function_places {
-            if let Place::Defined(DefinedPlace {
-                ty: Type::FunctionLiteral(function),
-                definedness: Definedness::AlwaysDefined,
-                ..
-            }) = place_from_bindings(
-                self.db(),
-                use_def.end_of_scope_symbol_bindings(place.as_symbol().unwrap()),
-            )
-            .place
-            {
-                if function.file(self.db()) != self.file() {
-                    // If the function is not in this file, we don't need to check it.
-                    // https://github.com/astral-sh/ruff/pull/17609#issuecomment-2839445740
-                    continue;
-                }
-
-                // Extend the functions that we need to check with the publicly visible overloaded
-                // function. This is always going to be either the implementation or the last
-                // overload if the implementation doesn't exists.
-                public_functions.insert(function);
-            }
-        }
-
-        for function in self.called_functions.union(&public_functions) {
-            let (overloads, implementation) = function.overloads_and_implementation(self.db());
-            if overloads.is_empty() {
-                continue;
-            }
-
-            // Check that the overloaded function has at least two overloads
-            if let [single_overload] = overloads {
-                let function_node = single_overload.node(self.db(), self.file(), self.module());
-                if let Some(builder) = self
-                    .context
-                    .report_lint(&INVALID_OVERLOAD, &function_node.name)
-                {
-                    let mut diagnostic = builder.into_diagnostic(format_args!(
-                        "Overloaded function `{}` requires at least two overloads",
-                        &function_node.name
-                    ));
-                    diagnostic.set_primary_message("Only one overload defined here");
-                }
-            }
-
-            // Check that the overloaded function has an implementation. Overload definitions
-            // within stub files, protocols, and on abstract methods within abstract base classes
-            // are exempt from this check.
-            if implementation.is_none() && !self.in_stub() {
-                let mut implementation_required = true;
-
-                if function
-                    .iter_overloads_and_implementation(self.db())
-                    .all(|f| {
-                        f.body_scope(self.db())
-                            .scope(self.db())
-                            .in_type_checking_block()
-                    })
-                {
-                    implementation_required = false;
-                } else if let NodeWithScopeKind::Class(class_node_ref) = scope {
-                    let class = binding_type(
-                        self.db(),
-                        self.index
-                            .expect_single_definition(class_node_ref.node(self.module())),
-                    )
-                    .expect_class_literal();
-
-                    if class.is_protocol(self.db())
-                        || (Type::ClassLiteral(class)
-                            .is_subtype_of(self.db(), KnownClass::ABCMeta.to_instance(self.db()))
-                            && overloads.iter().all(|overload| {
-                                overload.has_known_decorator(
-                                    self.db(),
-                                    FunctionDecorators::ABSTRACT_METHOD,
-                                )
-                            }))
-                    {
-                        implementation_required = false;
-                    }
-                }
-
-                if implementation_required {
-                    let function_node = overloads[0].node(self.db(), self.file(), self.module());
-                    if let Some(builder) = self
-                        .context
-                        .report_lint(&INVALID_OVERLOAD, &function_node.name)
-                    {
-                        let mut diagnostic = builder.into_diagnostic(format_args!(
-                            "Overloads for function `{}` must be followed by a non-`@overload`-decorated implementation function",
-                            &function_node.name
-                        ));
-                        diagnostic.info(format_args!(
-                            "Attempting to call `{}` will raise `TypeError` at runtime",
-                            &function_node.name
-                        ));
-                        diagnostic.info(
-                            "Overloaded functions without implementations are only permitted:",
-                        );
-                        diagnostic.info(" - in stub files");
-                        diagnostic.info(" - in `if TYPE_CHECKING` blocks");
-                        diagnostic.info(" - as methods on protocol classes");
-                        diagnostic.info(
-                            " - or as `@abstractmethod`-decorated methods on abstract classes",
-                        );
-                        diagnostic.info(
-                            "See https://docs.python.org/3/library/typing.html#typing.overload \
-                            for more details",
-                        );
-                    }
-                }
-            }
-
-            for (decorator, name) in [
-                (FunctionDecorators::CLASSMETHOD, "classmethod"),
-                (FunctionDecorators::STATICMETHOD, "staticmethod"),
-            ] {
-                let mut decorator_present = false;
-                let mut decorator_missing = vec![];
-
-                for function in overloads.iter().chain(implementation.as_ref()) {
-                    if function.has_known_decorator(self.db(), decorator) {
-                        decorator_present = true;
-                    } else {
-                        decorator_missing.push(function);
-                    }
-                }
-
-                if !decorator_present {
-                    // Both overloads and implementation does not have the decorator
-                    continue;
-                }
-                if decorator_missing.is_empty() {
-                    // All overloads and implementation have the decorator
-                    continue;
-                }
-
-                let function_node = function.node(self.db(), self.file(), self.module());
-                if let Some(builder) = self
-                    .context
-                    .report_lint(&INVALID_OVERLOAD, &function_node.name)
-                {
-                    let mut diagnostic = builder.into_diagnostic(format_args!(
-                        "Overloaded function `{}` does not use the `@{name}` decorator \
-                         consistently",
-                        &function_node.name
-                    ));
-                    for function in decorator_missing {
-                        diagnostic.annotate(
-                            self.context
-                                .secondary(function.focus_range(self.db(), self.module()))
-                                .message(format_args!("Missing here")),
-                        );
-                    }
-                }
-            }
-
-            for (function, decorator) in [
-                (KnownFunction::Final, FunctionDecorators::FINAL),
-                (KnownFunction::Override, FunctionDecorators::OVERRIDE),
-            ] {
-                if let Some(implementation) = implementation {
-                    for overload in overloads {
-                        if !overload.has_known_decorator(self.db(), decorator) {
-                            continue;
-                        }
-                        let function_node = overload.node(self.db(), self.file(), self.module());
-                        let Some(builder) = self
-                            .context
-                            .report_lint(&INVALID_OVERLOAD, &function_node.name)
-                        else {
-                            continue;
-                        };
-                        let mut diagnostic = builder.into_diagnostic(format_args!(
-                            "`@{name}` decorator should be applied only to the \
-                                overload implementation",
-                            name = function.name()
-                        ));
-                        if let Some(decorator) =
-                            overload.find_known_decorator_span(self.db(), function)
-                        {
-                            diagnostic.annotate(Annotation::secondary(decorator));
-                        }
-                        diagnostic.annotate(
-                            self.context
-                                .secondary(implementation.focus_range(self.db(), self.module()))
-                                .message(format_args!("Implementation defined here")),
-                        );
-                    }
-                } else {
-                    let mut overloads = overloads.iter();
-                    let Some(first_overload) = overloads.next() else {
-                        continue;
-                    };
-                    for overload in overloads {
-                        if !overload.has_known_decorator(self.db(), decorator) {
-                            continue;
-                        }
-                        let function_node = overload.node(self.db(), self.file(), self.module());
-                        let Some(builder) = self
-                            .context
-                            .report_lint(&INVALID_OVERLOAD, &function_node.name)
-                        else {
-                            continue;
-                        };
-                        let mut diagnostic = builder.into_diagnostic(format_args!(
-                            "`@{name}` decorator should be applied only to the \
-                                first overload",
-                            name = function.name()
-                        ));
-                        if let Some(decorator) =
-                            overload.find_known_decorator_span(self.db(), function)
-                        {
-                            diagnostic.annotate(Annotation::secondary(decorator));
-                        }
-                        diagnostic.annotate(
-                            self.context
-                                .secondary(first_overload.focus_range(self.db(), self.module()))
-                                .message(format_args!("First overload defined here")),
-                        );
-                    }
                 }
             }
         }
