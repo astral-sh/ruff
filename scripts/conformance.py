@@ -892,9 +892,13 @@ def render_summary(test_cases: list[TestCase], *, force_summary_table: bool) -> 
 
             ### No changes detected ✅
 
-            ---
+            <details>
+            <summary>Current numbers</summary>
 
+            <br>
             {summary_paragraph}
+
+            </details>
             """
         )
 
