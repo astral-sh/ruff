@@ -1035,7 +1035,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ///
     /// [method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
     /// [metaclass]: https://docs.python.org/3/reference/datamodel.html#metaclasses
-    fn check_static_class_definitions(&mut self) {
+    fn check_static_class_definitions(&self) {
         let class_definitions = self.declarations.iter().filter_map(|(definition, ty)| {
             // Filter out class literals that result from imports
             if let DefinitionKind::Class(class) = definition.kind(self.db()) {
@@ -2395,7 +2395,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ///
     /// For (1), this has the consequence of not checking an overloaded function that is being
     /// shadowed by another function with the same name in this scope.
-    fn check_overloaded_functions(&mut self, scope: &NodeWithScopeKind) {
+    fn check_overloaded_functions(&self, scope: &NodeWithScopeKind) {
         // Collect all the unique overloaded function places in this scope. This requires a set
         // because an overloaded function uses the same place for each of the overloads and the
         // implementation.
@@ -2652,7 +2652,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// Check that all type guard function definitions have at least one positional parameter
     /// (in addition to `self`/`cls` for methods), and for `TypeIs`, that the narrowed type is
     /// assignable to the declared type of that parameter.
-    fn check_type_guard_definitions(&mut self) {
+    fn check_type_guard_definitions(&self) {
         for (definition, ty) in &self.declarations {
             // Only check actual function definitions, not imports.
             let DefinitionKind::Function(function_ref) = definition.kind(self.db()) else {
@@ -8190,7 +8190,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// Iterate over all dynamic class definitions (created using `type()` calls) to check that
     /// the definition will not cause an exception to be raised at runtime. This needs to be done
     /// after deferred inference completes, since bases may contain forward references.
-    fn check_dynamic_class_definitions(&mut self, deferred_definitions: &[Definition<'db>]) {
+    fn check_dynamic_class_definitions(&self, deferred_definitions: &[Definition<'db>]) {
         let db = self.db();
         let module = self.module();
 
@@ -8227,7 +8227,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ///
     /// Returns `true` if the MRO is valid, `false` if there were errors.
     fn report_dynamic_mro_errors(
-        &mut self,
+        &self,
         dynamic_class: DynamicClassLiteral<'db>,
         call_expr: &ast::ExprCall,
         bases: &ast::Expr,
@@ -8327,7 +8327,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     /// Check a single dynamic class definition for MRO and metaclass errors.
     fn check_dynamic_class_definition(
-        &mut self,
+        &self,
         dynamic_class: DynamicClassLiteral<'db>,
         call_expr: &ast::ExprCall,
     ) {
