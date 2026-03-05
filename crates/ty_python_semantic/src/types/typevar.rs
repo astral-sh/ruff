@@ -904,7 +904,7 @@ impl<'db> BoundTypeVarInstance<'db> {
                 }
             }
             TypeMapping::UniqueSpecialization { .. }
-            | TypeMapping::PromoteLiterals(_)
+            | TypeMapping::Promote(_)
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::EagerExpansion

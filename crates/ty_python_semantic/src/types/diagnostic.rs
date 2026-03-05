@@ -4477,7 +4477,7 @@ pub(crate) fn report_undeclared_protocol_member(
     if definition.kind(db).is_unannotated_assignment() {
         let binding_type = binding_type(db, definition);
 
-        let suggestion = binding_type.promote_literals(db);
+        let suggestion = binding_type.promote(db);
 
         if should_give_hint(db, suggestion) {
             diagnostic.set_primary_message(format_args!(

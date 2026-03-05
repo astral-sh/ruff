@@ -9971,7 +9971,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             if tuple.len() > MAX_TUPLE_LENGTH_FOR_UNANNOTATED_LITERAL_INFERENCE {
                 // Promote literals for very large unannotated tuples,
                 // to avoid pathological performance issues
-                self.infer_expression(elt, ctx).promote_literals(db)
+                self.infer_expression(elt, ctx).promote(db)
             } else {
                 self.infer_expression(elt, ctx)
             }
@@ -10367,7 +10367,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 // Note that unlike when preferring the declared type, we use covariant type
                 // assignments from the type context to potentially _narrow_ the inferred type,
-                // by avoiding literal promotion.
+                // by avoiding promotion.
                 let elt_ty_identity = elt_ty.identity(self.db());
 
                 // If the element is a starred expression, we want to apply the type context to each element
@@ -10395,9 +10395,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     continue;
                 }
 
-                // Convert any element literals to their promoted type form to avoid excessively large
-                // unions for large nested list literals, which the constraint solver struggles with.
-                let inferred_elt_ty = inferred_elt_ty.promote_literals(self.db());
+                // Promote types to avoid excessively large unions for large nested list literals,
+                // which the constraint solver struggles with.
+                let inferred_elt_ty = inferred_elt_ty.promote(self.db());
 
                 builder
                     .infer(
