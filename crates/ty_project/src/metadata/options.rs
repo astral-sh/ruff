@@ -1828,7 +1828,7 @@ mod schema {
             let registry = ty_python_semantic::default_lint_registry();
             let level_schema = generator.subschema_for::<super::Level>();
 
-            let properties: Map<String, Value> = registry
+            let mut properties: Map<String, Value> = registry
                 .lints()
                 .iter()
                 .map(|lint| {
@@ -1857,6 +1857,26 @@ mod schema {
                     (lint.name().to_string(), schema.into())
                 })
                 .collect();
+
+            let mut all_schema = schemars::Schema::default();
+            let all = all_schema.ensure_object();
+            all.insert(
+                "title".to_string(),
+                Value::String("set the default severity level for all rules".to_string()),
+            );
+            all.insert(
+                "description".to_string(),
+                Value::String(
+                    "Configure a default severity level for all rules. Individual rule settings override this default."
+                        .to_string(),
+                ),
+            );
+            all.insert(
+                "oneOf".to_string(),
+                Value::Array(vec![level_schema.clone().into()]),
+            );
+
+            properties.insert("all".to_string(), all_schema.into());
 
             let mut schema = schemars::json_schema!({ "type": "object" });
             let object = schema.ensure_object();
