@@ -1,5 +1,0 @@
----
-source: crates/ruff_linter/src/linter.rs
----
-D100 Missing docstring in public module
---> <filename>:1:1

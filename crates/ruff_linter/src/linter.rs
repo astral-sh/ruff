@@ -1225,38 +1225,22 @@ mod tests {
         assert_diagnostics!(snapshot, diagnostics);
     }
 
+    #[test_case("on_line_one", r#"#!/usr/bin/env python #noqa:D100"#)]
     #[test_case(
-		"noqa_on_same_line",
-		r#"#!/usr/bin/env python #noqa:D100"#,
-		&LinterSettings::for_rule(Rule::UndocumentedPublicModule)
-	)]
+        "on_line_two",
+        r#"#!/usr/bin/env python
+        #noqa: D100"#
+    )]
     #[test_case(
-		"noqa_on_line_two",
-		r#"#!/usr/bin/env python
-        #noqa: D100"#,
-		&LinterSettings::for_rule(Rule::UndocumentedPublicModule)
-	)]
-    #[test_case(
-		"noqa_on_line_three",
-		r#"#!/usr/bin/env python
+        "on_line_three",
+        r#"#!/usr/bin/env python
 
-        #noqa: D100"#,
-		&LinterSettings::for_rule(Rule::UndocumentedPublicModule)
-	)]
-    #[test_case(
-		"noqa_line_2_but_no_shebang",
-		r#"#/usr/bin/env python
-        #noqa: D100"#,
-		&LinterSettings::for_rule(Rule::UndocumentedPublicModule)
-	)]
-    #[test_case(
-		"noqa_same_line_but_no_shebang",
-		r#"#/usr/bin/env python #noqa: D100"#,
-		&LinterSettings::for_rule(Rule::UndocumentedPublicModule)
-	)]
-    fn test_shebang_noqa(name: &str, contents: &str, settings: &LinterSettings) {
+        #noqa: D100"#
+    )]
+    fn test_shebang_noqa(name: &str, contents: &str) {
         let snapshot = format!("shebang_noqa_{name}");
-        let diagnostics = test_snippet(contents, settings);
+        let settings = LinterSettings::for_rule(Rule::UndocumentedPublicModule);
+        let diagnostics = test_snippet(contents, &settings);
         assert_diagnostics!(snapshot, diagnostics);
     }
 }
