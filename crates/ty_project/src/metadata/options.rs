@@ -910,7 +910,7 @@ impl Rules {
         // Initialize the selection with the defaults
         let mut selection = RuleSelection::from_registry(registry);
 
-        for (rule_name, level) in &self.inner {
+        let mut apply_rule = |rule_name: &RangedValue<String>, level: &RangedValue<Level>| {
             let source = rule_name.source();
             let lint_source = match source {
                 ValueSource::File(_) => LintSource::File,
@@ -931,7 +931,7 @@ impl Rules {
                 for lint in registry.lints() {
                     set_lint_level(*lint);
                 }
-                continue;
+                return;
             }
 
             match registry.get(rule_name) {
@@ -959,6 +959,29 @@ impl Rules {
                     diagnostics.push(diagnostic.with_annotation(annotation));
                 }
             }
+        };
+
+        // TOML tables are unordered, so for file-based configuration we always treat `all` as
+        // the base level and apply explicit per-rule selectors afterwards.
+        let is_file_all_selector = |rule_name: &RangedValue<String>| {
+            rule_name.eq_ignore_ascii_case("all")
+                && matches!(rule_name.source(), ValueSource::File(_))
+        };
+
+        for (rule_name, level) in self
+            .inner
+            .iter()
+            .filter(|(rule_name, _)| is_file_all_selector(rule_name))
+        {
+            apply_rule(rule_name, level);
+        }
+
+        for (rule_name, level) in self
+            .inner
+            .iter()
+            .filter(|(rule_name, _)| !is_file_all_selector(rule_name))
+        {
+            apply_rule(rule_name, level);
         }
 
         selection
