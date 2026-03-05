@@ -648,6 +648,43 @@ def _(x: type[object], y: type[object], z: type[object]):
         reveal_type(z)  # revealed: type[Top[Invariant[Unknown]]]
 ```
 
+## Narrowing generic defaults in Python 3.13
+
+When a type parameter has a bare `Any` default, narrowing still materializes the substituted
+typevar. The default isn't used during `isinstance` narrowing (the type parameter gets `Unknown`
+instead), so the default value is irrelevant here:
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import Any
+
+class WithAnyDefault[T = Any]:
+    y: tuple[Any, T]
+
+def _(x: object):
+    if isinstance(x, WithAnyDefault):
+        reveal_type(x.y)  # revealed: tuple[Any, object]
+```
+
+Type alias defaults substituted into type parameters still need to be materialized when narrowing:
+
+```py
+from typing import Any
+
+type A = Any
+
+class WithAliasDefault[T = A]:
+    y: tuple[A, T]
+
+def _(x: object):
+    if isinstance(x, WithAliasDefault):
+        reveal_type(x.y)  # revealed: tuple[A, object]
+```
+
 ## Narrowing with TypedDict unions
 
 Narrowing unions of `int` and multiple TypedDicts using `isinstance(x, dict)` should not panic

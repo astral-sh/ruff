@@ -878,7 +878,10 @@ impl<'db> BoundTypeVarInstance<'db> {
                     if mapped == Type::TypeVar(self) {
                         mapped
                     } else {
-                        mapped.materialize(db, *materialization_kind, visitor)
+                        // Materialization uses a different mapping mode. Reuse of the outer
+                        // visitor can incorrectly hit a cache entry from specialization.
+                        let materialization_visitor = ApplyTypeMappingVisitor::default();
+                        mapped.materialize(db, *materialization_kind, &materialization_visitor)
                     }
                 })
                 .unwrap_or(Type::TypeVar(self)),
