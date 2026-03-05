@@ -7,7 +7,7 @@ use crate::types::diagnostic::{
     self, INVALID_TYPE_FORM, NOT_SUBSCRIPTABLE, UNBOUND_TYPE_VARIABLE,
     report_invalid_argument_number_to_special_form, report_invalid_arguments_to_callable,
 };
-use crate::types::infer::builder::{InnerExpressionInferenceState, TypeInferenceFlags};
+use crate::types::infer::builder::{InferenceFlags, InnerExpressionInferenceState};
 use crate::types::signatures::Signature;
 use crate::types::special_form::{AliasSpec, LegacyStdlibAlias};
 use crate::types::string_annotation::parse_string_annotation;
@@ -1399,10 +1399,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // decide to revisit this in the future.
         let previous_check_unbound_typevars = self
             .inference_flags
-            .replace(TypeInferenceFlags::CHECK_UNBOUND_TYPEVARS, false);
+            .replace(InferenceFlags::CHECK_UNBOUND_TYPEVARS, false);
         let result = inner(self, subscript);
         self.inference_flags.set(
-            TypeInferenceFlags::CHECK_UNBOUND_TYPEVARS,
+            InferenceFlags::CHECK_UNBOUND_TYPEVARS,
             previous_check_unbound_typevars,
         );
         result
@@ -1712,13 +1712,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     } else if i < arguments.len() - 1 {
                         self.infer_type_expression(argument);
                     } else {
-                        let previously_allowed_paramspec = self.inference_flags.replace(
-                            TypeInferenceFlags::ALLOW_PARAM_SPEC_IN_TYPE_EXPRESSIONS,
-                            true,
-                        );
+                        let previously_allowed_paramspec = self
+                            .inference_flags
+                            .replace(InferenceFlags::ALLOW_PARAMSPEC_TYPE_EXPR, true);
                         self.infer_type_expression(argument);
                         self.inference_flags.set(
-                            TypeInferenceFlags::ALLOW_PARAM_SPEC_IN_TYPE_EXPRESSIONS,
+                            InferenceFlags::ALLOW_PARAMSPEC_TYPE_EXPR,
                             previously_allowed_paramspec,
                         );
                     }
@@ -2011,58 +2010,26 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 // TODO: Support `Concatenate[...]`
                 return Some(Parameters::todo());
             }
-            ast::Expr::Name(name) => {
-                if name.is_invalid() {
+            ast::Expr::Name(_) | ast::Expr::Attribute(_) => {
+                if parameters
+                    .as_name_expr()
+                    .is_some_and(ast::ExprName::is_invalid)
+                {
                     // This is a special case to avoid raising the error suggesting what the first
                     // argument should be. This only happens when there's already a syntax error like
                     // `Callable[]`.
                     return None;
                 }
-                let name_ty = self.infer_name_load(name);
-
-                let previously_allowed_paramspec = self.inference_flags.replace(
-                    TypeInferenceFlags::ALLOW_PARAM_SPEC_IN_TYPE_EXPRESSIONS,
-                    true,
-                );
-                let in_type_expr = name_ty.in_type_expression(
-                    self.db(),
-                    self.scope,
-                    self.typevar_binding_context,
-                    self.inference_flags,
-                );
+                let previously_allowed_paramspec = self
+                    .inference_flags
+                    .replace(InferenceFlags::ALLOW_PARAMSPEC_TYPE_EXPR, true);
+                let parameters_type = self.infer_type_expression_no_store(parameters);
                 self.inference_flags.set(
-                    TypeInferenceFlags::ALLOW_PARAM_SPEC_IN_TYPE_EXPRESSIONS,
+                    InferenceFlags::ALLOW_PARAMSPEC_TYPE_EXPR,
                     previously_allowed_paramspec,
                 );
-
-                if let Type::TypeVar(tvar) = in_type_expr.unwrap_or_else(|err| {
-                    err.into_fallback_type(&self.context, name, self.is_reachable(name))
-                }) && tvar.is_paramspec(self.db())
-                {
-                    return Some(Parameters::paramspec(self.db(), tvar));
-                }
-            }
-            ast::Expr::Attribute(attr) => {
-                let attr_ty = self.infer_attribute_load(attr);
-
-                let previously_allowed_paramspec = self.inference_flags.replace(
-                    TypeInferenceFlags::ALLOW_PARAM_SPEC_IN_TYPE_EXPRESSIONS,
-                    true,
-                );
-                let in_type_expr = attr_ty.in_type_expression(
-                    self.db(),
-                    self.scope,
-                    self.typevar_binding_context,
-                    self.inference_flags,
-                );
-                self.inference_flags.set(
-                    TypeInferenceFlags::ALLOW_PARAM_SPEC_IN_TYPE_EXPRESSIONS,
-                    previously_allowed_paramspec,
-                );
-
-                if let Type::TypeVar(tvar) = in_type_expr.unwrap_or_else(|err| {
-                    err.into_fallback_type(&self.context, attr, self.is_reachable(attr))
-                }) && tvar.is_paramspec(self.db())
+                if let Type::TypeVar(tvar) = parameters_type
+                    && tvar.is_paramspec(self.db())
                 {
                     return Some(Parameters::paramspec(self.db(), tvar));
                 }
@@ -2072,13 +2039,21 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     self.string_annotations
                         .insert(ruff_python_ast::ExprRef::StringLiteral(string).into());
                     let node_key = self.enclosing_node_key(string.into());
+
                     let previous_deferred_state = std::mem::replace(
                         &mut self.deferred_state,
                         DeferredExpressionState::InStringAnnotation(node_key),
                     );
-                    let result = self.infer_callable_parameter_types(parsed.expr());
+                    let result = matches!(
+                        parsed.expr(),
+                        ast::Expr::Name(_) | ast::Expr::Attribute(_) | ast::Expr::Subscript(_)
+                    )
+                    .then(|| self.infer_callable_parameter_types(parsed.expr()));
                     self.deferred_state = previous_deferred_state;
-                    return result;
+
+                    if let Some(result) = result {
+                        return result;
+                    }
                 }
             }
             _ => {}
@@ -2104,7 +2079,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     ) -> Type<'db> {
         if !self
             .inference_flags
-            .contains(TypeInferenceFlags::CHECK_UNBOUND_TYPEVARS)
+            .contains(InferenceFlags::CHECK_UNBOUND_TYPEVARS)
         {
             return ty;
         }

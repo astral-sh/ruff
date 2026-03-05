@@ -63,7 +63,7 @@ use crate::types::generics::{
     ApplySpecialization, InferableTypeVars, Specialization, bind_typevar,
 };
 pub(crate) use crate::types::generics::{GenericContext, SpecializationBuilder};
-use crate::types::infer::TypeInferenceFlags;
+use crate::types::infer::InferenceFlags;
 use crate::types::known_instance::{InternedConstraintSet, InternedType, UnionTypeInstance};
 pub use crate::types::method::{BoundMethodType, KnownBoundMethodType, WrapperDescriptorKind};
 use crate::types::mro::{MroIterator, StaticMroError};
@@ -4865,7 +4865,7 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         scope_id: ScopeId<'db>,
         typevar_binding_context: Option<Definition<'db>>,
-        inference_flags: TypeInferenceFlags,
+        inference_flags: InferenceFlags,
     ) -> Result<Type<'db>, InvalidTypeExpressionError<'db>> {
         match self {
             // Special cases for `float` and `complex`
@@ -4910,8 +4910,7 @@ impl<'db> Type<'db> {
                 KnownInstanceType::TypeAliasType(alias) => Ok(Type::TypeAlias(*alias)),
                 KnownInstanceType::NewType(newtype) => Ok(Type::NewTypeInstance(*newtype)),
                 KnownInstanceType::TypeVar(typevar) => {
-                    if !inference_flags
-                        .contains(TypeInferenceFlags::ALLOW_PARAM_SPEC_IN_TYPE_EXPRESSIONS)
+                    if !inference_flags.contains(InferenceFlags::ALLOW_PARAMSPEC_TYPE_EXPR)
                         && typevar.is_paramspec(db)
                     {
                         return Err(InvalidTypeExpressionError {
@@ -6681,7 +6680,7 @@ impl<'db> InvalidTypeExpression<'db> {
                 return;
             };
             if module_member_with_same_name
-                .in_type_expression(db, scope, None, TypeInferenceFlags::empty())
+                .in_type_expression(db, scope, None, InferenceFlags::empty())
                 .is_err()
             {
                 return;

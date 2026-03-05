@@ -5,8 +5,8 @@ use crate::{
     semantic_index::{definition::Definition, scope::ScopeId},
     types::{
         ApplyTypeMappingVisitor, BoundTypeVarInstance, CallableType, ClassType, GenericContext,
-        InvalidTypeExpressionError, KnownClass, StringLiteralType, Type, TypeAliasType,
-        TypeContext, TypeInferenceFlags, TypeMapping, TypeVarVariance, UnionBuilder,
+        InferenceFlags, InvalidTypeExpressionError, KnownClass, StringLiteralType, Type,
+        TypeAliasType, TypeContext, TypeMapping, TypeVarVariance, UnionBuilder,
         class::NamedTupleSpec,
         constraints::OwnedConstraintSet,
         generics::{Specialization, walk_generic_context},
@@ -426,7 +426,7 @@ impl<'db> UnionTypeInstance<'db> {
         value_expr_types: [Type<'db>; 2],
         scope_id: ScopeId<'db>,
         typevar_binding_context: Option<Definition<'db>>,
-        inference_flags: TypeInferenceFlags,
+        inference_flags: InferenceFlags,
     ) -> Type<'db> {
         let mut builder = UnionBuilder::new(db);
         for ty in &value_expr_types {

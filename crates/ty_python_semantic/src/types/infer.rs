@@ -885,13 +885,13 @@ impl<'db> ExpressionInference<'db> {
 
 bitflags::bitflags! {
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-    pub(crate) struct TypeInferenceFlags: u8 {
+    pub(crate) struct InferenceFlags: u8 {
         /// Whether to allow `ParamSpec` in type expressions.
         ///
         /// In most contexts inside type expressions, bare `ParamSpec`s are not allowed.
         /// They are specifically allowed as the first argument to `Callable`,
         /// the second argument to `Concatenate`, and certain other special cases.
-        const ALLOW_PARAM_SPEC_IN_TYPE_EXPRESSIONS = 1 << 0;
+        const ALLOW_PARAMSPEC_TYPE_EXPR = 1 << 0;
 
         /// Whether to check for unbound type variables in type expressions.
         /// This flag is set when processing annotation expressions, where unbound type variables
@@ -901,7 +901,7 @@ bitflags::bitflags! {
     }
 }
 
-impl TypeInferenceFlags {
+impl InferenceFlags {
     fn replace(&mut self, other: Self, set_to: bool) -> bool {
         let previously_contained_flag = self.contains(other);
         self.set(other, set_to);

@@ -183,6 +183,8 @@ def valid(
     a3: Callable["P", int],
     a4: Callable[Concatenate[int, "P"], int],
     a5: Callable[library.LibraryP, int],
+    a6: Callable["Concatenate[int, P]", int],
+    a7: Callable["library.LibraryP", int],
 ) -> None: ...
 def invalid(
     # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
@@ -204,6 +206,10 @@ def invalid(
     a8: Optional[P],
     # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
     a9: Annotated[P, "metadata"],
+    # error: [invalid-type-form] "The first argument to `Callable` must be either a list of types, ParamSpec, Concatenate, or `...`"
+    a10: Callable["[int, str]", str],
+    # error: [invalid-type-form] "The first argument to `Callable` must be either a list of types, ParamSpec, Concatenate, or `...`"
+    a11: Callable["...", int],
 ) -> None: ...
 
 # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"

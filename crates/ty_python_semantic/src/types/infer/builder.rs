@@ -135,14 +135,14 @@ use crate::types::typevar::{
 use crate::types::visitor::find_over_type;
 use crate::types::{
     CallDunderError, CallableBinding, CallableType, ClassType, DataclassParams, DynamicType,
-    EvaluationMode, GenericAlias, InternedConstraintSet, InternedType, IntersectionBuilder,
-    IntersectionType, KnownClass, KnownInstanceType, KnownUnion, LintDiagnosticGuard,
-    LiteralValueTypeKind, MemberLookupPolicy, MetaclassCandidate, ParamSpecAttrKind, Parameter,
-    ParameterForm, Parameters, Signature, SpecialFormType, StaticClassLiteral, SubclassOfType,
-    Truthiness, Type, TypeAliasType, TypeAndQualifiers, TypeContext, TypeInferenceFlags,
-    TypeQualifiers, TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, TypedDictType,
-    UnionBuilder, UnionType, binding_type, definition_expression_type, infer_complete_scope_types,
-    infer_scope_types, todo_type,
+    EvaluationMode, GenericAlias, InferenceFlags, InternedConstraintSet, InternedType,
+    IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, KnownUnion,
+    LintDiagnosticGuard, LiteralValueTypeKind, MemberLookupPolicy, MetaclassCandidate,
+    ParamSpecAttrKind, Parameter, ParameterForm, Parameters, Signature, SpecialFormType,
+    StaticClassLiteral, SubclassOfType, Truthiness, Type, TypeAliasType, TypeAndQualifiers,
+    TypeContext, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance,
+    TypedDictType, UnionBuilder, UnionType, binding_type, definition_expression_type,
+    infer_complete_scope_types, infer_scope_types, todo_type,
 };
 use crate::types::{CallableTypes, overrides};
 use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
@@ -303,7 +303,7 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
 
     /// Type-inference is context-dependent, especially in type expressions.
     /// This field tracks various flags that control how type inference should behave in the current context.
-    inference_flags: TypeInferenceFlags,
+    inference_flags: InferenceFlags,
 
     /// The deferred state of inferring types of certain expressions within the region.
     ///
@@ -371,7 +371,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             bindings: VecMap::default(),
             declarations: VecMap::default(),
             typevar_binding_context: None,
-            inference_flags: TypeInferenceFlags::empty(),
+            inference_flags: InferenceFlags::empty(),
             deferred: VecSet::default(),
             undecorated_type: None,
             cycle_recovery: None,
@@ -5016,13 +5016,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn infer_paramspec_default(&mut self, default_expr: &ast::Expr) {
-        let previously_allowed_paramspec = self.inference_flags.replace(
-            TypeInferenceFlags::ALLOW_PARAM_SPEC_IN_TYPE_EXPRESSIONS,
-            true,
-        );
+        let previously_allowed_paramspec = self
+            .inference_flags
+            .replace(InferenceFlags::ALLOW_PARAMSPEC_TYPE_EXPR, true);
         self.infer_paramspec_default_impl(default_expr);
         self.inference_flags.set(
-            TypeInferenceFlags::ALLOW_PARAM_SPEC_IN_TYPE_EXPRESSIONS,
+            InferenceFlags::ALLOW_PARAMSPEC_TYPE_EXPR,
             previously_allowed_paramspec,
         );
     }
