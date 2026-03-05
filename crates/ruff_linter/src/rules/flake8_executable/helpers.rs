@@ -13,6 +13,8 @@ pub(super) fn is_executable(filepath: &Path) -> Result<bool> {
 }
 
 /// Returns `true` if the current process is running under WSL.
+///
+/// Adapted from is-wsl by Sean Larkin, MIT License.
 pub(super) fn is_wsl() -> bool {
     static CACHED: OnceLock<bool> = OnceLock::new();
     *CACHED.get_or_init(detect_wsl)
@@ -41,6 +43,8 @@ fn detect_wsl() -> bool {
 ///
 /// Checks for Docker (`/.dockerenv`), Podman (`/run/.containerenv`), and
 /// various container runtimes via their cgroup paths.
+///
+/// Adapted from is-docker by Sean Larkin, MIT License.
 fn is_container() -> bool {
     if std::fs::metadata("/.dockerenv").is_ok() || std::fs::metadata("/run/.containerenv").is_ok() {
         return true;
