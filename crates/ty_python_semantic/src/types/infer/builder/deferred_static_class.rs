@@ -67,12 +67,16 @@ use crate::{
 /// [metaclass]: https://docs.python.org/3/reference/datamodel.html#metaclasses
 pub(super) fn check_static_class_definitions<'db>(
     context: &InferContext<'db, '_>,
-    class: StaticClassLiteral<'db>,
+    ty: Type<'db>,
     class_node: &ast::StmtClassDef,
     index: &SemanticIndex<'db>,
     file_expression_type: &impl Fn(&ast::Expr) -> Type<'db>,
 ) {
     let db = context.db();
+
+    let Type::ClassLiteral(ClassLiteral::Static(class)) = ty else {
+        return;
+    };
 
     // Check that the class does not have a cyclic definition
     if let Some(inheritance_cycle) = class.inheritance_cycle(db) {

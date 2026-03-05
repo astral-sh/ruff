@@ -109,6 +109,7 @@ use crate::types::generics::{
 };
 use crate::types::infer::builder::deferred_function::check_function_definition;
 use crate::types::infer::builder::deferred_static_class::check_static_class_definitions;
+use crate::types::infer::builder::dynamic_class_deferred::check_dynamic_class_definition;
 use crate::types::infer::builder::paramspec_validation::validate_paramspec_components;
 use crate::types::infer::{nearest_enclosing_class, nearest_enclosing_function};
 use crate::types::mro::DynamicMroErrorKind;
@@ -144,6 +145,7 @@ mod annotation_expression;
 mod binary_expressions;
 mod deferred_function;
 mod deferred_static_class;
+mod dynamic_class_deferred;
 mod paramspec_validation;
 mod subscript;
 mod type_expression;
@@ -686,14 +688,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         });
                     }
                     DefinitionKind::Class(class_node) => {
-                        let Type::ClassLiteral(ClassLiteral::Static(class)) =
-                            ty_and_quals.inner_type()
-                        else {
-                            continue;
-                        };
                         check_static_class_definitions(
                             &self.context,
-                            class,
+                            ty_and_quals.inner_type(),
                             class_node.node(self.module()),
                             self.index,
                             &|expr| self.file_expression_type(expr),
@@ -702,10 +699,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     _ => {}
                 }
             }
+
+            for definition in &deferred_definitions {
+                check_dynamic_class_definition(&self.context, *definition);
+            }
         }
 
         if self.db().should_check_file(self.file()) {
-            self.check_dynamic_class_definitions(&deferred_definitions);
             self.check_overloaded_functions(node);
             self.check_type_guard_definitions();
             self.check_final_without_value();
@@ -6570,203 +6570,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.validate_dynamic_type_bases(bases_arg, &bases, name);
     }
 
-    /// Iterate over all dynamic class definitions (created using `type()` calls) to check that
-    /// the definition will not cause an exception to be raised at runtime. This needs to be done
-    /// after deferred inference completes, since bases may contain forward references.
-    fn check_dynamic_class_definitions(&self, deferred_definitions: &[Definition<'db>]) {
-        let db = self.db();
-        let module = self.module();
-
-        for definition in deferred_definitions {
-            // Only check assignment definitions (`type()` calls).
-            let DefinitionKind::Assignment(assignment) = definition.kind(db) else {
-                continue;
-            };
-
-            // Get the binding type for this definition.
-            let ty = binding_type(db, *definition);
-
-            // Check if it's a dynamic class with a Definition anchor.
-            let Type::ClassLiteral(ClassLiteral::Dynamic(dynamic_class)) = ty else {
-                continue;
-            };
-
-            // Only check classes with Definition anchors (i.e., assigned `type()` calls).
-            // Dangling `type()` calls are validated eagerly during inference.
-            let DynamicClassAnchor::Definition(_) = dynamic_class.anchor(db) else {
-                continue;
-            };
-
-            let value = assignment.value(module);
-            let Some(call_expr) = value.as_call_expr() else {
-                continue;
-            };
-
-            self.check_dynamic_class_definition(dynamic_class, call_expr);
-        }
-    }
-
-    /// Report MRO errors for a dynamic class.
-    ///
-    /// Returns `true` if the MRO is valid, `false` if there were errors.
-    fn report_dynamic_mro_errors(
-        &self,
-        dynamic_class: DynamicClassLiteral<'db>,
-        call_expr: &ast::ExprCall,
-        bases: &ast::Expr,
-    ) -> bool {
-        let db = self.db();
-        let Err(error) = dynamic_class.try_mro(db) else {
-            return true;
-        };
-
-        let bases_tuple_elts = bases.as_tuple_expr().map(|tuple| tuple.elts.as_slice());
-
-        match error.reason() {
-            DynamicMroErrorKind::InvalidBases(invalid_bases) => {
-                for (idx, base_type) in invalid_bases {
-                    // Check if the type is "type-like" (e.g., `type[Base]`).
-                    let instance_of_type = KnownClass::Type.to_instance(db);
-
-                    // Determine the diagnostic node; prefer specific base expr, fall back to bases.
-                    let specific_base = bases_tuple_elts.and_then(|elts| elts.get(*idx));
-                    let diagnostic_range = specific_base
-                        .map(ast::Expr::range)
-                        .unwrap_or_else(|| bases.range());
-
-                    if base_type.is_assignable_to(db, instance_of_type) {
-                        if let Some(builder) = self
-                            .context
-                            .report_lint(&UNSUPPORTED_DYNAMIC_BASE, diagnostic_range)
-                        {
-                            let mut diagnostic = builder.into_diagnostic("Unsupported class base");
-                            diagnostic.set_primary_message(format_args!(
-                                "Has type `{}`",
-                                base_type.display(db)
-                            ));
-                            diagnostic.info(format_args!(
-                                "ty cannot determine a MRO for class `{}` due to this base",
-                                dynamic_class.name(db)
-                            ));
-                            diagnostic
-                                .info("Only class objects or `Any` are supported as class bases");
-                        }
-                    } else if let Some(builder) =
-                        self.context.report_lint(&INVALID_BASE, diagnostic_range)
-                    {
-                        let mut diagnostic = builder.into_diagnostic(format_args!(
-                            "Invalid class base with type `{}`",
-                            base_type.display(db)
-                        ));
-                        if specific_base.is_none() {
-                            diagnostic
-                                .info(format_args!("Element {} of the tuple is invalid", idx + 1));
-                        }
-                    }
-                }
-            }
-            DynamicMroErrorKind::InheritanceCycle => {
-                if let Some(builder) = self
-                    .context
-                    .report_lint(&CYCLIC_CLASS_DEFINITION, call_expr)
-                {
-                    builder.into_diagnostic(format_args!(
-                        "Cyclic definition of `{}`",
-                        dynamic_class.name(db)
-                    ));
-                }
-            }
-            DynamicMroErrorKind::DuplicateBases(duplicates) => {
-                if let Some(builder) = self.context.report_lint(&DUPLICATE_BASE, call_expr) {
-                    builder.into_diagnostic(format_args!(
-                        "Duplicate base class{maybe_s} {dupes} in class `{class}`",
-                        maybe_s = if duplicates.len() == 1 { "" } else { "es" },
-                        dupes = duplicates
-                            .iter()
-                            .map(|base: &ClassBase<'_>| base.display(db))
-                            .join(", "),
-                        class = dynamic_class.name(db),
-                    ));
-                }
-            }
-            DynamicMroErrorKind::UnresolvableMro => {
-                if let Some(builder) = self.context.report_lint(&INCONSISTENT_MRO, call_expr) {
-                    builder.into_diagnostic(format_args!(
-                        "Cannot create a consistent method resolution order (MRO) \
-                        for class `{}` with bases `[{}]`",
-                        dynamic_class.name(db),
-                        dynamic_class
-                            .explicit_bases(db)
-                            .iter()
-                            .map(|base| base.display(db))
-                            .join(", ")
-                    ));
-                }
-            }
-        }
-
-        false
-    }
-
-    /// Check a single dynamic class definition for MRO and metaclass errors.
-    fn check_dynamic_class_definition(
-        &self,
-        dynamic_class: DynamicClassLiteral<'db>,
-        call_expr: &ast::ExprCall,
-    ) {
-        let db = self.db();
-
-        // A valid 3-argument type() call must have a `bases` argument.
-        let Some(bases) = call_expr.arguments.args.get(1) else {
-            return;
-        };
-
-        // Check for MRO errors.
-        if self.report_dynamic_mro_errors(dynamic_class, call_expr, bases) {
-            // MRO succeeded, check for instance-layout-conflict.
-            let mut disjoint_bases = IncompatibleBases::default();
-            let bases_tuple_elts = bases.as_tuple_expr().map(|tuple| tuple.elts.as_slice());
-
-            for (idx, base_type) in dynamic_class.explicit_bases(db).iter().enumerate() {
-                // Convert to ClassType to access nearest_disjoint_base.
-                if let Some(class_type) = base_type.to_class_type(db) {
-                    if let Some(disjoint_base) = class_type.nearest_disjoint_base(db) {
-                        disjoint_bases.insert(disjoint_base, idx, class_type.class_literal(db));
-                    }
-                }
-            }
-
-            disjoint_bases.remove_redundant_entries(db);
-            if disjoint_bases.len() > 1 {
-                report_instance_layout_conflict(
-                    &self.context,
-                    dynamic_class.header_range(db),
-                    bases_tuple_elts,
-                    &disjoint_bases,
-                );
-            }
-        }
-
-        // Check for metaclass conflicts.
-        if let Err(DynamicMetaclassConflict {
-            metaclass1,
-            base1,
-            metaclass2,
-            base2,
-        }) = dynamic_class.try_metaclass(db)
-        {
-            report_conflicting_metaclass_from_bases(
-                &self.context,
-                call_expr.into(),
-                dynamic_class.name(db),
-                metaclass1,
-                base1.display(db),
-                metaclass2,
-                base2.display(db),
-            );
-        }
-    }
-
     /// Infer a call to `builtins.type()`.
     ///
     /// `builtins.type` has two overloads: a single-argument overload (e.g. `type("foo")`,
@@ -7021,7 +6824,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.validate_dynamic_type_bases(bases_arg, explicit_bases, &name);
 
             // Check for MRO errors.
-            if self.report_dynamic_mro_errors(dynamic_class, call_expr, bases_arg) {
+            if report_dynamic_mro_errors(&self.context, dynamic_class, call_expr, bases_arg) {
                 // MRO succeeded, check for instance-layout-conflict.
                 disjoint_bases.remove_redundant_entries(db);
                 if disjoint_bases.len() > 1 {
@@ -14184,4 +13987,99 @@ impl std::fmt::Display for NamedTupleKind {
 enum BoundOrConstraintsNodes<'ast> {
     Bound(&'ast ast::Expr),
     Constraints(&'ast [ast::Expr]),
+}
+
+/// Report MRO errors for a dynamic class.
+///
+/// Returns `true` if the MRO is valid, `false` if there were errors.
+fn report_dynamic_mro_errors<'db>(
+    context: &InferContext<'db, '_>,
+    dynamic_class: DynamicClassLiteral<'db>,
+    call_expr: &ast::ExprCall,
+    bases: &ast::Expr,
+) -> bool {
+    let db = context.db();
+    let Err(error) = dynamic_class.try_mro(db) else {
+        return true;
+    };
+
+    let bases_tuple_elts = bases.as_tuple_expr().map(|tuple| tuple.elts.as_slice());
+
+    match error.reason() {
+        DynamicMroErrorKind::InvalidBases(invalid_bases) => {
+            for (idx, base_type) in invalid_bases {
+                // Check if the type is "type-like" (e.g., `type[Base]`).
+                let instance_of_type = KnownClass::Type.to_instance(db);
+
+                // Determine the diagnostic node; prefer specific base expr, fall back to bases.
+                let specific_base = bases_tuple_elts.and_then(|elts| elts.get(*idx));
+                let diagnostic_range = specific_base
+                    .map(ast::Expr::range)
+                    .unwrap_or_else(|| bases.range());
+
+                if base_type.is_assignable_to(db, instance_of_type) {
+                    if let Some(builder) =
+                        context.report_lint(&UNSUPPORTED_DYNAMIC_BASE, diagnostic_range)
+                    {
+                        let mut diagnostic = builder.into_diagnostic("Unsupported class base");
+                        diagnostic.set_primary_message(format_args!(
+                            "Has type `{}`",
+                            base_type.display(db)
+                        ));
+                        diagnostic.info(format_args!(
+                            "ty cannot determine a MRO for class `{}` due to this base",
+                            dynamic_class.name(db)
+                        ));
+                        diagnostic.info("Only class objects or `Any` are supported as class bases");
+                    }
+                } else if let Some(builder) = context.report_lint(&INVALID_BASE, diagnostic_range) {
+                    let mut diagnostic = builder.into_diagnostic(format_args!(
+                        "Invalid class base with type `{}`",
+                        base_type.display(db)
+                    ));
+                    if specific_base.is_none() {
+                        diagnostic
+                            .info(format_args!("Element {} of the tuple is invalid", idx + 1));
+                    }
+                }
+            }
+        }
+        DynamicMroErrorKind::InheritanceCycle => {
+            if let Some(builder) = context.report_lint(&CYCLIC_CLASS_DEFINITION, call_expr) {
+                builder.into_diagnostic(format_args!(
+                    "Cyclic definition of `{}`",
+                    dynamic_class.name(db)
+                ));
+            }
+        }
+        DynamicMroErrorKind::DuplicateBases(duplicates) => {
+            if let Some(builder) = context.report_lint(&DUPLICATE_BASE, call_expr) {
+                builder.into_diagnostic(format_args!(
+                    "Duplicate base class{maybe_s} {dupes} in class `{class}`",
+                    maybe_s = if duplicates.len() == 1 { "" } else { "es" },
+                    dupes = duplicates
+                        .iter()
+                        .map(|base: &ClassBase<'_>| base.display(db))
+                        .join(", "),
+                    class = dynamic_class.name(db),
+                ));
+            }
+        }
+        DynamicMroErrorKind::UnresolvableMro => {
+            if let Some(builder) = context.report_lint(&INCONSISTENT_MRO, call_expr) {
+                builder.into_diagnostic(format_args!(
+                    "Cannot create a consistent method resolution order (MRO) \
+                        for class `{}` with bases `[{}]`",
+                    dynamic_class.name(db),
+                    dynamic_class
+                        .explicit_bases(db)
+                        .iter()
+                        .map(|base| base.display(db))
+                        .join(", ")
+                ));
+            }
+        }
+    }
+
+    false
 }
