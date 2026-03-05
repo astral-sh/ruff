@@ -334,18 +334,11 @@ def _(x: type[FalsyClass] | type[TruthyClass]):
 ## Narrowing with conditional expressions
 
 ```py
-from random import choice
-
-def func() -> bool:
-    return choice((True, False))
-
-def _(flag: bool):
-    var = func()
-
-    if var if flag else var:
-        reveal_type(var)  # revealed: Literal[True]
+def _(coinflip_1: bool, coinflip_2: bool):
+    if coinflip_1 if conflip_2 else coinflip_1:
+        reveal_type(coinflip_1)  # revealed: Literal[True]
     else:
-        reveal_type(var)  # revealed: Literal[False]
+        reveal_type(conflip_1)  # revealed: Literal[False]
 ```
 
 ## Conditional expressions with ambiguous branch constraints
