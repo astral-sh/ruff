@@ -78,6 +78,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 [left_ty, right_ty],
                 self.scope(),
                 self.typevar_binding_context,
+                self.inference_flags,
             )
         }
     }
@@ -703,6 +704,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         [left_ty, right_ty],
                         self.scope(),
                         self.typevar_binding_context,
+                        self.inference_flags,
                     ))
                 }
             }
@@ -729,6 +731,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     [left_ty, right_ty],
                     self.scope(),
                     self.typevar_binding_context,
+                    self.inference_flags,
                 ))
             }
 
