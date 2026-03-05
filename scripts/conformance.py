@@ -804,12 +804,17 @@ def render_file_stats_table(test_cases: list[TestCase]) -> str:
     )
 
     lines = [
-        "### Files changed",
+        "### Test file breakdown",
+        "",
+        "<details>",
+        f"<summary>{len(changed)} file{'s' if len(changed) != 1 else ''} altered</summary>",
         "",
         "| File | True Positives | False Positives | False Negatives | Status |",
         "|------|----|----|----|--------|",
         *rows,
         totals_row,
+        "",
+        "</details>",
         "",
     ]
     return "\n".join(lines)
@@ -847,6 +852,13 @@ def diff_format(
 
 
 def render_summary(test_cases: list[TestCase], *, force_summary_table: bool) -> str:
+    def format_metric(diff: float, old: float, new: float):
+        if diff > 0:
+            return f"increased from {old:.2%} to {new:.2%}"
+        if diff < 0:
+            return f"decreased from {old:.2%} to {new:.2%}"
+        return f"held steady at {old:.2%}"
+
     old = compute_stats(test_cases, Source.OLD)
     new = compute_stats(test_cases, Source.NEW)
 
@@ -862,6 +874,13 @@ def render_summary(test_cases: list[TestCase], *, force_summary_table: bool) -> 
     false_neg_change = new.false_negatives - old.false_negatives
     total_change = new.total_diagnostics - old.total_diagnostics
 
+    summary_paragraph = (
+        f"The percentage of diagnostics emitted that were expected errors "
+        f"{format_metric(precision_change, old.precision, new.precision)}. "
+        f"The percentage of expected errors that received a diagnostic "
+        f"{format_metric(recall_change, old.recall, new.recall)}."
+    )
+
     base_header = f"[Typing conformance results]({CONFORMANCE_DIR_WITH_README})"
 
     if not force_summary_table and all(
@@ -871,7 +890,11 @@ def render_summary(test_cases: list[TestCase], *, force_summary_table: bool) -> 
             f"""
             ## {base_header}
 
-            No changes detected ✅
+            ### No changes detected ✅
+
+            ---
+
+            {summary_paragraph}
             """
         )
 
@@ -899,10 +922,18 @@ def render_summary(test_cases: list[TestCase], *, force_summary_table: bool) -> 
         f"""
         ## {header}
 
+        {summary_paragraph}
 
         ### Summary
 
-        <details><summary>How are test cases classified?</summary>{summary_note}</details>
+        <details>
+        <summary>How are test cases classified?</summary>
+
+        <br>
+
+        {summary_note}
+
+        </details>
 
         | Metric | Old | New | Diff | Outcome |
         |--------|-----|-----|------|---------|
