@@ -11,8 +11,8 @@ use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::visitor::{Visitor, walk_expr};
 use ruff_python_ast::{
-    self as ast, AnyNodeRef, AnyParameterRef, ArgOrKeyword, ArgumentsSourceOrder, ExprContext,
-    HasNodeIndex, NodeIndex, PythonVersion,
+    self as ast, AnyNodeRef, ArgOrKeyword, ArgumentsSourceOrder, ExprContext, HasNodeIndex,
+    NodeIndex, PythonVersion,
 };
 use ruff_python_stdlib::builtins::version_builtin_was_added;
 use ruff_python_stdlib::identifiers::is_identifier;
@@ -77,18 +77,18 @@ use crate::types::diagnostic::{
     FINAL_WITHOUT_VALUE, INCONSISTENT_MRO, INEFFECTIVE_FINAL, INVALID_ARGUMENT_TYPE,
     INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, INVALID_BASE, INVALID_DATACLASS,
     INVALID_DECLARATION, INVALID_ENUM_MEMBER_ANNOTATION, INVALID_GENERIC_CLASS,
-    INVALID_GENERIC_ENUM, INVALID_KEY, INVALID_LEGACY_POSITIONAL_PARAMETER,
-    INVALID_LEGACY_TYPE_VARIABLE, INVALID_METACLASS, INVALID_NAMED_TUPLE, INVALID_NEWTYPE,
-    INVALID_OVERLOAD, INVALID_PARAMETER_DEFAULT, INVALID_PARAMSPEC, INVALID_PROTOCOL,
-    INVALID_TYPE_ALIAS_TYPE, INVALID_TYPE_ARGUMENTS, INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL,
-    INVALID_TYPE_GUARD_DEFINITION, INVALID_TYPE_VARIABLE_BOUND, INVALID_TYPE_VARIABLE_CONSTRAINTS,
-    INVALID_TYPE_VARIABLE_DEFAULT, INVALID_TYPED_DICT_HEADER, INVALID_TYPED_DICT_STATEMENT,
-    IncompatibleBases, MISSING_ARGUMENT, NO_MATCHING_OVERLOAD, PARAMETER_ALREADY_ASSIGNED,
-    POSSIBLY_MISSING_ATTRIBUTE, POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_IMPORT,
-    SUBCLASS_OF_FINAL_CLASS, TOO_MANY_POSITIONAL_ARGUMENTS, TypedDictDeleteErrorKind,
-    UNDEFINED_REVEAL, UNKNOWN_ARGUMENT, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_IMPORT,
-    UNRESOLVED_REFERENCE, UNSUPPORTED_DYNAMIC_BASE, UNSUPPORTED_OPERATOR, UNUSED_AWAITABLE,
-    USELESS_OVERLOAD_BODY, hint_if_stdlib_attribute_exists_on_other_versions,
+    INVALID_GENERIC_ENUM, INVALID_KEY, INVALID_LEGACY_TYPE_VARIABLE, INVALID_METACLASS,
+    INVALID_NAMED_TUPLE, INVALID_NEWTYPE, INVALID_OVERLOAD, INVALID_PARAMETER_DEFAULT,
+    INVALID_PARAMSPEC, INVALID_PROTOCOL, INVALID_TYPE_ALIAS_TYPE, INVALID_TYPE_ARGUMENTS,
+    INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL, INVALID_TYPE_GUARD_DEFINITION,
+    INVALID_TYPE_VARIABLE_BOUND, INVALID_TYPE_VARIABLE_CONSTRAINTS, INVALID_TYPE_VARIABLE_DEFAULT,
+    INVALID_TYPED_DICT_HEADER, INVALID_TYPED_DICT_STATEMENT, IncompatibleBases, MISSING_ARGUMENT,
+    NO_MATCHING_OVERLOAD, PARAMETER_ALREADY_ASSIGNED, POSSIBLY_MISSING_ATTRIBUTE,
+    POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_IMPORT, SUBCLASS_OF_FINAL_CLASS,
+    TOO_MANY_POSITIONAL_ARGUMENTS, TypedDictDeleteErrorKind, UNDEFINED_REVEAL, UNKNOWN_ARGUMENT,
+    UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_IMPORT, UNRESOLVED_REFERENCE,
+    UNSUPPORTED_DYNAMIC_BASE, UNSUPPORTED_OPERATOR, UNUSED_AWAITABLE, USELESS_OVERLOAD_BODY,
+    hint_if_stdlib_attribute_exists_on_other_versions,
     hint_if_stdlib_submodule_exists_on_other_versions, report_attempted_protocol_instantiation,
     report_bad_dunder_set_call, report_bad_frozen_dataclass_inheritance,
     report_call_to_abstract_method, report_cannot_delete_typed_dict_key,
@@ -117,6 +117,7 @@ use crate::types::function::{
 use crate::types::generics::{
     InferableTypeVars, SpecializationBuilder, bind_typevar, enclosing_generic_contexts, typing_self,
 };
+use crate::types::infer::builder::deferred_function::check_function_definition;
 use crate::types::infer::builder::paramspec_validation::validate_paramspec_components;
 use crate::types::infer::{nearest_enclosing_class, nearest_enclosing_function};
 use crate::types::mro::{DynamicMroErrorKind, StaticMroErrorKind};
@@ -152,6 +153,7 @@ use crate::{AnalysisSettings, Db, FxIndexSet, Program};
 
 mod annotation_expression;
 mod binary_expressions;
+mod deferred_function;
 mod paramspec_validation;
 mod subscript;
 mod type_expression;
@@ -686,338 +688,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         );
 
         if self.db().should_check_file(self.file()) {
+            for (definition, _) in &self.declarations {
+                match definition.kind(self.db()) {
+                    DefinitionKind::Function(_) => {
+                        check_function_definition(&self.context, *definition, &|expr| {
+                            self.file_expression_type(expr)
+                        });
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        if self.db().should_check_file(self.file()) {
             self.check_static_class_definitions();
             self.check_dynamic_class_definitions(&deferred_definitions);
             self.check_overloaded_functions(node);
             self.check_type_guard_definitions();
-            self.check_function_definitions();
             self.check_final_without_value();
-        }
-    }
-
-    /// Iterate over all function definitions in this scope and run checks that
-    /// require access to the function's inferred signature (and therefore must
-    /// run after deferred inference is complete).
-    fn check_function_definitions(&self) {
-        let db = self.db();
-
-        for (definition, _) in &self.declarations {
-            if !definition.kind(db).is_function_def() {
-                continue;
-            }
-            let Some(Type::FunctionLiteral(function_type)) =
-                infer_definition_types(db, *definition).undecorated_type()
-            else {
-                continue;
-            };
-
-            let last_definition = function_type.literal(db).last_definition(db);
-            let signature = last_definition.raw_signature(db);
-
-            self.check_legacy_positional_only_convention(last_definition, &signature);
-            self.check_legacy_typevar_defaults(last_definition, &signature);
-            self.check_legacy_typevar_ordering(last_definition, &signature);
-        }
-    }
-
-    /// Check for invalid applications of the pre-PEP-570 positional-only parameter convention.
-    fn check_legacy_positional_only_convention(
-        &self,
-        last_definition: OverloadLiteral<'db>,
-        signature: &Signature<'db>,
-    ) {
-        let node = last_definition.node(self.db(), self.file(), self.module());
-        let ast_parameters = &node.parameters;
-
-        // If the function has any PEP-570 positional-only parameters,
-        // assume that `__`-prefixed parameters are not meant to be positional-only
-        if !ast_parameters.posonlyargs.is_empty() {
-            return;
-        }
-        let parsed_parameters = signature.parameters();
-        let mut previous_non_positional_only: Option<&ast::ParameterWithDefault> = None;
-
-        for (param_node, param) in std::iter::zip(ast_parameters, parsed_parameters) {
-            let AnyParameterRef::NonVariadic(param_node) = param_node else {
-                continue;
-            };
-            if param.is_positional_only() {
-                continue;
-            }
-
-            // Valid uses of the PEP-484 positional-only convention will have been detected as such
-            // in the first iteration over this scope, so `param.is_positional_only()` will return `true`
-            // for those. We only get here for invalid uses of the PEP-484 positional-only convention.
-            if param_node.uses_pep_484_positional_only_convention() {
-                let Some(builder) = self
-                    .context
-                    .report_lint(&INVALID_LEGACY_POSITIONAL_PARAMETER, param_node.name())
-                else {
-                    continue;
-                };
-                let mut diagnostic = builder.into_diagnostic(
-                    "Invalid use of the legacy convention \
-                        for positional-only parameters",
-                );
-                diagnostic.set_primary_message(
-                    "Parameter name begins with `__` but will not be treated as positional-only",
-                );
-                diagnostic.info(
-                    "A parameter can only be positional-only \
-                        if it precedes all positional-or-keyword parameters",
-                );
-                if let Some(earlier_node) = previous_non_positional_only {
-                    diagnostic.annotate(
-                        self.context
-                            .secondary(earlier_node.name())
-                            .message("Prior parameter here was positional-or-keyword"),
-                    );
-                }
-            } else if previous_non_positional_only.is_none() {
-                previous_non_positional_only = Some(param_node);
-            }
-        }
-    }
-
-    /// Find the range of the first parameter annotation (or return type) in a function
-    /// whose inferred type references the given `TypeVar`, falling back to the function name.
-    fn find_typevar_annotation_range(
-        &self,
-        node: &ast::StmtFunctionDef,
-        typevar: TypeVarInstance<'db>,
-    ) -> TextRange {
-        let db = self.db();
-        let typevar_id = typevar.identity(self.db());
-
-        node.parameters
-            .iter()
-            .filter_map(ast::AnyParameterRef::annotation)
-            .chain(node.returns.as_deref())
-            .find(|ann| {
-                self.file_expression_type(ann)
-                    .references_typevar(db, typevar_id)
-            })
-            .map(Ranged::range)
-            .unwrap_or(node.name.range())
-    }
-
-    /// Check whether any legacy `TypeVar` used in a function signature has a default
-    /// that references an out-of-scope type variable.
-    ///
-    /// This check mirrors the class-level check at `report_invalid_typevar_default_reference`,
-    /// but for function/method generic contexts.
-    fn check_legacy_typevar_defaults(
-        &self,
-        last_definition: OverloadLiteral<'db>,
-        signature: &Signature<'db>,
-    ) {
-        let db = self.db();
-
-        let Some(generic_context) = signature.generic_context else {
-            return;
-        };
-
-        let typevars = generic_context
-            .variables(db)
-            .map(|bound_tvar| bound_tvar.typevar(db));
-
-        for (i, typevar) in typevars.clone().enumerate() {
-            // Only check legacy TypeVars; PEP 695 type parameters are already validated
-            // by `check_default_for_outer_scope_typevars` in the type parameter scope.
-            if !matches!(
-                typevar.kind(db),
-                TypeVarKind::Legacy | TypeVarKind::Pep613Alias | TypeVarKind::ParamSpec
-            ) {
-                continue;
-            }
-
-            let Some(default_ty) = typevar.default_type(db) else {
-                continue;
-            };
-
-            let first_bad_tvar = find_over_type(db, default_ty, false, |t| {
-                let tvar = match t {
-                    Type::TypeVar(tvar) => tvar.typevar(db),
-                    Type::KnownInstance(KnownInstanceType::TypeVar(tvar)) => tvar,
-                    _ => return None,
-                };
-                if !typevars.clone().take(i).contains(&tvar) {
-                    Some(tvar)
-                } else {
-                    None
-                }
-            });
-
-            let Some(bad_typevar) = first_bad_tvar else {
-                continue;
-            };
-
-            let is_later_in_list = typevars.clone().skip(i).contains(&bad_typevar);
-            let node = last_definition.node(db, self.file(), self.module());
-
-            let primary_range = self.find_typevar_annotation_range(node, typevar);
-
-            let Some(builder) = self
-                .context
-                .report_lint(&INVALID_TYPE_VARIABLE_DEFAULT, primary_range)
-            else {
-                continue;
-            };
-            let typevar_name = typevar.name(db);
-            let mut diagnostic = builder.into_diagnostic(format_args!(
-                "Invalid use of type variable `{typevar_name}`",
-            ));
-
-            if is_later_in_list {
-                diagnostic.set_primary_message(format_args!(
-                    "Default of `{typevar_name}` references later type parameter `{}`",
-                    bad_typevar.name(db),
-                ));
-                diagnostic.set_concise_message(format_args!(
-                    "Invalid use of type variable `{typevar_name}`: default of `{typevar_name}` \
-                    refers to later parameter `{}`",
-                    bad_typevar.name(db)
-                ));
-            } else {
-                diagnostic.set_primary_message(format_args!(
-                    "Default of `{typevar_name}` references out-of-scope type variable `{}`",
-                    bad_typevar.name(db),
-                ));
-                diagnostic.set_concise_message(format_args!(
-                    "Invalid use of type variable `{typevar_name}`: default of `{typevar_name}` \
-                    refers to out-of-scope type variable `{}`",
-                    bad_typevar.name(db)
-                ));
-            }
-
-            if let Some(typevar_definition) = typevar.definition(db) {
-                let file = typevar_definition.file(db);
-                diagnostic.annotate(
-                    Annotation::secondary(Span::from(
-                        typevar_definition.full_range(db, &parsed_module(db, file).load(db)),
-                    ))
-                    .message(format_args!("`{typevar_name}` defined here")),
-                );
-            }
-
-            diagnostic
-                .info("See https://typing.python.org/en/latest/spec/generics.html#scoping-rules");
-        }
-    }
-
-    /// Check that legacy `TypeVar`s without defaults don't follow `TypeVar`s with defaults
-    /// in a function's generic context.
-    ///
-    /// This mirrors the class-level check using `report_invalid_type_param_order`, but for
-    /// function/method generic contexts using the `invalid-type-variable-default` lint.
-    fn check_legacy_typevar_ordering(
-        &self,
-        last_definition: OverloadLiteral<'db>,
-        signature: &Signature<'db>,
-    ) {
-        struct State<'db> {
-            typevar_with_default: TypeVarInstance<'db>,
-            invalid_later_tvars: Vec<TypeVarInstance<'db>>,
-        }
-
-        let db = self.db();
-
-        let Some(generic_context) = signature.generic_context else {
-            return;
-        };
-
-        let mut state: Option<State<'db>> = None;
-
-        for bound_typevar in generic_context.variables(db) {
-            let typevar = bound_typevar.typevar(db);
-
-            // Only check legacy TypeVars; PEP 695 ordering is validated by the parser.
-            if !matches!(
-                typevar.kind(db),
-                TypeVarKind::Legacy | TypeVarKind::Pep613Alias | TypeVarKind::ParamSpec
-            ) {
-                continue;
-            }
-
-            let has_default = typevar.default_type(db).is_some();
-
-            if let Some(state) = state.as_mut() {
-                if !has_default {
-                    state.invalid_later_tvars.push(typevar);
-                }
-            } else if has_default {
-                state = Some(State {
-                    typevar_with_default: typevar,
-                    invalid_later_tvars: vec![],
-                });
-            }
-        }
-
-        let Some(state) = state else {
-            return;
-        };
-
-        if state.invalid_later_tvars.is_empty() {
-            return;
-        }
-
-        let node = last_definition.node(db, self.file(), self.module());
-
-        let primary_range = self.find_typevar_annotation_range(node, state.invalid_later_tvars[0]);
-
-        let Some(builder) = self
-            .context
-            .report_lint(&INVALID_TYPE_VARIABLE_DEFAULT, primary_range)
-        else {
-            return;
-        };
-
-        let mut diagnostic = builder.into_diagnostic(
-            "Type parameters without defaults cannot follow type parameters with defaults",
-        );
-
-        let typevar_with_default_name = state.typevar_with_default.name(db);
-
-        diagnostic.set_concise_message(format_args!(
-            "Type parameter `{}` without a default cannot follow \
-            earlier parameter `{typevar_with_default_name}` with a default",
-            state.invalid_later_tvars[0].name(db),
-        ));
-
-        if let [single_typevar] = &*state.invalid_later_tvars {
-            diagnostic.set_primary_message(format_args!(
-                "Type variable `{}` does not have a default",
-                single_typevar.name(db),
-            ));
-        } else {
-            let later_typevars =
-                format_enumeration(state.invalid_later_tvars.iter().map(|tv| tv.name(db)));
-            diagnostic.set_primary_message(format_args!(
-                "Type variables {later_typevars} do not have defaults",
-            ));
-        }
-
-        let secondary_range = self.find_typevar_annotation_range(node, state.typevar_with_default);
-
-        diagnostic.annotate(
-            self.context
-                .secondary(secondary_range)
-                .message(format_args!(
-                    "Earlier TypeVar `{typevar_with_default_name}` has a default"
-                )),
-        );
-
-        for tvar in [state.typevar_with_default, state.invalid_later_tvars[0]] {
-            let Some(definition) = tvar.definition(db) else {
-                continue;
-            };
-            let file = definition.file(db);
-            diagnostic.annotate(
-                Annotation::secondary(Span::from(
-                    definition.full_range(db, &parsed_module(db, file).load(db)),
-                ))
-                .message(format_args!("`{}` defined here", tvar.name(db))),
-            );
         }
     }
 
