@@ -331,6 +331,64 @@ def _(x: type[FalsyClass] | type[TruthyClass]):
     reveal_type(x and A())  # revealed: type[FalsyClass] | A
 ```
 
+## Narrowing with conditional expressions
+
+```py
+from random import choice
+
+def func() -> bool:
+    return choice((True, False))
+
+def _(flag: bool):
+    var = func()
+
+    if var if flag else var:
+        reveal_type(var)  # revealed: Literal[True]
+    else:
+        reveal_type(var)  # revealed: Literal[False]
+```
+
+## Conditional expressions with ambiguous branch constraints
+
+```py
+from typing import Literal
+
+def _(flag: bool, x: Literal[0, 1], y: Literal[0, 1]):
+    if x if flag else y:
+        reveal_type(x)  # revealed: Literal[0, 1]
+        reveal_type(y)  # revealed: Literal[0, 1]
+    else:
+        reveal_type(x)  # revealed: Literal[0, 1]
+        reveal_type(y)  # revealed: Literal[0, 1]
+
+def _(flag: bool, x: Literal[0, 1, 2]):
+    if (x == 1) if flag else (x == 2):
+        reveal_type(x)  # revealed: Literal[1, 2]
+    else:
+        reveal_type(x)  # revealed: Literal[0, 2, 1]
+
+def _(flag: bool, x: Literal[0, 1], y: int):
+    if (x == 1) if flag else y:
+        reveal_type(x)  # revealed: Literal[0, 1]
+```
+
+## Conditional expressions with statically known tests
+
+```py
+from typing import Literal
+
+def _(x: Literal[0, 1], y: Literal[0, 1]):
+    if x if True else y:
+        reveal_type(x)  # revealed: Literal[1]
+    else:
+        reveal_type(x)  # revealed: Literal[0]
+
+    if x if False else y:
+        reveal_type(y)  # revealed: Literal[1]
+    else:
+        reveal_type(y)  # revealed: Literal[0]
+```
+
 ## Truthiness narrowing for `LiteralString`
 
 ```py
