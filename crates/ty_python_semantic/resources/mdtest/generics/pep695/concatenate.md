@@ -16,16 +16,14 @@ element.
 from typing import Callable, Concatenate
 
 def foo[**P, R](func: Callable[Concatenate[int, P], R]) -> Callable[Concatenate[int, P], R]:
-    # TODO: Should reveal `(int, /, *args: P@foo.args, **kwargs: P@foo.kwargs) -> R@foo`
-    reveal_type(func)  # revealed: (...) -> R@foo
+    reveal_type(func)  # revealed: (int, /, *args: P@foo.args, **kwargs: P@foo.kwargs) -> R@foo
     return func
 
 def f(x: int, y: str) -> bool:
     return True
 
 result = foo(f)
-# TODO: Should reveal `(int, /, y: str) -> bool`
-reveal_type(result)  # revealed: (...) -> bool
+reveal_type(result)  # revealed: (int, /, y: str) -> bool
 ```
 
 ### With ellipsis
@@ -34,8 +32,7 @@ reveal_type(result)  # revealed: (...) -> bool
 from typing import Callable, Concatenate
 
 def _(c: Callable[Concatenate[int, str, ...], bool]):
-    # TODO: Should reveal `(int, str, /, ...) -> bool`
-    reveal_type(c)  # revealed: (...) -> bool
+    reveal_type(c)  # revealed: (int, str, /, *args: Any, **kwargs: Any) -> bool
 ```
 
 ### Complex types inside `Concatenate`
@@ -44,8 +41,7 @@ def _(c: Callable[Concatenate[int, str, ...], bool]):
 from typing import Callable, Concatenate
 
 def _(c: Callable[Concatenate[int | str, list[int], type[str], ...], None]):
-    # TODO: Should reveal `(int | str, list[int], type[str], ...) -> None`
-    reveal_type(c)  # revealed: (...) -> None
+    reveal_type(c)  # revealed: (int | str, list[int], type[str], /, *args: Any, **kwargs: Any) -> None
 ```
 
 ### Nested
@@ -54,8 +50,7 @@ def _(c: Callable[Concatenate[int | str, list[int], type[str], ...], None]):
 from typing import Callable, Concatenate
 
 def _(c: Callable[Concatenate[int, Callable[Concatenate[str, ...], None], ...], None]):
-    # TODO: Should reveal `(int, (str, ...) -> None, /, ...) -> None`
-    reveal_type(c)  # revealed: (...) -> None
+    reveal_type(c)  # revealed: (int, (str, /, *args: Any, **kwargs: Any) -> None, /, *args: Any, **kwargs: Any) -> None
 ```
 
 ## Decorator patterns
@@ -76,12 +71,12 @@ def add_param[**P, R](func: Callable[P, R]) -> Callable[Concatenate[int, P], R]:
 def f(x: str, y: bytes) -> int:
     return 1
 
-# TODO: Should reveal `(int, /, x: str, y: bytes) -> int`
-reveal_type(f)  # revealed: (...) -> int
+reveal_type(f)  # revealed: (int, /, x: str, y: bytes) -> int
 
 reveal_type(f(1, "", b""))  # revealed: int
 
-# TODO: This should be an error since `param` is a positional-only parameter
+# error: [missing-argument] "No argument provided for required parameter 1"
+# error: [unknown-argument] "Argument `param` does not match any known parameter"
 reveal_type(f(param=1, x="", y=b""))  # revealed: int
 ```
 
@@ -95,25 +90,18 @@ from typing import Callable, Concatenate
 def remove_param[**P, R](func: Callable[Concatenate[int, P], R]) -> Callable[P, R]:
     def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
         return func(0, *args, **kwargs)
-    # TODO: no error expected here
-    return wrapper  # error: [invalid-return-type]
+    return wrapper
 
 @remove_param
 def f(x: int, y: str, z: bytes) -> int:
     return 1
 
-# TODO: Should reveal `(y: str, z: bytes) -> int`
-reveal_type(f)  # revealed: [**P'return](**P'return) -> int
+reveal_type(f)  # revealed: (y: str, z: bytes) -> int
 
-# TODO: Shouldn't be an error
-# error: [missing-argument]
 reveal_type(f("", b""))  # revealed: int
-# TODO: Shouldn't be an error
-# error: [missing-argument]
 reveal_type(f(y="", z=b""))  # revealed: int
 
-# TODO: missing-argument is an incorrect error, it should be [unknown-argument] since `x` is removed
-# error: [missing-argument] "No argument provided for required parameter `*args`"
+# error: [unknown-argument] "Argument `x` does not match any known parameter"
 reveal_type(f(x=1, y="", z=b""))  # revealed: int
 ```
 
@@ -133,13 +121,13 @@ def transform[**P, R](func: Callable[Concatenate[int, P], R]) -> Callable[Concat
 def f(x: int, y: int) -> int:
     return 1
 
-# TODO: Should reveal `(str, /, y: int) -> int`
-reveal_type(f)  # revealed: (...) -> int
+reveal_type(f)  # revealed: (str, /, y: int) -> int
 
 reveal_type(f("", 1))  # revealed: int
 reveal_type(f("", y=1))  # revealed: int
 
-# TODO: This should be an error since `param` is a positional-only parameter
+# error: [missing-argument] "No argument provided for required parameter 1"
+# error: [unknown-argument] "Argument `param` does not match any known parameter"
 reveal_type(f(param="", y=1))  # revealed: int
 ```
 
@@ -157,13 +145,14 @@ def multi[**P, R](func: Callable[P, R]) -> Callable[Concatenate[int, str, P], R]
 def f(x: int) -> int:
     return 1
 
-# TODO: Should reveal `(int, str, /, x: int) -> int`
-reveal_type(f)  # revealed: (...) -> int
+reveal_type(f)  # revealed: (int, str, /, x: int) -> int
 
 reveal_type(f(1, "", 2))  # revealed: int
 reveal_type(f(1, "", x=2))  # revealed: int
 
-# TODO: This should be an error since `a` and `b` are positional-only parameters
+# error: [missing-argument] "No arguments provided for required parameters 1, 2"
+# error: [unknown-argument] "Argument `a` does not match any known parameter"
+# error: [unknown-argument] "Argument `b` does not match any known parameter"
 reveal_type(f(a=1, b="", x=2))  # revealed: int
 ```
 
@@ -225,15 +214,16 @@ from typing import Callable, Concatenate
 
 # TODO: Should be an error - ParamSpec not in last position
 def invalid1[**P](c: Callable[Concatenate[P, int], bool]):
-    reveal_type(c)  # revealed: (...) -> bool
+    # TODO: Should this reveal `(...) -> bool` instead because of the invalid `Concatenate` form?
+    reveal_type(c)  # revealed: (...) -> Unknown
 
 # TODO: Should be an error - ParamSpec not in last position
 def invalid2[**P](c: Callable[Concatenate[P, ...], bool]):
-    reveal_type(c)  # revealed: (...) -> bool
+    # TODO: Should this reveal `(...) -> bool` instead because of the invalid `Concatenate` form?
+    reveal_type(c)  # revealed: (P@invalid2, /, *args: Any, **kwargs: Any) -> bool
 
 def valid[**P](c: Callable[Concatenate[int, P], bool]):
-    # TODO: Should reveal `(int, /, **P@valid) -> bool`
-    reveal_type(c)  # revealed: (...) -> bool
+    reveal_type(c)  # revealed: (int, /, *args: P@valid.args, **kwargs: P@valid.kwargs) -> bool
 ```
 
 ### Nested `Concatenate`
@@ -257,8 +247,7 @@ from typing import Callable, Concatenate
 def decorator[**P](func: Callable[Concatenate[int, P], bool]) -> Callable[P, bool]:
     def wrapper(*args: P.args, **kwargs: P.kwargs) -> bool:
         return func(0, *args, **kwargs)
-    # TODO: no error expected here
-    return wrapper  # error: [invalid-return-type]
+    return wrapper
 
 # TODO: This should be an error because the required `int` parameter is missing
 @decorator
@@ -278,10 +267,8 @@ def f2(a: int, b: str) -> bool:
 def f3(a: str, b: int) -> bool:
     return True
 
-# TODO: Should reveal `() -> bool`
-reveal_type(f1)  # revealed: [**P'return](**P'return) -> bool
-# TODO: Should reveal `(b: str) -> bool`
-reveal_type(f2)  # revealed: [**P'return](**P'return) -> bool
+reveal_type(f1)  # revealed: () -> bool
+reveal_type(f2)  # revealed: (b: str) -> bool
 ```
 
 ## Generic classes
@@ -301,8 +288,7 @@ def my_handler(env: str, x: int, y: float) -> bool:
     return True
 
 m = Middleware(my_handler)
-# TODO: Should reveal `Middleware[((x: int, y: float)), bool]` or similar
-reveal_type(m)  # revealed: Middleware[(...), bool]
+reveal_type(m)  # revealed: Middleware[(x: int, y: int | float), bool]
 ```
 
 ### Specializing `ParamSpec` with `Concatenate`
@@ -317,8 +303,7 @@ class Foo[**P1]:
     attr: Callable[P1, None]
 
 def with_paramspec[**P2](f: Foo[Concatenate[int, P2]]) -> None:
-    # TODO: Should reveal `Callable[Concatenate[int, P2], None]`
-    reveal_type(f.attr)  # revealed: (...) -> None
+    reveal_type(f.attr)  # revealed: (int, /, *args: P2@with_paramspec.args, **kwargs: P2@with_paramspec.kwargs) -> None
 ```
 
 ## `Concatenate` in type aliases
@@ -331,8 +316,7 @@ from typing import Callable, Concatenate
 type Foo[**P, R] = Callable[Concatenate[int, P], R]
 
 def _(f: Foo[[str], bool]) -> None:
-    # TODO: Should reveal `(int, str, /) -> bool`
-    reveal_type(f)  # revealed: (...) -> bool
+    reveal_type(f)  # revealed: (int, str, /) -> bool
 ```
 
 ### Using `TypeAlias`
@@ -347,8 +331,7 @@ R = TypeVar("R")
 Foo: TypeAlias = Callable[Concatenate[int, P], R]
 
 def _(f: Foo[[str], bool]) -> None:
-    # TODO: Should reveal `(int, str, /) -> bool`
-    reveal_type(f)  # revealed: Unknown
+    reveal_type(f)  # revealed: (int, str, /) -> bool
 ```
 
 ## `Concatenate` with different parameter kinds
@@ -361,14 +344,12 @@ from typing import Callable, Concatenate
 def decorator[**P](func: Callable[Concatenate[int, P], None]) -> Callable[P, None]:
     def wrapper(*args: P.args, **kwargs: P.kwargs) -> None:
         func(0, *args, **kwargs)
-    # TODO: no error expected here
-    return wrapper  # error: [invalid-return-type]
+    return wrapper
 
 @decorator
 def kwonly(x: int, *, key: str) -> None: ...
 
-# TODO: Should reveal `(*, key: str) -> None`
-reveal_type(kwonly)  # revealed: [**P'return](**P'return) -> None
+reveal_type(kwonly)  # revealed: (*, key: str) -> None
 ```
 
 ### Function with default values
@@ -379,14 +360,12 @@ from typing import Callable, Concatenate
 def decorator[**P](func: Callable[Concatenate[int, P], None]) -> Callable[P, None]:
     def wrapper(*args: P.args, **kwargs: P.kwargs) -> None:
         func(0, *args, **kwargs)
-    # TODO: no error expected here
-    return wrapper  # error: [invalid-return-type]
+    return wrapper
 
 @decorator
 def defaults(x: int, y: str = "default", z: int = 0) -> None: ...
 
-# TODO: Should reveal `(y: str = "default", z: int = 0) -> None`
-reveal_type(defaults)  # revealed: [**P'return](**P'return) -> None
+reveal_type(defaults)  # revealed: (y: str = "default", z: int = 0) -> None
 ```
 
 ### Function with `*args` and `**kwargs`
@@ -397,26 +376,25 @@ from typing import Callable, Concatenate
 def decorator[**P](func: Callable[Concatenate[int, P], None]) -> Callable[P, None]:
     def wrapper(*args: P.args, **kwargs: P.kwargs) -> None:
         func(0, *args, **kwargs)
-    # TODO: no error expected here
-    return wrapper  # error: [invalid-return-type]
+    return wrapper
 
 @decorator
 def variadic(x: int, *args: str, **kwargs: int) -> None: ...
 
 # TODO: Should reveal `(*args: str, **kwargs: int) -> None`
-reveal_type(variadic)  # revealed: [**P'return](**P'return) -> None
+reveal_type(variadic)  # revealed: (*args: str, **kwargs: int) -> None
 
 @decorator
 def only_variadic(*args: str, **kwargs: int) -> None: ...
 
 # TODO: Should reveal `(*args: str, **kwargs: int) -> None`
-reveal_type(only_variadic)  # revealed: [**P'return](**P'return) -> None
+reveal_type(only_variadic)  # revealed: (...) -> None
 
 @decorator
 def unpack_variadic(*args: *tuple[int, *tuple[str, ...]], **kwargs: int) -> None: ...
 
 # TODO: should reveal `(*args: str, **kwargs: int) -> None`
-reveal_type(unpack_variadic)  # revealed: [**P'return](**P'return) -> None
+reveal_type(unpack_variadic)  # revealed: (...) -> None
 ```
 
 ## `Concatenate` with `ParamSpec` in generic function calls
@@ -432,12 +410,14 @@ def foo[**P, R](func: Callable[Concatenate[int, P], R], *args: P.args, **kwargs:
 def test(x: str, y: str) -> bool:
     return True
 
-reveal_type(foo(test, "", ""))  # revealed: bool
-reveal_type(foo(test, y="", x=""))  # revealed: bool
+# TODO: These shouldn't be Unknown
+reveal_type(foo(test, "", ""))  # revealed: Unknown
+reveal_type(foo(test, y="", x=""))  # revealed: Unknown
 
 # TODO: These calls should raise an error
-reveal_type(foo(test, 1, ""))  # revealed: bool
-reveal_type(foo(test, ""))  # revealed: bool
+# TODO: These shouldn't be Unknown
+reveal_type(foo(test, 1, ""))  # revealed: Unknown
+reveal_type(foo(test, ""))  # revealed: Unknown
 ```
 
 ### Prepended type variable
@@ -450,18 +430,18 @@ def decorator[T, R, **P](func: Callable[Concatenate[T, P], R], *args: P.args, **
         return func(arg, *args, **kwargs)
     return wrapper
 
+# TODO: Remove this error
+# error: [missing-argument] "No argument provided for required parameter `y` of function `decorator`"
 @decorator
 def test1(x: str, y: str) -> bool:
     return True
 
-# TODO: should reveal (str, /) -> bool
-reveal_type(test1)  # revealed: [T'return](T'return, /) -> bool
+reveal_type(test1)  # revealed: (str, /) -> bool
 reveal_type(test1(""))  # revealed: bool
 # error: [too-many-positional-arguments]
 reveal_type(test1("", ""))  # revealed: bool
 
-# TODO: This should be an error since a keyword-only parameter cannot be assigned to positional-only
-# parameter `T`
+# error: [invalid-argument-type] "Argument to function `decorator` is incorrect: Expected `(int, /) -> bool`, found `def test2(*, x: int) -> bool`"
 @decorator
 def test2(*, x: int) -> bool:
     return True
@@ -478,8 +458,7 @@ from typing import Callable, Concatenate, overload
 def remove_param[**P, R](func: Callable[Concatenate[int, P], R]) -> Callable[P, R]:
     def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
         return func(0, *args, **kwargs)
-    # TODO: no error expected here
-    return wrapper  # error: [invalid-return-type]
+    return wrapper
 
 @overload
 def f1(x: int, y: str) -> str: ...
@@ -490,7 +469,7 @@ def f1(x: int, y: str | int) -> str | int:
     return y
 
 # TODO: Should reveal `Overloaded[(y: str) -> str, (y: int) -> int]`
-reveal_type(f1)  # revealed: [**P'return](**P'return) -> str | int
+reveal_type(f1)  # revealed: (y: str) -> str | int
 ```
 
 But, it's not possible to _add_ a parameter to an overloaded function using `Concatenate` because
@@ -513,7 +492,7 @@ def f2(y: str | int) -> str | int:
     return y
 
 # TODO: Should this reveal `Overloaded[(int, /, y: str) -> str, (int, /, y: int) -> int]` ?
-reveal_type(f2)  # revealed: (...) -> str | int
+reveal_type(f2)  # revealed: Overload[(int, /, y: str) -> str | int, (int, /, y: int) -> str | int]
 ```
 
 But, it's possible to add the additional parameter just to the overload signatures and not the
@@ -529,7 +508,7 @@ def f3(y: str | int) -> str | int:
     return y
 
 # TODO: Should reveal `Overloaded[(int, /, y: str) -> str, (int, /, y: int) -> int]`
-reveal_type(f3)  # revealed: (...) -> str | int
+reveal_type(f3)  # revealed: Overload[(int, x: int, /, y: str) -> str | int, (int, x: int, /, y: int) -> str | int]
 ```
 
 ## `Concatenate` with protocol classes
@@ -550,13 +529,8 @@ class MyHandler:
     def __call__(self, value: int, name: str) -> bool:
         return True
 
-# TODO: P should be inferred as [name: str], R as bool from MyHandler.__call__
-# TODO: These should not be errors
-# TODO: Should reveal `bool`
-# error: [invalid-argument-type]
-reveal_type(process(MyHandler(), "hello"))  # revealed: Unknown
-# error: [invalid-argument-type]
-reveal_type(process(MyHandler(), name="hello"))  # revealed: Unknown
+reveal_type(process(MyHandler(), "hello"))  # revealed: bool
+reveal_type(process(MyHandler(), name="hello"))  # revealed: bool
 
 def use_callable[**P, R](func: Callable[Concatenate[int, P], R], handler: Handler[P, R]) -> None: ...
 ```
@@ -569,6 +543,5 @@ def use_callable[**P, R](func: Callable[Concatenate[int, P], R], handler: Handle
 from typing_extensions import Callable, Concatenate
 
 def _(c: Callable[Concatenate[int, str, ...], bool]):
-    # TODO: Should reveal `(int, str, ...) -> bool`
-    reveal_type(c)  # revealed: (...) -> bool
+    reveal_type(c)  # revealed: (int, str, /, *args: Any, **kwargs: Any) -> bool
 ```
