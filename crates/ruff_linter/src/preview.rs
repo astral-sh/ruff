@@ -312,6 +312,9 @@ pub(crate) const fn is_file_level_invalid_rule_code_enabled(settings: &LinterSet
 pub(crate) const fn is_incorrect_dict_iterator_comprehension_enabled(
     settings: &LinterSettings,
 ) -> bool {
+    settings.preview.is_enabled()
+}
+
 // https://github.com/astral-sh/ruff/pull/23260
 pub(crate) const fn is_up006_future_annotations_fix_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
