@@ -61,6 +61,7 @@ pub(super) use comparisons::UnsupportedComparisonError;
 
 mod builder;
 mod comparisons;
+mod deferred;
 #[cfg(test)]
 mod tests;
 

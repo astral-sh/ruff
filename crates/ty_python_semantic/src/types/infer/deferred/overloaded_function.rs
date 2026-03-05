@@ -22,7 +22,7 @@ use crate::{
 ///
 /// For (1), this has the consequence of not checking an overloaded function that is being
 /// shadowed by another function with the same name in this scope.
-pub(super) fn check_overloaded_function<'db>(
+pub(crate) fn check_overloaded_function<'db>(
     context: &InferContext<'db, '_>,
     ty: Type<'db>,
     definition: Definition<'db>,

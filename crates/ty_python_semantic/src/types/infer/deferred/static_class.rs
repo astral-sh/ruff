@@ -65,7 +65,7 @@ use crate::{
 ///
 /// [method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
 /// [metaclass]: https://docs.python.org/3/reference/datamodel.html#metaclasses
-pub(super) fn check_static_class_definitions<'db>(
+pub(crate) fn check_static_class_definitions<'db>(
     context: &InferContext<'db, '_>,
     ty: Type<'db>,
     class_node: &ast::StmtClassDef,

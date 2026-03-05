@@ -23,6 +23,7 @@ use ty_module_resolver::{
     resolve_module, search_paths,
 };
 
+use super::deferred;
 use super::{
     DefinitionInference, DefinitionInferenceExtra, ExpressionInference, ExpressionInferenceExtra,
     InferenceRegion, ScopeInference, ScopeInferenceExtra, infer_deferred_types,
@@ -69,19 +70,19 @@ use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::context::{InNoTypeCheck, InferContext};
 use crate::types::diagnostic::{
     self, CALL_NON_CALLABLE, CONFLICTING_DECLARATIONS, CYCLIC_CLASS_DEFINITION,
-    CYCLIC_TYPE_ALIAS_DEFINITION, DUPLICATE_BASE, FINAL_ON_NON_METHOD, FINAL_WITHOUT_VALUE,
-    INCONSISTENT_MRO, INEFFECTIVE_FINAL, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT,
-    INVALID_ATTRIBUTE_ACCESS, INVALID_BASE, INVALID_DECLARATION, INVALID_ENUM_MEMBER_ANNOTATION,
-    INVALID_KEY, INVALID_LEGACY_TYPE_VARIABLE, INVALID_NAMED_TUPLE, INVALID_NEWTYPE,
-    INVALID_PARAMETER_DEFAULT, INVALID_PARAMSPEC, INVALID_TYPE_ALIAS_TYPE, INVALID_TYPE_ARGUMENTS,
-    INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL, INVALID_TYPE_GUARD_DEFINITION,
-    INVALID_TYPE_VARIABLE_BOUND, INVALID_TYPE_VARIABLE_CONSTRAINTS, INVALID_TYPE_VARIABLE_DEFAULT,
-    IncompatibleBases, MISSING_ARGUMENT, NO_MATCHING_OVERLOAD, PARAMETER_ALREADY_ASSIGNED,
-    POSSIBLY_MISSING_ATTRIBUTE, POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_IMPORT,
-    SUBCLASS_OF_FINAL_CLASS, TOO_MANY_POSITIONAL_ARGUMENTS, TypedDictDeleteErrorKind,
-    UNDEFINED_REVEAL, UNKNOWN_ARGUMENT, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_IMPORT,
-    UNRESOLVED_REFERENCE, UNSUPPORTED_DYNAMIC_BASE, UNSUPPORTED_OPERATOR, UNUSED_AWAITABLE,
-    USELESS_OVERLOAD_BODY, hint_if_stdlib_attribute_exists_on_other_versions,
+    CYCLIC_TYPE_ALIAS_DEFINITION, DUPLICATE_BASE, FINAL_ON_NON_METHOD, INCONSISTENT_MRO,
+    INEFFECTIVE_FINAL, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS,
+    INVALID_BASE, INVALID_DECLARATION, INVALID_ENUM_MEMBER_ANNOTATION, INVALID_KEY,
+    INVALID_LEGACY_TYPE_VARIABLE, INVALID_NAMED_TUPLE, INVALID_NEWTYPE, INVALID_PARAMETER_DEFAULT,
+    INVALID_PARAMSPEC, INVALID_TYPE_ALIAS_TYPE, INVALID_TYPE_ARGUMENTS, INVALID_TYPE_FORM,
+    INVALID_TYPE_GUARD_CALL, INVALID_TYPE_VARIABLE_BOUND, INVALID_TYPE_VARIABLE_CONSTRAINTS,
+    INVALID_TYPE_VARIABLE_DEFAULT, IncompatibleBases, MISSING_ARGUMENT, NO_MATCHING_OVERLOAD,
+    PARAMETER_ALREADY_ASSIGNED, POSSIBLY_MISSING_ATTRIBUTE, POSSIBLY_MISSING_IMPLICIT_CALL,
+    POSSIBLY_MISSING_IMPORT, SUBCLASS_OF_FINAL_CLASS, TOO_MANY_POSITIONAL_ARGUMENTS,
+    TypedDictDeleteErrorKind, UNDEFINED_REVEAL, UNKNOWN_ARGUMENT, UNRESOLVED_ATTRIBUTE,
+    UNRESOLVED_GLOBAL, UNRESOLVED_IMPORT, UNRESOLVED_REFERENCE, UNSUPPORTED_DYNAMIC_BASE,
+    UNSUPPORTED_OPERATOR, UNUSED_AWAITABLE, USELESS_OVERLOAD_BODY,
+    hint_if_stdlib_attribute_exists_on_other_versions,
     hint_if_stdlib_submodule_exists_on_other_versions, report_attempted_protocol_instantiation,
     report_bad_dunder_set_call, report_call_to_abstract_method,
     report_cannot_delete_typed_dict_key, report_cannot_pop_required_field_on_typed_dict,
@@ -106,10 +107,6 @@ use crate::types::function::{
 use crate::types::generics::{
     InferableTypeVars, SpecializationBuilder, bind_typevar, enclosing_generic_contexts, typing_self,
 };
-use crate::types::infer::builder::deferred_function::check_function_definition;
-use crate::types::infer::builder::deferred_static_class::check_static_class_definitions;
-use crate::types::infer::builder::dynamic_class_deferred::check_dynamic_class_definition;
-use crate::types::infer::builder::overload_deferred::check_overloaded_function;
 use crate::types::infer::builder::paramspec_validation::validate_paramspec_components;
 use crate::types::infer::{nearest_enclosing_class, nearest_enclosing_function};
 use crate::types::mro::DynamicMroErrorKind;
@@ -143,10 +140,6 @@ use crate::{AnalysisSettings, Db, FxIndexSet, Program};
 
 mod annotation_expression;
 mod binary_expressions;
-mod deferred_function;
-mod deferred_static_class;
-mod dynamic_class_deferred;
-mod overload_deferred;
 mod paramspec_validation;
 mod subscript;
 mod type_expression;
@@ -270,9 +263,9 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     /// A set of functions that have been defined **and** called in this region.
     ///
     /// This is a set because the same function could be called multiple times in the same region.
-    /// This is mainly used in [`check_overloaded_functions`] to check an overloaded function that
-    /// is shadowed by a function with the same name in this scope but has been called before. For
-    /// example:
+    /// This is mainly used in [`deferred::overloaded_function::check_overloaded_function`] to
+    /// check an overloaded function that is shadowed by a function with the same name in this
+    /// scope but has been called before. For example:
     ///
     /// ```py
     /// from typing import overload
@@ -290,8 +283,6 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     /// ```
     ///
     /// To keep the calculation deterministic, we use an `FxIndexSet` whose order is determined by the sequence of insertion calls.
-    ///
-    /// [`check_overloaded_functions`]: TypeInferenceBuilder::check_overloaded_functions
     called_functions: FxIndexSet<FunctionType<'db>>,
 
     /// Whether we are in a context that binds unbound typevars.
@@ -685,25 +676,34 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let mut seen_public_functions = FxHashSet::default();
 
             for (definition, ty_and_quals) in &self.declarations {
+                let ty = ty_and_quals.inner_type();
                 match definition.kind(self.db()) {
-                    DefinitionKind::Function(_) => {
-                        check_function_definition(&self.context, *definition, &|expr| {
-                            self.file_expression_type(expr)
-                        });
-                        check_overloaded_function(
+                    DefinitionKind::Function(function) => {
+                        deferred::function::check_function_definition(
                             &self.context,
-                            ty_and_quals.inner_type(),
+                            *definition,
+                            &|expr| self.file_expression_type(expr),
+                        );
+                        deferred::overloaded_function::check_overloaded_function(
+                            &self.context,
+                            ty,
                             *definition,
                             self.scope.scope(self.db()).node(),
                             self.index,
                             &mut seen_overloaded_places,
                             &mut seen_public_functions,
                         );
+                        deferred::typeguard::check_type_guard_definition(
+                            &self.context,
+                            ty,
+                            function.node(self.module()),
+                            self.index,
+                        );
                     }
                     DefinitionKind::Class(class_node) => {
-                        check_static_class_definitions(
+                        deferred::static_class::check_static_class_definitions(
                             &self.context,
-                            ty_and_quals.inner_type(),
+                            ty,
                             class_node.node(self.module()),
                             self.index,
                             &|expr| self.file_expression_type(expr),
@@ -714,11 +714,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             for definition in &deferred_definitions {
-                check_dynamic_class_definition(&self.context, *definition);
+                deferred::dynamic_class::check_dynamic_class_definition(&self.context, *definition);
             }
 
             for function in &self.called_functions {
-                check_overloaded_function(
+                deferred::overloaded_function::check_overloaded_function(
                     &self.context,
                     Type::FunctionLiteral(*function),
                     function.definition(self.db()),
@@ -728,148 +728,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     &mut seen_public_functions,
                 );
             }
-        }
 
-        if self.db().should_check_file(self.file()) {
-            self.check_type_guard_definitions();
-            self.check_final_without_value();
-        }
-    }
-
-    /// Check for `Final`-qualified declarations in module/function scopes that are never
-    /// assigned a value. Class body scopes are handled separately in
-    /// [`Self::check_class_final_without_value`].
-    fn check_final_without_value(&self) {
-        // In stub files, bare declarations without values are normal.
-        if self.in_stub() {
-            return;
-        }
-
-        // Class body scopes are handled separately in check_class_final_without_value,
-        // which has access to the class literal to handle special cases (e.g. dataclasses).
-        let db = self.db();
-        let file_scope_id = self.scope().file_scope_id(db);
-        if self.index.scope(file_scope_id).kind().is_class() {
-            return;
-        }
-
-        let use_def = self.index.use_def_map(file_scope_id);
-        let place_table = self.index.place_table(file_scope_id);
-
-        for (symbol_id, declarations) in use_def.all_end_of_scope_symbol_declarations() {
-            let result = place_from_declarations(db, declarations);
-            let first_declaration = result.first_declaration;
-            let (place_and_quals, _) = result.into_place_and_conflicting_declarations();
-
-            if !place_and_quals.qualifiers.contains(TypeQualifiers::FINAL) {
-                continue;
-            }
-
-            // Imports inherit the `Final` qualifier from the source module, but the
-            // import itself provides the value. Don't flag imported `Final` symbols,
-            // even if a later `del` removes the binding at end-of-scope.
-            if first_declaration.is_some_and(|decl| decl.kind(db).is_import()) {
-                continue;
-            }
-
-            // Check if the symbol has any bindings in the current scope.
-            let bindings = use_def.end_of_scope_symbol_bindings(symbol_id);
-            let binding_place = place_from_bindings(db, bindings);
-
-            if !binding_place.place.is_undefined() {
-                continue;
-            }
-
-            let place = place_table.place(symbol_id);
-            if let Some(first_decl) = first_declaration {
-                if let Some(builder) = self.context.report_lint(
-                    &FINAL_WITHOUT_VALUE,
-                    first_decl.full_range(db, self.module()),
-                ) {
-                    builder.into_diagnostic(format_args!(
-                        "`Final` symbol `{place}` is not assigned a value"
-                    ));
-                }
-            }
-        }
-    }
-
-    /// Check that all type guard function definitions have at least one positional parameter
-    /// (in addition to `self`/`cls` for methods), and for `TypeIs`, that the narrowed type is
-    /// assignable to the declared type of that parameter.
-    fn check_type_guard_definitions(&self) {
-        for (definition, ty) in &self.declarations {
-            // Only check actual function definitions, not imports.
-            let DefinitionKind::Function(function_ref) = definition.kind(self.db()) else {
-                continue;
-            };
-
-            let Some(function) = ty.inner_type().as_function_literal() else {
-                continue;
-            };
-
-            for overload in function.iter_overloads_and_implementation(self.db()) {
-                let signature = overload.signature(self.db());
-                let return_ty = signature.return_ty;
-
-                // Check if this is a `TypeIs` or `TypeGuard` return type.
-                let (type_guard_form_name, narrowed_type) = match return_ty {
-                    Type::TypeIs(type_is) => ("TypeIs", Some(type_is.return_type(self.db()))),
-                    Type::TypeGuard(_) => ("TypeGuard", None),
-                    _ => continue,
-                };
-
-                let function_node = function_ref.node(self.module());
-
-                // The return type annotation must exist since we matched `TypeIs`/`TypeGuard`.
-                let Some(returns_expr) = function_node.returns.as_deref() else {
-                    continue;
-                };
-
-                // Check if this is a non-static method (first parameter is implicit `self`/`cls`).
-                let is_method = self
-                    .index
-                    .class_definition_of_method(
-                        overload.body_scope(self.db()).file_scope_id(self.db()),
-                    )
-                    .is_some();
-                let has_implicit_receiver = is_method && !overload.is_staticmethod(self.db());
-
-                // Find the first positional parameter to narrow (skip implicit `self`/`cls`).
-                let positional_params: Vec<_> = signature.parameters().positional().collect();
-                let first_narrowed_param_index = usize::from(has_implicit_receiver);
-                let first_narrowed_param = positional_params.get(first_narrowed_param_index);
-
-                let Some(first_narrowed_param) = first_narrowed_param else {
-                    if let Some(builder) = self
-                        .context
-                        .report_lint(&INVALID_TYPE_GUARD_DEFINITION, returns_expr)
-                    {
-                        builder.into_diagnostic(format_args!(
-                            "`{type_guard_form_name}` function must have a parameter to narrow"
-                        ));
-                    }
-                    continue;
-                };
-
-                // For `TypeIs`, check that the narrowed type is assignable to the parameter type.
-                if let Some(narrowed_ty) = narrowed_type {
-                    let param_ty = first_narrowed_param.annotated_type();
-                    if !narrowed_ty.is_assignable_to(self.db(), param_ty) {
-                        if let Some(builder) = self
-                            .context
-                            .report_lint(&INVALID_TYPE_GUARD_DEFINITION, returns_expr)
-                        {
-                            builder.into_diagnostic(format_args!(
-                                "Narrowed type `{narrowed}` is not assignable \
-                                to the declared parameter type `{param}`",
-                                narrowed = narrowed_ty.display(self.db()),
-                                param = param_ty.display(self.db())
-                            ));
-                        }
-                    }
-                }
-            }
+            deferred::final_variable::check_final_without_value(&self.context, self.index);
         }
     }
 
@@ -13754,7 +13614,7 @@ enum BoundOrConstraintsNodes<'ast> {
 /// Report MRO errors for a dynamic class.
 ///
 /// Returns `true` if the MRO is valid, `false` if there were errors.
-fn report_dynamic_mro_errors<'db>(
+pub(super) fn report_dynamic_mro_errors<'db>(
     context: &InferContext<'db, '_>,
     dynamic_class: DynamicClassLiteral<'db>,
     call_expr: &ast::ExprCall,

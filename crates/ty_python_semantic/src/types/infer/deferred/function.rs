@@ -19,7 +19,7 @@ use ruff_db::{
 use ruff_python_ast as ast;
 use ruff_text_size::{Ranged, TextRange};
 
-pub(super) fn check_function_definition<'db>(
+pub(crate) fn check_function_definition<'db>(
     context: &InferContext<'db, '_>,
     definition: Definition<'db>,
     file_expression_type: &impl Fn(&ast::Expr) -> Type<'db>,

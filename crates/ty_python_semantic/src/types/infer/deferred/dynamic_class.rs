@@ -15,7 +15,7 @@ use crate::{
 /// Iterate over all dynamic class definitions (created using `type()` calls) to check that
 /// the definition will not cause an exception to be raised at runtime. This needs to be done
 /// after deferred inference completes, since bases may contain forward references.
-pub(super) fn check_dynamic_class_definition<'db>(
+pub(crate) fn check_dynamic_class_definition<'db>(
     context: &InferContext<'db, '_>,
     definition: Definition<'db>,
 ) {
