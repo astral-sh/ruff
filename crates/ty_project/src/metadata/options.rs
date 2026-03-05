@@ -108,8 +108,40 @@ pub struct Options {
 impl Options {
     pub fn from_toml_str(content: &str, source: ValueSource) -> Result<Self, TyTomlError> {
         let _guard = ValueSourceGuard::new(source, true);
-        let options = toml::from_str(content)?;
+        let mut options: Self = toml::from_str(content)?;
+        options.prioritize_all_selectors();
         Ok(options)
+    }
+
+    /// Ensures that the `all` selector is applied before per-rule selectors
+    /// in all rule tables (top-level and overrides).
+    ///
+    /// This must be called after deserializing from TOML and before any
+    /// [`Combine::combine`] calls, because TOML tables are unordered and the
+    /// `toml` crate sorts keys lexicographically.
+    pub(crate) fn prioritize_all_selectors(&mut self) {
+        // Stable sort that moves all `all` selectors before non-`all` selectors
+        // while preserving relative order among non-`all` entries.
+        let sort = |rules: &mut Rules| {
+            rules.inner.sort_by(
+                |key_a, _, key_b, _| match (**key_a == "all", **key_b == "all") {
+                    (true, false) => Ordering::Less,
+                    (false, true) => Ordering::Greater,
+                    _ => Ordering::Equal,
+                },
+            );
+        };
+
+        if let Some(rules) = &mut self.rules {
+            sort(rules);
+        }
+        if let Some(overrides) = &mut self.overrides {
+            for override_option in &mut overrides.0 {
+                if let Some(rules) = &mut override_option.rules {
+                    sort(rules);
+                }
+            }
+        }
     }
 
     pub fn deserialize_with<'de, D>(source: ValueSource, deserializer: D) -> Result<Self, D::Error>
@@ -911,7 +943,7 @@ impl Rules {
         // Initialize the selection with the defaults
         let mut selection = RuleSelection::from_registry(registry);
 
-        let mut apply_rule = |rule_name: &RangedValue<String>, level: &RangedValue<Level>| {
+        for (rule_name, level) in &self.inner {
             let source = rule_name.source();
             let lint_source = match source {
                 ValueSource::File(_) => LintSource::File,
@@ -932,7 +964,7 @@ impl Rules {
                 for lint in registry.lints() {
                     set_lint_level(*lint);
                 }
-                return;
+                continue;
             }
 
             match registry.get(rule_name) {
@@ -960,29 +992,6 @@ impl Rules {
                     diagnostics.push(diagnostic.with_annotation(annotation));
                 }
             }
-        };
-
-        // TOML tables are unordered, so for selectors from the same configuration file we treat
-        // `all` as the base level and apply explicit per-rule selectors afterwards.
-        let mut ordered_rules: Vec<_> = self.inner.iter().collect();
-        ordered_rules.sort_by(|(rule_a, _), (rule_b, _)| {
-            match (rule_a.source(), rule_b.source()) {
-                (ValueSource::File(path_a), ValueSource::File(path_b)) if path_a == path_b => {
-                    match (
-                        rule_a.eq_ignore_ascii_case("all"),
-                        rule_b.eq_ignore_ascii_case("all"),
-                    ) {
-                        (true, false) => Ordering::Less,
-                        (false, true) => Ordering::Greater,
-                        _ => Ordering::Equal,
-                    }
-                }
-                _ => Ordering::Equal,
-            }
-        });
-
-        for (rule_name, level) in ordered_rules {
-            apply_rule(rule_name, level);
         }
 
         selection
