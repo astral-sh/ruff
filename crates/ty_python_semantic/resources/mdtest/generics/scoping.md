@@ -499,8 +499,12 @@ T = TypeVar("T", default=int)
 U = TypeVar("U", default=T)
 
 # error: [invalid-type-variable-default]
-def inner(y: U, z: T) -> tuple[U, T]:
+def bad(y: U, z: T) -> tuple[U, T]:
     return y, z
+
+# OK, because the typevar with the default comes after the one without
+def fine(y: T, z: U) -> tuple[U, T]:
+    return z, y
 ```
 
 ### Legacy TypeVar ordering: default before non-default in function

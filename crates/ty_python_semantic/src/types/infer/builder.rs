@@ -59,6 +59,7 @@ use crate::semantic_index::{
     ApplicableConstraints, EnclosingSnapshotResult, SemanticIndex, attribute_assignments,
     place_table,
 };
+use crate::types::BindingContext;
 use crate::types::call::bind::MatchingOverloadIndex;
 use crate::types::call::{Argument, Binding, Bindings, CallArguments, CallError, CallErrorKind};
 use crate::types::callable::CallableTypeKind;
@@ -132,7 +133,6 @@ use crate::types::typevar::{
     BoundTypeVarIdentity, TypeVarBoundOrConstraintsEvaluation, TypeVarConstraints,
     TypeVarDefaultEvaluation, TypeVarIdentity, TypeVarInstance,
 };
-use crate::types::BindingContext;
 use crate::types::visitor::find_over_type;
 use crate::types::{
     CallDunderError, CallableBinding, CallableType, ClassType, DataclassParams, DynamicType,
@@ -745,30 +745,33 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 continue;
             }
 
+            // Valid uses of the PEP-484 positional-only convention will have been detected as such
+            // in the first iteration over this scope, so `param.is_positional_only()` will return `true`
+            // for those. We only get here for invalid uses of the PEP-484 positional-only convention.
             if param_node.uses_pep_484_positional_only_convention() {
-                if let Some(builder) = self
+                let Some(builder) = self
                     .context
                     .report_lint(&INVALID_LEGACY_POSITIONAL_PARAMETER, param_node.name())
-                {
-                    let mut diagnostic = builder.into_diagnostic(
-                        "Invalid use of the legacy convention \
+                else {
+                    continue;
+                };
+                let mut diagnostic = builder.into_diagnostic(
+                    "Invalid use of the legacy convention \
                         for positional-only parameters",
-                    );
-                    diagnostic.set_primary_message(
-                        "Parameter name begins with `__` \
-                        but will not be treated as positional-only",
-                    );
-                    diagnostic.info(
-                        "A parameter can only be positional-only \
+                );
+                diagnostic.set_primary_message(
+                    "Parameter name begins with `__` but will not be treated as positional-only",
+                );
+                diagnostic.info(
+                    "A parameter can only be positional-only \
                         if it precedes all positional-or-keyword parameters",
+                );
+                if let Some(earlier_node) = previous_non_positional_only {
+                    diagnostic.annotate(
+                        self.context
+                            .secondary(earlier_node.name())
+                            .message("Prior parameter here was positional-or-keyword"),
                     );
-                    if let Some(earlier_node) = previous_non_positional_only {
-                        diagnostic.annotate(
-                            self.context
-                                .secondary(earlier_node.name())
-                                .message("Prior parameter here was positional-or-keyword"),
-                        );
-                    }
                 }
             } else if previous_non_positional_only.is_none() {
                 previous_non_positional_only = Some(param_node);
@@ -858,7 +861,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .context
                 .report_lint(&INVALID_TYPE_VARIABLE_DEFAULT, primary_range)
             else {
-                return;
+                continue;
             };
             let typevar_name = typevar.name(db);
             let mut diagnostic = builder.into_diagnostic(format_args!(
@@ -5359,7 +5362,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         );
     }
 
-    fn infer_paramspec_default_impl(&mut self, default_expr: &ast::Expr, paramspec_name: Option<&str>) {
+    fn infer_paramspec_default_impl(
+        &mut self,
+        default_expr: &ast::Expr,
+        paramspec_name: Option<&str>,
+    ) {
         match default_expr {
             ast::Expr::EllipsisLiteral(ellipsis) => {
                 let ty = self.infer_ellipsis_literal_expression(ellipsis);
