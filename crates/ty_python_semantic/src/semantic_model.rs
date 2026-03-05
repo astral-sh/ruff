@@ -304,14 +304,10 @@ impl<'db> SemanticModel<'db> {
                     .scope(self.db)
                     .file_scope_id(self.db),
             ),
-            ast::AnyNodeRef::ExceptHandlerExceptHandler(handler) => self
-                .except_handler_definition(handler)
+            ast::AnyNodeRef::ExceptHandlerExceptHandler(handler) => handler
+                .optional_definition(self)
                 .map(|definition| definition.scope(self.db).file_scope_id(self.db))
-                .or_else(|| {
-                    handler.type_.as_deref().and_then(|handled_exceptions| {
-                        index.try_expression_scope_id(handled_exceptions)
-                    })
-                })
+                .or_else(|| index.try_expression_scope_id(handler.type_.as_deref()?))
                 .or(Some(FileScopeId::global())),
             ast::AnyNodeRef::TypeParamTypeVar(var) => {
                 Some(var.definition(self).scope(self.db).file_scope_id(self.db))
@@ -326,29 +322,6 @@ impl<'db> SemanticModel<'db> {
                 Some(expr) => index.try_expression_scope_id(&expr),
             },
         }
-    }
-
-    /// Returns the definition for an exception-handler variable.
-    ///
-    /// Exception handlers only have a definition when they bind a name (`except E as name:`).
-    pub fn except_handler_definition(
-        &self,
-        handler: &ast::ExceptHandlerExceptHandler,
-    ) -> Option<Definition<'db>> {
-        handler.name.as_ref()?;
-        let index = semantic_index(self.db, self.file);
-        Some(index.expect_single_definition(handler))
-    }
-
-    /// Returns the inferred type of an exception-handler variable.
-    ///
-    /// Exception handlers only bind a variable when they have a name (`except E as name:`).
-    pub fn except_handler_type(
-        &self,
-        handler: &ast::ExceptHandlerExceptHandler,
-    ) -> Option<Type<'db>> {
-        let definition = self.except_handler_definition(handler)?;
-        Some(binding_type(self.db, definition))
     }
 
     /// Get a "safe" [`ast::AnyNodeRef`] to use for referring to the given (sub-)AST node.
@@ -543,6 +516,14 @@ pub trait HasDefinition {
     fn definition<'db>(&self, model: &SemanticModel<'db>) -> Definition<'db>;
 }
 
+pub trait HasOptionalDefinition {
+    /// Returns the definition of `self`, if it has one.
+    ///
+    /// ## Panics
+    /// May panic if `self` is from another file than `model`.
+    fn optional_definition<'db>(&self, model: &SemanticModel<'db>) -> Option<Definition<'db>>;
+}
+
 impl HasType for ast::ExprRef<'_> {
     fn inferred_type<'db>(&self, model: &SemanticModel<'db>) -> Option<Type<'db>> {
         let index = semantic_index(model.db, model.file);
@@ -676,6 +657,21 @@ impl HasType for ast::Alias {
         }
         let index = semantic_index(model.db, model.file);
         Some(binding_type(model.db, index.expect_single_definition(self)))
+    }
+}
+
+impl HasOptionalDefinition for ast::ExceptHandlerExceptHandler {
+    fn optional_definition<'db>(&self, model: &SemanticModel<'db>) -> Option<Definition<'db>> {
+        self.name.as_ref()?;
+        let index = semantic_index(model.db, model.file);
+        Some(index.expect_single_definition(self))
+    }
+}
+
+impl HasType for ast::ExceptHandlerExceptHandler {
+    fn inferred_type<'db>(&self, model: &SemanticModel<'db>) -> Option<Type<'db>> {
+        let definition = self.optional_definition(model)?;
+        Some(binding_type(model.db, definition))
     }
 }
 
