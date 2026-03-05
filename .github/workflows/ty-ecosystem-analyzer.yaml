@@ -14,7 +14,7 @@ on:
 
 concurrency:
   group: ty-ecosystem-analyzer-${{ github.ref_name }}-${{ github.event.pull_request.number || github.sha }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'ecosystem-analyzer') }}
 
 env:
   CARGO_INCREMENTAL: 0

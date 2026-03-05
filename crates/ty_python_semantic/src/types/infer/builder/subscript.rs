@@ -17,6 +17,7 @@ use crate::types::diagnostic::{
     report_invalid_arguments_to_annotated,
 };
 use crate::types::generics::{GenericContext, InferableTypeVars, bind_typevar};
+use crate::types::infer::InferenceFlags;
 use crate::types::special_form::AliasSpec;
 use crate::types::subscript::{LegacyGenericOrigin, SubscriptError, SubscriptErrorKind};
 use crate::types::tuple::{Tuple, TupleType};
@@ -417,6 +418,29 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     }
 
     pub(super) fn infer_explicit_callable_specialization(
+        &mut self,
+        subscript: &ast::ExprSubscript,
+        value_ty: Type<'db>,
+        generic_context: GenericContext<'db>,
+        specialize: &dyn Fn(&[Option<Type<'db>>]) -> Type<'db>,
+    ) -> Type<'db> {
+        let previously_allowed_paramspec = self
+            .inference_flags
+            .replace(InferenceFlags::ALLOW_PARAMSPEC_TYPE_EXPR, true);
+        let result = self.infer_explicit_callable_specialization_impl(
+            subscript,
+            value_ty,
+            generic_context,
+            specialize,
+        );
+        self.inference_flags.set(
+            InferenceFlags::ALLOW_PARAMSPEC_TYPE_EXPR,
+            previously_allowed_paramspec,
+        );
+        result
+    }
+
+    pub(super) fn infer_explicit_callable_specialization_impl(
         &mut self,
         subscript: &ast::ExprSubscript,
         value_ty: Type<'db>,

@@ -246,6 +246,45 @@ def _(g: G):
     reveal_type(g)  # revealed: list[int]
 ```
 
+Self-referential defaults should not crash type inference:
+
+```py
+# error: [cyclic-type-alias-definition] "Cyclic definition of `A`"
+type A[T = A] = A[int]
+```
+
+A self-referential default that does not reference itself in the alias body should also not crash,
+even when the default is evaluated (e.g., by omitting the type argument):
+
+```py
+type B[T = B] = list[T]
+
+def _(x: B) -> None:
+    pass
+```
+
+Mutually-referential defaults (where two type aliases reference each other via their typevar
+defaults) should also not crash:
+
+```py
+type X[T = Y] = list[T]
+type Y[U = X] = list[U]
+
+def _(x: X, y: Y) -> None:
+    pass
+```
+
+Indirect self-references through a chain of type aliases should also not crash:
+
+```py
+type P[T = R] = list[T]
+type Q[T = P] = list[T]
+type R[T = Q] = list[T]
+
+def _(p: P) -> None:
+    pass
+```
+
 ## Snapshots of verbose diagnostics
 
 <!-- snapshot-diagnostics -->

@@ -124,7 +124,7 @@ impl LSPSystem {
         extension: Option<&str>,
     ) -> Option<PySourceType> {
         match document {
-            Document::Text(text) => match text.language_id()? {
+            Document::Text(text) => match text.language_id() {
                 LanguageId::Python => Some(
                     extension
                         .and_then(PySourceType::try_from_extension)

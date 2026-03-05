@@ -212,12 +212,12 @@ If a `ParamSpec` appears in `Concatenate`, it must be the last element.
 ```py
 from typing import Callable, Concatenate
 
-# TODO: Should be an error - ParamSpec not in last position
+# error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
 def invalid1[**P](c: Callable[Concatenate[P, int], bool]):
     # TODO: Should this reveal `(...) -> bool` instead because of the invalid `Concatenate` form?
     reveal_type(c)  # revealed: (...) -> Unknown
 
-# TODO: Should be an error - ParamSpec not in last position
+# error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
 def invalid2[**P](c: Callable[Concatenate[P, ...], bool]):
     # TODO: Should this reveal `(...) -> bool` instead because of the invalid `Concatenate` form?
     reveal_type(c)  # revealed: (P@invalid2, /, *args: Any, **kwargs: Any) -> bool

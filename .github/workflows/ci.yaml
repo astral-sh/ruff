@@ -663,6 +663,12 @@ jobs:
           path: ecosystem-result
           if-no-files-found: "error"
 
+      - name: Fail on ecosystem errors
+        run: |
+          if grep -q "project error" ecosystem-result; then
+            exit 1
+          fi
+
   fuzz-ty:
     name: "Fuzz for new ty panics"
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-16' || 'ubuntu-latest' }}

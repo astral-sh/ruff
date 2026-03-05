@@ -4,10 +4,11 @@ use super::TypeInferenceBuilder;
 use crate::Db;
 use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::diagnostic::{DIVISION_BY_ZERO, report_unsupported_binary_operation};
+use crate::types::typevar::TypeVarConstraints;
 use crate::types::{
     DynamicType, InternedConstraintSet, KnownClass, KnownInstanceType, LiteralValueTypeKind,
-    MemberLookupPolicy, Type, TypeContext, TypeVarBoundOrConstraints, TypeVarConstraints,
-    UnionBuilder, UnionTypeInstance,
+    MemberLookupPolicy, Type, TypeContext, TypeVarBoundOrConstraints, UnionBuilder,
+    UnionTypeInstance,
 };
 use ruff_python_ast::PythonVersion;
 
@@ -77,6 +78,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 [left_ty, right_ty],
                 self.scope(),
                 self.typevar_binding_context,
+                self.inference_flags,
             )
         }
     }
@@ -702,6 +704,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         [left_ty, right_ty],
                         self.scope(),
                         self.typevar_binding_context,
+                        self.inference_flags,
                     ))
                 }
             }
@@ -728,6 +731,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     [left_ty, right_ty],
                     self.scope(),
                     self.typevar_binding_context,
+                    self.inference_flags,
                 ))
             }
 

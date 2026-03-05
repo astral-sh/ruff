@@ -59,8 +59,10 @@ use crate::semantic_index::{
     ApplicableConstraints, EnclosingSnapshotResult, SemanticIndex, attribute_assignments,
     place_table, semantic_index,
 };
+use crate::types::BindingContext;
 use crate::types::call::bind::MatchingOverloadIndex;
 use crate::types::call::{Argument, Binding, Bindings, CallArguments, CallError, CallErrorKind};
+use crate::types::callable::CallableTypeKind;
 use crate::types::class::{
     AbstractMethod, ClassLiteral, CodeGeneratorKind, DynamicClassAnchor, DynamicClassLiteral,
     DynamicMetaclassConflict, DynamicNamedTupleAnchor, DynamicNamedTupleLiteral, FieldKind,
@@ -85,8 +87,8 @@ use crate::types::diagnostic::{
     POSSIBLY_MISSING_ATTRIBUTE, POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_IMPORT,
     SUBCLASS_OF_FINAL_CLASS, TOO_MANY_POSITIONAL_ARGUMENTS, TypedDictDeleteErrorKind,
     UNDEFINED_REVEAL, UNKNOWN_ARGUMENT, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_IMPORT,
-    UNRESOLVED_REFERENCE, UNSUPPORTED_DYNAMIC_BASE, UNSUPPORTED_OPERATOR, USELESS_OVERLOAD_BODY,
-    hint_if_stdlib_attribute_exists_on_other_versions,
+    UNRESOLVED_REFERENCE, UNSUPPORTED_DYNAMIC_BASE, UNSUPPORTED_OPERATOR, UNUSED_AWAITABLE,
+    USELESS_OVERLOAD_BODY, hint_if_stdlib_attribute_exists_on_other_versions,
     hint_if_stdlib_submodule_exists_on_other_versions, report_attempted_protocol_instantiation,
     report_bad_dunder_set_call, report_bad_frozen_dataclass_inheritance,
     report_call_to_abstract_method, report_cannot_delete_typed_dict_key,
@@ -123,23 +125,26 @@ use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::signatures::ConcatenateTail;
 use crate::types::subclass_of::SubclassOfInner;
 use crate::types::tuple::{Tuple, TupleLength, TupleSpecBuilder, TupleType};
+use crate::types::type_alias::{ManualPEP695TypeAliasType, PEP695TypeAliasType};
 use crate::types::typed_dict::{
     TypedDictAssignmentKind, TypedDictKeyAssignment, validate_typed_dict_constructor,
     validate_typed_dict_dict_literal,
 };
+use crate::types::typevar::{
+    BoundTypeVarIdentity, TypeVarBoundOrConstraintsEvaluation, TypeVarConstraints,
+    TypeVarDefaultEvaluation, TypeVarIdentity, TypeVarInstance,
+};
 use crate::types::visitor::find_over_type;
 use crate::types::{
-    BoundTypeVarIdentity, CallDunderError, CallableBinding, CallableType, CallableTypeKind,
-    ClassType, DataclassParams, DynamicType, EvaluationMode, GenericAlias, InternedConstraintSet,
-    InternedType, IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, KnownUnion,
-    LintDiagnosticGuard, LiteralValueTypeKind, ManualPEP695TypeAliasType, MemberLookupPolicy,
-    MetaclassCandidate, PEP695TypeAliasType, ParamSpecAttrKind, Parameter, ParameterForm,
-    Parameters, Signature, SpecialFormType, StaticClassLiteral, SubclassOfType, Truthiness, Type,
-    TypeAliasType, TypeAndQualifiers, TypeContext, TypeQualifiers, TypeVarBoundOrConstraints,
-    TypeVarBoundOrConstraintsEvaluation, TypeVarConstraints, TypeVarDefaultEvaluation,
-    TypeVarIdentity, TypeVarInstance, TypeVarKind, TypeVarVariance, TypedDictType, UnionBuilder,
-    UnionType, binding_type, definition_expression_type, infer_complete_scope_types,
-    infer_scope_types, todo_type,
+    CallDunderError, CallableBinding, CallableType, ClassType, DataclassParams, DynamicType,
+    EvaluationMode, GenericAlias, InferenceFlags, InternedConstraintSet, InternedType,
+    IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, KnownUnion,
+    LintDiagnosticGuard, LiteralValueTypeKind, MemberLookupPolicy, MetaclassCandidate,
+    ParamSpecAttrKind, Parameter, ParameterForm, Parameters, Signature, SpecialFormType,
+    StaticClassLiteral, SubclassOfType, Truthiness, Type, TypeAliasType, TypeAndQualifiers,
+    TypeContext, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance,
+    TypedDictType, UnionBuilder, UnionType, binding_type, definition_expression_type,
+    infer_complete_scope_types, infer_scope_types, todo_type,
 };
 use crate::types::{CallableTypes, overrides};
 use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
@@ -298,11 +303,9 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     /// Whether we are in a context that binds unbound typevars.
     typevar_binding_context: Option<Definition<'db>>,
 
-    /// Whether to check for unbound type variables in type expressions.
-    /// This is set to `true` when processing annotation expressions, where unbound type variables
-    /// are an error. It is `false` in other contexts (e.g., `TypeVar` defaults, explicit class
-    /// specialization) where unbound type variables are expected.
-    check_unbound_typevars: bool,
+    /// Type-inference is context-dependent, especially in type expressions.
+    /// This field tracks various flags that control how type inference should behave in the current context.
+    inference_flags: InferenceFlags,
 
     /// The deferred state of inferring types of certain expressions within the region.
     ///
@@ -370,7 +373,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             bindings: VecMap::default(),
             declarations: VecMap::default(),
             typevar_binding_context: None,
-            check_unbound_typevars: false,
+            inference_flags: InferenceFlags::empty(),
             deferred: VecSet::default(),
             undecorated_type: None,
             cycle_recovery: None,
@@ -562,6 +565,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.context.in_stub()
     }
 
+    /// Returns `true` if `expr` is a call to a known diagnostic function
+    /// (e.g., `reveal_type` or `assert_type`) whose return value should not
+    /// trigger the `unused-awaitable` lint.
+    fn is_known_function_call(&self, expr: &ast::Expr) -> bool {
+        let ast::Expr::Call(call) = expr else {
+            return false;
+        };
+        matches!(
+            self.expression_type(&call.func),
+            Type::FunctionLiteral(f)
+                if matches!(
+                    f.known(self.db()),
+                    Some(KnownFunction::RevealType | KnownFunction::AssertType)
+                )
+        )
+    }
+
     /// Get the already-inferred type of an expression node, or Unknown.
     fn expression_type(&self, expr: &ast::Expr) -> Type<'db> {
         self.try_expression_type(expr).unwrap_or_else(Type::unknown)
@@ -671,21 +691,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.check_dynamic_class_definitions(&deferred_definitions);
             self.check_overloaded_functions(node);
             self.check_type_guard_definitions();
-            self.check_legacy_positional_only_convention();
+            self.check_function_definitions();
             self.check_final_without_value();
         }
     }
 
-    /// Iterate over all function definitions in this scope and check for invalid applications
-    /// of the pre-PEP-570 positional-only parameter convention.
-    fn check_legacy_positional_only_convention(&mut self) {
+    /// Iterate over all function definitions in this scope and run checks that
+    /// require access to the function's inferred signature (and therefore must
+    /// run after deferred inference is complete).
+    fn check_function_definitions(&self) {
         let db = self.db();
 
         for (definition, _) in &self.declarations {
             if !definition.kind(db).is_function_def() {
                 continue;
             }
-
             let Some(Type::FunctionLiteral(function_type)) =
                 infer_definition_types(db, *definition).undecorated_type()
             else {
@@ -693,55 +713,312 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             };
 
             let last_definition = function_type.literal(db).last_definition(db);
-            let node = last_definition.node(db, self.file(), self.module());
+            let signature = last_definition.raw_signature(db);
 
-            let ast_parameters = &node.parameters;
-            // If the function has any PEP-570 positional-only parameters,
-            // assume that `__`-prefixed parameters are not meant to be positional-only
-            if !ast_parameters.posonlyargs.is_empty() {
+            self.check_legacy_positional_only_convention(last_definition, &signature);
+            self.check_legacy_typevar_defaults(last_definition, &signature);
+            self.check_legacy_typevar_ordering(last_definition, &signature);
+        }
+    }
+
+    /// Check for invalid applications of the pre-PEP-570 positional-only parameter convention.
+    fn check_legacy_positional_only_convention(
+        &self,
+        last_definition: OverloadLiteral<'db>,
+        signature: &Signature<'db>,
+    ) {
+        let node = last_definition.node(self.db(), self.file(), self.module());
+        let ast_parameters = &node.parameters;
+
+        // If the function has any PEP-570 positional-only parameters,
+        // assume that `__`-prefixed parameters are not meant to be positional-only
+        if !ast_parameters.posonlyargs.is_empty() {
+            return;
+        }
+        let parsed_parameters = signature.parameters();
+        let mut previous_non_positional_only: Option<&ast::ParameterWithDefault> = None;
+
+        for (param_node, param) in std::iter::zip(ast_parameters, parsed_parameters) {
+            let AnyParameterRef::NonVariadic(param_node) = param_node else {
+                continue;
+            };
+            if param.is_positional_only() {
                 continue;
             }
-            let signature = last_definition.raw_signature(db);
-            let parsed_parameters = signature.parameters();
-            let mut previous_non_positional_only: Option<&ast::ParameterWithDefault> = None;
 
-            for (param_node, param) in std::iter::zip(ast_parameters, parsed_parameters) {
-                let AnyParameterRef::NonVariadic(param_node) = param_node else {
+            // Valid uses of the PEP-484 positional-only convention will have been detected as such
+            // in the first iteration over this scope, so `param.is_positional_only()` will return `true`
+            // for those. We only get here for invalid uses of the PEP-484 positional-only convention.
+            if param_node.uses_pep_484_positional_only_convention() {
+                let Some(builder) = self
+                    .context
+                    .report_lint(&INVALID_LEGACY_POSITIONAL_PARAMETER, param_node.name())
+                else {
                     continue;
                 };
-                if param.is_positional_only() {
-                    continue;
+                let mut diagnostic = builder.into_diagnostic(
+                    "Invalid use of the legacy convention \
+                        for positional-only parameters",
+                );
+                diagnostic.set_primary_message(
+                    "Parameter name begins with `__` but will not be treated as positional-only",
+                );
+                diagnostic.info(
+                    "A parameter can only be positional-only \
+                        if it precedes all positional-or-keyword parameters",
+                );
+                if let Some(earlier_node) = previous_non_positional_only {
+                    diagnostic.annotate(
+                        self.context
+                            .secondary(earlier_node.name())
+                            .message("Prior parameter here was positional-or-keyword"),
+                    );
                 }
-
-                if param_node.uses_pep_484_positional_only_convention() {
-                    if let Some(builder) = self
-                        .context
-                        .report_lint(&INVALID_LEGACY_POSITIONAL_PARAMETER, param_node.name())
-                    {
-                        let mut diagnostic = builder.into_diagnostic(
-                            "Invalid use of the legacy convention \
-                            for positional-only parameters",
-                        );
-                        diagnostic.set_primary_message(
-                            "Parameter name begins with `__` \
-                            but will not be treated as positional-only",
-                        );
-                        diagnostic.info(
-                            "A parameter can only be positional-only \
-                            if it precedes all positional-or-keyword parameters",
-                        );
-                        if let Some(earlier_node) = previous_non_positional_only {
-                            diagnostic.annotate(
-                                self.context
-                                    .secondary(earlier_node.name())
-                                    .message("Prior parameter here was positional-or-keyword"),
-                            );
-                        }
-                    }
-                } else if previous_non_positional_only.is_none() {
-                    previous_non_positional_only = Some(param_node);
-                }
+            } else if previous_non_positional_only.is_none() {
+                previous_non_positional_only = Some(param_node);
             }
+        }
+    }
+
+    /// Find the range of the first parameter annotation (or return type) in a function
+    /// whose inferred type references the given `TypeVar`, falling back to the function name.
+    fn find_typevar_annotation_range(
+        &self,
+        node: &ast::StmtFunctionDef,
+        typevar: TypeVarInstance<'db>,
+    ) -> TextRange {
+        let db = self.db();
+        let typevar_id = typevar.identity(self.db());
+
+        node.parameters
+            .iter()
+            .filter_map(ast::AnyParameterRef::annotation)
+            .chain(node.returns.as_deref())
+            .find(|ann| {
+                self.file_expression_type(ann)
+                    .references_typevar(db, typevar_id)
+            })
+            .map(Ranged::range)
+            .unwrap_or(node.name.range())
+    }
+
+    /// Check whether any legacy `TypeVar` used in a function signature has a default
+    /// that references an out-of-scope type variable.
+    ///
+    /// This check mirrors the class-level check at `report_invalid_typevar_default_reference`,
+    /// but for function/method generic contexts.
+    fn check_legacy_typevar_defaults(
+        &self,
+        last_definition: OverloadLiteral<'db>,
+        signature: &Signature<'db>,
+    ) {
+        let db = self.db();
+
+        let Some(generic_context) = signature.generic_context else {
+            return;
+        };
+
+        let typevars = generic_context
+            .variables(db)
+            .map(|bound_tvar| bound_tvar.typevar(db));
+
+        for (i, typevar) in typevars.clone().enumerate() {
+            // Only check legacy TypeVars; PEP 695 type parameters are already validated
+            // by `check_default_for_outer_scope_typevars` in the type parameter scope.
+            if !matches!(
+                typevar.kind(db),
+                TypeVarKind::Legacy | TypeVarKind::Pep613Alias | TypeVarKind::ParamSpec
+            ) {
+                continue;
+            }
+
+            let Some(default_ty) = typevar.default_type(db) else {
+                continue;
+            };
+
+            let first_bad_tvar = find_over_type(db, default_ty, false, |t| {
+                let tvar = match t {
+                    Type::TypeVar(tvar) => tvar.typevar(db),
+                    Type::KnownInstance(KnownInstanceType::TypeVar(tvar)) => tvar,
+                    _ => return None,
+                };
+                if !typevars.clone().take(i).contains(&tvar) {
+                    Some(tvar)
+                } else {
+                    None
+                }
+            });
+
+            let Some(bad_typevar) = first_bad_tvar else {
+                continue;
+            };
+
+            let is_later_in_list = typevars.clone().skip(i).contains(&bad_typevar);
+            let node = last_definition.node(db, self.file(), self.module());
+
+            let primary_range = self.find_typevar_annotation_range(node, typevar);
+
+            let Some(builder) = self
+                .context
+                .report_lint(&INVALID_TYPE_VARIABLE_DEFAULT, primary_range)
+            else {
+                continue;
+            };
+            let typevar_name = typevar.name(db);
+            let mut diagnostic = builder.into_diagnostic(format_args!(
+                "Invalid use of type variable `{typevar_name}`",
+            ));
+
+            if is_later_in_list {
+                diagnostic.set_primary_message(format_args!(
+                    "Default of `{typevar_name}` references later type parameter `{}`",
+                    bad_typevar.name(db),
+                ));
+                diagnostic.set_concise_message(format_args!(
+                    "Invalid use of type variable `{typevar_name}`: default of `{typevar_name}` \
+                    refers to later parameter `{}`",
+                    bad_typevar.name(db)
+                ));
+            } else {
+                diagnostic.set_primary_message(format_args!(
+                    "Default of `{typevar_name}` references out-of-scope type variable `{}`",
+                    bad_typevar.name(db),
+                ));
+                diagnostic.set_concise_message(format_args!(
+                    "Invalid use of type variable `{typevar_name}`: default of `{typevar_name}` \
+                    refers to out-of-scope type variable `{}`",
+                    bad_typevar.name(db)
+                ));
+            }
+
+            if let Some(typevar_definition) = typevar.definition(db) {
+                let file = typevar_definition.file(db);
+                diagnostic.annotate(
+                    Annotation::secondary(Span::from(
+                        typevar_definition.full_range(db, &parsed_module(db, file).load(db)),
+                    ))
+                    .message(format_args!("`{typevar_name}` defined here")),
+                );
+            }
+
+            diagnostic
+                .info("See https://typing.python.org/en/latest/spec/generics.html#scoping-rules");
+        }
+    }
+
+    /// Check that legacy `TypeVar`s without defaults don't follow `TypeVar`s with defaults
+    /// in a function's generic context.
+    ///
+    /// This mirrors the class-level check using `report_invalid_type_param_order`, but for
+    /// function/method generic contexts using the `invalid-type-variable-default` lint.
+    fn check_legacy_typevar_ordering(
+        &self,
+        last_definition: OverloadLiteral<'db>,
+        signature: &Signature<'db>,
+    ) {
+        struct State<'db> {
+            typevar_with_default: TypeVarInstance<'db>,
+            invalid_later_tvars: Vec<TypeVarInstance<'db>>,
+        }
+
+        let db = self.db();
+
+        let Some(generic_context) = signature.generic_context else {
+            return;
+        };
+
+        let mut state: Option<State<'db>> = None;
+
+        for bound_typevar in generic_context.variables(db) {
+            let typevar = bound_typevar.typevar(db);
+
+            // Only check legacy TypeVars; PEP 695 ordering is validated by the parser.
+            if !matches!(
+                typevar.kind(db),
+                TypeVarKind::Legacy | TypeVarKind::Pep613Alias | TypeVarKind::ParamSpec
+            ) {
+                continue;
+            }
+
+            let has_default = typevar.default_type(db).is_some();
+
+            if let Some(state) = state.as_mut() {
+                if !has_default {
+                    state.invalid_later_tvars.push(typevar);
+                }
+            } else if has_default {
+                state = Some(State {
+                    typevar_with_default: typevar,
+                    invalid_later_tvars: vec![],
+                });
+            }
+        }
+
+        let Some(state) = state else {
+            return;
+        };
+
+        if state.invalid_later_tvars.is_empty() {
+            return;
+        }
+
+        let node = last_definition.node(db, self.file(), self.module());
+
+        let primary_range = self.find_typevar_annotation_range(node, state.invalid_later_tvars[0]);
+
+        let Some(builder) = self
+            .context
+            .report_lint(&INVALID_TYPE_VARIABLE_DEFAULT, primary_range)
+        else {
+            return;
+        };
+
+        let mut diagnostic = builder.into_diagnostic(
+            "Type parameters without defaults cannot follow type parameters with defaults",
+        );
+
+        let typevar_with_default_name = state.typevar_with_default.name(db);
+
+        diagnostic.set_concise_message(format_args!(
+            "Type parameter `{}` without a default cannot follow \
+            earlier parameter `{typevar_with_default_name}` with a default",
+            state.invalid_later_tvars[0].name(db),
+        ));
+
+        if let [single_typevar] = &*state.invalid_later_tvars {
+            diagnostic.set_primary_message(format_args!(
+                "Type variable `{}` does not have a default",
+                single_typevar.name(db),
+            ));
+        } else {
+            let later_typevars =
+                format_enumeration(state.invalid_later_tvars.iter().map(|tv| tv.name(db)));
+            diagnostic.set_primary_message(format_args!(
+                "Type variables {later_typevars} do not have defaults",
+            ));
+        }
+
+        let secondary_range = self.find_typevar_annotation_range(node, state.typevar_with_default);
+
+        diagnostic.annotate(
+            self.context
+                .secondary(secondary_range)
+                .message(format_args!(
+                    "Earlier TypeVar `{typevar_with_default_name}` has a default"
+                )),
+        );
+
+        for tvar in [state.typevar_with_default, state.invalid_later_tvars[0]] {
+            let Some(definition) = tvar.definition(db) else {
+                continue;
+            };
+            let file = definition.file(db);
+            diagnostic.annotate(
+                Annotation::secondary(Span::from(
+                    definition.full_range(db, &parsed_module(db, file).load(db)),
+                ))
+                .message(format_args!("`{}` defined here", tvar.name(db))),
+            );
         }
     }
 
@@ -3268,7 +3545,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }) => {
                 // If this is a call expression, we would have added a `ReturnsNever` constraint,
                 // meaning this will be a standalone expression.
-                self.infer_maybe_standalone_expression(value, TypeContext::default());
+                let ty = self.infer_maybe_standalone_expression(value, TypeContext::default());
+
+                if ty.is_awaitable(self.db()) && !self.is_known_function_call(value) {
+                    if let Some(builder) =
+                        self.context.report_lint(&UNUSED_AWAITABLE, value.as_ref())
+                    {
+                        builder.into_diagnostic(format_args!(
+                            "Object of type `{}` is not awaited",
+                            ty.display(self.db()),
+                        ));
+                    }
+                }
             }
             ast::Stmt::If(if_statement) => self.infer_if_statement(if_statement),
             ast::Stmt::Try(try_statement) => self.infer_try_statement(try_statement),
@@ -4628,17 +4916,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
         if let Some(default_expr) = default.as_deref() {
             let default_ty = self.infer_type_expression(default_expr);
-            let bound_node = bound_node.map(|n| match n {
-                ast::Expr::Tuple(tuple) => BoundOrConstraintsNodes::Constraints(&tuple.elts),
-                _ => BoundOrConstraintsNodes::Bound(n),
-            });
-            self.validate_typevar_default(
-                Some(&name.id),
-                bound_or_constraints,
-                default_ty,
-                default_expr,
-                bound_node,
-            );
+            if !self.check_default_for_outer_scope_typevars(default_ty, default_expr, &name.id) {
+                let bound_node = bound_node.map(|n| match n {
+                    ast::Expr::Tuple(tuple) => BoundOrConstraintsNodes::Constraints(&tuple.elts),
+                    _ => BoundOrConstraintsNodes::Bound(n),
+                });
+                self.validate_typevar_default(
+                    Some(&name.id),
+                    bound_or_constraints,
+                    default_ty,
+                    default_expr,
+                    bound_node,
+                );
+            }
         }
         self.deferred_state = previous_deferred_state;
     }
@@ -4936,6 +5226,82 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
+    /// Check if a PEP 695 type parameter's default references type variables from an outer scope.
+    ///
+    /// Returns `true` if such a reference was found and a diagnostic was emitted,
+    /// indicating that further default validation should be skipped.
+    ///
+    /// Note: this only handles PEP 695 type parameters in function and type alias scopes.
+    /// Class type parameter scopes are skipped here because out-of-scope references
+    /// are validated at the class level via `report_invalid_typevar_default_reference`.
+    /// Legacy `TypeVar`s are validated by `check_legacy_typevar_defaults`.
+    fn check_default_for_outer_scope_typevars(
+        &self,
+        default_ty: Type<'db>,
+        default_node: &ast::Expr,
+        typevar_name: &str,
+    ) -> bool {
+        let db = self.db();
+
+        // Determine the expected binding context from the current type parameter scope.
+        // Only check function and type alias scopes; class scopes are handled separately
+        // when processing the class definition.
+        let expected_binding_def = match self.scope().node(db) {
+            NodeWithScopeKind::FunctionTypeParameters(function) => {
+                self.index.expect_single_definition(function)
+            }
+            NodeWithScopeKind::TypeAliasTypeParameters(type_alias) => {
+                self.index.expect_single_definition(type_alias)
+            }
+            _ => return false,
+        };
+        let expected_binding = BindingContext::Definition(expected_binding_def);
+
+        let outer_tv = find_over_type(db, default_ty, false, |ty| {
+            if let Type::TypeVar(bound_tv) = ty
+                && bound_tv.binding_context(db) != expected_binding
+            {
+                Some(bound_tv)
+            } else {
+                None
+            }
+        });
+
+        let Some(outer_tv) = outer_tv else {
+            return false;
+        };
+        let outer_typevar = outer_tv.typevar(db);
+        let outer_name = outer_typevar.name(db);
+        let Some(builder) = self
+            .context
+            .report_lint(&INVALID_TYPE_VARIABLE_DEFAULT, default_node)
+        else {
+            return false;
+        };
+        let mut diagnostic = builder.into_diagnostic(format_args!(
+            "Invalid default for type parameter `{typevar_name}`"
+        ));
+        diagnostic.set_primary_message(format_args!(
+            "`{outer_name}` is a type parameter bound in an outer scope"
+        ));
+        diagnostic.set_concise_message(format_args!(
+            "Type parameter `{typevar_name}` cannot use \
+                outer-scope type parameter `{outer_name}` as its default"
+        ));
+        if let Some(definition) = outer_typevar.definition(db) {
+            let file = definition.file(db);
+            diagnostic.annotate(
+                Annotation::secondary(Span::from(
+                    definition.full_range(db, &parsed_module(db, file).load(db)),
+                ))
+                .message(format_args!("`{outer_name}` defined here")),
+            );
+        }
+        diagnostic.info("See https://typing.python.org/en/latest/spec/generics.html#scoping-rules");
+
+        true
+    }
+
     fn infer_paramspec_definition(
         &mut self,
         node: &ast::TypeParamParamSpec,
@@ -4974,7 +5340,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let ast::TypeParamParamSpec {
             range: _,
             node_index: _,
-            name: _,
+            name,
             default: Some(default),
         } = node
         else {
@@ -4982,11 +5348,26 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
         let previous_deferred_state =
             std::mem::replace(&mut self.deferred_state, DeferredExpressionState::Deferred);
-        self.infer_paramspec_default(default);
+        self.infer_paramspec_default(default, Some(&name.id));
         self.deferred_state = previous_deferred_state;
     }
 
-    fn infer_paramspec_default(&mut self, default_expr: &ast::Expr) {
+    fn infer_paramspec_default(&mut self, default_expr: &ast::Expr, paramspec_name: Option<&str>) {
+        let previously_allowed_paramspec = self
+            .inference_flags
+            .replace(InferenceFlags::ALLOW_PARAMSPEC_TYPE_EXPR, true);
+        self.infer_paramspec_default_impl(default_expr, paramspec_name);
+        self.inference_flags.set(
+            InferenceFlags::ALLOW_PARAMSPEC_TYPE_EXPR,
+            previously_allowed_paramspec,
+        );
+    }
+
+    fn infer_paramspec_default_impl(
+        &mut self,
+        default_expr: &ast::Expr,
+        paramspec_name: Option<&str>,
+    ) {
         match default_expr {
             ast::Expr::EllipsisLiteral(ellipsis) => {
                 let ty = self.infer_ellipsis_literal_expression(ellipsis);
@@ -5008,6 +5389,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             ast::Expr::Name(_) => {
                 let ty = self.infer_type_expression(default_expr);
+                if let Some(name) = paramspec_name
+                    && self.check_default_for_outer_scope_typevars(ty, default_expr, name)
+                {
+                    return;
+                }
                 let is_paramspec = match ty {
                     Type::TypeVar(typevar) => typevar.is_paramspec(self.db()),
                     Type::KnownInstance(known_instance) => {
@@ -7662,7 +8048,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 known_class,
                 Some(KnownClass::ParamSpec | KnownClass::ExtensionsParamSpec)
             ) {
-                self.infer_paramspec_default(&default.value);
+                // Pass `None` for the name: the outer-scope typevar check inside
+                // `infer_paramspec_default` is only relevant for PEP 695 type parameter
+                // scopes. Legacy ParamSpec definitions live at module/class-body scope,
+                // so the check would be a no-op here. Out-of-scope defaults for legacy
+                // typevars are instead validated by `check_legacy_typevar_defaults`
+                // (for functions) and `report_invalid_typevar_default_reference`
+                // (for classes).
+                self.infer_paramspec_default(&default.value, None);
             } else {
                 let default_ty = self.infer_type_expression(&default.value);
                 let bound_or_constraints_node = arguments
@@ -9703,13 +10096,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             typevar.identity(self.db()).definition(self.db()),
                             TypeVarKind::Pep613Alias,
                         );
-                        Type::KnownInstance(KnownInstanceType::TypeVar(TypeVarInstance::new(
-                            self.db(),
-                            identity,
-                            typevar._bound_or_constraints(self.db()),
-                            typevar.explicit_variance(self.db()),
-                            typevar._default(self.db()),
-                        )))
+                        Type::KnownInstance(KnownInstanceType::TypeVar(
+                            typevar.with_identity(self.db(), identity),
+                        ))
                     } else {
                         inferred_ty
                     };
@@ -14139,6 +14528,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 db,
                                 self.scope(),
                                 self.typevar_binding_context,
+                                self.inference_flags
                             ) && !defined_type.member(db, attr_name).place.is_undefined()
                             {
                                 diag.help(format_args!(
@@ -14731,7 +15121,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // builder only state
             typevar_binding_context: _,
-            check_unbound_typevars: _,
+            inference_flags: _,
             deferred_state: _,
             multi_inference_state: _,
             inner_expression_inference_state: _,
@@ -14801,7 +15191,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             dataclass_field_specifiers: _,
             all_definitely_bound: _,
             typevar_binding_context: _,
-            check_unbound_typevars: _,
+            inference_flags: _,
             deferred_state: _,
             inferring_vararg_annotation: _,
             multi_inference_state: _,
@@ -14884,7 +15274,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             dataclass_field_specifiers: _,
             all_definitely_bound: _,
             typevar_binding_context: _,
-            check_unbound_typevars: _,
+            inference_flags: _,
             deferred_state: _,
             multi_inference_state: _,
             inner_expression_inference_state: _,
