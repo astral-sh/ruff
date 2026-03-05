@@ -658,6 +658,44 @@ impl Session {
             },
         );
 
+        // When a nested workspace is added, files that were previously
+        // open in a parent project need to also be marked as open in
+        // the new project's database.
+        //
+        // Note that we specifically allow the same file to be in the
+        // open file set of multiple projects.
+        //
+        // (We collect these up-front to work around borrowck.)
+        let open_paths: Vec<SystemPathBuf> = self
+            .text_document_handles()
+            .filter_map(|doc| {
+                // We don't account for virtual paths here since,
+                // at time of writing (2026-03-05), virtual paths
+                // are always tied to the first project.
+                //
+                // Ref: https://github.com/astral-sh/ty/issues/794
+                if let AnySystemPath::System(ref path) = *doc.notebook_or_file_path()
+                    && path.starts_with(&root)
+                {
+                    Some(path.clone())
+                } else {
+                    None
+                }
+            })
+            .collect();
+        for path in &open_paths {
+            let db = self.project_db_mut(&AnySystemPath::System(path.clone()));
+            match system_path_to_file(db, path) {
+                Ok(file) => {
+                    let project = db.project();
+                    if project.is_file_included(db, path) {
+                        project.open_file(db, file);
+                    }
+                }
+                Err(err) => tracing::warn!("Failed to open file {path}: {err}"),
+            }
+        }
+
         publish_settings_diagnostics(self, client, root);
     }
 
@@ -837,6 +875,11 @@ impl Session {
         let documents_to_clear: Vec<DocumentHandle> = self
             .text_document_handles()
             .filter_map(|doc| {
+                // We don't account for virtual paths here since,
+                // at time of writing (2026-03-05), virtual paths
+                // are always tied to the first project.
+                //
+                // Ref: https://github.com/astral-sh/ty/issues/794
                 if let AnySystemPath::System(ref path) = *doc.notebook_or_file_path()
                     && path.starts_with(&workspace_path)
                 {
