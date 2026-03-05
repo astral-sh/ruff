@@ -35,6 +35,20 @@ impl<'db> Type<'db> {
         any_over_type(db, self, false, |ty| matches!(ty, Type::TypeVar(_)))
     }
 
+    pub(crate) fn references_typevar(
+        self,
+        db: &'db dyn Db,
+        typevar_id: TypeVarIdentity<'db>,
+    ) -> bool {
+        any_over_type(db, self, false, |ty| match ty {
+            Type::TypeVar(bound_typevar) => typevar_id == bound_typevar.typevar(db).identity(db),
+            Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) => {
+                typevar_id == typevar.identity(db)
+            }
+            _ => false,
+        })
+    }
+
     pub(crate) fn has_non_self_typevar(self, db: &'db dyn Db) -> bool {
         any_over_type(
             db,
@@ -593,7 +607,8 @@ impl<'db> TypeVarInstance<'db> {
     ) -> Option<Type<'db>> {
         let default = self.lazy_default_unchecked(db)?;
 
-        // Unlike bounds/constraints, default types are allowed to be generic (https://peps.python.org/pep-0696/#using-another-type-parameter-as-default).
+        // Unlike bounds/constraints, default types are allowed to be generic
+        // (https://typing.python.org/en/latest/spec/generics.html#defaults-for-type-parameters).
         // Here we simply check for non-self-referential.
         // TODO: We should also check for non-forward references.
         if self.type_is_self_referential(db, default, visitor) {

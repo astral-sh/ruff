@@ -63,6 +63,7 @@ use crate::types::generics::{
     ApplySpecialization, InferableTypeVars, Specialization, bind_typevar,
 };
 pub(crate) use crate::types::generics::{GenericContext, SpecializationBuilder};
+use crate::types::infer::InferenceFlags;
 use crate::types::known_instance::{InternedConstraintSet, InternedType, UnionTypeInstance};
 pub use crate::types::method::{BoundMethodType, KnownBoundMethodType, WrapperDescriptorKind};
 use crate::types::mro::{MroIterator, StaticMroError};
@@ -77,6 +78,7 @@ use crate::types::special_form::TypeQualifier;
 use crate::types::tuple::TupleSpec;
 use crate::types::type_alias::TypeAliasType;
 pub(crate) use crate::types::typed_dict::TypedDictType;
+use crate::types::typevar::TypeVarInstance;
 pub use crate::types::typevar::{
     BindingContext, BoundTypeVarInstance, ParamSpecAttrKind, TypeVarBoundOrConstraints, TypeVarKind,
 };
@@ -4857,6 +4859,7 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         scope_id: ScopeId<'db>,
         typevar_binding_context: Option<Definition<'db>>,
+        inference_flags: InferenceFlags,
     ) -> Result<Type<'db>, InvalidTypeExpressionError<'db>> {
         match self {
             // Special cases for `float` and `complex`
@@ -4901,9 +4904,16 @@ impl<'db> Type<'db> {
                 KnownInstanceType::TypeAliasType(alias) => Ok(Type::TypeAlias(*alias)),
                 KnownInstanceType::NewType(newtype) => Ok(Type::NewTypeInstance(*newtype)),
                 KnownInstanceType::TypeVar(typevar) => {
-                    // TODO: A `ParamSpec` type variable cannot be used in type expressions. This
-                    // requires storing additional context as it's allowed in some places
-                    // (`Concatenate`, `Callable`) but not others.
+                    if !inference_flags.contains(InferenceFlags::ALLOW_PARAMSPEC_TYPE_EXPR)
+                        && typevar.is_paramspec(db)
+                    {
+                        return Err(InvalidTypeExpressionError {
+                            invalid_expressions: smallvec_inline![
+                                InvalidTypeExpression::InvalidBareParamSpec(*typevar)
+                            ],
+                            fallback_type: Type::unknown(),
+                        });
+                    }
                     let index = semantic_index(db, scope_id.file(db));
                     Ok(bind_typevar(
                         db,
@@ -4977,7 +4987,12 @@ impl<'db> Type<'db> {
                 let mut builder = UnionBuilder::new(db);
                 let mut invalid_expressions = smallvec::SmallVec::default();
                 for element in union.elements(db) {
-                    match element.in_type_expression(db, scope_id, typevar_binding_context) {
+                    match element.in_type_expression(
+                        db,
+                        scope_id,
+                        typevar_binding_context,
+                        inference_flags,
+                    ) {
                         Ok(type_expr) => builder = builder.add(type_expr),
                         Err(InvalidTypeExpressionError {
                             fallback_type,
@@ -5016,11 +5031,12 @@ impl<'db> Type<'db> {
 
             Type::Intersection(_) => Ok(todo_type!("Type::Intersection.in_type_expression")),
 
-            Type::TypeAlias(alias) => {
-                alias
-                    .value_type(db)
-                    .in_type_expression(db, scope_id, typevar_binding_context)
-            }
+            Type::TypeAlias(alias) => alias.value_type(db).in_type_expression(
+                db,
+                scope_id,
+                typevar_binding_context,
+                inference_flags,
+            ),
 
             Type::NewTypeInstance(_) => Err(InvalidTypeExpressionError {
                 invalid_expressions: smallvec_inline![InvalidTypeExpression::InvalidType(
@@ -6536,6 +6552,7 @@ enum InvalidTypeExpression<'db> {
     TypeQualifierRequiresOneArgument(TypeQualifier),
     /// Some types are always invalid in type expressions
     InvalidType(Type<'db>, ScopeId<'db>),
+    InvalidBareParamSpec(TypeVarInstance<'db>),
 }
 
 impl<'db> InvalidTypeExpression<'db> {
@@ -6619,6 +6636,11 @@ impl<'db> InvalidTypeExpression<'db> {
                         "Variable of type `{ty}` is not allowed in a type expression",
                         ty = ty.display(self.db)
                     ),
+                    InvalidTypeExpression::InvalidBareParamSpec(paramspec) => write!(
+                        f,
+                        "Bare ParamSpec `{}` is not valid in this context in a type expression",
+                        paramspec.name(self.db)
+                    ),
                 }
             }
         }
@@ -6652,7 +6674,7 @@ impl<'db> InvalidTypeExpression<'db> {
                 return;
             };
             if module_member_with_same_name
-                .in_type_expression(db, scope, None)
+                .in_type_expression(db, scope, None, InferenceFlags::empty())
                 .is_err()
             {
                 return;
@@ -6684,6 +6706,13 @@ impl<'db> InvalidTypeExpression<'db> {
                 == builtins_module_scope(db)
         {
             diagnostic.set_primary_message("Did you mean `collections.abc.Callable`?");
+        } else if matches!(self, InvalidTypeExpression::InvalidBareParamSpec(_)) {
+            diagnostic.info("A bare ParamSpec is only valid:");
+            diagnostic.info(" - as the first argument to `Callable`");
+            diagnostic.info(" - as the last argument to `Concatenate`");
+            diagnostic.info(" - as the default type for another ParamSpec");
+            diagnostic.info(" - as part of a type parameter list when defining a generic class");
+            diagnostic.info(" - or as part of an argument list when specializing a generic class");
         }
     }
 }
