@@ -5351,6 +5351,26 @@ except <CURSOR># Trigger completion/hover here
         );
     }
 
+    // Ref: https://github.com/astral-sh/ty/issues/2401
+    #[test]
+    fn incomplete_except_handler_uses_enclosing_scope() {
+        completion_test_builder(
+            "\
+def f():
+    sentinel = 1
+    try:
+        print()
+    except <CURSOR>as err:
+        pass
+",
+        )
+        .skip_keywords()
+        .skip_builtins()
+        .skip_auto_import()
+        .build()
+        .contains("sentinel");
+    }
+
     // Ref: https://github.com/astral-sh/ty/issues/572
     #[test]
     fn scope_id_missing_global1() {
