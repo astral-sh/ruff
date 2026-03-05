@@ -565,6 +565,23 @@ def _(x: object):
         x.push(42)
 ```
 
+The same applies when the contravariant type parameter appears inside `type[T]`:
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T", contravariant=True)
+
+class ContravariantType(Generic[T]):
+    def push(self, x: type[T]) -> None: ...
+
+def _(x: object):
+    if isinstance(x, ContravariantType):
+        reveal_type(x)  # revealed: ContravariantType[Never]
+        # error: [invalid-argument-type]
+        x.push(str)
+```
+
 Invariant generics are trickiest. The top materialization, conceptually the type that includes all
 instances of the generic class regardless of the type parameter, cannot be represented directly in
 the type system, so we represent it with the internal `Top[]` special form.
