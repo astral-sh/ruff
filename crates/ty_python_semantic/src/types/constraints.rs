@@ -4581,7 +4581,7 @@ impl PathAssignments {
             edge = %assignment.display(db, builder),
             "walk edge",
         );
-        let found_conflict = self.add_assignment(db, builder, assignment, source_order);
+        let found_conflict = self.add_assignment(db, builder, assignment, source_order, false);
         let result = if found_conflict.is_err() {
             // If that results in the path now being impossible due to a contradiction, return
             // without invoking the callback.
@@ -4662,6 +4662,7 @@ impl PathAssignments {
         builder: &ConstraintSetBuilder<'db>,
         assignment: ConstraintAssignment,
         source_order: usize,
+        derived: bool,
     ) -> Result<(), PathAssignmentConflict> {
         // First add this assignment. If it causes a conflict, return that as an error. If we've
         // already know this assignment holds, just return.
@@ -4682,7 +4683,16 @@ impl PathAssignments {
 
         match self.assignments.entry(assignment) {
             Entry::Vacant(entry) => entry.insert(source_order),
-            Entry::Occupied(_) => return Ok(()),
+            Entry::Occupied(mut entry) => {
+                // If a constraint appears both as an "origin" constraint (it actually appears in
+                // the BDD structure) and as a "derived" constraint (we infer it from other
+                // constraints), we should prefer the origin source_order, regardless of which
+                // order we encounter the various constraints in the BDD.
+                if !derived {
+                    *entry.get_mut() = source_order;
+                }
+                return Ok(());
+            }
         };
 
         // Then use our sequents to add additional facts that we know to be true. We currently
@@ -4759,7 +4769,7 @@ impl PathAssignments {
         }
 
         for new_constraint in new_constraints {
-            self.add_assignment(db, builder, new_constraint.when_true(), source_order)?;
+            self.add_assignment(db, builder, new_constraint.when_true(), source_order, true)?;
         }
 
         Ok(())
