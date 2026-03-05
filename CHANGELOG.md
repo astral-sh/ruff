@@ -1,5 +1,45 @@
 # Changelog
 
+## 0.15.5
+
+Released on 2026-03-05.
+
+### Preview features
+
+- Discover Markdown files by default in preview mode ([#23434](https://github.com/astral-sh/ruff/pull/23434))
+- \[`perflint`\] Extend `PERF102` to comprehensions and generators ([#23473](https://github.com/astral-sh/ruff/pull/23473))
+- \[`refurb`\] Fix `FURB101` and `FURB103` false positives when I/O variable is used later ([#23542](https://github.com/astral-sh/ruff/pull/23542))
+- \[`ruff`\] Add fix for `none-not-at-end-of-union` (`RUF036`) ([#22829](https://github.com/astral-sh/ruff/pull/22829))
+- \[`ruff`\] Fix false positive for `re.split` with empty string pattern (`RUF055`) ([#23634](https://github.com/astral-sh/ruff/pull/23634))
+
+### Bug fixes
+
+- \[`fastapi`\] Handle callable class dependencies with `__call__` method (`FAST003`) ([#23553](https://github.com/astral-sh/ruff/pull/23553))
+- \[`pydocstyle`\] Fix numpy section ordering (`D420`) ([#23685](https://github.com/astral-sh/ruff/pull/23685))
+- \[`pyflakes`\] Fix false positive for names shadowing re-exports (`F811`) ([#23356](https://github.com/astral-sh/ruff/pull/23356))
+- \[`pyupgrade`\] Avoid inserting redundant `None` elements in `UP045` ([#23459](https://github.com/astral-sh/ruff/pull/23459))
+
+### Documentation
+
+- Document extension mapping for Markdown code formatting ([#23574](https://github.com/astral-sh/ruff/pull/23574))
+- Update default Python version examples ([#23605](https://github.com/astral-sh/ruff/pull/23605))
+
+### Other changes
+
+- Publish releases to Astral mirror ([#23616](https://github.com/astral-sh/ruff/pull/23616))
+
+### Contributors
+
+- [@amyreese](https://github.com/amyreese)
+- [@stakeswky](https://github.com/stakeswky)
+- [@chirizxc](https://github.com/chirizxc)
+- [@anishgirianish](https://github.com/anishgirianish)
+- [@bxff](https://github.com/bxff)
+- [@zsol](https://github.com/zsol)
+- [@charliermarsh](https://github.com/charliermarsh)
+- [@ntBre](https://github.com/ntBre)
+- [@kar-ganap](https://github.com/kar-ganap)
+
 ## 0.15.4
 
 Released on 2026-02-26.

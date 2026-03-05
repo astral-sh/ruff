@@ -14,7 +14,8 @@ pub use program::{Program, ProgramSettings};
 pub use python_platform::PythonPlatform;
 use rustc_hash::FxHasher;
 pub use semantic_model::{
-    Completion, HasDefinition, HasType, MemberDefinition, NameKind, SemanticModel,
+    Completion, HasDefinition, HasOptionalDefinition, HasType, MemberDefinition, NameKind,
+    SemanticModel,
 };
 pub use suppression::{
     UNUSED_IGNORE_COMMENT, is_unused_ignore_comment_lint, suppress_all, suppress_single,

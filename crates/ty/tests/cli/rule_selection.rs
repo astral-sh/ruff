@@ -1013,35 +1013,6 @@ fn cli_all_rules_with_override() -> anyhow::Result<()> {
     Ok(())
 }
 
-/// The "all" keyword is case-insensitive
-#[test]
-fn cli_all_rules_case_insensitive() -> anyhow::Result<()> {
-    let case = CliTest::with_file(
-        "test.py",
-        r#"
-        prin(x)  # unresolved-reference
-        "#,
-    )?;
-
-    // Using --ignore ALL (uppercase) should work the same as --ignore all
-    assert_cmd_snapshot!(
-        case
-            .command()
-            .arg("--ignore")
-            .arg("ALL"),
-        @"
-    success: true
-    exit_code: 0
-    ----- stdout -----
-    All checks passed!
-
-    ----- stderr -----
-    "
-    );
-
-    Ok(())
-}
-
 /// A specific rule can be set first and then overridden by "all"
 #[test]
 fn cli_specific_then_all() -> anyhow::Result<()> {
@@ -1113,6 +1084,132 @@ fn configuration_all_rules() -> anyhow::Result<()> {
       | ^^^^
       |
     info: rule `unresolved-reference` was selected in the configuration file
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
+/// In TOML, key order in a table is not semantically meaningful, so specific rules should
+/// still override `all` even if they sort lexicographically before `all`.
+#[test]
+fn configuration_all_rules_with_rule_sorting_before_all() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        (
+            "pyproject.toml",
+            r#"
+            [tool.ty.rules]
+            all = "warn"
+            abstract-method-in-final-class = "error"
+            "#,
+        ),
+        (
+            "test.py",
+            r#"
+            from typing import final
+            from abc import ABC, abstractmethod
+
+            class Base(ABC):
+                @abstractmethod
+                def foo(self) -> int:
+                    raise NotImplementedError
+
+            @final
+            class Derived(Base):
+                pass
+            "#,
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(case.command(), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[abstract-method-in-final-class]: Final class `Derived` has unimplemented abstract methods
+      --> test.py:11:7
+       |
+    10 | @final
+    11 | class Derived(Base):
+       |       ^^^^^^^ `foo` is unimplemented
+    12 |     pass
+       |
+      ::: test.py:7:9
+       |
+     5 | class Base(ABC):
+     6 |     @abstractmethod
+     7 |     def foo(self) -> int:
+       |         --- `foo` declared as abstract on superclass `Base`
+     8 |         raise NotImplementedError
+       |
+    info: rule `abstract-method-in-final-class` was selected in the configuration file
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
+/// Same TOML key ordering issue, but within an override's `[rules]` table.
+/// `abstract-method-in-final-class` sorts before `all` lexicographically, but
+/// the specific rule should still take precedence over `all`.
+#[test]
+fn overrides_all_rules_with_rule_sorting_before_all() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        (
+            "pyproject.toml",
+            r#"
+            [[tool.ty.overrides]]
+            include = ["src/**"]
+
+            [tool.ty.overrides.rules]
+            all = "warn"
+            abstract-method-in-final-class = "error"
+            "#,
+        ),
+        (
+            "src/test.py",
+            r#"
+            from typing import final
+            from abc import ABC, abstractmethod
+
+            class Base(ABC):
+                @abstractmethod
+                def foo(self) -> int:
+                    raise NotImplementedError
+
+            @final
+            class Derived(Base):
+                pass
+            "#,
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(case.command(), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[abstract-method-in-final-class]: Final class `Derived` has unimplemented abstract methods
+      --> src/test.py:11:7
+       |
+    10 | @final
+    11 | class Derived(Base):
+       |       ^^^^^^^ `foo` is unimplemented
+    12 |     pass
+       |
+      ::: src/test.py:7:9
+       |
+     5 | class Base(ABC):
+     6 |     @abstractmethod
+     7 |     def foo(self) -> int:
+       |         --- `foo` declared as abstract on superclass `Base`
+     8 |         raise NotImplementedError
+       |
+    info: rule `abstract-method-in-final-class` was selected in the configuration file
 
     Found 1 diagnostic
 
