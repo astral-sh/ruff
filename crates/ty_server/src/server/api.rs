@@ -6,6 +6,7 @@ use lsp_server::{ErrorCode, RequestId};
 use lsp_types::notification::Notification;
 use lsp_types::request::Request;
 use std::panic::{AssertUnwindSafe, UnwindSafe};
+use std::sync::Arc;
 
 mod diagnostics;
 mod notifications;
@@ -16,7 +17,7 @@ mod traits;
 mod type_hierarchy;
 
 use self::traits::{NotificationHandler, RequestHandler};
-use super::{Result, schedule::BackgroundSchedule};
+use super::{RequestExtension, Result, schedule::BackgroundSchedule};
 use crate::session::client::Client;
 pub(crate) use diagnostics::publish_settings_diagnostics;
 pub use requests::{PartialWorkspaceProgress, PartialWorkspaceProgressParams};
@@ -28,8 +29,15 @@ use ruff_db::panic::PanicError;
 /// it's crucial that all paths in this method call [`Client::respond`] exactly once.
 /// The only exception to this is requests that were cancelled by the client. In this case,
 /// the response was already sent by the [`notification::CancelNotificationHandler`].
-pub(super) fn request(req: server::Request) -> Task {
+pub(super) fn request(req: server::Request, extension: Option<Arc<dyn RequestExtension>>) -> Task {
     let id = req.id.clone();
+
+    // Extension gets first look at any request it claims to handle.
+    if let Some(ext) = &extension {
+        if ext.handles_method(&req.method) {
+            return extension_request_task(req, ext.clone());
+        }
+    }
 
     match req.method.as_str() {
         requests::ExecuteCommand::METHOD => sync_request_task::<requests::ExecuteCommand>(req),
@@ -160,34 +168,40 @@ pub(super) fn request(req: server::Request) -> Task {
     })
 }
 
-pub(super) fn notification(notif: server::Notification) -> Task {
+pub(super) fn notification(
+    notif: server::Notification,
+    extension: Option<Arc<dyn RequestExtension>>,
+) -> Task {
     match notif.method.as_str() {
         notifications::DidCloseTextDocumentHandler::METHOD => {
-            sync_notification_task::<notifications::DidCloseTextDocumentHandler>(notif)
+            sync_notification_task::<notifications::DidCloseTextDocumentHandler>(
+                notif,
+                extension,
+            )
         }
         notifications::DidOpenTextDocumentHandler::METHOD => {
-            sync_notification_task::<notifications::DidOpenTextDocumentHandler>(notif)
+            sync_notification_task::<notifications::DidOpenTextDocumentHandler>(notif, extension)
         }
         notifications::DidChangeTextDocumentHandler::METHOD => {
-            sync_notification_task::<notifications::DidChangeTextDocumentHandler>(notif)
+            sync_notification_task::<notifications::DidChangeTextDocumentHandler>(notif, extension)
         }
         notifications::DidOpenNotebookHandler::METHOD => {
-            sync_notification_task::<notifications::DidOpenNotebookHandler>(notif)
+            sync_notification_task::<notifications::DidOpenNotebookHandler>(notif, None)
         }
         notifications::DidChangeNotebookHandler::METHOD => {
-            sync_notification_task::<notifications::DidChangeNotebookHandler>(notif)
+            sync_notification_task::<notifications::DidChangeNotebookHandler>(notif, None)
         }
         notifications::DidCloseNotebookHandler::METHOD => {
-            sync_notification_task::<notifications::DidCloseNotebookHandler>(notif)
+            sync_notification_task::<notifications::DidCloseNotebookHandler>(notif, None)
         }
         notifications::DidChangeWatchedFiles::METHOD => {
-            sync_notification_task::<notifications::DidChangeWatchedFiles>(notif)
+            sync_notification_task::<notifications::DidChangeWatchedFiles>(notif, None)
         }
         notifications::DidChangeWorkspaceFoldersHandler::METHOD => {
-            sync_notification_task::<notifications::DidChangeWorkspaceFoldersHandler>(notif)
+            sync_notification_task::<notifications::DidChangeWorkspaceFoldersHandler>(notif, None)
         }
         lsp_types::notification::Cancel::METHOD => {
-            sync_notification_task::<notifications::CancelNotificationHandler>(notif)
+            sync_notification_task::<notifications::CancelNotificationHandler>(notif, None)
         }
         lsp_types::notification::SetTrace::METHOD => {
             tracing::trace!("Ignoring `setTrace` notification");
@@ -222,6 +236,44 @@ where
         let result = R::run(session, client, params);
         respond::<R>(&id, result, client, session.client_name().log_guidance());
     }))
+}
+
+/// Creates a task that delegates request handling to an extension.
+///
+/// Extension requests run on a **background thread** with read-only access
+/// to project database snapshots, so they don't block the main event loop.
+fn extension_request_task(req: server::Request, extension: Arc<dyn RequestExtension>) -> Task {
+    let id = req.id.clone();
+    let method = req.method.clone();
+
+    Task::background(BackgroundSchedule::Worker, move |session: &Session| {
+        // Take a snapshot of all project databases while on the main thread.
+        let snapshot = session.snapshot_session();
+
+        Box::new(move |client| {
+            let _span = tracing::debug_span!("extension_request", %id, %method).entered();
+
+            match extension.handle_request(&req, snapshot.projects()) {
+                Some(response) => {
+                    // Extension provided a response, send it to the client
+                    client.send_response(response);
+                }
+                None => {
+                    // Extension didn't provide a response - this shouldn't happen
+                    // if handles_method returned true, but handle it gracefully
+                    tracing::warn!("Extension claimed to handle {method} but returned None");
+                    client.respond_err(
+                        id,
+                        server::ResponseError {
+                            code: server::ErrorCode::InternalError as i32,
+                            message: format!("Extension failed to handle {method}"),
+                            data: None,
+                        },
+                    );
+                }
+            }
+        })
+    })
 }
 
 fn background_request_task<R: traits::BackgroundRequestHandler>(
@@ -383,6 +435,7 @@ fn panic_response<R>(
 
 fn sync_notification_task<N: traits::SyncNotificationHandler>(
     notif: server::Notification,
+    extension: Option<Arc<dyn RequestExtension>>,
 ) -> Result<Task> {
     let (id, params) = cast_notification::<N>(notif)?;
     Ok(Task::sync(move |session, client| {
@@ -395,6 +448,11 @@ fn sync_notification_task<N: traits::SyncNotificationHandler>(
             ));
 
             return;
+        }
+
+        // Notify extension (if any) after successful processing.
+        if let Some(ext) = &extension {
+            ext.on_notification(N::METHOD, client);
         }
 
         // If there's a pending workspace diagnostic long-polling request,

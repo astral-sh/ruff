@@ -1,0 +1,23 @@
+[package]
+name = "tsp_types"
+version = "0.0.0"
+publish = false
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+description = "Type Server Protocol (TSP) types for Pylance integration"
+
+[dependencies]
+lsp-types = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+insta = { workspace = true, features = ["json"] }
+
+[lints]
+workspace = true

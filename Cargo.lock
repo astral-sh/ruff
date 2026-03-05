@@ -4534,6 +4534,39 @@ dependencies = [
 ]
 
 [[package]]
+name = "tsp_ty_server"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "insta",
+ "lsp-server",
+ "lsp-types",
+ "ruff_db",
+ "ruff_source_file",
+ "ruff_text_size",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tracing",
+ "tsp_types",
+ "ty_ide",
+ "ty_module_resolver",
+ "ty_project",
+ "ty_server",
+ "ty_vendored",
+]
+
+[[package]]
+name = "tsp_types"
+version = "0.0.0"
+dependencies = [
+ "insta",
+ "lsp-types",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "ty"
 version = "0.0.0"
 dependencies = [

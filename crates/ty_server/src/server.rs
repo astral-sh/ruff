@@ -13,6 +13,7 @@ use std::panic::{PanicHookInfo, RefUnwindSafe};
 use std::sync::Arc;
 
 mod api;
+pub(crate) mod extension;
 mod lazy_work_done_progress;
 mod main_loop;
 mod schedule;
@@ -20,6 +21,7 @@ mod schedule;
 use crate::session::client::Client;
 pub(crate) use api::Error;
 pub(crate) use api::publish_settings_diagnostics;
+pub use extension::{NoOpExtension, Notifier, RequestExtension};
 pub(crate) use main_loop::{
     Action, ConnectionSender, Event, MainLoopReceiver, MainLoopSender, SendRequest,
 };
@@ -32,6 +34,9 @@ pub struct Server {
     main_loop_receiver: MainLoopReceiver,
     main_loop_sender: MainLoopSender,
     session: Session,
+    /// Extension for handling custom requests (e.g., TSP protocol).
+    /// `None` for normal ty usage (zero overhead), `Some` when an extension is active.
+    extension: Option<Arc<dyn RequestExtension>>,
 }
 
 impl Server {
@@ -40,6 +45,26 @@ impl Server {
         connection: Connection,
         native_system: Arc<dyn System + 'static + Send + Sync + RefUnwindSafe>,
         in_test: bool,
+    ) -> crate::Result<Self> {
+        Self::with_extension(
+            worker_threads,
+            connection,
+            native_system,
+            in_test,
+            None,
+        )
+    }
+
+    /// Create a new server with a custom request extension.
+    ///
+    /// The extension will be called for any request method that `ty_server`
+    /// doesn't natively handle. Pass `None` for normal ty usage (zero overhead).
+    pub fn with_extension(
+        worker_threads: NonZeroUsize,
+        connection: Connection,
+        native_system: Arc<dyn System + 'static + Send + Sync + RefUnwindSafe>,
+        in_test: bool,
+        extension: Option<Arc<dyn RequestExtension>>,
     ) -> crate::Result<Self> {
         let (id, init_value) = connection.initialize_start()?;
 
@@ -145,7 +170,13 @@ impl Server {
                 ClientName::from(client_info),
                 in_test,
             )?,
+            extension,
         })
+    }
+
+    /// Returns a reference to the request extension, if one is configured.
+    pub fn extension(&self) -> Option<&Arc<dyn RequestExtension>> {
+        self.extension.as_ref()
     }
 
     pub fn run(mut self) -> crate::Result<()> {
