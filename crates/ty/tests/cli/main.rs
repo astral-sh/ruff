@@ -383,7 +383,7 @@ fn user_configuration() -> anyhow::Result<()> {
         ),
     ])?;
 
-    let config_directory = case.root().join("home/.config");
+    let config_directory = case.user_config_directory();
     let config_env_var = user_config_directory_env_var();
 
     assert_cmd_snapshot!(
@@ -884,13 +884,16 @@ impl CliTest {
         // Canonicalize the tempdir path because macos uses symlinks for tempdirs
         // and that doesn't play well with our snapshot filtering.
         // Simplify with dunce because otherwise we get UNC paths on Windows.
-        let project_dir = dunce::simplified(
+        let temp_dir_path = dunce::simplified(
             &temp_dir
                 .path()
                 .canonicalize()
-                .context("Failed to canonicalize project path")?,
+                .context("Failed to canonicalize temporary directory path")?,
         )
         .to_path_buf();
+        let project_dir = temp_dir_path.join("project");
+        std::fs::create_dir_all(&project_dir)
+            .with_context(|| format!("Failed to create directory `{}`", project_dir.display()))?;
 
         let mut settings = insta::Settings::clone_current();
         settings.add_filter(&tempdir_filter(&project_dir), "<temp_dir>/");
@@ -1015,10 +1018,17 @@ impl CliTest {
         // Point user config discovery at a test-local directory to avoid picking up host config.
         command.env(
             user_config_directory_env_var(),
-            self.project_dir.join("home/.config"),
+            self.user_config_directory(),
         );
 
         command
+    }
+
+    fn user_config_directory(&self) -> PathBuf {
+        self.project_dir
+            .parent()
+            .expect("project directory always has a parent")
+            .join("home/.config")
     }
 }
 
