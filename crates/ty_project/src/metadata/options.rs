@@ -22,6 +22,7 @@ use ruff_python_ast::PythonVersion;
 use rustc_hash::FxHasher;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
+use std::cmp::Ordering;
 use std::fmt::{self, Debug, Display};
 use std::hash::BuildHasherDefault;
 use std::ops::Deref;
@@ -961,26 +962,26 @@ impl Rules {
             }
         };
 
-        // TOML tables are unordered, so for file-based configuration we always treat `all` as
-        // the base level and apply explicit per-rule selectors afterwards.
-        let is_file_all_selector = |rule_name: &RangedValue<String>| {
-            rule_name.eq_ignore_ascii_case("all")
-                && matches!(rule_name.source(), ValueSource::File(_))
-        };
+        // TOML tables are unordered, so for selectors from the same configuration file we treat
+        // `all` as the base level and apply explicit per-rule selectors afterwards.
+        let mut ordered_rules: Vec<_> = self.inner.iter().collect();
+        ordered_rules.sort_by(|(rule_a, _), (rule_b, _)| {
+            match (rule_a.source(), rule_b.source()) {
+                (ValueSource::File(path_a), ValueSource::File(path_b)) if path_a == path_b => {
+                    match (
+                        rule_a.eq_ignore_ascii_case("all"),
+                        rule_b.eq_ignore_ascii_case("all"),
+                    ) {
+                        (true, false) => Ordering::Less,
+                        (false, true) => Ordering::Greater,
+                        _ => Ordering::Equal,
+                    }
+                }
+                _ => Ordering::Equal,
+            }
+        });
 
-        for (rule_name, level) in self
-            .inner
-            .iter()
-            .filter(|(rule_name, _)| is_file_all_selector(rule_name))
-        {
-            apply_rule(rule_name, level);
-        }
-
-        for (rule_name, level) in self
-            .inner
-            .iter()
-            .filter(|(rule_name, _)| !is_file_all_selector(rule_name))
-        {
+        for (rule_name, level) in ordered_rules {
             apply_rule(rule_name, level);
         }
 
