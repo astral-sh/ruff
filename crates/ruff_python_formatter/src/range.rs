@@ -5,7 +5,7 @@ use ruff_formatter::{
     FormatContext, FormatError, FormatOptions, IndentStyle, PrintedRange, SourceCode, format,
 };
 use ruff_python_ast::visitor::source_order::{SourceOrderVisitor, TraversalSignal, walk_body};
-use ruff_python_ast::{AnyNodeRef, Stmt, StmtMatch, StmtTry};
+use ruff_python_ast::{AnyNodeRef, ExceptHandler, Stmt, StmtMatch, StmtTry};
 use ruff_python_parser::{ParseOptions, parse};
 use ruff_python_trivia::{
     BackwardsTokenizer, CommentRanges, SimpleToken, SimpleTokenKind, indentation_at_offset,
@@ -15,7 +15,7 @@ use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use crate::comments::Comments;
 use crate::context::{IndentLevel, NodeLevel};
 use crate::prelude::*;
-use crate::statement::suite::{DocstringStmt, skip_range};
+use crate::statement::suite::{DocstringStmt, new_logical_line_between_statements, skip_range};
 use crate::verbatim::{ends_suppression, starts_suppression};
 use crate::{FormatModuleError, PyFormatOptions, format_module_source};
 
@@ -75,6 +75,16 @@ pub fn format_range(
     assert_valid_char_boundaries(range, source);
 
     let parsed = parse(source, ParseOptions::from(options.source_type()))?;
+
+    // Expand the range to cover the full semicolon-separated statement group, if any.
+    // Semicolon-separated statements form a single logical line and must be formatted
+    // as a unit to produce the same result as formatting the entire file.
+    let range = if let ruff_python_ast::Mod::Module(module) = parsed.syntax() {
+        expand_range_to_semicolon_group(range, &module.body, source)
+    } else {
+        range
+    };
+
     let source_code = SourceCode::new(source);
     let comment_ranges = CommentRanges::from(parsed.tokens());
     let comments = Comments::from_ast(parsed.syntax(), source_code, &comment_ranges);
@@ -275,6 +285,114 @@ impl<'ast> SourceOrderVisitor<'ast> for FindEnclosingNode<'_, 'ast> {
             self.visit_stmt(stmt);
         }
         self.suppressed = Suppressed::No;
+    }
+}
+
+/// Expands `range` to cover all statements in a semicolon-separated group, if `range`
+/// falls within such a group anywhere in the AST.
+///
+/// Semicolon-separated statements form a single logical line and must be formatted
+/// as a unit to produce the same result as formatting the entire file.
+/// This function recursively searches through nested bodies (class, function, if, etc.)
+/// to find the body that directly contains the range.
+fn expand_range_to_semicolon_group(range: TextRange, body: &[Stmt], source: &str) -> TextRange {
+    // Check if this body has a semicolon group that covers the range.
+    if let Some(expanded) = semicolon_group_range(range, body, source) {
+        return expanded;
+    }
+
+    // Recursively check sub-bodies of the statement that contains the range.
+    for stmt in body {
+        if !stmt.range().contains_range(range) {
+            continue;
+        }
+
+        for sub_body in compound_statement_bodies(stmt) {
+            let expanded = expand_range_to_semicolon_group(range, sub_body, source);
+            if expanded != range {
+                return expanded;
+            }
+        }
+        break;
+    }
+
+    range
+}
+
+/// Returns the range of the semicolon-separated group in `body` that covers `range`,
+/// or `None` if `range` doesn't fall within any semicolon group.
+fn semicolon_group_range(range: TextRange, body: &[Stmt], source: &str) -> Option<TextRange> {
+    let mut group_start = None;
+    let mut prev: Option<&Stmt> = None;
+
+    for stmt in body {
+        if let Some(previous) = prev {
+            let between = TextRange::new(previous.end(), stmt.start());
+            if new_logical_line_between_statements(source, between) {
+                // Previous group ended. Check if the range was in it.
+                if let Some(start) = group_start {
+                    let group_range = TextRange::new(start, previous.end());
+                    if group_range.contains_range(range) {
+                        return Some(group_range);
+                    }
+                }
+                group_start = None;
+            } else {
+                // Same line as previous — extend or start the group.
+                if group_start.is_none() {
+                    group_start = Some(previous.start());
+                }
+            }
+        }
+        prev = Some(stmt);
+    }
+
+    // Check the final group.
+    if let Some(start) = group_start {
+        if let Some(last) = prev {
+            let group_range = TextRange::new(start, last.end());
+            if group_range.contains_range(range) {
+                return Some(group_range);
+            }
+        }
+    }
+
+    None
+}
+
+/// Returns all sub-bodies of a compound statement.
+fn compound_statement_bodies(stmt: &Stmt) -> Vec<&[Stmt]> {
+    match stmt {
+        Stmt::FunctionDef(def) => vec![&def.body],
+        Stmt::ClassDef(def) => vec![&def.body],
+        Stmt::For(for_stmt) => vec![&for_stmt.body, &for_stmt.orelse],
+        Stmt::While(while_stmt) => vec![&while_stmt.body, &while_stmt.orelse],
+        Stmt::If(if_stmt) => {
+            let mut bodies = vec![if_stmt.body.as_slice()];
+            for clause in &if_stmt.elif_else_clauses {
+                bodies.push(&clause.body);
+            }
+            bodies
+        }
+        Stmt::With(with_stmt) => vec![&with_stmt.body],
+        Stmt::Try(try_stmt) => {
+            let mut bodies = vec![
+                try_stmt.body.as_slice(),
+                try_stmt.orelse.as_slice(),
+                try_stmt.finalbody.as_slice(),
+            ];
+            for handler in &try_stmt.handlers {
+                let ExceptHandler::ExceptHandler(h) = handler;
+                bodies.push(&h.body);
+            }
+            bodies
+        }
+        Stmt::Match(match_stmt) => match_stmt
+            .cases
+            .iter()
+            .map(|case| case.body.as_slice())
+            .collect(),
+        _ => vec![],
     }
 }
 
