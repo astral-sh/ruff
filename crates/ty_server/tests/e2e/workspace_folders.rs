@@ -656,6 +656,80 @@ fn open_document_then_add_nested_workspace_folder_open_files_only() -> Result<()
     Ok(())
 }
 
+/// Tests that when a file exists in multiple workspace folders
+/// simultaneousy, then changes to that file are properly captured even
+/// after a workspace folder is removed.
+#[test]
+fn open_document_then_add_nested_workspace_folder_with_change() -> Result<()> {
+    let root = SystemPath::new("root");
+    let root_main = root.join("main.py");
+    let child = SystemPath::new("root/child");
+    let child_main = child.join("main.py");
+    let child_main_content_v1 = "does_not_exist_child1()\n";
+    let child_main_content_v2 = "does_not_exist_child1()\ndoes_not_exist_child2()\n";
+
+    let mut server = TestServerBuilder::new()?
+        .with_initialization_options(
+            ClientOptions::default().with_diagnostic_mode(DiagnosticMode::OpenFilesOnly),
+        )
+        .with_file(&root_main, "does_not_exist_root()")?
+        .with_file(&child_main, child_main_content_v1)?
+        .with_workspace(root, None)?
+        .enable_pull_diagnostics(true)
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(&child_main, child_main_content_v1, 1);
+    let diagnostics = server.document_diagnostic_request(&child_main, None);
+    assert_snapshot!(
+        condensed_document_diagnostic_snapshot(diagnostics),
+        @"0:0..0:21[ERROR]: Name `does_not_exist_child1` used when not defined",
+    );
+
+    server.add_workspace_folder(child, None)?;
+    server.change_workspace_folders([child], []);
+    server = server.wait_until_workspaces_are_initialized();
+
+    server.change_text_document(
+        &child_main,
+        vec![lsp_types::TextDocumentContentChangeEvent {
+            range: None,
+            range_length: None,
+            text: child_main_content_v2.to_string(),
+        }],
+        2,
+    );
+
+    let diagnostics = server.document_diagnostic_request(&child_main, None);
+    assert_snapshot!(
+        condensed_document_diagnostic_snapshot(diagnostics),
+        @r"
+    0:0..0:21[ERROR]: Name `does_not_exist_child1` used when not defined
+    1:0..1:21[ERROR]: Name `does_not_exist_child2` used when not defined
+    ",
+    );
+
+    server.change_workspace_folders([], [&child]);
+    let _ = server.await_notification::<PublishDiagnostics>();
+
+    // Previously, the diagnostics here would be reported for
+    // `child_main_content_v1`. The bug was that after the removal
+    // of the nested workspace, `child` now became part of the root
+    // project. But its state in the root project hadn't been updated
+    // when the file was changed. Only its state in the child project
+    // was updated.
+    let diagnostics = server.document_diagnostic_request(&child_main, None);
+    assert_snapshot!(
+        condensed_document_diagnostic_snapshot(diagnostics),
+        @r"
+    0:0..0:21[ERROR]: Name `does_not_exist_child1` used when not defined
+    1:0..1:21[ERROR]: Name `does_not_exist_child2` used when not defined
+    ",
+    );
+
+    Ok(())
+}
+
 #[test]
 fn open_document_then_add_nested_workspace_folder_workspace() -> Result<()> {
     let root = SystemPath::new("root");

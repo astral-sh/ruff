@@ -889,11 +889,21 @@ impl Session {
                 }
             })
             .collect();
-        for doc in documents_to_clear {
+        for doc in &documents_to_clear {
             self.clear_diagnostics(client, doc.url());
         }
 
-        self.bump_revision();
+        // Re-sync file state for open documents that now belong to a
+        // different project. While the file was owned by the removed
+        // project, content changes were only applied to that project's
+        // database. The project that now owns these files needs to be
+        // notified that their content may have changed.
+        for doc in &documents_to_clear {
+            if let AnySystemPath::System(path) = doc.notebook_or_file_path() {
+                let changes = vec![ChangeEvent::file_content_changed(path.clone())];
+                self.apply_changes(&AnySystemPath::System(path.clone()), changes);
+            }
+        }
 
         Ok(())
     }
