@@ -2012,14 +2012,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         .collect();
 
                     let parameters = match last_arg {
-                        ast::Expr::EllipsisLiteral(_) => {
-                            self.infer_type_expression(last_arg);
-                            Some(Parameters::concatenate(
-                                self.db(),
-                                prefix_params,
-                                ConcatenateTail::Gradual,
-                            ))
-                        }
+                        ast::Expr::EllipsisLiteral(_) => Some(Parameters::concatenate(
+                            self.db(),
+                            prefix_params,
+                            ConcatenateTail::Gradual,
+                        )),
                         ast::Expr::Name(name) if !name.is_invalid() => {
                             let name_ty = self.infer_name_load(name);
                             if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) =
