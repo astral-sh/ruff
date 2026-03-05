@@ -129,12 +129,13 @@ mod tests {
     }
 
     #[test_case(Rule::NonPEP585Annotation, Path::new("UP006_future.py"))]
-    fn rules_future(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = path.to_string_lossy().to_string();
+    fn up006_add_future_annotation_preview(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!("{}__preview", path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("pyupgrade").join(path).as_path(),
             &settings::LinterSettings {
                 future_annotations: true,
+                preview: PreviewMode::Enabled,
                 unresolved_target_version: PythonVersion::PY38.into(),
                 ..settings::LinterSettings::for_rule(rule_code)
             },

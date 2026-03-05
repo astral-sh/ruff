@@ -6,6 +6,8 @@ use ruff_python_parser::semantic_errors::SemanticSyntaxContext;
 use ruff_python_semantic::analyze::typing::ModuleMember;
 use ruff_text_size::Ranged;
 
+use crate::preview::is_up006_future_annotations_fix_enabled;
+
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
 use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
@@ -148,7 +150,9 @@ fn fix_applicability(checker: &Checker) -> (Applicability, Option<Edit>) {
     if checker.settings().pyupgrade.keep_runtime_typing {
         return (Applicability::Unsafe, None);
     }
-    if checker.settings().future_annotations {
+    if checker.settings().future_annotations
+        && is_up006_future_annotations_fix_enabled(checker.settings())
+    {
         if checker.future_annotations_or_stub() {
             (Applicability::Safe, None)
         } else {
