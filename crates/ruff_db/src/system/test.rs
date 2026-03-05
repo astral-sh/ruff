@@ -121,6 +121,10 @@ impl System for TestSystem {
         self.system().read_virtual_path_to_notebook(path)
     }
 
+    fn is_executable(&self, path: &SystemPath) -> bool {
+        self.system().is_executable(path)
+    }
+
     fn current_directory(&self) -> &SystemPath {
         self.system().current_directory()
     }
@@ -389,6 +393,10 @@ impl System for InMemorySystem {
     ) -> std::result::Result<Notebook, NotebookError> {
         let content = self.read_virtual_path_to_string(path)?;
         Notebook::from_source_code(&content)
+    }
+
+    fn is_executable(&self, path: &SystemPath) -> bool {
+        self.memory_fs.is_executable(path)
     }
 
     fn current_directory(&self) -> &SystemPath {

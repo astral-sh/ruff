@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use rand::{Rng, SeedableRng};
+use rand::{RngExt, SeedableRng};
 use serde::Serialize;
 use serde_json::error::Category;
 use std::cmp::Ordering;

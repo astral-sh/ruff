@@ -46,6 +46,10 @@ mod tests {
     #[test_case(Rule::CompareToEmptyString, Path::new("compare_to_empty_string.py"))]
     #[test_case(Rule::ComparisonOfConstant, Path::new("comparison_of_constant.py"))]
     #[test_case(Rule::ComparisonWithItself, Path::new("comparison_with_itself.py"))]
+    #[test_case(
+        Rule::SwapWithTemporaryVariable,
+        Path::new("swap_with_temporary_variable.py")
+    )]
     #[test_case(Rule::EqWithoutHash, Path::new("eq_without_hash.py"))]
     #[test_case(Rule::EmptyComment, Path::new("empty_comment.py"))]
     #[test_case(Rule::EmptyComment, Path::new("empty_comment_line_continuation.py"))]
@@ -466,6 +470,20 @@ mod tests {
                     Rule::ImportOutsideTopLevel,
                 ])
             },
+        )?;
+        assert_diagnostics!(diagnostics);
+        Ok(())
+    }
+
+    /// Regression test for <https://github.com/astral-sh/ruff/issues/23587>.
+    #[test]
+    fn conflict_with_definition_rules() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pylint/swap_with_temporary_variable_1.py"),
+            &LinterSettings::for_rules(vec![
+                Rule::SwapWithTemporaryVariable,
+                Rule::MissingTypeFunctionArgument,
+            ]),
         )?;
         assert_diagnostics!(diagnostics);
         Ok(())

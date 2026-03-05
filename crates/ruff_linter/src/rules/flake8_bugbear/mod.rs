@@ -8,13 +8,14 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
+    use ruff_db::diagnostic::DiagnosticTag;
     use test_case::test_case;
 
     use crate::assert_diagnostics;
     use crate::registry::Rule;
 
     use crate::settings::LinterSettings;
-    use crate::test::test_path;
+    use crate::test::{test_path, test_snippet};
 
     use crate::settings::types::PreviewMode;
     use ruff_python_ast::PythonVersion;
@@ -73,6 +74,7 @@ mod tests {
     #[test_case(Rule::LoopIteratorMutation, Path::new("B909.py"))]
     #[test_case(Rule::MutableContextvarDefault, Path::new("B039.py"))]
     #[test_case(Rule::BatchedWithoutExplicitStrict, Path::new("B911.py"))]
+    #[test_case(Rule::MapWithoutExplicitStrict, Path::new("B912.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
@@ -83,7 +85,6 @@ mod tests {
         Ok(())
     }
 
-    #[test_case(Rule::MapWithoutExplicitStrict, Path::new("B912.py"))]
     #[test_case(Rule::MutableArgumentDefault, Path::new("B006_1.py"))]
     #[test_case(Rule::MutableArgumentDefault, Path::new("B006_2.py"))]
     #[test_case(Rule::MutableArgumentDefault, Path::new("B006_3.py"))]
@@ -211,5 +212,38 @@ mod tests {
         )?;
         assert_diagnostics!(snapshot, diagnostics);
         Ok(())
+    }
+
+    #[test]
+    fn b007_unnecessary_tag_only_for_certain_cases() {
+        let settings = LinterSettings::for_rule(Rule::UnusedLoopControlVariable);
+
+        let certain = test_snippet(
+            r"
+for i in range(3):
+    print(1)
+",
+            &settings,
+        );
+        assert_eq!(certain.len(), 1);
+        assert!(
+            certain[0]
+                .primary_tags()
+                .is_some_and(|tags| tags.contains(&DiagnosticTag::Unnecessary))
+        );
+
+        let uncertain = test_snippet(
+            r"
+for i in range(3):
+    print(locals())
+",
+            &settings,
+        );
+        assert_eq!(uncertain.len(), 1);
+        assert!(
+            !uncertain[0]
+                .primary_tags()
+                .is_some_and(|tags| tags.contains(&DiagnosticTag::Unnecessary))
+        );
     }
 }

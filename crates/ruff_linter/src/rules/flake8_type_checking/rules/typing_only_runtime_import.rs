@@ -374,6 +374,7 @@ pub(crate) fn typing_only_runtime_import(
             range: binding.range(),
             parent_range: binding.parent_range(checker.semantic()),
             needs_future_import,
+            runtime_reference: None,
         };
 
         if checker.rule_is_ignored(rule_for(import_type), import.start())

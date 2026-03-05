@@ -6,8 +6,9 @@ use itertools::Itertools;
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHashMap;
 
+use crate::types::TypeContext;
+use crate::types::callable::CallableTypeKind;
 use crate::types::relation::{HasRelationToVisitor, IsDisjointVisitor, TypeRelation};
-use crate::types::{CallableTypeKind, TypeContext};
 use crate::{
     Db, FxOrderSet,
     place::{
@@ -18,9 +19,12 @@ use crate::{
     types::{
         ApplyTypeMappingVisitor, BoundTypeVarInstance, CallableType, ClassBase, ClassType,
         FindLegacyTypeVarsVisitor, InstanceFallbackShadowsNonDataDescriptor, KnownFunction,
-        MemberLookupPolicy, NormalizedVisitor, PropertyInstanceType, Signature, StaticClassLiteral,
-        Type, TypeMapping, TypeQualifiers, TypeVarVariance, VarianceInferable,
-        constraints::{ConstraintSet, IteratorConstraintsExtension, OptionConstraintsExtension},
+        MemberLookupPolicy, PropertyInstanceType, Signature, StaticClassLiteral, Type, TypeMapping,
+        TypeQualifiers, TypeVarVariance, VarianceInferable,
+        constraints::{
+            ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
+            OptionConstraintsExtension,
+        },
         context::InferContext,
         diagnostic::report_undeclared_protocol_member,
         generics::InferableTypeVars,
@@ -45,14 +49,7 @@ impl<'db> ClassType<'db> {
 }
 
 /// Representation of a single `Protocol` class definition.
-///
-/// # Ordering
-///
-/// Ordering is based on the wrapped data's salsa-assigned id and not on its values.
-/// The id may change between runs, or when e.g. a `ProtocolClass` was garbage-collected and recreated.
-#[derive(
-    Debug, Copy, Clone, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize, PartialOrd, Ord,
-)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 pub(super) struct ProtocolClass<'db>(ClassType<'db>);
 
 impl<'db> ProtocolClass<'db> {
@@ -184,12 +181,7 @@ impl<'db> From<ProtocolClass<'db>> for Type<'db> {
 }
 
 /// The interface of a protocol: the members of that protocol, and the types of those members.
-///
-/// # Ordering
-/// Ordering is based on the protocol interface member's salsa-assigned id and not on its members.
-/// The id may change between runs, or when the protocol instance members was garbage collected and recreated.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
-#[derive(PartialOrd, Ord)]
 pub(super) struct ProtocolInterface<'db> {
     #[returns(ref)]
     inner: BTreeMap<Name, ProtocolMemberData<'db>>,
@@ -226,7 +218,7 @@ impl<'db> ProtocolInterface<'db> {
                         db,
                         [Parameter::positional_only(Some(Name::new_static("self")))],
                     ),
-                    ty.normalized(db),
+                    ty,
                 );
                 let property_getter = Type::single_callable(db, property_getter_signature);
                 let property = PropertyInstanceType::new(db, Some(property_getter), None);
@@ -235,6 +227,7 @@ impl<'db> ProtocolInterface<'db> {
                     ProtocolMemberData {
                         qualifiers: TypeQualifiers::default(),
                         kind: ProtocolMemberKind::Property(property),
+                        definition: None,
                     },
                 )
             })
@@ -257,7 +250,14 @@ impl<'db> ProtocolInterface<'db> {
             name,
             kind: data.kind,
             qualifiers: data.qualifiers,
+            definition: data.definition,
         })
+    }
+
+    pub(super) fn non_method_members(self, db: &'db dyn Db) -> Vec<ProtocolMember<'db, 'db>> {
+        self.members(db)
+            .filter(|member| !member.is_method() && !member.ty().is_todo())
+            .collect()
     }
 
     fn member_by_name<'a>(self, db: &'db dyn Db, name: &'a str) -> Option<ProtocolMember<'a, 'db>> {
@@ -265,11 +265,21 @@ impl<'db> ProtocolInterface<'db> {
             name,
             kind: data.kind,
             qualifiers: data.qualifiers,
+            definition: data.definition,
         })
     }
 
     pub(super) fn includes_member(self, db: &'db dyn Db, name: &str) -> bool {
         self.inner(db).contains_key(name)
+    }
+
+    /// Returns the `__call__` method's callable type if this protocol has a `__call__` method member.
+    pub(super) fn call_method(self, db: &'db dyn Db) -> Option<CallableType<'db>> {
+        self.member_by_name(db, "__call__")
+            .and_then(|member| match member.kind {
+                ProtocolMemberKind::Method(callable) => Some(callable),
+                _ => None,
+            })
     }
 
     pub(super) fn instance_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
@@ -281,87 +291,60 @@ impl<'db> ProtocolInterface<'db> {
             .unwrap_or_else(|| Type::object().member(db, name))
     }
 
-    pub(super) fn has_relation_to_impl(
+    #[expect(clippy::too_many_arguments)]
+    pub(super) fn has_relation_to_impl<'c>(
         self,
         db: &'db dyn Db,
         other: Self,
+        constraints: &'c ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'_, 'db>,
-        relation: TypeRelation<'db>,
-        relation_visitor: &HasRelationToVisitor<'db>,
-        disjointness_visitor: &IsDisjointVisitor<'db>,
-    ) -> ConstraintSet<'db> {
-        other.members(db).when_all(db, |other_member| {
-            self.member_by_name(db, other_member.name)
-                .when_some_and(|our_member| match (our_member.kind, other_member.kind) {
-                    // Method members are always immutable;
-                    // they can never be subtypes of/assignable to mutable attribute members.
-                    (ProtocolMemberKind::Method(_), ProtocolMemberKind::Other(_)) => {
-                        ConstraintSet::from(false)
-                    }
+        relation: TypeRelation,
+        relation_visitor: &HasRelationToVisitor<'db, 'c>,
+        disjointness_visitor: &IsDisjointVisitor<'db, 'c>,
+    ) -> ConstraintSet<'db, 'c> {
+        other.members(db).when_all(db, constraints, |other_member| {
+            self.member_by_name(db, other_member.name).when_some_and(
+                db,
+                constraints,
+                |our_member| {
+                    match (our_member.kind, other_member.kind) {
+                        // Method members are always immutable;
+                        // they can never be subtypes of/assignable to mutable attribute members.
+                        (ProtocolMemberKind::Method(_), ProtocolMemberKind::Other(_)) => {
+                            ConstraintSet::from_bool(constraints, false)
+                        }
 
-                    // A property member can only be a subtype of an attribute member
-                    // if the property is readable *and* writable.
-                    //
-                    // TODO: this should also consider the types of the members on both sides.
-                    (ProtocolMemberKind::Property(property), ProtocolMemberKind::Other(_)) => {
-                        ConstraintSet::from(
-                            property.getter(db).is_some() && property.setter(db).is_some(),
+                        // A property member can only be a subtype of an attribute member
+                        // if the property is readable *and* writable.
+                        //
+                        // TODO: this should also consider the types of the members on both sides.
+                        (ProtocolMemberKind::Property(property), ProtocolMemberKind::Other(_)) => {
+                            ConstraintSet::from_bool(
+                                constraints,
+                                property.getter(db).is_some() && property.setter(db).is_some(),
+                            )
+                        }
+
+                        // A `@property` member can never be a subtype of a method member, as it is not necessarily
+                        // accessible on the meta-type, whereas a method member must be.
+                        (ProtocolMemberKind::Property(_), ProtocolMemberKind::Method(_)) => {
+                            ConstraintSet::from_bool(constraints, false)
+                        }
+
+                        // But an attribute member *can* be a subtype of a method member,
+                        // providing it is marked `ClassVar`
+                        (
+                            ProtocolMemberKind::Other(our_type),
+                            ProtocolMemberKind::Method(other_type),
+                        ) => ConstraintSet::from_bool(
+                            constraints,
+                            our_member.qualifiers.contains(TypeQualifiers::CLASS_VAR),
                         )
-                    }
-
-                    // A `@property` member can never be a subtype of a method member, as it is not necessarily
-                    // accessible on the meta-type, whereas a method member must be.
-                    (ProtocolMemberKind::Property(_), ProtocolMemberKind::Method(_)) => {
-                        ConstraintSet::from(false)
-                    }
-
-                    // But an attribute member *can* be a subtype of a method member,
-                    // providing it is marked `ClassVar`
-                    (
-                        ProtocolMemberKind::Other(our_type),
-                        ProtocolMemberKind::Method(other_type),
-                    ) => ConstraintSet::from(
-                        our_member.qualifiers.contains(TypeQualifiers::CLASS_VAR),
-                    )
-                    .and(db, || {
-                        our_type.has_relation_to_impl(
-                            db,
-                            Type::Callable(protocol_bind_self(db, other_type, None)),
-                            inferable,
-                            relation,
-                            relation_visitor,
-                            disjointness_visitor,
-                        )
-                    }),
-
-                    (
-                        ProtocolMemberKind::Method(our_method),
-                        ProtocolMemberKind::Method(other_method),
-                    ) => our_method.bind_self(db, None).has_relation_to_impl(
-                        db,
-                        protocol_bind_self(db, other_method, None),
-                        inferable,
-                        relation,
-                        relation_visitor,
-                        disjointness_visitor,
-                    ),
-
-                    (
-                        ProtocolMemberKind::Other(our_type),
-                        ProtocolMemberKind::Other(other_type),
-                    ) => our_type
-                        .has_relation_to_impl(
-                            db,
-                            other_type,
-                            inferable,
-                            relation,
-                            relation_visitor,
-                            disjointness_visitor,
-                        )
-                        .and(db, || {
-                            other_type.has_relation_to_impl(
+                        .and(db, constraints, || {
+                            our_type.has_relation_to_impl(
                                 db,
-                                our_type,
+                                Type::Callable(protocol_bind_self(db, other_type, None)),
+                                constraints,
                                 inferable,
                                 relation,
                                 relation_visitor,
@@ -369,26 +352,56 @@ impl<'db> ProtocolInterface<'db> {
                             )
                         }),
 
-                    // TODO: finish assignability/subtyping between two `@property` members,
-                    // and between a `@property` member and a member of a different kind.
-                    (
-                        ProtocolMemberKind::Property(_)
-                        | ProtocolMemberKind::Method(_)
-                        | ProtocolMemberKind::Other(_),
-                        ProtocolMemberKind::Property(_),
-                    ) => ConstraintSet::from(true),
-                })
-        })
-    }
+                        (
+                            ProtocolMemberKind::Method(our_method),
+                            ProtocolMemberKind::Method(other_method),
+                        ) => our_method.bind_self(db, None).has_relation_to_impl(
+                            db,
+                            protocol_bind_self(db, other_method, None),
+                            constraints,
+                            inferable,
+                            relation,
+                            relation_visitor,
+                            disjointness_visitor,
+                        ),
 
-    pub(super) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
-        Self::new(
-            db,
-            self.inner(db)
-                .iter()
-                .map(|(name, data)| (name.clone(), data.normalized_impl(db, visitor)))
-                .collect::<BTreeMap<_, _>>(),
-        )
+                        (
+                            ProtocolMemberKind::Other(our_type),
+                            ProtocolMemberKind::Other(other_type),
+                        ) => our_type
+                            .has_relation_to_impl(
+                                db,
+                                other_type,
+                                constraints,
+                                inferable,
+                                relation,
+                                relation_visitor,
+                                disjointness_visitor,
+                            )
+                            .and(db, constraints, || {
+                                other_type.has_relation_to_impl(
+                                    db,
+                                    our_type,
+                                    constraints,
+                                    inferable,
+                                    relation,
+                                    relation_visitor,
+                                    disjointness_visitor,
+                                )
+                            }),
+
+                        // TODO: finish assignability/subtyping between two `@property` members,
+                        // and between a `@property` member and a member of a different kind.
+                        (
+                            ProtocolMemberKind::Property(_)
+                            | ProtocolMemberKind::Method(_)
+                            | ProtocolMemberKind::Other(_),
+                            ProtocolMemberKind::Property(_),
+                        ) => ConstraintSet::from_bool(constraints, true),
+                    }
+                },
+            )
+        })
     }
 
     pub(super) fn recursive_type_normalized_impl(
@@ -411,11 +424,12 @@ impl<'db> ProtocolInterface<'db> {
         ))
     }
 
-    pub(super) fn specialized_and_normalized<'a>(
+    pub(super) fn apply_type_mapping_impl<'a>(
         self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
         tcx: TypeContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         Self::new(
             db,
@@ -424,13 +438,7 @@ impl<'db> ProtocolInterface<'db> {
                 .map(|(name, data)| {
                     (
                         name.clone(),
-                        data.apply_type_mapping_impl(
-                            db,
-                            type_mapping,
-                            tcx,
-                            &ApplyTypeMappingVisitor::default(),
-                        )
-                        .normalized(db),
+                        data.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
                     )
                 })
                 .collect::<BTreeMap<_, _>>(),
@@ -488,20 +496,10 @@ impl<'db> VarianceInferable<'db> for ProtocolInterface<'db> {
 pub(super) struct ProtocolMemberData<'db> {
     kind: ProtocolMemberKind<'db>,
     qualifiers: TypeQualifiers,
+    definition: Option<Definition<'db>>,
 }
 
 impl<'db> ProtocolMemberData<'db> {
-    fn normalized(&self, db: &'db dyn Db) -> Self {
-        self.normalized_impl(db, &NormalizedVisitor::default())
-    }
-
-    fn normalized_impl(&self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
-        Self {
-            kind: self.kind.normalized_impl(db, visitor),
-            qualifiers: self.qualifiers,
-        }
-    }
-
     fn recursive_type_normalized_impl(
         &self,
         db: &'db dyn Db,
@@ -525,6 +523,7 @@ impl<'db> ProtocolMemberData<'db> {
                 ),
             },
             qualifiers: self.qualifiers,
+            definition: self.definition,
         })
     }
 
@@ -540,6 +539,7 @@ impl<'db> ProtocolMemberData<'db> {
                 .kind
                 .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
             qualifiers: self.qualifiers,
+            definition: self.definition,
         }
     }
 
@@ -605,20 +605,6 @@ enum ProtocolMemberKind<'db> {
 }
 
 impl<'db> ProtocolMemberKind<'db> {
-    fn normalized_impl(&self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
-        match self {
-            ProtocolMemberKind::Method(callable) => {
-                ProtocolMemberKind::Method(callable.normalized_impl(db, visitor))
-            }
-            ProtocolMemberKind::Property(property) => {
-                ProtocolMemberKind::Property(property.normalized_impl(db, visitor))
-            }
-            ProtocolMemberKind::Other(ty) => {
-                ProtocolMemberKind::Other(ty.normalized_impl(db, visitor))
-            }
-        }
-    }
-
     fn apply_type_mapping_impl<'a>(
         &self,
         db: &'db dyn Db,
@@ -669,6 +655,7 @@ pub(super) struct ProtocolMember<'a, 'db> {
     name: &'a str,
     kind: ProtocolMemberKind<'db>,
     qualifiers: TypeQualifiers,
+    definition: Option<Definition<'db>>,
 }
 
 fn walk_protocol_member<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
@@ -694,6 +681,14 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
         self.qualifiers
     }
 
+    pub(super) const fn is_method(&self) -> bool {
+        matches!(self.kind, ProtocolMemberKind::Method(_))
+    }
+
+    pub(super) fn definition(&self) -> Option<Definition<'db>> {
+        self.definition
+    }
+
     fn ty(&self) -> Type<'db> {
         match &self.kind {
             ProtocolMemberKind::Method(callable) => Type::Callable(*callable),
@@ -702,22 +697,24 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
         }
     }
 
-    pub(super) fn has_disjoint_type_from(
+    pub(super) fn has_disjoint_type_from<'c>(
         &self,
         db: &'db dyn Db,
         other: Type<'db>,
+        constraints: &'c ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'_, 'db>,
-        disjointness_visitor: &IsDisjointVisitor<'db>,
-        relation_visitor: &HasRelationToVisitor<'db>,
-    ) -> ConstraintSet<'db> {
+        disjointness_visitor: &IsDisjointVisitor<'db, 'c>,
+        relation_visitor: &HasRelationToVisitor<'db, 'c>,
+    ) -> ConstraintSet<'db, 'c> {
         match &self.kind {
             // TODO: implement disjointness for property/method members as well as attribute members
             ProtocolMemberKind::Property(_) | ProtocolMemberKind::Method(_) => {
-                ConstraintSet::from(false)
+                ConstraintSet::from_bool(constraints, false)
             }
             ProtocolMemberKind::Other(ty) => ty.is_disjoint_from_impl(
                 db,
                 other,
+                constraints,
                 inferable,
                 disjointness_visitor,
                 relation_visitor,
@@ -727,15 +724,17 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
 
     /// Return `true` if `other` contains an attribute/method/property that satisfies
     /// the part of the interface defined by this protocol member.
-    pub(super) fn is_satisfied_by(
+    #[expect(clippy::too_many_arguments)]
+    pub(super) fn is_satisfied_by<'c>(
         &self,
         db: &'db dyn Db,
         other: Type<'db>,
+        constraints: &'c ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'_, 'db>,
-        relation: TypeRelation<'db>,
-        relation_visitor: &HasRelationToVisitor<'db>,
-        disjointness_visitor: &IsDisjointVisitor<'db>,
-    ) -> ConstraintSet<'db> {
+        relation: TypeRelation,
+        relation_visitor: &HasRelationToVisitor<'db, 'c>,
+        disjointness_visitor: &IsDisjointVisitor<'db, 'c>,
+    ) -> ConstraintSet<'db, 'c> {
         match &self.kind {
             ProtocolMemberKind::Method(method) => {
                 // `__call__` members must be special cased for several reasons:
@@ -764,7 +763,7 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
                         )
                         .place
                     else {
-                        return ConstraintSet::from(false);
+                        return ConstraintSet::from_bool(constraints, false);
                     };
                     attribute_type
                 };
@@ -781,29 +780,35 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
                 // With the new solver, we should be to replace all of this with an additional
                 // constraint that enforces what `Self` can specialize to.
                 let fallback_other = other.literal_fallback_instance(db).unwrap_or(other);
-                attribute_type
-                    .try_upcast_to_callable(db)
-                    .when_some_and(|callables| {
+                attribute_type.try_upcast_to_callable(db).when_some_and(
+                    db,
+                    constraints,
+                    |callables| {
                         callables
                             .map(|callable| callable.apply_self(db, fallback_other))
                             .has_relation_to_impl(
                                 db,
                                 protocol_bind_self(db, *method, Some(fallback_other)),
+                                constraints,
                                 inferable,
                                 relation,
                                 relation_visitor,
                                 disjointness_visitor,
                             )
-                    })
+                    },
+                )
             }
             // TODO: consider the types of the attribute on `other` for property members
-            ProtocolMemberKind::Property(_) => ConstraintSet::from(matches!(
-                other.member(db, self.name).place,
-                Place::Defined(DefinedPlace {
-                    definedness: Definedness::AlwaysDefined,
-                    ..
-                })
-            )),
+            ProtocolMemberKind::Property(_) => ConstraintSet::from_bool(
+                constraints,
+                matches!(
+                    other.member(db, self.name).place,
+                    Place::Defined(DefinedPlace {
+                        definedness: Definedness::AlwaysDefined,
+                        ..
+                    })
+                ),
+            ),
             ProtocolMemberKind::Other(member_type) => {
                 let Place::Defined(DefinedPlace {
                     ty: attribute_type,
@@ -811,21 +816,23 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
                     ..
                 }) = other.member(db, self.name).place
                 else {
-                    return ConstraintSet::from(false);
+                    return ConstraintSet::from_bool(constraints, false);
                 };
                 member_type
                     .has_relation_to_impl(
                         db,
                         attribute_type,
+                        constraints,
                         inferable,
                         relation,
                         relation_visitor,
                         disjointness_visitor,
                     )
-                    .and(db, || {
+                    .and(db, constraints, || {
                         attribute_type.has_relation_to_impl(
                             db,
                             *member_type,
+                            constraints,
                             inferable,
                             relation,
                             relation_visitor,
@@ -919,32 +926,42 @@ fn cached_protocol_interface<'db>(
         // type narrowing that uses `isinstance()` or `issubclass()` with
         // runtime-checkable protocols.
         for (symbol_id, bindings) in use_def_map.all_end_of_scope_symbol_bindings() {
-            let Some(ty) = place_from_bindings(db, bindings)
-                .place
-                .ignore_possibly_undefined()
-            else {
+            let place_and_definition = place_from_bindings(db, bindings);
+            let Some(ty) = place_and_definition.place.ignore_possibly_undefined() else {
                 continue;
             };
             direct_members.insert(
                 symbol_id,
-                (ty, TypeQualifiers::default(), BoundOnClass::Yes),
+                (
+                    ty,
+                    TypeQualifiers::default(),
+                    place_and_definition.first_definition,
+                    BoundOnClass::Yes,
+                ),
             );
         }
 
         for (symbol_id, declarations) in use_def_map.all_end_of_scope_symbol_declarations() {
-            let place = place_from_declarations(db, declarations).ignore_conflicting_declarations();
+            let place_result = place_from_declarations(db, declarations);
+            let first_declaration = place_result.first_declaration;
+            let place = place_result.ignore_conflicting_declarations();
             if let Some(new_type) = place.place.ignore_possibly_undefined() {
                 direct_members
                     .entry(symbol_id)
-                    .and_modify(|(ty, quals, _)| {
+                    .and_modify(|(ty, quals, _, _)| {
                         *ty = new_type;
                         *quals = place.qualifiers;
                     })
-                    .or_insert((new_type, place.qualifiers, BoundOnClass::No));
+                    .or_insert((
+                        new_type,
+                        place.qualifiers,
+                        first_declaration,
+                        BoundOnClass::No,
+                    ));
             }
         }
 
-        for (symbol_id, (ty, qualifiers, bound_on_class)) in direct_members {
+        for (symbol_id, (ty, qualifiers, definition, bound_on_class)) in direct_members {
             let name = place_table.symbol(symbol_id).name();
             if excluded_from_proto_members(name) {
                 continue;
@@ -980,6 +997,7 @@ fn cached_protocol_interface<'db>(
                 ProtocolMemberData {
                     kind: member,
                     qualifiers,
+                    definition,
                 },
             );
         }

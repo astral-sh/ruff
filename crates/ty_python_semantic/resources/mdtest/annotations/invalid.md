@@ -155,6 +155,61 @@ def invalid_binary_operators(
     reveal_type(l)  # revealed: Unknown
 ```
 
+## Multiple starred expressions in a `tuple` specialization
+
+<!-- snapshot-diagnostics -->
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from typing import TypeVarTuple, Unpack
+
+Ts = TypeVarTuple("Ts")
+
+def f(
+    # error: [invalid-type-form] "Multiple unpacked variadic tuples are not allowed in a `tuple` specialization"
+    x: tuple[*tuple[int, ...], *tuple[str, ...]],
+    # error: [invalid-type-form] "Multiple unpacked variadic tuples are not allowed in a `tuple` specialization"
+    x2: tuple[Unpack[tuple[int, ...]], Unpack[tuple[str, ...]]],
+    y: tuple[*tuple[int, ...], str, int, *tuple[str, ...]],  # error: [invalid-type-form]
+    y2: tuple[Unpack[tuple[int, ...]], str, int, Unpack[tuple[str, ...]]],  # error: [invalid-type-form]
+    # Multiple unpacked elements are fine, as long as the unpacked elements are not variadic:
+    z: tuple[*tuple[int, ...], *tuple[str]],
+    z2: tuple[Unpack[tuple[int, ...]], Unpack[tuple[str]]],
+):
+    reveal_type(x)  # revealed: tuple[int | str, ...]
+    reveal_type(x2)  # revealed: tuple[int | str, ...]
+    reveal_type(y)  # revealed: tuple[str | int, ...]
+    reveal_type(y2)  # revealed: tuple[str | int, ...]
+    reveal_type(z)  # revealed: tuple[*tuple[int, ...], str]
+    reveal_type(z2)  # revealed: tuple[*tuple[int, ...], str]
+
+T1 = tuple[int, *Ts, str, *Ts]  # error: [invalid-type-form]
+
+def func3(t: tuple[*Ts]):
+    t5: tuple[*tuple[str], *Ts]  # OK
+    t6: tuple[*tuple[str, ...], *Ts]  # error: [invalid-type-form]
+```
+
+## Ellipses in the wrong place in a `tuple` specialization
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+# error: [invalid-type-form] "Invalid `tuple` specialization: `...` can only be used as the second element in a two-element `tuple` specialization"
+a: tuple[...]
+# error: [invalid-type-form] "Invalid `tuple` specialization: `...` cannot be used after an unpacked element"
+b: tuple[*tuple[int, ...], ...]
+# error: [invalid-type-form] "Invalid `tuple` specialization: `...` can only be used as the second element in a two-element `tuple` specialization"
+c: tuple[int, str, ...]
+```
+
 ## Invalid AST nodes in string annotations
 
 Invalid AST nodes should also be rejected when they appear in string annotations:

@@ -212,6 +212,7 @@ linter.isort.classes = []
 linter.isort.constants = []
 linter.isort.variables = []
 linter.isort.no_lines_before = []
+linter.isort.import_headings = {}
 linter.isort.lines_after_imports = -1
 linter.isort.lines_between_types = 0
 linter.isort.forced_separate = []

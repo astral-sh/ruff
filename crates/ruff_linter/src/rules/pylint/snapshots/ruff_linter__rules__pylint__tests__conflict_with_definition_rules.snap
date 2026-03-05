@@ -1,0 +1,21 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+PLR1712 [*] Unnecessary temporary variable
+ --> swap_with_temporary_variable_1.py:6:1
+  |
+5 |   x, y = 1, 2
+6 | / temp = x  # PLR1712
+7 | | x = y
+8 | | y = temp
+  | |________^
+  |
+help: Use `x, y = y, x` instead
+3 | """
+4 | 
+5 | x, y = 1, 2
+  - temp = x  # PLR1712
+  - x = y
+  - y = temp
+6 + x, y = y, x
+note: This is an unsafe fix and may change runtime behavior

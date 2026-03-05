@@ -1,3 +1,4 @@
+use ruff_diagnostics::Applicability;
 use ruff_python_ast::Expr;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -26,6 +27,8 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// with open("file.txt") as f:
 ///     ...
 /// ```
+/// ## Fix safety
+/// This rule's fix is marked as safe, unless the expression contains comments.
 ///
 /// ## References
 /// - [Python documentation: `io.open`](https://docs.python.org/3/library/io.html#io.open)
@@ -60,9 +63,17 @@ pub(crate) fn open_alias(checker: &Checker, expr: &Expr, func: &Expr) {
                 expr.start(),
                 checker.semantic(),
             )?;
-            Ok(Fix::safe_edits(
+
+            let applicability = if checker.comment_ranges().intersects(func.range()) {
+                Applicability::Unsafe
+            } else {
+                Applicability::Safe
+            };
+
+            Ok(Fix::applicable_edits(
                 Edit::range_replacement(binding, func.range()),
                 import_edit,
+                applicability,
             ))
         });
     }

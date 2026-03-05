@@ -27,6 +27,7 @@ use std::path::Path;
 use itertools::Itertools;
 use log::debug;
 use rustc_hash::{FxHashMap, FxHashSet};
+use smallvec::SmallVec;
 
 use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticTag, IntoDiagnosticMessage, Span};
 use ruff_diagnostics::{Applicability, Fix, IsolationLevel};
@@ -67,7 +68,9 @@ use crate::docstrings::extraction::ExtractionTarget;
 use crate::importer::{ImportRequest, Importer, ResolutionError};
 use crate::noqa::NoqaMapping;
 use crate::package::PackageRoot;
-use crate::preview::is_undefined_export_in_dunder_init_enabled;
+use crate::preview::{
+    is_incorrect_dict_iterator_comprehension_enabled, is_undefined_export_in_dunder_init_enabled,
+};
 use crate::registry::Rule;
 use crate::rules::flake8_bugbear::rules::ReturnInGenerator;
 use crate::rules::pyflakes::rules::{
@@ -419,6 +422,18 @@ impl<'a> Checker<'a> {
         range: TextRange,
     ) -> Option<DiagnosticGuard<'chk, 'a>> {
         self.context.report_diagnostic_if_enabled(kind, range)
+    }
+
+    /// Return a [`DiagnosticGuard`] for reporting a diagnostic, with its fix title deferred.
+    ///
+    /// Prefer [`Checker::report_diagnostic`] unless you need to attach sub-diagnostics before the
+    /// fix title. See its documentation for more details.
+    pub(crate) fn report_custom_diagnostic<'chk, T: Violation>(
+        &'chk self,
+        kind: T,
+        range: TextRange,
+    ) -> DiagnosticGuard<'chk, 'a> {
+        self.context.report_custom_diagnostic(kind, range)
     }
 
     /// Adds a [`TextRange`] to the set of ranges of variable names
@@ -784,17 +799,7 @@ impl SemanticSyntaxContext for Checker<'_> {
     }
 
     fn in_async_context(&self) -> bool {
-        for scope in self.semantic.current_scopes() {
-            match scope.kind {
-                ScopeKind::Class(_) | ScopeKind::Lambda(_) => return false,
-                ScopeKind::Function(ast::StmtFunctionDef { is_async, .. }) => return *is_async,
-                ScopeKind::Generator { .. }
-                | ScopeKind::Module
-                | ScopeKind::Type
-                | ScopeKind::DunderClassCell => {}
-            }
-        }
-        false
+        self.semantic.in_async_context()
     }
 
     fn in_await_allowed_context(&self) -> bool {
@@ -2462,6 +2467,12 @@ impl<'a> Checker<'a> {
         for generator in generators {
             analyze::comprehension(generator, self);
         }
+
+        if self.is_rule_enabled(Rule::IncorrectDictIterator)
+            && is_incorrect_dict_iterator_comprehension_enabled(self.settings())
+        {
+            self.analyze.comprehensions.push(self.semantic.snapshot());
+        }
     }
 
     /// Visit a body of [`Stmt`] nodes within a type-checking block.
@@ -3306,9 +3317,11 @@ pub(crate) fn check_ast(
     // Check docstrings, bindings, and unresolved references.
     analyze::deferred_lambdas(&mut checker);
     analyze::deferred_for_loops(&mut checker);
+    analyze::deferred_comprehensions(&mut checker);
     analyze::definitions(&mut checker);
     analyze::bindings(&checker);
     analyze::unresolved_references(&checker);
+    analyze::deferred_with_statements(&mut checker);
 
     // Reset the scope to module-level, and check all consumed scopes.
     checker.semantic.scope_id = ScopeId::global();
@@ -3367,6 +3380,7 @@ impl<'a> LintContext<'a> {
             context: self,
             diagnostic: Some(kind.into_diagnostic(range, &self.source_file)),
             rule: T::rule(),
+            before_drop_fns: SmallVec::new(),
         }
     }
 
@@ -3386,10 +3400,60 @@ impl<'a> LintContext<'a> {
                 context: self,
                 diagnostic: Some(kind.into_diagnostic(range, &self.source_file)),
                 rule,
+                before_drop_fns: SmallVec::new(),
             })
         } else {
             None
         }
+    }
+
+    /// Return a [`DiagnosticGuard`] for reporting a diagnostic, with its fix title deferred.
+    ///
+    /// Prefer [`LintContext::report_diagnostic`] unless you need to attach sub-diagnostics before
+    /// the fix title. See its documentation for more details.
+    #[expect(clippy::needless_pass_by_value)]
+    pub(crate) fn report_custom_diagnostic<'chk, T: Violation>(
+        &'chk self,
+        kind: T,
+        range: TextRange,
+    ) -> DiagnosticGuard<'chk, 'a> {
+        let diagnostic = crate::message::create_lint_diagnostic(
+            kind.message(),
+            Option::<&'static str>::None,
+            range,
+            None,
+            None,
+            self.source_file.clone(),
+            None,
+            T::rule(),
+        );
+
+        let mut guard = DiagnosticGuard {
+            context: self,
+            diagnostic: Some(diagnostic),
+            rule: T::rule(),
+            before_drop_fns: SmallVec::new(),
+        };
+
+        if let Some(fix_title) = kind.fix_title() {
+            guard.before_drop(move |diag| diag.help(&fix_title));
+        }
+
+        guard
+    }
+
+    /// Return a [`DiagnosticGuard`] for reporting a diagnostic, with its fix title deferred, if the
+    /// corresponding rule is enabled.
+    ///
+    /// Prefer [`LintContext::report_diagnostic_if_enabled`] unless you need to attach
+    /// sub-diagnostics before the fix title. See its documentation for more details.
+    pub(crate) fn report_custom_diagnostic_if_enabled<'chk, T: Violation>(
+        &'chk self,
+        kind: T,
+        range: TextRange,
+    ) -> Option<DiagnosticGuard<'chk, 'a>> {
+        self.is_rule_enabled(T::rule())
+            .then(|| self.report_custom_diagnostic(kind, range))
     }
 
     #[inline]
@@ -3433,6 +3497,8 @@ impl<'a> LintContext<'a> {
     }
 }
 
+type BeforeDropFn = Box<dyn Fn(&mut Diagnostic)>;
+
 /// An abstraction for mutating a diagnostic.
 ///
 /// Callers can build this guard by starting with `Checker::report_diagnostic`.
@@ -3447,6 +3513,8 @@ pub(crate) struct DiagnosticGuard<'a, 'b> {
     ///
     /// This is always `Some` until the `Drop` (or `defuse`) call.
     diagnostic: Option<Diagnostic>,
+    /// Functions to call before dropping the guard and storing the diagnostic.
+    before_drop_fns: SmallVec<[BeforeDropFn; 1]>,
     rule: Rule,
 }
 
@@ -3507,6 +3575,27 @@ impl DiagnosticGuard<'_, '_> {
     pub(crate) fn add_primary_tag(&mut self, tag: DiagnosticTag) {
         let ann = self.primary_annotation_mut().unwrap();
         ann.push_tag(tag);
+    }
+
+    /// Register a function to call before dropping the guard.
+    ///
+    /// This is intended for use with the [`Checker::report_custom_diagnostic`]
+    /// or [`LintContext::report_custom_diagnostic`] methods in cases where a
+    /// fix title should be added as a `help` diagnostic after all other
+    /// sub-diagnostics. `report_custom_diagnostic` uses this method to defer
+    /// adding the fix title, but you can defer additional diagnostics if you
+    /// want them to appear after the fix title. For example:
+    ///
+    /// ```ignore
+    /// let mut diagnostic = checker.report_custom_diagnostic(MyViolation, range);
+    /// diagnostic.info("This will appear first");
+    /// diagnostic.before_drop(|diag| diag.info("This will appear last, after the fix title"));
+    /// ```
+    pub(crate) fn before_drop<F>(&mut self, f: F)
+    where
+        F: Fn(&mut Diagnostic) + 'static,
+    {
+        self.before_drop_fns.push(Box::new(f));
     }
 }
 
@@ -3592,7 +3681,10 @@ impl Drop for DiagnosticGuard<'_, '_> {
             return;
         }
 
-        if let Some(diagnostic) = self.diagnostic.take() {
+        if let Some(mut diagnostic) = self.diagnostic.take() {
+            for f in &self.before_drop_fns {
+                f(&mut diagnostic);
+            }
             self.context.diagnostics.borrow_mut().push(diagnostic);
         }
     }

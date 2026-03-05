@@ -561,6 +561,49 @@ fn benchmark_many_enum_members(criterion: &mut Criterion) {
     });
 }
 
+/// Micro-benchmark that tests our performance when slicing and unpacking
+/// a very large tuple that has many varied literal strings inside it.
+///
+/// Adapted from <https://github.com/MMD-Blender/blender_mmd_tools/blob/6ae13d6039763b6813832622c13da464983e93b3/mmd_tools/m17n.py>
+fn benchmark_very_large_tuple(criterion: &mut Criterion) {
+    /// Number of entries in the tuple -- must be >64 to trigger the literal-promotion optimization
+    const NUM_ENTRIES: usize = 65;
+
+    setup_rayon();
+
+    let mut code = "translations_tuple = (\n".to_string();
+    for i in 0..NUM_ENTRIES {
+        writeln!(
+            &mut code,
+            r#"    (("*", "Description {i}"), (("ref.path.{i}",), ()), ("ja_JP", "翻訳{i}", (False, ())), ("zh_HANS", "翻译{i}", (False, ()))),"#
+        )
+        .ok();
+    }
+    code.push_str(")\n\n");
+
+    // This slice operation (msg[2:]) is what triggers the expensive type inference:
+    // ty must compute the union of all possible slice results.
+    code.push_str(
+        "\
+for msg in translations_tuple:
+    for lang, trans, (is_fuzzy, comments) in msg[2:]:
+        pass
+",
+    );
+
+    criterion.bench_function("ty_micro[very_large_tuple]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 fn benchmark_many_enum_members_2(criterion: &mut Criterion) {
     const NUM_ENUM_MEMBERS: usize = 48;
 
@@ -603,6 +646,125 @@ class E(Enum):
     .ok();
 
     criterion.bench_function("ty_micro[many_enum_members_2]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+/// Benchmark for narrowing a large union type through multiple match statements.
+///
+/// This is extracted from egglog-python's `pretty.py`, where a ~30-class union type
+/// (`AllDecls`) is narrowed by exhaustive match statements.
+///
+/// Sample code structure:
+/// ```python
+/// from __future__ import annotations
+/// from dataclasses import dataclass
+///
+/// @dataclass
+/// class C0:
+///     value: int
+/// ...
+///
+/// AllDecls = C0 | C1 | ...
+///
+/// def process(decl: AllDecls) -> None:
+///     match decl:
+///         case C0(): pass
+///         ...
+///         case _: pass
+/// ```
+fn benchmark_large_union_narrowing(criterion: &mut Criterion) {
+    const NUM_CLASSES: usize = 30;
+    const NUM_MATCH_BRANCHES: usize = 29;
+
+    setup_rayon();
+
+    let mut code =
+        "from __future__ import annotations\nfrom dataclasses import dataclass\n\n".to_string();
+
+    for i in 0..NUM_CLASSES {
+        writeln!(&mut code, "@dataclass\nclass C{i}:\n    value: int\n").ok();
+    }
+
+    code.push_str("AllDecls = ");
+    for i in 0..NUM_CLASSES {
+        if i > 0 {
+            code.push_str(" | ");
+        }
+        write!(&mut code, "C{i}").ok();
+    }
+    code.push_str("\n\n");
+
+    code.push_str("def process(decl: AllDecls) -> None:\n    match decl:\n");
+    for i in 0..NUM_MATCH_BRANCHES {
+        writeln!(&mut code, "        case C{i}():\n            pass",).ok();
+    }
+    code.push_str("        case _:\n            pass\n\n");
+
+    criterion.bench_function("ty_micro[large_union_narrowing]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+/// Benchmark for narrowing through a long `isinstance` elif chain.
+///
+/// This pattern is common in visitor-style dispatch code (e.g. koda-validate's
+/// `generate_schema_validator`) where a base class parameter is narrowed through
+/// many sequential `isinstance` checks.
+///
+/// Sample code structure:
+/// ```python
+/// class Base: ...
+/// class C0(Base): ...
+/// class C1(Base): ...
+/// ...
+///
+/// def f(obj: Base) -> None:
+///     if isinstance(obj, C0):
+///         pass
+///     elif isinstance(obj, C1):
+///         pass
+///     ...
+/// ```
+fn benchmark_large_isinstance_narrowing(criterion: &mut Criterion) {
+    const NUM_CLASSES: usize = 50;
+
+    setup_rayon();
+
+    let mut code = String::new();
+    writeln!(&mut code, "class Base: ...").ok();
+    for i in 0..NUM_CLASSES {
+        writeln!(&mut code, "class C{i}(Base): ...").ok();
+    }
+    writeln!(&mut code).ok();
+
+    writeln!(&mut code, "def f(obj: Base) -> None:").ok();
+    for i in 0..NUM_CLASSES {
+        if i == 0 {
+            writeln!(&mut code, "    if isinstance(obj, C{i}):").ok();
+        } else {
+            writeln!(&mut code, "    elif isinstance(obj, C{i}):").ok();
+        }
+        writeln!(&mut code, "        pass").ok();
+    }
+
+    criterion.bench_function("ty_micro[large_isinstance_narrowing]", |b| {
         b.iter_batched_ref(
             || setup_micro_case(&code),
             |case| {
@@ -776,6 +938,9 @@ criterion_group!(
     benchmark_complex_constrained_attributes_3,
     benchmark_many_enum_members,
     benchmark_many_enum_members_2,
+    benchmark_very_large_tuple,
+    benchmark_large_union_narrowing,
+    benchmark_large_isinstance_narrowing,
 );
 criterion_group!(project, anyio, attrs, hydra, datetype);
 criterion_main!(check_file, micro, project);

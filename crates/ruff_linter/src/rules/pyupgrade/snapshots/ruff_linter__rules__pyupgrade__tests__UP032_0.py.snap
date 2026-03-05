@@ -1378,6 +1378,8 @@ UP032 [*] Use f-string instead of `format` call
 279 | # Unicode escape
 280 | "\N{angle}AOB = {angle}°".format(angle=180)
     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+281 |
+282 | # Raw string with \N{...}
     |
 help: Convert to f-string
 277 |     print(string)
@@ -1385,3 +1387,20 @@ help: Convert to f-string
 279 | # Unicode escape
     - "\N{angle}AOB = {angle}°".format(angle=180)
 280 + f"\N{angle}AOB = {180}°"
+281 | 
+282 | # Raw string with \N{...}
+283 | r"\N{angle}AOB = {angle}°".format(angle=180)
+
+UP032 [*] Use f-string instead of `format` call
+   --> UP032_0.py:283:1
+    |
+282 | # Raw string with \N{...}
+283 | r"\N{angle}AOB = {angle}°".format(angle=180)
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: Convert to f-string
+280 | "\N{angle}AOB = {angle}°".format(angle=180)
+281 | 
+282 | # Raw string with \N{...}
+    - r"\N{angle}AOB = {angle}°".format(angle=180)
+283 + rf"\N{180}AOB = {180}°"

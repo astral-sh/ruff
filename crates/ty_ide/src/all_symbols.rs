@@ -44,24 +44,27 @@ pub fn all_symbols<'db>(
                 let Some(file) = module.file(&*db) else {
                     continue;
                 };
+                let name = module.name(&*db);
 
-                // By convention, modules starting with an underscore
-                // are generally considered unexported. However, we
-                // should consider first party modules fair game.
-                //
-                // Note that we apply this recursively. e.g.,
-                // `numpy._core.multiarray` is considered private
-                // because it's a child of `_core`.
-                if module.name(&*db).components().any(|c| c.starts_with('_'))
-                    && module
-                        .search_path(&*db)
-                        .is_none_or(|sp| !sp.is_first_party())
-                {
+                // Note that this will always consider namespace
+                // packages to be "not firsty party." This isn't
+                // necessarily correct, and we can probably improve
+                // on this in response to user feedback. (At time
+                // of writing, 2026-02-13, we don't really handle
+                // namespace packages in auto-import anyway.)
+                let is_non_first_party = module
+                    .search_path(&*db)
+                    .is_none_or(|sp| !sp.is_first_party());
+
+                // Filter out non-first-party modules that are conventionally
+                // regarded as private or tests.
+                if is_non_first_party && (name.is_private() || name.is_test_module()) {
                     continue;
                 }
+
                 // TODO: also make it available in `TYPE_CHECKING` blocks
                 // (we'd need https://github.com/astral-sh/ty/issues/1553 to do this well)
-                if !is_typing_extensions_available && module.name(&*db) == &typing_extensions {
+                if !is_typing_extensions_available && name == &typing_extensions {
                     continue;
                 }
                 s.spawn(move |_| {
@@ -77,6 +80,11 @@ pub fn all_symbols<'db>(
                         symbols.push(AllSymbolInfo::from_module(&*db, module, file));
                     }
                     for (_, symbol) in symbols_for_file_global_only(&*db, file).search(query) {
+                        // Test functions (starting with `test_`) in third-party
+                        // packages are almost never useful to import.
+                        if is_non_first_party && symbol.name.starts_with("test_") {
+                            continue;
+                        }
                         symbols.push(AllSymbolInfo::from_non_module_symbol(
                             &*db,
                             symbol.to_owned(),
@@ -171,6 +179,11 @@ impl<'db> AllSymbolInfo<'db> {
             .as_ref()
             .map(|symbol| symbol.kind)
             .unwrap_or(SymbolKind::Module)
+    }
+
+    /// Returns whether this symbol has a `@deprecated` decorator.
+    pub fn deprecated(&self) -> bool {
+        self.symbol.as_ref().is_some_and(|symbol| symbol.deprecated)
     }
 
     /// Returns the module this symbol is exported from.
@@ -411,6 +424,7 @@ mod merge {
                         (&origin.symbol, &mut reexport.symbol)
                     {
                         reexport_sym.kind = origin_sym.kind;
+                        reexport_sym.deprecated = origin_sym.deprecated;
                     }
 
                     // Now we want to find the shortest (in terms of
@@ -597,7 +611,7 @@ def zqzqzq():
             )
             .build();
 
-        assert_snapshot!(test.all_symbols("zqzqzq"), @r"
+        assert_snapshot!(test.all_symbols("zqzqzq"), @"
         info[all-symbols]: AllSymbolInfo
          --> pandas/__init__.py:2:27
           |
@@ -643,7 +657,7 @@ def zqzqzq():
             )
             .build();
 
-        assert_snapshot!(test.all_symbols("zqzqzq"), @r"
+        assert_snapshot!(test.all_symbols("zqzqzq"), @"
         info[all-symbols]: AllSymbolInfo
          --> pandas/__init__.py:2:37
           |
@@ -688,7 +702,7 @@ def zqzqzq():
             )
             .build();
 
-        assert_snapshot!(test.all_symbols("zqzqzq"), @r"
+        assert_snapshot!(test.all_symbols("zqzqzq"), @"
         info[all-symbols]: AllSymbolInfo
          --> pandas/__init__.py:2:5
           |
@@ -739,7 +753,7 @@ def zqzqzq():
             )
             .build();
 
-        assert_snapshot!(test.all_symbols("zqzqzq"), @r"
+        assert_snapshot!(test.all_symbols("zqzqzq"), @"
         info[all-symbols]: AllSymbolInfo
          --> pandas/io/api.py:2:31
           |
@@ -802,7 +816,7 @@ __all__ = ['zqzqzq']
             )
             .build();
 
-        assert_snapshot!(test.all_symbols("zqzqzq"), @r"
+        assert_snapshot!(test.all_symbols("zqzqzq"), @"
         info[all-symbols]: AllSymbolInfo
          --> pandas/__init__.py:2:5
           |
@@ -834,7 +848,7 @@ def zqzqzq():
             .source("sub1/sub2/sub3.py", "from pandas import zqzqzq as zqzqzq")
             .build();
 
-        assert_snapshot!(test.all_symbols("zqzqzq"), @r"
+        assert_snapshot!(test.all_symbols("zqzqzq"), @"
         info[all-symbols]: AllSymbolInfo
          --> pandas/__init__.py:2:5
           |
@@ -877,7 +891,7 @@ def zqzqzq():
             .source("sub1/sub2/sub3.py", "from pandas import zqzqzq as zqzqzq")
             .build();
 
-        assert_snapshot!(test.all_symbols("zqzqzq"), @r"
+        assert_snapshot!(test.all_symbols("zqzqzq"), @"
         info[all-symbols]: AllSymbolInfo
          --> pandas/__init__.py:2:5
           |
@@ -964,6 +978,157 @@ ABCDEFGHIJKLMNOP = 'https://api.example.com'
         4 |     pass
           |
         info: Function abcdefghijklmnop
+        ");
+    }
+
+    /// Tests that first-party test modules are NOT filtered out.
+    /// This ensures developers can still auto-import from their own test code.
+    #[test]
+    fn first_party_test_modules_not_filtered() {
+        let test = CursorTest::builder()
+            .source("main.py", "<CURSOR>")
+            .source("mypackage/__init__.py", "")
+            .source("mypackage/tests/__init__.py", "")
+            .source(
+                "mypackage/tests/test_utils.py",
+                "
+def test_helper_xyzxyzxyz():
+    '''A test helper function'''
+    pass
+",
+            )
+            .build();
+
+        // First-party test symbols should still be available
+        // (both test_ prefixed and non-test_ prefixed)
+        assert_snapshot!(test.all_symbols("xyzxyzxyz"), @"
+        info[all-symbols]: AllSymbolInfo
+         --> mypackage/tests/test_utils.py:2:5
+          |
+        2 | def test_helper_xyzxyzxyz():
+          |     ^^^^^^^^^^^^^^^^^^^^^
+        3 |     '''A test helper function'''
+        4 |     pass
+          |
+        info: Function test_helper_xyzxyzxyz
+        ");
+    }
+
+    /// Tests that test modules and test functions are filtered out from
+    /// third-party (site-packages) code.
+    #[test]
+    fn third_party_test_modules_filtered() {
+        let test = CursorTest::builder()
+            .with_site_packages()
+            .source("main.py", "<CURSOR>")
+            // Regular third-party module (should be included)
+            .site_packages("thirdparty/__init__.py", "def useful_xyzxyzxyz(): pass")
+            // A test module (should be filtered)
+            .site_packages("thirdparty/tests/__init__.py", "")
+            // Another test module (should also be filtered).
+            .site_packages(
+                "thirdparty/tests/test_core.py",
+                "def check_xyzxyzxyz(): pass",
+            )
+            // A conftest module (should be filtered)
+            .site_packages("thirdparty/conftest.py", "def fixture_xyzxyzxyz(): pass")
+            // A module with test_ functions (test_ functions should be filtered)
+            .site_packages(
+                "thirdparty/utils.py",
+                "def helper_xyzxyzxyz(): pass\ndef test_something_xyzxyzxyz(): pass",
+            )
+            .build();
+
+        assert_snapshot!(test.all_symbols("xyzxyzxyz"), @"
+        info[all-symbols]: AllSymbolInfo
+         --> site-packages/thirdparty/utils.py:1:5
+          |
+        1 | def helper_xyzxyzxyz(): pass
+          |     ^^^^^^^^^^^^^^^^
+        2 | def test_something_xyzxyzxyz(): pass
+          |
+        info: Function helper_xyzxyzxyz
+
+        info[all-symbols]: AllSymbolInfo
+         --> site-packages/thirdparty/__init__.py:1:5
+          |
+        1 | def useful_xyzxyzxyz(): pass
+          |     ^^^^^^^^^^^^^^^^
+          |
+        info: Function useful_xyzxyzxyz
+        ");
+    }
+
+    /// Tests that first-party "private" modules are NOT filtered out.
+    /// This ensures developers can still auto-import from their unexported
+    /// modules.
+    #[test]
+    fn first_party_underscore_modules_not_filtered() {
+        let test = CursorTest::builder()
+            .source("main.py", "<CURSOR>")
+            .source("mypackage/__init__.py", "")
+            .source("mypackage/_test/__init__.py", "ZQZQZQ = 1")
+            .source("mypackage/_tests/__init__.py", "ZQZQZQ = 1")
+            .source("mypackage/_testing/__init__.py", "ZQZQZQ = 1")
+            .source("mypackage/_foo/__init__.py", "ZQZQZQ = 1")
+            .build();
+
+        assert_snapshot!(test.all_symbols("zqzqzq"), @"
+        info[all-symbols]: AllSymbolInfo
+         --> mypackage/_foo/__init__.py:1:1
+          |
+        1 | ZQZQZQ = 1
+          | ^^^^^^
+          |
+        info: Constant ZQZQZQ
+
+        info[all-symbols]: AllSymbolInfo
+         --> mypackage/_test/__init__.py:1:1
+          |
+        1 | ZQZQZQ = 1
+          | ^^^^^^
+          |
+        info: Constant ZQZQZQ
+
+        info[all-symbols]: AllSymbolInfo
+         --> mypackage/_testing/__init__.py:1:1
+          |
+        1 | ZQZQZQ = 1
+          | ^^^^^^
+          |
+        info: Constant ZQZQZQ
+
+        info[all-symbols]: AllSymbolInfo
+         --> mypackage/_tests/__init__.py:1:1
+          |
+        1 | ZQZQZQ = 1
+          | ^^^^^^
+          |
+        info: Constant ZQZQZQ
+        ");
+    }
+
+    /// Tests that non-first-party "private" modules ARE filtered out.
+    #[test]
+    fn third_party_underscore_modules_are_filtered() {
+        let test = CursorTest::builder()
+            .with_site_packages()
+            .source("main.py", "<CURSOR>")
+            .site_packages("thirdparty/__init__.py", "ZQZQZQ = 1")
+            .site_packages("thirdparty/_test/__init__.py", "ZQZQZQ = 1")
+            .site_packages("thirdparty/_tests/__init__.py", "ZQZQZQ = 1")
+            .site_packages("thirdparty/_testing/__init__.py", "ZQZQZQ = 1")
+            .site_packages("thirdparty/_foo/__init__.py", "ZQZQZQ = 1")
+            .build();
+
+        assert_snapshot!(test.all_symbols("zqzqzq"), @"
+        info[all-symbols]: AllSymbolInfo
+         --> site-packages/thirdparty/__init__.py:1:1
+          |
+        1 | ZQZQZQ = 1
+          | ^^^^^^
+          |
+        info: Constant ZQZQZQ
         ");
     }
 

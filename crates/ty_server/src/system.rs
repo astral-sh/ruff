@@ -124,7 +124,7 @@ impl LSPSystem {
         extension: Option<&str>,
     ) -> Option<PySourceType> {
         match document {
-            Document::Text(text) => match text.language_id()? {
+            Document::Text(text) => match text.language_id() {
                 LanguageId::Python => Some(
                     extension
                         .and_then(PySourceType::try_from_extension)
@@ -226,6 +226,10 @@ impl System for LSPSystem {
             Document::Text(document) => Notebook::from_source_code(document.contents()),
             Document::Notebook(notebook) => Ok(notebook.to_ruff_notebook(self.index())),
         }
+    }
+
+    fn is_executable(&self, path: &SystemPath) -> bool {
+        self.native_system.is_executable(path)
     }
 
     fn current_directory(&self) -> &SystemPath {

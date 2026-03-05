@@ -46,6 +46,22 @@ def _(unknown: Unknown):
     assert_never(unknown)  # error: [type-assertion-failure]
 ```
 
+### Return type of `assert_never`
+
+The return type of `assert_never` is always `Never`, despite the type of the argument:
+
+```py
+from typing_extensions import Never, assert_never
+
+def _(never: Never):
+    # revealed: Never
+    reveal_type(assert_never(never))
+
+def _():
+    # revealed: Never
+    reveal_type(assert_never(0))  # error: [type-assertion-failure]
+```
+
 ## Use case: Type narrowing and exhaustiveness checking
 
 ```toml

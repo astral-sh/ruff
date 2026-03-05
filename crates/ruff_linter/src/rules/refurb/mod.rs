@@ -17,6 +17,7 @@ mod tests {
 
     #[test_case(Rule::ReadWholeFile, Path::new("FURB101_0.py"))]
     #[test_case(Rule::ReadWholeFile, Path::new("FURB101_1.py"))]
+    #[test_case(Rule::ReadWholeFile, Path::new("FURB101_2.py"))]
     #[test_case(Rule::RepeatedAppend, Path::new("FURB113.py"))]
     #[test_case(Rule::IfExpInsteadOfOrOperator, Path::new("FURB110.py"))]
     #[test_case(Rule::ReimplementedOperator, Path::new("FURB118.py"))]
@@ -49,6 +50,7 @@ mod tests {
     #[test_case(Rule::ListReverseCopy, Path::new("FURB187.py"))]
     #[test_case(Rule::WriteWholeFile, Path::new("FURB103_0.py"))]
     #[test_case(Rule::WriteWholeFile, Path::new("FURB103_1.py"))]
+    #[test_case(Rule::WriteWholeFile, Path::new("FURB103_2.py"))]
     #[test_case(Rule::FStringNumberFormat, Path::new("FURB116.py"))]
     #[test_case(Rule::SortedMinMax, Path::new("FURB192.py"))]
     #[test_case(Rule::SliceToRemovePrefixOrSuffix, Path::new("FURB188.py"))]

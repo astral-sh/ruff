@@ -38,6 +38,17 @@ instance.attr = "wrong"  # error: [invalid-assignment]
 C.attr = 1  # error: [invalid-attribute-access]
 ```
 
+## Invalid annotated assignment to attribute
+
+Annotated assignments to attributes on `self` should be validated against their annotation.
+
+```py
+class C:
+    def __init__(self):
+        self.attr: str = None  # error: [invalid-assignment]
+        self.attr2: int = 1  # fine
+```
+
 ## `ClassVar`s
 
 These can only be set on class objects. When trying to set them on instances, we generate a useful

@@ -31,14 +31,14 @@ else:
     reveal_type(x)  # revealed: Never
 
 if x or not x:
-    reveal_type(x)  # revealed: Literal[0, -1, "", "foo", b"", b"bar"] | bool | None | tuple[()]
+    reveal_type(x)  # revealed: Literal[-1, 0, "foo", "", b"bar", b""] | bool | None | tuple[()]
 else:
     reveal_type(x)  # revealed: Never
 
 if not (x or not x):
     reveal_type(x)  # revealed: Never
 else:
-    reveal_type(x)  # revealed: Literal[0, -1, "", "foo", b"", b"bar"] | bool | None | tuple[()]
+    reveal_type(x)  # revealed: Literal[-1, 0, "foo", "", b"bar", b""] | bool | None | tuple[()]
 
 if (isinstance(x, int) or isinstance(x, str)) and x:
     reveal_type(x)  # revealed: Literal[-1, True, "foo"]
@@ -362,6 +362,18 @@ def f():
         reveal_type(x)  # revealed: str & ~AlwaysFalsy
     else:
         reveal_type(x)  # revealed: (str & ~AlwaysTruthy) | None
+```
+
+## Narrowing the value of a named expression
+
+The value expression on the right-hand side of the walrus operator should also be narrowed:
+
+```py
+def foo(value: int | None):
+    if foo := value:
+        reveal_type(value)  # revealed: int & ~AlwaysFalsy
+    else:
+        reveal_type(value)  # revealed: (int & ~AlwaysTruthy) | None
 ```
 
 ## Narrowing a union of a `TypedDict` and `None`

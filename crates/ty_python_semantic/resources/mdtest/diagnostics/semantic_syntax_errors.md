@@ -98,7 +98,7 @@ python-version = "3.10"
 match 2:
     # error: [invalid-syntax] "mapping pattern checks duplicate key `"x"`"
     case {"x": 1, "x": 2}:
-        ...
+        pass
 ```
 
 ## Duplicate `match` class attribute
@@ -224,7 +224,7 @@ def func():
 
 def gen():
     # error: [invalid-syntax] "Starred expression cannot be used here"
-    yield * [1, 2, 3]
+    yield *[1, 2, 3]
 
 # error: [invalid-syntax] "Starred expression cannot be used here"
 for *x in range(10):
@@ -340,10 +340,10 @@ def _():
 
     # error: [invalid-syntax] "`async for` outside of an asynchronous function"
     async for _ in elements(1):
-        ...
+        pass
     # error: [invalid-syntax] "`async with` outside of an asynchronous function"
     async with elements(1) as x:
-        ...
+        pass
     # error: [invalid-syntax] "asynchronous comprehension outside of an asynchronous function"
     [x async for x in elements(1)]
 ```

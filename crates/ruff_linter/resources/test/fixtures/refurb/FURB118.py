@@ -163,3 +163,7 @@ def custom_decorator(func):
 @custom_decorator
 def add(x, y):
     return x + y
+
+# Regression https://github.com/astral-sh/ruff/issues/23076
+def func(rows):
+    rows.sort(key=lambda x: (x[x.find("=")], x[1]))

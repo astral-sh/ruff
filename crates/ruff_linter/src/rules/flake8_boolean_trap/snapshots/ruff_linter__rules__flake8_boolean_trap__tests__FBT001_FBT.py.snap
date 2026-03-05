@@ -90,27 +90,27 @@ FBT001 Boolean-typed positional argument in function definition
    |
 
 FBT001 Boolean-typed positional argument in function definition
-  --> FBT.py:90:19
+  --> FBT.py:93:19
    |
-89 |     # FBT001: Boolean positional arg in function definition
-90 |     def foo(self, value: bool) -> None:
+92 |     # FBT001: Boolean positional arg in function definition
+93 |     def foo(self, value: bool) -> None:
    |                   ^^^^^
-91 |         pass
+94 |         pass
    |
 help: Consider adding `@typing.override` if changing the function signature would violate the Liskov Substitution Principle
 
 FBT001 Boolean-typed positional argument in function definition
-   --> FBT.py:100:10
+   --> FBT.py:103:10
     |
-100 | def func(x: Union[list, Optional[int | str | float | bool]]):
+103 | def func(x: Union[list, Optional[int | str | float | bool]]):
     |          ^
-101 |     pass
+104 |     pass
     |
 
 FBT001 Boolean-typed positional argument in function definition
-   --> FBT.py:104:10
+   --> FBT.py:107:10
     |
-104 | def func(x: bool | str):
+107 | def func(x: bool | str):
     |          ^
-105 |     pass
+108 |     pass
     |

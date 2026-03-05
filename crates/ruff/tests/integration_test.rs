@@ -630,6 +630,42 @@ fn stdin_override_parser_py() {
 }
 
 #[test]
+fn stdin_override_parser_py_config() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let pyproject_toml = tempdir.path().join("pyproject.toml");
+    fs::write(
+        &pyproject_toml,
+        r#"
+[tool.ruff]
+extension = {ipynb="python"}
+"#,
+    )?;
+    let mut cmd = RuffCheck::default()
+        .config(&pyproject_toml)
+        .args(["--stdin-filename", "F401.ipynb"])
+        .build();
+    assert_cmd_snapshot!(cmd
+        .pass_stdin("import os\n"), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    F401 [*] `os` imported but unused
+     --> F401.ipynb:1:8
+      |
+    1 | import os
+      |        ^^
+      |
+    help: Remove unused import: `os`
+
+    Found 1 error.
+    [*] 1 fixable with the `--fix` option.
+
+    ----- stderr -----
+    ");
+    Ok(())
+}
+
+#[test]
 fn stdin_fix_when_not_fixable_should_still_print_contents() {
     let mut cmd = RuffCheck::default().args(["--fix"]).build();
     assert_cmd_snapshot!(cmd
@@ -876,7 +912,9 @@ fn parse_error_not_included() {
 
 #[test]
 fn full_output_preview() {
-    let mut cmd = RuffCheck::default().args(["--preview"]).build();
+    let mut cmd = RuffCheck::default()
+        .args(["--preview", "--select=E741"])
+        .build();
     assert_cmd_snapshot!(cmd
         .pass_stdin("l = 1"), @"
     success: false
@@ -907,7 +945,7 @@ preview = true
 ",
     )?;
     let mut cmd = RuffCheck::default().config(&pyproject_toml).build();
-    assert_cmd_snapshot!(cmd.pass_stdin("l = 1"), @"
+    assert_cmd_snapshot!(cmd.arg("--select=E741").pass_stdin("l = 1"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1795,8 +1833,7 @@ fn missing_argfile_reports_error() {
         ----- stderr -----
         ruff failed
           Cause: Failed to read CLI arguments from files
-          Cause: failed to open file `!.txt`
-          Cause: No such file or directory (os error 2)
+          Cause: failed to open file `!.txt`: No such file or directory (os error 2)
         ");
     });
 }

@@ -4,7 +4,7 @@ import types
 from _typeshed import SupportsKeysAndGetItem, Unused
 from builtins import property as _builtins_property
 from collections.abc import Callable, Iterable, Iterator, Mapping
-from typing import Any, Final, Generic, Literal, TypeVar, overload
+from typing import Any, Final, Generic, Literal, SupportsIndex, TypeVar, overload
 from typing_extensions import Self, TypeAlias, disjoint_base
 
 __all__ = ["EnumMeta", "Enum", "IntEnum", "Flag", "IntFlag", "auto", "unique"]
@@ -625,6 +625,17 @@ if sys.version_info >= (3, 11):
         """
 
     def show_flag_values(value: int) -> list[int]: ...
+    def bin(num: SupportsIndex, max_bits: int | None = None) -> str:
+        """
+        Like built-in bin(), except negative values are represented in
+        twos-complement, and the leading bit always indicates sign
+        (0=positive, 1=negative).
+
+        >>> bin(10)
+        '0b0 1010'
+        >>> bin(~10)   # ~10 is -11
+        '0b1 0101'
+        """
 
 if sys.version_info >= (3, 12):
     # The body of the class is the same, but the base classes are different.

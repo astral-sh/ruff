@@ -75,7 +75,7 @@ def test(a: f"f-string type annotation", b: b"byte-string-type-annotation"): ...
 
 ## Can't suppress syntax errors
 
-<!-- blacken-docs:off -->
+<!-- fmt:off -->
 
 ```py
 # error: [invalid-syntax]
@@ -84,7 +84,7 @@ def test($):  # ty: ignore
     pass
 ```
 
-<!-- blacken-docs:on -->
+<!-- fmt:on -->
 
 ## Can't suppress `revealed-type` diagnostics
 
@@ -127,14 +127,14 @@ a = 10 / 0  # ty: ignore[*-*]
 
 ## Trailing whitespace
 
-<!-- blacken-docs:off -->
+<!-- fmt:off -->
 
 ```py
 a = 10 / 0  # ty: ignore[division-by-zero]       
             #                               ^^^^^^ trailing whitespace
 ```
 
-<!-- blacken-docs:on -->
+<!-- fmt:on -->
 
 ## Missing comma
 

@@ -1788,7 +1788,7 @@ impl<'src> Parser<'src> {
             let spec_start = self.node_start();
             let elements = self.parse_interpolated_string_elements(
                 flags,
-                InterpolatedStringElementsKind::FormatSpec,
+                InterpolatedStringElementsKind::FormatSpec(string_kind),
                 string_kind,
             );
             Some(Box::new(ast::InterpolatedStringFormatSpec {

@@ -29,6 +29,8 @@ mod os;
 mod path;
 mod test;
 pub mod walk_directory;
+#[cfg(not(target_family = "wasm"))]
+mod which;
 
 pub type Result<T> = std::io::Result<T>;
 
@@ -144,6 +146,9 @@ pub trait System: Debug + Sync + Send {
         self.path_metadata(path)
             .is_ok_and(|metadata| metadata.file_type.is_file())
     }
+
+    /// Returns `true` if `path` exists and is marked as executable.
+    fn is_executable(&self, path: &SystemPath) -> bool;
 
     /// Returns the current working directory
     fn current_directory(&self) -> &SystemPath;

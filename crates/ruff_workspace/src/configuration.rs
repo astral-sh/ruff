@@ -11,6 +11,7 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context, Result, anyhow};
 use glob::{GlobError, Paths, PatternError, glob};
 use itertools::Itertools;
+use log::debug;
 use regex::Regex;
 use rustc_hash::{FxHashMap, FxHashSet};
 use shellexpand;
@@ -32,7 +33,8 @@ use ruff_linter::settings::types::{
     RequiredVersion, UnsafeFixes,
 };
 use ruff_linter::settings::{
-    DEFAULT_SELECTORS, DUMMY_VARIABLE_RGX, LinterSettings, TASK_TAGS, TargetVersion,
+    DEFAULT_SELECTORS, DUMMY_VARIABLE_RGX, LinterSettings, PREVIEW_DEFAULT_SELECTORS, TASK_TAGS,
+    TargetVersion,
 };
 use ruff_linter::{
     RuleSelector, fs, warn_user_once, warn_user_once_by_id, warn_user_once_by_message,
@@ -53,6 +55,8 @@ use crate::options::{
     PydoclintOptions, PydocstyleOptions, PyflakesOptions, PylintOptions, RuffOptions,
     validate_required_version,
 };
+use crate::pyproject;
+use crate::resolver::ConfigurationOrigin;
 use crate::settings::{
     EXCLUDE, FileResolverSettings, FormatterSettings, INCLUDE, INCLUDE_PREVIEW, LineEnding,
     Settings,
@@ -245,11 +249,14 @@ impl Configuration {
             .unwrap_or_default();
         let flake8_import_conventions = lint
             .flake8_import_conventions
-            .map(Flake8ImportConventionsOptions::try_into_settings)
+            .map(|options| options.try_into_settings(lint_preview))
             .transpose()?
-            .unwrap_or_default();
+            .unwrap_or_else(|| {
+                ruff_linter::rules::flake8_import_conventions::settings::Settings::new(lint_preview)
+            });
 
         conflicting_import_settings(&isort, &flake8_import_conventions)?;
+        conflicting_required_import_pyi025(&isort, &rules)?;
 
         let future_annotations = lint.future_annotations.unwrap_or_default();
 
@@ -275,9 +282,19 @@ impl Configuration {
                     PreviewMode::Disabled => FilePatternSet::try_from_iter(
                         self.include.unwrap_or_else(|| INCLUDE.to_vec()),
                     )?,
-                    PreviewMode::Enabled => FilePatternSet::try_from_iter(
-                        self.include.unwrap_or_else(|| INCLUDE_PREVIEW.to_vec()),
-                    )?,
+                    PreviewMode::Enabled => {
+                        FilePatternSet::try_from_iter(self.include.unwrap_or_else(|| {
+                            let mut patterns = INCLUDE_PREVIEW.to_vec();
+                            if let Some(extension_map) = &self.extension {
+                                patterns.extend(
+                                    extension_map
+                                        .extensions()
+                                        .map(|ext| FilePattern::Config(format!("*.{ext}"))),
+                                );
+                            }
+                            patterns
+                        }))?
+                    }
                 },
                 respect_gitignore: self.respect_gitignore.unwrap_or(true),
                 project_root: project_root.to_path_buf(),
@@ -561,10 +578,7 @@ impl Configuration {
                     })
                     .collect()
             }),
-            // `--extension` is a hidden command-line argument that isn't supported in configuration
-            // files at present.
-            extension: None,
-
+            extension: options.extension.map(ExtensionMapping::from),
             lint: LintConfiguration::from_options(lint, project_root)?,
             format: FormatConfiguration::from_options(
                 options.format.unwrap_or_default(),
@@ -618,6 +632,33 @@ impl Configuration {
             format: self.format.combine(config.format),
             analyze: self.analyze.combine(config.analyze),
         }
+    }
+
+    #[must_use]
+    pub fn apply_fallbacks(
+        mut self,
+        origin: ConfigurationOrigin,
+        initial_config_path: &Path,
+    ) -> Self {
+        if matches!(origin, ConfigurationOrigin::Ancestor) {
+            self.target_version = self.target_version.or_else(|| {
+                let dir = initial_config_path.parent()?;
+                let fallback = pyproject::find_fallback_target_version(dir)?;
+                debug!("Derived `target-version` from `requires-python`: {fallback:?}");
+                Some(fallback.into())
+            });
+        }
+        // If the origin is UserSettings, we need more information
+        // to determine where to search for a fallback target version.
+        // - If Ruff is being invoked via the CLI, then we search in
+        // the cwd.
+        // - If Ruff is being invoked via the server, then we search
+        // in the editor's workspace root.
+        //
+        // This logic is implemented manually, at the time of this
+        // writing 2026-01-30, in `ruff::resolve::resolve` and
+        // `ruff_server::session::index::ruff_settings::RuffSettings::fallback`, respectively.
+        self
     }
 }
 
@@ -801,8 +842,14 @@ impl LintConfiguration {
             require_explicit: self.explicit_preview_rules.unwrap_or_default(),
         };
 
+        let selectors = if preview.mode.is_enabled() {
+            PREVIEW_DEFAULT_SELECTORS
+        } else {
+            DEFAULT_SELECTORS
+        };
+
         // The select_set keeps track of which rules have been selected.
-        let mut select_set: RuleSet = DEFAULT_SELECTORS
+        let mut select_set: RuleSet = selectors
             .iter()
             .flat_map(|selector| selector.rules(&preview))
             .collect();
@@ -1644,6 +1691,40 @@ fn conflicting_import_settings(
                 \n{err_body}\n\
             Help: Remove the required import or alias from your configuration."
         ));
+    }
+
+    Ok(())
+}
+
+/// Detect conflicts between I002 (missing-required-import) and PYI025
+/// (unaliased-collections-abc-set-import).
+///
+/// If `required-imports` includes `from collections.abc import Set` (without
+/// aliasing it as `AbstractSet`) and PYI025 is enabled, the configuration is
+/// contradictory: I002 requires the unaliased import, while PYI025 forbids it.
+fn conflicting_required_import_pyi025(
+    isort: &isort::settings::Settings,
+    rules: &RuleTable,
+) -> Result<()> {
+    if !rules.enabled(Rule::UnaliasedCollectionsAbcSetImport) {
+        return Ok(());
+    }
+
+    for required_import in &isort.required_imports {
+        let qualified_name = required_import.qualified_name();
+        if qualified_name.segments() == ["collections", "abc", "Set"]
+            && required_import.bound_name() != "AbstractSet"
+        {
+            return Err(anyhow!(
+                "Required import `from collections.abc import Set` specified in \
+                `lint.isort.required-imports` (I002) conflicts with \
+                `unaliased-collections-abc-set-import` (PYI025), which requires \
+                this import to be aliased as `AbstractSet`.\n\n\
+                Help: Either alias the required import \
+                (`from collections.abc import Set as AbstractSet`), \
+                or disable PYI025."
+            ));
+        }
     }
 
     Ok(())
