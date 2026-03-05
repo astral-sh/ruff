@@ -21,7 +21,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/annotations/string.md
  6 |     x: int
  7 | 
  8 | class Meta(type):
- 9 |     def __or__(cls, other: str) -> str:
+ 9 |     def __or__(cls, other: str) -> Any:
 10 |         return "wow, so fancy, bet type checkers can't handle this"
 11 | 
 12 | class UsesMeta(metaclass=Meta): ...
@@ -46,20 +46,26 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/annotations/string.md
 31 |     g: UsesMeta | "Foo",
 32 |     # error: [unsupported-operator]
 33 |     h: None | None,
-34 | ):
-35 |     reveal_type(a)  # revealed: int | Foo
-36 |     reveal_type(b)  # revealed: int | memoryview[int] | bytes
-37 |     reveal_type(c)  # revealed: TD | None
-38 |     reveal_type(d)  # revealed: P | None
-39 |     reveal_type(e)  # revealed: T@f | Foo
-40 |     reveal_type(f)  # revealed: Foo | ((...) -> None)
-41 | 
-42 | # fmt: on
-43 | 
-44 | class Foo: ...
-45 | 
-46 | # error: [unsupported-operator]
-47 | X = list["int" | None]
+34 |     # error: [unresolved-reference] "SomethingUndefined"
+35 |     # error: [unresolved-reference] "SomethingAlsoUndefined"
+36 |     i: SomethingUndefined | SomethingAlsoUndefined,
+37 | ):
+38 |     reveal_type(a)  # revealed: int | Foo
+39 |     reveal_type(b)  # revealed: int | memoryview[int] | bytes
+40 |     reveal_type(c)  # revealed: TD | None
+41 |     reveal_type(d)  # revealed: P | None
+42 |     reveal_type(e)  # revealed: T@f | Foo
+43 |     reveal_type(f)  # revealed: Foo | ((...) -> None)
+44 |     reveal_type(g)  # revealed: UsesMeta | Foo
+45 |     reveal_type(h)  # revealed: None
+46 |     reveal_type(i)  # revealed: Unknown
+47 | 
+48 | # fmt: on
+49 | 
+50 | class Foo: ...
+51 | 
+52 | # error: [unsupported-operator]
+53 | X = list["int" | None]
 ```
 
 # Diagnostics
@@ -156,8 +162,8 @@ error[unsupported-operator]: Unsupported `|` operation
 32 |     # error: [unsupported-operator]
 33 |     h: None | None,
    |        ^^^^^^^^^^^ Both operands have type `None`
-34 | ):
-35 |     reveal_type(a)  # revealed: int | Foo
+34 |     # error: [unresolved-reference] "SomethingUndefined"
+35 |     # error: [unresolved-reference] "SomethingAlsoUndefined"
    |
 info: All type expressions are evaluated at runtime by default on Python <3.14
 info: Python 3.13 was assumed when inferring types because it was specified on the command line
@@ -166,11 +172,41 @@ info: rule `unsupported-operator` is enabled by default
 ```
 
 ```
-error[unsupported-operator]: Unsupported `|` operation
-  --> src/mdtest_snippet.py:47:10
+error[unresolved-reference]: Name `SomethingUndefined` used when not defined
+  --> src/mdtest_snippet.py:36:8
    |
-46 | # error: [unsupported-operator]
-47 | X = list["int" | None]
+34 |     # error: [unresolved-reference] "SomethingUndefined"
+35 |     # error: [unresolved-reference] "SomethingAlsoUndefined"
+36 |     i: SomethingUndefined | SomethingAlsoUndefined,
+   |        ^^^^^^^^^^^^^^^^^^
+37 | ):
+38 |     reveal_type(a)  # revealed: int | Foo
+   |
+info: rule `unresolved-reference` is enabled by default
+
+```
+
+```
+error[unresolved-reference]: Name `SomethingAlsoUndefined` used when not defined
+  --> src/mdtest_snippet.py:36:29
+   |
+34 |     # error: [unresolved-reference] "SomethingUndefined"
+35 |     # error: [unresolved-reference] "SomethingAlsoUndefined"
+36 |     i: SomethingUndefined | SomethingAlsoUndefined,
+   |                             ^^^^^^^^^^^^^^^^^^^^^^
+37 | ):
+38 |     reveal_type(a)  # revealed: int | Foo
+   |
+info: rule `unresolved-reference` is enabled by default
+
+```
+
+```
+error[unsupported-operator]: Unsupported `|` operation
+  --> src/mdtest_snippet.py:53:10
+   |
+52 | # error: [unsupported-operator]
+53 | X = list["int" | None]
    |          -----^^^----
    |          |       |
    |          |       Has type `None`

@@ -2,6 +2,7 @@ use itertools::Either;
 use ruff_python_ast::{self as ast, PythonVersion};
 
 use super::{DeferredExpressionState, TypeInferenceBuilder};
+use crate::semantic_index::scope::ScopeKind;
 use crate::types::diagnostic::{
     self, INVALID_TYPE_FORM, NOT_SUBSCRIPTABLE, UNBOUND_TYPE_VARIABLE, UNSUPPORTED_OPERATOR,
     report_invalid_argument_number_to_special_form, report_invalid_arguments_to_callable,
@@ -232,39 +233,54 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                     ));
                                 }
 
-                                let python_version =
-                                    Program::get(self.db()).python_version(self.db());
+                                match self.scope.scope(self.db()).kind() {
+                                    ScopeKind::TypeAlias => diagnostic.info(
+                                        "A type alias scope is deferred but will be \
+                                        executed at runtime if the `__value__` property is \
+                                        accessed",
+                                    ),
+                                    ScopeKind::TypeParams => diagnostic.info(
+                                        "Type parameter scopes are deferred but may be \
+                                        executed at runtime if the `__bound__`, `__value__`
+                                        or `__constraints__` property of a type parameter is \
+                                        accessed",
+                                    ),
+                                    _ => {
+                                        let python_version =
+                                            Program::get(self.db()).python_version(self.db());
 
-                                if python_version < PythonVersion::PY310
-                                    && !binary.left.is_string_literal_expr()
-                                    && !binary.right.is_string_literal_expr()
-                                {
-                                    diagnostic.info(
-                                        "PEP 604 `|` unions are only available on Python 3.10+ \
-                                        unless they are quoted",
-                                    );
-                                    add_inferred_python_version_hint_to_diagnostic(
-                                        self.db(),
-                                        &mut diagnostic,
-                                        "inferring types",
-                                    );
-                                } else if python_version < PythonVersion::PY314 {
-                                    diagnostic.info(
-                                        "All type expressions are evaluated at runtime \
-                                        by default on Python <3.14",
-                                    );
-                                    add_inferred_python_version_hint_to_diagnostic(
-                                        self.db(),
-                                        &mut diagnostic,
-                                        "inferring types",
-                                    );
-                                    if binary.left.is_string_literal_expr()
-                                        || binary.right.is_string_literal_expr()
-                                    {
-                                        diagnostic.help(
-                                            "Put quotes around the whole union \
-                                            rather than just certain elements",
-                                        );
+                                        if python_version < PythonVersion::PY310
+                                            && !binary.left.is_string_literal_expr()
+                                            && !binary.right.is_string_literal_expr()
+                                        {
+                                            diagnostic.info(
+                                                "PEP 604 `|` unions are only available on \
+                                            Python 3.10+ unless they are quoted",
+                                            );
+                                            add_inferred_python_version_hint_to_diagnostic(
+                                                self.db(),
+                                                &mut diagnostic,
+                                                "inferring types",
+                                            );
+                                        } else if python_version < PythonVersion::PY314 {
+                                            diagnostic.info(
+                                                "All type expressions are evaluated at \
+                                                runtime by default on Python <3.14",
+                                            );
+                                            add_inferred_python_version_hint_to_diagnostic(
+                                                self.db(),
+                                                &mut diagnostic,
+                                                "inferring types",
+                                            );
+                                            if binary.left.is_string_literal_expr()
+                                                || binary.right.is_string_literal_expr()
+                                            {
+                                                diagnostic.help(
+                                                    "Put quotes around the whole union \
+                                                rather than just certain elements",
+                                                );
+                                            }
+                                        }
                                     }
                                 }
                             }

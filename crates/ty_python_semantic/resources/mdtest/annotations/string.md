@@ -75,7 +75,7 @@ class P(Protocol):
     x: int
 
 class Meta(type):
-    def __or__(cls, other: str) -> str:
+    def __or__(cls, other: str) -> Any:
         return "wow, so fancy, bet type checkers can't handle this"
 
 class UsesMeta(metaclass=Meta): ...
@@ -100,6 +100,9 @@ def f(
     g: UsesMeta | "Foo",
     # error: [unsupported-operator]
     h: None | None,
+    # error: [unresolved-reference] "SomethingUndefined"
+    # error: [unresolved-reference] "SomethingAlsoUndefined"
+    i: SomethingUndefined | SomethingAlsoUndefined,
 ):
     reveal_type(a)  # revealed: int | Foo
     reveal_type(b)  # revealed: int | memoryview[int] | bytes
@@ -107,6 +110,9 @@ def f(
     reveal_type(d)  # revealed: P | None
     reveal_type(e)  # revealed: T@f | Foo
     reveal_type(f)  # revealed: Foo | ((...) -> None)
+    reveal_type(g)  # revealed: UsesMeta | Foo
+    reveal_type(h)  # revealed: None
+    reveal_type(i)  # revealed: Unknown
 
 # fmt: on
 
@@ -132,7 +138,8 @@ def f(x: "int" | None): ...
 
 ### Python less than 3.14 with `__future__` annotations
 
-The errors can be avoided in some situations by using `__future__` annotations on Pythonn \<3.14:
+The errors can be avoided in type-annotation contexts by using `__future__` annotations on Python
+\<3.14:
 
 ```toml
 [environment]

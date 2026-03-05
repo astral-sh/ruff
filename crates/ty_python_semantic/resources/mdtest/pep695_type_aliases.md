@@ -131,6 +131,31 @@ def f(x: Foo[int]):
     reveal_type(x.foo())  # revealed: int
 ```
 
+## Stringified values
+
+<!-- snapshot-diagnostics -->
+
+Stringifying the right-hand side of a type alias is redundant, but allowed:
+
+```py
+type X = "int | str"
+
+def f(obj: X):
+    reveal_type(obj)  # revealed: int | str
+```
+
+The right-hand side of a PEP-695 type alias will not usually be executed, but can be if the user
+accesses the `.__value__` attribute. Normal runtime rules still therefore apply regarding partially
+stringified alias values:
+
+```py
+# error: [unsupported-operator]
+type Y = "int" | str
+
+def g(obj: Y):
+    reveal_type(obj)  # revealed: int | str
+```
+
 ## In unions and intersections
 
 We can "break apart" a type alias by e.g. adding it to a union:
