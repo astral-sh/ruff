@@ -114,7 +114,7 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     python_version: PythonVersion,
     source_text: OnceCell<SourceText>,
     semantic_checker: SemanticSyntaxChecker,
-    try_depth: u32,
+    in_try: bool,
 
     // Semantic Index fields
     scopes: IndexVec<FileScopeId, Scope>,
@@ -174,7 +174,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             python_version: Program::get(db).python_version(db),
             source_text: OnceCell::new(),
             semantic_checker: SemanticSyntaxChecker::default(),
-            try_depth: 0,
+            in_try: false,
             semantic_syntax_errors: RefCell::default(),
         };
 
@@ -1958,12 +1958,13 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         (&alias.name.id, is_self_import)
                     };
 
-                    // Look for imports `from __future__ import annotations`, ignore `as ...`
+                    // Look for eager imports `from __future__ import annotations`, ignore `as ...`
                     // We intentionally don't enforce the rules about location of `__future__`
                     // imports here, we assume the user's intent was to apply the `__future__`
                     // import, so we still check using it (and will also emit a diagnostic about a
                     // miss-placed `__future__` import.)
-                    self.has_future_annotations |= alias.name.id == "annotations"
+                    self.has_future_annotations |= !node.is_lazy
+                        && alias.name.id == "annotations"
                         && node.module.as_deref() == Some("__future__");
 
                     let symbol = self.add_symbol(symbol_name.clone());
@@ -2507,7 +2508,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 range: _,
                 node_index: _,
             }) => {
-                self.try_depth += 1;
+                let was_in_try = std::mem::replace(&mut self.in_try, true);
                 self.record_ambiguous_reachability();
 
                 // Save the state prior to visiting any of the `try` block.
@@ -2617,7 +2618,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 // - https://astral-sh.notion.site/Exception-handler-control-flow-11348797e1ca80bb8ce1e9aedbbe439d
                 // - https://github.com/astral-sh/ruff/pull/13633#discussion_r1788626702
                 self.visit_body(finalbody);
-                self.try_depth -= 1;
+                self.in_try = was_in_try;
             }
 
             ast::Stmt::Raise(_) | ast::Stmt::Return(_) => {
@@ -3233,16 +3234,19 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_, '_> {
 
     fn lazy_import_context(&self) -> Option<LazyImportContext> {
         match self.scopes[self.current_scope()].kind() {
+            // Possible, but invalid positions.
             ScopeKind::Function => return Some(LazyImportContext::Function),
             ScopeKind::Class => return Some(LazyImportContext::Class),
+            // Valid position.
+            ScopeKind::Module => {}
+            // Impossible positions because lambdas and comprehensions can't contain statements.
             ScopeKind::Comprehension
             | ScopeKind::Lambda
-            | ScopeKind::Module
             | ScopeKind::TypeAlias
             | ScopeKind::TypeParams => {}
         }
 
-        if self.try_depth > 0 {
+        if self.in_try {
             return Some(LazyImportContext::TryExceptBlocks);
         }
 

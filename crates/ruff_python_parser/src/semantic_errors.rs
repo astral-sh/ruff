@@ -831,7 +831,8 @@ impl SemanticSyntaxChecker {
             Stmt::ImportFrom(StmtImportFrom {
                 module, is_lazy, ..
             }) => {
-                // Allow __future__ imports until we see a non-__future__ import.
+                // Allow eager `__future__` imports until we see any other import. Lazy imports,
+                // including `lazy from __future__ import ...`, always close the boundary.
                 if *is_lazy || !matches!(module.as_deref(), Some("__future__")) {
                     self.seen_futures_boundary = true;
                 }

@@ -1,0 +1,10 @@
+---
+source: crates/ruff_linter/src/linter.rs
+---
+invalid-syntax: lazy from __future__ import is not allowed
+ --> resources/test/fixtures/semantic_errors/lazy_future_import.py:1:1
+  |
+1 | lazy from __future__ import annotations
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2 | from __future__ import generator_stop
+  |

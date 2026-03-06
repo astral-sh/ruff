@@ -532,7 +532,7 @@ struct SemanticSyntaxCheckerVisitor<'a> {
     python_version: PythonVersion,
     source: &'a str,
     scopes: Vec<Scope>,
-    try_depth: u32,
+    in_try: bool,
 }
 
 impl<'a> SemanticSyntaxCheckerVisitor<'a> {
@@ -543,7 +543,7 @@ impl<'a> SemanticSyntaxCheckerVisitor<'a> {
             python_version: PythonVersion::default(),
             source,
             scopes: vec![Scope::Module],
-            try_depth: 0,
+            in_try: false,
         }
     }
 
@@ -576,7 +576,7 @@ impl SemanticSyntaxContext for SemanticSyntaxCheckerVisitor<'_> {
             Some(Scope::Module | Scope::Comprehension { .. }) | None => {}
         }
 
-        if self.try_depth > 0 {
+        if self.in_try {
             return Some(LazyImportContext::TryExceptBlocks);
         }
 
@@ -688,21 +688,10 @@ impl Visitor<'_> for SemanticSyntaxCheckerVisitor<'_> {
                 ast::visitor::walk_stmt(self, stmt);
                 self.scopes.pop().unwrap();
             }
-            ast::Stmt::Try(ast::StmtTry {
-                body,
-                handlers,
-                orelse,
-                finalbody,
-                ..
-            }) => {
-                self.try_depth += 1;
-                self.visit_body(body);
-                for handler in handlers {
-                    self.visit_except_handler(handler);
-                }
-                self.visit_body(orelse);
-                self.visit_body(finalbody);
-                self.try_depth -= 1;
+            ast::Stmt::Try(_) => {
+                let was_in_try = std::mem::replace(&mut self.in_try, true);
+                ast::visitor::walk_stmt(self, stmt);
+                self.in_try = was_in_try;
             }
             _ => {
                 ast::visitor::walk_stmt(self, stmt);

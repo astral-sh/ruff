@@ -540,8 +540,9 @@ impl<'a> Importer<'a> {
         let _docstring = body.next_if(|stmt| ast::helpers::is_docstring_stmt(stmt));
 
         body.take_while(|stmt| {
-            stmt.as_import_from_stmt()
-                .is_some_and(|import_from| import_from.module.as_deref() == Some("__future__"))
+            stmt.as_import_from_stmt().is_some_and(|import_from| {
+                !import_from.is_lazy && import_from.module.as_deref() == Some("__future__")
+            })
         })
         .last()
     }
