@@ -707,7 +707,7 @@ ProtoInt = Proto[int]
 def _(doubly_specialized: ProtoInt[int]):
     reveal_type(doubly_specialized)  # revealed: Unknown
 
-# TODO: TypedDict is just a function object at runtime, we should emit an error
+# error: [invalid-base]
 class LegacyDict(TypedDict[T]):
     # error: [unbound-type-variable]
     x: T
@@ -717,8 +717,7 @@ LegacyDictInt = LegacyDict[int]
 
 # TODO: should be a `not-subscriptable` error
 def _(doubly_specialized: LegacyDictInt[int]):
-    # TODO: should be `Unknown`
-    reveal_type(doubly_specialized)  # revealed: @Todo(Inference of subscript on special form)
+    reveal_type(doubly_specialized)  # revealed: Unknown
 
 class Dict[T](TypedDict):
     x: T

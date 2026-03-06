@@ -365,11 +365,10 @@ def f() -> ClassVar[int]:
 def f[T](x: T) -> ClassVar[T]:
     return x
 
-# TODO: this should be an error
+# error: [invalid-base]
 class Foo(ClassVar[tuple[int]]): ...
 
-# TODO: Show `Unknown` instead of `@Todo` type in the MRO; or ignore `ClassVar` and show the MRO as if `ClassVar` was not there
-# revealed: (<class 'Foo'>, @Todo(Inference of subscript on special form), <class 'object'>)
+# revealed: (<class 'Foo'>, Unknown, <class 'object'>)
 reveal_mro(Foo)
 ```
 
