@@ -189,9 +189,6 @@ def valid(
 def invalid(
     # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
     a1: P,
-    # TODO: this should cause us to emit an error because a `ParamSpec` type argument
-    # cannot be used to specialize a non-`ParamSpec` type parameter
-    a2: list[P],
     # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
     a3: Callable[[P], int],
     # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
@@ -435,6 +432,41 @@ both mypy and Pyright allow this and there are usages of this in the wild e.g.,
 
 ```py
 reveal_type(TypeVarAndParamSpec[int, Any]().attr)  # revealed: (...) -> int
+```
+
+## `ParamSpec` cannot specialize a `TypeVar`, and vice versa
+
+<!-- snapshot-diagnostics -->
+
+A `ParamSpec` is not a valid type argument for a regular `TypeVar`, and vice versa.
+
+```py
+from typing import Generic, Callable, TypeVar, ParamSpec
+
+T = TypeVar("T")
+P = ParamSpec("P")
+
+class OnlyTypeVar(Generic[T]):
+    attr: T
+
+def func(c: Callable[P, None]):
+    # error: [invalid-type-arguments] "ParamSpec `P` cannot be used to specialize type variable `T`"
+    a: OnlyTypeVar[P]
+
+class OnlyParamSpec(Generic[P]):
+    attr: Callable[P, None]
+
+# This is fine due to the special case whereby `OnlyParamSpec[T]` is interpreted the same as
+# `OnlyParamSpec[[T]]`, due to the fact that `OnlyParamSpec` is only generic over a single
+# `ParamSpec` and no other type variables.
+def func2(c: OnlyParamSpec[T], other: T):
+    reveal_type(c.attr)  # revealed: (T@func2, /) -> None
+
+class ParamSpecAndTypeVar(Generic[P, T]):
+    attr: Callable[P, T]
+
+# error: [invalid-type-arguments] "Type argument for `ParamSpec` must be either a list of types, `ParamSpec`, `Concatenate`, or `...`"
+def func3(c: ParamSpecAndTypeVar[T, int], other: T): ...
 ```
 
 ## Specialization when defaults are involved

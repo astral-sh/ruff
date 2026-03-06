@@ -4547,11 +4547,11 @@ def function():
         "#,
         );
 
-        assert_snapshot!(test.hover(), @"
-        list[Unknown | int]
+        assert_snapshot!(test.hover(), @r###"
+        list[int]
         ---------------------------------------------
         ```python
-        list[Unknown | int]
+        list[int]
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
@@ -4562,7 +4562,7 @@ def function():
           |      |
           |      source
           |
-        ");
+        "###);
 
         let test = cursor_test(
             r#"

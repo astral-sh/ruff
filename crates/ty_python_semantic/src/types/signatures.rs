@@ -217,7 +217,10 @@ impl<'db> CallableSignature<'db> {
             }
         }
 
-        if let TypeMapping::ApplySpecialization(specialization) = type_mapping {
+        if let TypeMapping::ApplySpecialization(specialization)
+        | TypeMapping::ApplySpecializationWithMaterialization { specialization, .. } =
+            type_mapping
+        {
             Self::from_overloads(self.overloads.iter().flat_map(|signature| {
                 if let Some((prefix, paramspec)) =
                     signature.parameters.find_paramspec_from_args_kwargs(db)

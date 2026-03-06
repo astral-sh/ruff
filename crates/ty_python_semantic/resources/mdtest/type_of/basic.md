@@ -165,6 +165,23 @@ class B: ...
 _: type[A, B]
 ```
 
+## Callable types are not valid parameters
+
+```py
+from collections.abc import Callable
+
+def f(
+    x: type[Callable],  # error: [invalid-type-form]
+    y: type[Callable[[int], str]],  # error: [invalid-type-form]
+    # error: [invalid-type-form] "Special form `typing.Callable` expected exactly two arguments"
+    # error: [invalid-type-form] "The first argument to `Callable` must be either a list of types, ParamSpec, Concatenate, or `...`"
+    z: type[Callable[int]],  # error: [invalid-type-form] "The argument to `type[]` must be a class object type"
+):
+    reveal_type(x)  # revealed: type[Unknown]
+    reveal_type(y)  # revealed: type[Unknown]
+    reveal_type(z)  # revealed: type[Unknown]
+```
+
 ## As a base class
 
 ```py

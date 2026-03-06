@@ -1830,7 +1830,7 @@ impl<'db> SpecializationBuilder<'db> {
     /// the specialization that this builder is building up.
     ///
     /// `formal` should be the top-level formal parameter type that we are inferring. This is used
-    /// by our literal promotion logic, which needs to know which typevars are affected by each
+    /// by our promotion logic, which needs to know which typevars are affected by each
     /// argument, and the variance of those typevars in the corresponding parameter.
     ///
     /// TODO: This is a stopgap! Eventually, the builder will maintain a single constraint set for
