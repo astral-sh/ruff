@@ -1,6 +1,15 @@
 ---
 source: crates/ruff_linter/src/rules/refurb/mod.rs
 ---
+--- Linter settings ---
+-linter.unresolved_target_version = 3.13
++linter.unresolved_target_version = 3.12
+
+--- Summary ---
+Removed: 3
+Added: 0
+
+--- Removed ---
 FURB101 [*] `open` and `read` should be replaced by `Path("file.txt").read_text(newline="\r\n")`
  --> FURB101_3.py:4:6
   |
@@ -20,6 +29,7 @@ help: Replace with `Path("file.txt").read_text(newline="\r\n")`
 6 | 
 7 | # FURB101 (newline with encoding)
 8 | with open("file.txt", encoding="utf-8", newline="") as f:
+
 
 FURB101 [*] `open` and `read` should be replaced by `Path("file.txt").read_text(encoding="utf-8", newline="")`
  --> FURB101_3.py:8:6
@@ -44,6 +54,7 @@ help: Replace with `Path("file.txt").read_text(encoding="utf-8", newline="")`
 10 | 
 11 | # FURB101 (newline=None is also valid)
 12 | with open("file.txt", newline=None) as f:
+
 
 FURB101 [*] `open` and `read` should be replaced by `Path("file.txt").read_text(newline=None)`
   --> FURB101_3.py:12:6
