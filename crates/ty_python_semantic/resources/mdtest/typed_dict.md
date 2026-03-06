@@ -1878,8 +1878,8 @@ TreeNode = TypedDict("TreeNode", {"value": int, "left": TreeNode | None, "right"
 reveal_type(TreeNode)  # revealed: <class 'TreeNode'>
 
 leaf: TreeNode = {"value": 1, "left": None, "right": None}
-reveal_type(leaf["value"])  # revealed: int
-reveal_type(leaf["left"])  # revealed: TreeNode | None
+reveal_type(leaf["value"])  # revealed: Literal[1]
+reveal_type(leaf["left"])  # revealed: None
 
 tree: TreeNode = {
     "value": 10,
@@ -2051,7 +2051,7 @@ TD = TypedDict("TD", {"required": str, "optional": "NotRequired[int]"})
 td1: TD = {"required": "hello"}  # Valid - optional is not required
 td2: TD = {"required": "hello", "optional": 42}  # Valid - all keys provided
 reveal_type(td1)  # revealed: TD
-reveal_type(td1["required"])  # revealed: str
+reveal_type(td1["required"])  # revealed: Literal["hello"]
 reveal_type(td1["optional"])  # revealed: int
 
 # error: [missing-typed-dict-key] "Missing required key 'required' in TypedDict `TD` constructor"
@@ -3143,15 +3143,14 @@ class Child(Base):
     y: str
 ```
 
-The functional `TypedDict` syntax is not yet fully supported, so we don't currently emit an error
-for it. Once functional `TypedDict` support is added, this should also emit an error:
+The functional `TypedDict` syntax also triggers this error:
 
 ```py
 from dataclasses import dataclass
 from typing import TypedDict
 
-# TODO: This should error once functional TypedDict is supported
 @dataclass
+# error: [invalid-dataclass]
 class Foo(TypedDict("Foo", {"x": int, "y": str})):
     pass
 ```

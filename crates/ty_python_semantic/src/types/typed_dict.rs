@@ -17,7 +17,9 @@ use super::diagnostic::{
     report_missing_typed_dict_key,
 };
 use super::infer::infer_deferred_types;
-use super::{ApplyTypeMappingVisitor, IntersectionBuilder, Type, TypeMapping, TypeQualifiers, visitor};
+use super::{
+    ApplyTypeMappingVisitor, IntersectionBuilder, Type, TypeMapping, TypeQualifiers, visitor,
+};
 use crate::Db;
 use crate::semantic_index::definition::Definition;
 use crate::types::TypeContext;

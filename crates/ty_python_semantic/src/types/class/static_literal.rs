@@ -56,7 +56,9 @@ use crate::{
         mro::{Mro, MroIterator},
         signatures::CallableSignature,
         tuple::{Tuple, TupleSpec, TupleType},
-        typed_dict::{TypedDictParams, dynamic_typed_dict_schema, typed_dict_params_from_class_def},
+        typed_dict::{
+            TypedDictParams, dynamic_typed_dict_schema, typed_dict_params_from_class_def,
+        },
         variance::VarianceInferable,
         visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard},
     },

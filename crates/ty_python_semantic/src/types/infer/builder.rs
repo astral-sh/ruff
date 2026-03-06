@@ -397,8 +397,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         assert_eq!(self.scope, inference.scope);
 
         self.expressions.extend(inference.expressions.iter());
-        self.qualifiers
-            .extend(inference.qualifiers.iter());
+        self.qualifiers.extend(inference.qualifiers.iter());
         self.declarations
             .extend(inference.declarations(), self.multi_inference_state);
 
@@ -8080,17 +8079,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 TypeQualifiers::REQUIRED | TypeQualifiers::NOT_REQUIRED | TypeQualifiers::READ_ONLY,
             ) {
                 let in_typed_dict = current_scope.kind() == ScopeKind::Class
-                    && nearest_enclosing_class(self.db(), self.index, self.scope()).is_some_and(
-                        |class| {
-                            class.iter_mro(self.db(), None).any(|base| {
-                                matches!(
-                                    base,
-                                    ClassBase::TypedDict
-                                        | ClassBase::Dynamic(DynamicType::TodoFunctionalTypedDict)
-                                )
-                            })
-                        },
-                    );
+                    && nearest_enclosing_class(self.db(), self.index, self.scope())
+                        .is_some_and(|class| class.is_typed_dict(self.db()));
                 if !in_typed_dict {
                     for qualifier in [
                         TypeQualifiers::REQUIRED,
