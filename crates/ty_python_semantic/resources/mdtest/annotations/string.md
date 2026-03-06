@@ -67,7 +67,7 @@ python-version = "3.13"
 ```
 
 ```py
-from typing import Any, TypeVar, Callable, Protocol, TypedDict
+from typing import Any, TypeVar, Callable, Protocol, TypedDict, TYPE_CHECKING
 
 class TD(TypedDict): ...
 
@@ -120,6 +120,21 @@ class Foo: ...
 
 # error: [unsupported-operator]
 X = list["int" | None]
+
+if TYPE_CHECKING:
+    # TODO: ideally we would not error here, since `if TYPE_CHECKING`
+    # blocks are not executed at runtime. Requires
+    # https://github.com/astral-sh/ty/issues/1553.
+    bar: "int" | "None"  # error: [unsupported-operator]
+
+    # TODO: same as above
+    # error: [unsupported-operator]
+    def foo(x: "int" | "None"): ...
+
+    class Bar:
+        # no error because this annotation is resolved inside a scope
+        # fully defined inside an `if TYPE_CHECKING` block
+        def f(x: "int" | "None"): ...
 ```
 
 ### Python less than 3.14 in a stub file

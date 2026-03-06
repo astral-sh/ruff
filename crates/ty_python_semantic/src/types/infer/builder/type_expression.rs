@@ -157,7 +157,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         let right_ty = self.infer_type_expression(&binary.right);
 
                         // Detect runtime errors from e.g. `int | "bytes"` on Python <3.14 without `__future__` annotations.
-                        if !self.deferred_state.is_deferred() {
+                        if !self.deferred_state.is_deferred()
+                            && !self.scope.scope(self.db()).in_type_checking_block()
+                        {
                             let previous_state =
                                 self.set_multi_inference_state(MultiInferenceState::Ignore);
                             self.context.set_multi_inference(true);
@@ -235,12 +237,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
                                 match self.scope.scope(self.db()).kind() {
                                     ScopeKind::TypeAlias => diagnostic.info(
-                                        "A type alias scope is deferred but will be \
+                                        "A type alias scope is lazy but will be \
                                         executed at runtime if the `__value__` property is \
                                         accessed",
                                     ),
                                     ScopeKind::TypeParams => diagnostic.info(
-                                        "Type parameter scopes are deferred but may be \
+                                        "Type parameter scopes are lazy but may be \
                                         executed at runtime if the `__bound__`, `__value__`
                                         or `__constraints__` property of a type parameter is \
                                         accessed",
@@ -255,7 +257,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                         {
                                             diagnostic.info(
                                                 "PEP 604 `|` unions are only available on \
-                                            Python 3.10+ unless they are quoted",
+                                                Python 3.10+ unless they are quoted",
                                             );
                                             add_inferred_python_version_hint_to_diagnostic(
                                                 self.db(),
@@ -277,7 +279,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                             {
                                                 diagnostic.help(
                                                     "Put quotes around the whole union \
-                                                rather than just certain elements",
+                                                    rather than just certain elements",
                                                 );
                                             }
                                         }

@@ -13,7 +13,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/annotations/string.md
 ## mdtest_snippet.py
 
 ```
- 1 | from typing import Any, TypeVar, Callable, Protocol, TypedDict
+ 1 | from typing import Any, TypeVar, Callable, Protocol, TypedDict, TYPE_CHECKING
  2 | 
  3 | class TD(TypedDict): ...
  4 | 
@@ -66,6 +66,21 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/annotations/string.md
 51 | 
 52 | # error: [unsupported-operator]
 53 | X = list["int" | None]
+54 | 
+55 | if TYPE_CHECKING:
+56 |     # TODO: ideally we would not error here, since `if TYPE_CHECKING`
+57 |     # blocks are not executed at runtime. Requires
+58 |     # https://github.com/astral-sh/ty/issues/1553.
+59 |     bar: "int" | "None"  # error: [unsupported-operator]
+60 | 
+61 |     # TODO: same as above
+62 |     # error: [unsupported-operator]
+63 |     def foo(x: "int" | "None"): ...
+64 | 
+65 |     class Bar:
+66 |         # no error because this annotation is resolved inside a scope
+67 |         # fully defined inside an `if TYPE_CHECKING` block
+68 |         def f(x: "int" | "None"): ...
 ```
 
 # Diagnostics
@@ -211,6 +226,50 @@ error[unsupported-operator]: Unsupported `|` operation
    |          |       |
    |          |       Has type `None`
    |          Has type `Literal["int"]`
+54 |
+55 | if TYPE_CHECKING:
+   |
+info: All type expressions are evaluated at runtime by default on Python <3.14
+info: Python 3.13 was assumed when inferring types because it was specified on the command line
+help: Put quotes around the whole union rather than just certain elements
+info: rule `unsupported-operator` is enabled by default
+
+```
+
+```
+error[unsupported-operator]: Unsupported `|` operation
+  --> src/mdtest_snippet.py:59:10
+   |
+57 |     # blocks are not executed at runtime. Requires
+58 |     # https://github.com/astral-sh/ty/issues/1553.
+59 |     bar: "int" | "None"  # error: [unsupported-operator]
+   |          -----^^^------
+   |          |       |
+   |          |       Has type `Literal["None"]`
+   |          Has type `Literal["int"]`
+60 |
+61 |     # TODO: same as above
+   |
+info: All type expressions are evaluated at runtime by default on Python <3.14
+info: Python 3.13 was assumed when inferring types because it was specified on the command line
+help: Put quotes around the whole union rather than just certain elements
+info: rule `unsupported-operator` is enabled by default
+
+```
+
+```
+error[unsupported-operator]: Unsupported `|` operation
+  --> src/mdtest_snippet.py:63:16
+   |
+61 |     # TODO: same as above
+62 |     # error: [unsupported-operator]
+63 |     def foo(x: "int" | "None"): ...
+   |                -----^^^------
+   |                |       |
+   |                |       Has type `Literal["None"]`
+   |                Has type `Literal["int"]`
+64 |
+65 |     class Bar:
    |
 info: All type expressions are evaluated at runtime by default on Python <3.14
 info: Python 3.13 was assumed when inferring types because it was specified on the command line
