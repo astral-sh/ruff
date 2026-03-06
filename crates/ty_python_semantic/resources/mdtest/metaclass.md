@@ -419,6 +419,33 @@ class C(metaclass=Meta): ...
 reveal_type(C())  # revealed: int
 ```
 
+### Invalid overloaded downstream `__new__` should preserve `Unknown`
+
+If metaclass `__call__` forwards to normal construction by returning the constructed instance type,
+and the downstream overloaded `__new__` doesn't match, we should preserve the downstream `Unknown`
+return rather than falling back to the class instance type.
+
+```py
+from typing import TypeVar, overload
+
+T = TypeVar("T")
+
+class Meta(type):
+    def __call__(cls: type[T], x: object) -> T:
+        raise NotImplementedError
+
+class D(metaclass=Meta):
+    @overload
+    def __new__(cls, x: int) -> int: ...
+    @overload
+    def __new__(cls, x: str) -> str: ...
+    def __new__(cls, x: object) -> object:
+        raise NotImplementedError
+
+# error: [no-matching-overload]
+reveal_type(D(1.2))  # revealed: Unknown
+```
+
 ### Mixed `__new__` and mixed metaclass `__call__`
 
 If both metaclass `__call__` and `__new__` are mixed (some overloads instance-returning and some

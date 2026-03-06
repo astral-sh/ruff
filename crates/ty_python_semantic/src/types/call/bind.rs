@@ -932,9 +932,24 @@ impl<'db> Bindings<'db> {
                         continue;
                     }
                     if let Some(downstream_return) = downstream.bindings.constructor_return_type(db)
-                        && !is_instance_of_constructor(downstream_return)
                     {
-                        return Some(downstream_return);
+                        if !is_instance_of_constructor(downstream_return) {
+                            return Some(downstream_return);
+                        }
+                    } else if downstream
+                        .bindings
+                        .iter_flat()
+                        .any(|downstream_binding| !downstream_binding.constructor_kind.is_init())
+                    {
+                        // Preserve `Unknown` from an invalid all-non-instance downstream
+                        // constructor (for example, metaclass `__call__` forwarding into an
+                        // overloaded `__new__` where no overload matches). We intentionally do not
+                        // do this for deferred `__init__`-only paths, where constructor return
+                        // typing should still come from the constructed instance.
+                        let downstream_return = downstream.bindings.return_type(db);
+                        if downstream_return.is_unknown() {
+                            return Some(downstream_return);
+                        }
                     }
                 }
             }
