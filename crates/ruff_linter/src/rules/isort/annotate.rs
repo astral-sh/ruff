@@ -26,6 +26,7 @@ pub(crate) fn annotate_imports<'a>(
                 Stmt::Import(ast::StmtImport {
                     names,
                     range,
+                    is_lazy: _,
                     node_index: _,
                 }) => {
                     // Find comments above.
@@ -62,6 +63,7 @@ pub(crate) fn annotate_imports<'a>(
                     module,
                     names,
                     level,
+                    is_lazy: _,
                     range: _,
                     node_index: _,
                 }) => {

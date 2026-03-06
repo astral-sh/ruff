@@ -710,6 +710,7 @@ pub enum UnsupportedSyntaxErrorKind {
     /// [PEP 695]: https://peps.python.org/pep-0695/
     /// [`typing.TypeVar`]: https://docs.python.org/3/library/typing.html#typevar
     TypeParameterList,
+    LazyImportStatement,
     TypeAliasStatement,
     TypeParamDefault,
 
@@ -957,6 +958,7 @@ impl Display for UnsupportedSyntaxError {
                 "Cannot use positional-only parameter separator"
             }
             UnsupportedSyntaxErrorKind::TypeParameterList => "Cannot use type parameter lists",
+            UnsupportedSyntaxErrorKind::LazyImportStatement => "Cannot use `lazy` import statement",
             UnsupportedSyntaxErrorKind::TypeAliasStatement => "Cannot use `type` alias statement",
             UnsupportedSyntaxErrorKind::TypeParamDefault => {
                 "Cannot set default type for a type parameter"
@@ -1038,6 +1040,7 @@ impl UnsupportedSyntaxErrorKind {
                 Change::Removed(PythonVersion::PY38)
             }
             UnsupportedSyntaxErrorKind::TypeParameterList => Change::Added(PythonVersion::PY312),
+            UnsupportedSyntaxErrorKind::LazyImportStatement => Change::Added(PythonVersion::PY315),
             UnsupportedSyntaxErrorKind::TypeAliasStatement => Change::Added(PythonVersion::PY312),
             UnsupportedSyntaxErrorKind::TypeParamDefault => Change::Added(PythonVersion::PY313),
             UnsupportedSyntaxErrorKind::Pep701FString(_) => Change::Added(PythonVersion::PY312),

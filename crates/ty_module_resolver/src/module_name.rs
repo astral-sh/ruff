@@ -308,6 +308,7 @@ impl ModuleName {
             module,
             level,
             names: _,
+            is_lazy: _,
             range: _,
             node_index: _,
         } = node;
