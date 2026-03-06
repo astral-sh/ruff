@@ -52,7 +52,7 @@ use crate::options::{
     Flake8QuotesOptions, Flake8SelfOptions, Flake8TidyImportsOptions, Flake8TypeCheckingOptions,
     Flake8UnusedArgumentsOptions, FormatOptions, IsortOptions, LintCommonOptions, LintOptions,
     McCabeOptions, Options, Pep8NamingOptions, PyUpgradeOptions, PycodestyleOptions,
-    PydoclintOptions, PydocstyleOptions, PyflakesOptions, PylintOptions, RuffOptions,
+    PydoclintOptions, PydocstyleOptions, PyflakesOptions, PylintOptions, RuffOptions, SSortOptions,
     validate_required_version,
 };
 use crate::pyproject;
@@ -452,6 +452,10 @@ impl Configuration {
                     .pyupgrade
                     .map(PyUpgradeOptions::into_settings)
                     .unwrap_or_default(),
+                ssort: lint
+                    .ssort
+                    .map(SSortOptions::into_settings)
+                    .unwrap_or_default(),
                 ruff: lint
                     .ruff
                     .map(RuffOptions::into_settings)
@@ -715,6 +719,7 @@ pub struct LintConfiguration {
     pub pyflakes: Option<PyflakesOptions>,
     pub pylint: Option<PylintOptions>,
     pub pyupgrade: Option<PyUpgradeOptions>,
+    pub ssort: Option<SSortOptions>,
     pub ruff: Option<RuffOptions>,
 }
 
@@ -832,6 +837,7 @@ impl LintConfiguration {
             pyflakes: options.common.pyflakes,
             pylint: options.common.pylint,
             pyupgrade: options.common.pyupgrade,
+            ssort: options.common.ssort,
             ruff: options.ruff,
         })
     }
@@ -1235,6 +1241,7 @@ impl LintConfiguration {
             pyflakes: self.pyflakes.combine(config.pyflakes),
             pylint: self.pylint.combine(config.pylint),
             pyupgrade: self.pyupgrade.combine(config.pyupgrade),
+            ssort: self.ssort.combine(config.ssort),
             ruff: self.ruff.combine(config.ruff),
             typing_extensions: self.typing_extensions.or(config.typing_extensions),
             future_annotations: self.future_annotations.or(config.future_annotations),
@@ -1452,6 +1459,7 @@ fn warn_about_deprecated_top_level_lint_options(
         pyflakes,
         pylint,
         pyupgrade,
+        ssort,
         per_file_ignores,
         extend_per_file_ignores,
     } = top_level_options;
@@ -1627,6 +1635,10 @@ fn warn_about_deprecated_top_level_lint_options(
 
     if pyupgrade.is_some() {
         used_options.push("pyupgrade");
+    }
+
+    if ssort.is_some() {
+        used_options.push("ssort");
     }
 
     if per_file_ignores.is_some() {

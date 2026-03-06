@@ -1,0 +1,24 @@
+---
+source: crates/ruff_linter/src/rules/ssort/mod.rs
+---
+SS001 [*] Statements are unsorted
+ --> class_non_self_use.py:1:1
+  |
+1 | / class Class:
+2 | |     def inner_function():
+3 | |         return inner_dependency()
+4 | |
+5 | |     def inner_dependency():
+6 | |         return 42
+  | |_________________^
+  |
+help: Organize statements
+1 | class Class:
+2 +     def inner_dependency():
+3 +         return 42
+4 + 
+5 |     def inner_function():
+6 |         return inner_dependency()
+  - 
+  -     def inner_dependency():
+  -         return 42

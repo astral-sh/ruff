@@ -1,0 +1,27 @@
+---
+source: crates/ruff_linter/src/rules/ssort/mod.rs
+---
+SS001 [*] Statements are unsorted
+ --> mixed_runtime_initialisation.py:1:1
+  |
+1 | / class Loopy:
+2 | |
+3 | |     def method(self):
+4 | |         return self._method()
+5 | |
+6 | |     attr = method
+7 | |
+8 | |     def _method(self):
+9 | |         pass
+  | |____________^
+  |
+help: Organize statements
+3 |     def method(self):
+4 |         return self._method()
+5 | 
+  -     attr = method
+  - 
+6 |     def _method(self):
+7 |         pass
+8 + 
+9 +     attr = method
