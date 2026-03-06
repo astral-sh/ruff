@@ -7,7 +7,9 @@ use ruff_python_semantic::analyze::typing;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::preview::is_future_required_preview_generics_enabled;
+use crate::preview::{
+    is_future_required_preview_generics_enabled, is_up006_future_annotations_fix_enabled,
+};
 use crate::registry::Rule;
 use crate::rules::{
     airflow, flake8_2020, flake8_async, flake8_bandit, flake8_boolean_trap, flake8_bugbear,
@@ -315,6 +317,10 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                                 if checker.source_type.is_stub()
                                     || checker.target_version() >= PythonVersion::PY39
                                     || (checker.target_version() >= PythonVersion::PY37
+                                        && (checker.semantic.future_annotations_or_stub()
+                                            || is_up006_future_annotations_fix_enabled(
+                                                checker.settings(),
+                                            ))
                                         && checker.semantic.in_annotation()
                                         && !checker.settings().pyupgrade.keep_runtime_typing)
                                 {
@@ -423,6 +429,8 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                         if checker.source_type.is_stub()
                             || checker.target_version() >= PythonVersion::PY39
                             || (checker.target_version() >= PythonVersion::PY37
+                                && (checker.semantic.future_annotations_or_stub()
+                                    || is_up006_future_annotations_fix_enabled(checker.settings()))
                                 && checker.semantic.in_annotation()
                                 && !checker.settings().pyupgrade.keep_runtime_typing)
                         {
