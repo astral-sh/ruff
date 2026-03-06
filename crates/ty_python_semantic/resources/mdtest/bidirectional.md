@@ -315,7 +315,7 @@ class Bar(TypedDict):
     bar: int
 
 x1 = lambda x: {"bar": 1}
-reveal_type(x1)  # revealed: (x) -> Unknown
+reveal_type(x1)  # revealed: (x) -> dict[Unknown | str, Unknown | int]
 
 x2: Callable[[int], Bar] = lambda x: {"bar": 1}
 reveal_type(x2)  # revealed: (x: int) -> Bar
