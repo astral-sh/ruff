@@ -26,7 +26,7 @@ pub(crate) fn annotate_imports<'a>(
                 Stmt::Import(ast::StmtImport {
                     names,
                     range,
-                    is_lazy: _,
+                    is_lazy,
                     node_index: _,
                 }) => {
                     // Find comments above.
@@ -53,6 +53,7 @@ pub(crate) fn annotate_imports<'a>(
                             .map(|alias| AliasData {
                                 name: locator.slice(&alias.name),
                                 asname: alias.asname.as_ref().map(|asname| locator.slice(asname)),
+                                is_lazy: *is_lazy,
                             })
                             .collect(),
                         atop,
@@ -63,7 +64,7 @@ pub(crate) fn annotate_imports<'a>(
                     module,
                     names,
                     level,
-                    is_lazy: _,
+                    is_lazy,
                     range: _,
                     node_index: _,
                 }) => {
@@ -158,6 +159,7 @@ pub(crate) fn annotate_imports<'a>(
                         module: module.as_ref().map(|module| locator.slice(module)),
                         names: aliases,
                         level: *level,
+                        is_lazy: *is_lazy,
                         trailing_comma: if split_on_trailing_comma {
                             trailing_comma(import, tokens)
                         } else {
