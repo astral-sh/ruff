@@ -1225,17 +1225,22 @@ mod tests {
         assert_diagnostics!(snapshot, diagnostics);
     }
 
-    #[test_case("on_line_one", r#"#!/usr/bin/env python #noqa:D100"#)]
+    #[test_case(
+        "on_line_one",
+        r#"#!/usr/bin/env python #noqa:D100
+"#
+    )]
     #[test_case(
         "on_line_two",
         r#"#!/usr/bin/env python
-        #noqa: D100"#
+#noqa: D100
+"#
     )]
     #[test_case(
         "on_line_three",
         r#"#!/usr/bin/env python
 
-        #noqa: D100"#
+#noqa: D100"#
     )]
     fn test_shebang_noqa(name: &str, contents: &str) {
         let snapshot = format!("shebang_noqa_{name}");

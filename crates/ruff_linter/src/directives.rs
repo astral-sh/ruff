@@ -125,16 +125,14 @@ fn extract_noqa_line_for(tokens: &Tokens, locator: &Locator, indexer: &Indexer) 
         }
     }
 
-    let mut shebang_mappings = Vec::new();
+    let mut shebang_mapping = None;
     if let Some(first_token) = tokens.first()
         && first_token.kind() == TokenKind::Comment
         && ShebangDirective::try_extract(locator.slice(first_token)).is_some()
     {
-        shebang_mappings.push(TextRange::new(
+        shebang_mapping = Some(TextRange::new(
             first_token.start(),
-            locator
-                .line_end(first_token.end())
-                .saturating_add(TextSize::new(1)),
+            locator.full_line_end(first_token.end()),
         ));
     }
 
@@ -190,7 +188,7 @@ fn extract_noqa_line_for(tokens: &Tokens, locator: &Locator, indexer: &Indexer) 
         continuation_mappings.len()
             + string_mappings.len()
             + interpolated_string_mappings.len()
-            + shebang_mappings.len(),
+            + usize::from(shebang_mapping.is_some()),
     );
 
     let all_mappings = SortedMergeIter {
@@ -201,11 +199,10 @@ fn extract_noqa_line_for(tokens: &Tokens, locator: &Locator, indexer: &Indexer) 
         left: all_mappings.peekable(),
         right: continuation_mappings.into_iter().peekable(),
     };
-    let all_mappings = SortedMergeIter {
-        left: all_mappings.peekable(),
-        right: shebang_mappings.into_iter().peekable(),
-    };
 
+    if let Some(mapping) = shebang_mapping {
+        mappings.push_mapping(mapping);
+    }
     for mapping in all_mappings {
         mappings.push_mapping(mapping);
     }
