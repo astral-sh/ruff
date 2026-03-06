@@ -184,8 +184,6 @@ class TyDiagnostic:
     def __post_init__(self) -> None:
         # Remove check name prefix from description
         self.description = self.description.replace(f"{self.check_name}: ", "")
-        # Escape pipe characters for GitHub markdown tables
-        self.description = self.description.replace("|", "\\|")
 
     def __str__(self) -> str:
         return (
