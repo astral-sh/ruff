@@ -68,6 +68,7 @@ python-version = "3.13"
 
 ```py
 from typing import Any, TypeVar, Callable, Protocol, TypedDict, TYPE_CHECKING
+from ty_extensions import Not
 
 class TD(TypedDict): ...
 
@@ -106,6 +107,8 @@ def f(
     # error: [unsupported-operator]
     # error: [unsupported-operator]
     j: list["int" | None] | "bytes",
+    # fine: subscripted ty_extensions special forms should preserve `_SpecialForm` runtime behavior
+    k: "Foo" | Not[int],
 ):
     reveal_type(a)  # revealed: int | Foo
     reveal_type(b)  # revealed: int | memoryview[int] | bytes
@@ -116,6 +119,8 @@ def f(
     reveal_type(g)  # revealed: UsesMeta | Foo
     reveal_type(h)  # revealed: None
     reveal_type(i)  # revealed: Unknown
+    reveal_type(j)  # revealed: list[int | None] | bytes
+    reveal_type(k)  # revealed: Foo | ~int
 
 # fmt: on
 

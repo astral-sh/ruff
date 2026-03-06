@@ -131,6 +131,7 @@ def _(x: ProtoInt[int]):
     reveal_type(x)  # revealed: Unknown
 
 # TODO: TypedDict is just a function object at runtime, we should emit an error
+# error: [invalid-base]
 class LegacyDict(TypedDict[T]):
     # error: [unbound-type-variable]
     x: T

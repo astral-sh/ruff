@@ -1338,6 +1338,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 KnownInstanceType::UnionType(_)
                 | KnownInstanceType::Callable(_)
                 | KnownInstanceType::Annotated(_)
+                | KnownInstanceType::ParameterizedSpecialForm(_)
                 | KnownInstanceType::TypeGenericAlias(_) => {
                     self.infer_explicit_type_alias_specialization(subscript, value_ty, true)
                 }

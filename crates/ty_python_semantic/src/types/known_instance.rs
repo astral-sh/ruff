@@ -5,8 +5,8 @@ use crate::{
     semantic_index::{definition::Definition, scope::ScopeId},
     types::{
         ApplyTypeMappingVisitor, BoundTypeVarInstance, CallableType, ClassType, GenericContext,
-        InferenceFlags, InvalidTypeExpressionError, KnownClass, StringLiteralType, Type,
-        TypeAliasType, TypeContext, TypeMapping, TypeVarVariance, UnionBuilder,
+        InferenceFlags, InvalidTypeExpressionError, KnownClass, SpecialFormType, StringLiteralType,
+        Type, TypeAliasType, TypeContext, TypeMapping, TypeVarVariance, UnionBuilder,
         class::NamedTupleSpec,
         constraints::OwnedConstraintSet,
         generics::{Specialization, walk_generic_context},
@@ -95,6 +95,10 @@ pub enum KnownInstanceType<'db> {
     /// An instance of `typing.GenericAlias` representing a `Callable[...]` expression.
     Callable(CallableType<'db>),
 
+    /// An instance of a parameterized `_SpecialForm` whose type-expression meaning is
+    /// represented separately from its runtime value.
+    ParameterizedSpecialForm(ParameterizedSpecialFormInstance<'db>),
+
     /// A literal string which is the right-hand side of a PEP 613 `TypeAlias`.
     LiteralStringAlias(InternedType<'db>),
 
@@ -144,6 +148,9 @@ pub(super) fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Size
         | KnownInstanceType::LiteralStringAlias(ty) => {
             visitor.visit_type(db, ty.inner(db));
         }
+        KnownInstanceType::ParameterizedSpecialForm(special_form) => {
+            visitor.visit_type(db, special_form.type_expression(db));
+        }
         KnownInstanceType::Callable(callable) => {
             visitor.visit_callable_type(db, callable);
         }
@@ -163,6 +170,9 @@ impl<'db> VarianceInferable<'db> for KnownInstanceType<'db> {
         match self {
             KnownInstanceType::TypeAliasType(type_alias) => {
                 type_alias.raw_value_type(db).variance_of(db, typevar)
+            }
+            KnownInstanceType::ParameterizedSpecialForm(special_form) => {
+                special_form.type_expression(db).variance_of(db, typevar)
             }
             _ => TypeVarVariance::Bivariant,
         }
@@ -199,6 +209,9 @@ impl<'db> KnownInstanceType<'db> {
             Self::TypeGenericAlias(ty) => ty
                 .recursive_type_normalized_impl(db, div, true)
                 .map(Self::TypeGenericAlias),
+            Self::ParameterizedSpecialForm(special_form) => special_form
+                .recursive_type_normalized_impl(db, div, true)
+                .map(Self::ParameterizedSpecialForm),
             Self::LiteralStringAlias(ty) => ty
                 .recursive_type_normalized_impl(db, div, true)
                 .map(Self::LiteralStringAlias),
@@ -237,6 +250,7 @@ impl<'db> KnownInstanceType<'db> {
             Self::GenericContext(_) => KnownClass::GenericContext,
             Self::Specialization(_) => KnownClass::Specialization,
             Self::UnionType(_) => KnownClass::UnionType,
+            Self::ParameterizedSpecialForm(_) => KnownClass::SpecialForm,
             Self::Literal(_)
             | Self::Annotated(_)
             | Self::TypeGenericAlias(_)
@@ -316,6 +330,11 @@ impl<'db> KnownInstanceType<'db> {
                     ty.inner(db)
                         .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
                 )))
+            }
+            KnownInstanceType::ParameterizedSpecialForm(instance) => {
+                Type::KnownInstance(KnownInstanceType::ParameterizedSpecialForm(
+                    instance.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                ))
             }
 
             KnownInstanceType::SubscriptedProtocol(_)
@@ -560,5 +579,50 @@ impl<'db> InternedType<'db> {
                 .unwrap_or(div)
         };
         Some(InternedType::new(db, inner))
+    }
+}
+
+/// A salsa-interned wrapper around a parameterized `_SpecialForm` value and its
+/// meaning in a type-expression context.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+pub struct ParameterizedSpecialFormInstance<'db> {
+    pub special_form: SpecialFormType,
+    pub type_expression: Type<'db>,
+}
+
+impl get_size2::GetSize for ParameterizedSpecialFormInstance<'_> {}
+
+impl<'db> ParameterizedSpecialFormInstance<'db> {
+    fn recursive_type_normalized_impl(
+        self,
+        db: &'db dyn Db,
+        div: Type<'db>,
+        nested: bool,
+    ) -> Option<Self> {
+        let type_expression = if nested {
+            self.type_expression(db)
+                .recursive_type_normalized_impl(db, div, true)?
+        } else {
+            self.type_expression(db)
+                .recursive_type_normalized_impl(db, div, true)
+                .unwrap_or(div)
+        };
+
+        Some(Self::new(db, self.special_form(db), type_expression))
+    }
+
+    fn apply_type_mapping_impl(
+        self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'_, 'db>,
+        tcx: TypeContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> Self {
+        Self::new(
+            db,
+            self.special_form(db),
+            self.type_expression(db)
+                .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+        )
     }
 }
