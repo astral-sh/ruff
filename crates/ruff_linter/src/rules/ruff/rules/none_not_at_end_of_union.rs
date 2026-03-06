@@ -7,6 +7,7 @@ use ruff_python_semantic::analyze::typing::traverse_union;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::fix::edits::pad;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -184,6 +185,13 @@ fn generate_fix(
         })
     };
 
-    let edit = Edit::range_replacement(checker.generator().expr(&new_expr), annotation.range());
+    let edit = Edit::range_replacement(
+        pad(
+            checker.generator().expr(&new_expr),
+            annotation.range(),
+            checker.locator(),
+        ),
+        annotation.range(),
+    );
     Some(Fix::applicable_edit(edit, applicability))
 }
