@@ -10823,23 +10823,34 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let scope = scope_id.to_scope_id(self.db(), self.file());
 
         // If we have a direct `Callable` type context, we can infer the body with the annotated
-        // return type as type context.
-        let return_tcx = if let Some(signature) = callable_tcx {
-            match signature.return_ty {
+        // return type as type context and use the inferred return type.
+        //
+        // Without a type context, we still need to infer the lambda body (for diagnostics and
+        // `reveal_type` calls), but we use `Unknown` as the return type instead of the inferred
+        // body type. Using the inferred body type without a type context can introduce cycle edges
+        // (the lambda body may reference names whose definitions depend on this expression),
+        // causing non-converging fixpoint iterations that panic.
+        let (return_tcx, use_inferred_return_ty) = if let Some(signature) = callable_tcx {
+            let tcx = match signature.return_ty {
                 Type::Dynamic(DynamicType::Unknown) => TypeContext::new(None),
                 _ => TypeContext::new(Some(signature.return_ty)),
-            }
+            };
+            (tcx, true)
         } else {
-            // TODO: Useful inference of a lambda's return type will require a different approach,
-            // which does the inference of the body expression based on arguments at each call site,
-            // rather than eagerly computing a return type without knowing the argument types.
-            TypeContext::new(None)
+            (TypeContext::new(None), false)
         };
 
         let inference = infer_scope_types(self.db(), scope, return_tcx);
         self.extend_scope(inference);
 
-        let return_ty = inference.expression_type(lambda_expression.body.as_ref());
+        let return_ty = if use_inferred_return_ty {
+            inference.expression_type(lambda_expression.body.as_ref())
+        } else {
+            // TODO: Useful inference of a lambda's return type will require a different approach,
+            // which does the inference of the body expression based on arguments at each call site,
+            // rather than eagerly computing a return type without knowing the argument types.
+            Type::unknown()
+        };
 
         Type::function_like_callable(self.db(), Signature::new(parameters, return_ty))
     }
