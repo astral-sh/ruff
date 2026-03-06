@@ -7,6 +7,7 @@ use crate::semantic_index::semantic_index;
 use crate::types::diagnostic::{
     self, INVALID_TYPE_FORM, NOT_SUBSCRIPTABLE, UNBOUND_TYPE_VARIABLE,
     report_invalid_argument_number_to_special_form, report_invalid_arguments_to_callable,
+    report_invalid_concatenate_last_arg,
 };
 use crate::types::generics::bind_typevar;
 use crate::types::infer::builder::{InferenceFlags, InnerExpressionInferenceState};
@@ -1701,46 +1702,36 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 ),
             },
             SpecialFormType::Concatenate => {
+                if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
+                    let mut diag = builder.into_diagnostic(format_args!(
+                        "`typing.Concatenate` is not allowed in this context in a type expression",
+                    ));
+                    diag.info("`typing.Concatenate` is only valid:");
+                    diag.info(" - as the first argument to `typing.Callable`");
+                    diag.info(" - as a type argument for a `ParamSpec` parameter");
+                }
+
                 let arguments = if let ast::Expr::Tuple(tuple) = arguments_slice {
                     &*tuple.elts
                 } else {
                     std::slice::from_ref(arguments_slice)
                 };
 
-                for (i, argument) in arguments.iter().enumerate() {
+                for argument in arguments {
                     if argument.is_ellipsis_literal_expr() {
                         // The trailing `...` in `Concatenate[int, str, ...]` is valid;
                         // store without going through type-expression inference.
                         self.store_expression_type(argument, Type::unknown());
-                    } else if i < arguments.len() - 1 {
-                        self.infer_type_expression(argument);
                     } else {
-                        let previously_allowed_paramspec = self
-                            .inference_flags
-                            .replace(InferenceFlags::ALLOW_PARAMSPEC_TYPE_EXPR, true);
                         self.infer_type_expression(argument);
-                        self.inference_flags.set(
-                            InferenceFlags::ALLOW_PARAMSPEC_TYPE_EXPR,
-                            previously_allowed_paramspec,
-                        );
                     }
                 }
 
-                let num_arguments = arguments.len();
-                let inferred_type = if num_arguments < 2 {
-                    if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
-                        builder.into_diagnostic(format_args!(
-                            "Special form `{special_form}` expected at least 2 parameters but got {num_arguments}",
-                        ));
-                    }
-                    Type::unknown()
-                } else {
-                    todo_type!("`Concatenate[]` special form")
-                };
                 if arguments_slice.is_tuple_expr() {
-                    self.store_expression_type(arguments_slice, inferred_type);
+                    self.store_expression_type(arguments_slice, Type::unknown());
                 }
-                inferred_type
+
+                Type::unknown()
             }
             SpecialFormType::Unpack => {
                 let inner_ty = self.infer_type_expression(arguments_slice);
@@ -2077,11 +2068,17 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                     )
                                 })
                             } else {
+                                report_invalid_concatenate_last_arg(
+                                    &self.context,
+                                    last_arg,
+                                    name_ty,
+                                );
                                 None
                             }
                         }
                         _ => {
-                            self.infer_type_expression(last_arg);
+                            let ty = self.infer_type_expression(last_arg);
+                            report_invalid_concatenate_last_arg(&self.context, last_arg, ty);
                             None
                         }
                     };
@@ -2092,10 +2089,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         self.store_expression_type(arguments_slice, Type::unknown());
                     }
 
-                    return parameters;
+                    return Some(parameters.unwrap_or_else(Parameters::unknown));
                 }
 
                 self.infer_subscript_type_expression(subscript, value_ty);
+
                 // Non-Concatenate subscript (e.g. Unpack): fall back to todo
                 return Some(Parameters::todo());
             }

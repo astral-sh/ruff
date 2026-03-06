@@ -715,10 +715,15 @@ impl SpecialFormType {
                 fallback_type: Type::unknown(),
             }),
 
-            Self::Annotated | Self::Concatenate => Err(InvalidTypeExpressionError {
+            Self::Annotated => Err(InvalidTypeExpressionError {
                 invalid_expressions: smallvec::smallvec_inline![
                     InvalidTypeExpression::RequiresTwoArguments(self)
                 ],
+                fallback_type: Type::unknown(),
+            }),
+
+            Self::Concatenate => Err(InvalidTypeExpressionError {
+                invalid_expressions: smallvec::smallvec_inline![InvalidTypeExpression::Concatenate],
                 fallback_type: Type::unknown(),
             }),
 

@@ -1985,10 +1985,7 @@ impl<'db> Parameters<'db> {
     }
 
     pub(crate) const fn is_gradual(&self) -> bool {
-        matches!(
-            self.kind,
-            ParametersKind::Gradual | ParametersKind::Concatenate(ConcatenateTail::Gradual)
-        )
+        matches!(self.kind, ParametersKind::Gradual)
     }
 
     pub(crate) const fn is_top(&self) -> bool {
@@ -2046,6 +2043,12 @@ impl<'db> Parameters<'db> {
         }
     }
 
+    /// Create a parameter list representing a `Concatenate` form with the given prefix parameters
+    /// and the tail (either gradual or a `ParamSpec`).
+    ///
+    /// Internally, this is represented as either:
+    /// - `(<prefix_params>, /, *args: Any, **kwargs: Any)` for the gradual form, or
+    /// - `(<prefix_params>, /, *args: P.args, **kwargs: P.kwargs)` for the `ParamSpec` form.
     pub(crate) fn concatenate(
         db: &'db dyn Db,
         mut prefix_params: Vec<Parameter<'db>>,
