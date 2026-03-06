@@ -6003,8 +6003,8 @@ pub(super) fn hint_if_stdlib_attribute_exists_on_other_versions(
     add_inferred_python_version_hint_to_diagnostic(db, &mut diagnostic, action);
 }
 
-pub(super) fn report_invalid_concatenate_last_arg<'ctx, 'db>(
-    context: &'ctx InferContext<'db, '_>,
+pub(super) fn report_invalid_concatenate_last_arg<'db>(
+    context: &InferContext<'db, '_>,
     last_arg: &ast::Expr,
     last_arg_type: Type<'db>,
 ) {

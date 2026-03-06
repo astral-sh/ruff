@@ -375,9 +375,8 @@ def _(c: Callable[Concatenate[int, str, ...], int]):
 Other type expressions can be nested inside `Concatenate`:
 
 ```py
-def _(c: Callable[[Concatenate[int | str, type[str], ...], int], int]):
-    # TODO: Should reveal the correct signature
-    reveal_type(c)  # revealed: (...) -> int
+def _(c: Callable[Concatenate[int | str, type[str], ...], int]):
+    reveal_type(c)  # revealed: (int | str, type[str], /, *args: Any, **kwargs: Any) -> int
 ```
 
 But providing fewer than 2 arguments to `Concatenate` is an error:
