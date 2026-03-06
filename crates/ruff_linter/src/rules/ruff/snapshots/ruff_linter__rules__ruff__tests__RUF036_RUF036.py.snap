@@ -241,37 +241,36 @@ help: Move `None` to the end of the type union
 68 | 
 
 RUF036 [*] `None` not at the end of the type union.
-  --> RUF036.py:70:7
+  --> RUF036.py:70:17
    |
-69 | # Preserve token boundaries when fixing non-annotation expressions.
-70 | print(None | (int)and 2)
-   |       ^^^^^^^^^^^^
-71 | print(2 or(None) | int)
+69 | # Preserve token boundaries when fixing annotations.
+70 | def func15(arg: None | (int)and 2):
+   |                 ^^^^^^^^^^^^
+71 |     ...
    |
 help: Move `None` to the end of the type union
 67 | 
 68 | 
-69 | # Preserve token boundaries when fixing non-annotation expressions.
-   - print(None | (int)and 2)
-70 + print(int | None and 2)
-71 | print(2 or(None) | int)
+69 | # Preserve token boundaries when fixing annotations.
+   - def func15(arg: None | (int)and 2):
+70 + def func15(arg: int | None and 2):
+71 |     ...
 72 | 
 73 | 
 
 RUF036 [*] `None` not at the end of the type union.
-  --> RUF036.py:71:11
+  --> RUF036.py:74:21
    |
-69 | # Preserve token boundaries when fixing non-annotation expressions.
-70 | print(None | (int)and 2)
-71 | print(2 or(None) | int)
-   |           ^^^^^^^^^^^^
+74 | def func16(arg: 2 or(None) | int):
+   |                     ^^^^^^^^^^^^
+75 |     ...
    |
 help: Move `None` to the end of the type union
-68 | 
-69 | # Preserve token boundaries when fixing non-annotation expressions.
-70 | print(None | (int)and 2)
-   - print(2 or(None) | int)
-71 + print(2 or int | None)
+71 |     ...
 72 | 
 73 | 
-74 | # Ok
+   - def func16(arg: 2 or(None) | int):
+74 + def func16(arg: 2 or int | None):
+75 |     ...
+76 | 
+77 |

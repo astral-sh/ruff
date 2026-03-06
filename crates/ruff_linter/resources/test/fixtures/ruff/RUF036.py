@@ -66,9 +66,13 @@ def func14(arg: None | int | str | bytes):
     ...
 
 
-# Preserve token boundaries when fixing non-annotation expressions.
-print(None | (int)and 2)
-print(2 or(None) | int)
+# Preserve token boundaries when fixing annotations.
+def func15(arg: None | (int)and 2):
+    ...
+
+
+def func16(arg: 2 or(None) | int):
+    ...
 
 
 # Ok
