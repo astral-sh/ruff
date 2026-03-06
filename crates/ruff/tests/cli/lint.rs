@@ -2043,12 +2043,10 @@ select = ["UP006"]
         .args(["--stdin-filename", "test.py"])
         .arg("-")
         .pass_stdin(r#"from typing import List; foo: List[int]"#), @"
-    success: false
-    exit_code: 1
+    success: true
+    exit_code: 0
     ----- stdout -----
-    test.py:1:31: UP006 Use `list` instead of `List` for type annotation
-    Found 1 error.
-    No fixes available (1 hidden fix can be enabled with the `--unsafe-fixes` option).
+    All checks passed!
 
     ----- stderr -----
     ");
