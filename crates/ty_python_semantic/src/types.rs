@@ -50,7 +50,7 @@ use crate::types::bound_super::BoundSuperType;
 use crate::types::call::{Binding, Bindings, CallArguments, CallableBinding};
 pub(crate) use crate::types::callable::{CallableType, CallableTypes};
 pub(crate) use crate::types::class_base::ClassBase;
-use crate::types::constraints::ConstraintSetBuilder;
+use crate::types::constraints::{ConstraintSetBuilder, Solutions};
 use crate::types::context::{LintDiagnosticGuard, LintDiagnosticGuardBuilder};
 use crate::types::diagnostic::{INVALID_AWAIT, INVALID_TYPE_FORM};
 pub use crate::types::display::{DisplaySettings, TypeDetail, TypeDisplayDetails};
@@ -59,10 +59,10 @@ use crate::types::function::{
     DataclassTransformerFlags, DataclassTransformerParams, FunctionDecorators, FunctionSpans,
     FunctionType, KnownFunction,
 };
+pub(crate) use crate::types::generics::GenericContext;
 use crate::types::generics::{
     ApplySpecialization, InferableTypeVars, Specialization, bind_typevar,
 };
-pub(crate) use crate::types::generics::{GenericContext, SpecializationBuilder};
 use crate::types::infer::InferenceFlags;
 use crate::types::known_instance::{InternedConstraintSet, InternedType, UnionTypeInstance};
 pub use crate::types::method::{BoundMethodType, KnownBoundMethodType, WrapperDescriptorKind};
@@ -1903,17 +1903,44 @@ impl<'db> Type<'db> {
         let generic_context = specialization.generic_context(db);
 
         // Collect the type mappings used to narrow the type context.
-        let tcx_mappings = {
-            let mut builder =
-                SpecializationBuilder::new(db, constraints, generic_context.inferable_typevars(db));
-
-            if let Some(tcx) = tcx.annotation {
+        //
+        // We use a forward CSA check (`alias_instance ≤ tcx`) to infer what each typevar
+        // in the identity specialization maps to in the type context. For example, if
+        // `tcx = list[int]` and `alias_instance = list[T]`, the CSA produces `T = int`.
+        let tcx_mappings: FxHashMap<_, _> = tcx
+            .annotation
+            .and_then(|tcx| {
                 let alias_instance = Type::instance(db, class_literal.identity_specialization(db));
-                let _ = builder.infer_reverse(tcx, alias_instance);
-            }
-
-            builder.into_type_mappings()
-        };
+                let inferable = generic_context.inferable_typevars(db);
+                let set = alias_instance.when_constraint_set_assignable_to(
+                    db,
+                    tcx,
+                    constraints,
+                    inferable,
+                );
+                match set.solutions(db, constraints) {
+                    Solutions::Constrained(solutions) => {
+                        let mut mappings = FxHashMap::default();
+                        for solution in solutions.iter() {
+                            for binding in solution {
+                                mappings
+                                    .entry(binding.bound_typevar.identity(db))
+                                    .and_modify(|existing| {
+                                        *existing = UnionType::from_two_elements(
+                                            db,
+                                            *existing,
+                                            binding.solution,
+                                        );
+                                    })
+                                    .or_insert(binding.solution);
+                            }
+                        }
+                        Some(mappings)
+                    }
+                    _ => None,
+                }
+            })
+            .unwrap_or_default();
 
         for (type_var, ty) in generic_context.variables(db).zip(specialization.types(db)) {
             let variance = type_var.variance_with_polarity(db, polarity);
