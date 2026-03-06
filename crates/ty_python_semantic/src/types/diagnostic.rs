@@ -1087,7 +1087,7 @@ declare_lint! {
     /// Checks for dynamic class definitions (using `type()`) that have bases
     /// which are unsupported by ty.
     ///
-    /// This is equivalent to [`unsupported-base`] but applies to classes created
+    /// This is equivalent to `unsupported-base` but applies to classes created
     /// via `type()` rather than `class` statements.
     ///
     /// ## Why is this bad?
@@ -1108,7 +1108,6 @@ declare_lint! {
     /// ```
     ///
     /// [method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
-    /// [`unsupported-base`]: https://docs.astral.sh/ty/rules/unsupported-base
     pub(crate) static UNSUPPORTED_DYNAMIC_BASE = {
         summary: "detects dynamic class bases that are unsupported as ty could not feasibly calculate the class's MRO",
         status: LintStatus::stable("0.0.12"),
