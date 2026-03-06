@@ -6,15 +6,16 @@ from __future__ import annotations
 
 import asyncio
 import dataclasses
-import re
 import time
 from asyncio import create_subprocess_exec
 from collections import Counter
-from collections.abc import Iterable, Iterator, Sequence
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
 from subprocess import PIPE
 from typing import TYPE_CHECKING, Self
+
+import msgspec
 
 from ruff_ecosystem import logger
 from ruff_ecosystem.markdown import (
@@ -24,6 +25,7 @@ from ruff_ecosystem.markdown import (
 )
 from ruff_ecosystem.types import (
     Comparison,
+    Diagnostic,
     Diff,
     Result,
     ToolError,
@@ -37,21 +39,7 @@ if TYPE_CHECKING:
         Project,
     )
 
-# Matches lines that are summaries rather than diagnostics
-CHECK_SUMMARY_LINE_RE = re.compile(r"^(Found \d+ error.*)|(.* fixable with .*)$")
-
-# Parses a diagnostic line (in a diff) to retrieve path and line number
-CHECK_DIFF_LINE_RE = re.compile(
-    r"^(?P<pre>[+-]) (?P<inner>(?P<path>[^:]+):(?P<lnum>\d+):\d+:) (?P<post>.*)$",
-)
-
-CHECK_DIAGNOSTIC_LINE_RE = re.compile(
-    r"^(?P<diff>[+-])? ?(?P<location>.*): (?P<code>[A-Z]{1,4}[0-9]{3,4}|[a-z\-]+:)(?P<fixable> \[\*\])? (?P<message>.*)"
-)
-
-PANIC_DIAGNOSTIC_LINE_RE = re.compile(r"^[^:]+: panic: Panicked at ")
-
-CHECK_VIOLATION_FIX_INDICATOR = " [*]"
+_DIAGNOSTIC_DECODER = msgspec.json.Decoder(Diagnostic)
 
 GITHUB_MAX_COMMENT_LENGTH = 65536  # characters
 
@@ -64,8 +52,8 @@ def markdown_check_result(result: Result) -> str:
 
     # Calculate the total number of rule changes
     all_rule_changes = RuleChanges()
-    project_diffs = {
-        project: CheckDiff.from_simple_diff(comparison.diff)
+    project_diffs: dict[Project, CheckDiff] = {
+        project: comparison.diff  # type: ignore[assignment]
         for project, comparison in result.completed
     }
     project_rule_changes: dict[Project, RuleChanges] = {}
@@ -188,9 +176,7 @@ def markdown_check_result(result: Result) -> str:
             if displayed_changes_per_rule[rule_code] > max_display_per_rule:
                 continue
 
-            diff_lines.append(
-                add_permalink_to_diagnostic_line(comparison.repo, line.to_string())
-            )
+            diff_lines.append(add_permalink_to_diagnostic_line(comparison.repo, line))
 
             displayed_changes_per_rule[rule_code] += 1
             displayed_changes += 1
@@ -382,7 +368,9 @@ class DiagnosticLine:
     is_removed: bool | None
     fix_available: bool
     rule_code: str
-    location: str
+    filename: str
+    row: int
+    col: int
     message: str
 
     def to_string(self) -> str:
@@ -394,45 +382,45 @@ class DiagnosticLine:
             line += "+ "
         elif self.is_removed:
             line += "- "
-        line += f"{self.location}: {self.rule_code} "
+        line += f"{self.filename}:{self.row}:{self.col}: {self.rule_code} "
         if self.fix_available:
             line += "[*] "
         line += self.message
         return line
 
     def with_fix_available(self) -> DiagnosticLine:
-        return DiagnosticLine(**{**dataclasses.asdict(self), "fix_available": True})
+        return dataclasses.replace(self, fix_available=True)
 
     def without_fix_available(self) -> DiagnosticLine:
-        return DiagnosticLine(**{**dataclasses.asdict(self), "fix_available": False})
+        return dataclasses.replace(self, fix_available=False)
 
     def without_diff(self) -> DiagnosticLine:
-        return DiagnosticLine(
-            **{**dataclasses.asdict(self), "is_added": None, "is_removed": None}
-        )
+        return dataclasses.replace(self, is_added=None, is_removed=None)
 
     @classmethod
-    def try_from_string(cls: type[Self], line: str) -> Self | None:
+    def from_diagnostic(
+        cls: type[Self], diagnostic: Diagnostic, path: Path
+    ) -> Self | None:
         """
-        Parse the rule code from a diagnostic line string
+        Construct a DiagnosticLine from a parsed JSON diagnostic.
+        Returns None if the diagnostic lacks location information.
+        The filename is made relative to `path` (the cloned repo root).
         """
-        match = CHECK_DIAGNOSTIC_LINE_RE.match(line)
-
-        if match is None:
-            # Handle case where there are no regex match e.g.
-            # +                 "?application=AIRFLOW&authenticator=TEST_AUTH&role=TEST_ROLE&warehouse=TEST_WAREHOUSE"
-            # Which was found in local testing
+        if diagnostic.filename is None or diagnostic.location is None:
             return None
-
-        match_items = match.groupdict()
-
+        try:
+            filename = str(Path(diagnostic.filename).relative_to(path.resolve()))
+        except ValueError:
+            filename = diagnostic.filename
         return cls(
-            location=match_items["location"],
-            is_removed=match_items.get("diff") == "-",
-            is_added=match_items.get("diff") == "+",
-            fix_available=match_items.get("fixable") is not None,
-            rule_code=match_items["code"],
-            message=match_items["message"],
+            is_added=None,
+            is_removed=None,
+            fix_available=diagnostic.fix is not None,
+            rule_code=diagnostic.code,
+            filename=filename,
+            row=diagnostic.location.row,
+            col=diagnostic.location.column,
+            message=diagnostic.message,
         )
 
 
@@ -452,53 +440,70 @@ class CheckDiff(Diff):
         super().__init__(lines)
 
     @classmethod
-    def from_simple_diff(cls, diff: Diff) -> CheckDiff:
+    def from_diagnostics_pair(
+        cls,
+        baseline: list[Diagnostic],
+        comparison: list[Diagnostic],
+        path: Path,
+    ) -> CheckDiff:
         """
-        Parse a simple diff to include check-specific analyses.
+        Build a CheckDiff by directly comparing two lists of parsed diagnostics.
         """
-        # Drop unchanged lines
-        diff = diff.without_unchanged_lines()
+        baseline_lines = {
+            line
+            for d in baseline
+            if (line := DiagnosticLine.from_diagnostic(d, path)) is not None
+        }
+        comparison_lines = {
+            line
+            for d in comparison
+            if (line := DiagnosticLine.from_diagnostic(d, path)) is not None
+        }
 
-        # Sort without account for the leading + / -
-        sorted_lines = sorted(diff, key=lambda line: line[2:])
+        added = [
+            dataclasses.replace(line, is_added=True)
+            for line in comparison_lines - baseline_lines
+        ]
+        removed = [
+            dataclasses.replace(line, is_removed=True)
+            for line in baseline_lines - comparison_lines
+        ]
 
-        # Parse the lines, drop lines that cannot be parsed
-        parsed_lines: list[DiagnosticLine] = list(
-            filter(
-                None,
-                (DiagnosticLine.try_from_string(line) for line in sorted_lines),
-            )
+        parsed_lines = sorted(
+            added + removed,
+            key=lambda line: (line.filename, line.row, line.col, line.rule_code),
         )
 
-        # Calculate which lines only changed fix availability
+        # A line is "fix only" if the same diagnostic exists in the other set with
+        # fix availability toggled (i.e. the violation itself didn't change, only
+        # whether a fix is available for it).
+        undiffed_added = {line.without_diff() for line in added}
+        undiffed_removed = {line.without_diff() for line in removed}
         fix_only: set[DiagnosticLine] = set()
-
-        # TODO(zanieb): There has to be a cleaner way to express this logic
-        # We check if each added line is available in the removed set with fix
-        # availability toggled and vice-versa
         for line in parsed_lines:
-            other_set = diff.removed if line.is_added else diff.added
+            other_set = undiffed_removed if line.is_added else undiffed_added
             toggled = (
                 line.without_fix_available()
                 if line.fix_available
                 else line.with_fix_available()
             )
-            if toggled.without_diff().to_string() in other_set:
+            if toggled.without_diff() in other_set:
                 fix_only.add(line)
 
-        return CheckDiff(
-            lines=sorted_lines, parsed_lines=parsed_lines, fix_only_lines=fix_only
-        )
+        diff_lines = [line.to_string() for line in parsed_lines]
+        return cls(lines=diff_lines, parsed_lines=parsed_lines, fix_only_lines=fix_only)
 
 
-def add_permalink_to_diagnostic_line(repo: ClonedRepository, line: str) -> str:
-    match = CHECK_DIFF_LINE_RE.match(line)
-    if match is None:
-        return line
-
-    pre, inner, path, lnum, post = match.groups()
-    url = repo.url_for(path, int(lnum))
-    return f"{pre} <a href='{url}'>{inner}</a> {post}"
+def add_permalink_to_diagnostic_line(
+    repo: ClonedRepository, line: DiagnosticLine
+) -> str:
+    url = repo.url_for(line.filename, line.row)
+    prefix = "+ " if line.is_added else "- "
+    location = f"{line.filename}:{line.row}:{line.col}:"
+    fix = " [*]" if line.fix_available else ""
+    return (
+        f"{prefix}<a href='{url}'>{location}</a> {line.rule_code}{fix} {line.message}"
+    )
 
 
 async def compare_check(
@@ -527,23 +532,18 @@ async def compare_check(
                 ),
             )
 
-    baseline_output, comparison_output = (
+    diff = CheckDiff.from_diagnostics_pair(
         baseline_task.result(),
         comparison_task.result(),
+        cloned_repo.path,
     )
-
-    for line in comparison_output:
-        if PANIC_DIAGNOSTIC_LINE_RE.match(line):
-            raise ToolError(line)
-
-    diff = Diff.from_pair(baseline_output, comparison_output)
 
     return Comparison(diff=diff, repo=cloned_repo)
 
 
 async def ruff_check(
     *, executable: Path, path: Path, name: str, options: CheckOptions
-) -> Sequence[str]:
+) -> list[Diagnostic]:
     """Run the given ruff binary against the specified path."""
     ruff_args = options.to_ruff_args()
     logger.debug(f"Checking {name} with {executable} " + " ".join(ruff_args))
@@ -565,9 +565,4 @@ async def ruff_check(
     if proc.returncode != 0:
         raise ToolError(err.decode("utf8"))
 
-    # Strip summary lines so the diff is only diagnostic lines
-    return [
-        line
-        for line in result.decode("utf8").splitlines()
-        if not CHECK_SUMMARY_LINE_RE.match(line)
-    ]
+    return _DIAGNOSTIC_DECODER.decode_lines(result)
