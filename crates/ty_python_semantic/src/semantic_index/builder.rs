@@ -13,8 +13,8 @@ use ruff_python_ast::name::Name;
 use ruff_python_ast::visitor::{Visitor, walk_expr, walk_pattern, walk_stmt};
 use ruff_python_ast::{self as ast, AtomicNodeIndex, NodeIndex, PySourceType, PythonVersion};
 use ruff_python_parser::semantic_errors::{
-    SemanticSyntaxChecker, SemanticSyntaxContext, SemanticSyntaxError, SemanticSyntaxErrorKind,
-    YieldOutsideFunctionKind,
+    LazyImportContext, SemanticSyntaxChecker, SemanticSyntaxContext, SemanticSyntaxError,
+    SemanticSyntaxErrorKind, YieldOutsideFunctionKind,
 };
 use ruff_text_size::TextRange;
 use ty_module_resolver::{ModuleName, resolve_module};
@@ -114,6 +114,7 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     python_version: PythonVersion,
     source_text: OnceCell<SourceText>,
     semantic_checker: SemanticSyntaxChecker,
+    try_depth: u32,
 
     // Semantic Index fields
     scopes: IndexVec<FileScopeId, Scope>,
@@ -173,6 +174,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             python_version: Program::get(db).python_version(db),
             source_text: OnceCell::new(),
             semantic_checker: SemanticSyntaxChecker::default(),
+            try_depth: 0,
             semantic_syntax_errors: RefCell::default(),
         };
 
@@ -2505,6 +2507,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 range: _,
                 node_index: _,
             }) => {
+                self.try_depth += 1;
                 self.record_ambiguous_reachability();
 
                 // Save the state prior to visiting any of the `try` block.
@@ -2614,6 +2617,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 // - https://astral-sh.notion.site/Exception-handler-control-flow-11348797e1ca80bb8ce1e9aedbbe439d
                 // - https://github.com/astral-sh/ruff/pull/13633#discussion_r1788626702
                 self.visit_body(finalbody);
+                self.try_depth -= 1;
             }
 
             ast::Stmt::Raise(_) | ast::Stmt::Return(_) => {
@@ -3225,6 +3229,24 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
 impl SemanticSyntaxContext for SemanticIndexBuilder<'_, '_> {
     fn future_annotations_or_stub(&self) -> bool {
         self.has_future_annotations
+    }
+
+    fn lazy_import_context(&self) -> Option<LazyImportContext> {
+        match self.scopes[self.current_scope()].kind() {
+            ScopeKind::Function => return Some(LazyImportContext::Function),
+            ScopeKind::Class => return Some(LazyImportContext::Class),
+            ScopeKind::Comprehension
+            | ScopeKind::Lambda
+            | ScopeKind::Module
+            | ScopeKind::TypeAlias
+            | ScopeKind::TypeParams => {}
+        }
+
+        if self.try_depth > 0 {
+            return Some(LazyImportContext::TryExceptBlocks);
+        }
+
+        None
     }
 
     fn python_version(&self) -> PythonVersion {

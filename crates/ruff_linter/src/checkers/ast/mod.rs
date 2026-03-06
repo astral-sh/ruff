@@ -47,7 +47,8 @@ use ruff_python_ast::{PySourceType, helpers, str, visitor};
 use ruff_python_codegen::{Generator, Stylist};
 use ruff_python_index::Indexer;
 use ruff_python_parser::semantic_errors::{
-    SemanticSyntaxChecker, SemanticSyntaxContext, SemanticSyntaxError, SemanticSyntaxErrorKind,
+    LazyImportContext, SemanticSyntaxChecker, SemanticSyntaxContext, SemanticSyntaxError,
+    SemanticSyntaxErrorKind,
 };
 use ruff_python_parser::typing::{AnnotationKind, ParsedAnnotation, parse_type_annotation};
 use ruff_python_parser::{ParseError, Parsed};
@@ -766,6 +767,9 @@ impl SemanticSyntaxContext for Checker<'_> {
                 }
             }
             SemanticSyntaxErrorKind::ReboundComprehensionVariable
+            | SemanticSyntaxErrorKind::LazyImportNotAllowed { .. }
+            | SemanticSyntaxErrorKind::LazyImportStar
+            | SemanticSyntaxErrorKind::LazyFutureImport
             | SemanticSyntaxErrorKind::DuplicateTypeParameter
             | SemanticSyntaxErrorKind::MultipleCaseAssignment(_)
             | SemanticSyntaxErrorKind::IrrefutableCasePattern(_)
@@ -796,6 +800,27 @@ impl SemanticSyntaxContext for Checker<'_> {
 
     fn future_annotations_or_stub(&self) -> bool {
         self.semantic.future_annotations_or_stub()
+    }
+
+    fn lazy_import_context(&self) -> Option<LazyImportContext> {
+        match self.semantic.current_scope().kind {
+            ScopeKind::Function(_) | ScopeKind::Lambda(_) => {
+                return Some(LazyImportContext::Function);
+            }
+            ScopeKind::Class(_) => return Some(LazyImportContext::Class),
+            ScopeKind::Generator { .. }
+            | ScopeKind::Module
+            | ScopeKind::Type
+            | ScopeKind::DunderClassCell => {}
+        }
+
+        for statement in self.semantic.current_statements().skip(1) {
+            if matches!(statement, Stmt::Try(_)) {
+                return Some(LazyImportContext::TryExceptBlocks);
+            }
+        }
+
+        None
     }
 
     fn in_async_context(&self) -> bool {
