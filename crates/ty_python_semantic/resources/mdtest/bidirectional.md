@@ -91,34 +91,25 @@ from typing import overload, Callable
 def list1[T](x: T) -> list[T]:
     return [x]
 
-def get_data() -> dict | None:
-    return {}
+def f() -> list[object]:
+    reveal_type(list1(1))  # revealed: list[int]
+    # `list[int]` and `list[object]` are incompatible, but the return type check passes here
+    # because the type of `list1(res)` is inferred by bidirectional type inference using the
+    # annotated return type, and the type of `res` is not used.
+    return list1(1)
 
-def wrap_data() -> list[dict]:
-    if not (res := get_data()):
-        return list1({})
-    reveal_type(list1(res))  # revealed: list[dict[Unknown, Unknown] & ~AlwaysFalsy]
-    # `list[dict[Unknown, Unknown] & ~AlwaysFalsy]` and `list[dict[Unknown, Unknown]]` are incompatible,
-    # but the return type check passes here because the type of `list1(res)` is inferred
-    # by bidirectional type inference using the annotated return type, and the type of `res` is not used.
-    return list1(res)
-
-def wrap_data2() -> list[dict] | None:
-    if not (res := get_data()):
-        return None
-    reveal_type(list1(res))  # revealed: list[dict[Unknown, Unknown] & ~AlwaysFalsy]
-    return list1(res)
+def f2() -> list[object] | None:
+    reveal_type(list1(1))  # revealed: list[int]
+    return list1(1)
 
 def deco[T](func: Callable[[], T]) -> Callable[[], T]:
     return func
 
-def outer() -> Callable[[], list[dict]]:
+def outer() -> Callable[[], list[object]]:
     @deco
-    def inner() -> list[dict]:
-        if not (res := get_data()):
-            return list1({})
-        reveal_type(list1(res))  # revealed: list[dict[Unknown, Unknown] & ~AlwaysFalsy]
-        return list1(res)
+    def inner() -> list[object]:
+        reveal_type(list1(1))  # revealed: list[int]
+        return list1(1)
     return inner
 
 @overload
