@@ -109,15 +109,13 @@ impl Cache {
             }
         };
 
-        let package: SerializedPackageCache = match bitcode::decode(&serialized) {
+        let mut package: PackageCache = match bitcode::deserialize(&serialized) {
             Ok(package) => package,
             Err(err) => {
                 warn_user!("Failed parse cache file `{}`: {err}", path.display());
                 return Cache::empty(path, package_root);
             }
         };
-
-        let mut package = package.into_runtime();
 
         // Sanity check.
         if package.package_root != package_root {
@@ -169,7 +167,7 @@ impl Cache {
 
         // Serialize to in-memory buffer because hyperfine benchmark showed that it's faster than
         // using a `BufWriter` and our cache files are small enough that streaming isn't necessary.
-        let serialized = bitcode::encode(&SerializedPackageCache::from_runtime(&self.package));
+        let serialized = bitcode::serialize(&self.package).context("Failed to serialize cache")?;
         temp_file
             .write_all(&serialized)
             .context("Failed to write serialized cache to temporary file.")?;
@@ -298,69 +296,8 @@ impl Cache {
     }
 }
 
-/// On disk representation of a cache of a package.
-#[derive(Debug, bitcode::Encode, bitcode::Decode)]
-struct SerializedPackageCache {
-    package_root: String,
-    files: Vec<(String, SerializedFileCache)>,
-}
-
-impl SerializedPackageCache {
-    fn from_runtime(cache: &PackageCache) -> Self {
-        Self {
-            package_root: cache.package_root.to_string_lossy().into_owned(),
-            files: cache
-                .files
-                .iter()
-                .map(|(path, file)| {
-                    (
-                        path.to_string_lossy().into_owned(),
-                        SerializedFileCache::from_runtime(file),
-                    )
-                })
-                .collect(),
-        }
-    }
-
-    fn into_runtime(self) -> PackageCache {
-        PackageCache {
-            package_root: PathBuf::from(self.package_root),
-            files: self
-                .files
-                .into_iter()
-                .map(|(path, file)| (PathBuf::from(path), file.into_runtime()))
-                .collect(),
-        }
-    }
-}
-
-#[derive(Debug, bitcode::Encode, bitcode::Decode)]
-struct SerializedFileCache {
-    key: u64,
-    last_seen: u64,
-    data: FileCacheData,
-}
-
-impl SerializedFileCache {
-    fn from_runtime(cache: &FileCache) -> Self {
-        Self {
-            key: cache.key,
-            last_seen: cache.last_seen.load(Ordering::Relaxed),
-            data: cache.data.clone(),
-        }
-    }
-
-    fn into_runtime(self) -> FileCache {
-        FileCache {
-            key: self.key,
-            last_seen: AtomicU64::new(self.last_seen),
-            data: self.data,
-        }
-    }
-}
-
 /// Runtime representation of a cache of a package.
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 struct PackageCache {
     /// Path to the root of the package.
     ///
@@ -372,7 +309,7 @@ struct PackageCache {
 }
 
 /// Runtime representation of the cache per source file.
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub(crate) struct FileCache {
     /// Key that determines if the cached item is still valid.
     key: u64,
@@ -392,7 +329,9 @@ impl FileCache {
     }
 }
 
-#[derive(Debug, Default, Clone, bitcode::Encode, bitcode::Decode)]
+#[derive(
+    Debug, Default, Clone, bitcode::Encode, bitcode::Decode, serde::Serialize, serde::Deserialize,
+)]
 struct FileCacheData {
     linted: bool,
     formatted: bool,
