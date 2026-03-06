@@ -1674,27 +1674,6 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         self.types
     }
 
-    /// Map the types that have been assigned in this specialization.
-    pub(crate) fn mapped(
-        &self,
-        generic_context: GenericContext<'db>,
-        f: impl Fn(BoundTypeVarInstance<'db>, Type<'db>) -> Type<'db>,
-    ) -> Self {
-        let mut types = self.types.clone();
-        for (identity, variable) in generic_context.variables_inner(self.db) {
-            if let Some(ty) = types.get_mut(identity) {
-                *ty = f(*variable, *ty);
-            }
-        }
-
-        Self {
-            db: self.db,
-            constraints: self.constraints,
-            inferable: self.inferable,
-            types,
-        }
-    }
-
     pub(crate) fn with_default(
         &self,
         generic_context: GenericContext<'db>,
@@ -1735,24 +1714,20 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     /// Build a specialization, using a caller-provided hook to select the solution for each
     /// typevar.
     ///
-    /// The `choose` hook is called for each typevar in the generic context with the typevar's
-    /// materialized lower and upper bounds:
-    /// - For typevars that were inferred (present in the type mappings), both bounds are set to
-    ///   the inferred type (representing an equality constraint).
-    /// - For typevars that were not inferred, `lower` is `Never` and `upper` is `object`
-    ///   (representing an unconstrained typevar).
+    /// The `choose` hook is called for each *inferred* typevar (those with entries in the type
+    /// mappings) with the typevar's materialized lower and upper bounds. Currently, both bounds
+    /// are set to the inferred type (representing an equality constraint). Unmapped typevars
+    /// are left to `specialize_recursive` to fill in with defaults.
     ///
     /// The hook returns:
     /// - `Some(ty)` to use `ty` as the specialization for this typevar
-    /// - `None` to use the default (the inferred type for mapped typevars, or the typevar's
-    ///   default for unmapped typevars)
+    /// - `None` to use the inferred type unchanged
     ///
     /// This method replaces the pattern of `mapped(...).build(...)`, allowing callers to
     /// transform inferred types (e.g., literal promotion) in a single step. In the future,
     /// when the builder's internal representation switches from a `HashMap` to a `ConstraintSet`,
     /// the hook will receive actual lower/upper bounds from the constraint set instead of
     /// synthetic equality bounds.
-    #[expect(dead_code)] // Will be used in Phase 2 of the constraint set migration
     pub(crate) fn build_with(
         &mut self,
         generic_context: GenericContext<'db>,
@@ -1762,14 +1737,10 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             .variables_inner(self.db)
             .iter()
             .map(|(identity, variable)| {
-                if let Some(&mapped_ty) = self.types.get(identity) {
-                    // The typevar was inferred — present both bounds as the inferred type.
-                    let chosen = choose(*variable, mapped_ty, mapped_ty);
-                    Some(chosen.unwrap_or(mapped_ty))
-                } else {
-                    // The typevar was not inferred — present open bounds.
-                    choose(*variable, Type::Never, Type::object())
-                }
+                let mapped_ty = self.types.get(identity).copied()?;
+                // The typevar was inferred — present both bounds as the inferred type.
+                let chosen = choose(*variable, mapped_ty, mapped_ty);
+                Some(chosen.unwrap_or(mapped_ty))
             });
 
         generic_context.specialize_recursive(self.db, types)

@@ -3800,55 +3800,56 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         self.errors.extend(specialization_errors);
 
         // Attempt to promote any promotable types assigned to the specialization.
-        let maybe_promote = |typevar: BoundTypeVarInstance<'db>, ty: Type<'db>| {
-            let bound_or_constraints = typevar.typevar(self.db).bound_or_constraints(self.db);
+        // The hook receives (typevar, lower_bound, upper_bound) and returns Some(ty) to
+        // override the default solution, or None to keep it.
+        let maybe_promote =
+            |typevar: BoundTypeVarInstance<'db>, lower: Type<'db>, _upper: Type<'db>| {
+                let bound_or_constraints = typevar.typevar(self.db).bound_or_constraints(self.db);
 
-            // For constrained TypeVars, the inferred type is already one of the
-            // constraints. Promoting literals would produce a type that doesn't
-            // match any constraint.
-            if matches!(
-                bound_or_constraints,
-                Some(TypeVarBoundOrConstraints::Constraints(_))
-            ) {
-                return ty;
-            }
-
-            let return_ty = self.constructor_instance_type.unwrap_or(self.return_ty);
-            let mut variance_in_return = TypeVarVariance::Bivariant;
-
-            // Find all occurrences of the type variable in the return type.
-            let visit_return_ty = |_, ty, variance, _| {
-                if ty != Type::TypeVar(typevar) {
-                    return;
+                // For constrained TypeVars, the inferred type is already one of the
+                // constraints. Promoting literals would produce a type that doesn't
+                // match any constraint.
+                if matches!(
+                    bound_or_constraints,
+                    Some(TypeVarBoundOrConstraints::Constraints(_))
+                ) {
+                    return None;
                 }
 
-                variance_in_return = variance_in_return.join(variance);
+                let return_ty = self.constructor_instance_type.unwrap_or(self.return_ty);
+                let mut variance_in_return = TypeVarVariance::Bivariant;
+
+                // Find all occurrences of the type variable in the return type.
+                let visit_return_ty = |_, ty, variance, _| {
+                    if ty != Type::TypeVar(typevar) {
+                        return;
+                    }
+
+                    variance_in_return = variance_in_return.join(variance);
+                };
+
+                return_ty.visit_specialization(self.db, self.call_expression_tcx, visit_return_ty);
+
+                // Promotion is only useful if the type variable is in invariant or contravariant
+                // position in the return type.
+                if variance_in_return.is_covariant() {
+                    return None;
+                }
+
+                let promoted = lower.promote(self.db);
+
+                // If the TypeVar has an upper bound, only use the promoted type if it
+                // still satisfies the bound.
+                if let Some(TypeVarBoundOrConstraints::UpperBound(bound)) = bound_or_constraints {
+                    if !promoted.is_assignable_to(self.db, bound) {
+                        return None;
+                    }
+                }
+
+                Some(promoted)
             };
 
-            return_ty.visit_specialization(self.db, self.call_expression_tcx, visit_return_ty);
-
-            // Promotion is only useful if the type variable is in invariant or contravariant
-            // position in the return type.
-            if variance_in_return.is_covariant() {
-                return ty;
-            }
-
-            let promoted = ty.promote(self.db);
-
-            // If the TypeVar has an upper bound, only use the promoted type if it
-            // still satisfies the bound.
-            if let Some(TypeVarBoundOrConstraints::UpperBound(bound)) = bound_or_constraints {
-                if !promoted.is_assignable_to(self.db, bound) {
-                    return ty;
-                }
-            }
-
-            promoted
-        };
-
-        let specialization = builder
-            .mapped(generic_context, maybe_promote)
-            .build(generic_context);
+        let specialization = builder.build_with(generic_context, maybe_promote);
 
         self.return_ty = self.return_ty.apply_specialization(self.db, specialization);
         self.specialization = Some(specialization);
