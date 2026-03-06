@@ -787,12 +787,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         let infer_type_argument = |builder: &mut Self, slice: &ast::Expr| {
             let slice_ty = builder.infer_type_expression(slice);
-            SubclassOfType::try_from_instance(builder.db(), slice_ty).unwrap_or_else(|| {
-                match slice_ty {
-                    Type::Callable(_) => invalid_type_argument(builder, slice),
-                    _ => todo_type!("unsupported type[X] special form"),
-                }
-            })
+            SubclassOfType::try_from_instance(builder.db(), slice_ty)
+                .unwrap_or_else(|| invalid_type_argument(builder, slice))
         };
 
         match slice {
@@ -888,9 +884,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         );
                         invalid_type_argument(self, slice)
                     }
-                    _ => {
-                        self.infer_type_expression(parameters);
-                        todo_type!("unsupported nested subscript in type[X]")
+                    other_value_ty => {
+                        let slice_ty =
+                            self.infer_subscript_type_expression(subscript, other_value_ty);
+                        SubclassOfType::try_from_instance(self.db(), slice_ty)
+                            .unwrap_or_else(|| invalid_type_argument(self, slice))
                     }
                 };
                 self.store_expression_type(slice, parameters_ty);
