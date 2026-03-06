@@ -1499,6 +1499,22 @@ static_assert(is_assignable_to(Callable[..., None], Callable[Concatenate[int, ..
 static_assert(is_assignable_to(Callable[..., None], Callable[Concatenate[int, str, ...], None]))
 ```
 
+### Assignable from bottom callable
+
+```py
+from ty_extensions import static_assert, is_assignable_to, CallableTypeOf
+from typing import Callable, Concatenate, Never
+
+def bottom(*args: object, **kwargs: object) -> Never:
+    raise NotImplementedError
+
+static_assert(is_assignable_to(CallableTypeOf[bottom], Callable[Concatenate[int, ...], None]))
+static_assert(is_assignable_to(CallableTypeOf[bottom], Callable[Concatenate[int, str, ...], None]))
+
+static_assert(not is_assignable_to(Callable[Concatenate[int, ...], None], CallableTypeOf[bottom]))
+static_assert(not is_assignable_to(Callable[Concatenate[int, str, ...], None], CallableTypeOf[bottom]))
+```
+
 ### Contravariance of parameters
 
 Callable parameters are contravariant: a callable accepting a wider type (`A`) is assignable to one

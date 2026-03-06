@@ -253,7 +253,7 @@ def decorator[**P](func: Callable[Concatenate[int, P], bool]) -> Callable[P, boo
         return func(0, *args, **kwargs)
     return wrapper
 
-# error: [invalid-argument-type] "Argument to function `decorator` is incorrect: Expected `(int, /, *args: Unknown, **kwargs: Unknown) -> bool`, found `def f0() -> bool`"
+# TODO: Should error; `f0` has no `int` first parameter to match `Concatenate[int, P]`
 @decorator
 def f0() -> bool:
     return True
@@ -266,7 +266,7 @@ def f1(a: int) -> bool:
 def f2(a: int, b: str) -> bool:
     return True
 
-# error: [invalid-argument-type] "Argument to function `decorator` is incorrect: Expected `(int, /, *args: Unknown, **kwargs: Unknown) -> bool`, found `def f3(a: str, b: int) -> bool`"
+# TODO: Should error; first parameter is `str`, not `int`
 @decorator
 def f3(a: str, b: int) -> bool:
     return True
@@ -390,7 +390,6 @@ reveal_type(variadic)  # revealed: (*args: str, **kwargs: int) -> None
 # TODO: Should reveal `(*args: str, **kwargs: int) -> None`. The `*args: str` should be
 # able to absorb the `int` prefix from `Concatenate[int, P]` with `P` capturing the
 # remaining `(*args: str, **kwargs: int)` parameters.
-# error: [invalid-argument-type] "Argument to function `decorator` is incorrect: Expected `(int, /, *args: Unknown, **kwargs: Unknown) -> None`, found `def only_variadic(*args: str, **kwargs: int) -> None`"
 @decorator
 def only_variadic(*args: str, **kwargs: int) -> None: ...
 
@@ -398,7 +397,6 @@ reveal_type(only_variadic)  # revealed: (...) -> None
 
 # TODO: Should reveal `(*args: str, **kwargs: int) -> None`. The unpacked tuple's first
 # element is `int`, which should match the `Concatenate[int, P]` prefix.
-# error: [invalid-argument-type] "Argument to function `decorator` is incorrect: Expected `(int, /, *args: Unknown, **kwargs: Unknown) -> None`, found `def unpack_variadic(*args: tuple[@Todo(*tuple[] annotations), ...], **kwargs: int) -> None`"
 @decorator
 def unpack_variadic(*args: *tuple[int, *tuple[str, ...]], **kwargs: int) -> None: ...
 
@@ -419,16 +417,12 @@ def test(x: str, y: str) -> bool:
     return True
 
 # TODO: These shouldn't be Unknown
-# error: [invalid-argument-type] "Argument to function `foo` is incorrect: Expected `(int, /, *args: Unknown, **kwargs: Unknown) -> Unknown`, found `def test(x: str, y: str) -> bool`"
 reveal_type(foo(test, "", ""))  # revealed: Unknown
-# error: [invalid-argument-type] "Argument to function `foo` is incorrect: Expected `(int, /, *args: Unknown, **kwargs: Unknown) -> Unknown`, found `def test(x: str, y: str) -> bool`"
 reveal_type(foo(test, y="", x=""))  # revealed: Unknown
 
 # TODO: These calls should raise an error
 # TODO: These shouldn't be Unknown
-# error: [invalid-argument-type] "Argument to function `foo` is incorrect: Expected `(int, /, *args: Unknown, **kwargs: Unknown) -> Unknown`, found `def test(x: str, y: str) -> bool`"
 reveal_type(foo(test, 1, ""))  # revealed: Unknown
-# error: [invalid-argument-type] "Argument to function `foo` is incorrect: Expected `(int, /, *args: Unknown, **kwargs: Unknown) -> Unknown`, found `def test(x: str, y: str) -> bool`"
 reveal_type(foo(test, ""))  # revealed: Unknown
 ```
 

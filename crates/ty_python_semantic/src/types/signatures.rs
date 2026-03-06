@@ -1314,31 +1314,21 @@ impl<'db> Signature<'db> {
         // If either of the parameter lists is gradual (`...`), then it is assignable to and from
         // any other parameter list, but not a subtype or supertype of any other parameter list.
         if self.parameters.is_gradual() || other.parameters.is_gradual() {
-            // TODO: For Concatenate[T, ...] forms, check that the prefix params are compatible.
-            // The prefix params precede the *args/**kwargs gradual tail, so prefix_len = total_params - 2.
-            // let self_is_concat_gradual = matches!(
-            //     self.parameters.kind(),
-            //     ParametersKind::Concatenate(ConcatenateTail::Gradual)
-            // );
-            // let other_is_concat_gradual = matches!(
-            //     other.parameters.kind(),
-            //     ParametersKind::Concatenate(ConcatenateTail::Gradual)
-            // );
-            //
-            // if self_is_concat_gradual && other_is_concat_gradual {
-            //     let self_prefix_len = self.parameters.len() - 2;
-            //     let other_prefix_len = other.parameters.len() - 2;
-            //     let common = self_prefix_len.min(other_prefix_len);
-            //     for i in 0..common {
-            //         // Parameters are contravariant
-            //         if !check_types(
-            //             other.parameters.as_slice()[i].annotated_type(),
-            //             self.parameters.as_slice()[i].annotated_type(),
-            //         ) {
-            //             return result;
-            //         }
-            //     }
-            // }
+            // If both parameter lists are gradual in `Concatenate` form, we need to perform type
+            // checking between the positional-only prefix parameters.
+            if self.parameters.is_concatenate_gradual() && other.parameters.is_concatenate_gradual()
+            {
+                let self_prefix =
+                    &self.parameters.value[..self.parameters.value.len().saturating_sub(2)];
+                let other_prefix =
+                    &other.parameters.value[..other.parameters.value.len().saturating_sub(2)];
+
+                for (self_param, other_param) in self_prefix.iter().zip(other_prefix.iter()) {
+                    if !check_types(other_param.annotated_type(), self_param.annotated_type()) {
+                        return result;
+                    }
+                }
+            }
 
             return match relation {
                 TypeRelation::Subtyping | TypeRelation::SubtypingAssuming => {
@@ -1922,15 +1912,15 @@ impl<'db> Parameters<'db> {
     ) -> Self {
         fn new_impl<'db>(db: &'db dyn Db, value: Vec<Parameter<'db>>) -> Parameters<'db> {
             let mut kind = ParametersKind::Standard;
-            if let [prefix_params @ .., p1, p2] = value.as_slice()
-                && p1.is_variadic()
-                && p2.is_keyword_variadic()
+            if let [prefix_params @ .., args, kwargs] = value.as_slice()
+                && args.is_variadic()
+                && kwargs.is_keyword_variadic()
             {
                 let has_prefix_params = !prefix_params.is_empty();
                 let prefix_params_are_positional_only =
                     prefix_params.iter().all(Parameter::is_positional_only);
 
-                match (p1.annotated_type(), p2.annotated_type()) {
+                match (args.annotated_type(), kwargs.annotated_type()) {
                     (Type::Dynamic(_), Type::Dynamic(_)) => {
                         if has_prefix_params {
                             if prefix_params_are_positional_only {
@@ -1987,8 +1977,22 @@ impl<'db> Parameters<'db> {
         self.kind
     }
 
+    /// Returns `true` if the parameters represent a gradual form using `...` as the only parameter
+    /// or a `Concatenate` form with `...` as the last argument.
     pub(crate) const fn is_gradual(&self) -> bool {
-        matches!(self.kind, ParametersKind::Gradual)
+        matches!(
+            self.kind,
+            ParametersKind::Gradual | ParametersKind::Concatenate(ConcatenateTail::Gradual)
+        )
+    }
+
+    /// Returns `true` if the parameters represent a `Concatenate` form with `...` as the last
+    /// argument.
+    const fn is_concatenate_gradual(&self) -> bool {
+        matches!(
+            self.kind,
+            ParametersKind::Concatenate(ConcatenateTail::Gradual)
+        )
     }
 
     pub(crate) const fn is_top(&self) -> bool {
