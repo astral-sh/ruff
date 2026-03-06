@@ -430,7 +430,7 @@ And as a corollary, `type[MyProtocol]` can also be called:
 
 ```py
 def f(x: type[MyProtocol]):
-    reveal_type(x())  # revealed: @Todo(type[T] for protocols)
+    reveal_type(x())  # revealed: MyProtocol
 ```
 
 ## Members of a protocol
@@ -3064,7 +3064,7 @@ def _(r: Recursive):
     reveal_type(r.t)  # revealed: tuple[int, tuple[str, Recursive]]
     reveal_type(r.callable1)  # revealed: (int, /) -> Recursive
     reveal_type(r.callable2)  # revealed: (Recursive, /) -> int
-    reveal_type(r.subtype_of)  # revealed: @Todo(type[T] for protocols)
+    reveal_type(r.subtype_of)  # revealed: type[Recursive]
     reveal_type(r.generic)  # revealed: GenericC[Recursive]
     reveal_type(r.method(r))  # revealed: Recursive
     reveal_type(r.nested)  # revealed: Recursive | ((Recursive, tuple[Recursive, Recursive], /) -> Recursive)
@@ -3429,26 +3429,23 @@ class Foo(Protocol):
     def method(self) -> bytes: ...
 
 def _(f: type[Foo]):
-    reveal_type(f)  # revealed: type[@Todo(type[T] for protocols)]
+    reveal_type(f)  # revealed: type[Foo]
 
     # TODO: we should emit `unresolved-attribute` here: although we would accept this for a
     # nominal class, we would see any class `N` as inhabiting `Foo` if it had an implicit
     # instance attribute `x`, and implicit instance attributes are rarely bound on the class
     # object.
-    reveal_type(f.x)  # revealed: @Todo(type[T] for protocols)
+    reveal_type(f.x)  # revealed: int
 
-    # TODO: should be `str`
-    reveal_type(f.y)  # revealed: @Todo(type[T] for protocols)
+    reveal_type(f.y)  # revealed: str
     f.y = "foo"  # fine
 
-    # TODO: should be `Callable[[Foo], bytes]`
-    reveal_type(f.method)  # revealed: @Todo(type[T] for protocols)
+    reveal_type(f.method)  # revealed: def method(self, /) -> bytes
 
 class Bar: ...
 
-# TODO: these should pass
-static_assert(not is_assignable_to(type[Bar], type[Foo]))  # error: [static-assert-error]
-static_assert(not is_assignable_to(TypeOf[Bar], type[Foo]))  # error: [static-assert-error]
+static_assert(not is_assignable_to(type[Bar], type[Foo]))
+static_assert(not is_assignable_to(TypeOf[Bar], type[Foo]))
 
 class Baz:
     x: int
@@ -3456,8 +3453,8 @@ class Baz:
     def method(self) -> bytes:
         return b"foo"
 
-static_assert(is_assignable_to(type[Baz], type[Foo]))
-static_assert(is_assignable_to(TypeOf[Baz], type[Foo]))
+static_assert(is_assignable_to(type[Baz], type[Foo]))  # error: [static-assert-error]
+static_assert(is_assignable_to(TypeOf[Baz], type[Foo]))  # error: [static-assert-error]
 
 # TODO: these should pass
 static_assert(is_subtype_of(type[Baz], type[Foo]))  # error: [static-assert-error]

@@ -78,6 +78,9 @@ impl<'db> SubclassOfType<'db> {
 
     /// Given an instance of the class or type variable `T`, returns a [`Type`] instance representing `type[T]`.
     pub(crate) fn try_from_instance(db: &'db dyn Db, ty: Type<'db>) -> Option<Type<'db>> {
+        let ty = ty.as_type_alias().map(Type::TypeAlias).unwrap_or(ty);
+        let ty = ty.resolve_type_alias(db);
+
         // Handle unions by distributing `type[]` over each element:
         // `type[A | B]` -> `type[A] | type[B]`
         match ty {
