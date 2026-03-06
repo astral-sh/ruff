@@ -10,19 +10,19 @@ use ty_python_semantic::lint::{Level, LintId, LintStatus};
 use crate::args::HelpFormat;
 
 #[derive(Serialize)]
-struct Explanation {
-    name: String,
-    summary: String,
+struct Explanation<'a> {
+    name: &'a str,
+    summary: &'a str,
     documentation: String,
     default_level: Level,
     status: LintStatus,
 }
 
-impl Explanation {
-    fn from_lint(lint: LintId) -> Self {
+impl<'a> Explanation<'a> {
+    fn from_lint(lint: &'a LintId) -> Self {
         Self {
-            name: lint.name().to_string(),
-            summary: lint.summary().to_owned(),
+            name: lint.name().as_str(),
+            summary: lint.summary(),
             documentation: lint.documentation(),
             default_level: lint.default_level(),
             status: *lint.status(),
@@ -64,7 +64,7 @@ pub(crate) fn rule(name: &str, format: HelpFormat) -> Result<()> {
             writeln!(stdout, "{}", format_rule_text(lint))?;
         }
         HelpFormat::Json => {
-            serde_json::to_writer_pretty(&mut stdout, &Explanation::from_lint(lint))?;
+            serde_json::to_writer_pretty(&mut stdout, &Explanation::from_lint(&lint))?;
         }
     }
     Ok(())
@@ -88,7 +88,7 @@ pub(crate) fn rules(format: HelpFormat) -> Result<()> {
             let mut serializer = serde_json::Serializer::pretty(stdout);
             let mut seq = serializer.serialize_seq(None)?;
             for lint in lints {
-                seq.serialize_element(&Explanation::from_lint(lint))?;
+                seq.serialize_element(&Explanation::from_lint(&lint))?;
             }
             seq.end()?;
         }
