@@ -213,6 +213,12 @@ impl ConstructorReturnKind {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+struct ConstructorReturnOutcome<'db> {
+    resolved_return: Type<'db>,
+    kind: ConstructorReturnKind,
+}
+
 /// Return `true` if `class_ty` is a subtype of (any specialization of) `class_literal`.
 fn is_subtype_of_class_literal<'db>(
     db: &'db dyn Db,
@@ -225,46 +231,79 @@ fn is_subtype_of_class_literal<'db>(
         .any(|base| base.class_literal(db) == class_literal)
 }
 
-impl<'db> DownstreamConstructor<'db> {
-    fn return_kind(&self, db: &'db dyn Db, return_ty: Type<'db>) -> ConstructorReturnKind {
-        match return_ty.resolve_type_alias(db) {
-            Type::Union(union) => {
-                for element in union.elements(db) {
-                    match self.return_kind(db, *element) {
-                        ConstructorReturnKind::NotInstance => {
-                            return ConstructorReturnKind::NotInstance;
-                        }
-                        ConstructorReturnKind::Instance => {}
+fn classify_constructor_return<'db>(
+    db: &'db dyn Db,
+    class_literal: ClassLiteral<'db>,
+    return_ty: Type<'db>,
+) -> ConstructorReturnKind {
+    match return_ty.resolve_type_alias(db) {
+        Type::Union(union) => {
+            for element in union.elements(db) {
+                match classify_constructor_return(db, class_literal, *element) {
+                    ConstructorReturnKind::NotInstance => {
+                        return ConstructorReturnKind::NotInstance;
                     }
+                    ConstructorReturnKind::Instance => {}
                 }
-                ConstructorReturnKind::Instance
             }
-            Type::Intersection(intersection) => {
-                for element in intersection.iter_positive(db) {
-                    match self.return_kind(db, element) {
-                        ConstructorReturnKind::Instance => {
-                            return ConstructorReturnKind::Instance;
-                        }
-                        ConstructorReturnKind::NotInstance => {}
+            ConstructorReturnKind::Instance
+        }
+        Type::Intersection(intersection) => {
+            for element in intersection.iter_positive(db) {
+                match classify_constructor_return(db, class_literal, element) {
+                    ConstructorReturnKind::Instance => {
+                        return ConstructorReturnKind::Instance;
                     }
+                    ConstructorReturnKind::NotInstance => {}
                 }
+            }
+            ConstructorReturnKind::NotInstance
+        }
+        // Spec says an explicit `Any` return type should be considered non-instance.
+        Type::Dynamic(DynamicType::Any) => ConstructorReturnKind::NotInstance,
+        // But a missing return annotation should be considered instance.
+        Type::Dynamic(_) => ConstructorReturnKind::Instance,
+        // A `Never` constructor return is terminal and does not run downstream construction.
+        Type::Never => ConstructorReturnKind::NotInstance,
+        Type::NominalInstance(instance) => {
+            if is_subtype_of_class_literal(db, instance.class(db), class_literal) {
+                ConstructorReturnKind::Instance
+            } else {
                 ConstructorReturnKind::NotInstance
             }
-            // Spec says an explicit `Any` return type should be considered non-instance.
-            Type::Dynamic(DynamicType::Any) => ConstructorReturnKind::NotInstance,
-            // But a missing return annotation should be considered instance.
-            Type::Dynamic(_) => ConstructorReturnKind::Instance,
-            // A `Never` constructor return is terminal and does not run downstream construction.
-            Type::Never => ConstructorReturnKind::NotInstance,
-            Type::NominalInstance(instance) => {
-                if is_subtype_of_class_literal(db, instance.class(db), self.class_literal) {
-                    ConstructorReturnKind::Instance
-                } else {
-                    ConstructorReturnKind::NotInstance
-                }
-            }
-            _ => ConstructorReturnKind::NotInstance,
         }
+        _ => ConstructorReturnKind::NotInstance,
+    }
+}
+
+fn constructor_return_outcome<'db>(
+    db: &'db dyn Db,
+    class_literal: ClassLiteral<'db>,
+    overload: &Binding<'db>,
+) -> ConstructorReturnOutcome<'db> {
+    let declared_return = overload.signature.return_ty;
+    let resolved_return = overload
+        .specialization
+        .map(|specialization| declared_return.apply_specialization(db, specialization))
+        .unwrap_or(declared_return);
+    let kind = classify_constructor_return(db, class_literal, resolved_return);
+    ConstructorReturnOutcome {
+        resolved_return,
+        kind,
+    }
+}
+
+impl<'db> DownstreamConstructor<'db> {
+    fn return_kind(&self, db: &'db dyn Db, return_ty: Type<'db>) -> ConstructorReturnKind {
+        classify_constructor_return(db, self.class_literal, return_ty)
+    }
+
+    fn overload_return_outcome(
+        &self,
+        db: &'db dyn Db,
+        overload: &Binding<'db>,
+    ) -> ConstructorReturnOutcome<'db> {
+        constructor_return_outcome(db, self.class_literal, overload)
     }
 
     /// Returns `true` if every matched overload is instance-returning (i.e., its return type
@@ -281,13 +320,11 @@ impl<'db> DownstreamConstructor<'db> {
         let mut saw_match = false;
         for (_, overload) in binding.matching_overloads() {
             saw_match = true;
-            let declared_return = overload.signature.return_ty;
-            let resolved_return = overload
-                .specialization
-                .map(|specialization| declared_return.apply_specialization(db, specialization))
-                .unwrap_or(declared_return);
-
-            if !self.return_kind(db, resolved_return).is_instance() {
+            if !self
+                .overload_return_outcome(db, overload)
+                .kind
+                .is_instance()
+            {
                 return false;
             }
         }
@@ -778,16 +815,10 @@ impl<'db> Bindings<'db> {
                     )
                 })
         });
-        let is_instance_of_constructor = |return_ty: Type<'db>| {
-            return_ty
-                .as_nominal_instance()
-                .is_some_and(|inst: NominalInstanceType<'db>| {
-                    constructor_class_literal.is_some_and(|cc_literal| {
-                        is_subtype_of_class_literal(db, inst.class(db), cc_literal)
-                    })
-                })
-        };
-        if constructor_class.is_some() {
+        if let Some(constructor_class_literal) = constructor_class_literal {
+            let is_instance_of_constructor = |return_ty: Type<'db>| {
+                classify_constructor_return(db, constructor_class_literal, return_ty).is_instance()
+            };
             for binding in self.iter_flat() {
                 if has_downstream_constructors && binding.downstream_constructor.is_none() {
                     continue;
@@ -811,31 +842,25 @@ impl<'db> Bindings<'db> {
                     continue;
                 }
 
-                let sig_return = overload.signature.return_ty;
-                // Fast path: if the declared return is already a specialization of the
-                // constructed class, this overload is instance-returning and cannot trigger
-                // the non-instance early return.
-                if class_literal
-                    .and_then(|lit| sig_return.specialization_of(db, lit))
-                    .is_some()
+                let outcome = constructor_return_outcome(db, constructor_class_literal, overload);
+                if outcome.resolved_return.is_unknown()
+                    || (outcome.resolved_return.has_typevar(db)
+                        && outcome.resolved_return.as_nominal_instance().is_none())
                 {
                     continue;
                 }
-                let resolved = overload
-                    .specialization
-                    .map(|specialization| sig_return.apply_specialization(db, specialization))
-                    .unwrap_or(sig_return);
-                if resolved.is_unknown()
-                    || (resolved.has_typevar(db) && resolved.as_nominal_instance().is_none())
-                {
-                    continue;
-                }
-                // Check if the resolved type is an instance of the constructing class or a
-                // base class. If so, it's a normal instance-returning `__new__` and should be
-                // handled by the standard constructor return logic below.
-                let is_instance_return = is_instance_of_constructor(resolved);
-                if !is_instance_return {
-                    if matches!(resolved, Type::Dynamic(DynamicType::Any))
+                let is_simple_instance_return = outcome
+                    .resolved_return
+                    .as_nominal_instance()
+                    .is_some_and(|instance| {
+                        is_subtype_of_class_literal(
+                            db,
+                            instance.class(db),
+                            constructor_class_literal,
+                        )
+                    });
+                if !is_simple_instance_return {
+                    if matches!(outcome.resolved_return, Type::Dynamic(DynamicType::Any))
                         && (binding.matching_overloads().next().is_none()
                             || constructor_is_subclass_of_any)
                         && let Some(downstream) = binding.downstream_constructor.as_ref()
@@ -845,7 +870,7 @@ impl<'db> Bindings<'db> {
                     {
                         return Some(downstream_return);
                     }
-                    return Some(resolved);
+                    return Some(outcome.resolved_return);
                 }
 
                 // For layered mixed-constructor handling (metaclass `__call__` mixed with
@@ -3357,7 +3382,7 @@ impl<'db> CallableBinding<'db> {
         let mut saw_instance_like = false;
         let mut saw_non_instance = false;
         for overload in &self.overloads {
-            match downstream.return_kind(db, overload.signature.return_ty) {
+            match downstream.overload_return_outcome(db, overload).kind {
                 ConstructorReturnKind::NotInstance => saw_non_instance = true,
                 ConstructorReturnKind::Instance => {
                     saw_instance_like = true;
