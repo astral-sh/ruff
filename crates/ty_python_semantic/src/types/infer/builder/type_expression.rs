@@ -2062,48 +2062,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         })
                         .collect();
 
-                    let parameters = match last_arg {
-                        ast::Expr::EllipsisLiteral(_) => Some(Parameters::concatenate(
-                            self.db(),
-                            prefix_params,
-                            ConcatenateTail::Gradual,
-                        )),
-                        ast::Expr::Name(name) if !name.is_invalid() => {
-                            let name_ty = self.infer_name_load(name);
-                            if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) =
-                                name_ty
-                                && typevar.is_paramspec(self.db())
-                            {
-                                let index = semantic_index(self.db(), self.scope().file(self.db()));
-                                bind_typevar(
-                                    self.db(),
-                                    index,
-                                    self.scope().file_scope_id(self.db()),
-                                    self.typevar_binding_context,
-                                    typevar,
-                                )
-                                .map(|bound_typevar| {
-                                    Parameters::concatenate(
-                                        self.db(),
-                                        prefix_params,
-                                        ConcatenateTail::ParamSpec(bound_typevar),
-                                    )
-                                })
-                            } else {
-                                report_invalid_concatenate_last_arg(
-                                    &self.context,
-                                    last_arg,
-                                    name_ty,
-                                );
-                                None
-                            }
-                        }
-                        _ => {
-                            let ty = self.infer_type_expression(last_arg);
-                            report_invalid_concatenate_last_arg(&self.context, last_arg, ty);
-                            None
-                        }
-                    };
+                    let parameters = self
+                        .infer_concatenate_tail(last_arg)
+                        .map(|tail| Parameters::concatenate(self.db(), prefix_params, tail));
 
                     if arguments_slice.is_tuple_expr() {
                         // TODO: What type to store for the argument slice in `Concatenate` because
@@ -2175,6 +2136,64 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             diagnostic::add_type_expression_reference_link(diag);
         }
         None
+    }
+
+    fn infer_concatenate_tail(&mut self, expr: &ast::Expr) -> Option<ConcatenateTail<'db>> {
+        match expr {
+            ast::Expr::EllipsisLiteral(_) => Some(ConcatenateTail::Gradual),
+            ast::Expr::Name(name) if !name.is_invalid() => {
+                let name_ty = self.infer_name_load(name);
+                if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = name_ty
+                    && typevar.is_paramspec(self.db())
+                {
+                    let index = semantic_index(self.db(), self.scope().file(self.db()));
+                    bind_typevar(
+                        self.db(),
+                        index,
+                        self.scope().file_scope_id(self.db()),
+                        self.typevar_binding_context,
+                        typevar,
+                    )
+                    .map(ConcatenateTail::ParamSpec)
+                } else {
+                    report_invalid_concatenate_last_arg(&self.context, expr, name_ty);
+                    None
+                }
+            }
+            ast::Expr::StringLiteral(string) => {
+                if let Some(parsed) = parse_string_annotation(&self.context, string) {
+                    self.string_annotations
+                        .insert(ruff_python_ast::ExprRef::StringLiteral(string).into());
+                    let node_key = self.enclosing_node_key(string.into());
+
+                    let previous_deferred_state = std::mem::replace(
+                        &mut self.deferred_state,
+                        DeferredExpressionState::InStringAnnotation(node_key),
+                    );
+                    let result = matches!(
+                        parsed.expr(),
+                        ast::Expr::Name(_) | ast::Expr::EllipsisLiteral(_)
+                    )
+                    .then(|| self.infer_concatenate_tail(parsed.expr()));
+                    self.deferred_state = previous_deferred_state;
+
+                    if let Some(result) = result {
+                        result
+                    } else {
+                        report_invalid_concatenate_last_arg(&self.context, expr, Type::unknown());
+                        None
+                    }
+                } else {
+                    report_invalid_concatenate_last_arg(&self.context, expr, Type::unknown());
+                    None
+                }
+            }
+            _ => {
+                let ty = self.infer_type_expression(expr);
+                report_invalid_concatenate_last_arg(&self.context, expr, ty);
+                None
+            }
+        }
     }
 
     /// Checks if the inferred type is an unbound type variable and reports a diagnostic if so.
