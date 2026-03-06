@@ -18,7 +18,8 @@ use super::diagnostic::{
 };
 use super::infer::infer_deferred_types;
 use super::{
-    ApplyTypeMappingVisitor, IntersectionBuilder, Type, TypeMapping, TypeQualifiers, visitor,
+    ApplyTypeMappingVisitor, IntersectionBuilder, Type, TypeMapping, TypeQualifiers,
+    definition_expression_type, visitor,
 };
 use crate::Db;
 use crate::semantic_index::definition::Definition;
@@ -48,6 +49,52 @@ impl Default for TypedDictParams {
     fn default() -> Self {
         Self::TOTAL
     }
+}
+
+/// A specification describing the fields of a functional `TypedDict`.
+///
+/// Assigned functional `TypedDict`s compute this lazily after deferred inference, while dangling
+/// calls store it eagerly on the anchor.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[derive(PartialOrd, Ord)]
+pub struct TypedDictSpec<'db> {
+    /// The fully materialized schema for this `TypedDict`.
+    #[returns(ref)]
+    pub(crate) items: TypedDictSchema<'db>,
+
+    /// Whether the fields are known statically.
+    pub(crate) has_known_fields: bool,
+}
+
+impl<'db> TypedDictSpec<'db> {
+    pub(crate) fn known(db: &'db dyn Db, items: TypedDictSchema<'db>) -> Self {
+        Self::new(db, items, true)
+    }
+
+    pub(crate) fn unknown(db: &'db dyn Db) -> Self {
+        Self::new(db, TypedDictSchema::default(), false)
+    }
+}
+
+impl get_size2::GetSize for TypedDictSpec<'_> {}
+
+pub(super) fn functional_typed_dict_field<'db>(
+    declared_ty: Type<'db>,
+    qualifiers: TypeQualifiers,
+    total: bool,
+) -> TypedDictField<'db> {
+    let required = if qualifiers.contains(TypeQualifiers::REQUIRED) {
+        true
+    } else if qualifiers.contains(TypeQualifiers::NOT_REQUIRED) {
+        false
+    } else {
+        total
+    };
+
+    TypedDictFieldBuilder::new(declared_ty)
+        .required(required)
+        .read_only(qualifiers.contains(TypeQualifiers::READ_ONLY))
+        .build()
 }
 
 /// Type that represents the set of all inhabitants (`dict` instances) that conform to
@@ -105,128 +152,11 @@ impl<'db> TypedDictType<'db> {
                 .collect()
         }
 
-        /// Compute field types for a dynamic `TypedDict` by re-reading the AST and inferring types.
-        ///
-        /// This is done lazily (after the `TypedDict` definition is complete) to support recursive
-        /// `TypedDict`s where field types may reference the `TypedDict` being defined.
-        #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
-        fn dynamic_typeddict_items<'db>(
-            db: &'db dyn Db,
-            class: DynamicTypedDictLiteral<'db>,
-        ) -> TypedDictSchema<'db> {
-            // If fields are not known statically, return empty schema (attribute access returns Any).
-            if !class.has_known_fields(db) {
-                return TypedDictSchema::default();
-            }
-
-            // Get the definition (if any) to access deferred type inference.
-            let Some(definition) = class.definition(db) else {
-                // For dangling TypedDict calls without a definition, we can't do deferred inference.
-                // Return types as Unknown with default requiredness.
-                return class
-                    .raw_fields(db)
-                    .iter()
-                    .cloned()
-                    .map(|name| {
-                        let field = TypedDictFieldBuilder::new(Type::unknown())
-                            .required(class.total(db))
-                            .build();
-                        (name, field)
-                    })
-                    .collect();
-            };
-
-            // Get the deferred inference to access the inferred field types.
-            let deferred_inference = infer_deferred_types(db, definition);
-
-            // Get the call expression AST to find field value expressions.
-            let file = definition.file(db);
-            let module = parsed_module(db, file).load(db);
-
-            // Get the call expression from the definition.
-            let Some(call_expr) = definition.kind(db).value(&module) else {
-                return TypedDictSchema::default();
-            };
-            let ast::Expr::Call(ast::ExprCall { arguments, .. }) = call_expr else {
-                return TypedDictSchema::default();
-            };
-
-            // Build a mapping from field names to their value expressions.
-            let mut field_value_exprs: BTreeMap<&str, &ast::Expr> = BTreeMap::new();
-
-            // Check for dict argument (normal syntax).
-            if let Some(fields_arg) = arguments.args.get(1)
-                && let ast::Expr::Dict(dict_expr) = fields_arg
-            {
-                for item in &dict_expr.items {
-                    if let Some(key) = &item.key
-                        && let ast::Expr::StringLiteral(key_lit) = key
-                    {
-                        field_value_exprs.insert(key_lit.value.to_str(), &item.value);
-                    }
-                }
-            }
-
-            // Also check for deprecated keyword-argument syntax.
-            for kw in &arguments.keywords {
-                if let Some(arg) = &kw.arg {
-                    match arg.id.as_str() {
-                        "total" | "closed" | "extra_items" => continue,
-                        field_name => {
-                            field_value_exprs.insert(field_name, &kw.value);
-                        }
-                    }
-                }
-            }
-
-            // Build the schema by looking up inferred types and qualifiers for each field.
-            class
-                .raw_fields(db)
-                .iter()
-                .cloned()
-                .map(|name| {
-                    // Look up the value expression for this field.
-                    let (field_ty, is_required) =
-                        if let Some(value_expr) = field_value_exprs.get(name.as_str()) {
-                            // Get the inferred type from deferred inference.
-                            // The type was inferred as an annotation expression in
-                            // `infer_functional_typeddict_deferred`.
-                            let ty = deferred_inference
-                                .try_expression_type(*value_expr)
-                                .unwrap_or(Type::unknown());
-
-                            // Get the qualifiers (Required/NotRequired) from deferred inference.
-                            let qualifiers = deferred_inference
-                                .try_qualifiers(*value_expr)
-                                .unwrap_or(TypeQualifiers::empty());
-
-                            // Determine requiredness from qualifiers or use class default.
-                            let required = if qualifiers.contains(TypeQualifiers::REQUIRED) {
-                                true
-                            } else if qualifiers.contains(TypeQualifiers::NOT_REQUIRED) {
-                                false
-                            } else {
-                                class.total(db)
-                            };
-
-                            (ty, required)
-                        } else {
-                            (Type::unknown(), class.total(db))
-                        };
-
-                    let field = TypedDictFieldBuilder::new(field_ty)
-                        .required(is_required)
-                        .build();
-                    (name, field)
-                })
-                .collect()
-        }
-
         match self {
             Self::Class(defining_class) => {
                 // Check if this is a dynamic TypedDict
                 if let ClassLiteral::DynamicTypedDict(class) = defining_class.class_literal(db) {
-                    return dynamic_typeddict_items(db, class);
+                    return class.items(db);
                 }
                 class_based_items(db, defining_class)
             }
@@ -616,7 +546,95 @@ pub(super) fn dynamic_typed_dict_schema<'db>(
     db: &'db dyn Db,
     class: DynamicTypedDictLiteral<'db>,
 ) -> &'db TypedDictSchema<'db> {
-    TypedDictType::Class(ClassType::NonGeneric(class.into())).items(db)
+    class.items(db)
+}
+
+pub(super) fn deferred_functional_typed_dict_spec<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+) -> TypedDictSpec<'db> {
+    let module = parsed_module(db, definition.file(db)).load(db);
+    let node = definition
+        .kind(db)
+        .value(&module)
+        .expect("Expected `TypedDict` definition to be an assignment")
+        .as_call_expr()
+        .expect("Expected `TypedDict` definition r.h.s. to be a call expression");
+
+    let deferred_inference = infer_deferred_types(db, definition);
+
+    let total = node
+        .arguments
+        .keywords
+        .iter()
+        .find_map(|keyword| {
+            (keyword
+                .arg
+                .as_ref()
+                .is_some_and(|arg| arg.id.as_str() == "total"))
+            .then(|| definition_expression_type(db, definition, &keyword.value))
+        })
+        .is_none_or(|total_ty| !total_ty.bool(db).is_always_false());
+
+    if let Some(fields_arg) = node.arguments.args.get(1) {
+        let ast::Expr::Dict(dict_expr) = fields_arg else {
+            return TypedDictSpec::unknown(db);
+        };
+
+        let mut schema = TypedDictSchema::default();
+
+        for item in &dict_expr.items {
+            let Some(key) = &item.key else {
+                return TypedDictSpec::unknown(db);
+            };
+
+            let key_ty = definition_expression_type(db, definition, key);
+            let Some(key_lit) = key_ty.as_string_literal() else {
+                return TypedDictSpec::unknown(db);
+            };
+
+            let field_ty = deferred_inference
+                .try_expression_type(&item.value)
+                .unwrap_or(Type::unknown());
+            let qualifiers = deferred_inference
+                .try_qualifiers(&item.value)
+                .unwrap_or(TypeQualifiers::empty());
+
+            schema.insert(
+                Name::new(key_lit.value(db)),
+                functional_typed_dict_field(field_ty, qualifiers, total),
+            );
+        }
+
+        return TypedDictSpec::known(db, schema);
+    }
+
+    let mut schema = TypedDictSchema::default();
+
+    for keyword in &node.arguments.keywords {
+        let Some(arg) = &keyword.arg else {
+            continue;
+        };
+
+        match arg.id.as_str() {
+            "total" | "closed" | "extra_items" => continue,
+            field_name => {
+                let field_ty = deferred_inference
+                    .try_expression_type(&keyword.value)
+                    .unwrap_or(Type::unknown());
+                let qualifiers = deferred_inference
+                    .try_qualifiers(&keyword.value)
+                    .unwrap_or(TypeQualifiers::empty());
+
+                schema.insert(
+                    Name::new(field_name),
+                    functional_typed_dict_field(field_ty, qualifiers, total),
+                );
+            }
+        }
+    }
+
+    TypedDictSpec::known(db, schema)
 }
 
 pub(super) fn typed_dict_params_from_class_def(class_stmt: &StmtClassDef) -> TypedDictParams {

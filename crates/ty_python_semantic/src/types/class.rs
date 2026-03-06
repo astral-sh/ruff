@@ -31,7 +31,9 @@ use crate::types::mro::{DynamicMroError, Mro};
 use crate::types::relation::{HasRelationToVisitor, IsDisjointVisitor, TypeRelation};
 use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
 use crate::types::tuple::TupleSpec;
-use crate::types::typed_dict::dynamic_typed_dict_schema;
+use crate::types::typed_dict::{
+    TypedDictSchema, TypedDictSpec, deferred_functional_typed_dict_spec, dynamic_typed_dict_schema,
+};
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, CallableTypes, DataclassFlags, DataclassParams,
     FindLegacyTypeVarsVisitor, IntersectionBuilder, TypeContext, TypeMapping, UnionBuilder,
@@ -2165,8 +2167,27 @@ impl<'db> VarianceInferable<'db> for ClassLiteral<'db> {
 ///
 /// The type of `Movie` would be `type[Movie]` where `Movie` is a `DynamicTypedDictLiteral`.
 ///
-/// Field types are NOT stored here to support recursive TypedDicts. Instead, field types
-/// are computed lazily in `dynamic_typeddict_items` by re-reading the AST.
+/// The field schema is represented by a separate [`TypedDictSpec`].
+#[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+pub enum DynamicTypedDictAnchor<'db> {
+    /// The `TypedDict()` call is assigned to a variable.
+    ///
+    /// The `Definition` uniquely identifies this TypedDict. Field types are computed lazily
+    /// during deferred inference so recursive TypedDict definitions can resolve correctly.
+    Definition(Definition<'db>),
+
+    /// The `TypedDict()` call is "dangling" (not assigned to a variable).
+    ///
+    /// The offset is relative to the enclosing scope's anchor node index. The eagerly
+    /// computed `spec` preserves field types for inline uses like
+    /// `TypedDict("Point", {"x": int})(x=1)`.
+    ScopeOffset {
+        scope: ScopeId<'db>,
+        offset: u32,
+        spec: TypedDictSpec<'db>,
+    },
+}
+
 #[salsa::interned(debug, heap_size = ruff_memory_usage::heap_size)]
 #[derive(PartialOrd, Ord)]
 pub struct DynamicTypedDictLiteral<'db> {
@@ -2174,32 +2195,14 @@ pub struct DynamicTypedDictLiteral<'db> {
     #[returns(ref)]
     pub name: Name,
 
-    /// The field names for this TypedDict.
-    ///
-    /// Field types and requiredness (Required/NotRequired qualifiers) are computed lazily
-    /// in `dynamic_typeddict_items` by re-reading the AST and using deferred inference.
-    /// This supports recursive TypedDicts where field types may reference the TypedDict being defined.
-    #[returns(ref)]
-    pub raw_fields: Box<[Name]>,
-
-    /// The default requiredness for fields without explicit `Required`/`NotRequired` wrapper.
-    /// This comes from the `total` keyword argument (default `True`).
-    pub total: bool,
-
-    /// Whether the fields are known statically.
-    ///
-    /// When `true`, the fields were determined from a literal dict.
-    /// When `false`, the fields argument was dynamic (e.g., a variable),
-    /// and attribute lookups should return `Any` instead of failing.
-    pub has_known_fields: bool,
-
     /// The anchor for this dynamic TypedDict, providing stable identity.
     ///
     /// - `Definition`: The call is assigned to a variable. The definition
     ///   uniquely identifies this TypedDict and can be used to find the call.
     /// - `ScopeOffset`: The call is "dangling" (not assigned). The offset
-    ///   is relative to the enclosing scope's anchor node index.
-    pub anchor: DynamicClassAnchor<'db>,
+    ///   is relative to the enclosing scope's anchor node index, and the
+    ///   eagerly computed spec is stored on the anchor.
+    pub anchor: DynamicTypedDictAnchor<'db>,
 }
 
 impl get_size2::GetSize for DynamicTypedDictLiteral<'_> {}
@@ -2209,16 +2212,16 @@ impl<'db> DynamicTypedDictLiteral<'db> {
     /// Returns the definition where this `TypedDict` is created, if it was assigned to a variable.
     pub(crate) fn definition(self, db: &'db dyn Db) -> Option<Definition<'db>> {
         match self.anchor(db) {
-            DynamicClassAnchor::Definition(definition) => Some(definition),
-            DynamicClassAnchor::ScopeOffset { .. } => None,
+            DynamicTypedDictAnchor::Definition(definition) => Some(definition),
+            DynamicTypedDictAnchor::ScopeOffset { .. } => None,
         }
     }
 
     /// Returns the scope in which this dynamic `TypedDict` was created.
     pub(crate) fn scope(self, db: &'db dyn Db) -> ScopeId<'db> {
         match self.anchor(db) {
-            DynamicClassAnchor::Definition(definition) => definition.scope(db),
-            DynamicClassAnchor::ScopeOffset { scope, .. } => scope,
+            DynamicTypedDictAnchor::Definition(definition) => definition.scope(db),
+            DynamicTypedDictAnchor::ScopeOffset { scope, .. } => scope,
         }
     }
 
@@ -2234,16 +2237,18 @@ impl<'db> DynamicTypedDictLiteral<'db> {
         let module = parsed_module(db, file).load(db);
 
         match self.anchor(db) {
-            DynamicClassAnchor::Definition(definition) => {
+            DynamicTypedDictAnchor::Definition(definition) => {
                 // For definitions, get the range from the definition's value.
                 // The TypedDict call is the value of the assignment.
                 definition
                     .kind(db)
                     .value(&module)
-                    .expect("DynamicClassAnchor::Definition should only be used for assignments")
+                    .expect(
+                        "DynamicTypedDictAnchor::Definition should only be used for assignments",
+                    )
                     .range()
             }
-            DynamicClassAnchor::ScopeOffset { offset, .. } => {
+            DynamicTypedDictAnchor::ScopeOffset { offset, .. } => {
                 // For dangling calls, compute the absolute index from the offset.
                 let scope_anchor = scope.node(db).node_index().unwrap_or(NodeIndex::from(0));
                 let anchor_u32 = scope_anchor
@@ -2264,6 +2269,37 @@ impl<'db> DynamicTypedDictLiteral<'db> {
     /// Returns a [`Span`] pointing to the `TypedDict` call expression.
     pub(super) fn header_span(self, db: &'db dyn Db) -> Span {
         Span::from(self.scope(db).file(db)).with_range(self.header_range(db))
+    }
+
+    fn spec(self, db: &'db dyn Db) -> TypedDictSpec<'db> {
+        #[salsa::tracked(
+            cycle_initial = deferred_spec_initial,
+            heap_size = ruff_memory_usage::heap_size
+        )]
+        fn deferred_spec<'db>(db: &'db dyn Db, definition: Definition<'db>) -> TypedDictSpec<'db> {
+            deferred_functional_typed_dict_spec(db, definition)
+        }
+
+        fn deferred_spec_initial<'db>(
+            db: &'db dyn Db,
+            _id: salsa::Id,
+            _definition: Definition<'db>,
+        ) -> TypedDictSpec<'db> {
+            TypedDictSpec::unknown(db)
+        }
+
+        match self.anchor(db) {
+            DynamicTypedDictAnchor::Definition(definition) => deferred_spec(db, definition),
+            DynamicTypedDictAnchor::ScopeOffset { spec, .. } => spec,
+        }
+    }
+
+    pub(crate) fn items(self, db: &'db dyn Db) -> &'db TypedDictSchema<'db> {
+        self.spec(db).items(db)
+    }
+
+    pub(crate) fn has_known_fields(self, db: &'db dyn Db) -> bool {
+        self.spec(db).has_known_fields(db)
     }
 
     /// Get the MRO for this `TypedDict`.

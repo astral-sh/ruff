@@ -1929,6 +1929,21 @@ reveal_type(movie["name"])  # revealed: str
 reveal_type(movie["year"])  # revealed: int
 ```
 
+An empty functional `TypedDict` can omit the `fields` argument entirely:
+
+```py
+from typing_extensions import TypedDict
+
+Empty = TypedDict("Empty")
+empty = Empty()
+
+reveal_type(Empty)  # revealed: <class 'Empty'>
+reveal_type(empty)  # revealed: Empty
+
+EmptyPartial = TypedDict("EmptyPartial", total=False)
+reveal_type(EmptyPartial())  # revealed: EmptyPartial
+```
+
 Constructor validation also works with dict literals:
 
 ```py
@@ -1951,6 +1966,50 @@ missing_key = Film({"title": "Incomplete"})
 
 # error: [invalid-key] "Unknown key "director" for TypedDict `Film`"
 extra_key = Film({"title": "Extra", "year": 2020, "director": "Someone"})
+```
+
+Inline functional `TypedDict`s preserve their field types too:
+
+```py
+from typing_extensions import TypedDict
+
+inline = TypedDict("Inline", {"x": int})(x=1)
+reveal_type(inline["x"])  # revealed: int
+
+# error: [invalid-argument-type] "Invalid argument to key "x" with declared type `int` on TypedDict `InlineBad`: value of type `Literal["bad"]`"
+inline_bad = TypedDict("InlineBad", {"x": int})(x="bad")
+```
+
+Inline functional `TypedDict`s also work with the deprecated keyword syntax:
+
+```py
+from typing_extensions import TypedDict
+
+inline_deprecated = TypedDict("InlineDeprecated", x=int)(x=1)
+reveal_type(inline_deprecated["x"])  # revealed: int
+```
+
+Inline functional `TypedDict`s preserve `ReadOnly` qualifiers:
+
+```py
+from typing_extensions import TypedDict, ReadOnly
+
+inline_readonly = TypedDict("InlineReadOnly", {"id": ReadOnly[int]})(id=1)
+
+# error: [invalid-assignment] "Cannot assign to key "id" on TypedDict `InlineReadOnly`: key is marked read-only"
+inline_readonly["id"] = 2
+```
+
+Inline functional `TypedDict`s resolve string forward references to existing names:
+
+```py
+from typing_extensions import TypedDict
+
+class Director:
+    pass
+
+inline_ref = TypedDict("InlineRef", {"director": "Director"})(director=Director())
+reveal_type(inline_ref["director"])  # revealed: Director
 ```
 
 ## Function syntax with `total=False`

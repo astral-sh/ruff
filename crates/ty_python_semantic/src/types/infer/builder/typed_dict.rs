@@ -1,0 +1,346 @@
+use ruff_python_ast::name::Name;
+use ruff_python_ast::{self as ast, NodeIndex};
+
+use super::{DeferredExpressionState, TypeInferenceBuilder};
+use crate::semantic_index::definition::Definition;
+use crate::types::class::{ClassLiteral, DynamicTypedDictAnchor, DynamicTypedDictLiteral};
+use crate::types::diagnostic::{
+    INVALID_ARGUMENT_TYPE, MISSING_ARGUMENT, TOO_MANY_POSITIONAL_ARGUMENTS, UNKNOWN_ARGUMENT,
+};
+use crate::types::typed_dict::{TypedDictSchema, TypedDictSpec, functional_typed_dict_field};
+use crate::types::{KnownClass, Type, TypeContext};
+
+impl<'db> TypeInferenceBuilder<'db, '_> {
+    /// Infer a `TypedDict(name, fields)` call expression.
+    ///
+    /// This method *does not* call `infer_expression` on the object being called;
+    /// it is assumed that the type for this AST node has already been inferred before this method is called.
+    pub(super) fn infer_typeddict_call_expression(
+        &mut self,
+        call_expr: &ast::ExprCall,
+        definition: Option<Definition<'db>>,
+    ) -> Type<'db> {
+        let db = self.db();
+
+        let ast::Arguments {
+            args,
+            keywords,
+            range: _,
+            node_index: _,
+        } = &call_expr.arguments;
+
+        let has_starred = args.iter().any(ast::Expr::is_starred_expr);
+        let has_double_starred = keywords.iter().any(|kw| kw.arg.is_none());
+
+        let Some(name_arg) = args.first() else {
+            for arg in args {
+                self.infer_expression(arg, TypeContext::default());
+            }
+            for kw in keywords {
+                self.infer_expression(&kw.value, TypeContext::default());
+            }
+
+            if !has_starred
+                && !has_double_starred
+                && let Some(builder) = self.context.report_lint(&MISSING_ARGUMENT, call_expr)
+            {
+                builder.into_diagnostic(
+                    "No argument provided for required parameter `typename` of function `TypedDict`",
+                );
+            }
+
+            return KnownClass::TypedDictFallback.to_subclass_of(db);
+        };
+
+        let fields_arg = args.get(1);
+        let name_type = self.infer_expression(name_arg, TypeContext::default());
+
+        let fields_type = fields_arg.and_then(|fields_arg| {
+            if matches!(fields_arg, ast::Expr::Dict(_)) {
+                None
+            } else {
+                Some(self.infer_expression(fields_arg, TypeContext::default()))
+            }
+        });
+
+        for arg in args.iter().skip(2) {
+            self.infer_expression(arg, TypeContext::default());
+        }
+
+        if has_starred || has_double_starred {
+            for kw in keywords {
+                self.infer_expression(&kw.value, TypeContext::default());
+            }
+            return KnownClass::TypedDictFallback.to_subclass_of(db);
+        }
+
+        if args.len() > 2
+            && let Some(builder) = self
+                .context
+                .report_lint(&TOO_MANY_POSITIONAL_ARGUMENTS, &args[2])
+        {
+            builder.into_diagnostic(format_args!(
+                "Too many positional arguments to function `TypedDict`: expected 2, got {}",
+                args.len()
+            ));
+        }
+
+        let mut total = true;
+        let deprecated_syntax = fields_arg.is_none();
+        let mut deprecated_field_values = Vec::new();
+
+        for kw in keywords {
+            let Some(arg) = &kw.arg else {
+                continue;
+            };
+
+            match arg.id.as_str() {
+                "total" => {
+                    let kw_type = self.infer_expression(&kw.value, TypeContext::default());
+                    if !kw_type.is_assignable_to(db, KnownClass::Bool.to_instance(db))
+                        && let Some(builder) =
+                            self.context.report_lint(&INVALID_ARGUMENT_TYPE, &kw.value)
+                    {
+                        let mut diagnostic = builder.into_diagnostic(format_args!(
+                            "Invalid argument to parameter `total` of `TypedDict()`"
+                        ));
+                        diagnostic.set_primary_message(format_args!(
+                            "Expected `bool`, found `{}`",
+                            kw_type.display(db)
+                        ));
+                    }
+
+                    if kw_type.bool(db).is_always_false() {
+                        total = false;
+                    } else if !kw_type.bool(db).is_always_true() {
+                        total = true;
+                    }
+                }
+                "closed" => {
+                    let kw_type = self.infer_expression(&kw.value, TypeContext::default());
+                    if !kw_type.is_assignable_to(db, KnownClass::Bool.to_instance(db))
+                        && let Some(builder) =
+                            self.context.report_lint(&INVALID_ARGUMENT_TYPE, &kw.value)
+                    {
+                        let mut diagnostic = builder.into_diagnostic(format_args!(
+                            "Invalid argument to parameter `closed` of `TypedDict()`"
+                        ));
+                        diagnostic.set_primary_message(format_args!(
+                            "Expected `bool`, found `{}`",
+                            kw_type.display(db)
+                        ));
+                    }
+                }
+                "extra_items" => {
+                    self.infer_type_expression(&kw.value);
+                }
+                field_name => {
+                    if deprecated_syntax {
+                        let field_name = Name::new(field_name);
+                        deprecated_field_values.push((field_name.clone(), &kw.value));
+                    } else {
+                        self.infer_expression(&kw.value, TypeContext::default());
+                        if let Some(builder) = self.context.report_lint(&UNKNOWN_ARGUMENT, kw) {
+                            builder.into_diagnostic(format_args!(
+                                "Argument `{field_name}` does not match any known parameter of function `TypedDict`",
+                            ));
+                        }
+                    }
+                }
+            }
+        }
+
+        let name = if let Some(literal) = name_type.as_string_literal() {
+            Name::new(literal.value(db))
+        } else {
+            if !name_type.is_assignable_to(db, KnownClass::Str.to_instance(db))
+                && let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, name_arg)
+            {
+                let mut diagnostic = builder.into_diagnostic(format_args!(
+                    "Invalid argument to parameter `typename` of `TypedDict()`"
+                ));
+                diagnostic.set_primary_message(format_args!(
+                    "Expected `str`, found `{}`",
+                    name_type.display(db)
+                ));
+            }
+            Name::new_static("<unknown>")
+        };
+
+        if let Some(definition) = definition {
+            self.deferred.insert(definition, self.multi_inference_state);
+        }
+
+        let fields_are_known = fields_arg
+            .map(|fields_arg| self.typeddict_fields_are_known(fields_arg, fields_type))
+            .unwrap_or(true);
+
+        let scope = self.scope();
+        let anchor = match definition {
+            Some(definition) => DynamicTypedDictAnchor::Definition(definition),
+            None => {
+                let call_node_index = call_expr.node_index.load();
+                let scope_anchor = scope.node(db).node_index().unwrap_or(NodeIndex::from(0));
+                let anchor_u32 = scope_anchor
+                    .as_u32()
+                    .expect("scope anchor should not be NodeIndex::NONE");
+                let call_u32 = call_node_index
+                    .as_u32()
+                    .expect("call node should not be NodeIndex::NONE");
+
+                let spec = if let Some(fields_arg) = fields_arg {
+                    if fields_are_known {
+                        self.infer_dangling_typeddict_spec(
+                            Some(fields_arg),
+                            &deprecated_field_values,
+                            total,
+                        )
+                    } else {
+                        TypedDictSpec::unknown(db)
+                    }
+                } else {
+                    self.infer_dangling_typeddict_spec(None, &deprecated_field_values, total)
+                };
+
+                DynamicTypedDictAnchor::ScopeOffset {
+                    scope,
+                    offset: call_u32 - anchor_u32,
+                    spec,
+                }
+            }
+        };
+
+        let typeddict = DynamicTypedDictLiteral::new(db, name, anchor);
+
+        Type::ClassLiteral(ClassLiteral::DynamicTypedDict(typeddict))
+    }
+
+    fn infer_dangling_typeddict_spec(
+        &mut self,
+        fields_arg: Option<&ast::Expr>,
+        deprecated_field_values: &[(Name, &ast::Expr)],
+        total: bool,
+    ) -> TypedDictSpec<'db> {
+        let db = self.db();
+        let mut schema = TypedDictSchema::default();
+
+        if let Some(ast::Expr::Dict(dict_expr)) = fields_arg {
+            for item in &dict_expr.items {
+                let Some(key) = &item.key else {
+                    return TypedDictSpec::unknown(db);
+                };
+
+                let key_ty = self
+                    .try_expression_type(key)
+                    .unwrap_or_else(|| self.infer_expression(key, TypeContext::default()));
+                let Some(key_literal) = key_ty.as_string_literal() else {
+                    return TypedDictSpec::unknown(db);
+                };
+
+                let annotation =
+                    self.infer_annotation_expression(&item.value, DeferredExpressionState::None);
+
+                schema.insert(
+                    Name::new(key_literal.value(db)),
+                    functional_typed_dict_field(
+                        annotation.inner_type(),
+                        annotation.qualifiers(),
+                        total,
+                    ),
+                );
+            }
+
+            return TypedDictSpec::known(db, schema);
+        }
+
+        for (field_name, annotation_expr) in deprecated_field_values {
+            let annotation =
+                self.infer_annotation_expression(annotation_expr, DeferredExpressionState::None);
+
+            schema.insert(
+                field_name.clone(),
+                functional_typed_dict_field(
+                    annotation.inner_type(),
+                    annotation.qualifiers(),
+                    total,
+                ),
+            );
+        }
+
+        TypedDictSpec::known(db, schema)
+    }
+
+    /// Infer field types for functional `TypedDict` in deferred phase.
+    ///
+    /// This is called during `infer_deferred_types` to infer field types after the `TypedDict`
+    /// definition is complete. This enables support for recursive `TypedDict`s where field types
+    /// may reference the `TypedDict` being defined.
+    pub(super) fn infer_functional_typeddict_deferred(&mut self, arguments: &ast::Arguments) {
+        if let Some(fields_arg) = arguments.args.get(1) {
+            self.infer_typeddict_field_types(fields_arg);
+        }
+
+        for kw in &arguments.keywords {
+            if let Some(arg) = &kw.arg {
+                match arg.id.as_str() {
+                    "total" | "closed" | "extra_items" => continue,
+                    _ => {
+                        self.infer_annotation_expression(
+                            &kw.value,
+                            DeferredExpressionState::Deferred,
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    /// Infer field types from a `TypedDict` fields dict argument.
+    fn infer_typeddict_field_types(&mut self, fields_arg: &ast::Expr) {
+        if let ast::Expr::Dict(dict_expr) = fields_arg {
+            for item in &dict_expr.items {
+                self.infer_annotation_expression(&item.value, DeferredExpressionState::Deferred);
+            }
+        }
+    }
+
+    fn typeddict_fields_are_known(
+        &mut self,
+        fields_arg: &ast::Expr,
+        fields_type: Option<Type<'db>>,
+    ) -> bool {
+        let db = self.db();
+
+        if let ast::Expr::Dict(dict_expr) = fields_arg {
+            for item in &dict_expr.items {
+                let ast::DictItem { key, value: _ } = item;
+
+                let Some(key) = key else {
+                    return false;
+                };
+
+                let key_ty = self.infer_expression(key, TypeContext::default());
+                if key_ty.as_string_literal().is_none() {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        if let Some(fields_type) = fields_type
+            && !fields_type.is_assignable_to(db, KnownClass::Dict.to_instance(db))
+            && let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, fields_arg)
+        {
+            let mut diagnostic = builder.into_diagnostic(format_args!(
+                "Invalid argument to parameter `fields` of `TypedDict()`"
+            ));
+            diagnostic.set_primary_message(format_args!(
+                "Expected a dict literal, found `{}`",
+                fields_type.display(db)
+            ));
+        }
+
+        false
+    }
+}

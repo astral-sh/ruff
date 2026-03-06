@@ -63,8 +63,8 @@ use crate::types::call::{Binding, Bindings, CallArguments, CallError, CallErrorK
 use crate::types::callable::CallableTypeKind;
 use crate::types::class::{
     ClassLiteral, CodeGeneratorKind, DynamicClassAnchor, DynamicClassLiteral,
-    DynamicMetaclassConflict, DynamicNamedTupleAnchor, DynamicNamedTupleLiteral,
-    DynamicTypedDictLiteral, MethodDecorator, NamedTupleField, NamedTupleSpec,
+    DynamicMetaclassConflict, DynamicNamedTupleAnchor, DynamicNamedTupleLiteral, MethodDecorator,
+    NamedTupleField, NamedTupleSpec,
 };
 use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::context::{InNoTypeCheck, InferContext};
@@ -144,6 +144,7 @@ mod make_dataclass;
 mod paramspec_validation;
 mod subscript;
 mod type_expression;
+mod typed_dict;
 
 use super::comparisons::{self, BinaryComparisonVisitor};
 pub(super) use make_dataclass::report_dynamic_dataclass_mro_errors;
@@ -5367,8 +5368,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         self.infer_make_dataclass_call_expression(call_expr, Some(definition))
                     } else if matches!(callable_type, Type::SpecialForm(SpecialFormType::TypedDict))
                     {
-                        // Functional TypedDict: defer field type evaluation to support recursive types.
-                        self.deferred.insert(definition, self.multi_inference_state);
                         self.infer_typeddict_call_expression(call_expr, Some(definition))
                     } else {
                         match callable_type
@@ -6051,45 +6050,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     &default.value,
                     bound_or_constraints_node,
                 );
-            }
-        }
-    }
-
-    /// Infer field types for functional `TypedDict` in deferred phase.
-    ///
-    /// This is called during `infer_deferred_types` to infer field types after the `TypedDict`
-    /// definition is complete. This enables support for recursive `TypedDict`s where field types
-    /// may reference the `TypedDict` being defined.
-    fn infer_functional_typeddict_deferred(&mut self, arguments: &ast::Arguments) {
-        // The second positional argument is the fields dict (if present).
-        if let Some(fields_arg) = arguments.args.get(1) {
-            self.infer_typeddict_field_types(fields_arg);
-        }
-
-        // Also handle deprecated keyword-argument syntax where fields are passed as kwargs.
-        for kw in &arguments.keywords {
-            if let Some(arg) = &kw.arg {
-                // Skip known parameters (total, closed, extra_items).
-                match arg.id.as_str() {
-                    "total" | "closed" | "extra_items" => continue,
-                    _ => {
-                        // This is a field definition - infer its type.
-                        self.infer_annotation_expression(
-                            &kw.value,
-                            DeferredExpressionState::Deferred,
-                        );
-                    }
-                }
-            }
-        }
-    }
-
-    /// Infer field types from a `TypedDict` fields dict argument.
-    fn infer_typeddict_field_types(&mut self, fields_arg: &ast::Expr) {
-        if let ast::Expr::Dict(dict_expr) = fields_arg {
-            for item in &dict_expr.items {
-                // Infer each value as an annotation expression with deferred state.
-                self.infer_annotation_expression(&item.value, DeferredExpressionState::Deferred);
             }
         }
     }
@@ -7311,284 +7271,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 diagnostic.set_primary_message("Will raise `ValueError` at runtime");
             }
         }
-    }
-
-    /// Infer a `TypedDict(name, fields)` call expression.
-    ///
-    /// This method *does not* call `infer_expression` on the object being called;
-    /// it is assumed that the type for this AST node has already been inferred before this method is called.
-    fn infer_typeddict_call_expression(
-        &mut self,
-        call_expr: &ast::ExprCall,
-        definition: Option<Definition<'db>>,
-    ) -> Type<'db> {
-        let db = self.db();
-
-        let ast::Arguments {
-            args,
-            keywords,
-            range: _,
-            node_index: _,
-        } = &call_expr.arguments;
-
-        // Need at least typename and fields (or fields via keyword arguments for deprecated syntax).
-        // The deprecated keyword-argument syntax is: `TypedDict("Name", field1=type1, field2=type2)`.
-        let (name_arg, fields_arg): (&ast::Expr, Option<&ast::Expr>) = match &**args {
-            [name_arg, fields_arg, ..] => (name_arg, Some(fields_arg)),
-            [name_arg] if !keywords.is_empty() => {
-                // Deprecated keyword-argument syntax: `TypedDict("Name", field1=type1, ...)`.
-                // We have just the typename, with fields as keyword arguments.
-                (name_arg, None)
-            }
-            _ => {
-                // Not enough arguments to form a TypedDict.
-                for arg in args {
-                    self.infer_expression(arg, TypeContext::default());
-                }
-                for kw in keywords {
-                    self.infer_expression(&kw.value, TypeContext::default());
-                }
-                return KnownClass::TypedDictFallback.to_subclass_of(self.db());
-            }
-        };
-
-        let name_type = self.infer_expression(name_arg, TypeContext::default());
-
-        // For the fields argument, we DON'T call infer_expression on it directly because:
-        // 1. The dict values are type annotations, not regular expressions
-        // 2. We need to handle forward references (including self-references) via annotation inference
-        // Instead, we extract fields directly from the AST in extract_typeddict_fields.
-        // We still need to get the fields_type for validation when it's not a dict literal.
-        let fields_type = fields_arg.and_then(|f| {
-            if matches!(f, ast::Expr::Dict(_)) {
-                // Dict literal - don't infer as value expression, will handle in extract_typeddict_fields
-                None
-            } else {
-                // Non-dict literal - infer to check type
-                Some(self.infer_expression(f, TypeContext::default()))
-            }
-        });
-
-        for arg in args.iter().skip(2) {
-            self.infer_expression(arg, TypeContext::default());
-        }
-
-        // If any argument is a starred expression or any keyword is a double-starred expression,
-        // we can't statically determine the arguments, so fall back to normal call binding.
-        if args.iter().any(ast::Expr::is_starred_expr) || keywords.iter().any(|kw| kw.arg.is_none())
-        {
-            for kw in keywords {
-                self.infer_expression(&kw.value, TypeContext::default());
-            }
-            return KnownClass::TypedDictFallback.to_subclass_of(self.db());
-        }
-
-        // Check for excess positional arguments (only typename and fields are expected).
-        if args.len() > 2 {
-            if let Some(builder) = self
-                .context
-                .report_lint(&TOO_MANY_POSITIONAL_ARGUMENTS, &args[2])
-            {
-                builder.into_diagnostic(format_args!(
-                    "Too many positional arguments to function `TypedDict`: expected 2, got {}",
-                    args.len()
-                ));
-            }
-        }
-
-        // Infer keyword arguments. Track `total` and collect deprecated-syntax field definitions.
-        let mut total = true;
-        let deprecated_syntax = fields_arg.is_none();
-        let mut deprecated_fields: Vec<Name> = Vec::new();
-
-        for kw in keywords {
-            let Some(arg) = &kw.arg else {
-                self.infer_expression(&kw.value, TypeContext::default());
-                continue;
-            };
-            match arg.id.as_str() {
-                "total" => {
-                    let kw_type = self.infer_expression(&kw.value, TypeContext::default());
-                    // Validate that total is a bool.
-                    if !kw_type.is_assignable_to(db, KnownClass::Bool.to_instance(db))
-                        && let Some(builder) =
-                            self.context.report_lint(&INVALID_ARGUMENT_TYPE, &kw.value)
-                    {
-                        let mut diagnostic = builder.into_diagnostic(format_args!(
-                            "Invalid argument to parameter `total` of `TypedDict()`"
-                        ));
-                        diagnostic.set_primary_message(format_args!(
-                            "Expected `bool`, found `{}`",
-                            kw_type.display(db)
-                        ));
-                    }
-
-                    // total=False means all fields are optional by default.
-                    if kw_type.bool(db).is_always_false() {
-                        total = false;
-                    } else if !kw_type.bool(db).is_always_true() {
-                        // If we can't determine the value statically, default to total=True.
-                        total = true;
-                    }
-                }
-                "closed" => {
-                    let kw_type = self.infer_expression(&kw.value, TypeContext::default());
-                    // closed is not yet supported, but we still validate the type.
-                    if !kw_type.is_assignable_to(db, KnownClass::Bool.to_instance(db))
-                        && let Some(builder) =
-                            self.context.report_lint(&INVALID_ARGUMENT_TYPE, &kw.value)
-                    {
-                        let mut diagnostic = builder.into_diagnostic(format_args!(
-                            "Invalid argument to parameter `closed` of `TypedDict()`"
-                        ));
-                        diagnostic.set_primary_message(format_args!(
-                            "Expected `bool`, found `{}`",
-                            kw_type.display(db)
-                        ));
-                    }
-                }
-                "extra_items" => {
-                    // extra_items is not yet supported, but we validate the type expression.
-                    self.infer_type_expression(&kw.value);
-                }
-                field_name => {
-                    // For deprecated keyword-argument syntax, treat unknown kwargs as field definitions.
-                    if deprecated_syntax {
-                        // Just collect field names. Types and requiredness are computed lazily
-                        // in deferred inference via `dynamic_typeddict_items`.
-                        deprecated_fields.push(Name::new(field_name));
-                    } else {
-                        // Normal syntax - report unknown argument.
-                        self.infer_expression(&kw.value, TypeContext::default());
-                        if let Some(builder) = self.context.report_lint(&UNKNOWN_ARGUMENT, kw) {
-                            builder.into_diagnostic(format_args!(
-                                "Argument `{field_name}` does not match any known parameter of `TypedDict`",
-                            ));
-                        }
-                    }
-                }
-            }
-        }
-
-        // Extract name.
-        let name = if let Some(literal) = name_type.as_string_literal() {
-            Name::new(literal.value(db))
-        } else {
-            // Name is not a string literal; use <unknown> like we do for NamedTuple calls.
-            if !name_type.is_assignable_to(db, KnownClass::Str.to_instance(db))
-                && let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, name_arg)
-            {
-                let mut diagnostic = builder.into_diagnostic(format_args!(
-                    "Invalid argument to parameter `typename` of `TypedDict()`"
-                ));
-                diagnostic.set_primary_message(format_args!(
-                    "Expected `str`, found `{}`",
-                    name_type.display(db)
-                ));
-            }
-            Name::new_static("<unknown>")
-        };
-
-        // Extract raw fields: from dict argument (normal syntax) or from keyword arguments (deprecated syntax).
-        // Field types are NOT evaluated here to support recursive TypedDicts.
-        let (raw_fields, has_known_fields) = if let Some(fields_arg) = fields_arg {
-            self.extract_raw_typeddict_fields(fields_arg, fields_type)
-        } else {
-            // Deprecated keyword-argument syntax: fields were collected from keyword arguments.
-            (deprecated_fields.into_boxed_slice(), true)
-        };
-
-        let scope = self.scope();
-
-        // Create the anchor for identifying this dynamic TypedDict.
-        // - For assigned TypedDict calls, the Definition uniquely identifies the TypedDict.
-        // - For dangling calls, compute a relative offset from the scope's node index.
-        let anchor = if let Some(def) = definition {
-            DynamicClassAnchor::Definition(def)
-        } else {
-            let call_node_index = call_expr.node_index.load();
-            let scope_anchor = scope.node(db).node_index().unwrap_or(NodeIndex::from(0));
-            let anchor_u32 = scope_anchor
-                .as_u32()
-                .expect("scope anchor should not be NodeIndex::NONE");
-            let call_u32 = call_node_index
-                .as_u32()
-                .expect("call node should not be NodeIndex::NONE");
-            DynamicClassAnchor::ScopeOffset {
-                scope,
-                offset: call_u32 - anchor_u32,
-                explicit_bases: Box::default(),
-            }
-        };
-
-        let typeddict =
-            DynamicTypedDictLiteral::new(db, name, raw_fields, total, has_known_fields, anchor);
-
-        Type::ClassLiteral(ClassLiteral::DynamicTypedDict(typeddict))
-    }
-
-    /// Extract field names from a `TypedDict` fields dict argument.
-    ///
-    /// Returns field names WITHOUT evaluating field types or requiredness.
-    /// Field types and requiredness (Required/NotRequired qualifiers) are computed lazily
-    /// in `dynamic_typeddict_items` using deferred inference to support recursive
-    /// `TypedDict`s where field types may reference the `TypedDict` being defined.
-    ///
-    /// Returns `(raw_fields, has_known_fields)` where `raw_fields` contains field names.
-    fn extract_raw_typeddict_fields(
-        &mut self,
-        fields_arg: &ast::Expr,
-        fields_type: Option<Type<'db>>,
-    ) -> (Box<[Name]>, bool) {
-        let db = self.db();
-
-        // First try to extract from AST if it's a dict literal.
-        if let ast::Expr::Dict(dict_expr) = fields_arg {
-            let mut fields: Vec<Name> = Vec::with_capacity(dict_expr.items.len());
-            let mut all_valid = true;
-
-            for item in &dict_expr.items {
-                let ast::DictItem { key, value: _ } = item;
-
-                // Key must be a string literal for the field name.
-                let Some(key) = key else {
-                    all_valid = false;
-                    continue; // Spread operator not supported
-                };
-
-                // Infer the key as a regular expression and extract the field name.
-                let key_ty = self.infer_expression(key, TypeContext::default());
-                let name = if let Some(s) = key_ty.as_string_literal() {
-                    Name::new(s.value(db))
-                } else {
-                    all_valid = false;
-                    continue; // Key must be a string literal
-                };
-
-                fields.push(name);
-            }
-
-            if all_valid {
-                return (fields.into_boxed_slice(), true);
-            }
-        }
-
-        // Emit diagnostic if fields is not a dict literal.
-        if let Some(fields_type) = fields_type
-            && !fields_type.is_assignable_to(db, KnownClass::Dict.to_instance(db))
-            && let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, fields_arg)
-        {
-            let mut diagnostic = builder.into_diagnostic(format_args!(
-                "Invalid argument to parameter `fields` of `TypedDict()`"
-            ));
-            diagnostic.set_primary_message(format_args!(
-                "Expected a dict literal, found `{}`",
-                fields_type.display(db)
-            ));
-        }
-
-        // Return empty fields with unknown flag.
-        (Box::default(), false)
     }
 
     /// Extract explicit base types from a bases tuple type.
