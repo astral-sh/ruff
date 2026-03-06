@@ -30,7 +30,9 @@ use ty_project::{ProjectDatabase, ProjectMetadata};
 use ty_server::run_server;
 use ty_static::EnvVars;
 
-use crate::args::{CheckCommand, Command, TerminalColor, VersionFormat};
+use crate::args::{
+    CheckCommand, Command, CoverageCommand, CoverageOutputFormat, TerminalColor, VersionFormat,
+};
 use crate::logging::{VerbosityLevel, setup_tracing};
 use crate::printer::Printer;
 pub use args::Cli;
@@ -47,6 +49,7 @@ pub fn run() -> anyhow::Result<ExitStatus> {
     match args.command {
         Command::Server => run_server().map(|()| ExitStatus::Success),
         Command::Check(check_args) => run_check(check_args),
+        Command::Coverage(coverage_args) => run_coverage(coverage_args),
         Command::Version { output_format } => version(output_format).map(|()| ExitStatus::Success),
         Command::GenerateShellCompletion { shell } => {
             use std::io::stdout;
@@ -195,6 +198,288 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     } else {
         Ok(exit_status)
     }
+}
+
+fn run_coverage(args: CoverageCommand) -> anyhow::Result<ExitStatus> {
+    use std::io::Write as _;
+
+    #[cfg(windows)]
+    assert!(colored::control::set_virtual_terminal(true).is_ok());
+
+    let output_format = args.format;
+    set_colored_override(args.color);
+
+    let verbosity = args.verbosity.level();
+    let _guard = setup_tracing(verbosity, args.color.unwrap_or_default())?;
+
+    let cwd = {
+        let cwd = std::env::current_dir().context("Failed to get the current working directory")?;
+        SystemPathBuf::from_path_buf(cwd).map_err(|path| {
+            anyhow!(
+                "The current working directory `{}` contains non-Unicode characters. ty only supports Unicode paths.",
+                path.display()
+            )
+        })?
+    };
+
+    let project_path = args
+        .project
+        .as_ref()
+        .map(|project| {
+            if project.as_std_path().is_dir() {
+                Ok(SystemPath::absolute(project, &cwd))
+            } else {
+                Err(anyhow!(
+                    "Provided project path `{project}` is not a directory"
+                ))
+            }
+        })
+        .transpose()?
+        .unwrap_or_else(|| cwd.clone());
+
+    let check_paths: Vec<_> = args
+        .paths
+        .iter()
+        .map(|path| SystemPath::absolute(path, &cwd))
+        .collect();
+
+    let system = OsSystem::new(&cwd);
+    let config_file = args
+        .config_file
+        .as_ref()
+        .map(|path| SystemPath::absolute(path, &cwd));
+
+    let mut project_metadata = match &config_file {
+        Some(config_file) => {
+            ProjectMetadata::from_config_file(config_file.clone(), &project_path, &system)?
+        }
+        None => ProjectMetadata::discover(&project_path, &system)?,
+    };
+
+    project_metadata.apply_configuration_files(&system)?;
+
+    let project_options_overrides = ProjectOptionsOverrides::new(config_file, args.into_options());
+    project_metadata.apply_overrides(&project_options_overrides);
+
+    let mut db = ProjectDatabase::new(project_metadata, system)?;
+    let project = db.project();
+
+    project.set_verbose(&mut db, verbosity >= VerbosityLevel::Verbose);
+
+    if !check_paths.is_empty() {
+        project.set_included_paths(&mut db, check_paths);
+    }
+
+    let files = project.files(&db);
+
+    let mut per_file: Vec<(String, ty_python_semantic::coverage::CoverageStats)> = files
+        .into_iter()
+        .map(|file| {
+            let path = file.path(&db).to_string();
+            let stats = ty_python_semantic::coverage::coverage_types(&db, file);
+            (path, stats)
+        })
+        .collect();
+
+    // Sort by dynamic percentage descending, with ties broken by path for stable output.
+    per_file.sort_by(|(path_a, stats_a), (path_b, stats_b)| {
+        let pct_a = stats_a.dynamic_percentage().unwrap_or(0.0);
+        let pct_b = stats_b.dynamic_percentage().unwrap_or(0.0);
+        pct_b
+            .partial_cmp(&pct_a)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then_with(|| path_a.cmp(path_b))
+    });
+
+    let total = per_file.iter().fold(
+        ty_python_semantic::coverage::CoverageStats::default(),
+        |acc, (_, s)| acc.merge(*s),
+    );
+
+    let mut stdout = std::io::stdout().lock();
+
+    match output_format {
+        CoverageOutputFormat::Text => {
+            for (path, stats) in &per_file {
+                writeln!(
+                    stdout,
+                    "{path}: {} exprs, {} dynamic ({:.1}%), {} todo ({:.1}%)",
+                    stats.total,
+                    stats.dynamic,
+                    stats.dynamic_percentage().unwrap_or(0.0),
+                    stats.todo,
+                    stats.todo_percentage().unwrap_or(0.0),
+                )?;
+            }
+            writeln!(stdout)?;
+            writeln!(
+                stdout,
+                "Total ({} files): {} exprs, {} dynamic ({:.1}%), {} todo ({:.1}%)",
+                per_file.len(),
+                total.total,
+                total.dynamic,
+                total.dynamic_percentage().unwrap_or(0.0),
+                total.todo,
+                total.todo_percentage().unwrap_or(0.0),
+            )?;
+        }
+
+        CoverageOutputFormat::Table => {
+            // Column headers
+            const H_FILE: &str = "File";
+            const H_EXPRS: &str = "Exprs";
+            const H_DYN: &str = "Dynamic";
+            const H_DYN_PCT: &str = "Dyn %";
+            const H_TODO: &str = "Todo";
+            const H_TODO_PCT: &str = "Todo %";
+
+            // Pre-format every cell so we can measure widths.
+            struct Row {
+                file: String,
+                exprs: String,
+                dynamic: String,
+                dyn_pct: String,
+                todo: String,
+                todo_pct: String,
+            }
+
+            let rows: Vec<Row> = per_file
+                .iter()
+                .map(|(path, s)| Row {
+                    file: std::path::Path::new(path)
+                        .file_name()
+                        .map(|n| n.to_string_lossy().into_owned())
+                        .unwrap_or_else(|| path.clone()),
+                    exprs: s.total.to_string(),
+                    dynamic: s.dynamic.to_string(),
+                    dyn_pct: format!("{:.1}%", s.dynamic_percentage().unwrap_or(0.0)),
+                    todo: s.todo.to_string(),
+                    todo_pct: format!("{:.1}%", s.todo_percentage().unwrap_or(0.0)),
+                })
+                .collect();
+
+            let total_label = format!("Total ({} files)", per_file.len());
+            let total_row = Row {
+                file: total_label,
+                exprs: total.total.to_string(),
+                dynamic: total.dynamic.to_string(),
+                dyn_pct: format!("{:.1}%", total.dynamic_percentage().unwrap_or(0.0)),
+                todo: total.todo.to_string(),
+                todo_pct: format!("{:.1}%", total.todo_percentage().unwrap_or(0.0)),
+            };
+
+            // Compute column widths.
+            let w_file = rows
+                .iter()
+                .chain([&total_row])
+                .map(|r| r.file.len())
+                .max()
+                .unwrap_or(0)
+                .max(H_FILE.len());
+            let w_exprs = rows
+                .iter()
+                .chain([&total_row])
+                .map(|r| r.exprs.len())
+                .max()
+                .unwrap_or(0)
+                .max(H_EXPRS.len());
+            let w_dyn = rows
+                .iter()
+                .chain([&total_row])
+                .map(|r| r.dynamic.len())
+                .max()
+                .unwrap_or(0)
+                .max(H_DYN.len());
+            let w_dyn_pct = rows
+                .iter()
+                .chain([&total_row])
+                .map(|r| r.dyn_pct.len())
+                .max()
+                .unwrap_or(0)
+                .max(H_DYN_PCT.len());
+            let w_todo = rows
+                .iter()
+                .chain([&total_row])
+                .map(|r| r.todo.len())
+                .max()
+                .unwrap_or(0)
+                .max(H_TODO.len());
+            let w_todo_pct = rows
+                .iter()
+                .chain([&total_row])
+                .map(|r| r.todo_pct.len())
+                .max()
+                .unwrap_or(0)
+                .max(H_TODO_PCT.len());
+
+            // Markdown separator row: colons indicate right-alignment.
+            // GitHub only requires at least one `-` per cell; width doesn't matter.
+            let sep = "| :--- | ---: | ---: | ---: | ---: | ---: |";
+
+            let print_row = |out: &mut dyn std::io::Write, r: &Row| -> std::io::Result<()> {
+                writeln!(
+                    out,
+                    "| {:<w_file$} | {:>w_exprs$} | {:>w_dyn$} | {:>w_dyn_pct$} | {:>w_todo$} | {:>w_todo_pct$} |",
+                    r.file,
+                    r.exprs,
+                    r.dynamic,
+                    r.dyn_pct,
+                    r.todo,
+                    r.todo_pct,
+                    w_file = w_file,
+                    w_exprs = w_exprs,
+                    w_dyn = w_dyn,
+                    w_dyn_pct = w_dyn_pct,
+                    w_todo = w_todo,
+                    w_todo_pct = w_todo_pct,
+                )
+            };
+
+            writeln!(
+                stdout,
+                "| {H_FILE:<w_file$} | {H_EXPRS:>w_exprs$} | {H_DYN:>w_dyn$} | {H_DYN_PCT:>w_dyn_pct$} | {H_TODO:>w_todo$} | {H_TODO_PCT:>w_todo_pct$} |",
+            )?;
+            writeln!(stdout, "{sep}")?;
+            for row in &rows {
+                print_row(&mut stdout, row)?;
+            }
+            print_row(&mut stdout, &total_row)?;
+        }
+
+        CoverageOutputFormat::Json => {
+            let files_json: Vec<serde_json::Value> = per_file
+                .iter()
+                .map(|(path, s)| {
+                    serde_json::json!({
+                        "path": path,
+                        "total": s.total,
+                        "dynamic": s.dynamic,
+                        "dynamic_percent": s.dynamic_percentage().unwrap_or(0.0),
+                        "todo": s.todo,
+                        "todo_percent": s.todo_percentage().unwrap_or(0.0),
+                    })
+                })
+                .collect();
+
+            let output = serde_json::json!({
+                "files": files_json,
+                "total": {
+                    "files": per_file.len(),
+                    "total": total.total,
+                    "dynamic": total.dynamic,
+                    "dynamic_percent": total.dynamic_percentage().unwrap_or(0.0),
+                    "todo": total.todo,
+                    "todo_percent": total.todo_percentage().unwrap_or(0.0),
+                }
+            });
+
+            writeln!(stdout, "{}", serde_json::to_string_pretty(&output)?)?;
+        }
+    }
+
+    std::mem::forget(db);
+
+    Ok(ExitStatus::Success)
 }
 
 #[derive(Copy, Clone)]
