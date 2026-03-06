@@ -656,6 +656,31 @@ def _(a: Any, u: Unknown):
     reveal_type(AmbiguousMixed(u))  # revealed: AmbiguousMixed
 ```
 
+### Mixed `__new__` overloads should not become declaration-order dependent
+
+Reversing the declaration order of the same mixed overload set should not change the result when
+overload resolution falls back to `Unknown`.
+
+```py
+from typing import Any, overload
+from typing_extensions import Self
+from missing import Unknown  # type: ignore
+
+class ReverseAmbiguousMixed:
+    @overload
+    def __new__(cls, x: str) -> str: ...
+    @overload
+    def __new__(cls, x: int) -> Self: ...
+    def __new__(cls, x: int | str) -> object:
+        raise NotImplementedError
+
+    def __init__(self) -> None: ...
+
+def _(a: Any, u: Unknown):
+    reveal_type(ReverseAmbiguousMixed(a))  # revealed: ReverseAmbiguousMixed
+    reveal_type(ReverseAmbiguousMixed(u))  # revealed: ReverseAmbiguousMixed
+```
+
 ### Overloaded non-instance `__new__` should preserve matched return type
 
 When all `__new__` overloads return non-instance types, constructor return typing should still use
@@ -673,6 +698,26 @@ class F:
 
 reveal_type(F(1))  # revealed: int
 reveal_type(F("foo"))  # revealed: str
+```
+
+### Invalid overloaded non-instance `__new__` should not invent an instance return
+
+If no overload matches, we should still report `Unknown` rather than falling back to the class
+instance type.
+
+```py
+from typing import overload
+
+class OnlyNonInstance:
+    @overload
+    def __new__(cls, x: int) -> int: ...
+    @overload
+    def __new__(cls, x: str) -> str: ...
+    def __new__(cls, x: int | str) -> object:
+        raise NotImplementedError
+
+# error: [no-matching-overload]
+reveal_type(OnlyNonInstance(1.2))  # revealed: Unknown
 ```
 
 ### Mixed generic `__new__` overloads should still validate `__init__`

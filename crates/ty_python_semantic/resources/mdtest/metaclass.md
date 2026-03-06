@@ -264,6 +264,33 @@ Foo("hello")  # error: [invalid-argument-type]
 Foo()  # error: [no-matching-overload]
 ```
 
+### Mixed metaclass `__call__` overloads should not become declaration-order dependent
+
+Reversing the declaration order of the same mixed overload set should not change the result when
+overload resolution falls back to `Unknown`.
+
+```py
+from typing import Any, TypeVar, overload
+from missing import Unknown  # type: ignore
+
+T = TypeVar("T")
+
+class ReverseMeta(type):
+    @overload
+    def __call__(cls: type[T], x: str) -> str: ...
+    @overload
+    def __call__(cls: type[T], x: int) -> T: ...
+    def __call__(cls, x: int | str) -> object:
+        return super().__call__()
+
+class ReverseMetaTarget(metaclass=ReverseMeta):
+    def __init__(self) -> None: ...
+
+def _(a: Any, u: Unknown):
+    reveal_type(ReverseMetaTarget(a))  # revealed: ReverseMetaTarget
+    reveal_type(ReverseMetaTarget(u))  # revealed: ReverseMetaTarget
+```
+
 ### Overloaded metaclass `__call__` preserving strict-subclass return
 
 ```py
@@ -311,6 +338,29 @@ class Bar(metaclass=Meta):
 # No error is raised because the metaclass `__call__` controls construction.
 reveal_type(Bar(1))  # revealed: int
 reveal_type(Bar("hello"))  # revealed: str
+```
+
+### Invalid overloaded non-instance metaclass `__call__` should not invent an instance return
+
+If no overload matches, we should still report `Unknown` rather than falling back to the class
+instance type.
+
+```py
+from typing import overload
+
+class OnlyNonInstanceMeta(type):
+    @overload
+    def __call__(cls, x: int) -> int: ...
+    @overload
+    def __call__(cls, x: str) -> str: ...
+    def __call__(cls, x: int | str) -> object:
+        raise NotImplementedError
+
+class OnlyNonInstanceMetaTarget(metaclass=OnlyNonInstanceMeta):
+    pass
+
+# error: [no-matching-overload]
+reveal_type(OnlyNonInstanceMetaTarget(1.2))  # revealed: Unknown
 ```
 
 ### Overloaded metaclass `__call__` with non-class return forms

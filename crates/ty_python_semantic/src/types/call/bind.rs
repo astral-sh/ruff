@@ -793,6 +793,9 @@ impl<'db> Bindings<'db> {
         let has_downstream_constructors = self
             .iter_flat()
             .any(|binding| binding.downstream_constructor.is_some());
+        let mut saw_matching_upstream_overload = false;
+        let mut saw_unmatched_all_non_instance_overloaded_upstream = false;
+        let mut saw_unmatched_instance_like_overloaded_upstream = false;
 
         // If any matched overload's signature return type, when resolved with the inferred
         // specialization, is a non-instance type (e.g. `__new__[S] -> S` with `S` inferred as
@@ -824,43 +827,85 @@ impl<'db> Bindings<'db> {
                     continue;
                 }
 
-                let overload = binding
-                    .matching_overloads()
-                    .next()
-                    .map(|(_, overload)| overload)
-                    .or_else(|| match binding.overloads() {
-                        [overload] if !binding.constructor_kind.is_init() => Some(overload),
-                        _ => None,
-                    });
-                let Some(overload) = overload else {
-                    continue;
-                };
-
                 // `__init__` is a post-construction validator and does not determine the
                 // constructor return type.
                 if binding.constructor_kind.is_init() {
                     continue;
                 }
 
-                let outcome = constructor_return_outcome(db, constructor_class_literal, overload);
-                if outcome.resolved_return.is_unknown()
-                    || (outcome.resolved_return.has_typevar(db)
-                        && outcome.resolved_return.as_nominal_instance().is_none())
-                {
+                let matching_overloads = binding.matching_overloads().collect::<Vec<_>>();
+                let candidate_overloads = if matching_overloads.is_empty() {
+                    if binding.overloads().len() > 1 {
+                        let has_instance_like_overload =
+                            binding.overloads().iter().any(|overload| {
+                                let outcome = constructor_return_outcome(
+                                    db,
+                                    constructor_class_literal,
+                                    overload,
+                                );
+                                outcome.kind.is_instance()
+                                    || outcome.resolved_return.is_unknown()
+                                    || (outcome.resolved_return.has_typevar(db)
+                                        && outcome.resolved_return.as_nominal_instance().is_none())
+                            });
+                        if has_instance_like_overload {
+                            saw_unmatched_instance_like_overloaded_upstream = true;
+                        } else {
+                            saw_unmatched_all_non_instance_overloaded_upstream = true;
+                        }
+                    }
+                    match binding.overloads() {
+                        [overload] => vec![overload],
+                        _ => Vec::new(),
+                    }
+                } else {
+                    saw_matching_upstream_overload = true;
+                    matching_overloads
+                        .into_iter()
+                        .map(|(_, overload)| overload)
+                        .collect()
+                };
+
+                if candidate_overloads.is_empty() {
                     continue;
                 }
-                let is_simple_instance_return = outcome
-                    .resolved_return
-                    .as_nominal_instance()
-                    .is_some_and(|instance| {
-                        is_subtype_of_class_literal(
-                            db,
-                            instance.class(db),
-                            constructor_class_literal,
-                        )
-                    });
-                if !is_simple_instance_return {
-                    if matches!(outcome.resolved_return, Type::Dynamic(DynamicType::Any))
+
+                let mut saw_instance_return = false;
+                let mut non_instance_returns = Vec::new();
+                for overload in candidate_overloads {
+                    let outcome =
+                        constructor_return_outcome(db, constructor_class_literal, overload);
+                    let is_unknown_like = outcome.resolved_return.is_unknown()
+                        || (outcome.resolved_return.has_typevar(db)
+                            && outcome.resolved_return.as_nominal_instance().is_none());
+                    if is_unknown_like {
+                        saw_instance_return = true;
+                        continue;
+                    }
+
+                    let is_simple_instance_return = outcome
+                        .resolved_return
+                        .as_nominal_instance()
+                        .is_some_and(|instance| {
+                            is_subtype_of_class_literal(
+                                db,
+                                instance.class(db),
+                                constructor_class_literal,
+                            )
+                        });
+                    if is_simple_instance_return {
+                        saw_instance_return = true;
+                    } else {
+                        non_instance_returns.push(outcome.resolved_return);
+                    }
+                }
+
+                if !saw_instance_return {
+                    let Some(first_non_instance_return) = non_instance_returns.first().copied()
+                    else {
+                        continue;
+                    };
+                    if matches!(first_non_instance_return, Type::Dynamic(DynamicType::Any))
                         && (binding.matching_overloads().next().is_none()
                             || constructor_is_subclass_of_any)
                         && let Some(downstream) = binding.downstream_constructor.as_ref()
@@ -870,7 +915,13 @@ impl<'db> Bindings<'db> {
                     {
                         return Some(downstream_return);
                     }
-                    return Some(outcome.resolved_return);
+                    if non_instance_returns
+                        .iter()
+                        .all(|return_ty| *return_ty == first_non_instance_return)
+                    {
+                        return Some(first_non_instance_return);
+                    }
+                    return Some(Type::unknown());
                 }
 
                 // For layered mixed-constructor handling (metaclass `__call__` mixed with
@@ -889,6 +940,13 @@ impl<'db> Bindings<'db> {
             }
         }
 
+        if !saw_matching_upstream_overload
+            && saw_unmatched_all_non_instance_overloaded_upstream
+            && !saw_unmatched_instance_like_overloaded_upstream
+        {
+            return None;
+        }
+
         // Preserve explicit strict-subclass constructor returns, e.g. constructing `C` from
         // `__new__ -> D` where `D` is a subclass of `C`.
         if let Some(constructor_class) = constructor_class {
@@ -897,9 +955,13 @@ impl<'db> Bindings<'db> {
                 if has_downstream_constructors && binding.downstream_constructor.is_none() {
                     continue;
                 }
-                let Some((_, overload)) = binding.matching_overloads().next() else {
+                let mut matching_overloads = binding.matching_overloads();
+                let Some((_, overload)) = matching_overloads.next() else {
                     continue;
                 };
+                if matching_overloads.next().is_some() {
+                    continue;
+                }
                 if binding.constructor_kind.is_init() {
                     continue;
                 }
