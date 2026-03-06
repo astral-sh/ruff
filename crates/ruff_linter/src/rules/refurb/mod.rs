@@ -67,6 +67,28 @@ mod tests {
     }
 
     #[test]
+    fn read_whole_file_newline_python_313() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("refurb/FURB101_3.py"),
+            &settings::LinterSettings::for_rule(Rule::ReadWholeFile)
+                .with_target_version(PythonVersion::PY313),
+        )?;
+        assert_diagnostics!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn read_whole_file_newline_python_312() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("refurb/FURB101_3.py"),
+            &settings::LinterSettings::for_rule(Rule::ReadWholeFile)
+                .with_target_version(PythonVersion::PY312),
+        )?;
+        assert_diagnostics!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
     fn write_whole_file_python_39() -> Result<()> {
         let diagnostics = test_path(
             Path::new("refurb/FURB103_0.py"),

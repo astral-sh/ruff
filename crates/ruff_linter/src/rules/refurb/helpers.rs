@@ -366,10 +366,12 @@ fn match_open_keywords(
             "encoding" | "errors" => result.push(keyword),
             "newline" => {
                 if read_mode {
-                    // newline is only valid for write_text
-                    return None;
+                    if target_version < PythonVersion::PY313 {
+                        // `pathlib.Path.read_text` doesn't support `newline` until Python 3.13.
+                        return None;
+                    }
                 } else if target_version < PythonVersion::PY310 {
-                    // `pathlib` doesn't support `newline` until Python 3.10.
+                    // `pathlib.Path.write_text` doesn't support `newline` until Python 3.10.
                     return None;
                 }
 
