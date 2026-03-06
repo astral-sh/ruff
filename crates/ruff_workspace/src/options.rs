@@ -3166,6 +3166,10 @@ pub struct PydocstyleOptions {
     /// the specified convention. As such, the intended workflow is to enable a
     /// convention and then selectively enable or disable any additional rules
     /// on top of it.
+    /// This applies even when rules are enabled via lint.select or
+    /// lint.extend-select using a prefix (for example, D or D4). Rules
+    /// excluded by the convention must be re-enabled explicitly via their
+    /// fully qualified code (for example, D400).
     ///
     /// For example, to use Google-style conventions but avoid requiring
     /// documentation for every function parameter:
