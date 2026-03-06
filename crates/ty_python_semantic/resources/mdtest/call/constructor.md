@@ -632,6 +632,30 @@ reveal_type(SimpleMixed(1))  # revealed: int
 reveal_type(SimpleMixed("foo"))  # revealed: SimpleMixed
 ```
 
+If overload resolution for `__new__` falls back to `Unknown` because the argument is `Any` or
+`Unknown`, we should still treat the constructor as instance-returning rather than reporting
+`no-matching-overload`:
+
+```py
+from typing import Any, overload
+from typing_extensions import Self
+from missing import Unknown  # type: ignore
+
+class AmbiguousMixed:
+    @overload
+    def __new__(cls, x: int) -> Self: ...
+    @overload
+    def __new__(cls, x: str) -> str: ...
+    def __new__(cls, x: int | str) -> Self | str:
+        raise NotImplementedError
+
+    def __init__(self) -> None: ...
+
+def _(a: Any, u: Unknown):
+    reveal_type(AmbiguousMixed(a))  # revealed: AmbiguousMixed
+    reveal_type(AmbiguousMixed(u))  # revealed: AmbiguousMixed
+```
+
 ### Overloaded non-instance `__new__` should preserve matched return type
 
 When all `__new__` overloads return non-instance types, constructor return typing should still use

@@ -251,18 +251,31 @@ impl<'db> DownstreamConstructor<'db> {
         }
     }
 
-    /// Returns `true` if any matched overload is instance-returning (i.e., its return type
-    /// is an instance of the constructor class).
-    fn is_instance_returning(&self, db: &'db dyn Db, binding: &CallableBinding<'db>) -> bool {
-        binding.matching_overloads().any(|(_, overload)| {
+    /// Returns `true` if every matched overload is instance-returning (i.e., its return type
+    /// is an instance of the constructor class). We have to check across all overloads, and not
+    /// just resolve to a single return type and check that, because of the possibility that
+    /// multiple overloads match due to a gradual argument, which would fall back to `Unknown`
+    /// return type (which we would consider instance-returning), but we still want to skip
+    /// validating `__init__` in case some of the matched overloads are not instance-returning.
+    fn all_matching_overloads_are_instance_returning(
+        &self,
+        db: &'db dyn Db,
+        binding: &CallableBinding<'db>,
+    ) -> bool {
+        let mut saw_match = false;
+        for (_, overload) in binding.matching_overloads() {
+            saw_match = true;
             let declared_return = overload.signature.return_ty;
             let resolved_return = overload
                 .specialization
                 .map(|specialization| declared_return.apply_specialization(db, specialization))
                 .unwrap_or(declared_return);
 
-            self.return_kind(db, resolved_return).is_instance()
-        })
+            if !self.return_kind(db, resolved_return).is_instance() {
+                return false;
+            }
+        }
+        saw_match
     }
 
     fn return_is_instance_of_constructor_class(
@@ -968,13 +981,13 @@ impl<'db> Bindings<'db> {
         }
 
         // Deferred downstream constructor bindings stay out-of-band for conditional validation.
-        // If a matched overload is instance-returning, include inferred specializations from
+        // If all matched overloads are instance-returning, include inferred specializations from
         // those deferred bindings as well.
         for binding in self.iter_flat() {
             let Some(downstream) = binding.downstream_constructor.as_ref() else {
                 continue;
             };
-            if !downstream.is_instance_returning(db, binding) {
+            if !downstream.all_matching_overloads_are_instance_returning(db, binding) {
                 continue;
             }
             for init_binding in downstream.bindings.iter_flat() {
@@ -3317,7 +3330,7 @@ impl<'db> CallableBinding<'db> {
         };
 
         if self.matching_overloads().next().is_some() {
-            return downstream.is_instance_returning(db, self);
+            return downstream.all_matching_overloads_are_instance_returning(db, self);
         }
 
         // If metaclass `__call__` itself doesn't match, constructor dispatch stops there.
