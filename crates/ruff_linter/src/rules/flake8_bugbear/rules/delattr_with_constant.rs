@@ -44,7 +44,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ## References
 /// - [Python documentation: `delattr`](https://docs.python.org/3/library/functions.html#delattr)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.15.4")]
+#[violation_metadata(preview_since = "NEXT_RUFF_VERSION")]
 pub(crate) struct DelAttrWithConstant;
 
 impl AlwaysFixableViolation for DelAttrWithConstant {
