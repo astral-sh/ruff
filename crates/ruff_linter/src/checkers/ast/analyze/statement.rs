@@ -532,6 +532,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
         }
         Stmt::Import(ast::StmtImport {
             names,
+            is_lazy: _,
             range: _,
             node_index: _,
         }) => {
@@ -690,6 +691,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 names,
                 module,
                 level,
+                is_lazy: _,
                 range: _,
                 node_index: _,
             },

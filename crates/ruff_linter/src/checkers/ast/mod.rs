@@ -1002,6 +1002,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
             }
             Stmt::Import(ast::StmtImport {
                 names,
+                is_lazy: _,
                 range: _,
                 node_index: _,
             }) => {
@@ -1057,6 +1058,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 names,
                 module,
                 level,
+                is_lazy: _,
                 range: _,
                 node_index: _,
             }) => {

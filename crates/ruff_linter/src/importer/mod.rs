@@ -457,6 +457,7 @@ impl<'a> Importer<'a> {
                 module: name,
                 names,
                 level,
+                is_lazy: _,
                 range: _,
                 node_index: _,
             }) = stmt

@@ -8157,9 +8157,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn infer_import_statement(&mut self, import: &ast::StmtImport) {
         let ast::StmtImport {
+            names,
+            is_lazy: _,
             range: _,
             node_index: _,
-            names,
         } = import;
 
         for alias in names {
@@ -8369,11 +8370,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn infer_import_from_statement(&mut self, import: &ast::StmtImportFrom) {
         let ast::StmtImportFrom {
-            range: _,
-            node_index: _,
             module: _,
             names,
             level: _,
+            is_lazy: _,
+            range: _,
+            node_index: _,
         } = import;
 
         self.check_import_from_module_is_resolvable(import);
