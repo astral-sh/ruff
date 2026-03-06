@@ -71,7 +71,11 @@ impl Diagnostics {
                             IOError {
                                 message: err.to_string(),
                             }
-                            .into_diagnostic(TextRange::default(), &source_file),
+                            .into_diagnostic(
+                                TextRange::default(),
+                                &source_file,
+                                settings.rules.severity(Rule::IOError),
+                            ),
                         ],
                         FxHashMap::default(),
                     )

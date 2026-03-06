@@ -311,8 +311,8 @@ mod tests {
     #[test]
     fn output() {
         let (env, diagnostics) = create_diagnostics(DiagnosticFormat::Full);
-        insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @r#"
-        error[unused-import]: `os` imported but unused
+        insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @r###"
+        error[F401]: `os` imported but unused
          --> fib.py:1:8
           |
         1 | import os
@@ -320,7 +320,7 @@ mod tests {
           |
         help: Remove unused import: `os`
 
-        error[unused-variable]: Local variable `x` is assigned to but never used
+        error[F841]: Local variable `x` is assigned to but never used
          --> fib.py:6:5
           |
         4 | def fibonacci(n):
@@ -332,14 +332,14 @@ mod tests {
           |
         help: Remove assignment to unused variable `x`
 
-        error[undefined-name]: Undefined name `a`
+        error[F821]: Undefined name `a`
          --> undef.py:1:4
           |
         1 | if a == 1: pass
           |    ^
           |
 
-        error[undefined-name]: Undefined name `fibonaccii`
+        error[F821]: Undefined name `fibonaccii`
           --> fib.py:12:16
            |
         10 |         return 1
@@ -357,7 +357,7 @@ mod tests {
         6 |     x = 1
         7 |     if n == 0:
           |
-        "#);
+        "###);
     }
 
     #[test]
@@ -630,8 +630,8 @@ print()
     fn notebook_output() {
         let (mut env, diagnostics) = create_notebook_diagnostics(DiagnosticFormat::Full);
         env.show_fix_status(true);
-        insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @r"
-        error[unused-import][*]: `os` imported but unused
+        insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @r###"
+        error[F401][*]: `os` imported but unused
          --> notebook.ipynb:cell 1:2:8
           |
         1 | # cell 1
@@ -640,7 +640,7 @@ print()
           |
         help: Remove unused import: `os`
 
-        error[unused-import][*]: `math` imported but unused
+        error[F401][*]: `math` imported but unused
          --> notebook.ipynb:cell 2:2:8
           |
         1 | # cell 2
@@ -651,7 +651,7 @@ print()
           |
         help: Remove unused import: `math`
 
-        error[unused-variable]: Local variable `x` is assigned to but never used
+        error[F841]: Local variable `x` is assigned to but never used
          --> notebook.ipynb:cell 3:4:5
           |
         2 | def foo():
@@ -660,7 +660,7 @@ print()
           |     ^
           |
         help: Remove assignment to unused variable `x`
-        ");
+        "###);
     }
 
     /// Check notebook handling for multiple annotations in a single diagnostic that span cells.
