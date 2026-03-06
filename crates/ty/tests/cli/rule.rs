@@ -73,17 +73,19 @@ fn rule_unknown() {
 
 #[test]
 fn rule_no_selector() {
-    assert_cmd_snapshot!(ty_cmd().args(["rule"]), @"
-    success: false
-    exit_code: 2
-    ----- stdout -----
+    insta::with_settings!({ filters => vec![(r"ty\.exe", "ty")] }, {
+        assert_cmd_snapshot!(ty_cmd().args(["rule"]), @"
+        success: false
+        exit_code: 2
+        ----- stdout -----
 
-    ----- stderr -----
-    error: the following required arguments were not provided:
-      <RULE|--all>
+        ----- stderr -----
+        error: the following required arguments were not provided:
+          <RULE|--all>
 
-    Usage: ty rule <RULE|--all>
+        Usage: ty rule <RULE|--all>
 
-    For more information, try '--help'.
-    ");
+        For more information, try '--help'.
+        ");
+    });
 }
