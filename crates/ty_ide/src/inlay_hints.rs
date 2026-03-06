@@ -2324,10 +2324,10 @@ mod tests {
           --> stdlib/ty_extensions.pyi:14:1
            |
         13 | # Types
-        14 | Unknown = object()
+        14 | Unknown: _SpecialForm
            | ^^^^^^^
-        15 | AlwaysTruthy = object()
-        16 | AlwaysFalsy = object()
+        15 | AlwaysTruthy: _SpecialForm
+        16 | AlwaysFalsy: _SpecialForm
            |
         info: Source
          --> main2.py:5:18
@@ -2664,7 +2664,7 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.inlay_hints(), @r###"
+        assert_snapshot!(test.inlay_hints(), @r#"
 
         a[: list[int]] = [1, 2]
         b[: list[int | float]] = [1.0, 2.0]
@@ -3164,7 +3164,7 @@ mod tests {
         i: list[bytes] = [b'/x01', b'/x02']
         j: list[int | float] = [+1, +2.0]
         k: list[int | float] = [-1, -2.0]
-        "###);
+        "#);
     }
 
     #[test]
@@ -3349,7 +3349,7 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.inlay_hints(), @r###"
+        assert_snapshot!(test.inlay_hints(), @r#"
 
         class MyClass[T, U]:
             def __init__(self, x: list[T], y: tuple[U, U]):
@@ -4083,7 +4083,7 @@ mod tests {
         y: tuple[MyClass[int, str], MyClass[int, str]] = (MyClass([42], ("a", "b")), MyClass([42], ("a", "b")))
         a, b = MyClass([42], ("a", "b")), MyClass([42], ("a", "b"))
         c, d = (MyClass([42], ("a", "b")), MyClass([42], ("a", "b")))
-        "###);
+        "#);
     }
 
     #[test]
@@ -4387,7 +4387,7 @@ mod tests {
             foo(y[0])",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r###"
+        assert_snapshot!(test.inlay_hints(), @r#"
 
         def foo(x: int): pass
         x[: list[int]] = [1]
@@ -4496,7 +4496,7 @@ mod tests {
 
         foo(x[0])
         foo(y[0])
-        "###);
+        "#);
     }
 
     #[test]
@@ -5525,10 +5525,10 @@ mod tests {
           --> stdlib/ty_extensions.pyi:14:1
            |
         13 | # Types
-        14 | Unknown = object()
+        14 | Unknown: _SpecialForm
            | ^^^^^^^
-        15 | AlwaysTruthy = object()
-        16 | AlwaysFalsy = object()
+        15 | AlwaysTruthy: _SpecialForm
+        16 | AlwaysFalsy: _SpecialForm
            |
         info: Source
          --> main2.py:2:14
@@ -5543,10 +5543,10 @@ mod tests {
           --> stdlib/ty_extensions.pyi:14:1
            |
         13 | # Types
-        14 | Unknown = object()
+        14 | Unknown: _SpecialForm
            | ^^^^^^^
-        15 | AlwaysTruthy = object()
-        16 | AlwaysFalsy = object()
+        15 | AlwaysTruthy: _SpecialForm
+        16 | AlwaysFalsy: _SpecialForm
            |
         info: Source
          --> main2.py:3:17
@@ -6530,10 +6530,10 @@ mod tests {
           --> stdlib/ty_extensions.pyi:14:1
            |
         13 | # Types
-        14 | Unknown = object()
+        14 | Unknown: _SpecialForm
            | ^^^^^^^
-        15 | AlwaysTruthy = object()
-        16 | AlwaysFalsy = object()
+        15 | AlwaysTruthy: _SpecialForm
+        16 | AlwaysFalsy: _SpecialForm
            |
         info: Source
          --> main2.py:4:63
@@ -7260,10 +7260,10 @@ mod tests {
           --> stdlib/ty_extensions.pyi:14:1
            |
         13 | # Types
-        14 | Unknown = object()
+        14 | Unknown: _SpecialForm
            | ^^^^^^^
-        15 | AlwaysTruthy = object()
-        16 | AlwaysFalsy = object()
+        15 | AlwaysTruthy: _SpecialForm
+        16 | AlwaysFalsy: _SpecialForm
            |
         info: Source
          --> main2.py:4:22
