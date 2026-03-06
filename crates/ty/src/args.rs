@@ -44,12 +44,28 @@ pub(crate) enum Command {
             default_value = "text",
             help = "The format in which to display the version information"
         )]
-        output_format: VersionFormat,
+        output_format: HelpFormat,
     },
 
     /// Generate shell completion
     #[clap(hide = true)]
     GenerateShellCompletion { shell: clap_complete_command::Shell },
+
+    /// Explain a rule (or all rules).
+    #[command(group = clap::ArgGroup::new("selector").multiple(false).required(true))]
+    Rule {
+        /// Rule to explain
+        #[arg(group = "selector", hide_possible_values = true)]
+        rule: Option<String>,
+
+        /// Explain all rules
+        #[arg(long, conflicts_with = "rule", group = "selector")]
+        all: bool,
+
+        /// Output format
+        #[arg(long, value_enum, default_value = "text")]
+        output_format: HelpFormat,
+    },
 }
 
 #[derive(Debug, Parser)]
@@ -412,7 +428,7 @@ pub(crate) enum TerminalColor {
 }
 
 #[derive(Debug, Clone, Copy, clap::ValueEnum)]
-pub(crate) enum VersionFormat {
+pub(crate) enum HelpFormat {
     Text,
     Json,
 }
