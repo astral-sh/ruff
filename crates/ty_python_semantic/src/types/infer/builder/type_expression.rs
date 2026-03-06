@@ -910,11 +910,26 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
     /// Given the slice of a `type[]` annotation, return the type that the annotation represents
     fn infer_subclass_of_type_expression(&mut self, slice: &ast::Expr) -> Type<'db> {
+        let invalid_type_argument = |builder: &Self, slice: &ast::Expr| {
+            builder.report_invalid_type_expression(
+                slice,
+                "The argument to `type[]` must be a class object type",
+            );
+            SubclassOfType::subclass_of_unknown()
+        };
+
+        let infer_type_argument = |builder: &mut Self, slice: &ast::Expr| {
+            let slice_ty = builder.infer_type_expression(slice);
+            SubclassOfType::try_from_instance(builder.db(), slice_ty).unwrap_or_else(|| {
+                match slice_ty {
+                    Type::Callable(_) => invalid_type_argument(builder, slice),
+                    _ => todo_type!("unsupported type[X] special form"),
+                }
+            })
+        };
+
         match slice {
-            ast::Expr::Name(_) | ast::Expr::Attribute(_) => {
-                SubclassOfType::try_from_instance(self.db(), self.infer_type_expression(slice))
-                    .unwrap_or(todo_type!("unsupported type[X] special form"))
-            }
+            ast::Expr::Name(_) | ast::Expr::Attribute(_) => infer_type_argument(self, slice),
             ast::Expr::BinOp(binary) if binary.op == ast::Operator::BitOr => {
                 let union_ty = UnionType::from_elements_leave_aliases(
                     self.db(),
@@ -998,6 +1013,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                 }
                             }
                         }
+                    }
+                    Type::SpecialForm(special_form @ SpecialFormType::Callable) => {
+                        self.infer_parameterized_special_form_type_expression(
+                            subscript,
+                            special_form,
+                        );
+                        invalid_type_argument(self, slice)
                     }
                     _ => {
                         self.infer_type_expression(parameters);

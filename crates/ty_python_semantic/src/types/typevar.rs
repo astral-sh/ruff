@@ -12,10 +12,11 @@ use crate::{
         semantic_index,
     },
     types::{
-        ApplyTypeMappingVisitor, CycleDetector, DynamicType, KnownClass, KnownInstanceType,
-        MaterializationKind, Parameter, Parameters, Type, TypeAliasType, TypeContext, TypeMapping,
-        TypeVarVariance, UnionBuilder, UnionType, any_over_type, binding_type,
-        definition_expression_type, tuple::Tuple, variance::VarianceInferable, visitor,
+        ApplySpecialization, ApplyTypeMappingVisitor, CycleDetector, DynamicType, KnownClass,
+        KnownInstanceType, MaterializationKind, Parameter, Parameters, Type, TypeAliasType,
+        TypeContext, TypeMapping, TypeVarVariance, UnionBuilder, UnionType, any_over_type,
+        binding_type, definition_expression_type, tuple::Tuple, variance::VarianceInferable,
+        visitor,
     },
 };
 
@@ -844,26 +845,46 @@ impl<'db> BoundTypeVarInstance<'db> {
         type_mapping: &TypeMapping<'a, 'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Type<'db> {
-        match type_mapping {
-            TypeMapping::ApplySpecialization(specialization) => {
+        let mapped_specialization_type =
+            |specialization: &ApplySpecialization<'a, 'db>| -> Option<Type<'db>> {
                 let typevar = if self.is_paramspec(db) {
                     self.without_paramspec_attr(db)
                 } else {
                     self
                 };
-                specialization
-                    .get(db, typevar)
-                    .map(|ty| {
-                        if let Some(attr) = self.paramspec_attr(db)
-                            && let Type::TypeVar(typevar) = ty
-                            && typevar.is_paramspec(db)
-                        {
-                            return Type::TypeVar(typevar.with_paramspec_attr(db, attr));
-                        }
-                        ty
-                    })
-                    .unwrap_or(Type::TypeVar(self))
+                specialization.get(db, typevar).map(|ty| {
+                    if let Some(attr) = self.paramspec_attr(db)
+                        && let Type::TypeVar(typevar) = ty
+                        && typevar.is_paramspec(db)
+                    {
+                        return Type::TypeVar(typevar.with_paramspec_attr(db, attr));
+                    }
+                    ty
+                })
+            };
+
+        match type_mapping {
+            TypeMapping::ApplySpecialization(specialization) => {
+                mapped_specialization_type(specialization).unwrap_or(Type::TypeVar(self))
             }
+            TypeMapping::ApplySpecializationWithMaterialization {
+                specialization,
+                materialization_kind,
+            } => mapped_specialization_type(specialization)
+                .map(|mapped| {
+                    // Only materialize if the specialization actually substituted this
+                    // typevar with a different type. A typevar that maps back to itself
+                    // hasn't been substituted and should not be materialized.
+                    if mapped == Type::TypeVar(self) {
+                        mapped
+                    } else {
+                        // Materialization uses a different mapping mode. Reuse of the outer
+                        // visitor can incorrectly hit a cache entry from specialization.
+                        let materialization_visitor = ApplyTypeMappingVisitor::default();
+                        mapped.materialize(db, *materialization_kind, &materialization_visitor)
+                    }
+                })
+                .unwrap_or(Type::TypeVar(self)),
             TypeMapping::BindSelf(binding) => {
                 if binding.should_bind(db, self) {
                     binding.self_type()
@@ -883,7 +904,7 @@ impl<'db> BoundTypeVarInstance<'db> {
                 }
             }
             TypeMapping::UniqueSpecialization { .. }
-            | TypeMapping::PromoteLiterals(_)
+            | TypeMapping::Promote(_)
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::EagerExpansion

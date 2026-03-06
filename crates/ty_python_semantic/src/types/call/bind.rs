@@ -3797,7 +3797,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
         self.errors.extend(specialization_errors);
 
-        // Attempt to promote any literal types assigned to the specialization.
+        // Attempt to promote any promotable types assigned to the specialization.
         let maybe_promote = |typevar: BoundTypeVarInstance<'db>, ty: Type<'db>| {
             let bound_or_constraints = typevar.typevar(self.db).bound_or_constraints(self.db);
 
@@ -3831,7 +3831,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 return ty;
             }
 
-            let promoted = ty.promote_literals(self.db);
+            let promoted = ty.promote(self.db);
 
             // If the TypeVar has an upper bound, only use the promoted type if it
             // still satisfies the bound.

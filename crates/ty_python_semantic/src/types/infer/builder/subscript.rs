@@ -494,6 +494,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     ) -> Type<'db> {
         enum ExplicitSpecializationError {
             InvalidParamSpec,
+            ParamSpecForTypeVar,
             UnsatisfiedBound,
             UnsatisfiedConstraints,
             /// These two errors override the errors above, causing all specializations to be `Unknown`.
@@ -579,6 +580,42 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     };
 
                     inferred_type_arguments.push(provided_type);
+
+                    // A ParamSpec cannot be used to specialize a regular TypeVar.
+                    if !typevar.is_paramspec(db)
+                        && let Type::TypeVar(tv) = provided_type
+                        && tv.is_paramspec(db)
+                    {
+                        let node = get_node(index);
+                        if let Some(builder) =
+                            self.context.report_lint(&INVALID_TYPE_ARGUMENTS, node)
+                        {
+                            let mut diagnostic = builder.into_diagnostic(format_args!(
+                                "ParamSpec `{}` cannot be used to specialize \
+                                    type variable `{}`",
+                                tv.typevar(db).name(db),
+                                typevar.name(db),
+                            ));
+                            for (kind, var) in [("ParamSpec", tv), ("Type variable", typevar)] {
+                                let Some(definition) = var.typevar(db).definition(db) else {
+                                    continue;
+                                };
+                                let file = definition.file(db);
+                                let module = parsed_module(db, file).load(db);
+                                let range = definition.focus_range(db, &module).range();
+                                diagnostic.annotate(
+                                    Annotation::secondary(Span::from(file).with_range(range))
+                                        .message(format_args!(
+                                            "{kind} `{}` defined here",
+                                            var.name(db)
+                                        )),
+                                );
+                            }
+                        }
+                        error = Some(ExplicitSpecializationError::ParamSpecForTypeVar);
+                        specialization_types.push(Some(Type::unknown()));
+                        continue;
+                    }
 
                     // TODO consider just accepting the given specialization without checking
                     // against bounds/constraints, but recording the expression for deferred
@@ -779,7 +816,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             Some(
                 ExplicitSpecializationError::UnsatisfiedBound
                 | ExplicitSpecializationError::UnsatisfiedConstraints
-                | ExplicitSpecializationError::InvalidParamSpec,
+                | ExplicitSpecializationError::InvalidParamSpec
+                | ExplicitSpecializationError::ParamSpecForTypeVar,
             )
             | None => specialize(&specialization_types),
         }
