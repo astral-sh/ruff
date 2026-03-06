@@ -662,6 +662,18 @@ from dataclasses import make_dataclass
 Point = make_dataclass("Point", [("x", int)], unknown=True)
 ```
 
+### Duplicate parameter assignment
+
+```py
+from dataclasses import make_dataclass
+
+# error: [parameter-already-assigned] "Multiple values provided for parameter `cls_name` of function `make_dataclass`"
+C1 = make_dataclass("C1", [], cls_name="Other")
+
+# error: [parameter-already-assigned] "Multiple values provided for parameter `fields` of function `make_dataclass`"
+C2 = make_dataclass("C2", [], fields=[("x", int)])
+```
+
 ### Invalid type for `cls_name`
 
 ```py
@@ -804,6 +816,99 @@ Point = make_dataclass("Point", [("x", int)], decorator=dataclass)
 
 p = Point(1)
 reveal_type(p.x)  # revealed: int
+```
+
+### `decorator=` passes dataclass kwargs through
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+from dataclasses import dataclass, make_dataclass
+
+Point = make_dataclass(
+    "Point",
+    [("x", int), ("y", int)],
+    decorator=dataclass,
+    kw_only=True,
+)
+
+reveal_type(Point.__init__)  # revealed: (self: Point, *, x: int, y: int) -> None
+```
+
+### `decorator=` respects `dataclass_transform` field specifiers
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+from dataclasses import field, make_dataclass
+from typing_extensions import Any, dataclass_transform
+
+def fancy_field(*, init: bool = True, kw_only: bool = False, alias: str | None = None) -> Any: ...
+@dataclass_transform(field_specifiers=(fancy_field,), kw_only_default=True)
+def fancy_model[T](cls: type[T], *, kw_only: bool = False) -> type[T]:
+    return cls
+
+@dataclass_transform()
+def plain_model[T](cls: type[T]) -> type[T]:
+    return cls
+
+FancyPerson = make_dataclass(
+    "FancyPerson",
+    [
+        ("id", int, fancy_field(init=False)),
+        ("internal_name", str, fancy_field(alias="name")),
+        ("age", int | None, fancy_field(kw_only=True)),
+    ],
+    decorator=fancy_model,
+    kw_only=False,
+)
+
+PlainPerson = make_dataclass(
+    "PlainPerson",
+    [("id", int, field(init=False))],
+    decorator=plain_model,
+)
+
+reveal_type(FancyPerson.__init__)  # revealed: (self: FancyPerson, name: str, *, age: int | None) -> None
+reveal_type(PlainPerson.__init__)  # revealed: (self: PlainPerson, id: int) -> None
+```
+
+### `decorator=` can change the return type
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+from dataclasses import make_dataclass
+
+def return_answer(cls: type[object], **kwargs: object) -> int:
+    return 42
+
+answer = make_dataclass("Answer", [("value", int)], decorator=return_answer)
+
+reveal_type(answer)  # revealed: int
+```
+
+### Invalid `decorator=`
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+from dataclasses import make_dataclass
+
+# error: [call-non-callable] "Object of type `Literal[1]` is not callable"
+BadDecorator = make_dataclass("BadDecorator", [("x", int)], decorator=1)
 ```
 
 ### Invalid field definitions
@@ -1102,6 +1207,46 @@ reveal_type(p.x)  # revealed: int
 reveal_type(p.describe())  # revealed: str
 reveal_type(p.version)  # revealed: Literal[1]
 reveal_type(PointWithMethod.version)  # revealed: Literal[1]
+```
+
+When the namespace dictionary is dynamic, unknown class and instance attributes resolve to
+`Unknown`:
+
+```py
+from dataclasses import make_dataclass
+from typing import Any
+
+def with_dynamic_namespace(attributes: dict[str, Any]) -> None:
+    DynamicPoint = make_dataclass("DynamicPoint", [("x", int)], namespace=attributes)
+
+    reveal_type(DynamicPoint)  # revealed: <class 'DynamicPoint'>
+    reveal_type(DynamicPoint.unknown)  # revealed: Unknown
+
+    p = DynamicPoint(1)
+    reveal_type(p.x)  # revealed: int
+    reveal_type(p.unknown)  # revealed: Unknown
+```
+
+When the namespace dictionary is partially dynamic, known attributes keep precise types while
+unknown ones fall back to `Unknown`:
+
+```py
+from dataclasses import make_dataclass
+from typing import Any
+
+def with_partially_dynamic_namespace(extra_attrs: dict[str, Any]) -> None:
+    PartialPoint = make_dataclass(
+        "PartialPoint",
+        [("x", int)],
+        namespace={"version": 1, **extra_attrs},
+    )
+
+    reveal_type(PartialPoint.version)  # revealed: Literal[1]
+    reveal_type(PartialPoint.unknown)  # revealed: Unknown
+
+    p = PartialPoint(1)
+    reveal_type(p.version)  # revealed: Literal[1]
+    reveal_type(p.unknown)  # revealed: Unknown
 ```
 
 ### Single field

@@ -717,7 +717,10 @@ impl<'db> ClassLiteral<'db> {
             Self::Dynamic(class) => {
                 Self::Dynamic(class.with_dataclass_params(db, dataclass_params))
             }
-            Self::DynamicNamedTuple(_) | Self::DynamicDataclass(_) => self,
+            Self::DynamicNamedTuple(_) => self,
+            Self::DynamicDataclass(class) => {
+                Self::DynamicDataclass(class.with_dataclass_params(db, dataclass_params))
+            }
         }
     }
 
@@ -3200,6 +3203,15 @@ impl<'db> DynamicDataclassLiteral<'db> {
             return Member::definitely_declared(ty);
         }
 
+        // Dynamic namespace fallbacks should not hide known dataclass fields on instances.
+        if self
+            .fields(db)
+            .iter()
+            .any(|field| field.name.as_str() == name)
+        {
+            return Member::unbound();
+        }
+
         self.has_dynamic_namespace(db)
             .then(Type::unknown)
             .map(Member::definitely_declared)
@@ -3217,6 +3229,23 @@ impl<'db> DynamicDataclassLiteral<'db> {
         ORDERING_METHODS
             .iter()
             .any(|name| !self.own_class_member(db, name).is_undefined())
+    }
+
+    /// Returns a new [`DynamicDataclassLiteral`] with the given dataclass params, preserving all
+    /// other fields.
+    pub(crate) fn with_dataclass_params(
+        self,
+        db: &'db dyn Db,
+        dataclass_params: Option<DataclassParams<'db>>,
+    ) -> Self {
+        Self::new(
+            db,
+            self.name(db).clone(),
+            dataclass_params.unwrap_or_else(|| self.dataclass_params(db)),
+            self.anchor(db).clone(),
+            self.members(db),
+            self.has_dynamic_namespace(db),
+        )
     }
 
     /// Generate synthesized class members for dataclasses.

@@ -1278,6 +1278,30 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// Apply dataclass parameters to a class-like type, preserving generic specialization.
+    pub(crate) fn try_with_dataclass_params(
+        self,
+        db: &'db dyn Db,
+        dataclass_params: DataclassParams<'db>,
+    ) -> Option<Self> {
+        match self {
+            Type::ClassLiteral(class_literal) => Some(Type::from(
+                class_literal.with_dataclass_params(db, Some(dataclass_params)),
+            )),
+            Type::GenericAlias(generic_alias) => {
+                let new_origin = generic_alias
+                    .origin(db)
+                    .with_dataclass_params(db, Some(dataclass_params));
+                Some(Type::GenericAlias(GenericAlias::new(
+                    db,
+                    new_origin,
+                    generic_alias.specialization(db),
+                )))
+            }
+            _ => None,
+        }
+    }
+
     pub const fn is_property_instance(&self) -> bool {
         matches!(self, Type::PropertyInstance(..))
     }
