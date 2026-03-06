@@ -66,6 +66,11 @@ def func14(arg: None | int | str | bytes):
     ...
 
 
+# Preserve token boundaries when fixing non-annotation expressions.
+print(None | (int)and 2)
+print(2 or(None) | int)
+
+
 # Ok
 def good_func1(arg: int | None):
     ...
@@ -85,4 +90,3 @@ def good_func4(arg: U[None]):
 
 def good_func5(arg: U[int]): 
     ...
-
