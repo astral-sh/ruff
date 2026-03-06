@@ -65,7 +65,6 @@ pub(crate) fn rule(name: &str, format: HelpFormat) -> Result<()> {
         }
         HelpFormat::Json => {
             serde_json::to_writer_pretty(&mut stdout, &RuleExplanation::from_lint(lint))?;
-            writeln!(stdout)?;
         }
     }
     Ok(())

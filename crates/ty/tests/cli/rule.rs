@@ -53,7 +53,6 @@ fn rule_json_output() {
         "since": "0.0.1-alpha.1"
       }
     }
-
     ----- stderr -----
     "###);
 }
