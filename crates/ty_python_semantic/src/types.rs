@@ -47,6 +47,7 @@ use crate::semantic_index::scope::ScopeId;
 use crate::semantic_index::{imported_modules, place_table, semantic_index};
 use crate::suppression::check_suppressions;
 use crate::types::bound_super::BoundSuperType;
+use crate::types::call::bind::ConstructorCallableKind;
 use crate::types::call::{Binding, Bindings, CallArguments, CallableBinding};
 pub(crate) use crate::types::callable::{CallableType, CallableTypes};
 pub(crate) use crate::types::class_base::ClassBase;
@@ -4334,6 +4335,7 @@ impl<'db> Type<'db> {
                 Some((new_callable, definedness)) => {
                     let mut bindings =
                         bind_constructor_new(db, new_callable.bindings(db), self_type);
+                    bindings.set_constructor_kind(ConstructorCallableKind::New);
                     if definedness == Definedness::PossiblyUndefined {
                         bindings.set_implicit_dunder_new_is_possibly_unbound();
                     }
@@ -4355,7 +4357,7 @@ impl<'db> Type<'db> {
                 _,
             ) => {
                 let mut bindings = init_method.bindings(db);
-                bindings.set_is_init();
+                bindings.set_constructor_kind(ConstructorCallableKind::Init);
                 if *definedness == Definedness::PossiblyUndefined {
                     bindings.set_implicit_dunder_init_is_possibly_unbound();
                 }
@@ -4374,7 +4376,7 @@ impl<'db> Type<'db> {
                         ..
                     }) => {
                         let mut bindings = init_method.bindings(db);
-                        bindings.set_is_init();
+                        bindings.set_constructor_kind(ConstructorCallableKind::Init);
                         if definedness == Definedness::PossiblyUndefined {
                             bindings.set_implicit_dunder_init_is_possibly_unbound();
                         }
@@ -4392,6 +4394,7 @@ impl<'db> Type<'db> {
                             Signature::new(Parameters::gradual_form(), constructor_instance_ty),
                         )
                         .into();
+                        bindings.set_constructor_kind(ConstructorCallableKind::Init);
                         bindings.set_implicit_dunder_init_is_possibly_unbound();
                         Some(bindings)
                     }
@@ -4405,11 +4408,7 @@ impl<'db> Type<'db> {
             // Preserve the full `__new__` signature and defer `__init__` validation until we know
             // which `__new__` overload matched at call time.
             if let Some(init_bindings) = init_bindings.as_ref() {
-                new_bindings.set_downstream_constructor(
-                    constructor_class_literal,
-                    init_bindings,
-                    false,
-                );
+                new_bindings.set_downstream_constructor(constructor_class_literal, init_bindings);
             }
             Some(new_bindings)
         } else {
@@ -4422,14 +4421,12 @@ impl<'db> Type<'db> {
         }) = metaclass_dunder_call.place
         {
             let mut metaclass_bindings = metaclass_call_method.bindings(db);
+            metaclass_bindings.set_constructor_kind(ConstructorCallableKind::MetaclassCall);
             if let Some(downstream_bindings) = constructor_bindings.as_ref() {
                 // Preserve the full metaclass `__call__` signature and defer whether constructor
                 // downstream checks apply until the matched overload is known.
-                metaclass_bindings.set_downstream_constructor(
-                    constructor_class_literal,
-                    downstream_bindings,
-                    true,
-                );
+                metaclass_bindings
+                    .set_downstream_constructor(constructor_class_literal, downstream_bindings);
             }
             metaclass_bindings
         } else if let Some(constructor_bindings) = constructor_bindings {

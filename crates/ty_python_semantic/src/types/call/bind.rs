@@ -177,8 +177,24 @@ struct DownstreamConstructor<'db> {
     class_literal: ClassLiteral<'db>,
     /// Downstream constructor bindings to validate conditionally.
     bindings: Bindings<'db>,
-    /// Whether the upstream method is a metaclass `__call__`.
-    of_metaclass_call: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ConstructorCallableKind {
+    Regular,
+    New,
+    Init,
+    MetaclassCall,
+}
+
+impl ConstructorCallableKind {
+    fn is_init(self) -> bool {
+        matches!(self, ConstructorCallableKind::Init)
+    }
+
+    fn is_metaclass_call(self) -> bool {
+        matches!(self, ConstructorCallableKind::MetaclassCall)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -468,16 +484,15 @@ impl<'db> Bindings<'db> {
         &mut self,
         class_literal: ClassLiteral<'db>,
         bindings: &Bindings<'db>,
-        of_metaclass_call: bool,
     ) {
         for binding in self.iter_flat_mut() {
-            binding.set_downstream_constructor(class_literal, bindings.clone(), of_metaclass_call);
+            binding.set_downstream_constructor(class_literal, bindings.clone());
         }
     }
 
-    pub(crate) fn set_is_init(&mut self) {
+    pub(crate) fn set_constructor_kind(&mut self, constructor_kind: ConstructorCallableKind) {
         for binding in self.iter_flat_mut() {
-            binding.is_init = true;
+            binding.constructor_kind = constructor_kind;
         }
     }
 
@@ -783,7 +798,7 @@ impl<'db> Bindings<'db> {
                     .next()
                     .map(|(_, overload)| overload)
                     .or_else(|| match binding.overloads() {
-                        [overload] if !binding.is_init => Some(overload),
+                        [overload] if !binding.constructor_kind.is_init() => Some(overload),
                         _ => None,
                     });
                 let Some(overload) = overload else {
@@ -792,7 +807,7 @@ impl<'db> Bindings<'db> {
 
                 // `__init__` is a post-construction validator and does not determine the
                 // constructor return type.
-                if binding.is_init {
+                if binding.constructor_kind.is_init() {
                     continue;
                 }
 
@@ -824,7 +839,7 @@ impl<'db> Bindings<'db> {
                         && (binding.matching_overloads().next().is_none()
                             || constructor_is_subclass_of_any)
                         && let Some(downstream) = binding.downstream_constructor.as_ref()
-                        && !downstream.of_metaclass_call
+                        && !binding.constructor_kind.is_metaclass_call()
                         && let Some(downstream_return) =
                             downstream.bindings.constructor_return_type(db)
                     {
@@ -860,7 +875,7 @@ impl<'db> Bindings<'db> {
                 let Some((_, overload)) = binding.matching_overloads().next() else {
                     continue;
                 };
-                if binding.is_init {
+                if binding.constructor_kind.is_init() {
                     continue;
                 }
 
@@ -898,7 +913,7 @@ impl<'db> Bindings<'db> {
                 .next()
                 .map(|(_, overload)| overload)
                 .or_else(|| match binding.overloads() {
-                    [overload] if binding.is_init => Some(overload),
+                    [overload] if binding.constructor_kind.is_init() => Some(overload),
                     _ => None,
                 });
             let Some(overload) = overload else {
@@ -2426,7 +2441,7 @@ impl<'db> From<Binding<'db>> for Bindings<'db> {
             dunder_call_is_possibly_unbound: false,
             bound_type: None,
             constructor_instance_type: None,
-            is_init: false,
+            constructor_kind: ConstructorCallableKind::Regular,
             downstream_constructor: None,
             overload_call_return_type: None,
             matching_overload_before_type_checking: None,
@@ -2475,8 +2490,8 @@ pub(crate) struct CallableBinding<'db> {
     /// The type of the instance being constructed, if this signature is for a constructor.
     pub(crate) constructor_instance_type: Option<Type<'db>>,
 
-    /// Whether this binding represents constructor `__init__` validation.
-    is_init: bool,
+    /// The callable's role within constructor dispatch.
+    constructor_kind: ConstructorCallableKind,
 
     /// Deferred downstream constructor validation.
     downstream_constructor: Option<Box<DownstreamConstructor<'db>>>,
@@ -2530,7 +2545,7 @@ impl<'db> CallableBinding<'db> {
             dunder_call_is_possibly_unbound: false,
             bound_type: None,
             constructor_instance_type: None,
-            is_init: false,
+            constructor_kind: ConstructorCallableKind::Regular,
             downstream_constructor: None,
             overload_call_return_type: None,
             matching_overload_before_type_checking: None,
@@ -2545,7 +2560,7 @@ impl<'db> CallableBinding<'db> {
             dunder_call_is_possibly_unbound: false,
             bound_type: None,
             constructor_instance_type: None,
-            is_init: false,
+            constructor_kind: ConstructorCallableKind::Regular,
             downstream_constructor: None,
             overload_call_return_type: None,
             matching_overload_before_type_checking: None,
@@ -2580,12 +2595,10 @@ impl<'db> CallableBinding<'db> {
         &mut self,
         class_literal: ClassLiteral<'db>,
         bindings: Bindings<'db>,
-        of_metaclass_call: bool,
     ) {
         self.downstream_constructor = Some(Box::new(DownstreamConstructor {
             class_literal,
             bindings,
-            of_metaclass_call,
         }));
     }
 
@@ -3334,7 +3347,7 @@ impl<'db> CallableBinding<'db> {
         }
 
         // If metaclass `__call__` itself doesn't match, constructor dispatch stops there.
-        if downstream.of_metaclass_call {
+        if self.constructor_kind.is_metaclass_call() {
             return false;
         }
 
