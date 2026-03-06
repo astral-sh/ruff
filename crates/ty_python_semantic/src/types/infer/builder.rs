@@ -62,10 +62,9 @@ use crate::types::call::bind::MatchingOverloadIndex;
 use crate::types::call::{Binding, Bindings, CallArguments, CallError, CallErrorKind};
 use crate::types::callable::CallableTypeKind;
 use crate::types::class::{
-    ClassLiteral, CodeGeneratorKind, DataclassFieldSpec, DataclassSpec, DynamicClassAnchor,
-    DynamicClassLiteral, DynamicDataclassAnchor, DynamicDataclassLiteral, DynamicMetaclassConflict,
-    DynamicNamedTupleAnchor, DynamicNamedTupleLiteral, MethodDecorator, NamedTupleField,
-    NamedTupleSpec,
+    ClassLiteral, CodeGeneratorKind, DynamicClassAnchor, DynamicClassLiteral,
+    DynamicMetaclassConflict, DynamicNamedTupleAnchor, DynamicNamedTupleLiteral, MethodDecorator,
+    NamedTupleField, NamedTupleSpec,
 };
 use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::context::{InNoTypeCheck, InferContext};
@@ -73,16 +72,16 @@ use crate::types::diagnostic::{
     self, CALL_NON_CALLABLE, CONFLICTING_DECLARATIONS, CYCLIC_CLASS_DEFINITION,
     CYCLIC_TYPE_ALIAS_DEFINITION, DUPLICATE_BASE, FINAL_ON_NON_METHOD, INCONSISTENT_MRO,
     INEFFECTIVE_FINAL, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS,
-    INVALID_BASE, INVALID_DATACLASS, INVALID_DECLARATION, INVALID_ENUM_MEMBER_ANNOTATION,
-    INVALID_KEY, INVALID_LEGACY_TYPE_VARIABLE, INVALID_NAMED_TUPLE, INVALID_NEWTYPE,
-    INVALID_PARAMETER_DEFAULT, INVALID_PARAMSPEC, INVALID_TYPE_ALIAS_TYPE, INVALID_TYPE_ARGUMENTS,
-    INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL, INVALID_TYPE_VARIABLE_BOUND,
-    INVALID_TYPE_VARIABLE_CONSTRAINTS, INVALID_TYPE_VARIABLE_DEFAULT, IncompatibleBases,
-    MISSING_ARGUMENT, NO_MATCHING_OVERLOAD, PARAMETER_ALREADY_ASSIGNED, POSSIBLY_MISSING_ATTRIBUTE,
-    POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_IMPORT, SUBCLASS_OF_FINAL_CLASS,
-    TOO_MANY_POSITIONAL_ARGUMENTS, TypedDictDeleteErrorKind, UNDEFINED_REVEAL, UNKNOWN_ARGUMENT,
-    UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_IMPORT, UNRESOLVED_REFERENCE,
-    UNSUPPORTED_DYNAMIC_BASE, UNSUPPORTED_OPERATOR, UNUSED_AWAITABLE, USELESS_OVERLOAD_BODY,
+    INVALID_BASE, INVALID_DECLARATION, INVALID_ENUM_MEMBER_ANNOTATION, INVALID_KEY,
+    INVALID_LEGACY_TYPE_VARIABLE, INVALID_NAMED_TUPLE, INVALID_NEWTYPE, INVALID_PARAMETER_DEFAULT,
+    INVALID_PARAMSPEC, INVALID_TYPE_ALIAS_TYPE, INVALID_TYPE_ARGUMENTS, INVALID_TYPE_FORM,
+    INVALID_TYPE_GUARD_CALL, INVALID_TYPE_VARIABLE_BOUND, INVALID_TYPE_VARIABLE_CONSTRAINTS,
+    INVALID_TYPE_VARIABLE_DEFAULT, IncompatibleBases, MISSING_ARGUMENT, NO_MATCHING_OVERLOAD,
+    PARAMETER_ALREADY_ASSIGNED, POSSIBLY_MISSING_ATTRIBUTE, POSSIBLY_MISSING_IMPLICIT_CALL,
+    POSSIBLY_MISSING_IMPORT, SUBCLASS_OF_FINAL_CLASS, TOO_MANY_POSITIONAL_ARGUMENTS,
+    TypedDictDeleteErrorKind, UNDEFINED_REVEAL, UNKNOWN_ARGUMENT, UNRESOLVED_ATTRIBUTE,
+    UNRESOLVED_GLOBAL, UNRESOLVED_IMPORT, UNRESOLVED_REFERENCE, UNSUPPORTED_DYNAMIC_BASE,
+    UNSUPPORTED_OPERATOR, UNUSED_AWAITABLE, USELESS_OVERLOAD_BODY,
     hint_if_stdlib_attribute_exists_on_other_versions,
     hint_if_stdlib_submodule_exists_on_other_versions, report_attempted_protocol_instantiation,
     report_bad_dunder_set_call, report_call_to_abstract_method,
@@ -126,15 +125,14 @@ use crate::types::typevar::{
 };
 use crate::types::visitor::find_over_type;
 use crate::types::{
-    CallDunderError, CallableBinding, CallableType, ClassType, DataclassFlags, DataclassParams,
-    DynamicType, EvaluationMode, InferenceFlags, InternedConstraintSet, InternedType,
-    IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, KnownUnion,
-    LintDiagnosticGuard, LiteralValueTypeKind, MemberLookupPolicy, ParamSpecAttrKind, Parameter,
-    ParameterForm, Parameters, Signature, SpecialFormType, StaticClassLiteral, SubclassOfType,
-    Truthiness, Type, TypeAliasType, TypeAndQualifiers, TypeContext, TypeQualifiers,
-    TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, TypedDictType, UnionBuilder,
-    UnionType, binding_type, definition_expression_type, infer_complete_scope_types,
-    infer_scope_types, todo_type,
+    CallDunderError, CallableBinding, CallableType, ClassType, DataclassParams, DynamicType,
+    EvaluationMode, InferenceFlags, InternedConstraintSet, InternedType, IntersectionBuilder,
+    IntersectionType, KnownClass, KnownInstanceType, KnownUnion, LintDiagnosticGuard,
+    LiteralValueTypeKind, MemberLookupPolicy, ParamSpecAttrKind, Parameter, ParameterForm,
+    Parameters, Signature, SpecialFormType, StaticClassLiteral, SubclassOfType, Truthiness, Type,
+    TypeAliasType, TypeAndQualifiers, TypeContext, TypeQualifiers, TypeVarBoundOrConstraints,
+    TypeVarKind, TypeVarVariance, TypedDictType, UnionBuilder, UnionType, binding_type,
+    definition_expression_type, infer_complete_scope_types, infer_scope_types, todo_type,
 };
 use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
 use crate::unpack::UnpackPosition;
@@ -142,11 +140,13 @@ use crate::{AnalysisSettings, Db, FxIndexSet, Program};
 
 mod annotation_expression;
 mod binary_expressions;
+mod make_dataclass;
 mod paramspec_validation;
 mod subscript;
 mod type_expression;
 
 use super::comparisons::{self, BinaryComparisonVisitor};
+pub(super) use make_dataclass::report_dynamic_dataclass_mro_errors;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 struct TypeAndRange<'db> {
@@ -501,6 +501,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if let Some(specifiers) = field_specifiers(self.db(), self.index, self.scope()) {
             self.dataclass_field_specifiers = specifiers;
         }
+    }
+
+    fn with_dataclass_field_specifiers<T>(
+        &mut self,
+        field_specifiers: &[Type<'db>],
+        f: impl FnOnce(&mut Self) -> T,
+    ) -> T {
+        let previous_field_specifiers = std::mem::replace(
+            &mut self.dataclass_field_specifiers,
+            SmallVec::from(field_specifiers),
+        );
+        let result = f(self);
+        self.dataclass_field_specifiers = previous_field_specifiers;
+        result
     }
 
     /// Set the multi-inference state, returning the previous value.
@@ -7236,42 +7250,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    /// Report diagnostics for invalid field names in a `make_dataclass()` definition.
-    fn check_invalid_make_dataclass_field_names(
-        &self,
-        field_names: &[Name],
-        fields_arg: &ast::Expr,
-    ) {
-        for (i, field_name) in field_names.iter().enumerate() {
-            if field_names[..i].iter().any(|prior| prior == field_name)
-                && let Some(builder) = self.context.report_lint(&INVALID_DATACLASS, fields_arg)
-            {
-                let mut diagnostic = builder.into_diagnostic(format_args!(
-                    "Duplicate field name `{field_name}` in `make_dataclass()`"
-                ));
-                diagnostic.set_primary_message(format_args!(
-                    "Field `{field_name}` already defined; will raise `TypeError` at runtime"
-                ));
-            }
-
-            if is_keyword(field_name)
-                && let Some(builder) = self.context.report_lint(&INVALID_DATACLASS, fields_arg)
-            {
-                let mut diagnostic = builder.into_diagnostic(format_args!(
-                    "Field name `{field_name}` in `make_dataclass()` cannot be a Python keyword"
-                ));
-                diagnostic.set_primary_message("Will raise `TypeError` at runtime");
-            } else if !is_identifier(field_name)
-                && let Some(builder) = self.context.report_lint(&INVALID_DATACLASS, fields_arg)
-            {
-                let mut diagnostic = builder.into_diagnostic(format_args!(
-                    "Field name `{field_name}` in `make_dataclass()` is not a valid identifier"
-                ));
-                diagnostic.set_primary_message("Will raise `TypeError` at runtime");
-            }
-        }
-    }
-
     /// Extract explicit base types from a bases tuple type.
     ///
     /// Emits a diagnostic if `bases_type` is not a valid tuple type.
@@ -7460,770 +7438,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         disjoint_bases
-    }
-
-    /// Infer a `dataclasses.make_dataclass(cls_name, fields, ...)` call.
-    ///
-    /// This method *does not* call `infer_expression` on the object being called;
-    /// it is assumed that the type for this AST node has already been inferred before this method is called.
-    fn infer_make_dataclass_call_expression(
-        &mut self,
-        call_expr: &ast::ExprCall,
-        definition: Option<Definition<'db>>,
-    ) -> Type<'db> {
-        let db = self.db();
-
-        let ast::Arguments {
-            args,
-            keywords,
-            range: _,
-            node_index: _,
-        } = &call_expr.arguments;
-
-        let has_starred = args.iter().any(ast::Expr::is_starred_expr);
-        let has_double_starred = keywords.iter().any(|kw| kw.arg.is_none());
-
-        let cls_name_kw = call_expr.arguments.find_keyword("cls_name");
-        let fields_kw = call_expr.arguments.find_keyword("fields");
-
-        let (name_arg, fields_arg, rest, name_from_keyword, fields_from_keyword): (
-            Option<&ast::Expr>,
-            Option<&ast::Expr>,
-            &[ast::Expr],
-            bool,
-            bool,
-        ) = match &**args {
-            [name, fields, rest @ ..] => (Some(name), Some(fields), rest, false, false),
-            [name, rest @ ..] => (
-                Some(name),
-                fields_kw.map(|kw| &kw.value),
-                rest,
-                false,
-                fields_kw.is_some(),
-            ),
-            [] => (
-                cls_name_kw.map(|kw| &kw.value),
-                fields_kw.map(|kw| &kw.value),
-                &[],
-                cls_name_kw.is_some(),
-                fields_kw.is_some(),
-            ),
-        };
-
-        let (Some(name_arg), Some(fields_arg)) = (name_arg, fields_arg) else {
-            for arg in args {
-                self.infer_expression(arg, TypeContext::default());
-            }
-            for kw in keywords {
-                self.infer_expression(&kw.value, TypeContext::default());
-            }
-
-            // Report missing argument diagnostic if we can statically determine the arguments.
-            if !has_starred && !has_double_starred {
-                let missing = match (name_arg.is_none(), fields_arg.is_none()) {
-                    (true, true) => "`cls_name` and `fields`",
-                    (true, false) => "`cls_name`",
-                    (false, true) => "`fields`",
-                    (false, false) => unreachable!(),
-                };
-                let plural = name_arg.is_none() && fields_arg.is_none();
-                if let Some(builder) = self.context.report_lint(&MISSING_ARGUMENT, call_expr) {
-                    builder.into_diagnostic(format_args!(
-                        "No argument{} provided for required parameter{} {missing} of function `make_dataclass`",
-                        if plural { "s" } else { "" },
-                        if plural { "s" } else { "" }
-                    ));
-                }
-            }
-
-            // Fall back to type[Unknown]
-            return SubclassOfType::subclass_of_unknown();
-        };
-
-        let name_type = self.infer_expression(name_arg, TypeContext::default());
-
-        for arg in rest {
-            self.infer_expression(arg, TypeContext::default());
-        }
-
-        // If any argument is a starred expression or any keyword is a double-starred expression,
-        // we can't statically determine the arguments, so fall back to type[Unknown].
-        if has_starred || has_double_starred {
-            for kw in keywords {
-                self.infer_expression(&kw.value, TypeContext::default());
-            }
-            return SubclassOfType::subclass_of_unknown();
-        }
-
-        // Check for excess positional arguments (only `cls_name` and `fields` are positional).
-        if !rest.is_empty() {
-            if let Some(builder) = self
-                .context
-                .report_lint(&TOO_MANY_POSITIONAL_ARGUMENTS, &rest[0])
-            {
-                builder.into_diagnostic(format_args!(
-                    "Too many positional arguments to function `make_dataclass`: expected 2, got {}",
-                    args.len()
-                ));
-            }
-        }
-
-        // Parse keyword arguments to extract dataclass parameters.
-        let mut dataclass_flags = self.make_dataclass_default_flags();
-        let mut bases_arg: Option<(&ast::Expr, Type<'db>)> = None;
-        let mut namespace_arg: Option<(&ast::Expr, Type<'db>)> = None;
-        let bool_type = KnownClass::Bool.to_instance(db);
-        let mut seen_parameters: FxHashSet<&str> = FxHashSet::default();
-
-        if !args.is_empty() {
-            seen_parameters.insert("cls_name");
-        }
-        if args.len() >= 2 {
-            seen_parameters.insert("fields");
-        }
-
-        for kw in keywords {
-            let Some(arg) = &kw.arg else {
-                continue;
-            };
-            let param = arg.id.as_str();
-
-            if matches!(param, "cls_name" | "fields") {
-                let already_assigned = !seen_parameters.insert(param);
-                if already_assigned {
-                    let _ = self.infer_expression(&kw.value, TypeContext::default());
-                    if let Some(builder) = self.context.report_lint(&PARAMETER_ALREADY_ASSIGNED, kw)
-                    {
-                        builder.into_diagnostic(format_args!(
-                            "Multiple values provided for parameter `{param}` of function `make_dataclass`"
-                        ));
-                    }
-                    continue;
-                }
-
-                if (param == "cls_name" && name_from_keyword)
-                    || (param == "fields" && fields_from_keyword)
-                {
-                    continue;
-                }
-            }
-
-            let kw_type = self.infer_expression(&kw.value, TypeContext::default());
-
-            if !matches!(param, "cls_name" | "fields") && !seen_parameters.insert(param) {
-                if let Some(builder) = self.context.report_lint(&PARAMETER_ALREADY_ASSIGNED, kw) {
-                    builder.into_diagnostic(format_args!(
-                        "Multiple values provided for parameter `{param}` of function `make_dataclass`"
-                    ));
-                }
-                continue;
-            }
-
-            if let Some(min_version) = self.make_dataclass_keyword_minimum_version(param)
-                && !self.make_dataclass_keyword_is_supported(min_version)
-            {
-                self.report_make_dataclass_unsupported_keyword(kw, param, min_version);
-                continue;
-            }
-
-            match param {
-                "bases" => {
-                    // Validate that bases is a tuple. At runtime, `make_dataclass` requires a tuple
-                    // (not list or other iterable).
-                    //
-                    // We use `tuple[object, ...]` rather than `tuple[type, ...]` because special
-                    // forms like `TypedDict`, `Protocol`, and `Generic` are not subtypes of `type`.
-                    // Using `tuple[type, ...]` would emit a generic type error here, but we prefer
-                    // to let `validate_dynamic_type_bases` emit more specific diagnostics.
-                    let tuple_of_objects =
-                        Type::homogeneous_tuple(db, KnownClass::Object.to_instance(db));
-                    if kw_type.is_assignable_to(db, tuple_of_objects) {
-                        bases_arg = Some((&kw.value, kw_type));
-                    } else if let Some(builder) =
-                        self.context.report_lint(&INVALID_ARGUMENT_TYPE, &kw.value)
-                    {
-                        let mut diagnostic = builder.into_diagnostic(format_args!(
-                            "Invalid argument to parameter `bases` of `make_dataclass()`"
-                        ));
-                        diagnostic.set_primary_message(format_args!(
-                            "Expected `tuple`, found `{}`",
-                            kw_type.display(db)
-                        ));
-                    }
-                }
-                "namespace" => {
-                    namespace_arg = Some((&kw.value, kw_type));
-
-                    // Emit diagnostic for invalid types (not `dict | None`).
-                    let dict_type =
-                        KnownClass::Dict.to_specialized_instance(db, &[Type::any(), Type::any()]);
-                    let valid_type = UnionType::from_elements(db, [dict_type, Type::none(db)]);
-                    if !kw_type.is_assignable_to(db, valid_type) {
-                        if let Some(builder) =
-                            self.context.report_lint(&INVALID_ARGUMENT_TYPE, &kw.value)
-                        {
-                            let mut diagnostic = builder.into_diagnostic(format_args!(
-                                "Invalid argument to parameter `namespace` of `make_dataclass()`"
-                            ));
-                            diagnostic.set_primary_message(format_args!(
-                                "Expected `dict | None`, found `{}`",
-                                kw_type.display(db)
-                            ));
-                        }
-                    }
-                }
-                "module" => {
-                    // Emit diagnostic for invalid types (not `str | None`).
-                    let valid_type = UnionType::from_elements(
-                        db,
-                        [KnownClass::Str.to_instance(db), Type::none(db)],
-                    );
-                    if !kw_type.is_assignable_to(db, valid_type) {
-                        if let Some(builder) =
-                            self.context.report_lint(&INVALID_ARGUMENT_TYPE, &kw.value)
-                        {
-                            let mut diagnostic = builder.into_diagnostic(format_args!(
-                                "Invalid argument to parameter `module` of `make_dataclass()`"
-                            ));
-                            diagnostic.set_primary_message(format_args!(
-                                "Expected `str | None`, found `{}`",
-                                kw_type.display(db)
-                            ));
-                        }
-                    }
-                }
-                // All boolean parameters share the same type validation logic.
-                param @ ("init" | "repr" | "eq" | "order" | "unsafe_hash" | "frozen"
-                | "match_args" | "kw_only" | "slots" | "weakref_slot") => {
-                    if !kw_type.is_assignable_to(db, bool_type) {
-                        if let Some(builder) =
-                            self.context.report_lint(&INVALID_ARGUMENT_TYPE, &kw.value)
-                        {
-                            let mut diagnostic = builder.into_diagnostic(format_args!(
-                                "Invalid argument to parameter `{param}` of `make_dataclass()`"
-                            ));
-                            diagnostic.set_primary_message(format_args!(
-                                "Expected `bool`, found `{}`",
-                                kw_type.display(db)
-                            ));
-                        }
-                    }
-                    // Update flags: params defaulting to true use is_always_false/remove,
-                    // params defaulting to false use is_always_true/insert.
-                    match param {
-                        "init" if kw_type.bool(db).is_always_false() => {
-                            dataclass_flags.remove(DataclassFlags::INIT);
-                        }
-                        "repr" if kw_type.bool(db).is_always_false() => {
-                            dataclass_flags.remove(DataclassFlags::REPR);
-                        }
-                        "eq" if kw_type.bool(db).is_always_false() => {
-                            dataclass_flags.remove(DataclassFlags::EQ);
-                        }
-                        "match_args" if kw_type.bool(db).is_always_false() => {
-                            dataclass_flags.remove(DataclassFlags::MATCH_ARGS);
-                        }
-                        "order" if kw_type.bool(db).is_always_true() => {
-                            dataclass_flags.insert(DataclassFlags::ORDER);
-                        }
-                        "unsafe_hash" if kw_type.bool(db).is_always_true() => {
-                            dataclass_flags.insert(DataclassFlags::UNSAFE_HASH);
-                        }
-                        "frozen" if kw_type.bool(db).is_always_true() => {
-                            dataclass_flags.insert(DataclassFlags::FROZEN);
-                        }
-                        "kw_only" if kw_type.bool(db).is_always_true() => {
-                            dataclass_flags.insert(DataclassFlags::KW_ONLY);
-                        }
-                        "slots" if kw_type.bool(db).is_always_true() => {
-                            dataclass_flags.insert(DataclassFlags::SLOTS);
-                        }
-                        "weakref_slot" if kw_type.bool(db).is_always_true() => {
-                            dataclass_flags.insert(DataclassFlags::WEAKREF_SLOT);
-                        }
-                        _ => {}
-                    }
-                }
-                "decorator" => {}
-                unknown_kwarg => {
-                    if let Some(builder) = self.context.report_lint(&UNKNOWN_ARGUMENT, kw) {
-                        builder.into_diagnostic(format_args!(
-                            "Argument `{unknown_kwarg}` does not match any known parameter of function `make_dataclass`",
-                        ));
-                    }
-                }
-            }
-        }
-
-        let dataclass_params = DataclassParams::from_flags(db, dataclass_flags);
-        let (members, has_dynamic_namespace) = namespace_arg
-            .map(|(namespace_arg, namespace_type)| {
-                self.extract_dynamic_namespace_members(namespace_arg, namespace_type, true)
-            })
-            .unwrap_or_default();
-
-        let name = if let Some(literal) = name_type.as_string_literal() {
-            Name::new(literal.value(db))
-        } else {
-            // Name is not a string literal; use `<unknown>` like we do for `type(...)` calls.
-            if !name_type.is_assignable_to(db, KnownClass::Str.to_instance(db))
-                && let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, name_arg)
-            {
-                let mut diagnostic = builder.into_diagnostic(format_args!(
-                    "Invalid argument to parameter `cls_name` of `make_dataclass()`"
-                ));
-                diagnostic.set_primary_message(format_args!(
-                    "Expected `str`, found `{}`",
-                    name_type.display(db)
-                ));
-            }
-            Name::new_static("<unknown>")
-        };
-
-        let scope = self.scope();
-
-        // Create the anchor for identifying this dynamic dataclass.
-        // For assigned calls, we defer field/base evaluation to support forward references.
-        // For dangling calls, we compute the spec eagerly.
-        let (anchor, disjoint_bases): (DynamicDataclassAnchor<'db>, IncompatibleBases<'db>) =
-            match definition {
-                Some(def) => {
-                    // Assigned call: defer field/base evaluation to support forward references
-                    // and recursive types.
-                    self.deferred.insert(def, self.multi_inference_state);
-                    (
-                        DynamicDataclassAnchor::Definition(def),
-                        IncompatibleBases::default(),
-                    )
-                }
-                None => {
-                    // Dangling call: compute spec eagerly since class bases are fully deferred
-                    // during type inference.
-                    let call_node_index = call_expr.node_index.load();
-                    let scope_anchor = scope.node(db).node_index().unwrap_or(NodeIndex::from(0));
-                    let anchor_u32 = scope_anchor
-                        .as_u32()
-                        .expect("scope anchor should not be NodeIndex::NONE");
-                    let call_u32 = call_node_index
-                        .as_u32()
-                        .expect("call node should not be NodeIndex::NONE");
-
-                    // Extract bases from the `bases` keyword argument.
-                    let (bases, disjoint_bases): (Box<[ClassBase<'db>]>, IncompatibleBases<'db>) =
-                        if let Some((bases_node, bases_type)) = bases_arg {
-                            let explicit_bases = self.extract_explicit_bases(
-                                bases_node,
-                                bases_type,
-                                "make_dataclass",
-                            );
-                            if let Some(explicit_bases) = explicit_bases {
-                                let disjoint = self.validate_dynamic_type_bases(
-                                    bases_node,
-                                    &explicit_bases,
-                                    &name,
-                                    "make_dataclass",
-                                );
-                                let class_bases: Box<[ClassBase<'db>]> = explicit_bases
-                                    .iter()
-                                    .filter_map(|ty| ClassBase::try_from_type(db, *ty, None))
-                                    .collect();
-                                (class_bases, disjoint)
-                            } else {
-                                (
-                                    Box::from([ClassBase::unknown()]),
-                                    IncompatibleBases::default(),
-                                )
-                            }
-                        } else {
-                            (Box::default(), IncompatibleBases::default())
-                        };
-
-                    // Compute the spec eagerly for dangling calls.
-                    let spec = self.infer_make_dataclass_fields(fields_arg, bases);
-
-                    (
-                        DynamicDataclassAnchor::ScopeOffset {
-                            scope,
-                            offset: call_u32 - anchor_u32,
-                            spec,
-                        },
-                        disjoint_bases,
-                    )
-                }
-            };
-
-        let dataclass = DynamicDataclassLiteral::new(
-            db,
-            name,
-            dataclass_params,
-            anchor,
-            members,
-            has_dynamic_namespace,
-        );
-
-        // For definition-bound calls (assigned to a variable), defer MRO checks until after
-        // the scope is fully inferred via `check_dynamic_dataclass_definitions()`. This avoids
-        // expensive Salsa cycle detection when forward references like
-        // `X = make_dataclass("X", [("field", X | None)])` are present.
-        // For dangling calls, check eagerly since they can't have recursive references.
-        if definition.is_none() {
-            self.check_dynamic_dataclass_mro(dataclass, call_expr, disjoint_bases, bases_arg);
-        }
-
-        Type::ClassLiteral(ClassLiteral::DynamicDataclass(dataclass))
-    }
-
-    /// Check MRO and instance layout conflicts for a dynamic dataclass.
-    /// Used for eager checking of dangling calls.
-    fn check_dynamic_dataclass_mro(
-        &self,
-        dataclass: DynamicDataclassLiteral<'db>,
-        call_expr: &ast::ExprCall,
-        mut disjoint_bases: IncompatibleBases<'db>,
-        bases_arg: Option<(&ast::Expr, Type<'db>)>,
-    ) {
-        let db = self.db();
-        let bases_node = bases_arg.map(|(node, _)| node);
-
-        if report_dynamic_dataclass_mro_errors(&self.context, dataclass, call_expr) {
-            // MRO succeeded, check for instance-layout-conflict.
-            disjoint_bases.remove_redundant_entries(db);
-            if disjoint_bases.len() > 1 {
-                report_instance_layout_conflict(
-                    &self.context,
-                    dataclass.header_range(db),
-                    bases_node.and_then(|n| n.as_tuple_expr().map(|t| t.elts.as_slice())),
-                    &disjoint_bases,
-                );
-            }
-        }
-
-        // Check for metaclass conflicts.
-        if let Err(DynamicMetaclassConflict {
-            metaclass1,
-            base1,
-            metaclass2,
-            base2,
-        }) = dataclass.try_metaclass(db)
-        {
-            report_conflicting_metaclass_from_bases(
-                &self.context,
-                call_expr.into(),
-                dataclass.name(db),
-                metaclass1,
-                base1.display(db),
-                metaclass2,
-                base2.display(db),
-            );
-        }
-    }
-
-    /// Infer deferred field and base types for a `make_dataclass()` assignment.
-    ///
-    /// This is called during deferred evaluation to process forward references
-    /// and recursive types in field type annotations and base classes.
-    fn infer_make_dataclass_deferred(&mut self, arguments: &ast::Arguments) {
-        let db = self.db();
-        let Some(name_arg) = arguments
-            .args
-            .first()
-            .or_else(|| arguments.find_keyword("cls_name").map(|kw| &kw.value))
-        else {
-            return;
-        };
-        let Some(fields_arg) = arguments
-            .args
-            .get(1)
-            .or_else(|| arguments.find_keyword("fields").map(|kw| &kw.value))
-        else {
-            return;
-        };
-
-        // Extract the class name from the first argument.
-        // The name was already inferred in the eager phase, so use try_expression_type.
-        let name_type = self
-            .try_expression_type(name_arg)
-            .unwrap_or_else(|| self.infer_expression(name_arg, TypeContext::default()));
-        let name = if let Some(literal) = name_type.as_string_literal() {
-            Name::new(literal.value(db))
-        } else {
-            Name::new_static("<dataclass>")
-        };
-
-        let InferenceRegion::Deferred(definition) = self.region else {
-            return;
-        };
-        let previous_context = self.typevar_binding_context.replace(definition);
-
-        // Extract bases from the `bases` keyword argument.
-        // Note: bases type validation (tuple check) was already done in the eager path,
-        // so we only need to extract and validate individual bases here.
-        let bases: Box<[ClassBase<'db>]> = if let Some(bases_kw) = arguments.find_keyword("bases") {
-            let bases_type = self.infer_expression(&bases_kw.value, TypeContext::default());
-            if let Some(elements) = bases_type
-                .fixed_tuple_elements(db)
-                .map(Cow::into_owned)
-                .map(Into::<Box<[Type<'db>]>>::into)
-            {
-                self.validate_dynamic_type_bases(
-                    &bases_kw.value,
-                    &elements,
-                    &name,
-                    "make_dataclass",
-                );
-                elements
-                    .iter()
-                    .filter_map(|ty| ClassBase::try_from_type(db, *ty, None))
-                    .collect()
-            } else {
-                Box::from([ClassBase::unknown()])
-            }
-        } else {
-            Box::default()
-        };
-
-        // Infer fields with proper handling of string annotations.
-        self.infer_make_dataclass_fields(fields_arg, bases);
-        self.typevar_binding_context = previous_context;
-    }
-
-    /// Infer fields from a `make_dataclass` fields argument.
-    ///
-    /// This method properly handles string annotations as forward references by using
-    /// `infer_type_expression` instead of `expression_type().in_type_expression()`.
-    ///
-    /// Returns a `DataclassSpec` containing the fields. The spec is also stored as the
-    /// expression type of the fields argument so it can be retrieved during deferred evaluation.
-    fn infer_make_dataclass_fields(
-        &mut self,
-        fields_arg: &ast::Expr,
-        bases: Box<[ClassBase<'db>]>,
-    ) -> DataclassSpec<'db> {
-        let db = self.db();
-
-        let store_unknown_spec = |builder: &mut Self| {
-            let spec = DataclassSpec::unknown(db);
-            builder.store_expression_type(
-                fields_arg,
-                Type::KnownInstance(KnownInstanceType::DataclassSpec(spec)),
-            );
-            spec
-        };
-
-        // Get the elements from the list or tuple literal.
-        let elements: &[ast::Expr] = match fields_arg {
-            ast::Expr::List(list) => &list.elts,
-            ast::Expr::Tuple(tuple) => &tuple.elts,
-            _ => {
-                // Not a list/tuple literal - return unknown spec.
-                // For dynamic fields, we don't store DataclassSpec since the expression
-                // already has a type from the variable inference.
-                self.infer_expression(fields_arg, TypeContext::default());
-                return DataclassSpec::unknown(db);
-            }
-        };
-
-        let mut fields = Vec::with_capacity(elements.len());
-        let mut has_dynamic_fields = false;
-
-        for elt in elements {
-            // Field can be a string literal (just the name, type defaults to Any).
-            if let ast::Expr::StringLiteral(string_lit) = elt {
-                let name = Name::new(string_lit.value.to_str());
-                fields.push(DataclassFieldSpec {
-                    name,
-                    ty: Type::any(),
-                    default_ty: None,
-                    init: true,
-                    kw_only: None,
-                    alias: None,
-                });
-                self.store_expression_type(
-                    elt,
-                    Type::string_literal(db, string_lit.value.to_str()),
-                );
-                continue;
-            }
-
-            // Field can be a tuple of (name, type) or (name, type, field).
-            let field_elements: &[ast::Expr] = match elt {
-                ast::Expr::Tuple(tuple) => &tuple.elts,
-                ast::Expr::List(list) => &list.elts,
-                _ => {
-                    self.infer_expression(elt, TypeContext::default());
-                    has_dynamic_fields = true;
-                    continue;
-                }
-            };
-
-            match field_elements {
-                [name_expr, type_expr] => {
-                    // (name, type)
-                    let name_ty = self.infer_expression(name_expr, TypeContext::default());
-                    // Use infer_type_expression to properly handle string annotations
-                    let field_ty = self.infer_type_expression(type_expr);
-
-                    if let Some(name_lit) = name_ty.as_string_literal() {
-                        let field_name = Name::new(name_lit.value(db));
-                        fields.push(DataclassFieldSpec {
-                            name: field_name,
-                            ty: field_ty,
-                            default_ty: None,
-                            init: true,
-                            kw_only: None,
-                            alias: None,
-                        });
-                    } else if !name_ty.is_assignable_to(db, KnownClass::Str.to_instance(db)) {
-                        if let Some(builder) =
-                            self.context.report_lint(&INVALID_DATACLASS, name_expr)
-                        {
-                            let mut diagnostic = builder
-                                .into_diagnostic("Invalid `make_dataclass` field name definition");
-                            diagnostic.set_primary_message(format_args!(
-                                "Expected `str`, found `{}`",
-                                name_ty.display(db)
-                            ));
-                        }
-                        return store_unknown_spec(self);
-                    } else {
-                        has_dynamic_fields = true;
-                    }
-                    // Store the tuple type
-                    self.store_expression_type(
-                        elt,
-                        Type::heterogeneous_tuple(db, [name_ty, field_ty]),
-                    );
-                }
-                [name_expr, type_expr, default_expr] => {
-                    // (name, type, default_or_field)
-                    let name_ty = self.infer_expression(name_expr, TypeContext::default());
-                    // Use infer_type_expression to properly handle string annotations
-                    let field_ty = self.infer_type_expression(type_expr);
-                    let default_ty_value =
-                        self.infer_expression(default_expr, TypeContext::default());
-
-                    if let Some(name_lit) = name_ty.as_string_literal() {
-                        let field_name = Name::new(name_lit.value(db));
-                        // Extract field properties from Field object, or use default values.
-                        let (default_ty, init, kw_only, alias) =
-                            if let Type::KnownInstance(KnownInstanceType::Field(field)) =
-                                default_ty_value
-                            {
-                                (
-                                    field.default_type(db),
-                                    field.init(db),
-                                    field.kw_only(db),
-                                    field.alias(db).map(Name::new),
-                                )
-                            } else {
-                                (Some(default_ty_value), true, None, None)
-                            };
-                        fields.push(DataclassFieldSpec {
-                            name: field_name,
-                            ty: field_ty,
-                            default_ty,
-                            init,
-                            kw_only,
-                            alias,
-                        });
-                    } else if !name_ty.is_assignable_to(db, KnownClass::Str.to_instance(db)) {
-                        if let Some(builder) =
-                            self.context.report_lint(&INVALID_DATACLASS, name_expr)
-                        {
-                            let mut diagnostic = builder
-                                .into_diagnostic("Invalid `make_dataclass` field name definition");
-                            diagnostic.set_primary_message(format_args!(
-                                "Expected `str`, found `{}`",
-                                name_ty.display(db)
-                            ));
-                        }
-                        return store_unknown_spec(self);
-                    } else {
-                        has_dynamic_fields = true;
-                    }
-                    // Store the tuple type
-                    self.store_expression_type(
-                        elt,
-                        Type::heterogeneous_tuple(db, [name_ty, field_ty, default_ty_value]),
-                    );
-                }
-                _ => {
-                    for expr in field_elements {
-                        self.infer_expression(expr, TypeContext::default());
-                    }
-                    if let Some(builder) = self.context.report_lint(&INVALID_DATACLASS, elt) {
-                        let mut diagnostic = builder.into_diagnostic(format_args!(
-                            "Invalid field definition in `make_dataclass()`"
-                        ));
-                        diagnostic.set_primary_message(
-                            "Each field must be a string, or a length-2 or length-3 tuple/list",
-                        );
-                    }
-                    return store_unknown_spec(self);
-                }
-            }
-        }
-
-        let field_names: Vec<Name> = fields.iter().map(|field| field.name.clone()).collect();
-        self.check_invalid_make_dataclass_field_names(&field_names, fields_arg);
-
-        if has_dynamic_fields {
-            return store_unknown_spec(self);
-        }
-
-        let spec = DataclassSpec::known(db, fields.into_boxed_slice(), bases);
-        self.store_expression_type(
-            fields_arg,
-            Type::KnownInstance(KnownInstanceType::DataclassSpec(spec)),
-        );
-        spec
-    }
-
-    fn make_dataclass_default_flags(&self) -> DataclassFlags {
-        let mut flags = DataclassFlags::INIT | DataclassFlags::REPR | DataclassFlags::EQ;
-        if self.in_stub()
-            || Program::get(self.db()).python_version(self.db()) >= PythonVersion::PY310
-        {
-            flags.insert(DataclassFlags::MATCH_ARGS);
-        }
-        flags
-    }
-
-    fn make_dataclass_keyword_minimum_version(&self, keyword: &str) -> Option<PythonVersion> {
-        match keyword {
-            "match_args" | "kw_only" | "slots" => Some(PythonVersion::PY310),
-            "weakref_slot" => Some(PythonVersion::PY311),
-            "module" => Some(PythonVersion::PY312),
-            "decorator" => Some(PythonVersion::PY314),
-            _ => None,
-        }
-    }
-
-    fn make_dataclass_keyword_is_supported(&self, minimum_version: PythonVersion) -> bool {
-        self.in_stub() || Program::get(self.db()).python_version(self.db()) >= minimum_version
-    }
-
-    fn report_make_dataclass_unsupported_keyword(
-        &self,
-        keyword: &ast::Keyword,
-        parameter: &str,
-        minimum_version: PythonVersion,
-    ) {
-        let Some(builder) = self.context.report_lint(&UNKNOWN_ARGUMENT, keyword) else {
-            return;
-        };
-
-        let mut diagnostic = builder.into_diagnostic(format_args!(
-            "Argument `{parameter}` does not match any known parameter of function `make_dataclass`",
-        ));
-        diagnostic.info(format_args!(
-            "The `{parameter}` parameter is only available on Python {minimum_version}+",
-        ));
-        add_inferred_python_version_hint_to_diagnostic(
-            self.db(),
-            &mut diagnostic,
-            "resolving types",
-        );
     }
 
     fn infer_annotated_assignment_statement(&mut self, assignment: &ast::StmtAnnAssign) {
@@ -14554,65 +13768,6 @@ pub(super) fn report_dynamic_mro_errors<'db>(
                     dynamic_class.name(db),
                     dynamic_class
                         .explicit_bases(db)
-                        .iter()
-                        .map(|base| base.display(db))
-                        .join(", ")
-                ));
-            }
-        }
-    }
-
-    false
-}
-
-/// Report MRO errors for a dynamic dataclass created via `make_dataclass()`.
-///
-/// Returns `true` if the MRO is valid (no errors), `false` if errors were reported.
-/// This is used both for eager checking (dangling calls) and deferred checking (assigned calls).
-pub(super) fn report_dynamic_dataclass_mro_errors<'db>(
-    context: &InferContext<'db, '_>,
-    dataclass: DynamicDataclassLiteral<'db>,
-    call_expr: &ast::ExprCall,
-) -> bool {
-    let db = context.db();
-    let Err(error) = dataclass.try_mro(db) else {
-        return true;
-    };
-
-    match error.reason() {
-        DynamicMroErrorKind::InvalidBases(_) => {
-            // DynamicDataclassLiteral bases are already resolved as ClassBase,
-            // so InvalidBases should not occur.
-        }
-        DynamicMroErrorKind::InheritanceCycle => {
-            if let Some(builder) = context.report_lint(&CYCLIC_CLASS_DEFINITION, call_expr) {
-                builder.into_diagnostic(format_args!(
-                    "Cyclic definition of `{}`",
-                    dataclass.name(db)
-                ));
-            }
-        }
-        DynamicMroErrorKind::DuplicateBases(duplicates) => {
-            if let Some(builder) = context.report_lint(&DUPLICATE_BASE, call_expr) {
-                builder.into_diagnostic(format_args!(
-                    "Duplicate base class{maybe_s} {dupes} in class `{class}`",
-                    maybe_s = if duplicates.len() == 1 { "" } else { "es" },
-                    dupes = duplicates
-                        .iter()
-                        .map(|base: &ClassBase<'_>| base.display(db))
-                        .join(", "),
-                    class = dataclass.name(db),
-                ));
-            }
-        }
-        DynamicMroErrorKind::UnresolvableMro => {
-            if let Some(builder) = context.report_lint(&INCONSISTENT_MRO, call_expr) {
-                builder.into_diagnostic(format_args!(
-                    "Cannot create a consistent method resolution order (MRO) \
-                        for class `{}` with bases `[{}]`",
-                    dataclass.name(db),
-                    dataclass
-                        .bases(db)
                         .iter()
                         .map(|base| base.display(db))
                         .join(", ")
