@@ -26,9 +26,9 @@ use ty_module_resolver::{
 use super::deferred;
 use super::{
     DefinitionInference, DefinitionInferenceExtra, ExpressionInference, ExpressionInferenceExtra,
-    InferenceRegion, ScopeInference, ScopeInferenceExtra, infer_deferred_types,
-    infer_definition_types, infer_expression_types, infer_same_file_expression_type,
-    infer_unpack_types,
+    InferenceRegion, ScopeInference, ScopeInferenceExtra,
+    infer_assignment_definition_type_expression, infer_deferred_types, infer_definition_types,
+    infer_expression_types, infer_same_file_expression_type, infer_unpack_types,
 };
 use crate::diagnostic::format_enumeration;
 use crate::node_key::NodeKey;
@@ -48,7 +48,7 @@ use crate::semantic_index::definition::{
 };
 use crate::semantic_index::expression::{Expression, ExpressionKind};
 use crate::semantic_index::narrowing_constraints::ConstraintKey;
-use crate::semantic_index::place::{PlaceExpr, PlaceExprRef};
+use crate::semantic_index::place::{PlaceExpr, PlaceExprRef, ScopedPlaceId};
 use crate::semantic_index::scope::{
     FileScopeId, NodeWithScopeKind, NodeWithScopeRef, ScopeId, ScopeKind,
 };
@@ -324,6 +324,20 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     /// A list of `dataclass_transform` field specifiers that are "active" (when inferring
     /// the right hand side of an annotated assignment in a class that is a dataclass).
     dataclass_field_specifiers: SmallVec<[Type<'db>; NUM_FIELD_SPECIFIERS_INLINE]>,
+
+    /// Cached assignment-definition type-expression results merged into this builder.
+    ///
+    /// This avoids re-extending diagnostics if the same implicit alias is referenced multiple
+    /// times in one region, while still allowing deferred diagnostic merge when the first lookup
+    /// happens during multi-inference.
+    assignment_type_expression_cache:
+        FxHashMap<Definition<'db>, AssignmentTypeExpressionCacheEntry<'db>>,
+}
+
+#[derive(Clone, Copy)]
+struct AssignmentTypeExpressionCacheEntry<'db> {
+    ty: Type<'db>,
+    diagnostics_merged: bool,
 }
 
 impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
@@ -364,6 +378,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             cycle_recovery: None,
             all_definitely_bound: true,
             dataclass_field_specifiers: SmallVec::new(),
+            assignment_type_expression_cache: FxHashMap::default(),
         }
     }
 
@@ -442,6 +457,109 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.string_annotations
                 .extend(extra.string_annotations.iter().copied());
         }
+    }
+
+    fn should_merge_assignment_type_expression_diagnostics(
+        &self,
+        definition: Definition<'db>,
+    ) -> bool {
+        if self.context.is_in_multi_inference() {
+            return false;
+        }
+
+        match self.region {
+            InferenceRegion::Definition(current)
+            | InferenceRegion::AssignmentTypeExpression(current)
+            | InferenceRegion::Deferred(current)
+                if current == definition =>
+            {
+                false
+            }
+            InferenceRegion::Scope(scope, _) if scope == definition.scope(self.db()) => false,
+            _ => true,
+        }
+    }
+
+    fn merge_assignment_type_expression_diagnostics(
+        &mut self,
+        definition: Definition<'db>,
+        diagnostics: &crate::types::diagnostic::TypeCheckDiagnostics,
+    ) -> bool {
+        if !self.should_merge_assignment_type_expression_diagnostics(definition) {
+            return false;
+        }
+
+        let value_track_diagnostics = infer_definition_types(self.db(), definition)
+            .extra
+            .as_ref()
+            .map(|extra| &extra.diagnostics);
+        if let Some(value_track_diagnostics) = value_track_diagnostics {
+            self.context
+                .extend_missing_by_primary_span(diagnostics, value_track_diagnostics);
+        } else {
+            self.context.extend_dedup_exact(diagnostics);
+        }
+
+        true
+    }
+
+    fn assignment_definition_type_expression_type(
+        &mut self,
+        definition: Definition<'db>,
+    ) -> Type<'db> {
+        let DefinitionKind::Assignment(assignment) = definition.kind(self.db()) else {
+            return Type::unknown();
+        };
+
+        if let Some(entry) = self
+            .assignment_type_expression_cache
+            .get(&definition)
+            .copied()
+        {
+            if !entry.diagnostics_merged {
+                let inference = infer_assignment_definition_type_expression(self.db(), definition);
+                let diagnostics_merged = if let Some(extra) = &inference.extra {
+                    let diagnostics_merged = self.merge_assignment_type_expression_diagnostics(
+                        definition,
+                        &extra.diagnostics,
+                    );
+                    if diagnostics_merged {
+                        self.extend_cycle_recovery(extra.cycle_recovery);
+                    }
+                    diagnostics_merged
+                } else {
+                    true
+                };
+                if diagnostics_merged
+                    && let Some(cached) = self.assignment_type_expression_cache.get_mut(&definition)
+                {
+                    cached.diagnostics_merged = true;
+                }
+            }
+
+            return entry.ty;
+        }
+
+        let inference = infer_assignment_definition_type_expression(self.db(), definition);
+        let diagnostics_merged = if let Some(extra) = &inference.extra {
+            let diagnostics_merged =
+                self.merge_assignment_type_expression_diagnostics(definition, &extra.diagnostics);
+            if diagnostics_merged {
+                self.extend_cycle_recovery(extra.cycle_recovery);
+            }
+            diagnostics_merged
+        } else {
+            true
+        };
+        let ty = inference.expression_type(assignment.value(self.module()));
+        self.assignment_type_expression_cache.insert(
+            definition,
+            AssignmentTypeExpressionCacheEntry {
+                ty,
+                diagnostics_merged,
+            },
+        );
+        ty
     }
 
     fn file(&self) -> File {
@@ -607,6 +725,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         match self.region {
             InferenceRegion::Scope(scope, tcx) => self.infer_region_scope(scope, tcx),
             InferenceRegion::Definition(definition) => self.infer_region_definition(definition),
+            InferenceRegion::AssignmentTypeExpression(definition) => {
+                self.infer_region_assignment_type_expression(definition);
+            }
             InferenceRegion::Deferred(definition) => self.infer_region_deferred(definition),
             InferenceRegion::Expression(expression, tcx) => {
                 self.infer_region_expression(expression, tcx);
@@ -880,6 +1001,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             _ => {}
         }
+    }
+
+    fn infer_region_assignment_type_expression(&mut self, definition: Definition<'db>) {
+        let DefinitionKind::Assignment(assignment) = definition.kind(self.db()) else {
+            return;
+        };
+
+        let previous_typevar_binding_context = self.typevar_binding_context.replace(definition);
+        self.infer_type_expression(assignment.value(self.module()));
+        self.typevar_binding_context = previous_typevar_binding_context;
     }
 
     fn infer_region_expression(&mut self, expression: Expression<'db>, tcx: TypeContext<'db>) {
@@ -11652,7 +11783,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // If we're inferring types of deferred expressions, look them up from end-of-scope.
         if self.is_deferred() {
             let place = if let Some(place_id) = place_table.place_id(expr) {
-                place_from_bindings(db, use_def.reachable_bindings(place_id)).place
+                if self.scope().node(db).scope_kind().is_class()
+                    && self.has_only_stub_annotated_assignment_bindings(file_scope_id, place_id)
+                {
+                    Place::Undefined
+                } else {
+                    place_from_bindings(db, use_def.reachable_bindings(place_id)).place
+                }
             } else {
                 assert!(
                     self.deferred_state.in_string_annotation(),
@@ -11994,6 +12131,39 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         (place, constraint_keys)
+    }
+
+    fn has_only_stub_annotated_assignment_bindings(
+        &self,
+        scope_id: FileScopeId,
+        place_id: ScopedPlaceId,
+    ) -> bool {
+        if !self.in_stub() {
+            return false;
+        }
+
+        let mut saw_stub_annotated_assignment = false;
+        for binding in self
+            .index
+            .use_def_map(scope_id)
+            .reachable_bindings(place_id)
+        {
+            let DefinitionState::Defined(definition) = binding.binding else {
+                continue;
+            };
+
+            let DefinitionKind::AnnotatedAssignment(assignment) = definition.kind(self.db()) else {
+                return false;
+            };
+
+            if assignment.value(self.module()).is_some() {
+                return false;
+            }
+
+            saw_stub_annotated_assignment = true;
+        }
+
+        saw_stub_annotated_assignment
     }
 
     pub(super) fn report_unresolved_reference(&self, expr_name_node: &ast::ExprName) {
@@ -12850,6 +13020,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             multi_inference_state: _,
             inner_expression_inference_state: _,
             inferring_vararg_annotation: _,
+            assignment_type_expression_cache: _,
             called_functions: _,
             index: _,
             region: _,
@@ -12920,6 +13091,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             inferring_vararg_annotation: _,
             multi_inference_state: _,
             inner_expression_inference_state: _,
+            assignment_type_expression_cache: _,
             index: _,
             region: _,
             return_types_and_ranges: _,
@@ -13003,6 +13175,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             multi_inference_state: _,
             inner_expression_inference_state: _,
             inferring_vararg_annotation: _,
+            assignment_type_expression_cache: _,
             called_functions: _,
             index: _,
             region: _,

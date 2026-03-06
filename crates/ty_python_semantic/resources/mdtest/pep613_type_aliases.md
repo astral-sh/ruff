@@ -461,6 +461,22 @@ BadTypeAlias14: TypeAlias = Literal[-3.14]  # error: [invalid-type-form]
 BadTypeAlias14: TypeAlias = Literal[3.14]
 ```
 
+## Dual-track diagnostics
+
+When inferring a type alias, we still infer the RHS as a value expression (so runtime-invalid
+operations can be diagnosed), while also validating type-expression correctness:
+
+```py
+from typing import TypeAlias
+
+# error: [call-non-callable]
+# error: [invalid-type-form]
+BadTypeAliasDualTrack: TypeAlias = 1()
+
+def _(x: BadTypeAliasDualTrack):
+    reveal_type(x)  # revealed: Unknown
+```
+
 ## No type qualifiers
 
 The right-hand side of a type alias definition is a [type expression], not an annotation expression.

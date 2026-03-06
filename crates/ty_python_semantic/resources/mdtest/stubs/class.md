@@ -46,3 +46,18 @@ from b import C
 # No error here, since we treat `class_or_instance_var` as bound on the class.
 reveal_type(C.class_or_instance_var)  # revealed: int
 ```
+
+## Class-body declarations in stubs do not self-shadow annotation references
+
+```pyi
+from typing import ClassVar
+
+class ProcessError(Exception): ...
+
+class BaseContext:
+    ProcessError: ClassVar[type[ProcessError]]
+    BufferTooShort: ClassVar[type[ProcessError]]
+
+reveal_type(BaseContext.ProcessError)  # revealed: type[ProcessError]
+reveal_type(BaseContext.BufferTooShort)  # revealed: type[ProcessError]
+```

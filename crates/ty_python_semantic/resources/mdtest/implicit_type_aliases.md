@@ -353,8 +353,7 @@ if TYPE_CHECKING:
     Y = int | str  # error: [unsupported-operator]
 
     def g(obj: Y):
-        # TODO: should be `int | str`
-        reveal_type(obj)  # revealed: Unknown
+        reveal_type(obj)  # revealed: int | str
 
 Y = list["int | str"]
 
@@ -1249,7 +1248,7 @@ from typing import Literal
 # error: [invalid-type-form]
 InvalidSubclassOf1 = type[1]
 
-# TODO: This should be an error
+# error: [invalid-type-form]
 InvalidSubclassOfLiteral = type[Literal[42]]
 
 def _(
@@ -1257,8 +1256,7 @@ def _(
     invalid_subclass_of_literal: InvalidSubclassOfLiteral,
 ):
     reveal_type(invalid_subclass_of_1)  # revealed: type[Unknown]
-    # TODO: this should be `type[Unknown]` or `Unknown`
-    reveal_type(invalid_subclass_of_literal)  # revealed: <class 'int'>
+    reveal_type(invalid_subclass_of_literal)  # revealed: type[Unknown]
 ```
 
 ### `Type[…]`
@@ -1561,6 +1559,95 @@ def _(invalid_callable1: InvalidCallable1, invalid_callable2: InvalidCallable2):
     reveal_type(invalid_callable2)  # revealed: (...) -> Unknown
 ```
 
+## Annotation-expression name resolution
+
+Assignment-backed names are resolved through the same type-context path in annotation expressions:
+
+```py
+AliasValue = list["int"] | None
+
+class C:
+    field: AliasValue
+
+def _(x: AliasValue, c: C):
+    reveal_type(x)  # revealed: list[int] | None
+    reveal_type(c.field)  # revealed: list[int] | None
+```
+
+## Annotation-expression attribute resolution
+
+Attribute-based references to assignment-backed aliases are resolved through the same path:
+
+```py
+from alias_mod import AliasValue as ImportedAlias
+import alias_mod
+
+class C:
+    field_from_module: alias_mod.AliasValue
+    field_from_import: ImportedAlias
+
+def _(x: alias_mod.AliasValue, y: ImportedAlias, c: C):
+    reveal_type(x)  # revealed: list[int] | None
+    reveal_type(y)  # revealed: list[int] | None
+    reveal_type(c.field_from_module)  # revealed: list[int] | None
+    reveal_type(c.field_from_import)  # revealed: list[int] | None
+```
+
+`alias_mod.py`:
+
+```py
+AliasValue = list["int"] | None
+```
+
+## Mixed binding resolution
+
+If one binding is eligible for assignment type-expression resolution and another is not, we resolve
+them per-binding rather than falling back all-or-nothing:
+
+```py
+import random
+
+if random.random():
+    Mixed = list[int]
+else:
+    from nonexistent import Mixed  # error: [unresolved-import]
+
+def _(x: Mixed):
+    reveal_type(x)  # revealed: list[int] | Unknown
+```
+
+For mixed bindings that include non-assignment definitions, we keep value-track semantics to avoid
+runtime fallback branches widening the annotation:
+
+```py
+try:
+    from ssl import SSLContext
+except ImportError:
+    SSLContext = object  # error: [invalid-assignment]
+
+def _(ctx: SSLContext | None):
+    reveal_type(ctx)  # revealed: SSLContext | None
+```
+
+## Multi-inference cache ordering
+
+If an alias is first resolved in a type-form argument while diagnostics are suppressed for
+multi-inference, a later non-multi-inference lookup should still report type-form diagnostics.
+
+```py
+from typing import Annotated, Literal
+from typing_extensions import assert_type
+
+# error: [invalid-type-form] "Special form `typing.Annotated` expected at least 2 arguments (one type and at least one metadata element)"
+BadAlias = Annotated[Literal[1]]
+
+typed_int: int = 1
+value: int | str = assert_type(typed_int, BadAlias)
+
+def _(x: BadAlias):
+    reveal_type(x)  # revealed: Literal[1]
+```
+
 ## Stringified annotations
 
 From the [typing spec on type aliases](https://typing.python.org/en/latest/spec/aliases.html):
@@ -1568,27 +1655,25 @@ From the [typing spec on type aliases](https://typing.python.org/en/latest/spec/
 > Type aliases may be as complex as type hints in annotations – anything that is acceptable as a
 > type hint is acceptable in a type alias
 
-However, no other type checker seems to support stringified annotations in implicit type aliases. We
-currently also do not support them, and we detect places where these attempted unions cause runtime
-errors:
+Stringified forms on implicit aliases are resolved in type-expression context, while runtime-invalid
+operations in value-expression context are still diagnosed:
 
 ```py
 AliasForStr = "str"
 
-# error: [invalid-type-form] "Variable of type `Literal["str"]` is not allowed in a type expression"
 def _(s: AliasForStr):
-    reveal_type(s)  # revealed: Unknown
+    reveal_type(s)  # revealed: str
 
 IntOrStr = int | "str"  # error: [unsupported-operator]
 
 reveal_type(IntOrStr)  # revealed: Unknown
 
 def _(int_or_str: IntOrStr):
-    reveal_type(int_or_str)  # revealed: Unknown
+    reveal_type(int_or_str)  # revealed: int | str
 ```
 
-We *do* support stringified annotations if they appear in a position where a type expression is
-syntactically expected:
+Stringified annotations also work in syntactic type-expression positions, except for the currently
+unsupported `type["..."]` form:
 
 ```py
 from typing import Union, List, Dict, Annotated, Callable
@@ -1621,6 +1706,23 @@ def _(
     reveal_type(callable_style_to_style)  # revealed: (Style, /) -> Style
 ```
 
+When mixed bindings include both assignment-backed and non-assignment-backed candidates, we keep the
+non-assignment fallback conservative and avoid noisy type-form diagnostics:
+
+```py
+import random
+from typing_extensions import Never
+
+if random.random():
+    Mixed = Never
+else:
+    def Mixed(x: int) -> int:
+        return x
+
+def _(x: Mixed) -> Mixed:
+    reveal_type(x)  # revealed: Unknown
+```
+
 ## Recursive
 
 ### Old union syntax
@@ -1631,7 +1733,7 @@ from typing import Union
 Recursive = list[Union["Recursive", None]]
 
 def _(r: Recursive):
-    reveal_type(r)  # revealed: list[Divergent]
+    reveal_type(r)  # revealed: list[list[Divergent] | None]
 ```
 
 ### New union syntax
@@ -1659,12 +1761,23 @@ def _(
     recursive_dict3: RecursiveDict3,
     recursive_dict4: RecursiveDict4,
 ):
-    reveal_type(recursive_list1)  # revealed: list[Divergent]
-    reveal_type(recursive_list2)  # revealed: list[Divergent]
-    reveal_type(recursive_dict1)  # revealed: dict[str, Divergent]
-    reveal_type(recursive_dict2)  # revealed: dict[str, Divergent]
-    reveal_type(recursive_dict3)  # revealed: dict[Divergent, int]
-    reveal_type(recursive_dict4)  # revealed: dict[Divergent, int]
+    reveal_type(recursive_list1)  # revealed: list[list[Divergent] | None]
+    reveal_type(recursive_list2)  # revealed: list[list[Divergent] | None]
+    reveal_type(recursive_dict1)  # revealed: dict[str, dict[str, Divergent] | None]
+    reveal_type(recursive_dict2)  # revealed: dict[str, dict[str, Divergent] | None]
+    reveal_type(recursive_dict3)  # revealed: dict[dict[Divergent, int], int]
+    reveal_type(recursive_dict4)  # revealed: dict[dict[Divergent, int], int]
+```
+
+### Mutually recursive tuple aliases
+
+```py
+Left = tuple["Right"]
+Right = tuple["Left"]
+
+def _(left: Left, right: Right):
+    reveal_type(left)  # revealed: tuple[tuple[tuple[Divergent]]]
+    reveal_type(right)  # revealed: tuple[tuple[Divergent]]
 ```
 
 ### Self-referential generic implicit type aliases

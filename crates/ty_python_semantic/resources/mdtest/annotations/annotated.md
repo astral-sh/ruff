@@ -35,11 +35,11 @@ def _(x: Annotated):
 
 def _(flag: bool):
     if flag:
+        # error: [invalid-type-form] "`typing.Annotated` requires at least two arguments when used in a type expression"
         X = Annotated
     else:
         X = bool
 
-    # error: [invalid-type-form] "`typing.Annotated` requires at least two arguments when used in a type expression"
     def f(y: X):
         reveal_type(y)  # revealed: Unknown | bool
 
