@@ -1073,6 +1073,8 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "103") => rules::ruff::rules::InvalidSuppressionComment,
         (Ruff, "104") => rules::ruff::rules::UnmatchedSuppressionComment,
 
+        (Ruff, "105") => rules::ruff::rules::ImportType,
+
         (Ruff, "200") => rules::ruff::rules::InvalidPyprojectToml,
         #[cfg(any(feature = "test-rules", test))]
         (Ruff, "900") => rules::ruff::rules::StableTestRule,
