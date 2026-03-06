@@ -649,6 +649,84 @@ def g(b: B[T]):
     return f(b.x)  # Fine
 ```
 
+## Calling shared methods on union-bounded TypeVars
+
+Calling a method that exists on all members of a union upper bound should be valid.
+
+```py
+from typing import TypeVar
+
+class A:
+    def call_me(self) -> int:
+        return 1
+
+class B:
+    def call_me(self) -> None:
+        return None
+
+TUnionBound = TypeVar("TUnionBound", bound=A | B)
+
+def call_shared_method(x: TUnionBound) -> None:
+    reveal_type(x.call_me())  # revealed: int | None
+```
+
+If the method is not shared by all upper-bound variants, we still diagnose it:
+
+```py
+class C:
+    def call_me(self) -> int:
+        return 1
+
+class D:
+    pass
+
+TPartiallyBound = TypeVar("TPartiallyBound", bound=C | D)
+
+def call_missing_method(x: TPartiallyBound) -> None:
+    x.call_me()  # error: [possibly-missing-attribute]
+```
+
+Explicit `self`-typed overloads should still be enforced for union-bounded type variables:
+
+```py
+from typing import TypeVar, overload
+
+class BaseRequest:
+    @overload
+    def payload(self: "JsonRequest") -> dict[str, object]: ...
+    @overload
+    def payload(self: "BinaryRequest") -> bytes: ...
+    def payload(self):
+        raise NotImplementedError
+
+class JsonRequest(BaseRequest):
+    pass
+
+class BinaryRequest(BaseRequest):
+    pass
+
+class StreamingRequest(BaseRequest):
+    pass
+
+TRequest = TypeVar("TRequest", bound=JsonRequest | StreamingRequest)
+
+def call_payload(request: TRequest) -> None:
+    # error: [no-matching-overload]
+    request.payload()
+```
+
+Constrained `TypeVar`s should keep the same overload behavior:
+
+```py
+from typing import TypeVar
+
+TConstrainedRequest = TypeVar("TConstrainedRequest", JsonRequest, StreamingRequest)
+
+def call_payload_constrained(request: TConstrainedRequest) -> None:
+    # error: [no-matching-overload]
+    request.payload()
+```
+
 ## Constrained TypeVar in a union
 
 This is a regression test for an issue that surfaced in the primer report of an early version of
