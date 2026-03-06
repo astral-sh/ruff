@@ -1,7 +1,7 @@
 use compact_str::ToCompactString;
 use itertools::Itertools;
 use ruff_diagnostics::{Edit, Fix};
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use std::borrow::Cow;
 use std::cell::RefCell;
@@ -863,18 +863,17 @@ impl<'db> Type<'db> {
             }
 
             _ => {
-                // Also avoid unioning in a previous type which contains a Divergent from the
-                // current cycle, if the most-recent type does not. This cannot cause an
-                // oscillation, since Divergent is only introduced at the start of fixpoint
-                // iteration.
-                let has_divergent_type_in_cycle = |ty| {
+                // Also avoid unioning in a previous type which contains a Divergent type,
+                // if the most-recent type does not. This cannot cause an oscillation,
+                // since Divergent is only introduced at the start of fixpoint iteration.
+                // We check for ANY divergent type, not just those matching current cycle
+                // heads, because cycle heads can oscillate across iterations.
+                let has_divergent_type = |ty| {
                     any_over_type(db, ty, false, |nested_ty| {
-                        nested_ty
-                            .as_divergent()
-                            .is_some_and(|DivergentType { id }| cycle.head_ids().contains(&id))
+                        nested_ty.as_divergent().is_some()
                     })
                 };
-                if has_divergent_type_in_cycle(previous) && !has_divergent_type_in_cycle(self) {
+                if has_divergent_type(previous) && !has_divergent_type(self) {
                     self
                 } else {
                     // The current type is unioned to the previous type. Unioning in the reverse order can cause the fixed-point iterations to converge slowly or even fail.
@@ -1728,7 +1727,20 @@ impl<'db> Type<'db> {
     /// Then `tuple[tuple[Divergent, Literal[1]], Literal[1]]` is replaced with `tuple[Divergent, Literal[1]]` and the query converges.
     #[must_use]
     pub(crate) fn recursive_type_normalized(self, db: &'db dyn Db, cycle: &salsa::Cycle) -> Self {
-        cycle.head_ids().fold(self, |ty, id| {
+        // Collect divergent type IDs from both the current cycle heads and any divergent
+        // types actually present in the type. Without this, we may fail to converge when
+        // cycle heads oscillate across iterations: divergent types introduced under previous
+        // cycle heads would not be normalized if they are no longer current heads, causing
+        // the result to appear different to Salsa on each iteration despite being
+        // semantically equivalent.
+        let ids: RefCell<FxHashSet<salsa::Id>> = RefCell::new(cycle.head_ids().collect());
+        any_over_type(db, self, false, |ty| {
+            if let Some(DivergentType { id }) = ty.as_divergent() {
+                ids.borrow_mut().insert(id);
+            }
+            false
+        });
+        ids.into_inner().into_iter().fold(self, |ty, id| {
             ty.recursive_type_normalized_impl(db, Type::divergent(id), false)
                 .unwrap_or(Type::divergent(id))
         })
