@@ -218,19 +218,25 @@ pub(crate) enum InferableTypeVars<'a, 'db> {
     ),
 }
 
+impl<'db> BoundTypeVarIdentity<'db> {
+    pub(crate) fn is_inferable(self, inferable: InferableTypeVars<'_, 'db>) -> bool {
+        match inferable {
+            InferableTypeVars::None => false,
+            InferableTypeVars::One(typevars) => typevars.contains(&self),
+            InferableTypeVars::Two(left, right) => {
+                self.is_inferable(*left) || self.is_inferable(*right)
+            }
+        }
+    }
+}
+
 impl<'db> BoundTypeVarInstance<'db> {
     pub(crate) fn is_inferable(
         self,
         db: &'db dyn Db,
         inferable: InferableTypeVars<'_, 'db>,
     ) -> bool {
-        match inferable {
-            InferableTypeVars::None => false,
-            InferableTypeVars::One(typevars) => typevars.contains(&self.identity(db)),
-            InferableTypeVars::Two(left, right) => {
-                self.is_inferable(db, *left) || self.is_inferable(db, *right)
-            }
-        }
+        self.identity(db).is_inferable(inferable)
     }
 }
 
@@ -1665,11 +1671,6 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     }
 
     /// Returns the current set of type mappings for this specialization.
-    pub(crate) fn type_mappings(&self) -> &FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>> {
-        &self.types
-    }
-
-    /// Returns the current set of type mappings for this specialization.
     pub(crate) fn into_type_mappings(self) -> FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>> {
         self.types
     }
@@ -1745,6 +1746,29 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             });
 
         generic_context.specialize_recursive(self.db, types)
+    }
+
+    /// Insert a type mapping for a bound typevar.
+    ///
+    /// If a mapping already exists for this typevar, the new type is unioned with the existing
+    /// one.
+    pub(crate) fn insert_type_mapping(
+        &mut self,
+        bound_typevar: BoundTypeVarInstance<'db>,
+        ty: Type<'db>,
+    ) {
+        let identity = bound_typevar.identity(self.db);
+        match self.types.entry(identity) {
+            Entry::Occupied(mut entry) => {
+                if bound_typevar.is_paramspec(self.db) {
+                    return;
+                }
+                *entry.get_mut() = UnionType::from_two_elements(self.db, *entry.get(), ty);
+            }
+            Entry::Vacant(entry) => {
+                entry.insert(ty);
+            }
+        }
     }
 
     fn add_type_mapping(

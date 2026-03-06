@@ -337,6 +337,14 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
     /// neither bound _is_ a typevar. And it's not something we can create a specialization from,
     /// since we would endlessly substitute until we stack overflow.
     pub(crate) fn is_cyclic(self, db: &'db dyn Db) -> bool {
+        self.is_cyclic_impl(db, None)
+    }
+
+    fn is_cyclic_impl(
+        self,
+        db: &'db dyn Db,
+        inferable: Option<InferableTypeVars<'_, 'db>>,
+    ) -> bool {
         #[derive(Default)]
         struct CollectReachability<'db> {
             reachable_typevars: RefCell<FxHashSet<BoundTypeVarIdentity<'db>>>,
@@ -403,21 +411,33 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
             false
         }
 
-        // First find all of the typevars that each constraint directly mentions.
+        // First find all of the typevars that each constraint directly mentions. When `inferable`
+        // is provided, only include inferable typevars as sources and targets in the graph.
         let mut reachable_typevars: FxHashMap<
             BoundTypeVarIdentity<'db>,
             FxHashSet<BoundTypeVarIdentity<'db>>,
         > = FxHashMap::default();
         self.node
             .for_each_constraint(self.builder, &mut |constraint, _| {
-                let visitor = CollectReachability::default();
                 let constraint = self.builder.constraint_data(constraint);
+                let identity = constraint.typevar.identity(db);
+                if inferable.is_some_and(|inferable| !identity.is_inferable(inferable)) {
+                    return;
+                }
+                let visitor = CollectReachability::default();
                 visitor.visit_type(db, constraint.lower);
                 visitor.visit_type(db, constraint.upper);
-                reachable_typevars
-                    .entry(constraint.typevar.identity(db))
-                    .or_default()
-                    .extend(visitor.reachable_typevars.into_inner());
+                let reachable = visitor.reachable_typevars.into_inner();
+                let entry = reachable_typevars.entry(identity).or_default();
+                if let Some(inferable) = inferable {
+                    entry.extend(
+                        reachable
+                            .into_iter()
+                            .filter(|tv| tv.is_inferable(inferable)),
+                    );
+                } else {
+                    entry.extend(reachable);
+                }
             });
 
         // Then perform a depth-first search to see if there are any cycles.
@@ -627,13 +647,36 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         builder: &'c ConstraintSetBuilder<'db>,
         choose: impl FnMut(BoundTypeVarInstance<'db>, Type<'db>, Type<'db>) -> Option<Type<'db>>,
     ) -> Solutions<Vec<Solution<'db>>> {
+        self.solutions_with_impl(db, builder, None, choose)
+    }
+
+    /// Like [`solutions_with`][Self::solutions_with], but only considers cycles among inferable
+    /// typevars. Non-inferable typevars (e.g., from outer scopes that appear due to BDD
+    /// constraint reordering) are skipped during both cycle detection and solution extraction.
+    pub(crate) fn solutions_with_inferable(
+        self,
+        db: &'db dyn Db,
+        builder: &'c ConstraintSetBuilder<'db>,
+        inferable: InferableTypeVars<'_, 'db>,
+        choose: impl FnMut(BoundTypeVarInstance<'db>, Type<'db>, Type<'db>) -> Option<Type<'db>>,
+    ) -> Solutions<Vec<Solution<'db>>> {
+        self.solutions_with_impl(db, builder, Some(inferable), choose)
+    }
+
+    fn solutions_with_impl(
+        self,
+        db: &'db dyn Db,
+        builder: &'c ConstraintSetBuilder<'db>,
+        inferable: Option<InferableTypeVars<'_, 'db>>,
+        choose: impl FnMut(BoundTypeVarInstance<'db>, Type<'db>, Type<'db>) -> Option<Type<'db>>,
+    ) -> Solutions<Vec<Solution<'db>>> {
         self.verify_builder(builder);
 
-        if self.is_cyclic(db) {
+        if self.is_cyclic_impl(db, inferable) {
             return Solutions::Unsatisfiable;
         }
 
-        self.node.solutions_with(db, builder, choose)
+        self.node.solutions_with(db, builder, inferable, choose)
     }
 
     #[expect(dead_code)] // Keep this around for debugging purposes
@@ -1763,12 +1806,13 @@ impl NodeId {
         self,
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
+        inferable: Option<InferableTypeVars<'_, 'db>>,
         choose: impl FnMut(BoundTypeVarInstance<'db>, Type<'db>, Type<'db>) -> Option<Type<'db>>,
     ) -> Solutions<Vec<Solution<'db>>> {
         match self.node() {
             Node::AlwaysTrue => Solutions::Unconstrained,
             Node::AlwaysFalse => Solutions::Unsatisfiable,
-            Node::Interior(interior) => interior.solutions_with(db, builder, choose),
+            Node::Interior(interior) => interior.solutions_with(db, builder, inferable, choose),
         }
     }
 
@@ -3419,10 +3463,18 @@ impl InteriorNode {
         self,
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
+        inferable: Option<InferableTypeVars<'_, 'db>>,
         mut choose: impl FnMut(BoundTypeVarInstance<'db>, Type<'db>, Type<'db>) -> Option<Type<'db>>,
     ) -> Solutions<Vec<Solution<'db>>> {
         let path_bounds = compute_path_bounds(db, builder, self.node());
         let solutions = solve_paths(db, &path_bounds, |db, bound_typevar, lower, upper| {
+            // When filtering by inferable typevars, skip non-inferable ones — they appear
+            // due to BDD constraint reordering and should not be solved.
+            if let Some(inferable) = inferable {
+                if !bound_typevar.is_inferable(db, inferable) {
+                    return Ok(None);
+                }
+            }
             if let Some(ty) = choose(bound_typevar, lower, upper) {
                 return Ok(Some(TypeVarSolution {
                     bound_typevar,
