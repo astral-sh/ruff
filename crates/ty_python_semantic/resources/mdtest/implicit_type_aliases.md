@@ -1285,7 +1285,7 @@ from typing import Literal
 # error: [invalid-type-form]
 InvalidSubclassOf1 = type[1]
 
-# TODO: This should be an error
+# error: [invalid-type-form] "The argument to `type[]` must be a class object type"
 InvalidSubclassOfLiteral = type[Literal[42]]
 
 def _(
@@ -1293,8 +1293,7 @@ def _(
     invalid_subclass_of_literal: InvalidSubclassOfLiteral,
 ):
     reveal_type(invalid_subclass_of_1)  # revealed: type[Unknown]
-    # TODO: this should be `type[Unknown]` or `Unknown`
-    reveal_type(invalid_subclass_of_literal)  # revealed: <class 'int'>
+    reveal_type(invalid_subclass_of_literal)  # revealed: type[Unknown]
 ```
 
 ### `Type[…]`

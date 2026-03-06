@@ -37,6 +37,22 @@ use ty_python_core::definition::Definition;
 use ty_python_core::place::{PlaceExpr, PlaceExprRef};
 use ty_python_core::scope::FileScopeId;
 
+fn is_valid_type_argument_to_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
+    match ty {
+        Type::NominalInstance(_)
+        | Type::TypedDict(_)
+        | Type::TypeVar(_)
+        | Type::ProtocolInstance(_) => true,
+        Type::Dynamic(DynamicType::Any | DynamicType::Unknown) => true,
+        Type::Union(union) => union
+            .elements(db)
+            .iter()
+            .copied()
+            .all(|element| is_valid_type_argument_to_type(db, element)),
+        _ => false,
+    }
+}
+
 impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn typed_dict_key_expected_type(&self, ty: Type<'db>) -> Option<Type<'db>> {
         struct TypedDictKeyExpectedType;
@@ -198,6 +214,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     return tuple_generic_alias(db, self.infer_tuple_type_expression(subscript));
                 } else if class.is_known(db, KnownClass::Type) {
                     let argument_ty = self.infer_type_expression(slice);
+                    let argument_ty = if is_valid_type_argument_to_type(db, argument_ty) {
+                        argument_ty
+                    } else {
+                        if let Some(builder) =
+                            self.context.report_lint(&INVALID_TYPE_FORM, subscript)
+                        {
+                            builder.into_diagnostic(
+                                "The argument to `type[]` must be a class object type",
+                            );
+                        }
+                        Type::unknown()
+                    };
                     return Type::KnownInstance(KnownInstanceType::TypeGenericAlias(
                         InternedType::new(db, argument_ty),
                     ));
@@ -324,6 +352,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 SpecialFormType::Type => {
                     // Similar to the branch above that handles `type[…]`, handle `typing.Type[…]`
                     let argument_ty = self.infer_type_expression(slice);
+                    let argument_ty = if is_valid_type_argument_to_type(db, argument_ty) {
+                        argument_ty
+                    } else {
+                        if let Some(builder) =
+                            self.context.report_lint(&INVALID_TYPE_FORM, subscript)
+                        {
+                            builder.into_diagnostic(
+                                "The argument to `type[]` must be a class object type",
+                            );
+                        }
+                        Type::unknown()
+                    };
                     return Type::KnownInstance(KnownInstanceType::TypeGenericAlias(
                         InternedType::new(db, argument_ty),
                     ));
