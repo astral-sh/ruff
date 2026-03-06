@@ -1,11 +1,12 @@
-use crate::Violation;
-use crate::checkers::ast::Checker;
-use crate::{Fix, FixAvailability};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_ast::{Expr, Operator};
 use ruff_python_parser::semantic_errors::SemanticSyntaxContext;
 use ruff_text_size::Ranged;
+
+use crate::Violation;
+use crate::checkers::ast::Checker;
+use crate::{Fix, FixAvailability};
 
 /// ## What it does
 /// Checks for the presence of string literals in `X | Y`-style union types.
@@ -86,7 +87,7 @@ pub(crate) fn runtime_string_union(checker: &Checker, expr: &Expr) {
 
     for string in &strings {
         let mut diagnostic = checker.report_diagnostic(RuntimeStringUnion, string.range());
-        if checker.settings().future_annotations {
+        if checker.settings().future_annotations && !checker.future_annotations_or_stub() {
             diagnostic.set_fix(Fix::unsafe_edit(checker.importer().add_future_import()));
         }
     }
