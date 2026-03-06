@@ -1,0 +1,12 @@
+---
+source: crates/ty_server/tests/e2e/provide_type.rs
+assertion_line: 67
+expression: provide_type_response
+---
+Some(
+    ProvideTypeResponse {
+        tys: [
+            "foo.A.B",
+        ],
+    },
+)
