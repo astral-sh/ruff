@@ -6188,7 +6188,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // our inference is compatible with subsequent additions to the collection), but it
             // matches the behavior of other type checkers and is usually the desired behavior.
             if let Some(elt_tcx) = elt_tcx {
-                builder.infer(Type::TypeVar(elt_ty), elt_tcx).ok()?;
+                builder.insert_type_mapping(elt_ty, elt_tcx);
             }
         }
 

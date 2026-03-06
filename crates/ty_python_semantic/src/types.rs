@@ -4,7 +4,6 @@ use ruff_diagnostics::{Edit, Fix};
 use rustc_hash::FxHashMap;
 
 use std::borrow::Cow;
-use std::cell::RefCell;
 use std::time::Duration;
 
 use bitflags::bitflags;
@@ -5390,12 +5389,6 @@ impl<'db> Type<'db> {
                     match type_mapping {
                         TypeMapping::EagerExpansion => unreachable!("handled above"),
 
-                        // For UniqueSpecialization, get raw value type, apply specialization, then apply mapping.
-                        TypeMapping::UniqueSpecialization { .. } => {
-                            let value_type = alias.raw_value_type(db);
-                            alias.apply_function_specialization(db, value_type).apply_type_mapping_impl(db, type_mapping, tcx, visitor)
-                        }
-
                         _ => {
                             let value_type = alias.raw_value_type(db).apply_type_mapping_impl(db, type_mapping, tcx, visitor);
                             alias.apply_function_specialization(db, value_type).apply_type_mapping_impl(db, type_mapping, tcx, visitor)
@@ -5420,7 +5413,6 @@ impl<'db> Type<'db> {
             Type::LiteralValue(_) => match type_mapping {
                 TypeMapping::ApplySpecialization(_) |
                 TypeMapping::ApplySpecializationWithMaterialization { .. } |
-                TypeMapping::UniqueSpecialization { .. } |
                 TypeMapping::BindLegacyTypevars(_) |
                 TypeMapping::BindSelf { .. } |
                 TypeMapping::ReplaceSelf { .. } |
@@ -5435,7 +5427,6 @@ impl<'db> Type<'db> {
             Type::Dynamic(_) => match type_mapping {
                 TypeMapping::ApplySpecialization(_) |
                 TypeMapping::ApplySpecializationWithMaterialization { .. } |
-                TypeMapping::UniqueSpecialization { .. } |
                 TypeMapping::BindLegacyTypevars(_) |
                 TypeMapping::BindSelf(..) |
                 TypeMapping::ReplaceSelf { .. } |
@@ -6208,11 +6199,6 @@ pub enum TypeMapping<'a, 'db> {
         specialization: ApplySpecialization<'a, 'db>,
         materialization_kind: MaterializationKind,
     },
-    /// Resets any specializations to contain unique synthetic type variables.
-    UniqueSpecialization {
-        // A list of synthetic type variables, and the types they replaced.
-        specialization: RefCell<Vec<(BoundTypeVarInstance<'db>, Type<'db>)>>,
-    },
     /// Replaces any literal types with their corresponding promoted type form (e.g. `Literal["string"]`
     /// to `str`, or `def _() -> int` to `Callable[[], int]`).
     Promote(PromotionMode),
@@ -6264,8 +6250,7 @@ impl<'db> TypeMapping<'_, 'db> {
                     }),
                 )
             }
-            TypeMapping::UniqueSpecialization { .. }
-            | TypeMapping::Promote(_)
+            TypeMapping::Promote(_)
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::Materialize(_)
             | TypeMapping::ReplaceParameterDefaults
@@ -6310,7 +6295,6 @@ impl<'db> TypeMapping<'_, 'db> {
             },
             TypeMapping::Promote(mode) => TypeMapping::Promote(mode.flip()),
             TypeMapping::ApplySpecialization(_)
-            | TypeMapping::UniqueSpecialization { .. }
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::BindSelf(..)
             | TypeMapping::ReplaceSelf { .. }
