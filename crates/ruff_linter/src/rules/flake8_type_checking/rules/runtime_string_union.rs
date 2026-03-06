@@ -59,10 +59,12 @@ pub(crate) struct RuntimeStringUnion;
 
 impl Violation for RuntimeStringUnion {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         "Invalid string member in `X | Y`-style union type".to_string()
     }
+
     fn fix_title(&self) -> Option<String> {
         Some("Add `from __future__ import annotations`".to_string())
     }
@@ -84,7 +86,7 @@ pub(crate) fn runtime_string_union(checker: &Checker, expr: &Expr) {
 
     for string in &strings {
         let mut diagnostic = checker.report_diagnostic(RuntimeStringUnion, string.range());
-        if checker.settings().future_annotations && !checker.future_annotations_or_stub() {
+        if checker.settings().future_annotations {
             diagnostic.set_fix(Fix::unsafe_edit(checker.importer().add_future_import()));
         }
     }
