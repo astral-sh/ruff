@@ -27,7 +27,7 @@ use crate::place::{DefinedPlace, Definedness, Place, known_module_symbol};
 use crate::subscript::PyIndex;
 use crate::types::call::arguments::{Expansion, is_expandable_type};
 use crate::types::callable::CallableTypeKind;
-use crate::types::constraints::{ConstraintSet, ConstraintSetBuilder};
+use crate::types::constraints::{ConstraintSet, ConstraintSetBuilder, Solutions};
 use crate::types::diagnostic::{
     CALL_NON_CALLABLE, CALL_TOP_CALLABLE, CONFLICTING_ARGUMENT_FORMS, INVALID_ARGUMENT_TYPE,
     INVALID_DATACLASS, MISSING_ARGUMENT, NO_MATCHING_OVERLOAD, PARAMETER_ALREADY_ASSIGNED,
@@ -3723,43 +3723,134 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         let mut partially_specialized_declared_type: FxHashSet<BoundTypeVarIdentity<'_>> =
             FxHashSet::default();
 
-        // Attempt to to solve the specialization while preferring the declared type of non-covariant
+        // Attempt to solve the specialization while preferring the declared type of non-covariant
         // type parameters from generic classes.
+        //
+        // We use a forward CSA check (`return_ty ≤ tcx`) to infer what each typevar in the
+        // function's return type maps to in the type context. For example, if the return type is
+        // `list[T]` and the type context is `list[int]`, the CSA produces `T ≤ int`, from which
+        // we extract the preferred type `int`.
+        //
+        // TODO: This two-phase approach (extract preferred types from TCX, then check argument
+        // compatibility) should eventually be replaced by conjoining the TCX constraint set
+        // directly with the argument constraint sets in the builder. The current solution-level
+        // filtering (variance, inferable typevars, concrete content) works around extracting
+        // solutions too early. When the builder maintains a single constraint set, the combined
+        // set `(return_ty ≤ tcx) ∧ (∧ᵢ actual_i ≤ formal_i)` would naturally resolve the tension
+        // between TCX preferences and argument constraints. If the combined set is unsatisfiable,
+        // we fall back to argument constraints alone (which the current code already does via
+        // `assignable_to_declared_type`).
         let preferred_type_mappings = return_with_tcx
             .and_then(|(return_ty, tcx)| {
                 tcx.filter_union(self.db, |ty| ty.class_specialization(self.db).is_some())
                     .class_specialization(self.db)?;
 
-                builder
-                    .infer_reverse_map(tcx, return_ty, |(identity, variance, inferred_ty)| {
+                let set = return_ty.when_constraint_set_assignable_to(
+                    self.db,
+                    tcx,
+                    constraints,
+                    self.inferable_typevars,
+                );
+
+                // Use `solutions_with` to determine per-typevar variance from the raw
+                // lower/upper bounds on each BDD path.
+                let mut variance_map: FxHashMap<BoundTypeVarIdentity<'_>, TypeVarVariance> =
+                    FxHashMap::default();
+                let solutions = set.solutions_with_inferable(
+                    self.db,
+                    constraints,
+                    self.inferable_typevars,
+                    |typevar, lower, upper| {
+                        let variance = if lower.is_never() {
+                            TypeVarVariance::Covariant
+                        } else if upper == Type::object() {
+                            TypeVarVariance::Contravariant
+                        } else {
+                            TypeVarVariance::Invariant
+                        };
+                        let identity = typevar.identity(self.db);
+                        variance_map
+                            .entry(identity)
+                            .and_modify(|current| *current = current.join(variance))
+                            .or_insert(variance);
+                        None // Use default solution selection
+                    },
+                );
+
+                let Solutions::Constrained(solutions) = solutions else {
+                    return None;
+                };
+
+                let mut preferred: FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>> =
+                    FxHashMap::default();
+
+                for solution in &solutions {
+                    for binding in solution {
+                        let identity = binding.bound_typevar.identity(self.db);
+
                         // Avoid unnecessarily widening the return type based on a covariant
                         // type parameter from the type context, as it can lead to argument
                         // assignability errors if the type variable is constrained by a narrower
                         // parameter type.
-                        if variance.is_covariant() {
-                            return None;
+                        if variance_map
+                            .get(&identity)
+                            .is_some_and(|v| v.is_covariant())
+                        {
+                            continue;
                         }
 
-                        // Avoid inferring a preferred type based on partially specialized type context
-                        // from an outer generic call. If the type context is a union, we try to keep
-                        // any concrete elements.
-                        let inferred_ty = inferred_ty.filter_union(self.db, |ty| {
+                        // Filter out inferable typevars (cross-typevar references from
+                        // SequentMap transitivity) and unspecialized typevars (from partially
+                        // specialized contexts).
+                        let inferred_ty = binding.solution.filter_union(self.db, |ty| {
+                            if ty
+                                .as_typevar()
+                                .is_some_and(|tv| tv.is_inferable(self.db, self.inferable_typevars))
+                            {
+                                return false;
+                            }
                             if ty.has_unspecialized_type_var(self.db) {
                                 partially_specialized_declared_type.insert(identity);
-                                false
-                            } else {
-                                true
+                                return false;
                             }
+                            true
                         });
                         if inferred_ty.has_unspecialized_type_var(self.db) {
-                            return None;
+                            continue;
                         }
 
-                        Some(inferred_ty)
-                    })
-                    .ok()?;
+                        // Skip preferred types where every non-TypeVar union element still
+                        // deeply contains non-inferable typevars. Such types (e.g.,
+                        // `T@h | list[T@h]` from an outer generic scope) don't provide
+                        // useful concrete information and would cause over-expansion.
+                        let concrete_content =
+                            inferred_ty.filter_union(self.db, |ty| !ty.has_typevar(self.db));
+                        if concrete_content.is_never() && inferred_ty.has_typevar(self.db) {
+                            continue;
+                        }
 
-                Some(builder.type_mappings().clone())
+                        preferred
+                            .entry(identity)
+                            .and_modify(|existing| {
+                                *existing =
+                                    UnionType::from_two_elements(self.db, *existing, inferred_ty);
+                            })
+                            .or_insert(inferred_ty);
+                    }
+                }
+
+                // Add preferred types to the builder so they serve as the base mapping
+                // when argument inference adds more types.
+                for solution in &solutions {
+                    for binding in solution {
+                        let identity = binding.bound_typevar.identity(self.db);
+                        if let Some(&ty) = preferred.get(&identity) {
+                            builder.insert_type_mapping(binding.bound_typevar, ty);
+                        }
+                    }
+                }
+
+                Some(preferred)
             })
             .unwrap_or_default();
 
