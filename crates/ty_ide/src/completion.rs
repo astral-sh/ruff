@@ -7990,6 +7990,40 @@ from collections import ChainMap as ChainMap
     }
 
     #[test]
+    fn auto_import_deprioritizes_deprecated_over_stdlib_special() {
+        let builder = CursorTest::builder()
+            .with_site_packages()
+            .source("main.py", "no_type_check_dec<CURSOR>")
+            .site_packages(
+                "thirdparty/__init__.py",
+                r#"
+def no_type_check_decorator():
+    pass
+"#,
+            )
+            .completion_test_builder()
+            .module_names();
+        let test = builder.build();
+        let third_party_idx = test
+            .completions()
+            .iter()
+            .position(|c| {
+                c.name == "no_type_check_decorator"
+                    && c.module_name.map(ModuleName::as_str) == Some("thirdparty")
+            })
+            .expect("expected non-deprecated `no_type_check_decorator` completion from `thirdparty`");
+        let typing_idx = test
+            .completions()
+            .iter()
+            .position(|c| {
+                c.name == "no_type_check_decorator"
+                    && c.module_name.map(ModuleName::as_str) == Some("typing")
+            })
+            .expect("expected deprecated `no_type_check_decorator` completion from `typing`");
+        assert!(third_party_idx < typing_idx);
+    }
+
+    #[test]
     fn auto_import_keeps_sys_below_third_party() {
         let builder = CursorTest::builder()
             .with_site_packages()
