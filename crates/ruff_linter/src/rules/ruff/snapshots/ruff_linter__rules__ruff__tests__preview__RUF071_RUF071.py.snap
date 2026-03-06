@@ -1,0 +1,176 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF071 [*] Use direct key assignment instead of `dict.update()` with a single-item dictionary literal
+ --> RUF071.py:6:1
+  |
+5 | # Basic single-item dict literal update
+6 | d.update({"key": "value"})  # RUF071
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^
+7 |
+8 | # Different key/value types
+  |
+help: Replace with direct key assignment
+3 | d = {}
+4 | 
+5 | # Basic single-item dict literal update
+  - d.update({"key": "value"})  # RUF071
+6 + d["key"] = "value"  # RUF071
+7 | 
+8 | # Different key/value types
+9 | d.update({1: 2})  # RUF071
+note: This is an unsafe fix and may change runtime behavior
+
+RUF071 [*] Use direct key assignment instead of `dict.update()` with a single-item dictionary literal
+  --> RUF071.py:9:1
+   |
+ 8 | # Different key/value types
+ 9 | d.update({1: 2})  # RUF071
+   | ^^^^^^^^^^^^^^^^
+10 | d.update({True: False})  # RUF071
+11 | d.update({"key": 42})  # RUF071
+   |
+help: Replace with direct key assignment
+6  | d.update({"key": "value"})  # RUF071
+7  | 
+8  | # Different key/value types
+   - d.update({1: 2})  # RUF071
+9  + d[1] = 2  # RUF071
+10 | d.update({True: False})  # RUF071
+11 | d.update({"key": 42})  # RUF071
+12 | d.update({"key": [1, 2, 3]})  # RUF071
+note: This is an unsafe fix and may change runtime behavior
+
+RUF071 [*] Use direct key assignment instead of `dict.update()` with a single-item dictionary literal
+  --> RUF071.py:10:1
+   |
+ 8 | # Different key/value types
+ 9 | d.update({1: 2})  # RUF071
+10 | d.update({True: False})  # RUF071
+   | ^^^^^^^^^^^^^^^^^^^^^^^
+11 | d.update({"key": 42})  # RUF071
+12 | d.update({"key": [1, 2, 3]})  # RUF071
+   |
+help: Replace with direct key assignment
+7  | 
+8  | # Different key/value types
+9  | d.update({1: 2})  # RUF071
+   - d.update({True: False})  # RUF071
+10 + d[True] = False  # RUF071
+11 | d.update({"key": 42})  # RUF071
+12 | d.update({"key": [1, 2, 3]})  # RUF071
+13 | d.update({"key": None})  # RUF071
+note: This is an unsafe fix and may change runtime behavior
+
+RUF071 [*] Use direct key assignment instead of `dict.update()` with a single-item dictionary literal
+  --> RUF071.py:11:1
+   |
+ 9 | d.update({1: 2})  # RUF071
+10 | d.update({True: False})  # RUF071
+11 | d.update({"key": 42})  # RUF071
+   | ^^^^^^^^^^^^^^^^^^^^^
+12 | d.update({"key": [1, 2, 3]})  # RUF071
+13 | d.update({"key": None})  # RUF071
+   |
+help: Replace with direct key assignment
+8  | # Different key/value types
+9  | d.update({1: 2})  # RUF071
+10 | d.update({True: False})  # RUF071
+   - d.update({"key": 42})  # RUF071
+11 + d["key"] = 42  # RUF071
+12 | d.update({"key": [1, 2, 3]})  # RUF071
+13 | d.update({"key": None})  # RUF071
+14 | 
+note: This is an unsafe fix and may change runtime behavior
+
+RUF071 [*] Use direct key assignment instead of `dict.update()` with a single-item dictionary literal
+  --> RUF071.py:12:1
+   |
+10 | d.update({True: False})  # RUF071
+11 | d.update({"key": 42})  # RUF071
+12 | d.update({"key": [1, 2, 3]})  # RUF071
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+13 | d.update({"key": None})  # RUF071
+   |
+help: Replace with direct key assignment
+9  | d.update({1: 2})  # RUF071
+10 | d.update({True: False})  # RUF071
+11 | d.update({"key": 42})  # RUF071
+   - d.update({"key": [1, 2, 3]})  # RUF071
+12 + d["key"] = [1, 2, 3]  # RUF071
+13 | d.update({"key": None})  # RUF071
+14 | 
+15 | # Variable as key
+note: This is an unsafe fix and may change runtime behavior
+
+RUF071 [*] Use direct key assignment instead of `dict.update()` with a single-item dictionary literal
+  --> RUF071.py:13:1
+   |
+11 | d.update({"key": 42})  # RUF071
+12 | d.update({"key": [1, 2, 3]})  # RUF071
+13 | d.update({"key": None})  # RUF071
+   | ^^^^^^^^^^^^^^^^^^^^^^^
+14 |
+15 | # Variable as key
+   |
+help: Replace with direct key assignment
+10 | d.update({True: False})  # RUF071
+11 | d.update({"key": 42})  # RUF071
+12 | d.update({"key": [1, 2, 3]})  # RUF071
+   - d.update({"key": None})  # RUF071
+13 + d["key"] = None  # RUF071
+14 | 
+15 | # Variable as key
+16 | x = "key"
+note: This is an unsafe fix and may change runtime behavior
+
+RUF071 [*] Use direct key assignment instead of `dict.update()` with a single-item dictionary literal
+  --> RUF071.py:17:1
+   |
+15 | # Variable as key
+16 | x = "key"
+17 | d.update({x: "value"})  # RUF071
+   | ^^^^^^^^^^^^^^^^^^^^^^
+18 |
+19 | # Variable as value
+   |
+help: Replace with direct key assignment
+14 | 
+15 | # Variable as key
+16 | x = "key"
+   - d.update({x: "value"})  # RUF071
+17 + d[x] = "value"  # RUF071
+18 | 
+19 | # Variable as value
+20 | y = "value"
+note: This is an unsafe fix and may change runtime behavior
+
+RUF071 [*] Use direct key assignment instead of `dict.update()` with a single-item dictionary literal
+  --> RUF071.py:21:1
+   |
+19 | # Variable as value
+20 | y = "value"
+21 | d.update({"key": y})  # RUF071
+   | ^^^^^^^^^^^^^^^^^^^^
+   |
+help: Replace with direct key assignment
+18 | 
+19 | # Variable as value
+20 | y = "value"
+   - d.update({"key": y})  # RUF071
+21 + d["key"] = y  # RUF071
+22 | 
+23 | 
+24 | # OK
+note: This is an unsafe fix and may change runtime behavior
+
+RUF071 Use direct key assignment instead of `dict.update()` with a single-item dictionary literal
+  --> RUF071.py:50:10
+   |
+49 | # Used as expression (not standalone statement)
+50 | result = d.update({"key": "value"})
+   |          ^^^^^^^^^^^^^^^^^^^^^^^^^^
+51 |
+52 | # Multiple positional arguments (invalid, but don't flag)
+   |
+help: Replace with direct key assignment
