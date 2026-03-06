@@ -1206,6 +1206,12 @@ struct Relevance {
     /// other non-module symbols, even when those symbols are in
     /// the user's project.
     is_module: Sort,
+    /// Deprecated symbols appear lower in the completion result.
+    ///
+    /// This appears before `module_dependency_kind` so deprecation
+    /// downranking applies even when a symbol's module origin would
+    /// otherwise boost it.
+    deprecated: Sort,
     /// The "dependency kind" of the module where this symbol
     /// originates from.
     ///
@@ -1222,8 +1228,6 @@ struct Relevance {
     /// Sorts based on whether this symbol is only available during
     /// type checking and not at runtime.
     type_check_only: Sort,
-    /// Deprecated symbols appear lower in the completion result
-    deprecated: Sort,
 }
 
 impl Relevance {
@@ -1268,13 +1272,13 @@ impl Relevance {
             } else {
                 Sort::Even
             },
-            module_dependency_kind: c.module_dependency_kind,
-            type_check_only: if c.is_type_check_only {
+            deprecated: if c.deprecated {
                 Sort::Lower
             } else {
                 Sort::Even
             },
-            deprecated: if c.deprecated {
+            module_dependency_kind: c.module_dependency_kind,
+            type_check_only: if c.is_type_check_only {
                 Sort::Lower
             } else {
                 Sort::Even
@@ -1322,7 +1326,7 @@ enum ModuleDependencyKind {
     /// `TypeVar` in `ast`, `cast` in `ctypes` and
     /// `Protocol` in `asyncio`.
     ///
-    /// We also include `abc` and `collections`
+    /// We also include `collections`
     /// for similar reasons.
     StdlibSpecial,
     /// A namespace package somewhat defies classification, since
@@ -1364,7 +1368,6 @@ impl ModuleDependencyKind {
         };
         if sp.is_standard_library() {
             if module.is_known(db, KnownModule::Typing)
-                || module.is_known(db, KnownModule::Abc)
                 || module.is_known(db, KnownModule::Collections)
             {
                 ModuleDependencyKind::StdlibSpecial
@@ -7953,35 +7956,6 @@ from typing import Protocol as Protocol
             })
             .expect("expected `Protocol` completion from `thirdparty`");
         assert!(typing_idx < third_party_idx);
-    }
-
-    #[test]
-    fn auto_import_prefers_abc_over_third_party_reexport() {
-        let builder = CursorTest::builder()
-            .with_site_packages()
-            .source("main.py", "ABC<CURSOR>")
-            .site_packages(
-                "thirdparty/__init__.py",
-                r#"
-from abc import ABC as ABC
-"#,
-            )
-            .completion_test_builder()
-            .module_names();
-        let test = builder.build();
-        let abc_idx = test
-            .completions()
-            .iter()
-            .position(|c| c.name == "ABC" && c.module_name.map(ModuleName::as_str) == Some("abc"))
-            .expect("expected `ABC` completion from `abc`");
-        let third_party_idx = test
-            .completions()
-            .iter()
-            .position(|c| {
-                c.name == "ABC" && c.module_name.map(ModuleName::as_str) == Some("thirdparty")
-            })
-            .expect("expected `ABC` completion from `thirdparty`");
-        assert!(abc_idx < third_party_idx);
     }
 
     #[test]
