@@ -477,7 +477,7 @@ declare_lint! {
     /// ```
     pub(crate) static DATACLASS_FIELD_ORDER = {
         summary: "detects dataclass definitions with required fields after fields with default values",
-        status: LintStatus::preview("1.0.0"),
+        status: LintStatus::stable("0.0.15"),
         default_level: Level::Error,
     }
 }
