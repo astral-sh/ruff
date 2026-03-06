@@ -1241,6 +1241,28 @@ def _(
     reveal_type(subclass_of_union_alias2())  # revealed: C | D
 ```
 
+PEP 695 aliases can also appear as `type[...]` arguments:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+class Text: ...
+class TextElement: ...
+
+type TextlikeNode = Text | TextElement
+
+SubclassOfTextlikeNode = type[TextlikeNode]
+
+reveal_type(SubclassOfTextlikeNode)  # revealed: <special-form 'type[TextlikeNode]'>
+
+def _(innernode: SubclassOfTextlikeNode):
+    reveal_type(innernode)  # revealed: type[Text | TextElement]
+    reveal_type(innernode())  # revealed: Text | TextElement
+```
+
 Invalid uses result in diagnostics:
 
 ```py

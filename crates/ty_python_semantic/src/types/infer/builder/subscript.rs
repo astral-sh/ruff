@@ -29,6 +29,9 @@ use crate::types::{
 use crate::{Db, FxOrderSet};
 
 fn is_valid_type_argument_to_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
+    let ty = ty.as_type_alias().map(Type::TypeAlias).unwrap_or(ty);
+    let ty = ty.resolve_type_alias(db);
+
     match ty {
         Type::NominalInstance(_)
         | Type::TypedDict(_)
