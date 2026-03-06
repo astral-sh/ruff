@@ -294,7 +294,7 @@ impl<'db> Type<'db> {
     ///
     /// See [`TypeRelation::Redundancy`] for more details.
     pub(super) fn is_redundant_with(self, db: &'db dyn Db, other: Type<'db>) -> bool {
-        #[salsa::tracked(cycle_initial=is_redundant_with_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+        #[salsa::tracked(cycle_fn=is_redundant_with_cycle_recover, cycle_initial=is_redundant_with_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
         fn is_redundant_with_impl<'db>(
             db: &'db dyn Db,
             self_ty: Type<'db>,
@@ -2469,13 +2469,25 @@ impl<'db> Type<'db> {
 }
 
 #[allow(clippy::trivially_copy_pass_by_ref)]
+fn is_redundant_with_cycle_recover<'db>(
+    _db: &'db dyn Db,
+    _cycle: &salsa::Cycle,
+    previous: &bool,
+    current: bool,
+    _self_ty: Type<'db>,
+    _other: Type<'db>,
+) -> bool {
+    *previous || current
+}
+
+#[allow(clippy::trivially_copy_pass_by_ref)]
 fn is_redundant_with_cycle_initial<'db>(
     _db: &'db dyn Db,
     _id: salsa::Id,
     _subtype: Type<'db>,
     _supertype: Type<'db>,
 ) -> bool {
-    true
+    false
 }
 
 /// A [`PairVisitor`] that is used in `has_relation_to` methods.
