@@ -1674,6 +1674,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         self.types
     }
 
+    #[expect(dead_code)] // Will be removed in Phase 4
     pub(crate) fn with_default(
         &self,
         generic_context: GenericContext<'db>,
@@ -2401,6 +2402,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
 
     /// Infer type mappings for the specialization in the reverse direction, i.e., where the
     /// actual type, not the formal type, contains inferable type variables.
+    #[expect(dead_code)] // Will be removed in Phase 4
     pub(crate) fn infer_reverse(
         &mut self,
         formal: Type<'db>,

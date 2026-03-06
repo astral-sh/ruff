@@ -621,7 +621,6 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
     /// [`add_type_mappings_from_constraint_set`][super::generics::SpecializationBuilder::add_type_mappings_from_constraint_set].
     ///
     /// Returns owned solutions (not cached), since the hook makes results non-deterministic.
-    #[expect(dead_code)] // Will be used in Phase 2 of the constraint set migration
     pub(crate) fn solutions_with(
         self,
         db: &'db dyn Db,
