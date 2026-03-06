@@ -26,6 +26,7 @@ mod hover;
 mod inlay_hints;
 mod prepare_rename;
 mod prepare_type_hierarchy;
+pub mod provide_type;
 mod references;
 mod rename;
 mod selection_range;
