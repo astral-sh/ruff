@@ -822,7 +822,13 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             };
 
             // Traverse into nested collections that may contain dictionary literals.
-            for (i, item) in items.iter().enumerate() {
+            for (i, item) in items
+                .iter()
+                // Ignore starred expressions and any elements that follow them, as we cannot
+                // determine the index to narrow on.
+                .take_while(|e| !e.is_starred_expr())
+                .enumerate()
+            {
                 if let Some(target) = MemberExprBuilder::visit_subscript_expr(
                     target.clone(),
                     &ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
