@@ -427,7 +427,7 @@ impl<'db> CallableTypes<'db> {
         }
     }
 
-    pub(super) fn as_slice(&self) -> &[CallableType<'db>] {
+    pub(crate) fn as_slice(&self) -> &[CallableType<'db>] {
         &self.0
     }
 

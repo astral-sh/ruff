@@ -176,6 +176,24 @@ impl<'db> CallableSignature<'db> {
                 Type::Callable(callable)
                     if matches!(callable.kind(db), CallableTypeKind::ParamSpecValue) =>
                 {
+                    let mapped_return_ty = self_signature.return_ty.apply_type_mapping_impl(
+                        db,
+                        type_mapping,
+                        tcx,
+                        visitor,
+                    );
+                    let actual_return_ty = callable
+                        .signatures(db)
+                        .iter()
+                        .fold(UnionBuilder::new(db), |builder, signature| {
+                            builder.add(signature.return_ty)
+                        })
+                        .build();
+                    let preserve_actual_returns =
+                        matches!(self_signature.return_ty, Type::TypeVar(_))
+                            && (mapped_return_ty.is_dynamic()
+                                || mapped_return_ty == actual_return_ty);
+
                     Some(CallableSignature::from_overloads(
                         callable.signatures(db).iter().map(|signature| Signature {
                             generic_context: GenericContext::merge_optional(
@@ -204,12 +222,11 @@ impl<'db> CallableSignature<'db> {
                                         .chain(signature.parameters().iter().cloned()),
                                 )
                             },
-                            return_ty: self_signature.return_ty.apply_type_mapping_impl(
-                                db,
-                                type_mapping,
-                                tcx,
-                                visitor,
-                            ),
+                            return_ty: if preserve_actual_returns {
+                                signature.return_ty
+                            } else {
+                                mapped_return_ty
+                            },
                         }),
                     ))
                 }

@@ -12,7 +12,7 @@ use crate::node_key::NodeKey;
 use crate::semantic_index::definition::{Definition, DefinitionKind};
 use crate::semantic_index::scope::{FileScopeId, NodeWithScopeKey, NodeWithScopeKind, ScopeId};
 use crate::semantic_index::{SemanticIndex, semantic_index};
-use crate::types::callable::walk_callable_type;
+use crate::types::callable::{CallableTypeKind, walk_callable_type};
 use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
 use crate::types::constraints::{
@@ -1859,6 +1859,62 @@ impl<'db> SpecializationBuilder<'db> {
         Ok(())
     }
 
+    fn actual_callables_for_callable_signature_inference(
+        &self,
+        actual: Type<'db>,
+        formal_signature: &CallableSignature<'db>,
+    ) -> Option<CallableTypes<'db>> {
+        let actual_callables = actual.try_upcast_to_callable(self.db)?;
+
+        if formal_signature.is_single_paramspec().is_none()
+            || !matches!(actual, Type::ClassLiteral(_) | Type::GenericAlias(_))
+            || actual_callables.as_slice().len() <= 1
+        {
+            return Some(actual_callables);
+        }
+
+        Some(self.select_common_constructor_callable(actual_callables))
+    }
+
+    fn select_common_constructor_callable(
+        &self,
+        actual_callables: CallableTypes<'db>,
+    ) -> CallableTypes<'db> {
+        fn specificity_key<'db>(db: &'db dyn Db, callable: CallableType<'db>) -> (usize, usize) {
+            let signatures = callable.signatures(db);
+            let gradual_signature_count = signatures
+                .iter()
+                .filter(|signature| signature.parameters().is_gradual())
+                .count();
+            let variadic_parameter_count = signatures
+                .iter()
+                .map(|signature| {
+                    usize::from(signature.parameters().variadic().is_some())
+                        + usize::from(signature.parameters().keyword_variadic().is_some())
+                })
+                .sum();
+            (gradual_signature_count, variadic_parameter_count)
+        }
+
+        let candidates: Vec<_> = actual_callables
+            .as_slice()
+            .iter()
+            .copied()
+            .filter(|candidate| {
+                actual_callables.as_slice().iter().all(|actual_callable| {
+                    Type::Callable(*actual_callable)
+                        .is_assignable_to(self.db, Type::Callable(*candidate))
+                })
+            })
+            .collect();
+
+        candidates
+            .into_iter()
+            .min_by_key(|candidate| specificity_key(self.db, *candidate))
+            .map(CallableTypes::one)
+            .unwrap_or(actual_callables)
+    }
+
     /// Infer type mappings by comparing formal callable signatures against actual callables.
     fn infer_from_callable_signature(
         &mut self,
@@ -1867,11 +1923,25 @@ impl<'db> SpecializationBuilder<'db> {
         actual_callables: &CallableTypes<'db>,
         f: &mut dyn FnMut(TypeVarAssignment<'db>) -> Option<Type<'db>>,
     ) -> Result<(), ()> {
-        let formal_is_single_paramspec = formal_signature.is_single_paramspec().is_some();
+        let formal_is_single_paramspec = formal_signature.is_single_paramspec();
 
         for actual_callable in actual_callables.as_slice() {
             let constraints = ConstraintSetBuilder::new();
-            if formal_is_single_paramspec {
+            if let Some((formal_paramspec, _)) = formal_is_single_paramspec {
+                // Preserve the full callable shape, including overload-specific return types, so
+                // specializing `Callable[P, R]` can reconstruct the original callable more
+                // faithfully.
+                self.add_type_mapping(
+                    formal_paramspec,
+                    Type::Callable(CallableType::new(
+                        self.db,
+                        actual_callable.signatures(self.db),
+                        CallableTypeKind::ParamSpecValue,
+                    )),
+                    formal.variance_of(self.db, formal_paramspec),
+                    &mut *f,
+                );
+
                 let when = actual_callable
                     .signatures(self.db)
                     .when_constraint_set_assignable_to(
@@ -2388,13 +2458,14 @@ impl<'db> SpecializationBuilder<'db> {
                 else {
                     return Ok(());
                 };
-                let Some(actual_callables) = actual.try_upcast_to_callable(self.db) else {
-                    return Ok(());
-                };
-
                 // The `__call__` method is bound to `self`, so we need to bind it to get the
                 // callable signature that the actual type needs to match.
                 let formal_signature = call_method.bind_self(self.db, None).signatures(self.db);
+                let Some(actual_callables) = self
+                    .actual_callables_for_callable_signature_inference(actual, &formal_signature)
+                else {
+                    return Ok(());
+                };
 
                 // For callable-signature inference, keep unsatisfiable constraint-set
                 // comparisons non-fatal for now. The hybrid inference/checking pipeline still
@@ -2409,10 +2480,12 @@ impl<'db> SpecializationBuilder<'db> {
             }
 
             (Type::Callable(formal_callable), _) => {
-                let Some(actual_callables) = actual.try_upcast_to_callable(self.db) else {
+                let formal_signature = formal_callable.signatures(self.db);
+                let Some(actual_callables) = self
+                    .actual_callables_for_callable_signature_inference(actual, &formal_signature)
+                else {
                     return Ok(());
                 };
-                let formal_signature = formal_callable.signatures(self.db);
 
                 // For callable-signature inference, keep unsatisfiable constraint-set
                 // comparisons non-fatal for now. The hybrid inference/checking pipeline still

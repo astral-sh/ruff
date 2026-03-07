@@ -1699,7 +1699,7 @@ impl<'db> ClassType<'db> {
             // Step 3: If the return type of the `__new__` evaluates to a type that is not a subclass of this class,
             // then we should ignore the `__init__` and just return the `__new__` method.
             let returns_non_subclass = dunder_new_signature.overloads.iter().any(|signature| {
-                !signature.return_ty.is_assignable_to(
+                !signature.return_ty.is_subtype_of(
                     db,
                     self_ty
                         .to_instance(db)
