@@ -7,7 +7,7 @@ use unicode_width::UnicodeWidthChar;
 
 use ruff_python_stdlib::str;
 
-use super::settings::{RelativeImportsOrder, Settings};
+use super::settings::{ImportStrategy, RelativeImportsOrder, Settings};
 
 #[derive(Debug, PartialOrd, Ord, PartialEq, Eq, Copy, Clone)]
 pub(crate) enum MemberType {
@@ -87,6 +87,7 @@ pub(crate) struct ModuleKey<'a> {
     force_to_top: bool,
     maybe_length: Option<usize>,
     distance: Distance,
+    qualified_name: Option<NatOrdStr<'a>>,
     maybe_lowercase_name: Option<NatOrdStr<'a>>,
     module_name: Option<NatOrdStr<'a>>,
     first_alias: Option<MemberKey<'a>>,
@@ -104,13 +105,16 @@ impl<'a> ModuleKey<'a> {
     ) -> Self {
         let force_to_top = !name.is_some_and(|name| settings.force_to_top.contains(name)); // `false` < `true` so we get forced to top first
 
-        let maybe_length = (settings.length_sort
-            || (settings.length_sort_straight && style == ImportStyle::Straight))
-            .then_some(
-                name.map(|name| name.chars().map(|c| c.width().unwrap_or(0)).sum::<usize>())
-                    .unwrap_or_default()
-                    + level as usize,
-            );
+        let compute_length = match settings.import_strategy {
+            ImportStrategy::Length => true,
+            ImportStrategy::LengthStraight => style == ImportStyle::Straight,
+            ImportStrategy::Path | ImportStrategy::FullPath => false,
+        };
+        let maybe_length = compute_length.then_some(
+            name.map(|name| name.chars().map(|c| c.width().unwrap_or(0)).sum::<usize>())
+                .unwrap_or_default()
+                + level as usize,
+        );
 
         let distance = match level {
             0 => Distance::None,
@@ -124,6 +128,32 @@ impl<'a> ModuleKey<'a> {
             (!settings.case_sensitive).then_some(NatOrdStr(maybe_lowercase(name)))
         });
 
+        // When using the `full-path` strategy, sort `from X import Y` statements by the
+        // fully-qualified name `X.Y` rather than just the module name `X`.
+        let qualified_name =
+            if settings.import_strategy == ImportStrategy::FullPath && style == ImportStyle::From {
+                first_alias.map(|(alias_name, _)| {
+                    let module_part = match (level, name) {
+                        (0, Some(n)) => n.to_string(),
+                        (0, None) => String::new(),
+                        (lvl, Some(n)) => format!("{}{}", ".".repeat(lvl as usize), n),
+                        (lvl, None) => ".".repeat(lvl as usize),
+                    };
+                    let qualified = if module_part.is_empty() {
+                        alias_name.to_string()
+                    } else {
+                        format!("{module_part}.{alias_name}")
+                    };
+                    if settings.case_sensitive {
+                        NatOrdStr::from(qualified)
+                    } else {
+                        NatOrdStr::from(qualified.to_lowercase())
+                    }
+                })
+            } else {
+                None
+            };
+
         let module_name = name.map(NatOrdStr::from);
 
         let asname = asname.map(NatOrdStr::from);
@@ -135,6 +165,7 @@ impl<'a> ModuleKey<'a> {
             force_to_top,
             maybe_length,
             distance,
+            qualified_name,
             maybe_lowercase_name,
             module_name,
             first_alias,
@@ -161,8 +192,7 @@ impl<'a> MemberKey<'a> {
         let member_type = settings
             .order_by_type
             .then_some(member_type(name, settings));
-        let maybe_length = settings
-            .length_sort
+        let maybe_length = matches!(settings.import_strategy, ImportStrategy::Length)
             .then(|| name.chars().map(|c| c.width().unwrap_or(0)).sum());
         let maybe_lowercase_name =
             (!settings.case_sensitive).then_some(NatOrdStr(maybe_lowercase(name)));
