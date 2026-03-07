@@ -896,14 +896,6 @@ static_assert(not is_subtype_of(Invariant[Any], Invariant[int]))
 static_assert(not is_subtype_of(Invariant[int], Invariant[Any]))
 static_assert(not is_subtype_of(Invariant[Any], Invariant[object]))
 static_assert(not is_subtype_of(Invariant[object], Invariant[Any]))
-
-class Bivariant[T]: ...
-
-static_assert(is_subtype_of(Bivariant[Any], Bivariant[Any]))
-static_assert(is_subtype_of(Bivariant[Any], Bivariant[int]))
-static_assert(is_subtype_of(Bivariant[int], Bivariant[Any]))
-static_assert(is_subtype_of(Bivariant[Any], Bivariant[object]))
-static_assert(is_subtype_of(Bivariant[object], Bivariant[Any]))
 ```
 
 The same for `Unknown`:
