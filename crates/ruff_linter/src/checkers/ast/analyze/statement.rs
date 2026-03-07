@@ -582,6 +582,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.is_rule_enabled(Rule::BannedModuleLevelImports) {
                 flake8_tidy_imports::rules::banned_module_level_imports(checker, stmt);
             }
+            if checker.is_rule_enabled(Rule::BannedEagerImports) {
+                flake8_tidy_imports::rules::banned_eager_imports(checker, stmt);
+            }
 
             for alias in names {
                 if checker.is_rule_enabled(Rule::NonAsciiImportName) {
@@ -785,6 +788,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.is_rule_enabled(Rule::BannedModuleLevelImports) {
                 flake8_tidy_imports::rules::banned_module_level_imports(checker, stmt);
+            }
+            if checker.is_rule_enabled(Rule::BannedEagerImports) {
+                flake8_tidy_imports::rules::banned_eager_imports(checker, stmt);
             }
 
             if checker.is_rule_enabled(Rule::PytestIncorrectPytestImport) {

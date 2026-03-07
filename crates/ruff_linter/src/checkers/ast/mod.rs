@@ -332,6 +332,29 @@ impl<'a> Checker<'a> {
         Generator::new(self.stylist.indentation(), self.stylist.line_ending())
     }
 
+    pub(crate) fn lazy_import_context(&self) -> Option<LazyImportContext> {
+        match self.semantic.current_scope().kind {
+            // Possible, but invalid positions.
+            ScopeKind::Function(_) => return Some(LazyImportContext::Function),
+            ScopeKind::Class(_) => return Some(LazyImportContext::Class),
+            // Valid position.
+            ScopeKind::Module => {}
+            // Impossible positions because lambdas and comprehensions can't contain statements.
+            ScopeKind::Lambda(_)
+            | ScopeKind::Generator { .. }
+            | ScopeKind::Type
+            | ScopeKind::DunderClassCell => {}
+        }
+
+        for statement in self.semantic.current_statements().skip(1) {
+            if matches!(statement, Stmt::Try(_)) {
+                return Some(LazyImportContext::TryExceptBlocks);
+            }
+        }
+
+        None
+    }
+
     /// Return the preferred quote for a generated `StringLiteral` node, given where we are in the
     /// AST.
     fn preferred_quote(&self) -> Quote {
@@ -803,26 +826,7 @@ impl SemanticSyntaxContext for Checker<'_> {
     }
 
     fn lazy_import_context(&self) -> Option<LazyImportContext> {
-        match self.semantic.current_scope().kind {
-            // Possible, but invalid positions.
-            ScopeKind::Function(_) => return Some(LazyImportContext::Function),
-            ScopeKind::Class(_) => return Some(LazyImportContext::Class),
-            // Valid position.
-            ScopeKind::Module => {}
-            // Impossible positions because lambdas and comprehensions can't contain statements.
-            ScopeKind::Lambda(_)
-            | ScopeKind::Generator { .. }
-            | ScopeKind::Type
-            | ScopeKind::DunderClassCell => {}
-        }
-
-        for statement in self.semantic.current_statements().skip(1) {
-            if matches!(statement, Stmt::Try(_)) {
-                return Some(LazyImportContext::TryExceptBlocks);
-            }
-        }
-
-        None
+        self.lazy_import_context()
     }
 
     fn in_async_context(&self) -> bool {
