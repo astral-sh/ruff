@@ -12,6 +12,7 @@ import {
 import { ErrorMessage, Header, setupMonaco, useTheme } from "shared";
 import { FileHandle, PositionEncoding, Workspace } from "ty_wasm";
 import { persist, persistLocal, restore } from "./Editor/persist";
+import { downloadZip } from "./Editor/downloadZip";
 import { loader } from "@monaco-editor/react";
 import tySchema from "../../../ty.schema.json";
 import Chrome, { formatError } from "./Editor/Chrome";
@@ -55,6 +56,14 @@ export default function Playground() {
 
     if (serialized != null) {
       await persist(serialized);
+    }
+  }, [files]);
+
+  const handleDownload = useCallback(async () => {
+    const serialized = serializeFiles(files);
+
+    if (serialized != null) {
+      await downloadZip(serialized.files);
     }
   }, [files]);
 
@@ -181,6 +190,7 @@ export default function Playground() {
         version={version}
         onChangeTheme={setTheme}
         onShare={handleShare}
+        onDownload={handleDownload}
         onReset={workspace == null ? undefined : handleReset}
       />
 
