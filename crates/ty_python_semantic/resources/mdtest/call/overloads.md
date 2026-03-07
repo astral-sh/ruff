@@ -1516,6 +1516,43 @@ def _(b_int: B[int], b_str: B[str], b_any: B[Any]):
     reveal_type(b_any.method())  # revealed: Unknown
 ```
 
+### Ambiguous `Any` overloads (multiple arguments)
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+`overloaded.pyi`:
+
+```pyi
+from typing import Any, overload
+
+class A[T]:
+    def get(self) -> T: ...
+
+@overload
+def op(l: A[None], r: A[None]) -> A[None]: ...
+@overload
+def op(l: A[None], r: A[Any]) -> A[None]: ...
+@overload
+def op(l: A[Any], r: A[None]) -> A[None]: ...
+@overload
+def op(l: A[Any], r: A[Any]) -> A[Any]: ...
+```
+
+```py
+from typing import Any, assert_type
+
+from overloaded import A, op
+
+def _(x: A[None], y: A[Any]) -> None:
+    assert_type(op(x, x), A[None])
+    assert_type(op(x, y), A[None])
+    assert_type(op(y, x), A[None])
+    reveal_type(op(y, y))  # revealed: Unknown
+```
+
 ### Variadic argument
 
 `overloaded.pyi`:
