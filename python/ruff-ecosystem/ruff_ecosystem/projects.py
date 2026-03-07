@@ -208,9 +208,8 @@ class CheckOptions(CommandOptions):
             "--exit-zero",
             # Never apply fixes, as they pollute the comparison results
             "--no-fix",
-            # Use the concise format for comparing violations
             "--output-format",
-            "concise",
+            "json-lines",
             f"--{'' if self.preview else 'no-'}preview",
         ]
         if self.select:

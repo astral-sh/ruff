@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import abc
 import dataclasses
-import difflib
-from collections.abc import Iterable, Iterator, Sequence
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, is_dataclass
 from typing import TYPE_CHECKING, Any
+
+import msgspec
 
 if TYPE_CHECKING:
     from ruff_ecosystem.projects import ClonedRepository, Project
@@ -58,16 +59,6 @@ class Diff(Serializable):
     def lines_removed(self):
         return len(self.removed)
 
-    @classmethod
-    def from_pair(cls, baseline: Sequence[str], comparison: Sequence[str]):
-        """
-        Construct a diff from before and after.
-        """
-        return cls(difflib.ndiff(baseline, comparison), leading_spaces=1)
-
-    def without_unchanged_lines(self) -> Diff:
-        return Diff(line for line in self.lines if line.startswith(("+", "-")))
-
     def jsonable(self) -> Any:
         return self.lines
 
@@ -94,3 +85,32 @@ class Comparison(Serializable):
 
 class ToolError(Exception):
     """An error reported by the checked executable."""
+
+
+class ColumnRow(msgspec.Struct):
+    column: int
+    row: int
+
+
+class Edit(msgspec.Struct):
+    content: str
+    location: ColumnRow | None
+    end_location: ColumnRow | None
+
+
+class Fix(msgspec.Struct):
+    applicability: str
+    edits: list[Edit]
+    message: str | None
+
+
+class Diagnostic(msgspec.Struct):
+    cell: int | None
+    code: str
+    end_location: ColumnRow | None
+    filename: str | None
+    fix: Fix | None
+    location: ColumnRow | None
+    message: str
+    noqa_row: int | None
+    url: str | None
