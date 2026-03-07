@@ -897,3 +897,63 @@ def baz(x, y, z=None) -> bytes | list[str]:
 # revealed: Overload[(x, y) -> bytes, (x, y, z) -> list[str]]
 reveal_type(baz)
 ```
+
+## Implementation decorated with untyped decorator (simple)
+
+When the overload implementation is wrapped in a decorator with no typed signature, the overload
+stubs should still govern dispatch.
+
+```py
+from typing import Literal, overload
+
+def untyped_deco(f):
+    return f
+
+class A: ...
+class B: ...
+
+@overload
+def f(x: Literal[True]) -> A: ...
+@overload
+def f(x: Literal[False] = ...) -> B: ...
+@untyped_deco
+def f(x: bool = False) -> A | B:
+    return B()
+
+reveal_type(f)  # revealed: Overload[(x: Literal[True]) -> A, (x: Literal[False] = ...) -> B]
+reveal_type(f())  # revealed: B
+reveal_type(f(True))  # revealed: A
+```
+
+## Implementation decorated with signature-preserving decorator
+
+When the overload implementation is wrapped in a signature-preserving decorator
+(`Callable[P, T] -> Callable[P, T]`), the overload stubs should still govern dispatch. Per PEP 484,
+the implementation should be ignored by type checkers; only the `@overload` stubs are used. This
+matches the behavior of mypy and pyright.
+
+```py
+from typing import Callable, Literal, ParamSpec, TypeVar, overload
+
+P = ParamSpec("P")
+T = TypeVar("T")
+
+def preserve(fn: Callable[P, T]) -> Callable[P, T]:
+    return fn
+
+class A: ...
+class B: ...
+
+@overload
+def f(x: Literal[True]) -> A: ...
+@overload
+def f(x: Literal[False] = ...) -> B: ...
+@preserve
+def f(x: bool = False) -> A | B:
+    return B()
+
+reveal_type(f)  # revealed: Overload[(x: Literal[True]) -> A, (x: Literal[False] = ...) -> B]
+reveal_type(f())  # revealed: B
+reveal_type(f(False))  # revealed: B
+reveal_type(f(True))  # revealed: A
+```
