@@ -60,7 +60,7 @@ impl Server {
                                 continue;
                             }
 
-                            api::request(req)
+                            api::request(req, self.extension.clone())
                         }
                         Message::Notification(notification) => {
                             if notification.method == lsp_types::notification::Exit::METHOD {
@@ -74,7 +74,7 @@ impl Server {
                                 return Ok(());
                             }
 
-                            api::notification(notification)
+                            api::notification(notification, self.extension.clone())
                         }
 
                         // Handle the response from the client to a server request
@@ -128,7 +128,7 @@ impl Server {
                             .incoming()
                             .is_pending(&request.id)
                         {
-                            let task = api::request(request);
+                            let task = api::request(request, self.extension.clone());
                             scheduler.dispatch(task, &mut self.session, client);
                         } else {
                             tracing::debug!(

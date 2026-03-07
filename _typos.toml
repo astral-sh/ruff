@@ -11,6 +11,8 @@ extend-exclude = [
     "crates/ty_ide/src/completion.rs",
     # Same for "Did you mean...?" levenshtein tests.
     "crates/ty_python_semantic/src/diagnostic/levenshtein.rs",
+    # Type info tests have incomplete words from cursor positions.
+    "crates/ty_ide/src/type_info.rs",
 ]
 
 [default.extend-words]
