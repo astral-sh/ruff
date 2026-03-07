@@ -73,6 +73,7 @@ pub(crate) fn definitions(checker: &mut Checker) {
         Rule::UndocumentedMagicMethod,
         Rule::UndocumentedParam,
         Rule::IncorrectSectionOrder,
+        Rule::PropertyDocstringStartsWithVerb,
         Rule::UndocumentedPublicClass,
         Rule::UndocumentedPublicFunction,
         Rule::UndocumentedPublicInit,
@@ -253,6 +254,13 @@ pub(crate) fn definitions(checker: &mut Checker) {
             }
             if checker.is_rule_enabled(Rule::NonImperativeMood) {
                 pydocstyle::rules::non_imperative_mood(
+                    checker,
+                    &docstring,
+                    &checker.settings().pydocstyle,
+                );
+            }
+            if checker.is_rule_enabled(Rule::PropertyDocstringStartsWithVerb) {
+                pydocstyle::rules::property_doc_verb(
                     checker,
                     &docstring,
                     &checker.settings().pydocstyle,

@@ -1,0 +1,115 @@
+---
+source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
+---
+D421 Property docstring should not start with a return/getter verb; started with "Returns"
+  --> D421.py:11:9
+   |
+ 9 |     @property
+10 |     def bar(self) -> str:
+11 |         """Returns the bar."""
+   |         ^^^^^^^^^^^^^^^^^^^^^^
+12 |         return self._bar
+   |
+
+D421 Property docstring should not start with a return/getter verb; started with "Return"
+  --> D421.py:16:9
+   |
+14 |     @property
+15 |     def baz(self) -> str:
+16 |         """Return the baz."""
+   |         ^^^^^^^^^^^^^^^^^^^^^
+17 |         return self._baz
+   |
+
+D421 Property docstring should not start with a return/getter verb; started with "Gets"
+  --> D421.py:21:9
+   |
+19 |     @property
+20 |     def qux(self) -> str:
+21 |         """Gets the qux."""
+   |         ^^^^^^^^^^^^^^^^^^^
+22 |         return self._qux
+   |
+
+D421 Property docstring should not start with a return/getter verb; started with "Get"
+  --> D421.py:26:9
+   |
+24 |     @property
+25 |     def quux(self) -> str:
+26 |         """Get the quux."""
+   |         ^^^^^^^^^^^^^^^^^^^
+27 |         return self._quux
+   |
+
+D421 Property docstring should not start with a return/getter verb; started with "Yields"
+  --> D421.py:31:9
+   |
+29 |     @property
+30 |     def corge(self) -> str:
+31 |         """Yields the corge."""
+   |         ^^^^^^^^^^^^^^^^^^^^^^^
+32 |         return self._corge
+   |
+
+D421 Property docstring should not start with a return/getter verb; started with "Yield"
+  --> D421.py:36:9
+   |
+34 |     @property
+35 |     def grault(self) -> str:
+36 |         """Yield the grault."""
+   |         ^^^^^^^^^^^^^^^^^^^^^^^
+37 |         return self._grault
+   |
+
+D421 Property docstring should not start with a return/getter verb; started with "Fetches"
+  --> D421.py:41:9
+   |
+39 |     @property
+40 |     def garply(self) -> str:
+41 |         """Fetches the garply."""
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^
+42 |         return self._garply
+   |
+
+D421 Property docstring should not start with a return/getter verb; started with "Fetch"
+  --> D421.py:46:9
+   |
+44 |     @property
+45 |     def waldo(self) -> str:
+46 |         """Fetch the waldo."""
+   |         ^^^^^^^^^^^^^^^^^^^^^^
+47 |         return self._waldo
+   |
+
+D421 Property docstring should not start with a return/getter verb; started with "Retrieves"
+  --> D421.py:51:9
+   |
+49 |     @property
+50 |     def fred(self) -> str:
+51 |         """Retrieves the fred."""
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^
+52 |         return self._fred
+   |
+
+D421 Property docstring should not start with a return/getter verb; started with "Retrieve"
+  --> D421.py:56:9
+   |
+54 |     @property
+55 |     def plugh(self) -> str:
+56 |         """Retrieve the plugh."""
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^
+57 |         return self._plugh
+   |
+
+D421 Property docstring should not start with a return/getter verb; started with "Returns"
+  --> D421.py:63:9
+   |
+61 |       @property
+62 |       def multiline_bad(self) -> str:
+63 | /         """Returns the value.
+64 | |
+65 | |         More detail here.
+66 | |         """
+   | |___________^
+67 |           return self._value
+   |
