@@ -330,6 +330,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.is_rule_enabled(Rule::UnusedAsync) {
                 ruff::rules::unused_async(checker, function_def);
             }
+            if checker.is_rule_enabled(Rule::MultipleYieldsInContextManager) {
+                ruff::rules::multiple_yields_in_contextmanager(checker, function_def);
+            }
             if checker.is_rule_enabled(Rule::WhitespaceAfterDecorator) {
                 pycodestyle::rules::whitespace_after_decorator(checker, decorator_list);
             }

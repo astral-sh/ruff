@@ -1058,6 +1058,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "059") => rules::ruff::rules::UnusedUnpackedVariable,
         (Ruff, "060") => rules::ruff::rules::InEmptyCollection,
         (Ruff, "061") => rules::ruff::rules::LegacyFormPytestRaises,
+        (Ruff, "062") => rules::ruff::rules::MultipleYieldsInContextManager,
         (Ruff, "063") => rules::ruff::rules::AccessAnnotationsFromClassDict,
         (Ruff, "064") => rules::ruff::rules::NonOctalPermissions,
         (Ruff, "065") => rules::ruff::rules::LoggingEagerConversion,
