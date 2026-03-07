@@ -192,6 +192,15 @@ fn type_alias_variance() {
         generic_context.variables(db).next().unwrap()
     }
 
+    fn assert_effective_variance<'db>(
+        db: &'db TestDb,
+        type_alias: PEP695TypeAliasType<'db>,
+        expected: TypeVarVariance,
+    ) {
+        let typevar = get_bound_typevar(db, type_alias);
+        assert_eq!(typevar.variance(db), expected);
+    }
+
     let mut db = setup_db();
     db.write_dedented(
         "/src/a.py",
@@ -263,6 +272,19 @@ type RecursiveAlias2[T] = None | list[T] | list[RecursiveAlias2[T]]
         KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(recursive2))
             .variance_of(&db, get_bound_typevar(&db, recursive2)),
         TypeVarVariance::Invariant
+    );
+
+    assert_effective_variance(&db, covariant, TypeVarVariance::Covariant);
+    assert_effective_variance(&db, contravariant, TypeVarVariance::Contravariant);
+    assert_effective_variance(&db, invariant, TypeVarVariance::Invariant);
+    assert_effective_variance(&db, bivariant, TypeVarVariance::Covariant);
+    assert_effective_variance(&db, recursive, TypeVarVariance::Covariant);
+    assert_effective_variance(&db, recursive2, TypeVarVariance::Invariant);
+
+    assert_eq!(
+        get_bound_typevar(&db, bivariant)
+            .variance_with_polarity(&db, TypeVarVariance::Contravariant),
+        TypeVarVariance::Contravariant
     );
 }
 
