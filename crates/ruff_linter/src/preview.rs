@@ -314,3 +314,8 @@ pub(crate) const fn is_incorrect_dict_iterator_comprehension_enabled(
 ) -> bool {
     settings.preview.is_enabled()
 }
+
+// https://github.com/astral-sh/ruff/pull/23404
+pub(crate) const fn is_ruff_ignore_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
