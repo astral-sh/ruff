@@ -23,9 +23,8 @@ use crate::types::subscript::{LegacyGenericOrigin, SubscriptError, SubscriptErro
 use crate::types::tuple::{Tuple, TupleType};
 use crate::types::{
     BoundTypeVarInstance, CallableType, DynamicType, InternedType, KnownClass, KnownInstanceType,
-    ParameterizedSpecialFormInstance, Parameters, SpecialFormType, StaticClassLiteral, Type,
-    TypeAliasType, TypeContext, TypeVarBoundOrConstraints, UnionType, UnionTypeInstance,
-    any_over_type, todo_type,
+    Parameters, SpecialFormType, StaticClassLiteral, Type, TypeAliasType, TypeContext,
+    TypeVarBoundOrConstraints, UnionType, UnionTypeInstance, any_over_type, todo_type,
 };
 use crate::{Db, FxOrderSet};
 
@@ -386,22 +385,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         .to_specialized_class_type(db, arg_types)
                         .map(Type::from)
                         .unwrap_or_else(Type::unknown);
-                }
-                SpecialFormType::Not
-                | SpecialFormType::Intersection
-                | SpecialFormType::Top
-                | SpecialFormType::Bottom
-                | SpecialFormType::TypeOf
-                | SpecialFormType::CallableTypeOf
-                | SpecialFormType::TypeIs
-                | SpecialFormType::TypeGuard => {
-                    let type_expression = self.infer_subscript_type_expression(
-                        subscript,
-                        Type::SpecialForm(special_form),
-                    );
-                    return Type::KnownInstance(KnownInstanceType::ParameterizedSpecialForm(
-                        ParameterizedSpecialFormInstance::new(db, special_form, type_expression),
-                    ));
                 }
                 _ => {}
             },

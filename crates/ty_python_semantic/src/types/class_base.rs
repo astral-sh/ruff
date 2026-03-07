@@ -183,7 +183,6 @@ impl<'db> ClassBase<'db> {
                 | KnownInstanceType::Specialization(_)
                 | KnownInstanceType::UnionType(_)
                 | KnownInstanceType::Literal(_)
-                | KnownInstanceType::ParameterizedSpecialForm(_)
                 | KnownInstanceType::LiteralStringAlias(_)
                 | KnownInstanceType::NamedTupleSpec(_)
                 // A class inheriting from a newtype would make intuitive sense, but newtype

@@ -27,7 +27,7 @@ pub(crate) use self::infer::{
     TypeContext, infer_complete_scope_types, infer_deferred_types, infer_definition_types,
     infer_expression_type, infer_expression_types, infer_scope_types,
 };
-pub use self::known_instance::{KnownInstanceType, ParameterizedSpecialFormInstance};
+pub use self::known_instance::KnownInstanceType;
 use self::set_theoretic::KnownUnion;
 pub(crate) use self::set_theoretic::builder::{IntersectionBuilder, UnionBuilder};
 pub use self::set_theoretic::{
@@ -4982,9 +4982,6 @@ impl<'db> Type<'db> {
                 }
                 KnownInstanceType::Literal(ty) => Ok(ty.inner(db)),
                 KnownInstanceType::Annotated(ty) => Ok(ty.inner(db)),
-                KnownInstanceType::ParameterizedSpecialForm(instance) => {
-                    Ok(instance.type_expression(db))
-                }
                 KnownInstanceType::TypeGenericAlias(instance) => {
                     // When `type[…]` appears in a value position (e.g. in an implicit type alias),
                     // we infer its argument as a type expression. This ensures that we can emit
@@ -5642,14 +5639,6 @@ impl<'db> Type<'db> {
                 KnownInstanceType::Annotated(ty) => {
                     ty.inner(db)
                         .find_legacy_typevars_impl(db, binding_context, typevars, visitor);
-                }
-                KnownInstanceType::ParameterizedSpecialForm(instance) => {
-                    instance.type_expression(db).find_legacy_typevars_impl(
-                        db,
-                        binding_context,
-                        typevars,
-                        visitor,
-                    );
                 }
                 KnownInstanceType::Callable(callable_type) => {
                     callable_type.find_legacy_typevars_impl(db, binding_context, typevars, visitor);

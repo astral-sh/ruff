@@ -14,98 +14,93 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/annotations/string.md
 
 ```
  1 | from typing import Any, TypeVar, Callable, Protocol, TypedDict, TYPE_CHECKING
- 2 | from ty_extensions import Not
- 3 | 
- 4 | class TD(TypedDict): ...
- 5 | 
- 6 | class P(Protocol):
- 7 |     x: int
- 8 | 
- 9 | class Meta(type):
-10 |     def __or__(cls, other: str) -> Any:
-11 |         return "wow, so fancy, bet type checkers can't handle this"
-12 | 
-13 | class UsesMeta(metaclass=Meta): ...
-14 | 
-15 | T = TypeVar("T")
-16 | 
-17 | # fmt: off
-18 | def f(
-19 |     # error: [unsupported-operator]
-20 |     a: int | "Foo",
-21 |     # error: [unsupported-operator]
-22 |     b: int | "memoryview" | bytes,
-23 |     # error: [unsupported-operator]
-24 |     c: "TD" | None,
-25 |     # error: [unsupported-operator]
-26 |     d: "P" | None,
-27 |     # fine: `TypeVar.__or__` accepts strings at runtime
-28 |     e: T | "Foo",
-29 |     # fine: _SpecialForm.__ror__` accepts strings at runtime
-30 |     f: "Foo" | Callable[..., None],
-31 |     # also fine due to the custom metaclass
-32 |     g: UsesMeta | "Foo",
-33 |     # error: [unsupported-operator]
-34 |     h: None | None,
-35 |     # error: [unresolved-reference] "SomethingUndefined"
-36 |     # error: [unresolved-reference] "SomethingAlsoUndefined"
-37 |     i: SomethingUndefined | SomethingAlsoUndefined,
+ 2 | 
+ 3 | class TD(TypedDict): ...
+ 4 | 
+ 5 | class P(Protocol):
+ 6 |     x: int
+ 7 | 
+ 8 | class Meta(type):
+ 9 |     def __or__(cls, other: str) -> Any:
+10 |         return "wow, so fancy, bet type checkers can't handle this"
+11 | 
+12 | class UsesMeta(metaclass=Meta): ...
+13 | 
+14 | T = TypeVar("T")
+15 | 
+16 | # fmt: off
+17 | def f(
+18 |     # error: [unsupported-operator]
+19 |     a: int | "Foo",
+20 |     # error: [unsupported-operator]
+21 |     b: int | "memoryview" | bytes,
+22 |     # error: [unsupported-operator]
+23 |     c: "TD" | None,
+24 |     # error: [unsupported-operator]
+25 |     d: "P" | None,
+26 |     # fine: `TypeVar.__or__` accepts strings at runtime
+27 |     e: T | "Foo",
+28 |     # fine: _SpecialForm.__ror__` accepts strings at runtime
+29 |     f: "Foo" | Callable[..., None],
+30 |     # also fine due to the custom metaclass
+31 |     g: UsesMeta | "Foo",
+32 |     # error: [unsupported-operator]
+33 |     h: None | None,
+34 |     # error: [unresolved-reference] "SomethingUndefined"
+35 |     # error: [unresolved-reference] "SomethingAlsoUndefined"
+36 |     i: SomethingUndefined | SomethingAlsoUndefined,
+37 |     # error: [unsupported-operator]
 38 |     # error: [unsupported-operator]
-39 |     # error: [unsupported-operator]
-40 |     j: list["int" | None] | "bytes",
-41 |     # fine: subscripted ty_extensions special forms should preserve `_SpecialForm` runtime behavior
-42 |     k: "Foo" | Not[int],
-43 | ):
-44 |     reveal_type(a)  # revealed: int | Foo
-45 |     reveal_type(b)  # revealed: int | memoryview[int] | bytes
-46 |     reveal_type(c)  # revealed: TD | None
-47 |     reveal_type(d)  # revealed: P | None
-48 |     reveal_type(e)  # revealed: T@f | Foo
-49 |     reveal_type(f)  # revealed: Foo | ((...) -> None)
-50 |     reveal_type(g)  # revealed: UsesMeta | Foo
-51 |     reveal_type(h)  # revealed: None
-52 |     reveal_type(i)  # revealed: Unknown
-53 |     reveal_type(j)  # revealed: list[int | None] | bytes
-54 |     reveal_type(k)  # revealed: Foo | ~int
-55 | 
-56 | # fmt: on
+39 |     j: list["int" | None] | "bytes",
+40 | ):
+41 |     reveal_type(a)  # revealed: int | Foo
+42 |     reveal_type(b)  # revealed: int | memoryview[int] | bytes
+43 |     reveal_type(c)  # revealed: TD | None
+44 |     reveal_type(d)  # revealed: P | None
+45 |     reveal_type(e)  # revealed: T@f | Foo
+46 |     reveal_type(f)  # revealed: Foo | ((...) -> None)
+47 |     reveal_type(g)  # revealed: UsesMeta | Foo
+48 |     reveal_type(h)  # revealed: None
+49 |     reveal_type(i)  # revealed: Unknown
+50 | 
+51 | # fmt: on
+52 | 
+53 | class Foo: ...
+54 | 
+55 | # error: [unsupported-operator]
+56 | X = list["int" | None]
 57 | 
-58 | class Foo: ...
-59 | 
-60 | # error: [unsupported-operator]
-61 | X = list["int" | None]
-62 | 
-63 | if TYPE_CHECKING:
-64 |     # TODO: ideally we would not error here, since `if TYPE_CHECKING`
-65 |     # blocks are not executed at runtime. Requires
-66 |     # https://github.com/astral-sh/ty/issues/1553.
-67 |     bar: "int" | "None"  # error: [unsupported-operator]
-68 | 
-69 |     # TODO: same as above
-70 |     # error: [unsupported-operator]
-71 |     def foo(x: "int" | "None"): ...
-72 | 
-73 |     class Bar:
-74 |         # no error because this annotation is resolved inside a scope
-75 |         # fully defined inside an `if TYPE_CHECKING` block
-76 |         def f(x: "int" | "None"): ...
+58 | if TYPE_CHECKING:
+59 |     # TODO: ideally we would not error here, since `if TYPE_CHECKING`
+60 |     # blocks are not executed at runtime. Requires
+61 |     # https://github.com/astral-sh/ty/issues/1553.
+62 |     bar: "int" | "None"  # error: [unsupported-operator]
+63 | 
+64 |     # TODO: same as above
+65 |     # error: [unsupported-operator]
+66 |     def foo(x: "int" | "None"): ...
+67 | 
+68 |     class Bar:
+69 |         # no error because this annotation is resolved inside a scope
+70 |         # fully defined inside an `if TYPE_CHECKING` block
+71 |         def f(x: "int" | "None"): ...
 ```
 
 # Diagnostics
 
 ```
 error[unsupported-operator]: Unsupported `|` operation
-  --> src/mdtest_snippet.py:20:8
+  --> src/mdtest_snippet.py:19:8
    |
-18 | def f(
-19 |     # error: [unsupported-operator]
-20 |     a: int | "Foo",
+17 | def f(
+18 |     # error: [unsupported-operator]
+19 |     a: int | "Foo",
    |        ---^^^-----
    |        |     |
    |        |     Has type `Literal["Foo"]`
    |        Has type `<class 'int'>`
-21 |     # error: [unsupported-operator]
-22 |     b: int | "memoryview" | bytes,
+20 |     # error: [unsupported-operator]
+21 |     b: int | "memoryview" | bytes,
    |
 info: All type expressions are evaluated at runtime by default on Python <3.14
 info: Python 3.13 was assumed when inferring types because it was specified on the command line
@@ -116,17 +111,17 @@ info: rule `unsupported-operator` is enabled by default
 
 ```
 error[unsupported-operator]: Unsupported `|` operation
-  --> src/mdtest_snippet.py:22:8
+  --> src/mdtest_snippet.py:21:8
    |
-20 |     a: int | "Foo",
-21 |     # error: [unsupported-operator]
-22 |     b: int | "memoryview" | bytes,
+19 |     a: int | "Foo",
+20 |     # error: [unsupported-operator]
+21 |     b: int | "memoryview" | bytes,
    |        ---^^^------------
    |        |     |
    |        |     Has type `Literal["memoryview"]`
    |        Has type `<class 'int'>`
-23 |     # error: [unsupported-operator]
-24 |     c: "TD" | None,
+22 |     # error: [unsupported-operator]
+23 |     c: "TD" | None,
    |
 info: All type expressions are evaluated at runtime by default on Python <3.14
 info: Python 3.13 was assumed when inferring types because it was specified on the command line
@@ -137,17 +132,17 @@ info: rule `unsupported-operator` is enabled by default
 
 ```
 error[unsupported-operator]: Unsupported `|` operation
-  --> src/mdtest_snippet.py:24:8
+  --> src/mdtest_snippet.py:23:8
    |
-22 |     b: int | "memoryview" | bytes,
-23 |     # error: [unsupported-operator]
-24 |     c: "TD" | None,
+21 |     b: int | "memoryview" | bytes,
+22 |     # error: [unsupported-operator]
+23 |     c: "TD" | None,
    |        ----^^^----
    |        |      |
    |        |      Has type `None`
    |        Has type `Literal["TD"]`
-25 |     # error: [unsupported-operator]
-26 |     d: "P" | None,
+24 |     # error: [unsupported-operator]
+25 |     d: "P" | None,
    |
 info: All type expressions are evaluated at runtime by default on Python <3.14
 info: Python 3.13 was assumed when inferring types because it was specified on the command line
@@ -158,17 +153,17 @@ info: rule `unsupported-operator` is enabled by default
 
 ```
 error[unsupported-operator]: Unsupported `|` operation
-  --> src/mdtest_snippet.py:26:8
+  --> src/mdtest_snippet.py:25:8
    |
-24 |     c: "TD" | None,
-25 |     # error: [unsupported-operator]
-26 |     d: "P" | None,
+23 |     c: "TD" | None,
+24 |     # error: [unsupported-operator]
+25 |     d: "P" | None,
    |        ---^^^----
    |        |     |
    |        |     Has type `None`
    |        Has type `Literal["P"]`
-27 |     # fine: `TypeVar.__or__` accepts strings at runtime
-28 |     e: T | "Foo",
+26 |     # fine: `TypeVar.__or__` accepts strings at runtime
+27 |     e: T | "Foo",
    |
 info: All type expressions are evaluated at runtime by default on Python <3.14
 info: Python 3.13 was assumed when inferring types because it was specified on the command line
@@ -179,14 +174,14 @@ info: rule `unsupported-operator` is enabled by default
 
 ```
 error[unsupported-operator]: Unsupported `|` operation
-  --> src/mdtest_snippet.py:34:8
+  --> src/mdtest_snippet.py:33:8
    |
-32 |     g: UsesMeta | "Foo",
-33 |     # error: [unsupported-operator]
-34 |     h: None | None,
+31 |     g: UsesMeta | "Foo",
+32 |     # error: [unsupported-operator]
+33 |     h: None | None,
    |        ^^^^^^^^^^^ Both operands have type `None`
-35 |     # error: [unresolved-reference] "SomethingUndefined"
-36 |     # error: [unresolved-reference] "SomethingAlsoUndefined"
+34 |     # error: [unresolved-reference] "SomethingUndefined"
+35 |     # error: [unresolved-reference] "SomethingAlsoUndefined"
    |
 info: All type expressions are evaluated at runtime by default on Python <3.14
 info: Python 3.13 was assumed when inferring types because it was specified on the command line
@@ -196,14 +191,14 @@ info: rule `unsupported-operator` is enabled by default
 
 ```
 error[unresolved-reference]: Name `SomethingUndefined` used when not defined
-  --> src/mdtest_snippet.py:37:8
+  --> src/mdtest_snippet.py:36:8
    |
-35 |     # error: [unresolved-reference] "SomethingUndefined"
-36 |     # error: [unresolved-reference] "SomethingAlsoUndefined"
-37 |     i: SomethingUndefined | SomethingAlsoUndefined,
+34 |     # error: [unresolved-reference] "SomethingUndefined"
+35 |     # error: [unresolved-reference] "SomethingAlsoUndefined"
+36 |     i: SomethingUndefined | SomethingAlsoUndefined,
    |        ^^^^^^^^^^^^^^^^^^
+37 |     # error: [unsupported-operator]
 38 |     # error: [unsupported-operator]
-39 |     # error: [unsupported-operator]
    |
 info: rule `unresolved-reference` is enabled by default
 
@@ -211,14 +206,14 @@ info: rule `unresolved-reference` is enabled by default
 
 ```
 error[unresolved-reference]: Name `SomethingAlsoUndefined` used when not defined
-  --> src/mdtest_snippet.py:37:29
+  --> src/mdtest_snippet.py:36:29
    |
-35 |     # error: [unresolved-reference] "SomethingUndefined"
-36 |     # error: [unresolved-reference] "SomethingAlsoUndefined"
-37 |     i: SomethingUndefined | SomethingAlsoUndefined,
+34 |     # error: [unresolved-reference] "SomethingUndefined"
+35 |     # error: [unresolved-reference] "SomethingAlsoUndefined"
+36 |     i: SomethingUndefined | SomethingAlsoUndefined,
    |                             ^^^^^^^^^^^^^^^^^^^^^^
+37 |     # error: [unsupported-operator]
 38 |     # error: [unsupported-operator]
-39 |     # error: [unsupported-operator]
    |
 info: rule `unresolved-reference` is enabled by default
 
@@ -226,17 +221,17 @@ info: rule `unresolved-reference` is enabled by default
 
 ```
 error[unsupported-operator]: Unsupported `|` operation
-  --> src/mdtest_snippet.py:40:8
+  --> src/mdtest_snippet.py:39:8
    |
+37 |     # error: [unsupported-operator]
 38 |     # error: [unsupported-operator]
-39 |     # error: [unsupported-operator]
-40 |     j: list["int" | None] | "bytes",
+39 |     j: list["int" | None] | "bytes",
    |        ------------------^^^-------
    |        |                    |
    |        |                    Has type `Literal["bytes"]`
    |        Has type `<class 'list[int | None]'>`
-41 |     # fine: subscripted ty_extensions special forms should preserve `_SpecialForm` runtime behavior
-42 |     k: "Foo" | Not[int],
+40 | ):
+41 |     reveal_type(a)  # revealed: int | Foo
    |
 info: All type expressions are evaluated at runtime by default on Python <3.14
 info: Python 3.13 was assumed when inferring types because it was specified on the command line
@@ -247,17 +242,17 @@ info: rule `unsupported-operator` is enabled by default
 
 ```
 error[unsupported-operator]: Unsupported `|` operation
-  --> src/mdtest_snippet.py:40:13
+  --> src/mdtest_snippet.py:39:13
    |
+37 |     # error: [unsupported-operator]
 38 |     # error: [unsupported-operator]
-39 |     # error: [unsupported-operator]
-40 |     j: list["int" | None] | "bytes",
+39 |     j: list["int" | None] | "bytes",
    |             -----^^^----
    |             |       |
    |             |       Has type `None`
    |             Has type `Literal["int"]`
-41 |     # fine: subscripted ty_extensions special forms should preserve `_SpecialForm` runtime behavior
-42 |     k: "Foo" | Not[int],
+40 | ):
+41 |     reveal_type(a)  # revealed: int | Foo
    |
 info: All type expressions are evaluated at runtime by default on Python <3.14
 info: Python 3.13 was assumed when inferring types because it was specified on the command line
@@ -268,16 +263,16 @@ info: rule `unsupported-operator` is enabled by default
 
 ```
 error[unsupported-operator]: Unsupported `|` operation
-  --> src/mdtest_snippet.py:61:10
+  --> src/mdtest_snippet.py:56:10
    |
-60 | # error: [unsupported-operator]
-61 | X = list["int" | None]
+55 | # error: [unsupported-operator]
+56 | X = list["int" | None]
    |          -----^^^----
    |          |       |
    |          |       Has type `None`
    |          Has type `Literal["int"]`
-62 |
-63 | if TYPE_CHECKING:
+57 |
+58 | if TYPE_CHECKING:
    |
 info: All type expressions are evaluated at runtime by default on Python <3.14
 info: Python 3.13 was assumed when inferring types because it was specified on the command line
@@ -288,17 +283,17 @@ info: rule `unsupported-operator` is enabled by default
 
 ```
 error[unsupported-operator]: Unsupported `|` operation
-  --> src/mdtest_snippet.py:67:10
+  --> src/mdtest_snippet.py:62:10
    |
-65 |     # blocks are not executed at runtime. Requires
-66 |     # https://github.com/astral-sh/ty/issues/1553.
-67 |     bar: "int" | "None"  # error: [unsupported-operator]
+60 |     # blocks are not executed at runtime. Requires
+61 |     # https://github.com/astral-sh/ty/issues/1553.
+62 |     bar: "int" | "None"  # error: [unsupported-operator]
    |          -----^^^------
    |          |       |
    |          |       Has type `Literal["None"]`
    |          Has type `Literal["int"]`
-68 |
-69 |     # TODO: same as above
+63 |
+64 |     # TODO: same as above
    |
 info: All type expressions are evaluated at runtime by default on Python <3.14
 info: Python 3.13 was assumed when inferring types because it was specified on the command line
@@ -309,17 +304,17 @@ info: rule `unsupported-operator` is enabled by default
 
 ```
 error[unsupported-operator]: Unsupported `|` operation
-  --> src/mdtest_snippet.py:71:16
+  --> src/mdtest_snippet.py:66:16
    |
-69 |     # TODO: same as above
-70 |     # error: [unsupported-operator]
-71 |     def foo(x: "int" | "None"): ...
+64 |     # TODO: same as above
+65 |     # error: [unsupported-operator]
+66 |     def foo(x: "int" | "None"): ...
    |                -----^^^------
    |                |       |
    |                |       Has type `Literal["None"]`
    |                Has type `Literal["int"]`
-72 |
-73 |     class Bar:
+67 |
+68 |     class Bar:
    |
 info: All type expressions are evaluated at runtime by default on Python <3.14
 info: Python 3.13 was assumed when inferring types because it was specified on the command line

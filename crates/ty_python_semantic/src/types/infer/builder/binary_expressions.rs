@@ -678,7 +678,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     KnownInstanceType::UnionType(_)
                     | KnownInstanceType::Literal(_)
                     | KnownInstanceType::Annotated(_)
-                    | KnownInstanceType::ParameterizedSpecialForm(_)
                     | KnownInstanceType::TypeGenericAlias(_)
                     | KnownInstanceType::Callable(_)
                     | KnownInstanceType::TypeVar(_),
@@ -691,7 +690,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     KnownInstanceType::UnionType(_)
                     | KnownInstanceType::Literal(_)
                     | KnownInstanceType::Annotated(_)
-                    | KnownInstanceType::ParameterizedSpecialForm(_)
                     | KnownInstanceType::TypeGenericAlias(_)
                     | KnownInstanceType::Callable(_)
                     | KnownInstanceType::TypeVar(_),
