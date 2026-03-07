@@ -87,6 +87,7 @@ pub(crate) struct ModuleKey<'a> {
     force_to_top: bool,
     maybe_length: Option<usize>,
     distance: Distance,
+    qualified_name: Option<NatOrdStr<'a>>,
     maybe_lowercase_name: Option<NatOrdStr<'a>>,
     module_name: Option<NatOrdStr<'a>>,
     first_alias: Option<MemberKey<'a>>,
@@ -124,6 +125,37 @@ impl<'a> ModuleKey<'a> {
             (!settings.case_sensitive).then_some(NatOrdStr(maybe_lowercase(name)))
         });
 
+        // Compute qualified name for `from X import Y` sorting.
+        // When enabled, `from collections import OrderedDict` sorts as `collections.OrderedDict`
+        // rather than just `collections`.
+        let qualified_name = if settings.sort_by_qualified_name && style == ImportStyle::From {
+            first_alias.map(|(alias_name, _)| {
+                // Build the module part including relative import dots
+                let module_part = match (level, name) {
+                    (0, Some(n)) => n.to_string(),
+                    (0, None) => String::new(),
+                    (lvl, Some(n)) => format!("{}{}", ".".repeat(lvl as usize), n),
+                    (lvl, None) => ".".repeat(lvl as usize),
+                };
+
+                // Construct the qualified name
+                let qualified = if module_part.is_empty() {
+                    alias_name.to_string()
+                } else {
+                    format!("{module_part}.{alias_name}")
+                };
+
+                // Respect case sensitivity setting
+                if settings.case_sensitive {
+                    NatOrdStr::from(qualified)
+                } else {
+                    NatOrdStr::from(qualified.to_lowercase())
+                }
+            })
+        } else {
+            None
+        };
+
         let module_name = name.map(NatOrdStr::from);
 
         let asname = asname.map(NatOrdStr::from);
@@ -135,6 +167,7 @@ impl<'a> ModuleKey<'a> {
             force_to_top,
             maybe_length,
             distance,
+            qualified_name,
             maybe_lowercase_name,
             module_name,
             first_alias,
