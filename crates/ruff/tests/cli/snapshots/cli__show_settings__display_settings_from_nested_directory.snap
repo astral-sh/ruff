@@ -1,20 +1,20 @@
 ---
-source: crates/ruff/tests/show_settings.rs
+source: crates/ruff/tests/cli/show_settings.rs
 info:
   program: ruff
   args:
     - check
     - "--show-settings"
-    - test.py
+    - subdir/test.py
 ---
 success: true
 exit_code: 0
 ----- stdout -----
-Resolved settings for: "<temp_dir>/test.py"
-Settings path: "<temp_dir>/pyproject.toml"
+Resolved settings for: "[TMP]/subdir/test.py"
+Settings path: "[TMP]/subdir/pyproject.toml"
 
 # General Settings
-cache_dir = "<temp_dir>/.ruff_cache"
+cache_dir = "[TMP]/subdir/.ruff_cache"
 fix = false
 fix_only = false
 output_format = full
@@ -59,14 +59,18 @@ file_resolver.include = [
 ]
 file_resolver.extend_include = []
 file_resolver.respect_gitignore = true
-file_resolver.project_root = "<temp_dir>/"
+file_resolver.project_root = "[TMP]/subdir"
 
 # Linter Settings
 linter.exclude = []
-linter.project_root = "<temp_dir>/"
+linter.project_root = "[TMP]/subdir"
 linter.rules.enabled = [
+	unsorted-imports (I001),
+	missing-required-import (I002),
+	mixed-spaces-and-tabs (E101),
 	multiple-imports-on-one-line (E401),
 	module-import-not-at-top-of-file (E402),
+	line-too-long (E501),
 	multiple-statements-on-one-line-colon (E701),
 	multiple-statements-on-one-line-semicolon (E702),
 	useless-semicolon (E703),
@@ -126,8 +130,12 @@ linter.rules.enabled = [
 	raise-not-implemented (F901),
 ]
 linter.rules.should_fix = [
+	unsorted-imports (I001),
+	missing-required-import (I002),
+	mixed-spaces-and-tabs (E101),
 	multiple-imports-on-one-line (E401),
 	module-import-not-at-top-of-file (E402),
+	line-too-long (E501),
 	multiple-statements-on-one-line-colon (E701),
 	multiple-statements-on-one-line-semicolon (E702),
 	useless-semicolon (E703),
@@ -189,7 +197,7 @@ linter.rules.should_fix = [
 linter.per_file_ignores = {}
 linter.safety_table.forced_safe = []
 linter.safety_table.forced_unsafe = []
-linter.unresolved_target_version = 3.7
+linter.unresolved_target_version = none
 linter.per_file_target_version = {}
 linter.preview = disabled
 linter.explicit_preview_rules = false
@@ -202,11 +210,11 @@ linter.ignore_init_module_imports = true
 linter.logger_objects = []
 linter.namespace_packages = []
 linter.src = [
-	"<temp_dir>/",
-	"<temp_dir>/src",
+	"[TMP]/subdir",
+	"[TMP]/subdir/src",
 ]
 linter.tab_size = 4
-linter.line_length = 100
+linter.line_length = 120
 linter.task_tags = [
 	TODO,
 	FIXME,
@@ -354,7 +362,7 @@ linter.pep8_naming.ignore_names = [
 ]
 linter.pep8_naming.classmethod_decorators = []
 linter.pep8_naming.staticmethod_decorators = []
-linter.pycodestyle.max_line_length = 100
+linter.pycodestyle.max_line_length = 120
 linter.pycodestyle.max_doc_length = none
 linter.pycodestyle.ignore_overlong_task_comments = false
 linter.pyflakes.extend_generics = []
@@ -379,10 +387,10 @@ linter.ruff.strictly_empty_init_modules = false
 
 # Formatter Settings
 formatter.exclude = []
-formatter.unresolved_target_version = 3.7
+formatter.unresolved_target_version = 3.10
 formatter.per_file_target_version = {}
 formatter.preview = disabled
-formatter.line_width = 100
+formatter.line_width = 120
 formatter.line_ending = auto
 formatter.indent_style = space
 formatter.indent_width = 4
@@ -394,7 +402,7 @@ formatter.docstring_code_line_width = dynamic
 # Analyze Settings
 analyze.exclude = []
 analyze.preview = disabled
-analyze.target_version = 3.7
+analyze.target_version = 3.10
 analyze.string_imports = disabled
 analyze.extension = ExtensionMapping({})
 analyze.include_dependencies = {}
