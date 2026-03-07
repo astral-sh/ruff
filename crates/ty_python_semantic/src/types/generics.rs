@@ -1784,6 +1784,13 @@ impl<'db> SpecializationBuilder<'db> {
         }
     }
 
+    /// Apply a transformation to all accumulated type variable assignments.
+    pub(crate) fn map_types(&mut self, mut f: impl FnMut(Type<'db>) -> Type<'db>) {
+        for ty in self.types.values_mut() {
+            *ty = f(*ty);
+        }
+    }
+
     pub(crate) fn build(&mut self, generic_context: GenericContext<'db>) -> Specialization<'db> {
         let types = generic_context
             .variables_inner(self.db)
