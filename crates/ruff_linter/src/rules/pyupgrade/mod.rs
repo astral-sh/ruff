@@ -128,6 +128,22 @@ mod tests {
         Ok(())
     }
 
+    #[test_case(Rule::NonPEP585Annotation, Path::new("UP006_future.py"))]
+    fn up006_add_future_annotation_preview(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!("{}__preview", path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("pyupgrade").join(path).as_path(),
+            &settings::LinterSettings {
+                future_annotations: true,
+                preview: PreviewMode::Enabled,
+                unresolved_target_version: PythonVersion::PY38.into(),
+                ..settings::LinterSettings::for_rule(rule_code)
+            },
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
     #[test_case(Rule::NonPEP695GenericClass, Path::new("UP046_2.py"))]
     #[test_case(Rule::NonPEP695GenericFunction, Path::new("UP047_1.py"))]
     fn rules_not_applied_default_typevar_backported(rule_code: Rule, path: &Path) -> Result<()> {
