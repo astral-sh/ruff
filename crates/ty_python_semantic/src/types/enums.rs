@@ -1,3 +1,4 @@
+use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
 use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
@@ -357,7 +358,10 @@ pub(crate) fn enum_metadata<'db>(
                         declaration.is_undefined_or(|declaration| {
                             matches!(
                                 declaration.kind(db),
-                                DefinitionKind::AnnotatedAssignment(..)
+                                DefinitionKind::AnnotatedAssignment(assignment)
+                                    if assignment
+                                        .value(&parsed_module(db, declaration.file(db)).load(db))
+                                        .is_some()
                             )
                         })
                     })

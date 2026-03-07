@@ -158,12 +158,46 @@ Pure declarations (annotations without values) are non-members and are fine:
 ```py
 class Pet6(Enum):
     CAT = 1
+    genus: str  # OK: no value, so this is a non-member declaration
     species: str  # OK: no value, so this is a non-member declaration
+
+reveal_type(Pet6.genus)  # revealed: str
+reveal_type(Pet6.species)  # revealed: str
+reveal_type(Pet6.CAT.genus)  # revealed: str
+reveal_type(Pet6.CAT.species)  # revealed: str
 ```
+
+### Pure declarations in stubs
+
+In stubs, these should still be treated as non-member attributes rather than enum members:
+
+```pyi
+from enum import Enum
+
+class Pet6Stub(Enum):
+    genus: str
+    species: str
+
+    CAT = ...
+    DOG = ...
+
+reveal_type(Pet6Stub.genus)  # revealed: str
+reveal_type(Pet6Stub.species)  # revealed: str
+```
+
+### Callable values and subclasses
 
 Callable values are never enum members at runtime, so annotating them is fine:
 
+```toml
+[environment]
+python-version = "3.11"
+```
+
 ```py
+from enum import Enum, IntEnum, StrEnum
+from typing import Callable
+
 def identity(x: int) -> int:
     return x
 
