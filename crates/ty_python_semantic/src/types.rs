@@ -1471,11 +1471,11 @@ impl<'db> Type<'db> {
             union.elements(db).iter().all(|ty| {
                 ty.is_single_valued(db)
                     || ty.is_bool(db)
-                    || ty.is_literal_string()
+                    || ty.is_subtype_of(db, Type::literal_string())
                     || (ty.is_enum(db) && !ty.overrides_equality(db))
             })
         }) || ty.is_bool(db)
-            || ty.is_literal_string()
+            || ty.is_subtype_of(db, Type::literal_string())
             || (ty.is_enum(db) && !ty.overrides_equality(db))
     }
 
@@ -1485,11 +1485,11 @@ impl<'db> Type<'db> {
             union.elements(db).iter().any(|ty| {
                 ty.is_single_valued(db)
                     || ty.is_bool(db)
-                    || ty.is_literal_string()
+                    || ty.is_subtype_of(db, Type::literal_string())
                     || (ty.is_enum(db) && !ty.overrides_equality(db))
             })
         }) || ty.is_bool(db)
-            || ty.is_literal_string()
+            || ty.is_subtype_of(db, Type::literal_string())
             || (ty.is_enum(db) && !ty.overrides_equality(db))
     }
 

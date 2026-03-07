@@ -940,7 +940,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     // other string literal could compare equal to it), or it is not a string
                     // literal, in which case (given that it is single-valued), LiteralString
                     // cannot compare equal to it.
-                    Type::LiteralValue(literal) if literal.is_literal_string() => true,
+                    ty if ty.is_subtype_of(db, Type::literal_string()) => true,
                     _ => !could_compare_equal(db, lhs_ty, rhs_ty),
                 }
             }
@@ -1047,7 +1047,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                         continue;
                     }
                     // Skip types that are handled specially (LiteralString, bool, enum).
-                    if element.is_literal_string()
+                    if element.is_subtype_of(self.db, Type::literal_string())
                         || element.is_bool(self.db)
                         || (element.is_enum(self.db) && !element.overrides_equality(self.db))
                     {
@@ -1090,7 +1090,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             if let Some(lhs_union) = lhs_ty.as_union() {
                 for element in lhs_union.elements(self.db) {
                     if element.is_single_valued(self.db)
-                        || element.is_literal_string()
+                        || element.is_subtype_of(self.db, Type::literal_string())
                         || element.is_bool(self.db)
                         || (element.is_enum(self.db) && !element.overrides_equality(self.db))
                     {
