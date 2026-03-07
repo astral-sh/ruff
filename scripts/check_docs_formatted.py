@@ -117,6 +117,7 @@ KNOWN_PARSE_ERRORS = [
     "mixed-spaces-and-tabs",
     "no-indented-block",
     "non-pep695-type-alias",  # requires Python 3.12
+    "quadratic-list-summation",  # requires Python 3.15
     "syntax-error",
     "tab-after-comma",
     "tab-after-keyword",
