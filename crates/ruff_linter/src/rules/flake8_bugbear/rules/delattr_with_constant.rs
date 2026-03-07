@@ -66,7 +66,11 @@ pub(crate) fn delattr_with_constant(checker: &Checker, expr: &Expr, func: &Expr,
         return;
     }
 
-    let [obj, Expr::StringLiteral(ast::ExprStringLiteral { value: name, .. })] = args else {
+    let [
+        obj,
+        Expr::StringLiteral(ast::ExprStringLiteral { value: name, .. }),
+    ] = args
+    else {
         return;
     };
     if obj.is_starred_expr() {
