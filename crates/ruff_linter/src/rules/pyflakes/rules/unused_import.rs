@@ -4,6 +4,15 @@ use std::iter;
 use anyhow::{Result, anyhow, bail};
 use std::collections::BTreeMap;
 
+use crate::checkers::ast::Checker;
+use crate::fix;
+use crate::preview::{
+    is_dunder_init_fix_unused_import_enabled, is_refined_submodule_import_match_enabled,
+};
+use crate::registry::Rule;
+use crate::rules::isort;
+use crate::settings::LinterSettings;
+use crate::{Applicability, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::{QualifiedName, QualifiedNameBuilder};
 use ruff_python_ast::{self as ast, Stmt};
@@ -12,16 +21,6 @@ use ruff_python_semantic::{
     ScopeId, SemanticModel, SubmoduleImport,
 };
 use ruff_text_size::{Ranged, TextRange};
-
-use crate::checkers::ast::Checker;
-use crate::fix;
-use crate::preview::{
-    is_dunder_init_fix_unused_import_enabled, is_refined_submodule_import_match_enabled,
-};
-use crate::registry::Rule;
-use crate::rules::{isort, isort::ImportSection, isort::ImportType};
-use crate::settings::LinterSettings;
-use crate::{Applicability, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for unused imports.
@@ -167,7 +166,7 @@ impl Violation for UnusedImport {
                     "`{name}` imported but unused; consider using `importlib.util.find_spec` to test for availability"
                 )
             }
-            UnusedImportContext::DunderInitFirstParty { .. } => {
+            UnusedImportContext::DunderInitSamePackage { .. } => {
                 format!(
                     "`{name}` imported but unused; consider removing, adding to `__all__`, or using a redundant alias"
                 )
@@ -187,11 +186,11 @@ impl Violation for UnusedImport {
         } = self;
         if *ignore_init_module_imports {
             match context {
-                UnusedImportContext::DunderInitFirstParty {
+                UnusedImportContext::DunderInitSamePackage {
                     dunder_all_count: DunderAllCount::Zero,
                     submodule_import: false,
                 } => return Some(format!("Use an explicit re-export: `{module} as {module}`")),
-                UnusedImportContext::DunderInitFirstParty {
+                UnusedImportContext::DunderInitSamePackage {
                     dunder_all_count: DunderAllCount::Zero,
                     submodule_import: true,
                 } => {
@@ -203,11 +202,11 @@ impl Violation for UnusedImport {
                             .expect("Expected all submodule imports to contain a '.'")
                     ));
                 }
-                UnusedImportContext::DunderInitFirstParty {
+                UnusedImportContext::DunderInitSamePackage {
                     dunder_all_count: DunderAllCount::One,
                     submodule_import: false,
                 } => return Some(format!("Add unused import `{binding}` to __all__")),
-                UnusedImportContext::DunderInitFirstParty {
+                UnusedImportContext::DunderInitSamePackage {
                     dunder_all_count: DunderAllCount::One,
                     submodule_import: true,
                 } => {
@@ -219,7 +218,7 @@ impl Violation for UnusedImport {
                             .expect("Expected all submodule imports to contain a '.'")
                     ));
                 }
-                UnusedImportContext::DunderInitFirstParty {
+                UnusedImportContext::DunderInitSamePackage {
                     dunder_all_count: DunderAllCount::Many,
                     submodule_import: _,
                 }
@@ -259,32 +258,12 @@ enum UnusedImportContext {
     /// The unused import occurs inside an except handler
     ExceptHandler,
     /// The unused import is a first-party import in an `__init__.py` file
-    DunderInitFirstParty {
+    DunderInitSamePackage {
         dunder_all_count: DunderAllCount,
         submodule_import: bool,
     },
     /// The unused import is something else
     Other,
-}
-
-fn is_first_party(import: &AnyImport, checker: &Checker) -> bool {
-    let source_name = import.source_name().join(".");
-    let category = isort::categorize(
-        &source_name,
-        import.qualified_name().is_unresolved_import(),
-        &checker.settings().src,
-        checker.package(),
-        checker.settings().isort.detect_same_package,
-        &checker.settings().isort.known_modules,
-        checker.target_version(),
-        checker.settings().isort.no_sections,
-        &checker.settings().isort.section_order,
-        &checker.settings().isort.default_section,
-    );
-    matches! {
-        category,
-        ImportSection::Known(ImportType::FirstParty | ImportType::LocalFolder)
-    }
 }
 
 /// Find the `Expr` for top-level `__all__` bindings.
@@ -408,7 +387,10 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope) {
                     UnusedImportContext::ExceptHandler
                 } else if in_init
                     && binding.scope.is_global()
-                    && is_first_party(&binding.import, checker)
+                    && isort::categorize::same_package(
+                        checker.package(),
+                        binding.import.source_name()[0],
+                    )
                     // In the situation where we have
                     // ```
                     // import a.b # <-- at this binding
@@ -422,8 +404,9 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope) {
                     // So we look up the name `a` and see if it has
                     // a reference in `__all__`.
                     && (!is_refined_submodule_import_match_enabled(checker.settings())||!symbol_used_in_dunder_all(checker.semantic(), &binding))
+
                 {
-                    UnusedImportContext::DunderInitFirstParty {
+                    UnusedImportContext::DunderInitSamePackage {
                         dunder_all_count: DunderAllCount::from(dunder_all_exprs.len()),
                         submodule_import: binding.import.is_submodule_import(),
                     }
@@ -432,7 +415,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope) {
                 };
                 (binding, context)
             })
-            .partition(|(_, context)| context.is_dunder_init_first_party() && preview_mode);
+            .partition(|(_, context)| context.is_dunder_init_same_package() && preview_mode);
 
         // generate fixes that are shared across bindings in the statement
         let (fix_remove, fix_reexport) =
