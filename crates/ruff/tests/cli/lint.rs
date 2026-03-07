@@ -1902,7 +1902,7 @@ select = ["D100"]
     let test_code =
         fs::read_to_string(fixture.root().join("noqa.py")).expect("should read test file");
 
-    insta::assert_snapshot!(test_code, @"  # noqa: D100");
+    insta::assert_snapshot!(test_code, @"# noqa: D100");
 
     Ok(())
 }
@@ -1944,7 +1944,7 @@ select = ["D100"]
 
     insta::assert_snapshot!(test_code, @"
     #!/usr/bin/env fake command
-      # noqa: D100
+    # noqa: D100
     ");
 
     Ok(())
