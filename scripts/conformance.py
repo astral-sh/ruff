@@ -858,17 +858,17 @@ def render_summary(
 ) -> str:
     def format_metric(diff: float, old: float, new: float) -> str:
         if diff > 0:
-            return f"increased from **{old:.2%}** to **{new:.2%}**"
+            return f"increased from <b>{old:.2%}</b> to <b>{new:.2%}</b>"
         if diff < 0:
-            return f"decreased from **{old:.2%}** to **{new:.2%}**"
-        return f"held steady at **{old:.2%}**"
+            return f"decreased from <b>{old:.2%}</b> to <b>{new:.2%}</b>"
+        return f"held steady at <b>{old:.2%}</b>"
 
     def format_int_metric(diff: int, old: int, new: int, total: int) -> str:
         if diff > 0:
-            return f"improved from **{old}/{total}** to **{new}/{total}**"
+            return f"improved from <b>{old}/{total}</b> to <b>{new}/{total}</b>"
         if diff < 0:
-            return f"regressed from **{old}/{total}** to **{new}/{total}**"
-        return f"held steady at **{old}/{total}**"
+            return f"regressed from <b>{old}/{total}</b> to <b>{new}/{total}</b>"
+        return f"held steady at <b>{old}/{total}</b>"
 
     old = compute_stats(test_cases, Source.OLD)
     new = compute_stats(test_cases, Source.NEW)
