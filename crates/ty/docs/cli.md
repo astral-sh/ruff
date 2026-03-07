@@ -17,6 +17,7 @@ ty <COMMAND>
 <dl class="cli-reference"><dt><a href="#ty-check"><code>ty check</code></a></dt><dd><p>Check a project for type errors</p></dd>
 <dt><a href="#ty-server"><code>ty server</code></a></dt><dd><p>Start the language server</p></dd>
 <dt><a href="#ty-version"><code>ty version</code></a></dt><dd><p>Display ty's version</p></dd>
+<dt><a href="#ty-rule"><code>ty rule</code></a></dt><dd><p>Explain a rule (or all rules)</p></dd>
 <dt><a href="#ty-help"><code>ty help</code></a></dt><dd><p>Print this message or the help of the given subcommand(s)</p></dd>
 </dl>
 
@@ -158,6 +159,32 @@ ty generate-shell-completion <SHELL>
 
 <dl class="cli-reference"><dt id="ty-generate-shell-completion--help"><a href="#ty-generate-shell-completion--help"><code>--help</code></a>, <code>-h</code></dt><dd><p>Print help</p>
 </dd></dl>
+
+## ty rule
+
+Explain a rule (or all rules)
+
+<h3 class="cli-reference">Usage</h3>
+
+```
+ty rule [OPTIONS] <RULE|--all>
+```
+
+<h3 class="cli-reference">Arguments</h3>
+
+<dl class="cli-reference"><dt id="ty-rule--rule"><a href="#ty-rule--rule"><code>RULE</code></a></dt><dd><p>Rule to explain</p>
+</dd></dl>
+
+<h3 class="cli-reference">Options</h3>
+
+<dl class="cli-reference"><dt id="ty-rule--all"><a href="#ty-rule--all"><code>--all</code></a></dt><dd><p>Explain all rules</p>
+</dd><dt id="ty-rule--help"><a href="#ty-rule--help"><code>--help</code></a>, <code>-h</code></dt><dd><p>Print help</p>
+</dd><dt id="ty-rule--output-format"><a href="#ty-rule--output-format"><code>--output-format</code></a> <i>output-format</i></dt><dd><p>Output format</p>
+<p>[default: text]</p><p>Possible values:</p>
+<ul>
+<li><code>text</code></li>
+<li><code>json</code></li>
+</ul></dd></dl>
 
 ## ty help
 
