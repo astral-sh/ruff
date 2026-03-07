@@ -49,6 +49,35 @@ def _(a: dict[str, int], b: Mapping[str, int], c: HasKeysAndGetItem, d: object):
     reveal_type({**d})  # revealed: dict[Unknown, Unknown]
 ```
 
+## Dict literal with union annotation containing unrelated collection type
+
+A dict literal passed to a parameter with a union annotation like `dict[str, Base] | Sequence[Base]`
+should correctly use the `dict[str, Base]` part of the union as the type context, even though
+`Sequence` is not provably disjoint from `dict`.
+
+```py
+from typing import Sequence, Union
+
+class Metric:
+    pass
+
+class M1(Metric):
+    pass
+
+class M2(Metric):
+    pass
+
+def f(d: Union[dict[str, Metric], Sequence[Metric]]) -> None:
+    pass
+
+# No error: dict[str, M1 | M2] is assignable to dict[str, Metric]
+# because the type context correctly narrows to dict[str, Metric].
+f({"one": M1(), "two": M2()})
+
+x: Union[dict[str, Metric], Sequence[Metric]] = {"one": M1(), "two": M2()}
+reveal_type(x)  # revealed: dict[str, Metric]
+```
+
 ## Dict of functions
 
 ```py

@@ -10237,7 +10237,28 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // `collection_ty` is `list`.
         let tcx = tcx.map(|annotation| {
             let collection_ty = collection_class.to_instance(self.db());
-            annotation.filter_disjoint_elements(self.db(), collection_ty, inferable)
+            let filtered = annotation.filter_disjoint_elements(self.db(), collection_ty, inferable);
+
+            // Further filter to keep only instances of classes that the collection class
+            // is a subclass of. This handles cases like `dict[str, Metric] | Sequence[Metric]`
+            // where `Sequence` is not provably disjoint from `dict` (a third class could
+            // inherit from both), but `dict` is not a subclass of `Sequence`, so `Sequence`
+            // is not a useful type context for a dict literal.
+            let collection_origin = collection_alias.origin(self.db());
+            filtered.filter_union(self.db(), |ty| {
+                ty.as_nominal_instance()
+                    .and_then(|instance| instance.class(self.db()).static_class_literal(self.db()))
+                    .is_some_and(|(element_origin, _)| {
+                        ClassLiteral::Static(collection_origin)
+                            .iter_mro(self.db())
+                            .filter_map(ClassBase::into_class)
+                            .any(|class| {
+                                class
+                                    .static_class_literal(self.db())
+                                    .is_some_and(|(l, _)| l == element_origin)
+                            })
+                    })
+            })
         });
 
         // Collect type constraints from the declared element types.
