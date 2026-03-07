@@ -39,11 +39,60 @@ impl Display for Strictness {
     }
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, CacheKey)]
+#[serde(deny_unknown_fields, rename_all = "kebab-case")]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub enum AllImports {
+    All,
+}
+
+impl Display for AllImports {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::All => write!(f, "\"all\""),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, CacheKey)]
+#[serde(untagged)]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub enum BannedEagerImports {
+    All(AllImports),
+    Imports(Vec<String>),
+}
+
+impl Default for BannedEagerImports {
+    fn default() -> Self {
+        Self::Imports(Vec::new())
+    }
+}
+
+impl Display for BannedEagerImports {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::All(all) => write!(f, "{all}"),
+            Self::Imports(imports) => {
+                if imports.is_empty() {
+                    write!(f, "[]")
+                } else {
+                    writeln!(f, "[")?;
+                    for import in imports {
+                        writeln!(f, "\t{import},")?;
+                    }
+                    write!(f, "]")
+                }
+            }
+        }
+    }
+}
+
 #[derive(Debug, Clone, CacheKey, Default)]
 pub struct Settings {
     pub ban_relative_imports: Strictness,
     pub banned_api: FxHashMap<String, ApiBan>,
     pub banned_module_level_imports: Vec<String>,
+    pub banned_eager_imports: BannedEagerImports,
 }
 
 impl Settings {
@@ -61,6 +110,7 @@ impl Display for Settings {
                 self.ban_relative_imports,
                 self.banned_api | map,
                 self.banned_module_level_imports | array,
+                self.banned_eager_imports,
             ]
         }
         Ok(())
