@@ -1839,14 +1839,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     // However, there's some debate about whether this is really
                     // fully correct. See <https://github.com/astral-sh/ruff/pull/20591>
                     // for more discussion.
-                    match self
-                        .infer_type_expression(arguments_slice)
-                        .top_materialization(self.db())
-                    {
-                        Type::TypeIs(type_is) => type_is.return_type(db),
-                        Type::TypeGuard(type_guard) => type_guard.return_type(db),
-                        ty => ty,
-                    },
+                    self.infer_type_expression(arguments_slice)
+                        .top_materialization(self.db()),
                 ),
             },
             SpecialFormType::TypeGuard => match arguments_slice {

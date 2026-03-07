@@ -754,6 +754,28 @@ fn recursive_type_normalize_type_guard_like<'db, T: TypeGuardLike<'db>>(
             .recursive_type_normalized_impl(db, div, true)
             .unwrap_or(div)
     };
+
+    // Recursive `TypeIs[TypeIs[...]]` and `TypeGuard[TypeGuard[...]]` expansions can grow by
+    // one redundant wrapper layer on each cycle iteration. Keep a single outer wrapper and
+    // collapse only repeated wrappers of the same form during cycle normalization.
+    let ty = match T::special_form() {
+        SpecialFormType::TypeIs => {
+            let mut ty = ty;
+            while let Type::TypeIs(type_is) = ty {
+                ty = type_is.return_type(db);
+            }
+            ty
+        }
+        SpecialFormType::TypeGuard => {
+            let mut ty = ty;
+            while let Type::TypeGuard(type_guard) = ty {
+                ty = type_guard.return_type(db);
+            }
+            ty
+        }
+        _ => ty,
+    };
+
     Some(guard.with_type(db, ty))
 }
 
@@ -5401,14 +5423,14 @@ impl<'db> Type<'db> {
                     }
                 });
 
-                // Materialization is a direct transform of the alias RHS. Don't run the
-                // alias-preservation and recursion-probing heuristic below, as that can
-                // re-enter recursive aliases outside the current visitor.
+                // Materialization is a direct transform of the alias RHS. Avoid the
+                // alias-preservation heuristic below, as that can recurse back into the same
+                // alias while `raw_value_type` is still being evaluated.
                 if matches!(type_mapping, TypeMapping::Materialize(_)) {
                     return mapped;
                 }
 
-                let is_recursive = any_over_type(db, alias.raw_value_type(db).expand_eagerly(db), false, |ty| ty.is_divergent());
+                let is_recursive = alias.is_recursive(db);
 
                 // If the type mapping does not result in any change to this (non-recursive) type alias, do not expand it.
                 //

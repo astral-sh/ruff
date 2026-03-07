@@ -8,7 +8,7 @@ use crate::{
         semantic_index,
     },
     types::{
-        GenericContext, Type, definition_expression_type,
+        GenericContext, Type, any_over_type, definition_expression_type,
         display::qualified_name_components_from_scope, generics::Specialization, visitor,
     },
 };
@@ -16,6 +16,18 @@ use crate::{
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
+
+fn type_alias_rhs_is_recursive<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
+    any_over_type(db, ty, false, |nested_ty| {
+        nested_ty.is_divergent()
+            || match nested_ty {
+                Type::TypeAlias(type_alias) => type_alias.is_recursive(db),
+                _ => nested_ty
+                    .as_type_alias()
+                    .is_some_and(|type_alias| type_alias.is_recursive(db)),
+            }
+    })
+}
 
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct PEP695TypeAliasType<'db> {
@@ -126,6 +138,11 @@ impl<'db> PEP695TypeAliasType<'db> {
                 GenericContext::from_type_params(db, index, definition, type_params)
             })
     }
+
+    #[salsa::tracked(cycle_initial=|_, _, _| true)]
+    pub(crate) fn is_recursive(self, db: &'db dyn Db) -> bool {
+        type_alias_rhs_is_recursive(db, self.raw_value_type(db))
+    }
 }
 
 /// A PEP 695 `types.TypeAliasType` created by manually calling the constructor.
@@ -179,6 +196,11 @@ impl<'db> ManualPEP695TypeAliasType<'db> {
             return Type::unknown();
         };
         definition_expression_type(db, definition, value_arg)
+    }
+
+    #[salsa::tracked(cycle_initial=|_, _, _| true)]
+    pub(crate) fn is_recursive(self, db: &'db dyn Db) -> bool {
+        type_alias_rhs_is_recursive(db, self.value_type(db))
     }
 }
 
@@ -276,6 +298,13 @@ impl<'db> TypeAliasType<'db> {
                 TypeAliasType::PEP695(type_alias.apply_specialization(db, f))
             }
             TypeAliasType::ManualPEP695(_) => self,
+        }
+    }
+
+    pub(crate) fn is_recursive(self, db: &'db dyn Db) -> bool {
+        match self {
+            TypeAliasType::PEP695(type_alias) => type_alias.is_recursive(db),
+            TypeAliasType::ManualPEP695(type_alias) => type_alias.is_recursive(db),
         }
     }
 
