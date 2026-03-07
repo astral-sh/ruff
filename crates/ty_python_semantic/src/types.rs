@@ -1706,7 +1706,6 @@ impl<'db> Type<'db> {
     fn promote_impl(self, db: &'db dyn Db) -> Type<'db> {
         match self {
             Type::LiteralValue(literal) if literal.is_promotable() => literal.fallback_instance(db),
-            Type::ModuleLiteral(_) => KnownClass::ModuleType.to_instance(db),
             Type::FunctionLiteral(literal) => Type::Callable(literal.into_callable_type(db)),
             _ => self,
         }
@@ -5396,21 +5395,6 @@ impl<'db> Type<'db> {
                 }
             }
 
-            Type::ModuleLiteral(_) => match type_mapping {
-                TypeMapping::ApplySpecialization(_) |
-                TypeMapping::ApplySpecializationWithMaterialization { .. } |
-                TypeMapping::UniqueSpecialization { .. } |
-                TypeMapping::BindLegacyTypevars(_) |
-                TypeMapping::BindSelf(..) |
-                TypeMapping::ReplaceSelf { .. } |
-                TypeMapping::Materialize(_) |
-                TypeMapping::ReplaceParameterDefaults |
-                TypeMapping::EagerExpansion |
-                TypeMapping::RescopeReturnCallables(_) |
-                TypeMapping::Promote(PromotionMode::Off) => self,
-                TypeMapping::Promote(PromotionMode::On) => self.promote_impl(db)
-            }
-
             Type::LiteralValue(_) => match type_mapping {
                 TypeMapping::ApplySpecialization(_) |
                 TypeMapping::ApplySpecializationWithMaterialization { .. } |
@@ -5447,6 +5431,7 @@ impl<'db> Type<'db> {
             | Type::AlwaysTruthy
             | Type::AlwaysFalsy
             | Type::WrapperDescriptor(_)
+            | Type::ModuleLiteral(_)
             | Type::KnownBoundMethod(
                 KnownBoundMethodType::StrStartswith(_)
                 | KnownBoundMethodType::ConstraintSetRange
