@@ -556,6 +556,19 @@ impl<'db> NegativeIntersectionElements<'db> {
             }
         }
     }
+
+    pub(crate) fn is_subset(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Empty, _) => true,
+            (_, Self::Empty) => false,
+            (Self::Single(ty), Self::Single(other_ty)) => ty == other_ty,
+            (Self::Single(ty), Self::Multiple(set)) => set.contains(ty),
+            (Self::Multiple(set), Self::Single(other_ty)) => {
+                set.len() == 1 && set.contains(other_ty)
+            }
+            (Self::Multiple(set), Self::Multiple(other_set)) => set.is_subset(other_set),
+        }
+    }
 }
 
 impl<'a, 'db> IntoIterator for &'a NegativeIntersectionElements<'db> {
