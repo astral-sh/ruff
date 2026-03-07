@@ -1664,6 +1664,18 @@ impl<'db> Type<'db> {
         )
     }
 
+    /// Recursively promote singleton types (like `None`, `EllipsisType`) to
+    /// `T | Unknown` within type parameters, without recursing into unions.
+    /// Used for collection literal inference so that `[None]` is inferred as
+    /// `list[None | Unknown]` rather than `list[None]`.
+    pub(crate) fn promote_singletons(self, db: &'db dyn Db) -> Type<'db> {
+        self.apply_type_mapping(
+            db,
+            &TypeMapping::Promote(PromotionMode::SingletonsOnly),
+            TypeContext::default(),
+        )
+    }
+
     /// Like [`Type::promote`], but does not recurse into nested types.
     fn promote_impl(self, db: &'db dyn Db) -> Type<'db> {
         match self {
@@ -5182,6 +5194,16 @@ impl<'db> Type<'db> {
             _ => {}
         }
 
+        // `SingletonsOnly` promotion only recurses into `NominalInstance` types (tuples
+        // and specialized generics). For all other types, return early.
+        if matches!(
+            type_mapping,
+            TypeMapping::Promote(PromotionMode::SingletonsOnly)
+        ) && !matches!(self, Type::NominalInstance(_))
+        {
+            return self;
+        }
+
         match self {
             Type::TypeVar(bound_typevar) => bound_typevar.apply_type_mapping_impl(db, type_mapping, visitor),
             Type::KnownInstance(known_instance) => known_instance.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
@@ -5219,6 +5241,14 @@ impl<'db> Type<'db> {
                     Some(KnownClass::Complex) => KnownUnion::Complex.to_type(db),
                     Some(KnownClass::Float) => KnownUnion::Float.to_type(db),
                     _ => instance.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                }
+            }
+
+            Type::NominalInstance(instance) if matches!(type_mapping, TypeMapping::Promote(PromotionMode::SingletonsOnly)) => {
+                if instance.known_class(db).is_some_and(KnownClass::is_singleton) {
+                    UnionType::from_two_elements(db, self, Type::unknown())
+                } else {
+                    instance.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
                 }
             }
 
@@ -5368,7 +5398,7 @@ impl<'db> Type<'db> {
                 TypeMapping::ReplaceParameterDefaults |
                 TypeMapping::EagerExpansion |
                 TypeMapping::RescopeReturnCallables(_) |
-                TypeMapping::Promote(PromotionMode::Off) => self,
+                TypeMapping::Promote(PromotionMode::Off | PromotionMode::SingletonsOnly) => self,
                 TypeMapping::Promote(PromotionMode::On) => self.promote_impl(db),
             }
 
@@ -6030,6 +6060,10 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
 pub enum PromotionMode {
     On,
     Off,
+    /// Promotes singleton types (like `None`, `EllipsisType`) to `T | Unknown`
+    /// within type parameters. Does not recurse into unions or
+    /// non-`NominalInstance` types.
+    SingletonsOnly,
 }
 
 impl PromotionMode {
@@ -6037,6 +6071,7 @@ impl PromotionMode {
         match self {
             PromotionMode::On => PromotionMode::Off,
             PromotionMode::Off => PromotionMode::On,
+            PromotionMode::SingletonsOnly => PromotionMode::Off,
         }
     }
 }
