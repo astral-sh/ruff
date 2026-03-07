@@ -961,7 +961,10 @@ pub(crate) fn skip_range(
     }
 }
 
-fn new_logical_line_between_statements(source: &str, between_statement_range: TextRange) -> bool {
+pub(crate) fn new_logical_line_between_statements(
+    source: &str,
+    between_statement_range: TextRange,
+) -> bool {
     let mut tokenizer = SimpleTokenizer::new(source, between_statement_range).map(|tok| tok.kind());
 
     while let Some(token) = tokenizer.next() {

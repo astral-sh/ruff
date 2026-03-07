@@ -83,3 +83,26 @@ def test_start ():
 <RANGE_START>
 def new_function_inserted_after_test_start ():
     print("This should get formatted" )<RANGE_END>
+
+# Regression tests for https://github.com/astral-sh/ruff/issues/22494
+# Range formatting of semicolon-separated statements should format the
+# entire logical line (all same-line statements), not just the selected one.
+
+# Range on second statement
+x=1;<RANGE_START>x=2<RANGE_END>
+
+# Range on first statement
+<RANGE_START>x=1<RANGE_END>;x=2
+
+# Range on middle statement
+x=1;<RANGE_START>x=2<RANGE_END>;x=3
+
+# MichaReiser's example: import statements
+import os; <RANGE_START>import sys<RANGE_END>
+
+# Inside indented block
+class Foo:
+    x=1;<RANGE_START>x=2<RANGE_END>
+
+# Multi-line second statement
+x=1;x = 2 + [1, 2,<RANGE_START>]<RANGE_END>
