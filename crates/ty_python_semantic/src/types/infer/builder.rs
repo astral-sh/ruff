@@ -54,7 +54,7 @@ use crate::semantic_index::scope::{
 };
 use crate::semantic_index::symbol::{ScopedSymbolId, Symbol};
 use crate::semantic_index::{
-    ApplicableConstraints, EnclosingSnapshotResult, SemanticIndex, place_table,
+    ApplicableConstraints, EnclosingSnapshotResult, SemanticIndex, place_table, semantic_index,
 };
 use crate::types::BindingContext;
 use crate::types::CallableTypes;
@@ -89,10 +89,11 @@ use crate::types::diagnostic::{
     report_conflicting_metaclass_from_bases, report_implicit_return_type,
     report_instance_layout_conflict, report_invalid_assignment,
     report_invalid_attribute_assignment, report_invalid_class_match_pattern,
-    report_invalid_exception_caught, report_invalid_exception_cause,
-    report_invalid_exception_raised, report_invalid_exception_tuple_caught,
-    report_invalid_generator_function_return_type, report_invalid_key_on_typed_dict,
-    report_invalid_return_type, report_invalid_type_checking_constant,
+    report_invalid_concatenate_last_arg, report_invalid_exception_caught,
+    report_invalid_exception_cause, report_invalid_exception_raised,
+    report_invalid_exception_tuple_caught, report_invalid_generator_function_return_type,
+    report_invalid_key_on_typed_dict, report_invalid_return_type,
+    report_invalid_type_checking_constant,
     report_match_pattern_against_non_runtime_checkable_protocol,
     report_match_pattern_against_typed_dict, report_not_subscriptable,
     report_possibly_missing_attribute, report_possibly_unresolved_reference,
@@ -112,6 +113,7 @@ use crate::types::infer::{nearest_enclosing_class, nearest_enclosing_function};
 use crate::types::mro::DynamicMroErrorKind;
 use crate::types::newtype::NewType;
 use crate::types::set_theoretic::RecursivelyDefined;
+use crate::types::signatures::ConcatenateTail;
 use crate::types::subclass_of::SubclassOfInner;
 use crate::types::tuple::{Tuple, TupleLength, TupleSpecBuilder, TupleType};
 use crate::types::type_alias::{ManualPEP695TypeAliasType, PEP695TypeAliasType};
@@ -3474,8 +3476,99 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 return Ok(Type::paramspec_value_callable(db, parameters));
             }
 
-            ast::Expr::Subscript(_) => {
-                // TODO: Support `Concatenate[...]`
+            ast::Expr::Subscript(subscript) => {
+                let value_ty = self.infer_expression(&subscript.value, TypeContext::default());
+
+                if matches!(value_ty, Type::SpecialForm(SpecialFormType::Concatenate)) {
+                    let arguments_slice = &*subscript.slice;
+                    let arguments = if let ast::Expr::Tuple(tuple) = arguments_slice {
+                        &*tuple.elts
+                    } else {
+                        std::slice::from_ref(arguments_slice)
+                    };
+
+                    let num_arguments = arguments.len();
+                    if num_arguments < 2 {
+                        for argument in arguments {
+                            self.infer_type_expression(argument);
+                        }
+                        if arguments_slice.is_tuple_expr() {
+                            self.store_expression_type(arguments_slice, Type::unknown());
+                        }
+                        return Ok(Type::paramspec_value_callable(
+                            db,
+                            Parameters::gradual_form(),
+                        ));
+                    }
+
+                    // SAFETY: `arguments` is guaranteed to have at least two elements from the
+                    // length check above.
+                    let (last_arg, prefix_args) = arguments.split_last().unwrap();
+
+                    let prefix_params = prefix_args
+                        .iter()
+                        .map(|arg| {
+                            Parameter::positional_only(None)
+                                .with_annotated_type(self.infer_type_expression(arg))
+                        })
+                        .collect();
+
+                    let parameters = match last_arg {
+                        ast::Expr::EllipsisLiteral(_) => Some(Parameters::concatenate(
+                            self.db(),
+                            prefix_params,
+                            ConcatenateTail::Gradual,
+                        )),
+                        ast::Expr::Name(name) if !name.is_invalid() => {
+                            let name_ty = self.infer_name_load(name);
+                            if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) =
+                                name_ty
+                                && typevar.is_paramspec(self.db())
+                            {
+                                let index = semantic_index(self.db(), self.scope().file(self.db()));
+                                bind_typevar(
+                                    self.db(),
+                                    index,
+                                    self.scope().file_scope_id(self.db()),
+                                    self.typevar_binding_context,
+                                    typevar,
+                                )
+                                .map(|bound_typevar| {
+                                    Parameters::concatenate(
+                                        self.db(),
+                                        prefix_params,
+                                        ConcatenateTail::ParamSpec(bound_typevar),
+                                    )
+                                })
+                            } else {
+                                report_invalid_concatenate_last_arg(
+                                    &self.context,
+                                    last_arg,
+                                    name_ty,
+                                );
+                                None
+                            }
+                        }
+                        _ => {
+                            let ty = self.infer_type_expression(last_arg);
+                            report_invalid_concatenate_last_arg(&self.context, last_arg, ty);
+                            None
+                        }
+                    };
+
+                    if arguments_slice.is_tuple_expr() {
+                        // TODO: What type to store for the argument slice in `Concatenate` because
+                        // `Parameters` is not a `Type` variant?
+                        self.store_expression_type(arguments_slice, Type::unknown());
+                    }
+
+                    return Ok(Type::paramspec_value_callable(
+                        db,
+                        parameters.unwrap_or_else(Parameters::unknown),
+                    ));
+                }
+
+                // Non-Concatenate subscript: fall back to todo
                 return Ok(Type::paramspec_value_callable(db, Parameters::todo()));
             }
 

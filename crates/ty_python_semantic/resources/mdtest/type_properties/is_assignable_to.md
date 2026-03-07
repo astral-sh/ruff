@@ -1499,6 +1499,22 @@ static_assert(is_assignable_to(Callable[..., None], Callable[Concatenate[int, ..
 static_assert(is_assignable_to(Callable[..., None], Callable[Concatenate[int, str, ...], None]))
 ```
 
+### Assignable from bottom callable
+
+```py
+from ty_extensions import static_assert, is_assignable_to, CallableTypeOf
+from typing import Callable, Concatenate, Never
+
+def bottom(*args: object, **kwargs: object) -> Never:
+    raise NotImplementedError
+
+static_assert(is_assignable_to(CallableTypeOf[bottom], Callable[Concatenate[int, ...], None]))
+static_assert(is_assignable_to(CallableTypeOf[bottom], Callable[Concatenate[int, str, ...], None]))
+
+static_assert(not is_assignable_to(Callable[Concatenate[int, ...], None], CallableTypeOf[bottom]))
+static_assert(not is_assignable_to(Callable[Concatenate[int, str, ...], None], CallableTypeOf[bottom]))
+```
+
 ### Contravariance of parameters
 
 Callable parameters are contravariant: a callable accepting a wider type (`A`) is assignable to one
@@ -1512,8 +1528,6 @@ class Parent: ...
 class Child(Parent): ...
 
 static_assert(is_assignable_to(Callable[Concatenate[Parent, ...], None], Callable[Concatenate[Child, ...], None]))
-# TODO: should not be assignable (`Parent` is not assignable to `Child`)
-# error: [static-assert-error]
 static_assert(not is_assignable_to(Callable[Concatenate[Child, ...], None], Callable[Concatenate[Parent, ...], None]))
 ```
 
@@ -1526,11 +1540,7 @@ from typing import Callable, Concatenate, final
 class A: ...
 class B: ...
 
-# TODO: should not be assignable (`A` and `B` are disjoint)
-# error: [static-assert-error]
 static_assert(not is_assignable_to(Callable[Concatenate[A, ...], None], Callable[Concatenate[B, ...], None]))
-# TODO: should not be assignable
-# error: [static-assert-error]
 static_assert(not is_assignable_to(Callable[Concatenate[B, ...], None], Callable[Concatenate[A, ...], None]))
 ```
 

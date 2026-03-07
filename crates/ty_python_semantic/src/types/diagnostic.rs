@@ -6002,3 +6002,20 @@ pub(super) fn hint_if_stdlib_attribute_exists_on_other_versions(
     // TODO: determine what platform they need to be on
     add_inferred_python_version_hint_to_diagnostic(db, &mut diagnostic, action);
 }
+
+pub(super) fn report_invalid_concatenate_last_arg<'db>(
+    context: &InferContext<'db, '_>,
+    last_arg: &ast::Expr,
+    last_arg_type: Type<'db>,
+) {
+    if let Some(builder) = context.report_lint(&INVALID_TYPE_ARGUMENTS, last_arg) {
+        let mut diag = builder.into_diagnostic(
+            "The last argument to `typing.Concatenate` must be either `...` or a `ParamSpec` \
+                type variable",
+        );
+        diag.set_primary_message(format_args!(
+            "Got `{}`",
+            last_arg_type.display(context.db())
+        ));
+    }
+}

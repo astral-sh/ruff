@@ -6583,6 +6583,9 @@ enum InvalidTypeExpression<'db> {
     /// Same for `typing.TypeAlias`, anywhere except for as the sole annotation on an annotated
     /// assignment
     TypeAlias,
+    /// Same for `typing.Concatenate`, anywhere except for as the first parameter of a `Callable`
+    /// type expression
+    Concatenate,
     /// Type qualifiers are always invalid in *type expressions*,
     /// but these ones are okay with 0 arguments in *annotation expressions*
     TypeQualifier(TypeQualifier),
@@ -6680,6 +6683,9 @@ impl<'db> InvalidTypeExpression<'db> {
                         "Bare ParamSpec `{}` is not valid in this context in a type expression",
                         paramspec.name(self.db)
                     ),
+                    InvalidTypeExpression::Concatenate => f.write_str(
+                        "`typing.Concatenate` is not allowed in this context in a type expression",
+                    ),
                 }
             }
         }
@@ -6752,6 +6758,10 @@ impl<'db> InvalidTypeExpression<'db> {
             diagnostic.info(" - as the default type for another ParamSpec");
             diagnostic.info(" - as part of a type parameter list when defining a generic class");
             diagnostic.info(" - or as part of an argument list when specializing a generic class");
+        } else if matches!(self, InvalidTypeExpression::Concatenate) {
+            diagnostic.info("`typing.Concatenate` is only valid:");
+            diagnostic.info(" - as the first argument to `typing.Callable`");
+            diagnostic.info(" - as a type argument for a `ParamSpec` parameter");
         }
     }
 }
