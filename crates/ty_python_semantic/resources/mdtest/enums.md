@@ -64,9 +64,10 @@ class ColorInt(IntEnum):
 reveal_type(enum_members(ColorInt))
 ```
 
-### Declared non-member attributes
+### Annotated assignments with values are still members
 
-Attributes on the enum class that are declared are not considered members of the enum:
+If an enum attribute has both an annotation and a value, it is still an enum member at runtime, even
+though the annotation is invalid:
 
 ```py
 from enum import Enum
@@ -76,12 +77,12 @@ class Answer(Enum):
     YES = 1
     NO = 2
 
-    non_member_1: int
-
     non_member_1: str = "some value"  # error: [invalid-enum-member-annotation]
 
-# revealed: tuple[Literal["YES"], Literal["NO"]]
+# revealed: tuple[Literal["YES"], Literal["NO"], Literal["non_member_1"]]
 reveal_type(enum_members(Answer))
+reveal_type(Answer.non_member_1)  # revealed: Literal[Answer.non_member_1]
+reveal_type(Answer.YES.non_member_1)  # revealed: Literal[Answer.non_member_1]
 ```
 
 Enum members are allowed to be marked `Final` (without a type), even if unnecessary:
@@ -157,12 +158,46 @@ Pure declarations (annotations without values) are non-members and are fine:
 ```py
 class Pet6(Enum):
     CAT = 1
+    genus: str  # OK: no value, so this is a non-member declaration
     species: str  # OK: no value, so this is a non-member declaration
+
+reveal_type(Pet6.genus)  # revealed: str
+reveal_type(Pet6.species)  # revealed: str
+reveal_type(Pet6.CAT.genus)  # revealed: str
+reveal_type(Pet6.CAT.species)  # revealed: str
 ```
+
+### Pure declarations in stubs
+
+In stubs, these should still be treated as non-member attributes rather than enum members:
+
+```pyi
+from enum import Enum
+
+class Pet6Stub(Enum):
+    genus: str
+    species: str
+
+    CAT = ...
+    DOG = ...
+
+reveal_type(Pet6Stub.genus)  # revealed: str
+reveal_type(Pet6Stub.species)  # revealed: str
+```
+
+### Callable values and subclasses
 
 Callable values are never enum members at runtime, so annotating them is fine:
 
+```toml
+[environment]
+python-version = "3.11"
+```
+
 ```py
+from enum import Enum, IntEnum, StrEnum
+from typing import Callable
+
 def identity(x: int) -> int:
     return x
 
