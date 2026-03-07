@@ -3798,74 +3798,105 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         self.errors.extend(specialization_errors);
 
         // Attempt to promote any promotable types assigned to the specialization.
-        let maybe_promote = |typevar: BoundTypeVarInstance<'db>, ty: Type<'db>| {
-            let bound_or_constraints = typevar.typevar(self.db).bound_or_constraints(self.db);
+        // First try with full tuple promotion (fixed-length tuples -> homogeneous tuples).
+        let mut promoted_builder = builder.mapped(generic_context, |typevar, ty| {
+            self.promote_typevar_solution(typevar, ty, TuplePromotion::Yes)
+        });
+        let specialization = promoted_builder.build(generic_context);
+        let return_ty = self.return_ty.apply_specialization(self.db, specialization);
 
-            // For constrained TypeVars, the inferred type is already one of the
-            // constraints. Promoting literals would produce a type that doesn't
-            // match any constraint.
-            if matches!(
-                bound_or_constraints,
-                Some(TypeVarBoundOrConstraints::Constraints(_))
-            ) {
-                return ty;
+        // If promoting fixed-length tuples to homogeneous tuples made the return type
+        // unassignable to the type context, retry without tuple promotion.
+        if let Some(annotation) = self.call_expression_tcx.annotation
+            && !return_ty.is_assignable_to(self.db, annotation)
+        {
+            let mut no_tuple_builder = builder.mapped(generic_context, |typevar, ty| {
+                self.promote_typevar_solution(typevar, ty, TuplePromotion::No)
+            });
+            let no_tuple_specialization = no_tuple_builder.build(generic_context);
+            let no_tuple_return_ty = self
+                .return_ty
+                .apply_specialization(self.db, no_tuple_specialization);
+
+            if no_tuple_return_ty.is_assignable_to(self.db, annotation) {
+                self.return_ty = no_tuple_return_ty;
+                self.specialization = Some(no_tuple_specialization);
+                return;
+            }
+        }
+        self.return_ty = return_ty;
+        self.specialization = Some(specialization);
+    }
+
+    /// Promote the inferred type for a single typevar, optionally promoting fixed-length
+    /// tuples to homogeneous tuples based on `tuple_promotion`.
+    fn promote_typevar_solution(
+        &self,
+        typevar: BoundTypeVarInstance<'db>,
+        ty: Type<'db>,
+        tuple_promotion: TuplePromotion,
+    ) -> Type<'db> {
+        let bound_or_constraints = typevar.typevar(self.db).bound_or_constraints(self.db);
+
+        // For constrained TypeVars, the inferred type is already one of the
+        // constraints. Promoting literals would produce a type that doesn't
+        // match any constraint.
+        if matches!(
+            bound_or_constraints,
+            Some(TypeVarBoundOrConstraints::Constraints(_))
+        ) {
+            return ty;
+        }
+
+        let return_ty = self.constructor_instance_type.unwrap_or(self.return_ty);
+        let mut variance_in_return = TypeVarVariance::Bivariant;
+
+        // Find all occurrences of the type variable in the return type.
+        let visit_return_ty = |_, ty, variance, _| {
+            if ty != Type::TypeVar(typevar) {
+                return;
             }
 
-            let return_ty = self.constructor_instance_type.unwrap_or(self.return_ty);
-            let mut variance_in_return = TypeVarVariance::Bivariant;
+            variance_in_return = variance_in_return.join(variance);
+        };
 
-            // Find all occurrences of the type variable in the return type.
-            let visit_return_ty = |_, ty, variance, _| {
-                if ty != Type::TypeVar(typevar) {
-                    return;
-                }
+        return_ty.visit_specialization(self.db, self.call_expression_tcx, visit_return_ty);
 
-                variance_in_return = variance_in_return.join(variance);
-            };
+        // Promotion is only useful if the type variable is in invariant or contravariant
+        // position in the return type.
+        if variance_in_return.is_covariant() {
+            return ty;
+        }
 
-            return_ty.visit_specialization(self.db, self.call_expression_tcx, visit_return_ty);
+        let promoted = ty.promote(
+            self.db,
+            PromotionPolicy {
+                mode: PromotionMode::On,
+                tuple_promotion,
+            },
+        );
 
-            // Promotion is only useful if the type variable is in invariant or contravariant
-            // position in the return type.
-            if variance_in_return.is_covariant() {
-                return ty;
-            }
-
-            let fully_promoted = ty.promote(
-                self.db,
-                PromotionPolicy {
-                    mode: PromotionMode::On,
-                    tuple_promotion: TuplePromotion::Yes,
-                },
-            );
-
-            // If the TypeVar has an upper bound, only use the promoted type if it
-            // still satisfies the bound.
-            if let Some(TypeVarBoundOrConstraints::UpperBound(bound)) = bound_or_constraints
-                && !fully_promoted.is_assignable_to(self.db, bound)
-            {
-                let partially_promoted = ty.promote(
+        // If the TypeVar has an upper bound, only use the promoted type if it
+        // still satisfies the bound.
+        if let Some(TypeVarBoundOrConstraints::UpperBound(bound)) = bound_or_constraints
+            && !promoted.is_assignable_to(self.db, bound)
+        {
+            if tuple_promotion == TuplePromotion::Yes {
+                let without_tuple_promotion = ty.promote(
                     self.db,
                     PromotionPolicy {
                         mode: PromotionMode::On,
                         tuple_promotion: TuplePromotion::No,
                     },
                 );
-                if partially_promoted.is_assignable_to(self.db, bound) {
-                    return partially_promoted;
+                if without_tuple_promotion.is_assignable_to(self.db, bound) {
+                    return without_tuple_promotion;
                 }
-                return ty;
             }
+            return ty;
+        }
 
-            fully_promoted
-        };
-
-        let specialization = builder
-            .mapped(generic_context, maybe_promote)
-            .build(generic_context);
-
-        self.return_ty = self.return_ty.apply_specialization(self.db, specialization);
-        self.specialization = Some(specialization);
+        promoted
     }
 
     fn infer_argument_types(
