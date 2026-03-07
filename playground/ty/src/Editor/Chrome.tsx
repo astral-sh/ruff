@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
 } from "react";
+import classNames from "classnames";
 import {
   ErrorMessage,
   HorizontalResizeHandle,
@@ -27,7 +28,12 @@ import SecondaryPanel, {
 } from "./SecondaryPanel";
 import Diagnostics, { Diagnostic } from "./Diagnostics";
 import VendoredFileBanner from "./VendoredFileBanner";
-import { FileId, ReadonlyFiles } from "../Playground";
+import { FileId, ReadonlyFiles, SETTINGS_FILE_NAME } from "../Playground";
+import {
+  formatError,
+  type InstallationStatus,
+  type PackageKind,
+} from "./PackageInstaller";
 import type { editor } from "monaco-editor";
 import type { Monaco } from "@monaco-editor/react";
 
@@ -44,6 +50,7 @@ export interface Props {
   files: ReadonlyFiles;
   theme: Theme;
   selectedFileName: string;
+  installStatus: InstallationStatus;
 
   onAddFile(workspace: Workspace, name: string): void;
 
@@ -58,6 +65,8 @@ export interface Props {
   onSelectVendoredFile(handle: FileHandle): void;
 
   onClearVendoredFile(): void;
+
+  onInstallDependencies(): void;
 }
 
 export default function Chrome({
@@ -65,6 +74,7 @@ export default function Chrome({
   selectedFileName,
   workspacePromise,
   theme,
+  installStatus,
   onAddFile,
   onRenameFile,
   onRemoveFile,
@@ -72,6 +82,7 @@ export default function Chrome({
   onChangeFile,
   onSelectVendoredFile,
   onClearVendoredFile,
+  onInstallDependencies,
 }: Props) {
   const workspace = use(workspacePromise);
 
@@ -249,11 +260,19 @@ export default function Chrome({
                 </Panel>
                 <VerticalResizeHandle />
                 <Panel id="diagnostics" minSize={150} className="my-2">
-                  <Diagnostics
-                    diagnostics={checkResult.diagnostics}
-                    onGoTo={handleGoTo}
-                    theme={theme}
-                  />
+                  {selectedFileName === SETTINGS_FILE_NAME ? (
+                    <DependenciesPanel
+                      theme={theme}
+                      status={installStatus}
+                      onInstall={onInstallDependencies}
+                    />
+                  ) : (
+                    <Diagnostics
+                      diagnostics={checkResult.diagnostics}
+                      onGoTo={handleGoTo}
+                      theme={theme}
+                    />
+                  )}
                 </Panel>
               </PanelGroup>
             </Panel>
@@ -387,9 +406,161 @@ function useCheckResult(
   ]);
 }
 
-export function formatError(error: unknown): string {
-  const message = error instanceof Error ? error.message : `${error}`;
-  return message.startsWith("Error: ")
-    ? message.slice("Error: ".length)
-    : message;
+function DependenciesPanel({
+  theme,
+  status,
+  onInstall,
+}: {
+  theme: Theme;
+  status: InstallationStatus;
+  onInstall: () => void;
+}) {
+  const isInstalling = status.state === "installing";
+
+  return (
+    <div
+      className={classNames(
+        "flex h-full flex-col overflow-hidden",
+        theme === "dark" ? "text-white" : null,
+      )}
+    >
+      <div
+        className={classNames(
+          "shrink-0 border-b border-gray-200 px-2 py-1 flex items-center",
+          theme === "dark" ? "border-rock" : null,
+        )}
+      >
+        <span>Dependencies</span>
+        <button
+          onClick={onInstall}
+          disabled={isInstalling}
+          className={classNames(
+            "ml-auto px-3 py-0.5 text-xs font-medium rounded-md cursor-pointer",
+            "transition-all duration-200 uppercase tracking-[.08em]",
+            isInstalling
+              ? "opacity-50 cursor-not-allowed bg-radiate/60 text-black"
+              : "bg-radiate text-black hover:bg-galaxy hover:text-white",
+          )}
+        >
+          {isInstalling ? "Installing..." : "Install"}
+        </button>
+      </div>
+
+      {status.state === "installing" && (
+        <div className="shrink-0 flex flex-col gap-1 px-2 pt-2">
+          <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+            <span>{status.message}</span>
+            {status.progress != null && <span>{status.progress}%</span>}
+          </div>
+          <div className="h-1 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
+            {status.progress != null ? (
+              <div
+                className="h-full rounded-full bg-radiate transition-[width] duration-300"
+                style={{ width: `${status.progress}%` }}
+              />
+            ) : (
+              <div className="h-full w-1/3 rounded-full bg-radiate animate-[indeterminate_1.5s_ease-in-out_infinite]" />
+            )}
+          </div>
+        </div>
+      )}
+
+      <div className="flex-1 overflow-y-auto p-2">
+        <DependenciesContent status={status} theme={theme} />
+      </div>
+    </div>
+  );
+}
+
+function DependenciesContent({
+  status,
+  theme,
+}: {
+  status: InstallationStatus;
+  theme: Theme;
+}) {
+  if (status.state === "error") {
+    return (
+      <div className="flex flex-auto flex-col justify-center items-center gap-1 px-4 text-center">
+        <span className="text-red-500 dark:text-red-400 text-sm">
+          {status.message}
+        </span>
+      </div>
+    );
+  }
+
+  const packages = status.installedPackages;
+
+  if (packages.length > 0) {
+    return (
+      <div className="space-y-2">
+        {status.warnings.length > 0 && (
+          <ul className="space-y-0.5">
+            {status.warnings.map((warning, i) => (
+              <li key={i} className="text-xs text-ayu-accent select-text">
+                {warning}
+              </li>
+            ))}
+          </ul>
+        )}
+        <ul className="space-y-0.5">
+          {packages.map((pkg) => (
+            <li
+              key={pkg.name}
+              className="flex items-baseline gap-2 text-sm select-text"
+            >
+              <span>{pkg.name}</span>
+              <span
+                className={classNames(
+                  "text-xs",
+                  theme === "dark" ? "text-gray-500" : "text-gray-400",
+                )}
+              >
+                {pkg.version}
+              </span>
+              <PackageKindBadge kind={pkg.kind} stubsSource={pkg.stubsSource} />
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-auto flex-col justify-center items-center text-gray-400 dark:text-gray-500 text-sm">
+      Add packages to &quot;dependencies&quot; and click Install.
+    </div>
+  );
+}
+
+function PackageKindBadge({
+  kind,
+  stubsSource,
+}: {
+  kind: PackageKind;
+  stubsSource?: string;
+}) {
+  if (kind === "pure-python") {
+    return null;
+  }
+
+  if (kind === "stubs-only") {
+    return (
+      <span
+        className="inline-block px-1.5 py-0 text-[10px] font-medium rounded bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300"
+        title={stubsSource ? `Stubs from ${stubsSource}` : "Type stubs only"}
+      >
+        stubs
+      </span>
+    );
+  }
+
+  return (
+    <span
+      className="inline-block px-1.5 py-0 text-[10px] font-medium rounded bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300"
+      title="No type information available — runtime execution only"
+    >
+      runtime
+    </span>
+  );
 }

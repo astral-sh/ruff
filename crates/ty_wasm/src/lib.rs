@@ -16,6 +16,7 @@ use ruff_notebook::Notebook;
 use ruff_python_formatter::formatted_file;
 use ruff_source_file::{LineIndex, OneIndexed, SourceLocation};
 use ruff_text_size::{Ranged, TextSize};
+use serde::Deserialize;
 use ty_ide::{
     InlayHintSettings, MarkupKind, RangedValue, document_highlights, find_references,
     goto_declaration, goto_definition, goto_type_definition, hover, inlay_hints,
@@ -126,6 +127,13 @@ impl Workspace {
         .map_err(into_error)?;
 
         let system = WasmSystem::new(SystemPath::new(root));
+
+        // Pre-create the /packages directory for external dependencies.
+        // extra-paths validation requires the directory to exist before options are applied.
+        system
+            .fs
+            .create_directory_all(SystemPath::new("/packages"))
+            .map_err(into_error)?;
 
         let project = ProjectMetadata::from_options(
             options,
@@ -726,6 +734,66 @@ impl Workspace {
             path: vendored_path.to_path_buf().into(),
         })
     }
+
+    /// Writes package files to the memory file system without opening them for checking.
+    /// This is used for external dependencies that should be available for module resolution
+    /// but should not be type-checked themselves.
+    #[wasm_bindgen(js_name = "writePackageFiles")]
+    pub fn write_package_files(&mut self, files: JsValue) -> Result<(), Error> {
+        let entries: Vec<PackageFileEntry> =
+            serde_wasm_bindgen::from_value(files).map_err(into_error)?;
+
+        let mut changes = Vec::with_capacity(entries.len());
+
+        for entry in &entries {
+            let path = SystemPath::absolute(&entry.path, self.db.project().root(&self.db));
+            self.system
+                .fs
+                .write_file_all(&path, &entry.contents)
+                .map_err(into_error)?;
+            changes.push(ChangeEvent::Created {
+                path,
+                kind: CreatedKind::File,
+            });
+        }
+
+        if !changes.is_empty() {
+            self.db.apply_changes(changes, None);
+        }
+
+        Ok(())
+    }
+
+    /// Removes package files from the memory file system.
+    #[wasm_bindgen(js_name = "removePackageFiles")]
+    pub fn remove_package_files(&mut self, paths: JsValue) -> Result<(), Error> {
+        let paths: Vec<String> = serde_wasm_bindgen::from_value(paths).map_err(into_error)?;
+
+        let mut changes = Vec::with_capacity(paths.len());
+
+        for path_str in &paths {
+            let path = SystemPath::absolute(path_str, self.db.project().root(&self.db));
+            if self.system.fs.exists(&path) {
+                self.system.fs.remove_file(&path).map_err(into_error)?;
+                changes.push(ChangeEvent::Deleted {
+                    path,
+                    kind: DeletedKind::File,
+                });
+            }
+        }
+
+        if !changes.is_empty() {
+            self.db.apply_changes(changes, None);
+        }
+
+        Ok(())
+    }
+}
+
+#[derive(Deserialize)]
+struct PackageFileEntry {
+    path: String,
+    contents: String,
 }
 
 pub(crate) fn into_error<E: std::fmt::Display>(err: E) -> Error {
