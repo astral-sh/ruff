@@ -133,6 +133,7 @@ mod tests {
     #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_31.py"))]
     #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_32.py"))]
     #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_33.pyi"))]
+    #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_34.py"))]
     #[test_case(Rule::UndefinedName, Path::new("F821_0.py"))]
     #[test_case(Rule::UndefinedName, Path::new("F821_1.py"))]
     #[test_case(Rule::UndefinedName, Path::new("F821_2.py"))]
@@ -236,6 +237,7 @@ mod tests {
     #[test_case(Rule::UnusedImport, Path::new("F401_28__all_multiple/__init__.py"))]
     #[test_case(Rule::UnusedImport, Path::new("F401_29__all_conditional/__init__.py"))]
     #[test_case(Rule::UndefinedExport, Path::new("__init__.py"))]
+    #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_34.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",
