@@ -1817,8 +1817,9 @@ impl<'db> ClassType<'db> {
                 }) = new_function_symbol
                 {
                     if let Some(class_generic_context) = class_generic_context {
-                        new_function =
-                            new_function.with_inherited_generic_context(db, class_generic_context);
+                        new_function = new_function
+                            .with_inherited_generic_context(db, class_generic_context)
+                            .merge_inherited_generic_context(db);
                     }
                     CallableTypes::one(
                         new_function
