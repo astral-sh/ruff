@@ -116,6 +116,7 @@ mod annotation_expression;
 mod binary_expressions;
 mod class;
 mod function;
+mod generator;
 mod imports;
 mod named_tuple;
 mod paramspec_validation;
@@ -7181,8 +7182,31 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             node_index: _,
             value,
         } = yield_expression;
-        self.infer_optional_expression(value.as_deref(), TypeContext::default());
-        todo_type!("yield expressions")
+        let yielded_ty = self
+            .infer_optional_expression(value.as_deref(), TypeContext::default())
+            .unwrap_or_else(|| Type::none(self.db()));
+        let expected = self.enclosing_generator_type_params();
+        let expected_yield_ty = expected.and_then(|expected| expected.yielded);
+        let diagnostic_node: AnyNodeRef = value
+            .as_deref()
+            .map_or_else(|| yield_expression.into(), AnyNodeRef::from);
+
+        if let Some(expected_yield_ty) = expected_yield_ty
+            && !yielded_ty.is_assignable_to(self.db(), expected_yield_ty)
+            && let Some(builder) = self
+                .context
+                .report_lint(&INVALID_ASSIGNMENT, diagnostic_node)
+        {
+            builder.into_diagnostic(format_args!(
+                "Object of type `{}` is not assignable to `{}`",
+                yielded_ty.display(self.db()),
+                expected_yield_ty.display(self.db()),
+            ));
+        }
+
+        expected
+            .and_then(|expected| expected.sent)
+            .unwrap_or_else(Type::unknown)
     }
 
     fn infer_yield_from_expression(&mut self, yield_from: &ast::ExprYieldFrom) -> Type<'db> {
