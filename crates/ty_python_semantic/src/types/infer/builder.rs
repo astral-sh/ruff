@@ -140,11 +140,13 @@ use crate::{AnalysisSettings, Db, FxIndexSet, Program};
 
 mod annotation_expression;
 mod binary_expressions;
+mod make_dataclass;
 mod paramspec_validation;
 mod subscript;
 mod type_expression;
 
 use super::comparisons::{self, BinaryComparisonVisitor};
+pub(super) use make_dataclass::report_dynamic_dataclass_mro_errors;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 struct TypeAndRange<'db> {
@@ -501,6 +503,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
+    fn with_dataclass_field_specifiers<T>(
+        &mut self,
+        field_specifiers: &[Type<'db>],
+        f: impl FnOnce(&mut Self) -> T,
+    ) -> T {
+        let previous_field_specifiers = std::mem::replace(
+            &mut self.dataclass_field_specifiers,
+            SmallVec::from(field_specifiers),
+        );
+        let result = f(self);
+        self.dataclass_field_specifiers = previous_field_specifiers;
+        result
+    }
+
     /// Set the multi-inference state, returning the previous value.
     fn set_multi_inference_state(&mut self, state: MultiInferenceState) -> MultiInferenceState {
         std::mem::replace(&mut self.multi_inference_state, state)
@@ -715,6 +731,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             for definition in &deferred_definitions {
                 deferred::dynamic_class::check_dynamic_class_definition(&self.context, *definition);
+                deferred::dynamic_dataclass::check_dynamic_dataclass_definition(
+                    &self.context,
+                    *definition,
+                );
             }
 
             for function in &self.called_functions {
@@ -5327,6 +5347,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             Some(definition),
                             namedtuple_kind,
                         )
+                    } else if callable_type
+                        .as_function_literal()
+                        .is_some_and(|f| f.is_known(self.db(), KnownFunction::MakeDataclass))
+                    {
+                        self.infer_make_dataclass_call_expression(call_expr, Some(definition))
                     } else {
                         match callable_type
                             .as_class_literal()
@@ -5912,6 +5937,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.infer_typing_namedtuple_fields(&arguments.args[1]);
             return;
         }
+        if func_ty
+            .as_function_literal()
+            .is_some_and(|f| f.is_known(self.db(), KnownFunction::MakeDataclass))
+        {
+            // The `fields` and `bases` arguments are deferred for `make_dataclass`;
+            // other arguments are inferred eagerly.
+            self.infer_make_dataclass_deferred(arguments);
+            return;
+        }
         let known_class = func_ty
             .as_class_literal()
             .and_then(|cls| cls.known(self.db()));
@@ -6183,13 +6217,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.typevar_binding_context = previous_context;
 
         // Extract and validate bases.
-        let Some(bases) = self.extract_explicit_bases(bases_arg, bases_type) else {
+        let Some(bases) = self.extract_explicit_bases(bases_arg, bases_type, "type") else {
             return;
         };
 
         // Validate individual bases for special types that aren't allowed in dynamic classes.
         let name = dynamic_class.name(db);
-        self.validate_dynamic_type_bases(bases_arg, &bases, name);
+        self.validate_dynamic_type_bases(bases_arg, &bases, name, "type");
     }
 
     /// Infer a call to `builtins.type()`.
@@ -6311,43 +6345,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         // Extract members from the namespace dict (third argument).
-        let (members, has_dynamic_namespace): (Box<[(ast::name::Name, Type<'db>)]>, bool) =
-            if let ast::Expr::Dict(dict) = namespace_arg {
-                // Check if all keys are string literal types. If any key is not a string literal
-                // type or is missing (spread), the namespace is considered dynamic.
-                let all_keys_are_string_literals = dict.items.iter().all(|item| {
-                    item.key
-                        .as_ref()
-                        .is_some_and(|k| self.expression_type(k).is_string_literal())
-                });
-                let members = dict
-                    .items
-                    .iter()
-                    .filter_map(|item| {
-                        // Only extract items with string literal keys.
-                        let key_expr = item.key.as_ref()?;
-                        let key_name = self.expression_type(key_expr).as_string_literal()?;
-                        let key_name = ast::name::Name::new(key_name.value(db));
-                        // Get the already-inferred type from when we inferred the dict above.
-                        let value_ty = self.expression_type(&item.value);
-                        Some((key_name, value_ty))
-                    })
-                    .collect();
-                (members, !all_keys_are_string_literals)
-            } else if let Type::TypedDict(typed_dict) = namespace_type {
-                // `namespace` is a TypedDict instance. Extract known keys as members.
-                // TypedDicts are "open" (can have additional string keys), so this
-                // is still a dynamic namespace for unknown attributes.
-                let members: Box<[(ast::name::Name, Type<'db>)]> = typed_dict
-                    .items(db)
-                    .iter()
-                    .map(|(name, field)| (name.clone(), field.declared_ty))
-                    .collect();
-                (members, true)
-            } else {
-                // `namespace` is not a dict literal, so it's dynamic.
-                (Box::new([]), true)
-            };
+        let (members, has_dynamic_namespace) =
+            self.extract_dynamic_namespace_members(namespace_arg, namespace_type, false);
 
         if !matches!(namespace_type, Type::TypedDict(_))
             && !namespace_type.is_assignable_to(
@@ -6393,7 +6392,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // (they'll be stored in the anchor and used for validation).
         let explicit_bases = if definition.is_none() {
             let bases_type = self.infer_expression(bases_arg, TypeContext::default());
-            self.extract_explicit_bases(bases_arg, bases_type)
+            self.extract_explicit_bases(bases_arg, bases_type, "type")
         } else {
             None
         };
@@ -6443,7 +6442,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if let Some(explicit_bases) = &explicit_bases {
             // Validate bases and collect disjoint bases for diagnostics.
             let mut disjoint_bases =
-                self.validate_dynamic_type_bases(bases_arg, explicit_bases, &name);
+                self.validate_dynamic_type_bases(bases_arg, explicit_bases, &name, "type");
 
             // Check for MRO errors.
             if report_dynamic_mro_errors(&self.context, dynamic_class, call_expr, bases_arg) {
@@ -6480,6 +6479,54 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         Type::ClassLiteral(ClassLiteral::Dynamic(dynamic_class))
+    }
+
+    fn extract_dynamic_namespace_members(
+        &self,
+        namespace_arg: &ast::Expr,
+        namespace_type: Type<'db>,
+        none_is_empty_namespace: bool,
+    ) -> (Box<[(ast::name::Name, Type<'db>)]>, bool) {
+        let db = self.db();
+
+        if none_is_empty_namespace
+            && (namespace_arg.is_none_literal_expr() || namespace_type.is_none(db))
+        {
+            return (Box::default(), false);
+        }
+
+        if let ast::Expr::Dict(dict) = namespace_arg {
+            // Check if all keys are string literal types. If any key is not a string literal
+            // type or is missing (spread), the namespace is considered dynamic.
+            let all_keys_are_string_literals = dict.items.iter().all(|item| {
+                item.key
+                    .as_ref()
+                    .is_some_and(|key| self.expression_type(key).is_string_literal())
+            });
+            let members = dict
+                .items
+                .iter()
+                .filter_map(|item| {
+                    let key_expr = item.key.as_ref()?;
+                    let key_name = self.expression_type(key_expr).as_string_literal()?;
+                    let key_name = ast::name::Name::new(key_name.value(db));
+                    let value_ty = self.expression_type(&item.value);
+                    Some((key_name, value_ty))
+                })
+                .collect();
+            (members, !all_keys_are_string_literals)
+        } else if let Type::TypedDict(typed_dict) = namespace_type {
+            // TypedDicts are open to unknown string keys, so we preserve known members
+            // while still marking the namespace as dynamic.
+            let members = typed_dict
+                .items(db)
+                .iter()
+                .map(|(name, field)| (name.clone(), field.declared_ty))
+                .collect();
+            (members, true)
+        } else {
+            (Box::default(), true)
+        }
     }
 
     /// Infer a `typing.NamedTuple(typename, fields)` or `collections.namedtuple(typename, field_names)` call.
@@ -7206,12 +7253,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// Extract explicit base types from a bases tuple type.
     ///
     /// Emits a diagnostic if `bases_type` is not a valid tuple type.
+    /// `creator_fn` is the name of the function that creates the dynamic class
+    /// (e.g., `"type"` or `"make_dataclass"`), used in diagnostic messages.
     ///
     /// Returns `None` if the bases cannot be extracted.
     fn extract_explicit_bases(
         &mut self,
         bases_node: &ast::Expr,
         bases_type: Type<'db>,
+        creator_fn: &str,
     ) -> Option<Box<[Type<'db>]>> {
         let db = self.db();
         // Check if bases_type is a tuple; emit diagnostic if not.
@@ -7222,8 +7272,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             )
             && let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, bases_node)
         {
-            let mut diagnostic =
-                builder.into_diagnostic("Invalid argument to parameter 2 (`bases`) of `type()`");
+            let mut diagnostic = builder.into_diagnostic(format_args!(
+                "Invalid argument to parameter 2 (`bases`) of `{creator_fn}()`"
+            ));
             diagnostic.set_primary_message(format_args!(
                 "Expected `tuple[type, ...]`, found `{}`",
                 bases_type.display(db)
@@ -7235,11 +7286,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .map(Into::into)
     }
 
-    /// Validate base classes from the second argument of a `type()` call.
+    /// Validate base classes for a dynamically created class.
     ///
     /// This validates bases that are valid `ClassBase` variants but aren't allowed
-    /// for dynamic classes created via `type()`. Invalid bases that can't be converted
-    /// to `ClassBase` at all are handled by `DynamicMroErrorKind::InvalidBases`.
+    /// for dynamic classes. `creator_fn` is the name of the function that creates
+    /// the dynamic class (e.g., `"type"` or `"make_dataclass"`).
     ///
     /// Returns disjoint bases found (for instance-layout-conflict checking).
     fn validate_dynamic_type_bases(
@@ -7247,6 +7298,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         bases_node: &ast::Expr,
         bases: &[Type<'db>],
         name: &Name,
+        creator_fn: &str,
     ) -> IncompatibleBases<'db> {
         let db = self.db();
 
@@ -7275,20 +7327,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 ClassBase::Generic | ClassBase::TypedDict => {
                     if let Some(builder) = self.context.report_lint(&INVALID_BASE, diagnostic_node)
                     {
-                        let mut diagnostic =
-                            builder.into_diagnostic("Invalid base for class created via `type()`");
+                        let mut diagnostic = builder.into_diagnostic(format_args!(
+                            "Invalid base for class created via `{creator_fn}()`"
+                        ));
                         diagnostic
                             .set_primary_message(format_args!("Has type `{}`", base.display(db)));
                         match class_base {
                             ClassBase::Generic => {
-                                diagnostic.info("Classes created via `type()` cannot be generic");
+                                diagnostic.info(format_args!(
+                                    "Classes created via `{creator_fn}()` cannot be generic"
+                                ));
                                 diagnostic.info(format_args!(
                                     "Consider using `class {name}(Generic[...]): ...` instead"
                                 ));
                             }
                             ClassBase::TypedDict => {
-                                diagnostic
-                                    .info("Classes created via `type()` cannot be TypedDicts");
+                                diagnostic.info(format_args!(
+                                    "Classes created via `{creator_fn}()` cannot be TypedDicts"
+                                ));
                                 diagnostic.info(format_args!(
                                     "Consider using `TypedDict(\"{name}\", {{}})` instead"
                                 ));
@@ -7302,11 +7358,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         .context
                         .report_lint(&UNSUPPORTED_DYNAMIC_BASE, diagnostic_node)
                     {
-                        let mut diagnostic = builder
-                            .into_diagnostic("Unsupported base for class created via `type()`");
+                        let mut diagnostic = builder.into_diagnostic(format_args!(
+                            "Unsupported base for class created via `{creator_fn}()`"
+                        ));
                         diagnostic
                             .set_primary_message(format_args!("Has type `{}`", base.display(db)));
-                        diagnostic.info("Classes created via `type()` cannot be protocols");
+                        diagnostic.info(format_args!(
+                            "Classes created via `{creator_fn}()` cannot be protocols"
+                        ));
                         diagnostic.info(format_args!(
                             "Consider using `class {name}(Protocol): ...` instead"
                         ));
@@ -7335,20 +7394,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
 
                     // Enum subclasses require the EnumMeta metaclass, which
-                    // expects special dict attributes that `type()` doesn't provide.
+                    // expects special dict attributes that dynamic class creation doesn't provide.
                     if let Some((static_class, _)) = class_type.static_class_literal(db) {
                         if is_enum_class_by_inheritance(db, static_class) {
                             if let Some(builder) =
                                 self.context.report_lint(&INVALID_BASE, diagnostic_node)
                             {
-                                let mut diagnostic = builder
-                                    .into_diagnostic("Invalid base for class created via `type()`");
+                                let mut diagnostic = builder.into_diagnostic(format_args!(
+                                    "Invalid base for class created via `{creator_fn}()`"
+                                ));
                                 diagnostic.set_primary_message(format_args!(
                                     "Has type `{}`",
                                     base.display(db)
                                 ));
-                                diagnostic
-                                    .info("Creating an enum class via `type()` is not supported");
+                                diagnostic.info(format_args!(
+                                    "Creating an enum class via `{creator_fn}()` is not supported"
+                                ));
                                 diagnostic.info(format_args!(
                                     "Consider using `Enum(\"{name}\", [])` instead"
                                 ));
@@ -11007,6 +11068,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Handle `typing.NamedTuple(typename, fields)` and `collections.namedtuple(typename, field_names)`.
         if let Some(namedtuple_kind) = NamedTupleKind::from_type(self.db(), callable_type) {
             return self.infer_namedtuple_call_expression(call_expression, None, namedtuple_kind);
+        }
+
+        // Handle `dataclasses.make_dataclass(cls_name, fields, ...)`.
+        if callable_type
+            .as_function_literal()
+            .is_some_and(|f| f.is_known(self.db(), KnownFunction::MakeDataclass))
+        {
+            return self.infer_make_dataclass_call_expression(call_expression, None);
         }
 
         // We don't call `Type::try_call`, because we want to perform type inference on the
