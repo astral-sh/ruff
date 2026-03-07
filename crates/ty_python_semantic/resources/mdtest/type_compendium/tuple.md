@@ -525,7 +525,7 @@ in some cases cause false positives:
 from typing import Literal
 
 reveal_type(list((1, 2, 3)))  # revealed: list[int]
-reveal_type(list(((1, 2, 3),)))  # revealed: list[tuple[int, int, int]]
+reveal_type(list(((1, 2, 3),)))  # revealed: list[tuple[int, ...]]
 
 x: list[Literal[1, 2, 3]] = list((1, 2, 3))
 reveal_type(x)  # revealed: list[Literal[1, 2, 3]]

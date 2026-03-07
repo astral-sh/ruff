@@ -52,9 +52,9 @@ use crate::types::{
     BoundMethodType, BoundTypeVarInstance, CallableType, ClassLiteral, DATACLASS_FLAGS,
     DataclassFlags, DataclassParams, EvaluationMode, GenericAlias, InternedConstraintSet,
     IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
-    MemberLookupPolicy, NominalInstanceType, PropertyInstanceType, SpecialFormType, TypeAliasType,
-    TypeContext, TypeVarBoundOrConstraints, TypeVarVariance, UnionBuilder, UnionType,
-    WrapperDescriptorKind, enums, list_members,
+    MemberLookupPolicy, NominalInstanceType, PromotionMode, PromotionPolicy, PropertyInstanceType,
+    SpecialFormType, TuplePromotion, TypeAliasType, TypeContext, TypeVarBoundOrConstraints,
+    TypeVarVariance, UnionBuilder, UnionType, WrapperDescriptorKind, enums, list_members,
 };
 use crate::{DisplaySettings, Program};
 use ruff_db::diagnostic::{Annotation, Diagnostic, SubDiagnostic, SubDiagnosticSeverity};
@@ -3831,17 +3831,33 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 return ty;
             }
 
-            let promoted = ty.promote(self.db);
+            let fully_promoted = ty.promote(
+                self.db,
+                PromotionPolicy {
+                    mode: PromotionMode::On,
+                    tuple_promotion: TuplePromotion::Yes,
+                },
+            );
 
             // If the TypeVar has an upper bound, only use the promoted type if it
             // still satisfies the bound.
-            if let Some(TypeVarBoundOrConstraints::UpperBound(bound)) = bound_or_constraints {
-                if !promoted.is_assignable_to(self.db, bound) {
-                    return ty;
+            if let Some(TypeVarBoundOrConstraints::UpperBound(bound)) = bound_or_constraints
+                && !fully_promoted.is_assignable_to(self.db, bound)
+            {
+                let partially_promoted = ty.promote(
+                    self.db,
+                    PromotionPolicy {
+                        mode: PromotionMode::On,
+                        tuple_promotion: TuplePromotion::No,
+                    },
+                );
+                if partially_promoted.is_assignable_to(self.db, bound) {
+                    return partially_promoted;
                 }
+                return ty;
             }
 
-            promoted
+            fully_promoted
         };
 
         let specialization = builder

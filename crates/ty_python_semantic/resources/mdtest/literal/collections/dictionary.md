@@ -15,7 +15,7 @@ reveal_type({1: 1, 2: 1})  # revealed: dict[int, int]
 ## Dict of tuples
 
 ```py
-reveal_type({1: (1, 2), 2: (3, 4)})  # revealed: dict[int, tuple[int, int]]
+reveal_type({1: (1, 2), 2: (3, 4)})  # revealed: dict[int, tuple[int, ...]]
 ```
 
 ## Unpacked dict
@@ -65,7 +65,7 @@ reveal_type(x)  # revealed: dict[int, (_: int) -> int]
 ## Mixed dict
 
 ```py
-# revealed: dict[str, int | tuple[int, int] | tuple[int, int, int]]
+# revealed: dict[str, int | tuple[int, ...]]
 reveal_type({"a": 1, "b": (1, 2), "c": (1, 2, 3)})
 ```
 
@@ -143,6 +143,6 @@ reveal_type(x12[0][0]["a"])  # revealed: Literal[1]
 reveal_type(x12[0][1]["b"])  # revealed: Literal["4"]
 
 # Starred expressions and any elements that follow them are not narrowed.
-reveal_type(x12[0][2]["a"])  # revealed: int
-reveal_type(x12[0][3]["b"])  # revealed: int
+reveal_type(x12[0][2]["a"])  # revealed: int | str
+reveal_type(x12[0][3]["b"])  # revealed: int | str
 ```

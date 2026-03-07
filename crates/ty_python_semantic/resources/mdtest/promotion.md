@@ -156,10 +156,10 @@ def promote[T](x: T) -> list[T]:
 
 x1 = ((((1),),),)
 reveal_type(x1)  # revealed: tuple[tuple[tuple[Literal[1]]]]
-reveal_type(promote(x1))  # revealed: list[tuple[tuple[tuple[int]]]]
+reveal_type(promote(x1))  # revealed: list[tuple[tuple[tuple[int, ...], ...], ...]]
 
 x2 = ([1, 2], [(3,), (4,)], ["5", "6"])
-reveal_type(x2)  # revealed: tuple[list[int], list[tuple[int]], list[str]]
+reveal_type(x2)  # revealed: tuple[list[int], list[tuple[int, ...]], list[str]]
 ```
 
 However, this promotion should not take place in contravariant position:
@@ -418,7 +418,7 @@ reveal_type([x2])  # revealed: list[Literal["hello"]]
 
 x3: tuple[Literal["hello"]] = ("hello",)
 reveal_type(x3)  # revealed: tuple[Literal["hello"]]
-reveal_type([x3])  # revealed: list[tuple[Literal["hello"]]]
+reveal_type([x3])  # revealed: list[tuple[Literal["hello"], ...]]
 
 def f() -> Literal["hello"]:
     return "hello"
@@ -433,7 +433,7 @@ reveal_type([id(f())])  # revealed: list[Literal["hello"]]
 
 def _(x: tuple[Literal["hello"]]):
     reveal_type(x)  # revealed: tuple[Literal["hello"]]
-    reveal_type([x])  # revealed: list[tuple[Literal["hello"]]]
+    reveal_type([x])  # revealed: list[tuple[Literal["hello"], ...]]
 
 type X = Literal["hello"]
 

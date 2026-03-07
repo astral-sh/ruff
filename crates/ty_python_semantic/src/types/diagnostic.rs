@@ -32,7 +32,10 @@ use crate::types::{
     ProtocolInstanceType, SpecialFormType, SubclassOfInner, Type, TypeContext, binding_type,
     protocol_class::ProtocolClass,
 };
-use crate::types::{KnownInstanceType, MemberLookupPolicy, UnionType};
+use crate::types::{
+    KnownInstanceType, MemberLookupPolicy, PromotionMode, PromotionPolicy, TuplePromotion,
+    UnionType,
+};
 use crate::{Db, DisplaySettings, FxIndexMap, Program, declare_lint};
 use itertools::Itertools;
 use ruff_db::{
@@ -4477,7 +4480,13 @@ pub(crate) fn report_undeclared_protocol_member(
     if definition.kind(db).is_unannotated_assignment() {
         let binding_type = binding_type(db, definition);
 
-        let suggestion = binding_type.promote(db);
+        let suggestion = binding_type.promote(
+            db,
+            PromotionPolicy {
+                mode: PromotionMode::On,
+                tuple_promotion: TuplePromotion::No,
+            },
+        );
 
         if should_give_hint(db, suggestion) {
             diagnostic.set_primary_message(format_args!(

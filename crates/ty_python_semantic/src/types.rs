@@ -1694,10 +1694,10 @@ impl<'db> Type<'db> {
     /// Note that this function tries to promote literals to a more user-friendly form than their
     /// fallback instance type. For example, `def _() -> int` is promoted to `Callable[[], int]`,
     /// as opposed to `FunctionType`.
-    pub(crate) fn promote(self, db: &'db dyn Db) -> Type<'db> {
+    pub(crate) fn promote(self, db: &'db dyn Db, promotion_policy: PromotionPolicy) -> Type<'db> {
         self.apply_type_mapping(
             db,
-            &TypeMapping::Promote(PromotionMode::On),
+            &TypeMapping::Promote(promotion_policy),
             TypeContext::default(),
         )
     }
@@ -1706,8 +1706,8 @@ impl<'db> Type<'db> {
     fn promote_impl(self, db: &'db dyn Db) -> Type<'db> {
         match self {
             Type::LiteralValue(literal) if literal.is_promotable() => literal.fallback_instance(db),
-            Type::ModuleLiteral(_) => KnownClass::ModuleType.to_instance(db),
             Type::FunctionLiteral(literal) => Type::Callable(literal.into_callable_type(db)),
+            //Type::NominalInstance(instance) if instance.is_singleton(db) => Type::u
             _ => self,
         }
     }
@@ -5229,7 +5229,7 @@ impl<'db> Type<'db> {
                 match type_mapping {
                     // Promote the types within the signature before promoting the signature to its
                     // callable form.
-                    TypeMapping::Promote(PromotionMode::On) => {
+                    TypeMapping::Promote(PromotionPolicy { mode: PromotionMode::On, .. }) => {
                         Type::FunctionLiteral(function.apply_type_mapping_impl(
                             db,
                             type_mapping,
@@ -5253,7 +5253,7 @@ impl<'db> Type<'db> {
                 method.self_instance(db).apply_type_mapping_impl(db, type_mapping, tcx, visitor),
             )),
 
-            Type::NominalInstance(instance) if matches!(type_mapping, TypeMapping::Promote(PromotionMode::On)) => {
+            Type::NominalInstance(instance) if matches!(type_mapping, TypeMapping::Promote(PromotionPolicy { mode: PromotionMode::On, .. })) => {
                 match instance.known_class(db) {
                     Some(KnownClass::Complex) => KnownUnion::Complex.to_type(db),
                     Some(KnownClass::Float) => KnownUnion::Float.to_type(db),
@@ -5335,7 +5335,7 @@ impl<'db> Type<'db> {
                 }
                 // Promotion should remove negative contributions from intersections,
                 // so we don't preserve them here when promotion is enabled.
-                if !matches!(type_mapping, TypeMapping::Promote(PromotionMode::On)) {
+                if !matches!(type_mapping, TypeMapping::Promote(PromotionPolicy { mode: PromotionMode::On, .. })) {
                     for negative in intersection.negative(db) {
                         builder = builder.add_negative(
                             negative.apply_type_mapping_impl(db, &type_mapping.flip(), tcx, visitor),
@@ -5396,21 +5396,6 @@ impl<'db> Type<'db> {
                 }
             }
 
-            Type::ModuleLiteral(_) => match type_mapping {
-                TypeMapping::ApplySpecialization(_) |
-                TypeMapping::ApplySpecializationWithMaterialization { .. } |
-                TypeMapping::UniqueSpecialization { .. } |
-                TypeMapping::BindLegacyTypevars(_) |
-                TypeMapping::BindSelf(..) |
-                TypeMapping::ReplaceSelf { .. } |
-                TypeMapping::Materialize(_) |
-                TypeMapping::ReplaceParameterDefaults |
-                TypeMapping::EagerExpansion |
-                TypeMapping::RescopeReturnCallables(_) |
-                TypeMapping::Promote(PromotionMode::Off) => self,
-                TypeMapping::Promote(PromotionMode::On) => self.promote_impl(db)
-            }
-
             Type::LiteralValue(_) => match type_mapping {
                 TypeMapping::ApplySpecialization(_) |
                 TypeMapping::ApplySpecializationWithMaterialization { .. } |
@@ -5422,8 +5407,8 @@ impl<'db> Type<'db> {
                 TypeMapping::ReplaceParameterDefaults |
                 TypeMapping::EagerExpansion |
                 TypeMapping::RescopeReturnCallables(_) |
-                TypeMapping::Promote(PromotionMode::Off) => self,
-                TypeMapping::Promote(PromotionMode::On) => self.promote_impl(db),
+                TypeMapping::Promote(PromotionPolicy { mode: PromotionMode::Off, .. }) => self,
+                TypeMapping::Promote(PromotionPolicy { mode: PromotionMode::On, .. }) => self.promote_impl(db),
             }
 
             Type::Dynamic(_) => match type_mapping {
@@ -5447,6 +5432,7 @@ impl<'db> Type<'db> {
             | Type::AlwaysTruthy
             | Type::AlwaysFalsy
             | Type::WrapperDescriptor(_)
+            | Type::ModuleLiteral(_)
             | Type::KnownBoundMethod(
                 KnownBoundMethodType::StrStartswith(_)
                 | KnownBoundMethodType::ConstraintSetRange
@@ -6079,18 +6065,33 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize)]
+pub struct PromotionPolicy {
+    mode: PromotionMode,
+    tuple_promotion: TuplePromotion,
+}
+
+impl PromotionPolicy {
+    const fn flip_mode(self) -> Self {
+        Self {
+            mode: match self.mode {
+                PromotionMode::On => PromotionMode::Off,
+                PromotionMode::Off => PromotionMode::On,
+            },
+            tuple_promotion: self.tuple_promotion,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize)]
+pub enum TuplePromotion {
+    Yes,
+    No,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize)]
 pub enum PromotionMode {
     On,
     Off,
-}
-
-impl PromotionMode {
-    const fn flip(self) -> Self {
-        match self {
-            PromotionMode::On => PromotionMode::Off,
-            PromotionMode::Off => PromotionMode::On,
-        }
-    }
 }
 
 /// Returns the [`ClassLiteral`] that "owns" a `Self` typevar (i.e., the class from its upper bound).
@@ -6207,7 +6208,7 @@ pub enum TypeMapping<'a, 'db> {
     },
     /// Replaces any literal types with their corresponding promoted type form (e.g. `Literal["string"]`
     /// to `str`, or `def _() -> int` to `Callable[[], int]`).
-    Promote(PromotionMode),
+    Promote(PromotionPolicy),
     /// Binds a legacy typevar with the generic context (class, function, type alias) that it is
     /// being used in.
     BindLegacyTypevars(BindingContext<'db>),
@@ -6300,7 +6301,7 @@ impl<'db> TypeMapping<'_, 'db> {
                 specialization: specialization.clone(),
                 materialization_kind: materialization_kind.flip(),
             },
-            TypeMapping::Promote(mode) => TypeMapping::Promote(mode.flip()),
+            TypeMapping::Promote(policy) => TypeMapping::Promote(policy.flip_mode()),
             TypeMapping::ApplySpecialization(_)
             | TypeMapping::UniqueSpecialization { .. }
             | TypeMapping::BindLegacyTypevars(_)

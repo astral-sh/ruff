@@ -33,7 +33,7 @@ use crate::types::relation::{HasRelationToVisitor, IsDisjointVisitor, TypeRelati
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, FindLegacyTypeVarsVisitor, IntersectionType,
-    Type, TypeMapping, UnionBuilder, UnionType,
+    PromotionMode, PromotionPolicy, TuplePromotion, Type, TypeMapping, UnionBuilder, UnionType,
 };
 use crate::types::{Truthiness, TypeContext};
 use crate::{Db, FxOrderSet, Program};
@@ -1371,11 +1371,34 @@ impl<'db> Tuple<Type<'db>> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
-        match self {
-            Tuple::Fixed(tuple) => {
-                Tuple::Fixed(tuple.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
-            }
-            Tuple::Variable(tuple) => tuple.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+        match type_mapping {
+            TypeMapping::Promote(PromotionPolicy {
+                mode: PromotionMode::On,
+                tuple_promotion: TuplePromotion::Yes,
+            }) => Tuple::homogeneous(UnionType::from_elements(
+                db,
+                self.all_elements()
+                    .iter()
+                    .map(|elem| elem.apply_type_mapping_impl(db, type_mapping, tcx, visitor)),
+            )),
+            TypeMapping::Promote(PromotionPolicy { .. })
+            | TypeMapping::EagerExpansion
+            | TypeMapping::ReplaceParameterDefaults
+            | TypeMapping::ApplySpecialization(_)
+            | TypeMapping::ApplySpecializationWithMaterialization { .. }
+            | TypeMapping::UniqueSpecialization { .. }
+            | TypeMapping::BindLegacyTypevars(_)
+            | TypeMapping::BindSelf(_)
+            | TypeMapping::ReplaceSelf { .. }
+            | TypeMapping::Materialize(_)
+            | TypeMapping::RescopeReturnCallables(_) => match self {
+                Tuple::Fixed(tuple) => {
+                    Tuple::Fixed(tuple.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
+                }
+                Tuple::Variable(tuple) => {
+                    tuple.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+                }
+            },
         }
     }
 

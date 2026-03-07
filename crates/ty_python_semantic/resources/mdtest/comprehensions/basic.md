@@ -149,7 +149,7 @@ reveal_type({x for x in range(10)})
 # revealed: dict[int, str]
 reveal_type({x: str(x) for x in range(10)})
 
-# revealed: list[tuple[int, str]]
+# revealed: list[tuple[int | str, ...]]
 reveal_type([(x, y) for x in range(5) for y in ["a", "b", "c"]])
 
 squares: list[int | None] = [x**2 for x in range(10)]
@@ -185,7 +185,7 @@ This also works for nested comprehensions:
 
 ```py
 table = [[(x, y) for x in range(3)] for y in range(3)]
-reveal_type(table)  # revealed: list[list[tuple[int, int]]]
+reveal_type(table)  # revealed: list[list[tuple[int, ...]]]
 
 table_with_content: list[list[tuple[int, int, str | None]]] = [[(x, y, None) for x in range(3)] for y in range(3)]
 reveal_type(table_with_content)  # revealed: list[list[tuple[int, int, str | None]]]

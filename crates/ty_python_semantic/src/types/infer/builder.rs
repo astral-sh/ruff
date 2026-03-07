@@ -56,7 +56,6 @@ use crate::semantic_index::symbol::{ScopedSymbolId, Symbol};
 use crate::semantic_index::{
     ApplicableConstraints, EnclosingSnapshotResult, SemanticIndex, place_table,
 };
-use crate::types::BindingContext;
 use crate::types::CallableTypes;
 use crate::types::call::bind::MatchingOverloadIndex;
 use crate::types::call::{Binding, Bindings, CallArguments, CallError, CallErrorKind};
@@ -124,6 +123,7 @@ use crate::types::typevar::{
     TypeVarDefaultEvaluation, TypeVarIdentity, TypeVarInstance,
 };
 use crate::types::visitor::find_over_type;
+use crate::types::{BindingContext, PromotionMode, PromotionPolicy, TuplePromotion};
 use crate::types::{
     CallDunderError, CallableBinding, CallableType, ClassType, DataclassParams, DynamicType,
     EvaluationMode, InferenceFlags, InternedConstraintSet, InternedType, IntersectionBuilder,
@@ -9973,7 +9973,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             if tuple.len() > MAX_TUPLE_LENGTH_FOR_UNANNOTATED_LITERAL_INFERENCE {
                 // Promote literals for very large unannotated tuples,
                 // to avoid pathological performance issues
-                self.infer_expression(elt, ctx).promote(db)
+                self.infer_expression(elt, ctx).promote(
+                    db,
+                    PromotionPolicy {
+                        mode: PromotionMode::On,
+                        tuple_promotion: TuplePromotion::Yes,
+                    },
+                )
             } else {
                 self.infer_expression(elt, ctx)
             }
@@ -10399,7 +10405,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 // Promote types to avoid excessively large unions for large nested list literals,
                 // which the constraint solver struggles with.
-                let inferred_elt_ty = inferred_elt_ty.promote(self.db());
+                let inferred_elt_ty = inferred_elt_ty.promote(
+                    self.db(),
+                    PromotionPolicy {
+                        mode: PromotionMode::On,
+                        tuple_promotion: TuplePromotion::Yes,
+                    },
+                );
 
                 builder
                     .infer(
