@@ -19,7 +19,7 @@ use ruff_linter::rules::flake8_import_conventions::settings::BannedAliases;
 use ruff_linter::rules::flake8_pytest_style::settings::SettingsError;
 use ruff_linter::rules::flake8_pytest_style::types;
 use ruff_linter::rules::flake8_quotes::settings::Quote;
-use ruff_linter::rules::flake8_tidy_imports::settings::{ApiBan, Strictness};
+use ruff_linter::rules::flake8_tidy_imports::settings::{ApiBan, BannedEagerImports, Strictness};
 use ruff_linter::rules::isort::settings::RelativeImportsOrder;
 use ruff_linter::rules::isort::{ImportSection, ImportType};
 use ruff_linter::rules::pep8_naming::settings::IgnoreNames;
@@ -2081,6 +2081,24 @@ pub struct Flake8TidyImportsOptions {
         "#
     )]
     pub banned_module_level_imports: Option<Vec<String>>,
+
+    /// Specific modules that may not be imported eagerly in contexts where lazy imports are legal,
+    /// or `"all"` to require every lazily-convertible import to use the `lazy` keyword. Ruff
+    /// ignores contexts where `lazy import` is invalid, such as functions, classes,
+    /// `try`/`except` blocks, `__future__` imports, and `from ... import *` statements. This rule
+    /// is only enforced when targeting Python 3.15 or newer.
+    #[option(
+        default = r#"[]"#,
+        value_type = r#""all" | list[str]"#,
+        example = r#"
+            # Require lazy imports for specific modules.
+            banned-eager-imports = ["typing", "foo"]
+
+            # Require every module-level import to be lazy.
+            banned-eager-imports = "all"
+        "#
+    )]
+    pub banned_eager_imports: Option<BannedEagerImports>,
 }
 
 impl Flake8TidyImportsOptions {
@@ -2089,6 +2107,7 @@ impl Flake8TidyImportsOptions {
             ban_relative_imports: self.ban_relative_imports.unwrap_or(Strictness::Parents),
             banned_api: self.banned_api.unwrap_or_default(),
             banned_module_level_imports: self.banned_module_level_imports.unwrap_or_default(),
+            banned_eager_imports: self.banned_eager_imports.unwrap_or_default(),
         }
     }
 }
