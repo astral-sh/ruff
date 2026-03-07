@@ -1089,7 +1089,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
             }
             Stmt::ImportFrom(ast::StmtImportFrom {
                 names,
-                module,
+                module: module_id,
                 level,
                 is_lazy,
                 range: _,
@@ -1099,7 +1099,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     self.importer.visit_import(stmt);
                 }
 
-                let module = module.as_deref();
+                let module = module_id.as_deref();
                 let level = *level;
                 let is_lazy = *is_lazy;
 
@@ -1107,6 +1107,27 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 if level == 0 {
                     if let Some(module) = module.and_then(|module| module.split('.').next()) {
                         self.semantic.add_module(module);
+                    }
+                }
+
+                // If this is a relative import in an `__init__.py` file, Python also binds the
+                // first component of the module name.
+                // For example, in `my_package/__init__.py`, `from .foo import Bar` also binds `foo`.
+                if level == 1 && self.in_init_module() {
+                    if let Some(module_id) = module_id {
+                        let submodule_name = module_id.split('.').next().unwrap();
+                        let qualified_name =
+                            collect_import_from_member(level, None, submodule_name);
+                        let submodule_range =
+                            TextRange::at(module_id.start(), TextSize::of(submodule_name));
+                        self.add_binding(
+                            submodule_name,
+                            submodule_range,
+                            BindingKind::FromImport(FromImport {
+                                qualified_name: Box::new(qualified_name),
+                            }),
+                            BindingFlags::EXTERNAL | BindingFlags::EXPLICIT_EXPORT,
+                        );
                     }
                 }
 
