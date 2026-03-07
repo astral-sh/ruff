@@ -4,13 +4,14 @@ use smallvec::SmallVec;
 
 use crate::{
     Db, FxIndexMap,
-    place::{
-        DefinedPlace, Place, PlaceAndQualifiers, place_from_bindings, place_from_declarations,
+    place::{DefinedPlace, Place, place_from_bindings, place_from_declarations},
+    semantic_index::{
+        DeclarationWithConstraint, definition::DefinitionKind, place_table, scope::ScopeId,
+        use_def_map,
     },
-    semantic_index::{place_table, scope::ScopeId, use_def_map},
     types::{
         ClassBase, ClassLiteral, DynamicType, EnumLiteralType, KnownClass, LiteralValueTypeKind,
-        MemberLookupPolicy, StaticClassLiteral, Type, TypeQualifiers, function::FunctionType,
+        MemberLookupPolicy, StaticClassLiteral, Type, function::FunctionType,
         set_theoretic::builder::UnionBuilder,
     },
 };
@@ -211,12 +212,15 @@ pub(crate) fn enum_metadata<'db>(
                 return None;
             }
 
-            if name == "_ignore_" || ignored_names.contains(name) {
+            if matches!(name.as_str(), "_ignore_" | "_value_" | "_name_")
+                || ignored_names.contains(name)
+            {
                 // Skip ignored attributes
                 return None;
             }
 
             let inferred = place_from_bindings(db, bindings).place;
+            let mut explicit_member_wrapper = false;
 
             let value_ty = match inferred {
                 Place::Undefined => {
@@ -233,12 +237,15 @@ pub(crate) fn enum_metadata<'db>(
                             Some(KnownClass::Nonmember) => return None,
 
                             // enum.member
-                            Some(KnownClass::Member) => Some(
-                                ty.member(db, "value")
-                                    .place
-                                    .ignore_possibly_undefined()
-                                    .unwrap_or(Type::unknown()),
-                            ),
+                            Some(KnownClass::Member) => {
+                                explicit_member_wrapper = true;
+                                Some(
+                                    ty.member(db, "value")
+                                        .place
+                                        .ignore_possibly_undefined()
+                                        .unwrap_or(Type::unknown()),
+                                )
+                            }
 
                             // enum.auto
                             Some(KnownClass::Auto) => {
@@ -342,38 +349,20 @@ pub(crate) fn enum_metadata<'db>(
             }
 
             let declarations = use_def_map.end_of_scope_symbol_declarations(symbol_id);
-            let declared =
-                place_from_declarations(db, declarations).ignore_conflicting_declarations();
 
-            match declared {
-                PlaceAndQualifiers {
-                    place:
-                        Place::Defined(DefinedPlace {
-                            ty: Type::Dynamic(DynamicType::Unknown),
-                            ..
-                        }),
-                    qualifiers,
-                } if qualifiers.contains(TypeQualifiers::FINAL) => {}
-                PlaceAndQualifiers {
-                    place: Place::Undefined,
-                    ..
-                } => {
-                    // Undeclared attributes are considered members
-                }
-                PlaceAndQualifiers {
-                    place:
-                        Place::Defined(DefinedPlace {
-                            ty: Type::NominalInstance(instance),
-                            ..
-                        }),
-                    ..
-                } if instance.has_known_class(db, KnownClass::Member) => {
-                    // If the attribute is specifically declared with `enum.member`, it is considered a member
-                }
-                _ => {
-                    // Declared attributes are considered non-members
-                    return None;
-                }
+            if !explicit_member_wrapper
+                && !declarations
+                    .clone()
+                    .all(|DeclarationWithConstraint { declaration, .. }| {
+                        declaration.is_undefined_or(|declaration| {
+                            matches!(
+                                declaration.kind(db),
+                                DefinitionKind::AnnotatedAssignment(..)
+                            )
+                        })
+                    })
+            {
+                return None;
             }
 
             Some((name.clone(), value_ty))

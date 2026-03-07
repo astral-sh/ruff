@@ -64,9 +64,10 @@ class ColorInt(IntEnum):
 reveal_type(enum_members(ColorInt))
 ```
 
-### Declared non-member attributes
+### Annotated assignments with values are still members
 
-Attributes on the enum class that are declared are not considered members of the enum:
+If an enum attribute has both an annotation and a value, it is still an enum member at runtime, even
+though the annotation is invalid:
 
 ```py
 from enum import Enum
@@ -76,12 +77,12 @@ class Answer(Enum):
     YES = 1
     NO = 2
 
-    non_member_1: int
-
     non_member_1: str = "some value"  # error: [invalid-enum-member-annotation]
 
-# revealed: tuple[Literal["YES"], Literal["NO"]]
+# revealed: tuple[Literal["YES"], Literal["NO"], Literal["non_member_1"]]
 reveal_type(enum_members(Answer))
+reveal_type(Answer.non_member_1)  # revealed: Literal[Answer.non_member_1]
+reveal_type(Answer.YES.non_member_1)  # revealed: Literal[Answer.non_member_1]
 ```
 
 Enum members are allowed to be marked `Final` (without a type), even if unnecessary:
@@ -916,8 +917,10 @@ class Answer(Enum):
 
     def is_yes(self) -> bool:
         return self == Answer.YES
+    constant: int = 1  # error: [invalid-enum-member-annotation]
 
 reveal_type(Answer.YES.is_yes())  # revealed: bool
+reveal_type(Answer.YES.constant)  # revealed: Literal[Answer.YES]
 
 class MyEnum(Enum):
     def some_method(self) -> None:
