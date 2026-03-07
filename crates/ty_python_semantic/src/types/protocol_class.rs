@@ -235,6 +235,27 @@ impl<'db> ProtocolInterface<'db> {
         Self::new(db, members)
     }
 
+    /// Synthesize a new protocol interface with the given methods.
+    pub(super) fn with_methods<'a, M>(db: &'db dyn Db, members: M) -> Self
+    where
+        M: IntoIterator<Item = (&'a str, CallableType<'db>)>,
+    {
+        let members: BTreeMap<_, _> = members
+            .into_iter()
+            .map(|(name, callable)| {
+                (
+                    Name::new(name),
+                    ProtocolMemberData {
+                        qualifiers: TypeQualifiers::default(),
+                        kind: ProtocolMemberKind::Method(callable),
+                        definition: None,
+                    },
+                )
+            })
+            .collect();
+        Self::new(db, members)
+    }
+
     fn empty(db: &'db dyn Db) -> Self {
         Self::new(db, BTreeMap::default())
     }

@@ -78,6 +78,13 @@ impl HasScopedUseId for ast::ExprSubscript {
     }
 }
 
+impl HasScopedUseId for ast::Keyword {
+    fn scoped_use_id(&self, db: &dyn Db, scope: ScopeId) -> ScopedUseId {
+        let ast_ids = ast_ids(db, scope);
+        ast_ids.use_id(self)
+    }
+}
+
 impl HasScopedUseId for ast::ExprRef<'_> {
     fn scoped_use_id(&self, db: &dyn Db, scope: ScopeId) -> ScopedUseId {
         let ast_ids = ast_ids(db, scope);
@@ -144,6 +151,12 @@ pub(crate) mod node_key {
 
     impl From<&ast::Identifier> for ExpressionNodeKey {
         fn from(value: &ast::Identifier) -> Self {
+            Self(NodeKey::from_node(value))
+        }
+    }
+
+    impl From<&ast::Keyword> for ExpressionNodeKey {
+        fn from(value: &ast::Keyword) -> Self {
             Self(NodeKey::from_node(value))
         }
     }
