@@ -1,7 +1,11 @@
 //! Remnant of the registry of all [`Rule`] implementations, now it's reexporting from codes.rs
 //! with some helper symbols
 
+use std::sync::LazyLock;
+
 use ruff_db::diagnostic::LintName;
+use rustc_hash::FxHashMap;
+use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
 pub use codes::Rule;
@@ -23,6 +27,17 @@ impl Rule {
             .all_rules()
             .find(|rule| rule.noqa_code().suffix() == code)
             .ok_or(FromCodeError::Unknown)
+    }
+
+    pub fn from_name(name: &str) -> Result<Self, FromCodeError> {
+        static RULES: LazyLock<FxHashMap<&'static str, Rule>> = LazyLock::new(|| {
+            let mut map = FxHashMap::default();
+            for rule in Rule::iter() {
+                map.insert(rule.name().as_str(), rule);
+            }
+            map
+        });
+        dbg!(RULES.get(name).copied().ok_or(FromCodeError::Unknown))
     }
 }
 
