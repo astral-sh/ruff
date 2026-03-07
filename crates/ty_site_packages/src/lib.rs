@@ -1248,6 +1248,7 @@ fn site_packages_directories_from_sys_prefix(
     // [some strange things on Fedora]: https://github.com/astral-sh/ty/issues/1043
 
     let mut directories = SitePackagesPaths::default();
+    let is_debian_system_prefix = sys_prefix_path.as_str() == "/usr";
 
     // If we were able to figure out what Python version this installation is,
     // we should be able to avoid iterating through all items in the `lib/` and `lib64/` directories:
@@ -1273,12 +1274,22 @@ fn site_packages_directories_from_sys_prefix(
         }
 
         // Also check for `dist-packages`, which is used on Debian/Ubuntu for system-installed packages
-        if let Some(expected_relative_path) =
+        if let Some(relative_path) =
             implementation.relative_dist_packages_path(lib_dir, python_version)
         {
-            let expected_absolute_path = sys_prefix_path.join(expected_relative_path);
+            let expected_absolute_path = sys_prefix_path.join(&relative_path);
             if system.is_directory(&expected_absolute_path) {
                 directories.insert(expected_absolute_path);
+            }
+
+            // On Debian/Ubuntu with sys.prefix=/usr, pip installs packages to
+            // /usr/local/lib/pythonX.Y/dist-packages (not under sys.prefix).
+            // Mirror Debian's patched site.py behavior.
+            if is_debian_system_prefix {
+                let usr_local_path = SystemPathBuf::from("/usr/local").join(&relative_path);
+                if system.is_directory(&usr_local_path) {
+                    directories.insert(usr_local_path);
+                }
             }
         }
     }
@@ -1293,6 +1304,42 @@ fn site_packages_directories_from_sys_prefix(
         let debian_dist_packages = sys_prefix_path.join("lib/python3/dist-packages");
         if system.is_directory(&debian_dist_packages) {
             directories.insert(debian_dist_packages);
+        }
+
+        if is_debian_system_prefix {
+            let local_dist_packages = SystemPathBuf::from("/usr/local/lib/python3/dist-packages");
+            if system.is_directory(&local_dist_packages) {
+                directories.insert(local_dist_packages);
+            }
+        }
+    }
+
+    // On Debian/Ubuntu with sys.prefix=/usr, also enumerate /usr/local/lib/
+    // for pip-installed packages that are not placed under sys.prefix.
+    // this must run before the early return below, because /usr/lib/python3/dist-packages
+    // may have been found above (causing an early return) while /usr/local/lib/pythonX.Y/dist-packages
+    // still needs to be discovered.
+    if is_debian_system_prefix {
+        let usr_local_lib = SystemPathBuf::from("/usr/local/lib");
+        if let Ok(dir_iter) = system.read_directory(&usr_local_lib) {
+            for entry_result in dir_iter {
+                let Ok(entry) = entry_result else { continue };
+                if !entry.file_type().is_directory() {
+                    continue;
+                }
+                let path = entry.into_path();
+                let name = path.file_name().unwrap_or_else(|| panic!(
+                    "File name should be non-null because path is guaranteed to be a child of `/usr/local/lib`",
+                ));
+                // no need to check `python3` (without minor version) here;
+                // `/usr/local/lib/python3/dist-packages` is already handled above.
+                if name.starts_with("python3.") || name.starts_with("pypy3.") {
+                    let dist_packages = path.join("dist-packages");
+                    if system.is_directory(&dist_packages) {
+                        directories.insert(dist_packages);
+                    }
+                }
+            }
         }
     }
 
@@ -2695,6 +2742,162 @@ mod tests {
             dirs.iter()
                 .any(|p| p.as_str().contains("python3/dist-packages")),
             "Expected to find Debian's python3/dist-packages, got: {dirs:?}"
+        );
+    }
+
+    /// Test that /usr/local/lib/pythonX.Y/dist-packages is discovered when sys.prefix=/usr
+    #[test]
+    #[cfg(not(target_os = "windows"))]
+    fn finds_usr_local_dist_packages_in_system_environment() {
+        let system = TestSystem::default();
+        let memory_fs = system.memory_file_system();
+
+        let sys_prefix = SystemPathBuf::from("/usr");
+        let site_packages = sys_prefix.join("lib/python3.12/site-packages");
+        let usr_local_dist_packages =
+            SystemPathBuf::from("/usr/local/lib/python3.12/dist-packages");
+
+        memory_fs.create_directory_all(&site_packages).unwrap();
+        memory_fs
+            .create_directory_all(&usr_local_dist_packages)
+            .unwrap();
+
+        let sys_prefix_path = SysPrefixPath {
+            inner: sys_prefix,
+            origin: SysPrefixPathOrigin::PythonCliFlag,
+        };
+
+        let directories = site_packages_directories_from_sys_prefix(
+            &sys_prefix_path,
+            Some(PythonVersion {
+                major: 3,
+                minor: 12,
+            }),
+            PythonImplementation::CPython,
+            &system,
+        )
+        .unwrap();
+
+        let dirs: Vec<_> = directories.into_iter().collect();
+        assert!(
+            dirs.iter()
+                .any(|p| p.as_str() == "/usr/local/lib/python3.12/dist-packages"),
+            "Expected to find /usr/local/lib/python3.12/dist-packages, got: {dirs:?}"
+        );
+    }
+
+    /// Test that /usr/local/lib/python3/dist-packages is discovered when sys.prefix=/usr
+    #[test]
+    #[cfg(not(target_os = "windows"))]
+    fn finds_usr_local_python3_dist_packages() {
+        let system = TestSystem::default();
+        let memory_fs = system.memory_file_system();
+
+        let sys_prefix = SystemPathBuf::from("/usr");
+        let site_packages = sys_prefix.join("lib/python3.12/site-packages");
+        let usr_local_python3_dist = SystemPathBuf::from("/usr/local/lib/python3/dist-packages");
+
+        memory_fs.create_directory_all(&site_packages).unwrap();
+        memory_fs
+            .create_directory_all(&usr_local_python3_dist)
+            .unwrap();
+
+        let sys_prefix_path = SysPrefixPath {
+            inner: sys_prefix,
+            origin: SysPrefixPathOrigin::PythonCliFlag,
+        };
+
+        let directories = site_packages_directories_from_sys_prefix(
+            &sys_prefix_path,
+            Some(PythonVersion {
+                major: 3,
+                minor: 12,
+            }),
+            PythonImplementation::CPython,
+            &system,
+        )
+        .unwrap();
+
+        let dirs: Vec<_> = directories.into_iter().collect();
+        assert!(
+            dirs.iter()
+                .any(|p| p.as_str() == "/usr/local/lib/python3/dist-packages"),
+            "Expected to find /usr/local/lib/python3/dist-packages, got: {dirs:?}"
+        );
+    }
+
+    /// Test that /usr/local/lib paths are NOT added when sys.prefix != "/usr"
+    #[test]
+    #[cfg(not(target_os = "windows"))]
+    fn does_not_add_usr_local_when_sys_prefix_is_not_usr() {
+        let system = TestSystem::default();
+        let memory_fs = system.memory_file_system();
+
+        // Simulate a pyenv-style installation (sys.prefix != "/usr")
+        let sys_prefix = SystemPathBuf::from("/home/user/.pyenv/versions/3.12.0");
+        let site_packages = sys_prefix.join("lib/python3.12/site-packages");
+        // Also create a /usr/local path to ensure it isn't picked up
+        let usr_local_dist = SystemPathBuf::from("/usr/local/lib/python3.12/dist-packages");
+
+        memory_fs.create_directory_all(&site_packages).unwrap();
+        memory_fs.create_directory_all(&usr_local_dist).unwrap();
+
+        let sys_prefix_path = SysPrefixPath {
+            inner: sys_prefix,
+            origin: SysPrefixPathOrigin::PythonCliFlag,
+        };
+
+        let directories = site_packages_directories_from_sys_prefix(
+            &sys_prefix_path,
+            Some(PythonVersion {
+                major: 3,
+                minor: 12,
+            }),
+            PythonImplementation::CPython,
+            &system,
+        )
+        .unwrap();
+
+        let dirs: Vec<_> = directories.into_iter().collect();
+        assert!(
+            dirs.iter().all(|p| !p.as_str().starts_with("/usr/local")),
+            "Expected no /usr/local paths when sys.prefix != /usr, got: {dirs:?}"
+        );
+    }
+
+    /// Test that /usr/local/lib/pythonX.Y/dist-packages is found during fallback enumeration
+    #[test]
+    #[cfg(not(target_os = "windows"))]
+    fn finds_usr_local_dist_packages_in_fallback_enumeration() {
+        let system = TestSystem::default();
+        let memory_fs = system.memory_file_system();
+
+        let sys_prefix = SystemPathBuf::from("/usr");
+        // Only create the /usr/local path; no /usr/lib dirs so phase 1 finds nothing
+        let usr_local_dist_packages =
+            SystemPathBuf::from("/usr/local/lib/python3.12/dist-packages");
+        memory_fs
+            .create_directory_all(&usr_local_dist_packages)
+            .unwrap();
+
+        let sys_prefix_path = SysPrefixPath {
+            inner: sys_prefix,
+            origin: SysPrefixPathOrigin::PythonCliFlag,
+        };
+
+        let directories = site_packages_directories_from_sys_prefix(
+            &sys_prefix_path,
+            None,
+            PythonImplementation::Unknown,
+            &system,
+        )
+        .unwrap();
+
+        let dirs: Vec<_> = directories.into_iter().collect();
+        assert!(
+            dirs.iter()
+                .any(|p| p.as_str() == "/usr/local/lib/python3.12/dist-packages"),
+            "Expected to find /usr/local/lib/python3.12/dist-packages in fallback, got: {dirs:?}"
         );
     }
 }
