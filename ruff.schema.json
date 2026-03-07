@@ -518,6 +518,17 @@
         }
       ]
     },
+    "logger-callables": {
+      "description": "A list of callables that should be treated as exception-logging\nfunctions when used inside `except` blocks, suppressing `BLE001`.\n\nThis is useful for projects that use custom error-reporting callables\n(e.g., Sentry or custom project-wide error handlers) which properly\nhandle exceptions.\n\nExpects to receive a list of fully-qualified names (e.g.,\n`sentry_sdk.capture_exception`, rather than `capture_exception`).",
+      "type": [
+        "array",
+        "null"
+      ],
+      "deprecated": true,
+      "items": {
+        "type": "string"
+      }
+    },
     "logger-objects": {
       "description": "A list of objects that should be treated equivalently to a\n`logging.Logger` object.\n\nThis is useful for ensuring proper diagnostics (e.g., to identify\n`logging` deprecations and other best-practices) for projects that\nre-export a `logging.Logger` object from a common module.\n\nFor example, if you have a module `logging_setup.py` with the following\ncontents:\n```python\nimport logging\n\nlogger = logging.getLogger(__name__)\n```\n\nAdding `\"logging_setup.logger\"` to `logger-objects` will ensure that\n`logging_setup.logger` is treated as a `logging.Logger` object when\nimported from other modules (e.g., `from logging_setup import logger`).",
       "type": [
@@ -2390,6 +2401,16 @@
               "type": "null"
             }
           ]
+        },
+        "logger-callables": {
+          "description": "A list of callables that should be treated as exception-logging\nfunctions when used inside `except` blocks, suppressing `BLE001`.\n\nThis is useful for projects that use custom error-reporting callables\n(e.g., Sentry or custom project-wide error handlers) which properly\nhandle exceptions.\n\nExpects to receive a list of fully-qualified names (e.g.,\n`sentry_sdk.capture_exception`, rather than `capture_exception`).",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
         },
         "logger-objects": {
           "description": "A list of objects that should be treated equivalently to a\n`logging.Logger` object.\n\nThis is useful for ensuring proper diagnostics (e.g., to identify\n`logging` deprecations and other best-practices) for projects that\nre-export a `logging.Logger` object from a common module.\n\nFor example, if you have a module `logging_setup.py` with the following\ncontents:\n```python\nimport logging\n\nlogger = logging.getLogger(__name__)\n```\n\nAdding `\"logging_setup.logger\"` to `logger-objects` will ensure that\n`logging_setup.logger` is treated as a `logging.Logger` object when\nimported from other modules (e.g., `from logging_setup import logger`).",
