@@ -3393,6 +3393,35 @@ impl<'db> Type<'db> {
         }
     }
 
+    // Returns the value type of a `__getitem__` dunder call on this object.
+    //
+    // Returns `None` if `__getitem__` is undefined or results in a call error.
+    fn getitem_dunder_call(self, db: &'db dyn Db, key: Option<&str>) -> Option<Type<'db>> {
+        let key = key
+            .map(|key| Type::string_literal(db, key))
+            .unwrap_or(Type::unknown());
+
+        match self
+            .member_lookup_with_policy(
+                db,
+                Name::new_static("__getitem__"),
+                MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+            )
+            .place
+        {
+            Place::Defined(DefinedPlace {
+                ty: getitem_method,
+                definedness: Definedness::AlwaysDefined,
+                ..
+            }) => getitem_method
+                .try_call(db, &CallArguments::positional([key]))
+                .ok()
+                .map(|bindings| bindings.return_type(db)),
+
+            _ => None,
+        }
+    }
+
     /// Returns the key and value types of this object if it was unpacked using `**`,
     /// or `None` if the object does not support unpacking.
     fn unpack_keys_and_items(self, db: &'db dyn Db) -> Option<(Type<'db>, Type<'db>)> {
@@ -3424,25 +3453,9 @@ impl<'db> Type<'db> {
             _ => return None,
         };
 
-        let value_ty = match self
-            .member_lookup_with_policy(
-                db,
-                Name::new_static("__getitem__"),
-                MemberLookupPolicy::NO_INSTANCE_FALLBACK,
-            )
-            .place
-        {
-            Place::Defined(DefinedPlace {
-                ty: getitem_method,
-                definedness: Definedness::AlwaysDefined,
-                ..
-            }) => getitem_method
-                .try_call(db, &CallArguments::positional([Type::unknown()]))
-                .ok()
-                .map_or_else(Type::unknown, |bindings| bindings.return_type(db)),
-
-            _ => Type::unknown(),
-        };
+        let value_ty = self
+            .getitem_dunder_call(db, None)
+            .unwrap_or(Type::unknown());
 
         Some((key_ty, value_ty))
     }
