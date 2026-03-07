@@ -36,6 +36,7 @@ pub use self::set_theoretic::{
 pub use self::signatures::ParameterKind;
 pub(crate) use self::signatures::Signature;
 pub(crate) use self::subclass_of::{SubclassOfInner, SubclassOfType};
+pub(crate) use self::tuple::TupleSpec;
 pub use crate::diagnostic::add_inferred_python_version_hint_to_diagnostic;
 use crate::place::{
     DefinedPlace, Definedness, Place, PlaceAndQualifiers, TypeOrigin, builtins_module_scope,
@@ -75,7 +76,6 @@ use crate::types::newtype::NewType;
 pub(crate) use crate::types::signatures::{Parameter, Parameters};
 use crate::types::signatures::{ParameterForm, walk_signature};
 use crate::types::special_form::TypeQualifier;
-use crate::types::tuple::TupleSpec;
 use crate::types::type_alias::TypeAliasType;
 pub(crate) use crate::types::typed_dict::TypedDictType;
 use crate::types::typevar::TypeVarInstance;
@@ -4807,6 +4807,37 @@ impl<'db> Type<'db> {
                 any_success.then(|| builder.build())
             }
             ty @ (Type::Dynamic(_) | Type::Never) => Some(ty),
+            _ => None,
+        }
+    }
+
+    /// Return the element type if `self` is a `Sequence[T]` specialization (or subtype), if known.
+    pub(crate) fn sequence_element_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        let from_class_base = |base: ClassBase<'db>| {
+            let class = base.into_class()?;
+            if class.is_known(db, KnownClass::Sequence)
+                && let Some((_, Some(specialization))) =
+                    class.static_class_literal_specialized(db, None)
+                && let [element_ty] = specialization.types(db)
+            {
+                Some(*element_ty)
+            } else {
+                None
+            }
+        };
+
+        match self {
+            Type::NominalInstance(instance) => {
+                instance.class(db).iter_mro(db).find_map(from_class_base)
+            }
+            Type::ProtocolInstance(instance) => {
+                if let Protocol::FromClass(class) = instance.inner {
+                    class.iter_mro(db).find_map(from_class_base)
+                } else {
+                    None
+                }
+            }
+            Type::TypeAlias(alias) => alias.value_type(db).sequence_element_type(db),
             _ => None,
         }
     }
