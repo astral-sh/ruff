@@ -164,7 +164,7 @@ def f(x: A[int] | B):
         reveal_type(x)  # revealed: A[int] | B
 
     if type(x) is A:
-        reveal_type(x)  # revealed: A[int]
+        reveal_type(x)  # revealed: A[int] | (B & A[object])
     else:
         reveal_type(x)  # revealed: A[int] | B
 
@@ -182,7 +182,7 @@ def f(x: A[int] | B):
     if type(x) is not A:
         reveal_type(x)  # revealed: A[int] | B
     else:
-        reveal_type(x)  # revealed: A[int]
+        reveal_type(x)  # revealed: A[int] | (B & A[object])
 
     if type(x) is not B:
         reveal_type(x)  # revealed: A[int] | B

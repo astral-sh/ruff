@@ -511,9 +511,11 @@ expects_type_c_of_int_and_str(C)
 # Also OK, the specialized `C[int, str]` is assignable to `type[C[int, str]]`
 expects_type_c_of_int_and_str(C[int, str])
 
-# TODO: these should be errors
+# error: [invalid-argument-type]
 expects_type_c_of_int_and_str(C[str])
+# error: [invalid-argument-type]
 expects_type_c_of_int_and_str(C[int, str, bytes])
+# error: [invalid-argument-type]
 expects_type_c_of_int_and_str(C[str, int])
 ```
 
@@ -529,14 +531,17 @@ def expects_type_c_default_of_int_str(f: type[C[int, str]]): ...
 
 expects_type_c_default(C)
 expects_type_c_default(C[int, str])
-expects_type_c_default_of_int(C)
 expects_type_c_default_of_int(C[int])
 expects_type_c_default_of_int_str(C)
 expects_type_c_default_of_int_str(C[int, str])
 
-# TODO: these should be errors
+# error: [invalid-argument-type]
 expects_type_c_default(C[int])
+# error: [invalid-argument-type]
+expects_type_c_default_of_int(C)
+# error: [invalid-argument-type]
 expects_type_c_default_of_int(C[str])
+# error: [invalid-argument-type]
 expects_type_c_default_of_int_str(C[str, int])
 ```
 
