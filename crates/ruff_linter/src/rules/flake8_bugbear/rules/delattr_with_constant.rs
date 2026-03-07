@@ -7,7 +7,7 @@ use ruff_python_stdlib::identifiers::{is_identifier, is_mangled_private};
 use unicode_normalization::UnicodeNormalization;
 
 use crate::checkers::ast::Checker;
-use crate::{AlwaysFixableViolation, Edit, Fix};
+use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 
 /// ## What it does
 /// Checks for uses of `delattr` that take a constant attribute value as an
@@ -60,50 +60,33 @@ impl AlwaysFixableViolation for DelAttrWithConstant {
     }
 }
 
-fn deletion(obj: &Expr, name: &str, generator: Generator) -> String {
-    let stmt = Stmt::Delete(ast::StmtDelete {
-        targets: vec![Expr::Attribute(ast::ExprAttribute {
-            value: Box::new(obj.clone()),
-            attr: Identifier::new(name.to_string(), TextRange::default()),
-            ctx: ExprContext::Del,
-            range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-        })],
-        range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-    });
-    generator.stmt(&stmt)
-}
-
 /// B043
 pub(crate) fn delattr_with_constant(checker: &Checker, expr: &Expr, func: &Expr, args: &[Expr]) {
-    let [obj, name] = args else {
+    if !checker.semantic().match_builtin_expr(func, "delattr") {
+        return;
+    }
+
+    let [obj, Expr::StringLiteral(ast::ExprStringLiteral { value: name, .. })] = args else {
         return;
     };
     if obj.is_starred_expr() {
         return;
     }
-    let Expr::StringLiteral(ast::ExprStringLiteral { value: name, .. }) = name else {
-        return;
-    };
-    if !is_identifier(name.to_str()) {
-        return;
-    }
-    // Ignore if the attribute name is `__debug__`. Deleting the `__debug__` property is a
-    // `SyntaxError`.
-    if name.to_str() == "__debug__" {
-        return;
-    }
-    if is_mangled_private(name.to_str()) {
-        return;
-    }
-    if !checker.semantic().match_builtin_expr(func, "delattr") {
+
+    let attr_name = name.to_str();
+
+    // Ignore if the attribute name is `__debug__` (syntax error), not a valid
+    // identifier (eg, keywords), or otherwise a name that would be mangled.
+    if !is_identifier(attr_name) || attr_name == "__debug__" || is_mangled_private(attr_name) {
         return;
     }
 
-    let attr_name = name.to_str();
     let has_comments = checker.comment_ranges().intersects(expr.range());
-    let is_unsafe = attr_name.nfkc().collect::<String>() != attr_name || has_comments;
+    let applicability = if attr_name.nfkc().collect::<String>() != attr_name || has_comments {
+        Applicability::Unsafe
+    } else {
+        Applicability::Safe
+    };
 
     // We can only replace a `delattr` call (which is an `Expr`) with a `del`
     // statement (which is a `Stmt`) if the `Expr` is already being used as a
@@ -117,15 +100,25 @@ pub(crate) fn delattr_with_constant(checker: &Checker, expr: &Expr, func: &Expr,
         if expr == child.as_ref() {
             let mut diagnostic = checker.report_diagnostic(DelAttrWithConstant, expr.range());
             let edit = Edit::range_replacement(
-                deletion(obj, name.to_str(), checker.generator()),
+                generate_del_statement(obj, attr_name, checker.generator()),
                 expr.range(),
             );
-            let fix = if is_unsafe {
-                Fix::unsafe_edit(edit)
-            } else {
-                Fix::safe_edit(edit)
-            };
-            diagnostic.set_fix(fix);
+            diagnostic.set_fix(Fix::applicable_edit(edit, applicability));
         }
     }
+}
+
+fn generate_del_statement(obj: &Expr, attr_name: &str, generator: Generator) -> String {
+    let stmt = Stmt::Delete(ast::StmtDelete {
+        targets: vec![Expr::Attribute(ast::ExprAttribute {
+            value: Box::new(obj.clone()),
+            attr: Identifier::new(attr_name.to_string(), TextRange::default()),
+            ctx: ExprContext::Del,
+            range: TextRange::default(),
+            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+        })],
+        range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+    });
+    generator.stmt(&stmt)
 }
