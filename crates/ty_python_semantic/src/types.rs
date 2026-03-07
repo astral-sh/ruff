@@ -862,6 +862,20 @@ impl<'db> Type<'db> {
                 self
             }
 
+            // Don't union wrapper special forms together across iterations; doing so can cause
+            // non-converging growth like `TypeIs[Any] | TypeIs[object]`.
+            (Type::TypeIs(prev_type_is), Type::TypeIs(curr_type_is))
+                if prev_type_is.place_info(db) == curr_type_is.place_info(db) =>
+            {
+                self
+            }
+
+            (Type::TypeGuard(prev_type_guard), Type::TypeGuard(curr_type_guard))
+                if prev_type_guard.place_info(db) == curr_type_guard.place_info(db) =>
+            {
+                self
+            }
+
             _ => {
                 // Also avoid unioning in a previous type which contains a Divergent from the
                 // current cycle, if the most-recent type does not. This cannot cause an
@@ -5346,9 +5360,19 @@ impl<'db> Type<'db> {
             }
 
             // TODO(jelle): Materialize should be handled differently, since TypeIs is invariant
-            Type::TypeIs(type_is) => type_is.with_type(db, type_is.return_type(db).apply_type_mapping(db, type_mapping, tcx)),
+            Type::TypeIs(type_is) => type_is.with_type(
+                db,
+                type_is
+                    .return_type(db)
+                    .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+            ),
 
-            Type::TypeGuard(type_guard) => type_guard.with_type(db, type_guard.return_type(db).apply_type_mapping(db, type_mapping, tcx)),
+            Type::TypeGuard(type_guard) => type_guard.with_type(
+                db,
+                type_guard
+                    .return_type(db)
+                    .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+            ),
 
             Type::TypeAlias(alias) => {
                 // For EagerExpansion, expand the raw value type. This path relies on Salsa's cycle
@@ -5381,6 +5405,13 @@ impl<'db> Type<'db> {
                         }
                     }
                 });
+
+                // Materialization is a direct transform of the alias RHS. Don't run the
+                // alias-preservation and recursion-probing heuristic below, as that can
+                // re-enter recursive aliases outside the current visitor.
+                if matches!(type_mapping, TypeMapping::Materialize(_)) {
+                    return mapped;
+                }
 
                 let is_recursive = any_over_type(db, alias.raw_value_type(db).expand_eagerly(db), false, |ty| ty.is_divergent());
 
