@@ -874,7 +874,7 @@ impl<'a> Generator<'a> {
     fn unparse_type_params(&mut self, type_params: &TypeParams) {
         self.p("[");
         let mut first = true;
-        for type_param in type_params.iter() {
+        for type_param in type_params {
             self.p_delim(&mut first, ", ");
             self.unparse_type_param(type_param);
         }

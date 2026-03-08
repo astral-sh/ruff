@@ -753,6 +753,16 @@ pub(crate) fn check_static_class_definitions<'db>(
         }
     }
 
+    // Check that no type parameter with a default follows a TypeVarTuple.
+    // This is prohibited by the typing spec because a TypeVarTuple consumes
+    // all remaining positional type arguments.
+    if let Some(type_params) = class_node.type_params.as_deref() {
+        super::type_param_validation::check_no_default_after_typevar_tuple_pep695(
+            context,
+            type_params,
+        );
+    }
+
     if context.is_lint_enabled(&INVALID_GENERIC_CLASS) {
         if !class.has_pep_695_type_params(db)
             && let Some(generic_context) = class.legacy_generic_context(db)

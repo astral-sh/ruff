@@ -1406,6 +1406,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ) {
         self.infer_expression(&type_alias.name, TypeContext::default());
 
+        // Check that no type parameter with a default follows a TypeVarTuple
+        // in the type alias's PEP 695 type parameter list.
+        if let Some(type_params) = type_alias.type_params.as_deref() {
+            deferred::type_param_validation::check_no_default_after_typevar_tuple_pep695(
+                &self.context,
+                type_params,
+            );
+        }
+
         let rhs_scope = self
             .index
             .node_scope(NodeWithScopeRef::TypeAlias(type_alias))
