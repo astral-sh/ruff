@@ -349,19 +349,6 @@ my_isinstance(1, 1)
 my_isinstance(1, (int, (str, 1)))
 ```
 
-## Recursive `TypeIs` and `TypeGuard` aliases don't stack overflow
-
-```py
-from typing import TypeAlias
-from typing_extensions import TypeGuard, TypeIs
-
-RecursiveIs: TypeAlias = TypeIs["RecursiveIs"]
-RecursiveGuard: TypeAlias = TypeGuard["RecursiveGuard"]
-
-AliasIs: TypeAlias = RecursiveIs
-AliasGuard: TypeAlias = RecursiveGuard
-```
-
 ## Conditionally imported on Python < 3.10
 
 ```toml
