@@ -113,32 +113,16 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                 true
             }
             ast::Expr::Starred(_) => false,
-            ast::Expr::List(target_list) => match value_expr {
-                ast::Expr::List(value_list) => self.unpack_fixed_sequence_from_inference(
-                    &target_list.elts,
-                    &value_list.elts,
-                    value_inference,
-                ),
-                ast::Expr::Tuple(value_tuple) => self.unpack_fixed_sequence_from_inference(
-                    &target_list.elts,
-                    &value_tuple.elts,
-                    value_inference,
-                ),
-                _ => false,
-            },
-            ast::Expr::Tuple(target_tuple) => match value_expr {
-                ast::Expr::List(value_list) => self.unpack_fixed_sequence_from_inference(
-                    &target_tuple.elts,
-                    &value_list.elts,
-                    value_inference,
-                ),
-                ast::Expr::Tuple(value_tuple) => self.unpack_fixed_sequence_from_inference(
-                    &target_tuple.elts,
-                    &value_tuple.elts,
-                    value_inference,
-                ),
-                _ => false,
-            },
+            ast::Expr::List(target_list) => self.unpack_fixed_sequence_from_inference(
+                &target_list.elts,
+                sequence_elts(value_expr),
+                value_inference,
+            ),
+            ast::Expr::Tuple(target_tuple) => self.unpack_fixed_sequence_from_inference(
+                &target_tuple.elts,
+                sequence_elts(value_expr),
+                value_inference,
+            ),
             _ => false,
         }
     }
@@ -146,9 +130,13 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
     fn unpack_fixed_sequence_from_inference(
         &mut self,
         targets: &[ast::Expr],
-        values: &[ast::Expr],
+        values: Option<&[ast::Expr]>,
         value_inference: &ExpressionInference<'db>,
     ) -> bool {
+        let Some(values) = values else {
+            return false;
+        };
+
         if targets.len() != values.len()
             || targets.iter().any(ast::Expr::is_starred_expr)
             || values.iter().any(ast::Expr::is_starred_expr)
@@ -156,6 +144,9 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
             return false;
         }
 
+        // `.all()` short-circuits, so early elements may already be inserted into
+        // `self.targets` when a later element returns `false`. This is harmless:
+        // the fallback `unpack_inner` path will overwrite any partial entries.
         targets.iter().zip(values).all(|(target, value_expr)| {
             self.unpack_assignment_sequence_from_inference(target, value_expr, value_inference)
         })
@@ -317,5 +308,14 @@ impl<'db> UnpackResult<'db> {
         }
 
         self
+    }
+}
+
+/// Extract the element slice from a list or tuple expression.
+fn sequence_elts(expr: &ast::Expr) -> Option<&[ast::Expr]> {
+    match expr {
+        ast::Expr::List(list) => Some(&list.elts),
+        ast::Expr::Tuple(tuple) => Some(&tuple.elts),
+        _ => None,
     }
 }
