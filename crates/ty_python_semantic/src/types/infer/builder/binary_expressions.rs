@@ -32,42 +32,34 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             node_index: _,
         } = binary;
 
-        if *op == ast::Operator::BitOr && matches!(left.as_ref(), ast::Expr::Dict(_)) {
-            let right_ty = self.infer_expression(right, TypeContext::default());
-
-            if let Type::TypedDict(typed_dict) = right_ty
-                && let Some(ty) = self.infer_typed_dict_pep_584_update(left, typed_dict)
-            {
-                return ty;
-            }
-
-            let left_ty = self.infer_expression(left, TypeContext::default());
-
-            return self
-                .infer_binary_expression_type(binary.into(), false, left_ty, right_ty, *op)
-                .unwrap_or_else(|| {
-                    report_unsupported_binary_operation(
-                        &self.context,
-                        binary,
-                        left_ty,
-                        right_ty,
-                        *op,
-                    );
-                    Type::unknown()
-                });
-        }
-
-        let left_ty = self.infer_expression(left, TypeContext::default());
-
-        if *op == ast::Operator::BitOr
-            && let Type::TypedDict(typed_dict) = left_ty
-            && matches!(right.as_ref(), ast::Expr::Dict(_))
-            && let Some(ty) = self.infer_typed_dict_pep_584_update(right, typed_dict)
-        {
-            return ty;
-        }
-
-        let right_ty = self.infer_expression(right, TypeContext::default());
+        // When a dict literal is `|`'d with a TypedDict, infer the non-literal side first
+        // so we can use bidirectional inference on the literal.
+        let (left_ty, right_ty) =
+            if *op == ast::Operator::BitOr && matches!(left.as_ref(), ast::Expr::Dict(_)) {
+                let right_ty = self.infer_expression(right, TypeContext::default());
+                if let Type::TypedDict(typed_dict) = right_ty
+                    && let Some(ty) = self.infer_typed_dict_pep_584_update(left, typed_dict)
+                {
+                    return ty;
+                }
+                (
+                    self.infer_expression(left, TypeContext::default()),
+                    right_ty,
+                )
+            } else {
+                let left_ty = self.infer_expression(left, TypeContext::default());
+                if *op == ast::Operator::BitOr
+                    && let Type::TypedDict(typed_dict) = left_ty
+                    && matches!(right.as_ref(), ast::Expr::Dict(_))
+                    && let Some(ty) = self.infer_typed_dict_pep_584_update(right, typed_dict)
+                {
+                    return ty;
+                }
+                (
+                    left_ty,
+                    self.infer_expression(right, TypeContext::default()),
+                )
+            };
 
         self.infer_binary_expression_type(binary.into(), false, left_ty, right_ty, *op)
             .unwrap_or_else(|| {
