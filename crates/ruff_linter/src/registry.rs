@@ -100,6 +100,9 @@ pub enum Linter {
     /// [flake8-gettext](https://pypi.org/project/flake8-gettext/)
     #[prefix = "INT"]
     Flake8GetText,
+    /// [flake8-hangover](https://pypi.org/project/flake8-hangover/)
+    #[prefix = "HG"]
+    Flake8Hangover,
     /// [flake8-implicit-str-concat](https://pypi.org/project/flake8-implicit-str-concat/)
     #[prefix = "ISC"]
     Flake8ImplicitStrConcat,
@@ -267,6 +270,7 @@ impl Rule {
             | Rule::BlankLinesAfterFunctionOrClass
             | Rule::BlankLinesBeforeNestedDefinition
             | Rule::BlankLinesTopLevel
+            | Rule::BracketIndentationMismatch
             | Rule::CommentedOutCode
             | Rule::EmptyComment
             | Rule::ExtraneousParentheses

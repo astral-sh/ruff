@@ -13,8 +13,9 @@ use crate::directives::TodoComment;
 use crate::registry::Rule;
 use crate::rules::pycodestyle::rules::BlankLinesChecker;
 use crate::rules::{
-    eradicate, flake8_commas, flake8_executable, flake8_fixme, flake8_implicit_str_concat,
-    flake8_pyi, flake8_todos, pycodestyle, pygrep_hooks, pylint, pyupgrade, ruff,
+    eradicate, flake8_commas, flake8_executable, flake8_fixme, flake8_hangover,
+    flake8_implicit_str_concat, flake8_pyi, flake8_todos, pycodestyle, pygrep_hooks, pylint,
+    pyupgrade, ruff,
 };
 
 use super::ast::LintContext;
@@ -157,5 +158,9 @@ pub(crate) fn check_tokens(
 
     if context.is_rule_enabled(Rule::TooManyNewlinesAtEndOfFile) {
         pycodestyle::rules::too_many_newlines_at_end_of_file(context, tokens, cell_offsets);
+    }
+
+    if context.is_rule_enabled(Rule::BracketIndentationMismatch) {
+        flake8_hangover::rules::bracket_indentation_mismatch(context, tokens, locator);
     }
 }

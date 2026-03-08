@@ -20,6 +20,7 @@ pub mod flake8_executable;
 pub mod flake8_fixme;
 pub mod flake8_future_annotations;
 pub mod flake8_gettext;
+pub mod flake8_hangover;
 pub mod flake8_implicit_str_concat;
 pub mod flake8_import_conventions;
 pub mod flake8_logging;

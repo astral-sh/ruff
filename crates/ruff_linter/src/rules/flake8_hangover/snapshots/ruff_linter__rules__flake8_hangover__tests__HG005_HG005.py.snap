@@ -1,0 +1,35 @@
+---
+source: crates/ruff_linter/src/rules/flake8_hangover/mod.rs
+---
+HG005 Closing bracket line indent doesn't match the opening bracket line indent
+ --> HG005.py:6:20
+  |
+4 |          arg2=[{f"""
+5 |                 data{i}
+6 |                 """} for i in range(5)])  # line indent = 16, not matching the previous lines
+  |                    ^
+7 |
+8 | # Good
+  |
+
+HG005 Closing bracket line indent doesn't match the opening bracket line indent
+ --> HG005.py:6:39
+  |
+4 |          arg2=[{f"""
+5 |                 data{i}
+6 |                 """} for i in range(5)])  # line indent = 16, not matching the previous lines
+  |                                       ^
+7 |
+8 | # Good
+  |
+
+HG005 Closing bracket line indent doesn't match the opening bracket line indent
+ --> HG005.py:6:40
+  |
+4 |          arg2=[{f"""
+5 |                 data{i}
+6 |                 """} for i in range(5)])  # line indent = 16, not matching the previous lines
+  |                                        ^
+7 |
+8 | # Good
+  |
