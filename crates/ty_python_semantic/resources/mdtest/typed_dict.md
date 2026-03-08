@@ -51,6 +51,30 @@ Methods that are available on `dict`s are also available on `TypedDict`s:
 bob.update(age=26)
 ```
 
+PEP 584-style immutable updates preserve the `TypedDict` type when the other operand is compatible:
+
+```py
+carol_update = Person(name="Carol", age=31)
+reveal_type(bob | carol_update)  # revealed: Person
+```
+
+When the other operand is not compatible with the `TypedDict`, the result falls back to
+`dict[str, object]`:
+
+```py
+# Dict literal: falls through to `dict.__or__`
+reveal_type(bob | {"age": 27})  # revealed: dict[str, object]
+reveal_type({"age": 27} | bob)  # revealed: dict[str, object]
+
+# Incompatible value type for a key
+reveal_type(bob | {"name": 42})  # revealed: dict[str, object]
+reveal_type({"name": 42} | bob)  # revealed: dict[str, object]
+
+# Key not present in the TypedDict
+reveal_type(bob | {"unknown_key": 1})  # revealed: dict[str, object]
+reveal_type({"unknown_key": 1} | bob)  # revealed: dict[str, object]
+```
+
 `TypedDict` keys do not have to be string literals, as long as they can be statically determined
 (inferred to be of type string `Literal`).
 
@@ -202,6 +226,13 @@ reveal_type(alice["inner"]["non_existing"])  # revealed: Unknown
 
 # error: [invalid-key] "Unknown key "extra" for TypedDict `Inner`"
 alice: Person = {"inner": {"name": "Alice", "age": 30, "extra": 1}}
+
+class Box(TypedDict):
+    inner: Inner
+
+box: Box = {"inner": {"name": "Alice", "age": 30}}
+reveal_type(box | {"inner": {"age": 31, "name": "Alice"}})  # revealed: dict[str, object]
+reveal_type({"inner": {"age": 31, "name": "Alice"}} | box)  # revealed: dict[str, object]
 ```
 
 ## Validation of `TypedDict` construction
@@ -1687,7 +1718,11 @@ def combine(p: Person, e: Employee):
     reveal_type(p | p)  # revealed: Person
     reveal_type(e | e)  # revealed: Employee
 
+    # `Employee` is assignable to `Person`, so the result is `Person` in both directions.
+    # The result dict will also contain the `employee_id` key at runtime, but that's
+    # compatible with `Person` (which simply doesn't require it).
     reveal_type(p | e)  # revealed: Person
+    reveal_type(e | p)  # revealed: Person
 ```
 
 When inheriting from a `TypedDict` with a different `total` setting, inherited fields maintain their
