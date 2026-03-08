@@ -1341,7 +1341,14 @@ fn site_packages_directories_from_sys_prefix(
                 let Some(name) = path.file_name() else {
                     continue;
                 };
-                if name.starts_with("python3.") || name.starts_with("pypy3.") {
+                // When we know the version, only include the matching version's directory
+                // to avoid pulling in packages from other Python versions.
+                let version_matches = if let Some(v) = python_version {
+                    name.starts_with(&format!("python{v}")) || name.starts_with(&format!("pypy{v}"))
+                } else {
+                    name.starts_with("python3.") || name.starts_with("pypy3.")
+                };
+                if version_matches {
                     let dist_packages = path.join("dist-packages");
                     if system.is_directory(&dist_packages) {
                         directories.insert(dist_packages);
@@ -2937,6 +2944,51 @@ mod tests {
                 minor: 12,
             }),
             PythonImplementation::CPython,
+            &system,
+        )
+        .unwrap();
+
+        let dirs: Vec<_> = directories.into_iter().collect();
+        assert!(
+            dirs.iter()
+                .any(|p| p.as_str() == "/usr/local/lib/python3.12/dist-packages"),
+            "Expected to find /usr/local/lib/python3.12/dist-packages, got: {dirs:?}"
+        );
+        assert!(
+            dirs.iter()
+                .all(|p| p.as_str() != "/usr/local/lib/python3.11/dist-packages"),
+            "Should NOT find python3.11 packages when version=3.12 is known, got: {dirs:?}"
+        );
+    }
+
+    /// Test that when version is known but implementation is Unknown, wrong-version
+    /// packages under /usr/local/lib are still excluded (edge case: enumeration runs
+    /// because implementation is Unknown, but must be filtered by known version).
+    #[test]
+    #[cfg(not(target_os = "windows"))]
+    fn does_not_include_wrong_version_when_implementation_unknown() {
+        let system = TestSystem::default();
+        let memory_fs = system.memory_file_system();
+
+        let sys_prefix = SystemPathBuf::from("/usr");
+        let correct = SystemPathBuf::from("/usr/local/lib/python3.12/dist-packages");
+        let wrong = SystemPathBuf::from("/usr/local/lib/python3.11/dist-packages");
+
+        memory_fs.create_directory_all(&correct).unwrap();
+        memory_fs.create_directory_all(&wrong).unwrap();
+
+        let sys_prefix_path = SysPrefixPath {
+            inner: sys_prefix,
+            origin: SysPrefixPathOrigin::PythonCliFlag,
+        };
+
+        let directories = site_packages_directories_from_sys_prefix(
+            &sys_prefix_path,
+            Some(PythonVersion {
+                major: 3,
+                minor: 12,
+            }),
+            PythonImplementation::Unknown,
             &system,
         )
         .unwrap();
