@@ -351,3 +351,86 @@ mod flaky {
         forall types t. t.bottom_materialization(db).is_assignable_to(db, t)
     );
 }
+
+/// Regression test for https://github.com/astral-sh/ty/issues/2981
+///
+/// The union builder incorrectly considers `type[type]` as redundant with a callable type
+/// `((ABCMeta | chr | object) -> type)` because `type[type]` can be upcast to a callable
+/// (via `type.__new__`), and the 1-arg overload `(object) -> type` matches the target.
+/// This causes `type[type]` to be removed from the union, so `type[ABCMeta]` (which is
+/// assignable to `type[type]` but not to the callable) can no longer find a match.
+#[cfg(test)]
+mod regression_2981 {
+    use super::*;
+    use crate::place::{builtins_symbol, known_module_symbol};
+    use crate::types::{Parameter, Parameters, Signature, SubclassOfType, Type, UnionType};
+    use ty_module_resolver::KnownModule;
+
+    #[test]
+    fn type_pairs_assignable_to_union() {
+        let db = &setup::get_cached_db();
+
+        // s = type[type]
+        let s = SubclassOfType::from(
+            db,
+            builtins_symbol(db, "type")
+                .place
+                .expect_type()
+                .expect_class_literal()
+                .default_specialization(db),
+        );
+
+        // Parameter type: <class 'ABCMeta'> | (def chr(...)) | <class 'object'>
+        let abc_meta_literal =
+            known_module_symbol(db, KnownModule::Abc, "ABCMeta")
+                .place
+                .expect_type();
+        let chr_function = builtins_symbol(db, "chr").place.expect_type();
+        let object_literal = builtins_symbol(db, "object").place.expect_type();
+        let param_ty =
+            UnionType::from_elements(db, [abc_meta_literal, chr_function, object_literal]);
+
+        // callable: ((ABCMeta | chr | object, /) -> type)
+        let return_ty = builtins_symbol(db, "type")
+            .place
+            .expect_type()
+            .to_instance(db)
+            .unwrap();
+        let callable = Type::single_callable(
+            db,
+            Signature::new(
+                Parameters::new(
+                    db,
+                    [Parameter::positional_only(None).with_annotated_type(param_ty)],
+                ),
+                return_ty,
+            ),
+        );
+
+        // type[ABCMeta]
+        let subclass_of_abcmeta = SubclassOfType::from(
+            db,
+            known_module_symbol(db, KnownModule::Abc, "ABCMeta")
+                .place
+                .expect_type()
+                .expect_class_literal()
+                .default_specialization(db),
+        );
+
+        // t = type[ABCMeta] | callable
+        let t = UnionType::from_elements(db, [subclass_of_abcmeta, callable]);
+
+        let u = union(db, [s, t]);
+
+        // The bug: `type[type]` is incorrectly considered redundant with the callable,
+        // so the union simplifies to just the callable, losing `type[type]`.
+        assert!(
+            s.is_assignable_to(db, u),
+            "s = type[type] should be assignable to s | t"
+        );
+        assert!(
+            t.is_assignable_to(db, u),
+            "t = type[ABCMeta] | callable should be assignable to s | t"
+        );
+    }
+}
