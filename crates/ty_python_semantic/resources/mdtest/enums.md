@@ -1506,6 +1506,142 @@ class MyEnum[T](MyEnumBase):
     A = 1
 ```
 
+## Flags
+
+### Basic Flag
+
+```py
+from enum import Flag
+from typing_extensions import Literal
+
+class Permissions(Flag):
+    READ = 1
+    WRITE = 2
+    EXECUTE = 4
+
+reveal_type(Permissions.READ)  # revealed: Literal[Permissions.READ]
+reveal_type(Permissions.READ | Permissions.WRITE)  # revealed: Literal[Permissions.READ, Permissions.WRITE]
+```
+
+### Flag members
+
+Flag enum members are treated similarly to regular enum members but allow for bitwise combinations:
+
+```py
+from enum import Flag
+from ty_extensions import enum_members
+
+class Permissions(Flag):
+    READ = 1
+    WRITE = 2
+    EXECUTE = 4
+
+# revealed: tuple[Literal["READ"], Literal["WRITE"], Literal["EXECUTE"]]
+reveal_type(enum_members(Permissions))
+```
+
+### IntFlag
+
+`IntFlag` is a flag enum that also behaves like an `int`:
+
+```py
+from enum import IntFlag
+from typing_extensions import Literal
+
+class Status(IntFlag):
+    READY = 1
+    RUNNING = 2
+    STOPPED = 4
+
+reveal_type(Status.READY)  # revealed: Literal[Status.READY]
+reveal_type(Status.READY | Status.RUNNING)  # revealed: Literal[Status.READY]
+
+# IntFlag members can be used in arithmetic operations
+reveal_type(Status.READY + 1)  # revealed: int
+reveal_type(Status.READY == 1)  # revealed: bool
+```
+
+### Flag narrowing with if/else
+
+Flags cannot be narrowed to individual members in the `else` branch of a guard expression,
+because flag combinations can exist that don't match any single member:
+
+```py
+from enum import Flag
+from typing_extensions import assert_type, Literal
+
+class Perms(Flag):
+    READ = 1
+    WRITE = 2
+    EXECUTE = 4
+
+def check_perms(p: Perms) -> None:
+    if p is Perms.READ or p is Perms.WRITE:
+        # When matched as individual literals, type is narrowed to those literals
+        assert_type(p, Literal[Perms.READ, Perms.WRITE])
+    else:
+        # The type remains `Perms` in the else branch,
+        # not narrowed to a specific literal or remaining member
+        assert_type(p, Perms)
+```
+
+### Flag narrowing with match
+
+Pattern matching on flags works similarly; the wildcard case preserves the full flag type:
+
+```py
+from enum import Flag
+from typing_extensions import assert_type, Literal
+
+class Flags(Flag):
+    A = 1
+    B = 2
+    C = 4
+
+def test(f: Flags) -> None:
+    match f:
+        case Flags.A | Flags.B:
+            # Pattern matching on flags does not narrow to specific literals
+            assert_type(f, Flags)
+        case Flags.C:
+            assert_type(f, Flags)
+        case _:
+            # The wildcard also preserves the full flag type
+            assert_type(f, Flags)
+```
+
+### Difference from regular enums
+
+Regular enums narrow to remaining members in the `else` branch. Flags do not, because flag members can be combined:
+
+```py
+from enum import Enum, Flag
+from typing_extensions import assert_type, Literal
+
+class Color(Enum):
+    RED = 1
+    BLUE = 2
+
+class Perms(Flag):
+    READ = 4
+    WRITE = 2
+
+def handle_color(c: Color) -> None:
+    if c is Color.RED:
+        assert_type(c, Literal[Color.RED])
+    else:
+        # Regular enums narrow to remaining members
+        assert_type(c, Literal[Color.BLUE])
+
+def handle_perms(p: Perms) -> None:
+    if p is Perms.READ:
+        assert_type(p, Literal[Perms.READ])
+    else:
+        # Flags do NOT narrow because other members can be combined
+        # with READ (e.g., Perms.READ | Perms.WRITE is a valid Perms)
+        assert_type(p, Perms)
+```
+
 ## References
 
 - Typing spec: <https://typing.python.org/en/latest/spec/enums.html>

@@ -64,6 +64,8 @@ pub enum KnownClass {
     // enum
     Enum,
     EnumType,
+    Flag,
+    IntFlag,
     Auto,
     Member,
     Nonmember,
@@ -219,6 +221,8 @@ impl KnownClass {
             | Self::Float
             | Self::Enum
             | Self::EnumType
+            | Self::Flag
+            | Self::IntFlag
             | Self::Auto
             | Self::Member
             | Self::Nonmember
@@ -285,6 +289,8 @@ impl KnownClass {
             | KnownClass::Super
             | KnownClass::Enum
             | KnownClass::EnumType
+            | KnownClass::Flag
+            | KnownClass::IntFlag
             | KnownClass::Auto
             | KnownClass::Member
             | KnownClass::Nonmember
@@ -374,6 +380,8 @@ impl KnownClass {
             | KnownClass::Super
             | KnownClass::Enum
             | KnownClass::EnumType
+            | KnownClass::Flag
+            | KnownClass::IntFlag
             | KnownClass::Auto
             | KnownClass::Member
             | KnownClass::Nonmember
@@ -463,6 +471,8 @@ impl KnownClass {
             | KnownClass::Super
             | KnownClass::Enum
             | KnownClass::EnumType
+            | KnownClass::Flag
+            | KnownClass::IntFlag
             | KnownClass::Auto
             | KnownClass::Member
             | KnownClass::Nonmember
@@ -592,6 +602,8 @@ impl KnownClass {
             | Self::OrderedDict
             | Self::Enum
             | Self::EnumType
+            | Self::Flag
+            | Self::IntFlag
             | Self::Auto
             | Self::Member
             | Self::Nonmember
@@ -653,6 +665,8 @@ impl KnownClass {
             | KnownClass::Super
             | KnownClass::Enum
             | KnownClass::EnumType
+            | KnownClass::Flag
+            | KnownClass::IntFlag
             | KnownClass::Auto
             | KnownClass::Member
             | KnownClass::Nonmember
@@ -770,6 +784,8 @@ impl KnownClass {
             Self::Deque => "deque",
             Self::OrderedDict => "OrderedDict",
             Self::Enum => "Enum",
+            Self::Flag => "Flag",
+            Self::IntFlag => "IntFlag",
             Self::EnumType => {
                 if Program::get(db).python_version(db) >= PythonVersion::PY311 {
                     "EnumType"
@@ -1107,6 +1123,8 @@ impl KnownClass {
             Self::ABCMeta => KnownModule::Abc,
             Self::Enum
             | Self::EnumType
+            | Self::Flag
+            | Self::IntFlag
             | Self::Auto
             | Self::Member
             | Self::Nonmember
@@ -1257,6 +1275,8 @@ impl KnownClass {
             | Self::ParamSpecArgs
             | Self::ParamSpecKwargs
             | Self::TypeVarTuple
+            | Self::Flag
+            | Self::IntFlag
             | Self::Enum
             | Self::EnumType
             | Self::Auto
@@ -1350,6 +1370,8 @@ impl KnownClass {
             | Self::ParamSpecArgs
             | Self::ParamSpecKwargs
             | Self::TypeVarTuple
+            | Self::Flag
+            | Self::IntFlag
             | Self::Enum
             | Self::EnumType
             | Self::Auto
@@ -1447,6 +1469,8 @@ impl KnownClass {
             "_NoDefaultType" => &[Self::NoDefaultType],
             "SupportsIndex" => &[Self::SupportsIndex],
             "Enum" => &[Self::Enum],
+            "Flag" => &[Self::Flag],
+            "IntFlag" => &[Self::IntFlag],
             "EnumMeta" => &[Self::EnumType],
             "EnumType" if Program::get(db).python_version(db) >= PythonVersion::PY311 => {
                 &[Self::EnumType]
@@ -1536,6 +1560,8 @@ impl KnownClass {
             | Self::MethodWrapperType
             | Self::Enum
             | Self::EnumType
+            | Self::Flag
+            | Self::IntFlag
             | Self::Auto
             | Self::Member
             | Self::Nonmember

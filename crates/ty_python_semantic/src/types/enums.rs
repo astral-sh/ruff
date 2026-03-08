@@ -485,6 +485,19 @@ pub(crate) fn is_enum_class<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
     }
 }
 
+/// Return `true` if the given type is a subclass of `enum.Flag` or `enum.IntFlag`.
+///
+/// We treat flag enums as a special case of enums for narrowing purposes; they
+/// still participate in `enum_metadata`, but certain operations (notably
+/// narrowing and intersection simplification) behave differently because flag
+/// classes can have values that aren't exposed as individual members (e.g. a
+/// combination of multiple flags).
+pub(crate) fn is_flag_class<'db>(db: &'db dyn Db, class: ClassLiteral<'db>) -> bool {
+    let ty = Type::ClassLiteral(class);
+    ty.is_subtype_of(db, KnownClass::Flag.to_subclass_of(db))
+        || ty.is_subtype_of(db, KnownClass::IntFlag.to_subclass_of(db))
+}
+
 /// Checks if a class is an enum class by inheritance (either a subtype of `Enum`
 /// or has a metaclass that is a subtype of `EnumType`).
 ///

@@ -37,7 +37,7 @@
 //! (unless exactly the same literal type), we can avoid many unnecessary redundancy checks.
 
 use super::RecursivelyDefined;
-use crate::types::enums::{enum_member_literals, enum_metadata};
+use crate::types::enums::{enum_member_literals, enum_metadata, is_flag_class};
 use crate::types::{
     BytesLiteralType, ClassLiteral, EnumLiteralType, IntersectionType, KnownClass,
     LiteralValueType, LiteralValueTypeKind, NegativeIntersectionElements, StringLiteralType, Type,
@@ -938,6 +938,17 @@ impl<'db> IntersectionBuilder<'db> {
             Type::NominalInstance(instance)
                 if enum_metadata(self.db, instance.class_literal(self.db)).is_some() =>
             {
+                // Flags are open-ended; a negative literal doesn't mean the entire
+                // instance should be expanded to member literals, because combinations
+                // may still satisfy the intersection. In that case, treat like a
+                // regular non-enum type.
+                if is_flag_class(self.db, instance.class_literal(self.db)) {
+                    for inner in &mut self.intersections {
+                        inner.add_positive(self.db, ty);
+                    }
+                    return self;
+                }
+
                 let mut contains_enum_literal_as_negative_element = false;
                 for intersection in &self.intersections {
                     if intersection.negative.iter().any(|negative| {
@@ -1051,6 +1062,18 @@ impl<'db> IntersectionBuilder<'db> {
             }
             Type::LiteralValue(literal) => match literal.kind() {
                 LiteralValueTypeKind::Enum(enum_literal) => {
+                    let enum_class = enum_literal.enum_class(self.db);
+
+                    // Flag enums should not be treated as closed sets of their members; there
+                    // may be combinations that aren't expressible as individual literals. For
+                    // those classes, just fall back to the generic negative logic instead of
+                    // partitioning / expanding.
+                    if is_flag_class(self.db, enum_class) {
+                        // For flag enums, do not restrict on negative literal values; any combination
+                        // of flags is still a valid member of the class.
+                        return self;
+                    }
+
                     let enum_instance = enum_literal.enum_class_instance(self.db);
 
                     // Partition intersections into those that contain the enum instance and those that don't.
