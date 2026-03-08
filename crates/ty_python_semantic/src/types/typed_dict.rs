@@ -126,6 +126,18 @@ impl<'db> TypedDictType<'db> {
         }
     }
 
+    /// Returns a synthesized `TypedDict` with the same keys and value types, but with all keys
+    /// marked `NotRequired`.
+    pub(crate) fn to_partial(self, db: &'db dyn Db) -> Self {
+        let items: TypedDictSchema<'db> = self
+            .items(db)
+            .iter()
+            .map(|(name, field)| (name.clone(), field.clone().with_required(false)))
+            .collect();
+
+        Self::Synthesized(SynthesizedTypedDictType::new(db, items))
+    }
+
     // Subtyping between `TypedDict`s follows the algorithm described at:
     // https://typing.python.org/en/latest/spec/typeddict.html#subtyping-between-typeddict-types
     #[expect(clippy::too_many_arguments)]
@@ -1130,6 +1142,11 @@ impl<'db> TypedDictField<'db> {
             flags: self.flags,
             first_declaration: self.first_declaration,
         }
+    }
+
+    fn with_required(mut self, yes: bool) -> Self {
+        self.flags.set(TypedDictFieldFlags::REQUIRED, yes);
+        self
     }
 }
 

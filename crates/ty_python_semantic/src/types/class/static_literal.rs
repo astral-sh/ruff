@@ -1890,6 +1890,14 @@ impl<'db> StaticClassLiteral<'db> {
                 )))
             }
             (CodeGeneratorKind::TypedDict, "__or__" | "__ror__") => {
+                // A "partial" version of this TypedDict (all keys `NotRequired`), so that
+                // dict literals like `{"foo": 2}` can match as a valid partial update.
+                let partial_param_ty = if let Type::TypedDict(td) = instance_ty {
+                    Type::TypedDict(td.to_partial(db))
+                } else {
+                    instance_ty
+                };
+
                 // Parameter type for the dict case: `dict[str, Any]`
                 let dict_param_ty = KnownClass::Dict
                     .to_specialized_instance(db, &[KnownClass::Str.to_instance(db), Type::any()]);
@@ -1919,7 +1927,20 @@ impl<'db> StaticClassLiteral<'db> {
                         ),
                         instance_ty,
                     ),
-                    // Overload 2: `(self, value: dict[str, Any]) -> dict[str, object]`
+                    // Overload 2: `(self, value: Partial[Self]) -> Self`
+                    Signature::new(
+                        Parameters::new(
+                            db,
+                            [
+                                Parameter::positional_only(Some(Name::new_static("self")))
+                                    .with_annotated_type(instance_ty),
+                                Parameter::positional_only(Some(Name::new_static("value")))
+                                    .with_annotated_type(partial_param_ty),
+                            ],
+                        ),
+                        instance_ty,
+                    ),
+                    // Overload 3: `(self, value: dict[str, Any]) -> dict[str, object]`
                     Signature::new(
                         Parameters::new(
                             db,

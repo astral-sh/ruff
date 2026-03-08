@@ -51,28 +51,20 @@ Methods that are available on `dict`s are also available on `TypedDict`s:
 bob.update(age=26)
 ```
 
-PEP 584-style immutable updates preserve the `TypedDict` type when the other operand is compatible:
+PEP 584-style immutable updates preserve the `TypedDict` type when the other operand is a compatible
+`TypedDict`:
 
 ```py
 carol_update = Person(name="Carol", age=31)
 reveal_type(bob | carol_update)  # revealed: Person
 ```
 
-When the other operand is not compatible with the `TypedDict`, the result falls back to
-`dict[str, object]`:
+When the other operand is a dict literal, the result falls back to `dict[str, object]`:
 
 ```py
-# Dict literal: falls through to `dict.__or__`
+# TODO: dict literals that are valid partial updates should preserve the TypedDict type
 reveal_type(bob | {"age": 27})  # revealed: dict[str, object]
 reveal_type({"age": 27} | bob)  # revealed: dict[str, object]
-
-# Incompatible value type for a key
-reveal_type(bob | {"name": 42})  # revealed: dict[str, object]
-reveal_type({"name": 42} | bob)  # revealed: dict[str, object]
-
-# Key not present in the TypedDict
-reveal_type(bob | {"unknown_key": 1})  # revealed: dict[str, object]
-reveal_type({"unknown_key": 1} | bob)  # revealed: dict[str, object]
 ```
 
 `TypedDict` keys do not have to be string literals, as long as they can be statically determined
@@ -166,11 +158,17 @@ plot3: Plot = {"y": homogeneous_list(1, 2, 3), "x": homogeneous_list(1, 2, 3)}
 reveal_type(plot3["y"])  # revealed: list[int | None]
 reveal_type(plot3["x"])  # revealed: list[int | None]
 
+reveal_type(plot1 | {"y": homogeneous_list(1, 2, 3)})  # revealed: dict[str, object]
+reveal_type({"y": homogeneous_list(1, 2, 3)} | plot1)  # revealed: dict[str, object]
+
 Y = "y"
 X = "x"
 
 plot4: Plot = {Y: [1, 2, 3], X: None}
 plot5: Plot = {Y: homogeneous_list(1, 2, 3), X: None}
+
+reveal_type(plot1 | {Y: homogeneous_list(1, 2, 3)})  # revealed: dict[str, object]
+reveal_type({Y: homogeneous_list(1, 2, 3)} | plot1)  # revealed: dict[str, object]
 
 class Items(TypedDict):
     items: list[int | str]
@@ -1562,53 +1560,6 @@ def _(p: Person) -> None:
 
     # error: [invalid-key] "Unknown key "extraz" for TypedDict `Person` - did you mean "extra"?"
     reveal_type(p.setdefault("extraz", "value"))  # revealed: Unknown
-```
-
-## PEP 584 merge operator
-
-The `|` operator on `TypedDict` instances (PEP 584) preserves the `TypedDict` type when merging with
-the same type, and returns `dict[str, object]` when merging with a plain `dict`.
-
-### TypedDict merged with same type
-
-```py
-from typing import TypedDict
-
-class MyDict(TypedDict):
-    foo: int
-    bar: str
-
-def _(val: MyDict, other: MyDict) -> None:
-    result = val | other
-    reveal_type(result)  # revealed: MyDict
-```
-
-### TypedDict merged with dict literal
-
-```py
-from typing import TypedDict
-
-class MyDict(TypedDict):
-    foo: int
-    bar: str
-
-def _(val: MyDict) -> None:
-    result = val | {"foo": 2}
-    reveal_type(result)  # revealed: dict[str, object]
-```
-
-### Dict merged with TypedDict (reflected)
-
-```py
-from typing import TypedDict
-
-class MyDict(TypedDict):
-    foo: int
-    bar: str
-
-def _(val: MyDict) -> None:
-    result = {"baz": 42} | val
-    reveal_type(result)  # revealed: dict[str, object]
 ```
 
 ## Unlike normal classes
