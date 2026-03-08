@@ -298,8 +298,8 @@ impl<'a> StatementVisitor<'a> for LogExceptionVisitor<'a> {
                             }
                         }
                         Expr::Name(ast::ExprName { .. }) => {
-                            if qualified_name.is_some_and(
-                                |qualified_name| match qualified_name.segments() {
+                            if qualified_name.is_some_and(|qualified_name| {
+                                match qualified_name.segments() {
                                     ["logging", "exception"] => true,
                                     ["logging", method] if is_logger_method_name(method) => {
                                         is_exc_info_enabled(
@@ -310,8 +310,8 @@ impl<'a> StatementVisitor<'a> for LogExceptionVisitor<'a> {
                                         )
                                     }
                                     _ => false,
-                                },
-                            ) {
+                                }
+                            }) {
                                 self.seen = true;
                             }
                         }
