@@ -2,6 +2,7 @@ use ruff_python_ast::{self as ast, AnyNodeRef};
 
 use super::{MultiInferenceState, TypeInferenceBuilder};
 use crate::Db;
+use crate::types::call::CallArguments;
 use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::diagnostic::{DIVISION_BY_ZERO, report_unsupported_binary_operation};
 use crate::types::typevar::TypeVarConstraints;
@@ -33,33 +34,35 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         } = binary;
 
         // When a dict literal is `|`'d with a TypedDict, infer the non-literal side first
-        // so we can use bidirectional inference on the literal.
-        let (left_ty, right_ty) =
-            if *op == ast::Operator::BitOr && matches!(left.as_ref(), ast::Expr::Dict(_)) {
-                let right_ty = self.infer_expression(right, TypeContext::default());
-                if let Type::TypedDict(typed_dict) = right_ty
-                    && let Some(ty) = self.infer_typed_dict_pep_584_update(left, typed_dict)
-                {
-                    return ty;
-                }
-                (
-                    self.infer_expression(left, TypeContext::default()),
-                    right_ty,
-                )
-            } else {
-                let left_ty = self.infer_expression(left, TypeContext::default());
-                if *op == ast::Operator::BitOr
-                    && let Type::TypedDict(typed_dict) = left_ty
-                    && matches!(right.as_ref(), ast::Expr::Dict(_))
-                    && let Some(ty) = self.infer_typed_dict_pep_584_update(right, typed_dict)
-                {
-                    return ty;
-                }
-                (
-                    left_ty,
-                    self.infer_expression(right, TypeContext::default()),
-                )
-            };
+        // so we can use bidirectional inference on the literal before calling the synthesized
+        // `__or__`/`__ror__` method on the TypedDict side.
+        let (left_ty, right_ty) = if *op == ast::Operator::BitOr
+            && matches!(left.as_ref(), ast::Expr::Dict(_))
+        {
+            let right_ty = self.infer_expression(right, TypeContext::default());
+            if let Type::TypedDict(typed_dict) = right_ty
+                && let Some(ty) = self.infer_typed_dict_pep_584_update(left, typed_dict, "__ror__")
+            {
+                return ty;
+            }
+            (
+                self.infer_expression(left, TypeContext::default()),
+                right_ty,
+            )
+        } else {
+            let left_ty = self.infer_expression(left, TypeContext::default());
+            if *op == ast::Operator::BitOr
+                && let Type::TypedDict(typed_dict) = left_ty
+                && matches!(right.as_ref(), ast::Expr::Dict(_))
+                && let Some(ty) = self.infer_typed_dict_pep_584_update(right, typed_dict, "__or__")
+            {
+                return ty;
+            }
+            (
+                left_ty,
+                self.infer_expression(right, TypeContext::default()),
+            )
+        };
 
         self.infer_binary_expression_type(binary.into(), false, left_ty, right_ty, *op)
             .unwrap_or_else(|| {
@@ -113,6 +116,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         &mut self,
         update: &ast::Expr,
         typed_dict: TypedDictType<'db>,
+        dunder_name: &str,
     ) -> Option<Type<'db>> {
         let db = self.db();
         let partial_typed_dict = typed_dict.to_partial(db);
@@ -128,9 +132,15 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         self.context.set_multi_inference(old_multi_inference);
         self.set_multi_inference_state(old_multi_inference_state);
 
-        update_ty
-            .is_assignable_to(db, Type::TypedDict(partial_typed_dict))
-            .then_some(Type::TypedDict(typed_dict))
+        Type::TypedDict(typed_dict)
+            .try_call_dunder(
+                db,
+                dunder_name,
+                CallArguments::positional([update_ty]),
+                TypeContext::default(),
+            )
+            .ok()
+            .map(|bindings| bindings.return_type(db))
     }
 
     /// Maps an operation over each constraint of a constrained `TypeVar`.
@@ -226,18 +236,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 alias.value_type(db),
                 op,
             ),
-
-            (Type::TypedDict(left_typed_dict), rhs, ast::Operator::BitOr)
-                if rhs.is_assignable_to(db, Type::TypedDict(left_typed_dict)) =>
-            {
-                Some(Type::TypedDict(left_typed_dict))
-            }
-
-            (lhs, Type::TypedDict(right_typed_dict), ast::Operator::BitOr)
-                if lhs.is_assignable_to(db, Type::TypedDict(right_typed_dict)) =>
-            {
-                Some(Type::TypedDict(right_typed_dict))
-            }
 
             // Non-todo Anys take precedence over Todos (as if we fix this `Todo` in the future,
             // the result would then become Any or Unknown, respectively).

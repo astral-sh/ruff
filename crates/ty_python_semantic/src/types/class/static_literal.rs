@@ -1889,6 +1889,73 @@ impl<'db> StaticClassLiteral<'db> {
                     CallableTypeKind::FunctionLike,
                 )))
             }
+            (CodeGeneratorKind::TypedDict, "__or__" | "__ror__") => {
+                // A "partial" version of this TypedDict (all keys `NotRequired`), so that
+                // dict literals like `{"foo": 2}` can match as a valid partial update.
+                let partial_param_ty = if let Type::TypedDict(td) = instance_ty {
+                    Type::TypedDict(td.to_partial(db))
+                } else {
+                    instance_ty
+                };
+
+                let dict_param_ty = KnownClass::Dict
+                    .to_specialized_instance(db, &[KnownClass::Str.to_instance(db), Type::any()]);
+
+                // We use `object` because a `closed=False` TypedDict (the default) can contain
+                // arbitrary additional keys with arbitrary value types.
+                let dict_return_ty = KnownClass::Dict.to_specialized_instance(
+                    db,
+                    &[
+                        KnownClass::Str.to_instance(db),
+                        KnownClass::Object.to_instance(db),
+                    ],
+                );
+
+                let overloads = [
+                    Signature::new(
+                        Parameters::new(
+                            db,
+                            [
+                                Parameter::positional_only(Some(Name::new_static("self")))
+                                    .with_annotated_type(instance_ty),
+                                Parameter::positional_only(Some(Name::new_static("value")))
+                                    .with_annotated_type(instance_ty),
+                            ],
+                        ),
+                        instance_ty,
+                    ),
+                    Signature::new(
+                        Parameters::new(
+                            db,
+                            [
+                                Parameter::positional_only(Some(Name::new_static("self")))
+                                    .with_annotated_type(instance_ty),
+                                Parameter::positional_only(Some(Name::new_static("value")))
+                                    .with_annotated_type(partial_param_ty),
+                            ],
+                        ),
+                        instance_ty,
+                    ),
+                    Signature::new(
+                        Parameters::new(
+                            db,
+                            [
+                                Parameter::positional_only(Some(Name::new_static("self")))
+                                    .with_annotated_type(instance_ty),
+                                Parameter::positional_only(Some(Name::new_static("value")))
+                                    .with_annotated_type(dict_param_ty),
+                            ],
+                        ),
+                        dict_return_ty,
+                    ),
+                ];
+
+                Some(Type::Callable(CallableType::new(
+                    db,
+                    CallableSignature::from_overloads(overloads),
+                    CallableTypeKind::FunctionLike,
+                )))
+            }
             (CodeGeneratorKind::TypedDict, "update") => {
                 // TODO: synthesize a set of overloads with precise types
                 let signature = Signature::new(
