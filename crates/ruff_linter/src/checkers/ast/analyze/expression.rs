@@ -1162,6 +1162,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                         checker, call, segments,
                     );
                 }
+                if checker.is_rule_enabled(Rule::OsPathCommonprefix) {
+                    ruff::rules::os_path_commonprefix(checker, call, segments);
+                }
             }
 
             if checker.is_rule_enabled(Rule::OsSepSplit) {
