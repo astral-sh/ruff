@@ -1,5 +1,6 @@
 ---
 source: crates/ruff/tests/show_settings.rs
+assertion_line: 95
 info:
   program: ruff
   args:
@@ -207,6 +208,7 @@ linter.builtins = []
 linter.dummy_variable_rgx = ^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$
 linter.external = []
 linter.ignore_init_module_imports = true
+linter.logger_callables = []
 linter.logger_objects = []
 linter.namespace_packages = []
 linter.src = [
