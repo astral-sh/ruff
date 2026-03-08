@@ -1536,7 +1536,7 @@ def _(p: Person) -> None:
 ## PEP 584 merge operator
 
 The `|` operator on `TypedDict` instances (PEP 584) preserves the `TypedDict` type when merging with
-the same type, and returns a more specific `dict[str, VT]` type when merging with a plain `dict`.
+the same type, and returns `dict[str, object]` when merging with a plain `dict`.
 
 ### TypedDict merged with same type
 
@@ -1563,7 +1563,7 @@ class MyDict(TypedDict):
 
 def _(val: MyDict) -> None:
     result = val | {"foo": 2}
-    reveal_type(result)  # revealed: dict[str, int | str]
+    reveal_type(result)  # revealed: dict[str, object]
 ```
 
 ### Dict merged with TypedDict (reflected)
@@ -1577,7 +1577,7 @@ class MyDict(TypedDict):
 
 def _(val: MyDict) -> None:
     result = {"baz": 42} | val
-    reveal_type(result)  # revealed: dict[str, int | str]
+    reveal_type(result)  # revealed: dict[str, object]
 ```
 
 ## Unlike normal classes

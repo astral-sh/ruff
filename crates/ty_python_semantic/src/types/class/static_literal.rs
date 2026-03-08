@@ -1890,22 +1890,20 @@ impl<'db> StaticClassLiteral<'db> {
                 )))
             }
             (CodeGeneratorKind::TypedDict, "__or__" | "__ror__") => {
-                let fields = self.fields(db, specialization, field_policy);
-
-                // Compute the union of all value types from the TypedDict's fields.
-                // For `MyDict(foo: int, bar: str)`, this gives `int | str`.
-                let value_type_union =
-                    UnionType::from_elements(db, fields.iter().map(|(_, field)| field.declared_ty));
-
-                // Return type for the dict case: `dict[str, VT]`
-                let dict_return_ty = KnownClass::Dict.to_specialized_instance(
-                    db,
-                    &[KnownClass::Str.to_instance(db), value_type_union],
-                );
-
                 // Parameter type for the dict case: `dict[str, Any]`
                 let dict_param_ty = KnownClass::Dict
                     .to_specialized_instance(db, &[KnownClass::Str.to_instance(db), Type::any()]);
+
+                // Return type for the dict case: `dict[str, object]`
+                // We use `object` because a `closed=False` TypedDict (the default) can
+                // contain arbitrary additional keys with arbitrary value types.
+                let dict_return_ty = KnownClass::Dict.to_specialized_instance(
+                    db,
+                    &[
+                        KnownClass::Str.to_instance(db),
+                        KnownClass::Object.to_instance(db),
+                    ],
+                );
 
                 let overloads = [
                     // Overload 1: `(self, value: Self) -> Self`
@@ -1921,7 +1919,7 @@ impl<'db> StaticClassLiteral<'db> {
                         ),
                         instance_ty,
                     ),
-                    // Overload 2: `(self, value: dict[str, Any]) -> dict[str, VT]`
+                    // Overload 2: `(self, value: dict[str, Any]) -> dict[str, object]`
                     Signature::new(
                         Parameters::new(
                             db,
