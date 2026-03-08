@@ -932,5 +932,40 @@ def reveal_type(obj, /): ...
 reveal_type((1, 2, 3))  # revealed: tuple[Literal[1], Literal[2], Literal[3]]
 ```
 
+## Default type parameter after `TypeVarTuple`
+
+<!-- snapshot-diagnostics -->
+
+A type parameter with a default cannot follow a `TypeVarTuple` in a type parameter list. This is
+prohibited by the typing spec because a `TypeVarTuple` consumes all remaining positional type
+arguments, making any subsequent defaults meaningless.
+
+```py
+# error: [invalid-type-variable-default] "Type parameter `T` with a default follows TypeVarTuple `Ts`"
+class Foo[*Ts, T = int]: ...
+
+# error: [invalid-type-variable-default]
+class Bar[T1, *Ts, T2 = int]: ...
+
+# error: [invalid-type-variable-default]
+class Baz[*Ts, T1 = int, T2 = str]: ...
+
+# error: [invalid-type-variable-default]
+class Qux[*Ts, **P = [int, str]]: ...
+
+# error: [invalid-type-variable-default]
+class Quux[*Ts, T1 = int, **P = [int, str]]: ...
+
+# error: [invalid-type-variable-default]
+class Corge[*Ts, T1 = int, T2 = str, **P = [int, str]]: ...
+
+# error: [invalid-type-variable-default]
+class Grault[*Us, *Ts = *tuple[int, str]]: ...
+
+# These are fine:
+class Ok1[T, *Ts]: ...
+class Ok3[*Ts]: ...
+```
+
 [crtp]: https://en.wikipedia.org/wiki/Curiously_recurring_template_pattern
 [f-bound]: https://en.wikipedia.org/wiki/Bounded_quantification#F-bounded_quantification

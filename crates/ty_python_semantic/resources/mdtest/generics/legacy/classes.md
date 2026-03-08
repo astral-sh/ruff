@@ -1063,5 +1063,53 @@ def func(x: D): ...
 func(G())  # error: [invalid-argument-type]
 ```
 
+## Default type parameter after `TypeVarTuple`
+
+A type parameter with a default cannot follow a `TypeVarTuple` in a legacy `Generic[...]` or
+`Protocol[...]` subscription. This is prohibited by the typing spec because a `TypeVarTuple`
+consumes all remaining positional type arguments, making any subsequent defaults meaningless.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import ParamSpec, TypeVar, TypeVarTuple, Unpack, Generic, Protocol
+
+T = TypeVar("T", default=int)
+T2 = TypeVar("T2", default=str)
+U = TypeVar("U")
+Ts = TypeVarTuple("Ts")
+Ts2 = TypeVarTuple("Ts2", default=Unpack[tuple[int, str]])
+Us = TypeVarTuple("Us")
+P = ParamSpec("P", default=[int, str])
+
+# TODO: should emit [invalid-type-variable-default]
+class Foo(Generic[*Ts, T]): ...
+
+# TODO: should emit [invalid-type-variable-default]
+class Bar(Generic[U, *Ts, T]): ...
+
+# TODO: should emit [invalid-type-variable-default]
+class Baz(Protocol[*Ts, T]): ...
+
+# TODO: should emit [invalid-type-variable-default]
+class Qux(Generic[*Ts, T, T2]): ...
+
+# TODO: should emit [invalid-type-variable-default]
+class Quux(Generic[Unpack[Ts], T]): ...
+
+# TODO: should emit [invalid-type-variable-default]
+class Corge(Generic[Unpack[Us], P]): ...
+
+# TODO: should emit [invalid-type-variable-default]
+class Grault(Generic[Unpack[Us], Unpack[Ts2]]): ...
+
+# These are fine:
+class Ok1(Generic[U, *Ts]): ...
+class Ok2(Generic[U, Unpack[Ts]]): ...
+```
+
 [crtp]: https://en.wikipedia.org/wiki/Curiously_recurring_template_pattern
 [f-bound]: https://en.wikipedia.org/wiki/Bounded_quantification#F-bounded_quantification
