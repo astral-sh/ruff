@@ -758,7 +758,7 @@ fn recursive_type_normalize_type_guard_like<'db, T: TypeGuardLike<'db>>(
     Some(guard.with_type(db, ty))
 }
 
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy)]
 struct GeneratorTypes<'db> {
     yielded: Option<Type<'db>>,
     sent: Option<Type<'db>>,
@@ -4794,8 +4794,8 @@ impl<'db> Type<'db> {
             {
                 Some(GeneratorTypes {
                     yielded: Some(*yield_ty),
-                    sent: None,
-                    returned: None,
+                    sent: Some(Type::none(db)),
+                    returned: Some(Type::none(db)),
                 })
             } else {
                 None
