@@ -1100,6 +1100,10 @@ class Qux(Generic[*Ts, T, T2]): ...
 # TODO: should emit [invalid-type-variable-default]
 class Quux(Generic[Unpack[Ts], T]): ...
 
+# Note: the spec says this is fine,
+# but it raises `TypeError` at runtime
+# (<https://github.com/python/typing/issues/2211>)
+#
 # TODO: should emit [invalid-type-variable-default]
 class Corge(Generic[Unpack[Us], P]): ...
 

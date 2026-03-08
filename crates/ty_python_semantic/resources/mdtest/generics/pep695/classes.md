@@ -950,6 +950,10 @@ class Bar[T1, *Ts, T2 = int]: ...
 # error: [invalid-type-variable-default]
 class Baz[*Ts, T1 = int, T2 = str]: ...
 
+# Note: the spec says this is fine,
+# but it raises `TypeError` at runtime
+# (<https://github.com/python/typing/issues/2211>)
+#
 # error: [invalid-type-variable-default]
 class Qux[*Ts, **P = [int, str]]: ...
 
