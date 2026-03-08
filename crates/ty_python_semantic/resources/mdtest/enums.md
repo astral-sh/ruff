@@ -1563,8 +1563,8 @@ reveal_type(Status.READY == 1)  # revealed: bool
 
 ### Flag narrowing with if/else
 
-Flags cannot be narrowed to individual members in the `else` branch of a guard expression,
-because flag combinations can exist that don't match any single member:
+Flags cannot be narrowed to individual members in the `else` branch of a guard expression, because
+flag combinations can exist that don't match any single member:
 
 ```py
 from enum import Flag
@@ -1612,7 +1612,8 @@ def test(f: Flags) -> None:
 
 ### Difference from regular enums
 
-Regular enums narrow to remaining members in the `else` branch. Flags do not, because flag members can be combined:
+Regular enums narrow to remaining members in the `else` branch. Flags do not, because flag members
+can be combined:
 
 ```py
 from enum import Enum, Flag

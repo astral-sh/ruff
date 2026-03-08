@@ -31,6 +31,7 @@ pub(crate) struct EnumMetadata<'db> {
     /// When present, member values are validated by synthesizing a call to
     /// `__init__` rather than by simple type assignability.
     pub(crate) init_function: Option<FunctionType<'db>>,
+    pub(crate) is_flag_subclass: bool,
 }
 
 impl get_size2::GetSize for EnumMetadata<'_> {}
@@ -43,6 +44,7 @@ impl<'db> EnumMetadata<'db> {
             auto_members: FxHashSet::default(),
             value_annotation: None,
             init_function: None,
+            is_flag_subclass: false,
         }
     }
 
@@ -393,12 +395,16 @@ pub(crate) fn enum_metadata<'db>(
     // Look up a custom `__init__`, falling back to parent enum classes.
     let init_function = custom_init(db, scope_id).or_else(|| inherited_init(db, class));
 
+    let is_flag_subclass = Type::ClassLiteral(ClassLiteral::Static(class))
+        .is_subtype_of(db, KnownClass::Flag.to_subclass_of(db));
+
     Some(EnumMetadata {
         members,
         aliases,
         auto_members,
         value_annotation,
         init_function,
+        is_flag_subclass,
     })
 }
 
@@ -483,19 +489,6 @@ pub(crate) fn is_enum_class<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
         Type::ClassLiteral(class_literal) => enum_metadata(db, class_literal).is_some(),
         _ => false,
     }
-}
-
-/// Return `true` if the given type is a subclass of `enum.Flag` or `enum.IntFlag`.
-///
-/// We treat flag enums as a special case of enums for narrowing purposes; they
-/// still participate in `enum_metadata`, but certain operations (notably
-/// narrowing and intersection simplification) behave differently because flag
-/// classes can have values that aren't exposed as individual members (e.g. a
-/// combination of multiple flags).
-pub(crate) fn is_flag_class<'db>(db: &'db dyn Db, class: ClassLiteral<'db>) -> bool {
-    let ty = Type::ClassLiteral(class);
-    ty.is_subtype_of(db, KnownClass::Flag.to_subclass_of(db))
-        || ty.is_subtype_of(db, KnownClass::IntFlag.to_subclass_of(db))
 }
 
 /// Checks if a class is an enum class by inheritance (either a subtype of `Enum`
