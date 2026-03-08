@@ -1321,8 +1321,9 @@ fn site_packages_directories_from_sys_prefix(
     // still needs to be discovered.
     //
     // Only enumerate when the version or implementation is unknown; when both are known,
-    // phase 1 already added the version-specific /usr/local path, and we must not include
-    // packages from other Python versions that happen to be installed under /usr/local/lib.
+    // phase 1 already added the version-specific /usr/local path (because
+    // `relative_dist_packages_path` returns `Some` only for known implementations), and
+    // we must not include packages from other Python versions installed under /usr/local/lib.
     if is_debian_system_prefix
         && (python_version.is_none() || matches!(implementation, PythonImplementation::Unknown))
     {
@@ -1336,15 +1337,22 @@ fn site_packages_directories_from_sys_prefix(
                     continue;
                 }
                 let path = entry.into_path();
-                // no need to check `python3` (without minor version) here;
+                // No need to check `python3` (without minor version) here;
                 // `/usr/local/lib/python3/dist-packages` is already handled above.
                 let Some(name) = path.file_name() else {
                     continue;
                 };
                 // When we know the version, only include the matching version's directory
                 // to avoid pulling in packages from other Python versions.
+                // Use an exact match or a dot-suffix check (e.g. "python3.12" or
+                // "python3.12.1") to avoid "python3.1" accidentally matching "python3.10".
                 let version_matches = if let Some(v) = python_version {
-                    name.starts_with(&format!("python{v}")) || name.starts_with(&format!("pypy{v}"))
+                    let python_prefix = format!("python{v}");
+                    let pypy_prefix = format!("pypy{v}");
+                    name == python_prefix
+                        || name.starts_with(&format!("{python_prefix}."))
+                        || name == pypy_prefix
+                        || name.starts_with(&format!("{pypy_prefix}."))
                 } else {
                     name.starts_with("python3.") || name.starts_with("pypy3.")
                 };
