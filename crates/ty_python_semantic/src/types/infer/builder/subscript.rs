@@ -1,8 +1,9 @@
-use itertools::{EitherOrBoth, Itertools};
+use itertools::{Either, EitherOrBoth, Itertools};
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span};
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::{self as ast, ExprContext};
 use ruff_text_size::Ranged;
+use ty_module_resolver::file_to_module;
 
 use super::TypeInferenceBuilder;
 use crate::place::{DefinedPlace, Definedness, Place};
@@ -10,25 +11,31 @@ use crate::semantic_index::SemanticIndex;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::place::{PlaceExpr, PlaceExprRef};
 use crate::semantic_index::scope::FileScopeId;
+use crate::types::call::CallErrorKind;
 use crate::types::call::bind::CallableDescription;
 use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::diagnostic::{
-    INVALID_TYPE_ARGUMENTS, INVALID_TYPE_FORM, NOT_SUBSCRIPTABLE,
-    report_invalid_arguments_to_annotated,
+    CALL_NON_CALLABLE, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_KEY,
+    INVALID_TYPE_ARGUMENTS, INVALID_TYPE_FORM, NOT_SUBSCRIPTABLE, POSSIBLY_MISSING_IMPLICIT_CALL,
+    TypedDictDeleteErrorKind, report_cannot_delete_typed_dict_key,
+    report_invalid_arguments_to_annotated, report_not_subscriptable,
 };
 use crate::types::generics::{GenericContext, InferableTypeVars, bind_typevar};
 use crate::types::infer::InferenceFlags;
+use crate::types::infer::builder::{ArgExpr, ArgumentsIter};
 use crate::types::special_form::AliasSpec;
 use crate::types::subscript::{LegacyGenericOrigin, SubscriptError, SubscriptErrorKind};
 use crate::types::tuple::{Tuple, TupleType};
+use crate::types::typed_dict::{TypedDictAssignmentKind, TypedDictKeyAssignment};
 use crate::types::{
-    BoundTypeVarInstance, CallableType, DynamicType, InternedType, KnownClass, KnownInstanceType,
-    Parameters, SpecialFormType, StaticClassLiteral, Type, TypeAliasType, TypeContext,
-    TypeVarBoundOrConstraints, UnionType, UnionTypeInstance, any_over_type, todo_type,
+    BoundTypeVarInstance, CallArguments, CallDunderError, CallableType, DynamicType, InternedType,
+    KnownClass, KnownInstanceType, LintDiagnosticGuard, Parameter, Parameters, SpecialFormType,
+    StaticClassLiteral, Type, TypeAliasType, TypeContext, TypeVarBoundOrConstraints, UnionType,
+    UnionTypeInstance, any_over_type, todo_type,
 };
 use crate::{Db, FxOrderSet};
 
-impl<'db> TypeInferenceBuilder<'db, '_> {
+impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     pub(super) fn infer_subscript_expression(
         &mut self,
         subscript: &ast::ExprSubscript,
@@ -823,6 +830,174 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
     }
 
+    /// Infer the type of the expression that represents an explicit specialization of a
+    /// `ParamSpec` type variable.
+    fn infer_paramspec_explicit_specialization_value(
+        &mut self,
+        expr: &ast::Expr,
+        exactly_one_paramspec: bool,
+    ) -> Result<Type<'db>, ()> {
+        let db = self.db();
+
+        match expr {
+            ast::Expr::EllipsisLiteral(_) => {
+                return Ok(Type::paramspec_value_callable(
+                    db,
+                    Parameters::gradual_form(),
+                ));
+            }
+
+            ast::Expr::Tuple(_) if !exactly_one_paramspec => {
+                // Tuple expression is only allowed when the generic context contains only one
+                // `ParamSpec` type variable and no other type variables.
+            }
+
+            ast::Expr::Tuple(ast::ExprTuple { elts, .. })
+            | ast::Expr::List(ast::ExprList { elts, .. }) => {
+                let mut parameter_types = Vec::with_capacity(elts.len());
+
+                // Whether to infer `Todo` for the parameters
+                let mut return_todo = false;
+
+                for param in elts {
+                    let param_type = self.infer_type_expression(param);
+                    // This is similar to what we currently do for inferring tuple type expression.
+                    // We currently infer `Todo` for the parameters to avoid invalid diagnostics
+                    // when trying to check for assignability or any other relation. For example,
+                    // `*tuple[int, str]`, `Unpack[]`, etc. are not yet supported.
+                    return_todo |= param_type.is_todo()
+                        && matches!(param, ast::Expr::Starred(_) | ast::Expr::Subscript(_));
+                    parameter_types.push(param_type);
+                }
+
+                let parameters = if return_todo {
+                    // TODO: `Unpack`
+                    Parameters::todo()
+                } else {
+                    Parameters::new(
+                        self.db(),
+                        parameter_types.iter().map(|param_type| {
+                            Parameter::positional_only(None).with_annotated_type(*param_type)
+                        }),
+                    )
+                };
+
+                return Ok(Type::paramspec_value_callable(db, parameters));
+            }
+
+            ast::Expr::Subscript(_) => {
+                // TODO: Support `Concatenate[...]`
+                return Ok(Type::paramspec_value_callable(db, Parameters::todo()));
+            }
+
+            ast::Expr::Name(name) => {
+                if name.is_invalid() {
+                    return Err(());
+                }
+
+                let param_type = self.infer_type_expression(expr);
+
+                match param_type {
+                    Type::TypeVar(typevar) if typevar.is_paramspec(db) => {
+                        return Ok(param_type);
+                    }
+
+                    Type::KnownInstance(KnownInstanceType::TypeVar(typevar))
+                        if typevar.is_paramspec(db) =>
+                    {
+                        if let Some(diagnostic_builder) =
+                            self.context.report_lint(&INVALID_TYPE_ARGUMENTS, expr)
+                        {
+                            diagnostic_builder.into_diagnostic(format_args!(
+                                "ParamSpec `{}` is unbound",
+                                typevar.name(self.db())
+                            ));
+                        }
+                        return Err(());
+                    }
+
+                    // This is to handle the following case:
+                    //
+                    // ```python
+                    // from typing import ParamSpec
+                    //
+                    // class Foo[**P]: ...
+                    //
+                    // Foo[ParamSpec]  # P: (ParamSpec, /)
+                    // ```
+                    Type::NominalInstance(nominal)
+                        if nominal.has_known_class(self.db(), KnownClass::ParamSpec) =>
+                    {
+                        return Ok(Type::paramspec_value_callable(
+                            db,
+                            Parameters::new(
+                                self.db(),
+                                [
+                                    Parameter::positional_only(None)
+                                        .with_annotated_type(param_type),
+                                ],
+                            ),
+                        ));
+                    }
+
+                    _ if exactly_one_paramspec => {
+                        // Square brackets are optional when `ParamSpec` is the only type variable
+                        // being specialized. This means that a single name expression represents a
+                        // parameter list with a single parameter. For example,
+                        //
+                        // ```python
+                        // class OnlyParamSpec[**P]: ...
+                        //
+                        // OnlyParamSpec[int]  # P: (int, /)
+                        // ```
+                        let parameters =
+                            if param_type.is_todo() {
+                                Parameters::todo()
+                            } else {
+                                Parameters::new(
+                                    self.db(),
+                                    [Parameter::positional_only(None)
+                                        .with_annotated_type(param_type)],
+                                )
+                            };
+                        return Ok(Type::paramspec_value_callable(db, parameters));
+                    }
+
+                    // This is specifically to handle a case where there are more than one type
+                    // variables and at least one of them is a `ParamSpec` which is specialized
+                    // using `typing.Any`. This isn't explicitly allowed in the spec, but both mypy
+                    // and Pyright allows this and the ecosystem report suggested there are usages
+                    // of this in the wild e.g., `staticmethod[Any, Any]`. For example,
+                    //
+                    // ```python
+                    // class Foo[**P, T]: ...
+                    //
+                    // Foo[Any, int]  # P: (Any, /), T: int
+                    // ```
+                    Type::Dynamic(DynamicType::Any) => {
+                        return Ok(Type::paramspec_value_callable(
+                            db,
+                            Parameters::gradual_form(),
+                        ));
+                    }
+
+                    _ => {}
+                }
+            }
+
+            _ => {}
+        }
+
+        if let Some(builder) = self.context.report_lint(&INVALID_TYPE_ARGUMENTS, expr) {
+            builder.into_diagnostic(
+                "Type argument for `ParamSpec` must be either \
+                    a list of types, `ParamSpec`, `Concatenate`, or `...`",
+            );
+        }
+
+        Err(())
+    }
+
     pub(super) fn infer_subscript_expression_types(
         &self,
         subscript: &ast::ExprSubscript,
@@ -917,6 +1092,600 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
             _ => KnownClass::Slice.to_instance(db),
         }
+    }
+
+    /// Validate a subscript assignment of the form `object[key] = rhs_value`.
+    pub(super) fn validate_subscript_assignment(
+        &mut self,
+        target: &ast::ExprSubscript,
+        rhs_value: &ast::Expr,
+        infer_rhs_value: &mut dyn FnMut(&mut Self, TypeContext<'db>) -> Type<'db>,
+    ) -> bool {
+        let ast::ExprSubscript {
+            range: _,
+            node_index: _,
+            value: object,
+            slice,
+            ctx: _,
+        } = target;
+
+        let object_ty = self.infer_expression(object, TypeContext::default());
+        let mut infer_slice_ty = |builder: &mut Self, tcx| builder.infer_expression(slice, tcx);
+
+        self.validate_subscript_assignment_impl(
+            target,
+            None,
+            object_ty,
+            &mut infer_slice_ty,
+            rhs_value,
+            infer_rhs_value,
+            true,
+        )
+    }
+
+    #[expect(clippy::too_many_arguments)]
+    fn validate_subscript_assignment_impl(
+        &mut self,
+        target: &ast::ExprSubscript,
+        full_object_ty: Option<Type<'db>>,
+        object_ty: Type<'db>,
+        infer_slice_ty: &mut dyn FnMut(&mut Self, TypeContext<'db>) -> Type<'db>,
+        rhs_value_node: &ast::Expr,
+        infer_rhs_value: &mut dyn FnMut(&mut Self, TypeContext<'db>) -> Type<'db>,
+        emit_diagnostic: bool,
+    ) -> bool {
+        /// Given a string literal or a union of string literals, return an iterator over the contained
+        /// strings, or `None`, if the type is neither.
+        fn key_literals<'db>(
+            db: &'db dyn Db,
+            slice_ty: Type<'db>,
+        ) -> Option<impl Iterator<Item = &'db str> + 'db> {
+            if let Some(literal) = slice_ty.as_string_literal() {
+                Some(Either::Left(std::iter::once(literal.value(db))))
+            } else {
+                slice_ty.as_union().map(|union| {
+                    Either::Right(
+                        union
+                            .elements(db)
+                            .iter()
+                            .filter_map(|ty| ty.as_string_literal().map(|lit| lit.value(db))),
+                    )
+                })
+            }
+        }
+
+        let db = self.db();
+
+        let attach_original_type_info = |diagnostic: &mut LintDiagnosticGuard| {
+            if let Some(full_object_ty) = full_object_ty {
+                diagnostic.info(format_args!(
+                    "The full type of the subscripted object is `{}`",
+                    full_object_ty.display(db)
+                ));
+            }
+        };
+
+        match object_ty {
+            Type::Union(union) => {
+                // TODO: Perform multi-inference here.
+                let slice_ty = infer_slice_ty(self, TypeContext::default());
+                let rhs_value_ty = infer_rhs_value(self, TypeContext::default());
+
+                // Note that we use a loop here instead of .all(…) to avoid short-circuiting.
+                // We need to keep iterating to emit all diagnostics.
+                let mut valid = true;
+                for element_ty in union.elements(db) {
+                    valid &= self.validate_subscript_assignment_impl(
+                        target,
+                        full_object_ty.or(Some(object_ty)),
+                        *element_ty,
+                        &mut |_, _| slice_ty,
+                        rhs_value_node,
+                        &mut |_, _| rhs_value_ty,
+                        emit_diagnostic,
+                    );
+                }
+                valid
+            }
+
+            Type::Intersection(intersection) => {
+                // TODO: Perform multi-inference here.
+                let slice_ty = infer_slice_ty(self, TypeContext::default());
+                let rhs_value_ty = infer_rhs_value(self, TypeContext::default());
+
+                let mut check_positive_elements = |emit_diagnostic_and_short_circuit| {
+                    let mut valid = false;
+                    for element_ty in intersection.positive(db) {
+                        valid |= self.validate_subscript_assignment_impl(
+                            target,
+                            full_object_ty.or(Some(object_ty)),
+                            *element_ty,
+                            &mut |_, _| slice_ty,
+                            rhs_value_node,
+                            &mut |_, _| rhs_value_ty,
+                            emit_diagnostic_and_short_circuit,
+                        );
+
+                        if !valid && emit_diagnostic_and_short_circuit {
+                            break;
+                        }
+                    }
+
+                    valid
+                };
+
+                // Perform an initial check of all elements. If the assignment is valid
+                // for at least one element, we do not emit any diagnostics. Otherwise,
+                // we re-run the check and emit a diagnostic on the first failing element.
+                let valid = check_positive_elements(false);
+
+                if !valid {
+                    check_positive_elements(true);
+                }
+
+                valid
+            }
+
+            Type::TypedDict(typed_dict) => {
+                // As an optimization, prevent calling `__setitem__` on (unions of) large `TypedDict`s, and
+                // validate the assignment ourselves. This also allows us to emit better diagnostics.
+
+                // TODO: Use type context here.
+                let slice_ty = infer_slice_ty(self, TypeContext::default());
+                let rhs_value_ty = infer_rhs_value(self, TypeContext::default());
+
+                let mut valid = true;
+                let Some(keys) = key_literals(db, slice_ty) else {
+                    // Check if the key has a valid type. We only allow string literals, a union of string literals,
+                    // or a dynamic type like `Any`. We can do this by checking assignability to `LiteralString`,
+                    // but we need to exclude `LiteralString` itself. This check would technically allow weird key
+                    // types like `LiteralString & Any` to pass, but it does not need to be perfect. We would just
+                    // fail to provide the "can only be subscripted with a string literal key" hint in that case.
+
+                    if slice_ty.is_dynamic() {
+                        return true;
+                    }
+
+                    let assigned_d = rhs_value_ty.display(db);
+                    let value_d = object_ty.display(db);
+
+                    if slice_ty.is_assignable_to(db, Type::literal_string())
+                        && !slice_ty.is_equivalent_to(db, Type::literal_string())
+                    {
+                        if let Some(builder) = self
+                            .context
+                            .report_lint(&INVALID_ASSIGNMENT, target.slice.as_ref())
+                        {
+                            let mut diagnostic = builder.into_diagnostic(format_args!(
+                                "Cannot assign value of type `{assigned_d}` to key of type `{}` on TypedDict `{value_d}`",
+                                slice_ty.display(db)
+                            ));
+                            attach_original_type_info(&mut diagnostic);
+                        }
+                    } else {
+                        if let Some(builder) = self
+                            .context
+                            .report_lint(&INVALID_KEY, target.slice.as_ref())
+                        {
+                            let mut diagnostic = builder.into_diagnostic(format_args!(
+                                "TypedDict `{value_d}` can only be subscripted with a string literal key, got key of type `{}`.",
+                                slice_ty.display(db)
+                            ));
+                            attach_original_type_info(&mut diagnostic);
+                        }
+                    }
+
+                    return false;
+                };
+
+                for key in keys {
+                    valid &= TypedDictKeyAssignment {
+                        context: &self.context,
+                        typed_dict,
+                        full_object_ty,
+                        key,
+                        value_ty: rhs_value_ty,
+                        typed_dict_node: target.value.as_ref().into(),
+                        key_node: target.slice.as_ref().into(),
+                        value_node: rhs_value_node.into(),
+                        assignment_kind: TypedDictAssignmentKind::Subscript,
+                        emit_diagnostic,
+                    }
+                    .validate();
+                }
+
+                valid
+            }
+
+            _ => {
+                let ast_arguments = [
+                    ast::ArgOrKeyword::Arg(&target.slice),
+                    ast::ArgOrKeyword::Arg(rhs_value_node),
+                ];
+
+                let mut call_arguments =
+                    CallArguments::positional([Type::unknown(), Type::unknown()]);
+
+                let mut infer_argument_ty =
+                    |builder: &mut Self, (argument_index, _, tcx): ArgExpr<'db, '_>| {
+                        match argument_index {
+                            0 => infer_slice_ty(builder, tcx),
+                            1 => infer_rhs_value(builder, tcx),
+                            _ => unreachable!(),
+                        }
+                    };
+
+                let Err(call_dunder_err) = self.infer_and_try_call_dunder(
+                    db,
+                    object_ty,
+                    "__setitem__",
+                    ArgumentsIter::synthesized(&ast_arguments),
+                    &mut call_arguments,
+                    &mut infer_argument_ty,
+                    TypeContext::default(),
+                ) else {
+                    return true;
+                };
+
+                let [Some(slice_ty), Some(rhs_value_ty)] = call_arguments.types() else {
+                    unreachable!();
+                };
+
+                match call_dunder_err {
+                    CallDunderError::PossiblyUnbound { .. } => {
+                        if emit_diagnostic
+                            && let Some(builder) = self
+                                .context
+                                .report_lint(&POSSIBLY_MISSING_IMPLICIT_CALL, target)
+                        {
+                            let mut diagnostic = builder.into_diagnostic(format_args!(
+                                "Method `__setitem__` of type `{}` may be missing",
+                                object_ty.display(db),
+                            ));
+                            attach_original_type_info(&mut diagnostic);
+                        }
+                        false
+                    }
+                    CallDunderError::CallError(call_error_kind, bindings) => {
+                        match call_error_kind {
+                            CallErrorKind::NotCallable => {
+                                if emit_diagnostic
+                                    && let Some(builder) =
+                                        self.context.report_lint(&CALL_NON_CALLABLE, target)
+                                {
+                                    let mut diagnostic = builder.into_diagnostic(format_args!(
+                                        "Method `__setitem__` of type `{}` is not callable \
+                                             on object of type `{}`",
+                                        bindings.callable_type().display(db),
+                                        object_ty.display(db),
+                                    ));
+                                    attach_original_type_info(&mut diagnostic);
+                                }
+                            }
+                            CallErrorKind::BindingError => {
+                                if let Some(typed_dict) = object_ty.as_typed_dict() {
+                                    if let Some(key) = slice_ty.as_string_literal() {
+                                        let key = key.value(db);
+                                        TypedDictKeyAssignment {
+                                            context: &self.context,
+                                            typed_dict,
+                                            full_object_ty,
+                                            key,
+                                            value_ty: *rhs_value_ty,
+                                            typed_dict_node: target.value.as_ref().into(),
+                                            key_node: target.slice.as_ref().into(),
+                                            value_node: rhs_value_node.into(),
+                                            assignment_kind: TypedDictAssignmentKind::Subscript,
+                                            emit_diagnostic: true,
+                                        }
+                                        .validate();
+                                    }
+                                } else {
+                                    if emit_diagnostic
+                                        && let Some(builder) = self.context.report_lint(
+                                            &INVALID_ASSIGNMENT,
+                                            target.range.cover(rhs_value_node.range()),
+                                        )
+                                    {
+                                        let assigned_d = rhs_value_ty.display(db);
+                                        let object_d = object_ty.display(db);
+
+                                        let mut diagnostic = builder.into_diagnostic(format_args!(
+                                                    "Invalid subscript assignment with key of type `{}` and value of \
+                                                     type `{assigned_d}` on object of type `{object_d}`",
+                                                    slice_ty.display(db),
+                                                ));
+
+                                        // Special diagnostic for dictionaries
+                                        if let Some([expected_key_ty, expected_value_ty]) =
+                                            object_ty
+                                                .known_specialization(db, KnownClass::Dict)
+                                                .map(|s| s.types(db))
+                                        {
+                                            if !slice_ty.is_assignable_to(db, *expected_key_ty) {
+                                                diagnostic.annotate(
+                                                    self.context
+                                                        .secondary(target.slice.as_ref())
+                                                        .message(format_args!(
+                                                            "Expected key of type `{}`, got `{}`",
+                                                            expected_key_ty.display(db),
+                                                            slice_ty.display(db),
+                                                        )),
+                                                );
+                                            }
+
+                                            if !rhs_value_ty
+                                                .is_assignable_to(db, *expected_value_ty)
+                                            {
+                                                diagnostic.annotate(
+                                                    self.context.secondary(rhs_value_node).message(
+                                                        format_args!(
+                                                            "Expected value of type `{}`, got `{}`",
+                                                            expected_value_ty.display(db),
+                                                            rhs_value_ty.display(db),
+                                                        ),
+                                                    ),
+                                                );
+                                            }
+                                        }
+
+                                        attach_original_type_info(&mut diagnostic);
+                                    }
+                                }
+                            }
+                            CallErrorKind::PossiblyNotCallable => {
+                                if emit_diagnostic
+                                    && let Some(builder) =
+                                        self.context.report_lint(&CALL_NON_CALLABLE, target)
+                                {
+                                    let mut diagnostic = builder.into_diagnostic(format_args!(
+                                            "Method `__setitem__` of type `{}` may not be callable on object of type `{}`",
+                                            bindings.callable_type().display(db),
+                                            object_ty.display(db),
+                                        ));
+                                    attach_original_type_info(&mut diagnostic);
+                                }
+                            }
+                        }
+                        false
+                    }
+                    CallDunderError::MethodNotAvailable => {
+                        if emit_diagnostic
+                            && let Some(builder) =
+                                self.context.report_lint(&INVALID_ASSIGNMENT, target)
+                        {
+                            let mut diagnostic = builder.into_diagnostic(format_args!(
+                                "Cannot assign to a subscript on an object of type `{}`",
+                                object_ty.display(db),
+                            ));
+                            attach_original_type_info(&mut diagnostic);
+
+                            // If it's a user-defined class, suggest adding a `__setitem__` method.
+                            if object_ty
+                                .as_nominal_instance()
+                                .and_then(|instance| instance.class(db).static_class_literal(db))
+                                .and_then(|(class_literal, _)| {
+                                    file_to_module(db, class_literal.file(db))
+                                })
+                                .and_then(|module| module.search_path(db))
+                                .is_some_and(ty_module_resolver::SearchPath::is_first_party)
+                            {
+                                diagnostic.help(format_args!(
+                                    "Consider adding a `__setitem__` method to `{}`.",
+                                    object_ty.display(db),
+                                ));
+                            } else {
+                                diagnostic.info(format_args!(
+                                    "`{}` does not have a `__setitem__` method.",
+                                    object_ty.display(db),
+                                ));
+                            }
+                        }
+                        false
+                    }
+                }
+            }
+        }
+    }
+
+    /// Validate a subscript deletion of the form `del object[key]`.
+    fn validate_subscript_deletion(
+        &self,
+        target: &ast::ExprSubscript,
+        object_ty: Type<'db>,
+        slice_ty: Type<'db>,
+    ) {
+        self.validate_subscript_deletion_impl(target, None, object_ty, slice_ty);
+    }
+
+    fn validate_subscript_deletion_impl(
+        &self,
+        target: &'ast ast::ExprSubscript,
+        full_object_ty: Option<Type<'db>>,
+        object_ty: Type<'db>,
+        slice_ty: Type<'db>,
+    ) {
+        let db = self.db();
+
+        let attach_original_type_info = |diagnostic: &mut LintDiagnosticGuard| {
+            if let Some(full_object_ty) = full_object_ty {
+                diagnostic.info(format_args!(
+                    "The full type of the subscripted object is `{}`",
+                    full_object_ty.display(db)
+                ));
+            }
+        };
+
+        match object_ty {
+            Type::Union(union) => {
+                for element_ty in union.elements(db) {
+                    self.validate_subscript_deletion_impl(
+                        target,
+                        full_object_ty.or(Some(object_ty)),
+                        *element_ty,
+                        slice_ty,
+                    );
+                }
+            }
+
+            Type::Intersection(intersection) => {
+                // Check if any positive element supports deletion
+                let mut any_valid = false;
+                for element_ty in intersection.positive(db) {
+                    if self.can_delete_subscript(*element_ty, slice_ty) {
+                        any_valid = true;
+                        break;
+                    }
+                }
+
+                // If none are valid, emit a diagnostic for the first failing element
+                if !any_valid && let Some(element_ty) = intersection.positive(db).first() {
+                    self.validate_subscript_deletion_impl(
+                        target,
+                        full_object_ty.or(Some(object_ty)),
+                        *element_ty,
+                        slice_ty,
+                    );
+                }
+            }
+
+            _ => {
+                match object_ty.try_call_dunder(
+                    db,
+                    "__delitem__",
+                    CallArguments::positional([slice_ty]),
+                    TypeContext::default(),
+                ) {
+                    Ok(_) => {}
+                    Err(err) => match err {
+                        CallDunderError::PossiblyUnbound { .. } => {
+                            if let Some(builder) = self
+                                .context
+                                .report_lint(&POSSIBLY_MISSING_IMPLICIT_CALL, target)
+                            {
+                                let mut diagnostic = builder.into_diagnostic(format_args!(
+                                    "Method `__delitem__` of type `{}` may be missing",
+                                    object_ty.display(db),
+                                ));
+                                attach_original_type_info(&mut diagnostic);
+                            }
+                        }
+                        CallDunderError::CallError(call_error_kind, bindings) => {
+                            match call_error_kind {
+                                CallErrorKind::NotCallable => {
+                                    if let Some(builder) =
+                                        self.context.report_lint(&CALL_NON_CALLABLE, target)
+                                    {
+                                        let mut diagnostic = builder.into_diagnostic(format_args!(
+                                            "Method `__delitem__` of type `{}` is not callable \
+                                             on object of type `{}`",
+                                            bindings.callable_type().display(db),
+                                            object_ty.display(db),
+                                        ));
+                                        attach_original_type_info(&mut diagnostic);
+                                    }
+                                }
+                                CallErrorKind::BindingError => {
+                                    // For deletions of string literal keys on `TypedDict`, provide
+                                    // a more detailed diagnostic.
+                                    if let Some(typed_dict) = object_ty.as_typed_dict() {
+                                        if let Some(string_literal) = slice_ty.as_string_literal() {
+                                            let key = string_literal.value(db);
+                                            let items = typed_dict.items(db);
+
+                                            if let Some(field) = items.get(key) {
+                                                // Key exists but is required (i.e., can't be deleted).
+                                                report_cannot_delete_typed_dict_key(
+                                                    &self.context,
+                                                    (&*target.slice).into(),
+                                                    object_ty,
+                                                    key,
+                                                    Some(field),
+                                                    TypedDictDeleteErrorKind::RequiredKey,
+                                                );
+                                            } else {
+                                                // Key doesn't exist.
+                                                report_cannot_delete_typed_dict_key(
+                                                    &self.context,
+                                                    (&*target.slice).into(),
+                                                    object_ty,
+                                                    key,
+                                                    None,
+                                                    TypedDictDeleteErrorKind::UnknownKey,
+                                                );
+                                            }
+                                        } else {
+                                            // Non-string-literal key on `TypedDict`.
+                                            if let Some(builder) = self
+                                                .context
+                                                .report_lint(&INVALID_ARGUMENT_TYPE, target)
+                                            {
+                                                let mut diagnostic = builder.into_diagnostic(format_args!(
+                                                    "Method `__delitem__` of type `{}` cannot be called \
+                                                     with key of type `{}` on object of type `{}`",
+                                                    bindings.callable_type().display(db),
+                                                    slice_ty.display(db),
+                                                    object_ty.display(db),
+                                                ));
+                                                attach_original_type_info(&mut diagnostic);
+                                            }
+                                        }
+                                    } else {
+                                        // Non-`TypedDict` object
+                                        if let Some(builder) =
+                                            self.context.report_lint(&INVALID_ARGUMENT_TYPE, target)
+                                        {
+                                            let mut diagnostic = builder.into_diagnostic(format_args!(
+                                                "Method `__delitem__` of type `{}` cannot be called \
+                                                 with key of type `{}` on object of type `{}`",
+                                                bindings.callable_type().display(db),
+                                                slice_ty.display(db),
+                                                object_ty.display(db),
+                                            ));
+                                            attach_original_type_info(&mut diagnostic);
+                                        }
+                                    }
+                                }
+                                CallErrorKind::PossiblyNotCallable => {
+                                    if let Some(builder) =
+                                        self.context.report_lint(&CALL_NON_CALLABLE, target)
+                                    {
+                                        let mut diagnostic = builder.into_diagnostic(format_args!(
+                                            "Method `__delitem__` of type `{}` may not be callable \
+                                             on object of type `{}`",
+                                            bindings.callable_type().display(db),
+                                            object_ty.display(db),
+                                        ));
+                                        attach_original_type_info(&mut diagnostic);
+                                    }
+                                }
+                            }
+                        }
+                        CallDunderError::MethodNotAvailable => {
+                            report_not_subscriptable(
+                                &self.context,
+                                target,
+                                object_ty,
+                                "__delitem__",
+                            );
+                        }
+                    },
+                }
+            }
+        }
+    }
+
+    /// Check if a type supports subscript deletion (has `__delitem__`).
+    fn can_delete_subscript(&self, object_ty: Type<'db>, slice_ty: Type<'db>) -> bool {
+        let db = self.db();
+        object_ty
+            .try_call_dunder(
+                db,
+                "__delitem__",
+                CallArguments::positional([slice_ty]),
+                TypeContext::default(),
+            )
+            .is_ok()
     }
 }
 
