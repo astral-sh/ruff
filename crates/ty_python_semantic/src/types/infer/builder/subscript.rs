@@ -1,7 +1,7 @@
 use itertools::{Either, EitherOrBoth, Itertools};
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span};
 use ruff_db::parsed::parsed_module;
-use ruff_python_ast::{self as ast, ExprContext};
+use ruff_python_ast::{self as ast, ArgOrKeyword, ExprContext};
 use ruff_text_size::Ranged;
 use ty_module_resolver::file_to_module;
 
@@ -18,11 +18,12 @@ use crate::types::diagnostic::{
     CALL_NON_CALLABLE, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_KEY,
     INVALID_TYPE_ARGUMENTS, INVALID_TYPE_FORM, NOT_SUBSCRIPTABLE, POSSIBLY_MISSING_IMPLICIT_CALL,
     TypedDictDeleteErrorKind, report_cannot_delete_typed_dict_key,
-    report_invalid_arguments_to_annotated, report_not_subscriptable,
+    report_invalid_arguments_to_annotated, report_invalid_key_on_typed_dict,
+    report_not_subscriptable,
 };
 use crate::types::generics::{GenericContext, InferableTypeVars, bind_typevar};
 use crate::types::infer::InferenceFlags;
-use crate::types::infer::builder::{ArgExpr, ArgumentsIter};
+use crate::types::infer::builder::{ArgExpr, ArgumentsIter, MultiInferenceGuard};
 use crate::types::special_form::AliasSpec;
 use crate::types::subscript::{LegacyGenericOrigin, SubscriptError, SubscriptErrorKind};
 use crate::types::tuple::{Tuple, TupleType};
@@ -1167,9 +1168,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         match object_ty {
             Type::Union(union) => {
-                // TODO: Perform multi-inference here.
-                let slice_ty = infer_slice_ty(self, TypeContext::default());
-                let rhs_value_ty = infer_rhs_value(self, TypeContext::default());
+                let mut infer_slice_ty = MultiInferenceGuard::new(infer_slice_ty);
+                let mut infer_rhs_value = MultiInferenceGuard::new(infer_rhs_value);
+
+                // Perform loud inference without type context, as there may be multiple
+                // equally applicable type contexts for each union member.
+                infer_slice_ty.infer_loud(self, TypeContext::default());
+                infer_rhs_value.infer_loud(self, TypeContext::default());
 
                 // Note that we use a loop here instead of .all(…) to avoid short-circuiting.
                 // We need to keep iterating to emit all diagnostics.
@@ -1179,19 +1184,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         target,
                         full_object_ty.or(Some(object_ty)),
                         *element_ty,
-                        &mut |_, _| slice_ty,
+                        &mut |builder, tcx| infer_slice_ty.infer_silent(builder, tcx),
                         rhs_value_node,
-                        &mut |_, _| rhs_value_ty,
+                        &mut |builder, tcx| infer_rhs_value.infer_silent(builder, tcx),
                         emit_diagnostic,
                     );
                 }
+
                 valid
             }
 
             Type::Intersection(intersection) => {
-                // TODO: Perform multi-inference here.
-                let slice_ty = infer_slice_ty(self, TypeContext::default());
-                let rhs_value_ty = infer_rhs_value(self, TypeContext::default());
+                let mut infer_slice_ty = MultiInferenceGuard::new(infer_slice_ty);
+                let mut infer_rhs_value = MultiInferenceGuard::new(infer_rhs_value);
 
                 let mut check_positive_elements = |emit_diagnostic_and_short_circuit| {
                     let mut valid = false;
@@ -1200,13 +1205,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             target,
                             full_object_ty.or(Some(object_ty)),
                             *element_ty,
-                            &mut |_, _| slice_ty,
+                            &mut |builder, tcx| infer_slice_ty.infer_silent(builder, tcx),
                             rhs_value_node,
-                            &mut |_, _| rhs_value_ty,
+                            &mut |builder, tcx| infer_rhs_value.infer_silent(builder, tcx),
                             emit_diagnostic_and_short_circuit,
                         );
 
-                        if !valid && emit_diagnostic_and_short_circuit {
+                        if valid || emit_diagnostic_and_short_circuit {
+                            // Otherwise, perform loud inference with the narrowed type context, or the
+                            // type context of the first failing element.
+                            infer_slice_ty.infer_loud(self, infer_slice_ty.last_tcx());
+                            infer_rhs_value.infer_loud(self, infer_rhs_value.last_tcx());
                             break;
                         }
                     }
@@ -1218,7 +1227,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // for at least one element, we do not emit any diagnostics. Otherwise,
                 // we re-run the check and emit a diagnostic on the first failing element.
                 let valid = check_positive_elements(false);
-
                 if !valid {
                     check_positive_elements(true);
                 }
@@ -1230,12 +1238,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // As an optimization, prevent calling `__setitem__` on (unions of) large `TypedDict`s, and
                 // validate the assignment ourselves. This also allows us to emit better diagnostics.
 
-                // TODO: Use type context here.
-                let slice_ty = infer_slice_ty(self, TypeContext::default());
-                let rhs_value_ty = infer_rhs_value(self, TypeContext::default());
-
                 let mut valid = true;
+                let slice_ty = infer_slice_ty(self, TypeContext::default());
                 let Some(keys) = key_literals(db, slice_ty) else {
+                    let rhs_value_ty = infer_rhs_value(self, TypeContext::default());
+
                     // Check if the key has a valid type. We only allow string literals, a union of string literals,
                     // or a dynamic type like `Any`. We can do this by checking assignability to `LiteralString`,
                     // but we need to exclude `LiteralString` itself. This check would technically allow weird key
@@ -1278,13 +1285,42 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     return false;
                 };
 
+                // We may need to infer the value multiple times for distinct keys.
+                let mut key_count = 0;
+                let mut infer_rhs_value = MultiInferenceGuard::new(infer_rhs_value);
+
                 for key in keys {
+                    let items = typed_dict.items(db);
+
+                    // Check if the key exists on the `TypedDict`
+                    let Some((_, item)) = items.iter().find(|(name, _)| *name == key) else {
+                        if emit_diagnostic {
+                            report_invalid_key_on_typed_dict(
+                                &self.context,
+                                target.value.as_ref().into(),
+                                target.slice.as_ref().into(),
+                                object_ty,
+                                full_object_ty,
+                                Type::string_literal(db, key),
+                                items,
+                            );
+                        }
+
+                        valid = false;
+                        continue;
+                    };
+
+                    // Infer the value with type context.
+                    let value_ty = infer_rhs_value
+                        .infer_silent(self, TypeContext::new(Some(item.declared_ty)));
+
+                    key_count += 1;
                     valid &= TypedDictKeyAssignment {
                         context: &self.context,
                         typed_dict,
                         full_object_ty,
                         key,
-                        value_ty: rhs_value_ty,
+                        value_ty,
                         typed_dict_node: target.value.as_ref().into(),
                         key_node: target.slice.as_ref().into(),
                         value_node: rhs_value_node.into(),
@@ -1294,13 +1330,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .validate();
                 }
 
+                // Perform loud inference with type context if there is a single key.
+                if key_count == 1 {
+                    infer_rhs_value.infer_loud(self, infer_rhs_value.last_tcx());
+                } else {
+                    infer_rhs_value.infer_loud(self, TypeContext::default());
+                }
+
                 valid
             }
 
             _ => {
                 let ast_arguments = [
-                    ast::ArgOrKeyword::Arg(&target.slice),
-                    ast::ArgOrKeyword::Arg(rhs_value_node),
+                    ArgOrKeyword::Arg(&target.slice),
+                    ArgOrKeyword::Arg(rhs_value_node),
                 ];
 
                 let mut call_arguments =

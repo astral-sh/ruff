@@ -209,9 +209,6 @@ class DataDescriptor:
     def __set__(self, instance: object, value: list[Literal[1]]) -> None:
         pass
 
-def lst[T](x: T) -> list[T]:
-    return [x]
-
 def _(flag: bool):
     class Meta(type):
         if flag:
@@ -221,11 +218,11 @@ def _(flag: bool):
         x: list[int | None]
 
     def _(c: C):
-        c.x = lst(1)
+        c.x = reveal_type([1])  # revealed: list[int]
 
         # TODO: Use the parameter type of `__set__` as type context to avoid this error.
         # error: [invalid-assignment]
-        C.x = lst(1)
+        C.x = [1]
 ```
 
 For union targets, each element of the union is considered as a separate type context:
@@ -239,11 +236,8 @@ class X:
 class Y:
     x: list[int | None]
 
-def lst[T](x: T) -> list[T]:
-    return [x]
-
 def _(xy: X | Y):
-    xy.x = lst(1)
+    xy.x = reveal_type([1])  # revealed: list[int]
 ```
 
 ## Class constructor parameters
@@ -307,50 +301,88 @@ The key and value parameters types are used as type context for `__setitem__` du
 from typing import TypedDict
 
 class Bar(TypedDict):
-    baz: float
+    bar: list[int | str]
+
+class Baz(TypedDict):
+    bar: list[int | None]
 
 def _(x: dict[str, Bar]):
-    x["foo"] = reveal_type({"baz": 2})  # revealed: Bar
+    x["foo"] = reveal_type({"bar": [2]})  # revealed: Bar
 
 class X:
     def __setitem__(self, key: Bar, value: Bar): ...
 
 def _(x: X):
     # revealed: Bar
-    x[reveal_type({"baz": 1})] = reveal_type({"baz": 2})  # revealed: Bar
-
-# TODO: Support type context with union subscripting.
-def _(x: X | dict[Bar, Bar]):
-    # error: [invalid-assignment]
-    # error: [invalid-assignment]
-    x[{"baz": 1}] = {"baz": 2}
+    x[reveal_type({"bar": [1]})] = reveal_type({"bar": [2]})  # revealed: Bar
 ```
 
-Similarly, the value type for augmented assignment dunder calls is inferred with type context:
+If the target is a union or intersection type, the key and value expressions may be inferred
+multiple times for each applicable type context:
+
+```py
+from ty_extensions import Intersection
+
+def _(x: X | dict[Baz, Baz]):
+    # revealed: dict[str, list[int]]
+    x[reveal_type({"bar": [1]})] = reveal_type({"bar": [2]})  # revealed: dict[str, list[int]]
+
+class Y:
+    def __setitem__(self, key: Baz, value: Baz): ...
+
+def _(x: Intersection[X, Y]):
+    # revealed: Bar
+    x[reveal_type({"bar": [1, "2"]})] = reveal_type({"bar": [3, "4"]})  # revealed: Bar
+
+    # revealed: Baz
+    x[reveal_type({"bar": [1, None]})] = reveal_type({"bar": [2, None]})  # revealed: Baz
+```
+
+Similarly, the declared type of a `TypedDict` key is used as type context:
+
+```py
+from typing import Literal
+
+class TD(TypedDict):
+    foo: list[int | None]
+    bar: list[int | str]
+
+def _(x: TD, foo_or_bar: Literal["foo", "bar"]):
+    x["foo"] = reveal_type([1])  # revealed: list[int | None]
+    x["bar"] = reveal_type([2])  # revealed: list[int | str]
+    x[foo_or_bar] = reveal_type([3])  # revealed: list[int]
+
+def _(x: TD | dict[str, list[int | float]]):
+    x["foo"] = reveal_type([4])  # revealed: list[int]
+
+def _(x: Bar | Baz | dict[str, list[int | float]]):
+    x["bar"] = reveal_type([4])  # revealed: list[int]
+```
+
+As well as the value parameter type of augmented assignment dunder calls:
 
 ```py
 from typing import TypedDict
 
-def lst[T](x: T) -> list[T]:
-    return [x]
-
-class Bar(TypedDict, closed=False):
-    bar: list[int]
-
 def _(bar: Bar):
-    bar |= reveal_type({"bar": lst(1)})  # revealed: Bar
-
-class Bar2(TypedDict):
-    bar: list[int | None]
+    bar |= reveal_type({"bar": [1]})  # revealed: Bar
 
 class X:
-    def __ior__(self, other: Bar2): ...
+    def __ior__(self, other: Baz): ...
 
 def _(x: X):
-    x |= reveal_type({"bar": lst(1)})  # revealed: Bar2
+    x |= reveal_type({"bar": [1]})  # revealed: Baz
 
 def _(x: X | Bar):
-    x |= {"bar": lst(1)}
+    x |= reveal_type({"bar": [1]})  # revealed: dict[str, list[int]]
+
+class Y:
+    def __ior__(self, other: Bar): ...
+
+def _(x: Intersection[X, Y]):
+    # TODO: Reveal `Bar` and `Baz` here.
+    x |= reveal_type({"bar": [1, "2"]})  # revealed: dict[str, list[int | str]]
+    x |= reveal_type({"bar": [1, None]})  # revealed: dict[str, list[int | None]]
 ```
 
 ## Multi-inference diagnostics
@@ -362,33 +394,33 @@ python-version = "3.12"
 
 Diagnostics unrelated to the type-context are only reported once:
 
-`call.py`:
-
 ```py
 from typing import TypedDict
 
-def f[T](x: T) -> list[T]:
+def lst[T](x: T) -> list[T]:
     return [x]
 
-def a(x: list[bool], y: list[bool]): ...
-def b(x: list[int], y: list[int]): ...
-def c(x: list[int], y: list[int]): ...
+def takes_list_of_bool(x: list[bool], y: list[bool]): ...
+def takes_list_of_int(x: list[int], y: list[int]): ...
+def takes_list_of_int2(x: list[int], y: list[int]): ...
 def _(x: int):
     if x == 0:
-        y = a
+        y = takes_list_of_bool
     elif x == 1:
-        y = b
+        y = takes_list_of_int
     else:
-        y = c
+        y = takes_list_of_int2
 
     if x == 0:
         z = True
 
-    y(f(True), [True])
+    y(lst(True), [True])
 
     # error: [possibly-unresolved-reference] "Name `z` used when possibly not defined"
-    y(f(True), [z])
+    y(lst(True), [z])
+```
 
+```py
 class Bar(TypedDict):
     bar: int
 
@@ -404,38 +436,50 @@ def _(flag: bool, bar: Bar | Bar2 | Bar3):
 
     # error: [possibly-unresolved-reference]
     bar |= {"bar": y}
+
+def _(flag: bool, x: dict[Bar, Bar] | dict[Bar2, Bar2] | dict[Bar3, Bar3]):
+    if flag:
+        y = 1
+
+    # error: [possibly-unresolved-reference]
+    x[{"bar": y}] = {"bar": 1}
+    # error: [possibly-unresolved-reference]
+    x[{"bar": 1}] = {"bar": y}
+
+class TD(TypedDict):
+    foo: Bar
+
+def _(flag: bool, x: TD | dict[str, Bar2] | dict[str, Bar3]):
+    if flag:
+        y = 1
+
+    # error: [possibly-unresolved-reference]
+    x["foo"] = {"bar": y}
 ```
 
-`call_standalone_expression.py`:
-
 ```py
-def f(_: str): ...
-def g(_: str): ...
+def takes_str(_: str): ...
+def takes_str2(_: str): ...
 def _(a: object, b: object, flag: bool):
     if flag:
-        x = f
+        x = takes_str
     else:
-        x = g
+        x = takes_str2
 
     # error: [unsupported-operator] "Operator `>` is not supported between two objects of type `object`"
     x(f"{'a' if a > b else 'b'}")
 ```
 
-`attribute_assignment.py`:
-
 ```py
 from typing import TypedDict
 
-class TD(TypedDict):
-    y: int
+class HasTD:
+    td: Bar
 
-class X:
-    td: TD
-
-def _(x: X, flag: bool):
+def _(has_td: HasTD, flag: bool):
     if flag:
         y = 1
 
     # error: [possibly-unresolved-reference] "Name `y` used when possibly not defined"
-    x.td = {"y": y}
+    has_td.td = {"bar": y}
 ```
