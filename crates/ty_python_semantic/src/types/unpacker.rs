@@ -8,6 +8,7 @@ use ruff_python_ast::{self as ast, AnyNodeRef};
 use crate::Db;
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::scope::ScopeId;
+use crate::types::infer::ExpressionInference;
 use crate::types::tuple::{ResizeTupleError, Tuple, TupleLength, TupleSpec, TupleUnpacker};
 use crate::types::{Type, TypeCheckDiagnostics, TypeContext, infer_expression_types};
 use crate::unpack::{UnpackKind, UnpackValue};
@@ -48,18 +49,21 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
             "Unpacking target must be a list or tuple expression"
         );
 
-        let value_type =
-            infer_expression_types(self.db(), value.expression(), TypeContext::default())
-                .expression_type(value.expression().node_ref(self.db(), self.module()));
+        let value_inference =
+            infer_expression_types(self.db(), value.expression(), TypeContext::default());
+        let value_expr = value.expression().node_ref(self.db(), self.module());
+
+        if matches!(value.kind(), UnpackKind::Assign)
+            && self.unpack_assignment_sequence_from_inference(target, value_expr, value_inference)
+        {
+            return;
+        }
+
+        let value_type = value_inference.expression_type(value_expr);
 
         let value_type = match value.kind() {
             UnpackKind::Assign => {
-                if self.context.in_stub()
-                    && value
-                        .expression()
-                        .node_ref(self.db(), self.module())
-                        .is_ellipsis_literal_expr()
-                {
+                if self.context.in_stub() && value_expr.is_ellipsis_literal_expr() {
                     Type::unknown()
                 } else {
                     value_type
@@ -88,11 +92,73 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                 }),
         };
 
-        self.unpack_inner(
-            target,
-            value.as_any_node_ref(self.db(), self.module()),
-            value_type,
-        );
+        self.unpack_inner(target, value_expr.into(), value_type);
+    }
+
+    /// Preserve per-element precision for fixed tuple/list assignment RHSes.
+    ///
+    /// When the RHS sequence is the cycle head, its normalized sequence type can collapse
+    /// element-level unions like `None | Divergent` to `Divergent`. Reusing the already-inferred
+    /// subexpression types lets unpacking converge as if each element had been queried directly.
+    fn unpack_assignment_sequence_from_inference(
+        &mut self,
+        target: &ast::Expr,
+        value_expr: &ast::Expr,
+        value_inference: &ExpressionInference<'db>,
+    ) -> bool {
+        match target {
+            ast::Expr::Name(_) | ast::Expr::Attribute(_) | ast::Expr::Subscript(_) => {
+                self.targets
+                    .insert(target.into(), value_inference.expression_type(value_expr));
+                true
+            }
+            ast::Expr::Starred(_) => false,
+            ast::Expr::List(target_list) => match value_expr {
+                ast::Expr::List(value_list) => self.unpack_fixed_sequence_from_inference(
+                    &target_list.elts,
+                    &value_list.elts,
+                    value_inference,
+                ),
+                ast::Expr::Tuple(value_tuple) => self.unpack_fixed_sequence_from_inference(
+                    &target_list.elts,
+                    &value_tuple.elts,
+                    value_inference,
+                ),
+                _ => false,
+            },
+            ast::Expr::Tuple(target_tuple) => match value_expr {
+                ast::Expr::List(value_list) => self.unpack_fixed_sequence_from_inference(
+                    &target_tuple.elts,
+                    &value_list.elts,
+                    value_inference,
+                ),
+                ast::Expr::Tuple(value_tuple) => self.unpack_fixed_sequence_from_inference(
+                    &target_tuple.elts,
+                    &value_tuple.elts,
+                    value_inference,
+                ),
+                _ => false,
+            },
+            _ => false,
+        }
+    }
+
+    fn unpack_fixed_sequence_from_inference(
+        &mut self,
+        targets: &[ast::Expr],
+        values: &[ast::Expr],
+        value_inference: &ExpressionInference<'db>,
+    ) -> bool {
+        if targets.len() != values.len()
+            || targets.iter().any(ast::Expr::is_starred_expr)
+            || values.iter().any(ast::Expr::is_starred_expr)
+        {
+            return false;
+        }
+
+        targets.iter().zip(values).all(|(target, value_expr)| {
+            self.unpack_assignment_sequence_from_inference(target, value_expr, value_inference)
+        })
     }
 
     fn unpack_inner(

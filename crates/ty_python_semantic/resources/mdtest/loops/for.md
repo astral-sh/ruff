@@ -1214,13 +1214,8 @@ x = 1
 y = 2
 for _ in range(1_000_000):
     x, y = y, x
-    # Note that we get correct types in the "avoid oscillations" test case below, but not here. I
-    # believe the difference is that in this case the Salsa "cycle head" is the tuple on the RHS of
-    # the assignment, which triggers our recursive type handling, whereas below it's `x`.
-    # TODO: should be Literal[2, 1]
-    reveal_type(x)  # revealed: Divergent
-    # TODO: should be Literal[1, 2]
-    reveal_type(y)  # revealed: Divergent
+    reveal_type(x)  # revealed: Literal[2, 1]
+    reveal_type(y)  # revealed: Literal[1, 2]
 ```
 
 ### Tuple assignments are inferred correctly
@@ -1229,8 +1224,7 @@ for _ in range(1_000_000):
 x = 0
 for _ in range(1_000_000):
     x, y = x + 1, None
-    # TODO: should be int
-    reveal_type(x)  # revealed: Divergent
+    reveal_type(x)  # revealed: int
 ```
 
 ### Avoid oscillations
