@@ -6,10 +6,7 @@ use smallvec::SmallVec;
 use crate::{
     Db, FxIndexMap,
     place::{DefinedPlace, Place, place_from_bindings, place_from_declarations},
-    semantic_index::{
-        DeclarationWithConstraint, definition::DefinitionKind, place_table, scope::ScopeId,
-        use_def_map,
-    },
+    semantic_index::{definition::DefinitionKind, place_table, scope::ScopeId, use_def_map},
     types::{
         ClassBase, ClassLiteral, DynamicType, EnumLiteralType, KnownClass, LiteralValueTypeKind,
         MemberLookupPolicy, StaticClassLiteral, Type, function::FunctionType,
@@ -352,19 +349,17 @@ pub(crate) fn enum_metadata<'db>(
             let declarations = use_def_map.end_of_scope_symbol_declarations(symbol_id);
 
             if !explicit_member_wrapper
-                && !declarations
-                    .clone()
-                    .all(|DeclarationWithConstraint { declaration, .. }| {
-                        declaration.is_undefined_or(|declaration| {
-                            matches!(
-                                declaration.kind(db),
-                                DefinitionKind::AnnotatedAssignment(assignment)
-                                    if assignment
-                                        .value(&parsed_module(db, declaration.file(db)).load(db))
-                                        .is_some()
-                            )
-                        })
+                && !declarations.clone().all_reachable(db, |declaration| {
+                    declaration.is_undefined_or(|declaration| {
+                        matches!(
+                            declaration.kind(db),
+                            DefinitionKind::AnnotatedAssignment(assignment)
+                                if assignment
+                                    .value(&parsed_module(db, declaration.file(db)).load(db))
+                                    .is_some()
+                        )
                     })
+                })
             {
                 return None;
             }

@@ -77,12 +77,12 @@ class Answer(Enum):
     YES = 1
     NO = 2
 
-    non_member_1: str = "some value"  # error: [invalid-enum-member-annotation]
+    annotated_member: str = "some value"  # error: [invalid-enum-member-annotation]
 
-# revealed: tuple[Literal["YES"], Literal["NO"], Literal["non_member_1"]]
+# revealed: tuple[Literal["YES"], Literal["NO"], Literal["annotated_member"]]
 reveal_type(enum_members(Answer))
-reveal_type(Answer.non_member_1)  # revealed: Literal[Answer.non_member_1]
-reveal_type(Answer.YES.non_member_1)  # revealed: Literal[Answer.non_member_1]
+reveal_type(Answer.annotated_member)  # revealed: Literal[Answer.annotated_member]
+reveal_type(Answer.YES.annotated_member)  # revealed: Literal[Answer.annotated_member]
 ```
 
 Enum members are allowed to be marked `Final` (without a type), even if unnecessary:
@@ -158,12 +158,9 @@ Pure declarations (annotations without values) are non-members and are fine:
 ```py
 class Pet6(Enum):
     CAT = 1
-    genus: str  # OK: no value, so this is a non-member declaration
     species: str  # OK: no value, so this is a non-member declaration
 
-reveal_type(Pet6.genus)  # revealed: str
 reveal_type(Pet6.species)  # revealed: str
-reveal_type(Pet6.CAT.genus)  # revealed: str
 reveal_type(Pet6.CAT.species)  # revealed: str
 ```
 
@@ -175,13 +172,11 @@ In stubs, these should still be treated as non-member attributes rather than enu
 from enum import Enum
 
 class Pet6Stub(Enum):
-    genus: str
     species: str
 
     CAT = ...
     DOG = ...
 
-reveal_type(Pet6Stub.genus)  # revealed: str
 reveal_type(Pet6Stub.species)  # revealed: str
 ```
 
@@ -235,6 +230,28 @@ class Pet9(Enum):
     A: int = 42  # OK: `A` is listed in `_ignore_`
     B: str = "hello"  # OK: `B` is listed in `_ignore_`
     C: int = 3  # error: [invalid-enum-member-annotation]
+```
+
+### Unreachable declarations do not change membership
+
+Statically unreachable declarations should be ignored when deciding whether a name is an enum
+member:
+
+```py
+from enum import Enum
+from ty_extensions import enum_members
+
+class Pet10(Enum):
+    if False:
+        CAT: int
+
+    CAT = 1
+    DOG = 2
+
+# revealed: tuple[Literal["CAT"], Literal["DOG"]]
+reveal_type(enum_members(Pet10))
+reveal_type(Pet10.CAT)  # revealed: Literal[Pet10.CAT]
+reveal_type(Pet10.DOG)  # revealed: Literal[Pet10.DOG]
 ```
 
 ### Declared `_value_` annotation
