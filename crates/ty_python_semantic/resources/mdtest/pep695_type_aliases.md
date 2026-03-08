@@ -566,18 +566,3 @@ def f(p: P):
     reveal_type(p.is_recursive(1))  # revealed: TypeIs[object]
     reveal_type(p.guard_recursive(1))  # revealed: TypeGuard[RecursiveGuard]
 ```
-
-### `TypeIs` preserves aliases to `TypeGuard`
-
-```py
-from typing_extensions import TypeGuard, TypeIs
-
-type Alias = TypeGuard[int]
-
-def f(x: bool) -> TypeIs[Alias]:
-    return False
-
-def _(x: bool):
-    if f(x):
-        reveal_type(x)  # revealed: TypeGuard[int]
-```

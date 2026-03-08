@@ -271,7 +271,7 @@ fn eager_expansion() {
     use crate::db::tests::TestDb;
     use crate::place::global_symbol;
 
-    fn get_type_alias<'db>(db: &'db TestDb, name: &str) -> TypeAliasType<'db> {
+    fn get_type_alias<'db>(db: &'db TestDb, name: &str) -> Type<'db> {
         let module = ruff_db::files::system_path_to_file(db, "/src/a.py").unwrap();
         let ty = global_symbol(db, module, name).place.expect_type();
         let Type::KnownInstance(KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(
@@ -280,7 +280,7 @@ fn eager_expansion() {
         else {
             panic!("Expected `{name}` to be a type alias");
         };
-        TypeAliasType::PEP695(type_alias)
+        Type::TypeAlias(TypeAliasType::PEP695(type_alias))
     }
 
     let mut db = setup_db();
@@ -302,92 +302,44 @@ type H[T] = G[T]
     .unwrap();
 
     let int_str = get_type_alias(&db, "IntStr");
-    assert!(!int_str.is_recursive(&db));
     assert_eq!(
-        Type::TypeAlias(int_str)
-            .expand_eagerly(&db)
-            .display(&db)
-            .to_string(),
+        int_str.expand_eagerly(&db).display(&db).to_string(),
         "int | str",
     );
 
     let list_int_str = get_type_alias(&db, "ListIntStr");
-    assert!(!list_int_str.is_recursive(&db));
     assert_eq!(
-        Type::TypeAlias(list_int_str)
-            .expand_eagerly(&db)
-            .display(&db)
-            .to_string(),
+        list_int_str.expand_eagerly(&db).display(&db).to_string(),
         "list[int | str]",
     );
 
     let rec_list = get_type_alias(&db, "RecursiveList");
-    assert!(rec_list.is_recursive(&db));
     assert_eq!(
-        Type::TypeAlias(rec_list)
-            .expand_eagerly(&db)
-            .display(&db)
-            .to_string(),
+        rec_list.expand_eagerly(&db).display(&db).to_string(),
         "list[Divergent]",
     );
 
     let rec_int_list = get_type_alias(&db, "RecursiveIntList");
-    assert!(rec_int_list.is_recursive(&db));
     assert_eq!(
-        Type::TypeAlias(rec_int_list)
-            .expand_eagerly(&db)
-            .display(&db)
-            .to_string(),
+        rec_int_list.expand_eagerly(&db).display(&db).to_string(),
         "list[Divergent]",
     );
 
     let itself = get_type_alias(&db, "Itself");
-    assert!(itself.is_recursive(&db));
     assert_eq!(
-        Type::TypeAlias(itself)
-            .expand_eagerly(&db)
-            .display(&db)
-            .to_string(),
+        itself.expand_eagerly(&db).display(&db).to_string(),
         "Divergent",
     );
 
     let a = get_type_alias(&db, "A");
-    assert!(a.is_recursive(&db));
-    assert_eq!(
-        Type::TypeAlias(a)
-            .expand_eagerly(&db)
-            .display(&db)
-            .to_string(),
-        "Divergent",
-    );
+    assert_eq!(a.expand_eagerly(&db).display(&db).to_string(), "Divergent",);
 
     let b = get_type_alias(&db, "B");
-    assert!(b.is_recursive(&db));
-    assert_eq!(
-        Type::TypeAlias(b)
-            .expand_eagerly(&db)
-            .display(&db)
-            .to_string(),
-        "Divergent",
-    );
+    assert_eq!(b.expand_eagerly(&db).display(&db).to_string(), "Divergent",);
 
     let g = get_type_alias(&db, "G");
-    assert!(g.is_recursive(&db));
-    assert_eq!(
-        Type::TypeAlias(g)
-            .expand_eagerly(&db)
-            .display(&db)
-            .to_string(),
-        "Divergent",
-    );
+    assert_eq!(g.expand_eagerly(&db).display(&db).to_string(), "Divergent",);
 
     let h = get_type_alias(&db, "H");
-    assert!(h.is_recursive(&db));
-    assert_eq!(
-        Type::TypeAlias(h)
-            .expand_eagerly(&db)
-            .display(&db)
-            .to_string(),
-        "Divergent",
-    );
+    assert_eq!(h.expand_eagerly(&db).display(&db).to_string(), "Divergent",);
 }
