@@ -7185,8 +7185,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let yielded_ty = self
             .infer_optional_expression(value.as_deref(), TypeContext::default())
             .unwrap_or_else(|| Type::none(self.db()));
-        let expected = self.enclosing_generator_type_params();
-        let expected_yield_ty = expected.and_then(|expected| expected.yielded);
+        let Some(expected) = self.enclosing_generator_type_params() else {
+            // TODO: Maybe raise an error if return type is not generator?
+            // Or infer the return type based on what is yielded so can say this is
+            // Generator[yield_ty, unknown, unknown], probably not as simple as this
+            return Type::unknown();
+        };
+        let expected_yield_ty = expected.yielded;
         let diagnostic_node: AnyNodeRef = value
             .as_deref()
             .map_or_else(|| yield_expression.into(), AnyNodeRef::from);
@@ -7204,9 +7209,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ));
         }
 
-        expected
-            .and_then(|expected| expected.sent)
-            .unwrap_or_else(Type::unknown)
+        expected.sent.unwrap_or_else(Type::unknown)
     }
 
     fn infer_yield_from_expression(&mut self, yield_from: &ast::ExprYieldFrom) -> Type<'db> {
