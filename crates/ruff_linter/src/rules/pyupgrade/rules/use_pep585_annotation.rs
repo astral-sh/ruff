@@ -1,12 +1,10 @@
 use ruff_python_ast::Expr;
 
+use crate::preview::is_up006_future_annotations_fix_enabled;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::UnqualifiedName;
-use ruff_python_parser::semantic_errors::SemanticSyntaxContext;
 use ruff_python_semantic::analyze::typing::ModuleMember;
 use ruff_text_size::Ranged;
-
-use crate::preview::is_up006_future_annotations_fix_enabled;
 
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
@@ -92,6 +90,22 @@ pub(crate) fn use_pep585_annotation(checker: &Checker, expr: &Expr, replacement:
         expr.range(),
     );
     if !checker.semantic().in_complex_string_type_definition() {
+        let future_import = if is_up006_future_annotations_fix_enabled(checker.settings())
+            && checker.settings().future_annotations
+            && !checker.semantic().future_annotations_or_stub()
+        {
+            Some(checker.importer().add_future_import())
+        } else {
+            None
+        };
+
+        let applicability = if checker.target_version() >= PythonVersion::PY310
+            || checker.semantic().future_annotations_or_stub()
+        {
+            Applicability::Safe
+        } else {
+            Applicability::Unsafe
+        };
         match replacement {
             ModuleMember::BuiltIn(name) => {
                 // Built-in type, like `list`.
@@ -102,17 +116,9 @@ pub(crate) fn use_pep585_annotation(checker: &Checker, expr: &Expr, replacement:
                         checker.semantic(),
                     )?;
                     let binding_edit = Edit::range_replacement(binding, expr.range());
-                    let (applicability, future_import) = fix_applicability(checker);
-                    let mut secondary_edit = Vec::new();
-                    if let Some(import) = import_edit {
-                        secondary_edit.push(import);
-                    }
-                    if let Some(future) = future_import {
-                        secondary_edit.push(future);
-                    }
                     Ok(Fix::applicable_edits(
                         binding_edit,
-                        secondary_edit,
+                        import_edit.into_iter().chain(future_import),
                         applicability,
                     ))
                 });
@@ -126,40 +132,13 @@ pub(crate) fn use_pep585_annotation(checker: &Checker, expr: &Expr, replacement:
                         checker.semantic(),
                     )?;
                     let reference_edit = Edit::range_replacement(binding, expr.range());
-                    let (applicability, future_import) = fix_applicability(checker);
-                    let mut secondary_edit = Vec::new();
-                    secondary_edit.push(import_edit);
-                    if let Some(future) = future_import {
-                        secondary_edit.push(future);
-                    }
                     Ok(Fix::applicable_edits(
                         reference_edit,
-                        secondary_edit,
+                        std::iter::once(import_edit).chain(future_import),
                         applicability,
                     ))
                 });
             }
         }
-    }
-}
-
-fn fix_applicability(checker: &Checker) -> (Applicability, Option<Edit>) {
-    if checker.target_version() >= PythonVersion::PY39 {
-        return (Applicability::Safe, None);
-    }
-    if checker.settings().pyupgrade.keep_runtime_typing {
-        return (Applicability::Unsafe, None);
-    }
-    if checker.settings().future_annotations
-        && is_up006_future_annotations_fix_enabled(checker.settings())
-    {
-        if checker.future_annotations_or_stub() {
-            (Applicability::Safe, None)
-        } else {
-            let future_import = checker.importer().add_future_import();
-            (Applicability::Safe, Some(future_import))
-        }
-    } else {
-        (Applicability::Unsafe, None)
     }
 }

@@ -1,0 +1,347 @@
+---
+source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+---
+UP006 [*] Use `list` instead of `typing.List` for type annotation
+ --> UP006_0.py:4:10
+  |
+4 | def f(x: typing.List[str]) -> None:
+  |          ^^^^^^^^^^^
+5 |     ...
+  |
+help: Replace with `list`
+1 + from __future__ import annotations
+2 | import typing
+3 | 
+4 | 
+  - def f(x: typing.List[str]) -> None:
+5 + def f(x: list[str]) -> None:
+6 |     ...
+7 | 
+8 | 
+note: This is an unsafe fix and may change runtime behavior
+
+UP006 [*] Use `list` instead of `List` for type annotation
+  --> UP006_0.py:11:10
+   |
+11 | def f(x: List[str]) -> None:
+   |          ^^^^
+12 |     ...
+   |
+help: Replace with `list`
+1  + from __future__ import annotations
+2  | import typing
+3  | 
+4  | 
+--------------------------------------------------------------------------------
+9  | from typing import List
+10 | 
+11 | 
+   - def f(x: List[str]) -> None:
+12 + def f(x: list[str]) -> None:
+13 |     ...
+14 | 
+15 | 
+note: This is an unsafe fix and may change runtime behavior
+
+UP006 [*] Use `list` instead of `t.List` for type annotation
+  --> UP006_0.py:18:10
+   |
+18 | def f(x: t.List[str]) -> None:
+   |          ^^^^^^
+19 |     ...
+   |
+help: Replace with `list`
+1  + from __future__ import annotations
+2  | import typing
+3  | 
+4  | 
+--------------------------------------------------------------------------------
+16 | import typing as t
+17 | 
+18 | 
+   - def f(x: t.List[str]) -> None:
+19 + def f(x: list[str]) -> None:
+20 |     ...
+21 | 
+22 | 
+note: This is an unsafe fix and may change runtime behavior
+
+UP006 [*] Use `list` instead of `IList` for type annotation
+  --> UP006_0.py:25:10
+   |
+25 | def f(x: IList[str]) -> None:
+   |          ^^^^^
+26 |     ...
+   |
+help: Replace with `list`
+1  + from __future__ import annotations
+2  | import typing
+3  | 
+4  | 
+--------------------------------------------------------------------------------
+23 | from typing import List as IList
+24 | 
+25 | 
+   - def f(x: IList[str]) -> None:
+26 + def f(x: list[str]) -> None:
+27 |     ...
+28 | 
+29 | 
+note: This is an unsafe fix and may change runtime behavior
+
+UP006 [*] Use `list` instead of `List` for type annotation
+  --> UP006_0.py:29:11
+   |
+29 | def f(x: "List[str]") -> None:
+   |           ^^^^
+30 |     ...
+   |
+help: Replace with `list`
+1  + from __future__ import annotations
+2  | import typing
+3  | 
+4  | 
+--------------------------------------------------------------------------------
+27 |     ...
+28 | 
+29 | 
+   - def f(x: "List[str]") -> None:
+30 + def f(x: "list[str]") -> None:
+31 |     ...
+32 | 
+33 | 
+note: This is an unsafe fix and may change runtime behavior
+
+UP006 [*] Use `list` instead of `List` for type annotation
+  --> UP006_0.py:33:12
+   |
+33 | def f(x: r"List[str]") -> None:
+   |            ^^^^
+34 |     ...
+   |
+help: Replace with `list`
+1  + from __future__ import annotations
+2  | import typing
+3  | 
+4  | 
+--------------------------------------------------------------------------------
+31 |     ...
+32 | 
+33 | 
+   - def f(x: r"List[str]") -> None:
+34 + def f(x: r"list[str]") -> None:
+35 |     ...
+36 | 
+37 | 
+note: This is an unsafe fix and may change runtime behavior
+
+UP006 [*] Use `list` instead of `List` for type annotation
+  --> UP006_0.py:37:11
+   |
+37 | def f(x: "List[str]") -> None:
+   |           ^^^^
+38 |     ...
+   |
+help: Replace with `list`
+1  + from __future__ import annotations
+2  | import typing
+3  | 
+4  | 
+--------------------------------------------------------------------------------
+35 |     ...
+36 | 
+37 | 
+   - def f(x: "List[str]") -> None:
+38 + def f(x: "list[str]") -> None:
+39 |     ...
+40 | 
+41 | 
+note: This is an unsafe fix and may change runtime behavior
+
+UP006 [*] Use `list` instead of `List` for type annotation
+  --> UP006_0.py:41:13
+   |
+41 | def f(x: """List[str]""") -> None:
+   |             ^^^^
+42 |     ...
+   |
+help: Replace with `list`
+1  + from __future__ import annotations
+2  | import typing
+3  | 
+4  | 
+--------------------------------------------------------------------------------
+39 |     ...
+40 | 
+41 | 
+   - def f(x: """List[str]""") -> None:
+42 + def f(x: """list[str]""") -> None:
+43 |     ...
+44 | 
+45 | 
+note: This is an unsafe fix and may change runtime behavior
+
+UP006 Use `list` instead of `List` for type annotation
+  --> UP006_0.py:45:10
+   |
+45 | def f(x: "Li" "st[str]") -> None:
+   |          ^^^^^^^^^^^^^^
+46 |     ...
+   |
+help: Replace with `list`
+
+UP006 [*] Use `list` instead of `List` for type annotation
+  --> UP006_0.py:49:11
+   |
+49 | def f(x: "List['List[str]']") -> None:
+   |           ^^^^
+50 |     ...
+   |
+help: Replace with `list`
+1  + from __future__ import annotations
+2  | import typing
+3  | 
+4  | 
+--------------------------------------------------------------------------------
+47 |     ...
+48 | 
+49 | 
+   - def f(x: "List['List[str]']") -> None:
+50 + def f(x: "list['List[str]']") -> None:
+51 |     ...
+52 | 
+53 | 
+note: This is an unsafe fix and may change runtime behavior
+
+UP006 [*] Use `list` instead of `List` for type annotation
+  --> UP006_0.py:49:17
+   |
+49 | def f(x: "List['List[str]']") -> None:
+   |                 ^^^^
+50 |     ...
+   |
+help: Replace with `list`
+1  + from __future__ import annotations
+2  | import typing
+3  | 
+4  | 
+--------------------------------------------------------------------------------
+47 |     ...
+48 | 
+49 | 
+   - def f(x: "List['List[str]']") -> None:
+50 + def f(x: "List['list[str]']") -> None:
+51 |     ...
+52 | 
+53 | 
+note: This is an unsafe fix and may change runtime behavior
+
+UP006 [*] Use `list` instead of `List` for type annotation
+  --> UP006_0.py:53:11
+   |
+53 | def f(x: "List['Li' 'st[str]']") -> None:
+   |           ^^^^
+54 |     ...
+   |
+help: Replace with `list`
+1  + from __future__ import annotations
+2  | import typing
+3  | 
+4  | 
+--------------------------------------------------------------------------------
+51 |     ...
+52 | 
+53 | 
+   - def f(x: "List['Li' 'st[str]']") -> None:
+54 + def f(x: "list['Li' 'st[str]']") -> None:
+55 |     ...
+56 | 
+57 | 
+note: This is an unsafe fix and may change runtime behavior
+
+UP006 Use `list` instead of `List` for type annotation
+  --> UP006_0.py:53:16
+   |
+53 | def f(x: "List['Li' 'st[str]']") -> None:
+   |                ^^^^^^^^^^^^^^
+54 |     ...
+   |
+help: Replace with `list`
+
+UP006 Use `list` instead of `List` for type annotation
+  --> UP006_0.py:57:10
+   |
+57 | def f(x: "Li" "st['List[str]']") -> None:
+   |          ^^^^^^^^^^^^^^^^^^^^^^
+58 |     ...
+   |
+help: Replace with `list`
+
+UP006 Use `list` instead of `List` for type annotation
+  --> UP006_0.py:57:10
+   |
+57 | def f(x: "Li" "st['List[str]']") -> None:
+   |          ^^^^^^^^^^^^^^^^^^^^^^
+58 |     ...
+   |
+help: Replace with `list`
+
+UP006 [*] Use `collections.deque` instead of `typing.Deque` for type annotation
+  --> UP006_0.py:61:10
+   |
+61 | def f(x: typing.Deque[str]) -> None:
+   |          ^^^^^^^^^^^^
+62 |     ...
+   |
+help: Replace with `collections.deque`
+1  + from __future__ import annotations
+2  | import typing
+3  | 
+4  | 
+--------------------------------------------------------------------------------
+21 | 
+22 | 
+23 | from typing import List as IList
+24 + from collections import deque
+25 | 
+26 | 
+27 | def f(x: IList[str]) -> None:
+--------------------------------------------------------------------------------
+60 |     ...
+61 | 
+62 | 
+   - def f(x: typing.Deque[str]) -> None:
+63 + def f(x: deque[str]) -> None:
+64 |     ...
+65 | 
+66 | 
+note: This is an unsafe fix and may change runtime behavior
+
+UP006 [*] Use `collections.defaultdict` instead of `typing.DefaultDict` for type annotation
+  --> UP006_0.py:65:10
+   |
+65 | def f(x: typing.DefaultDict[str, str]) -> None:
+   |          ^^^^^^^^^^^^^^^^^^
+66 |     ...
+   |
+help: Replace with `collections.defaultdict`
+1  + from __future__ import annotations
+2  | import typing
+3  | 
+4  | 
+--------------------------------------------------------------------------------
+21 | 
+22 | 
+23 | from typing import List as IList
+24 + from collections import defaultdict
+25 | 
+26 | 
+27 | def f(x: IList[str]) -> None:
+--------------------------------------------------------------------------------
+64 |     ...
+65 | 
+66 | 
+   - def f(x: typing.DefaultDict[str, str]) -> None:
+67 + def f(x: defaultdict[str, str]) -> None:
+68 |     ...
+note: This is an unsafe fix and may change runtime behavior

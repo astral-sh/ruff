@@ -309,6 +309,11 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                                     && checker.target_version() >= PythonVersion::PY37
                                     && checker.semantic.in_annotation()
                                     && !checker.settings().pyupgrade.keep_runtime_typing
+                                    && !(checker.is_rule_enabled(Rule::NonPEP585Annotation)
+                                        && is_up006_future_annotations_fix_enabled(
+                                            checker.settings(),
+                                        )
+                                        && checker.settings().future_annotations)
                                 {
                                     flake8_future_annotations::rules::future_rewritable_type_annotation(checker, expr);
                                 }
@@ -419,6 +424,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                             && checker.target_version() >= PythonVersion::PY37
                             && checker.semantic.in_annotation()
                             && !checker.settings().pyupgrade.keep_runtime_typing
+                            && !(checker.is_rule_enabled(Rule::NonPEP585Annotation)
+                                && is_up006_future_annotations_fix_enabled(checker.settings())
+                                && checker.settings().future_annotations)
                         {
                             flake8_future_annotations::rules::future_rewritable_type_annotation(
                                 checker, expr,

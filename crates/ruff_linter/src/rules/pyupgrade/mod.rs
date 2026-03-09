@@ -128,16 +128,22 @@ mod tests {
         Ok(())
     }
 
-    #[test_case(Rule::NonPEP585Annotation, Path::new("UP006_future.py"))]
-    fn up006_add_future_annotation_preview(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}__preview", path.to_string_lossy());
+    #[test_case(Rule::NonPEP585Annotation, Path::new("UP006_0.py"), false; "stable_with_fa100")]
+    #[test_case(Rule::NonPEP585Annotation, Path::new("UP006_0.py"), true; "preview_with_fa100")]
+    fn up006_future_annotations(rule_code: Rule, path: &Path, preview: bool) -> Result<()> {
+        let snapshot = format!("{}__preview_{preview}__with_fa100", path.to_string_lossy());
+        let rules = vec![rule_code, Rule::FutureRewritableTypeAnnotation];
         let diagnostics = test_path(
             Path::new("pyupgrade").join(path).as_path(),
             &settings::LinterSettings {
                 future_annotations: true,
-                preview: PreviewMode::Enabled,
+                preview: if preview {
+                    PreviewMode::Enabled
+                } else {
+                    PreviewMode::Disabled
+                },
                 unresolved_target_version: PythonVersion::PY38.into(),
-                ..settings::LinterSettings::for_rule(rule_code)
+                ..settings::LinterSettings::for_rules(rules)
             },
         )?;
         assert_diagnostics!(snapshot, diagnostics);

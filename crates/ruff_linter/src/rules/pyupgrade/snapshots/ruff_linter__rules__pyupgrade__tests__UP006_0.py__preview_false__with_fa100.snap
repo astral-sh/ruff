@@ -1,0 +1,240 @@
+---
+source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+---
+FA100 [*] Add `from __future__ import annotations` to simplify `typing.List`
+ --> UP006_0.py:4:10
+  |
+4 | def f(x: typing.List[str]) -> None:
+  |          ^^^^^^^^^^^
+5 |     ...
+  |
+help: Add `from __future__ import annotations`
+1 + from __future__ import annotations
+2 | import typing
+3 | 
+4 | 
+note: This is an unsafe fix and may change runtime behavior
+
+FA100 [*] Add `from __future__ import annotations` to simplify `typing.List`
+  --> UP006_0.py:11:10
+   |
+11 | def f(x: List[str]) -> None:
+   |          ^^^^
+12 |     ...
+   |
+help: Add `from __future__ import annotations`
+1 + from __future__ import annotations
+2 | import typing
+3 | 
+4 | 
+note: This is an unsafe fix and may change runtime behavior
+
+FA100 [*] Add `from __future__ import annotations` to simplify `typing.List`
+  --> UP006_0.py:18:10
+   |
+18 | def f(x: t.List[str]) -> None:
+   |          ^^^^^^
+19 |     ...
+   |
+help: Add `from __future__ import annotations`
+1 + from __future__ import annotations
+2 | import typing
+3 | 
+4 | 
+note: This is an unsafe fix and may change runtime behavior
+
+FA100 [*] Add `from __future__ import annotations` to simplify `typing.List`
+  --> UP006_0.py:25:10
+   |
+25 | def f(x: IList[str]) -> None:
+   |          ^^^^^
+26 |     ...
+   |
+help: Add `from __future__ import annotations`
+1 + from __future__ import annotations
+2 | import typing
+3 | 
+4 | 
+note: This is an unsafe fix and may change runtime behavior
+
+FA100 [*] Add `from __future__ import annotations` to simplify `typing.List`
+  --> UP006_0.py:29:11
+   |
+29 | def f(x: "List[str]") -> None:
+   |           ^^^^
+30 |     ...
+   |
+help: Add `from __future__ import annotations`
+1 + from __future__ import annotations
+2 | import typing
+3 | 
+4 | 
+note: This is an unsafe fix and may change runtime behavior
+
+FA100 [*] Add `from __future__ import annotations` to simplify `typing.List`
+  --> UP006_0.py:33:12
+   |
+33 | def f(x: r"List[str]") -> None:
+   |            ^^^^
+34 |     ...
+   |
+help: Add `from __future__ import annotations`
+1 + from __future__ import annotations
+2 | import typing
+3 | 
+4 | 
+note: This is an unsafe fix and may change runtime behavior
+
+FA100 [*] Add `from __future__ import annotations` to simplify `typing.List`
+  --> UP006_0.py:37:11
+   |
+37 | def f(x: "List[str]") -> None:
+   |           ^^^^
+38 |     ...
+   |
+help: Add `from __future__ import annotations`
+1 + from __future__ import annotations
+2 | import typing
+3 | 
+4 | 
+note: This is an unsafe fix and may change runtime behavior
+
+FA100 [*] Add `from __future__ import annotations` to simplify `typing.List`
+  --> UP006_0.py:41:13
+   |
+41 | def f(x: """List[str]""") -> None:
+   |             ^^^^
+42 |     ...
+   |
+help: Add `from __future__ import annotations`
+1 + from __future__ import annotations
+2 | import typing
+3 | 
+4 | 
+note: This is an unsafe fix and may change runtime behavior
+
+FA100 [*] Add `from __future__ import annotations` to simplify `typing.List`
+  --> UP006_0.py:45:10
+   |
+45 | def f(x: "Li" "st[str]") -> None:
+   |          ^^^^^^^^^^^^^^
+46 |     ...
+   |
+help: Add `from __future__ import annotations`
+1 + from __future__ import annotations
+2 | import typing
+3 | 
+4 | 
+note: This is an unsafe fix and may change runtime behavior
+
+FA100 [*] Add `from __future__ import annotations` to simplify `typing.List`
+  --> UP006_0.py:49:11
+   |
+49 | def f(x: "List['List[str]']") -> None:
+   |           ^^^^
+50 |     ...
+   |
+help: Add `from __future__ import annotations`
+1 + from __future__ import annotations
+2 | import typing
+3 | 
+4 | 
+note: This is an unsafe fix and may change runtime behavior
+
+FA100 [*] Add `from __future__ import annotations` to simplify `typing.List`
+  --> UP006_0.py:49:17
+   |
+49 | def f(x: "List['List[str]']") -> None:
+   |                 ^^^^
+50 |     ...
+   |
+help: Add `from __future__ import annotations`
+1 + from __future__ import annotations
+2 | import typing
+3 | 
+4 | 
+note: This is an unsafe fix and may change runtime behavior
+
+FA100 [*] Add `from __future__ import annotations` to simplify `typing.List`
+  --> UP006_0.py:53:11
+   |
+53 | def f(x: "List['Li' 'st[str]']") -> None:
+   |           ^^^^
+54 |     ...
+   |
+help: Add `from __future__ import annotations`
+1 + from __future__ import annotations
+2 | import typing
+3 | 
+4 | 
+note: This is an unsafe fix and may change runtime behavior
+
+FA100 [*] Add `from __future__ import annotations` to simplify `typing.List`
+  --> UP006_0.py:53:16
+   |
+53 | def f(x: "List['Li' 'st[str]']") -> None:
+   |                ^^^^^^^^^^^^^^
+54 |     ...
+   |
+help: Add `from __future__ import annotations`
+1 + from __future__ import annotations
+2 | import typing
+3 | 
+4 | 
+note: This is an unsafe fix and may change runtime behavior
+
+FA100 [*] Add `from __future__ import annotations` to simplify `typing.List`
+  --> UP006_0.py:57:10
+   |
+57 | def f(x: "Li" "st['List[str]']") -> None:
+   |          ^^^^^^^^^^^^^^^^^^^^^^
+58 |     ...
+   |
+help: Add `from __future__ import annotations`
+1 + from __future__ import annotations
+2 | import typing
+3 | 
+4 | 
+note: This is an unsafe fix and may change runtime behavior
+
+FA100 [*] Add `from __future__ import annotations` to simplify `typing.List`
+  --> UP006_0.py:57:10
+   |
+57 | def f(x: "Li" "st['List[str]']") -> None:
+   |          ^^^^^^^^^^^^^^^^^^^^^^
+58 |     ...
+   |
+help: Add `from __future__ import annotations`
+1 + from __future__ import annotations
+2 | import typing
+3 | 
+4 | 
+note: This is an unsafe fix and may change runtime behavior
+
+FA100 [*] Add `from __future__ import annotations` to simplify `typing.Deque`
+  --> UP006_0.py:61:10
+   |
+61 | def f(x: typing.Deque[str]) -> None:
+   |          ^^^^^^^^^^^^
+62 |     ...
+   |
+help: Add `from __future__ import annotations`
+1 + from __future__ import annotations
+2 | import typing
+3 | 
+4 | 
+note: This is an unsafe fix and may change runtime behavior
+
+FA100 [*] Add `from __future__ import annotations` to simplify `typing.DefaultDict`
+  --> UP006_0.py:65:10
+   |
+65 | def f(x: typing.DefaultDict[str, str]) -> None:
+   |          ^^^^^^^^^^^^^^^^^^
+66 |     ...
+   |
+help: Add `from __future__ import annotations`
+1 + from __future__ import annotations
+2 | import typing
+3 | 
+4 | 
+note: This is an unsafe fix and may change runtime behavior
