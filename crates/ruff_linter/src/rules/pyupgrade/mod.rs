@@ -128,41 +128,53 @@ mod tests {
         Ok(())
     }
 
-    #[test_case(Rule::NonPEP585Annotation, Path::new("UP006_0.py"), false; "stable_with_fa100")]
-    #[test_case(Rule::NonPEP585Annotation, Path::new("UP006_0.py"), true; "preview_with_fa100")]
-    fn up006_future_annotations(rule_code: Rule, path: &Path, preview: bool) -> Result<()> {
-        let snapshot = format!("{}__preview_{preview}__with_fa100", path.to_string_lossy());
-        let rules = vec![rule_code, Rule::FutureRewritableTypeAnnotation];
-        let diagnostics = test_path(
-            Path::new("pyupgrade").join(path).as_path(),
+    /// Test that enabling preview switches from `FA100` to `UP006` when `future-annotations` is on.
+    #[test]
+    fn up006_preview_with_fa100() -> Result<()> {
+        assert_diagnostics_diff!(
+            Path::new("pyupgrade/UP006_4.py"),
             &settings::LinterSettings {
                 future_annotations: true,
-                preview: if preview {
-                    PreviewMode::Enabled
-                } else {
-                    PreviewMode::Disabled
-                },
+                preview: PreviewMode::Disabled,
                 unresolved_target_version: PythonVersion::PY38.into(),
-                ..settings::LinterSettings::for_rules(rules)
+                ..settings::LinterSettings::for_rules(vec![
+                    Rule::NonPEP585Annotation,
+                    Rule::FutureRewritableTypeAnnotation
+                ])
             },
-        )?;
-        assert_diagnostics!(snapshot, diagnostics);
+            &settings::LinterSettings {
+                future_annotations: true,
+                preview: PreviewMode::Enabled,
+                unresolved_target_version: PythonVersion::PY38.into(),
+                ..settings::LinterSettings::for_rules(vec![
+                    Rule::NonPEP585Annotation,
+                    Rule::FutureRewritableTypeAnnotation
+                ])
+            },
+        );
         Ok(())
     }
 
-    /// Test that `UP006` does not fire on 3.8 when `future-annotations` is disabled, even in
-    /// preview mode.
+    /// Test that `FA100` fires when added alongside `UP006` in preview on 3.8 with
+    /// `future-annotations` disabled.
     #[test]
-    fn up006_preview_no_future_annotations_setting() -> Result<()> {
-        let diagnostics = test_path(
-            Path::new("pyupgrade/UP006_0.py"),
+    fn up006_preview_with_fa100_no_future_annotations_setting() -> Result<()> {
+        assert_diagnostics_diff!(
+            Path::new("pyupgrade/UP006_4.py"),
             &settings::LinterSettings {
                 preview: PreviewMode::Enabled,
                 unresolved_target_version: PythonVersion::PY38.into(),
                 ..settings::LinterSettings::for_rule(Rule::NonPEP585Annotation)
             },
-        )?;
-        assert_diagnostics!(diagnostics);
+            &settings::LinterSettings {
+                preview: PreviewMode::Enabled,
+                unresolved_target_version: PythonVersion::PY38.into(),
+                ..settings::LinterSettings::for_rules(vec![
+                    Rule::NonPEP585Annotation,
+                    Rule::FutureRewritableTypeAnnotation,
+                ])
+            },
+        );
         Ok(())
     }
 
