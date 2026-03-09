@@ -167,18 +167,18 @@ Explain a rule (or all rules)
 <h3 class="cli-reference">Usage</h3>
 
 ```
-ty rule [OPTIONS] <RULE|--all>
+ty rule [OPTIONS] [RULE]
 ```
 
 <h3 class="cli-reference">Arguments</h3>
 
-<dl class="cli-reference"><dt id="ty-rule--rule"><a href="#ty-rule--rule"><code>RULE</code></a></dt><dd><p>Rule to explain</p>
+<dl class="cli-reference"><dt id="ty-rule--rule"><a href="#ty-rule--rule"><code>RULE</code></a></dt><dd><p>Rule to explain.</p>
+<p>Defaults to all rules if omitted.</p>
 </dd></dl>
 
 <h3 class="cli-reference">Options</h3>
 
-<dl class="cli-reference"><dt id="ty-rule--all"><a href="#ty-rule--all"><code>--all</code></a></dt><dd><p>Explain all rules</p>
-</dd><dt id="ty-rule--help"><a href="#ty-rule--help"><code>--help</code></a>, <code>-h</code></dt><dd><p>Print help</p>
+<dl class="cli-reference"><dt id="ty-rule--help"><a href="#ty-rule--help"><code>--help</code></a>, <code>-h</code></dt><dd><p>Print help (see a summary with '-h')</p>
 </dd><dt id="ty-rule--output-format"><a href="#ty-rule--output-format"><code>--output-format</code></a> <i>output-format</i></dt><dd><p>Output format</p>
 <p>[default: text]</p><p>Possible values:</p>
 <ul>
