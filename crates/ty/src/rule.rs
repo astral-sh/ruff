@@ -1,4 +1,3 @@
-use std::fmt::Write as _;
 use std::io::{self, BufWriter, Write};
 
 use anyhow::Result;
@@ -30,27 +29,23 @@ impl<'a> Explanation<'a> {
     }
 }
 
-fn format_rule_text(lint: LintId) -> String {
-    let mut output = format!("# {}\n\n", lint.name());
+impl std::fmt::Display for Explanation<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "# {}\n", self.name)?;
 
-    let status = match lint.status() {
-        LintStatus::Preview { since } => format!("Preview (since {since})"),
-        LintStatus::Stable { since } => format!("Stable (since {since})"),
-        LintStatus::Deprecated { since, reason } => {
-            format!("Deprecated (since {since}): {reason}")
-        }
-        LintStatus::Removed { since, reason } => format!("Removed (since {since}): {reason}"),
-    };
+        let status = match self.status {
+            LintStatus::Preview { since } => format!("Preview (since {since})"),
+            LintStatus::Stable { since } => format!("Stable (since {since})"),
+            LintStatus::Deprecated { since, reason } => {
+                format!("Deprecated (since {since}): {reason}")
+            }
+            LintStatus::Removed { since, reason } => format!("Removed (since {since}): {reason}"),
+        };
 
-    let _ = write!(
-        output,
-        "Default level: {} | {status}\n\n",
-        lint.default_level()
-    );
+        writeln!(f, "Default level: {} | {status}\n", self.default_level)?;
 
-    output.push_str(lint.documentation().trim());
-
-    output
+        f.write_str(self.documentation.trim())
+    }
 }
 
 /// Explain a single rule.
@@ -61,7 +56,7 @@ pub(crate) fn rule(name: &str, format: HelpFormat) -> Result<()> {
     let mut stdout = BufWriter::new(io::stdout().lock());
     match format {
         HelpFormat::Text => {
-            writeln!(stdout, "{}", format_rule_text(lint))?;
+            writeln!(stdout, "{}", Explanation::from_lint(&lint))?;
         }
         HelpFormat::Json => {
             serde_json::to_writer_pretty(&mut stdout, &Explanation::from_lint(&lint))?;
@@ -80,8 +75,7 @@ pub(crate) fn rules(format: HelpFormat) -> Result<()> {
     match format {
         HelpFormat::Text => {
             for lint in lints {
-                writeln!(stdout, "{}", format_rule_text(lint))?;
-                writeln!(stdout)?;
+                writeln!(stdout, "{}\n", Explanation::from_lint(&lint))?;
             }
         }
         HelpFormat::Json => {
