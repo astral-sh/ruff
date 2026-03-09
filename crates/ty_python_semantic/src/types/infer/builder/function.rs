@@ -114,6 +114,43 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         declared_ty,
                     );
                 }
+
+                if let Some(generator_types) = declared_ty.generator_types(db)
+                    && let Some(expected_return_ty) = generator_types.return_ty
+                {
+                    for invalid in self
+                        .return_types_and_ranges
+                        .iter()
+                        .copied()
+                        .filter(|ty_range| !ty_range.ty.is_assignable_to(db, expected_return_ty))
+                    {
+                        report_invalid_return_type(
+                            &self.context,
+                            invalid.range,
+                            returns.range(),
+                            expected_return_ty,
+                            invalid.ty,
+                        );
+                    }
+
+                    if self
+                        .index
+                        .use_def_map(scope_id)
+                        .can_implicitly_return_none(db)
+                        && !Type::none(db).is_assignable_to(db, expected_return_ty)
+                    {
+                        let no_return = self.return_types_and_ranges.is_empty();
+                        report_implicit_return_type(
+                            &self.context,
+                            returns.range(),
+                            expected_return_ty,
+                            false,
+                            None,
+                            no_return,
+                        );
+                    }
+                }
+
                 return;
             }
 

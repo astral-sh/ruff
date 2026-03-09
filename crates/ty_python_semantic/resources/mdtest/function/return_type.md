@@ -528,6 +528,30 @@ def i2() -> typing.Generator:
 
 def j() -> str:  # error: [invalid-return-type]
     yield 42
+
+def invalid_return_type() -> typing.Generator[None, None, None]:
+    yield
+    return ""  # error: [invalid-return-type]
+```
+
+When a function is annotated the return type must match the return type:
+
+```py
+def wrong_return() -> typing.Generator[int, int, int]:
+    yield 1
+    return ""  # error: [invalid-return-type]
+```
+
+Also bare returns are checked the function is assumed to return nothing and it's type checked
+againts the declarated return type.
+
+```py
+def bare_return_ok() -> typing.Generator[int, int, None]:
+    yield 1
+    return
+
+def missing_return() -> typing.Generator[int, int, int]:  # error: [invalid-return-type]
+    yield 1
 ```
 
 ### Asynchronous
@@ -555,6 +579,10 @@ async def i() -> typing.AsyncIterable:
 
 async def j() -> str:  # error: [invalid-return-type]
     yield 42
+
+async def j() -> typing.AsyncGenerator:
+    yield 42
+    return 2  # error: [invalid-syntax] "`return` with value in async generator"
 ```
 
 ## Diagnostics for `empty-body` on non-protocol subclasses of protocol classes
