@@ -15,9 +15,8 @@ use crate::semantic_index::{
 };
 use crate::semantic_index::{DeclarationWithConstraint, global_scope, use_def_map};
 use crate::types::{
-    ApplyTypeMappingVisitor, DynamicType, KnownClass, MaterializationKind, MemberLookupPolicy,
-    Truthiness, Type, TypeAndQualifiers, TypeQualifiers, UnionBuilder, UnionType, binding_type,
-    declaration_type,
+    DynamicType, KnownClass, MemberLookupPolicy, Truthiness, Type, TypeAndQualifiers,
+    TypeQualifiers, UnionBuilder, UnionType, binding_type, declaration_type,
 };
 use crate::{Db, FxIndexSet, FxOrderSet, Program};
 
@@ -85,7 +84,7 @@ impl Widening {
     pub(crate) fn apply_if_needed<'db>(self, db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
         match self {
             Self::None => ty,
-            Self::WithUnknown => UnionType::from_elements(db, [Type::unknown(), ty]),
+            Self::WithUnknown => UnionType::from_two_elements(db, Type::unknown(), ty),
         }
     }
 }
@@ -326,13 +325,13 @@ impl<'db> LookupError<'db> {
             (LookupError::Undefined(_), _) => fallback,
             (LookupError::PossiblyUndefined { .. }, Err(LookupError::Undefined(_))) => Err(self),
             (LookupError::PossiblyUndefined(ty), Ok(ty2)) => Ok(TypeAndQualifiers::new(
-                UnionType::from_elements(db, [ty.inner_type(), ty2.inner_type()]),
+                UnionType::from_two_elements(db, ty.inner_type(), ty2.inner_type()),
                 ty.origin().merge(ty2.origin()),
                 ty.qualifiers().union(ty2.qualifiers()),
             )),
             (LookupError::PossiblyUndefined(ty), Err(LookupError::PossiblyUndefined(ty2))) => {
                 Err(LookupError::PossiblyUndefined(TypeAndQualifiers::new(
-                    UnionType::from_elements(db, [ty.inner_type(), ty2.inner_type()]),
+                    UnionType::from_two_elements(db, ty.inner_type(), ty2.inner_type()),
                     ty.origin().merge(ty2.origin()),
                     ty.qualifiers().union(ty2.qualifiers()),
                 )))
@@ -733,15 +732,6 @@ impl<'db> PlaceAndQualifiers<'db> {
         }
     }
 
-    pub(crate) fn materialize(
-        self,
-        db: &'db dyn Db,
-        materialization_kind: MaterializationKind,
-        visitor: &ApplyTypeMappingVisitor<'db>,
-    ) -> PlaceAndQualifiers<'db> {
-        self.map_type(|ty| ty.materialize(db, materialization_kind, visitor))
-    }
-
     /// Transform place and qualifiers into a [`LookupResult`],
     /// a [`Result`] type in which the `Ok` variant represents a definitely defined place
     /// and the `Err` variant represents a place that is either definitely or possibly undefined.
@@ -920,7 +910,7 @@ pub(crate) fn place_by_id<'db>(
                     definedness: boundness,
                     ..
                 }) => Place::Defined(DefinedPlace {
-                    ty: UnionType::from_elements(db, [Type::unknown(), inferred]),
+                    ty: UnionType::from_two_elements(db, Type::unknown(), inferred),
                     origin,
                     definedness: boundness,
                     widening: Widening::None,
@@ -979,7 +969,7 @@ pub(crate) fn place_by_id<'db>(
                     definedness: boundness,
                     ..
                 }) => Place::Defined(DefinedPlace {
-                    ty: UnionType::from_elements(db, [inferred_ty, declared_ty]),
+                    ty: UnionType::from_two_elements(db, inferred_ty, declared_ty),
                     origin,
                     definedness: if boundness_analysis == BoundnessAnalysis::AssumeBound {
                         Definedness::AlwaysDefined
@@ -1208,13 +1198,15 @@ fn loop_header_reachability_impl<'db>(
 
         match use_def.definition(live_binding.binding) {
             DefinitionState::Defined(def) => {
+                debug_assert_ne!(
+                    def, definition,
+                    "loop headers only include bindings from within the loop"
+                );
                 has_defined_bindings = true;
-                if def != definition {
-                    reachable_bindings.insert(ReachableLoopBinding {
-                        definition: def,
-                        narrowing_constraint: live_binding.narrowing_constraint,
-                    });
-                }
+                reachable_bindings.insert(ReachableLoopBinding {
+                    definition: def,
+                    narrowing_constraint: live_binding.narrowing_constraint,
+                });
             }
             // `del` in the loop body is always visible to code after the loop via the
             // normal control flow merge. Updating `deleted_reachability` here is
@@ -1222,10 +1214,9 @@ fn loop_header_reachability_impl<'db>(
             DefinitionState::Deleted => {
                 deleted_reachability = deleted_reachability.or(reachability);
             }
-            // If UNBOUND is visible at loop-back, then it was visible before the loop.
-            // Loop header definitions don't shadow preexisting bindings, so we don't
-            // need to do anything with this.
-            DefinitionState::Undefined => {}
+            DefinitionState::Undefined => {
+                unreachable!("loop headers only include bindings from within the loop")
+            }
         }
     }
 
@@ -1242,7 +1233,7 @@ pub(crate) struct LoopHeaderReachability<'db> {
     /// Whether any reachable loop-back binding is a defined binding.
     pub(crate) has_defined_bindings: bool,
     pub(crate) deleted_reachability: Truthiness,
-    /// Reachable, defined loop-back bindings (excluding the loop header definition itself).
+    /// Reachable loop-back bindings that are not `del`s.
     pub(crate) reachable_bindings: FxIndexSet<ReachableLoopBinding<'db>>,
 }
 
@@ -1968,9 +1959,10 @@ pub(crate) fn class_body_implicit_symbol<'db>(
         "__qualname__" => Place::bound(KnownClass::Str.to_instance(db)).into(),
         "__module__" => Place::bound(KnownClass::Str.to_instance(db)).into(),
         // __doc__ is `str` if there's a docstring, `None` if there isn't
-        "__doc__" => Place::bound(UnionType::from_elements(
+        "__doc__" => Place::bound(UnionType::from_two_elements(
             db,
-            [KnownClass::Str.to_instance(db), Type::none(db)],
+            KnownClass::Str.to_instance(db),
+            Type::none(db),
         ))
         .into(),
         // __firstlineno__ was added in Python 3.13

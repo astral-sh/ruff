@@ -1,0 +1,53 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+---
+## Input
+```python
+lazy import foo
+lazy    import    foo,    bar as baz
+
+lazy from a import b
+lazy from some.really.long.module.name import first_really_long_name, second_really_long_name as renamed_value
+lazy from a import (  # comment
+    bar,
+)
+
+def f():
+    lazy import foo.bar
+    lazy from another.really.long.module.path import first_name, second_name as alias
+```
+
+## Outputs
+### Output 1
+```
+indent-style               = space
+line-width                 = 88
+indent-width               = 4
+quote-style                = Double
+line-ending                = LineFeed
+magic-trailing-comma       = Respect
+docstring-code             = Disabled
+docstring-code-line-width  = "dynamic"
+preview                    = Disabled
+target_version             = 3.15
+source_type                = Python
+```
+
+```python
+lazy import foo
+lazy import foo, bar as baz
+
+lazy from a import b
+lazy from some.really.long.module.name import (
+    first_really_long_name,
+    second_really_long_name as renamed_value,
+)
+lazy from a import (  # comment
+    bar,
+)
+
+
+def f():
+    lazy import foo.bar
+    lazy from another.really.long.module.path import first_name, second_name as alias
+```

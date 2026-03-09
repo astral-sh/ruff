@@ -302,3 +302,15 @@ pub(crate) const fn is_baseloader_safe_in_yaml_load_enabled(settings: &LinterSet
 pub(crate) const fn is_expanded_import_conventions_enabled(preview: PreviewMode) -> bool {
     preview.is_enabled()
 }
+
+// https://github.com/astral-sh/ruff/pull/23535
+pub(crate) const fn is_file_level_invalid_rule_code_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
+
+// https://github.com/astral-sh/ruff/pull/23473
+pub(crate) const fn is_incorrect_dict_iterator_comprehension_enabled(
+    settings: &LinterSettings,
+) -> bool {
+    settings.preview.is_enabled()
+}

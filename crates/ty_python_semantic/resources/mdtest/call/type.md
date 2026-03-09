@@ -490,6 +490,20 @@ reveal_type(T.__bases__)  # revealed: tuple[type, ...]
 reveal_type(T.__mro__)  # revealed: tuple[type, ...]
 ```
 
+`type[Any]` and `type[Unknown]` are gradual forms with an unknown metaclass that is at least `type`.
+Attributes defined as data descriptors on `type` (like `__mro__`) resolve to their declared types
+intersected with `Unknown`, reflecting uncertainty about whether the unknown metaclass overrides
+them:
+
+```py
+from typing import Any
+from ty_extensions import Unknown
+
+def f(a: type[Any], b: type[Unknown]):
+    reveal_type(a.__mro__)  # revealed: tuple[type, ...] & Any
+    reveal_type(b.__mro__)  # revealed: tuple[type, ...] & Unknown
+```
+
 ## Invalid calls
 
 Other numbers of arguments are invalid:
@@ -527,7 +541,7 @@ type("Foo", Base, {})
 # error: 17 [invalid-base] "Invalid class base with type `Literal[2]`"
 type("Foo", (1, 2), {})
 
-# error: [invalid-argument-type] "Invalid argument to parameter 3 (`namespace`) of `type()`: Expected `dict[str, Any]`, found `dict[Unknown | bytes, Unknown | int]`"
+# error: [invalid-argument-type] "Invalid argument to parameter 3 (`namespace`) of `type()`: Expected `dict[str, Any]`, found `dict[bytes, int]`"
 type("Foo", (Base,), {b"attr": 1})
 ```
 

@@ -31,14 +31,14 @@ else:
     reveal_type(x)  # revealed: Never
 
 if x or not x:
-    reveal_type(x)  # revealed: Literal[0, -1, "", "foo", b"", b"bar"] | bool | None | tuple[()]
+    reveal_type(x)  # revealed: Literal[-1, 0, "foo", "", b"bar", b""] | bool | None | tuple[()]
 else:
     reveal_type(x)  # revealed: Never
 
 if not (x or not x):
     reveal_type(x)  # revealed: Never
 else:
-    reveal_type(x)  # revealed: Literal[0, -1, "", "foo", b"", b"bar"] | bool | None | tuple[()]
+    reveal_type(x)  # revealed: Literal[-1, 0, "foo", "", b"bar", b""] | bool | None | tuple[()]
 
 if (isinstance(x, int) or isinstance(x, str)) and x:
     reveal_type(x)  # revealed: Literal[-1, True, "foo"]
@@ -331,6 +331,57 @@ def _(x: type[FalsyClass] | type[TruthyClass]):
     reveal_type(x and A())  # revealed: type[FalsyClass] | A
 ```
 
+## Narrowing with conditional expressions
+
+```py
+def _(coinflip_1: bool, coinflip_2: bool):
+    if coinflip_1 if coinflip_2 else coinflip_1:
+        reveal_type(coinflip_1)  # revealed: Literal[True]
+    else:
+        reveal_type(coinflip_1)  # revealed: Literal[False]
+```
+
+## Conditional expressions with ambiguous branch constraints
+
+```py
+from typing import Literal
+
+def _(flag: bool, x: Literal[0, 1], y: Literal[0, 1]):
+    if x if flag else y:
+        reveal_type(x)  # revealed: Literal[0, 1]
+        reveal_type(y)  # revealed: Literal[0, 1]
+    else:
+        reveal_type(x)  # revealed: Literal[0, 1]
+        reveal_type(y)  # revealed: Literal[0, 1]
+
+def _(flag: bool, x: Literal[0, 1, 2]):
+    if (x == 1) if flag else (x == 2):
+        reveal_type(x)  # revealed: Literal[1, 2]
+    else:
+        reveal_type(x)  # revealed: Literal[0, 2, 1]
+
+def _(flag: bool, x: Literal[0, 1], y: int):
+    if (x == 1) if flag else y:
+        reveal_type(x)  # revealed: Literal[0, 1]
+```
+
+## Conditional expressions with statically known tests
+
+```py
+from typing import Literal
+
+def _(x: Literal[0, 1], y: Literal[0, 1]):
+    if x if True else y:
+        reveal_type(x)  # revealed: Literal[1]
+    else:
+        reveal_type(x)  # revealed: Literal[0]
+
+    if x if False else y:
+        reveal_type(y)  # revealed: Literal[1]
+    else:
+        reveal_type(y)  # revealed: Literal[0]
+```
+
 ## Truthiness narrowing for `LiteralString`
 
 ```py
@@ -362,6 +413,18 @@ def f():
         reveal_type(x)  # revealed: str & ~AlwaysFalsy
     else:
         reveal_type(x)  # revealed: (str & ~AlwaysTruthy) | None
+```
+
+## Narrowing the value of a named expression
+
+The value expression on the right-hand side of the walrus operator should also be narrowed:
+
+```py
+def foo(value: int | None):
+    if foo := value:
+        reveal_type(value)  # revealed: int & ~AlwaysFalsy
+    else:
+        reveal_type(value)  # revealed: (int & ~AlwaysTruthy) | None
 ```
 
 ## Narrowing a union of a `TypedDict` and `None`

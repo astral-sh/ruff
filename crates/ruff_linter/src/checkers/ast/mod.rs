@@ -47,7 +47,8 @@ use ruff_python_ast::{PySourceType, helpers, str, visitor};
 use ruff_python_codegen::{Generator, Stylist};
 use ruff_python_index::Indexer;
 use ruff_python_parser::semantic_errors::{
-    SemanticSyntaxChecker, SemanticSyntaxContext, SemanticSyntaxError, SemanticSyntaxErrorKind,
+    LazyImportContext, SemanticSyntaxChecker, SemanticSyntaxContext, SemanticSyntaxError,
+    SemanticSyntaxErrorKind,
 };
 use ruff_python_parser::typing::{AnnotationKind, ParsedAnnotation, parse_type_annotation};
 use ruff_python_parser::{ParseError, Parsed};
@@ -68,7 +69,9 @@ use crate::docstrings::extraction::ExtractionTarget;
 use crate::importer::{ImportRequest, Importer, ResolutionError};
 use crate::noqa::NoqaMapping;
 use crate::package::PackageRoot;
-use crate::preview::is_undefined_export_in_dunder_init_enabled;
+use crate::preview::{
+    is_incorrect_dict_iterator_comprehension_enabled, is_undefined_export_in_dunder_init_enabled,
+};
 use crate::registry::Rule;
 use crate::rules::flake8_bugbear::rules::ReturnInGenerator;
 use crate::rules::pyflakes::rules::{
@@ -764,6 +767,9 @@ impl SemanticSyntaxContext for Checker<'_> {
                 }
             }
             SemanticSyntaxErrorKind::ReboundComprehensionVariable
+            | SemanticSyntaxErrorKind::LazyImportNotAllowed { .. }
+            | SemanticSyntaxErrorKind::LazyImportStar
+            | SemanticSyntaxErrorKind::LazyFutureImport
             | SemanticSyntaxErrorKind::DuplicateTypeParameter
             | SemanticSyntaxErrorKind::MultipleCaseAssignment(_)
             | SemanticSyntaxErrorKind::IrrefutableCasePattern(_)
@@ -794,6 +800,29 @@ impl SemanticSyntaxContext for Checker<'_> {
 
     fn future_annotations_or_stub(&self) -> bool {
         self.semantic.future_annotations_or_stub()
+    }
+
+    fn lazy_import_context(&self) -> Option<LazyImportContext> {
+        match self.semantic.current_scope().kind {
+            // Possible, but invalid positions.
+            ScopeKind::Function(_) => return Some(LazyImportContext::Function),
+            ScopeKind::Class(_) => return Some(LazyImportContext::Class),
+            // Valid position.
+            ScopeKind::Module => {}
+            // Impossible positions because lambdas and comprehensions can't contain statements.
+            ScopeKind::Lambda(_)
+            | ScopeKind::Generator { .. }
+            | ScopeKind::Type
+            | ScopeKind::DunderClassCell => {}
+        }
+
+        for statement in self.semantic.current_statements().skip(1) {
+            if matches!(statement, Stmt::Try(_)) {
+                return Some(LazyImportContext::TryExceptBlocks);
+            }
+        }
+
+        None
     }
 
     fn in_async_context(&self) -> bool {
@@ -940,11 +969,17 @@ impl<'a> Visitor<'a> for Checker<'a> {
             {
                 self.semantic.flags |= SemanticModelFlags::MODULE_DOCSTRING_BOUNDARY;
             }
-            Stmt::ImportFrom(ast::StmtImportFrom { module, names, .. }) => {
+            Stmt::ImportFrom(ast::StmtImportFrom {
+                module,
+                names,
+                is_lazy,
+                ..
+            }) => {
                 self.semantic.flags |= SemanticModelFlags::MODULE_DOCSTRING_BOUNDARY;
 
-                // Allow __future__ imports until we see a non-__future__ import.
-                if let Some("__future__") = module.as_deref() {
+                // Allow eager `__future__` imports until we see any other import. Lazy imports,
+                // including `lazy from __future__ import ...`, don't enable future annotations.
+                if !*is_lazy && matches!(module.as_deref(), Some("__future__")) {
                     if names
                         .iter()
                         .any(|alias| alias.name.as_str() == "annotations")
@@ -1000,6 +1035,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
             }
             Stmt::Import(ast::StmtImport {
                 names,
+                is_lazy: _,
                 range: _,
                 node_index: _,
             }) => {
@@ -1055,6 +1091,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 names,
                 module,
                 level,
+                is_lazy,
                 range: _,
                 node_index: _,
             }) => {
@@ -1064,6 +1101,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
 
                 let module = module.as_deref();
                 let level = *level;
+                let is_lazy = *is_lazy;
 
                 // Mark the top-level module as "seen" by the semantic model.
                 if level == 0 {
@@ -1073,7 +1111,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 }
 
                 for alias in names {
-                    if let Some("__future__") = module {
+                    if !is_lazy && matches!(module, Some("__future__")) {
                         let name = alias.asname.as_ref().unwrap_or(&alias.name);
                         self.add_binding(
                             name,
@@ -2465,6 +2503,12 @@ impl<'a> Checker<'a> {
         for generator in generators {
             analyze::comprehension(generator, self);
         }
+
+        if self.is_rule_enabled(Rule::IncorrectDictIterator)
+            && is_incorrect_dict_iterator_comprehension_enabled(self.settings())
+        {
+            self.analyze.comprehensions.push(self.semantic.snapshot());
+        }
     }
 
     /// Visit a body of [`Stmt`] nodes within a type-checking block.
@@ -3309,9 +3353,11 @@ pub(crate) fn check_ast(
     // Check docstrings, bindings, and unresolved references.
     analyze::deferred_lambdas(&mut checker);
     analyze::deferred_for_loops(&mut checker);
+    analyze::deferred_comprehensions(&mut checker);
     analyze::definitions(&mut checker);
     analyze::bindings(&checker);
     analyze::unresolved_references(&checker);
+    analyze::deferred_with_statements(&mut checker);
 
     // Reset the scope to module-level, and check all consumed scopes.
     checker.semantic.scope_id = ScopeId::global();

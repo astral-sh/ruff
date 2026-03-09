@@ -210,6 +210,9 @@ class WithDefault[T, U = int]: ...
 
 reveal_type(WithDefault[str, str]())  # revealed: WithDefault[str, str]
 reveal_type(WithDefault[str]())  # revealed: WithDefault[str, int]
+
+# error: [invalid-type-arguments] "Too many type arguments to class `WithDefault`: expected between 1 and 2, got 3"
+reveal_type(WithDefault[str, str, str]())  # revealed: WithDefault[Unknown, Unknown]
 ```
 
 ## Diagnostics for bad specializations
@@ -659,7 +662,7 @@ class C[T]:
     # error: [unresolved-reference]
     def cannot_use_outside_of_method(self, u: U): ...
 
-    # TODO: error
+    # error: [shadowed-type-variable]
     def cannot_shadow_class_typevar[T](self, t: T): ...
 
 # revealed: ty_extensions.GenericContext[T@C]
@@ -763,6 +766,8 @@ def protocol_case(x: GenericProtocol[[int], str]) -> None:
 
 ### No back-references
 
+<!-- snapshot-diagnostics -->
+
 Typevar bounds/constraints/defaults are lazy, but cannot refer to later typevars. Furthermore,
 bounds/constraints cannot refer to other type variables, i.e. they must be non-generic.
 
@@ -783,6 +788,19 @@ class F[S: X]:
     pass
 
 X = int
+```
+
+Type variable defaults can reference earlier type variables, but not later ones:
+
+```py
+# This is fine: U's default references T, which comes before U
+class Good[T, U = T]: ...
+
+# error: [invalid-generic-class] "Default of `S` cannot reference later type parameter `T`"
+class Bad[S = T, T = int]: ...
+
+# error: [invalid-generic-class]
+class AlsoBad[S = list[T], T = int]: ...
 ```
 
 ## Cyclic class definitions
@@ -912,6 +930,45 @@ def reveal_type(obj, /): ...
 
 ```py
 reveal_type((1, 2, 3))  # revealed: tuple[Literal[1], Literal[2], Literal[3]]
+```
+
+## Default type parameter after `TypeVarTuple`
+
+<!-- snapshot-diagnostics -->
+
+A type parameter with a default cannot follow a `TypeVarTuple` in a type parameter list. This is
+prohibited by the typing spec because a `TypeVarTuple` consumes all remaining positional type
+arguments, making any subsequent defaults meaningless.
+
+```py
+# error: [invalid-type-variable-default] "Type parameter `T` with a default follows TypeVarTuple `Ts`"
+class Foo[*Ts, T = int]: ...
+
+# error: [invalid-type-variable-default]
+class Bar[T1, *Ts, T2 = int]: ...
+
+# error: [invalid-type-variable-default]
+class Baz[*Ts, T1 = int, T2 = str]: ...
+
+# Note: the spec says this is fine,
+# but it raises `TypeError` at runtime
+# (<https://github.com/python/typing/issues/2211>)
+#
+# error: [invalid-type-variable-default]
+class Qux[*Ts, **P = [int, str]]: ...
+
+# error: [invalid-type-variable-default]
+class Quux[*Ts, T1 = int, **P = [int, str]]: ...
+
+# error: [invalid-type-variable-default]
+class Corge[*Ts, T1 = int, T2 = str, **P = [int, str]]: ...
+
+# error: [invalid-type-variable-default]
+class Grault[*Us, *Ts = *tuple[int, str]]: ...
+
+# These are fine:
+class Ok1[T, *Ts]: ...
+class Ok3[*Ts]: ...
 ```
 
 [crtp]: https://en.wikipedia.org/wiki/Curiously_recurring_template_pattern

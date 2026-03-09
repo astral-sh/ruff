@@ -1076,57 +1076,6 @@ include = ["*.ipy"]
 }
 
 #[test]
-fn warn_invalid_noqa_with_no_diagnostics() {
-    assert_cmd_snapshot!(
-        Command::new(get_cargo_bin(BIN_NAME))
-            .args(STDIN_BASE_OPTIONS)
-            .args(["--isolated"])
-            .arg("--select")
-            .arg("F401")
-            .arg("-")
-            .pass_stdin(
-                r#"
-# ruff: noqa: AAA101
-print("Hello world!")
-"#
-            )
-    );
-}
-
-#[test]
-fn file_noqa_external() -> Result<()> {
-    let fixture = CliTest::with_file(
-        "ruff.toml",
-        r#"
-[lint]
-external = ["AAA"]
-"#,
-    )?;
-
-    assert_cmd_snapshot!(fixture
-        .check_command()
-        .arg("--config")
-        .arg("ruff.toml")
-        .arg("-")
-        .pass_stdin(r#"
-# flake8: noqa: AAA101, BBB102
-import os
-"#), @"
-    success: false
-    exit_code: 1
-    ----- stdout -----
-    -:3:8: F401 [*] `os` imported but unused
-    Found 1 error.
-    [*] 1 fixable with the `--fix` option.
-
-    ----- stderr -----
-    warning: Invalid rule code provided to `# ruff: noqa` at -:2: BBB102
-    ");
-
-    Ok(())
-}
-
-#[test]
 fn required_version_fails_to_parse() -> Result<()> {
     let fixture = CliTest::with_file(
         "ruff.toml",
@@ -1915,6 +1864,88 @@ print(
         % name
     )
     "#);
+
+    Ok(())
+}
+
+#[test]
+fn add_noqa_top_of_file() -> Result<()> {
+    let fixture = CliTest::new()?;
+    fixture.write_file(
+        "ruff.toml",
+        r#"
+[lint]
+select = ["D100"]
+"#,
+    )?;
+
+    fixture.write_file(
+        "noqa.py", r"
+",
+    )?;
+
+    assert_cmd_snapshot!(fixture
+        .check_command()
+        .args(["--config", "ruff.toml"])
+        .arg("noqa.py")
+        .arg("--preview")
+        .args(["--add-noqa"])
+        , @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Added 1 noqa directive.
+    ");
+
+    let test_code =
+        fs::read_to_string(fixture.root().join("noqa.py")).expect("should read test file");
+
+    insta::assert_snapshot!(test_code, @"  # noqa: D100");
+
+    Ok(())
+}
+
+#[test]
+fn add_noqa_top_of_file_with_shebang() -> Result<()> {
+    let fixture = CliTest::new()?;
+    fixture.write_file(
+        "ruff.toml",
+        r#"
+[lint]
+select = ["D100"]
+"#,
+    )?;
+
+    fixture.write_file(
+        "noqa.py",
+        r"#!/usr/bin/env fake command
+",
+    )?;
+
+    assert_cmd_snapshot!(fixture
+        .check_command()
+        .args(["--config", "ruff.toml"])
+        .arg("noqa.py")
+        .arg("--preview")
+        .args(["--add-noqa"])
+        , @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Added 1 noqa directive.
+    ");
+
+    let test_code =
+        fs::read_to_string(fixture.root().join("noqa.py")).expect("should read test file");
+
+    insta::assert_snapshot!(test_code, @"
+    #!/usr/bin/env fake command
+      # noqa: D100
+    ");
 
     Ok(())
 }

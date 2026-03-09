@@ -2519,10 +2519,10 @@ def function():
         // TODO: This should just be `**AB@Alias2 (<variance>)`
         // https://github.com/astral-sh/ty/issues/1581
         assert_snapshot!(test.hover(), @"
-        (**AB@Alias2) -> tuple[AB@Alias2]
+        (**AB@Alias2) -> tuple[Unknown]
         ---------------------------------------------
         ```python
-        (**AB@Alias2) -> tuple[AB@Alias2]
+        (**AB@Alias2) -> tuple[Unknown]
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
@@ -4547,11 +4547,11 @@ def function():
         "#,
         );
 
-        assert_snapshot!(test.hover(), @"
-        list[Unknown | int]
+        assert_snapshot!(test.hover(), @r###"
+        list[int]
         ---------------------------------------------
         ```python
-        list[Unknown | int]
+        list[int]
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
@@ -4562,7 +4562,7 @@ def function():
           |      |
           |      source
           |
-        ");
+        "###);
 
         let test = cursor_test(
             r#"
@@ -4950,6 +4950,20 @@ def function():
           | source
           |
         ");
+    }
+
+    // Ref: https://github.com/astral-sh/ty/issues/2401
+    #[test]
+    fn hover_incomplete_except_handler() {
+        let test = cursor_test(
+            "\
+try:
+    print()
+except <CURSOR># Trigger completion/hover here
+",
+        );
+
+        assert_snapshot!(test.hover(), @"Hover provided no content");
     }
 
     impl CursorTest {

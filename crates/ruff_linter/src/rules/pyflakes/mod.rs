@@ -132,6 +132,7 @@ mod tests {
     #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_30.py"))]
     #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_31.py"))]
     #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_32.py"))]
+    #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_33.pyi"))]
     #[test_case(Rule::UndefinedName, Path::new("F821_0.py"))]
     #[test_case(Rule::UndefinedName, Path::new("F821_1.py"))]
     #[test_case(Rule::UndefinedName, Path::new("F821_2.py"))]
@@ -168,6 +169,7 @@ mod tests {
     #[test_case(Rule::UndefinedName, Path::new("F821_31.py"))]
     #[test_case(Rule::UndefinedName, Path::new("F821_32.pyi"))]
     #[test_case(Rule::UndefinedName, Path::new("F821_33.py"))]
+    #[test_case(Rule::UndefinedName, Path::new("F821_34.pyi"))]
     #[test_case(Rule::UndefinedExport, Path::new("F822_0.py"))]
     #[test_case(Rule::UndefinedExport, Path::new("F822_0.pyi"))]
     #[test_case(Rule::UndefinedExport, Path::new("F822_1.py"))]
@@ -4056,6 +4058,13 @@ lambda: fu
         class B: pass
         ",
             &[],
+        );
+
+        flakes(
+            r"
+        lazy from __future__ import annotations
+        ",
+            &[Rule::UnusedImport],
         );
 
         flakes(

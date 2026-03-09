@@ -262,7 +262,7 @@ pub struct Options {
     ///
     /// For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).
     #[option(
-        default = r#"["*.py", "*.pyi", "*.pyw", "*.ipynb", "**/pyproject.toml"]"#,
+        default = r#"["*.py", "*.pyi", "*.pyw", "*.ipynb", "*.md", "**/pyproject.toml"]"#,
         value_type = "list[str]",
         example = r#"
             include = ["*.py"]
@@ -2530,6 +2530,7 @@ pub struct IsortOptions {
     #[option(
         default = r#"{}"#,
         value_type = r#"dict["future" | "standard-library" | "third-party" | "first-party" | "local-folder" | str, str]"#,
+        scope = "import-heading",
         example = r#"
             future = "Future imports"
             standard-library = "Standard library imports"

@@ -630,6 +630,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pydocstyle, "417") => rules::pydocstyle::rules::UndocumentedParam,
         (Pydocstyle, "418") => rules::pydocstyle::rules::OverloadWithDocstring,
         (Pydocstyle, "419") => rules::pydocstyle::rules::EmptyDocstring,
+        (Pydocstyle, "420") => rules::pydocstyle::rules::IncorrectSectionOrder,
 
         // pep8-naming
         (PEP8Naming, "801") => rules::pep8_naming::rules::InvalidClassName,

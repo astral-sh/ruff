@@ -767,12 +767,11 @@ impl ReachabilityConstraintsBuilder {
 
 /// AND a new optional narrowing constraint with an accumulated one.
 fn accumulate_constraint<'db>(
-    db: &'db dyn Db,
     accumulated: Option<NarrowingConstraint<'db>>,
     new: Option<NarrowingConstraint<'db>>,
 ) -> Option<NarrowingConstraint<'db>> {
     match (accumulated, new) {
-        (Some(acc), Some(new_c)) => Some(new_c.merge_constraint_and(acc, db)),
+        (Some(acc), Some(new_c)) => Some(new_c.merge_constraint_and(acc)),
         (None, Some(new_c)) => Some(new_c),
         (Some(acc), None) => Some(acc),
         (None, None) => None,
@@ -839,7 +838,7 @@ impl ReachabilityConstraints {
                 // Apply all accumulated narrowing constraints to the base type
                 match accumulated {
                     Some(constraint) => NarrowingConstraint::intersection(base_ty)
-                        .merge_constraint_and(constraint, db)
+                        .merge_constraint_and(constraint)
                         .evaluate_constraint_type(db),
                     None => base_ty,
                 }
@@ -888,7 +887,7 @@ impl ReachabilityConstraints {
                         is_positive: !predicate.is_positive,
                     };
                     let neg_constraint = infer_narrowing_constraint(db, neg_predicate, place);
-                    let false_accumulated = accumulate_constraint(db, accumulated, neg_constraint);
+                    let false_accumulated = accumulate_constraint(accumulated, neg_constraint);
                     return self.narrow_by_constraint_inner(
                         db,
                         predicates,
@@ -901,7 +900,7 @@ impl ReachabilityConstraints {
 
                 // If the false branch is statically unreachable, skip it entirely.
                 if node.if_false == ALWAYS_FALSE {
-                    let true_accumulated = accumulate_constraint(db, accumulated, pos_constraint);
+                    let true_accumulated = accumulate_constraint(accumulated, pos_constraint);
                     return self.narrow_by_constraint_inner(
                         db,
                         predicates,
@@ -913,8 +912,7 @@ impl ReachabilityConstraints {
                 }
 
                 // True branch: predicate holds → accumulate positive narrowing
-                let true_accumulated =
-                    accumulate_constraint(db, accumulated.clone(), pos_constraint);
+                let true_accumulated = accumulate_constraint(accumulated.clone(), pos_constraint);
                 let true_ty = self.narrow_by_constraint_inner(
                     db,
                     predicates,
@@ -930,7 +928,7 @@ impl ReachabilityConstraints {
                     is_positive: !predicate.is_positive,
                 };
                 let neg_constraint = infer_narrowing_constraint(db, neg_predicate, place);
-                let false_accumulated = accumulate_constraint(db, accumulated, neg_constraint);
+                let false_accumulated = accumulate_constraint(accumulated, neg_constraint);
                 let false_ty = self.narrow_by_constraint_inner(
                     db,
                     predicates,
@@ -940,7 +938,7 @@ impl ReachabilityConstraints {
                     false_accumulated,
                 );
 
-                UnionType::from_elements(db, [true_ty, false_ty])
+                UnionType::from_two_elements(db, true_ty, false_ty)
             }
         }
     }

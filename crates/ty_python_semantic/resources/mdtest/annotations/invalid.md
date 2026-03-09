@@ -86,7 +86,9 @@ async def outer_async():  # avoid unrelated syntax errors on `yield` and `await`
         b: 2.3,  # error: [invalid-type-form] "Float literals are not allowed in type expressions"
         c: 4j,  # error: [invalid-type-form] "Complex literals are not allowed in type expressions"
         d: True,  # error: [invalid-type-form] "Boolean literals are not allowed in this context in a type expression"
-        e: int | b"foo",  # error: [invalid-type-form] "Bytes literals are not allowed in this context in a type expression"
+        # error: [unsupported-operator]
+        # error: [invalid-type-form] "Bytes literals are not allowed in this context in a type expression"
+        e: int | b"foo",
         f: 1 and 2,  # error: [invalid-type-form] "Boolean operations are not allowed in type expressions"
         g: 1 or 2,  # error: [invalid-type-form] "Boolean operations are not allowed in type expressions"
         h: (foo := 1),  # error: [invalid-type-form] "Named expressions are not allowed in type expressions"
@@ -97,7 +99,9 @@ async def outer_async():  # avoid unrelated syntax errors on `yield` and `await`
         m: (yield 1),  # error: [invalid-type-form] "`yield` expressions are not allowed in type expressions"
         n: 1 < 2,  # error: [invalid-type-form] "Comparison expressions are not allowed in type expressions"
         o: bar(),  # error: [invalid-type-form] "Function calls are not allowed in type expressions"
-        p: int | f"foo",  # error: [invalid-type-form] "F-strings are not allowed in type expressions"
+        # error: [unsupported-operator]
+        # error: [invalid-type-form] "F-strings are not allowed in type expressions"
+        p: int | f"foo",
         # error: [invalid-type-form] "Slices are not allowed in type expressions"
         # error: [invalid-type-form] "Invalid subscript"
         q: [1, 2, 3][1:2],
@@ -165,20 +169,27 @@ python-version = "3.11"
 ```
 
 ```py
-from typing import TypeVarTuple
+from typing import TypeVarTuple, Unpack
 
 Ts = TypeVarTuple("Ts")
 
 def f(
     # error: [invalid-type-form] "Multiple unpacked variadic tuples are not allowed in a `tuple` specialization"
     x: tuple[*tuple[int, ...], *tuple[str, ...]],
+    # error: [invalid-type-form] "Multiple unpacked variadic tuples are not allowed in a `tuple` specialization"
+    x2: tuple[Unpack[tuple[int, ...]], Unpack[tuple[str, ...]]],
     y: tuple[*tuple[int, ...], str, int, *tuple[str, ...]],  # error: [invalid-type-form]
+    y2: tuple[Unpack[tuple[int, ...]], str, int, Unpack[tuple[str, ...]]],  # error: [invalid-type-form]
     # Multiple unpacked elements are fine, as long as the unpacked elements are not variadic:
     z: tuple[*tuple[int, ...], *tuple[str]],
+    z2: tuple[Unpack[tuple[int, ...]], Unpack[tuple[str]]],
 ):
     reveal_type(x)  # revealed: tuple[int | str, ...]
+    reveal_type(x2)  # revealed: tuple[int | str, ...]
     reveal_type(y)  # revealed: tuple[str | int, ...]
+    reveal_type(y2)  # revealed: tuple[str | int, ...]
     reveal_type(z)  # revealed: tuple[*tuple[int, ...], str]
+    reveal_type(z2)  # revealed: tuple[*tuple[int, ...], str]
 
 T1 = tuple[int, *Ts, str, *Ts]  # error: [invalid-type-form]
 

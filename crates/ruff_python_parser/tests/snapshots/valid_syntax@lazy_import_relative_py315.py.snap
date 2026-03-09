@@ -1,0 +1,104 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+---
+## AST
+
+```
+Module(
+    ModModule {
+        node_index: NodeIndex(None),
+        range: 0..124,
+        body: [
+            ImportFrom(
+                StmtImportFrom {
+                    node_index: NodeIndex(None),
+                    range: 44..69,
+                    module: None,
+                    names: [
+                        Alias {
+                            range: 63..69,
+                            node_index: NodeIndex(None),
+                            name: Identifier {
+                                id: Name("basic2"),
+                                range: 63..69,
+                                node_index: NodeIndex(None),
+                            },
+                            asname: None,
+                        },
+                    ],
+                    level: 1,
+                    is_lazy: true,
+                },
+            ),
+            ImportFrom(
+                StmtImportFrom {
+                    node_index: NodeIndex(None),
+                    range: 70..99,
+                    module: Some(
+                        Identifier {
+                            id: Name("basic2"),
+                            range: 81..87,
+                            node_index: NodeIndex(None),
+                        },
+                    ),
+                    names: [
+                        Alias {
+                            range: 95..96,
+                            node_index: NodeIndex(None),
+                            name: Identifier {
+                                id: Name("x"),
+                                range: 95..96,
+                                node_index: NodeIndex(None),
+                            },
+                            asname: None,
+                        },
+                        Alias {
+                            range: 98..99,
+                            node_index: NodeIndex(None),
+                            name: Identifier {
+                                id: Name("f"),
+                                range: 98..99,
+                                node_index: NodeIndex(None),
+                            },
+                            asname: None,
+                        },
+                    ],
+                    level: 1,
+                    is_lazy: true,
+                },
+            ),
+            ImportFrom(
+                StmtImportFrom {
+                    node_index: NodeIndex(None),
+                    range: 100..123,
+                    module: None,
+                    names: [
+                        Alias {
+                            range: 119..120,
+                            node_index: NodeIndex(None),
+                            name: Identifier {
+                                id: Name("b"),
+                                range: 119..120,
+                                node_index: NodeIndex(None),
+                            },
+                            asname: None,
+                        },
+                        Alias {
+                            range: 122..123,
+                            node_index: NodeIndex(None),
+                            name: Identifier {
+                                id: Name("x"),
+                                range: 122..123,
+                                node_index: NodeIndex(None),
+                            },
+                            asname: None,
+                        },
+                    ],
+                    level: 1,
+                    is_lazy: true,
+                },
+            ),
+        ],
+    },
+)
+```

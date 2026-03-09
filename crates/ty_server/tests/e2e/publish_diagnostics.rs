@@ -429,6 +429,8 @@ def foo() -> str:
     insta::assert_debug_snapshot!(diagnostics);
 
     server.close_text_document(foo);
+    let diagnostics = server.await_notification::<PublishDiagnostics>();
+    insta::assert_debug_snapshot!(diagnostics);
 
     let params = DidOpenTextDocumentParams {
         text_document: TextDocumentItem {

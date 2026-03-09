@@ -22,11 +22,7 @@ use ty_module_resolver::{KnownModule, file_to_module, resolve_module_confident};
 /// The enum uses a nested structure: variants that fall into well-defined subcategories
 /// (legacy stdlib aliases and type qualifiers) are represented as nested enums,
 /// while other special forms that each require unique handling remain as direct variants.
-///
-/// # Ordering
-///
-/// Ordering is stable and should be the same between runs.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, get_size2::GetSize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub enum SpecialFormType {
     /// Special forms that are simple aliases to classes elsewhere in the standard library.
     LegacyStdlibAlias(LegacyStdlibAlias),
@@ -147,6 +143,9 @@ impl SpecialFormType {
             | Self::Bottom
             | Self::Intersection
             | Self::CallableTypeOf
+            | Self::Unknown
+            | Self::AlwaysTruthy
+            | Self::AlwaysFalsy
             | Self::TypeQualifier(_) => KnownClass::SpecialForm,
 
             // Typeshed says it's an instance of `_SpecialForm`,
@@ -157,8 +156,6 @@ impl SpecialFormType {
             Self::Generic | Self::Any => KnownClass::Type,
 
             Self::LegacyStdlibAlias(_) => KnownClass::StdlibAlias,
-
-            Self::Unknown | Self::AlwaysTruthy | Self::AlwaysFalsy => KnownClass::Object,
 
             Self::NamedTuple => KnownClass::FunctionType,
         }
@@ -762,7 +759,7 @@ impl std::fmt::Display for SpecialFormType {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, get_size2::GetSize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub enum LegacyStdlibAlias {
     List,
     Dict,
@@ -812,7 +809,7 @@ impl std::fmt::Display for LegacyStdlibAlias {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, get_size2::GetSize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub enum TypeQualifier {
     ReadOnly,
     Final,

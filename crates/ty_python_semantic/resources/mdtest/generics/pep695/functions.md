@@ -689,7 +689,7 @@ def test[T: int](items: list[T]) -> list[T]:
 from typing import overload
 
 def outer[T](t: T) -> None:
-    def inner[T](t: T) -> None: ...
+    def inner[T](t: T) -> None: ...  # error: [shadowed-type-variable]
 
     inner(t)
 
@@ -1073,6 +1073,20 @@ def f[T: (int, str)](x: T) -> T:
 
 def g[S: (bool, str)](x: S) -> S:
     return f(x)  # error: [invalid-argument-type]
+```
+
+## Display ordering
+
+Where possible, we want the types that appear in inferred specializations to line up with the types
+that are listed in the source code. We don't want arbitarily reorder e.g. union elements as part of
+finding a solution.
+
+```py
+from typing import Any
+
+def f(l: list[tuple[Any | str, Any | str]]) -> None:
+    # revealed: dict[Any | str, Any | str]
+    reveal_type(dict(l))
 ```
 
 [implies_subtype_of]: ../../type_properties/implies_subtype_of.md

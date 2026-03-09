@@ -2643,8 +2643,8 @@ class C3:
     def replace_with(self, other: "C3"):
         self.x = [self.x[0].flip()]
 
-# TODO: should be `Unknown | list[Unknown | Sub] | list[Unknown | Base]`
-reveal_type(C3(Sub()).x)  # revealed: Unknown | list[Unknown | Sub] | list[Divergent]
+# TODO: should be `Unknown | list[Sub] | list[Base]`
+reveal_type(C3(Sub()).x)  # revealed: Unknown | list[Sub] | list[Divergent]
 ```
 
 And cycles between many attributes:
@@ -2702,8 +2702,8 @@ class ManyCycles2:
         self.x3 = [1]
 
     def f1(self: "ManyCycles2"):
-        # TODO: should be Unknown | list[Unknown | int] | list[Divergent]
-        reveal_type(self.x3)  # revealed: Unknown | list[Unknown | int] | list[Divergent] | list[Unknown]
+        # TODO: should be Unknown | list[int] | list[Divergent]
+        reveal_type(self.x3)  # revealed: Unknown | list[int] | list[Divergent] | list[Unknown]
 
         self.x1 = [self.x2] + [self.x3]
         self.x2 = [self.x1] + [self.x3]

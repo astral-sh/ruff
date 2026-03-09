@@ -11,9 +11,9 @@ from typing_extensions import LiteralString, Self  # noqa: UP035
 def static_assert(condition: object, msg: LiteralString | None = None) -> None: ...
 
 # Types
-Unknown = object()
-AlwaysTruthy = object()
-AlwaysFalsy = object()
+Unknown: _SpecialForm
+AlwaysTruthy: _SpecialForm
+AlwaysFalsy: _SpecialForm
 
 # Special forms
 Not: _SpecialForm
@@ -145,14 +145,6 @@ class GenericContext:
     The set of typevars that are bound by a generic class, function, or type
     alias.
     """
-
-    def specialize_constrained(
-        self, constraints: ConstraintSet
-    ) -> Specialization | None:
-        """
-        Returns a specialization of this generic context that satisfies the
-        given constraints, or None if the constraints cannot be satisfied.
-        """
 
 class Specialization:
     """A mapping of typevars to specific types"""
