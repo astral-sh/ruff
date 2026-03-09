@@ -53,12 +53,6 @@ let runtimePackages: string[] = [];
 export function getRuntimePackages(): string[] {
   return runtimePackages;
 }
-/**
- * Cheap guard to prevent runaway BFS over the dependency graph.
- * Without this, transitive deps can explode (flask alone pulls 7 direct deps,
- * each with their own trees) and cyclic or deep chains can stall the installer.
- */
-const MAX_DEPENDENCY_DEPTH = 3;
 const PYPI_API = "https://pypi.org/pypi";
 
 /**
@@ -720,33 +714,31 @@ async function resolveAllDeps(
       continue;
     }
 
-    // Enqueue transitive dependencies (with depth limit) — only for pure-python
-    if (entry.depth < MAX_DEPENDENCY_DEPTH) {
-      const deps = parseMandatoryDeps(info.info.requires_dist);
-      for (const dep of deps) {
-        // Find the exact pin version if there is one (==X.Y.Z)
-        const exactPin = dep.constraints.find(
-          (c) => c.op === "==" && !c.version.includes("*"),
-        );
+    // Enqueue transitive dependencies — only for pure-python
+    const deps = parseMandatoryDeps(info.info.requires_dist);
+    for (const dep of deps) {
+      // Find the exact pin version if there is one (==X.Y.Z)
+      const exactPin = dep.constraints.find(
+        (c) => c.op === "==" && !c.version.includes("*"),
+      );
 
-        if (!seen.has(dep.name)) {
-          queue.push({
-            name: dep.name,
-            version: exactPin?.version ?? null,
-            constraints: dep.constraints,
-            depth: entry.depth + 1,
-            requestedBy: info.info.name,
-          });
-        } else if (dep.constraints.length > 0) {
-          // Already resolved — check constraints against the resolved version
-          const resolvedVersion = seen.get(dep.name)!;
-          for (const constraint of dep.constraints) {
-            if (!satisfiesConstraint(resolvedVersion, constraint)) {
-              warnings.push(
-                `${dep.name} ${formatConstraints(dep.constraints)} (required by ${info.info.name}) conflicts with installed ${resolvedVersion}`,
-              );
-              break;
-            }
+      if (!seen.has(dep.name)) {
+        queue.push({
+          name: dep.name,
+          version: exactPin?.version ?? null,
+          constraints: dep.constraints,
+          depth: entry.depth + 1,
+          requestedBy: info.info.name,
+        });
+      } else if (dep.constraints.length > 0) {
+        // Already resolved: check constraints against the resolved version
+        const resolvedVersion = seen.get(dep.name)!;
+        for (const constraint of dep.constraints) {
+          if (!satisfiesConstraint(resolvedVersion, constraint)) {
+            warnings.push(
+              `${dep.name} ${formatConstraints(dep.constraints)} (required by ${info.info.name}) conflicts with installed ${resolvedVersion}`,
+            );
+            break;
           }
         }
       }
