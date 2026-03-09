@@ -738,15 +738,18 @@ impl Workspace {
     /// Writes package files to the memory file system without opening them for checking.
     /// This is used for external dependencies that should be available for module resolution
     /// but should not be type-checked themselves.
+    ///
+    /// Paths are expected to start with `/packages/`.
     #[wasm_bindgen(js_name = "writePackageFiles")]
     pub fn write_package_files(&mut self, files: JsValue) -> Result<(), Error> {
         let entries: Vec<PackageFileEntry> =
             serde_wasm_bindgen::from_value(files).map_err(into_error)?;
 
+        let root = self.db.project().root(&self.db).to_path_buf();
         let mut changes = Vec::with_capacity(entries.len());
 
         for entry in &entries {
-            let path = SystemPath::absolute(&entry.path, self.db.project().root(&self.db));
+            let path = SystemPath::absolute(&entry.path, &root);
             self.system
                 .fs
                 .write_file_all(&path, &entry.contents)
@@ -769,10 +772,11 @@ impl Workspace {
     pub fn remove_package_files(&mut self, paths: JsValue) -> Result<(), Error> {
         let paths: Vec<String> = serde_wasm_bindgen::from_value(paths).map_err(into_error)?;
 
+        let root = self.db.project().root(&self.db).to_path_buf();
         let mut changes = Vec::with_capacity(paths.len());
 
         for path_str in &paths {
-            let path = SystemPath::absolute(path_str, self.db.project().root(&self.db));
+            let path = SystemPath::absolute(path_str, &root);
             if self.system.fs.exists(&path) {
                 self.system.fs.remove_file(&path).map_err(into_error)?;
                 changes.push(ChangeEvent::Deleted {

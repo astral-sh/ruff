@@ -425,28 +425,23 @@ async function downloadAndExtractWheel(
 
   const buffer = await response.arrayBuffer();
   const zipData = new Uint8Array(buffer);
-  const unzipped = unzipSync(zipData);
+
+  // Filter during decompression so binary files (.so, .dll, etc.) are never inflated
+  const unzipped = unzipSync(zipData, {
+    filter: (file) =>
+      !file.name.includes(".dist-info/") &&
+      (file.name.endsWith(".py") ||
+        file.name.endsWith(".pyi") ||
+        file.name.endsWith("/py.typed")),
+  });
 
   const files: Array<{ path: string; contents: string }> = [];
 
   for (const [path, data] of Object.entries(unzipped)) {
-    // Only extract Python source files and type stubs
-    if (
-      path.endsWith(".py") ||
-      path.endsWith(".pyi") ||
-      path.endsWith("/py.typed")
-    ) {
-      // Skip .dist-info directory files
-      if (path.includes(".dist-info/")) {
-        continue;
-      }
-      // The wheel internal structure maps directly to Python package structure
-      // e.g., requests/api.py stays as requests/api.py
-      files.push({
-        path,
-        contents: textDecoder.decode(data),
-      });
-    }
+    files.push({
+      path,
+      contents: textDecoder.decode(data),
+    });
   }
 
   return files;
@@ -572,6 +567,27 @@ function normalizePackageName(name: string): string {
 }
 
 /**
+ * Check whether a resolved version satisfies all constraints, and push a warning if not.
+ */
+function checkConstraints(
+  name: string,
+  constraints: VersionConstraint[],
+  resolvedVersion: string,
+  requestedBy: string | null,
+  warnings: string[],
+): void {
+  for (const constraint of constraints) {
+    if (!satisfiesConstraint(resolvedVersion, constraint)) {
+      const source = requestedBy != null ? ` (required by ${requestedBy})` : "";
+      warnings.push(
+        `${name} ${formatConstraints(constraints)}${source} conflicts with installed ${resolvedVersion}`,
+      );
+      break;
+    }
+  }
+}
+
+/**
  * Parse mandatory dependencies from requires_dist, excluding extras.
  * Returns package names with their version constraints.
  */
@@ -651,19 +667,13 @@ async function resolveAllDeps(
     // entry.name is already normalized (by queue producers)
     const existingVersion = seen.get(entry.name);
     if (existingVersion != null) {
-      // Check if the resolved version satisfies the constraints
-      for (const constraint of entry.constraints) {
-        if (!satisfiesConstraint(existingVersion, constraint)) {
-          const source =
-            entry.requestedBy != null
-              ? ` (required by ${entry.requestedBy})`
-              : "";
-          warnings.push(
-            `${entry.name} ${formatConstraints(entry.constraints)}${source} conflicts with installed ${existingVersion}`,
-          );
-          break;
-        }
-      }
+      checkConstraints(
+        entry.name,
+        entry.constraints,
+        existingVersion,
+        entry.requestedBy,
+        warnings,
+      );
       continue;
     }
 
@@ -731,16 +741,13 @@ async function resolveAllDeps(
           requestedBy: info.info.name,
         });
       } else if (dep.constraints.length > 0) {
-        // Already resolved: check constraints against the resolved version
-        const resolvedVersion = seen.get(dep.name)!;
-        for (const constraint of dep.constraints) {
-          if (!satisfiesConstraint(resolvedVersion, constraint)) {
-            warnings.push(
-              `${dep.name} ${formatConstraints(dep.constraints)} (required by ${info.info.name}) conflicts with installed ${resolvedVersion}`,
-            );
-            break;
-          }
-        }
+        checkConstraints(
+          dep.name,
+          dep.constraints,
+          seen.get(dep.name)!,
+          info.info.name,
+          warnings,
+        );
       }
     }
   }
