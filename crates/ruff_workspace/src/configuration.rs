@@ -924,6 +924,15 @@ impl LintConfiguration {
                 {
                     for rule in selector.rules(&preview) {
                         select_map_updates.insert(rule, true);
+                        // Override warnings of weaker specificity
+                        // For example:
+                        // ```
+                        // select = ["F401"]
+                        // warn = ["F"]
+                        // ```
+                        // should warn on all Pyflakes rules
+                        // except for `F401` where it should error.
+                        warn_map_updates.insert(rule, false);
 
                         if spec == Specificity::Rule {
                             docstring_override_updates.insert(rule);
@@ -940,6 +949,15 @@ impl LintConfiguration {
                 {
                     for rule in selector.rules(&preview) {
                         warn_map_updates.insert(rule, true);
+                        // Note that here we need not override
+                        // `select` statements of weaker specificity
+                        // because the rule table records simply a
+                        // set of _enabled_ rules and some _subset_
+                        // which are given a severity of `warning`.
+                        // Therefore, the presence of a rule in the
+                        // `warn_set` will cause the rule to have this
+                        // severity, regardless of whether it is in
+                        // the `select_set` already.
                     }
                 }
                 for selector in selection
