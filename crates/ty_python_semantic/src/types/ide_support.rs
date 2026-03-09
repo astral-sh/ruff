@@ -769,7 +769,7 @@ pub fn definitions_for_bin_op<'db>(
         return None;
     };
 
-    let callable_type = promote_literals_for_self(model.db(), bindings.callable_type());
+    let callable_type = promote_for_self(model.db(), bindings.callable_type());
 
     let definitions: Vec<_> = bindings
         .iter_flat()
@@ -827,7 +827,7 @@ pub fn definitions_for_unary_op<'db>(
         ) => *bindings,
     };
 
-    let callable_type = promote_literals_for_self(model.db(), bindings.callable_type());
+    let callable_type = promote_for_self(model.db(), bindings.callable_type());
 
     let definitions = bindings
         .iter_flat()
@@ -842,10 +842,10 @@ pub fn definitions_for_unary_op<'db>(
     Some((definitions, callable_type))
 }
 
-/// Promotes literal types in `self` positions to their fallback instance types.
+/// Promotes types in `self` positions.
 ///
 /// This is so that we show e.g. `int.__add__` instead of `Literal[4].__add__`.
-fn promote_literals_for_self<'db>(db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
+fn promote_for_self<'db>(db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
     match ty {
         Type::BoundMethod(method) => Type::BoundMethod(method.map_self_type(db, |self_ty| {
             self_ty.literal_fallback_instance(db).unwrap_or(self_ty)

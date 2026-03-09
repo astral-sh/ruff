@@ -70,6 +70,21 @@ from collections import namedtuple
 from __future__ import print_function
 ```
 
+## Lazy `__future__` imports are not future imports
+
+```toml
+[environment]
+python-version = "3.15"
+```
+
+```py
+# error: [invalid-syntax] "lazy from __future__ import is not allowed"
+lazy from __future__ import annotations
+
+# error: [invalid-syntax] "__future__ imports must be at the top of the file"
+from __future__ import generator_stop
+```
+
 ## Invalid annotation
 
 This one might be a bit redundant with the `invalid-type-form` error.

@@ -477,7 +477,7 @@ declare_lint! {
     /// ```
     pub(crate) static DATACLASS_FIELD_ORDER = {
         summary: "detects dataclass definitions with required fields after fields with default values",
-        status: LintStatus::preview("1.0.0"),
+        status: LintStatus::stable("0.0.15"),
         default_level: Level::Error,
     }
 }
@@ -1087,7 +1087,7 @@ declare_lint! {
     /// Checks for dynamic class definitions (using `type()`) that have bases
     /// which are unsupported by ty.
     ///
-    /// This is equivalent to [`unsupported-base`] but applies to classes created
+    /// This is equivalent to `unsupported-base` but applies to classes created
     /// via `type()` rather than `class` statements.
     ///
     /// ## Why is this bad?
@@ -1108,7 +1108,6 @@ declare_lint! {
     /// ```
     ///
     /// [method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
-    /// [`unsupported-base`]: https://docs.astral.sh/ty/rules/unsupported-base
     pub(crate) static UNSUPPORTED_DYNAMIC_BASE = {
         summary: "detects dynamic class bases that are unsupported as ty could not feasibly calculate the class's MRO",
         status: LintStatus::stable("0.0.12"),
@@ -4477,7 +4476,7 @@ pub(crate) fn report_undeclared_protocol_member(
     if definition.kind(db).is_unannotated_assignment() {
         let binding_type = binding_type(db, definition);
 
-        let suggestion = binding_type.promote_literals(db);
+        let suggestion = binding_type.promote(db);
 
         if should_give_hint(db, suggestion) {
             diagnostic.set_primary_message(format_args!(

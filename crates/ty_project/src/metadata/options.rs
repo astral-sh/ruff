@@ -918,6 +918,10 @@ impl SrcOptions {
 )]
 #[serde(rename_all = "kebab-case", transparent)]
 pub struct Rules {
+    /// The rules with their severity. Entries coming later in the map take precedence over
+    /// earlier entries (e.g. a `all` selector earlier in the hash map will be overridden
+    /// by a specific rule selector coming after it but if `all` is the last selector, then it
+    /// overrides even specific rule codes).
     inner: OrderMap<RangedValue<String>, RangedValue<Level>, BuildHasherDefault<FxHasher>>,
 }
 

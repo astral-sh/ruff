@@ -42,7 +42,7 @@ python-version = "3.12"  # typing.TypeAliasType
 ```py
 from typing import Union, TypeAliasType, Sequence, Mapping
 
-A = list["A" | None]
+A = list["A | None"]
 
 def f(x: A):
     # TODO: should be `list[A | None]`?
@@ -152,7 +152,7 @@ class Cyclic:
         if isinstance(self.data, str):
             self.data = {"url": self.data}
 
-# revealed: Unknown | str | dict[Unknown, Unknown] | dict[Unknown | str, Unknown | str]
+# revealed: Unknown | str | dict[Unknown, Unknown] | dict[str, str]
 reveal_type(Cyclic("").data)
 ```
 

@@ -294,3 +294,25 @@ PERF401 Use a list comprehension to create a transformed list
 294 | G_INDEX = None
     |
 help: Replace for loop with list comprehension
+
+PERF401 Use a list comprehension to create a transformed list
+   --> PERF401.py:318:13
+    |
+316 |             # comment
+317 |         ):
+318 |             filtered.append(i)
+    |             ^^^^^^^^^^^^^^^^^^
+319 |
+320 | def f():
+    |
+help: Replace for loop with list comprehension
+
+PERF401 Use a list comprehension to create a transformed list
+   --> PERF401.py:328:13
+    |
+326 |     ) in original:
+327 |         if i > 0:
+328 |             filtered.append(i)
+    |             ^^^^^^^^^^^^^^^^^^
+    |
+help: Replace for loop with list comprehension

@@ -22,7 +22,7 @@ mod tests {
     use crate::rules::pydocstyle::settings::Settings as PydocstyleSettings;
     use crate::settings::LinterSettings;
     use crate::settings::types::{CompiledPerFileIgnoreList, PerFileIgnore, PreviewMode};
-    use crate::test::{test_path, test_resource_path};
+    use crate::test::{test_path, test_resource_path, test_snippet};
     use crate::{assert_diagnostics, assert_diagnostics_diff, settings};
 
     #[test_case(Rule::CollectionLiteralConcatenation, Path::new("RUF005.py"))]
@@ -226,6 +226,23 @@ mod tests {
         )?;
         assert_diagnostics!(diagnostics);
         Ok(())
+    }
+
+    #[test]
+    fn none_not_at_end_of_union_py313() {
+        let diagnostics = test_snippet(
+            r"
+            def func(arg: None | int):
+                ...
+
+            print(None | (int)and 2)
+            ",
+            &settings::LinterSettings {
+                unresolved_target_version: PythonVersion::PY313.into(),
+                ..settings::LinterSettings::for_rule(Rule::NoneNotAtEndOfUnion)
+            },
+        );
+        assert_diagnostics!("PY313_RUF036_runtime_evaluated", diagnostics);
     }
 
     #[test]

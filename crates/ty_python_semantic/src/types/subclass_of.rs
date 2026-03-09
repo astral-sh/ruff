@@ -158,11 +158,15 @@ impl<'db> SubclassOfType<'db> {
                 },
                 _ => Type::SubclassOf(self),
             },
-            SubclassOfInner::TypeVar(typevar) => SubclassOfType::try_from_instance(
-                db,
-                typevar.apply_type_mapping_impl(db, type_mapping, visitor),
-            )
-            .unwrap_or(SubclassOfType::subclass_of_unknown()),
+            SubclassOfInner::TypeVar(typevar) => {
+                let mapped = typevar.apply_type_mapping_impl(db, type_mapping, visitor);
+                if mapped.is_never() {
+                    Type::Never
+                } else {
+                    SubclassOfType::try_from_instance(db, mapped)
+                        .unwrap_or(SubclassOfType::subclass_of_unknown())
+                }
+            }
         }
     }
 

@@ -76,13 +76,12 @@ CONFORMANCE_URL = CONFORMANCE_DIR_WITH_README + "tests/{filename}#L{line}"
 
 GITHUB_HEADER = [
     "<table>",
-    "",
     "<tr>",
     "<th>Test case</th>",
     "<th>Diff</th>",
     "</tr>",
 ]
-GITHUB_FOOTER = ["", "</table>"]
+GITHUB_FOOTER = ["</table>"]
 SUMMARY_NOTE = """
     Each test case represents one expected error annotation or a group of annotations
     sharing a tag. Counts are per test case, not per diagnostic — multiple diagnostics
@@ -184,8 +183,6 @@ class TyDiagnostic:
     def __post_init__(self) -> None:
         # Remove check name prefix from description
         self.description = self.description.replace(f"{self.check_name}: ", "")
-        # Escape pipe characters for GitHub markdown tables
-        self.description = self.description.replace("|", "\\|")
 
     def __str__(self) -> str:
         return (
@@ -372,7 +369,6 @@ def render_html_diff_row(tc: TestCase, *, source: Source | None) -> list[str]:
     return [
         "",
         "<tr>",
-        "",
         "<td>",
         "",
         location,
@@ -386,7 +382,6 @@ def render_html_diff_row(tc: TestCase, *, source: Source | None) -> list[str]:
         "```",
         "",
         "</td>",
-        "",
         "</tr>",
     ]
 
@@ -721,16 +716,28 @@ def render_test_cases(
             lines.append("```")
         else:
             lines.extend(GITHUB_FOOTER)
-        lines.extend(["", "</details>", ""])
+        lines.extend(["</details>", ""])
 
     return "\n".join(lines)
 
 
-def render_file_stats_table(test_cases: list[TestCase]) -> str:
-    """Render a per-file breakdown showing only files whose TP/FP/FN counts changed."""
+def collect_file_stats(test_cases: list[TestCase]) -> list[FileStats]:
+    """Compute per-file statistics from grouped test cases."""
     path_to_cases: dict[Path, list[TestCase]] = {}
     for tc in test_cases:
         path_to_cases.setdefault(tc.path, []).append(tc)
+    return [
+        FileStats(
+            path=path,
+            old=compute_stats(cases, Source.OLD),
+            new=compute_stats(cases, Source.NEW),
+        )
+        for path, cases in path_to_cases.items()
+    ]
+
+
+def render_file_stats_table(file_stats: list[FileStats]) -> str:
+    """Render a per-file breakdown showing only files whose TP/FP/FN counts changed."""
 
     def fmt(old: int, new: int, *, greater_is_better: bool = True) -> str:
         if old == new:
@@ -740,19 +747,13 @@ def render_file_stats_table(test_cases: list[TestCase]) -> str:
         indicator = " ✅" if improved else " ❌"
         return f"{new} ({diff:+}){indicator}"
 
-    # Collect per-file data; track totals across all files regardless of change.
-    file_stats: list[FileStats] = []
+    # Collect totals across all files regardless of change.
     old_totals = Statistics()
     new_totals = Statistics()
     passing = 0
-    total_files = 0
+    total_files = len(file_stats)
 
-    for path, cases in path_to_cases.items():
-        fs = FileStats(
-            path=path,
-            old=compute_stats(cases, Source.OLD),
-            new=compute_stats(cases, Source.NEW),
-        )
+    for fs in file_stats:
         old_totals.true_positives += fs.old.true_positives
         old_totals.false_positives += fs.old.false_positives
         old_totals.false_negatives += fs.old.false_negatives
@@ -760,8 +761,6 @@ def render_file_stats_table(test_cases: list[TestCase]) -> str:
         new_totals.false_positives += fs.new.false_positives
         new_totals.false_negatives += fs.new.false_negatives
         passing += fs.new_passes
-        total_files += 1
-        file_stats.append(fs)
 
     changed = [fs for fs in file_stats if fs.total_change > 0]
     if not changed:
@@ -774,9 +773,9 @@ def render_file_stats_table(test_cases: list[TestCase]) -> str:
         if fs.new_passes and not fs.old_passes:
             status = "✅ Newly Passing 🎉"
         elif fs.old_passes and not fs.new_passes:
-            status = "❌ Newly Failing"
+            status = "❌ Newly Failing ☹️"
         elif fs.new_passes:
-            status = "✅"
+            status = "✅ Still Passing"
         else:
             old_errors = fs.old.false_positives + fs.old.false_negatives
             new_errors = fs.new.false_positives + fs.new.false_negatives
@@ -851,16 +850,33 @@ def diff_format(
             assert_never((greater_is_better, increased))  # ty: ignore[type-assertion-failure]
 
 
-def render_summary(test_cases: list[TestCase], *, force_summary_table: bool) -> str:
-    def format_metric(diff: float, old: float, new: float):
+def render_summary(
+    test_cases: list[TestCase],
+    file_stats: list[FileStats],
+    *,
+    force_summary_table: bool,
+) -> str:
+    def format_metric(diff: float, old: float, new: float) -> str:
         if diff > 0:
-            return f"increased from {old:.2%} to {new:.2%}"
+            return f"increased from <b>{old:.2%}</b> to <b>{new:.2%}</b>"
         if diff < 0:
-            return f"decreased from {old:.2%} to {new:.2%}"
-        return f"held steady at {old:.2%}"
+            return f"decreased from <b>{old:.2%}</b> to <b>{new:.2%}</b>"
+        return f"held steady at <b>{old:.2%}</b>"
+
+    def format_int_metric(diff: int, old: int, new: int, total: int) -> str:
+        if diff > 0:
+            return f"improved from <b>{old}/{total}</b> to <b>{new}/{total}</b>"
+        if diff < 0:
+            return f"regressed from <b>{old}/{total}</b> to <b>{new}/{total}</b>"
+        return f"held steady at <b>{old}/{total}</b>"
 
     old = compute_stats(test_cases, Source.OLD)
     new = compute_stats(test_cases, Source.NEW)
+
+    old_files_passing = sum(fs.old_passes for fs in file_stats)
+    new_files_passing = sum(fs.new_passes for fs in file_stats)
+    total_files = len(file_stats)
+    files_passing_change = new_files_passing - old_files_passing
 
     assert new.true_positives > 0, (
         "Expected ty to have at least one true positive.\n"
@@ -878,7 +894,9 @@ def render_summary(test_cases: list[TestCase], *, force_summary_table: bool) -> 
         f"The percentage of diagnostics emitted that were expected errors "
         f"{format_metric(precision_change, old.precision, new.precision)}. "
         f"The percentage of expected errors that received a diagnostic "
-        f"{format_metric(recall_change, old.recall, new.recall)}."
+        f"{format_metric(recall_change, old.recall, new.recall)}. "
+        f"The number of fully passing files "
+        f"{format_int_metric(files_passing_change, old_files_passing, new_files_passing, total_files)}."
     )
 
     base_header = f"[Typing conformance results]({CONFORMANCE_DIR_WITH_README})"
@@ -892,9 +910,13 @@ def render_summary(test_cases: list[TestCase], *, force_summary_table: bool) -> 
 
             ### No changes detected ✅
 
-            ---
+            <details>
+            <summary>Current numbers</summary>
 
+            <br>
             {summary_paragraph}
+
+            </details>
             """
         )
 
@@ -904,13 +926,18 @@ def render_summary(test_cases: list[TestCase], *, force_summary_table: bool) -> 
     precision_diff = diff_format(precision_change, greater_is_better=True)
     recall_diff = diff_format(recall_change, greater_is_better=True)
     total_diff = diff_format(total_change, neutral=True)
+    passing_diff = diff_format(files_passing_change, greater_is_better=True)
 
-    if (precision_change > 0 and recall_change >= 0) or (
-        recall_change > 0 and precision_change >= 0
+    if (
+        (precision_change > 0 and recall_change >= 0 and files_passing_change >= 0)
+        or (recall_change > 0 and precision_change >= 0 and files_passing_change >= 0)
+        or (files_passing_change > 0 and precision_change >= 0 and recall_change >= 0)
     ):
         header = f"{base_header} improved 🎉"
-    elif (precision_change < 0 and recall_change <= 0) or (
-        recall_change < 0 and precision_change <= 0
+    elif (
+        (precision_change < 0 and recall_change <= 0 and files_passing_change <= 0)
+        or (recall_change < 0 and precision_change <= 0 and files_passing_change <= 0)
+        or (files_passing_change < 0 and precision_change <= 0 and recall_change <= 0)
     ):
         header = f"{base_header} regressed ❌"
     else:
@@ -943,6 +970,7 @@ def render_summary(test_cases: list[TestCase], *, force_summary_table: bool) -> 
         | Total Diagnostics | {old.total_diagnostics} | {new.total_diagnostics} | {total_change:+} | {total_diff} |
         | Precision | {old.precision:.2%} | {new.precision:.2%} | {precision_change:+.2%} | {precision_diff} |
         | Recall | {old.recall:.2%} | {new.recall:.2%} | {recall_change:+.2%} | {recall_diff} |
+        | Passing Files | {old_files_passing}/{total_files} | {new_files_passing}/{total_files} | {files_passing_change:+} | {passing_diff} |
 
         """
     )
@@ -1058,12 +1086,18 @@ def main():
         expected=expected,
     )
 
+    file_stats = collect_file_stats(grouped)
+
     rendered = "\n\n".join(
         filter(
             None,
             [
-                render_summary(grouped, force_summary_table=args.force_summary_table),
-                render_file_stats_table(grouped),
+                render_summary(
+                    grouped,
+                    file_stats,
+                    force_summary_table=args.force_summary_table,
+                ),
+                render_file_stats_table(file_stats),
                 render_test_cases(grouped, format=args.format),
             ],
         )

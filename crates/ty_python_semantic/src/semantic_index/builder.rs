@@ -11,10 +11,10 @@ use ruff_db::source::{SourceText, source_text};
 use ruff_index::IndexVec;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::visitor::{Visitor, walk_expr, walk_pattern, walk_stmt};
-use ruff_python_ast::{self as ast, NodeIndex, PySourceType, PythonVersion};
+use ruff_python_ast::{self as ast, AtomicNodeIndex, NodeIndex, PySourceType, PythonVersion};
 use ruff_python_parser::semantic_errors::{
-    SemanticSyntaxChecker, SemanticSyntaxContext, SemanticSyntaxError, SemanticSyntaxErrorKind,
-    YieldOutsideFunctionKind,
+    LazyImportContext, SemanticSyntaxChecker, SemanticSyntaxContext, SemanticSyntaxError,
+    SemanticSyntaxErrorKind, YieldOutsideFunctionKind,
 };
 use ruff_text_size::TextRange;
 use ty_module_resolver::{ModuleName, resolve_module};
@@ -114,6 +114,7 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     python_version: PythonVersion,
     source_text: OnceCell<SourceText>,
     semantic_checker: SemanticSyntaxChecker,
+    in_try: bool,
 
     // Semantic Index fields
     scopes: IndexVec<FileScopeId, Scope>,
@@ -173,6 +174,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             python_version: Program::get(db).python_version(db),
             source_text: OnceCell::new(),
             semantic_checker: SemanticSyntaxChecker::default(),
+            in_try: false,
             semantic_syntax_errors: RefCell::default(),
         };
 
@@ -793,7 +795,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     fn add_dict_key_assignment_definitions(
         &mut self,
         targets: impl IntoIterator<Item = &'ast ast::Expr> + Copy,
-        dict: &'ast ast::ExprDict,
+        dict: &'ast ast::Expr,
         assignment: Definition<'db>,
     ) {
         // TODO: Although we synthesize place expressions for each dictionary key, the definition
@@ -804,16 +806,45 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         };
 
         if let Some(target) = MemberExprBuilder::visit_expr(target.into()) {
-            self.add_dict_key_assignment_definitions_impl(&target, dict, assignment);
+            self.add_dict_key_assignment_definitions_impl(&target, dict.into(), assignment);
         }
     }
 
     fn add_dict_key_assignment_definitions_impl(
         &mut self,
         target: &MemberExprBuilder,
-        dict: &'ast ast::ExprDict,
+        expr: ast::ExprRef<'ast>,
         assignment: Definition<'db>,
     ) {
+        let ruff_python_ast::ExprRef::Dict(dict) = expr else {
+            let items = match expr {
+                ruff_python_ast::ExprRef::List(list) => &list.elts,
+                ruff_python_ast::ExprRef::Tuple(tuple) => &tuple.elts,
+                _ => return,
+            };
+
+            // Traverse into nested collections that may contain dictionary literals.
+            for (i, item) in items
+                .iter()
+                // Ignore starred expressions and any elements that follow them, as we cannot
+                // determine the index to narrow on.
+                .take_while(|e| !e.is_starred_expr())
+                .enumerate()
+            {
+                if let Some(target) = MemberExprBuilder::visit_subscript_expr(
+                    target.clone(),
+                    &ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
+                        value: ast::Number::Int(ast::Int::from(i as u64)),
+                        range: TextRange::default(),
+                        node_index: AtomicNodeIndex::NONE,
+                    }),
+                ) {
+                    self.add_dict_key_assignment_definitions_impl(&target, item.into(), assignment);
+                }
+            }
+            return;
+        };
+
         for item in &dict.items {
             let Some(key) = item.key.as_ref() else {
                 continue;
@@ -825,9 +856,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             };
 
             // Recurse into nested dictionaries.
-            if let ast::Expr::Dict(dict_value) = &item.value {
-                self.add_dict_key_assignment_definitions_impl(&member_expr, dict_value, assignment);
-            }
+            self.add_dict_key_assignment_definitions_impl(
+                &member_expr,
+                (&item.value).into(),
+                assignment,
+            );
 
             if let Some(place_expr) = PlaceExpr::try_from_member_expr(member_expr) {
                 let place_id = self.add_place(place_expr);
@@ -1925,12 +1958,13 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         (&alias.name.id, is_self_import)
                     };
 
-                    // Look for imports `from __future__ import annotations`, ignore `as ...`
+                    // Look for eager imports `from __future__ import annotations`, ignore `as ...`
                     // We intentionally don't enforce the rules about location of `__future__`
                     // imports here, we assume the user's intent was to apply the `__future__`
                     // import, so we still check using it (and will also emit a diagnostic about a
                     // miss-placed `__future__` import.)
-                    self.has_future_annotations |= alias.name.id == "annotations"
+                    self.has_future_annotations |= !node.is_lazy
+                        && alias.name.id == "annotations"
                         && node.module.as_deref() == Some("__future__");
 
                     let symbol = self.add_symbol(symbol_name.clone());
@@ -2474,6 +2508,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 range: _,
                 node_index: _,
             }) => {
+                let was_in_try = std::mem::replace(&mut self.in_try, true);
                 self.record_ambiguous_reachability();
 
                 // Save the state prior to visiting any of the `try` block.
@@ -2583,6 +2618,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 // - https://astral-sh.notion.site/Exception-handler-control-flow-11348797e1ca80bb8ce1e9aedbbe439d
                 // - https://github.com/astral-sh/ruff/pull/13633#discussion_r1788626702
                 self.visit_body(finalbody);
+                self.in_try = was_in_try;
             }
 
             ast::Stmt::Raise(_) | ast::Stmt::Return(_) => {
@@ -2863,13 +2899,11 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                                     },
                                 );
 
-                                if let ast::Expr::Dict(dict) = &*node.value {
-                                    self.add_dict_key_assignment_definitions(
-                                        &node.targets,
-                                        dict,
-                                        assignment,
-                                    );
-                                }
+                                self.add_dict_key_assignment_definitions(
+                                    &node.targets,
+                                    &node.value,
+                                    assignment,
+                                );
                             }
                             Some(CurrentAssignment::AnnAssign(ann_assign)) => {
                                 self.add_standalone_type_expression(&ann_assign.annotation);
@@ -2883,10 +2917,10 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                                     },
                                 );
 
-                                if let Some(ast::Expr::Dict(dict)) = ann_assign.value.as_deref() {
+                                if let Some(value) = ann_assign.value.as_deref() {
                                     self.add_dict_key_assignment_definitions(
                                         [&*ann_assign.target],
-                                        dict,
+                                        value,
                                         assignment,
                                     );
                                 }
@@ -3196,6 +3230,27 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
 impl SemanticSyntaxContext for SemanticIndexBuilder<'_, '_> {
     fn future_annotations_or_stub(&self) -> bool {
         self.has_future_annotations
+    }
+
+    fn lazy_import_context(&self) -> Option<LazyImportContext> {
+        match self.scopes[self.current_scope()].kind() {
+            // Possible, but invalid positions.
+            ScopeKind::Function => return Some(LazyImportContext::Function),
+            ScopeKind::Class => return Some(LazyImportContext::Class),
+            // Valid position.
+            ScopeKind::Module => {}
+            // Impossible positions because lambdas and comprehensions can't contain statements.
+            ScopeKind::Comprehension
+            | ScopeKind::Lambda
+            | ScopeKind::TypeAlias
+            | ScopeKind::TypeParams => {}
+        }
+
+        if self.in_try {
+            return Some(LazyImportContext::TryExceptBlocks);
+        }
+
+        None
     }
 
     fn python_version(&self) -> PythonVersion {
