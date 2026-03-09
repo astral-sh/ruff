@@ -91,12 +91,6 @@ impl<'a> ConciseRenderer<'a> {
                         )
                     )?;
                 }
-                if self.config.show_fix_status {
-                    // Do not display an indicator for inapplicable fixes
-                    if diag.has_applicable_fix(self.config) {
-                        write!(f, "[{fix}] ", fix = fmt_styled("*", stylesheet.separator))?;
-                    }
-                }
             } else {
                 let (severity, severity_style) = match diag.severity() {
                     Severity::Info => ("info", stylesheet.info),
@@ -109,10 +103,20 @@ impl<'a> ConciseRenderer<'a> {
                     "{severity}[{id}] ",
                     severity = fmt_styled(severity, severity_style),
                     id = fmt_styled(
-                        fmt_with_hyperlink(&diag.id(), diag.documentation_url(), &stylesheet),
+                        fmt_with_hyperlink(
+                            &diag.secondary_code_or_id(),
+                            diag.documentation_url(),
+                            &stylesheet
+                        ),
                         stylesheet.emphasis
                     )
                 )?;
+            }
+            if self.config.show_fix_status {
+                // Do not display an indicator for inapplicable fixes
+                if diag.has_applicable_fix(self.config) {
+                    write!(f, "[{fix}] ", fix = fmt_styled("*", stylesheet.separator))?;
+                }
             }
 
             writeln!(f, "{message}", message = diag.concise_message())?;
