@@ -1874,13 +1874,22 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     std::slice::from_ref(arguments_slice)
                 };
 
-                for argument in arguments {
+                for (i, argument) in arguments.iter().enumerate() {
                     if argument.is_ellipsis_literal_expr() {
                         // The trailing `...` in `Concatenate[int, str, ...]` is valid;
                         // store without going through type-expression inference.
                         self.store_expression_type(argument, Type::unknown());
-                    } else {
+                    } else if i < arguments.len() - 1 {
                         self.infer_type_expression(argument);
+                    } else {
+                        let previously_allowed_paramspec = self
+                            .inference_flags
+                            .replace(InferenceFlags::ALLOW_PARAMSPEC_TYPE_EXPR, true);
+                        self.infer_type_expression(argument);
+                        self.inference_flags.set(
+                            InferenceFlags::ALLOW_PARAMSPEC_TYPE_EXPR,
+                            previously_allowed_paramspec,
+                        );
                     }
                 }
 
