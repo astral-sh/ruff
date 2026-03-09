@@ -37,7 +37,7 @@ impl Rule {
             }
             map
         });
-        dbg!(RULES.get(name).copied().ok_or(FromCodeError::Unknown))
+        RULES.get(name).copied().ok_or(FromCodeError::Unknown)
     }
 }
 
