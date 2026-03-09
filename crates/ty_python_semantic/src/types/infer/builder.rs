@@ -5784,11 +5784,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ctx: _,
         } = list;
 
-        let mut elts = elts.iter().map(|elt| [Some(elt)]);
+        let elts = elts.iter().map(|elt| [Some(elt)]).collect_vec();
         let mut infer_elt_ty =
             |builder: &mut Self, (_, elt, tcx)| builder.infer_expression(elt, tcx);
 
-        self.infer_collection_literal(KnownClass::List, &mut elts, &mut infer_elt_ty, tcx)
+        self.infer_collection_literal(KnownClass::List, &elts, &mut infer_elt_ty, tcx)
             .unwrap_or_else(|| {
                 KnownClass::List.to_specialized_instance(self.db(), &[Type::unknown()])
             })
@@ -5801,11 +5801,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             elts,
         } = set;
 
-        let mut elts = elts.iter().map(|elt| [Some(elt)]);
+        let elts = elts.iter().map(|elt| [Some(elt)]).collect_vec();
         let mut infer_elt_ty =
             |builder: &mut Self, (_, elt, tcx)| builder.infer_expression(elt, tcx);
 
-        self.infer_collection_literal(KnownClass::Set, &mut elts, &mut infer_elt_ty, tcx)
+        self.infer_collection_literal(KnownClass::Set, &elts, &mut infer_elt_ty, tcx)
             .unwrap_or_else(|| {
                 KnownClass::Set.to_specialized_instance(self.db(), &[Type::unknown()])
             })
@@ -5888,9 +5888,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .to_specialized_instance(self.db(), &[Type::unknown(), Type::unknown()]);
         }
 
-        let mut items = items
+        let items = items
             .iter()
-            .map(|item| [item.key.as_ref(), Some(&item.value)]);
+            .map(|item| [item.key.as_ref(), Some(&item.value)])
+            .collect_vec();
 
         // Avoid inferring the items multiple times if we already attempted to infer the
         // dictionary literal as a `TypedDict`. This also allows us to infer using the
@@ -5902,7 +5903,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .unwrap_or_else(|| builder.infer_expression(elt, tcx))
         };
 
-        self.infer_collection_literal(KnownClass::Dict, &mut items, &mut infer_elt_ty, tcx)
+        self.infer_collection_literal(KnownClass::Dict, &items, &mut infer_elt_ty, tcx)
             .unwrap_or_else(|| {
                 KnownClass::Dict
                     .to_specialized_instance(self.db(), &[Type::unknown(), Type::unknown()])
@@ -5955,7 +5956,72 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn infer_collection_literal<'expr, const N: usize>(
         &mut self,
         collection_class: KnownClass,
-        elts: &mut dyn Iterator<Item = [Option<&'expr ast::Expr>; N]>,
+        elts: &[[Option<&'expr ast::Expr>; N]],
+        infer_elt_expression: &mut dyn FnMut(&mut Self, ArgExpr<'db, 'expr>) -> Type<'db>,
+        tcx: TypeContext<'db>,
+    ) -> Option<Type<'db>> {
+        // If the type context is a union, attempt to narrow to a specific element.
+        let narrow_targets: &[_] = match tcx.annotation {
+            Some(Type::Union(union)) => union.elements(self.db()),
+            _ => &[],
+        };
+
+        // We silence diagnostics until we successfully narrow to a specific type.
+        let prev_multi_inference = self.set_multi_inference_state(MultiInferenceState::Ignore);
+        let was_in_multi_inference = self.context.set_multi_inference(true);
+
+        let mut try_narrow = |narrowed_ty| {
+            let narrowed_tcx = TypeContext::new(Some(narrowed_ty));
+
+            // Attempt to infer the collection literal using the narrowed type context.
+            let inferred_ty = self.infer_collection_literal_impl(
+                collection_class,
+                elts,
+                infer_elt_expression,
+                narrowed_tcx,
+            )?;
+
+            // Ensure the inferred return type is assignable to the (narrowed) declared type.
+            if !inferred_ty.is_assignable_to(self.db(), narrowed_ty) {
+                return None;
+            }
+
+            // Successfully narrowed to an element of the union.
+            //
+            // If necessary, infer the collection literal again with diagnostics enabled.
+            if !was_in_multi_inference {
+                self.context.set_multi_inference(was_in_multi_inference);
+                self.set_multi_inference_state(prev_multi_inference);
+
+                self.infer_collection_literal_impl(
+                    collection_class,
+                    elts,
+                    infer_elt_expression,
+                    narrowed_tcx,
+                );
+            }
+
+            Some(inferred_ty)
+        };
+
+        for narrowed_ty in narrow_targets {
+            if let Some(result) = try_narrow(*narrowed_ty) {
+                return Some(result);
+            }
+        }
+
+        // Re-enable diagnostics, and fallback to the entire type context.
+        self.context.set_multi_inference(was_in_multi_inference);
+        self.set_multi_inference_state(prev_multi_inference);
+
+        self.infer_collection_literal_impl(collection_class, elts, infer_elt_expression, tcx)
+    }
+
+    // Infer the type of a collection literal expression.
+    fn infer_collection_literal_impl<'expr, const N: usize>(
+        &mut self,
+        collection_class: KnownClass,
+        elts: &[[Option<&'expr ast::Expr>; N]],
         infer_elt_expression: &mut dyn FnMut(&mut Self, ArgExpr<'db, 'expr>) -> Type<'db>,
         tcx: TypeContext<'db>,
     ) -> Option<Type<'db>> {
@@ -5980,7 +6046,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let Some((collection_alias, generic_context, elt_tys)) = elt_tys(collection_class) else {
             // Infer the element types without type context, and fallback to `Unknown` for
             // custom typesheds.
-            for (i, elt) in elts.flatten().flatten().enumerate() {
+            for (i, elt) in elts.iter().flatten().flatten().enumerate() {
                 infer_elt_expression(self, (i, elt, TypeContext::default()));
             }
 
@@ -6009,12 +6075,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 FxHashMap::default();
 
             if let Some(tcx) = tcx.annotation
-                // If there are multiple potential type contexts, we fallback to `Unknown`.
-                // TODO: We could perform multi-inference here.
-                && tcx
-                    .filter_union(self.db(), |ty| ty.class_specialization(self.db()).is_some())
-                    .class_specialization(self.db())
-                    .is_some()
+                && tcx.class_specialization(self.db()).is_some()
             {
                 let collection_instance =
                     Type::instance(self.db(), ClassType::Generic(collection_alias));
@@ -6245,15 +6306,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn infer_comprehension_specialization<const N: usize>(
         &mut self,
         collection_class: KnownClass,
-        elements: &[Option<&ast::Expr>; N],
+        elements: [Option<&ast::Expr>; N],
         inference: &ScopeInference<'db>,
         tcx: TypeContext<'db>,
     ) -> Option<Type<'db>> {
-        let mut elements = [elements].into_iter().copied();
         let mut infer_element_ty =
             |_builder: &mut Self, (_, elt, _)| inference.expression_type(elt);
 
-        self.infer_collection_literal(collection_class, &mut elements, &mut infer_element_ty, tcx)
+        self.infer_collection_literal(collection_class, &[elements], &mut infer_element_ty, tcx)
     }
 
     fn infer_list_comprehension_expression(
@@ -6280,7 +6340,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let inference = infer_scope_types(self.db(), scope, tcx);
         self.extend_scope(inference);
 
-        self.infer_comprehension_specialization(KnownClass::List, &[Some(elt)], inference, tcx)
+        self.infer_comprehension_specialization(KnownClass::List, [Some(elt)], inference, tcx)
             .unwrap_or_else(|| {
                 KnownClass::List.to_specialized_instance(self.db(), &[Type::unknown()])
             })
@@ -6310,7 +6370,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let inference = infer_scope_types(self.db(), scope, tcx);
         self.extend_scope(inference);
 
-        self.infer_comprehension_specialization(KnownClass::Set, &[Some(elt)], inference, tcx)
+        self.infer_comprehension_specialization(KnownClass::Set, [Some(elt)], inference, tcx)
             .unwrap_or_else(|| {
                 KnownClass::Set.to_specialized_instance(self.db(), &[Type::unknown()])
             })
@@ -6343,7 +6403,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         self.infer_comprehension_specialization(
             KnownClass::Dict,
-            &[Some(key), Some(value)],
+            [Some(key), Some(value)],
             inference,
             tcx,
         )
@@ -6378,10 +6438,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = listcomp;
 
         // Infer the element type using the outer type context.
-        let mut elts = [[Some(elt.as_ref())]].into_iter();
+        let elts = [[Some(elt.as_ref())]];
         let mut infer_elt_ty =
             |builder: &mut Self, (_, elt, tcx)| builder.infer_expression(elt, tcx);
-        self.infer_collection_literal(KnownClass::List, &mut elts, &mut infer_elt_ty, tcx);
+        self.infer_collection_literal(KnownClass::List, &elts, &mut infer_elt_ty, tcx);
 
         self.infer_comprehensions(generators);
     }
@@ -6399,10 +6459,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = setcomp;
 
         // Infer the element type using the outer type context.
-        let mut elts = [[Some(elt.as_ref())]].into_iter();
+        let elts = [[Some(elt.as_ref())]];
         let mut infer_elt_ty =
             |builder: &mut Self, (_, elt, tcx)| builder.infer_expression(elt, tcx);
-        self.infer_collection_literal(KnownClass::Set, &mut elts, &mut infer_elt_ty, tcx);
+        self.infer_collection_literal(KnownClass::Set, &elts, &mut infer_elt_ty, tcx);
 
         self.infer_comprehensions(generators);
     }
@@ -6421,10 +6481,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = dictcomp;
 
         // Infer the key and value types using the outer type context.
-        let mut elts = [[Some(key.as_ref()), Some(value.as_ref())]].into_iter();
+        let elts = [[Some(key.as_ref()), Some(value.as_ref())]];
         let mut infer_elt_ty =
             |builder: &mut Self, (_, elt, tcx)| builder.infer_expression(elt, tcx);
-        self.infer_collection_literal(KnownClass::Dict, &mut elts, &mut infer_elt_ty, tcx);
+        self.infer_collection_literal(KnownClass::Dict, &elts, &mut infer_elt_ty, tcx);
 
         self.infer_comprehensions(generators);
     }
