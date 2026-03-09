@@ -345,7 +345,7 @@ mod tests {
 
         insta::assert_snapshot!(
             env.render(&diag),
-            @r#"
+            @r###"
         [
           {
             "cell": null,
@@ -356,10 +356,11 @@ mod tests {
             "location": null,
             "message": "main diagnostic message",
             "noqa_row": null,
+            "severity": "error",
             "url": "https://docs.astral.sh/ruff/rules/test-diagnostic"
           }
         ]
-        "#,
+        "###,
         );
     }
 }
