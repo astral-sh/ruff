@@ -2,7 +2,9 @@ use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_db::source::source_text;
 use ruff_python_ast::token::{TokenKind, Tokens};
-use ruff_python_ast::visitor::source_order::{SourceOrderVisitor, TraversalSignal, walk_body};
+use ruff_python_ast::visitor::source_order::{
+    SourceOrderVisitor, TraversalSignal, walk_body, walk_node,
+};
 use ruff_python_ast::{AnyNodeRef, Stmt, StmtClassDef, StmtFunctionDef};
 use ruff_source_file::{Line, UniversalNewlines};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
@@ -45,7 +47,11 @@ impl From<TextRange> for FoldingRange {
 }
 
 /// Returns a list of folding ranges for the given file.
-pub fn folding_ranges(db: &dyn Db, file: File) -> Vec<FoldingRange> {
+pub fn folding_ranges(
+    db: &dyn Db,
+    file: File,
+    range_filter: Option<TextRange>,
+) -> Vec<FoldingRange> {
     let parsed = parsed_module(db, file).load(db);
     let source = source_text(db, file);
 
@@ -53,11 +59,9 @@ pub fn folding_ranges(db: &dyn Db, file: File) -> Vec<FoldingRange> {
         source: source.as_str(),
         ranges: vec![],
         tokens: parsed.tokens(),
+        range_filter,
     };
-    visitor.visit_body(parsed.suite());
-
-    // Add docstring for module-level (first statement if it's a string literal).
-    visitor.add_docstring_range(parsed.suite());
+    walk_node(&mut visitor, AnyNodeRef::from(parsed.syntax()));
 
     // Add remaining ranges not covered by the AST visitor.
     visitor.add_comment_ranges();
@@ -70,12 +74,26 @@ struct FoldingRangeVisitor<'a> {
     source: &'a str,
     ranges: Vec<FoldingRange>,
     tokens: &'a Tokens,
+    range_filter: Option<TextRange>,
 }
 
 impl<'a> FoldingRangeVisitor<'a> {
+    fn intersects_range_filter(&self, range: TextRange) -> bool {
+        self.range_filter
+            .is_none_or(|range_filter| range_filter.intersect(range).is_some())
+    }
+
+    fn contains_range_filter(&self, range: TextRange) -> bool {
+        self.range_filter
+            .is_none_or(|range_filter| range_filter.contains_range(range))
+    }
+
     /// Add the given folding range if it spans multiple lines.
     fn add_range(&mut self, folding_range: impl Into<FoldingRange>) {
         let folding_range = folding_range.into();
+        if !self.contains_range_filter(folding_range.range) {
+            return;
+        }
         if !self.is_multiline(folding_range.range) {
             return;
         }
@@ -89,6 +107,9 @@ impl<'a> FoldingRangeVisitor<'a> {
     /// or `finally` blocks.
     fn force_add_range(&mut self, folding_range: impl Into<FoldingRange>) {
         let folding_range = folding_range.into();
+        if !self.contains_range_filter(folding_range.range) {
+            return;
+        }
         self.ranges.push(folding_range);
     }
 
@@ -114,6 +135,15 @@ impl<'a> FoldingRangeVisitor<'a> {
         let mut prev_import_end: Option<TextSize> = None;
 
         for stmt in stmts {
+            if !self.intersects_range_filter(stmt.range()) {
+                if let Some(range) = import_range {
+                    self.add_range(FoldingRange::from(range).with_kind(FoldingRangeKind::Imports));
+                }
+                import_range = None;
+                prev_import_end = None;
+                continue;
+            }
+
             if matches!(stmt, Stmt::Import(_) | Stmt::ImportFrom(_)) {
                 // Check if there's a blank line between this import and the previous one.
                 let has_blank_line = prev_import_end
@@ -163,6 +193,9 @@ impl<'a> FoldingRangeVisitor<'a> {
         let mut region_starts: Vec<TextSize> = Vec::new();
 
         for line in self.lines() {
+            if !self.intersects_range_filter(line.full_range()) {
+                continue;
+            }
             let trimmed = line.trim_start();
             if trimmed.starts_with("# region") || trimmed.starts_with("#region") {
                 region_starts.push(line.start());
@@ -183,6 +216,14 @@ impl<'a> FoldingRangeVisitor<'a> {
         let mut comment_range: Option<TextRange> = None;
 
         for line in self.lines() {
+            if !self.intersects_range_filter(line.full_range()) {
+                if let Some(range) = comment_range {
+                    self.add_range(FoldingRange::from(range).with_kind(FoldingRangeKind::Comment));
+                    comment_range = None;
+                }
+                continue;
+            }
+
             let trimmed = line.trim_start();
 
             // Check if this is a comment line (but not a region marker)
@@ -215,6 +256,9 @@ impl<'a> FoldingRangeVisitor<'a> {
         let Some(first_stmt) = body.first() else {
             return;
         };
+        if !self.contains_range_filter(first_stmt.range()) {
+            return;
+        }
         let Stmt::Expr(ref expr_stmt) = *first_stmt else {
             return;
         };
@@ -270,7 +314,14 @@ impl<'a> FoldingRangeVisitor<'a> {
 
 impl SourceOrderVisitor<'_> for FoldingRangeVisitor<'_> {
     fn enter_node(&mut self, node: AnyNodeRef<'_>) -> TraversalSignal {
+        if !self.intersects_range_filter(node.range()) {
+            return TraversalSignal::Skip;
+        }
+
         match node {
+            AnyNodeRef::ModModule(module) => {
+                self.add_docstring_range(&module.body);
+            }
             // Compound statements that create folding regions
             AnyNodeRef::StmtFunctionDef(func) => {
                 self.add_function_def_range(func);
@@ -1711,7 +1762,7 @@ with open("file.txt") as f:
 
     impl CursorTest {
         fn folding_ranges(&self) -> String {
-            let ranges = folding_ranges(&self.db, self.cursor.file);
+            let ranges = folding_ranges(&self.db, self.cursor.file, None);
 
             if ranges.is_empty() {
                 return "No folding ranges found".to_string();
