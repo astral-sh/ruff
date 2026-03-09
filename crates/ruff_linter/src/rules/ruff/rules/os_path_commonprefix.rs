@@ -46,7 +46,11 @@ pub(crate) struct OsPathCommonprefix;
 impl Violation for OsPathCommonprefix {
     #[derive_message_formats]
     fn message(&self) -> String {
-        "`os.path.commonprefix()` compares strings character-by-character; use `os.path.commonpath()` to compare path components".to_string()
+        "`os.path.commonprefix()` compares strings character-by-character".to_string()
+    }
+    
+    fn fix_title(&self) -> Option<String> {
+        Some("Use `os.path.commonpath()` to compare path components".to_string())
     }
 }
 
