@@ -6,6 +6,7 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
+    use ruff_python_ast::PythonVersion;
     use test_case::test_case;
 
     use crate::registry::Rule;
@@ -72,6 +73,35 @@ mod tests {
                 preview: PreviewMode::Enabled,
                 ..LinterSettings::for_rule(rule_code)
             },
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(
+        Rule::SuppressibleException,
+        Path::new("SIM105_1.py"),
+        PythonVersion::PY311
+    )]
+    #[test_case(
+        Rule::SuppressibleException,
+        Path::new("SIM105_1.py"),
+        PythonVersion::PY312
+    )]
+    fn version_specific_rules(
+        rule_code: Rule,
+        path: &Path,
+        py_version: PythonVersion,
+    ) -> Result<()> {
+        let snapshot = format!(
+            "{}_{}_{}",
+            rule_code.noqa_code(),
+            path.to_string_lossy(),
+            py_version
+        );
+        let diagnostics = test_path(
+            Path::new("flake8_simplify").join(path).as_path(),
+            &settings::LinterSettings::for_rule(rule_code).with_target_version(py_version),
         )?;
         assert_diagnostics!(snapshot, diagnostics);
         Ok(())
