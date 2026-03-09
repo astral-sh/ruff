@@ -953,6 +953,7 @@ fn find_noqa_comments<'a>(
 }
 
 struct NoqaEdit<'a> {
+    is_blank_line: bool,
     edit_range: TextRange,
     noqa_codes: FxHashSet<&'a SecondaryCode>,
     codes: Option<&'a Codes<'a>>,
@@ -969,7 +970,11 @@ impl NoqaEdit<'_> {
     }
 
     fn write(&self, writer: &mut impl std::fmt::Write) {
-        write!(writer, "  # noqa: ").unwrap();
+        if self.is_blank_line {
+            write!(writer, "# noqa: ").unwrap();
+        } else {
+            write!(writer, "  # noqa: ").unwrap();
+        }
         match self.codes {
             Some(codes) => {
                 push_codes(
@@ -1010,11 +1015,13 @@ fn generate_noqa_edit<'a>(
 
     let edit_range;
     let codes;
+    let is_blank_line;
 
     // Add codes.
     match directive {
         None => {
             let trimmed_line = locator.slice(line_range).trim_end();
+            is_blank_line = trimmed_line.is_empty();
             edit_range = TextRange::new(TextSize::of(trimmed_line), line_range.len()) + offset;
             codes = None;
         }
@@ -1023,6 +1030,7 @@ fn generate_noqa_edit<'a>(
             let trimmed_line = locator
                 .slice(TextRange::new(line_range.start(), existing_codes.start()))
                 .trim_end();
+            is_blank_line = trimmed_line.is_empty();
             edit_range = TextRange::new(TextSize::of(trimmed_line), line_range.len()) + offset;
             codes = Some(existing_codes);
         }
@@ -1030,6 +1038,7 @@ fn generate_noqa_edit<'a>(
     }
 
     Some(NoqaEdit {
+        is_blank_line,
         edit_range,
         noqa_codes,
         codes,
@@ -3011,4 +3020,35 @@ bar =
             ))]
         );
     }
+
+    #[test]
+    fn blank_line_no_leading_whitespace() {
+        let path = Path::new("/tmp/foo.txt");
+        let contents = "
+";
+        let source_file = SourceFileBuilder::new(path.to_string_lossy(), contents).finish();
+        let messages = [UnusedVariable {
+            name: "x".to_string(),
+        }
+        .into_diagnostic(
+            TextRange::new(TextSize::from(0), TextSize::from(0)),
+            &source_file,
+        )];
+        let noqa_line_for = NoqaMapping::default();
+        let (count, output) = add_noqa_inner(
+            path,
+            &messages,
+            &Locator::new(contents),
+            &CommentRanges::default(),
+            &[],
+            &noqa_line_for,
+            LineEnding::Lf,
+            None,
+            &Suppressions::default(),
+        );
+        assert_eq!(count, 1);
+        assert_eq!(output, "# noqa: F841
+");
+    }
+
 }
