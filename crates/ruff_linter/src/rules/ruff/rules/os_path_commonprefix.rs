@@ -48,7 +48,7 @@ impl Violation for OsPathCommonprefix {
     fn message(&self) -> String {
         "`os.path.commonprefix()` compares strings character-by-character".to_string()
     }
-    
+
     fn fix_title(&self) -> Option<String> {
         Some("Use `os.path.commonpath()` to compare path components".to_string())
     }
