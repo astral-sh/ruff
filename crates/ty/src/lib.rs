@@ -57,14 +57,12 @@ pub fn run() -> anyhow::Result<ExitStatus> {
         }
         Command::Rule {
             rule,
-            all,
             output_format,
         } => {
-            if all {
-                rule::rules(output_format)?;
-            }
             if let Some(name) = rule {
                 rule::rule(&name, output_format)?;
+            } else {
+                rule::rules(output_format)?;
             }
             Ok(ExitStatus::Success)
         }

@@ -52,15 +52,12 @@ pub(crate) enum Command {
     GenerateShellCompletion { shell: clap_complete_command::Shell },
 
     /// Explain a rule (or all rules).
-    #[command(group = clap::ArgGroup::new("selector").multiple(false).required(true))]
     Rule {
-        /// Rule to explain
-        #[arg(group = "selector", hide_possible_values = true)]
+        /// Rule to explain.
+        ///
+        /// Defaults to all rules if omitted.
+        #[arg(hide_possible_values = true)]
         rule: Option<String>,
-
-        /// Explain all rules
-        #[arg(long, conflicts_with = "rule", group = "selector")]
-        all: bool,
 
         /// Output format
         #[arg(long, value_enum, default_value = "text")]

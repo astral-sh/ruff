@@ -70,21 +70,11 @@ fn rule_unknown() {
     ");
 }
 
+/// Without a selector, we default to explaining all rules, so just assert that the command succeeds
+/// rather than snapshotting the documentation for ever rule.
 #[test]
-fn rule_no_selector() {
-    insta::with_settings!({ filters => vec![(r"ty\.exe", "ty")] }, {
-        assert_cmd_snapshot!(ty_cmd().args(["rule"]), @"
-        success: false
-        exit_code: 2
-        ----- stdout -----
+fn rule_no_selector() -> anyhow::Result<()> {
+    assert!(ty_cmd().args(["rule"]).status()?.success());
 
-        ----- stderr -----
-        error: the following required arguments were not provided:
-          <RULE|--all>
-
-        Usage: ty rule <RULE|--all>
-
-        For more information, try '--help'.
-        ");
-    });
+    Ok(())
 }
