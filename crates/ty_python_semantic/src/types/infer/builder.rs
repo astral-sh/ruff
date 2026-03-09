@@ -7322,13 +7322,59 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = yield_from;
 
         let iterable_type = self.infer_expression(value, TypeContext::default());
-        iterable_type
+
+        let Some(enclosing_function) =
+            nearest_enclosing_function(self.db(), self.index, self.scope())
+        else {
+            return Type::unknown();
+        };
+        let declared_return_ty = enclosing_function
+            .last_definition_raw_signature(self.db())
+            .return_ty;
+
+        let Some(outer_expected) = declared_return_ty.generator_types(self.db()) else {
+            return Type::unknown();
+        };
+
+        let (inner_yield_ty, inner_is_iterable) = iterable_type
             .try_iterate(self.db())
-            .map(|tuple| tuple.homogeneous_element_type(self.db()))
+            .map(|tuple| (tuple.homogeneous_element_type(self.db()), true))
             .unwrap_or_else(|err| {
                 err.report_diagnostic(&self.context, iterable_type, value.as_ref().into());
-                err.fallback_element_type(self.db())
+                (err.fallback_element_type(self.db()), false)
             });
+
+        if inner_is_iterable {
+            if let Some(outer_yield_ty) = outer_expected.yielded
+                && !inner_yield_ty.is_assignable_to(self.db(), outer_yield_ty)
+                && let Some(builder) = self
+                    .context
+                    .report_lint(&INVALID_ASSIGNMENT, value.as_ref())
+            {
+                builder.into_diagnostic(format_args!(
+                    "Object of type `{}` is not assignable to `{}`",
+                    inner_yield_ty.display(self.db()),
+                    outer_yield_ty.display(self.db()),
+                ));
+            }
+
+            if let Some(outer_send_ty) = outer_expected.sent {
+                let inner_send_ty = iterable_type
+                    .generator_send_type(self.db())
+                    .unwrap_or_else(|| Type::none(self.db()));
+                if !outer_send_ty.is_assignable_to(self.db(), inner_send_ty)
+                    && let Some(builder) = self
+                        .context
+                        .report_lint(&INVALID_ASSIGNMENT, value.as_ref())
+                {
+                    builder.into_diagnostic(format_args!(
+                        "Object of type `{}` is not assignable to `{}`",
+                        outer_send_ty.display(self.db()),
+                        inner_send_ty.display(self.db()),
+                    ));
+                }
+            }
+        }
 
         iterable_type
             .generator_return_type(self.db())
