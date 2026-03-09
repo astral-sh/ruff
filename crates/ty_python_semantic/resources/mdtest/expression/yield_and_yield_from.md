@@ -154,17 +154,6 @@ def invalid_generator() -> Generator[int, None, None]:
     yield "not an int"
 ```
 
-### Invalid return type
-
-```py
-from typing import Generator
-
-def invalid_return_type() -> Generator[None, None, None]:
-    yield
-    # TODO: error: [invalid-return-type]
-    return ""
-```
-
 ### Invalid annotation
 
 ```py

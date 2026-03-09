@@ -2,7 +2,6 @@
 source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
-
 ---
 mdtest name: return_type.md - Function return type - Generator functions - Synchronous
 mdtest path: crates/ty_python_semantic/resources/mdtest/function/return_type.md
@@ -33,6 +32,11 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/function/return_type.md
 18 | 
 19 | def j() -> str:  # error: [invalid-return-type]
 20 |     yield 42
+21 | 
+22 | def invalid_return_type() -> typing.Generator[None, None, None]:
+23 |     yield
+24 |     # TODO: error: [invalid-return-type]
+25 |     return ""
 ```
 
 # Diagnostics
