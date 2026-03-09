@@ -9,6 +9,7 @@ export interface InstalledPackageInfo {
   version: string;
   kind: PackageKind;
   stubsSource?: string;
+  stubsVersion?: string;
 }
 
 export interface InstallationStatus {
@@ -104,6 +105,7 @@ interface ResolvedPackage {
   requiresDist: string[] | null;
   kind: PackageKind;
   stubsSource?: string;
+  stubsVersion?: string;
 }
 
 /**
@@ -228,7 +230,7 @@ export async function installPackages(
 
       installed.push({
         name: pkg.name,
-        version: pkg.version,
+        version: pkg.stubsVersion ?? pkg.version,
         kind: pkg.kind,
         stubsSource: pkg.stubsSource,
       });
@@ -421,6 +423,7 @@ interface StubResolution {
   kind: PackageKind;
   wheelUrl: string | null;
   stubsSource?: string;
+  stubsVersion?: string;
 }
 
 /**
@@ -452,7 +455,8 @@ async function resolveStubs(
         return {
           kind: "stubs-only",
           wheelUrl: wheel.url,
-          stubsSource: `${stubsCandidates[i]} ${result.value.info.version}`,
+          stubsSource: stubsCandidates[i],
+          stubsVersion: result.value.info.version,
         };
       }
     }
@@ -466,7 +470,7 @@ async function resolveStubs(
     return {
       kind: "stubs-only",
       wheelUrl: smallestWheel.url,
-      stubsSource: "from wheel",
+      stubsSource: "wheel",
     };
   }
 
@@ -795,7 +799,12 @@ async function resolveAllDeps(
         kind: "pure-python",
       });
     } else {
-      // C extension package: try to find type stubs
+      // No compatible pure-Python wheel: try to find type stubs
+      if (info.urls.length === 0) {
+        warnings.push(
+          `No wheels available for '${entry.name}==${info.info.version}' on PyPI`,
+        );
+      }
       const stubs = await resolveStubs(entry.name, info, pythonVersion, signal);
       if (signal?.aborted) {
         return { packages: resolved, warnings };
@@ -808,6 +817,7 @@ async function resolveAllDeps(
         requiresDist: null,
         kind: stubs.kind,
         stubsSource: stubs.stubsSource,
+        stubsVersion: stubs.stubsVersion,
       });
       // Do not enqueue transitive deps: Pyodide handles them
       continue;
