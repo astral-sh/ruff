@@ -387,17 +387,8 @@ impl<'db> SemanticTokenVisitor<'db> {
     ) -> (SemanticTokenType, SemanticTokenModifier) {
         let mut modifiers = SemanticTokenModifier::empty();
 
-        // In type annotation contexts, names that refer to nominal instances or protocol instances
-        // should be classified as Class tokens (e.g., "int" in "x: int" should be a Class token)
-        if self.in_type_annotation {
-            match ty {
-                Type::NominalInstance(_) | Type::ProtocolInstance(_) => {
-                    return (SemanticTokenType::Class, modifiers);
-                }
-                _ => {
-                    // Continue with normal classification for other types in annotations
-                }
-            }
+        if let Some(classification) = self.classify_annotation_type_expr(ty) {
+            return classification;
         }
 
         match ty {
@@ -424,12 +415,39 @@ impl<'db> SemanticTokenVisitor<'db> {
         }
     }
 
+    fn classify_annotation_type_expr(
+        &self,
+        ty: Type,
+    ) -> Option<(SemanticTokenType, SemanticTokenModifier)> {
+        if !self.in_type_annotation {
+            return None;
+        }
+
+        // In annotation contexts, these types all denote class-like type expressions that should
+        // be highlighted like `int` in `x: int`, even if their inferred type is instance-shaped.
+        match ty {
+            Type::ClassLiteral(_)
+            | Type::GenericAlias(_)
+            | Type::SubclassOf(_)
+            | Type::NominalInstance(_)
+            | Type::ProtocolInstance(_) => {
+                Some((SemanticTokenType::Class, SemanticTokenModifier::empty()))
+            }
+            _ => None,
+        }
+    }
+
     fn classify_from_type_for_attribute(
+        &self,
         ty: Type,
         attr_name: &ast::Identifier,
     ) -> (SemanticTokenType, SemanticTokenModifier) {
         let attr_name_str = attr_name.id.as_str();
         let mut modifiers = SemanticTokenModifier::empty();
+
+        if let Some(classification) = self.classify_annotation_type_expr(ty) {
+            return classification;
+        }
 
         // Classify based on the inferred type of the attribute
         match ty {
@@ -748,7 +766,7 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
                 self.visit_expr(&assignment.target);
                 self.in_target_creating_definition = false;
 
-                self.visit_expr(&assignment.annotation);
+                self.visit_annotation(&assignment.annotation);
 
                 if let Some(value) = &assignment.value {
                     self.visit_expr(value);
@@ -835,8 +853,7 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
 
                 // Then add token for the attribute name (e.g., 'path' in 'os.path')
                 let ty = expr.inferred_type(self.model).unwrap_or(Type::unknown());
-                let (token_type, modifiers) =
-                    Self::classify_from_type_for_attribute(ty, &attr.attr);
+                let (token_type, modifiers) = self.classify_from_type_for_attribute(ty, &attr.attr);
                 self.add_token(&attr.attr, token_type, modifiers);
             }
             ast::Expr::NumberLiteral(_) => {
@@ -1163,7 +1180,7 @@ def f(x: ast.AST):
         "f" @ 16..17: Function [definition]
         "x" @ 18..19: Parameter [definition]
         "ast" @ 21..24: Namespace
-        "AST" @ 25..28: Variable [readonly]
+        "AST" @ 25..28: Class
         "x" @ 41..42: Parameter
         "ast" @ 57..60: Namespace
         "Attribute" @ 61..70: Class
@@ -1962,6 +1979,47 @@ y: Optional[str] = None
         "str" @ 150..153: Class
         "None" @ 157..161: BuiltinConstant
         "#);
+    }
+
+    #[test]
+    fn generic_class_members_in_annotations() {
+        let test = SemanticTokenTest::new(
+            r#"
+import os
+from os import PathLike
+
+x1: os.PathLike
+x2: os.PathLike[str]
+
+y1: PathLike
+y2: PathLike[str]
+
+z1 = os.PathLike
+z2 = os.PathLike[str]
+"#,
+        );
+
+        let tokens = test.highlight_file();
+        let source = ruff_db::source::source_text(&test.db, test.file);
+        let pathlike_types: Vec<_> = tokens
+            .iter()
+            .filter_map(|token| (&source[token.range()] == "PathLike").then_some(token.token_type))
+            .collect();
+
+        assert!(
+            pathlike_types.len() >= 5,
+            "expected import plus annotation tokens, got {pathlike_types:?}"
+        );
+
+        assert_eq!(
+            pathlike_types[1..5],
+            [
+                SemanticTokenType::Class,
+                SemanticTokenType::Class,
+                SemanticTokenType::Class,
+                SemanticTokenType::Class,
+            ]
+        );
     }
 
     #[test]
