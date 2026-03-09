@@ -5,8 +5,91 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 
 use crate::display_settings;
+use ruff_cache::{CacheKey, CacheKeyHasher};
 use ruff_macros::CacheKey;
 use ruff_python_ast::{ExprNumberLiteral, LiteralExpressionRef, Number};
+
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, CacheKey)]
+#[serde(untagged)]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub enum AllowedValue {
+    String(String),
+    Int(i32),
+    Float(AllowedFloatValue),
+}
+
+impl AllowedValue {
+    pub fn matches_literal(&self, literal_expr: LiteralExpressionRef<'_>) -> bool {
+        match (self, literal_expr) {
+            (
+                AllowedValue::String(allowed),
+                LiteralExpressionRef::StringLiteral(string_literal),
+            ) => allowed.as_str() == string_literal.value.to_str(),
+            (AllowedValue::Int(allowed), LiteralExpressionRef::NumberLiteral(number_literal)) => {
+                #[expect(clippy::cast_possible_truncation)]
+                match &number_literal.value {
+                    Number::Int(i) => i.as_i32() == Some(*allowed), // allowed int vs found int
+                    Number::Float(f) => f.fract() == 0.0 && *f as i32 == *allowed, // allowed int vs found float
+                    Number::Complex { .. } => false,
+                }
+            }
+            (AllowedValue::Float(allowed), LiteralExpressionRef::NumberLiteral(number_literal)) => {
+                match &number_literal.value {
+                    Number::Float(f) => *allowed == AllowedFloatValue::new(*f), //allowed float vs found float
+                    Number::Int(i) => i.as_i32().map(f64::from) == Some(allowed.value()), //allowed float vs found int
+                    Number::Complex { .. } => false,
+                }
+            }
+            _ => false,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub struct AllowedFloatValue(f64);
+
+impl AllowedFloatValue {
+    pub fn new(value: f64) -> Self {
+        Self(value)
+    }
+
+    pub fn value(&self) -> f64 {
+        self.0
+    }
+}
+
+impl PartialEq for AllowedFloatValue {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.to_bits() == other.0.to_bits()
+    }
+}
+
+impl Eq for AllowedFloatValue {}
+
+impl CacheKey for AllowedFloatValue {
+    fn cache_key(&self, state: &mut CacheKeyHasher) {
+        self.0.to_bits().cache_key(state);
+    }
+}
+
+impl fmt::Display for AllowedValue {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            AllowedValue::String(s) => write!(f, "\"{s}\""),
+            AllowedValue::Int(i) => write!(f, "{i}"),
+            AllowedValue::Float(fl) => {
+                let value = fl.value();
+                // Ensure floats always display with decimal point
+                if value.fract() == 0.0 {
+                    write!(f, "{value:.?}")
+                } else {
+                    write!(f, "{value}")
+                }
+            }
+        }
+    }
+}
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, CacheKey)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
@@ -51,6 +134,7 @@ impl fmt::Display for ConstantType {
 #[derive(Debug, Clone, CacheKey)]
 pub struct Settings {
     pub allow_magic_value_types: Vec<ConstantType>,
+    pub allow_magic_values: Vec<AllowedValue>,
     pub allow_dunder_method_names: FxHashSet<String>,
     pub max_args: usize,
     pub max_positional_args: usize,
@@ -67,6 +151,13 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             allow_magic_value_types: vec![ConstantType::Str, ConstantType::Bytes],
+            allow_magic_values: vec![
+                AllowedValue::Int(0),
+                AllowedValue::Int(1),
+                AllowedValue::Int(-1),
+                AllowedValue::String(String::new()),
+                AllowedValue::String("__main__".to_string()),
+            ],
             allow_dunder_method_names: FxHashSet::default(),
             max_args: 5,
             max_positional_args: 5,
@@ -88,6 +179,7 @@ impl fmt::Display for Settings {
             namespace = "linter.pylint",
             fields = [
                 self.allow_magic_value_types | array,
+                self.allow_magic_values | array,
                 self.allow_dunder_method_names | set,
                 self.max_args,
                 self.max_positional_args,
