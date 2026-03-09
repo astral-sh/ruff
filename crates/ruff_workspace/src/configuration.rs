@@ -1036,7 +1036,7 @@ impl LintConfiguration {
                     prefix,
                     redirected_from: Some(redirect_from),
                 }
-                | RuleSelector::Rule {
+                | RuleSelector::RuleCode {
                     prefix,
                     redirected_from: Some(redirect_from),
                 } = selector

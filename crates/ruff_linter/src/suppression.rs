@@ -185,7 +185,7 @@ impl<'a> SuppressionDiagnostic<'a> {
 impl Suppressions {
     pub fn from_tokens(source: &str, tokens: &Tokens, indexer: &Indexer) -> Suppressions {
         let builder = SuppressionsBuilder::new(source);
-        dbg!(builder.load_from_tokens(tokens, indexer))
+        builder.load_from_tokens(tokens, indexer)
     }
 
     pub(crate) fn is_empty(&self) -> bool {
@@ -212,7 +212,6 @@ impl Suppressions {
             let suppression_code =
                 get_redirect_target(suppression.code.as_str()).unwrap_or(suppression.code.as_str());
             if *code == suppression_code && suppression.range.contains_range(range) {
-                dbg!(&suppression);
                 suppression.used.set(true);
                 return true;
             }
