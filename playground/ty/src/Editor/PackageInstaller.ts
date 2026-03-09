@@ -117,6 +117,7 @@ interface ResolvedPackage {
 export async function installPackages(
   workspace: Workspace,
   packages: string[],
+  pythonVersion: string | null,
   previousFiles: string[],
   onProgress: (status: InstallationStatus) => void,
   signal?: AbortSignal,
@@ -144,6 +145,7 @@ export async function installPackages(
     // Resolve all transitive dependencies
     const { packages: resolved, warnings } = await resolveAllDeps(
       packages,
+      pythonVersion,
       signal,
     );
 
@@ -320,20 +322,96 @@ async function fetchPackageInfo(
   return response.json();
 }
 
-function findPureWheel(
+/** Preference order for pure-Python wheel selection (higher = better match). */
+const enum WheelPriority {
+  Incompatible = -1,
+  /** py3-none-any */
+  AnyPython3 = 0,
+  /** cp3-none-any */
+  AnyCPython3,
+  /** e.g. py312-none-any */
+  SpecificPython3,
+  /** e.g. cp312-none-any */
+  SpecificCPython3,
+}
+
+/**
+ * Score a single python tag for compatibility with Python 3.
+ * Returns Incompatible (-1) if the tag doesn't match.
+ */
+function pythonTagPriority(
+  tag: string,
+  targetMinor: string | undefined,
+): WheelPriority {
+  const m = /^(py|cp)3(\d+)?$/.exec(tag);
+  if (m == null) {
+    return WheelPriority.Incompatible;
+  }
+  const isCPython = m[1] === "cp";
+  const minor = m[2] as string | undefined;
+  if (minor != null && targetMinor != null && minor !== targetMinor) {
+    return WheelPriority.Incompatible;
+  }
+  if (minor != null && targetMinor == null) {
+    return WheelPriority.Incompatible;
+  }
+  if (isCPython) {
+    return minor != null
+      ? WheelPriority.SpecificCPython3
+      : WheelPriority.AnyCPython3;
+  }
+  return minor != null
+    ? WheelPriority.SpecificPython3
+    : WheelPriority.AnyPython3;
+}
+
+const NONE_ANY_SUFFIX = "-none-any.whl";
+
+/**
+ * Find the best compatible pure-Python wheel (abi=none, platform=any).
+ * Handles version-specific tags like `py312-none-any` in addition to `py3-none-any`.
+ */
+function findCompatiblePureWheel(
   info: PyPIInfo,
+  pythonVersion: string | null,
 ): { filename: string; url: string } | null {
-  // Look for py3-none-any wheel first, then py2.py3-none-any
+  const targetMinor = pythonVersion?.split(".")[1];
+  let best: {
+    filename: string;
+    url: string;
+    priority: WheelPriority;
+  } | null = null;
+
   for (const url of info.urls) {
+    if (url.packagetype !== "bdist_wheel") {
+      continue;
+    }
+    if (!url.filename.endsWith(NONE_ANY_SUFFIX)) {
+      continue;
+    }
+
+    // Extract compound python tag:
+    // e.g. "requests-2.31.0-py2.py3-none-any.whl" → "py2.py3"
+    const stem = url.filename.slice(0, -NONE_ANY_SUFFIX.length);
+    const pythonTagStr = stem.slice(stem.lastIndexOf("-") + 1);
+
+    let priority: WheelPriority = WheelPriority.Incompatible;
+    for (const tag of pythonTagStr.split(".")) {
+      const p = pythonTagPriority(tag, targetMinor);
+      if (p > priority) {
+        priority = p;
+      }
+    }
+
     if (
-      url.packagetype === "bdist_wheel" &&
-      (url.filename.includes("-py3-none-any") ||
-        url.filename.includes("-py2.py3-none-any"))
+      priority > WheelPriority.Incompatible &&
+      (best == null || priority > best.priority)
     ) {
-      return { filename: url.filename, url: url.url };
+      best = { filename: url.filename, url: url.url, priority };
     }
   }
-  return null;
+
+  return best != null ? { filename: best.filename, url: best.url } : null;
 }
 
 interface StubResolution {
@@ -354,6 +432,7 @@ interface StubResolution {
 async function resolveStubs(
   name: string,
   info: PyPIInfo,
+  pythonVersion: string | null,
   signal?: AbortSignal,
 ): Promise<StubResolution> {
   // Fetch {name}-stubs and types-{name} in parallel
@@ -365,7 +444,7 @@ async function resolveStubs(
   for (let i = 0; i < results.length; i++) {
     const result = results[i];
     if (result.status === "fulfilled") {
-      const wheel = findPureWheel(result.value);
+      const wheel = findCompatiblePureWheel(result.value, pythonVersion);
       if (wheel != null) {
         return {
           kind: "stubs-only",
@@ -629,6 +708,7 @@ interface ResolveResult {
 
 async function resolveAllDeps(
   packages: string[],
+  pythonVersion: string | null,
   signal?: AbortSignal,
 ): Promise<ResolveResult> {
   const resolved: ResolvedPackage[] = [];
@@ -689,7 +769,7 @@ async function resolveAllDeps(
       continue;
     }
 
-    const wheel = findPureWheel(info);
+    const wheel = findCompatiblePureWheel(info, pythonVersion);
     if (wheel != null) {
       // Pure-Python package
       seen.set(entry.name, info.info.version);
@@ -702,7 +782,7 @@ async function resolveAllDeps(
       });
     } else {
       // C extension package (any depth): try to find type stubs
-      const stubs = await resolveStubs(entry.name, info, signal);
+      const stubs = await resolveStubs(entry.name, info, pythonVersion, signal);
       if (signal?.aborted) {
         return { packages: resolved, warnings };
       }

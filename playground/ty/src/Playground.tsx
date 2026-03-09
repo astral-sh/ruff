@@ -116,9 +116,14 @@ export default function Playground() {
 
     const content = files.contents[settingsFile.id];
     let deps: string[] = [];
+    let pythonVersion: string | null = null;
     try {
       const parsed = JSON.parse(content);
       deps = Array.isArray(parsed.dependencies) ? parsed.dependencies : [];
+      pythonVersion =
+        typeof parsed.environment?.["python-version"] === "string"
+          ? parsed.environment["python-version"]
+          : null;
     } catch {
       return;
     }
@@ -133,6 +138,7 @@ export default function Playground() {
     installPackages(
       workspace,
       deps,
+      pythonVersion,
       previousFiles,
       setInstallStatus,
       abortController.signal,
