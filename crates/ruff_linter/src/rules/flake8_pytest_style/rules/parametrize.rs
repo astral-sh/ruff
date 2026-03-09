@@ -204,6 +204,7 @@ impl Violation for PytestParametrizeNamesWrongType {
 pub(crate) struct PytestParametrizeValuesWrongType {
     values: types::ParametrizeValuesType,
     row: types::ParametrizeValuesRowType,
+    is_multi_named: bool,
 }
 
 impl Violation for PytestParametrizeValuesWrongType {
@@ -211,13 +212,29 @@ impl Violation for PytestParametrizeValuesWrongType {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let PytestParametrizeValuesWrongType { values, row } = self;
-        format!("Wrong values type in `pytest.mark.parametrize` expected `{values}` of `{row}`")
+        let PytestParametrizeValuesWrongType {
+            values,
+            row,
+            is_multi_named,
+        } = self;
+        if *is_multi_named {
+            format!("Wrong values type in `pytest.mark.parametrize` expected `{values}` of `{row}`")
+        } else {
+            format!("Wrong values type in `pytest.mark.parametrize` expected `{values}`")
+        }
     }
 
     fn fix_title(&self) -> Option<String> {
-        let PytestParametrizeValuesWrongType { values, row } = self;
-        Some(format!("Use `{values}` of `{row}` for parameter values"))
+        let PytestParametrizeValuesWrongType {
+            values,
+            row,
+            is_multi_named,
+        } = self;
+        if *is_multi_named {
+            Some(format!("Use `{values}` of `{row}` for parameter values"))
+        } else {
+            Some(format!("Use `{values}` for parameter values"))
+        }
     }
 }
 
@@ -520,10 +537,18 @@ fn check_values(checker: &Checker, names: &Expr, values: &Expr) {
     match values {
         Expr::List(ast::ExprList { elts, .. }) => {
             if values_type != types::ParametrizeValuesType::List {
+                // Include the row type in the message when the parametrize has
+                // multiple names, or when any element is itself a list/tuple
+                // (i.e., the outer container structurally wraps rows).
+                let has_row_type = is_multi_named
+                    || elts
+                        .iter()
+                        .any(|elt| matches!(elt, Expr::List(_) | Expr::Tuple(_)));
                 let mut diagnostic = checker.report_diagnostic(
                     PytestParametrizeValuesWrongType {
                         values: values_type,
                         row: values_row_type,
+                        is_multi_named: has_row_type,
                     },
                     values.range(),
                 );
@@ -567,10 +592,18 @@ fn check_values(checker: &Checker, names: &Expr, values: &Expr) {
         }
         Expr::Tuple(ast::ExprTuple { elts, .. }) => {
             if values_type != types::ParametrizeValuesType::Tuple {
+                // Include the row type in the message when the parametrize has
+                // multiple names, or when any element is itself a list/tuple
+                // (i.e., the outer container structurally wraps rows).
+                let has_row_type = is_multi_named
+                    || elts
+                        .iter()
+                        .any(|elt| matches!(elt, Expr::List(_) | Expr::Tuple(_)));
                 let mut diagnostic = checker.report_diagnostic(
                     PytestParametrizeValuesWrongType {
                         values: values_type,
                         row: values_row_type,
+                        is_multi_named: has_row_type,
                     },
                     values.range(),
                 );
@@ -775,6 +808,7 @@ fn handle_value_rows(
                         PytestParametrizeValuesWrongType {
                             values: values_type,
                             row: values_row_type,
+                            is_multi_named: true,
                         },
                         elt.range(),
                     );
@@ -817,6 +851,7 @@ fn handle_value_rows(
                         PytestParametrizeValuesWrongType {
                             values: values_type,
                             row: values_row_type,
+                            is_multi_named: true,
                         },
                         elt.range(),
                     );
