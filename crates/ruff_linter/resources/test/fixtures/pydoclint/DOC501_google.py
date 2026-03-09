@@ -246,3 +246,29 @@ def foo():
         raise TypeError  # no DOC501 here because we already emitted a diagnostic for the earlier `raise TypeError`
     raise ValueError  # DOC501
     return 42
+
+
+class MyError(Exception):
+    @classmethod
+    def from_code(cls, code: int) -> "MyError":
+        return cls(f"Error code: {code}")
+
+
+# OK: exception raised via classmethod should be recognized (https://github.com/astral-sh/ruff/issues/23570)
+def foo_classmethod():
+    """Foo.
+
+    Raises:
+        MyError: If something goes wrong.
+    """
+    raise MyError.from_code(42)
+
+
+# DOC501: classmethod-constructed exception missing from docstring
+def bar_classmethod():
+    """Bar.
+
+    Raises:
+        ValueError: Some other error.
+    """
+    raise MyError.from_code(42)  # DOC501

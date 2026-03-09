@@ -226,3 +226,18 @@ DOC501 Raised exception `ValueError` missing from docstring
 244 |           raise TypeError  # DOC501
     |
 help: Add `ValueError` to the docstring
+
+DOC501 Raised exception `MyError` missing from docstring
+   --> DOC501_google.py:269:5
+    |
+267 |   # DOC501: classmethod-constructed exception missing from docstring
+268 |   def bar_classmethod():
+269 | /     """Bar.
+270 | |
+271 | |     Raises:
+272 | |         ValueError: Some other error.
+273 | |     """
+    | |_______^
+274 |       raise MyError.from_code(42)  # DOC501
+    |
+help: Add `MyError` to the docstring

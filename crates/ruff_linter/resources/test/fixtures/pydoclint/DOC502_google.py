@@ -164,3 +164,19 @@ def i():
         pass
     except (ValueError, TypeError) as e:
         raise e
+
+
+class MyError(Exception):
+    @classmethod
+    def from_code(cls, code: int) -> "MyError":
+        return cls(f"Error code: {code}")
+
+
+# OK: exception raised via classmethod should be recognized (https://github.com/astral-sh/ruff/issues/23570)
+def foo_classmethod():
+    """Foo.
+
+    Raises:
+        MyError: If something goes wrong.
+    """
+    raise MyError.from_code(42)

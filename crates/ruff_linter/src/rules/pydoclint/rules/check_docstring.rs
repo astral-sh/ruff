@@ -980,10 +980,31 @@ impl<'a> Visitor<'a> for BodyVisitor<'a> {
         match stmt {
             Stmt::Raise(ast::StmtRaise { exc, .. }) => {
                 if let Some(exc) = exc.as_ref() {
-                    // First try to resolve the exception directly
-                    if let Some(qualified_name) =
-                        self.semantic.resolve_qualified_name(map_callable(exc))
-                    {
+                    let callable = map_callable(exc);
+                    // If the exception is raised via a method call on a class
+                    // (e.g., `ValidationError.from_exception_data(...)`),
+                    // `map_callable` strips the call, leaving an attribute
+                    // expression like `ValidationError.from_exception_data`.
+                    // In that case, try resolving the object (class) part so
+                    // that classmethod-constructed exceptions are recognised.
+                    let resolved =
+                        if exc.is_call_expr() {
+                            if let ast::Expr::Attribute(ast::ExprAttribute {
+                                value, ..
+                            }) = callable
+                            {
+                                self.semantic
+                                    .resolve_qualified_name(value)
+                                    .or_else(|| {
+                                        self.semantic.resolve_qualified_name(callable)
+                                    })
+                            } else {
+                                self.semantic.resolve_qualified_name(callable)
+                            }
+                        } else {
+                            self.semantic.resolve_qualified_name(callable)
+                        };
+                    if let Some(qualified_name) = resolved {
                         self.raised_exceptions.push(ExceptionEntry {
                             qualified_name,
                             range: exc.range(),
