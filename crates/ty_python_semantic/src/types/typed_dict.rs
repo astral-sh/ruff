@@ -22,11 +22,8 @@ use crate::semantic_index::definition::Definition;
 use crate::types::TypeContext;
 use crate::types::TypeDefinition;
 use crate::types::class::FieldKind;
-use crate::types::constraints::{
-    ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
-};
-use crate::types::generics::InferableTypeVars;
-use crate::types::relation::{HasRelationToVisitor, IsDisjointVisitor, TypeRelation};
+use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
+use crate::types::relation::{DisjointnessChecker, TypeRelation, TypeRelationChecker};
 
 bitflags! {
     /// Used for `TypedDict` class parameters.
@@ -154,217 +151,6 @@ impl<'db> TypedDictType<'db> {
         Self::from_patch_items(db, items)
     }
 
-    // Subtyping between `TypedDict`s follows the algorithm described at:
-    // https://typing.python.org/en/latest/spec/typeddict.html#subtyping-between-typeddict-types
-    #[expect(clippy::too_many_arguments)]
-    pub(super) fn has_relation_to_impl<'c>(
-        self,
-        db: &'db dyn Db,
-        target: TypedDictType<'db>,
-        constraints: &'c ConstraintSetBuilder<'db>,
-        inferable: InferableTypeVars<'_, 'db>,
-        relation: TypeRelation,
-        relation_visitor: &HasRelationToVisitor<'db, 'c>,
-        disjointness_visitor: &IsDisjointVisitor<'db, 'c>,
-    ) -> ConstraintSet<'db, 'c> {
-        if let TypedDictType::Synthesized(synthesized_target) = target
-            && synthesized_target.is_patch(db)
-        {
-            let self_items = self.items(db);
-            let target_items = synthesized_target.items(db);
-            let mut result = ConstraintSet::from_bool(constraints, true);
-
-            for (self_item_name, self_item_field) in self_items {
-                let Some(target_item_field) = target_items.get(self_item_name) else {
-                    continue;
-                };
-
-                result.intersect(
-                    db,
-                    constraints,
-                    self_item_field.declared_ty.has_relation_to_impl(
-                        db,
-                        target_item_field.declared_ty,
-                        constraints,
-                        inferable,
-                        relation,
-                        relation_visitor,
-                        disjointness_visitor,
-                    ),
-                );
-
-                if result.is_never_satisfied(db) {
-                    return result;
-                }
-            }
-
-            return result;
-        }
-
-        // First do a quick nominal check that (if it succeeds) means that we can avoid
-        // materializing the full `TypedDict` schema for either `self` or `target`.
-        // This should be cheaper in many cases, and also helps us avoid some cycles.
-        if let Some(defining_class) = self.defining_class()
-            && let Some(target_defining_class) = target.defining_class()
-            && defining_class.is_subclass_of(db, target_defining_class)
-        {
-            return ConstraintSet::from_bool(constraints, true);
-        }
-
-        let self_items = self.items(db);
-        let target_items = target.items(db);
-        // Many rules violations short-circuit with "never", but asking whether one field is
-        // [relation] to/of another can produce more complicated constraints, and we collect those.
-        let mut result = ConstraintSet::from_bool(constraints, true);
-        for (target_item_name, target_item_field) in target_items {
-            let field_constraints = if target_item_field.is_required() {
-                // required target fields
-                let Some(self_item_field) = self_items.get(target_item_name) else {
-                    // Self is missing a required field.
-                    return ConstraintSet::from_bool(constraints, false);
-                };
-                if !self_item_field.is_required() {
-                    // A required field is not required in self.
-                    return ConstraintSet::from_bool(constraints, false);
-                }
-                if target_item_field.is_read_only() {
-                    // For `ReadOnly[]` fields in the target, the corresponding fields in
-                    // self need to have the same assignability/subtyping/etc relation
-                    // individually that we're looking for overall between the
-                    // `TypedDict`s.
-                    self_item_field.declared_ty.has_relation_to_impl(
-                        db,
-                        target_item_field.declared_ty,
-                        constraints,
-                        inferable,
-                        relation,
-                        relation_visitor,
-                        disjointness_visitor,
-                    )
-                } else {
-                    if self_item_field.is_read_only() {
-                        // A read-only field can't be assigned to a mutable target.
-                        return ConstraintSet::from_bool(constraints, false);
-                    }
-                    // For mutable fields in the target, the relation needs to apply both
-                    // ways, or else mutating the target could violate the structural
-                    // invariants of self. For fully-static types, this is "equivalence".
-                    // For gradual types, it depends on the relation, but mutual
-                    // assignability is "consistency".
-                    self_item_field
-                        .declared_ty
-                        .has_relation_to_impl(
-                            db,
-                            target_item_field.declared_ty,
-                            constraints,
-                            inferable,
-                            relation,
-                            relation_visitor,
-                            disjointness_visitor,
-                        )
-                        .and(db, constraints, || {
-                            target_item_field.declared_ty.has_relation_to_impl(
-                                db,
-                                self_item_field.declared_ty,
-                                constraints,
-                                inferable,
-                                relation,
-                                relation_visitor,
-                                disjointness_visitor,
-                            )
-                        })
-                }
-            } else {
-                // `NotRequired[]` target fields
-                if target_item_field.is_read_only() {
-                    // As above, for `NotRequired[]` + `ReadOnly[]` fields in the target. It's
-                    // tempting to refactor things and unify some of these calls to
-                    // `has_relation_to_impl`, but this branch will get more complicated when we
-                    // add support for `closed` and `extra_items` (which is why the rules in the
-                    // spec are structured like they are), and following the structure of the spec
-                    // makes it easier to check the logic here.
-                    if let Some(self_item_field) = self_items.get(target_item_name) {
-                        self_item_field.declared_ty.has_relation_to_impl(
-                            db,
-                            target_item_field.declared_ty,
-                            constraints,
-                            inferable,
-                            relation,
-                            relation_visitor,
-                            disjointness_visitor,
-                        )
-                    } else {
-                        // Self is missing this not-required, read-only item. However, since all
-                        // `TypedDict`s by default are allowed to have "extra items" of any type
-                        // (until we support `closed` and explicit `extra_items`), this key could
-                        // actually turn out to have a value. To make sure this is type-safe, the
-                        // not-required field in the target needs to be assignable from `object`.
-                        // TODO: `closed` and `extra_items` support will go here.
-                        Type::object().when_assignable_to(
-                            db,
-                            target_item_field.declared_ty,
-                            constraints,
-                            inferable,
-                        )
-                    }
-                } else {
-                    // As above, for `NotRequired[]` mutable fields in the target. Again the logic
-                    // is largely the same for now, but it will get more complicated with `closed`
-                    // and `extra_items`.
-                    if let Some(self_item_field) = self_items.get(target_item_name) {
-                        if self_item_field.is_read_only() {
-                            // A read-only field can't be assigned to a mutable target.
-                            return ConstraintSet::from_bool(constraints, false);
-                        }
-                        if self_item_field.is_required() {
-                            // A required field can't be assigned to a not-required, mutable field
-                            // in the target, because `del` is allowed on the target field.
-                            return ConstraintSet::from_bool(constraints, false);
-                        }
-
-                        // As above, for mutable fields in the target, the relation needs
-                        // to apply both ways.
-                        self_item_field
-                            .declared_ty
-                            .has_relation_to_impl(
-                                db,
-                                target_item_field.declared_ty,
-                                constraints,
-                                inferable,
-                                relation,
-                                relation_visitor,
-                                disjointness_visitor,
-                            )
-                            .and(db, constraints, || {
-                                target_item_field.declared_ty.has_relation_to_impl(
-                                    db,
-                                    self_item_field.declared_ty,
-                                    constraints,
-                                    inferable,
-                                    relation,
-                                    relation_visitor,
-                                    disjointness_visitor,
-                                )
-                            })
-                    } else {
-                        // Self is missing this not-required, mutable field. This isn't ok if self
-                        // has read-only extra items, which all `TypedDict`s effectively do until
-                        // we support `closed` and explicit `extra_items`. See "A subtle
-                        // interaction between two structural assignability rules prevents
-                        // unsoundness" in `typed_dict.md`.
-                        // TODO: `closed` and `extra_items` support will go here.
-                        ConstraintSet::from_bool(constraints, false)
-                    }
-                }
-            };
-            result.intersect(db, constraints, field_constraints);
-            if result.is_never_satisfied(db) {
-                return result;
-            }
-        }
-        result
-    }
-
     pub fn definition(self, db: &'db dyn Db) -> Option<Definition<'db>> {
         match self {
             TypedDictType::Class(defining_class) => defining_class.definition(db),
@@ -378,7 +164,186 @@ impl<'db> TypedDictType<'db> {
             TypedDictType::Synthesized(_) => None,
         }
     }
+}
 
+impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
+    // Subtyping between `TypedDict`s follows the algorithm described at:
+    // https://typing.python.org/en/latest/spec/typeddict.html#subtyping-between-typeddict-types
+    pub(super) fn check_typeddict_pair(
+        &self,
+        db: &'db dyn Db,
+        source: TypedDictType<'db>,
+        target: TypedDictType<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        if let TypedDictType::Synthesized(synthesized_target) = target
+            && synthesized_target.is_patch(db)
+        {
+            let source_items = source.items(db);
+            let target_items = synthesized_target.items(db);
+            let mut result = self.always();
+
+            for (source_item_name, source_item_field) in source_items {
+                let Some(target_item_field) = target_items.get(source_item_name) else {
+                    continue;
+                };
+
+                result.intersect(
+                    db,
+                    self.constraints,
+                    self.check_type_pair(
+                        db,
+                        source_item_field.declared_ty,
+                        target_item_field.declared_ty,
+                    ),
+                );
+
+                if result.is_never_satisfied(db) {
+                    return result;
+                }
+            }
+
+            return result;
+        }
+
+        // First do a quick nominal check that (if it succeeds) means that we can avoid
+        // materializing the full `TypedDict` schema for either `source` or `target`.
+        // This should be cheaper in many cases, and also helps us avoid some cycles.
+        if let Some(defining_class) = source.defining_class()
+            && let Some(target_defining_class) = target.defining_class()
+            && defining_class.is_subclass_of(db, target_defining_class)
+        {
+            return self.always();
+        }
+
+        let source_items = source.items(db);
+        let target_items = target.items(db);
+        // Many rules violations short-circuit with "never", but asking whether one field is
+        // [relation] to/of another can produce more complicated constraints, and we collect those.
+        let mut result = self.always();
+        for (target_item_name, target_item_field) in target_items {
+            let field_constraints = if target_item_field.is_required() {
+                // required target fields
+                let Some(source_item_field) = source_items.get(target_item_name) else {
+                    // Self is missing a required field.
+                    return self.never();
+                };
+                if !source_item_field.is_required() {
+                    // A required field is not required in self.
+                    return self.never();
+                }
+                if target_item_field.is_read_only() {
+                    // For `ReadOnly[]` fields in the target, the corresponding fields in
+                    // self need to have the same assignability/subtyping/etc relation
+                    // individually that we're looking for overall between the
+                    // `TypedDict`s.
+                    self.check_type_pair(
+                        db,
+                        source_item_field.declared_ty,
+                        target_item_field.declared_ty,
+                    )
+                } else {
+                    if source_item_field.is_read_only() {
+                        // A read-only field can't be assigned to a mutable target.
+                        return self.never();
+                    }
+                    // For mutable fields in the target, the relation needs to apply both
+                    // ways, or else mutating the target could violate the structural
+                    // invariants of self. For fully-static types, this is "equivalence".
+                    // For gradual types, it depends on the relation, but mutual
+                    // assignability is "consistency".
+                    self.check_type_pair(
+                        db,
+                        source_item_field.declared_ty,
+                        target_item_field.declared_ty,
+                    )
+                    .and(db, self.constraints, || {
+                        self.check_type_pair(
+                            db,
+                            target_item_field.declared_ty,
+                            source_item_field.declared_ty,
+                        )
+                    })
+                }
+            } else {
+                // `NotRequired[]` target fields
+                if target_item_field.is_read_only() {
+                    // As above, for `NotRequired[]` + `ReadOnly[]` fields in the target. It's
+                    // tempting to refactor things and unify some of these calls to
+                    // `check_typeddict_pair`, but this branch will get more complicated when we
+                    // add support for `closed` and `extra_items` (which is why the rules in the
+                    // spec are structured like they are), and following the structure of the spec
+                    // makes it easier to check the logic here.
+                    if let Some(source_item_field) = source_items.get(target_item_name) {
+                        self.check_type_pair(
+                            db,
+                            source_item_field.declared_ty,
+                            target_item_field.declared_ty,
+                        )
+                    } else {
+                        // `source` is missing this not-required, read-only item. However, since all
+                        // `TypedDict`s by default are allowed to have "extra items" of any type
+                        // (until we support `closed` and explicit `extra_items`), this key could
+                        // actually turn out to have a value. To make sure this is type-safe, the
+                        // not-required field in the target needs to be assignable from `object`.
+                        // TODO: `closed` and `extra_items` support will go here.
+                        Type::object().when_assignable_to(
+                            db,
+                            target_item_field.declared_ty,
+                            self.constraints,
+                            self.inferable,
+                        )
+                    }
+                } else {
+                    // As above, for `NotRequired[]` mutable fields in the target. Again the logic
+                    // is largely the same for now, but it will get more complicated with `closed`
+                    // and `extra_items`.
+                    if let Some(source_item_field) = source_items.get(target_item_name) {
+                        if source_item_field.is_read_only() {
+                            // A read-only field can't be assigned to a mutable target.
+                            return self.never();
+                        }
+                        if source_item_field.is_required() {
+                            // A required field can't be assigned to a not-required, mutable field
+                            // in the target, because `del` is allowed on the target field.
+                            return self.never();
+                        }
+
+                        // As above, for mutable fields in the target, the relation needs
+                        // to apply both ways.
+                        self.check_type_pair(
+                            db,
+                            source_item_field.declared_ty,
+                            target_item_field.declared_ty,
+                        )
+                        .and(db, self.constraints, || {
+                            self.check_type_pair(
+                                db,
+                                target_item_field.declared_ty,
+                                source_item_field.declared_ty,
+                            )
+                        })
+                    } else {
+                        // `source` is missing this not-required, mutable field. This isn't OK if
+                        // `source has read-only extra items, which all `TypedDict`s effectively
+                        // do until we support `closed` and explicit `extra_items`. See "A subtle
+                        // interaction between two structural assignability rules prevents
+                        // unsoundness" in `typed_dict.md`.
+                        //
+                        // TODO: `closed` and `extra_items` support will go here.
+                        self.never()
+                    }
+                }
+            };
+            result.intersect(db, self.constraints, field_constraints);
+            if result.is_never_satisfied(db) {
+                return result;
+            }
+        }
+        result
+    }
+}
+
+impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
     /// Two `TypedDict`s `A` and `B` are disjoint if it's impossible to come up with a third
     /// `TypedDict` `C` that's fully-static and assignable to both of them.
     ///
@@ -393,8 +358,8 @@ impl<'db> TypedDictType<'db> {
     /// in `C`, which we want to be assignable to both `A` and `B`) given a destination field (for
     /// us that means in either `A` or `B`). For completeness we'll also include the possibility
     /// that the source field is missing entirely, though we'll soon see that we can ignore that
-    /// case. This table is essentially what `has_relation_to_impl` implements above. Here
-    /// "equivalent" means the source and destination types must be equivalent/compatible,
+    /// case. This table is essentially what [`TypeRelationChecker::check_typeddict_pair`] implements
+    /// above. Here "equivalent" means the source and destination types must be equivalent/compatible,
     /// "assignable" means the source must be assignable to the destination, and "-" means the
     /// assignment is never allowed:
     ///
@@ -438,91 +403,51 @@ impl<'db> TypedDictType<'db> {
     ///    be assignable to both.)
     ///
     /// TODO: Adding support for `closed` and `extra_items` will complicate this.
-    pub(crate) fn is_disjoint_from_impl<'c>(
-        self,
+    pub(super) fn check_typeddict_pair(
+        &self,
         db: &'db dyn Db,
-        other: TypedDictType<'db>,
-        constraints: &'c ConstraintSetBuilder<'db>,
-        inferable: InferableTypeVars<'_, 'db>,
-        disjointness_visitor: &IsDisjointVisitor<'db, 'c>,
-        relation_visitor: &HasRelationToVisitor<'db, 'c>,
+        left: TypedDictType<'db>,
+        right: TypedDictType<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        let fields_in_common = btreemap_values_with_same_key(self.items(db), other.items(db));
-        fields_in_common.when_any(db, constraints, |(self_field, other_field)| {
+        let fields_in_common = btreemap_values_with_same_key(left.items(db), right.items(db));
+        fields_in_common.when_any(db, self.constraints, |(left_field, right_field)| {
             // Condition 1 above.
-            if self_field.is_required() || other_field.is_required() {
-                if (!self_field.is_required() && !self_field.is_read_only())
-                    || (!other_field.is_required() && !other_field.is_read_only())
+            if left_field.is_required() || right_field.is_required() {
+                if (!left_field.is_required() && !left_field.is_read_only())
+                    || (!right_field.is_required() && !right_field.is_read_only())
                 {
                     // One side demands a `Required` source field, while the other side demands a
                     // `NotRequired` one. They must be disjoint.
-                    return ConstraintSet::from_bool(constraints, true);
+                    return self.always();
                 }
             }
-            if !self_field.is_read_only() && !other_field.is_read_only() {
+            if !left_field.is_read_only() && !right_field.is_read_only() {
                 // Condition 2 above. This field is mutable on both sides, so the so the types must
                 // be compatible, i.e. mutually assignable.
-                self_field
-                    .declared_ty
-                    .has_relation_to_impl(
-                        db,
-                        other_field.declared_ty,
-                        constraints,
-                        inferable,
-                        TypeRelation::Assignability,
-                        relation_visitor,
-                        disjointness_visitor,
-                    )
-                    .and(db, constraints, || {
-                        other_field.declared_ty.has_relation_to_impl(
+                let relation_checker = self.as_relation_checker(TypeRelation::Assignability);
+                relation_checker
+                    .check_type_pair(db, left_field.declared_ty, right_field.declared_ty)
+                    .and(db, self.constraints, || {
+                        relation_checker.check_type_pair(
                             db,
-                            self_field.declared_ty,
-                            constraints,
-                            inferable,
-                            TypeRelation::Assignability,
-                            relation_visitor,
-                            disjointness_visitor,
+                            right_field.declared_ty,
+                            left_field.declared_ty,
                         )
                     })
-                    .negate(db, constraints)
-            } else if !self_field.is_read_only() {
+                    .negate(db, self.constraints)
+            } else if !left_field.is_read_only() {
                 // Half of condition 3 above.
-                self_field
-                    .declared_ty
-                    .has_relation_to_impl(
-                        db,
-                        other_field.declared_ty,
-                        constraints,
-                        inferable,
-                        TypeRelation::Assignability,
-                        relation_visitor,
-                        disjointness_visitor,
-                    )
-                    .negate(db, constraints)
-            } else if !other_field.is_read_only() {
+                self.as_relation_checker(TypeRelation::Assignability)
+                    .check_type_pair(db, left_field.declared_ty, right_field.declared_ty)
+                    .negate(db, self.constraints)
+            } else if !right_field.is_read_only() {
                 // The other half of condition 3 above.
-                other_field
-                    .declared_ty
-                    .has_relation_to_impl(
-                        db,
-                        self_field.declared_ty,
-                        constraints,
-                        inferable,
-                        TypeRelation::Assignability,
-                        relation_visitor,
-                        disjointness_visitor,
-                    )
-                    .negate(db, constraints)
+                self.as_relation_checker(TypeRelation::Assignability)
+                    .check_type_pair(db, right_field.declared_ty, left_field.declared_ty)
+                    .negate(db, self.constraints)
             } else {
                 // Condition 4 above.
-                self_field.declared_ty.is_disjoint_from_impl(
-                    db,
-                    other_field.declared_ty,
-                    constraints,
-                    inferable,
-                    disjointness_visitor,
-                    relation_visitor,
-                )
+                self.check_type_pair(db, left_field.declared_ty, right_field.declared_ty)
             }
         })
     }
