@@ -769,6 +769,17 @@ async function resolveAllDeps(
       continue;
     }
 
+    // Validate fetched version against constraints (e.g. >=1,<3).
+    // We always fetch the latest (or pinned) version; warn if that doesn't
+    // satisfy a transitive constraint.
+    checkConstraints(
+      entry.name,
+      entry.constraints,
+      info.info.version,
+      entry.requestedBy,
+      warnings,
+    );
+
     const wheel = findCompatiblePureWheel(info, pythonVersion);
     if (wheel != null) {
       // Pure-Python package
@@ -820,7 +831,7 @@ async function resolveAllDeps(
           depth: entry.depth + 1,
           requestedBy: info.info.name,
         });
-      } else if (dep.constraints.length > 0) {
+      } else {
         checkConstraints(
           dep.name,
           dep.constraints,
