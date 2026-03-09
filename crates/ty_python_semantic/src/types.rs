@@ -1435,11 +1435,6 @@ impl<'db> Type<'db> {
         }
     }
 
-    pub(crate) fn is_literal_string(&self) -> bool {
-        self.as_literal_value()
-            .is_some_and(literal::LiteralValueType::is_literal_string)
-    }
-
     pub(crate) fn is_string_literal(&self) -> bool {
         self.as_literal_value()
             .is_some_and(literal::LiteralValueType::is_string)
@@ -5754,6 +5749,7 @@ impl<'db> Type<'db> {
             Type::KnownInstance(known_instance) => {
                 Type::string_literal(db, &known_instance.repr(db).to_string())
             }
+            ty if ty.is_subtype_of(db, Type::literal_string()) => Type::literal_string(),
             // TODO: handle more complex types
             _ => KnownClass::Str.to_instance(db),
         }

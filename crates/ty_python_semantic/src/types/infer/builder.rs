@@ -9837,7 +9837,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                     let str_ty = ty.str(self.db());
                                     if let Some(literal) = str_ty.as_string_literal() {
                                         collector.push_str(literal.value(self.db()));
-                                    } else if str_ty.is_literal_string() {
+                                    } else if str_ty
+                                        .is_subtype_of(self.db(), Type::literal_string())
+                                    {
                                         collector.add_literal_string_expression();
                                     } else {
                                         collector.add_non_literal_string_expression();
