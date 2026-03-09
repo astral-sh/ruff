@@ -149,9 +149,9 @@ def generator() -> Generator:
 ```py
 from typing import Generator
 
-def invalid_generator() -> Generator[int, None, None]:
-    # error: [invalid-return-type]
-    yield "not an int"
+def invalid_generator() -> Generator[int, int, None]:
+    # error: [invalid-return-type] "Yielded type does not match annotated yield type: expected yielded type assignable to `int`, found `Literal[""]`"
+    yield ""
 ```
 
 ### Invalid annotation
