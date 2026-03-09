@@ -166,11 +166,15 @@ fn has_float(expr: &Expr, semantic: &SemanticModel) -> bool {
                     // Division always returns float in Python
                     // https://docs.python.org/3/tutorial/introduction.html#numbers
                     match op {
-                        ast::Operator::Div => {
-                            // Only trigger for numeric divisions, not path operations
-                            // Ex) `Path(__file__).parents[2] / "text.txt"`
-                            is_numeric_expr(left) || is_numeric_expr(right)
-                        }
+                        // For now, we intentionally do not treat division as reliably float-producing.
+                        // Without type information from ty, we cannot precisely determine whether the
+                        // operands are `Decimal` or some other non-float type.
+                        //
+                        // ast::Operator::Div => {
+                        //     // Only trigger for numeric divisions, not path operations
+                        //     // Ex) `Path(__file__).parents[2] / "text.txt"`
+                        //     is_numeric_expr(left) || is_numeric_expr(right)
+                        // }
                         _ => has_float(left, semantic) || has_float(right, semantic),
                     }
                 }
@@ -181,17 +185,17 @@ fn has_float(expr: &Expr, semantic: &SemanticModel) -> bool {
     }
 }
 
-fn is_numeric_expr(expr: &Expr) -> bool {
-    match expr {
-        Expr::NumberLiteral(_) => true,
-        Expr::BinOp(ast::ExprBinOp { left, right, .. }) => {
-            is_numeric_expr(left) || is_numeric_expr(right)
-        }
-        Expr::UnaryOp(ast::ExprUnaryOp { operand, .. }) => is_numeric_expr(operand),
-        Expr::Named(ast::ExprNamed { value, .. }) => is_numeric_expr(value),
-        _ => false,
-    }
-}
+// fn is_numeric_expr(expr: &Expr) -> bool {
+//     match expr {
+//         Expr::NumberLiteral(_) => true,
+//         Expr::BinOp(ast::ExprBinOp { left, right, .. }) => {
+//             is_numeric_expr(left) || is_numeric_expr(right)
+//         }
+//         Expr::UnaryOp(ast::ExprUnaryOp { operand, .. }) => is_numeric_expr(operand),
+//         Expr::Named(ast::ExprNamed { value, .. }) => is_numeric_expr(value),
+//         _ => false,
+//     }
+// }
 
 fn should_skip_comparison(expr: &Expr, semantic: &SemanticModel) -> bool {
     match expr {
