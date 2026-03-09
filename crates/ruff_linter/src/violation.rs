@@ -2,7 +2,7 @@ use std::fmt::{Debug, Display};
 
 use serde::Serialize;
 
-use ruff_db::diagnostic::Diagnostic;
+use ruff_db::diagnostic::{Diagnostic, Severity};
 use ruff_source_file::SourceFile;
 use ruff_text_size::TextRange;
 
@@ -68,11 +68,17 @@ pub trait Violation: ViolationMetadata + Sized {
     fn message_formats() -> &'static [&'static str];
 
     /// Convert the violation into a [`Diagnostic`].
-    fn into_diagnostic(self, range: TextRange, file: &SourceFile) -> Diagnostic {
+    fn into_diagnostic(
+        self,
+        range: TextRange,
+        file: &SourceFile,
+        severity: Severity,
+    ) -> Diagnostic {
         create_lint_diagnostic(
             self.message(),
             self.fix_title(),
             range,
+            severity,
             None,
             None,
             file.clone(),
