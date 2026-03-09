@@ -21,6 +21,39 @@ use super::categorize::ImportSection;
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[derive(Default)]
+pub enum ImportStrategy {
+    /// Sort imports by their module path, using the module name for `from` imports (the default).
+    #[default]
+    Path,
+    /// Sort `from` imports by their fully-qualified name.
+    ///
+    /// For example, `from foo import bar` sorts as `foo.bar` rather than just `foo`. This means
+    /// `from foo import baz` sorts after `from foo.bar import wow`, since `foo.bar.wow < foo.baz`.
+    FullPath,
+    /// Sort imports by their string length, placing shorter imports before longer ones.
+    ///
+    /// This strategy applies to both straight imports (`import foo`) and `from` imports
+    /// (`from foo import bar`).
+    Length,
+    /// Sort straight imports by their string length, leaving `from` imports sorted by path.
+    LengthStraight,
+}
+
+impl Display for ImportStrategy {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Path => write!(f, "path"),
+            Self::FullPath => write!(f, "full_path"),
+            Self::Length => write!(f, "length"),
+            Self::LengthStraight => write!(f, "length_straight"),
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, CacheKey)]
+#[serde(deny_unknown_fields, rename_all = "kebab-case")]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+#[derive(Default)]
 pub enum RelativeImportsOrder {
     /// Place "closer" imports (fewer `.` characters, most local) before
     /// "further" imports (more `.` characters, least local).
@@ -68,8 +101,7 @@ pub struct Settings {
     pub default_section: ImportSection,
     pub no_sections: bool,
     pub from_first: bool,
-    pub length_sort: bool,
-    pub length_sort_straight: bool,
+    pub import_strategy: ImportStrategy,
 }
 
 impl Settings {
@@ -123,8 +155,7 @@ impl Default for Settings {
             default_section: ImportSection::Known(ImportType::ThirdParty),
             no_sections: false,
             from_first: false,
-            length_sort: false,
-            length_sort_straight: false,
+            import_strategy: ImportStrategy::default(),
         }
     }
 }
@@ -160,8 +191,7 @@ impl Display for Settings {
                 self.default_section,
                 self.no_sections,
                 self.from_first,
-                self.length_sort,
-                self.length_sort_straight
+                self.import_strategy
             ]
         }
         Ok(())
@@ -176,6 +206,9 @@ pub enum SettingsError {
     InvalidKnownLocalFolder(glob::PatternError),
     InvalidExtraStandardLibrary(glob::PatternError),
     InvalidUserDefinedSection(glob::PatternError),
+    /// The `import-strategy` option conflicts with the deprecated `length-sort` or
+    /// `length-sort-straight` options.
+    ConflictingImportStrategy,
 }
 
 impl Display for SettingsError {
@@ -196,6 +229,12 @@ impl Display for SettingsError {
             SettingsError::InvalidUserDefinedSection(err) => {
                 write!(f, "invalid user-defined section pattern: {err}")
             }
+            SettingsError::ConflictingImportStrategy => {
+                write!(
+                    f,
+                    "`import-strategy` cannot be set alongside the deprecated `length-sort` or `length-sort-straight` options"
+                )
+            }
         }
     }
 }
@@ -208,6 +247,7 @@ impl Error for SettingsError {
             SettingsError::InvalidKnownLocalFolder(err) => Some(err),
             SettingsError::InvalidExtraStandardLibrary(err) => Some(err),
             SettingsError::InvalidUserDefinedSection(err) => Some(err),
+            SettingsError::ConflictingImportStrategy => None,
         }
     }
 }
