@@ -99,13 +99,15 @@ pub(crate) fn use_pep585_annotation(checker: &Checker, expr: &Expr, replacement:
             None
         };
 
-        let applicability = if checker.target_version() >= PythonVersion::PY310
-            || checker.semantic().future_annotations_or_stub()
-        {
-            Applicability::Safe
-        } else {
-            Applicability::Unsafe
-        };
+        // Adding `from __future__ import annotations` changes runtime behavior for all
+        // annotations in the file, so those fixes are always unsafe. Without a future
+        // import, the original applicability applies: safe only on Python 3.10+.
+        let applicability =
+            if future_import.is_none() && checker.target_version() >= PythonVersion::PY310 {
+                Applicability::Safe
+            } else {
+                Applicability::Unsafe
+            };
         match replacement {
             ModuleMember::BuiltIn(name) => {
                 // Built-in type, like `list`.

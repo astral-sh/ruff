@@ -150,6 +150,22 @@ mod tests {
         Ok(())
     }
 
+    /// Test that `UP006` does not fire on 3.8 when `future-annotations` is disabled, even in
+    /// preview mode.
+    #[test]
+    fn up006_preview_no_future_annotations_setting() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pyupgrade/UP006_0.py"),
+            &settings::LinterSettings {
+                preview: PreviewMode::Enabled,
+                unresolved_target_version: PythonVersion::PY38.into(),
+                ..settings::LinterSettings::for_rule(Rule::NonPEP585Annotation)
+            },
+        )?;
+        assert_diagnostics!(diagnostics);
+        Ok(())
+    }
+
     #[test_case(Rule::NonPEP695GenericClass, Path::new("UP046_2.py"))]
     #[test_case(Rule::NonPEP695GenericFunction, Path::new("UP047_1.py"))]
     fn rules_not_applied_default_typevar_backported(rule_code: Rule, path: &Path) -> Result<()> {

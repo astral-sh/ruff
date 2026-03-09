@@ -323,9 +323,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                                     || checker.target_version() >= PythonVersion::PY39
                                     || (checker.target_version() >= PythonVersion::PY37
                                         && (checker.semantic.future_annotations_or_stub()
-                                            || is_up006_future_annotations_fix_enabled(
+                                            || (is_up006_future_annotations_fix_enabled(
                                                 checker.settings(),
-                                            ))
+                                            ) && checker.settings().future_annotations))
                                         && checker.semantic.in_annotation()
                                         && !checker.settings().pyupgrade.keep_runtime_typing)
                                 {
@@ -438,7 +438,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                             || checker.target_version() >= PythonVersion::PY39
                             || (checker.target_version() >= PythonVersion::PY37
                                 && (checker.semantic.future_annotations_or_stub()
-                                    || is_up006_future_annotations_fix_enabled(checker.settings()))
+                                    || (is_up006_future_annotations_fix_enabled(
+                                        checker.settings(),
+                                    ) && checker.settings().future_annotations))
                                 && checker.semantic.in_annotation()
                                 && !checker.settings().pyupgrade.keep_runtime_typing)
                         {
