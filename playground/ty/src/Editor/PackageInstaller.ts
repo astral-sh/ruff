@@ -713,7 +713,7 @@ async function resolveAllDeps(
       });
       if (stubs.kind === "runtime-only") {
         warnings.push(
-          `No type stubs found for '${entry.name}' — runtime execution only`,
+          `No type stubs found for '${entry.name}': runtime execution only`,
         );
       }
       // Do not enqueue transitive deps: Pyodide handles them
