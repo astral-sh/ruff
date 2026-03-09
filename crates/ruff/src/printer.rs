@@ -236,7 +236,7 @@ impl Printer {
 
         let config = DisplayDiagnosticConfig::new("ruff")
             .preview(preview)
-            .hide_severity(true)
+            .hide_severity(!preview)
             .color(!cfg!(test) && colored::control::SHOULD_COLORIZE.should_colorize())
             .with_show_fix_status(show_fix_status(self.fix_mode, fixables.as_ref()))
             .with_fix_applicability(self.unsafe_fixes.required_applicability())
@@ -410,7 +410,7 @@ impl Printer {
             let context = EmitterContext::new(&diagnostics.notebook_indexes);
             let config = DisplayDiagnosticConfig::new("ruff")
                 .preview(preview)
-                .hide_severity(true)
+                .hide_severity(!preview)
                 .color(!cfg!(test) && colored::control::SHOULD_COLORIZE.should_colorize())
                 .with_show_fix_status(show_fix_status(self.fix_mode, fixables.as_ref()))
                 .with_fix_applicability(self.unsafe_fixes.required_applicability())
