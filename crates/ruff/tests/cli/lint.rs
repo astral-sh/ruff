@@ -886,7 +886,7 @@ fn value_given_to_table_key_is_not_inline_table_2() {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)
         .args([".", "--config", r#"lint=123"#]),
-        @"
+        @r###"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -923,12 +923,14 @@ fn value_given_to_table_key_is_not_inline_table_2() {
     - `lint.per-file-ignores`
     - `lint.extend-per-file-ignores`
     - `lint.exclude`
+    - `lint.warn`
+    - `lint.extend-warn`
     - `lint.preview`
     - `lint.typing-extensions`
     - `lint.future-annotations`
 
     For more information, try '--help'.
-    ");
+    "###);
 }
 
 #[test]
@@ -4434,6 +4436,329 @@ fn preview_default_rules() -> Result<()> {
     	verbose-log-message (TRY401),
     ]
     ",
+    );
+    Ok(())
+}
+
+#[test]
+fn warn_and_select_precedence() -> Result<()> {
+    let test = CliTest::new()?;
+    test.write_file(
+        "ruff.toml",
+        r#"
+[lint]
+preview = true
+select = ["F401"]
+warn = ["F401"]
+"#,
+    )?;
+
+    test.write_file("try.py", "import os")?;
+
+    assert_cmd_snapshot!(
+        test.check_command().args(["--preview", "try.py"]),
+        @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    try.py:1:8: warning[F401] [*] `os` imported but unused
+    Found 1 error.
+    [*] 1 fixable with the `--fix` option.
+
+    ----- stderr -----
+    "###);
+    Ok(())
+}
+
+#[test]
+fn warn_inner_select_outer_precedence() -> Result<()> {
+    let test = CliTest::new()?;
+    test.write_file(
+        "ruff.toml",
+        r#"
+[lint]
+preview = true
+select = ["F401"]
+"#,
+    )?;
+    test.write_file(
+        ".ruff.toml",
+        r#"
+extend = "ruff.toml"
+[lint]
+warn = ["F401"]
+"#,
+    )?;
+
+    test.write_file("try.py", "import os")?;
+
+    assert_cmd_snapshot!(
+        test.check_command().args(["--preview", "try.py"]),
+        @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    try.py:1:8: warning[F401] [*] `os` imported but unused
+    Found 1 error.
+    [*] 1 fixable with the `--fix` option.
+
+    ----- stderr -----
+    "###);
+    Ok(())
+}
+
+#[test]
+fn ignore_overrides_warn() -> Result<()> {
+    let test = CliTest::new()?;
+    test.write_file(
+        "ruff.toml",
+        r#"
+[lint]
+preview = true
+warn = ["F401"]
+ignore = ["F401"]
+"#,
+    )?;
+    test.write_file("try.py", "import os")?;
+    assert_cmd_snapshot!(
+        test.check_command().args(["--preview", "try.py"]),
+        @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    "###
+    );
+    Ok(())
+}
+
+#[test]
+fn select_prefix_warn_specific_rule() -> Result<()> {
+    let test = CliTest::new()?;
+    test.write_file(
+        "ruff.toml",
+        r#"
+[lint]
+preview = true
+select = ["F"]
+warn = ["F401"]
+"#,
+    )?;
+    test.write_file("try.py", "import os")?;
+    assert_cmd_snapshot!(
+        test.check_command().args(["--preview", "try.py"]),
+        @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    try.py:1:8: warning[F401] [*] `os` imported but unused
+    Found 1 error.
+    [*] 1 fixable with the `--fix` option.
+
+    ----- stderr -----
+    "###
+    );
+    Ok(())
+}
+
+#[test]
+fn warn_prefix_select_specific_rule() -> Result<()> {
+    let test = CliTest::new()?;
+    test.write_file(
+        "ruff.toml",
+        r#"
+[lint]
+preview = true
+warn = ["F"]
+select = ["F401"]
+"#,
+    )?;
+    test.write_file("try.py", "import os")?;
+    assert_cmd_snapshot!(
+        test.check_command().args(["--preview", "try.py"]),
+        @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    try.py:1:8: error[F401] [*] `os` imported but unused
+    Found 1 error.
+    [*] 1 fixable with the `--fix` option.
+
+    ----- stderr -----
+    "###
+    );
+    Ok(())
+}
+
+#[test]
+fn warn_prefix_ignore_specific_rule() -> Result<()> {
+    let test = CliTest::new()?;
+    test.write_file(
+        "ruff.toml",
+        r#"
+[lint]
+preview = true
+warn = ["F"]
+ignore = ["F401"]
+"#,
+    )?;
+    test.write_file("try.py", "import os")?;
+    assert_cmd_snapshot!(
+        test.check_command().args(["--preview", "try.py"]),
+        @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    "###
+    );
+    Ok(())
+}
+
+#[test]
+fn select_category_outer_warn_specific_inner() -> Result<()> {
+    let test = CliTest::new()?;
+    test.write_file(
+        "ruff.toml",
+        r#"
+[lint]
+preview = true
+select = ["F"]
+"#,
+    )?;
+    test.write_file(
+        ".ruff.toml",
+        r#"
+extend = "ruff.toml"
+[lint]
+warn = ["F401"]
+"#,
+    )?;
+    test.write_file("try.py", "import os;import foo;foo=1")?;
+    assert_cmd_snapshot!(
+        test.check_command().args(["--preview", "try.py"]),
+        @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    try.py:1:8: warning[F401] [*] `os` imported but unused
+    try.py:1:22: error[F811] Redefinition of unused `foo` from line 1: `foo` redefined here
+    Found 2 errors.
+    [*] 1 fixable with the `--fix` option.
+
+    ----- stderr -----
+    "###
+    );
+    Ok(())
+}
+
+#[test]
+fn warn_category_outer_select_specific_inner() -> Result<()> {
+    let test = CliTest::new()?;
+    test.write_file(
+        "ruff.toml",
+        r#"
+[lint]
+preview = true
+warn = ["F"]
+"#,
+    )?;
+    test.write_file(
+        ".ruff.toml",
+        r#"
+extend = "ruff.toml"
+[lint]
+select = ["F401"]
+"#,
+    )?;
+    test.write_file("try.py", "import os;import foo;foo=1")?;
+    assert_cmd_snapshot!(
+        test.check_command().args(["--preview", "try.py"]),
+        @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    try.py:1:8: error[F401] [*] `os` imported but unused
+    try.py:1:22: warning[F811] Redefinition of unused `foo` from line 1: `foo` redefined here
+    Found 2 errors.
+    [*] 1 fixable with the `--fix` option.
+
+    ----- stderr -----
+    "###
+    );
+    Ok(())
+}
+
+#[test]
+fn warn_specific_outer_ignore_inner() -> Result<()> {
+    let test = CliTest::new()?;
+    test.write_file(
+        "ruff.toml",
+        r#"
+[lint]
+preview = true
+warn = ["F401"]
+"#,
+    )?;
+    test.write_file(
+        ".ruff.toml",
+        r#"
+extend = "ruff.toml"
+[lint]
+ignore = ["F401"]
+"#,
+    )?;
+    test.write_file("try.py", "import os")?;
+    assert_cmd_snapshot!(
+        test.check_command().args(["--preview", "try.py"]),
+        @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    "###
+    );
+    Ok(())
+}
+
+#[test]
+fn ignore_outer_warn_inner() -> Result<()> {
+    let test = CliTest::new()?;
+    test.write_file(
+        "ruff.toml",
+        r#"
+[lint]
+preview = true
+ignore = ["ALL"]
+"#,
+    )?;
+    test.write_file(
+        ".ruff.toml",
+        r#"
+extend = "ruff.toml"
+[lint]
+warn = ["F401"]
+"#,
+    )?;
+    test.write_file("try.py", "import os")?;
+    assert_cmd_snapshot!(
+        test.check_command().args(["--preview", "try.py"]),
+        @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    try.py:1:8: warning[F401] [*] `os` imported but unused
+    Found 1 error.
+    [*] 1 fixable with the `--fix` option.
+
+    ----- stderr -----
+    "###
     );
     Ok(())
 }
