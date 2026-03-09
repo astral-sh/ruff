@@ -96,7 +96,7 @@ def outer_generator():
 from typing import AsyncGenerator, AsyncIterator, Generator, Iterator
 
 def unannotated():
-    x = yield
+    x = yield 1
     reveal_type(x)  # revealed: Unknown
 
 def default_generator() -> Generator:
@@ -126,6 +126,11 @@ async def async_generator_send_str() -> AsyncGenerator[int, str]:
 async def async_iterator_send_none() -> AsyncIterator[int]:
     x = yield 1
     reveal_type(x)  # revealed: None
+
+def mixing_generator_async_generator() -> Generator[int, int, None] | AsyncGenerator[int, str]:
+    x = yield 1
+    reveal_type(x)  # revealed: int | str
+    return None
 ```
 
 ## Error cases
@@ -154,13 +159,23 @@ def invalid_generator() -> Generator[int, None, None]:
 ```py
 from typing import Generator
 
-# TODO: should emit an error (does not return `str`)
-def invalid_generator1() -> Generator[int, None, str]:
-    yield 1
+def invalid_return_type() -> Generator[None, None, None]:
+    yield
+    # TODO: error: [invalid-return-type]
+    return ""
+```
 
-# TODO: should emit an error (does not return `int`)
-def invalid_generator2() -> Generator[int, None, None]:
-    yield 1
+### Invalid annotation
 
-    return "done"
+```py
+from typing import AsyncGenerator, Generator
+
+def returns_str() -> str:  # error: [invalid-return-type]
+    x = yield 1
+    reveal_type(x)  # revealed: Unknown
+
+# error: [invalid-return-type]
+def sync_returns_async_generator() -> AsyncGenerator[int, str]:
+    x = yield 1
+    reveal_type(x)  # revealed: str
 ```

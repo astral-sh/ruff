@@ -116,7 +116,6 @@ mod annotation_expression;
 mod binary_expressions;
 mod class;
 mod function;
-mod generator;
 mod imports;
 mod named_tuple;
 mod paramspec_validation;
@@ -7280,12 +7279,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let yielded_ty = self
             .infer_optional_expression(value.as_deref(), TypeContext::default())
             .unwrap_or_else(|| Type::none(self.db()));
-        let Some(expected) = self.enclosing_generator_type_params() else {
-            // TODO: Maybe raise an error if return type is not generator?
-            // Or infer the return type based on what is yielded so can say this is
-            // Generator[yield_ty, unknown, unknown], probably not as simple as this
+
+        let Some(enclosing_function) =
+            nearest_enclosing_function(self.db(), self.index, self.scope())
+        else {
             return Type::unknown();
         };
+        let declared_return_ty = enclosing_function
+            .last_definition_raw_signature(self.db())
+            .return_ty;
+
+        let Some(expected) = declared_return_ty.generator_types(self.db()) else {
+            return Type::unknown();
+        };
+
         let expected_yield_ty = expected.yielded;
         let diagnostic_node: AnyNodeRef = value
             .as_deref()
