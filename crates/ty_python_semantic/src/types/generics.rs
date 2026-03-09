@@ -2236,8 +2236,8 @@ impl<'db> SpecializationBuilder<'db> {
                 // It's important that this arm comes after the `TypeVar` arm above, so that a bare
                 // typevar bound to an intersection gets the whole thing.
                 //
-                // If the typevar in this case is upper-bounded or constrained, it's sufficient for
-                // one intersection element to satisfy the constraint. They don't all have to.
+                // It's sufficient for one intersection element to satisfy the constraints here.
+                // They don't all have to.
                 let mut first_error = None;
                 let mut found_matching_element = false;
                 for positive in actual_intersection.iter_positive(self.db) {
