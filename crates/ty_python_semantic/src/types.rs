@@ -4882,11 +4882,6 @@ impl<'db> Type<'db> {
             .and_then(|expected_types| expected_types.returned)
     }
 
-    fn generator_send_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
-        self.generator_types(db)
-            .and_then(|expected_types| expected_types.sent)
-    }
-
     #[must_use]
     pub(crate) fn to_instance(self, db: &'db dyn Db) -> Option<Type<'db>> {
         match self {
