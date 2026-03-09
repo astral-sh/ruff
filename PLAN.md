@@ -362,7 +362,7 @@ forward CSA checks. In each case:
 
 ## Key file locations
 
-- **`SpecializationBuilder`**: `crates/ty_python_semantic/src/types/generics.rs` ~line 1719
+- **`SpecializationBuilder`**: `crates/ty_python_semantic/src/types/generics.rs` ~line 1705
 - **`ConstraintSet` and `solutions()`**: `crates/ty_python_semantic/src/types/constraints.rs`
     - `solutions()` inner implementation at ~line 3023, with the `Bounds` struct
     - `constrain_typevar()` at ~line 279
@@ -372,7 +372,7 @@ forward CSA checks. In each case:
         on either side of a comparison. This is what makes forward CSA work as a replacement for
         `infer_reverse`.
 - **`infer_specialization`** (call sites #1, #2): `crates/ty_python_semantic/src/types/call/bind.rs` ~line 3706
-- **`infer_argument_types`**: same file, ~line 3848
+- **`infer_argument_types`**: same file, ~line 3940
 - **`visit_specialization_impl`** (call site #5): `crates/ty_python_semantic/src/types.rs` ~line 1853
 - **Bidirectional argument inference** (call site #3): `crates/ty_python_semantic/src/types/infer/builder.rs` ~line 9425
 - **`infer_collection_literal_type`** (call site #6): same file, ~line 10245
@@ -387,7 +387,7 @@ After each step, run:
 cargo nextest run -p ty_python_semantic --cargo-profile fast-test
 ```
 
-For steps that might have broader impact (especially Phase 5 arms), also run:
+For steps that might have broader impact (especially Phase 5 steps), also run:
 
 ```sh
 cargo nextest run --cargo-profile fast-test
@@ -397,7 +397,7 @@ cargo nextest run --cargo-profile fast-test
 cargo nextest run -p ty_python_semantic -p ty_ide --cargo-profile fast-test
 ```
 
-For deeper validation (especially Phase 5 arms or Phase 6), run ecosystem analyses using the
+For deeper validation (especially Phases 5–6), run ecosystem analyses using the
 `local-ecosystem` skill on `aiortc`, `sympy`, `static-frame`, and `vision`, and compare
 diagnostics against a `main` baseline to ensure no regressions.
 
@@ -426,11 +426,16 @@ Phase 1 (hook API design)
   │    Phase 4.1 (conjoin method) ──► Phase 4.3 (coll. literal conjunction)
   │                                                        │
   │                                                        ▼
-  │                                              Phase 5 (migrate infer_map_impl arms)
+  │                                              Phase 5 (switch internal repr
+  │                                                        + eliminate f callback)
   │                                                        │
   └────────────────────────────────────────────────────────►│
-                                                           ▼
-                                                  Phase 6 (switch internal repr)
+                                                      ┌────┴────┐
+                                                      ▼         ▼
+                                            Phase 6          Phase 7
+                                     (migrate infer_map   (replace preferred_
+                                      _impl arms;         type_mappings with
+                                      optional cleanup)   CS conjunction)
 ```
 
 Key observations:
@@ -440,12 +445,15 @@ Key observations:
 - **Phase 4** steps have mixed dependencies: Step 4.1 is independent; Step 4.2 depends on
     Phase 2 (same builder) and Phase 3 (eliminates remaining `infer_reverse` callers);
     Step 4.3 depends on Steps 3.2 and 4.1; Step 4.4 depends on all other Phase 3/4 steps.
-- **Phase 5** depends on Phase 4 (callers must be migrated before we change `infer_map_impl`).
-- **Phase 6** depends on Phase 5 (all constraints must flow through constraint sets).
+- **Phase 5** depends on Phase 4 (callers must be migrated before we change the internal repr).
+    Phase 5 switches the builder to a `ConstraintSet` AND eliminates the `f` callback (there is
+    only one non-trivial caller, and it can be restructured to use satisfiability checks instead).
+- **Phase 6** and **Phase 7** both depend on Phase 5, but are independent of each other.
+    Phase 6 is optional cleanup — the `infer_map_impl` arms work correctly when their output
+    flows through constraints. Phase 7 replaces the `preferred_type_mappings` mechanism with
+    direct constraint set conjunction.
 
 ### Phase 1: Design the solution extraction hook API
-
-Status: Not started
 
 Status: Complete ✅
 **Difficulty: Medium** — requires design decisions about multi-path BDD handling and the hook
@@ -647,7 +655,7 @@ Test expectation updated.
     must be excluded from TCX injection (requiring filtering that ConstraintSet doesn't support),
     and (b) typevars without TCX constraints need an explicit Unknown fallback. The direct
     `insert_type_mapping` approach is the correct simplification at this stage; full constraint
-    set conjunction will happen in Phase 6 when the builder's internal representation changes.
+    set conjunction will happen in Phase 5 when the builder's internal representation changes.
 
 **Step 4.4** ✅: Removed all dead code from the old reverse inference machinery:
 
@@ -662,13 +670,271 @@ Test expectation updated.
 - Cleaned up unused imports: `ruff_python_ast::name::Name` (generics.rs),
     `std::cell::RefCell` (types.rs).
 
-### Phase 5: Migrate `infer_map_impl` arms to constraint sets
+### Phase 5: Switch internal representation to ConstraintSet
+
+Status: Not started
+**Difficulty: Medium–Hard** — the mechanical changes are straightforward, but behavioral
+differences in how constraints combine (vs HashMap union) may cause test changes.
+**Dependencies: Phase 4** (callers must be migrated so that `infer_reverse` is gone).
+
+#### Rationale for doing this before migrating `infer_map_impl` arms
+
+The original plan had Phase 5 (migrate `infer_map_impl` arms to CSA) before Phase 6 (switch
+internal repr). This ordering is unnecessary and undesirable:
+
+1. **Each `add_type_mapping` call already has all the information needed to create a constraint**:
+    the typevar, the inferred type, and the polarity (which maps directly to lower/upper bounds).
+    We don't need to rewrite the type-walk logic to produce constraints — we can convert at the
+    `add_type_mapping` boundary.
+
+2. **The new-solver arms (callable/protocol) can AND their local constraint sets directly**,
+    eliminating the `add_type_mappings_from_constraint_set` stopgap (which extracts solutions
+    only to re-insert them into the HashMap). This is the TODO that the code itself calls out.
+
+3. **Migrating `infer_map_impl` arms is optional cleanup** that can happen incrementally later.
+    Once the builder maintains a constraint set, each arm's `add_type_mapping` calls produce
+    constraints that flow through the solver naturally. The arms still do useful work (type
+    structure walking, bound/constraint checking, error detection).
+
+#### How `add_type_mapping` maps to constraints
+
+Each call to `add_type_mapping(typevar, ty, polarity, f)` translates to:
+
+- **Covariant** polarity: `ty` is a lower bound on the typevar.
+    Constraint: `constrain_typevar(T, ty, object)` i.e. `ty ≤ T ≤ object`.
+- **Contravariant** polarity: `ty` is an upper bound on the typevar.
+    Constraint: `constrain_typevar(T, Never, ty)` i.e. `Never ≤ T ≤ ty`.
+- **Invariant** polarity: `ty` is both a lower and upper bound (equality).
+    Constraint: `constrain_typevar(T, ty, ty)` i.e. `T = ty`.
+- **Bivariant** polarity: no constraint (the typevar is unconstrained by this position).
+
+The constraint is AND'd into the builder's pending `ConstraintSet`.
+
+#### Behavioral differences from HashMap union
+
+The HashMap combines multiple assignments via union regardless of polarity. The constraint set
+combines them via AND, which produces different results depending on polarity:
+
+| Polarity | HashMap behavior | Constraint set behavior | Different? |
+|---|---|---|---|
+| Covariant | `T = ty1 \| ty2` (union) | `T ≥ ty1` AND `T ≥ ty2` → `T ≥ ty1 \| ty2`, solution picks lower bound → `ty1 \| ty2` | **Same** |
+| Contravariant | `T = ty1 \| ty2` (union, **wrong**) | `T ≤ ty1` AND `T ≤ ty2` → `T ≤ ty1 & ty2`, solution picks upper bound → `ty1 & ty2` | **Yes — more correct** |
+| Invariant | `T = ty1 \| ty2` (union, **wrong**) | `T = ty1` AND `T = ty2` → unsatisfiable if `ty1 ≠ ty2` | **Yes — more correct** |
+
+The covariant case (the most common) is unchanged. The contravariant and invariant cases are
+improvements, but may cause test changes that need review.
+
+**Invariant case detail**: Two equality constraints `T = ty1` AND `T = ty2` where `ty1 ≠ ty2`
+would be unsatisfiable. The current code unions them to `T = ty1 | ty2`, which is incorrect
+(e.g., for `dict[T, T]` called with `{1: "hello"}`, the current code infers `T = int | str`,
+but `dict[int, str]` is NOT assignable to `dict[int | str, int | str]` since dict is invariant).
+The constraint set approach correctly detects the inconsistency. Test changes from this are
+expected to be improvements.
+
+#### The `f` callback is eliminated in this phase
+
+The `f` callback in `infer_map` / `add_type_mapping` lets callers filter or modify type
+mappings before they're stored. There are currently two callers of `infer_map`:
+
+1. `infer()` (generics.rs) → uses the identity callback `|(_, _, ty)| Some(ty)`. No-op.
+2. `infer_argument_types` (bind.rs) → uses the preferred_type_mappings callback.
+
+Caller #1 is trivially compatible — it's already a pass-through. Caller #2 is the only
+non-trivial use. The callback does two things:
+
+- Returns `None` to suppress the mapping when the inferred type is assignable to the preferred
+    type (the preferred type "wins")
+- Sets `assignable_to_declared_type = false` as a side effect when the inferred type is NOT
+    assignable to the preferred type
+
+Both of these are about the preferred type mechanism, not about the `f` callback itself. Once
+the builder maintains a constraint set, we can replace this per-mapping filtering with a
+constraint-set-level check:
+
+1. **Before argument inference**: Seed the preferred types into the builder (via
+    `insert_type_mapping`, which creates equality constraints — already done today).
+2. **During argument inference**: Call `infer()` instead of `infer_map()` — no callback needed.
+    Each argument's inferred type becomes a constraint AND'd into the pending set alongside
+    the preferred type constraints.
+3. **After argument inference**: Check whether the pending constraint set is satisfiable. If
+    the preferred types and argument types are compatible, the set is satisfiable. If not
+    (e.g., preferred `T ≤ int` but argument gives `T ≥ str`), the set is unsatisfiable. This
+    replaces the `assignable_to_declared_type` flag.
+4. **Retry logic**: If unsatisfiable, create a fresh builder without preferred types and
+    re-infer from arguments alone (same as today's retry).
+
+This eliminates `infer_map` and the `f` callback entirely from `SpecializationBuilder`. The
+`add_type_mapping` internal method also loses its `f` parameter.
+
+The callable/protocol arms in `infer_map_impl` currently pass `f` through to
+`add_type_mappings_from_constraint_set`. Once we switch to direct constraint-set conjunction
+(Step 5.3), those arms AND their local constraint sets directly into `self.pending` — no `f`
+callback is involved. This is the natural behavior: the solver combines preferred type
+constraints with callable/protocol constraints, and satisfiability is checked at the end.
+
+#### ParamSpec "first wins" semantics
+
+The current `add_type_mapping` and `insert_type_mapping` both have special handling for
+ParamSpec: if a mapping already exists for the typevar, the new one is silently dropped. This
+"first wins" semantics can't be expressed as constraint conjunction (ANDing two ParamSpec
+constraints would produce their intersection).
+
+**Mitigation**: Keep a `HashSet<BoundTypeVarIdentity>` of ParamSpec typevars that have already
+been constrained. Before creating a constraint for a ParamSpec typevar, check the set; if
+already present, skip. This preserves existing behavior.
+
+**Note**: The TODO in the existing code acknowledges this is a limitation — ParamSpecs should
+ideally be solved to a common behavioral supertype. The "first wins" workaround is preserved
+for now, not made worse.
+
+#### Steps
+
+**Step 5.1**: Eliminate the `f` callback from `infer_map` / `add_type_mapping`.
+
+Do this first so that subsequent steps don't have to consider callback invocation logic.
+
+The only non-trivial `f` callback is in `infer_argument_types` (bind.rs). Restructure it:
+
+1. Change `infer_argument_types` to call `builder.infer()` instead of `builder.infer_map()`.
+    Each argument's inferred type is added to the builder alongside the preferred type
+    constraints (already seeded via `insert_type_mapping`). In the HashMap world, when a
+    typevar already has a preferred type and the argument adds a second type, they are unioned.
+    The satisfiability check (next point) replaces the per-mapping filtering.
+2. After all arguments are inferred, check whether the argument types are compatible with the
+    preferred types. The current `assignable_to_declared_type` flag is set by the `f` callback
+    when an argument's inferred type is not assignable to the preferred type. Replace this with
+    a post-hoc check: for each typevar that has a preferred type, check whether the builder's
+    inferred type (from `self.types`) is assignable to the preferred type. If any is not (and
+    the typevar is not in `partially_specialized_declared_type`), set
+    `assignable_to_declared_type = false`. This is semantically equivalent to the callback.
+    (In later steps, when the builder switches to a constraint set, this becomes a
+    satisfiability check on the pending set.)
+3. The retry logic remains: if not assignable to declared type, create a fresh builder without
+    preferred types and re-infer.
+
+Then remove the `f` parameter from `add_type_mapping`, delete `infer_map` (making `infer`
+call `infer_map_impl` directly), and remove the `f` parameter from `infer_map_impl` and
+`add_type_mappings_from_constraint_set`. The `TypeVarAssignment` type alias can also be removed.
+
+This step changes no inference semantics — only the mechanism for preferred type filtering.
+
+**Step 5.2**: Add the `pending` field to `SpecializationBuilder`.
+
+Add a `pending: ConstraintSet<'db, 'c>` field to the struct, initialized to
+`ConstraintSet::always(constraints)` (the always-true constraint set, the identity for AND).
+Keep the `types` HashMap as a parallel path during the transition — both fields are updated
+simultaneously so we can compare results during testing.
+
+Also add a `paramspec_seen: FxHashSet<BoundTypeVarIdentity<'db>>` field for ParamSpec tracking.
+
+**Step 5.3**: Convert `add_type_mapping` to create constraints.
+
+Change `add_type_mapping` to, in addition to the existing HashMap update, also:
+1. Check `paramspec_seen` for ParamSpec typevars (skip if already seen)
+2. Map polarity to lower/upper bounds:
+    - Covariant: `(ty, object)`
+    - Contravariant: `(Never, ty)`
+    - Invariant: `(ty, ty)`
+    - Bivariant: skip
+3. Call `ConstraintSet::constrain_typevar(db, constraints, typevar, lower, upper)`
+4. AND the result into `self.pending` via `self.pending.intersect(...)`
+
+During the transition, both the HashMap and the constraint set are updated. This lets us
+validate that the constraint set produces equivalent (or better) results.
+
+**Step 5.4**: Convert `add_type_mappings_from_constraint_set` to direct conjunction.
+
+Replace the extract-solutions-then-reinsert logic with:
+```rust
+self.pending.intersect(db, self.constraints, local_set);
+```
+
+This is the core simplification — the callable/protocol arms' local constraint sets are AND'd
+directly into the pending set, preserving all structural information instead of collapsing it
+through solution extraction.
+
+For the overloaded callable case (OR across overloads, then AND into pending):
+```rust
+let combined = overload1_set.or(db, builder, || overload2_set).or(db, builder, || ...);
+self.pending.intersect(db, self.constraints, combined);
+```
+
+The unsatisfiability check (returning `Err(())`) is preserved: check
+`combined.is_never_satisfied(db)` before ANDing. For the non-overloaded case, check the single
+constraint set.
+
+**Step 5.5**: Convert `insert_type_mapping` to create constraints.
+
+`insert_type_mapping` (used by `bind.rs` to seed preferred types and by
+`infer_collection_literal_type` for TCX injection) currently inserts directly into the HashMap.
+Convert it to create an equality constraint `constrain_typevar(T, ty, ty)` and AND it into
+the pending set. (Equality because preferred types and TCX injections represent specific type
+assignments, not directional bounds.)
+
+During the transition, update both HashMap and constraint set.
+
+**Step 5.6**: Update `build` to use the pending constraint set.
+
+Change `build` to extract solutions from `self.pending` via `solutions()` instead of iterating
+`self.types`. Map each solved typevar to `Some(solution)` and unsolved to `None`, then pass to
+`specialize_recursive`.
+
+Keep the HashMap-based `build` logic alongside temporarily for comparison during testing. Once
+validated, remove it.
+
+**Step 5.7**: Update `build_with` to use the pending constraint set.
+
+Change `build_with` to use `solutions_with()` on `self.pending`. The hook now receives actual
+lower/upper bounds from the constraint set rather than synthetic equality bounds. This is the
+design that Phase 1 anticipated — `build_with`'s hook signature was designed for real bounds.
+
+The `maybe_promote` hook in `bind.rs` should work correctly with real bounds:
+- For typevars with a single covariant constraint: lower = inferred type, upper = object.
+    Hook sees `(typevar, Literal[1], object)` and can promote to `int`.
+- For typevars with both lower and upper bounds: hook can check whether the promoted type
+    is within the upper bound.
+
+**Step 5.8**: Remove the HashMap field and old code paths.
+
+Once tests pass with the constraint-set-based `build`/`build_with`:
+- Remove the `types: FxHashMap` field
+- Remove the HashMap update code from `add_type_mapping` and `insert_type_mapping`
+- Remove the old `add_type_mappings_from_constraint_set` method entirely
+- Remove the `paramspec_seen` set if ParamSpec handling has been integrated into the constraint
+    logic (or keep it as a necessary workaround)
+
+At this point, `SpecializationBuilder` fields should be:
+```rust
+pub(crate) struct SpecializationBuilder<'db, 'c> {
+    db: &'db dyn Db,
+    constraints: &'c ConstraintSetBuilder<'db>,
+    inferable: InferableTypeVars<'db, 'db>,
+    pending: ConstraintSet<'db, 'c>,
+    // ParamSpec workaround (if still needed)
+    paramspec_seen: FxHashSet<BoundTypeVarIdentity<'db>>,
+}
+```
+
+Also update the `assignable_to_declared_type` check from Step 5.1 to use constraint set
+satisfiability: `builder.is_satisfiable()` (checking `!self.pending.is_never_satisfied(db)`)
+replaces the post-hoc per-typevar assignability check.
+
+### Phase 6: Migrate `infer_map_impl` arms to constraint sets (optional cleanup)
 
 Status: Not started
 **Difficulty: Hard** — many arms with subtle heuristics, each potentially causing behavioral
 changes that require test updates. Can be done incrementally (one arm at a time).
-**Dependencies: Phase 4** (callers must be migrated so that the `f` callback and
-`preferred_type_mappings` patterns are gone before we change how `infer_map_impl` works).
+**Dependencies: Phase 5** (the builder must maintain a constraint set internally, and the `f`
+callback must be eliminated — both done in Phase 5).
+
+After Phase 5, the `infer_map_impl` arms still walk the type structure manually and call
+`add_type_mapping`, which now creates constraints. This works correctly — each arm's output
+flows through the constraint set solver. However, the arms duplicate logic that the CSA relation
+already handles (MRO walking, union/intersection decomposition, bound checking, etc.).
+
+This phase replaces the manual type-walk arms with calls to
+`actual.when_constraint_set_assignable_to(formal, ...)`, then AND's the resulting constraint set
+into `self.pending`. This eliminates code duplication and makes `infer_map_impl` trivially small.
 
 The CSA relation already handles most cases that `infer_map_impl` has specialized arms for:
 
@@ -682,69 +948,60 @@ The CSA relation already handles most cases that `infer_map_impl` has specialize
     comparisons.
 - **TypeAlias expansion**: Handled by the relation code.
 
-**Step 5.1**: Replace the TypeVar match arm with CSA. Currently manually checks
+**Step 6.1**: Replace the TypeVar match arm with CSA. Currently manually checks
 bounds/constraints and calls `add_type_mapping`.
 
-**Step 5.2**: Replace the NominalInstance/specialization walk arm with CSA.
+**Step 6.2**: Replace the NominalInstance/specialization walk arm with CSA.
 
-**Step 5.3**: Replace the Union/Intersection arms with CSA.
+**Step 6.3**: Replace the Union/Intersection arms with CSA.
 
-**Step 5.4**: Replace remaining arms (TypeAlias, tuple, SubclassOf, LiteralValue fallback, etc.)
+**Step 6.4**: Replace remaining arms (TypeAlias, tuple, SubclassOf, LiteralValue fallback, etc.)
 one by one.
+
+**Step 6.5**: Once all arms are migrated, `infer_map_impl` reduces to:
+```rust
+fn infer_map_impl(...) -> Result<(), SpecializationError<'db>> {
+    let when = actual.when_constraint_set_assignable_to(self.db, formal, ...);
+    self.pending.intersect(self.db, self.constraints, when);
+    Ok(())
+}
+```
+
+Steps 6.1–6.4 are independent of each other and can be done in any order.
 
 **Note**: Each step should be validated by running the full test suite. Behavioral differences
 from CSA vs old solver are expected (usually more precise), and may require test updates.
-Steps 5.1–5.4 are independent of each other and can be done in any order.
-
-### Phase 6: Switch internal representation
-
-Status: Not started
-**Difficulty: Medium** — mostly mechanical once all constraints flow through constraint sets,
-but may surface edge cases in the interaction between the HashMap and constraint set paths.
-**Dependencies: Phase 5** (all `infer_map_impl` arms must use constraint sets).
-
-At this point, the internal HashMap should be nearly vestigial — most or all constraints flow
-through the constraint set.
-
-**Step 6.1**: Add a `ConstraintSet` field alongside the `types` HashMap during a brief
-transition.
-
-**Step 6.2**: Change `add_type_mapping` to create proper constraints instead of HashMap entries:
-
-- Covariant position: add lower bound `ty ≤ T`
-- Contravariant position: add upper bound `T ≤ ty`
-- Invariant position: add equality `T = ty`
-
-**Step 6.3**: Update `build` / `build_with` to extract solutions from the constraint set.
-
-**Step 6.4**: Remove the HashMap field, `add_type_mapping`, and
-`add_type_mappings_from_constraint_set` (now just an AND on the pending constraint set).
-
-**Step 6.5**: Remove `infer_map` — `infer` becomes a thin wrapper around
-`actual.when_constraint_set_assignable_to(formal, ...)` conjoined into the pending set.
 
 ### Phase 7: Replace `preferred_type_mappings` with constraint set conjunction
 
 Status: Not started
-**Difficulty: Medium** — conceptually straightforward once Phase 6 is complete, but may require
+**Difficulty: Medium** — conceptually straightforward once Phase 5 is complete, but may require
 adjusting the fallback logic.
-**Dependencies: Phase 6** (the builder must maintain a constraint set).
+**Dependencies: Phase 5** (the builder must maintain a constraint set).
 
-The `preferred_type_mappings` mechanism in `bind.rs` currently uses a two-phase approach:
+After Phase 5, the preferred type mechanism works as follows:
 
 1. Extract preferred types from the TCX by solving `return_ty ≤ tcx` and filtering solutions
     (variance, inferable typevars, concrete content checks)
-1. During argument inference, prefer TCX types unless argument types are incompatible
-1. If incompatible, re-infer from arguments alone
+1. Seed them into the builder via `insert_type_mapping` (creating equality constraints)
+1. Infer argument types via `infer()` (creating additional constraints)
+1. Check satisfiability of the combined constraint set; retry without preferred types if
+    unsatisfiable
 
-This should be replaced by directly conjoining the TCX constraint set with argument constraints:
+This works correctly but is more complex than necessary. The TCX produces a constraint set
+(`return_ty.when_constraint_set_assignable_to(tcx, ...)`), but instead of using that constraint
+set directly, we extract solutions, filter them (variance, inferable typevars, concrete content),
+and re-inject them as individual equality constraints.
+
+This phase replaces that with direct conjunction:
 
 1. Let `tcx_set = return_ty.when_constraint_set_assignable_to(tcx, ...)`
-1. Let `arg_set = ∧ᵢ (actual_i ≤ formal_i)` for all arguments
-1. Try solving `tcx_set ∧ arg_set` (combined)
-1. If unsatisfiable, fall back to just `arg_set`
+1. AND `tcx_set` into the builder's pending constraint set before argument inference
+1. Infer argument types via `infer()` (AND'd into the same pending set)
+1. Check satisfiability; if unsatisfiable, create a fresh builder without `tcx_set` and retry
 
 This eliminates the ad-hoc solution-level filtering (variance, inferable typevars, concrete
-content), since the constraint solver would naturally resolve the tension between TCX preferences
-and argument constraints. It also removes `insert_type_mapping`, `preferred_type_mappings`,
-`partially_specialized_declared_type`, and the `assignable_to_declared_type` retry logic.
+content), since the constraint solver naturally resolves the tension between TCX preferences and
+argument constraints. It also removes `insert_type_mapping`, the `preferred_type_mappings`
+HashMap, the `partially_specialized_declared_type` set, and the solution extraction/filtering
+logic in `infer_specialization`.
