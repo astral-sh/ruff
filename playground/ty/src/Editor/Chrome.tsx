@@ -558,7 +558,7 @@ function PackageKindBadge({
   return (
     <span
       className="inline-block px-1.5 py-0 text-[10px] font-medium rounded bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300"
-      title="No type information available — runtime execution only"
+      title="No type information available: runtime execution only"
     >
       runtime
     </span>

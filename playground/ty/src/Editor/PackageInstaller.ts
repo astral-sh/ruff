@@ -198,9 +198,6 @@ export async function installPackages(
           if (filteredFiles.length === 0) {
             pkg.kind = "runtime-only";
             pkg.stubsSource = undefined;
-            warnings.push(
-              `No type stubs found for '${pkg.name}' — runtime execution only`,
-            );
           }
         } else {
           filteredFiles = files;
@@ -221,6 +218,12 @@ export async function installPackages(
             allExtractedFiles.push(...packageFiles);
           }
         }
+      }
+
+      if (pkg.kind === "runtime-only") {
+        warnings.push(
+          `No type stubs found for '${pkg.name}': runtime execution only`,
+        );
       }
 
       installed.push({
@@ -248,7 +251,7 @@ export async function installPackages(
           runtimePackages.push(normalized);
         } else {
           warnings.push(
-            `'${pkg.name}' is not available in Pyodide — it cannot be imported at runtime`,
+            `'${pkg.name}' is not available in Pyodide: it cannot be imported at runtime`,
           );
         }
       }
@@ -792,7 +795,7 @@ async function resolveAllDeps(
         kind: "pure-python",
       });
     } else {
-      // C extension package (any depth): try to find type stubs
+      // C extension package: try to find type stubs
       const stubs = await resolveStubs(entry.name, info, pythonVersion, signal);
       if (signal?.aborted) {
         return { packages: resolved, warnings };
@@ -806,11 +809,6 @@ async function resolveAllDeps(
         kind: stubs.kind,
         stubsSource: stubs.stubsSource,
       });
-      if (stubs.kind === "runtime-only") {
-        warnings.push(
-          `No type stubs found for '${entry.name}': runtime execution only`,
-        );
-      }
       // Do not enqueue transitive deps: Pyodide handles them
       continue;
     }
