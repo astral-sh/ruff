@@ -1,15 +1,15 @@
 use ruff_python_ast::Expr;
 
-use crate::preview::is_up006_future_annotations_fix_enabled;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::PythonVersion;
 use ruff_python_ast::name::UnqualifiedName;
 use ruff_python_semantic::analyze::typing::ModuleMember;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
+use crate::preview::is_up006_future_annotations_fix_enabled;
 use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
-use ruff_python_ast::PythonVersion;
 
 /// ## What it does
 /// Checks for the use of generics that can be replaced with standard library
