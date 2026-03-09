@@ -59,10 +59,40 @@ reveal_type({"age": 27} | bob)  # revealed: Person
 
 carol_update = Person(name="Carol", age=31)
 reveal_type(bob | carol_update)  # revealed: Person
+```
 
-UPDATED_AGE = "age"
-reveal_type(bob | {UPDATED_AGE: 28})  # revealed: Person
-reveal_type({UPDATED_AGE: 28} | bob)  # revealed: Person
+Compatible `TypedDict` subset updates are also accepted for `|=`:
+
+```py
+class NameOnly(TypedDict, closed=True):
+    name: str
+
+name_update: NameOnly = {"name": "Bobby"}
+
+bob |= {"age": 27}
+bob |= name_update
+```
+
+TODO: protocol matching for synthesized `TypedDict.__or__` should also accept these cases:
+
+```py
+from typing import Callable, Protocol
+
+class PersonOrNameOnly(Protocol):
+    def __or__(self, other: NameOnly) -> Person: ...
+
+class PersonOrNameOnlyAttr(Protocol):
+    __or__: Callable[[NameOnly], Person]
+
+def takes_person_or_name_only(x: PersonOrNameOnly) -> None: ...
+def takes_person_or_name_only_attr(x: PersonOrNameOnlyAttr) -> None: ...
+
+# TODO: this should pass
+# error: [invalid-argument-type] "Argument to function `takes_person_or_name_only` is incorrect: Expected `PersonOrNameOnly`, found `Person`"
+takes_person_or_name_only(bob)
+# TODO: this should pass
+# error: [invalid-argument-type] "Argument to function `takes_person_or_name_only_attr` is incorrect: Expected `PersonOrNameOnlyAttr`, found `Person`"
+takes_person_or_name_only_attr(bob)
 ```
 
 When the other operand is not compatible with the `TypedDict`, the result falls back to the normal
@@ -76,6 +106,9 @@ reveal_type({"name": 42} | bob)  # revealed: dict[str, object]
 # Key not present in the TypedDict
 reveal_type(bob | {"unknown_key": 1})  # revealed: dict[str, object]
 reveal_type({"unknown_key": 1} | bob)  # revealed: dict[str, object]
+
+# error: [unsupported-operator] "Operator `|=` is not supported between objects of type `Person` and `dict[str, int]`"
+bob |= {"unknown_key": 1}
 ```
 
 `TypedDict` keys do not have to be string literals, as long as they can be statically determined

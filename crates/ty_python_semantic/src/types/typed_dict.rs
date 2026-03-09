@@ -59,6 +59,12 @@ pub enum TypedDictType<'db> {
     Synthesized(SynthesizedTypedDictType<'db>),
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize, salsa::Update)]
+pub enum SynthesizedTypedDictKind {
+    Schema,
+    Patch,
+}
+
 impl<'db> TypedDictType<'db> {
     pub(crate) fn new(defining_class: ClassType<'db>) -> Self {
         Self::Class(defining_class)
@@ -126,17 +132,25 @@ impl<'db> TypedDictType<'db> {
         }
     }
 
-    /// Returns a synthesized `TypedDict` with the same keys and value types, but with all keys
-    /// marked `NotRequired`. The result is always a `Synthesized` variant (the original class
-    /// identity, if any, is not preserved).
-    pub(crate) fn to_partial(self, db: &'db dyn Db) -> Self {
+    pub(crate) fn from_schema_items(db: &'db dyn Db, items: TypedDictSchema<'db>) -> Self {
+        Self::Synthesized(SynthesizedTypedDictType::schema(db, items))
+    }
+
+    fn from_patch_items(db: &'db dyn Db, items: TypedDictSchema<'db>) -> Self {
+        Self::Synthesized(SynthesizedTypedDictType::patch(db, items))
+    }
+
+    /// Returns a synthesized `TypedDict` used to model PEP 584 update operands. This accepts
+    /// dictionary literals that update any subset of known keys, and also accepts other
+    /// `TypedDict`s as long as any overlapping keys are compatible.
+    pub(crate) fn to_update_operand(self, db: &'db dyn Db) -> Self {
         let items: TypedDictSchema<'db> = self
             .items(db)
             .iter()
             .map(|(name, field)| (name.clone(), field.clone().with_required(false)))
             .collect();
 
-        Self::Synthesized(SynthesizedTypedDictType::new(db, items))
+        Self::from_patch_items(db, items)
     }
 
     // Subtyping between `TypedDict`s follows the algorithm described at:
@@ -152,6 +166,40 @@ impl<'db> TypedDictType<'db> {
         relation_visitor: &HasRelationToVisitor<'db, 'c>,
         disjointness_visitor: &IsDisjointVisitor<'db, 'c>,
     ) -> ConstraintSet<'db, 'c> {
+        if let TypedDictType::Synthesized(synthesized_target) = target
+            && synthesized_target.is_patch(db)
+        {
+            let self_items = self.items(db);
+            let target_items = synthesized_target.items(db);
+            let mut result = ConstraintSet::from_bool(constraints, true);
+
+            for (self_item_name, self_item_field) in self_items {
+                let Some(target_item_field) = target_items.get(self_item_name) else {
+                    continue;
+                };
+
+                result.intersect(
+                    db,
+                    constraints,
+                    self_item_field.declared_ty.has_relation_to_impl(
+                        db,
+                        target_item_field.declared_ty,
+                        constraints,
+                        inferable,
+                        relation,
+                        relation_visitor,
+                        disjointness_visitor,
+                    ),
+                );
+
+                if result.is_never_satisfied(db) {
+                    return result;
+                }
+            }
+
+            return result;
+        }
+
         // First do a quick nominal check that (if it succeeds) means that we can avoid
         // materializing the full `TypedDict` schema for either `self` or `target`.
         // This should be cheaper in many cases, and also helps us avoid some cycles.
@@ -1048,12 +1096,25 @@ pub(super) fn validate_typed_dict_dict_literal<'db>(
 pub struct SynthesizedTypedDictType<'db> {
     #[returns(ref)]
     pub(crate) items: TypedDictSchema<'db>,
+    pub(crate) kind: SynthesizedTypedDictKind,
 }
 
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for SynthesizedTypedDictType<'_> {}
 
 impl<'db> SynthesizedTypedDictType<'db> {
+    fn schema(db: &'db dyn Db, items: TypedDictSchema<'db>) -> Self {
+        Self::new(db, items, SynthesizedTypedDictKind::Schema)
+    }
+
+    fn patch(db: &'db dyn Db, items: TypedDictSchema<'db>) -> Self {
+        Self::new(db, items, SynthesizedTypedDictKind::Patch)
+    }
+
+    fn is_patch(self, db: &'db dyn Db) -> bool {
+        self.kind(db) == SynthesizedTypedDictKind::Patch
+    }
+
     pub(super) fn apply_type_mapping_impl<'a>(
         self,
         db: &'db dyn Db,
@@ -1073,7 +1134,10 @@ impl<'db> SynthesizedTypedDictType<'db> {
             })
             .collect::<TypedDictSchema<'db>>();
 
-        SynthesizedTypedDictType::new(db, items)
+        match self.kind(db) {
+            SynthesizedTypedDictKind::Schema => Self::schema(db, items),
+            SynthesizedTypedDictKind::Patch => Self::patch(db, items),
+        }
     }
 }
 
