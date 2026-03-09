@@ -10,6 +10,7 @@ use itertools::Itertools;
 use log::warn;
 
 use ruff_db::diagnostic::{Diagnostic, SecondaryCode};
+use ruff_python_trivia::PythonWhitespace;
 use ruff_python_trivia::{CommentRanges, Cursor, indentation_at_offset};
 use ruff_source_file::{LineEnding, LineRanges};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
@@ -1020,7 +1021,7 @@ fn generate_noqa_edit<'a>(
     match directive {
         None => {
             let trimmed_line = locator.slice(line_range).trim_end();
-            blank_line = trimmed_line.trim_start().is_empty();
+            blank_line = trimmed_line.trim_whitespace_start().is_empty();
             edit_range = TextRange::new(TextSize::of(trimmed_line), line_range.len()) + offset;
             codes = None;
         }
