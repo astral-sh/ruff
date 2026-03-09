@@ -1248,6 +1248,7 @@ mod tests {
 
     use insta::assert_debug_snapshot;
 
+    use ruff_db::diagnostic::Severity;
     use ruff_python_trivia::CommentRanges;
     use ruff_source_file::{LineEnding, SourceFileBuilder};
     use ruff_text_size::{TextLen, TextRange, TextSize};
@@ -2867,6 +2868,7 @@ mod tests {
         .into_diagnostic(
             TextRange::new(TextSize::from(0), TextSize::from(0)),
             &source_file,
+            Severity::Error,
         )];
 
         let contents = "x = 1";
@@ -2890,6 +2892,7 @@ mod tests {
             AmbiguousVariableName("x".to_string()).into_diagnostic(
                 TextRange::new(TextSize::from(0), TextSize::from(0)),
                 &source_file,
+                Severity::Error,
             ),
             UnusedVariable {
                 name: "x".to_string(),
@@ -2897,6 +2900,7 @@ mod tests {
             .into_diagnostic(
                 TextRange::new(TextSize::from(0), TextSize::from(0)),
                 &source_file,
+                Severity::Error,
             ),
         ];
         let contents = "x = 1  # noqa: E741\n";
@@ -2922,6 +2926,7 @@ mod tests {
             AmbiguousVariableName("x".to_string()).into_diagnostic(
                 TextRange::new(TextSize::from(0), TextSize::from(0)),
                 &source_file,
+                Severity::Error,
             ),
             UnusedVariable {
                 name: "x".to_string(),
@@ -2929,6 +2934,7 @@ mod tests {
             .into_diagnostic(
                 TextRange::new(TextSize::from(0), TextSize::from(0)),
                 &source_file,
+                Severity::Error,
             ),
         ];
         let contents = "x = 1  # noqa";
@@ -2964,8 +2970,11 @@ print(
 "#;
         let noqa_line_for = [TextRange::new(8.into(), 68.into())].into_iter().collect();
         let source_file = SourceFileBuilder::new(path.to_string_lossy(), source).finish();
-        let messages = [PrintfStringFormatting
-            .into_diagnostic(TextRange::new(12.into(), 79.into()), &source_file)];
+        let messages = [PrintfStringFormatting.into_diagnostic(
+            TextRange::new(12.into(), 79.into()),
+            &source_file,
+            Severity::Error,
+        )];
         let comment_ranges = CommentRanges::default();
         let suppressions = Suppressions::default();
         let edits = generate_noqa_edits(
@@ -2996,8 +3005,11 @@ foo;
 bar =
 ";
         let source_file = SourceFileBuilder::new(path.to_string_lossy(), source).finish();
-        let messages =
-            [UselessSemicolon.into_diagnostic(TextRange::new(4.into(), 5.into()), &source_file)];
+        let messages = [UselessSemicolon.into_diagnostic(
+            TextRange::new(4.into(), 5.into()),
+            &source_file,
+            Severity::Error,
+        )];
         let noqa_line_for = NoqaMapping::default();
         let comment_ranges = CommentRanges::default();
         let suppressions = Suppressions::default();

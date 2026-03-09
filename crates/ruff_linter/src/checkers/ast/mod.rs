@@ -3421,7 +3421,11 @@ impl<'a> LintContext<'a> {
     ) -> DiagnosticGuard<'chk, 'a> {
         DiagnosticGuard {
             context: self,
-            diagnostic: Some(kind.into_diagnostic(range, &self.source_file)),
+            diagnostic: Some(kind.into_diagnostic(
+                range,
+                &self.source_file,
+                self.rules.severity(T::rule()),
+            )),
             rule: T::rule(),
             before_drop_fns: SmallVec::new(),
         }
@@ -3441,7 +3445,11 @@ impl<'a> LintContext<'a> {
         if self.is_rule_enabled(rule) {
             Some(DiagnosticGuard {
                 context: self,
-                diagnostic: Some(kind.into_diagnostic(range, &self.source_file)),
+                diagnostic: Some(kind.into_diagnostic(
+                    range,
+                    &self.source_file,
+                    self.rules.severity(T::rule()),
+                )),
                 rule,
                 before_drop_fns: SmallVec::new(),
             })
@@ -3464,6 +3472,7 @@ impl<'a> LintContext<'a> {
             kind.message(),
             Option::<&'static str>::None,
             range,
+            self.rules.severity(T::rule()),
             None,
             None,
             self.source_file.clone(),
