@@ -111,6 +111,7 @@ KNOWN_FORMATTING_VIOLATIONS = [
 
 # For some docs, Ruff is unable to parse the example code.
 KNOWN_PARSE_ERRORS = [
+    "banned-eager-imports",  # requires Python 3.15
     "blank-line-with-whitespace",
     "indented-form-feed",
     "missing-newline-at-end-of-file",
