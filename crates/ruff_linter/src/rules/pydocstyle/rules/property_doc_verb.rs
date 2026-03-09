@@ -100,7 +100,9 @@ pub(crate) fn property_doc_verb(checker: &Checker, docstring: &Docstring, settin
     };
 
     // Extract and normalize the first word.
-    let Some(first_word) = first_line.split_whitespace().next() else { return };
+    let Some(first_word) = first_line.split_whitespace().next() else {
+        return;
+    };
     let first_word_norm = normalize_word(first_word);
     if first_word_norm.is_empty() {
         return;
