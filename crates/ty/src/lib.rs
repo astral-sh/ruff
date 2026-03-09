@@ -31,7 +31,7 @@ use ty_project::{ProjectDatabase, ProjectMetadata};
 use ty_server::run_server;
 use ty_static::EnvVars;
 
-use crate::args::{CheckCommand, Command, HelpFormat, TerminalColor};
+use crate::args::{CheckCommand, Command, ExplainCommand, HelpFormat, TerminalColor};
 use crate::logging::{VerbosityLevel, setup_tracing};
 use crate::printer::Printer;
 pub use args::Cli;
@@ -55,17 +55,19 @@ pub fn run() -> anyhow::Result<ExitStatus> {
             shell.generate(&mut Cli::command(), &mut stdout());
             Ok(ExitStatus::Success)
         }
-        Command::Rule {
-            rule,
-            output_format,
-        } => {
-            if let Some(name) = rule {
-                rule::rule(&name, output_format)?;
-            } else {
-                rule::rules(output_format)?;
+        Command::Explain { command } => match command {
+            ExplainCommand::Rule {
+                rule,
+                output_format,
+            } => {
+                if let Some(name) = rule {
+                    rule::rule(&name, output_format)?;
+                } else {
+                    rule::rules(output_format)?;
+                }
+                Ok(ExitStatus::Success)
             }
-            Ok(ExitStatus::Success)
-        }
+        },
     }
 }
 

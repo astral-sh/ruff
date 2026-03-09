@@ -51,17 +51,10 @@ pub(crate) enum Command {
     #[clap(hide = true)]
     GenerateShellCompletion { shell: clap_complete_command::Shell },
 
-    /// Explain a rule (or all rules).
-    Rule {
-        /// Rule to explain.
-        ///
-        /// Defaults to all rules if omitted.
-        #[arg(hide_possible_values = true)]
-        rule: Option<String>,
-
-        /// Output format
-        #[arg(long, value_enum, default_value = "text")]
-        output_format: HelpFormat,
+    /// Explain rules and other parts of ty
+    Explain {
+        #[command(subcommand)]
+        command: ExplainCommand,
     },
 }
 
@@ -490,6 +483,22 @@ impl ConfigsArg {
     pub(crate) fn into_options(self) -> Option<Options> {
         self.0
     }
+}
+
+#[derive(Debug, clap::Subcommand)]
+pub(crate) enum ExplainCommand {
+    /// Explain a rule (or all rules).
+    Rule {
+        /// Rule to explain
+        ///
+        /// Defaults to all rules if omitted.
+        #[arg(hide_possible_values = true)]
+        rule: Option<String>,
+
+        /// Output format
+        #[arg(long, value_enum, default_value = "text")]
+        output_format: HelpFormat,
+    },
 }
 
 fn resolve_bool_arg(yes: bool, no: bool) -> Option<bool> {

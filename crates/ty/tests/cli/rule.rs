@@ -9,7 +9,7 @@ fn ty_cmd() -> Command {
 
 #[test]
 fn rule_default_output() {
-    assert_cmd_snapshot!(ty_cmd().args(["rule", "invalid-return-type"]), @r#"
+    assert_cmd_snapshot!(ty_cmd().args(["explain", "rule", "invalid-return-type"]), @r#"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -39,7 +39,7 @@ fn rule_default_output() {
 
 #[test]
 fn rule_json_output() {
-    assert_cmd_snapshot!(ty_cmd().args(["rule", "invalid-return-type", "--output-format", "json"]), @r###"
+    assert_cmd_snapshot!(ty_cmd().args(["explain", "rule", "invalid-return-type", "--output-format", "json"]), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -59,7 +59,7 @@ fn rule_json_output() {
 
 #[test]
 fn rule_unknown() {
-    assert_cmd_snapshot!(ty_cmd().args(["rule", "does-not-exist"]), @"
+    assert_cmd_snapshot!(ty_cmd().args(["explain", "rule", "does-not-exist"]), @"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -74,7 +74,7 @@ fn rule_unknown() {
 /// rather than snapshotting the documentation for ever rule.
 #[test]
 fn rule_no_selector() -> anyhow::Result<()> {
-    assert!(ty_cmd().args(["rule"]).status()?.success());
+    assert!(ty_cmd().args(["explain", "rule"]).status()?.success());
 
     Ok(())
 }
