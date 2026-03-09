@@ -179,3 +179,15 @@ def sync_returns_async_generator() -> AsyncGenerator[int, str]:
     x = yield 1
     reveal_type(x)  # revealed: str
 ```
+
+### Using a generator with incompatible annotation in `yield from`
+
+```py
+from typing import Generator
+
+def f() -> Generator[None, float, None]:
+    x = yield
+
+def g() -> Generator[None, int, None]:
+    yield from f()
+```
