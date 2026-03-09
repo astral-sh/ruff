@@ -247,6 +247,7 @@ use rustc_hash::{FxBuildHasher, FxHashMap};
 use crate::node_key::NodeKey;
 use crate::place::BoundnessAnalysis;
 use crate::semantic_index::ast_ids::ScopedUseId;
+use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::definition::{Definition, DefinitionState};
 use crate::semantic_index::member::ScopedMemberId;
 use crate::semantic_index::narrowing_constraints::{ConstraintKey, ScopedNarrowingConstraint};
@@ -1343,7 +1344,7 @@ impl<'db> UseDefMapBuilder<'db> {
         &mut self,
         place: ScopedPlaceId,
         use_id: ScopedUseId,
-        node_key: NodeKey,
+        node_key: ExpressionNodeKey,
     ) {
         let bindings = match place {
             ScopedPlaceId::Symbol(symbol) => &mut self.symbol_states[symbol].bindings(),
@@ -1356,7 +1357,7 @@ impl<'db> UseDefMapBuilder<'db> {
 
         // Track reachability of all uses of places to silence `unresolved-reference`
         // diagnostics in unreachable code.
-        self.record_node_reachability(node_key);
+        self.record_node_reachability(node_key.into_inner());
     }
 
     pub(super) fn record_node_reachability(&mut self, node_key: NodeKey) {

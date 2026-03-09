@@ -630,8 +630,9 @@ impl<'db> GenericContext<'db> {
                             db,
                             typevar_replacements.values().copied(),
                         );
-                        let signatures =
-                            signatures.with_inherited_generic_context(db, generic_context);
+                        let signatures = signatures
+                            .with_inherited_generic_context(generic_context)
+                            .merge_inherited_generic_context(db);
                         let replacement = CallableType::new(db, signatures, callable.kind(db));
 
                         Some((callable, replacement))
@@ -777,6 +778,17 @@ impl<'db> GenericContext<'db> {
     /// Returns a specialization of this generic context where each typevar is mapped to itself.
     pub(crate) fn identity_specialization(self, db: &'db dyn Db) -> Specialization<'db> {
         let types: Vec<Type> = self.variables(db).map(Type::TypeVar).collect();
+        self.specialize(db, types)
+    }
+
+    /// Returns a specialization of this generic context where each typevar is mapped to the same
+    /// type.
+    pub(crate) fn repeat_specialization(
+        self,
+        db: &'db dyn Db,
+        ty: Type<'db>,
+    ) -> Specialization<'db> {
+        let types: Vec<Type> = self.variables(db).map(|_| ty).collect();
         self.specialize(db, types)
     }
 

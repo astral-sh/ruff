@@ -544,7 +544,8 @@ impl<'db> Bindings<'db> {
     // Constructor calls should combine `__new__`/`__init__` specializations instead of unioning.
     fn constructor_return_type(&self, db: &'db dyn Db) -> Option<Type<'db>> {
         let constructor_instance_type = self.constructor_instance_type?;
-        let Some(class_specialization) = constructor_instance_type.class_specialization(db) else {
+        let Some((_, class_specialization)) = constructor_instance_type.class_specialization(db)
+        else {
             return Some(constructor_instance_type);
         };
         let class_context = class_specialization.generic_context(db);
@@ -3852,6 +3853,26 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         self.specialization = Some(specialization);
     }
 
+    fn infer_inherited_specialization(
+        &mut self,
+        constraints: &ConstraintSetBuilder<'db>,
+    ) -> Option<Specialization<'db>> {
+        let inherited_generic_context = self.signature.inherited_generic_context?;
+
+        let inferable_typevars = inherited_generic_context.inferable_typevars(self.db);
+        let mut builder = SpecializationBuilder::new(self.db, inferable_typevars);
+
+        self.infer_argument_types(
+            constraints,
+            &mut builder,
+            &FxHashMap::default(),
+            &FxHashSet::default(),
+            &mut Vec::new(),
+        );
+
+        Some(builder.build(inherited_generic_context))
+    }
+
     fn infer_argument_types(
         &mut self,
         constraints: &ConstraintSetBuilder<'db>,
@@ -4458,7 +4479,7 @@ impl<'db> Binding<'db> {
         self.argument_matches = matcher.finish();
     }
 
-    fn check_types(
+    pub(crate) fn check_types(
         &mut self,
         db: &'db dyn Db,
         constraints: &ConstraintSetBuilder<'db>,
@@ -4489,6 +4510,30 @@ impl<'db> Binding<'db> {
         checker.check_argument_types(constraints);
 
         (self.inferable_typevars, self.specialization, self.return_ty) = checker.finish();
+    }
+
+    pub(crate) fn infer_inherited_specialization(
+        &mut self,
+        db: &'db dyn Db,
+        arguments: &CallArguments<'_, 'db>,
+        unspecialized_signature: &Signature<'db>,
+        call_expression_tcx: TypeContext<'db>,
+    ) -> Option<Specialization<'db>> {
+        let mut checker = ArgumentTypeChecker::new(
+            db,
+            self.signature_type,
+            unspecialized_signature,
+            arguments,
+            &self.argument_matches,
+            &mut self.parameter_tys,
+            self.constructor_instance_type,
+            call_expression_tcx,
+            self.return_ty,
+            &mut self.errors,
+        );
+
+        let constraints = ConstraintSetBuilder::new();
+        checker.infer_inherited_specialization(&constraints)
     }
 
     pub(crate) fn set_return_type(&mut self, return_ty: Type<'db>) {
