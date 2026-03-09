@@ -106,3 +106,21 @@ class Foo:
 
 # Multi-line second statement
 x=1;x = 2 + [1, 2,<RANGE_START>]<RANGE_END>
+
+# Range starts before semicolon group and ends within it
+x1  = 1
+<RANGE_START>x2 = 2
+x3  = 3; x4=4<RANGE_END>;x5=5
+x6  = 6
+
+# Range starts within semicolon group and ends after it
+x1  = 1
+x2 = 2; <RANGE_START>x3  = 3; x4=4
+x5  = 5<RANGE_END>
+x6  = 6
+
+# Non-standard indentation with semicolons
+def test():
+ x1  = 10;  <RANGE_START>x2  = 20<RANGE_END>
+
+ print(x1)
