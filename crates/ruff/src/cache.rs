@@ -329,9 +329,7 @@ impl FileCache {
     }
 }
 
-#[derive(
-    Debug, Default, Clone, bitcode::Encode, bitcode::Decode, serde::Serialize, serde::Deserialize,
-)]
+#[derive(Debug, Default, serde::Serialize, serde::Deserialize)]
 struct FileCacheData {
     linted: bool,
     formatted: bool,
