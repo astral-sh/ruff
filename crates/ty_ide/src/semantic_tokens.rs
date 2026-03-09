@@ -469,13 +469,37 @@ impl<'db> SemanticTokenVisitor<'db> {
                 (SemanticTokenType::Property, modifiers)
             }
             _ => {
-                // Check for constant naming convention
-                if Self::is_constant_name(attr_name_str) {
-                    modifiers |= SemanticTokenModifier::READONLY;
-                }
+                // If we got a union type, check if all elements of the union belong to the same
+                // type variant and if so, recursively call `classify_from_type_for_attribute`
+                // for that variant.
+                if let Type::Union(union) = ty
+                    && let Some(classification) = (|| {
+                        let elements: Vec<_> = union.elements(self.model.db()).iter().collect();
+                        if elements.is_empty() {
+                            return None;
+                        }
 
-                // For other types (variables, constants, etc.), classify as variable
-                (SemanticTokenType::Variable, modifiers)
+                        let first = elements[0];
+                        if elements
+                            .iter()
+                            .all(|ty| std::mem::discriminant(*ty) == std::mem::discriminant(first))
+                        {
+                            Some(self.classify_from_type_for_attribute(*first, attr_name))
+                        } else {
+                            None
+                        }
+                    })()
+                {
+                    classification
+                } else {
+                    // Check for constant naming convention
+                    if Self::is_constant_name(attr_name_str) {
+                        modifiers |= SemanticTokenModifier::READONLY;
+                    }
+
+                    // For other types (variables, constants, etc.), classify as variable
+                    (SemanticTokenType::Variable, modifiers)
+                }
             }
         }
     }
@@ -1975,7 +1999,7 @@ x = foobar_cls.prop                              # prop should be property
         "Bar" @ 362..365: Class
         "y" @ 368..369: Variable [definition]
         "foobar" @ 372..378: Variable
-        "method" @ 379..385: Variable
+        "method" @ 379..385: Method
         "z" @ 458..459: Variable [definition]
         "foobar" @ 462..468: Variable
         "CONSTANT" @ 469..477: Variable [readonly]
@@ -1988,7 +2012,7 @@ x = foobar_cls.prop                              # prop should be property
         "Bar" @ 684..687: Class
         "v" @ 688..689: Variable [definition]
         "foobar_cls" @ 692..702: Variable
-        "method" @ 703..709: Variable
+        "method" @ 703..709: Method
         "x" @ 774..775: Variable [definition]
         "foobar_cls" @ 778..788: Variable
         "prop" @ 789..793: Property
