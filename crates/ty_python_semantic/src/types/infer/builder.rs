@@ -5960,9 +5960,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         infer_elt_expression: &mut dyn FnMut(&mut Self, ArgExpr<'db, 'expr>) -> Type<'db>,
         tcx: TypeContext<'db>,
     ) -> Option<Type<'db>> {
+        let db = self.db();
+
         // If the type context is a union, attempt to narrow to a specific element.
         let narrow_targets: &[_] = match tcx.annotation {
-            Some(Type::Union(union)) => union.elements(self.db()),
+            Some(Type::Union(union)) => union.elements(db),
             _ => &[],
         };
 
@@ -5982,7 +5984,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             )?;
 
             // Ensure the inferred return type is assignable to the (narrowed) declared type.
-            if !inferred_ty.is_assignable_to(self.db(), narrowed_ty) {
+            if !inferred_ty.is_assignable_to(db, narrowed_ty) {
                 return None;
             }
 
@@ -6004,7 +6006,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             Some(inferred_ty)
         };
 
-        for narrowed_ty in narrow_targets {
+        for narrowed_ty in narrow_targets
+            .iter()
+            .filter(|ty| ty.class_specialization(db).is_some())
+        {
             if let Some(result) = try_narrow(*narrowed_ty) {
                 return Some(result);
             }
