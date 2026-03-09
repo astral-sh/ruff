@@ -393,6 +393,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Bugbear, "034") => rules::flake8_bugbear::rules::ReSubPositionalArgs,
         (Flake8Bugbear, "035") => rules::flake8_bugbear::rules::StaticKeyDictComprehension,
         (Flake8Bugbear, "039") => rules::flake8_bugbear::rules::MutableContextvarDefault,
+        (Flake8Bugbear, "043") => rules::flake8_bugbear::rules::DelAttrWithConstant,
         (Flake8Bugbear, "901") => rules::flake8_bugbear::rules::ReturnInGenerator,
         (Flake8Bugbear, "903") => rules::flake8_bugbear::rules::ClassAsDataStructure,
         (Flake8Bugbear, "904") => rules::flake8_bugbear::rules::RaiseWithoutFromInsideExcept,

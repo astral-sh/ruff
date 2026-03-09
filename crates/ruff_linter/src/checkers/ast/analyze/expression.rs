@@ -739,6 +739,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.is_rule_enabled(Rule::GetAttrWithConstant) {
                 flake8_bugbear::rules::getattr_with_constant(checker, expr, func, args);
             }
+            if checker.is_rule_enabled(Rule::DelAttrWithConstant) {
+                flake8_bugbear::rules::delattr_with_constant(checker, expr, func, args);
+            }
             if checker.is_rule_enabled(Rule::SetAttrWithConstant) {
                 flake8_bugbear::rules::setattr_with_constant(checker, expr, func, args);
             }
