@@ -2609,8 +2609,61 @@ def _(t: Bar, u: Foo | Intersection[Bar, Any], v: Intersection[Bar, Any], w: Lit
         reveal_type(u)  # revealed: Foo | (Bar & Any)
 ```
 
-TODO: The narrowing that we didn't do above will become possible when we add support for
-`closed=True`. This is [one of the main use cases][closed] that motivated the `closed` feature.
+With `closed=True`, the narrowing that we couldn't do above becomes possible, because a [closed]
+TypedDict is guaranteed not to have extra keys:
+
+```py
+from typing_extensions import Literal, TypedDict
+
+class ClosedFoo(TypedDict, closed=True):
+    foo: int
+
+class ClosedBar(TypedDict, closed=True):
+    bar: int
+
+def _(u: ClosedFoo | ClosedBar, v: Literal["foo"]):
+    if "foo" in u:
+        # TODO: should be `ClosedFoo`
+        reveal_type(u)  # revealed: ClosedFoo | ClosedBar
+    else:
+        reveal_type(u)  # revealed: ClosedBar
+
+    if v in u:
+        # TODO: should be `ClosedFoo`
+        reveal_type(u)  # revealed: ClosedFoo | ClosedBar
+    else:
+        reveal_type(u)  # revealed: ClosedBar
+```
+
+Similarly, for `not in`, we can now also narrow in the negative case:
+
+```py
+from typing_extensions import Literal, Any
+from ty_extensions import Intersection
+
+def _(
+    t: ClosedBar,
+    u: ClosedFoo | Intersection[ClosedBar, Any],
+    v: Intersection[ClosedBar, Any],
+    w: Literal["bar"],
+):
+    if "bar" not in u:
+        reveal_type(u)  # revealed: ClosedFoo
+    else:
+        # TODO: should be `ClosedBar & Any`
+        reveal_type(u)  # revealed: ClosedFoo | (ClosedBar & Any)
+
+    if "bar" not in v:
+        reveal_type(v)  # revealed: Never
+    else:
+        reveal_type(v)  # revealed: ClosedBar & Any
+
+    if w not in u:
+        reveal_type(u)  # revealed: ClosedFoo
+    else:
+        # TODO: should be `ClosedBar & Any`
+        reveal_type(u)  # revealed: ClosedFoo | (ClosedBar & Any)
+```
 
 ## Narrowing tagged unions of `TypedDict`s with `match` statements
 
