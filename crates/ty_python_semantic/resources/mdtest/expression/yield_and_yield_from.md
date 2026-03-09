@@ -93,7 +93,7 @@ def outer_generator():
 ## `yield` expression send type inference
 
 ```py
-from typing import AsyncGenerator, AsyncIterator, Generator, Iterator,
+from typing import AsyncGenerator, AsyncIterator, Generator, Iterator
 
 def unannotated():
     x = yield
