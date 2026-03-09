@@ -1816,9 +1816,10 @@ obj = MyClass()
 x = os.path              # path should be namespace (module)
 y = obj.method           # method should be method (bound method)
 z = obj.CONSTANT         # CONSTANT should be variable with readonly modifier
-w = obj.prop             # prop should be property
+w = obj.prop             # prop should be variable on an instance
 v = MyClass.method       # method should be method (function)
 u = List.__name__        # __name__ should be variable
+t = MyClass.prop          # prop should be property on the class itself
 ",
         );
 
@@ -1856,12 +1857,15 @@ u = List.__name__        # __name__ should be variable
         "w" @ 483..484: Variable [definition]
         "obj" @ 487..490: Variable
         "prop" @ 491..495: Variable
-        "v" @ 534..535: Variable [definition]
-        "MyClass" @ 538..545: Class
-        "method" @ 546..552: Method
-        "u" @ 596..597: Variable [definition]
-        "List" @ 600..604: Variable
-        "__name__" @ 605..613: Variable
+        "v" @ 549..550: Variable [definition]
+        "MyClass" @ 553..560: Class
+        "method" @ 561..567: Method
+        "u" @ 611..612: Variable [definition]
+        "List" @ 615..619: Variable
+        "__name__" @ 620..628: Variable
+        "t" @ 666..667: Variable [definition]
+        "MyClass" @ 670..677: Class
+        "prop" @ 678..682: Property
         "#);
     }
 
@@ -1893,6 +1897,101 @@ y = obj.unknown_attr     # Should fall back to variable
         "y" @ 187..188: Variable [definition]
         "obj" @ 191..194: Variable
         "unknown_attr" @ 195..207: Variable
+        "#);
+    }
+
+    #[test]
+    fn attribute_on_union() {
+        let test = SemanticTokenTest::new(
+            "
+from random import random
+
+class Foo:
+    CONSTANT = 42
+
+    def method(self):
+        return \"hello\"
+
+    @property
+    def prop(self):
+        return self.CONSTANT
+
+class Bar:
+    CONSTANT = 24
+
+    def method(self, x: int = 1):
+        return \"bye\"
+
+    @property
+    def prop(self):
+        return self.CONSTANT
+
+
+foobar: Foo | Bar = Foo() if random() else Bar()
+y = foobar.method                                # method should be method (bound method)
+z = foobar.CONSTANT                              # CONSTANT should be variable with readonly modifier
+w = foobar.prop                                  # prop should be variable on an instance
+foobar_cls = Foo if random() else Bar
+v = foobar_cls.method                            # method should be method (function)
+x = foobar_cls.prop                              # prop should be property
+",
+        );
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "random" @ 6..12: Namespace
+        "random" @ 20..26: Method
+        "Foo" @ 34..37: Class [definition]
+        "CONSTANT" @ 43..51: Variable [definition, readonly]
+        "42" @ 54..56: Number
+        "method" @ 66..72: Method [definition]
+        "self" @ 73..77: SelfParameter [definition]
+        "\"hello\"" @ 95..102: String
+        "property" @ 109..117: Decorator
+        "prop" @ 126..130: Method [definition]
+        "self" @ 131..135: SelfParameter [definition]
+        "self" @ 153..157: SelfParameter
+        "CONSTANT" @ 158..166: Variable [readonly]
+        "Bar" @ 174..177: Class [definition]
+        "CONSTANT" @ 183..191: Variable [definition, readonly]
+        "24" @ 194..196: Number
+        "method" @ 206..212: Method [definition]
+        "self" @ 213..217: SelfParameter [definition]
+        "x" @ 219..220: Parameter [definition]
+        "int" @ 222..225: Class
+        "1" @ 228..229: Number
+        "\"bye\"" @ 247..252: String
+        "property" @ 259..267: Decorator
+        "prop" @ 276..280: Method [definition]
+        "self" @ 281..285: SelfParameter [definition]
+        "self" @ 303..307: SelfParameter
+        "CONSTANT" @ 308..316: Variable [readonly]
+        "foobar" @ 319..325: Variable [definition]
+        "Foo" @ 327..330: Class
+        "Bar" @ 333..336: Class
+        "Foo" @ 339..342: Class
+        "random" @ 348..354: Variable
+        "Bar" @ 362..365: Class
+        "y" @ 368..369: Variable [definition]
+        "foobar" @ 372..378: Variable
+        "method" @ 379..385: Variable
+        "z" @ 458..459: Variable [definition]
+        "foobar" @ 462..468: Variable
+        "CONSTANT" @ 469..477: Variable [readonly]
+        "w" @ 560..561: Variable [definition]
+        "foobar" @ 564..570: Variable
+        "prop" @ 571..575: Variable
+        "foobar_cls" @ 650..660: Variable [definition]
+        "Foo" @ 663..666: Class
+        "random" @ 670..676: Variable
+        "Bar" @ 684..687: Class
+        "v" @ 688..689: Variable [definition]
+        "foobar_cls" @ 692..702: Variable
+        "method" @ 703..709: Variable
+        "x" @ 774..775: Variable [definition]
+        "foobar_cls" @ 778..788: Variable
+        "prop" @ 789..793: Property
         "#);
     }
 
