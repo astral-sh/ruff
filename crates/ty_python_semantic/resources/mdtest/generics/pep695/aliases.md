@@ -593,3 +593,28 @@ def j(x: Container1.Item, y: Container2.Item) -> None:
     # error: [invalid-assignment] "Object of type `mdtest_snippet.Container2.Item` is not assignable to `mdtest_snippet.Container1.Item`"
     a: Container1.Item = y
 ```
+
+## Default type parameter after `TypeVarTuple`
+
+<!-- snapshot-diagnostics -->
+
+A type parameter with a default cannot follow a `TypeVarTuple` in a type parameter list. This is
+prohibited by the typing spec because a `TypeVarTuple` consumes all remaining positional type
+arguments, making any subsequent defaults meaningless.
+
+```py
+# error: [invalid-type-variable-default] "Type parameter `T` with a default follows TypeVarTuple `Ts`"
+type Alias1[*Ts, T = int] = tuple[*Ts, T]
+
+# error: [invalid-type-variable-default]
+type Alias2[T1, *Ts, T2 = int] = tuple[T1, *Ts, T2]
+
+# error: [invalid-type-variable-default]
+type Alias3[*Ts, T1 = int, T2 = str] = tuple[*Ts, T1, T2]
+
+# error: [invalid-type-variable-default]
+type Alias4[*Us, *Ts = *tuple[int, str]] = tuple[*Us, *Ts]
+
+# These are fine:
+type Ok1[T, *Ts] = tuple[T, *Ts]
+```

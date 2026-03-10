@@ -103,6 +103,9 @@ def f(
     # error: [unresolved-reference] "SomethingUndefined"
     # error: [unresolved-reference] "SomethingAlsoUndefined"
     i: SomethingUndefined | SomethingAlsoUndefined,
+    # error: [unsupported-operator]
+    # error: [unsupported-operator]
+    j: list["int" | None] | "bytes",
 ):
     reveal_type(a)  # revealed: int | Foo
     reveal_type(b)  # revealed: int | memoryview[int] | bytes

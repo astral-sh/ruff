@@ -525,6 +525,9 @@ So, because we do monotonic widening in cycle recovery, we need to make sure tha
 types. Instead, `Divergent` should "poison" any value we try to narrow against it, so that our cycle
 recovery logic doesn't carry that result forward.
 
+Addendum: #23563 fixed the implementation of `Type::cycle_normalized`, so that such "tainted
+previous values" are no longer unioned.
+
 ### `global` and `nonlocal` keywords in a loop
 
 We need to make sure that the loop header definition doesn't count as a "use" prior to the

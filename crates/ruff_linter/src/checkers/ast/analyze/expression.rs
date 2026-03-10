@@ -739,6 +739,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.is_rule_enabled(Rule::GetAttrWithConstant) {
                 flake8_bugbear::rules::getattr_with_constant(checker, expr, func, args);
             }
+            if checker.is_rule_enabled(Rule::DelAttrWithConstant) {
+                flake8_bugbear::rules::delattr_with_constant(checker, expr, func, args);
+            }
             if checker.is_rule_enabled(Rule::SetAttrWithConstant) {
                 flake8_bugbear::rules::setattr_with_constant(checker, expr, func, args);
             }
@@ -1162,6 +1165,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                         checker, call, segments,
                     );
                 }
+                if checker.is_rule_enabled(Rule::OsPathCommonprefix) {
+                    ruff::rules::os_path_commonprefix(checker, call, segments);
+                }
             }
 
             if checker.is_rule_enabled(Rule::OsSepSplit) {
@@ -1283,6 +1289,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             }
             if checker.is_rule_enabled(Rule::Airflow3IncompatibleFunctionSignature) {
                 airflow::rules::airflow_3_incompatible_function_signature(checker, expr);
+            }
+            if checker.is_rule_enabled(Rule::Airflow3DagDynamicValue) {
+                airflow::rules::airflow_3_dag_dynamic_value(checker, call);
             }
             if checker.is_rule_enabled(Rule::UnnecessaryCastToInt) {
                 ruff::rules::unnecessary_cast_to_int(checker, call);

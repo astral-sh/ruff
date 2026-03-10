@@ -166,7 +166,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         {
                             let previous_state =
                                 self.set_multi_inference_state(MultiInferenceState::Ignore);
-                            self.context.set_multi_inference(true);
+                            let was_in_multi_inference = self.context.set_multi_inference(true);
                             // If the left-hand side of the union is itself a PEP-604 union,
                             // we'll already have checked whether it can be used with `|` in a previous inference step
                             // and emitted a diagnostic if it was appropriate. We should skip inferring it here to
@@ -177,7 +177,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             let right_type_value =
                                 self.infer_expression(&binary.right, TypeContext::default());
                             self.multi_inference_state = previous_state;
-                            self.context.set_multi_inference(false);
+                            self.context.set_multi_inference(was_in_multi_inference);
 
                             let dunder_fails = Type::try_call_bin_op(
                                 self.db(),
@@ -189,18 +189,27 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
                             // As well as trying the normal dunder lookup,
                             // we also check for the case where one of the operands is a class-literal type
-                            // and the other is a string literal. The normal dunder lookup fails to catch
-                            // this error, since typeshed annotates `type.__(r)or__` as accepting `Any`.
-                            let should_emit_error = dunder_fails
-                                || matches!(
-                                    (left_type_value, right_type_value),
-                                    (
-                                        Type::ClassLiteral(class), Type::LiteralValue(literal))
-                                        | (Type::LiteralValue(literal), Type::ClassLiteral(class)
-                                    )
-                                    if class.metaclass(self.db()) == KnownClass::Type.to_class_literal(self.db())
-                                    && !literal.is_enum()
-                                );
+                            // or generic-alias type and the other is a string literal. The normal dunder lookup
+                            // fails to catch this error, since typeshed annotates `type.__(r)or__` as accepting `Any`.
+                            let should_emit_error = if dunder_fails {
+                                true
+                            } else {
+                                let literal = match (left_type_value, right_type_value) {
+                                    (Type::ClassLiteral(class), Type::LiteralValue(literal))
+                                    | (Type::LiteralValue(literal), Type::ClassLiteral(class))
+                                        if class.metaclass(self.db())
+                                            == KnownClass::Type.to_class_literal(self.db()) =>
+                                    {
+                                        Some(literal)
+                                    }
+                                    (Type::GenericAlias(_), Type::LiteralValue(literal))
+                                    | (Type::LiteralValue(literal), Type::GenericAlias(_)) => {
+                                        Some(literal)
+                                    }
+                                    _ => None,
+                                };
+                                literal.is_some_and(|literal| !literal.is_enum())
+                            };
 
                             if should_emit_error
                                 && let Some(builder) =

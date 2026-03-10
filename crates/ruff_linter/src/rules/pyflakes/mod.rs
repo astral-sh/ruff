@@ -4062,6 +4062,13 @@ lambda: fu
 
         flakes(
             r"
+        lazy from __future__ import annotations
+        ",
+            &[Rule::UnusedImport],
+        );
+
+        flakes(
+            r"
         from __future__ import annotations
         def f(a: A) -> A: pass
         class A:

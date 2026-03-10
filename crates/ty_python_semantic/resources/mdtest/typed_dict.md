@@ -142,6 +142,9 @@ plot3: Plot = {"y": homogeneous_list(1, 2, 3), "x": homogeneous_list(1, 2, 3)}
 reveal_type(plot3["y"])  # revealed: list[int | None]
 reveal_type(plot3["x"])  # revealed: list[int | None]
 
+plot3["y"] = homogeneous_list(1, 2, 3)
+reveal_type(plot3["y"])  # revealed: list[int | None]
+
 Y = "y"
 X = "x"
 

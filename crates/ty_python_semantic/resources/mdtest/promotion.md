@@ -501,3 +501,26 @@ def _(a: A | None):
         reveal_type(d)  # revealed: dict[str, A]
     return {}
 ```
+
+## Module-literal types are not promoted
+
+Since module-literal types are "literal" types in a certain sense (each type is a singleton type),
+we used to promote module-literal types to `types.ModuleType`. We no longer do, because
+`types.ModuleType` is a very broad type that is not particularly useful. The fake
+`types.ModuleType.__getattr__` method that typeshed provides also meant that you would not receive
+any errors from clearly incorrect code like this:
+
+`module1.py`:
+
+```py
+```
+
+`main.py`:
+
+```py
+import module1
+
+my_modules = [module1]
+reveal_type(my_modules)  # revealed: list[<module 'module1'>]
+my_modules[0].flibbertigibbet  # error: [unresolved-attribute]
+```
