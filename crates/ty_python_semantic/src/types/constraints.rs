@@ -670,7 +670,6 @@ struct ConstraintSetStorage<'db> {
     negate_cache: FxHashMap<NodeId, NodeId>,
     or_cache: FxHashMap<(NodeId, NodeId, usize), NodeId>,
     and_cache: FxHashMap<(NodeId, NodeId, usize), NodeId>,
-    iff_cache: FxHashMap<(NodeId, NodeId, usize), NodeId>,
     exists_one_cache: FxHashMap<(NodeId, BoundTypeVarIdentity<'db>), NodeId>,
     retain_one_cache: FxHashMap<(NodeId, BoundTypeVarIdentity<'db>), NodeId>,
     restrict_one_cache: FxHashMap<(NodeId, ConstraintAssignment), (NodeId, bool)>,
@@ -1928,35 +1927,12 @@ impl NodeId {
         other: Self,
         other_offset: usize,
     ) -> Self {
-        match (self.node(), other.node()) {
-            (Node::AlwaysFalse, Node::AlwaysFalse) | (Node::AlwaysTrue, Node::AlwaysTrue) => {
-                ALWAYS_TRUE
-            }
-            (Node::AlwaysTrue, Node::AlwaysFalse) | (Node::AlwaysFalse, Node::AlwaysTrue) => {
-                ALWAYS_FALSE
-            }
-            (Node::AlwaysTrue | Node::AlwaysFalse, Node::Interior(_)) => {
-                let interior = builder.interior_node_data(other);
-                NodeId::new(
-                    builder,
-                    interior.constraint,
-                    self.iff_inner(builder, interior.if_true, other_offset),
-                    self.iff_inner(builder, interior.if_false, other_offset),
-                    interior.source_order + other_offset,
-                )
-            }
-            (Node::Interior(_), Node::AlwaysTrue | Node::AlwaysFalse) => {
-                let interior = builder.interior_node_data(self);
-                NodeId::new(
-                    builder,
-                    interior.constraint,
-                    interior.if_true.iff_inner(builder, other, other_offset),
-                    interior.if_false.iff_inner(builder, other, other_offset),
-                    interior.source_order,
-                )
-            }
-            (Node::Interior(a), Node::Interior(b)) => a.iff(builder, b, other_offset),
-        }
+        // iff(a, b) = (a ∧ b) ∨ (¬a ∧ ¬b)
+        let a_and_b = self.and_inner(builder, other, other_offset);
+        let not_a_and_not_b =
+            self.negate(builder)
+                .and_inner(builder, other.negate(builder), other_offset);
+        a_and_b.or(builder, not_a_and_not_b)
     }
 
     /// Returns the `if-then-else` of three BDDs: when `self` evaluates to `true`, it returns what
@@ -2749,57 +2725,6 @@ impl InteriorNode {
 
         let mut storage = builder.storage.borrow_mut();
         storage.and_cache.insert(key, result);
-        result
-    }
-
-    fn iff(self, builder: &ConstraintSetBuilder<'_>, other: Self, other_offset: usize) -> NodeId {
-        let key = (self.node(), other.node(), other_offset);
-        let storage = builder.storage.borrow();
-        if let Some(result) = storage.iff_cache.get(&key) {
-            return *result;
-        }
-        drop(storage);
-
-        let self_interior = builder.interior_node_data(self.node());
-        let self_ordering = self_interior.constraint.ordering();
-        let other_interior = builder.interior_node_data(other.node());
-        let other_ordering = other_interior.constraint.ordering();
-        let result = match self_ordering.cmp(&other_ordering) {
-            Ordering::Equal => NodeId::new(
-                builder,
-                self_interior.constraint,
-                self_interior
-                    .if_true
-                    .iff_inner(builder, other_interior.if_true, other_offset),
-                self_interior
-                    .if_false
-                    .iff_inner(builder, other_interior.if_false, other_offset),
-                self_interior.source_order,
-            ),
-            Ordering::Less => NodeId::new(
-                builder,
-                self_interior.constraint,
-                self_interior
-                    .if_true
-                    .iff_inner(builder, other.node(), other_offset),
-                self_interior
-                    .if_false
-                    .iff_inner(builder, other.node(), other_offset),
-                self_interior.source_order,
-            ),
-            Ordering::Greater => NodeId::new(
-                builder,
-                other_interior.constraint,
-                self.node()
-                    .iff_inner(builder, other_interior.if_true, other_offset),
-                self.node()
-                    .iff_inner(builder, other_interior.if_false, other_offset),
-                other_interior.source_order + other_offset,
-            ),
-        };
-
-        let mut storage = builder.storage.borrow_mut();
-        storage.iff_cache.insert(key, result);
         result
     }
 
