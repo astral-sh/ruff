@@ -1709,21 +1709,27 @@ impl NodeId {
             (Node::AlwaysTrue, Node::AlwaysTrue) => ALWAYS_TRUE,
             (Node::AlwaysTrue, Node::Interior(_)) => {
                 let other_interior = builder.interior_node_data(other);
-                NodeId::new(
+                // If lhs is always true, then the overall result is true for any assignment of
+                // rhs.
+                NodeId::with_uncertain(
                     builder,
                     other_interior.constraint,
+                    ALWAYS_FALSE,
                     ALWAYS_TRUE,
-                    ALWAYS_TRUE,
+                    ALWAYS_FALSE,
                     other_interior.source_order + other_offset,
                 )
             }
             (Node::Interior(_), Node::AlwaysTrue) => {
                 let self_interior = builder.interior_node_data(self);
-                NodeId::new(
+                // If rhs is always true, then the overall result is true for any assignment of
+                // lhs.
+                NodeId::with_uncertain(
                     builder,
                     self_interior.constraint,
+                    ALWAYS_FALSE,
                     ALWAYS_TRUE,
-                    ALWAYS_TRUE,
+                    ALWAYS_FALSE,
                     self_interior.source_order,
                 )
             }
@@ -2579,35 +2585,44 @@ impl InteriorNode {
         let other_interior = builder.interior_node_data(other.node());
         let other_ordering = other_interior.constraint.ordering();
         let result = match self_ordering.cmp(&other_ordering) {
-            Ordering::Equal => NodeId::new(
+            Ordering::Equal => NodeId::with_uncertain(
                 builder,
                 self_interior.constraint,
                 self_interior
                     .if_true
                     .or_inner(builder, other_interior.if_true, other_offset),
+                self_interior.if_uncertain.or_inner(
+                    builder,
+                    other_interior.if_uncertain,
+                    other_offset,
+                ),
                 self_interior
                     .if_false
                     .or_inner(builder, other_interior.if_false, other_offset),
                 self_interior.source_order,
             ),
-            Ordering::Less => NodeId::new(
+            // This is one of Duboc's optimizations. If self < other, we check self first. Instead
+            // of distributing other into the if_true and if_false branches, we "park" it in the
+            // if_uncertain branch. That causes us to only evaluate other "lazily" when needed.
+            Ordering::Less => NodeId::with_uncertain(
                 builder,
                 self_interior.constraint,
+                self_interior.if_true,
                 self_interior
-                    .if_true
+                    .if_uncertain
                     .or_inner(builder, other.node(), other_offset),
-                self_interior
-                    .if_false
-                    .or_inner(builder, other.node(), other_offset),
+                self_interior.if_false,
                 self_interior.source_order,
             ),
-            Ordering::Greater => NodeId::new(
+            // Ditto above but for the other variable ordering
+            Ordering::Greater => NodeId::with_uncertain(
                 builder,
                 other_interior.constraint,
-                self.node()
-                    .or_inner(builder, other_interior.if_true, other_offset),
-                self.node()
-                    .or_inner(builder, other_interior.if_false, other_offset),
+                other_interior.if_true,
+                other_interior
+                    .if_uncertain
+                    .or_inner(builder, self.node(), other_offset),
+                other_interior.if_false,
                 other_interior.source_order + other_offset,
             ),
         };
