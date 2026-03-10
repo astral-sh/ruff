@@ -39,6 +39,143 @@ src="https://astral.sh/static/GIF/v0.4.5/format_vscode.gif"
 alt="Formatting a document in VS Code"
 />
 
+## Markdown formatting
+
+!!! note "Preview mode required"
+
+    Markdown formatting is currently only available in [preview mode](../preview.md#preview). You must
+    enable [format.preview](./settings.md#format_preview) for Markdown formatting to work in editors.
+
+Ruff can format Python code blocks within Markdown files. This formats fenced code blocks
+(```` ```py ````, ```` ```python ````, etc.) while leaving the rest of the document unchanged.
+See the [formatter documentation](../formatter.md#markdown-code-formatting) for details on which
+code blocks are supported.
+
+### Enabling in VS Code
+
+1. Enable preview mode for the formatter in your settings:
+
+   ```json
+   {
+     "ruff.format.preview": true
+   }
+   ```
+
+2. Set Ruff as the default formatter for Markdown files:
+
+   ```json
+   {
+     "[markdown]": {
+       "editor.defaultFormatter": "charliermarsh.ruff"
+     }
+   }
+   ```
+
+3. Optionally, enable format on save for Markdown:
+
+   ```json
+   {
+     "[markdown]": {
+       "editor.defaultFormatter": "charliermarsh.ruff",
+       "editor.formatOnSave": true
+     }
+   }
+   ```
+
+### Conflicts with other formatters
+
+If you use other Markdown formatters (e.g., Prettier, Markdown All in One), they may conflict with
+Ruff. VS Code only uses one default formatter per language. Recommended approaches:
+
+**Option 1: Use Ruff exclusively for Markdown** (recommended for Python-focused projects)
+
+Set Ruff as the default formatter for Markdown. Ruff only formats Python code blocks and leaves
+other Markdown content unchanged:
+
+```json
+{
+  "[markdown]": {
+    "editor.defaultFormatter": "charliermarsh.ruff"
+  }
+}
+```
+
+**Option 2: Use Ruff for Python, another formatter for Markdown**
+
+If you prefer a general-purpose Markdown formatter for prose, disable Ruff for Markdown and use
+ Ruff only for Python files:
+
+```json
+{
+  "[python]": {
+    "editor.defaultFormatter": "charliermarsh.ruff"
+  },
+  "[markdown]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  }
+}
+```
+
+**Option 3: Format with both (manual)**
+
+Use Ruff for Markdown when you want to format Python code blocks: run `Ruff: Format Document` or
+`Format Document` with Ruff selected. Use your other formatter for general Markdown formatting.
+
+### Configuration
+
+Markdown formatting respects your Ruff configuration. Use `pyproject.toml` or `ruff.toml` to customize
+formatting behavior:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ruff]
+    line-length = 100
+
+    [tool.ruff.format]
+    quote-style = "single"
+    ```
+
+=== "ruff.toml"
+
+    ```toml
+    line-length = 100
+
+    [format]
+    quote-style = "single"
+    ```
+
+To disable Markdown formatting for specific files, add them to `extend-exclude`:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ruff]
+    extend-exclude = ["docs/**/*.md"]
+    ```
+
+=== "ruff.toml"
+
+    ```toml
+    extend-exclude = ["docs/**/*.md"]
+    ```
+
+To format Markdown files with extensions other than `.md` (e.g., `.mdx`, `.qmd`), configure
+[extension mappings](../settings.md#extension):
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ruff]
+    extension = { mdx = "markdown", qmd = "markdown" }
+    ```
+
+=== "ruff.toml"
+
+    ```toml
+    extension = { mdx = "markdown", qmd = "markdown" }
+    ```
+
 ## Code Actions
 
 Code actions are context-sensitive suggestions that can help you fix issues in your code. They are
