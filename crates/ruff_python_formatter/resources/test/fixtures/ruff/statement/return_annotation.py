@@ -192,3 +192,8 @@ def process_board_action(
     payload: WildValue, action_type: Optional[str]
 ) -> Optional[Tuple[str, str]]:
     pass
+
+
+# Regression test: Preserve parentheses around invalid type expressions.
+async def preserve_await_return_annotation() -> (await g()):
+    pass
