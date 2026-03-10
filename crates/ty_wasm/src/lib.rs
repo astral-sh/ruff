@@ -740,7 +740,7 @@ impl Workspace {
     /// but should not be type-checked themselves (e.g. files under `/packages/`).
     ///
     /// If the file already exists, a `Changed` event is emitted (matching the
-    /// behaviour of [`update_file`]). Otherwise, a `Created` event is emitted.
+    /// behaviour of [`Self::update_file`]). Otherwise, a `Created` event is emitted.
     #[wasm_bindgen(js_name = "writeFile")]
     pub fn write_file(&mut self, path: &str, contents: &str) -> Result<(), Error> {
         let path = SystemPath::absolute(path, self.db.project().root(&self.db));
