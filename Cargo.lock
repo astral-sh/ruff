@@ -4899,7 +4899,6 @@ dependencies = [
  "ruff_python_formatter",
  "ruff_source_file",
  "ruff_text_size",
- "serde",
  "serde-wasm-bindgen",
  "tracing",
  "ty_ide",

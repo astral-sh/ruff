@@ -34,8 +34,6 @@ ruff_python_formatter = { workspace = true }
 ruff_source_file = { workspace = true }
 ruff_text_size = { workspace = true }
 
-serde = { workspace = true }
-
 console_error_panic_hook = { workspace = true, optional = true }
 console_log = { workspace = true }
 # Not a direct dependency but required to enable the `wasm_js` feature.

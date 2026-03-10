@@ -126,8 +126,8 @@ export async function installPackages(
 ): Promise<InstallationStatus> {
   if (packages.length === 0) {
     // Clean up previous files if dependencies were removed
-    if (previousFiles.length > 0) {
-      workspace.removePackageFiles(previousFiles);
+    for (const path of previousFiles) {
+      workspace.removeFile(path);
     }
     extractedPackageFiles = [];
     runtimePackages = [];
@@ -156,8 +156,8 @@ export async function installPackages(
     }
 
     // Remove previously written files
-    if (previousFiles.length > 0) {
-      workspace.removePackageFiles(previousFiles);
+    for (const path of previousFiles) {
+      workspace.removeFile(path);
     }
 
     const allWrittenFiles: string[] = [];
@@ -212,7 +212,9 @@ export async function installPackages(
 
         if (packageFiles.length > 0) {
           // Always write to ty MemoryFS for type checking
-          workspace.writePackageFiles(packageFiles);
+          for (const { path, contents } of packageFiles) {
+            workspace.writeFile(path, contents);
+          }
           allWrittenFiles.push(...packageFiles.map((f) => f.path));
 
           // Only store pure-python files for Pyodide FS (stubs don't need runtime)
