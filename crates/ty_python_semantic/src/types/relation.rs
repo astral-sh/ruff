@@ -681,7 +681,8 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 self.check_type_pair(db, source, target_alias.value_type(db))
             }),
 
-            // Pretend that instances of `dataclasses.Field` are assignable to their default type.
+            // Pretend that instances of `dataclasses.Field` are assignable to their default type
+            // and that the converter's output type is assignable to the declared field type.
             // This allows field definitions like `name: str = field(default="")` in dataclasses
             // to pass the assignability check of the inferred type to the declared type.
             (Type::KnownInstance(KnownInstanceType::Field(field)), _)
@@ -691,6 +692,14 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     .default_type(db)
                     .when_none_or(db, self.constraints, |default_type| {
                         self.check_type_pair(db, default_type, target)
+                    })
+                    .and(db, self.constraints, || {
+                        field
+                            .converter(db)
+                            .map(|(_, output_ty)| output_ty)
+                            .when_none_or(db, self.constraints, |converter_output_type| {
+                                self.check_type_pair(db, converter_output_type, target)
+                            })
                     })
             }
 

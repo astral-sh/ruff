@@ -2359,8 +2359,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             dunder_set_result.is_ok()
                         } else {
                             let write_ty = effective_write_type(meta_attr_ty);
-                            let value_ty = infer_value_ty
-                                .infer_silent(self, TypeContext::new(Some(write_ty)));
+                            let value_ty =
+                                infer_value_ty.infer_silent(self, TypeContext::new(Some(write_ty)));
 
                             ensure_assignable_to(self, value_ty, write_ty)
                         };
@@ -2431,8 +2431,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             let instance_attr_ty =
                                 instance_attr_ty.bind_self_typevars(db, object_ty);
                             let write_ty = effective_write_type(instance_attr_ty);
-                            let value_ty = infer_value_ty
-                                .infer_silent(self, TypeContext::new(Some(write_ty)));
+                            let value_ty =
+                                infer_value_ty.infer_silent(self, TypeContext::new(Some(write_ty)));
                             if invalid_assignment_to_final(self, qualifiers) {
                                 return false;
                             }
