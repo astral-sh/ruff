@@ -35,7 +35,7 @@ help: Use `os.path.commonpath()` to compare path components
 6  | # Errors
 7  | os.path.commonprefix(["/usr/lib", "/usr/local/lib"])
    - commonprefix(["/usr/lib", "/usr/local/lib"])
-8  + os.path.commonpath(["/usr/lib", "/usr/local/lib"])
+8  + commonpath(["/usr/lib", "/usr/local/lib"])
 9  | path.commonprefix(["/usr/lib", "/usr/local/lib"])
 10 | 
 11 | # OK
@@ -56,7 +56,7 @@ help: Use `os.path.commonpath()` to compare path components
 7  | os.path.commonprefix(["/usr/lib", "/usr/local/lib"])
 8  | commonprefix(["/usr/lib", "/usr/local/lib"])
    - path.commonprefix(["/usr/lib", "/usr/local/lib"])
-9  + os.path.commonpath(["/usr/lib", "/usr/local/lib"])
+9  + path.commonpath(["/usr/lib", "/usr/local/lib"])
 10 | 
 11 | # OK
 12 | os.path.commonpath(["/usr/lib", "/usr/local/lib"])
