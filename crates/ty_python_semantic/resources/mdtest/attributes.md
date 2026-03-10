@@ -256,6 +256,43 @@ class C:
 reveal_type(C().w)  # revealed: Unknown | Weird
 ```
 
+#### Ecosystem regression: pip SSL context options
+
+```py
+from unknown_module import unknown  # type: ignore
+
+class SSLContext:
+    options: int = 0
+
+def create_context() -> None:
+    context = SSLContext() if unknown else unknown
+    options = 0
+    options |= unknown
+    context.options |= options
+```
+
+#### Ecosystem regression: spack Mach-O header size sync
+
+```py
+from unknown_module import unknown  # type: ignore
+
+class Header:
+    sizeofcmds: int = 0
+
+class Holder:
+    def __init__(self) -> None:
+        self.header = None
+        self.load()
+
+    def load(self) -> None:
+        self.header = Header() if unknown else unknown
+
+    def synchronize_size(self) -> None:
+        if self.header is None:
+            return
+        self.header.sizeofcmds += unknown
+```
+
 #### Attributes defined in tuple unpackings
 
 ```py
