@@ -5172,9 +5172,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // If this is a generic call, attempt to specialize the parameter type using the
                 // declared type context, if provided.
                 if let Some(generic_context) = overload.signature.generic_context {
-                    // Use a forward CSA check to infer typevar specializations from the
-                    // declared type context. For example, if the return type is `list[T]`
-                    // and the declared type context is `list[int]`, CSA produces `T = int`.
+                    // Use a forward assignability check to infer typevar specializations from the
+                    // declared type context. For example, if the return type is `list[T]` and the
+                    // declared type context is `list[int]`, the check produces `T = int`.
                     let mut tcx_mappings = FxHashMap::default();
                     if let Some(declared_return_ty) = call_expression_tcx.annotation {
                         let return_ty = overload
@@ -6061,15 +6061,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // Collect type constraints from the declared element types.
         //
-        // We use a forward CSA check (`collection_instance ≤ tcx`) to infer what each
-        // typevar maps to in the type context. For example, if `tcx = list[int]` and
-        // `collection_instance = list[T]`, the CSA produces `T = int`.
+        // We use a forward assignability check (`collection_instance ≤ tcx`) to infer what each
+        // typevar maps to in the type context. For example, if the type context is `list[int]` and
+        // `collection_instance` is `list[T]`, the check produces `T = int`.
         //
-        // Variance is determined from the constraint bounds: a constraint with only an
-        // upper bound (`lower = Never`) indicates a covariant position, while a constraint
-        // with only a lower bound (`upper = object`) indicates contravariant. This correctly
-        // handles cases where the TCX type is a covariant superclass of the collection
-        // (e.g., `Sequence[Any]` as TCX for `list[T]`).
+        // Variance is determined from the constraint bounds: a constraint with only an upper bound
+        // (`lower = Never`) indicates a covariant position, while a constraint with only a lower
+        // bound (`upper = object`) indicates contravariant. This correctly handles cases where the
+        // type context is a covariant superclass of the collection (e.g., `Sequence[Any]` as type
+        // context for `list[T]`).
         let (elt_tcx_constraints, elt_tcx_variance) = {
             let mut elt_tcx_constraints: FxHashMap<BoundTypeVarIdentity<'_>, Type<'db>> =
                 FxHashMap::default();
@@ -6112,10 +6112,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 });
 
                 match solutions {
-                    // If the TCX type context is not compatible with the collection type
-                    // (e.g., a `list` literal where a `tuple` is expected), the CSA produces
-                    // an unsatisfiable result. In that case, we simply proceed without TCX
-                    // constraints rather than aborting the entire collection literal inference.
+                    // If the type context is not compatible with the collection type (e.g., a
+                    // `list` literal where a `tuple` is expected), the assignability check
+                    // produces an unsatisfiable result. In that case, we simply proceed without
+                    // type context constraints rather than aborting the entire collection literal
+                    // inference.
                     Solutions::Unsatisfiable | Solutions::Unconstrained => {}
                     Solutions::Constrained(solutions) => {
                         for solution in &solutions {
@@ -6154,9 +6155,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             }
                         }
 
-                        // Remove variance entries for typevars whose solutions were
-                        // filtered out (e.g., due to unspecialized typevars). Variance
-                        // should only be tracked for typevars with actual TCX constraints.
+                        // Remove variance entries for typevars whose solutions were filtered out
+                        // (e.g., due to unspecialized typevars). Variance should only be tracked
+                        // for typevars with actual type context constraints.
                         elt_tcx_variance
                             .retain(|identity, _| elt_tcx_constraints.contains_key(identity));
                     }
