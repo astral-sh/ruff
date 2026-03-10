@@ -2558,12 +2558,23 @@ impl InteriorNode {
         }
         drop(storage);
 
+        // negate(n ? C : U : D) = n ? negate(or(C, U)) : 0 : negate(or(D, U))
+        //
+        // The uncertain branch U is absorbed into C and D via union before negation. The result's
+        // uncertain branch is always zero. When U = 0 (the common case), this degenerates to the
+        // standard binary BDD leaf-swap: n ? negate(C) : 0 : negate(D).
         let interior = builder.interior_node_data(self.node());
         let result = NodeId::new(
             builder,
             interior.constraint,
-            interior.if_true.negate(builder),
-            interior.if_false.negate(builder),
+            interior
+                .if_true
+                .or(builder, interior.if_uncertain)
+                .negate(builder),
+            interior
+                .if_false
+                .or(builder, interior.if_uncertain)
+                .negate(builder),
             interior.source_order,
         );
 
