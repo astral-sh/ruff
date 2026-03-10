@@ -527,7 +527,8 @@ impl<'db> Type<'db> {
                 })
             }
 
-            // Pretend that instances of `dataclasses.Field` are assignable to their default type.
+            // Pretend that instances of `dataclasses.Field` are assignable to their default type
+            // and that the converter's output type is assignable to the declared field type.
             // This allows field definitions like `name: str = field(default="")` in dataclasses
             // to pass the assignability check of the inferred type to the declared type.
             (Type::KnownInstance(KnownInstanceType::Field(field)), right)
@@ -545,6 +546,22 @@ impl<'db> Type<'db> {
                             relation_visitor,
                             disjointness_visitor,
                         )
+                    })
+                    .and(db, constraints, || {
+                        field
+                            .converter(db)
+                            .map(|(_, output_ty)| output_ty)
+                            .when_none_or(db, constraints, |converter_output_type| {
+                                converter_output_type.has_relation_to_impl(
+                                    db,
+                                    right,
+                                    constraints,
+                                    inferable,
+                                    relation,
+                                    relation_visitor,
+                                    disjointness_visitor,
+                                )
+                            })
                     })
             }
 

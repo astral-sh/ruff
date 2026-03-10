@@ -1219,27 +1219,18 @@ impl<'db> StaticClassLiteral<'db> {
 
         let signature_from_fields = |mut parameters: Vec<_>, return_ty: Type<'db>| {
             for (field_name, field) in self.fields(db, specialization, field_policy) {
-                let (init, mut default_ty, kw_only, alias, converter_input_type) =
-                    match &field.kind {
-                        FieldKind::NamedTuple { default_ty } => {
-                            (true, *default_ty, None, None, None)
-                        }
-                        FieldKind::Dataclass {
-                            init,
-                            default_ty,
-                            kw_only,
-                            alias,
-                            converter_input_type,
-                            ..
-                        } => (
-                            *init,
-                            *default_ty,
-                            *kw_only,
-                            alias.as_ref(),
-                            *converter_input_type,
-                        ),
-                        FieldKind::TypedDict { .. } => continue,
-                    };
+                let (init, mut default_ty, kw_only, alias, converter) = match &field.kind {
+                    FieldKind::NamedTuple { default_ty } => (true, *default_ty, None, None, None),
+                    FieldKind::Dataclass {
+                        init,
+                        default_ty,
+                        kw_only,
+                        alias,
+                        converter,
+                        ..
+                    } => (*init, *default_ty, *kw_only, alias.as_ref(), *converter),
+                    FieldKind::TypedDict { .. } => continue,
+                };
                 let mut field_ty = field.declared_ty;
 
                 if name == "__init__" && !init {
@@ -1307,8 +1298,8 @@ impl<'db> StaticClassLiteral<'db> {
                     }
                 }
 
-                if let Some(converter_ty) = converter_input_type {
-                    field_ty = converter_ty;
+                if let Some((converter_input_ty, _)) = converter {
+                    field_ty = converter_input_ty;
                 }
 
                 let is_kw_only =
@@ -2142,7 +2133,7 @@ impl<'db> StaticClassLiteral<'db> {
                 let mut init = true;
                 let mut kw_only = None;
                 let mut alias = None;
-                let mut converter_input_type = None;
+                let mut converter = None;
                 if let Some(Type::KnownInstance(KnownInstanceType::Field(field))) = default_ty {
                     default_ty = field.default_type(db);
                     if self
@@ -2157,7 +2148,7 @@ impl<'db> StaticClassLiteral<'db> {
                         init = field.init(db);
                         kw_only = field.kw_only(db);
                         alias = field.alias(db);
-                        converter_input_type = field.converter_input_type(db);
+                        converter = field.converter(db);
                     }
                 }
 
@@ -2169,7 +2160,7 @@ impl<'db> StaticClassLiteral<'db> {
                         init,
                         kw_only,
                         alias,
-                        converter_input_type,
+                        converter,
                     },
                     CodeGeneratorKind::TypedDict => {
                         let is_required = if attr.is_required() {
@@ -2843,12 +2834,8 @@ impl<'db> StaticClassLiteral<'db> {
         }
         let fields = self.own_fields(db, None, field_policy);
         let field = fields.get(name)?;
-        if let FieldKind::Dataclass {
-            converter_input_type,
-            ..
-        } = field.kind
-        {
-            converter_input_type
+        if let FieldKind::Dataclass { converter, .. } = field.kind {
+            converter.map(|(input_ty, _)| input_ty)
         } else {
             None
         }

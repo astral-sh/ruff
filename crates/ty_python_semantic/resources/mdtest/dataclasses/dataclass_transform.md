@@ -1767,7 +1767,7 @@ class PermissiveNumber:
 
 @my_model
 class WithClassConverter:
-    a: int = field(converter=PermissiveNumber)
+    a: PermissiveNumber = field(converter=PermissiveNumber)
     b: float = field(converter=float)
 
 # revealed: (self: WithClassConverter, a: int | str, b: str | Buffer | SupportsFloat | SupportsIndex) -> None
@@ -1777,7 +1777,7 @@ WithClassConverter(1, 2.5)
 WithClassConverter("1", "2.5")
 
 with_class_converter = WithClassConverter("1", "2.5")
-reveal_type(with_class_converter.a)  # revealed: int
+reveal_type(with_class_converter.a)  # revealed: PermissiveNumber
 reveal_type(with_class_converter.b)  # revealed: int | float
 
 with_class_converter.a = "2"
@@ -1832,6 +1832,35 @@ reveal_type(WithVariadicConverter.__init__)  # revealed: (self: WithVariadicConv
 
 WithVariadicConverter("1")
 WithVariadicConverter(1)  # error: [invalid-argument-type]
+```
+
+When the declared field type does not match the converter's output type, we emit a diagnostic:
+
+```py
+@my_model
+class WrongConverterOutput:
+    # error: [invalid-assignment] "Object of type `dataclasses.Field[int]` is not assignable to `bytes`"
+    x: bytes = field(converter=str_to_int)
+```
+
+This also works for overloaded converters with multiple output types:
+
+```py
+@overload
+def validate(x: str) -> str: ...
+@overload
+def validate(x: int) -> int: ...
+def validate(x: str | int) -> str | int:
+    return x
+
+@my_model
+class WrongOverloadedConverterOutput:
+    correct: str | int = field(converter=validate)
+
+    # error: [invalid-assignment] "Object of type `dataclasses.Field[str | int]` is not assignable to `int`"
+    incorrect1: int = field(converter=validate)
+    # error: [invalid-assignment] "Object of type `dataclasses.Field[str | int]` is not assignable to `str`"
+    incorrect2: str = field(converter=validate)
 ```
 
 We also validate writes to unions of converter fields:

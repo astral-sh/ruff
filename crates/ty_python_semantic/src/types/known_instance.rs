@@ -132,8 +132,9 @@ pub(super) fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Size
             if let Some(default_ty) = field.default_type(db) {
                 visitor.visit_type(db, default_ty);
             }
-            if let Some(converter_ty) = field.converter_input_type(db) {
-                visitor.visit_type(db, converter_ty);
+            if let Some((input_ty, output_ty)) = field.converter(db) {
+                visitor.visit_type(db, input_ty);
+                visitor.visit_type(db, output_ty);
             }
         }
         KnownInstanceType::UnionType(instance) => {
@@ -367,9 +368,10 @@ pub struct FieldInstance<'db> {
     /// This name is used to provide an alternative parameter name in the synthesized `__init__` method.
     pub alias: Option<Box<str>>,
 
-    /// The type of the first positional parameter of the converter callable, if a `converter`
-    /// argument was provided.
-    pub converter_input_type: Option<Type<'db>>,
+    /// The converter types for this field, if a `converter` argument was provided.
+    /// The first element is the input type (first positional parameter), the second is the
+    /// output type (return type of the converter callable).
+    pub converter: Option<(Type<'db>, Type<'db>)>,
 }
 
 // The Salsa heap is tracked separately.
@@ -391,12 +393,19 @@ impl<'db> FieldInstance<'db> {
             ),
             None => None,
         };
-        let converter_input_type = match self.converter_input_type(db) {
-            Some(ty) if nested => Some(ty.recursive_type_normalized_impl(db, div, true)?),
-            Some(ty) => Some(
-                ty.recursive_type_normalized_impl(db, div, true)
+        let converter = match self.converter(db) {
+            Some((input_ty, output_ty)) if nested => Some((
+                input_ty.recursive_type_normalized_impl(db, div, true)?,
+                output_ty.recursive_type_normalized_impl(db, div, true)?,
+            )),
+            Some((input_ty, output_ty)) => Some((
+                input_ty
+                    .recursive_type_normalized_impl(db, div, true)
                     .unwrap_or(div),
-            ),
+                output_ty
+                    .recursive_type_normalized_impl(db, div, true)
+                    .unwrap_or(div),
+            )),
             None => None,
         };
         Some(FieldInstance::new(
@@ -405,7 +414,7 @@ impl<'db> FieldInstance<'db> {
             self.init(db),
             self.kw_only(db),
             self.alias(db),
-            converter_input_type,
+            converter,
         ))
     }
 }

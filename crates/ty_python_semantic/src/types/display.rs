@@ -2885,9 +2885,15 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'db> {
             KnownInstanceType::Deprecated(_) => f.write_str("warnings.deprecated"),
             KnownInstanceType::Field(field) => {
                 f.with_type(ty).write_str("dataclasses.Field")?;
-                if let Some(default_ty) = field.default_type(self.db) {
+
+                let field_type = field
+                    .converter(self.db)
+                    .map(|(_, converter_output)| converter_output)
+                    .or(field.default_type(self.db));
+
+                if let Some(field_ty) = field_type {
                     f.write_char('[')?;
-                    write!(f.with_type(default_ty), "{}", default_ty.display(self.db))?;
+                    write!(f.with_type(field_ty), "{}", field_ty.display(self.db))?;
                     f.write_char(']')?;
                 }
                 Ok(())

@@ -1978,8 +1978,10 @@ pub(crate) enum FieldKind<'db> {
         kw_only: Option<bool>,
         /// The name for this field in the `__init__` signature, if specified.
         alias: Option<Box<str>>,
-        /// The type of the converter's first positional parameter, if a `converter` was specified.
-        converter_input_type: Option<Type<'db>>,
+        /// The converter types for this field, if a `converter` was specified.
+        /// The first element is the input type (first positional parameter), the second is the
+        /// output type (return type of the converter callable).
+        converter: Option<(Type<'db>, Type<'db>)>,
     },
     /// `TypedDict` field metadata
     TypedDict {
