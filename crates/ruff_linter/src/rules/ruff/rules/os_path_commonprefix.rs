@@ -2,8 +2,9 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
 
-use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::importer::ImportRequest;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for uses of `os.path.commonprefix`.
@@ -43,14 +44,14 @@ use crate::checkers::ast::Checker;
 #[violation_metadata(preview_since = "NEXT_RUFF_VERSION")]
 pub(crate) struct OsPathCommonprefix;
 
-impl Violation for OsPathCommonprefix {
+impl AlwaysFixableViolation for OsPathCommonprefix {
     #[derive_message_formats]
     fn message(&self) -> String {
         "`os.path.commonprefix()` compares strings character-by-character".to_string()
     }
 
-    fn fix_title(&self) -> Option<String> {
-        Some("Use `os.path.commonpath()` to compare path components".to_string())
+    fn fix_title(&self) -> String {
+        "Use `os.path.commonpath()` to compare path components".to_string()
     }
 }
 
@@ -61,4 +62,14 @@ pub(crate) fn os_path_commonprefix(checker: &Checker, call: &ast::ExprCall, segm
     }
     let mut diagnostic = checker.report_diagnostic(OsPathCommonprefix, call.func.range());
     diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
+
+    diagnostic.try_set_fix(|| {
+        let (import_edit, binding) = checker.importer().get_or_import_symbol(
+            &ImportRequest::import_from("os.path", "commonpath"),
+            call.func.start(),
+            checker.semantic(),
+        )?;
+        let reference_edit = Edit::range_replacement(binding, call.func.range());
+        Ok(Fix::unsafe_edits(import_edit, [reference_edit]))
+    });
 }
