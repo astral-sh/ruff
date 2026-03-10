@@ -813,3 +813,9 @@ lambda x: (
     lambda  # dangling header comment
     : (x := 1)
 )
+
+
+# Regression tests for https://github.com/astral-sh/ruff/issues/23851
+foo = lambda x: 'hello this is a really long string that then get concatenated ' 'with another string that prints {x!r}'
+
+# foo = lambda x: 'hello this is a really long string that then get concatenated ' 'with another string that prints {x!r}'.format(x=x)
