@@ -2645,33 +2645,91 @@ impl InteriorNode {
         let other_interior = builder.interior_node_data(other.node());
         let other_ordering = other_interior.constraint.ordering();
         let result = match self_ordering.cmp(&other_ordering) {
-            Ordering::Equal => NodeId::new(
-                builder,
-                self_interior.constraint,
-                self_interior
+            // This is one of Duboc's optimizations over Frisch's original TDD operators. Frisch
+            // always sets the if_uncertain branch to ALWAYS_FALSE, and always distributes both
+            // input if_uncertain branchs into the corresponding if_true and if_false branches.
+            // Duboc propagates the input if_uncertain branches into the result's if_uncertain
+            // branch.
+            //
+            //     n ? (C1 ∧ (C2 ∨ U2)) ∨ (U1 ∧ C2) : U1 ∧ U2 : (D1 ∧ (U2 ∨ D2)) ∨ (U1 ∧ D2)
+            //
+            // See [Duboc2026], §11.2 for more details.
+            Ordering::Equal => {
+                let if_true = self_interior
                     .if_true
-                    .and_inner(builder, other_interior.if_true, other_offset),
-                self_interior
+                    .and_inner(
+                        builder,
+                        other_interior.if_true.or_inner(
+                            builder,
+                            other_interior.if_uncertain,
+                            other_offset,
+                        ),
+                        other_offset,
+                    )
+                    .or_inner(
+                        builder,
+                        self_interior.if_uncertain.and_inner(
+                            builder,
+                            other_interior.if_true,
+                            other_offset,
+                        ),
+                        0,
+                    );
+                let if_uncertain = self_interior.if_uncertain.and_inner(
+                    builder,
+                    other_interior.if_uncertain,
+                    other_offset,
+                );
+                let if_false = self_interior
                     .if_false
-                    .and_inner(builder, other_interior.if_false, other_offset),
-                self_interior.source_order,
-            ),
-            Ordering::Less => NodeId::new(
+                    .and_inner(
+                        builder,
+                        other_interior.if_uncertain.or_inner(
+                            builder,
+                            other_interior.if_false,
+                            other_offset,
+                        ),
+                        other_offset,
+                    )
+                    .or_inner(
+                        builder,
+                        self_interior.if_uncertain.and_inner(
+                            builder,
+                            other_interior.if_false,
+                            other_offset,
+                        ),
+                        0,
+                    );
+                NodeId::with_uncertain(
+                    builder,
+                    self_interior.constraint,
+                    if_true,
+                    if_uncertain,
+                    if_false,
+                    self_interior.source_order,
+                )
+            }
+            Ordering::Less => NodeId::with_uncertain(
                 builder,
                 self_interior.constraint,
                 self_interior
                     .if_true
                     .and_inner(builder, other.node(), other_offset),
                 self_interior
+                    .if_uncertain
+                    .and_inner(builder, other.node(), other_offset),
+                self_interior
                     .if_false
                     .and_inner(builder, other.node(), other_offset),
                 self_interior.source_order,
             ),
-            Ordering::Greater => NodeId::new(
+            Ordering::Greater => NodeId::with_uncertain(
                 builder,
                 other_interior.constraint,
                 self.node()
                     .and_inner(builder, other_interior.if_true, other_offset),
+                self.node()
+                    .and_inner(builder, other_interior.if_uncertain, other_offset),
                 self.node()
                     .and_inner(builder, other_interior.if_false, other_offset),
                 other_interior.source_order + other_offset,
