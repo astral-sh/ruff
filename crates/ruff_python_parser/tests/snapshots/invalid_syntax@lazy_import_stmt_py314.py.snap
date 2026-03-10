@@ -1,0 +1,77 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+---
+## AST
+
+```
+Module(
+    ModModule {
+        node_index: NodeIndex(None),
+        range: 0..85,
+        body: [
+            Import(
+                StmtImport {
+                    node_index: NodeIndex(None),
+                    range: 44..59,
+                    names: [
+                        Alias {
+                            range: 56..59,
+                            node_index: NodeIndex(None),
+                            name: Identifier {
+                                id: Name("foo"),
+                                range: 56..59,
+                                node_index: NodeIndex(None),
+                            },
+                            asname: None,
+                        },
+                    ],
+                    is_lazy: true,
+                },
+            ),
+            ImportFrom(
+                StmtImportFrom {
+                    node_index: NodeIndex(None),
+                    range: 60..84,
+                    module: Some(
+                        Identifier {
+                            id: Name("bar"),
+                            range: 70..73,
+                            node_index: NodeIndex(None),
+                        },
+                    ),
+                    names: [
+                        Alias {
+                            range: 81..84,
+                            node_index: NodeIndex(None),
+                            name: Identifier {
+                                id: Name("baz"),
+                                range: 81..84,
+                                node_index: NodeIndex(None),
+                            },
+                            asname: None,
+                        },
+                    ],
+                    level: 0,
+                    is_lazy: true,
+                },
+            ),
+        ],
+    },
+)
+```
+## Unsupported Syntax Errors
+
+  |
+1 | # parse_options: {"target-version": "3.14"}
+2 | lazy import foo
+  | ^^^^ Syntax Error: Cannot use `lazy` import statement on Python 3.14 (syntax was added in Python 3.15)
+3 | lazy from bar import baz
+  |
+
+
+  |
+1 | # parse_options: {"target-version": "3.14"}
+2 | lazy import foo
+3 | lazy from bar import baz
+  | ^^^^ Syntax Error: Cannot use `lazy` import statement on Python 3.14 (syntax was added in Python 3.15)
+  |

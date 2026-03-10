@@ -64,7 +64,7 @@ d3: dict[str, int] = {"x": 1}
 d4: TD = dict(x=1)
 d5: TD = dict(x="1")  # error: [invalid-argument-type]
 
-reveal_type(d1)  # revealed: dict[Unknown | str, Unknown | int]
+reveal_type(d1)  # revealed: dict[str, int]
 reveal_type(d2)  # revealed: TD
 reveal_type(d3)  # revealed: dict[str, int]
 reveal_type(d4)  # revealed: TD
@@ -91,34 +91,25 @@ from typing import overload, Callable
 def list1[T](x: T) -> list[T]:
     return [x]
 
-def get_data() -> dict | None:
-    return {}
+def f() -> list[object]:
+    reveal_type(list1(1))  # revealed: list[int]
+    # `list[int]` and `list[object]` are incompatible, but the return type check passes here
+    # because the type of `list1(res)` is inferred by bidirectional type inference using the
+    # annotated return type, and the type of `res` is not used.
+    return list1(1)
 
-def wrap_data() -> list[dict]:
-    if not (res := get_data()):
-        return list1({})
-    reveal_type(list1(res))  # revealed: list[dict[Unknown, Unknown] & ~AlwaysFalsy]
-    # `list[dict[Unknown, Unknown] & ~AlwaysFalsy]` and `list[dict[Unknown, Unknown]]` are incompatible,
-    # but the return type check passes here because the type of `list1(res)` is inferred
-    # by bidirectional type inference using the annotated return type, and the type of `res` is not used.
-    return list1(res)
-
-def wrap_data2() -> list[dict] | None:
-    if not (res := get_data()):
-        return None
-    reveal_type(list1(res))  # revealed: list[dict[Unknown, Unknown] & ~AlwaysFalsy]
-    return list1(res)
+def f2() -> list[object] | None:
+    reveal_type(list1(1))  # revealed: list[int]
+    return list1(1)
 
 def deco[T](func: Callable[[], T]) -> Callable[[], T]:
     return func
 
-def outer() -> Callable[[], list[dict]]:
+def outer() -> Callable[[], list[object]]:
     @deco
-    def inner() -> list[dict]:
-        if not (res := get_data()):
-            return list1({})
-        reveal_type(list1(res))  # revealed: list[dict[Unknown, Unknown] & ~AlwaysFalsy]
-        return list1(res)
+    def inner() -> list[object]:
+        reveal_type(list1(1))  # revealed: list[int]
+        return list1(1)
     return inner
 
 @overload
@@ -305,6 +296,11 @@ def _(flag: bool):
 
 ## Dunder Calls
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 The key and value parameters types are used as type context for `__setitem__` dunder calls:
 
 ```py
@@ -330,6 +326,33 @@ def _(x: X | dict[Bar, Bar]):
     x[{"baz": 1}] = {"baz": 2}
 ```
 
+Similarly, the value type for augmented assignment dunder calls is inferred with type context:
+
+```py
+from typing import TypedDict
+
+def lst[T](x: T) -> list[T]:
+    return [x]
+
+class Bar(TypedDict, closed=False):
+    bar: list[int]
+
+def _(bar: Bar):
+    bar |= reveal_type({"bar": lst(1)})  # revealed: Bar
+
+class Bar2(TypedDict):
+    bar: list[int | None]
+
+class X:
+    def __ior__(self, other: Bar2): ...
+
+def _(x: X):
+    x |= reveal_type({"bar": lst(1)})  # revealed: Bar2
+
+def _(x: X | Bar):
+    x |= {"bar": lst(1)}
+```
+
 ## Multi-inference diagnostics
 
 ```toml
@@ -342,6 +365,8 @@ Diagnostics unrelated to the type-context are only reported once:
 `call.py`:
 
 ```py
+from typing import TypedDict
+
 def f[T](x: T) -> list[T]:
     return [x]
 
@@ -363,6 +388,22 @@ def _(x: int):
 
     # error: [possibly-unresolved-reference] "Name `z` used when possibly not defined"
     y(f(True), [z])
+
+class Bar(TypedDict):
+    bar: int
+
+class Bar2(TypedDict):
+    bar: int
+
+class Bar3(TypedDict):
+    bar: int
+
+def _(flag: bool, bar: Bar | Bar2 | Bar3):
+    if flag:
+        y = 1
+
+    # error: [possibly-unresolved-reference]
+    bar |= {"bar": y}
 ```
 
 `call_standalone_expression.py`:

@@ -11,7 +11,7 @@ use crate::fix::edits::{Parentheses, remove_argument};
 use crate::{Fix, FixAvailability, Violation};
 
 /// ## What it does
-/// Checks for usages of `collections.deque` that have an empty iterable as the first argument.
+/// Checks for use of `collections.deque` with an empty iterable as the first argument.
 ///
 /// ## Why is this bad?
 /// It's unnecessary to use an empty literal as a deque's iterable, since this is already the default behavior.
@@ -46,7 +46,7 @@ use crate::{Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: `collections.deque`](https://docs.python.org/3/library/collections.html#collections.deque)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.9.0")]
+#[violation_metadata(stable_since = "0.15.0")]
 pub(crate) struct UnnecessaryEmptyIterableWithinDequeCall {
     has_maxlen: bool,
 }

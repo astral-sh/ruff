@@ -268,7 +268,7 @@ impl ty_python_semantic::Db for CorpusDb {
         false
     }
 
-    fn analysis_settings(&self) -> &AnalysisSettings {
+    fn analysis_settings(&self, _file: File) -> &AnalysisSettings {
         &self.analysis_settings
     }
 }

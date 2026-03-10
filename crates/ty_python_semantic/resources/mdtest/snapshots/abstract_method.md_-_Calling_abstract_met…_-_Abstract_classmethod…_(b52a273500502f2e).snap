@@ -1,0 +1,49 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: abstract_method.md - Calling abstract methods on class objects - Abstract classmethod with trivial body on class literal
+mdtest path: crates/ty_python_semantic/resources/mdtest/call/abstract_method.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | from abc import ABC, abstractmethod
+2 | 
+3 | class Foo(ABC):
+4 |     @classmethod
+5 |     @abstractmethod
+6 |     def method(cls) -> int: ...
+7 | 
+8 | # error: [call-abstract-method] "Cannot call `method` on class object"
+9 | Foo.method()
+```
+
+# Diagnostics
+
+```
+error[call-abstract-method]: Cannot call `method` on class object
+ --> src/mdtest_snippet.py:9:1
+  |
+8 | # error: [call-abstract-method] "Cannot call `method` on class object"
+9 | Foo.method()
+  | ^^^^^^^^^^^^ `method` is an abstract classmethod with a trivial body
+  |
+info: Method `method` defined here
+ --> src/mdtest_snippet.py:6:9
+  |
+4 |     @classmethod
+5 |     @abstractmethod
+6 |     def method(cls) -> int: ...
+  |         ^^^^^^
+7 |
+8 | # error: [call-abstract-method] "Cannot call `method` on class object"
+  |
+info: rule `call-abstract-method` is enabled by default
+
+```

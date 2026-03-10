@@ -64,6 +64,37 @@ def g(x: Any = "foo"):
     reveal_type(x)  # revealed: Any
 ```
 
+## TypedDict defaults use annotation context
+
+```py
+from typing import TypedDict
+
+class Foo(TypedDict):
+    x: int
+
+def x(a: Foo = {"x": 42}): ...
+def y(a: Foo = dict(x=42)): ...
+```
+
+## TypedDict defaults still validate keys and value types
+
+```py
+from typing import TypedDict
+
+class Foo(TypedDict):
+    x: int
+    y: int
+
+# error: [missing-typed-dict-key]
+def missing_key(a: Foo = {"x": 42}): ...
+
+# error: [invalid-argument-type]
+def wrong_type(a: Foo = {"x": "s", "y": 1}): ...
+
+# error: [invalid-key]
+def extra_key(a: Foo = {"x": 1, "y": 2, "z": 3}): ...
+```
+
 ## Stub functions
 
 ```toml

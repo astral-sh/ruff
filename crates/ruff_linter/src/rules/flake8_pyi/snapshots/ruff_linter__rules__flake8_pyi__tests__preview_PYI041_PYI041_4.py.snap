@@ -1,0 +1,76 @@
+---
+source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
+---
+--- Linter settings ---
+-linter.preview = disabled
++linter.preview = enabled
+
+--- Summary ---
+Removed: 0
+Added: 4
+
+--- Added ---
+PYI041 Use `float` instead of `int | float`
+ --> PYI041_4.py:4:11
+  |
+4 | def f1(a: "U" "no[int, fl" "oat, Foo]") -> "None": ...
+  |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+5 | def f2(a: "Uno[int, float, Foo]") -> "None": ...
+6 | def f3(a: """Uno[int, float, Foo]""") -> "None": ...
+  |
+help: Remove redundant type
+
+
+PYI041 [*] Use `float` instead of `int | float`
+ --> PYI041_4.py:5:12
+  |
+4 | def f1(a: "U" "no[int, fl" "oat, Foo]") -> "None": ...
+5 | def f2(a: "Uno[int, float, Foo]") -> "None": ...
+  |            ^^^^^^^^^^^^^^^^^^^^
+6 | def f3(a: """Uno[int, float, Foo]""") -> "None": ...
+7 | def f4(a: "Uno[in\
+  |
+help: Remove redundant type
+2 | 
+3 | 
+4 | def f1(a: "U" "no[int, fl" "oat, Foo]") -> "None": ...
+  - def f2(a: "Uno[int, float, Foo]") -> "None": ...
+5 + def f2(a: "Uno[float, Foo]") -> "None": ...
+6 | def f3(a: """Uno[int, float, Foo]""") -> "None": ...
+7 | def f4(a: "Uno[in\
+8 | t, float, Foo]") -> "None": ...
+note: This is an unsafe fix and may change runtime behavior
+
+
+PYI041 [*] Use `float` instead of `int | float`
+ --> PYI041_4.py:6:14
+  |
+4 | def f1(a: "U" "no[int, fl" "oat, Foo]") -> "None": ...
+5 | def f2(a: "Uno[int, float, Foo]") -> "None": ...
+6 | def f3(a: """Uno[int, float, Foo]""") -> "None": ...
+  |              ^^^^^^^^^^^^^^^^^^^^
+7 | def f4(a: "Uno[in\
+8 | t, float, Foo]") -> "None": ...
+  |
+help: Remove redundant type
+3 | 
+4 | def f1(a: "U" "no[int, fl" "oat, Foo]") -> "None": ...
+5 | def f2(a: "Uno[int, float, Foo]") -> "None": ...
+  - def f3(a: """Uno[int, float, Foo]""") -> "None": ...
+6 + def f3(a: """Uno[float, Foo]""") -> "None": ...
+7 | def f4(a: "Uno[in\
+8 | t, float, Foo]") -> "None": ...
+note: This is an unsafe fix and may change runtime behavior
+
+
+PYI041 Use `float` instead of `int | float`
+ --> PYI041_4.py:7:11
+  |
+5 |   def f2(a: "Uno[int, float, Foo]") -> "None": ...
+6 |   def f3(a: """Uno[int, float, Foo]""") -> "None": ...
+7 |   def f4(a: "Uno[in\
+  |  ___________^
+8 | | t, float, Foo]") -> "None": ...
+  | |_______________^
+  |
+help: Remove redundant type

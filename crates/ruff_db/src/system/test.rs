@@ -8,7 +8,7 @@ use crate::Db;
 use crate::files::File;
 use crate::system::{
     CaseSensitivity, DirectoryEntry, GlobError, MemoryFileSystem, Metadata, Result, System,
-    SystemPath, SystemPathBuf, SystemVirtualPath,
+    SystemPath, SystemPathBuf, SystemVirtualPath, WhichError, WhichResult,
 };
 
 use super::WritableSystem;
@@ -133,6 +133,10 @@ impl System for TestSystem {
         self.system().cache_dir()
     }
 
+    fn which(&self, _name: &str) -> WhichResult {
+        Err(WhichError::CannotFindBinaryPath)
+    }
+
     fn read_directory<'a>(
         &'a self,
         path: &SystemPath,
@@ -193,10 +197,7 @@ impl System for TestSystem {
 
 impl Default for TestSystem {
     fn default() -> Self {
-        Self {
-            inner: Arc::new(InMemorySystem::default()),
-            env_overrides: Arc::new(Mutex::new(FxHashMap::default())),
-        }
+        Self::new(InMemorySystem::default())
     }
 }
 
@@ -401,6 +402,10 @@ impl System for InMemorySystem {
 
     fn cache_dir(&self) -> Option<SystemPathBuf> {
         None
+    }
+
+    fn which(&self, _name: &str) -> WhichResult {
+        Err(WhichError::CannotFindBinaryPath)
     }
 
     fn read_directory<'a>(

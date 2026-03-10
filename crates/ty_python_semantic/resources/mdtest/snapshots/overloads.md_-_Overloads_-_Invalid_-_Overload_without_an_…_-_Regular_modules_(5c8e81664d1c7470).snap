@@ -16,16 +16,16 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/overloads.md
  1 | from typing import overload
  2 | 
  3 | @overload
- 4 | def func(x: int) -> int: ...
- 5 | @overload
- 6 | # error: [invalid-overload] "Overloads for function `func` must be followed by a non-`@overload`-decorated implementation function"
+ 4 | # error: [invalid-overload] "Overloads for function `func` must be followed by a non-`@overload`-decorated implementation function"
+ 5 | def func(x: int) -> int: ...
+ 6 | @overload
  7 | def func(x: str) -> str: ...
  8 | 
  9 | class Foo:
 10 |     @overload
-11 |     def method(self, x: int) -> int: ...
-12 |     @overload
-13 |     # error: [invalid-overload] "Overloads for function `method` must be followed by a non-`@overload`-decorated implementation function"
+11 |     # error: [invalid-overload] "Overloads for function `method` must be followed by a non-`@overload`-decorated implementation function"
+12 |     def method(self, x: int) -> int: ...
+13 |     @overload
 14 |     def method(self, x: str) -> str: ...
 ```
 
@@ -33,14 +33,14 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/overloads.md
 
 ```
 error[invalid-overload]: Overloads for function `func` must be followed by a non-`@overload`-decorated implementation function
- --> src/mdtest_snippet.py:7:5
+ --> src/mdtest_snippet.py:5:5
   |
-5 | @overload
-6 | # error: [invalid-overload] "Overloads for function `func` must be followed by a non-`@overload`-decorated implementation function"
-7 | def func(x: str) -> str: ...
+3 | @overload
+4 | # error: [invalid-overload] "Overloads for function `func` must be followed by a non-`@overload`-decorated implementation function"
+5 | def func(x: int) -> int: ...
   |     ^^^^
-8 |
-9 | class Foo:
+6 | @overload
+7 | def func(x: str) -> str: ...
   |
 info: Attempting to call `func` will raise `TypeError` at runtime
 info: Overloaded functions without implementations are only permitted:
@@ -55,12 +55,14 @@ info: rule `invalid-overload` is enabled by default
 
 ```
 error[invalid-overload]: Overloads for function `method` must be followed by a non-`@overload`-decorated implementation function
-  --> src/mdtest_snippet.py:14:9
+  --> src/mdtest_snippet.py:12:9
    |
-12 |     @overload
-13 |     # error: [invalid-overload] "Overloads for function `method` must be followed by a non-`@overload`-decorated implementation functi…
-14 |     def method(self, x: str) -> str: ...
+10 |     @overload
+11 |     # error: [invalid-overload] "Overloads for function `method` must be followed by a non-`@overload`-decorated implementation functi…
+12 |     def method(self, x: int) -> int: ...
    |         ^^^^^^
+13 |     @overload
+14 |     def method(self, x: str) -> str: ...
    |
 info: Attempting to call `method` will raise `TypeError` at runtime
 info: Overloaded functions without implementations are only permitted:

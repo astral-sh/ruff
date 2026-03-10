@@ -141,6 +141,7 @@ mod tests {
         fib.py:1:8: error[unused-import] `os` imported but unused
         fib.py:6:5: error[unused-variable] Local variable `x` is assigned to but never used
         undef.py:1:4: error[undefined-name] Undefined name `a`
+        fib.py:12:16: error[undefined-name] Undefined name `fibonaccii`
         ");
     }
 
@@ -154,6 +155,7 @@ mod tests {
         fib.py:1:8: F401 [*] `os` imported but unused
         fib.py:6:5: F841 [*] Local variable `x` is assigned to but never used
         undef.py:1:4: F821 Undefined name `a`
+        fib.py:12:16: F821 Undefined name `fibonaccii`
         ");
     }
 
@@ -168,6 +170,7 @@ mod tests {
         fib.py:1:8: F401 [*] `os` imported but unused
         fib.py:6:5: F841 [*] Local variable `x` is assigned to but never used
         undef.py:1:4: F821 Undefined name `a`
+        fib.py:12:16: F821 Undefined name `fibonaccii`
         ");
     }
 

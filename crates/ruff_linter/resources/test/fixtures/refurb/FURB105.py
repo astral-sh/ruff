@@ -37,3 +37,9 @@ print("foo", "", "bar", "", sep=",")
 print("", "", **kwargs)
 print(*args, sep=",")
 print(f"foo")
+
+
+print(
+    # text
+    ""
+)

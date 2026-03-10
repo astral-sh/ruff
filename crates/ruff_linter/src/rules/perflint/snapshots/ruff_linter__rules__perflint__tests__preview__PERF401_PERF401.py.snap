@@ -628,3 +628,53 @@ help: Replace for loop with list comprehension
 292 | G_INDEX = None
 293 | def f():
 note: This is an unsafe fix and may change runtime behavior
+
+PERF401 [*] Use a list comprehension to create a transformed list
+   --> PERF401.py:318:13
+    |
+316 |             # comment
+317 |         ):
+318 |             filtered.append(i)
+    |             ^^^^^^^^^^^^^^^^^^
+319 |
+320 | def f():
+    |
+help: Replace for loop with list comprehension
+309 | def f():
+310 |     # comment duplication in if test (https://github.com/astral-sh/ruff/issues/18787)
+311 |     original = list(range(10000))
+    -     filtered = []
+    -     for i in original:
+    -         if (
+    -             i
+    -             # comment
+    -         ):
+    -             filtered.append(i)
+312 +     # comment
+313 +     filtered = [i for i in original if i]
+314 | 
+315 | def f():
+316 |     # comment duplication in target (https://github.com/astral-sh/ruff/issues/18787)
+note: This is an unsafe fix and may change runtime behavior
+
+PERF401 [*] Use a list comprehension to create a transformed list
+   --> PERF401.py:328:13
+    |
+326 |     ) in original:
+327 |         if i > 0:
+328 |             filtered.append(i)
+    |             ^^^^^^^^^^^^^^^^^^
+    |
+help: Replace for loop with list comprehension
+320 | def f():
+321 |     # comment duplication in target (https://github.com/astral-sh/ruff/issues/18787)
+322 |     original = list(range(10000))
+    -     filtered = []
+    -     for (
+    -         i  # comment
+    -     ) in original:
+    -         if i > 0:
+    -             filtered.append(i)
+323 +     # comment
+324 +     filtered = [i for i in original if i > 0]
+note: This is an unsafe fix and may change runtime behavior

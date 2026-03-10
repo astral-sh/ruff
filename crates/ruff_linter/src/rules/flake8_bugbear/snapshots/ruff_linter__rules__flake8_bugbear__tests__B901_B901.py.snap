@@ -64,3 +64,30 @@ B901 Using `yield` and `return {value}` in a generator function can lead to conf
 88 |     return [1, 2, 3]
    |     ^^^^^^^^^^^^^^^^
    |
+
+B901 Using `yield` and `return {value}` in a generator function can lead to confusing behavior
+   --> B901.py:116:5
+    |
+114 | def pytest_configure():
+115 |     yield
+116 |     return "should error"
+    |     ^^^^^^^^^^^^^^^^^^^^^
+    |
+
+B901 Using `yield` and `return {value}` in a generator function can lead to confusing behavior
+   --> B901.py:122:5
+    |
+120 | def pytest_unconfigure():
+121 |     yield
+122 |     return "should error"
+    |     ^^^^^^^^^^^^^^^^^^^^^
+    |
+
+B901 Using `yield` and `return {value}` in a generator function can lead to confusing behavior
+   --> B901.py:128:5
+    |
+126 | def my_fixture():
+127 |     yield
+128 |     return "should error"
+    |     ^^^^^^^^^^^^^^^^^^^^^
+    |

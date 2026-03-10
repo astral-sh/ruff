@@ -321,4 +321,65 @@ C.with_init(1)
 C().with_init(1)
 ```
 
+## Decorators returning PEP 695 type aliases
+
+When a decorator's return type is a PEP 695 type alias that wraps a `Callable` type, the decorated
+method should still behave as a bound-method descriptor. This also works correctly with `super()`.
+
+```py
+from typing import Any
+from collections.abc import Callable
+
+type Func = Callable[[Any], str]
+
+def noop(func: Func) -> Func:
+    return func
+
+class Base:
+    @noop
+    def foo(self) -> str:
+        return "base"
+
+class Derived(Base):
+    @noop
+    def foo(self) -> str:
+        return super().foo()
+
+reveal_type(Base().foo)  # revealed: () -> str
+reveal_type(Derived().foo)  # revealed: () -> str
+
+# These calls should work without errors
+Base().foo()
+Derived().foo()
+```
+
+The same applies to methods accessed via `super()` directly:
+
+```py
+from typing import Any
+from collections.abc import Callable
+
+type MethodType = Callable[[Any, int], str]
+
+def decorator(func: MethodType) -> MethodType:
+    return func
+
+class Parent:
+    @decorator
+    def method(self, x: int) -> str:
+        return str(x)
+
+class Child(Parent):
+    @decorator
+    def method(self, x: int) -> str:
+        # super().method should be a bound method, not require `self`
+        return super().method(x)
+
+reveal_type(Parent().method)  # revealed: (int, /) -> str
+reveal_type(Child().method)  # revealed: (int, /) -> str
+
+Parent().method(1)
+Child().method(1)
+```
+
 [`tensorbase`]: https://github.com/pytorch/pytorch/blob/f3913ea641d871f04fa2b6588a77f63efeeb9f10/torch/_tensor.py#L1084-L1092

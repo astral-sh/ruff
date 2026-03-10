@@ -283,4 +283,30 @@ help: Replace with `f"{-1:b}"`
 43 | # for negatives numbers autofix is display-only
    - print(bin(-1)[2:])
 44 + print(f"{-1:b}")
+45 | 
+46 | 
+47 | print(
 note: This is a display-only fix and is likely to be incorrect
+
+FURB116 [*] Replace `bin` call with `f"{1337:b}"`
+  --> FURB116.py:48:5
+   |
+47 |   print(
+48 | /     bin(
+49 | |         1337
+50 | |         # text
+51 | |     )[2:]
+   | |_________^
+52 |   )
+   |
+help: Replace with `f"{1337:b}"`
+45 | 
+46 | 
+47 | print(
+   -     bin(
+   -         1337
+   -         # text
+   -     )[2:]
+48 +     f"{1337:b}"
+49 | )
+note: This is an unsafe fix and may change runtime behavior

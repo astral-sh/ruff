@@ -80,7 +80,7 @@ impl CallableParams {
             CallableParams::List(params) => Parameters::new(
                 db,
                 params.into_iter().map(|param| {
-                    let mut parameter = match param.kind {
+                    let parameter = match param.kind {
                         ParamKind::PositionalOnly => Parameter::positional_only(param.name),
                         ParamKind::PositionalOrKeyword => {
                             Parameter::positional_or_keyword(param.name.unwrap())
@@ -91,11 +91,9 @@ impl CallableParams {
                             Parameter::keyword_variadic(param.name.unwrap())
                         }
                     };
-                    parameter = parameter.with_annotated_type(param.annotated_ty.into_type(db));
-                    if let Some(default_ty) = param.default_ty {
-                        parameter = parameter.with_default_type(default_ty.into_type(db));
-                    }
                     parameter
+                        .with_annotated_type(param.annotated_ty.into_type(db))
+                        .with_optional_default_type(param.default_ty.map(|t| t.into_type(db)))
                 }),
             ),
         }
@@ -139,12 +137,12 @@ impl Ty {
             Ty::Unknown => Type::unknown(),
             Ty::None => Type::none(db),
             Ty::Any => Type::any(),
-            Ty::IntLiteral(n) => Type::IntLiteral(n),
+            Ty::IntLiteral(n) => Type::int_literal(n),
             Ty::StringLiteral(s) => Type::string_literal(db, s),
-            Ty::BooleanLiteral(b) => Type::BooleanLiteral(b),
-            Ty::LiteralString => Type::LiteralString,
+            Ty::BooleanLiteral(b) => Type::bool_literal(b),
+            Ty::LiteralString => Type::literal_string(),
             Ty::BytesLiteral(s) => Type::bytes_literal(db, s.as_bytes()),
-            Ty::EnumLiteral(name) => Type::EnumLiteral(EnumLiteralType::new(
+            Ty::EnumLiteral(name) => Type::enum_literal(EnumLiteralType::new(
                 db,
                 known_module_symbol(db, KnownModule::Uuid, "SafeUUID")
                     .place

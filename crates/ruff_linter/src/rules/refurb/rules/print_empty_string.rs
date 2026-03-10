@@ -3,6 +3,7 @@ use ruff_python_ast::helpers::{contains_effect, is_empty_f_string};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_codegen::Generator;
 use ruff_python_semantic::SemanticModel;
+use ruff_python_trivia::CommentRanges;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -31,7 +32,7 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// ```
 ///
 /// ## Fix safety
-/// This fix is marked as unsafe if it removes an unused `sep` keyword argument
+/// This fix is marked as unsafe if it removes comments or an unused `sep` keyword argument
 /// that may have side effects. Removing such arguments may change the program's
 /// behavior by skipping the execution of those side effects.
 ///
@@ -99,6 +100,7 @@ pub(crate) fn print_empty_string(checker: &Checker, call: &ast::ExprCall) {
                     Separator::Remove,
                     checker.semantic(),
                     checker.generator(),
+                    checker.comment_ranges(),
                 )
                 .into_fix(),
             );
@@ -125,6 +127,7 @@ pub(crate) fn print_empty_string(checker: &Checker, call: &ast::ExprCall) {
                         Separator::Remove,
                         checker.semantic(),
                         checker.generator(),
+                        checker.comment_ranges(),
                     )
                     .into_fix(),
                 );
@@ -185,8 +188,14 @@ pub(crate) fn print_empty_string(checker: &Checker, call: &ast::ExprCall) {
             );
 
             diagnostic.set_fix(
-                EmptyStringFix::from_call(call, separator, checker.semantic(), checker.generator())
-                    .into_fix(),
+                EmptyStringFix::from_call(
+                    call,
+                    separator,
+                    checker.semantic(),
+                    checker.generator(),
+                    checker.comment_ranges(),
+                )
+                .into_fix(),
             );
         }
     }
@@ -218,10 +227,15 @@ impl EmptyStringFix {
         separator: Separator,
         semantic: &SemanticModel,
         generator: Generator,
+        comment_ranges: &CommentRanges,
     ) -> Self {
         let range = call.range();
         let mut call = call.clone();
         let mut applicability = Applicability::Safe;
+
+        if comment_ranges.intersects(range) {
+            applicability = Applicability::Unsafe;
+        }
 
         // Remove all empty string positional arguments.
         call.arguments.args = call

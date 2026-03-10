@@ -4622,6 +4622,8 @@
   <CWD>/torch/_inductor/codegen/common.py:186:32 - error: "uint8" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/codegen/common.py:224:35 - error: "device" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/codegen/common.py:229:34 - error: "dtype" is not a known attribute of module "torch" (reportAttributeAccessIssue)
+  <CWD>/torch/_inductor/codegen/common.py:242:21 - error: Argument of type "list[int]" cannot be assigned to parameter "stride" of type "Sequence[Expr] | None" in function "__init__"
+    "Literal[1]" is not assignable to "Expr" (reportArgumentType)
   <CWD>/torch/_inductor/codegen/common.py:285:18 - error: "dtype" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/codegen/common.py:310:27 - error: "dtype" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/codegen/common.py:448:25 - error: "device" is not a known attribute of module "torch" (reportAttributeAccessIssue)
@@ -5490,6 +5492,12 @@
     Base method is declared as an instance method but override is not (reportIncompatibleMethodOverride)
   <CWD>/torch/_inductor/codegen/cpp.py:4695:49 - error: "device" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/codegen/cpp.py:5019:45 - error: "get_default_sizes_body" is not a known attribute of "None" (reportOptionalMemberAccess)
+  <CWD>/torch/_inductor/codegen/cpp.py:5206:29 - error: Argument of type "list[int]" cannot be assigned to parameter "stride" of type "Sequence[Expr] | None" in function "__init__"
+    Type "list[int]" is not assignable to type "Sequence[Expr] | None"
+      "list[int]" is not assignable to "Sequence[Expr]"
+        Type parameter "_T_co@Sequence" is covariant, but "int" is not a subtype of "Expr"
+          "int" is not assignable to "Expr"
+      "list[int]" is not assignable to "None" (reportArgumentType)
   <CWD>/torch/_inductor/codegen/cpp.py:5290:34 - error: "config" is not a known attribute of module "torch._inductor" (reportAttributeAccessIssue)
 <CWD>/torch/_inductor/codegen/cpp_flex_attention_template.py
   <CWD>/torch/_inductor/codegen/cpp_flex_attention_template.py:705:39 - error: "float" is not a known attribute of module "torch" (reportAttributeAccessIssue)
@@ -5613,6 +5621,10 @@
   <CWD>/torch/_inductor/codegen/cpp_template_kernel.py:129:39 - error: "float32" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/codegen/cpp_template_kernel.py:129:54 - error: "bfloat16" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/codegen/cpp_template_kernel.py:129:70 - error: "half" is not a known attribute of module "torch" (reportAttributeAccessIssue)
+  <CWD>/torch/_inductor/codegen/cpp_template_kernel.py:173:15 - error: Type "Expr" is not assignable to declared type "int"
+    "Expr" is not assignable to "int" (reportAssignmentType)
+  <CWD>/torch/_inductor/codegen/cpp_template_kernel.py:173:45 - error: Argument of type "int" cannot be assigned to parameter "idx" of type "Expr" in function "handle_negative_index"
+    "int" is not assignable to "Expr" (reportArgumentType)
   <CWD>/torch/_inductor/codegen/cpp_template_kernel.py:207:65 - error: "float" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/codegen/cpp_template_kernel.py:211:52 - error: "device" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/codegen/cpp_template_kernel.py:219:51 - error: "float" is not a known attribute of module "torch" (reportAttributeAccessIssue)
@@ -5696,13 +5708,6 @@
   <CWD>/torch/_inductor/codegen/cpp_utils.py:148:31 - error: "dtype" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/codegen/cpp_utils.py:439:26 - error: Cannot access attribute "data" for class "IRNode"
     Attribute "data" is unknown (reportAttributeAccessIssue)
-  <CWD>/torch/_inductor/codegen/cpp_utils.py:442:23 - error: Cannot access attribute "inner_fn" for class "IRNode"
-    Attribute "inner_fn" is unknown (reportAttributeAccessIssue)
-  <CWD>/torch/_inductor/codegen/cpp_utils.py:446:45 - error: Argument of type "Unknown | IRNode" cannot be assigned to parameter "obj" of type "_DataclassT@replace" in function "replace"
-    Type "Unknown | IRNode" is not assignable to type "DataclassInstance"
-      Type "Unknown | IRNode" is not assignable to type "DataclassInstance"
-        "IRNode" is incompatible with protocol "DataclassInstance"
-          "__dataclass_fields__" is not present (reportArgumentType)
   <CWD>/torch/_inductor/codegen/cpp_utils.py:462:17 - error: "float" is not a known attribute of module "torch" (reportAttributeAccessIssue)
 <CWD>/torch/_inductor/codegen/cpp_wrapper_cpu.py
   <CWD>/torch/_inductor/codegen/cpp_wrapper_cpu.py:351:36 - error: Argument of type "Basic" cannot be assigned to parameter "elem" of type "Symbol" in function "add"
@@ -5719,8 +5724,6 @@
   <CWD>/torch/_inductor/codegen/cpp_wrapper_cpu.py:1073:28 - error: "dtype" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/codegen/cpp_wrapper_cpu.py:1078:27 - error: "float16" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/codegen/cpp_wrapper_cpu.py:1078:53 - error: "bfloat16" is not a known attribute of module "torch" (reportAttributeAccessIssue)
-  <CWD>/torch/_inductor/codegen/cpp_wrapper_cpu.py:1112:46 - error: Cannot access attribute "data" for class "IRNode"
-    Attribute "data" is unknown (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/codegen/cpp_wrapper_cpu.py:1316:23 - error: "Tag" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/codegen/cpp_wrapper_cpu.py:2012:9 - error: Method "codegen_subgraph" overrides class "PythonWrapperCodegen" in an incompatible manner
     Parameter 4 name mismatch: base parameter is named "outer_buffer_name", override parameter is named "outer_outputs" (reportIncompatibleMethodOverride)
@@ -5785,8 +5788,6 @@
   <CWD>/torch/_inductor/codegen/cpp_wrapper_cpu.py:2982:38 - error: Cannot access attribute "get_stack_traces" for class "Sequence[BaseSchedulerNode]"
     Attribute "get_stack_traces" is unknown (reportAttributeAccessIssue)
 <CWD>/torch/_inductor/codegen/cpp_wrapper_cpu_array_ref.py
-  <CWD>/torch/_inductor/codegen/cpp_wrapper_cpu_array_ref.py:413:46 - error: Cannot access attribute "data" for class "IRNode"
-    Attribute "data" is unknown (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/codegen/cpp_wrapper_cpu_array_ref.py:571:9 - error: Method "make_allocation" overrides class "CppWrapperCpu" in an incompatible manner
     Parameter 7 name mismatch: base parameter is named "allocation_shape", override parameter is named "buffer_if_can_stack_allocate" (reportIncompatibleMethodOverride)
   <CWD>/torch/_inductor/codegen/cpp_wrapper_cpu_array_ref.py:858:41 - error: "OptionalType" is not a known attribute of module "torch" (reportAttributeAccessIssue)
@@ -7268,6 +7269,8 @@
   <CWD>/torch/_inductor/codegen/triton_utils.py:98:29 - error: Cannot access attribute "dtype" for class "ConstexprArg"
     Attribute "dtype" is unknown (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/codegen/triton_utils.py:187:43 - error: "ir" is not a known attribute of module "torch._inductor" (reportAttributeAccessIssue)
+  <CWD>/torch/_inductor/codegen/triton_utils.py:188:27 - error: Cannot access attribute "maybe_guard_aligned" for class "Layout"
+    Attribute "maybe_guard_aligned" is unknown (reportAttributeAccessIssue)
 <CWD>/torch/_inductor/codegen/wrapper.py
   <CWD>/torch/_inductor/codegen/wrapper.py:25:19 - error: "dtype" is unknown import symbol (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/codegen/wrapper.py:91:24 - error: "device" is not a known attribute of module "torch" (reportAttributeAccessIssue)
@@ -7294,18 +7297,11 @@
   <CWD>/torch/_inductor/codegen/wrapper.py:1233:34 - error: "_cuda_getCurrentRawStream" is unknown import symbol (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/codegen/wrapper.py:1279:16 - error: Type "str" is not assignable to declared type "TritonMetaParams"
     "str" is not assignable to "dict[str, int]" (reportAssignmentType)
-  <CWD>/torch/_inductor/codegen/wrapper.py:1320:34 - error: Cannot access attribute "get_size" for class "Expr"
-    Attribute "get_size" is unknown (reportAttributeAccessIssue)
-  <CWD>/torch/_inductor/codegen/wrapper.py:1322:56 - error: Cannot access attribute "get_size" for class "Expr"
-    Attribute "get_size" is unknown (reportAttributeAccessIssue)
-  <CWD>/torch/_inductor/codegen/wrapper.py:1323:54 - error: Argument of type "Sequence[_IntLike] | Any | Unknown" cannot be assigned to parameter "shape" of type "Sequence[Expr]" in function "codegen_python_shape_tuple"
-    Type "Sequence[_IntLike] | Any | Unknown" is not assignable to type "Sequence[Expr]"
-      "Sequence[_IntLike]" is not assignable to "Sequence[Expr]"
-        Type parameter "_T_co@Sequence" is covariant, but "_IntLike" is not a subtype of "Expr"
-          Type "_IntLike" is not assignable to type "Expr"
-            "int" is not assignable to "Expr" (reportArgumentType)
-  <CWD>/torch/_inductor/codegen/wrapper.py:1323:58 - error: Cannot access attribute "get_stride" for class "Expr"
-    Attribute "get_stride" is unknown (reportAttributeAccessIssue)
+  <CWD>/torch/_inductor/codegen/wrapper.py:1323:54 - error: Argument of type "Sequence[_IntLike]" cannot be assigned to parameter "shape" of type "Sequence[Expr]" in function "codegen_python_shape_tuple"
+    "Sequence[_IntLike]" is not assignable to "Sequence[Expr]"
+      Type parameter "_T_co@Sequence" is covariant, but "_IntLike" is not a subtype of "Expr"
+        Type "_IntLike" is not assignable to type "Expr"
+          "int" is not assignable to "Expr" (reportArgumentType)
   <CWD>/torch/_inductor/codegen/wrapper.py:2411:47 - error: Argument of type "Unknown | int | Integer" cannot be assigned to parameter "expr" of type "Expr" in function "__init__"
     Type "Unknown | int | Integer" is not assignable to type "Expr"
       "int" is not assignable to "Expr" (reportArgumentType)
@@ -7371,7 +7367,21 @@
   <CWD>/torch/_inductor/codegen/wrapper.py:3330:43 - error: Index 0 is out of range for type KeyPath (reportGeneralTypeIssues)
   <CWD>/torch/_inductor/codegen/wrapper.py:3332:33 - error: Index 0 is out of range for type KeyPath (reportGeneralTypeIssues)
   <CWD>/torch/_inductor/codegen/wrapper.py:3335:54 - error: Index 0 is out of range for type KeyPath (reportGeneralTypeIssues)
+  <CWD>/torch/_inductor/codegen/wrapper.py:3796:9 - error: Method "get_graph_inputs" overrides class "PythonWrapperCodegen" in an incompatible manner
+    Return type mismatch: base method returns type "dict[str, TensorBox | TorchBindObject | Expr]", override returns type "dict[str, TensorBox | TorchBindObject | Expr | None]"
+      "dict[str, TensorBox | TorchBindObject | Expr | None]" is not assignable to "dict[str, TensorBox | TorchBindObject | Expr]"
+        Type parameter "_VT@dict" is invariant, but "TensorBox | TorchBindObject | Expr | None" is not the same as "TensorBox | TorchBindObject | Expr"
+        Consider switching from "dict" to "Mapping" which is covariant in the value type (reportIncompatibleMethodOverride)
+  <CWD>/torch/_inductor/codegen/wrapper.py:3805:16 - error: Type "dict[str, IRNode | Expr | TorchBindObject | Symbol] | dict[str, TensorBox | TorchBindObject | Expr]" is not assignable to return type "dict[str, TensorBox | TorchBindObject | Expr | None]"
+    Type "dict[str, IRNode | Expr | TorchBindObject | Symbol] | dict[str, TensorBox | TorchBindObject | Expr]" is not assignable to type "dict[str, TensorBox | TorchBindObject | Expr | None]"
+      "dict[str, IRNode | Expr | TorchBindObject | Symbol]" is not assignable to "dict[str, TensorBox | TorchBindObject | Expr | None]"
+        Type parameter "_VT@dict" is invariant, but "IRNode | Expr | TorchBindObject | Symbol" is not the same as "TensorBox | TorchBindObject | Expr | None"
+        Consider switching from "dict" to "Mapping" which is covariant in the value type (reportReturnType)
 <CWD>/torch/_inductor/codegen/wrapper_fxir.py
+  <CWD>/torch/_inductor/codegen/wrapper_fxir.py:198:16 - error: Type "dict[str, TensorBox | TorchBindObject | Expr]" is not assignable to return type "dict[str, TensorBox | TorchBindObject | Expr | None]"
+    "dict[str, TensorBox | TorchBindObject | Expr]" is not assignable to "dict[str, TensorBox | TorchBindObject | Expr | None]"
+      Type parameter "_VT@dict" is invariant, but "TensorBox | TorchBindObject | Expr" is not the same as "TensorBox | TorchBindObject | Expr | None"
+      Consider switching from "dict" to "Mapping" which is covariant in the value type (reportReturnType)
   <CWD>/torch/_inductor/codegen/wrapper_fxir.py:239:9 - error: Method "create" overrides class "PythonWrapperCodegen" in an incompatible manner
     Base method is declared as a staticmethod but override is not
     Parameter 2 name mismatch: base parameter is named "subgraph_name", override parameter is named "is_subgraph"
@@ -7379,10 +7389,8 @@
     Parameter 4 name mismatch: base parameter is named "partition_signatures", override parameter is named "parent_wrapper" (reportIncompatibleMethodOverride)
   <CWD>/torch/_inductor/codegen/wrapper_fxir.py:293:32 - error: "proxy" is not a known attribute of module "torch.fx" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/codegen/wrapper_fxir.py:325:19 - error: "as_strided" is not a known attribute of module "torch" (reportAttributeAccessIssue)
-  <CWD>/torch/_inductor/codegen/wrapper_fxir.py:369:42 - error: Cannot access attribute "data" for class "IRNode"
-    Attribute "data" is unknown (reportAttributeAccessIssue)
-  <CWD>/torch/_inductor/codegen/wrapper_fxir.py:398:39 - error: Argument of type "TensorBox | Any | Expr" cannot be assigned to parameter "node" of type "IRNode" in function "_get_buffer"
-    Type "TensorBox | Any | Expr" is not assignable to type "IRNode"
+  <CWD>/torch/_inductor/codegen/wrapper_fxir.py:398:39 - error: Argument of type "TensorBox | TorchBindObject | Expr" cannot be assigned to parameter "node" of type "IRNode" in function "_get_buffer"
+    Type "TensorBox | TorchBindObject | Expr" is not assignable to type "IRNode"
       "Expr" is not assignable to "IRNode" (reportArgumentType)
   <CWD>/torch/_inductor/codegen/wrapper_fxir.py:466:37 - error: Cannot access attribute "is_integer" for class "Basic"
     Attribute "is_integer" is unknown (reportAttributeAccessIssue)
@@ -7393,18 +7401,12 @@
       Type "int" is not assignable to type "Symbol | Expr"
         "int" is not assignable to "Symbol"
         "int" is not assignable to "Expr" (reportArgumentType)
-  <CWD>/torch/_inductor/codegen/wrapper_fxir.py:506:44 - error: Cannot access attribute "expr" for class "IRNode"
-    Attribute "expr" is unknown (reportAttributeAccessIssue)
-  <CWD>/torch/_inductor/codegen/wrapper_fxir.py:518:48 - error: Cannot access attribute "data" for class "IRNode"
-    Attribute "data" is unknown (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/codegen/wrapper_fxir.py:523:33 - error: Cannot access attribute "get_device" for class "SymbolBuffer"
     Attribute "get_device" is unknown (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/codegen/wrapper_fxir.py:526:34 - error: Cannot access attribute "get_size" for class "SymbolBuffer"
     Attribute "get_size" is unknown (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/codegen/wrapper_fxir.py:530:34 - error: Cannot access attribute "get_dtype" for class "SymbolBuffer"
     Attribute "get_dtype" is unknown (reportAttributeAccessIssue)
-  <CWD>/torch/_inductor/codegen/wrapper_fxir.py:534:75 - error: Cannot access attribute "layout" for class "IRNode"
-    Attribute "layout" is unknown (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/codegen/wrapper_fxir.py:639:51 - error: Argument of type "dict[Expr, Proxy]" cannot be assigned to parameter "env" of type "dict[Symbol, Any]" in function "sympy_interp"
     "dict[Expr, Proxy]" is not assignable to "dict[Symbol, Any]"
       Type parameter "_KT@dict" is invariant, but "Expr" is not the same as "Symbol" (reportArgumentType)
@@ -7432,8 +7434,6 @@
 <CWD>/torch/_inductor/comm_lowering.py
   <CWD>/torch/_inductor/comm_lowering.py:106:12 - error: Cannot assign to attribute "layout" for class "IRNode"
     Attribute "layout" is unknown (reportAttributeAccessIssue)
-  <CWD>/torch/_inductor/comm_lowering.py:118:21 - error: Cannot access attribute "data" for class "IRNode"
-    Attribute "data" is unknown (reportAttributeAccessIssue)
 <CWD>/torch/_inductor/comms.py
   <CWD>/torch/_inductor/comms.py:69:40 - error: "median" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/comms.py:70:15 - error: "tensor" is not a known attribute of module "torch" (reportAttributeAccessIssue)
@@ -7664,6 +7664,7 @@
   <CWD>/torch/_inductor/config.py:643:36 - error: "config" is not a known attribute of module "torch._inductor" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/config.py:653:47 - error: "hip" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/config.py:964:21 - error: "_utils_internal" is not a known attribute of module "torch" (reportAttributeAccessIssue)
+  <CWD>/torch/_inductor/config.py:993:20 - error: "sched_getaffinity" is not a known attribute of module "os" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/config.py:1040:14 - error: Import "libfb.py" could not be resolved (reportMissingImports)
   <CWD>/torch/_inductor/config.py:1565:48 - error: "hip" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/config.py:2240:10 - warning: Import "torch.utils._config_typing" could not be resolved from source (reportMissingModuleSource)
@@ -7805,6 +7806,12 @@
   <CWD>/torch/_inductor/debug.py:561:34 - error: "config" is not a known attribute of module "torch._inductor" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/debug.py:634:34 - error: Cannot access attribute "name" for class "IRNode"
     Attribute "name" is unknown (reportAttributeAccessIssue)
+  <CWD>/torch/_inductor/debug.py:657:31 - error: Argument of type "list[int]" cannot be assigned to parameter "size" of type "Sequence[Expr]" in function "__init__"
+    "int" is not assignable to "Expr" (reportArgumentType)
+  <CWD>/torch/_inductor/debug.py:658:33 - error: Argument of type "list[int]" cannot be assigned to parameter "stride" of type "Sequence[Expr] | None" in function "__init__"
+    "int" is not assignable to "Expr" (reportArgumentType)
+  <CWD>/torch/_inductor/debug.py:659:32 - error: Argument of type "int" cannot be assigned to parameter "offset" of type "Expr" in function "__init__"
+    "int" is not assignable to "Expr" (reportArgumentType)
   <CWD>/torch/_inductor/debug.py:688:58 - error: Cannot access attribute "data" for class "IRNode"
     Attribute "data" is unknown (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/debug.py:689:58 - error: Cannot access attribute "data" for class "IRNode"
@@ -7946,6 +7953,19 @@
     Parameter 2 name mismatch: base parameter is named "expr", override parameter is named "index" (reportIncompatibleMethodOverride)
   <CWD>/torch/_inductor/dependencies.py:577:67 - error: "dtype" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/dependencies.py:585:31 - error: "dtype" is not a known attribute of module "torch" (reportAttributeAccessIssue)
+  <CWD>/torch/_inductor/dependencies.py:635:26 - error: Argument of type "list[int]" cannot be assigned to parameter "object" of type "Sequence[Expr]" in function "append"
+    "list[int]" is not assignable to "Sequence[Expr]"
+      Type parameter "_T_co@Sequence" is covariant, but "int" is not a subtype of "Expr"
+        "int" is not assignable to "Expr" (reportArgumentType)
+  <CWD>/torch/_inductor/dependencies.py:636:47 - error: Argument of type "list[int]" cannot be assigned to parameter "iterable" of type "Iterable[_T1@__new__]" in function "__new__"
+    "list[int]" is not assignable to "Iterable[Expr]"
+      Type parameter "_T_co@Iterable" is covariant, but "int" is not a subtype of "Expr"
+        "int" is not assignable to "Expr" (reportArgumentType)
+  <CWD>/torch/_inductor/dependencies.py:636:47 - error: Argument of type "list[int]" cannot be assigned to parameter "iterable" of type "Iterable[_T1@__new__]" in function "__new__"
+    "list[int]" is not assignable to "Iterable[_T1@__new__]"
+      Type parameter "_T_co@Iterable" is covariant, but "int" is not a subtype of "_T1@__new__"
+        Type "int" is not assignable to type "Expr"
+          "int" is not assignable to "Expr" (reportArgumentType)
   <CWD>/torch/_inductor/dependencies.py:672:26 - error: Cannot access attribute "_reads" for class "OpsHandler[Any]"
     Attribute "_reads" is unknown (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/dependencies.py:674:26 - error: Cannot access attribute "_writes" for class "OpsHandler[Any]"
@@ -9566,8 +9586,56 @@
         "FunctionType" is not assignable to "str"
       "tuple[Argument, ...]" is not assignable to "tuple[object]"
         Tuple size mismatch; expected 1 but received indeterminate (reportIncompatibleMethodOverride)
+  <CWD>/torch/_inductor/graph.py:1151:20 - error: Type "TorchBindObject" is not assignable to return type "Expr | TensorBox | None"
+    Type "TorchBindObject" is not assignable to type "Expr | TensorBox | None"
+      "TorchBindObject" is not assignable to "Expr"
+      "TorchBindObject" is not assignable to "TensorBox"
+      "TorchBindObject" is not assignable to "None" (reportReturnType)
   <CWD>/torch/_inductor/graph.py:1161:40 - error: "Generator" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/graph.py:1165:23 - error: "_prims" is not a known attribute of module "torch" (reportAttributeAccessIssue)
+  <CWD>/torch/_inductor/graph.py:1171:20 - error: Type "GeneratorState" is not assignable to return type "Expr | TensorBox | None"
+    Type "GeneratorState" is not assignable to type "Expr | TensorBox | None"
+      "GeneratorState" is not assignable to "Expr"
+      "GeneratorState" is not assignable to "TensorBox"
+      "GeneratorState" is not assignable to "None" (reportReturnType)
+  <CWD>/torch/_inductor/graph.py:1192:71 - error: Argument of type "list[Expr] | Sequence[int | Expr]" cannot be assigned to parameter "size" of type "Sequence[Expr]" in function "__init__"
+    Type "list[Expr] | Sequence[int | Expr]" is not assignable to type "Sequence[Expr]"
+      "Sequence[int | Expr]" is not assignable to "Sequence[Expr]"
+        Type parameter "_T_co@Sequence" is covariant, but "int | Expr" is not a subtype of "Expr"
+          Type "int | Expr" is not assignable to type "Expr"
+            "int" is not assignable to "Expr" (reportArgumentType)
+  <CWD>/torch/_inductor/graph.py:1192:78 - error: Argument of type "list[Expr] | Sequence[int | Expr]" cannot be assigned to parameter "stride" of type "Sequence[Expr] | None" in function "__init__"
+    Type "list[Expr] | Sequence[int | Expr]" is not assignable to type "Sequence[Expr] | None"
+      Type "Sequence[int | Expr]" is not assignable to type "Sequence[Expr] | None"
+        "Sequence[int | Expr]" is not assignable to "Sequence[Expr]"
+          Type parameter "_T_co@Sequence" is covariant, but "int | Expr" is not a subtype of "Expr"
+            Type "int | Expr" is not assignable to type "Expr"
+        "Sequence[int | Expr]" is not assignable to "None" (reportArgumentType)
+  <CWD>/torch/_inductor/graph.py:1200:71 - error: Argument of type "list[Expr] | Sequence[int | Expr]" cannot be assigned to parameter "size" of type "Sequence[Expr]" in function "__init__"
+    Type "list[Expr] | Sequence[int | Expr]" is not assignable to type "Sequence[Expr]"
+      "Sequence[int | Expr]" is not assignable to "Sequence[Expr]"
+        Type parameter "_T_co@Sequence" is covariant, but "int | Expr" is not a subtype of "Expr"
+          Type "int | Expr" is not assignable to type "Expr"
+            "int" is not assignable to "Expr" (reportArgumentType)
+  <CWD>/torch/_inductor/graph.py:1200:78 - error: Argument of type "list[Expr] | Sequence[int | Expr]" cannot be assigned to parameter "stride" of type "Sequence[Expr] | None" in function "__init__"
+    Type "list[Expr] | Sequence[int | Expr]" is not assignable to type "Sequence[Expr] | None"
+      Type "Sequence[int | Expr]" is not assignable to type "Sequence[Expr] | None"
+        "Sequence[int | Expr]" is not assignable to "Sequence[Expr]"
+          Type parameter "_T_co@Sequence" is covariant, but "int | Expr" is not a subtype of "Expr"
+            Type "int | Expr" is not assignable to type "Expr"
+        "Sequence[int | Expr]" is not assignable to "None" (reportArgumentType)
+  <CWD>/torch/_inductor/graph.py:1204:9 - error: Argument of type "TensorBox | ShapeAsConstantBuffer" cannot be assigned to parameter "value" of type "TensorBox | TorchBindObject | Expr" in function "__setitem__"
+    Type "TensorBox | ShapeAsConstantBuffer" is not assignable to type "TensorBox | TorchBindObject | Expr"
+      Type "ShapeAsConstantBuffer" is not assignable to type "TensorBox | TorchBindObject | Expr"
+        "ShapeAsConstantBuffer" is not assignable to "TensorBox"
+        "ShapeAsConstantBuffer" is not assignable to "TorchBindObject"
+        "ShapeAsConstantBuffer" is not assignable to "Expr" (reportArgumentType)
+  <CWD>/torch/_inductor/graph.py:1225:16 - error: Type "TensorBox | ShapeAsConstantBuffer" is not assignable to return type "Expr | TensorBox | None"
+    Type "TensorBox | ShapeAsConstantBuffer" is not assignable to type "Expr | TensorBox | None"
+      Type "ShapeAsConstantBuffer" is not assignable to type "Expr | TensorBox | None"
+        "ShapeAsConstantBuffer" is not assignable to "Expr"
+        "ShapeAsConstantBuffer" is not assignable to "TensorBox"
+        "ShapeAsConstantBuffer" is not assignable to "None" (reportReturnType)
   <CWD>/torch/_inductor/graph.py:1256:40 - error: "Tag" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/graph.py:1261:40 - error: "utils" is not a known attribute of module "torch._library" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/graph.py:1275:43 - error: "Tag" is not a known attribute of module "torch" (reportAttributeAccessIssue)
@@ -9617,8 +9685,8 @@
   <CWD>/torch/_inductor/graph.py:1463:38 - error: Cannot access attribute "meta" for class "SymFloat"
     Attribute "meta" is unknown (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/graph.py:1463:38 - error: "meta" is not a known attribute of "None" (reportOptionalMemberAccess)
-  <CWD>/torch/_inductor/graph.py:1471:13 - error: Type "TensorBox | Any | Expr" is not assignable to declared type "IRNode"
-    Type "TensorBox | Any | Expr" is not assignable to type "IRNode"
+  <CWD>/torch/_inductor/graph.py:1471:13 - error: Type "TensorBox | TorchBindObject | Expr" is not assignable to declared type "IRNode"
+    Type "TensorBox | TorchBindObject | Expr" is not assignable to type "IRNode"
       "Expr" is not assignable to "IRNode" (reportAssignmentType)
   <CWD>/torch/_inductor/graph.py:1475:64 - error: "ir" is not a known attribute of module "torch._inductor" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/graph.py:1547:29 - error: "_higher_order_ops" is not a known attribute of module "torch" (reportAttributeAccessIssue)
@@ -9737,6 +9805,7 @@
       "Basic" is not assignable to "None" (reportReturnType)
 <CWD>/torch/_inductor/ir.py
   <CWD>/torch/_inductor/ir.py:132:12 - error: Import "triton" could not be resolved (reportMissingImports)
+  <CWD>/torch/_inductor/ir.py:371:18 - error: Type "list[int | Expr]" is not assignable to declared type "StrideType" (reportAssignmentType)
   <CWD>/torch/_inductor/ir.py:373:18 - error: Type "list[Expr]" is not assignable to declared type "StrideType"
     Type "list[Expr]" is not assignable to type "StrideType"
       "list[Expr]" is not assignable to "list[int]"
@@ -9780,6 +9849,10 @@
           Type "SymInt" is not assignable to type "_IntLike"
             "SymInt" is not assignable to "int"
             "SymInt" is not assignable to "Expr" (reportArgumentType)
+  <CWD>/torch/_inductor/ir.py:501:13 - error: No overloads for "__setitem__" match the provided arguments (reportCallIssue)
+  <CWD>/torch/_inductor/ir.py:501:13 - error: Argument of type "int | SymInt" cannot be assigned to parameter "value" of type "Expr" in function "__setitem__"
+    Type "int | SymInt" is not assignable to type "Expr"
+      "int" is not assignable to "Expr" (reportArgumentType)
   <CWD>/torch/_inductor/ir.py:608:54 - error: "stack_trace" is not a known attribute of "None" (reportOptionalMemberAccess)
   <CWD>/torch/_inductor/ir.py:610:39 - error: "stack_trace" is not a known attribute of "None" (reportOptionalMemberAccess)
   <CWD>/torch/_inductor/ir.py:613:37 - error: "debug" is not a known attribute of module "torch._inductor" (reportAttributeAccessIssue)
@@ -9934,6 +10007,11 @@
   <CWD>/torch/_inductor/ir.py:1894:40 - error: "float16" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/ir.py:1894:55 - error: "bfloat16" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/ir.py:1895:24 - error: "float" is not a known attribute of module "torch" (reportAttributeAccessIssue)
+  <CWD>/torch/_inductor/ir.py:1913:40 - error: Argument of type "list[_IntLike]" cannot be assigned to parameter of type "Sequence[Expr]"
+    Type "_IntLike" is not assignable to type "Expr"
+      "int" is not assignable to "Expr"
+    Type "_IntLike" is not assignable to type "Expr"
+      "int" is not assignable to "Expr" (reportArgumentType)
   <CWD>/torch/_inductor/ir.py:1937:23 - error: "device" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/ir.py:1938:26 - error: "dtype" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/ir.py:1939:26 - error: "dtype" is not a known attribute of module "torch" (reportAttributeAccessIssue)
@@ -9994,6 +10072,11 @@
     Type "_IntLike" is not assignable to type "Integer"
       "Expr" is not assignable to "Integer" (reportArgumentType)
   <CWD>/torch/_inductor/ir.py:2369:25 - error: "dtype" is not a known attribute of module "torch" (reportAttributeAccessIssue)
+  <CWD>/torch/_inductor/ir.py:2418:16 - error: Type "Sequence[_IntLike]" is not assignable to return type "Sequence[Expr]"
+    "Sequence[_IntLike]" is not assignable to "Sequence[Expr]"
+      Type parameter "_T_co@Sequence" is covariant, but "_IntLike" is not a subtype of "Expr"
+        Type "_IntLike" is not assignable to type "Expr"
+          "int" is not assignable to "Expr" (reportReturnType)
   <CWD>/torch/_inductor/ir.py:2433:52 - error: Argument of type "Sequence[_IntLike]" cannot be assigned to parameter "index" of type "Sequence[Expr]" in function "extract_free_symbols"
     "Sequence[_IntLike]" is not assignable to "Sequence[Expr]"
       Type parameter "_T_co@Sequence" is covariant, but "_IntLike" is not a subtype of "Expr"
@@ -10004,9 +10087,24 @@
   <CWD>/torch/_inductor/ir.py:2480:19 - error: Index 0 is out of range for type tuple[()] (reportGeneralTypeIssues)
   <CWD>/torch/_inductor/ir.py:2492:31 - error: "hip" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/ir.py:2492:62 - error: Operator ">=" not supported for "None" (reportOptionalOperand)
+  <CWD>/torch/_inductor/ir.py:2520:29 - error: Argument of type "(index: Sequence[Expr], scan_index: Sequence[Expr]) -> list[Expr]" cannot be assigned to parameter "reindex" of type "(Sequence[_IntLike], Sequence[_IntLike]) -> Sequence[_IntLike]" in function "__init__"
+    Type "(index: Sequence[Expr], scan_index: Sequence[Expr]) -> list[Expr]" is not assignable to type "(Sequence[_IntLike], Sequence[_IntLike]) -> Sequence[_IntLike]"
+      Parameter 1: type "Sequence[_IntLike]" is incompatible with type "Sequence[Expr]"
+        "Sequence[_IntLike]" is not assignable to "Sequence[Expr]"
+          Type parameter "_T_co@Sequence" is covariant, but "_IntLike" is not a subtype of "Expr"
+            Type "_IntLike" is not assignable to type "Expr"
+      Parameter 2: type "Sequence[_IntLike]" is incompatible with type "Sequence[Expr]"
+        "Sequence[_IntLike]" is not assignable to "Sequence[Expr]"
+          Type parameter "_T_co@Sequence" is covariant, but "_IntLike" is not a subtype of "Expr"
+    ... (reportArgumentType)
   <CWD>/torch/_inductor/ir.py:2537:23 - error: "device" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/ir.py:2538:22 - error: "dtype" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/ir.py:2577:25 - error: "dtype" is not a known attribute of module "torch" (reportAttributeAccessIssue)
+  <CWD>/torch/_inductor/ir.py:2625:16 - error: Type "Sequence[_IntLike]" is not assignable to return type "Sequence[Expr]"
+    "Sequence[_IntLike]" is not assignable to "Sequence[Expr]"
+      Type parameter "_T_co@Sequence" is covariant, but "_IntLike" is not a subtype of "Expr"
+        Type "_IntLike" is not assignable to type "Expr"
+          "int" is not assignable to "Expr" (reportReturnType)
   <CWD>/torch/_inductor/ir.py:2645:23 - error: "device" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/ir.py:2646:29 - error: "dtype" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/ir.py:2782:21 - error: Argument of type "Sequence[int | Integer]" cannot be assigned to parameter "order" of type "Sequence[int]" in function "freeze_layout_with_stride_order"
@@ -10016,38 +10114,60 @@
           "Integer" is not assignable to "int" (reportArgumentType)
   <CWD>/torch/_inductor/ir.py:2789:19 - error: Cannot access attribute "decide_layout" for class "IRNode"
     Attribute "decide_layout" is unknown (reportAttributeAccessIssue)
-  <CWD>/torch/_inductor/ir.py:2795:15 - error: Cannot access attribute "data" for class "IRNode"
-    Attribute "data" is unknown (reportAttributeAccessIssue)
-  <CWD>/torch/_inductor/ir.py:2798:26 - error: Cannot access attribute "layout" for class "IRNode"
-    Attribute "layout" is unknown (reportAttributeAccessIssue)
-  <CWD>/torch/_inductor/ir.py:2817:23 - error: Cannot access attribute "layout" for class "IRNode"
-    Attribute "layout" is unknown (reportAttributeAccessIssue)
-  <CWD>/torch/_inductor/ir.py:2821:34 - error: Cannot access attribute "data" for class "IRNode"
-    Attribute "data" is unknown (reportAttributeAccessIssue)
+  <CWD>/torch/_inductor/ir.py:2807:41 - error: Argument of type "Sequence[int | Integer]" cannot be assigned to parameter "order" of type "Sequence[int]" in function "is_stride_ordered"
+    "Sequence[int | Integer]" is not assignable to "Sequence[int]"
+      Type parameter "_T_co@Sequence" is covariant, but "int | Integer" is not a subtype of "int"
+        Type "int | Integer" is not assignable to type "int"
+          "Integer" is not assignable to "int" (reportArgumentType)
   <CWD>/torch/_inductor/ir.py:2860:30 - error: "dtype" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/ir.py:2866:44 - error: "device" is not a known attribute of module "torch" (reportAttributeAccessIssue)
-  <CWD>/torch/_inductor/ir.py:2898:26 - error: Cannot access attribute "is_module_buffer" for class "IRNode"
-    Attribute "is_module_buffer" is unknown (reportAttributeAccessIssue)
-  <CWD>/torch/_inductor/ir.py:2913:19 - error: Cannot access attribute "data" for class "IRNode"
-    Attribute "data" is unknown (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/ir.py:2916:48 - error: "device" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/ir.py:2945:17 - error: Argument of type "Expr | None" cannot be assigned to parameter "size" of type "Expr" in function "is_size_one_or_false"
     Type "Expr | None" is not assignable to type "Expr"
       "None" is not assignable to "Expr" (reportArgumentType)
+  <CWD>/torch/_inductor/ir.py:2978:17 - error: Argument of type "list[_IntLike]" cannot be assigned to parameter "size" of type "Sequence[Expr]" in function "__init__"
+    "list[_IntLike]" is not assignable to "Sequence[Expr]"
+      Type parameter "_T_co@Sequence" is covariant, but "_IntLike" is not a subtype of "Expr"
+        Type "_IntLike" is not assignable to type "Expr"
+          "int" is not assignable to "Expr" (reportArgumentType)
+  <CWD>/torch/_inductor/ir.py:2985:40 - error: Argument of type "Sequence[_IntLike]" cannot be assigned to parameter "size" of type "Sequence[Expr]" in function "__init__"
+    "Sequence[_IntLike]" is not assignable to "Sequence[Expr]"
+      Type parameter "_T_co@Sequence" is covariant, but "_IntLike" is not a subtype of "Expr"
+        Type "_IntLike" is not assignable to type "Expr"
+          "int" is not assignable to "Expr" (reportArgumentType)
+  <CWD>/torch/_inductor/ir.py:3032:41 - error: Argument of type "list[int]" cannot be assigned to parameter "dims" of type "list[Expr]" in function "__init__"
+    "list[int]" is not assignable to "list[Expr]"
+      Type parameter "_T@list" is invariant, but "int" is not the same as "Expr"
+      Consider switching from "list" to "Sequence" which is covariant (reportArgumentType)
   <CWD>/torch/_inductor/ir.py:3039:46 - error: Argument of type "list[Expr]" cannot be assigned to parameter "dims" of type "Sequence[int]" in function "_map_neg_dims"
     "list[Expr]" is not assignable to "Sequence[int]"
       Type parameter "_T_co@Sequence" is covariant, but "Expr" is not a subtype of "int"
         "Expr" is not assignable to "int" (reportArgumentType)
+  <CWD>/torch/_inductor/ir.py:3043:17 - error: No overloads for "__getitem__" match the provided arguments (reportCallIssue)
+  <CWD>/torch/_inductor/ir.py:3043:17 - error: Argument of type "Expr" cannot be assigned to parameter "index" of type "slice[Any, Any, Any]" in function "__getitem__"
+    "Expr" is not assignable to "slice[Any, Any, Any]" (reportArgumentType)
   <CWD>/torch/_inductor/ir.py:3049:16 - error: Argument of type "int" cannot be assigned to parameter "key" of type "Expr" in function "__getitem__"
     "int" is not assignable to "Expr" (reportArgumentType)
   <CWD>/torch/_inductor/ir.py:3123:16 - error: Type "tuple[list[Expr], (index: Sequence[Expr]) -> tuple[Expr]]" is not assignable to return type "tuple[list[int], (Sequence[Expr]) -> tuple[Expr]]"
     "list[Expr]" is not assignable to "list[int]"
       Type parameter "_T@list" is invariant, but "Expr" is not the same as "int"
       Consider switching from "list" to "Sequence" which is covariant (reportReturnType)
+  <CWD>/torch/_inductor/ir.py:3198:61 - error: Argument of type "(index: Any) -> tuple[int, ...]" cannot be assigned to parameter "reindex" of type "(Sequence[Expr]) -> Sequence[Expr]" in function "__init__"
+    Type "(index: Any) -> tuple[int, ...]" is not assignable to type "(Sequence[Expr]) -> Sequence[Expr]"
+      Function return type "tuple[int, ...]" is incompatible with type "Sequence[Expr]"
+        "tuple[int, ...]" is not assignable to "Sequence[Expr]"
+          Type parameter "_T_co@Sequence" is covariant, but "int" is not a subtype of "Expr"
+            "int" is not assignable to "Expr" (reportArgumentType)
   <CWD>/torch/_inductor/ir.py:3214:51 - error: Argument of type "list[Expr]" cannot be assigned to parameter "sizes" of type "Sequence[int]" in function "contiguous_strides"
     "list[Expr]" is not assignable to "Sequence[int]"
       Type parameter "_T_co@Sequence" is covariant, but "Expr" is not a subtype of "int"
         "Expr" is not assignable to "int" (reportArgumentType)
+  <CWD>/torch/_inductor/ir.py:3221:57 - error: Argument of type "(Sequence[_T@dynamic_reshape_indexer]) -> Sequence[_V@dynamic_reshape_indexer]" cannot be assigned to parameter "reindex" of type "(Sequence[Expr]) -> Sequence[Expr]" in function "__init__"
+    Type "(Sequence[_T@dynamic_reshape_indexer]) -> Sequence[_V@dynamic_reshape_indexer]" is not assignable to type "(Sequence[Expr]) -> Sequence[Expr]"
+      Function return type "Sequence[_V@dynamic_reshape_indexer]" is incompatible with type "Sequence[Expr]"
+        "Sequence[_V@dynamic_reshape_indexer]" is not assignable to "Sequence[Expr]"
+          Type parameter "_T_co@Sequence" is covariant, but "_V@dynamic_reshape_indexer" is not a subtype of "Expr"
+            "object*" is not assignable to "Expr" (reportArgumentType)
   <CWD>/torch/_inductor/ir.py:3246:29 - warning: TypeVar "_T" appears only once in generic function signature
     Use "object" instead (reportInvalidTypeVarUse)
   <CWD>/torch/_inductor/ir.py:3246:44 - warning: TypeVar "_V" appears only once in generic function signature
@@ -10102,6 +10222,12 @@
   <CWD>/torch/_inductor/ir.py:3499:79 - error: Argument of type "int" cannot be assigned to parameter "right" of type "Expr" in function "evaluate_max"
     "int" is not assignable to "Expr" (reportArgumentType)
   <CWD>/torch/_inductor/ir.py:3504:46 - error: Argument of type "int" cannot be assigned to parameter "right" of type "Expr" in function "evaluate_min"
+    "int" is not assignable to "Expr" (reportArgumentType)
+  <CWD>/torch/_inductor/ir.py:3514:19 - error: Type "Expr" is not assignable to declared type "int | None"
+    Type "Expr" is not assignable to type "int | None"
+      "Expr" is not assignable to "int"
+      "Expr" is not assignable to "None" (reportAssignmentType)
+  <CWD>/torch/_inductor/ir.py:3514:45 - error: Argument of type "int" cannot be assigned to parameter "idx" of type "Expr" in function "handle_negative_index"
     "int" is not assignable to "Expr" (reportArgumentType)
   <CWD>/torch/_inductor/ir.py:3515:26 - error: Argument of type "int | None" cannot be assigned to parameter "x" of type "Expr" in function "clamp"
     Type "int | None" is not assignable to type "Expr"
@@ -10176,21 +10302,27 @@
   <CWD>/torch/_inductor/ir.py:3886:13 - error: Argument of type "int | Integer | Unknown | Expr" cannot be assigned to parameter "value" of type "int" in function "__setitem__"
     Type "int | Integer | Unknown | Expr" is not assignable to type "int"
       "Expr" is not assignable to "int" (reportArgumentType)
-  <CWD>/torch/_inductor/ir.py:3933:38 - error: Cannot access attribute "device" for class "object"
-    Attribute "device" is unknown (reportAttributeAccessIssue)
-  <CWD>/torch/_inductor/ir.py:3934:37 - error: Cannot access attribute "dtype" for class "object"
-    Attribute "dtype" is unknown (reportAttributeAccessIssue)
-  <CWD>/torch/_inductor/ir.py:3935:36 - error: Cannot access attribute "size" for class "object"
-    Attribute "size" is unknown (reportAttributeAccessIssue)
-  <CWD>/torch/_inductor/ir.py:3936:38 - error: Cannot access attribute "stride" for class "object"
-    Attribute "stride" is unknown (reportAttributeAccessIssue)
-  <CWD>/torch/_inductor/ir.py:3937:38 - error: Cannot access attribute "offset" for class "object"
-    Attribute "offset" is unknown (reportAttributeAccessIssue)
-  <CWD>/torch/_inductor/ir.py:3938:41 - error: Cannot access attribute "is_pinned" for class "object"
-    Attribute "is_pinned" is unknown (reportAttributeAccessIssue)
+  <CWD>/torch/_inductor/ir.py:3904:23 - error: Cannot assign to attribute "stride" for class "FlexibleLayout*"
+    "Sequence[int]*" is not assignable to "Sequence[Expr]"
+      Type parameter "_T_co@Sequence" is covariant, but "int" is not a subtype of "Expr"
+        "int" is not assignable to "Expr" (reportAttributeAccessIssue)
+  <CWD>/torch/_inductor/ir.py:3904:41 - error: Argument of type "Sequence[Expr]*" cannot be assigned to parameter "in_strides" of type "Sequence[int]" in function "_pad_strides"
+    "Sequence[Expr]*" is not assignable to "Sequence[int]"
+      Type parameter "_T_co@Sequence" is covariant, but "Expr" is not a subtype of "int"
+        "Expr" is not assignable to "int" (reportArgumentType)
   <CWD>/torch/_inductor/ir.py:3941:9 - error: Method "storage_size" overrides class "OutputSpec" in an incompatible manner
     Return type mismatch: base method returns type "int", override returns type "Expr"
       "Expr" is not assignable to "int" (reportIncompatibleMethodOverride)
+  <CWD>/torch/_inductor/ir.py:3960:31 - error: Argument of type "Sequence[Expr]" cannot be assigned to parameter "size" of type "Sequence[int]" in function "_fixed_indexer"
+    "Sequence[Expr]" is not assignable to "Sequence[int]"
+      Type parameter "_T_co@Sequence" is covariant, but "Expr" is not a subtype of "int"
+        "Expr" is not assignable to "int" (reportArgumentType)
+  <CWD>/torch/_inductor/ir.py:3960:42 - error: Argument of type "Sequence[Expr]" cannot be assigned to parameter "stride" of type "Sequence[int] | None" in function "_fixed_indexer"
+    Type "Sequence[Expr]" is not assignable to type "Sequence[int] | None"
+      "Sequence[Expr]" is not assignable to "Sequence[int]"
+        Type parameter "_T_co@Sequence" is covariant, but "Expr" is not a subtype of "int"
+          "Expr" is not assignable to "int"
+      "Sequence[Expr]" is not assignable to "None" (reportArgumentType)
   <CWD>/torch/_inductor/ir.py:3997:16 - error: Type "list[None]" is not assignable to return type "list[Expr]"
     "list[None]" is not assignable to "list[Expr]"
       Type parameter "_T@list" is invariant, but "None" is not the same as "Expr"
@@ -10203,6 +10335,29 @@
     "Sequence[Expr]" is not assignable to "Sequence[int]"
       Type parameter "_T_co@Sequence" is covariant, but "Expr" is not a subtype of "int"
         "Expr" is not assignable to "int" (reportArgumentType)
+  <CWD>/torch/_inductor/ir.py:4085:44 - error: Argument of type "Sequence[Expr]" cannot be assigned to parameter "in_strides" of type "Sequence[int]" in function "_pad_strides"
+    "Sequence[Expr]" is not assignable to "Sequence[int]"
+      Type parameter "_T_co@Sequence" is covariant, but "Expr" is not a subtype of "int"
+        "Expr" is not assignable to "int" (reportArgumentType)
+  <CWD>/torch/_inductor/ir.py:4091:13 - error: Argument of type "Sequence[int] | Sequence[Expr]" cannot be assigned to parameter "stride" of type "Sequence[Expr] | None" in function "__init__"
+    Type "Sequence[int] | Sequence[Expr]" is not assignable to type "Sequence[Expr] | None"
+      Type "Sequence[int]" is not assignable to type "Sequence[Expr] | None"
+        "Sequence[int]" is not assignable to "Sequence[Expr]"
+          Type parameter "_T_co@Sequence" is covariant, but "int" is not a subtype of "Expr"
+            "int" is not assignable to "Expr"
+        "Sequence[int]" is not assignable to "None" (reportArgumentType)
+  <CWD>/torch/_inductor/ir.py:4101:44 - error: Argument of type "Sequence[_IntLike]" cannot be assigned to parameter "in_strides" of type "Sequence[int]" in function "_pad_strides"
+    "Sequence[_IntLike]" is not assignable to "Sequence[int]"
+      Type parameter "_T_co@Sequence" is covariant, but "_IntLike" is not a subtype of "int"
+        Type "_IntLike" is not assignable to type "int"
+          "Expr" is not assignable to "int" (reportArgumentType)
+  <CWD>/torch/_inductor/ir.py:4107:13 - error: Argument of type "Sequence[int] | Sequence[_IntLike]" cannot be assigned to parameter "stride" of type "Sequence[Expr] | None" in function "__init__"
+    Type "Sequence[int] | Sequence[_IntLike]" is not assignable to type "Sequence[Expr] | None"
+      Type "Sequence[_IntLike]" is not assignable to type "Sequence[Expr] | None"
+        "Sequence[_IntLike]" is not assignable to "Sequence[Expr]"
+          Type parameter "_T_co@Sequence" is covariant, but "_IntLike" is not a subtype of "Expr"
+            Type "_IntLike" is not assignable to type "Expr"
+        "Sequence[_IntLike]" is not assignable to "None" (reportArgumentType)
   <CWD>/torch/_inductor/ir.py:4113:37 - error: Type "list[Expr]" is not assignable to declared type "Sequence[int]"
     "list[Expr]" is not assignable to "Sequence[int]"
       Type parameter "_T_co@Sequence" is covariant, but "Expr" is not a subtype of "int"
@@ -10211,10 +10366,27 @@
     "Sequence[Expr]" is not assignable to "Sequence[int]"
       Type parameter "_T_co@Sequence" is covariant, but "Expr" is not a subtype of "int"
         "Expr" is not assignable to "int" (reportArgumentType)
+  <CWD>/torch/_inductor/ir.py:4120:13 - error: Argument of type "Sequence[int]" cannot be assigned to parameter "stride" of type "Sequence[Expr] | None" in function "__init__"
+    Type "Sequence[int]" is not assignable to type "Sequence[Expr] | None"
+      "Sequence[int]" is not assignable to "Sequence[Expr]"
+        Type parameter "_T_co@Sequence" is covariant, but "int" is not a subtype of "Expr"
+          "int" is not assignable to "Expr"
+      "Sequence[int]" is not assignable to "None" (reportArgumentType)
   <CWD>/torch/_inductor/ir.py:4126:40 - error: Argument of type "Sequence[Expr]" cannot be assigned to parameter "sizes" of type "Sequence[int]" in function "same_ordered"
     "Sequence[Expr]" is not assignable to "Sequence[int]"
       Type parameter "_T_co@Sequence" is covariant, but "Expr" is not a subtype of "int"
         "Expr" is not assignable to "int" (reportArgumentType)
+  <CWD>/torch/_inductor/ir.py:4128:44 - error: Argument of type "Sequence[Expr]" cannot be assigned to parameter "in_strides" of type "Sequence[int]" in function "_pad_strides"
+    "Sequence[Expr]" is not assignable to "Sequence[int]"
+      Type parameter "_T_co@Sequence" is covariant, but "Expr" is not a subtype of "int"
+        "Expr" is not assignable to "int" (reportArgumentType)
+  <CWD>/torch/_inductor/ir.py:4133:13 - error: Argument of type "Sequence[int] | Sequence[Expr]" cannot be assigned to parameter "stride" of type "Sequence[Expr] | None" in function "__init__"
+    Type "Sequence[int] | Sequence[Expr]" is not assignable to type "Sequence[Expr] | None"
+      Type "Sequence[int]" is not assignable to type "Sequence[Expr] | None"
+        "Sequence[int]" is not assignable to "Sequence[Expr]"
+          Type parameter "_T_co@Sequence" is covariant, but "int" is not a subtype of "Expr"
+            "int" is not assignable to "Expr"
+        "Sequence[int]" is not assignable to "None" (reportArgumentType)
   <CWD>/torch/_inductor/ir.py:4159:23 - error: "device" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/ir.py:4160:22 - error: "dtype" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/ir.py:4166:51 - error: Argument of type "Sequence[Expr]" cannot be assigned to parameter "sizes" of type "Sequence[int]" in function "fill_ordered"
@@ -10234,6 +10406,10 @@
     Attribute "layout" is unknown (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/ir.py:4266:28 - error: "device" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/ir.py:4276:44 - error: "device" is not a known attribute of module "torch" (reportAttributeAccessIssue)
+  <CWD>/torch/_inductor/ir.py:4297:9 - error: "stride" incorrectly overrides property of same name in class "Layout"
+    Property method "fset" is incompatible
+      Parameter 2 type mismatch: base parameter is type "Sequence[Expr]", override parameter is type "Never"
+        Type "Sequence[Expr]" is not assignable to type "Never" (reportIncompatibleMethodOverride)
   <CWD>/torch/_inductor/ir.py:4358:31 - error: Cannot access attribute "data" for class "IRNode"
     Attribute "data" is unknown (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/ir.py:4358:70 - error: Cannot access attribute "data" for class "IRNode"
@@ -10242,14 +10418,10 @@
     Attribute "data" is unknown (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/ir.py:4360:20 - error: Cannot access attribute "data" for class "IRNode"
     Attribute "data" is unknown (reportAttributeAccessIssue)
-  <CWD>/torch/_inductor/ir.py:4392:32 - error: Cannot access attribute "get_example" for class "OutputSpec"
-    Attribute "get_example" is unknown (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/ir.py:4395:44 - error: "device" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/ir.py:4402:30 - error: "dtype" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/ir.py:4423:16 - error: Type "Expr" is not assignable to return type "int"
     "Expr" is not assignable to "int" (reportReturnType)
-  <CWD>/torch/_inductor/ir.py:4432:39 - error: Cannot access attribute "as_fixed" for class "OutputSpec"
-    Attribute "as_fixed" is unknown (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/ir.py:4444:9 - error: Method "freeze_layout_with_same_order" overrides class "IRNode" in an incompatible manner
     Parameter 2 type mismatch: base parameter is type "Sequence[_IntLike]", override parameter is type "Sequence[int]"
       "Sequence[_IntLike]" is not assignable to "Sequence[int]"
@@ -10264,11 +10436,19 @@
             "Expr" is not assignable to "int" (reportIncompatibleMethodOverride)
   <CWD>/torch/_inductor/ir.py:4539:37 - error: "device" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/ir.py:4551:48 - error: "device" is not a known attribute of module "torch" (reportAttributeAccessIssue)
-  <CWD>/torch/_inductor/ir.py:4775:57 - error: Argument of type "Any | Sequence[Expr]" cannot be assigned to parameter "vars" of type "Sequence[Symbol]" in function "stride_hints"
-    Type "Any | Sequence[Expr]" is not assignable to type "Sequence[Symbol]"
-      "Sequence[Expr]" is not assignable to "Sequence[Symbol]"
-        Type parameter "_T_co@Sequence" is covariant, but "Expr" is not a subtype of "Symbol"
-          "Expr" is not assignable to "Symbol" (reportArgumentType)
+  <CWD>/torch/_inductor/ir.py:4637:17 - error: Argument of type "Sequence[_IntLike]" cannot be assigned to parameter "size" of type "Sequence[Expr]" in function "__init__"
+    "Sequence[_IntLike]" is not assignable to "Sequence[Expr]"
+      Type parameter "_T_co@Sequence" is covariant, but "_IntLike" is not a subtype of "Expr"
+        Type "_IntLike" is not assignable to type "Expr"
+          "int" is not assignable to "Expr" (reportArgumentType)
+  <CWD>/torch/_inductor/ir.py:4663:30 - error: Cannot access attribute "name" for class "Loops"
+    Attribute "name" is unknown (reportAttributeAccessIssue)
+  <CWD>/torch/_inductor/ir.py:4775:57 - error: Argument of type "Sequence[_IntLike] | Sequence[Expr]" cannot be assigned to parameter "vars" of type "Sequence[Symbol]" in function "stride_hints"
+    Type "Sequence[_IntLike] | Sequence[Expr]" is not assignable to type "Sequence[Symbol]"
+      "Sequence[_IntLike]" is not assignable to "Sequence[Symbol]"
+        Type parameter "_T_co@Sequence" is covariant, but "_IntLike" is not a subtype of "Symbol"
+          Type "_IntLike" is not assignable to type "Symbol"
+            "Expr" is not assignable to "Symbol" (reportArgumentType)
   <CWD>/torch/_inductor/ir.py:4807:18 - error: Argument of type "Sequence[Expr]" cannot be assigned to parameter "allow_same_symbol_in_index" of type "bool" in function "__init__"
     "Sequence[Expr]" is not assignable to "bool" (reportArgumentType)
   <CWD>/torch/_inductor/ir.py:4928:22 - error: Type "Sequence[Symbol] | Sequence[int]" is not assignable to declared type "Sequence[Symbol]"
@@ -10458,34 +10638,26 @@
       Type parameter "_T_co@Sequence" is covariant, but "Expr | int" is not a subtype of "int"
         Type "Expr | int" is not assignable to type "int"
           "Expr" is not assignable to "int" (reportAssignmentType)
+  <CWD>/torch/_inductor/ir.py:5619:24 - error: Argument of type "Sequence[int]" cannot be assigned to parameter "stride" of type "Sequence[Expr] | None" in function "__init__"
+    Type "Sequence[int]" is not assignable to type "Sequence[Expr] | None"
+      "Sequence[int]" is not assignable to "Sequence[Expr]"
+        Type parameter "_T_co@Sequence" is covariant, but "int" is not a subtype of "Expr"
+          "int" is not assignable to "Expr"
+      "Sequence[int]" is not assignable to "None" (reportArgumentType)
   <CWD>/torch/_inductor/ir.py:5631:52 - error: Argument of type "Expr" cannot be assigned to parameter "end" of type "int" in function "create"
     "Expr" is not assignable to "int" (reportArgumentType)
-  <CWD>/torch/_inductor/ir.py:5638:31 - error: Cannot access attribute "data" for class "IRNode"
-    Attribute "data" is unknown (reportAttributeAccessIssue)
-  <CWD>/torch/_inductor/ir.py:5639:39 - error: Cannot access attribute "data" for class "IRNode"
-    Attribute "data" is unknown (reportAttributeAccessIssue)
-  <CWD>/torch/_inductor/ir.py:5641:39 - error: Cannot access attribute "data" for class "IRNode"
-    Attribute "data" is unknown (reportAttributeAccessIssue)
-  <CWD>/torch/_inductor/ir.py:5670:27 - error: Cannot access attribute "data" for class "IRNode"
-    Attribute "data" is unknown (reportAttributeAccessIssue)
-  <CWD>/torch/_inductor/ir.py:5672:36 - error: Cannot access attribute "data" for class "IRNode"
-    Attribute "data" is unknown (reportAttributeAccessIssue)
-  <CWD>/torch/_inductor/ir.py:5673:28 - error: Cannot access attribute "data" for class "IRNode"
-    Attribute "data" is unknown (reportAttributeAccessIssue)
-  <CWD>/torch/_inductor/ir.py:5692:25 - error: Cannot access attribute "data" for class "IRNode"
-    Attribute "data" is unknown (reportAttributeAccessIssue)
-  <CWD>/torch/_inductor/ir.py:5693:32 - error: Cannot access attribute "data" for class "IRNode"
-    Attribute "data" is unknown (reportAttributeAccessIssue)
-  <CWD>/torch/_inductor/ir.py:5694:36 - error: Cannot access attribute "data" for class "IRNode"
-    Attribute "data" is unknown (reportAttributeAccessIssue)
+  <CWD>/torch/_inductor/ir.py:5693:37 - error: Cannot access attribute "layout" for class "IRNode"
+    Attribute "layout" is unknown (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/ir.py:5723:26 - error: Cannot assign to attribute "layout" for class "IRNode"
     Attribute "layout" is unknown (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/ir.py:5998:40 - error: "ScriptObject" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/ir.py:5998:78 - error: "Generator" is not a known attribute of module "torch" (reportAttributeAccessIssue)
-  <CWD>/torch/_inductor/ir.py:6016:39 - error: Cannot access attribute "get_value" for class "IRNode"
-    Attribute "get_value" is unknown (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/ir.py:6017:48 - error: "ir" is not a known attribute of module "torch._inductor" (reportAttributeAccessIssue)
+  <CWD>/torch/_inductor/ir.py:6018:34 - error: Cannot access attribute "device" for class "BaseView"
+    Attribute "device" is unknown (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/ir.py:6018:34 - error: Cannot access attribute "device" for class "IRNode"
+    Attribute "device" is unknown (reportAttributeAccessIssue)
+  <CWD>/torch/_inductor/ir.py:6019:26 - error: Cannot access attribute "device" for class "BaseView"
     Attribute "device" is unknown (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/ir.py:6019:26 - error: Cannot access attribute "device" for class "IRNode"
     Attribute "device" is unknown (reportAttributeAccessIssue)
@@ -10498,13 +10670,10 @@
     "Sequence[Expr]" is not assignable to "Sequence[Symbol]"
       Type parameter "_T_co@Sequence" is covariant, but "Expr" is not a subtype of "Symbol"
         "Expr" is not assignable to "Symbol" (reportArgumentType)
-  <CWD>/torch/_inductor/ir.py:6123:20 - error: Cannot access attribute "data" for class "IRNode"
-    Attribute "data" is unknown (reportAttributeAccessIssue)
+  <CWD>/torch/_inductor/ir.py:6139:47 - error: Argument of type "<subclass of IRNode and Expr> | <subclass of IRNode and Boolean> | <subclass of IRNode and int>" cannot be assigned to parameter "expr" of type "Expr" in function "__init__"
+    Type "<subclass of IRNode and Expr> | <subclass of IRNode and Boolean> | <subclass of IRNode and int>" is not assignable to type "Expr"
+      "<subclass of IRNode and Boolean>" is not assignable to "Expr" (reportArgumentType)
   <CWD>/torch/_inductor/ir.py:6145:27 - error: "tensor" is not a known attribute of module "torch" (reportAttributeAccessIssue)
-  <CWD>/torch/_inductor/ir.py:6145:36 - error: Cannot access attribute "value" for class "IRNode"
-    Attribute "value" is unknown (reportAttributeAccessIssue)
-  <CWD>/torch/_inductor/ir.py:6153:42 - error: Cannot access attribute "data" for class "IRNode"
-    Attribute "data" is unknown (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/ir.py:6233:39 - error: Argument of type "Sequence[_IntLike] | None" cannot be assigned to parameter "exact_strides" of type "Sequence[int | Integer] | None" in function "as_storage_and_layout"
     Type "Sequence[_IntLike] | None" is not assignable to type "Sequence[int | Integer] | None"
       Type "Sequence[_IntLike]" is not assignable to type "Sequence[int | Integer] | None"
@@ -10552,6 +10721,8 @@
   <CWD>/torch/_inductor/ir.py:6688:24 - error: "iinfo" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/ir.py:6688:36 - error: "int64" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/ir.py:6692:29 - error: "int64" is not a known attribute of module "torch" (reportAttributeAccessIssue)
+  <CWD>/torch/_inductor/ir.py:6693:23 - error: Argument of type "list[int]" cannot be assigned to parameter "size" of type "Sequence[Expr]" in function "__init__"
+    "int" is not assignable to "Expr" (reportArgumentType)
   <CWD>/torch/_inductor/ir.py:6925:48 - error: Cannot access attribute "name" for class "Expr"
     Attribute "name" is unknown (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/ir.py:6926:60 - error: Cannot access attribute "name" for class "Expr"
@@ -10598,11 +10769,16 @@
   <CWD>/torch/_inductor/ir.py:7133:35 - error: Cannot access attribute "arg_names" for class "Kernel[CSEVariable]"
     Attribute "arg_names" is unknown (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/ir.py:7158:44 - error: "device" is not a known attribute of module "torch" (reportAttributeAccessIssue)
-  <CWD>/torch/_inductor/ir.py:7300:50 - error: Cannot access attribute "data" for class "IRNode"
-    Attribute "data" is unknown (reportAttributeAccessIssue)
-  <CWD>/torch/_inductor/ir.py:7315:53 - error: Cannot access attribute "data" for class "IRNode"
-    Attribute "data" is unknown (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/ir.py:7431:46 - error: "device" is not a known attribute of module "torch" (reportAttributeAccessIssue)
+  <CWD>/torch/_inductor/ir.py:7459:28 - error: Cannot assign to attribute "is_pinned" for class "Layout"
+    "Layout" is frozen (reportAttributeAccessIssue)
+  <CWD>/torch/_inductor/ir.py:7465:17 - error: Argument of type "Sequence[_IntLike] | None" cannot be assigned to parameter "stride" of type "Sequence[Expr] | None" in function "__init__"
+    Type "Sequence[_IntLike] | None" is not assignable to type "Sequence[Expr] | None"
+      Type "Sequence[_IntLike]" is not assignable to type "Sequence[Expr] | None"
+        "Sequence[_IntLike]" is not assignable to "Sequence[Expr]"
+          Type parameter "_T_co@Sequence" is covariant, but "_IntLike" is not a subtype of "Expr"
+            Type "_IntLike" is not assignable to type "Expr"
+        "Sequence[_IntLike]" is not assignable to "None" (reportArgumentType)
   <CWD>/torch/_inductor/ir.py:7507:56 - error: "device" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/ir.py:7560:56 - error: "device" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/ir.py:7599:43 - error: "device" is not a known attribute of module "torch" (reportAttributeAccessIssue)
@@ -10648,14 +10824,17 @@
     Attribute "name" is unknown (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/ir.py:8538:26 - error: Cannot access attribute "name" for class "IRNode"
     Attribute "name" is unknown (reportAttributeAccessIssue)
-  <CWD>/torch/_inductor/ir.py:8546:27 - error: Cannot access attribute "inner_fn_opcount" for class "IRNode"
-    Attribute "inner_fn_opcount" is unknown (reportAttributeAccessIssue)
-  <CWD>/torch/_inductor/ir.py:8589:37 - error: Cannot access attribute "inner_fn_opcount" for class "IRNode"
-    Attribute "inner_fn_opcount" is unknown (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/ir.py:8647:35 - error: Parameter declaration "operands" is obscured by a declaration of the same name (reportRedeclaration)
   <CWD>/torch/_inductor/ir.py:8678:21 - error: Argument of type "Any | dict[Any, Any]" cannot be assigned to parameter "object" of type "IRNode" in function "append"
     Type "Any | dict[Any, Any]" is not assignable to type "IRNode"
       "dict[Any, Any]" is not assignable to "IRNode" (reportArgumentType)
+  <CWD>/torch/_inductor/ir.py:8724:32 - error: Argument of type "Sequence[_IntLike]" cannot be assigned to parameter "stride" of type "Sequence[Expr] | None" in function "__init__"
+    Type "Sequence[_IntLike]" is not assignable to type "Sequence[Expr] | None"
+      "Sequence[_IntLike]" is not assignable to "Sequence[Expr]"
+        Type parameter "_T_co@Sequence" is covariant, but "_IntLike" is not a subtype of "Expr"
+          Type "_IntLike" is not assignable to type "Expr"
+            "int" is not assignable to "Expr"
+      "Sequence[_IntLike]" is not assignable to "None" (reportArgumentType)
   <CWD>/torch/_inductor/ir.py:9089:43 - error: "bool" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/ir.py:9112:51 - error: Argument of type "int | Expr" cannot be assigned to parameter "left" of type "Expr" in function "check_equals"
     Type "int | Expr" is not assignable to type "Expr"
@@ -10690,6 +10869,12 @@
   <CWD>/torch/_inductor/kernel/bmm.py:130:11 - error: "baddbmm" is not a known attribute of module "torch" (reportAttributeAccessIssue)
 <CWD>/torch/_inductor/kernel/conv.py
   <CWD>/torch/_inductor/kernel/conv.py:326:11 - error: "convolution" is not a known attribute of module "torch" (reportAttributeAccessIssue)
+  <CWD>/torch/_inductor/kernel/conv.py:383:9 - error: Argument of type "Sequence[int]" cannot be assigned to parameter "stride" of type "Sequence[Expr] | None" in function "__init__"
+    Type "Sequence[int]" is not assignable to type "Sequence[Expr] | None"
+      "Sequence[int]" is not assignable to "Sequence[Expr]"
+        Type parameter "_T_co@Sequence" is covariant, but "int" is not a subtype of "Expr"
+          "int" is not assignable to "Expr"
+      "Sequence[int]" is not assignable to "None" (reportArgumentType)
   <CWD>/torch/_inductor/kernel/conv.py:564:24 - error: "utils" is not a known attribute of module "torch._inductor" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/kernel/conv.py:575:25 - error: "utils" is not a known attribute of module "torch._inductor" (reportAttributeAccessIssue)
 <CWD>/torch/_inductor/kernel/custom_op.py
@@ -10699,6 +10884,11 @@
   <CWD>/torch/_inductor/kernel/flex/common.py:56:48 - error: "float32" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/kernel/flex/common.py:206:18 - error: "dtype" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/kernel/flex/common.py:207:19 - error: "device" is not a known attribute of module "torch" (reportAttributeAccessIssue)
+  <CWD>/torch/_inductor/kernel/flex/common.py:216:13 - error: Argument of type "list[int] | list[Expr]" cannot be assigned to parameter "size" of type "Sequence[Expr]" in function "__init__"
+    Type "list[int] | list[Expr]" is not assignable to type "Sequence[Expr]"
+      "list[int]" is not assignable to "Sequence[Expr]"
+        Type parameter "_T_co@Sequence" is covariant, but "int" is not a subtype of "Expr"
+          "int" is not assignable to "Expr" (reportArgumentType)
   <CWD>/torch/_inductor/kernel/flex/common.py:266:21 - error: "arange" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/kernel/flex/common.py:289:22 - error: "full" is not a known attribute of module "torch" (reportAttributeAccessIssue)
 <CWD>/torch/_inductor/kernel/flex/flex_flash_attention.py
@@ -10831,7 +11021,19 @@
   <CWD>/torch/_inductor/lowering.py:2155:25 - error: "float8_e8m0fnu" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/lowering.py:2418:33 - error: "device" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/lowering.py:2446:19 - error: "float32" is not a known attribute of module "torch" (reportAttributeAccessIssue)
+  <CWD>/torch/_inductor/lowering.py:2449:24 - error: Argument of type "list[int]" cannot be assigned to parameter "size" of type "Sequence[Expr]" in function "__init__"
+    "list[int]" is not assignable to "Sequence[Expr]"
+      Type parameter "_T_co@Sequence" is covariant, but "int" is not a subtype of "Expr"
+        "int" is not assignable to "Expr" (reportArgumentType)
+  <CWD>/torch/_inductor/lowering.py:2449:81 - error: Argument of type "int" cannot be assigned to parameter "offset" of type "Expr" in function "__init__"
+    "int" is not assignable to "Expr" (reportArgumentType)
   <CWD>/torch/_inductor/lowering.py:2475:19 - error: "int64" is not a known attribute of module "torch" (reportAttributeAccessIssue)
+  <CWD>/torch/_inductor/lowering.py:2478:24 - error: Argument of type "list[int]" cannot be assigned to parameter "size" of type "Sequence[Expr]" in function "__init__"
+    "list[int]" is not assignable to "Sequence[Expr]"
+      Type parameter "_T_co@Sequence" is covariant, but "int" is not a subtype of "Expr"
+        "int" is not assignable to "Expr" (reportArgumentType)
+  <CWD>/torch/_inductor/lowering.py:2478:81 - error: Argument of type "int" cannot be assigned to parameter "offset" of type "Expr" in function "__init__"
+    "int" is not assignable to "Expr" (reportArgumentType)
   <CWD>/torch/_inductor/lowering.py:2506:12 - error: Type "tuple[str, Expr, int | Unknown, _IntLike]" is not assignable to return type "tuple[str, Expr, Expr, Expr]"
     Type "int | Unknown" is not assignable to type "Expr"
       "int" is not assignable to "Expr"
@@ -10864,6 +11066,8 @@
     Attribute "name" is unknown (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/lowering.py:4491:27 - error: Cannot access attribute "name" for class "IRNode"
     Attribute "name" is unknown (reportAttributeAccessIssue)
+  <CWD>/torch/_inductor/lowering.py:4501:47 - error: Argument of type "Expr" cannot be assigned to parameter "start" of type "int"
+    "Expr" is not assignable to "int" (reportArgumentType)
   <CWD>/torch/_inductor/lowering.py:4566:33 - error: "int64" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/lowering.py:4567:50 - error: "int64" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/lowering.py:4573:33 - error: "int64" is not a known attribute of module "torch" (reportAttributeAccessIssue)
@@ -10871,10 +11075,6 @@
   <CWD>/torch/_inductor/lowering.py:4798:25 - error: "virtualized" is not a known attribute of module "torch._inductor" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/lowering.py:4816:21 - error: "int64" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/lowering.py:6526:31 - error: "ops_handler" is not a known attribute of module "torch._inductor" (reportAttributeAccessIssue)
-  <CWD>/torch/_inductor/lowering.py:6531:17 - error: Cannot access attribute "inner_fn" for class "IRNode"
-    Attribute "inner_fn" is unknown (reportAttributeAccessIssue)
-  <CWD>/torch/_inductor/lowering.py:6531:29 - error: Cannot access attribute "inner_fn_args" for class "IRNode"
-    Attribute "inner_fn_args" is unknown (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/lowering.py:6533:44 - error: "virtualized" is not a known attribute of module "torch._inductor" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/lowering.py:6771:58 - error: "int64" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/lowering.py:6774:58 - error: "int64" is not a known attribute of module "torch" (reportAttributeAccessIssue)
@@ -10948,16 +11148,22 @@
         "Expr" is not assignable to "int" (reportArgumentType)
   <CWD>/torch/_inductor/mkldnn_ir.py:676:35 - error: "float32" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/mkldnn_ir.py:676:50 - error: "bfloat16" is not a known attribute of module "torch" (reportAttributeAccessIssue)
+  <CWD>/torch/_inductor/mkldnn_ir.py:679:27 - error: Cannot assign to attribute "dtype" for class "FixedLayout"
+    "Layout" is frozen (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/mkldnn_ir.py:768:13 - error: Type "TensorBox | None" is not assignable to declared type "TensorBox"
     Type "TensorBox | None" is not assignable to type "TensorBox"
       "None" is not assignable to "TensorBox" (reportAssignmentType)
   <CWD>/torch/_inductor/mkldnn_ir.py:1051:35 - error: "float32" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/mkldnn_ir.py:1051:50 - error: "bfloat16" is not a known attribute of module "torch" (reportAttributeAccessIssue)
+  <CWD>/torch/_inductor/mkldnn_ir.py:1054:27 - error: Cannot assign to attribute "dtype" for class "FixedLayout"
+    "Layout" is frozen (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/mkldnn_ir.py:1139:13 - error: Type "Unknown | TensorBox | None" is not assignable to declared type "TensorBox"
     Type "Unknown | TensorBox | None" is not assignable to type "TensorBox"
       "None" is not assignable to "TensorBox" (reportAssignmentType)
   <CWD>/torch/_inductor/mkldnn_ir.py:1174:35 - error: "float32" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/mkldnn_ir.py:1174:50 - error: "bfloat16" is not a known attribute of module "torch" (reportAttributeAccessIssue)
+  <CWD>/torch/_inductor/mkldnn_ir.py:1177:27 - error: Cannot assign to attribute "dtype" for class "FixedLayout"
+    "Layout" is frozen (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/mkldnn_ir.py:1282:47 - error: Argument of type "Sequence[Expr]" cannot be assigned to parameter "sizes" of type "Sequence[int]" in function "contiguous_strides"
     "Sequence[Expr]" is not assignable to "Sequence[int]"
       Type parameter "_T_co@Sequence" is covariant, but "Expr" is not a subtype of "int"
@@ -11017,6 +11223,12 @@
   <CWD>/torch/_inductor/mkldnn_lowerings.py:740:59 - error: "int32" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/mkldnn_lowerings.py:757:31 - error: "equal" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/mkldnn_lowerings.py:758:31 - error: "zeros_like" is not a known attribute of module "torch" (reportAttributeAccessIssue)
+  <CWD>/torch/_inductor/mkldnn_lowerings.py:772:25 - error: Argument of type "TensorBox | ShapeAsConstantBuffer" cannot be assigned to parameter "x_scale" of type "TensorBox" in function "create_int8_compensation"
+    Type "TensorBox | ShapeAsConstantBuffer" is not assignable to type "TensorBox"
+      "ShapeAsConstantBuffer" is not assignable to "TensorBox" (reportArgumentType)
+  <CWD>/torch/_inductor/mkldnn_lowerings.py:774:25 - error: Argument of type "TensorBox | ShapeAsConstantBuffer" cannot be assigned to parameter "x_zp" of type "TensorBox" in function "create_int8_compensation"
+    Type "TensorBox | ShapeAsConstantBuffer" is not assignable to type "TensorBox"
+      "ShapeAsConstantBuffer" is not assignable to "TensorBox" (reportArgumentType)
   <CWD>/torch/_inductor/mkldnn_lowerings.py:904:52 - error: "uint8" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/mkldnn_lowerings.py:904:65 - error: "int8" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/mkldnn_lowerings.py:1001:30 - error: Argument of type "list[int | Expr]" cannot be assigned to parameter "sizes" of type "Sequence[Expr]"
@@ -11039,6 +11251,12 @@
   <CWD>/torch/_inductor/mkldnn_lowerings.py:1053:63 - error: "bfloat16" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/mkldnn_lowerings.py:1083:31 - error: "equal" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/mkldnn_lowerings.py:1084:31 - error: "zeros_like" is not a known attribute of module "torch" (reportAttributeAccessIssue)
+  <CWD>/torch/_inductor/mkldnn_lowerings.py:1099:25 - error: Argument of type "TensorBox | ShapeAsConstantBuffer" cannot be assigned to parameter "x_scale" of type "TensorBox" in function "create_int8_compensation"
+    Type "TensorBox | ShapeAsConstantBuffer" is not assignable to type "TensorBox"
+      "ShapeAsConstantBuffer" is not assignable to "TensorBox" (reportArgumentType)
+  <CWD>/torch/_inductor/mkldnn_lowerings.py:1101:25 - error: Argument of type "TensorBox | ShapeAsConstantBuffer" cannot be assigned to parameter "x_zp" of type "TensorBox" in function "create_int8_compensation"
+    Type "TensorBox | ShapeAsConstantBuffer" is not assignable to type "TensorBox"
+      "ShapeAsConstantBuffer" is not assignable to "TensorBox" (reportArgumentType)
 <CWD>/torch/_inductor/ops_handler.py
   <CWD>/torch/_inductor/ops_handler.py:88:69 - error: "dtype" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/ops_handler.py:128:57 - error: "dtype" is not a known attribute of module "torch" (reportAttributeAccessIssue)
@@ -11591,8 +11809,6 @@
   <CWD>/torch/_inductor/scheduler.py:754:58 - error: "codegen" is not a known attribute of module "torch._inductor" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/scheduler.py:862:55 - error: "codegen" is not a known attribute of module "torch._inductor" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/scheduler.py:985:22 - error: "_prims" is not a known attribute of module "torch" (reportAttributeAccessIssue)
-  <CWD>/torch/_inductor/scheduler.py:1051:32 - error: Cannot access attribute "get_buf_bytes" for class "TensorBox"
-    Attribute "get_buf_bytes" is unknown (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/scheduler.py:1221:53 - error: "codecache" is not a known attribute of module "torch._inductor" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/scheduler.py:1222:28 - error: "codecache" is not a known attribute of module "torch._inductor" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/scheduler.py:1433:39 - error: "simplify_and_reorder" is not a known attribute of "None" (reportOptionalMemberAccess)
@@ -11664,12 +11880,9 @@
   <CWD>/torch/_inductor/scheduler.py:5252:48 - error: "ir" is not a known attribute of module "torch._inductor" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/scheduler.py:5253:27 - error: "op_overload" is not a known attribute of "None" (reportOptionalMemberAccess)
   <CWD>/torch/_inductor/scheduler.py:5272:33 - error: "config" is not a known attribute of module "torch._inductor" (reportAttributeAccessIssue)
-  <CWD>/torch/_inductor/scheduler.py:5387:41 - error: "size" is not a known attribute of "None" (reportOptionalMemberAccess)
-  <CWD>/torch/_inductor/scheduler.py:5388:43 - error: "stride" is not a known attribute of "None" (reportOptionalMemberAccess)
-  <CWD>/torch/_inductor/scheduler.py:5389:43 - error: "offset" is not a known attribute of "None" (reportOptionalMemberAccess)
-  <CWD>/torch/_inductor/scheduler.py:5597:17 - error: Argument of type "list[IRNode | Any | Expr]" cannot be assigned to parameter "output_nodes" of type "list[IRNode]" in function "__init__"
-    "list[IRNode | Any | Expr]" is not assignable to "list[IRNode]"
-      Type parameter "_T@list" is invariant, but "IRNode | Any | Expr" is not the same as "IRNode"
+  <CWD>/torch/_inductor/scheduler.py:5597:17 - error: Argument of type "list[IRNode | TorchBindObject | Expr]" cannot be assigned to parameter "output_nodes" of type "list[IRNode]" in function "__init__"
+    "list[IRNode | TorchBindObject | Expr]" is not assignable to "list[IRNode]"
+      Type parameter "_T@list" is invariant, but "IRNode | TorchBindObject | Expr" is not the same as "IRNode"
       Consider switching from "list" to "Sequence" which is covariant (reportArgumentType)
   <CWD>/torch/_inductor/scheduler.py:5812:36 - error: "config" is not a known attribute of module "torch._inductor" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/scheduler.py:5852:58 - error: Argument of type "str | None" cannot be assigned to parameter "name" of type "str" in function "define_subgraph_launcher_fn"
@@ -11693,6 +11906,12 @@
   <CWD>/torch/_inductor/select_algorithm.py:559:44 - error: Object of type "None" cannot be called (reportOptionalCall)
   <CWD>/torch/_inductor/select_algorithm.py:1298:28 - error: "float32" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/select_algorithm.py:1740:33 - error: "config" is not a known attribute of module "torch._inductor" (reportAttributeAccessIssue)
+  <CWD>/torch/_inductor/select_algorithm.py:1962:26 - error: Type "Sequence[Expr]" is not assignable to declared type "Sequence[Symbol] | None"
+    Type "Sequence[Expr]" is not assignable to type "Sequence[Symbol] | None"
+      "Sequence[Expr]" is not assignable to "Sequence[Symbol]"
+        Type parameter "_T_co@Sequence" is covariant, but "Expr" is not a subtype of "Symbol"
+          "Expr" is not assignable to "Symbol"
+      "Sequence[Expr]" is not assignable to "None" (reportAssignmentType)
   <CWD>/torch/_inductor/select_algorithm.py:1968:13 - error: Argument of type "Sequence[Symbol] | None" cannot be assigned to parameter "call_sizes" of type "Sequence[Symbol]" in function "generate_and_load"
     Type "Sequence[Symbol] | None" is not assignable to type "Sequence[Symbol]"
       "None" is not assignable to "Sequence[Symbol]" (reportArgumentType)
@@ -11702,6 +11921,7 @@
     Type "Sequence[Symbol] | None" is not assignable to type "Iterable[Expr | int]"
       "None" is incompatible with protocol "Iterable[Expr | int]"
         "__iter__" is not present (reportArgumentType)
+  <CWD>/torch/_inductor/select_algorithm.py:2534:16 - error: "sched_getaffinity" is not a known attribute of module "os" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/select_algorithm.py:2745:29 - error: "autotune_process" is not a known attribute of module "torch._inductor" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/select_algorithm.py:2761:26 - error: Cannot access attribute "hint_override" for class "ChoiceCaller"
     Attribute "hint_override" is unknown (reportAttributeAccessIssue)
@@ -11723,6 +11943,8 @@
   <CWD>/torch/_inductor/select_algorithm.py:3451:26 - error: Import "triton.runtime.autotuner" could not be resolved (reportMissingImports)
   <CWD>/torch/_inductor/select_algorithm.py:3682:47 - error: "select_algorithm" is not a known attribute of module "torch._inductor" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/select_algorithm.py:3685:51 - error: "select_algorithm" is not a known attribute of module "torch._inductor" (reportAttributeAccessIssue)
+  <CWD>/torch/_inductor/select_algorithm.py:3897:22 - error: Cannot access attribute "layout" for class "IRNode"
+    Attribute "layout" is unknown (reportAttributeAccessIssue)
 <CWD>/torch/_inductor/shape_propagation.py
   <CWD>/torch/_inductor/shape_propagation.py:20:69 - error: "dtype" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/shape_propagation.py:55:25 - error: Cannot access attribute "shape" for class "int"
@@ -11798,8 +12020,6 @@
     "Proxy" is not assignable to "OpsHandler[Any]" (reportArgumentType)
   <CWD>/torch/_inductor/subgraph_lowering.py:149:9 - error: Method "placeholder" overrides class "OpsHandler" in an incompatible manner
     Parameter 2 name mismatch: base parameter is named "index", override parameter is named "idx" (reportIncompatibleMethodOverride)
-  <CWD>/torch/_inductor/subgraph_lowering.py:198:40 - error: Cannot access attribute "inner_fn" for class "IRNode"
-    Attribute "inner_fn" is unknown (reportAttributeAccessIssue)
 <CWD>/torch/_inductor/template_heuristics/contiguous_mm.py
   <CWD>/torch/_inductor/template_heuristics/contiguous_mm.py:34:28 - error: "hip" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/template_heuristics/contiguous_mm.py:40:28 - error: "hip" is not a known attribute of module "torch" (reportAttributeAccessIssue)
@@ -12116,6 +12336,14 @@
       Function accepts too many positional parameters; expected 0 but received 1 (reportArgumentType)
   <CWD>/torch/_inductor/utils.py:773:30 - error: Cannot access attribute "origins" for class "Sequence[BaseSchedulerNode]"
     Attribute "origins" is unknown (reportAttributeAccessIssue)
+  <CWD>/torch/_inductor/utils.py:938:55 - error: Argument of type "Sequence[Expr]" cannot be assigned to parameter "shape" of type "Iterable[int]" in function "stringify_shape"
+    "Sequence[Expr]" is not assignable to "Iterable[int]"
+      Type parameter "_T_co@Iterable" is covariant, but "Expr" is not a subtype of "int"
+        "Expr" is not assignable to "int" (reportArgumentType)
+  <CWD>/torch/_inductor/utils.py:939:56 - error: Argument of type "Sequence[Expr]" cannot be assigned to parameter "shape" of type "Iterable[int]" in function "stringify_shape"
+    "Sequence[Expr]" is not assignable to "Iterable[int]"
+      Type parameter "_T_co@Iterable" is covariant, but "Expr" is not a subtype of "int"
+        "Expr" is not assignable to "int" (reportArgumentType)
   <CWD>/torch/_inductor/utils.py:1053:73 - error: Argument of type "Basic" cannot be assigned to parameter "expr" of type "Expr" in function "sympy_str_mul"
     "Basic" is not assignable to "Expr" (reportArgumentType)
   <CWD>/torch/_inductor/utils.py:1076:69 - error: Argument of type "tuple[Basic, ...]" cannot be assigned to parameter "iterable" of type "Iterable[_T1@__new__]" in function "__new__"
@@ -15898,10 +16126,10 @@
   <CWD>/torch/_prims_common/wrappers.py:49:51 - error: "dtype" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/_prims_common/wrappers.py:191:35 - error: "memory_format" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/_prims_common/wrappers.py:284:18 - error: Expected two-entry tuple specifying entry name and type (reportArgumentType)
-  <CWD>/torch/_prims_common/wrappers.py:419:16 - error: Type "_Wrapped[_P@out_wrapper, _T@out_wrapper, _P@out_wrapper, _NotImplementedType | TensorLike | tuple[Unknown, ...] | list[Unknown] | tuple[Unknown, ...]* | list[Unknown]* | ]" is not assignable to return type "(**_P@out_wrapper) -> _T@out_wrapper"
-    Type "_Wrapped[_P@out_wrapper, _T@out_wrapper, _P@out_wrapper, _NotImplementedType | TensorLike | tuple[Unknown, ...] | list[Unknown] | tuple[Unknown, ...]* | list[Unknown]* | ]" is not assignable to type "(**_P@out_wrapper) -> _T@out_wrapper"
-      Function return type "_NotImplementedType | TensorLike | tuple[Unknown, ...] | list[Unknown] | tuple[Unknown, ...]* | list[Unknown]* | " is incompatible with type "_T@out_wrapper"
-        Type "_NotImplementedType | TensorLike | tuple[Unknown, ...] | list[Unknown] | tuple[Unknown, ...]* | list[Unknown]* | " is not assignable to type "_T@out_wrapper" (reportReturnType)
+  <CWD>/torch/_prims_common/wrappers.py:419:16 - error: Type "_Wrapped[_P@out_wrapper, _T@out_wrapper, _P@out_wrapper, NotImplementedType | TensorLike | tuple[Unknown, ...] | list[Unknown] | tuple[Unknown, ...]* | list[Unknown]* | ]" is not assignable to return type "(**_P@out_wrapper) -> _T@out_wrapper"
+    Type "_Wrapped[_P@out_wrapper, _T@out_wrapper, _P@out_wrapper, NotImplementedType | TensorLike | tuple[Unknown, ...] | list[Unknown] | tuple[Unknown, ...]* | list[Unknown]* | ]" is not assignable to type "(**_P@out_wrapper) -> _T@out_wrapper"
+      Function return type "NotImplementedType | TensorLike | tuple[Unknown, ...] | list[Unknown] | tuple[Unknown, ...]* | list[Unknown]* | " is incompatible with type "_T@out_wrapper"
+        Type "NotImplementedType | TensorLike | tuple[Unknown, ...] | list[Unknown] | tuple[Unknown, ...]* | list[Unknown]* | " is not assignable to type "_T@out_wrapper" (reportReturnType)
 <CWD>/torch/_python_dispatcher.py
   <CWD>/torch/_python_dispatcher.py:75:22 - error: "_dispatch_library" is not a known attribute of module "torch._C" (reportAttributeAccessIssue)
 <CWD>/torch/_refs/__init__.py
@@ -18217,6 +18445,8 @@
   <CWD>/torch/ao/pruning/_experimental/pruner/prune_functions.py:349:41 - error: "tensor" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/ao/pruning/_experimental/pruner/prune_functions.py:430:36 - error: "cat" is not a known attribute of module "torch" (reportAttributeAccessIssue)
 <CWD>/torch/ao/pruning/sparsifier/base_sparsifier.py
+  <CWD>/torch/ao/pruning/sparsifier/base_sparsifier.py:71:23 - error: Cannot access attribute "update" for class "MappingProxyType[str, Any]"
+    Attribute "update" is unknown (reportAttributeAccessIssue)
   <CWD>/torch/ao/pruning/sparsifier/base_sparsifier.py:129:40 - error: "ones" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/ao/pruning/sparsifier/base_sparsifier.py:133:17 - error: "p" is possibly unbound (reportPossiblyUnboundVariable)
 <CWD>/torch/ao/quantization/__init__.py
@@ -19977,8 +20207,8 @@
 <CWD>/torch/compiler/__init__.py
   <CWD>/torch/compiler/__init__.py:364:10 - warning: Import "torch._C._dynamo.eval_frame" could not be resolved from source (reportMissingModuleSource)
 <CWD>/torch/contrib/_tensorboard_vis.py
-  <CWD>/torch/contrib/_tensorboard_vis.py:13:10 - error: Import "tensorflow.core.framework" could not be resolved (reportMissingImports)
-  <CWD>/torch/contrib/_tensorboard_vis.py:14:10 - error: Import "tensorflow.core.util" could not be resolved (reportMissingImports)
+  <CWD>/torch/contrib/_tensorboard_vis.py:13:43 - warning: Import "tensorflow.core.framework.graph_pb2" could not be resolved from source (reportMissingModuleSource)
+  <CWD>/torch/contrib/_tensorboard_vis.py:14:38 - warning: Import "tensorflow.core.util.event_pb2" could not be resolved from source (reportMissingModuleSource)
   <CWD>/torch/contrib/_tensorboard_vis.py:15:10 - error: Import "tensorflow.python.summary.writer.writer" could not be resolved (reportMissingImports)
 <CWD>/torch/cpu/__init__.py
   <CWD>/torch/cpu/__init__.py:12:16 - error: "device" is unknown import symbol (reportAttributeAccessIssue)
@@ -23916,6 +24146,7 @@
   <CWD>/torch/jit/_script.pyi:53:27 - error: "ScriptFunction" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/jit/_script.pyi:140:30 - error: "Graph" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/jit/_script.pyi:142:38 - error: "Graph" is not a known attribute of module "torch" (reportAttributeAccessIssue)
+  <CWD>/torch/jit/_script.pyi:158:5 - error: "__dict__" cannot be redeclared because parent class "type" declares it as Final (reportGeneralTypeIssues)
   <CWD>/torch/jit/_script.pyi:205:12 - error: "ScriptDict" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/jit/_script.pyi:213:12 - error: "ScriptList" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/jit/_script.pyi:237:6 - error: Variable not allowed in type expression (reportInvalidTypeForm)
@@ -25929,7 +26160,13 @@
 <CWD>/torch/onnx/_internal/torchscript_exporter/symbolic_opset11.py
   <CWD>/torch/onnx/_internal/torchscript_exporter/symbolic_opset11.py:14:22 - warning: Import "torch._C._onnx" could not be resolved from source (reportMissingModuleSource)
   <CWD>/torch/onnx/_internal/torchscript_exporter/symbolic_opset11.py:100:50 - error: "Value" is not a known attribute of module "torch" (reportAttributeAccessIssue)
+  <CWD>/torch/onnx/_internal/torchscript_exporter/symbolic_opset11.py:104:15 - error: Type "Unknown | tuple[Unknown, ...]" is not assignable to declared type "float"
+    Type "Unknown | tuple[Unknown, ...]" is not assignable to type "float"
+      "tuple[Unknown, ...]" is not assignable to "float" (reportAssignmentType)
   <CWD>/torch/onnx/_internal/torchscript_exporter/symbolic_opset11.py:106:23 - error: "tensor" is not a known attribute of module "torch" (reportAttributeAccessIssue)
+  <CWD>/torch/onnx/_internal/torchscript_exporter/symbolic_opset11.py:108:15 - error: Type "Unknown | tuple[Unknown, ...]" is not assignable to declared type "float"
+    Type "Unknown | tuple[Unknown, ...]" is not assignable to type "float"
+      "tuple[Unknown, ...]" is not assignable to "float" (reportAssignmentType)
   <CWD>/torch/onnx/_internal/torchscript_exporter/symbolic_opset11.py:110:23 - error: "tensor" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/onnx/_internal/torchscript_exporter/symbolic_opset11.py:189:23 - error: "tensor" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/onnx/_internal/torchscript_exporter/symbolic_opset11.py:193:23 - error: "tensor" is not a known attribute of module "torch" (reportAttributeAccessIssue)
@@ -26030,6 +26267,9 @@
   <CWD>/torch/onnx/_internal/torchscript_exporter/symbolic_opset12.py:90:48 - error: "Value" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/onnx/_internal/torchscript_exporter/symbolic_opset12.py:91:21 - error: "Value" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/onnx/_internal/torchscript_exporter/symbolic_opset12.py:91:37 - error: "Value" is not a known attribute of module "torch" (reportAttributeAccessIssue)
+  <CWD>/torch/onnx/_internal/torchscript_exporter/symbolic_opset12.py:97:9 - error: Type "Unknown | tuple[Unknown, ...]" is not assignable to declared type "float"
+    Type "Unknown | tuple[Unknown, ...]" is not assignable to type "float"
+      "tuple[Unknown, ...]" is not assignable to "float" (reportAssignmentType)
   <CWD>/torch/onnx/_internal/torchscript_exporter/symbolic_opset12.py:97:40 - error: "tensor" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/onnx/_internal/torchscript_exporter/symbolic_opset12.py:98:40 - error: "tensor" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/onnx/_internal/torchscript_exporter/symbolic_opset12.py:98:66 - error: "bool" is not a known attribute of module "torch" (reportAttributeAccessIssue)
@@ -26230,6 +26470,8 @@
   <CWD>/torch/onnx/_internal/torchscript_exporter/symbolic_opset17.py:241:68 - error: "int64" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/onnx/_internal/torchscript_exporter/symbolic_opset17.py:246:27 - error: "sqrt" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/onnx/_internal/torchscript_exporter/symbolic_opset17.py:246:38 - error: "tensor" is not a known attribute of module "torch" (reportAttributeAccessIssue)
+  <CWD>/torch/onnx/_internal/torchscript_exporter/symbolic_opset17.py:246:65 - error: Cannot access attribute "type" for class "tuple[Unknown, ...]"
+    Attribute "type" is unknown (reportAttributeAccessIssue)
 <CWD>/torch/onnx/_internal/torchscript_exporter/symbolic_opset18.py
   <CWD>/torch/onnx/_internal/torchscript_exporter/symbolic_opset18.py:68:15 - error: "Value" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/onnx/_internal/torchscript_exporter/symbolic_opset18.py:69:21 - error: "Value" is not a known attribute of module "torch" (reportAttributeAccessIssue)
@@ -26482,8 +26724,8 @@
   <CWD>/torch/onnx/_internal/torchscript_exporter/symbolic_opset9.py:4247:25 - error: Object of type "None" is not subscriptable (reportOptionalSubscript)
   <CWD>/torch/onnx/_internal/torchscript_exporter/symbolic_opset9.py:4248:25 - error: Object of type "None" is not subscriptable (reportOptionalSubscript)
   <CWD>/torch/onnx/_internal/torchscript_exporter/symbolic_opset9.py:4463:48 - error: "LongTensor" is not a known attribute of module "torch" (reportAttributeAccessIssue)
-  <CWD>/torch/onnx/_internal/torchscript_exporter/symbolic_opset9.py:4564:5 - error: Expression with type "tuple[Unknown, Unknown] | tuple[Unknown, Unknown, Unknown] | None" cannot be assigned to target tuple
-    Type "tuple[Unknown, Unknown]" is incompatible with target tuple
+  <CWD>/torch/onnx/_internal/torchscript_exporter/symbolic_opset9.py:4564:5 - error: Expression with type "tuple[Unknown | tuple[Unknown, ...], Unknown | tuple[Unknown, ...]] | tuple[Unknown | tuple[Unknown, ...], Unknown | tuple[Unknown, ...], Unknown | tuple[Unknown, ...]] | None" cannot be assigned to target tuple
+    Type "tuple[Unknown | tuple[Unknown, ...], Unknown | tuple[Unknown, ...]]" is incompatible with target tuple
       Tuple size mismatch; expected 3 but received 2 (reportAssignmentType)
   <CWD>/torch/onnx/_internal/torchscript_exporter/symbolic_opset9.py:4564:25 - error: "None" is not iterable
     "__iter__" method not defined (reportGeneralTypeIssues)
@@ -26589,6 +26831,21 @@
   <CWD>/torch/onnx/_internal/torchscript_exporter/symbolic_opset9.py:5921:48 - error: "tensor" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/onnx/_internal/torchscript_exporter/symbolic_opset9.py:5926:48 - error: "tensor" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/onnx/_internal/torchscript_exporter/symbolic_opset9.py:5929:64 - error: "tensor" is not a known attribute of module "torch" (reportAttributeAccessIssue)
+  <CWD>/torch/onnx/_internal/torchscript_exporter/symbolic_opset9.py:5932:23 - error: Type "Unknown | tuple[Unknown, ...]" is not assignable to declared type "Tensor | None"
+    Type "Unknown | tuple[Unknown, ...]" is not assignable to type "Tensor | None"
+      Type "tuple[Unknown, ...]" is not assignable to type "Tensor | None"
+        "tuple[Unknown, ...]" is not assignable to "Tensor"
+        "tuple[Unknown, ...]" is not assignable to "None" (reportAssignmentType)
+  <CWD>/torch/onnx/_internal/torchscript_exporter/symbolic_opset9.py:5934:23 - error: Type "Unknown | tuple[Unknown, ...]" is not assignable to declared type "Tensor | None"
+    Type "Unknown | tuple[Unknown, ...]" is not assignable to type "Tensor | None"
+      Type "tuple[Unknown, ...]" is not assignable to type "Tensor | None"
+        "tuple[Unknown, ...]" is not assignable to "Tensor"
+        "tuple[Unknown, ...]" is not assignable to "None" (reportAssignmentType)
+  <CWD>/torch/onnx/_internal/torchscript_exporter/symbolic_opset9.py:5937:19 - error: Type "Unknown | tuple[Unknown, ...]" is not assignable to declared type "Tensor | None"
+    Type "Unknown | tuple[Unknown, ...]" is not assignable to type "Tensor | None"
+      Type "tuple[Unknown, ...]" is not assignable to type "Tensor | None"
+        "tuple[Unknown, ...]" is not assignable to "Tensor"
+        "tuple[Unknown, ...]" is not assignable to "None" (reportAssignmentType)
   <CWD>/torch/onnx/_internal/torchscript_exporter/symbolic_opset9.py:5937:59 - error: "tensor" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/onnx/_internal/torchscript_exporter/symbolic_opset9.py:5967:48 - error: "tensor" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/onnx/_internal/torchscript_exporter/symbolic_opset9.py:5967:70 - error: "int64" is not a known attribute of module "torch" (reportAttributeAccessIssue)
@@ -28465,6 +28722,7 @@
 <CWD>/torch/utils/data/dataloader.py
   <CWD>/torch/utils/data/dataloader.py:268:18 - error: "_log_api_usage_once" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/utils/data/dataloader.py:455:69 - error: "context" is not a known attribute of module "multiprocessing" (reportAttributeAccessIssue)
+  <CWD>/torch/utils/data/dataloader.py:612:49 - error: "sched_getaffinity" is not a known attribute of module "os" (reportAttributeAccessIssue)
   <CWD>/torch/utils/data/dataloader.py:650:32 - error: "Generator" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/utils/data/dataloader.py:706:19 - error: "empty" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/utils/data/dataloader.py:706:41 - error: "int64" is not a known attribute of module "torch" (reportAttributeAccessIssue)
@@ -28724,9 +28982,6 @@
 <CWD>/torch/utils/throughput_benchmark.py
   <CWD>/torch/utils/throughput_benchmark.py:98:40 - error: "ThroughputBenchmark" is not a known attribute of module "torch._C" (reportAttributeAccessIssue)
   <CWD>/torch/utils/throughput_benchmark.py:100:40 - error: "ThroughputBenchmark" is not a known attribute of module "torch._C" (reportAttributeAccessIssue)
-<CWD>/torch/utils/weak.py
-  <CWD>/torch/utils/weak.py:296:9 - error: Method "pop" overrides class "MutableMapping" in an incompatible manner
-    Parameter 3 mismatch: base parameter "default" is keyword parameter, override parameter is position-only (reportIncompatibleMethodOverride)
 <CWD>/torch/xpu/__init__.py
   <CWD>/torch/xpu/__init__.py:18:19 - error: "device" is unknown import symbol (reportAttributeAccessIssue)
   <CWD>/torch/xpu/__init__.py:39:21 - error: "_has_xpu" is not a known attribute of module "torch._C" (reportAttributeAccessIssue)
@@ -28787,4 +29042,4 @@
 <CWD>/torch/xpu/streams.py
   <CWD>/torch/xpu/streams.py:14:23 - error: "_XpuStreamBase" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/xpu/streams.py:103:22 - error: "_XpuEventBase" is not a known attribute of module "torch" (reportAttributeAccessIssue)
-19681 errors, 402 warnings, 0 informations
+19720 errors, 404 warnings, 0 informations

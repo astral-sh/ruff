@@ -31,11 +31,11 @@ use ty_module_resolver::{ModuleName, resolve_module};
 
 use crate::Db;
 
-fn exports_cycle_initial(_db: &dyn Db, _id: salsa::Id, _file: File) -> Box<[Name]> {
-    Box::default()
-}
-
-#[salsa::tracked(returns(deref), cycle_initial=exports_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(
+    returns(deref),
+    cycle_initial=|_, _, _| Box::default(),
+    heap_size=ruff_memory_usage::heap_size)
+]
 pub(super) fn exported_names(db: &dyn Db, file: File) -> Box<[Name]> {
     let module = parsed_module(db, file).load(db);
     let mut finder = ExportFinder::new(db, file);

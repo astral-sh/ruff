@@ -712,6 +712,8 @@ help: Replace with `Fraction` constructor
    - _ = Fraction.from_float(f=4.2)
 70 + _ = Fraction(4.2)
 71 | _ = Fraction.from_decimal(dec=4)
+72 | 
+73 | _ = (
 
 FURB164 [*] Verbose method `from_decimal` in `Fraction` construction
   --> FURB164.py:71:5
@@ -720,6 +722,8 @@ FURB164 [*] Verbose method `from_decimal` in `Fraction` construction
 70 | _ = Fraction.from_float(f=4.2)
 71 | _ = Fraction.from_decimal(dec=4)
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+72 |
+73 | _ = (
    |
 help: Replace with `Fraction` constructor
 68 | # See: https://github.com/astral-sh/ruff/issues/21257
@@ -727,3 +731,27 @@ help: Replace with `Fraction` constructor
 70 | _ = Fraction.from_float(f=4.2)
    - _ = Fraction.from_decimal(dec=4)
 71 + _ = Fraction(4)
+72 | 
+73 | _ = (
+74 |     Fraction
+
+FURB164 [*] Verbose method `from_float` in `Fraction` construction
+  --> FURB164.py:74:5
+   |
+73 |   _ = (
+74 | /     Fraction
+75 | |     # text
+76 | |     .from_float(4.2)
+   | |____________________^
+77 |   )
+   |
+help: Replace with `Fraction` constructor
+71 | _ = Fraction.from_decimal(dec=4)
+72 | 
+73 | _ = (
+   -     Fraction
+   -     # text
+   -     .from_float(4.2)
+74 +     Fraction(4.2)
+75 | )
+note: This is an unsafe fix and may change runtime behavior

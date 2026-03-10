@@ -41,8 +41,8 @@ def f():
 
 
 def f():
-    # Neither of these are ignored and warnings are
-    # logged to user
+    # Neither of these are ignored and warnings are logged to user.
+    # An usued suppression diagnostic should also be logged.
     # ruff: disable[E501]
     I = 1
     # ruff: enable[E501]
@@ -109,3 +109,10 @@ def f():
     # ruff: disable
     # ruff: disable[]
     print("hello")
+
+
+# Ensure LAST suppression in file is reported.
+# https://github.com/astral-sh/ruff/issues/23235
+# ruff:disable[F401]
+print("goodbye")
+# ruff:enable[F401]

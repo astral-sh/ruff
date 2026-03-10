@@ -35,7 +35,7 @@ use ty_python_semantic::types::check_types;
 mod db;
 mod files;
 mod fixes;
-mod glob;
+pub mod glob;
 pub mod metadata;
 mod walk;
 pub mod watch;
@@ -365,10 +365,7 @@ impl Project {
 
         let mut open_files = self.take_open_files(db);
         let removed = open_files.remove(&file);
-
-        if removed {
-            self.set_open_files(db, open_files);
-        }
+        self.set_open_files(db, open_files);
 
         removed
     }
@@ -453,17 +450,60 @@ impl Project {
     pub fn should_check_file(self, db: &dyn Db, file: File) -> bool {
         let path = file.path(db);
 
+        // NOTE: The tracing messages below were added because
+        // whether a file should be checked or not can sometimes
+        // be at the root of confusing UX like "diagnostics all
+        // of a sudden stopped working." Having a trace message
+        // indicating *why* a particular file isn't being checked
+        // can be quite helpful for narrowing down the issue.
+        //
+        // The problem is that it's incredibly noisy. Which is why
+        // we set them to the TRACE level.
+
         // Try to return early to avoid adding a dependency on `open_files` or `file_set` which
         // both have a durability of `LOW`.
         if path.is_vendored_path() {
+            tracing::trace!("Not checking {path} because it is a vendored path");
             return false;
         }
 
         match self.check_mode(db) {
-            CheckMode::OpenFiles => self.open_files(db).contains(&file),
+            CheckMode::OpenFiles => {
+                let should_check = self.open_files(db).contains(&file);
+                if !should_check {
+                    tracing::trace!(
+                        "Not checking {path} because check mode is `OpenFiles` \
+                         and it is not in the open file set"
+                    );
+                }
+                should_check
+            }
             CheckMode::AllFiles => {
                 // Virtual files are always checked.
-                path.is_system_virtual_path() || self.files(db).contains(&file)
+                //
+                // We also check the open file set. In theory, we
+                // shouldn't need to do this since it is accounted for
+                // by the virtual file check (for the case when a file
+                // wants to be checked but isn't saved to disk yet).
+                // However, not all clients follow the LSP convention
+                // that URIs for documents not on disk yet use the
+                // `untitled://...` scheme. That is, we assume that a
+                // `file://...` scheme corresponds to a saved file on
+                // disk, and anything else is "virtual." For example,
+                // neovim uses `file://...` even for an open buffer
+                // that does not correspond to a file saved to disk
+                // yet.
+                let should_check = path.is_system_virtual_path()
+                    || self.files(db).contains(&file)
+                    || self.open_files(db).contains(&file);
+                if !should_check {
+                    tracing::trace!(
+                        "Not checking {path} because check mode is `AllFiles` \
+                         and it is not a virtual path, in the project files \
+                         or in the open file set"
+                    );
+                }
+                should_check
             }
         }
     }

@@ -159,7 +159,7 @@ fn black_compatibility(input_path: &Utf8Path, content: String) -> datatest_stabl
                 "{}",
                 DisplayDiagnostics::new(
                     &DummyFileResolver,
-                    &DisplayDiagnosticConfig::default().format(DiagnosticFormat::Full),
+                    &DisplayDiagnosticConfig::new("ruff").format(DiagnosticFormat::Full),
                     &unsupported_syntax_errors
                 )
             )
@@ -239,7 +239,7 @@ fn format(input_path: &Utf8Path, content: String) -> datatest_stable::Result<()>
                     "### Unsupported Syntax Errors\n{}",
                     DisplayDiagnostics::new(
                         &DummyFileResolver,
-                        &DisplayDiagnosticConfig::default().format(DiagnosticFormat::Full),
+                        &DisplayDiagnosticConfig::new("ruff").format(DiagnosticFormat::Full),
                         &unsupported_syntax_errors
                     )
                 )
@@ -285,7 +285,7 @@ fn format(input_path: &Utf8Path, content: String) -> datatest_stable::Result<()>
                 "## Unsupported Syntax Errors\n{}",
                 DisplayDiagnostics::new(
                     &DummyFileResolver,
-                    &DisplayDiagnosticConfig::default().format(DiagnosticFormat::Full),
+                    &DisplayDiagnosticConfig::new("ruff").format(DiagnosticFormat::Full),
                     &unsupported_syntax_errors
                 )
             )
@@ -394,7 +394,7 @@ fn ensure_stability_when_formatting_twice(
             panic!(
                 "Expected formatted code of {input_path} to be valid syntax: {err}:\
                     \n---\n{formatted_code}---\n{}",
-                diag.display(&DummyFileResolver, &DisplayDiagnosticConfig::default()),
+                diag.display(&DummyFileResolver, &DisplayDiagnosticConfig::new("ruff")),
             );
         }
     };

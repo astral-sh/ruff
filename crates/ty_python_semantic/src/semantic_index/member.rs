@@ -1,10 +1,13 @@
-use bitflags::bitflags;
-use hashbrown::hash_table::Entry;
 use ruff_index::{IndexVec, newtype_index};
 use ruff_python_ast::{self as ast, name::Name};
 use ruff_text_size::{TextLen as _, TextRange, TextSize};
+
+use bitflags::bitflags;
+use hashbrown::hash_table::Entry;
 use rustc_hash::FxHasher;
 use smallvec::SmallVec;
+
+use std::fmt::Write as _;
 use std::hash::{Hash, Hasher as _};
 use std::ops::{Deref, DerefMut};
 
@@ -162,60 +165,18 @@ pub(crate) struct MemberExpr {
 }
 
 impl MemberExpr {
+    #[cfg(test)]
     pub(super) fn try_from_expr(expression: ast::ExprRef<'_>) -> Option<Self> {
-        fn visit(expr: ast::ExprRef) -> Option<(Name, SmallVec<[SegmentInfo; 8]>)> {
-            use std::fmt::Write as _;
+        MemberExprBuilder::visit_expr(expression).and_then(Self::try_from_builder)
+    }
 
-            match expr {
-                ast::ExprRef::Name(name) => {
-                    Some((name.id.clone(), smallvec::SmallVec::new_const()))
-                }
-                ast::ExprRef::Attribute(attribute) => {
-                    let (mut path, mut segments) = visit(ast::ExprRef::from(&attribute.value))?;
-
-                    let start_offset = path.text_len();
-                    let _ = write!(path, "{}", attribute.attr.id);
-                    segments.push(SegmentInfo::new(SegmentKind::Attribute, start_offset));
-
-                    Some((path, segments))
-                }
-                ast::ExprRef::Subscript(subscript) => {
-                    let (mut path, mut segments) = visit((&subscript.value).into())?;
-                    let start_offset = path.text_len();
-
-                    match &*subscript.slice {
-                        ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
-                            value: ast::Number::Int(index),
-                            ..
-                        }) => {
-                            let _ = write!(path, "{index}");
-                            segments
-                                .push(SegmentInfo::new(SegmentKind::IntSubscript, start_offset));
-                        }
-                        ast::Expr::StringLiteral(string) => {
-                            let _ = write!(path, "{}", string.value);
-                            segments
-                                .push(SegmentInfo::new(SegmentKind::StringSubscript, start_offset));
-                        }
-                        _ => {
-                            return None;
-                        }
-                    }
-
-                    Some((path, segments))
-                }
-                _ => None,
-            }
-        }
-
-        let (path, segments) = visit(expression)?;
-
-        if segments.is_empty() {
+    pub(super) fn try_from_builder(builder: MemberExprBuilder) -> Option<Self> {
+        if builder.segments.is_empty() {
             None
         } else {
             Some(Self {
-                path,
-                segments: Segments::from_vec(segments),
+                path: builder.path,
+                segments: Segments::from_vec(builder.segments),
             })
         }
     }
@@ -251,6 +212,116 @@ impl MemberExpr {
     }
 }
 
+/// A builder for a [`MemberExpr`].
+#[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize)]
+pub(super) struct MemberExprBuilder {
+    path: Name,
+    segments: SmallVec<[SegmentInfo; 8]>,
+}
+
+impl MemberExprBuilder {
+    pub(super) fn visit_expr(expr: ast::ExprRef) -> Option<MemberExprBuilder> {
+        match expr {
+            ast::ExprRef::Name(name) => Some(MemberExprBuilder {
+                path: name.id.clone(),
+                segments: smallvec::SmallVec::new_const(),
+            }),
+
+            ast::ExprRef::Attribute(attribute) => {
+                let mut builder =
+                    MemberExprBuilder::visit_expr(ast::ExprRef::from(&attribute.value))?;
+
+                let start_offset = builder.path.text_len();
+                let _ = write!(builder.path, "{}", attribute.attr.id);
+                builder
+                    .segments
+                    .push(SegmentInfo::new(SegmentKind::Attribute, start_offset));
+
+                Some(builder)
+            }
+            ast::ExprRef::Subscript(subscript) => {
+                let subscript_value =
+                    MemberExprBuilder::visit_expr(ast::ExprRef::from(&subscript.value))?;
+                MemberExprBuilder::visit_subscript_expr(subscript_value, &subscript.slice)
+            }
+            _ => None,
+        }
+    }
+
+    pub(super) fn visit_subscript_expr(
+        subscript_value: MemberExprBuilder,
+        subscript_slice: &ast::Expr,
+    ) -> Option<MemberExprBuilder> {
+        let MemberExprBuilder {
+            mut path,
+            mut segments,
+        } = subscript_value;
+        let start_offset = path.text_len();
+
+        match subscript_slice {
+            // Handle integer subscripts, like `x[0]`.
+            ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
+                value: ast::Number::Int(index),
+                ..
+            }) => {
+                let _ = write!(path, "{index}");
+                segments.push(SegmentInfo::new(SegmentKind::IntSubscript, start_offset));
+            }
+            // Handle negative integer subscripts, like `x[-1]`.
+            ast::Expr::UnaryOp(ast::ExprUnaryOp {
+                op: ast::UnaryOp::USub,
+                operand,
+                ..
+            }) => match operand.as_ref() {
+                ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
+                    value: ast::Number::Int(index),
+                    ..
+                }) => {
+                    let _ = write!(path, "-{index}");
+                    segments.push(SegmentInfo::new(SegmentKind::IntSubscript, start_offset));
+                }
+                _ => return None,
+            },
+            // Handle positive integer subscripts with explicit plus, like `x[+1]`.
+            ast::Expr::UnaryOp(ast::ExprUnaryOp {
+                op: ast::UnaryOp::UAdd,
+                operand,
+                ..
+            }) => match operand.as_ref() {
+                ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
+                    value: ast::Number::Int(index),
+                    ..
+                }) => {
+                    let _ = write!(path, "{index}");
+                    segments.push(SegmentInfo::new(SegmentKind::IntSubscript, start_offset));
+                }
+                _ => return None,
+            },
+            // Handle boolean subscripts, like `x[True]` or `x[False]`.
+            // In Python, `True` and `False` are equivalent to `1` and `0` for indexing.
+            ast::Expr::BooleanLiteral(ast::ExprBooleanLiteral { value, .. }) => {
+                let _ = write!(path, "{}", u8::from(*value));
+                segments.push(SegmentInfo::new(SegmentKind::IntSubscript, start_offset));
+            }
+            ast::Expr::StringLiteral(string) => {
+                let _ = write!(path, "{}", string.value);
+                segments.push(SegmentInfo::new(SegmentKind::StringSubscript, start_offset));
+            }
+            // Handle bytes literal subscripts, like `x[b"key"]`.
+            ast::Expr::BytesLiteral(bytes) => {
+                let bytes_vec: Vec<u8> = bytes.value.bytes().collect();
+                let _ = write!(path, "{}", String::from_utf8_lossy(&bytes_vec));
+                segments.push(SegmentInfo::new(SegmentKind::BytesSubscript, start_offset));
+            }
+            _ => {
+                return None;
+            }
+        }
+
+        Some(MemberExprBuilder { path, segments })
+    }
+}
+
 impl std::fmt::Display for MemberExpr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(self.symbol_name())?;
@@ -260,6 +331,7 @@ impl std::fmt::Display for MemberExpr {
                 SegmentKind::Attribute => write!(f, ".{}", segment.text)?,
                 SegmentKind::IntSubscript => write!(f, "[{}]", segment.text)?,
                 SegmentKind::StringSubscript => write!(f, "[\"{}\"]", segment.text)?,
+                SegmentKind::BytesSubscript => write!(f, "[b\"{}\"]", segment.text)?,
             }
         }
 
@@ -562,6 +634,7 @@ impl SegmentInfo {
             0 => SegmentKind::Attribute,
             1 => SegmentKind::IntSubscript,
             2 => SegmentKind::StringSubscript,
+            3 => SegmentKind::BytesSubscript,
             _ => panic!("Invalid SegmentKind bits"),
         }
     }
@@ -591,6 +664,7 @@ enum SegmentKind {
     Attribute = 0,
     IntSubscript = 1,
     StringSubscript = 2,
+    BytesSubscript = 3,
 }
 
 /// Iterator over segments that converts `SegmentInfo` to `Segment` with text slices.
@@ -778,6 +852,7 @@ impl Iterator for SmallSegmentsInfoIterator {
             0 => SegmentKind::Attribute,
             1 => SegmentKind::IntSubscript,
             2 => SegmentKind::StringSubscript,
+            3 => SegmentKind::BytesSubscript,
             _ => panic!("Invalid SegmentKind bits"),
         };
 

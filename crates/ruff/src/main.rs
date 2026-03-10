@@ -32,13 +32,6 @@ pub fn main() -> ExitCode {
     #[cfg(windows)]
     assert!(colored::control::set_virtual_terminal(true).is_ok());
 
-    // support FORCE_COLOR env var
-    if let Some(force_color) = std::env::var_os("FORCE_COLOR") {
-        if !force_color.is_empty() {
-            colored::control::set_override(true);
-        }
-    }
-
     let args = wild::args_os();
     let args = match argfile::expand_args_from(args, argfile::parse_fromfile, argfile::PREFIX)
         .context("Failed to read CLI arguments from files")

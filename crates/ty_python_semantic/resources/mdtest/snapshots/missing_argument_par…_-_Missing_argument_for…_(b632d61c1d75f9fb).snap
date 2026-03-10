@@ -1,0 +1,73 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: missing_argument_paramspec.md - Missing argument for ParamSpec
+mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/missing_argument_paramspec.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | from typing import Callable
+2 | 
+3 | def decorator[**P](func: Callable[P, int]) -> Callable[P, None]:
+4 |     def wrapper(*args: P.args, **kwargs: P.kwargs) -> None:
+5 |         func()  # error: [missing-argument]
+6 |         func(*args)  # error: [missing-argument]
+7 |         func(**kwargs)  # error: [missing-argument]
+8 |     return wrapper
+```
+
+# Diagnostics
+
+```
+error[missing-argument]: No arguments provided for required parameters `*args`, `**kwargs`
+ --> src/mdtest_snippet.py:5:9
+  |
+3 | def decorator[**P](func: Callable[P, int]) -> Callable[P, None]:
+4 |     def wrapper(*args: P.args, **kwargs: P.kwargs) -> None:
+5 |         func()  # error: [missing-argument]
+  |         ^^^^^^
+6 |         func(*args)  # error: [missing-argument]
+7 |         func(**kwargs)  # error: [missing-argument]
+  |
+info: These arguments are required because `ParamSpec` `P` could represent any set of parameters at runtime
+info: rule `missing-argument` is enabled by default
+
+```
+
+```
+error[missing-argument]: No argument provided for required parameter `**kwargs`
+ --> src/mdtest_snippet.py:6:9
+  |
+4 |     def wrapper(*args: P.args, **kwargs: P.kwargs) -> None:
+5 |         func()  # error: [missing-argument]
+6 |         func(*args)  # error: [missing-argument]
+  |         ^^^^^^^^^^^
+7 |         func(**kwargs)  # error: [missing-argument]
+8 |     return wrapper
+  |
+info: These arguments are required because `ParamSpec` `P` could represent any set of parameters at runtime
+info: rule `missing-argument` is enabled by default
+
+```
+
+```
+error[missing-argument]: No argument provided for required parameter `*args`
+ --> src/mdtest_snippet.py:7:9
+  |
+5 |         func()  # error: [missing-argument]
+6 |         func(*args)  # error: [missing-argument]
+7 |         func(**kwargs)  # error: [missing-argument]
+  |         ^^^^^^^^^^^^^^
+8 |     return wrapper
+  |
+info: These arguments are required because `ParamSpec` `P` could represent any set of parameters at runtime
+info: rule `missing-argument` is enabled by default
+
+```

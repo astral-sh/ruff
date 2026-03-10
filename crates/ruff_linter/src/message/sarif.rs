@@ -1,10 +1,10 @@
+use std::borrow::Cow;
 use std::collections::HashSet;
 use std::io::Write;
 
 use anyhow::Result;
 use log::warn;
 use serde::{Serialize, Serializer};
-use serde_json::json;
 
 use ruff_db::diagnostic::{Diagnostic, SecondaryCode};
 use ruff_source_file::{OneIndexed, SourceFile};
@@ -39,36 +39,67 @@ impl Emitter for SarifEmitter {
             .filter_map(|result| result.rule_id.as_secondary_code())
             .collect();
         let mut rules: Vec<SarifRule> = unique_rules.into_iter().map(SarifRule::from).collect();
-        rules.sort_by(|a, b| a.code.cmp(b.code));
+        rules.sort_by(|a, b| a.id.cmp(b.id));
 
-        let output = json!({
-            "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
-            "version": "2.1.0",
-            "runs": [{
-                "tool": {
-                    "driver": {
-                        "name": "ruff",
-                        "informationUri": "https://github.com/astral-sh/ruff",
-                        "rules": rules,
-                        "version": VERSION.to_string(),
-                    }
+        let output = SarifOutput {
+            schema: "https://json.schemastore.org/sarif-2.1.0.json",
+            version: "2.1.0",
+            runs: [SarifRun {
+                tool: SarifTool {
+                    driver: SarifDriver {
+                        name: "ruff",
+                        information_uri: "https://github.com/astral-sh/ruff",
+                        rules,
+                        version: VERSION.to_string(),
+                    },
                 },
-                "results": results,
+                results: &results,
             }],
-        });
+        };
         serde_json::to_writer_pretty(writer, &output)?;
         Ok(())
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Serialize)]
+struct SarifOutput<'a> {
+    #[serde(rename = "$schema")]
+    schema: &'static str,
+    runs: [SarifRun<'a>; 1],
+    version: &'static str,
+}
+
+#[derive(Serialize)]
+struct SarifRun<'a> {
+    results: &'a [SarifResult<'a>],
+    tool: SarifTool<'a>,
+}
+
+#[derive(Serialize)]
+struct SarifTool<'a> {
+    driver: SarifDriver<'a>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SarifDriver<'a> {
+    information_uri: &'static str,
+    name: &'static str,
+    rules: Vec<SarifRule<'a>>,
+    version: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 struct SarifRule<'a> {
-    name: &'a str,
-    code: &'a SecondaryCode,
-    linter: &'a str,
-    summary: &'a str,
-    explanation: Option<&'a str>,
-    url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    full_description: Option<SarifMessage<'a>>,
+    help: SarifMessage<'a>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    help_uri: Option<String>,
+    id: &'a SecondaryCode,
+    properties: SarifProperties<'a>,
+    short_description: SarifMessage<'a>,
 }
 
 impl<'a> From<&'a SecondaryCode> for SarifRule<'a> {
@@ -81,41 +112,24 @@ impl<'a> From<&'a SecondaryCode> for SarifRule<'a> {
             .find(|rule| rule.noqa_code().suffix() == suffix)
             .expect("Expected a valid noqa code corresponding to a rule");
         Self {
-            name: rule.into(),
-            code,
-            linter: linter.name(),
-            summary: rule.message_formats()[0],
-            explanation: rule.explanation(),
-            url: rule.url(),
+            id: code,
+            short_description: SarifMessage {
+                text: rule.message_formats()[0].into(),
+            },
+            full_description: rule
+                .explanation()
+                .map(|text| SarifMessage { text: text.into() }),
+            help: SarifMessage {
+                text: rule.message_formats()[0].into(),
+            },
+            help_uri: rule.url(),
+            properties: SarifProperties {
+                id: code,
+                kind: linter.name(),
+                name: rule.into(),
+                problem_severity: "error",
+            },
         }
-    }
-}
-
-impl Serialize for SarifRule<'_> {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        json!({
-            "id": self.code,
-            "shortDescription": {
-                "text": self.summary,
-            },
-            "fullDescription": {
-                "text": self.explanation,
-            },
-            "help": {
-                "text": self.summary,
-            },
-            "helpUri": self.url,
-            "properties": {
-                "id": self.code,
-                "kind": self.linter,
-                "name": self.name,
-                "problem.severity": "error".to_string(),
-            },
-        })
-        .serialize(serializer)
     }
 }
 
@@ -166,18 +180,18 @@ impl<'a> From<&'a Diagnostic> for RuleCode<'a> {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct SarifResult<'a> {
-    rule_id: RuleCode<'a>,
-    level: String,
-    message: SarifMessage,
-    locations: Vec<SarifLocation>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     fixes: Vec<SarifFix>,
+    level: String,
+    locations: Vec<SarifLocation>,
+    message: SarifMessage<'a>,
+    rule_id: RuleCode<'a>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-struct SarifMessage {
-    text: String,
+struct SarifMessage<'a> {
+    text: Cow<'a, str>,
 }
 
 #[derive(Debug, Serialize)]
@@ -196,8 +210,8 @@ struct SarifLocation {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct SarifFix {
-    description: RuleDescription,
     artifact_changes: Vec<SarifArtifactChange>,
+    description: RuleDescription,
 }
 
 #[derive(Debug, Serialize)]
@@ -236,10 +250,19 @@ struct InsertedContent {
 #[derive(Debug, Serialize, Clone, Copy)]
 #[serde(rename_all = "camelCase")]
 struct SarifRegion {
-    start_line: OneIndexed,
-    start_column: OneIndexed,
-    end_line: OneIndexed,
     end_column: OneIndexed,
+    end_line: OneIndexed,
+    start_column: OneIndexed,
+    start_line: OneIndexed,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct SarifProperties<'a> {
+    id: &'a SecondaryCode,
+    kind: &'a str,
+    name: &'a str,
+    #[serde(rename = "problem.severity")]
+    problem_severity: &'static str,
 }
 
 impl<'a> SarifResult<'a> {
@@ -334,7 +357,7 @@ impl<'a> SarifResult<'a> {
             rule_id: RuleCode::from(diagnostic),
             level: "error".to_string(),
             message: SarifMessage {
-                text: diagnostic.concise_message().to_string(),
+                text: diagnostic.concise_message().to_str(),
             },
             fixes: Self::fix(diagnostic, &uri).into_iter().collect(),
             locations: vec![SarifLocation {

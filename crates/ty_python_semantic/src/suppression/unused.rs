@@ -5,7 +5,8 @@ use std::fmt::Write as _;
 
 use crate::lint::LintId;
 use crate::suppression::{
-    CheckSuppressionsContext, Suppression, SuppressionTarget, UNUSED_IGNORE_COMMENT,
+    CheckSuppressionsContext, Suppression, SuppressionKind, SuppressionTarget,
+    UNUSED_IGNORE_COMMENT, UNUSED_TYPE_IGNORE_COMMENT,
 };
 
 /// Checks for unused suppression comments in `file` and
@@ -13,7 +14,9 @@ use crate::suppression::{
 ///
 /// Does nothing if the [`UNUSED_IGNORE_COMMENT`] rule is disabled.
 pub(super) fn check_unused_suppressions(context: &mut CheckSuppressionsContext) {
-    if context.is_lint_disabled(&UNUSED_IGNORE_COMMENT) {
+    if context.is_lint_disabled(&UNUSED_IGNORE_COMMENT)
+        && context.is_lint_disabled(&UNUSED_TYPE_IGNORE_COMMENT)
+    {
         return;
     }
 
@@ -66,11 +69,14 @@ pub(super) fn check_unused_suppressions(context: &mut CheckSuppressionsContext) 
     let source = source_text(context.db, context.file);
 
     while let Some(suppression) = unused_iter.next() {
+        let unused_lint = match suppression.kind {
+            SuppressionKind::Ty => &UNUSED_IGNORE_COMMENT,
+            SuppressionKind::TypeIgnore => &UNUSED_TYPE_IGNORE_COMMENT,
+        };
+
         let mut diag = match suppression.target {
             SuppressionTarget::All => {
-                let Some(diag) =
-                    context.report_unchecked(&UNUSED_IGNORE_COMMENT, suppression.range)
-                else {
+                let Some(diag) = context.report_unchecked(unused_lint, suppression.range) else {
                     continue;
                 };
 
@@ -120,7 +126,7 @@ pub(super) fn check_unused_suppressions(context: &mut CheckSuppressionsContext) 
                     }
 
                     if let Some(diag) = context.report_unchecked(
-                        &UNUSED_IGNORE_COMMENT,
+                        unused_lint,
                         TextRange::new(suppression.range.start(), current.range.end()),
                     ) {
                         let mut diag = diag.into_diagnostic(format_args!(
@@ -168,8 +174,7 @@ pub(super) fn check_unused_suppressions(context: &mut CheckSuppressionsContext) 
                 }
 
                 // All codes are unused
-                let Some(diag) =
-                    context.report_unchecked(&UNUSED_IGNORE_COMMENT, suppression.comment_range)
+                let Some(diag) = context.report_unchecked(unused_lint, suppression.comment_range)
                 else {
                     continue;
                 };
@@ -180,9 +185,7 @@ pub(super) fn check_unused_suppressions(context: &mut CheckSuppressionsContext) 
                 ))
             }
             SuppressionTarget::Empty => {
-                let Some(diag) =
-                    context.report_unchecked(&UNUSED_IGNORE_COMMENT, suppression.range)
-                else {
+                let Some(diag) = context.report_unchecked(unused_lint, suppression.range) else {
                     continue;
                 };
                 diag.into_diagnostic(format_args!(

@@ -177,6 +177,16 @@
         "$ref": "#/definitions/RuleSelector"
       }
     },
+    "extension": {
+      "description": "A mapping of custom file extensions to known file types (overridden\nby the `--extension` command-line flag).\n\nSupported file types include `python`, `pyi`, `ipynb`, and `markdown`.\n\nAny file extensions listed here will be automatically added to the\ndefault `include` list as a `*.{ext}` glob, so that they are linted\nand formatted without needing any additional configuration settings.",
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": {
+        "$ref": "#/definitions/Language"
+      }
+    },
     "external": {
       "description": "A list of rule codes or prefixes that are unsupported by Ruff, but should be\npreserved when (e.g.) validating `# noqa` directives. Useful for\nretaining `# noqa` directives that cover plugins not yet implemented\nby Ruff.",
       "type": [
@@ -758,6 +768,12 @@
     "Alias": {
       "type": "string"
     },
+    "AllImports": {
+      "type": "string",
+      "enum": [
+        "all"
+      ]
+    },
     "AnalyzeOptions": {
       "description": "Configures Ruff's `analyze` command.",
       "type": "object",
@@ -847,6 +863,19 @@
       "items": {
         "type": "string"
       }
+    },
+    "BannedEagerImports": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/AllImports"
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      ]
     },
     "ConstantType": {
       "type": "string",
@@ -1443,6 +1472,17 @@
             "$ref": "#/definitions/ApiBan"
           }
         },
+        "banned-eager-imports": {
+          "description": "Specific modules that may not be imported eagerly in contexts where lazy imports are legal,\nor `\"all\"` to require every lazily-convertible import to use the `lazy` keyword. Ruff\nignores contexts where `lazy import` is invalid, such as functions, classes,\n`try`/`except` blocks, `__future__` imports, and `from ... import *` statements. This rule\nis only enforced when targeting Python 3.15 or newer.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/BannedEagerImports"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "banned-module-level-imports": {
           "description": "List of specific modules that may not be imported at module level, and should instead be\nimported lazily (e.g., within a function definition, or an `if TYPE_CHECKING:`\nblock, or some other nested context). This also affects the rule `import-outside-top-level`\nif `banned-module-level-imports` is enabled.",
           "type": [
@@ -1488,7 +1528,7 @@
           }
         },
         "runtime-evaluated-decorators": {
-          "description": "Exempt classes and functions decorated with any of the enumerated\ndecorators from being moved into type-checking blocks.\n\nCommon examples include Pydantic's `@pydantic.validate_call` decorator\n(for functions) and attrs' `@attrs.define` decorator (for classes).\n\nThis also supports framework decorators like FastAPI's `fastapi.FastAPI.get`\nwhich will work across assignments in the same module.\n\nFor example:\n```python\nimport fastapi\n\napp = FastAPI(\"app\")\n\n@app.get(\"/home\")\ndef home() -> str: ...\n```\n\nHere `app.get` will correctly be identified as `fastapi.FastAPI.get`.",
+          "description": "Exempt classes and functions decorated with any of the enumerated\ndecorators from being moved into type-checking blocks.\n\nCommon examples include Pydantic's `@pydantic.validate_call` decorator\n(for functions) and attrs' `@attrs.define` decorator (for classes).\n\nThis also supports framework decorators like FastAPI's `fastapi.FastAPI.get`\nwhich will work across assignments in the same module.\n\nFor example:\n```python\nfrom fastapi import FastAPI\n\napp = FastAPI(\"app\")\n\n@app.get(\"/home\")\ndef home() -> str: ...\n```\n\nHere `app.get` will correctly be identified as `fastapi.FastAPI.get`.",
           "type": [
             "array",
             "null"
@@ -1758,6 +1798,33 @@
             "null"
           ]
         },
+        "import-heading": {
+          "description": "A mapping from import section names to their heading comments.\n\nWhen set, a comment with the specified text will be added above imports\nin the corresponding section. If a heading comment already exists, it\nwill be replaced.\n\nCompatible with isort's `import_heading_{section_name}` settings.",
+          "type": [
+            "object",
+            "null"
+          ],
+          "properties": {
+            "first-party": {
+              "type": "string"
+            },
+            "future": {
+              "type": "string"
+            },
+            "local-folder": {
+              "type": "string"
+            },
+            "standard-library": {
+              "type": "string"
+            },
+            "third-party": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
         "known-first-party": {
           "description": "A list of modules to consider first-party, regardless of whether they\ncan be identified as such via introspection of the local filesystem.\n\nSupports glob patterns. For more information on the glob syntax, refer\nto the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).",
           "type": [
@@ -1948,6 +2015,15 @@
         }
       },
       "additionalProperties": false
+    },
+    "Language": {
+      "type": "string",
+      "enum": [
+        "python",
+        "pyi",
+        "ipynb",
+        "markdown"
+      ]
     },
     "LineEnding": {
       "oneOf": [
@@ -2992,9 +3068,12 @@
         "AIR301",
         "AIR302",
         "AIR303",
+        "AIR304",
         "AIR31",
         "AIR311",
         "AIR312",
+        "AIR32",
+        "AIR321",
         "ALL",
         "ANN",
         "ANN0",
@@ -3086,6 +3165,8 @@
         "B034",
         "B035",
         "B039",
+        "B04",
+        "B043",
         "B9",
         "B90",
         "B901",
@@ -3194,6 +3275,8 @@
         "D417",
         "D418",
         "D419",
+        "D42",
+        "D420",
         "DJ",
         "DJ0",
         "DJ00",
@@ -3767,6 +3850,7 @@
         "PLR1708",
         "PLR171",
         "PLR1711",
+        "PLR1712",
         "PLR1714",
         "PLR1716",
         "PLR172",
@@ -4089,6 +4173,10 @@
         "RUF066",
         "RUF067",
         "RUF068",
+        "RUF069",
+        "RUF07",
+        "RUF070",
+        "RUF071",
         "RUF1",
         "RUF10",
         "RUF100",
@@ -4282,6 +4370,7 @@
         "TID251",
         "TID252",
         "TID253",
+        "TID254",
         "TRY",
         "TRY0",
         "TRY00",

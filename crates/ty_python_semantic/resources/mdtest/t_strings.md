@@ -2,7 +2,7 @@
 
 (NB: `black` does not support Python 3.14 at the time of this writing)
 
-<!-- blacken-docs:off -->
+<!-- fmt:off -->
 
 ```toml
 [environment]

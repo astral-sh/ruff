@@ -11,10 +11,11 @@ use std::fmt;
 use crate::{FixAvailability, Violation, checkers::ast::Checker};
 
 /// ## What it does
-/// Checks for non-contextmanager use of `pytest.raises`, `pytest.warns`, and `pytest.deprecated_call`.
+/// Checks for non-context-manager use of `pytest.raises`, `pytest.warns`, and `pytest.deprecated_call`.
 ///
 /// ## Why is this bad?
-/// The context-manager form is more readable, easier to extend, and supports additional kwargs.
+/// The context-manager form is more readable, easier to extend, and supports additional keyword
+/// arguments.
 ///
 /// ## Example
 /// ```python
@@ -44,7 +45,7 @@ use crate::{FixAvailability, Violation, checkers::ast::Checker};
 /// - [`pytest` documentation: `pytest.warns`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-warns)
 /// - [`pytest` documentation: `pytest.deprecated_call`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-deprecated-call)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.12.0")]
+#[violation_metadata(stable_since = "0.15.0")]
 pub(crate) struct LegacyFormPytestRaises {
     context_type: PytestContextType,
 }

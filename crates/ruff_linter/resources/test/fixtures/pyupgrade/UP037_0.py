@@ -120,3 +120,7 @@ def f() -> """Literal[0]
     
     """:
     return 0
+
+# https://github.com/astral-sh/ruff/issues/19835
+def foo(bar: "A\n#"): ...
+def foo(bar: "A\n#\n"): ...

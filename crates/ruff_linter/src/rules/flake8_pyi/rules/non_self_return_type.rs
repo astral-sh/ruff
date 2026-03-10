@@ -182,7 +182,7 @@ pub(crate) fn non_self_return_type(
 
     if is_async {
         if name == "__aenter__"
-            && is_name(returns, &class_def.name)
+            && is_name_or_stringized_name(returns, &class_def.name, checker)
             && !is_final(&class_def.decorator_list, semantic)
         {
             add_diagnostic(checker, stmt, returns, class_def, name);
@@ -198,7 +198,7 @@ pub(crate) fn non_self_return_type(
         return;
     }
 
-    if is_name(returns, &class_def.name) {
+    if is_name_or_stringized_name(returns, &class_def.name, checker) {
         if matches!(name, "__enter__" | "__new__") && !is_final(&class_def.decorator_list, semantic)
         {
             add_diagnostic(checker, stmt, returns, class_def, name);
@@ -325,6 +325,11 @@ fn is_name(expr: &ast::Expr, name: &str) -> bool {
         return false;
     };
     id.as_str() == name
+}
+
+/// Return `true` if the given expression resolves to the given name,
+fn is_name_or_stringized_name(expr: &ast::Expr, name: &str, checker: &Checker) -> bool {
+    checker.match_maybe_stringized_annotation(expr, |expr| is_name(expr, name))
 }
 
 /// Return `true` if the given expression resolves to `typing.Self`.

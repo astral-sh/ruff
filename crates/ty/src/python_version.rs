@@ -20,6 +20,8 @@ pub enum PythonVersion {
     Py313,
     #[value(name = "3.14")]
     Py314,
+    #[value(name = "3.15")]
+    Py315,
 }
 
 impl PythonVersion {
@@ -33,6 +35,7 @@ impl PythonVersion {
             Self::Py312 => "3.12",
             Self::Py313 => "3.13",
             Self::Py314 => "3.14",
+            Self::Py315 => "3.15",
         }
     }
 }
@@ -54,6 +57,7 @@ impl From<PythonVersion> for ruff_python_ast::PythonVersion {
             PythonVersion::Py312 => Self::PY312,
             PythonVersion::Py313 => Self::PY313,
             PythonVersion::Py314 => Self::PY314,
+            PythonVersion::Py315 => Self::PY315,
         }
     }
 }

@@ -23,15 +23,15 @@ use crate::{FixAvailability, Locator, Violation};
 ///
 /// ## Example
 /// ```python
-/// with open(filename, "w") as f:
-///     f.write(contents)
+/// with open("file.txt", "w") as f:
+///     f.write("some text")
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// from pathlib import Path
 ///
-/// Path(filename).write_text(contents)
+/// Path("file.txt").write_text("some text")
 /// ```
 ///
 /// ## Fix Safety

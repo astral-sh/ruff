@@ -20,7 +20,6 @@ use {
 };
 
 use super::NormalizedString;
-use crate::preview::is_no_chaperone_for_escaped_quote_in_triple_quoted_docstring_enabled;
 use crate::string::StringQuotes;
 use crate::{DocstringCodeLineWidth, FormatModuleError, prelude::*};
 
@@ -168,7 +167,7 @@ pub(crate) fn format(normalized: &NormalizedString, f: &mut PyFormatter) -> Form
     if docstring[first.len()..].trim().is_empty() {
         // For `"""\n"""` or other whitespace between the quotes, black keeps a single whitespace,
         // but `""""""` doesn't get one inserted.
-        if needs_chaperone_space(normalized.flags(), trim_end, f.context())
+        if needs_chaperone_space(normalized.flags(), trim_end)
             || (trim_end.is_empty() && !docstring.is_empty())
         {
             space().fmt(f)?;
@@ -208,7 +207,7 @@ pub(crate) fn format(normalized: &NormalizedString, f: &mut PyFormatter) -> Form
     let trim_end = docstring
         .as_ref()
         .trim_end_matches(|c: char| c.is_whitespace() && c != '\n');
-    if needs_chaperone_space(normalized.flags(), trim_end, f.context()) {
+    if needs_chaperone_space(normalized.flags(), trim_end) {
         space().fmt(f)?;
     }
 
@@ -1599,36 +1598,28 @@ fn docstring_format_source(
 /// If the last line of the docstring is `content""""` or `content\"""`, we need a chaperone space
 /// that avoids `content""""` and `content\"""`. This only applies to un-escaped backslashes,
 /// so `content\\"""` doesn't need a space while `content\\\"""` does.
-pub(super) fn needs_chaperone_space(
-    flags: AnyStringFlags,
-    trim_end: &str,
-    context: &PyFormatContext,
-) -> bool {
+pub(super) fn needs_chaperone_space(flags: AnyStringFlags, trim_end: &str) -> bool {
     if count_consecutive_chars_from_end(trim_end, '\\') % 2 == 1 {
         // Odd backslash count; chaperone avoids escaping closing quotes
         // `"\ "` -> prevent that this becomes `"\"` which escapes the closing quote.
         return true;
     }
 
-    if is_no_chaperone_for_escaped_quote_in_triple_quoted_docstring_enabled(context) {
-        if flags.is_triple_quoted() {
-            if let Some(before_quote) = trim_end.strip_suffix(flags.quote_style().as_char()) {
-                if count_consecutive_chars_from_end(before_quote, '\\').is_multiple_of(2) {
-                    // Even backslash count preceding quote;
-                    // ```py
-                    // """a "  """
-                    // """a \\"  """
-                    // ```
-                    // The chaperon is needed or the triple quoted string "ends" with 4 instead of 3 quotes.
-                    return true;
-                }
+    if flags.is_triple_quoted() {
+        if let Some(before_quote) = trim_end.strip_suffix(flags.quote_style().as_char()) {
+            if count_consecutive_chars_from_end(before_quote, '\\').is_multiple_of(2) {
+                // Even backslash count preceding quote;
+                // ```py
+                // """a "  """
+                // """a \\"  """
+                // ```
+                // The chaperon is needed or the triple quoted string "ends" with 4 instead of 3 quotes.
+                return true;
             }
         }
-
-        false
-    } else {
-        flags.is_triple_quoted() && trim_end.ends_with(flags.quote_style().as_char())
     }
+
+    false
 }
 
 fn count_consecutive_chars_from_end(s: &str, target: char) -> usize {

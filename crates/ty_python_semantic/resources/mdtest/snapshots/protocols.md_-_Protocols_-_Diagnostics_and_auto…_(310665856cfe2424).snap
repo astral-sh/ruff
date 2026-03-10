@@ -1,0 +1,157 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: protocols.md - Protocols - Diagnostics and autofixes for `Protocol` classes defined in invalid ways
+mdtest path: crates/ty_python_semantic/resources/mdtest/protocols.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from typing import Protocol, Generic, TypeVar
+ 2 | 
+ 3 | T = TypeVar("T")
+ 4 | 
+ 5 | class Foo(Protocol[T], Generic[T]): ...  # error: [invalid-generic-class]
+ 6 | 
+ 7 | # fmt: off
+ 8 | 
+ 9 | # error: [invalid-generic-class]
+10 | class Bar(Protocol[
+11 |   T,
+12 | ], Generic[T]): ...
+13 | 
+14 | class Spam(  # docs
+15 |   # error: [invalid-generic-class]
+16 |   Protocol[  # some comment
+17 |     # another comment
+18 |     T,  # just love my comments
+19 |     # very well documented code
+20 | ],  # important comma!
+21 |   # and a newline...
+22 |   Generic[  # look at this
+23 |   # wow
+24 |     T,  # wow
+25 |     # wowwwwwww
+26 |   ] # oof
+27 |   # another newline?
+28 | ): ...
+29 | 
+30 | # fmt: on
+31 | 
+32 | class Foo[T](Protocol[T]): ...  # error: [invalid-generic-class]
+```
+
+# Diagnostics
+
+```
+error[invalid-generic-class]: Cannot both inherit from subscripted `Protocol` and subscripted `Generic`
+ --> src/mdtest_snippet.py:5:11
+  |
+3 | T = TypeVar("T")
+4 |
+5 | class Foo(Protocol[T], Generic[T]): ...  # error: [invalid-generic-class]
+  |           ^^^^^^^^^^^
+6 |
+7 | # fmt: off
+  |
+help: Remove the type parameters from the `Protocol` base
+info: rule `invalid-generic-class` is enabled by default
+2 | 
+3 | T = TypeVar("T")
+4 | 
+  - class Foo(Protocol[T], Generic[T]): ...  # error: [invalid-generic-class]
+5 + class Foo(Protocol, Generic[T]): ...  # error: [invalid-generic-class]
+6 | 
+7 | # fmt: off
+8 | 
+note: This is an unsafe fix and may change runtime behavior
+
+```
+
+```
+error[invalid-generic-class]: Cannot both inherit from subscripted `Protocol` and subscripted `Generic`
+  --> src/mdtest_snippet.py:10:11
+   |
+ 9 |   # error: [invalid-generic-class]
+10 |   class Bar(Protocol[
+   |  ___________^
+11 | |   T,
+12 | | ], Generic[T]): ...
+   | |_^
+13 |
+14 |   class Spam(  # docs
+   |
+help: Remove the type parameters from the `Protocol` base
+info: rule `invalid-generic-class` is enabled by default
+7  | # fmt: off
+8  | 
+9  | # error: [invalid-generic-class]
+   - class Bar(Protocol[
+   -   T,
+   - ], Generic[T]): ...
+10 + class Bar(Protocol, Generic[T]): ...
+11 | 
+12 | class Spam(  # docs
+13 |   # error: [invalid-generic-class]
+note: This is an unsafe fix and may change runtime behavior
+
+```
+
+```
+error[invalid-generic-class]: Cannot both inherit from subscripted `Protocol` and subscripted `Generic`
+  --> src/mdtest_snippet.py:16:3
+   |
+14 |   class Spam(  # docs
+15 |     # error: [invalid-generic-class]
+16 | /   Protocol[  # some comment
+17 | |     # another comment
+18 | |     T,  # just love my comments
+19 | |     # very well documented code
+20 | | ],  # important comma!
+   | |_^
+21 |     # and a newline...
+22 |     Generic[  # look at this
+   |
+help: Remove the type parameters from the `Protocol` base
+info: rule `invalid-generic-class` is enabled by default
+13 | 
+14 | class Spam(  # docs
+15 |   # error: [invalid-generic-class]
+   -   Protocol[  # some comment
+   -     # another comment
+   -     T,  # just love my comments
+   -     # very well documented code
+   - ],  # important comma!
+16 +   Protocol,  # important comma!
+17 |   # and a newline...
+18 |   Generic[  # look at this
+19 |   # wow
+note: This is an unsafe fix and may change runtime behavior
+
+```
+
+```
+error[invalid-generic-class]: Cannot both inherit from subscripted `Protocol` and use PEP 695 type variables
+  --> src/mdtest_snippet.py:32:14
+   |
+30 | # fmt: on
+31 |
+32 | class Foo[T](Protocol[T]): ...  # error: [invalid-generic-class]
+   |              ^^^^^^^^^^^
+   |
+help: Remove the type parameters from the `Protocol` base
+info: rule `invalid-generic-class` is enabled by default
+29 | 
+30 | # fmt: on
+31 | 
+   - class Foo[T](Protocol[T]): ...  # error: [invalid-generic-class]
+32 + class Foo[T](Protocol): ...  # error: [invalid-generic-class]
+note: This is an unsafe fix and may change runtime behavior
+
+```

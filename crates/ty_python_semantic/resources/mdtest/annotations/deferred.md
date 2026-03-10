@@ -6,6 +6,7 @@
 
 ```pyi
 def get_foo() -> Foo: ...
+
 class Foo: ...
 ```
 
@@ -256,7 +257,6 @@ Forward references in class keyword arguments are allowed in stub files.
 
 ```pyi
 class Foo(metaclass=SomeMeta): ...
-
 class SomeMeta(type): ...
 ```
 

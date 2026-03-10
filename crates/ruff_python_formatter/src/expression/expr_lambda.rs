@@ -10,7 +10,6 @@ use crate::expression::parentheses::{
 use crate::expression::{CallChainLayout, has_own_parentheses};
 use crate::other::parameters::ParametersParentheses;
 use crate::prelude::*;
-use crate::preview::is_parenthesize_lambda_bodies_enabled;
 
 #[derive(Default)]
 pub struct FormatExprLambda {
@@ -31,7 +30,6 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
 
         let comments = f.context().comments().clone();
         let dangling = comments.dangling(item);
-        let preview = is_parenthesize_lambda_bodies_enabled(f.context());
 
         write!(f, [token("lambda")])?;
 
@@ -108,7 +106,7 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
             }
 
             // Try to keep the parameters on a single line, unless there are intervening comments.
-            if preview && !comments.contains_comments(parameters.into()) {
+            if !comments.contains_comments(parameters.into()) {
                 let mut buffer = RemoveSoftLinesBuffer::new(f);
                 write!(
                     buffer,
@@ -134,17 +132,12 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
 
         if dangling_header_comments.is_empty() {
             write!(f, [space()])?;
-        } else if !preview {
-            write!(f, [dangling_comments(dangling_header_comments)])?;
-        }
-
-        if !preview {
-            return body.format().fmt(f);
         }
 
         let fmt_body = FormatBody {
             body,
             dangling_header_comments,
+            needs_parentheses: body.needs_parentheses(item.into(), f.context()),
         };
 
         match self.layout {
@@ -262,6 +255,7 @@ struct FormatBody<'a> {
     /// )
     /// ```
     dangling_header_comments: &'a [SourceComment],
+    needs_parentheses: OptionalParentheses,
 }
 
 impl Format<PyFormatContext<'_>> for FormatBody<'_> {
@@ -269,6 +263,7 @@ impl Format<PyFormatContext<'_>> for FormatBody<'_> {
         let FormatBody {
             dangling_header_comments,
             body,
+            needs_parentheses,
         } = self;
 
         let body = *body;
@@ -437,6 +432,14 @@ impl Format<PyFormatContext<'_>> for FormatBody<'_> {
         // ```
         else if has_own_parentheses(body, f.context()).is_some() {
             body.format().fmt(f)
+        }
+        // Include parentheses for cases that always require them, such as named expressions:
+        //
+        // ```py
+        // lambda x: (y := x + 1)
+        // ```
+        else if matches!(needs_parentheses, OptionalParentheses::Always) {
+            body.format().with_options(Parentheses::Always).fmt(f)
         }
         // Finally, for expressions without their own parentheses, use
         // `parenthesize_if_expands` to add parentheses around the body, only if it expands
