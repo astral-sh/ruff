@@ -215,6 +215,13 @@ export default function Playground() {
       return;
     }
 
+    // Abort any in-progress install and clean up package files
+    installAbortRef.current?.abort();
+    for (const path of installStatus.writtenFiles) {
+      workspace.removeFile(path);
+    }
+    setInstallStatus(IDLE_STATUS);
+
     // Close all open files
     for (const file of files.index) {
       const handle = files.handles[file.id];
@@ -231,7 +238,7 @@ export default function Playground() {
     dispatchFiles({ type: "reset" });
 
     restoreWorkspace(workspace, DEFAULT_WORKSPACE, dispatchFiles, setError);
-  }, [files.handles, files.index, workspace]);
+  }, [files.handles, files.index, workspace, installStatus.writtenFiles]);
 
   return (
     <main className="flex flex-col h-full bg-ayu-background dark:bg-ayu-background-dark">

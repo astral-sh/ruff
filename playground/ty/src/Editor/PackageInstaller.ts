@@ -20,6 +20,10 @@ export interface InstallationStatus {
   installedPackages: InstalledPackageInfo[];
   writtenFiles: string[];
   warnings: string[];
+  /** Pure-python package files extracted for Pyodide runtime. */
+  extractedPackageFiles: Array<{ path: string; contents: string }>;
+  /** C extension packages available in Pyodide CDN for loadPackage(). */
+  runtimePackages: string[];
 }
 
 export const IDLE_STATUS: InstallationStatus = {
@@ -29,31 +33,12 @@ export const IDLE_STATUS: InstallationStatus = {
   installedPackages: [],
   writtenFiles: [],
   warnings: [],
+  extractedPackageFiles: [],
+  runtimePackages: [],
 };
 
 export const PACKAGES_ROOT = "/packages";
 
-/**
- * Module-level store of extracted package files for use by Pyodide runtime.
- * Updated each time packages are installed.
- */
-let extractedPackageFiles: Array<{ path: string; contents: string }> = [];
-
-export function getExtractedPackageFiles(): Array<{
-  path: string;
-  contents: string;
-}> {
-  return extractedPackageFiles;
-}
-
-/**
- * C extension packages that need pyodide.loadPackage() at runtime.
- */
-let runtimePackages: string[] = [];
-
-export function getRuntimePackages(): string[] {
-  return runtimePackages;
-}
 const PYPI_API = "https://pypi.org/pypi";
 
 /**
@@ -129,8 +114,6 @@ export async function installPackages(
     for (const path of previousFiles) {
       workspace.removeFile(path);
     }
-    extractedPackageFiles = [];
-    runtimePackages = [];
     return IDLE_STATUS;
   }
 
@@ -141,6 +124,8 @@ export async function installPackages(
     installedPackages: [],
     writtenFiles: [],
     warnings: [],
+    extractedPackageFiles: [],
+    runtimePackages: [],
   });
 
   try {
@@ -181,6 +166,8 @@ export async function installPackages(
         installedPackages: installed,
         writtenFiles: allWrittenFiles,
         warnings,
+        extractedPackageFiles: allExtractedFiles,
+        runtimePackages: [],
       });
 
       if (pkg.wheelUrl != null) {
@@ -238,29 +225,24 @@ export async function installPackages(
       });
     }
 
-    // Store extracted files for Pyodide runtime (pure-python only)
-    extractedPackageFiles = allExtractedFiles;
-
     // Track C extension packages for pyodide.loadPackage() at runtime,
     // but only those actually available in Pyodide's CDN.
+    const allRuntimePackages: string[] = [];
     const candidateRuntimePkgs = resolved.filter(
       (pkg) => pkg.kind !== "pure-python",
     );
     if (candidateRuntimePkgs.length > 0) {
       const pyodidePkgs = await fetchPyodidePackages();
-      runtimePackages = [];
       for (const pkg of candidateRuntimePkgs) {
         const normalized = normalizePackageName(pkg.name);
         if (pyodidePkgs.has(normalized)) {
-          runtimePackages.push(normalized);
+          allRuntimePackages.push(normalized);
         } else {
           warnings.push(
             `'${pkg.name}' is not available in Pyodide: it cannot be imported at runtime`,
           );
         }
       }
-    } else {
-      runtimePackages = [];
     }
 
     const result: InstallationStatus = {
@@ -270,6 +252,8 @@ export async function installPackages(
       installedPackages: installed,
       writtenFiles: allWrittenFiles,
       warnings,
+      extractedPackageFiles: allExtractedFiles,
+      runtimePackages: allRuntimePackages,
     };
 
     onProgress(result);
@@ -282,6 +266,8 @@ export async function installPackages(
       installedPackages: [],
       writtenFiles: previousFiles,
       warnings: [],
+      extractedPackageFiles: [],
+      runtimePackages: [],
     };
     onProgress(result);
     return result;

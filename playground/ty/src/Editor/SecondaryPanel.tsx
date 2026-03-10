@@ -4,11 +4,7 @@ import { ReadonlyFiles } from "../Playground";
 import { Suspense, use, useState } from "react";
 import { loadPyodide, version as pyodideVersion } from "pyodide";
 import classNames from "classnames";
-import {
-  getExtractedPackageFiles,
-  getRuntimePackages,
-  PACKAGES_ROOT,
-} from "./PackageInstaller";
+import { type InstallationStatus, PACKAGES_ROOT } from "./PackageInstaller";
 
 export enum SecondaryTool {
   "AST" = "AST",
@@ -26,6 +22,7 @@ export interface SecondaryPanelProps {
   tool: SecondaryTool;
   result: SecondaryPanelResult;
   theme: Theme;
+  installStatus: InstallationStatus;
 }
 
 export default function SecondaryPanel({
@@ -33,6 +30,7 @@ export default function SecondaryPanel({
   result,
   files,
   theme,
+  installStatus,
 }: SecondaryPanelProps) {
   return (
     <div className="flex flex-col h-full">
@@ -42,6 +40,7 @@ export default function SecondaryPanel({
         theme={theme}
         files={files}
         revision={files.revision}
+        installStatus={installStatus}
       />
     </div>
   );
@@ -53,12 +52,14 @@ function Content({
   result,
   theme,
   revision,
+  installStatus,
 }: {
   tool: SecondaryTool;
   files: ReadonlyFiles;
   revision: number;
   result: SecondaryPanelResult;
   theme: Theme;
+  installStatus: InstallationStatus;
 }) {
   if (result == null) {
     return "";
@@ -76,7 +77,14 @@ function Content({
             break;
 
           case "Run":
-            return <Run theme={theme} files={files} key={`${revision}`} />;
+            return (
+              <Run
+                theme={theme}
+                files={files}
+                installStatus={installStatus}
+                key={`${revision}`}
+              />
+            );
         }
 
         return (
@@ -110,14 +118,22 @@ function Content({
 
 const SANDBOX_BASE_DIRECTORY = "/playground/";
 
-function Run({ files, theme }: { files: ReadonlyFiles; theme: Theme }) {
+function Run({
+  files,
+  theme,
+  installStatus,
+}: {
+  files: ReadonlyFiles;
+  theme: Theme;
+  installStatus: InstallationStatus;
+}) {
   const [runOutput, setRunOutput] = useState<Promise<string> | null>(null);
   const handleRun = () => {
     const output = (async () => {
       // The pyodide npm package doesn't ship .whl files, so loadPackage()
       // must fetch from CDN. Set packageBaseUrl when C extension packages
       // are needed.
-      const runtimePkgs = getRuntimePackages();
+      const runtimePkgs = installStatus.runtimePackages;
       const pyodide = await loadPyodide({
         env: {
           HOME: SANDBOX_BASE_DIRECTORY,
@@ -130,7 +146,7 @@ function Run({ files, theme }: { files: ReadonlyFiles; theme: Theme }) {
       });
 
       // Write extracted pure-Python package files to Pyodide's filesystem
-      const packageFiles = getExtractedPackageFiles();
+      const packageFiles = installStatus.extractedPackageFiles;
       if (packageFiles.length > 0) {
         for (const { path, contents } of packageFiles) {
           const lastSlash = path.lastIndexOf("/");

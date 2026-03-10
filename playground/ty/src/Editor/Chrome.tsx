@@ -285,6 +285,7 @@ export default function Chrome({
                     theme={theme}
                     tool={secondaryTool}
                     result={checkResult.secondary}
+                    installStatus={installStatus}
                   />
                 </Panel>
               </>
