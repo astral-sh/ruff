@@ -745,9 +745,18 @@ impl<'db> ConstraintSetBuilder<'db> {
                 old_constraint.upper,
             );
 
+            // Absorb the uncertain branch into both true and false branches. This collapses
+            // the TDD back to a binary structure, which is correct but loses the TDD laziness for
+            // unions. This is acceptable since `load` is only used for `OwnedConstraintSet` in
+            // mdtests.
+            // TODO: A 4-arg `ite_uncertain` could preserve TDD structure if `load` ever becomes
+            // performance-sensitive.
             let if_true = rebuild_node(db, builder, other, cache, old_interior.if_true);
+            let if_uncertain = rebuild_node(db, builder, other, cache, old_interior.if_uncertain);
             let if_false = rebuild_node(db, builder, other, cache, old_interior.if_false);
-            let remapped = condition.ite(builder, if_true, if_false);
+            let if_true_merged = if_true.or(builder, if_uncertain);
+            let if_false_merged = if_false.or(builder, if_uncertain);
+            let remapped = condition.ite(builder, if_true_merged, if_false_merged);
 
             cache.insert(old_node, remapped);
             remapped
@@ -1524,14 +1533,24 @@ impl NodeId {
                     builder,
                     interior.constraint.when_true(),
                     interior.source_order,
-                    |path, _| interior.if_true.for_each_path_inner(db, builder, f, path),
+                    |path, _| {
+                        interior.if_true.for_each_path_inner(db, builder, f, path);
+                        interior
+                            .if_uncertain
+                            .for_each_path_inner(db, builder, f, path);
+                    },
                 );
                 path.walk_edge(
                     db,
                     builder,
                     interior.constraint.when_false(),
                     interior.source_order,
-                    |path, _| interior.if_false.for_each_path_inner(db, builder, f, path),
+                    |path, _| {
+                        interior.if_false.for_each_path_inner(db, builder, f, path);
+                        interior
+                            .if_uncertain
+                            .for_each_path_inner(db, builder, f, path);
+                    },
                 );
             }
         }
@@ -1566,18 +1585,21 @@ impl NodeId {
                 // walk_edge will return None if this node's constraint (or anything we can derive
                 // from it) causes the if_true edge to become impossible. We want to ignore
                 // impossible paths, and so we treat them as passing the "always satisfied" check.
+                //
+                // Under TDD semantics, when the constraint holds the result is C ∪ U, and when
+                // it doesn't the result is D ∪ U. We fold the uncertain branch into both before
+                // checking, because "C ∪ U is always satisfied" cannot be decomposed into
+                // independent checks on C and U (it's a disjunction). This is zero-cost for
+                // binary BDDs since or(C, ALWAYS_FALSE) = C.
                 let interior = builder.interior_node_data(self);
+                let if_true_or_uncertain = interior.if_true.or(builder, interior.if_uncertain);
                 let true_always_satisfied = path
                     .walk_edge(
                         db,
                         builder,
                         interior.constraint.when_true(),
                         interior.source_order,
-                        |path, _| {
-                            interior
-                                .if_true
-                                .is_always_satisfied_inner(db, builder, path)
-                        },
+                        |path, _| if_true_or_uncertain.is_always_satisfied_inner(db, builder, path),
                     )
                     .unwrap_or(true);
                 if !true_always_satisfied {
@@ -1585,16 +1607,13 @@ impl NodeId {
                 }
 
                 // Ditto for the if_false branch
+                let if_false_or_uncertain = interior.if_false.or(builder, interior.if_uncertain);
                 path.walk_edge(
                     db,
                     builder,
                     interior.constraint.when_false(),
                     interior.source_order,
-                    |path, _| {
-                        interior
-                            .if_false
-                            .is_always_satisfied_inner(db, builder, path)
-                    },
+                    |path, _| if_false_or_uncertain.is_always_satisfied_inner(db, builder, path),
                 )
                 .unwrap_or(true)
             }
@@ -1637,6 +1656,24 @@ impl NodeId {
                     )
                     .unwrap_or(true);
                 if !true_never_satisfied {
+                    return false;
+                }
+
+                // Ditto for the if_uncertain branch
+                let uncertain_never_satisfied = path
+                    .walk_edge(
+                        db,
+                        builder,
+                        interior.constraint.when_unconstrained(),
+                        interior.source_order,
+                        |path, _| {
+                            interior
+                                .if_uncertain
+                                .is_never_satisfied_inner(db, builder, path)
+                        },
+                    )
+                    .unwrap_or(true);
+                if !uncertain_never_satisfied {
                     return false;
                 }
 
@@ -2269,6 +2306,7 @@ impl NodeId {
         let interior = builder.interior_node_data(self);
         f(interior.constraint, interior.source_order);
         interior.if_true.for_each_constraint(builder, f);
+        interior.if_uncertain.for_each_constraint(builder, f);
         interior.if_false.for_each_constraint(builder, f);
     }
 
@@ -2434,6 +2472,15 @@ impl NodeId {
                         db,
                         builder,
                         interior.if_true,
+                        &format_args!("{prefix}│   ",),
+                        seen,
+                        f,
+                    )?;
+                    write!(f, "\n{prefix}├─? ",)?;
+                    format_node(
+                        db,
+                        builder,
+                        interior.if_uncertain,
                         &format_args!("{prefix}│   ",),
                         seen,
                         f,
@@ -2606,9 +2653,8 @@ impl InteriorNode {
                 builder,
                 other_interior.constraint,
                 other_interior.if_true,
-                other_interior
-                    .if_uncertain
-                    .or_inner(builder, self.node(), other_offset),
+                self.node()
+                    .or_inner(builder, other_interior.if_uncertain, other_offset),
                 other_interior.if_false,
                 other_interior.source_order + other_offset,
             ),
@@ -2787,7 +2833,7 @@ impl InteriorNode {
         let self_interior = builder.interior_node_data(self.node());
         if should_remove(self_interior.constraint) {
             // If we should remove constraints involving this typevar, then we replace this node
-            // with the OR of its if_false/if_true edges. That is, the result is true if there's
+            // with the OR of all of its outgoing edges. That is, the result is true if there's
             // any assignment of this node's constraint that is true.
             //
             // We also have to check if there are any derived facts that depend on the constraint
@@ -2864,7 +2910,36 @@ impl InteriorNode {
                     },
                 )
                 .unwrap_or(ALWAYS_FALSE);
-            if_true.or(builder, if_false)
+            let if_uncertain = path
+                .walk_edge(
+                    db,
+                    builder,
+                    self_interior.constraint.when_unconstrained(),
+                    self_interior.source_order,
+                    |path, new_range| {
+                        let branch = self_interior.if_uncertain.abstract_one_inner(
+                            db,
+                            builder,
+                            should_remove,
+                            path,
+                        );
+                        path.assignments[new_range]
+                            .iter()
+                            .filter(|(assignment, _)| !should_remove(assignment.constraint()))
+                            .fold(branch, |branch, (assignment, source_order)| {
+                                branch.and(
+                                    builder,
+                                    Node::new_satisfied_constraint(
+                                        builder,
+                                        *assignment,
+                                        *source_order,
+                                    ),
+                                )
+                            })
+                    },
+                )
+                .unwrap_or(ALWAYS_FALSE);
+            if_true.or(builder, if_uncertain).or(builder, if_false)
         } else {
             // Otherwise, we abstract the if_false/if_true edges recursively.
             let if_true = path
@@ -2877,6 +2952,22 @@ impl InteriorNode {
                         self_interior
                             .if_true
                             .abstract_one_inner(db, builder, should_remove, path)
+                    },
+                )
+                .unwrap_or(ALWAYS_FALSE);
+            let if_uncertain = path
+                .walk_edge(
+                    db,
+                    builder,
+                    self_interior.constraint.when_unconstrained(),
+                    self_interior.source_order,
+                    |path, _| {
+                        self_interior.if_uncertain.abstract_one_inner(
+                            db,
+                            builder,
+                            should_remove,
+                            path,
+                        )
                     },
                 )
                 .unwrap_or(ALWAYS_FALSE);
@@ -2893,6 +2984,10 @@ impl InteriorNode {
                     },
                 )
                 .unwrap_or(ALWAYS_FALSE);
+            // Absorb the uncertain branch into both the true and false branches before
+            // constructing the ITE, matching TDD semantics: when the constraint holds the result
+            // is C ∪ U, and when it doesn't the result is D ∪ U.
+            //
             // NB: We cannot use `Node::new` here, because the recursive calls might introduce new
             // derived constraints into the result, and those constraints might appear before this
             // one in the BDD ordering.
@@ -2901,7 +2996,11 @@ impl InteriorNode {
                 self_interior.constraint,
                 self_interior.source_order,
             )
-            .ite(builder, if_true, if_false)
+            .ite(
+                builder,
+                if_true.or(builder, if_uncertain),
+                if_false.or(builder, if_uncertain),
+            )
         }
     }
 
@@ -2927,11 +3026,33 @@ impl InteriorNode {
             (self.node(), false)
         } else {
             // Otherwise, check if this node's variable is in the assignment. If so, substitute the
-            // variable by replacing this node with its if_false/if_true edge, accordingly.
+            // variable by replacing this node with the appropriate edge(s). When restricting a
+            // TDD, the uncertain branch is folded in.
             if assignment == self_interior.constraint.when_true() {
-                (self_interior.if_true, true)
+                // restrict(n ? C : U : D, n == true) = or(C, U),
+                (
+                    self_interior
+                        .if_true
+                        .or(builder, self_interior.if_uncertain),
+                    true,
+                )
             } else if assignment == self_interior.constraint.when_false() {
-                (self_interior.if_false, true)
+                // restrict(n ? C : U : D, n == false) = or(D, U).
+                (
+                    self_interior
+                        .if_false
+                        .or(builder, self_interior.if_uncertain),
+                    true,
+                )
+            } else if assignment == self_interior.constraint.when_unconstrained() {
+                // restrict(n ? C : U : D, n is unconstrained) = or(C, U, D)
+                (
+                    self_interior
+                        .if_true
+                        .or(builder, self_interior.if_uncertain)
+                        .or(builder, self_interior.if_false),
+                    true,
+                )
             } else {
                 let (if_true, found_in_true) =
                     self_interior.if_true.restrict_one(db, builder, assignment);
@@ -4681,6 +4802,12 @@ impl PathAssignments {
         self.assignments.contains_key(&assignment)
     }
 
+    fn contains_constraint(&self, constraint: ConstraintId) -> bool {
+        self.assignment_holds(constraint.when_true())
+            || self.assignment_holds(constraint.when_false())
+            || self.assignment_holds(constraint.when_unconstrained())
+    }
+
     /// Update our sequent map to ensure that it holds all of the sequents that involve the given
     /// constraint. We do not calculate the new sequents directly. Instead, we call
     /// [`SequentMap::for_constraint`] and [`for_constraint_pair`][SequentMap::for_constraint_pair]
@@ -4720,6 +4847,22 @@ impl PathAssignments {
         source_order: usize,
         derived: bool,
     ) -> Result<(), PathAssignmentConflict> {
+        if matches!(assignment, ConstraintAssignment::Unconstrained(_)) {
+            // An `Unconstrained` assignment means "this constraint can go either way". If there is
+            // already any assignment for this constraint (positive, negative, or unconstrained),
+            // the existing assignment is at least as informative, and we skip.
+            if self.contains_constraint(assignment.constraint()) {
+                return Ok(());
+            }
+
+            // Since we don't know whether the assignment's constraint holds or not, we cannot
+            // derive any additional information from the sequent map. We still want to record the
+            // assignment, but as an optimization we can return early without actually querying the
+            // sequent map.
+            self.assignments.insert(assignment, source_order);
+            return Ok(());
+        }
+
         // First add this assignment. If it causes a conflict, return that as an error. If we've
         // already know this assignment holds, just return.
         if self.assignments.contains_key(&assignment.negated()) {
@@ -5161,18 +5304,18 @@ mod tests {
     fn test_display_graph_output() {
         let expected = indoc! {r#"
             <0> (U = bool) 2/4
-            ┡━₁ <1> (U = str) 1/4
-            │   ┡━₁ <2> (T = bool) 4/4
-            │   │   ┡━₁ <3> (T = str) 3/3
-            │   │   │   ┡━₁ always
-            │   │   │   └─₀ always
-            │   │   └─₀ <4> (T = str) 3/3
-            │   │       ┡━₁ always
-            │   │       └─₀ never
-            │   └─₀ <2> SHARED
-            └─₀ <5> (U = str) 1/4
-                ┡━₁ <2> SHARED
-                └─₀ never
+            ┡━₁ <1> (T = bool) 4/4
+            │   ┡━₁ always
+            │   ├─? <2> (T = str) 3/3
+            │   │   ┡━₁ always
+            │   │   ├─? never
+            │   │   └─₀ never
+            │   └─₀ never
+            ├─? <3> (U = str) 1/4
+            │   ┡━₁ <1> SHARED
+            │   ├─? never
+            │   └─₀ never
+            └─₀ never
         "#}
         .trim_end();
 

@@ -205,7 +205,7 @@ ______________________________________________________________________
 
 ## Phase 2: Core Operation — Union (Duboc Set 2)
 
-### Step 2.1: Update `InteriorNode::or` [ ]
+### Step 2.1: Update `InteriorNode::or` [x]
 
 **File:** `constraints.rs`, `InteriorNode::or` (~line 2600)
 
@@ -239,7 +239,7 @@ n2 ? C2 : or(U2, T1) : D2
 
 Symmetric to the Less case.
 
-### Step 2.2: Update `NodeId::or_inner` terminal cases [ ]
+### Step 2.2: Update `NodeId::or_inner` terminal cases [x]
 
 **File:** `constraints.rs`, `NodeId::or_inner` (~line 1773)
 
@@ -256,7 +256,7 @@ ______________________________________________________________________
 
 ## Phase 3: Core Operation — Intersection (Duboc Set 2)
 
-### Step 3.1: Update `InteriorNode::and` [ ]
+### Step 3.1: Update `InteriorNode::and` [x]
 
 **File:** `constraints.rs`, `InteriorNode::and` (~line 2651)
 
@@ -288,7 +288,7 @@ n2 ? (T1 ∧ C2) : (T1 ∧ U2) : (T1 ∧ D2)
 
 Symmetric.
 
-### Step 3.2: Update `NodeId::and_inner` terminal cases [ ]
+### Step 3.2: Update `NodeId::and_inner` terminal cases [x]
 
 Update the terminal-vs-interior cases analogously to Step 2.2:
 
@@ -300,7 +300,7 @@ ______________________________________________________________________
 
 ## Phase 4: Core Operation — Negation
 
-### Step 4.1: Implement TDD negation as `1 \ T` (difference) [ ]
+### Step 4.1: Implement TDD negation as `1 \ T` (difference) [x]
 
 **File:** `constraints.rs`, `InteriorNode::negate` (~line 2577)
 
@@ -362,7 +362,7 @@ no uncertain branches.
 **Important property:** `negate()` always produces a TDD where every node has
 `if_uncertain = ALWAYS_FALSE`.
 
-### Step 4.2: Update `NodeId::negate` terminal cases [ ]
+### Step 4.2: Update `NodeId::negate` terminal cases [x]
 
 Terminal cases remain unchanged:
 
@@ -373,7 +373,7 @@ ______________________________________________________________________
 
 ## Phase 5: Core Operation — Iff (Biconditional)
 
-### Step 5.1: Replace dedicated iff implementation with desugaring [ ]
+### Step 5.1: Replace dedicated iff implementation with desugaring [x]
 
 **File:** `constraints.rs`
 
@@ -399,11 +399,9 @@ fn iff(self, builder: &ConstraintSetBuilder<'_>, other: Self) -> Self {
 }
 ```
 
-Keep `NodeId::iff` and `NodeId::iff_with_offset` as convenience helpers
-(there are callers at the `NodeId` level in `satisfied_by_all_typevars`
-and the substitution methods), but they no longer need their own recursive
-implementation or cache. The existing caches for `negate`, `and`, and `or`
-handle memoization.
+**Implementation note:** We kept `iff_inner` with offset threading (using
+`and_inner`/`negate`/`or` internally), and `iff`/`iff_with_offset` as
+wrappers. `InteriorNode::iff` and `iff_cache` were removed.
 
 Since `negate()` produces flat TDDs (all uncertain=0), the `¬a ∧ ¬b`
 intersection uses the simpler binary-like code path.
@@ -412,7 +410,7 @@ ______________________________________________________________________
 
 ## Phase 6: Update Derived Operations
 
-### Step 6.1: Update `ite` (if-then-else) [ ]
+### Step 6.1: Update `ite` (if-then-else) [x]
 
 **File:** `constraints.rs`, `NodeId::ite` (~line 1987)
 
@@ -429,12 +427,12 @@ This definition still works correctly with the updated `and`, `or`, and
 `negate` operations. No changes needed to the definition itself, but verify
 it produces correct results for TDD inputs.
 
-### Step 6.2: Update `implies` [ ]
+### Step 6.2: Update `implies` [x]
 
 Currently defined as `self.negate(builder).or(builder, other)`. This still
 works correctly. No changes needed.
 
-### Step 6.3: Update `restrict_one` [ ]
+### Step 6.3: Update `restrict_one` [x]
 
 **File:** `constraints.rs`, `InteriorNode::restrict_one` (~line 2917)
 
@@ -450,7 +448,7 @@ when a constraint is fixed, the uncertain branch must be folded in:
 - For a non-matching constraint, recurse into all three branches:
     `n ? restrict(C, m) : restrict(U, m) : restrict(D, m)`
 
-### Step 6.4: Update `exists_one` / `abstract_one_inner` [ ]
+### Step 6.4: Update `exists_one` / `abstract_one_inner` [x]
 
 **File:** `constraints.rs`, `InteriorNode::exists_one` (~line 2729),
 `InteriorNode::abstract_one_inner` (~line 2778)
@@ -487,7 +485,7 @@ fn when_unconstrained(self) -> ConstraintAssignment {
 Already done as part of Phase 1: recurses into `if_uncertain` using
 `NodeId::with_uncertain`.
 
-### Step 6.6: Update `for_each_constraint` [ ]
+### Step 6.6: Update `for_each_constraint` [x]
 
 **File:** `constraints.rs`, `NodeId::for_each_constraint` (~line 2313)
 
@@ -503,7 +501,7 @@ ______________________________________________________________________
 
 ## Phase 7: Update BDD Walking and Path Analysis
 
-### Step 7.1: Update `for_each_path` / `for_each_path_inner` [ ]
+### Step 7.1: Update `for_each_path` / `for_each_path_inner` [x]
 
 **File:** `constraints.rs`, `NodeId::for_each_path_inner` (~line 1546)
 
@@ -513,75 +511,35 @@ only ever sees paths with fully-determined (positive/negative) assignments,
 and downstream consumers like `solutions` don't need any changes to handle
 `Unconstrained`.
 
-Collapse into two `walk_edge` calls — one for positive, one for negative —
-and recurse into both `if_true`/`if_uncertain` (or `if_false`/`if_uncertain`)
-inside each callback:
+**Implementation note:** We use 4 separate `walk_edge` calls instead of 2,
+to preserve the binary BDD path ordering (which affects `source_order`-based
+solution sorting). Walk `if_true` and `if_false` first (matching the old
+binary BDD order), then expand `if_uncertain` under both positive and
+negative assignments. For binary BDDs (U = ALWAYS_FALSE), the last two calls
+are no-ops.
 
-```rust
-Node::Interior(_) => {
-    let interior = builder.interior_node_data(self);
-    // Positive: walk if_true and if_uncertain
-    path.walk_edge(
-        db, builder,
-        interior.constraint.when_true(),
-        interior.source_order,
-        |path, _| {
-            interior.if_true.for_each_path_inner(db, builder, f, path);
-            interior.if_uncertain.for_each_path_inner(db, builder, f, path);
-        },
-    );
-    // Negative: walk if_false and if_uncertain
-    path.walk_edge(
-        db, builder,
-        interior.constraint.when_false(),
-        interior.source_order,
-        |path, _| {
-            interior.if_false.for_each_path_inner(db, builder, f, path);
-            interior.if_uncertain.for_each_path_inner(db, builder, f, path);
-        },
-    );
-}
-```
-
-This mirrors the TDD semantics directly: when the constraint holds, the
-result is `⟦C⟧ ∪ ⟦U⟧`; when it doesn't, the result is `⟦D⟧ ∪ ⟦U⟧`.
-Paths through `if_uncertain` are naturally explored under both assignments,
-and the sequent map handles any pruning of impossible paths.
-
-### Step 7.2: Update `is_always_satisfied_inner` [ ]
+### Step 7.2: Update `is_always_satisfied_inner` [x]
 
 **File:** `constraints.rs`, `NodeId::is_always_satisfied_inner` (~line 1589)
 
-Add a check for the uncertain branch. The TDD is always satisfied only if
-all three branches are always satisfied. Walk the uncertain branch with an
-`Unconstrained` assignment (no expansion needed — we're checking a boolean
-property, not enumerating solutions):
+**Implementation note:** Unlike `is_never_satisfied` (Step 7.3), the uncertain
+branch CANNOT be checked independently here. The TDD semantics say the result
+under positive(n) is `C ∪ U`, but "C ∪ U is always satisfied" is a disjunction
+that can't be decomposed — checking U alone fails when U = ALWAYS_FALSE.
+Instead, we fold the uncertain branch into both branches via `or` before
+checking: `or(C, U).is_always_satisfied` and `or(D, U).is_always_satisfied`.
+This is zero-cost for binary BDDs since `or(X, ALWAYS_FALSE) = X`.
 
-```rust
-// Check uncertain branch
-let uncertain_always_satisfied = path
-    .walk_edge(
-        db, builder,
-        interior.constraint.when_unconstrained(),
-        interior.source_order,
-        |path, _| {
-            interior.if_uncertain.is_always_satisfied_inner(db, builder, path)
-        },
-    )
-    .unwrap_or(true);
-if !uncertain_always_satisfied {
-    return false;
-}
-```
-
-### Step 7.3: Update `is_never_satisfied_inner` [ ]
+### Step 7.3: Update `is_never_satisfied_inner` [x]
 
 **File:** `constraints.rs`, `NodeId::is_never_satisfied_inner` (~line 1643)
 
-Same pattern — the TDD is never satisfied only if all three branches are
-never satisfied. Walk the uncertain branch with `when_unconstrained()`.
+**Implementation note:** Unlike `is_always_satisfied` (Step 7.2), independent
+branch checking works here because "C ∪ U is never satisfied" decomposes into
+"C is never satisfied AND U is never satisfied." Walk the uncertain branch
+with `when_unconstrained()`.
 
-### Step 7.4: Update `PathAssignments::walk_edge` for Unconstrained [ ]
+### Step 7.4: Update `PathAssignments::walk_edge` for Unconstrained [x]
 
 **File:** `constraints.rs`, `PathAssignments::walk_edge` (~line 4545) and
 `PathAssignments::add_assignment` (~line 4650)
@@ -609,14 +567,14 @@ constraint (positive, negative, or unconstrained). If so, return early
 inference (no tautology checks, no impossibility checks, no implication
 propagation).
 
-### Step 7.5: No changes needed to `PathAssignments` accessors [ ]
+### Step 7.5: No changes needed to `PathAssignments` accessors [x]
 
 The existing `positive_constraints` accessor remains correct. Callers that
 need to enumerate solutions (Step 8.1) will only ever see `Positive` and
 `Negative` assignments, because `for_each_path` expands `Unconstrained`
 assignments into both alternatives (see Step 7.1).
 
-### Step 7.6: Update `PathAssignments::assignment_holds` [ ]
+### Step 7.6: Update `PathAssignments::assignment_holds` [x]
 
 This checks if a specific assignment is in the current path. An
 `Unconstrained` assignment should only match itself. The existing
@@ -664,7 +622,7 @@ Node::Interior(_) => {
 }
 ```
 
-### Step 8.3: Update `display_graph` [ ]
+### Step 8.3: Update `display_graph` [x]
 
 **File:** `constraints.rs`, `NodeId::display_graph` (~line 2416)
 
@@ -730,7 +688,7 @@ ______________________________________________________________________
 The `nodes: IndexVec<NodeId, InteriorNodeData>` field will automatically pick
 up the new `if_uncertain` field. No explicit changes needed to the struct.
 
-### Step 9.2: Update `ConstraintSetBuilder::load` [ ]
+### Step 9.2: Update `ConstraintSetBuilder::load` [x]
 
 **File:** `constraints.rs`, `rebuild_node` in `load` (~line 741)
 
