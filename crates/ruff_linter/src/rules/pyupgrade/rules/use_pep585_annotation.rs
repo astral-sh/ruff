@@ -50,11 +50,17 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// alongside libraries that rely on runtime type annotations, like Pydantic,
 /// on Python versions prior to Python 3.9.
 ///
+/// In [preview], this rule can also add its own `__future__` import on Python
+/// 3.9 and earlier, if the [`lint.future-annotations`] setting is enabled. This
+/// also makes the fix unsafe.
+///
 /// ## Options
 /// - `target-version`
 /// - `lint.pyupgrade.keep-runtime-typing`
+/// - `lint.future-annotations`
 ///
 /// [PEP 585]: https://peps.python.org/pep-0585/
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.155")]
 pub(crate) struct NonPEP585Annotation {
