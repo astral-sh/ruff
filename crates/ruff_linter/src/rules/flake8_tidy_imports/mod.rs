@@ -16,7 +16,7 @@ mod tests {
     use crate::registry::Rule;
     use crate::rules::flake8_tidy_imports;
     use crate::rules::flake8_tidy_imports::settings::{
-        AllImports, ApiBan, BannedEagerImports, Strictness,
+        AllImports, ApiBan, ImportSelection, ImportSelector, ImportSelectorSettings, Strictness,
     };
     use crate::settings::LinterSettings;
     use crate::source_kind::SourceKind;
@@ -150,12 +150,12 @@ mod tests {
     }
 
     #[test]
-    fn preview_banned_eager_imports() -> Result<()> {
+    fn preview_lazy_import_mismatch() -> Result<()> {
         let diagnostics = test_path(
             Path::new("flake8_tidy_imports/TID254.py"),
             &LinterSettings {
                 flake8_tidy_imports: flake8_tidy_imports::settings::Settings {
-                    banned_eager_imports: BannedEagerImports::Imports(vec![
+                    require_lazy: ImportSelector::Selection(ImportSelection::Imports(vec![
                         "typing".to_string(),
                         "foo".to_string(),
                         "email".to_string(),
@@ -163,10 +163,10 @@ mod tests {
                         "starry".to_string(),
                         "collections".to_string(),
                         "pkg".to_string(),
-                    ]),
+                    ])),
                     ..Default::default()
                 },
-                ..LinterSettings::for_rule(Rule::BannedEagerImports)
+                ..LinterSettings::for_rule(Rule::LazyImportMismatch)
                     .with_preview_mode()
                     .with_target_version(PythonVersion::PY315)
             },
@@ -176,15 +176,15 @@ mod tests {
     }
 
     #[test]
-    fn preview_banned_eager_imports_all() -> Result<()> {
+    fn preview_lazy_import_mismatch_all() -> Result<()> {
         let diagnostics = test_path(
             Path::new("flake8_tidy_imports/TID254.py"),
             &LinterSettings {
                 flake8_tidy_imports: flake8_tidy_imports::settings::Settings {
-                    banned_eager_imports: BannedEagerImports::All(AllImports::All),
+                    require_lazy: ImportSelector::Selection(ImportSelection::All(AllImports::All)),
                     ..Default::default()
                 },
-                ..LinterSettings::for_rule(Rule::BannedEagerImports)
+                ..LinterSettings::for_rule(Rule::LazyImportMismatch)
                     .with_preview_mode()
                     .with_target_version(PythonVersion::PY315)
             },
@@ -194,15 +194,15 @@ mod tests {
     }
 
     #[test]
-    fn preview_banned_eager_imports_pre_py315() -> Result<()> {
+    fn preview_lazy_import_mismatch_pre_py315() -> Result<()> {
         let diagnostics = test_path(
             Path::new("flake8_tidy_imports/TID254_py314.py"),
             &LinterSettings {
                 flake8_tidy_imports: flake8_tidy_imports::settings::Settings {
-                    banned_eager_imports: BannedEagerImports::All(AllImports::All),
+                    require_lazy: ImportSelector::Selection(ImportSelection::All(AllImports::All)),
                     ..Default::default()
                 },
-                ..LinterSettings::for_rule(Rule::BannedEagerImports)
+                ..LinterSettings::for_rule(Rule::LazyImportMismatch)
                     .with_preview_mode()
                     .with_target_version(PythonVersion::PY314)
             },
@@ -212,7 +212,7 @@ mod tests {
     }
 
     #[test]
-    fn preview_banned_eager_imports_fix() {
+    fn preview_lazy_import_mismatch_fix() {
         let source = dedent(
             r#"
             from __future__ import annotations
@@ -276,10 +276,10 @@ mod tests {
             Path::new("flake8_tidy_imports/TID254_fix.py"),
             &LinterSettings {
                 flake8_tidy_imports: flake8_tidy_imports::settings::Settings {
-                    banned_eager_imports: BannedEagerImports::All(AllImports::All),
+                    require_lazy: ImportSelector::Selection(ImportSelection::All(AllImports::All)),
                     ..Default::default()
                 },
-                ..LinterSettings::for_rule(Rule::BannedEagerImports)
+                ..LinterSettings::for_rule(Rule::LazyImportMismatch)
                     .with_preview_mode()
                     .with_target_version(PythonVersion::PY315)
             },
@@ -290,7 +290,7 @@ mod tests {
     }
 
     #[test]
-    fn preview_banned_eager_imports_dotted_module() {
+    fn preview_lazy_import_mismatch_dotted_module() {
         let source = dedent(
             r#"
             import foo
@@ -320,10 +320,98 @@ mod tests {
             Path::new("flake8_tidy_imports/TID254_dotted.py"),
             &LinterSettings {
                 flake8_tidy_imports: flake8_tidy_imports::settings::Settings {
-                    banned_eager_imports: BannedEagerImports::Imports(vec!["foo.bar".to_string()]),
+                    require_lazy: ImportSelector::Selection(ImportSelection::Imports(vec![
+                        "foo.bar".to_string(),
+                    ])),
                     ..Default::default()
                 },
-                ..LinterSettings::for_rule(Rule::BannedEagerImports)
+                ..LinterSettings::for_rule(Rule::LazyImportMismatch)
+                    .with_preview_mode()
+                    .with_target_version(PythonVersion::PY315)
+            },
+        );
+
+        assert_eq!(diagnostics.len(), 2);
+        assert_eq!(fixed.source_code(), expected);
+    }
+
+    #[test]
+    fn preview_lazy_import_mismatch_exclude() {
+        let source = dedent(
+            r#"
+            import sitecustomize
+            import typing
+            import typing_extensions
+            "#,
+        );
+        let expected = dedent(
+            r#"
+            import sitecustomize
+            lazy import typing
+            lazy import typing_extensions
+            "#,
+        );
+
+        let source_kind = SourceKind::Python {
+            code: source.to_string(),
+            is_stub: false,
+        };
+
+        let (diagnostics, fixed) = test_contents(
+            &source_kind,
+            Path::new("flake8_tidy_imports/TID254_exclude.py"),
+            &LinterSettings {
+                flake8_tidy_imports: flake8_tidy_imports::settings::Settings {
+                    require_lazy: ImportSelector::Settings(ImportSelectorSettings {
+                        include: ImportSelection::All(AllImports::All),
+                        exclude: vec!["sitecustomize".to_string()],
+                    }),
+                    ..Default::default()
+                },
+                ..LinterSettings::for_rule(Rule::LazyImportMismatch)
+                    .with_preview_mode()
+                    .with_target_version(PythonVersion::PY315)
+            },
+        );
+
+        assert_eq!(diagnostics.len(), 2);
+        assert_eq!(fixed.source_code(), expected);
+    }
+
+    #[test]
+    fn preview_lazy_import_mismatch_ban_lazy() {
+        let source = dedent(
+            r#"
+            lazy import sitecustomize
+            lazy import typing
+            lazy from foo import bar
+            "#,
+        );
+        let expected = dedent(
+            r#"
+            lazy import sitecustomize
+            import typing
+            from foo import bar
+            "#,
+        );
+
+        let source_kind = SourceKind::Python {
+            code: source.to_string(),
+            is_stub: false,
+        };
+
+        let (diagnostics, fixed) = test_contents(
+            &source_kind,
+            Path::new("flake8_tidy_imports/TID254_ban_lazy.py"),
+            &LinterSettings {
+                flake8_tidy_imports: flake8_tidy_imports::settings::Settings {
+                    ban_lazy: ImportSelector::Settings(ImportSelectorSettings {
+                        include: ImportSelection::All(AllImports::All),
+                        exclude: vec!["sitecustomize".to_string()],
+                    }),
+                    ..Default::default()
+                },
+                ..LinterSettings::for_rule(Rule::LazyImportMismatch)
                     .with_preview_mode()
                     .with_target_version(PythonVersion::PY315)
             },
