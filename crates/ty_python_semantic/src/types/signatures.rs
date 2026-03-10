@@ -1352,43 +1352,31 @@ impl<'db> Signature<'db> {
             let other_paramspec = other.parameters.find_paramspec_from_args_kwargs(db);
 
             match (self_paramspec, other_paramspec) {
-                // self: `P`
-                // other: `P`
-                (Some(([], self_bound_typevar)), Some(([], other_bound_typevar))) => {
-                    let param_spec_matches = ConstraintSet::constrain_typevar(
-                        db,
-                        constraints,
-                        self_bound_typevar,
-                        Type::TypeVar(other_bound_typevar),
-                        Type::TypeVar(other_bound_typevar),
-                    );
-                    result.intersect(db, constraints, param_spec_matches);
-                    return result;
-                }
-
-                // self: `Concatenate[<prefix_params>, P]`
+                // self: `P` or `Concatenate[<prefix_params>, P]`
                 // other: `P`
                 (
                     Some((self_prefix_params, self_bound_typevar)),
                     Some(([], other_bound_typevar)),
                 ) => {
-                    let upper = Type::Callable(CallableType::new(
-                        db,
-                        CallableSignature::single(Signature::new_generic(
-                            self.generic_context,
-                            Parameters::new(db, self_prefix_params.iter().cloned()),
-                            Type::unknown(),
-                        )),
-                        CallableTypeKind::ParamSpecValue,
-                    ));
-                    let param_spec_prefix_matches = ConstraintSet::constrain_typevar(
-                        db,
-                        constraints,
-                        self_bound_typevar,
-                        Type::Never,
-                        upper,
-                    );
-                    result.intersect(db, constraints, param_spec_prefix_matches);
+                    if !self_prefix_params.is_empty() {
+                        let upper = Type::Callable(CallableType::new(
+                            db,
+                            CallableSignature::single(Signature::new_generic(
+                                self.generic_context,
+                                Parameters::new(db, self_prefix_params.iter().cloned()),
+                                Type::unknown(),
+                            )),
+                            CallableTypeKind::ParamSpecValue,
+                        ));
+                        let param_spec_prefix_matches = ConstraintSet::constrain_typevar(
+                            db,
+                            constraints,
+                            self_bound_typevar,
+                            Type::Never,
+                            upper,
+                        );
+                        result.intersect(db, constraints, param_spec_prefix_matches);
+                    }
                     let param_spec_matches = ConstraintSet::constrain_typevar(
                         db,
                         constraints,
