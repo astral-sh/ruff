@@ -17,6 +17,8 @@ JSONSerializable: str | int | float | bool | None | list | tuple | JSONMapping =
 
 JSONSerializable: str | int | float | bool | None | list | tuple | JSONMapping = aaaaaaaaaaaaaaaa
 
+D: (E := 4) = (F := 5)
+
 # Regression test: Don't forget the parentheses in the annotation when breaking
 class DefaultRunner:
     task_runner_cls: TaskRunnerProtocol | typing.Callable[[], typing.Any] = DefaultTaskRunner
