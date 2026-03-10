@@ -230,14 +230,10 @@ def f(x):
 *This feature is currently only available in [preview mode](preview.md#preview).*
 
 The Ruff formatter can also format Python code blocks in Markdown files.
-In these files, Ruff will format any CommonMark [fenced code blocks][]
-with the following info strings: `python`, `py`, `python3`, `py3`, or `pyi`.
-Fenced code blocks without an info string are assumed to be Python code examples
-and will also be formatted.
-
-If a code example is recognized and treated as Python, the Ruff formatter will
-automatically skip it if the code does not parse as valid Python or if the
-reformatted code would produce an invalid Python program.
+In these files, Ruff will format any CommonMark [fenced code blocks][] with
+the following info strings: `python`, `py`, `python3`, `py3`, or `pyi`. The
+formatter will automatically skip a code block if the code does not parse as
+valid Python or if the reformatted code would produce an invalid Python program.
 
 Code blocks marked as `python`, `py`, `python3`, or `py3` will be formatted with
 the normal Python code formatting style, while any code blocks marked with
