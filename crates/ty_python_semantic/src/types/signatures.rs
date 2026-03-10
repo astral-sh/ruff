@@ -2288,13 +2288,26 @@ impl<'db> Parameters<'db> {
                 && kwargs.is_keyword_variadic()
             {
                 let has_prefix_params = !prefix_params.is_empty();
-                let prefix_params_are_positional_only =
-                    prefix_params.iter().all(Parameter::is_positional_only);
+
+                // As per the spec:
+                //
+                // > A function declared as
+                // > `def inner(a: A, b: B, *args: P.args, **kwargs: P.kwargs) -> R` has type
+                // > `Callable[Concatenate[A, B, P], R]`.
+                // >
+                // > https://typing.python.org/en/latest/spec/generics.html#id5
+                //
+                // which means that if a signature ends with the components of a `ParamSpec` type
+                // variable, then any parameters before those components must become positional-only
+                // even though the function can be called with keyword arguments like
+                // `inner(a=A(), b=B())` is a valid call for the above signature.
+                let prefix_params_are_positional =
+                    prefix_params.iter().all(Parameter::is_positional);
 
                 match (args.annotated_type(), kwargs.annotated_type()) {
                     (Type::Dynamic(_), Type::Dynamic(_)) => {
                         if has_prefix_params {
-                            if prefix_params_are_positional_only {
+                            if prefix_params_are_positional {
                                 kind = ParametersKind::Concatenate(ConcatenateTail::Gradual);
                             }
                         } else {
@@ -2311,7 +2324,7 @@ impl<'db> Parameters<'db> {
                                 .is_same_typevar_as(db, kwargs_typevar.without_paramspec_attr(db))
                             {
                                 if has_prefix_params {
-                                    if prefix_params_are_positional_only {
+                                    if prefix_params_are_positional {
                                         kind = ParametersKind::Concatenate(
                                             ConcatenateTail::ParamSpec(typevar),
                                         );
