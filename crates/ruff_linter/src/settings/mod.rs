@@ -521,9 +521,7 @@ pub const PREVIEW_DEFAULT_SELECTORS: &[RuleSelector] = &[
     RuleSelector::rule(RuleCodePrefix::PEP8Naming(codes::PEP8Naming::_999)), // N999
     RuleSelector::rule(RuleCodePrefix::Perflint(codes::Perflint::_101)), // PERF101
     RuleSelector::rule(RuleCodePrefix::Perflint(codes::Perflint::_102)), // PERF102
-    RuleSelector::rule(RuleCodePrefix::Perflint(codes::Perflint::_401)), // PERF401
     RuleSelector::rule(RuleCodePrefix::Perflint(codes::Perflint::_402)), // PERF402
-    RuleSelector::rule(RuleCodePrefix::Perflint(codes::Perflint::_403)), // PERF403
     RuleSelector::rule(RuleCodePrefix::PygrepHooks(codes::PygrepHooks::_005)), // PGH005
     RuleSelector::rule(RuleCodePrefix::Flake8Pie(codes::Flake8Pie::_790)), // PIE790
     RuleSelector::rule(RuleCodePrefix::Flake8Pie(codes::Flake8Pie::_794)), // PIE794
