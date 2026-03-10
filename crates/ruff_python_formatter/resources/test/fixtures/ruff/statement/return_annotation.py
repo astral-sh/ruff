@@ -194,6 +194,6 @@ def process_board_action(
     pass
 
 
-# Regression test: Preserve parentheses around invalid type expressions.
+# Preserve parentheses around invalid type expressions.
 async def preserve_await_return_annotation() -> (await g()):
     pass

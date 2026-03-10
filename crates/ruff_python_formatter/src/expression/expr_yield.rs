@@ -3,7 +3,6 @@ use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::{Expr, ExprYield, ExprYieldFrom};
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::expression::is_type_expression_parent;
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::{
     NeedsParentheses, OptionalParentheses, Parenthesize, is_expression_parenthesized,
@@ -43,10 +42,6 @@ impl NeedsParentheses for AnyExpressionYield<'_> {
         parent: AnyNodeRef,
         context: &PyFormatContext,
     ) -> OptionalParentheses {
-        if is_type_expression_parent(parent) {
-            return OptionalParentheses::Always;
-        }
-
         // According to https://docs.python.org/3/reference/grammar.html There are two situations
         // where we do not want to always parenthesize a yield expression:
         //  1. Right hand side of an assignment, e.g. `x = yield y`

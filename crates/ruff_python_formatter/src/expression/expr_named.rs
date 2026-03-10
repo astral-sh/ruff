@@ -3,7 +3,6 @@ use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::ExprNamed;
 
 use crate::comments::dangling_comments;
-use crate::expression::is_type_expression_parent;
 use crate::expression::parentheses::{
     NeedsParentheses, OptionalParentheses, in_parentheses_only_soft_line_break_or_space,
 };
@@ -54,8 +53,7 @@ impl NeedsParentheses for ExprNamed {
     ) -> OptionalParentheses {
         // Unlike tuples, named expression parentheses are not part of the range even when
         // mandatory. See [PEP 572](https://peps.python.org/pep-0572/) for details.
-        if is_type_expression_parent(parent)
-            || parent.is_stmt_ann_assign()
+        if parent.is_stmt_ann_assign()
             || parent.is_stmt_assign()
             || parent.is_stmt_aug_assign()
             || parent.is_stmt_assert()
@@ -67,6 +65,7 @@ impl NeedsParentheses for ExprNamed {
             || parent.is_expr_await()
             || parent.is_stmt_delete()
             || parent.is_stmt_for()
+            || parent.is_stmt_function_def()
             || parent.is_expr_lambda()
         {
             OptionalParentheses::Always

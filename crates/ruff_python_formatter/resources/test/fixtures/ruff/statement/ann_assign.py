@@ -24,11 +24,12 @@ class DefaultRunner:
     task_runner_cls: TaskRunnerProtocol | typing.Callable[[], typing.Any] = DefaultTaskRunner
 
 
-# Regression test: Preserve parentheses around invalid type expressions.
+# Preserve parentheses around invalid type expressions.
 def preserve_invalid_type_expressions_in_annotations():
     named: (value := int) = 1
     yielded_with_value: (yield 1) = 1
     yielded: (yield 1)
+    yielded_from: (yield from iter) = 1
 
 
 async def preserve_invalid_type_expressions_in_async_annotations():

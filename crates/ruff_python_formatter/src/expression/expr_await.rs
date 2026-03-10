@@ -2,7 +2,6 @@ use ruff_formatter::write;
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::ExprAwait;
 
-use crate::expression::is_type_expression_parent;
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::{
     NeedsParentheses, OptionalParentheses, Parenthesize, is_expression_parenthesized,
@@ -37,7 +36,7 @@ impl NeedsParentheses for ExprAwait {
         parent: AnyNodeRef,
         context: &PyFormatContext,
     ) -> OptionalParentheses {
-        if parent.is_expr_await() || is_type_expression_parent(parent) {
+        if parent.is_expr_await() {
             OptionalParentheses::Always
         } else if is_expression_parenthesized(
             self.value.as_ref().into(),

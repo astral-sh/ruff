@@ -1452,19 +1452,6 @@ pub(crate) const fn is_invalid_type_expression(expr: &Expr) -> bool {
     )
 }
 
-/// Returns `true` if `parent` represents a type-expression position.
-pub(crate) const fn is_type_expression_parent(parent: AnyNodeRef) -> bool {
-    matches!(
-        parent,
-        AnyNodeRef::StmtFunctionDef(_)
-            | AnyNodeRef::StmtTypeAlias(_)
-            | AnyNodeRef::Parameter(_)
-            | AnyNodeRef::TypeParamTypeVar(_)
-            | AnyNodeRef::TypeParamTypeVarTuple(_)
-            | AnyNodeRef::TypeParamParamSpec(_)
-    )
-}
-
 /// Returns the sub-expression to which the left-most character in expression belongs.
 ///
 /// For example, in the expression `a + b * c`, the left-most subexpression is `a`. But for
