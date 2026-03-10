@@ -2244,6 +2244,10 @@ impl<'db> SpecializationBuilder<'db> {
                     let result =
                         self.infer_map_impl(constraints, formal, positive, polarity, f, seen);
                     if let Err(err) = result {
+                        // TODO: `infer_map_impl` can have side effects even in the error case, so
+                        // to be fully correct here we'd need to snapshot `self.types` before each
+                        // call and roll it back if we get an error. The `Union` arm has the same
+                        // issue above.
                         first_error.get_or_insert(err);
                     } else {
                         // The recursive call to `infer_map_impl` may succeed even if the actual
