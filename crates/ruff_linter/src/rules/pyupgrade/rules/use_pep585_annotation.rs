@@ -90,7 +90,8 @@ pub(crate) fn use_pep585_annotation(checker: &Checker, expr: &Expr, replacement:
         expr.range(),
     );
     if !checker.semantic().in_complex_string_type_definition() {
-        let future_import = if is_up006_future_annotations_fix_enabled(checker.settings())
+        let future_import = if checker.target_version() < PythonVersion::PY310
+            && is_up006_future_annotations_fix_enabled(checker.settings())
             && checker.settings().future_annotations
             && !checker.semantic().future_annotations_or_stub()
         {

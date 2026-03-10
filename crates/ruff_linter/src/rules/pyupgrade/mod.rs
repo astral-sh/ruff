@@ -178,6 +178,26 @@ mod tests {
         Ok(())
     }
 
+    /// On 3.10, the `__future__` import is unnecessary from either the `future-annotations` setting
+    /// or from FA100.
+    #[test]
+    fn up006_preview_with_fa100_and_future_annotations_py39() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pyupgrade/UP006_4.py"),
+            &settings::LinterSettings {
+                preview: PreviewMode::Enabled,
+                future_annotations: true,
+                unresolved_target_version: PythonVersion::PY310.into(),
+                ..settings::LinterSettings::for_rules(vec![
+                    Rule::NonPEP585Annotation,
+                    Rule::FutureRewritableTypeAnnotation,
+                ])
+            },
+        )?;
+        assert_diagnostics!(diagnostics);
+        Ok(())
+    }
+
     #[test_case(Rule::NonPEP695GenericClass, Path::new("UP046_2.py"))]
     #[test_case(Rule::NonPEP695GenericFunction, Path::new("UP047_1.py"))]
     fn rules_not_applied_default_typevar_backported(rule_code: Rule, path: &Path) -> Result<()> {
