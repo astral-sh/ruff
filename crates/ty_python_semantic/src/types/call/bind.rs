@@ -3726,20 +3726,21 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         // Attempt to solve the specialization while preferring the declared type of non-covariant
         // type parameters from generic classes.
         //
-        // We use a forward CSA check (`return_ty ≤ tcx`) to infer what each typevar in the
-        // function's return type maps to in the type context. For example, if the return type is
-        // `list[T]` and the type context is `list[int]`, the CSA produces `T ≤ int`, from which
-        // we extract the preferred type `int`.
+        // We use a forward assignability check (`return_ty ≤ tcx`) to infer what each typevar in
+        // the function's return type maps to in the type context. (We use _constraint set_
+        // assignability so that we get a constraint set describing the typevars.) For example, if
+        // the return type is `list[T]` and the type context is `list[int]`, the check produces
+        // `T ≤ int`, from which we extract the preferred type `int`.
         //
-        // TODO: This two-phase approach (extract preferred types from TCX, then check argument
-        // compatibility) should eventually be replaced by conjoining the TCX constraint set
-        // directly with the argument constraint sets in the builder. The current solution-level
-        // filtering (variance, inferable typevars, concrete content) works around extracting
-        // solutions too early. When the builder maintains a single constraint set, the combined
-        // set `(return_ty ≤ tcx) ∧ (∧ᵢ actual_i ≤ formal_i)` would naturally resolve the tension
-        // between TCX preferences and argument constraints. If the combined set is unsatisfiable,
-        // we fall back to argument constraints alone (which the current code already does via
-        // `assignable_to_declared_type`).
+        // TODO: This two-phase approach (extract preferred types from the type context, then check
+        // argument compatibility) should eventually be replaced by conjoining the type context
+        // constraint set directly with the argument constraint sets in the builder. The current
+        // solution-level filtering (variance, inferable typevars, concrete content) works around
+        // extracting solutions too early. When the builder maintains a single constraint set, the
+        // combined set `(return_ty ≤ tcx) ∧ (∧ᵢ actual_i ≤ formal_i)` will naturally resolve the
+        // tension between type context preferences and argument constraints. If the combined set
+        // is unsatisfiable, we will fall back to argument constraints alone (which the current
+        // code does via `assignable_to_declared_type`).
         let preferred_type_mappings = return_with_tcx
             .and_then(|(return_ty, tcx)| {
                 tcx.filter_union(self.db, |ty| ty.class_specialization(self.db).is_some())
