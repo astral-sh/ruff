@@ -1139,6 +1139,10 @@ impl ConstraintId {
         ConstraintAssignment::Negative(self)
     }
 
+    fn when_unconstrained(self) -> ConstraintAssignment {
+        ConstraintAssignment::Unconstrained(self)
+    }
+
     /// Defines the ordering of the variables in a constraint set BDD.
     ///
     /// If we only care about _correctness_, we can choose any ordering that we want, as long as
@@ -1253,93 +1257,7 @@ impl ConstraintId {
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
     ) -> impl Display {
-        self.display_inner(db, builder, false)
-    }
-
-    fn display_negated<'db>(
-        self,
-        db: &'db dyn Db,
-        builder: &ConstraintSetBuilder<'db>,
-    ) -> impl Display {
-        self.display_inner(db, builder, true)
-    }
-
-    fn display_inner<'db>(
-        self,
-        db: &'db dyn Db,
-        builder: &ConstraintSetBuilder<'db>,
-        negated: bool,
-    ) -> impl Display {
-        struct DisplayConstrainedTypeVar<'db> {
-            constraint: Constraint<'db>,
-            negated: bool,
-            db: &'db dyn Db,
-        }
-
-        impl Display for DisplayConstrainedTypeVar<'_> {
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                let lower = self.constraint.lower;
-                let upper = self.constraint.upper;
-                let typevar = self.constraint.typevar;
-                if lower.is_equivalent_to(self.db, upper) {
-                    // If this typevar is equivalent to another, output the constraint in a
-                    // consistent alphabetical order, regardless of the salsa ordering that we are
-                    // using the in BDD.
-                    if let Type::TypeVar(bound) = lower {
-                        let bound = bound.identity(self.db).display(self.db).to_string();
-                        let typevar = typevar.identity(self.db).display(self.db).to_string();
-                        let (smaller, larger) = if bound < typevar {
-                            (bound, typevar)
-                        } else {
-                            (typevar, bound)
-                        };
-                        return write!(
-                            f,
-                            "({} {} {})",
-                            smaller,
-                            if self.negated { "≠" } else { "=" },
-                            larger,
-                        );
-                    }
-
-                    return write!(
-                        f,
-                        "({} {} {})",
-                        typevar.identity(self.db).display(self.db),
-                        if self.negated { "≠" } else { "=" },
-                        lower.display(self.db)
-                    );
-                }
-
-                if lower.is_never() && upper.is_object() {
-                    return write!(
-                        f,
-                        "({} {} *)",
-                        typevar.identity(self.db).display(self.db),
-                        if self.negated { "≠" } else { "=" }
-                    );
-                }
-
-                if self.negated {
-                    f.write_str("¬")?;
-                }
-                f.write_str("(")?;
-                if !lower.is_never() {
-                    write!(f, "{} ≤ ", lower.display(self.db))?;
-                }
-                typevar.identity(self.db).display(self.db).fmt(f)?;
-                if !upper.is_object() {
-                    write!(f, " ≤ {}", upper.display(self.db))?;
-                }
-                f.write_str(")")
-            }
-        }
-
-        DisplayConstrainedTypeVar {
-            constraint: builder.constraint_data(self),
-            negated,
-            db,
-        }
+        self.when_true().display(db, builder)
     }
 }
 
@@ -1395,8 +1313,35 @@ impl NodeId {
         if_false: NodeId,
         source_order: usize,
     ) -> NodeId {
+        Self::with_uncertain(
+            builder,
+            constraint,
+            if_true,
+            ALWAYS_FALSE,
+            if_false,
+            source_order,
+        )
+    }
+
+    /// Creates a new TDD node with an explicit `if_uncertain` branch, ensuring that it is
+    /// quasi-reduced.
+    fn with_uncertain(
+        builder: &ConstraintSetBuilder<'_>,
+        constraint: ConstraintId,
+        if_true: NodeId,
+        if_uncertain: NodeId,
+        if_false: NodeId,
+        source_order: usize,
+    ) -> NodeId {
         debug_assert!(
             if_true
+                .root_constraint(builder)
+                .is_none_or(|root_constraint| {
+                    root_constraint.ordering() > constraint.ordering()
+                })
+        );
+        debug_assert!(
+            if_uncertain
                 .root_constraint(builder)
                 .is_none_or(|root_constraint| {
                     root_constraint.ordering() > constraint.ordering()
@@ -1409,15 +1354,17 @@ impl NodeId {
                     root_constraint.ordering() > constraint.ordering()
                 })
         );
-        if if_true == ALWAYS_FALSE && if_false == ALWAYS_FALSE {
+        if if_true == ALWAYS_FALSE && if_uncertain == ALWAYS_FALSE && if_false == ALWAYS_FALSE {
             return ALWAYS_FALSE;
         }
         let max_source_order = source_order
             .max(if_true.max_source_order(builder))
+            .max(if_uncertain.max_source_order(builder))
             .max(if_false.max_source_order(builder));
         builder.intern_interior_node(InteriorNodeData {
             constraint,
             if_true,
+            if_uncertain,
             if_false,
             source_order,
             max_source_order,
@@ -1436,15 +1383,18 @@ impl Node {
         builder.intern_interior_node(InteriorNodeData {
             constraint,
             if_true: ALWAYS_TRUE,
+            if_uncertain: ALWAYS_FALSE,
             if_false: ALWAYS_FALSE,
             source_order,
             max_source_order: source_order,
         })
     }
 
-    /// Creates a new BDD node for a positive or negative individual constraint. (For a positive
-    /// constraint, this returns the same BDD node as [`new_constraint`][Self::new_constraint]. For
-    /// a negative constraint, it returns the negation of that BDD node.)
+    /// Creates a new BDD node for a positive, negative, or unconstrained individual constraint.
+    /// (For a positive constraint, this returns the same BDD node as
+    /// [`new_constraint`][Self::new_constraint]. For a negative constraint, it returns the
+    /// negation of that BDD node. For an unconstrained constraint, the result holds regardless
+    /// of the constraint's truth value.)
     fn new_satisfied_constraint(
         builder: &ConstraintSetBuilder<'_>,
         constraint: ConstraintAssignment,
@@ -1455,6 +1405,7 @@ impl Node {
                 builder.intern_interior_node(InteriorNodeData {
                     constraint,
                     if_true: ALWAYS_TRUE,
+                    if_uncertain: ALWAYS_FALSE,
                     if_false: ALWAYS_FALSE,
                     source_order,
                     max_source_order: source_order,
@@ -1464,7 +1415,21 @@ impl Node {
                 builder.intern_interior_node(InteriorNodeData {
                     constraint,
                     if_true: ALWAYS_FALSE,
+                    if_uncertain: ALWAYS_FALSE,
                     if_false: ALWAYS_TRUE,
+                    source_order,
+                    max_source_order: source_order,
+                })
+            }
+            ConstraintAssignment::Unconstrained(constraint) => {
+                // The result holds regardless of the constraint's truth value, so only
+                // `if_uncertain` should be `ALWAYS_TRUE`. We use the factored form
+                // `n ? 0 : 1 : 0` rather than `n ? 1 : 1 : 1`.
+                builder.intern_interior_node(InteriorNodeData {
+                    constraint,
+                    if_true: ALWAYS_FALSE,
+                    if_uncertain: ALWAYS_TRUE,
+                    if_false: ALWAYS_FALSE,
                     source_order,
                     max_source_order: source_order,
                 })
@@ -1513,10 +1478,13 @@ impl NodeId {
             Node::AlwaysTrue | Node::AlwaysFalse => self,
             Node::Interior(_) => {
                 let interior = builder.interior_node_data(self);
-                NodeId::new(
+                NodeId::with_uncertain(
                     builder,
                     interior.constraint,
                     interior.if_true.with_adjusted_source_order(builder, delta),
+                    interior
+                        .if_uncertain
+                        .with_adjusted_source_order(builder, delta),
                     interior.if_false.with_adjusted_source_order(builder, delta),
                     interior.source_order + delta,
                 )
@@ -2557,6 +2525,7 @@ struct InteriorNode(NodeId);
 struct InteriorNodeData {
     constraint: ConstraintId,
     if_true: NodeId,
+    if_uncertain: NodeId,
     if_false: NodeId,
 
     /// Represents the order in which this node's constraint was added to the containing constraint
@@ -2957,17 +2926,21 @@ impl InteriorNode {
             } else {
                 let (if_true, found_in_true) =
                     self_interior.if_true.restrict_one(db, builder, assignment);
+                let (if_uncertain, found_in_uncertain) = self_interior
+                    .if_uncertain
+                    .restrict_one(db, builder, assignment);
                 let (if_false, found_in_false) =
                     self_interior.if_false.restrict_one(db, builder, assignment);
                 (
-                    NodeId::new(
+                    NodeId::with_uncertain(
                         builder,
                         self_interior.constraint,
                         if_true,
+                        if_uncertain,
                         if_false,
                         self_interior.source_order,
                     ),
-                    found_in_true || found_in_false,
+                    found_in_true || found_in_uncertain || found_in_false,
                 )
             }
         };
@@ -3628,6 +3601,7 @@ pub(crate) struct TypeVarSolution<'db> {
 pub(crate) enum ConstraintAssignment {
     Positive(ConstraintId),
     Negative(ConstraintId),
+    Unconstrained(ConstraintId),
 }
 
 impl ConstraintAssignment {
@@ -3635,6 +3609,7 @@ impl ConstraintAssignment {
         match self {
             ConstraintAssignment::Positive(constraint) => constraint,
             ConstraintAssignment::Negative(constraint) => constraint,
+            ConstraintAssignment::Unconstrained(constraint) => constraint,
         }
     }
 
@@ -3645,6 +3620,10 @@ impl ConstraintAssignment {
             }
             ConstraintAssignment::Negative(constraint) => {
                 ConstraintAssignment::Positive(constraint)
+            }
+            // "This constraint can go either way" is symmetric under negation.
+            ConstraintAssignment::Unconstrained(constraint) => {
+                ConstraintAssignment::Unconstrained(constraint)
             }
         }
     }
@@ -3706,31 +3685,99 @@ impl ConstraintAssignment {
             //     |------other-------|
             //     |---|...self...|---|
             (ConstraintAssignment::Negative(_), ConstraintAssignment::Positive(_)) => false,
+
+            // An `Unconstrained` assignment means "this constraint can go either way." It does
+            // not imply any positive or negative assignment, and no positive or negative
+            // assignment implies it. The only trivially true case is Unconstrained => Unconstrained
+            // for the same constraint.
+            (
+                ConstraintAssignment::Unconstrained(self_constraint),
+                ConstraintAssignment::Unconstrained(other_constraint),
+            ) => self_constraint == other_constraint,
+            (ConstraintAssignment::Unconstrained(_), _)
+            | (_, ConstraintAssignment::Unconstrained(_)) => false,
         }
     }
 
     fn display<'db>(self, db: &'db dyn Db, builder: &ConstraintSetBuilder<'db>) -> impl Display {
         struct DisplayConstraintAssignment<'db, 'c> {
-            constraint: ConstraintAssignment,
+            assignment: ConstraintAssignment,
             db: &'db dyn Db,
             builder: &'c ConstraintSetBuilder<'db>,
         }
 
-        impl Display for DisplayConstraintAssignment<'_, '_> {
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                match self.constraint {
-                    ConstraintAssignment::Positive(constraint) => {
-                        constraint.display(self.db, self.builder).fmt(f)
-                    }
-                    ConstraintAssignment::Negative(constraint) => {
-                        constraint.display_negated(self.db, self.builder).fmt(f)
-                    }
+        impl DisplayConstraintAssignment<'_, '_> {
+            fn equality_sign(&self) -> &'static str {
+                match self.assignment {
+                    ConstraintAssignment::Positive(_) => "=",
+                    ConstraintAssignment::Negative(_) => "≠",
+                    ConstraintAssignment::Unconstrained(_) => "=?",
+                }
+            }
+
+            fn range_prefix(&self) -> &'static str {
+                match self.assignment {
+                    ConstraintAssignment::Positive(_) => "",
+                    ConstraintAssignment::Negative(_) => "¬",
+                    ConstraintAssignment::Unconstrained(_) => "?",
                 }
             }
         }
 
+        impl Display for DisplayConstraintAssignment<'_, '_> {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                let constraint_data = self.builder.constraint_data(self.assignment.constraint());
+                let lower = constraint_data.lower;
+                let upper = constraint_data.upper;
+                let typevar = constraint_data.typevar;
+                if lower.is_equivalent_to(self.db, upper) {
+                    // If this typevar is equivalent to another, output the constraint in a
+                    // consistent alphabetical order, regardless of the salsa ordering that we are
+                    // using the in BDD.
+                    if let Type::TypeVar(bound) = lower {
+                        let bound = bound.identity(self.db).display(self.db).to_string();
+                        let typevar = typevar.identity(self.db).display(self.db).to_string();
+                        let (smaller, larger) = if bound < typevar {
+                            (bound, typevar)
+                        } else {
+                            (typevar, bound)
+                        };
+                        return write!(f, "({} {} {})", smaller, self.equality_sign(), larger);
+                    }
+
+                    return write!(
+                        f,
+                        "({} {} {})",
+                        typevar.identity(self.db).display(self.db),
+                        self.equality_sign(),
+                        lower.display(self.db)
+                    );
+                }
+
+                if lower.is_never() && upper.is_object() {
+                    return write!(
+                        f,
+                        "({} {} *)",
+                        typevar.identity(self.db).display(self.db),
+                        self.equality_sign()
+                    );
+                }
+
+                f.write_str(self.range_prefix())?;
+                f.write_str("(")?;
+                if !lower.is_never() {
+                    write!(f, "{} ≤ ", lower.display(self.db))?;
+                }
+                typevar.identity(self.db).display(self.db).fmt(f)?;
+                if !upper.is_object() {
+                    write!(f, " ≤ {}", upper.display(self.db))?;
+                }
+                f.write_str(")")
+            }
+        }
+
         DisplayConstraintAssignment {
-            constraint: self,
+            assignment: self,
             db,
             builder,
         }
@@ -4617,7 +4664,7 @@ impl PathAssignments {
             .iter()
             .filter_map(|(assignment, source_order)| match assignment {
                 ConstraintAssignment::Positive(constraint) => Some((*constraint, *source_order)),
-                ConstraintAssignment::Negative(_) => None,
+                ConstraintAssignment::Negative(_) | ConstraintAssignment::Unconstrained(_) => None,
             })
     }
 
@@ -4866,14 +4913,7 @@ impl SatisfiedClause {
         let mut constraints: Vec<_> = self
             .constraints
             .iter()
-            .map(|constraint| match constraint {
-                ConstraintAssignment::Positive(constraint) => {
-                    constraint.display(db, builder).to_string()
-                }
-                ConstraintAssignment::Negative(constraint) => {
-                    constraint.display_negated(db, builder).to_string()
-                }
-            })
+            .map(|constraint| constraint.display(db, builder).to_string())
             .collect();
         constraints.sort();
 

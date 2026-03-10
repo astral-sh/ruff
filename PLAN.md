@@ -54,7 +54,7 @@ ______________________________________________________________________
 
 ## Phase 1: Data Structure Changes
 
-### Step 1.1: Add `if_uncertain` field to `InteriorNodeData` [ ]
+### Step 1.1: Add `if_uncertain` field to `InteriorNodeData` [x]
 
 **File:** `constraints.rs`, struct `InteriorNodeData` (~line 2557)
 
@@ -74,7 +74,7 @@ struct InteriorNodeData {
 This will cause compilation errors everywhere `InteriorNodeData` is
 constructed or destructured — those are addressed in subsequent steps.
 
-### Step 1.2: Add `Unconstrained` variant to `ConstraintAssignment` [ ]
+### Step 1.2: Add `Unconstrained` variant to `ConstraintAssignment` [x]
 
 **File:** `constraints.rs`, enum `ConstraintAssignment` (~line 3628)
 
@@ -97,28 +97,23 @@ Update the existing methods on `ConstraintAssignment`:
     for all combinations involving `Unconstrained`, except
     `Unconstrained ⇒ Unconstrained` for the same constraint, which is trivially
     true.
-- `display()`: Display as e.g. `(T =? int)` or `(T ≤? int)` to indicate
-    uncertainty.
+- `display()`: All formatting logic now lives in `ConstraintAssignment::display`,
+    which uses the variant to determine equality signs (`=`/`≠`/`=?`) and
+    range prefixes (empty/`¬`/`?`). `ConstraintId::display` simply delegates
+    to `self.when_true().display()`.
 
-### Step 1.3: Update `NodeId::new` signature [ ]
+### Step 1.3: Update `NodeId::new` signature [x]
 
 **File:** `constraints.rs`, `NodeId::new` (~line 1387)
 
-Change signature to accept `if_uncertain`:
+`NodeId::new` keeps its original 5-argument signature (without
+`if_uncertain`), filling in `ALWAYS_FALSE` as a default. A new
+`NodeId::with_uncertain` method takes all 6 arguments for callers that need
+an explicit uncertain branch. Both methods share the same reduction rule,
+`max_source_order` calculation, and debug assertions (including a check on
+`if_uncertain`'s root constraint ordering).
 
-```rust
-fn new(
-    builder: &ConstraintSetBuilder<'_>,
-    constraint: ConstraintId,
-    if_true: NodeId,
-    if_uncertain: NodeId,   // NEW
-    if_false: NodeId,
-    source_order: usize,
-) -> NodeId
-```
-
-Update the reduction rule: currently we reduce to `ALWAYS_FALSE` when both
-`if_true` and `if_false` are `ALWAYS_FALSE`. Extend to require all three:
+The reduction rule requires all three edges to be `ALWAYS_FALSE`:
 
 ```rust
 if if_true == ALWAYS_FALSE && if_uncertain == ALWAYS_FALSE && if_false == ALWAYS_FALSE {
@@ -137,19 +132,7 @@ principle in `or_inner` terminal cases (Step 2.2), `new_satisfied_constraint`
 for `Unconstrained` (Step 1.4), and anywhere else a node with three identical
 edges would otherwise be constructed.
 
-Update `max_source_order` calculation to include `if_uncertain`:
-
-```rust
-let max_source_order = source_order
-    .max(if_true.max_source_order(builder))
-    .max(if_uncertain.max_source_order(builder))
-    .max(if_false.max_source_order(builder));
-```
-
-Update the debug assertions to also check `if_uncertain`'s root constraint
-ordering.
-
-### Step 1.4: Update `Node::new_constraint` and `Node::new_satisfied_constraint` [ ]
+### Step 1.4: Update `Node::new_constraint` and `Node::new_satisfied_constraint` [x]
 
 These create single-constraint BDD nodes.
 
@@ -193,7 +176,7 @@ under Duboc semantics — both evaluate to `1`. Overlap between `C`/`D` and
 `U` is harmless since everything is unioned together; the factoring is an
 efficiency concern (keeping TDDs compact), not a correctness one.)
 
-### Step 1.5: Update memoization caches [ ]
+### Step 1.5: Update memoization caches [x]
 
 The `node_cache: FxHashMap<InteriorNodeData, NodeId>` already uses
 `InteriorNodeData` as the key. Since we're adding a field to `InteriorNodeData`,
@@ -203,7 +186,7 @@ explicit change needed for interning correctness.
 No new caches are needed at this point. The existing operation caches are keyed
 on `(NodeId, NodeId, usize)` and remain valid since node IDs are unique.
 
-### Step 1.6: Fix all compilation errors from struct changes [ ]
+### Step 1.6: Fix all compilation errors from struct changes [x]
 
 Every place that constructs an `InteriorNodeData` directly (bypassing
 `NodeId::new`) must be updated to include `if_uncertain: ALWAYS_FALSE`. Search
@@ -497,25 +480,12 @@ fn when_unconstrained(self) -> ConstraintAssignment {
 }
 ```
 
-### Step 6.5: Update `with_adjusted_source_order` [ ]
+### Step 6.5: Update `with_adjusted_source_order` [x]
 
 **File:** `constraints.rs`, `NodeId::with_adjusted_source_order` (~line 1509)
 
-Recurse into `if_uncertain` as well:
-
-```rust
-Node::Interior(_) => {
-    let interior = builder.interior_node_data(self);
-    NodeId::new(
-        builder,
-        interior.constraint,
-        interior.if_true.with_adjusted_source_order(builder, delta),
-        interior.if_uncertain.with_adjusted_source_order(builder, delta),
-        interior.if_false.with_adjusted_source_order(builder, delta),
-        interior.source_order + delta,
-    )
-}
-```
+Already done as part of Phase 1: recurses into `if_uncertain` using
+`NodeId::with_uncertain`.
 
 ### Step 6.6: Update `for_each_constraint` [ ]
 
@@ -710,17 +680,15 @@ Add a third branch to the tree display. Proposed format:
 Where `├─?` is the uncertain branch (or use `┝━?`). This lets the graph
 visualization clearly show all three outgoing edges.
 
-### Step 8.4: Update `SatisfiedClause::display` and `SatisfiedClauses::display` [ ]
+### Step 8.4: Update `SatisfiedClause::display` and `SatisfiedClauses::display` [x]
 
 `satisfied_clauses` (Step 8.2) DOES produce `Unconstrained` assignments
 (unlike `for_each_path`, which expands them). `SatisfiedClause::display`
 needs to handle the new variant.
 
-The current `SatisfiedClause::display` contains duplicated logic for
-formatting constraint assignments. Simplify it to delegate to
-`ConstraintAssignment::display` (which already handles all variants
-including the new `Unconstrained` display format from Step 1.3). This
-removes the stale duplication and handles the new variant in one go.
+Already done as part of Phase 1: `SatisfiedClause::display` now delegates to
+`ConstraintAssignment::display` (which handles all variants including
+`Unconstrained`), removing the previous duplicated formatting logic.
 
 ### Step 8.5: Update `simplify_for_display` [ ]
 
