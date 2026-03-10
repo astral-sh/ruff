@@ -482,13 +482,35 @@ UP008 [*] Use `super()` instead of `super(__class__, self)`
     |
 316 |     class Inner(Base):
 317 |         def __init__(self, foo):
-318 |             super(Outer.Inner, self).__init__(foo)  # Should trigger UP008
+318 |             super(Outer.Inner, self).__init__(foo)  # UP008: matches enclosing class chain
     |                  ^^^^^^^^^^^^^^^^^^^
     |
 help: Remove `super()` parameters
 315 | 
 316 |     class Inner(Base):
 317 |         def __init__(self, foo):
-    -             super(Outer.Inner, self).__init__(foo)  # Should trigger UP008
-318 +             super().__init__(foo)  # Should trigger UP008
-319 |
+    -             super(Outer.Inner, self).__init__(foo)  # UP008: matches enclosing class chain
+318 +             super().__init__(foo)  # UP008: matches enclosing class chain
+319 | 
+320 | 
+321 | # super() first arg is an attribute that only matches on the last segment,
+
+UP008 [*] Use `super()` instead of `super(__class__, self)`
+   --> UP008.py:338:22
+    |
+336 |         class C(Base):
+337 |             def __init__(self, foo):
+338 |                 super(A.B.C, self).__init__(foo)  # UP008: matches full chain
+    |                      ^^^^^^^^^^^^^
+339 |
+340 | # Mismatched middle segment: Wrong.Inner doesn't match Outer3.Inner
+    |
+help: Remove `super()` parameters
+335 |     class B:
+336 |         class C(Base):
+337 |             def __init__(self, foo):
+    -                 super(A.B.C, self).__init__(foo)  # UP008: matches full chain
+338 +                 super().__init__(foo)  # UP008: matches full chain
+339 | 
+340 | # Mismatched middle segment: Wrong.Inner doesn't match Outer3.Inner
+341 | class Outer3:
