@@ -4,10 +4,10 @@ use ruff_text_size::Ranged;
 
 use crate::builders::parenthesize_if_expands;
 use crate::comments::{SourceComment, dangling_comments, leading_comments, trailing_comments};
+use crate::expression::has_own_parentheses;
 use crate::expression::parentheses::{
     NeedsParentheses, OptionalParentheses, Parentheses, is_expression_parenthesized,
 };
-use crate::expression::{CallChainLayout, has_own_parentheses};
 use crate::other::parameters::ParametersParentheses;
 use crate::prelude::*;
 
@@ -388,13 +388,7 @@ impl Format<PyFormatContext<'_>> for FormatBody<'_> {
         // ```
         else if matches!(body, Expr::Call(_) | Expr::Subscript(_)) {
             let unparenthesized = body.format().with_options(Parentheses::Never);
-            if CallChainLayout::from_expression(
-                body.into(),
-                comments.ranges(),
-                f.context().source(),
-            )
-            .is_fluent()
-            {
+            if matches!(needs_parentheses, OptionalParentheses::Multiline) {
                 parenthesize_if_expands(&unparenthesized).fmt(f)
             } else {
                 let unparenthesized = unparenthesized.memoized();
