@@ -1784,9 +1784,16 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         let identity = bound_typevar.identity(self.db);
         match self.types.entry(identity) {
             Entry::Occupied(mut entry) => {
+                // TODO: The spec says that when a ParamSpec is used multiple times in a signature,
+                // the type checker can solve it to a common behavioral supertype. We don't
+                // implement that yet so in case there are multiple ParamSpecs, use the
+                // specialization from the first occurrence.
+                // https://github.com/astral-sh/ty/issues/1778
+                // https://github.com/astral-sh/ruff/pull/21445#discussion_r2591510145
                 if bound_typevar.is_paramspec(self.db) {
                     return;
                 }
+
                 *entry.get_mut() = UnionType::from_two_elements(self.db, *entry.get(), ty);
             }
             Entry::Vacant(entry) => {
@@ -1806,25 +1813,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         let Some(ty) = f((identity, variance, ty)) else {
             return;
         };
-
-        match self.types.entry(identity) {
-            Entry::Occupied(mut entry) => {
-                // TODO: The spec says that when a ParamSpec is used multiple times in a signature,
-                // the type checker can solve it to a common behavioral supertype. We don't
-                // implement that yet so in case there are multiple ParamSpecs, use the
-                // specialization from the first occurrence.
-                // https://github.com/astral-sh/ty/issues/1778
-                // https://github.com/astral-sh/ruff/pull/21445#discussion_r2591510145
-                if bound_typevar.is_paramspec(self.db) {
-                    return;
-                }
-
-                *entry.get_mut() = UnionType::from_two_elements(self.db, *entry.get(), ty);
-            }
-            Entry::Vacant(entry) => {
-                entry.insert(ty);
-            }
-        }
+        self.insert_type_mapping(bound_typevar, ty);
     }
 
     /// Finds all of the valid specializations of a constraint set, and adds their type mappings to
