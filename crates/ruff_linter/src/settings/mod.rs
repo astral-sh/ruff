@@ -700,7 +700,6 @@ pub const PREVIEW_DEFAULT_SELECTORS: &[RuleSelector] = &[
     RuleSelector::rule(RuleCodePrefix::Flake8Bandit(codes::Flake8Bandit::_110)), // S110
     RuleSelector::rule(RuleCodePrefix::Flake8Bandit(codes::Flake8Bandit::_112)), // S112
     RuleSelector::rule(RuleCodePrefix::Flake8Simplify(codes::Flake8Simplify::_101)), // SIM101
-    RuleSelector::rule(RuleCodePrefix::Flake8Simplify(codes::Flake8Simplify::_102)), // SIM102
     RuleSelector::rule(RuleCodePrefix::Flake8Simplify(codes::Flake8Simplify::_103)), // SIM103
     RuleSelector::rule(RuleCodePrefix::Flake8Simplify(codes::Flake8Simplify::_107)), // SIM107
     RuleSelector::rule(RuleCodePrefix::Flake8Simplify(codes::Flake8Simplify::_113)), // SIM113
