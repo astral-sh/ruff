@@ -1741,7 +1741,7 @@ field's declared type.
 ```py
 from typing_extensions import Any, Callable, dataclass_transform
 
-def field[T, R](*, converter: Callable[[T], R], default: T | None = None) -> R:
+def field[T, R](*, converter: Callable[[T], R] | None = None, default: T | None = None) -> R:
     raise NotImplementedError
 
 @dataclass_transform(field_specifiers=(field,))
@@ -1793,7 +1793,7 @@ class WrongDefault:
     # the type of the `default` parameter is just wrong, but the error message wants you to change the converter
     # function instead. And in principle, that is just as likely to be the issue. But especially since we expand
     # `T` to a `str | Literal[0]` union here, this is a bit confusing:
-    # error: [invalid-argument-type] "Argument to function `field` is incorrect: Expected `(str | Literal[0], /) -> int`, found `def str_to_int(x: str) -> int`"
+    # error: [invalid-argument-type] "Argument to function `field` is incorrect: Expected `((str | Literal[0], /) -> int) | None`, found `def str_to_int(x: str) -> int`"
     a: int = field(converter=str_to_int, default=0)
 ```
 
@@ -1900,6 +1900,21 @@ class WrongOverloadedConverterOutput:
     incorrect1: int = field(converter=validate)
     # error: [invalid-assignment] "Object of type `dataclasses.Field[str | int]` is not assignable to `str`"
     incorrect2: str = field(converter=validate)
+```
+
+When a field-specifier call contains both a default value and a converter, the default value should
+be verified against the converter's input type, not the field's declared type:
+
+```py
+@my_model
+class ConverterWithDefault:
+    correct: int = field(converter=str_to_int, default="0")
+
+    # error: [invalid-argument-type]
+    incorrect1: int = field(converter=str_to_int, default=0)
+
+    # TODO: this should be an error
+    incorrect2: int = field(default="0")
 ```
 
 We also validate writes to unions of converter fields:
