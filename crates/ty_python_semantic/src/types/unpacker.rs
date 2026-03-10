@@ -97,9 +97,11 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
 
     /// Preserve per-element precision for fixed tuple/list assignment RHSes.
     ///
-    /// When the RHS sequence is the cycle head, its normalized sequence type can collapse
-    /// element-level unions like `None | Divergent` to `Divergent`. Reusing the already-inferred
-    /// subexpression types lets unpacking converge as if each element had been queried directly.
+    /// If the RHS sequence is the cycle head, recursive normalization can flatten its
+    /// tuple/list structure to a single level. That's desirable for values like
+    /// `x = (0, x)`, but for unpacking it can collapse `(foo(), bar(), baz())` to a
+    /// tuple of recursive element types and lose per-element precision. Reusing the
+    /// already-inferred subexpression types preserves the fixed outer sequence shape.
     fn unpack_assignment_sequence_from_inference(
         &mut self,
         target: &ast::Expr,
@@ -112,17 +114,13 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                     .insert(target.into(), value_inference.expression_type(value_expr));
                 true
             }
-            ast::Expr::Starred(_) => false,
-            ast::Expr::List(target_list) => self.unpack_fixed_sequence_from_inference(
-                &target_list.elts,
-                sequence_elts(value_expr),
-                value_inference,
-            ),
-            ast::Expr::Tuple(target_tuple) => self.unpack_fixed_sequence_from_inference(
-                &target_tuple.elts,
-                sequence_elts(value_expr),
-                value_inference,
-            ),
+            ast::Expr::List(ast::ExprList { elts, .. })
+            | ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+                let Some(values) = sequence_elts(value_expr) else {
+                    return false;
+                };
+                self.unpack_fixed_sequence_from_inference(elts, values, value_inference)
+            }
             _ => false,
         }
     }
@@ -130,13 +128,9 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
     fn unpack_fixed_sequence_from_inference(
         &mut self,
         targets: &[ast::Expr],
-        values: Option<&[ast::Expr]>,
+        values: &[ast::Expr],
         value_inference: &ExpressionInference<'db>,
     ) -> bool {
-        let Some(values) = values else {
-            return false;
-        };
-
         if targets.len() != values.len()
             || targets.iter().any(ast::Expr::is_starred_expr)
             || values.iter().any(ast::Expr::is_starred_expr)
@@ -144,9 +138,11 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
             return false;
         }
 
-        // `.all()` short-circuits, so early elements may already be inserted into
-        // `self.targets` when a later element returns `false`. This is harmless:
-        // the fallback `unpack_inner` path will overwrite any partial entries.
+        // Even `a, b = 1, 2` recurses through this helper. `.all()` short-circuits,
+        // so in nested cases an earlier element may update `self.targets` before a
+        // later element falls back to the general unpacking path. That's harmless
+        // because the fallback recomputes the full unpacking and overwrites any
+        // partial entries.
         targets.iter().zip(values).all(|(target, value_expr)| {
             self.unpack_assignment_sequence_from_inference(target, value_expr, value_inference)
         })
