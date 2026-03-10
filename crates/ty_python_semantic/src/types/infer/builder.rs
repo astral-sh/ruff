@@ -6089,27 +6089,38 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     inferable,
                 );
 
-                // Use `solutions_with` to capture per-typevar variance from the raw
-                // lower/upper bounds on each BDD path.
-                let solutions = set.solutions_with(db, &constraints, |typevar, lower, upper| {
-                    // Determine variance from the constraint bounds:
-                    // - Only upper bound (lower = Never) → covariant position
-                    // - Only lower bound (upper = object) → contravariant position
-                    // - Both bounds set → invariant position
-                    let variance = if lower.is_never() {
-                        TypeVarVariance::Covariant
-                    } else if upper == Type::object() {
-                        TypeVarVariance::Contravariant
-                    } else {
-                        TypeVarVariance::Invariant
-                    };
-                    let identity = typevar.identity(db);
-                    elt_tcx_variance
-                        .entry(identity)
-                        .and_modify(|current| *current = current.join(variance))
-                        .or_insert(variance);
-                    None // Use default solution selection
-                });
+                // Use `solutions_with_inferable` to capture per-typevar variance from the raw
+                // lower/upper bounds on each BDD path. We must use the inferable-aware variant so
+                // that non-inferable typevars from outer scopes (which the assignability check
+                // constrains alongside the collection's own typevars) are excluded from cycle
+                // detection and solution extraction. Without this, a type context like
+                // `list[T@MyClass]` would create mutual constraints between `_T` (list's typevar)
+                // and `T@MyClass`, which `is_cyclic` would flag as a cycle, returning
+                // `Unsatisfiable` and losing the type context information entirely.
+                let solutions = set.solutions_with_inferable(
+                    db,
+                    &constraints,
+                    inferable,
+                    |typevar, lower, upper| {
+                        // Determine variance from the constraint bounds:
+                        // - Only upper bound (lower = Never) → covariant position
+                        // - Only lower bound (upper = object) → contravariant position
+                        // - Both bounds set → invariant position
+                        let variance = if lower.is_never() {
+                            TypeVarVariance::Covariant
+                        } else if upper == Type::object() {
+                            TypeVarVariance::Contravariant
+                        } else {
+                            TypeVarVariance::Invariant
+                        };
+                        let identity = typevar.identity(db);
+                        elt_tcx_variance
+                            .entry(identity)
+                            .and_modify(|current| *current = current.join(variance))
+                            .or_insert(variance);
+                        None // Use default solution selection
+                    },
+                );
 
                 match solutions {
                     // If the type context is not compatible with the collection type (e.g., a
