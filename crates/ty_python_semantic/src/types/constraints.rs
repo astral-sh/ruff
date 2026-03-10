@@ -17,11 +17,36 @@
 //! An individual constraint restricts the specialization of a single typevar to be within a
 //! particular lower and upper bound. (A type is within a lower and upper bound if it is a
 //! supertype of the lower bound and a subtype of the upper bound.) You can then build up more
-//! complex constraint sets using union, intersection, and negation operations. We use a [binary
-//! decision diagram][bdd] (BDD) to represent a constraint set.
+//! complex constraint sets using union, intersection, and negation operations. We use a ternary
+//! decision diagram (TDD), as described in §11.2 of [Duboc's thesis][duboc] to represent a
+//! constraint set.
 //!
-//! Note that all lower and upper bounds in a constraint must be fully static. We take the bottom
-//! and top materializations of the types to remove any gradual forms if needed.
+//! A TDD is an extension of a binary decision diagram (BDD). Each interior node has three
+//! outgoing edges instead of two:
+//!
+//! - `if_true`: taken when the constraint holds
+//! - `if_uncertain`: included regardless of the constraint's truth value
+//! - `if_false`: taken when the constraint does not hold
+//!
+//! The semantics of a TDD node are:
+//!
+//! ```text
+//! ⟦n ? C : U : D⟧ = (n ∩ ⟦C⟧) ∪ ⟦U⟧ ∪ (¬n ∩ ⟦D⟧)
+//! ```
+//!
+//! The key benefit of TDDs over BDDs is that unions are more efficient. When computing the union
+//! of two TDDs with different root constraints, the second operand is "parked" in the uncertain
+//! branch rather than duplicated into both the true and false branches. This avoids an
+//! exponential blowup in diagram size that can occur when ORing together many constraint sets
+//! (e.g., when inferring specializations for overloaded callables).
+//!
+//! When `if_uncertain` is `ALWAYS_FALSE` everywhere, the TDD degenerates to a standard BDD, and
+//! all operations have zero overhead compared to the binary case.
+//!
+//! Our TDD operations follow Duboc's algorithms (union, intersection) with one correction: the `n1
+//! > n2` case for difference uses the original Frisch formulation, since Duboc's restructuring of
+//! that case is incorrect. Negation is defined as `1 \ T` (difference from the universe), and
+//! always produces a flat TDD (all `if_uncertain` branches are `ALWAYS_FALSE`).
 //!
 //! NOTE: This module is currently in a transitional state. We've added the BDD [`ConstraintSet`]
 //! representation, and updated all of our property checks to build up a constraint set and then
@@ -64,7 +89,7 @@
 //! env TY_LOG=ty_python_semantic::types::constraints::SequentMap=trace ty check ...
 //! ```
 //!
-//! [bdd]: https://en.wikipedia.org/wiki/Binary_decision_diagram
+//! [duboc]: https://gldubc.github.io/#thesis
 
 use std::cell::{Ref, RefCell};
 use std::cmp::Ordering;
