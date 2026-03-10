@@ -2,7 +2,7 @@ use ruff_formatter::write;
 use ruff_python_ast::StmtAnnAssign;
 
 use crate::expression::is_splittable_expression;
-use crate::expression::parentheses::Parentheses;
+use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses, Parentheses};
 use crate::prelude::*;
 use crate::statement::stmt_assign::{
     AnyAssignmentOperator, AnyBeforeOperator, FormatStatementsLastExpression,
@@ -37,9 +37,16 @@ impl FormatNodeRule<StmtAnnAssign> for FormatStmtAnnAssign {
             } else {
                 // Remove unnecessary parentheses around the annotation if the parenthesize long type hints preview style is enabled.
                 // Ensure we keep the parentheses if the annotation has any comments.
-                if f.context().comments().has_leading(annotation.as_ref())
+                let preserve_parentheses = f.context().comments().has_leading(annotation.as_ref())
                     || f.context().comments().has_trailing(annotation.as_ref())
-                {
+                    || matches!(
+                        annotation
+                            .as_ref()
+                            .needs_parentheses(item.into(), f.context()),
+                        OptionalParentheses::Always
+                    );
+
+                if preserve_parentheses {
                     annotation
                         .format()
                         .with_options(Parentheses::Always)
