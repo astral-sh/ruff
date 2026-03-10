@@ -9,7 +9,7 @@ use lsp_types::{
 use ruff_diagnostics::Applicability;
 use ruff_text_size::Ranged;
 use rustc_hash::FxHashMap;
-use ty_python_semantic::types::ide_support::unused_bindings;
+use ty_python_semantic::types::ide_support::{UnusedBinding, unused_bindings};
 
 use ruff_db::diagnostic::{Annotation, Severity, SubDiagnostic};
 use ruff_db::files::{File, FileRange};
@@ -25,11 +25,13 @@ use crate::system::{AnySystemPath, file_to_url};
 use crate::{DIAGNOSTIC_NAME, Db, DiagnosticMode};
 use crate::{PositionEncoding, Session};
 
+/// Server-only LSP code for IDE dimming (not a configurable lint rule).
 const UNUSED_BINDING_CODE: &str = "unused-binding";
 
 #[derive(Debug)]
 pub(super) struct Diagnostics {
     items: Vec<ruff_db::diagnostic::Diagnostic>,
+    unused_bindings: Vec<UnusedBinding>,
     encoding: PositionEncoding,
     file_or_notebook: File,
 }
@@ -40,8 +42,9 @@ impl Diagnostics {
     /// Returns `None` if there are no diagnostics.
     pub(super) fn result_id_from_hash(
         diagnostics: &[ruff_db::diagnostic::Diagnostic],
+        unused_bindings: &[UnusedBinding],
     ) -> Option<String> {
-        if diagnostics.is_empty() {
+        if diagnostics.is_empty() && unused_bindings.is_empty() {
             return None;
         }
 
@@ -49,6 +52,7 @@ impl Diagnostics {
         let mut hasher = DefaultHasher::new();
 
         diagnostics.hash(&mut hasher);
+        unused_bindings.hash(&mut hasher);
 
         Some(format!("{:016x}", hasher.finish()))
     }
@@ -57,7 +61,7 @@ impl Diagnostics {
     ///
     /// Returns `None` if there are no diagnostics.
     pub(super) fn result_id(&self) -> Option<String> {
-        Self::result_id_from_hash(&self.items)
+        Self::result_id_from_hash(&self.items, &self.unused_bindings)
     }
 
     pub(super) fn to_lsp_diagnostics(
@@ -99,23 +103,29 @@ impl Diagnostics {
 
             LspDiagnostics::NotebookDocument(cell_diagnostics)
         } else {
-            LspDiagnostics::TextDocument(
-                self.items
-                    .iter()
-                    .filter_map(|diagnostic| {
-                        Some(
-                            to_lsp_diagnostic(
-                                db,
-                                diagnostic,
-                                self.encoding,
-                                client_capabilities,
-                                global_settings,
-                            )?
-                            .1,
-                        )
-                    })
-                    .collect(),
-            )
+            let mut diagnostics = self
+                .items
+                .iter()
+                .filter_map(|diagnostic| {
+                    Some(
+                        to_lsp_diagnostic(
+                            db,
+                            diagnostic,
+                            self.encoding,
+                            client_capabilities,
+                            global_settings,
+                        )?
+                        .1,
+                    )
+                })
+                .collect::<Vec<_>>();
+            diagnostics.extend(unused_bindings_to_lsp_diagnostics(
+                db,
+                self.file_or_notebook,
+                self.encoding,
+                &self.unused_bindings,
+            ));
+            LspDiagnostics::TextDocument(diagnostics)
         }
     }
 }
@@ -327,38 +337,46 @@ pub(super) fn compute_diagnostics(
         return None;
     };
 
-    let mut diagnostics = db.check_file(file);
-    if db.project().should_check_file(db, file) {
-        diagnostics.extend(unused_binding_diagnostics(db, file));
-    }
+    let diagnostics = db.check_file(file);
+    let unused_bindings = collect_unused_bindings(db, file);
 
     Some(Diagnostics {
         items: diagnostics,
+        unused_bindings,
         encoding,
         file_or_notebook: file,
     })
 }
 
-pub(super) fn unused_binding_diagnostics(
+pub(super) fn collect_unused_bindings(db: &ProjectDatabase, file: File) -> Vec<UnusedBinding> {
+    if db.notebook_document(file).is_some() || !db.project().should_check_file(db, file) {
+        return Vec::new();
+    }
+    unused_bindings(db, file).clone()
+}
+
+pub(super) fn unused_bindings_to_lsp_diagnostics(
     db: &ProjectDatabase,
     file: File,
-) -> Vec<ruff_db::diagnostic::Diagnostic> {
-    use ruff_db::diagnostic::{Annotation, DiagnosticId, DiagnosticTag};
-    use ruff_db::files::FileRange;
-
-    unused_bindings(db, file)
+    encoding: PositionEncoding,
+    unused_bindings: &[UnusedBinding],
+) -> Vec<Diagnostic> {
+    unused_bindings
         .iter()
-        .map(|binding| {
-            let mut diagnostic = ruff_db::diagnostic::Diagnostic::new(
-                DiagnosticId::lint(UNUSED_BINDING_CODE),
-                Severity::Hint,
-                format!("Binding `{}` is unused", binding.name),
-            );
-            diagnostic.annotate(
-                Annotation::primary(FileRange::new(file, binding.range).into())
-                    .tag(DiagnosticTag::Unnecessary),
-            );
-            diagnostic
+        .map(|binding| Diagnostic {
+            range: binding
+                .range
+                .to_lsp_range(db, file, encoding)
+                .map(|range| range.local_range())
+                .unwrap_or_default(),
+            severity: Some(DiagnosticSeverity::HINT),
+            code: Some(NumberOrString::String(UNUSED_BINDING_CODE.to_owned())),
+            code_description: None,
+            source: Some(DIAGNOSTIC_NAME.into()),
+            message: format!("Binding `{}` is unused", binding.name),
+            related_information: None,
+            tags: Some(vec![DiagnosticTag::UNNECESSARY]),
+            data: None,
         })
         .collect()
 }
@@ -393,7 +411,6 @@ pub(super) fn to_lsp_diagnostic(
     };
 
     let severity = match diagnostic.severity() {
-        Severity::Hint => DiagnosticSeverity::HINT,
         Severity::Info => DiagnosticSeverity::INFORMATION,
         Severity::Warning => DiagnosticSeverity::WARNING,
         Severity::Error | Severity::Fatal => DiagnosticSeverity::ERROR,

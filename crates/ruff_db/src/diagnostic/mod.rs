@@ -1282,7 +1282,6 @@ impl From<crate::files::FileRange> for Span {
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "lowercase"))]
 pub enum Severity {
-    Hint,
     Info,
     Warning,
     Error,
@@ -1292,7 +1291,6 @@ pub enum Severity {
 impl Severity {
     fn to_annotate(self) -> AnnotateLevel {
         match self {
-            Severity::Hint => AnnotateLevel::Info,
             Severity::Info => AnnotateLevel::Info,
             Severity::Warning => AnnotateLevel::Warning,
             Severity::Error => AnnotateLevel::Error,

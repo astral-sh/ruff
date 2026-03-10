@@ -11,14 +11,13 @@ See [the rules documentation](https://ty.dev/rules) for a list of all available 
 Valid severities are:
 
 * `ignore`: Disable the rule.
-* `hint`: Enable the rule and create a hint diagnostic.
 * `warn`: Enable the rule and create a warning diagnostic.
 * `error`: Enable the rule and create an error diagnostic.
   ty will exit with a non-zero code if any error diagnostics are emitted.
 
 **Default value**: `{...}`
 
-**Type**: `dict[RuleName | "all", "ignore" | "hint" | "warn" | "error"]`
+**Type**: `dict[RuleName | "all", "ignore" | "warn" | "error"]`
 
 **Example usage**:
 
@@ -504,7 +503,7 @@ severity levels or disable them entirely.
 
 **Default value**: `{...}`
 
-**Type**: `dict[RuleName | "all", "ignore" | "hint" | "warn" | "error"]`
+**Type**: `dict[RuleName | "all", "ignore" | "warn" | "error"]`
 
 **Example usage**:
 
