@@ -736,14 +736,29 @@ impl Workspace {
 
     /// Writes a single file to the memory file system without opening it for checking.
     ///
-    /// Used for external dependency files that should be available for module resolution
+    /// Unlike [`Self::open_file`], this does **not** register the file in the project's
+    /// open-file set, so it will not be type-checked directly.
+    /// Use this for external dependency files that should be available for module resolution
     /// but should not be type-checked themselves (e.g. files under `/packages/`).
     ///
-    /// If the file already exists, a `Changed` event is emitted (matching the
-    /// behaviour of [`Self::update_file`]). Otherwise, a `Created` event is emitted.
+    /// If the file already exists, a `Changed` event is emitted.
+    /// Otherwise, a `Created` event is emitted.
+    ///
+    /// Returns an error if the path refers to a file that is currently open
+    /// (managed via [`Self::open_file`] / [`Self::update_file`]).
+    /// Use [`Self::update_file`] to modify open files instead.
     #[wasm_bindgen(js_name = "writeFile")]
     pub fn write_file(&mut self, path: &str, contents: &str) -> Result<(), Error> {
         let path = SystemPath::absolute(path, self.db.project().root(&self.db));
+
+        if let Ok(file) = system_path_to_file(&self.db, &path) {
+            if self.db.project().open_files(&self.db).contains(&file) {
+                return Err(Error::new(&format!(
+                    "Cannot write to open file '{path}'. Use `updateFile` instead."
+                )));
+            }
+        }
+
         let already_exists = self.system.fs.exists(&path);
 
         self.system
@@ -775,10 +790,20 @@ impl Workspace {
 
     /// Removes a single file from the memory file system.
     ///
-    /// No-op if the file does not exist.
+    /// No-op if the file does not exist. Returns an error if the path refers to a
+    /// file that is currently open (managed via [`Self::open_file`]).
+    /// Use [`Self::close_file`] to remove open files.
     #[wasm_bindgen(js_name = "removeFile")]
     pub fn remove_file(&mut self, path: &str) -> Result<(), Error> {
         let path = SystemPath::absolute(path, self.db.project().root(&self.db));
+
+        if let Ok(file) = system_path_to_file(&self.db, &path) {
+            if self.db.project().open_files(&self.db).contains(&file) {
+                return Err(Error::new(&format!(
+                    "Cannot remove open file '{path}'. Use `closeFile` instead."
+                )));
+            }
+        }
 
         if self.system.fs.exists(&path) {
             self.system.fs.remove_file(&path).map_err(into_error)?;
