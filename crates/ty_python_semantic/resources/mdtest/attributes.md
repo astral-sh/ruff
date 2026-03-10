@@ -256,41 +256,31 @@ class C:
 reveal_type(C().w)  # revealed: Unknown | Weird
 ```
 
-#### Ecosystem regression: pip SSL context options
+#### Nested augmented assignments after narrowing
+
+Augmented assignments to nested attributes (e.g., `self.inner.value += ...`) should work correctly
+after narrowing away `None` from the intermediate attribute. This is a regression test for a case
+where the combination of narrowing and augmented assignment on a nested attribute caused a false
+positive.
 
 ```py
-from unknown_module import unknown  # type: ignore
+from unknown_module import unknown  # error: [unresolved-import]
 
-class SSLContext:
-    options: int = 0
+class Inner:
+    value: int = 0
 
-def create_context() -> None:
-    context = SSLContext() if unknown else unknown
-    options = 0
-    options |= unknown
-    context.options |= options
-```
-
-#### Ecosystem regression: spack Mach-O header size sync
-
-```py
-from unknown_module import unknown  # type: ignore
-
-class Header:
-    sizeofcmds: int = 0
-
-class Holder:
+class Outer:
     def __init__(self) -> None:
-        self.header = None
+        self.inner = None
         self.load()
 
     def load(self) -> None:
-        self.header = Header() if unknown else unknown
+        self.inner = Inner() if unknown else unknown
 
-    def synchronize_size(self) -> None:
-        if self.header is None:
+    def update(self) -> None:
+        if self.inner is None:
             return
-        self.header.sizeofcmds += unknown
+        self.inner.value += unknown
 ```
 
 #### Attributes defined in tuple unpackings

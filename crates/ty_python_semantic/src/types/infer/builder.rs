@@ -120,7 +120,7 @@ mod annotation_expression;
 mod binary_expressions;
 mod class;
 mod dict;
-mod r#final;
+mod final_attribute;
 mod function;
 mod imports;
 mod named_tuple;
@@ -2005,7 +2005,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             attr_ty
         };
 
-
         match object_ty {
             Type::Union(union) => {
                 let mut infer_value_ty = MultiInferenceGuard::new(infer_value_ty);
@@ -2246,13 +2245,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         // Resolve `Self` type variables to the concrete instance type.
                         let meta_attr_ty = meta_attr_ty.bind_self_typevars(db, object_ty);
 
-                        if self.invalid_assignment_to_final_attribute(
-                            target,
-                            object_ty,
-                            attribute,
-                            qualifiers,
-                            emit_diagnostics,
-                        ) {
+                        if emit_diagnostics
+                            && self.invalid_assignment_to_final_attribute(
+                                target.range(),
+                                object_ty,
+                                Some(target),
+                                attribute,
+                                qualifiers,
+                            )
+                        {
                             return false;
                         }
 
@@ -2290,56 +2291,57 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             ensure_assignable_to(self, value_ty, write_ty)
                         };
 
-                        let assignable_to_instance_attribute = if let Some(fallback_attr) =
-                            fallback_attr
-                        {
-                            let (assignable, boundness) = if let PlaceAndQualifiers {
-                                place:
-                                    Place::Defined(DefinedPlace {
-                                        ty: instance_attr_ty,
-                                        definedness: instance_attr_boundness,
-                                        ..
-                                    }),
-                                qualifiers,
-                            } = fallback_attr
-                            {
-                                // Bind `Self` via MRO matching.
-                                let instance_attr_ty =
-                                    instance_attr_ty.bind_self_typevars(db, object_ty);
-                                let write_ty = effective_write_type(instance_attr_ty);
-                                let value_ty = infer_value_ty
-                                    .infer_silent(self, TypeContext::new(Some(write_ty)));
-                                if self.invalid_assignment_to_final_attribute(
-                                    target,
-                                    object_ty,
-                                    attribute,
+                        let assignable_to_instance_attribute =
+                            if let Some(fallback_attr) = fallback_attr {
+                                let (assignable, boundness) = if let PlaceAndQualifiers {
+                                    place:
+                                        Place::Defined(DefinedPlace {
+                                            ty: instance_attr_ty,
+                                            definedness: instance_attr_boundness,
+                                            ..
+                                        }),
                                     qualifiers,
-                                    emit_diagnostics,
-                                ) {
-                                    return false;
+                                } = fallback_attr
+                                {
+                                    // Bind `Self` via MRO matching.
+                                    let instance_attr_ty =
+                                        instance_attr_ty.bind_self_typevars(db, object_ty);
+                                    let write_ty = effective_write_type(instance_attr_ty);
+                                    let value_ty = infer_value_ty
+                                        .infer_silent(self, TypeContext::new(Some(write_ty)));
+                                    if emit_diagnostics
+                                        && self.invalid_assignment_to_final_attribute(
+                                            target.range(),
+                                            object_ty,
+                                            Some(target),
+                                            attribute,
+                                            qualifiers,
+                                        )
+                                    {
+                                        return false;
+                                    }
+
+                                    (
+                                        ensure_assignable_to(self, value_ty, write_ty),
+                                        instance_attr_boundness,
+                                    )
+                                } else {
+                                    (true, Definedness::PossiblyUndefined)
+                                };
+
+                                if boundness == Definedness::PossiblyUndefined {
+                                    report_possibly_missing_attribute(
+                                        &self.context,
+                                        target,
+                                        attribute,
+                                        object_ty,
+                                    );
                                 }
 
-                                (
-                                    ensure_assignable_to(self, value_ty, write_ty),
-                                    instance_attr_boundness,
-                                )
+                                assignable
                             } else {
-                                (true, Definedness::PossiblyUndefined)
+                                true
                             };
-
-                            if boundness == Definedness::PossiblyUndefined {
-                                report_possibly_missing_attribute(
-                                    &self.context,
-                                    target,
-                                    attribute,
-                                    object_ty,
-                                );
-                            }
-
-                            assignable
-                        } else {
-                            true
-                        };
 
                         assignable_to_meta_attr && assignable_to_instance_attribute
                     }
@@ -2364,13 +2366,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             let write_ty = effective_write_type(instance_attr_ty);
                             let value_ty =
                                 infer_value_ty.infer_silent(self, TypeContext::new(Some(write_ty)));
-                            if self.invalid_assignment_to_final_attribute(
-                                target,
-                                object_ty,
-                                attribute,
-                                qualifiers,
-                                emit_diagnostics,
-                            ) {
+                            if emit_diagnostics
+                                && self.invalid_assignment_to_final_attribute(
+                                    target.range(),
+                                    object_ty,
+                                    Some(target),
+                                    attribute,
+                                    qualifiers,
+                                )
+                            {
                                 return false;
                             }
 
@@ -2440,13 +2444,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             }),
                         qualifiers,
                     } => {
-                        if self.invalid_assignment_to_final_attribute(
-                            target,
-                            object_ty,
-                            attribute,
-                            qualifiers,
-                            emit_diagnostics,
-                        ) {
+                        if emit_diagnostics
+                            && self.invalid_assignment_to_final_attribute(
+                                target.range(),
+                                object_ty,
+                                Some(target),
+                                attribute,
+                                qualifiers,
+                            )
+                        {
                             infer_value_ty(self, TypeContext::default());
                             return false;
                         }
@@ -2544,13 +2550,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         {
                             let value_ty =
                                 infer_value_ty(self, TypeContext::new(Some(class_attr_ty)));
-                            if self.invalid_assignment_to_final_attribute(
-                                target,
-                                object_ty,
-                                attribute,
-                                qualifiers,
-                                emit_diagnostics,
-                            ) {
+                            if emit_diagnostics
+                                && self.invalid_assignment_to_final_attribute(
+                                    target.range(),
+                                    object_ty,
+                                    Some(target),
+                                    attribute,
+                                    qualifiers,
+                                )
+                            {
                                 return false;
                             }
 
@@ -3883,11 +3891,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             {
                 let object_ty = self.expression_type(&attr_expr.value);
                 self.invalid_assignment_to_final_attribute(
-                    target.as_ref(),
+                    assignment.range(),
                     object_ty,
+                    Some(attr_expr),
                     attr_expr.attr.id(),
                     annotated.qualifiers,
-                    true,
                 );
             }
 
@@ -4339,6 +4347,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let object_ty = self.expression_type(&attr_expr.value);
                 self.validate_final_attribute_assignment(
                     attr_expr,
+                    assignment.range(),
                     object_ty,
                     attr_expr.attr.id(),
                     true,
