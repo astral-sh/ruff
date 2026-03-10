@@ -308,6 +308,23 @@ def positive_typevar(t: S) -> S:
     return +t
 ```
 
+Narrowing should preserve the constrained typevar identity so the narrowed value remains assignable
+to the function's return type:
+
+```py
+from typing import TypeVar
+
+class P: ...
+class Q: ...
+
+T = TypeVar("T", P, Q)
+
+def return_narrowed_typevar(x: T) -> T:
+    if isinstance(x, P):
+        return x
+    return x
+```
+
 Unary operations that are not supported by all constraints should error:
 
 ```py

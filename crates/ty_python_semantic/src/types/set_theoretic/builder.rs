@@ -1430,22 +1430,21 @@ impl<'db> InnerIntersectionBuilder<'db> {
         }
     }
 
-    /// Tries to simplify any constrained typevars in the intersection:
+    /// Tries to simplify any constrained typevars in the intersection.
     ///
-    /// - If the intersection contains a positive entry for exactly one of the constraints, we can
-    ///   remove the typevar (effectively replacing it with that one positive constraint).
+    /// We must preserve the constrained `TypeVar` itself in the result, even if only a single
+    /// compatible constraint remains, because other occurrences of the same `TypeVar` still need
+    /// to correlate with it (for example, when returning a narrowed value as `T`).
     ///
     /// - If the intersection contains negative entries for all but one of the constraints, we can
-    ///   remove the negative constraints and replace the typevar with the remaining positive
-    ///   constraint.
+    ///   add that remaining constraint as a positive entry.
     ///
     /// - If the intersection contains negative entries for all of the constraints, the overall
     ///   intersection is `Never`.
     fn simplify_constrained_typevars(&mut self, db: &'db dyn Db) {
         let mut to_add = SmallVec::<[Type<'db>; 1]>::new();
-        let mut positive_to_remove = SmallVec::<[usize; 1]>::new();
 
-        for (typevar_index, ty) in self.positive.iter().enumerate() {
+        for ty in &self.positive {
             let Type::TypeVar(bound_typevar) = ty else {
                 continue;
             };
@@ -1455,35 +1454,10 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 continue;
             };
 
-            // Determine which constraints appear as positive entries in the intersection. Note
-            // that we shouldn't have duplicate entries in the positive or negative lists, so we
-            // don't need to worry about finding any particular constraint more than once.
-            let constraints = constraints.elements(db);
-            let mut positive_constraint_count = 0;
-            for (i, positive) in self.positive.iter().enumerate() {
-                if i == typevar_index {
-                    continue;
-                }
-
-                // This linear search should be fine as long as we don't encounter typevars with
-                // thousands of constraints.
-                positive_constraint_count += constraints
-                    .iter()
-                    .filter(|c| c.is_subtype_of(db, *positive))
-                    .count();
-            }
-
-            // If precisely one constraint appears as a positive element, we can replace the
-            // typevar with that positive constraint.
-            if positive_constraint_count == 1 {
-                positive_to_remove.push(typevar_index);
-                continue;
-            }
-
             // Determine which constraints appear as negative entries in the intersection.
-            let mut to_remove = Vec::with_capacity(constraints.len());
+            let constraints = constraints.elements(db);
             let mut remaining_constraints: Vec<_> = constraints.iter().copied().map(Some).collect();
-            for (negative_index, negative) in self.negative.iter().enumerate() {
+            for negative in &self.negative {
                 // This linear search should be fine as long as we don't encounter typevars with
                 // thousands of constraints.
                 let matching_constraints = constraints
@@ -1491,7 +1465,6 @@ impl<'db> InnerIntersectionBuilder<'db> {
                     .enumerate()
                     .filter(|(_, c)| c.is_subtype_of(db, *negative));
                 for (constraint_index, _) in matching_constraints {
-                    to_remove.push(negative_index);
                     remaining_constraints[constraint_index] = None;
                 }
             }
@@ -1511,15 +1484,10 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 continue;
             }
 
-            // Only one typevar constraint remains. Remove all of the negative constraints, and
-            // replace the typevar itself with the remaining positive constraint.
+            // Only one typevar constraint remains. Adding it as a positive element lets the normal
+            // intersection simplification remove any incompatible negatives, while keeping the
+            // original typevar in the result.
             to_add.push(remaining_constraint);
-            positive_to_remove.push(typevar_index);
-        }
-
-        // We don't need to sort the positive list, since we only append to it in increasing order.
-        for index in positive_to_remove.into_iter().rev() {
-            self.positive.swap_remove_index(index);
         }
 
         for remaining_constraint in to_add {
