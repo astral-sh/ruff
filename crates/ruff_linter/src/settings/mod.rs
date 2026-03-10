@@ -579,7 +579,6 @@ pub const PREVIEW_DEFAULT_SELECTORS: &[RuleSelector] = &[
     RuleSelector::rule(RuleCodePrefix::Pylint(codes::Pylint::R0402)), // PLR0402
     RuleSelector::rule(RuleCodePrefix::Pylint(codes::Pylint::R1704)), // PLR1704
     RuleSelector::rule(RuleCodePrefix::Pylint(codes::Pylint::R1711)), // PLR1711
-    RuleSelector::rule(RuleCodePrefix::Pylint(codes::Pylint::R1714)), // PLR1714
     RuleSelector::rule(RuleCodePrefix::Pylint(codes::Pylint::R1716)), // PLR1716
     RuleSelector::rule(RuleCodePrefix::Pylint(codes::Pylint::R1722)), // PLR1722
     RuleSelector::rule(RuleCodePrefix::Pylint(codes::Pylint::R1730)), // PLR1730
@@ -705,7 +704,6 @@ pub const PREVIEW_DEFAULT_SELECTORS: &[RuleSelector] = &[
     RuleSelector::rule(RuleCodePrefix::Flake8Simplify(codes::Flake8Simplify::_103)), // SIM103
     RuleSelector::rule(RuleCodePrefix::Flake8Simplify(codes::Flake8Simplify::_107)), // SIM107
     RuleSelector::rule(RuleCodePrefix::Flake8Simplify(codes::Flake8Simplify::_113)), // SIM113
-    RuleSelector::rule(RuleCodePrefix::Flake8Simplify(codes::Flake8Simplify::_114)), // SIM114
     RuleSelector::rule(RuleCodePrefix::Flake8Simplify(codes::Flake8Simplify::_115)), // SIM115
     RuleSelector::rule(RuleCodePrefix::Flake8Simplify(codes::Flake8Simplify::_117)), // SIM117
     RuleSelector::rule(RuleCodePrefix::Flake8Simplify(codes::Flake8Simplify::_118)), // SIM118
@@ -730,7 +728,6 @@ pub const PREVIEW_DEFAULT_SELECTORS: &[RuleSelector] = &[
     RuleSelector::rule(RuleCodePrefix::Tryceratops(codes::Tryceratops::_004)), // TRY004
     RuleSelector::rule(RuleCodePrefix::Tryceratops(codes::Tryceratops::_201)), // TRY201
     RuleSelector::rule(RuleCodePrefix::Tryceratops(codes::Tryceratops::_203)), // TRY203
-    RuleSelector::rule(RuleCodePrefix::Tryceratops(codes::Tryceratops::_300)), // TRY300
     RuleSelector::rule(RuleCodePrefix::Tryceratops(codes::Tryceratops::_401)), // TRY401
     RuleSelector::rule(RuleCodePrefix::Pyupgrade(codes::Pyupgrade::_001)), // UP001
     RuleSelector::rule(RuleCodePrefix::Pyupgrade(codes::Pyupgrade::_003)), // UP003
