@@ -442,6 +442,12 @@ impl<'db, 'ctx> LintDiagnosticGuardBuilder<'db, 'ctx> {
         if ctx.is_in_multi_inference() {
             return None;
         }
+        // Nested scopes in statically unreachable branches should not produce body diagnostics.
+        if !semantic_index(ctx.db, ctx.file)
+            .is_scope_reachable(ctx.db, ctx.scope.file_scope_id(ctx.db))
+        {
+            return None;
+        }
 
         Some((severity, source))
     }
