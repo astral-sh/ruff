@@ -2360,6 +2360,10 @@ impl NodeId {
                         self.current_clause.push(interior.constraint.when_true());
                         self.visit_node(builder, interior.if_true);
                         self.current_clause.pop();
+                        self.current_clause
+                            .push(interior.constraint.when_unconstrained());
+                        self.visit_node(builder, interior.if_uncertain);
+                        self.current_clause.pop();
                         self.current_clause.push(interior.constraint.when_false());
                         self.visit_node(builder, interior.if_false);
                         self.current_clause.pop();

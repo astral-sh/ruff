@@ -585,7 +585,7 @@ ______________________________________________________________________
 
 ## Phase 8: Update Solutions, Display, and Simplification
 
-### Step 8.1: Update `InteriorNode::solutions` [ ]
+### Step 8.1: Update `InteriorNode::solutions` [x]
 
 **File:** `constraints.rs`, `InteriorNode::solutions` (~line 2884)
 
@@ -600,7 +600,7 @@ non-redundant solutions. The sequent map / path assignment deduplication
 should handle most overlap between the `if_true` paths and the positive
 expansion of `if_uncertain`, but confirm this empirically with tests.
 
-### Step 8.2: Update `satisfied_clauses` [ ]
+### Step 8.2: Update `satisfied_clauses` [x]
 
 **File:** `constraints.rs`, `NodeId::satisfied_clauses` (~line 2341)
 
@@ -648,7 +648,7 @@ Already done as part of Phase 1: `SatisfiedClause::display` now delegates to
 `ConstraintAssignment::display` (which handles all variants including
 `Unconstrained`), removing the previous duplicated formatting logic.
 
-### Step 8.5: Update `simplify_for_display` [ ]
+### Step 8.5: Update `simplify_for_display` [x]
 
 **File:** `constraints.rs`, `InteriorNode::simplify` (~line 2851)
 
@@ -658,7 +658,7 @@ uncertain branches. The simplification logic itself should work on the
 semantic content (constraint pairs), which doesn't change — but the
 substitution methods called within need to handle ternary nodes.
 
-### Step 8.6: Update `substitute_intersection` and `substitute_union` [ ]
+### Step 8.6: Update `substitute_intersection` and `substitute_union` [x]
 
 **File:** `constraints.rs`, `NodeId::substitute_intersection` (~line 2183),
 `NodeId::substitute_union` (~line 2244)
@@ -681,7 +681,7 @@ ______________________________________________________________________
 
 ## Phase 9: Update OwnedConstraintSet and Builder Load
 
-### Step 9.1: Update `OwnedConstraintSet` [ ]
+### Step 9.1: Update `OwnedConstraintSet` [x]
 
 **File:** `constraints.rs`, struct `OwnedConstraintSet` (~line 173)
 
@@ -729,7 +729,7 @@ Add a `TODO` comment in the code noting that this collapses the uncertain
 branch and that a 4-arg `ite_uncertain` could preserve TDD structure if
 `load` ever becomes performance-sensitive.
 
-### Step 9.3: Update `ConstraintSetBuilder::into_owned` [ ]
+### Step 9.3: Update `ConstraintSetBuilder::into_owned` [x]
 
 No changes needed — it extracts constraints and nodes from the storage, which
 will automatically include the new `if_uncertain` field.
@@ -738,7 +738,7 @@ ______________________________________________________________________
 
 ## Phase 10: Update `satisfied_by_all_typevars`
 
-### Step 10.1: Verify correctness [ ]
+### Step 10.1: Verify correctness [x]
 
 **File:** `constraints.rs`, `NodeId::satisfied_by_all_typevars` (~line 1730)
 
@@ -759,7 +759,7 @@ ______________________________________________________________________
 
 ## Phase 11: Backward Compatibility Verification
 
-### Step 11.1: Verify that existing BDDs (uncertain=0) produce identical results [ ]
+### Step 11.1: Verify that existing BDDs (uncertain=0) produce identical results [x]
 
 All existing code constructs BDD nodes with `if_uncertain = ALWAYS_FALSE`.
 Verify algebraically that the Duboc algorithms degenerate to the current
@@ -781,7 +781,7 @@ binary BDD algorithms when all uncertain branches are zero:
 This verification should be done analytically (confirm the math) and
 empirically (run the full test suite and confirm no changes in output).
 
-### Step 11.2: Run the full test suite [ ]
+### Step 11.2: Run the full test suite [x]
 
 ```sh
 cargo nextest run -p ty_python_semantic
