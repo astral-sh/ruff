@@ -1,5 +1,5 @@
 use ruff_python_ast as ast;
-use ruff_text_size::Ranged;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::{
     TypeQualifiers,
@@ -7,9 +7,9 @@ use crate::{
 };
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
-    pub(super) fn invalid_assignment_to_final_attribute<T: Ranged + Copy>(
+    pub(super) fn invalid_assignment_to_final_attribute(
         &self,
-        target: T,
+        diagnostic_range: TextRange,
         object_ty: Type<'db>,
         attribute: &str,
         qualifiers: TypeQualifiers,
@@ -23,7 +23,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         let emit_invalid_final = || {
             if emit_diagnostics
-                && let Some(builder) = self.context.report_lint(&INVALID_ASSIGNMENT, target)
+                && let Some(builder) = self
+                    .context
+                    .report_lint(&INVALID_ASSIGNMENT, diagnostic_range)
             {
                 builder.into_diagnostic(format_args!(
                     "Cannot assign to final attribute `{attribute}` on type `{}`",
@@ -80,8 +82,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 && symbol.is_bound()
             {
                 if emit_diagnostics
-                    && let Some(diag_builder) =
-                        self.context.report_lint(&INVALID_ASSIGNMENT, target)
+                    && let Some(diag_builder) = self
+                        .context
+                        .report_lint(&INVALID_ASSIGNMENT, diagnostic_range)
                 {
                     diag_builder.into_diagnostic(format_args!(
                         "Cannot assign to final attribute `{attribute}` in `__init__` \
@@ -162,7 +165,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 };
 
                 if !self.invalid_assignment_to_final_attribute(
-                    target,
+                    target.range(),
                     object_ty,
                     attribute,
                     meta_attr.qualifiers,
@@ -170,7 +173,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 ) && let Some(fallback_attr) = fallback_attr
                 {
                     self.invalid_assignment_to_final_attribute(
-                        target,
+                        target.range(),
                         object_ty,
                         attribute,
                         fallback_attr.qualifiers,

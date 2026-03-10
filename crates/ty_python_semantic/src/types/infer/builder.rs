@@ -115,7 +115,7 @@ use crate::{AnalysisSettings, Db, FxIndexSet, Program};
 mod annotation_expression;
 mod binary_expressions;
 mod class;
-mod r#final;
+mod final_attribute;
 mod function;
 mod imports;
 mod named_tuple;
@@ -2246,7 +2246,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         let meta_attr_ty = meta_attr_ty.bind_self_typevars(db, object_ty);
 
                         if self.invalid_assignment_to_final_attribute(
-                            target,
+                            target.range(),
                             object_ty,
                             attribute,
                             qualifiers,
@@ -2307,7 +2307,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 let value_ty = infer_value_ty
                                     .infer_silent(self, TypeContext::new(Some(instance_attr_ty)));
                                 if self.invalid_assignment_to_final_attribute(
-                                    target,
+                                    target.range(),
                                     object_ty,
                                     attribute,
                                     qualifiers,
@@ -2361,7 +2361,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             let value_ty = infer_value_ty
                                 .infer_silent(self, TypeContext::new(Some(instance_attr_ty)));
                             if self.invalid_assignment_to_final_attribute(
-                                target,
+                                target.range(),
                                 object_ty,
                                 attribute,
                                 qualifiers,
@@ -2437,7 +2437,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         qualifiers,
                     } => {
                         if self.invalid_assignment_to_final_attribute(
-                            target,
+                            target.range(),
                             object_ty,
                             attribute,
                             qualifiers,
@@ -2541,7 +2541,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             let value_ty =
                                 infer_value_ty(self, TypeContext::new(Some(class_attr_ty)));
                             if self.invalid_assignment_to_final_attribute(
-                                target,
+                                target.range(),
                                 object_ty,
                                 attribute,
                                 qualifiers,
@@ -3877,7 +3877,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             {
                 let object_ty = self.expression_type(&attr_expr.value);
                 self.invalid_assignment_to_final_attribute(
-                    target.as_ref(),
+                    target.range(),
                     object_ty,
                     attr_expr.attr.id(),
                     annotated.qualifiers,
