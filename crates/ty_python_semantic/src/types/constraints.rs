@@ -610,28 +610,17 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
 
     /// Computes solutions for each BDD path, using a caller-provided hook to select solutions.
     ///
+    /// We only consider cycles among inferable typevars. Non-inferable typevars (e.g., from outer
+    /// scopes that appear due to BDD constraint reordering) are skipped during both cycle
+    /// detection and solution extraction.
+    ///
     /// The `choose` hook is called for each typevar on each BDD path with the typevar's
     /// materialized lower and upper bounds. It returns:
     /// - `Some(ty)` to use `ty` as the solution for this typevar on this path
     /// - `None` to fall back to the default solution selection logic
     ///
     /// For multi-path BDDs, the hook is called per-path. The caller is responsible for combining
-    /// results across paths (typically via union), matching the behavior of
-    /// [`add_type_mappings_from_constraint_set`][super::generics::SpecializationBuilder::add_type_mappings_from_constraint_set].
-    ///
-    /// Returns owned solutions (not cached), since the hook makes results non-deterministic.
-    pub(crate) fn solutions_with(
-        self,
-        db: &'db dyn Db,
-        builder: &'c ConstraintSetBuilder<'db>,
-        choose: impl FnMut(BoundTypeVarInstance<'db>, Type<'db>, Type<'db>) -> Option<Type<'db>>,
-    ) -> Solutions<Vec<Solution<'db>>> {
-        self.solutions_with_impl(db, builder, None, choose)
-    }
-
-    /// Like [`solutions_with`][Self::solutions_with], but only considers cycles among inferable
-    /// typevars. Non-inferable typevars (e.g., from outer scopes that appear due to BDD
-    /// constraint reordering) are skipped during both cycle detection and solution extraction.
+    /// results across paths (typically via union).
     pub(crate) fn solutions_with_inferable(
         self,
         db: &'db dyn Db,
@@ -639,23 +628,14 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         inferable: InferableTypeVars<'_, 'db>,
         choose: impl FnMut(BoundTypeVarInstance<'db>, Type<'db>, Type<'db>) -> Option<Type<'db>>,
     ) -> Solutions<Vec<Solution<'db>>> {
-        self.solutions_with_impl(db, builder, Some(inferable), choose)
-    }
-
-    fn solutions_with_impl(
-        self,
-        db: &'db dyn Db,
-        builder: &'c ConstraintSetBuilder<'db>,
-        inferable: Option<InferableTypeVars<'_, 'db>>,
-        choose: impl FnMut(BoundTypeVarInstance<'db>, Type<'db>, Type<'db>) -> Option<Type<'db>>,
-    ) -> Solutions<Vec<Solution<'db>>> {
         self.verify_builder(builder);
 
-        if self.is_cyclic_impl(db, inferable) {
+        if self.is_cyclic_impl(db, Some(inferable)) {
             return Solutions::Unsatisfiable;
         }
 
-        self.node.solutions_with(db, builder, inferable, choose)
+        self.node
+            .solutions_with(db, builder, Some(inferable), choose)
     }
 
     #[expect(dead_code)] // Keep this around for debugging purposes
