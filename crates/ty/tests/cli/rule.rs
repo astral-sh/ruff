@@ -71,7 +71,7 @@ fn rule_unknown() {
 }
 
 /// Without a selector, we default to explaining all rules, so just assert that the command succeeds
-/// rather than snapshotting the documentation for ever rule.
+/// rather than snapshotting the documentation for every rule.
 #[test]
 fn rule_no_selector() -> anyhow::Result<()> {
     assert!(ty_cmd().args(["explain", "rule"]).status()?.success());
