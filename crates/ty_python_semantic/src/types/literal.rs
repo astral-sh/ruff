@@ -55,7 +55,7 @@ impl<'db> LiteralValueType<'db> {
         }
     }
 
-    /// Creates a literal value that may be promoted during literal promotion.
+    /// Creates a literal value that may be promoted.
     pub(crate) fn promotable(kind: impl Into<LiteralValueTypeKind<'db>>) -> LiteralValueType<'db> {
         let repr = match kind.into() {
             LiteralValueTypeKind::Int(int) => LiteralValueTypeInner::PromotableInt(int),
@@ -69,7 +69,7 @@ impl<'db> LiteralValueType<'db> {
         Self(repr)
     }
 
-    /// Creates a literal value that should not be promoted during literal promotion.
+    /// Creates a literal value that should not be promoted.
     pub(crate) fn unpromotable(
         kind: impl Into<LiteralValueTypeKind<'db>>,
     ) -> LiteralValueType<'db> {

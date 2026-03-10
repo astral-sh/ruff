@@ -532,6 +532,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
         }
         Stmt::Import(ast::StmtImport {
             names,
+            is_lazy: _,
             range: _,
             node_index: _,
         }) => {
@@ -580,6 +581,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
 
             if checker.is_rule_enabled(Rule::BannedModuleLevelImports) {
                 flake8_tidy_imports::rules::banned_module_level_imports(checker, stmt);
+            }
+            if checker.is_rule_enabled(Rule::BannedEagerImports) {
+                flake8_tidy_imports::rules::banned_eager_imports(checker, stmt);
             }
 
             for alias in names {
@@ -690,6 +694,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 names,
                 module,
                 level,
+                is_lazy: _,
                 range: _,
                 node_index: _,
             },
@@ -783,6 +788,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.is_rule_enabled(Rule::BannedModuleLevelImports) {
                 flake8_tidy_imports::rules::banned_module_level_imports(checker, stmt);
+            }
+            if checker.is_rule_enabled(Rule::BannedEagerImports) {
+                flake8_tidy_imports::rules::banned_eager_imports(checker, stmt);
             }
 
             if checker.is_rule_enabled(Rule::PytestIncorrectPytestImport) {

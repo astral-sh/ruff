@@ -8,7 +8,7 @@ use ruff_db::source::{SourceText, line_index, source_text};
 use ruff_db::system::walk_directory::WalkDirectoryBuilder;
 use ruff_db::system::{
     CaseSensitivity, DirectoryEntry, GlobError, MemoryFileSystem, Metadata, PatternError, System,
-    SystemPath, SystemPathBuf, SystemVirtualPath, WritableSystem,
+    SystemPath, SystemPathBuf, SystemVirtualPath, WhichError, WhichResult, WritableSystem,
 };
 use ruff_db::vendored::VendoredPath;
 use ruff_diagnostics::{Applicability, Edit};
@@ -1402,10 +1402,8 @@ impl System for WasmSystem {
         CaseSensitivity::CaseSensitive
     }
 
-    fn is_executable(&self, path: &SystemPath) -> bool {
-        // Since permissions of all files is 755,
-        // it follows that every file is executable.
-        self.is_file(path)
+    fn which(&self, _name: &str) -> WhichResult {
+        Err(WhichError::CannotFindBinaryPath)
     }
 
     fn current_directory(&self) -> &SystemPath {

@@ -314,6 +314,7 @@ pub enum TokenKind {
 
     // Soft keywords
     Case,
+    Lazy,
     Match,
     Type,
 
@@ -724,6 +725,7 @@ impl fmt::Display for TokenKind {
             TokenKind::Return => "`return`",
             TokenKind::Try => "`try`",
             TokenKind::While => "`while`",
+            TokenKind::Lazy => "`lazy`",
             TokenKind::Match => "`match`",
             TokenKind::Type => "`type`",
             TokenKind::Case => "`case`",

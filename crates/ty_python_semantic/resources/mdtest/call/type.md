@@ -541,7 +541,7 @@ type("Foo", Base, {})
 # error: 17 [invalid-base] "Invalid class base with type `Literal[2]`"
 type("Foo", (1, 2), {})
 
-# error: [invalid-argument-type] "Invalid argument to parameter 3 (`namespace`) of `type()`: Expected `dict[str, Any]`, found `dict[Unknown | bytes, Unknown | int]`"
+# error: [invalid-argument-type] "Invalid argument to parameter 3 (`namespace`) of `type()`: Expected `dict[str, Any]`, found `dict[bytes, int]`"
 type("Foo", (Base,), {b"attr": 1})
 ```
 

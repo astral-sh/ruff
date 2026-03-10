@@ -283,8 +283,9 @@ impl<'db> KnownInstanceType<'db> {
                     BoundTypeVarInstance::new(db, typevar, *binding_context, None),
                 ),
                 TypeMapping::ApplySpecialization(_)
+                | TypeMapping::ApplySpecializationWithMaterialization { .. }
                 | TypeMapping::UniqueSpecialization { .. }
-                | TypeMapping::PromoteLiterals(_)
+                | TypeMapping::Promote(_)
                 | TypeMapping::BindSelf(..)
                 | TypeMapping::ReplaceSelf { .. }
                 | TypeMapping::Materialize(_)

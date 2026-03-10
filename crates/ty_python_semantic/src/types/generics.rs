@@ -1830,7 +1830,7 @@ impl<'db> SpecializationBuilder<'db> {
     /// the specialization that this builder is building up.
     ///
     /// `formal` should be the top-level formal parameter type that we are inferring. This is used
-    /// by our literal promotion logic, which needs to know which typevars are affected by each
+    /// by our promotion logic, which needs to know which typevars are affected by each
     /// argument, and the variance of those typevars in the corresponding parameter.
     ///
     /// TODO: This is a stopgap! Eventually, the builder will maintain a single constraint set for
@@ -2113,16 +2113,6 @@ impl<'db> SpecializationBuilder<'db> {
                 }
             }
 
-            (Type::Intersection(formal), _) => {
-                // The actual type must be assignable to every (positive) element of the
-                // formal intersection, so we must infer type mappings for each of them. (The
-                // actual type must also be disjoint from every negative element of the
-                // intersection, but that doesn't help us infer any type mappings.)
-                for positive in formal.iter_positive(self.db) {
-                    self.infer_map_impl(constraints, positive, actual, polarity, f, seen)?;
-                }
-            }
-
             (Type::TypeVar(bound_typevar), ty) | (ty, Type::TypeVar(bound_typevar))
                 if bound_typevar.is_inferable(self.db, self.inferable) =>
             {
@@ -2220,6 +2210,58 @@ impl<'db> SpecializationBuilder<'db> {
                         });
                     }
                     _ => self.add_type_mapping(bound_typevar, ty, polarity, f),
+                }
+            }
+
+            (Type::Intersection(formal_intersection), _) => {
+                // The actual type must be assignable to every (positive) element of the
+                // formal intersection, so we must infer type mappings for each of them. (The
+                // actual type must also be disjoint from every negative element of the
+                // intersection, but that doesn't help us infer any type mappings.)
+                for positive in formal_intersection.iter_positive(self.db) {
+                    self.infer_map_impl(constraints, positive, actual, polarity, f, seen)?;
+                }
+            }
+            (_, Type::Intersection(actual_intersection)) => {
+                // Try to infer type mappings by checking against each intersection element. This
+                // is the dual of the `union_formal` arm above, and it handles cases like:
+                //
+                // ```py
+                // def f[T](t: P[T]) -> T: ...
+                //
+                // def _(x: P[str] & Q[str]):
+                //     reveal_type(f(x))  # revealed: str
+                // ```
+                //
+                // It's important that this arm comes after the `TypeVar` arm above, so that a bare
+                // typevar bound to an intersection gets the whole thing.
+                //
+                // It's sufficient for one intersection element to satisfy the constraints here.
+                // They don't all have to.
+                let mut first_error = None;
+                let mut found_matching_element = false;
+                for positive in actual_intersection.iter_positive(self.db) {
+                    let result =
+                        self.infer_map_impl(constraints, formal, positive, polarity, f, seen);
+                    if let Err(err) = result {
+                        // TODO: `infer_map_impl` can have side effects even in the error case, so
+                        // to be fully correct here we'd need to snapshot `self.types` before each
+                        // call and roll it back if we get an error. The `Union` arm has the same
+                        // issue above.
+                        first_error.get_or_insert(err);
+                    } else {
+                        // The recursive call to `infer_map_impl` may succeed even if the actual
+                        // type is not assignable to the formal element.
+                        if !positive
+                            .when_assignable_to(self.db, formal, constraints, self.inferable)
+                            .is_never_satisfied(self.db)
+                        {
+                            found_matching_element = true;
+                        }
+                    }
+                }
+                if !found_matching_element && let Some(error) = first_error {
+                    return Err(error);
                 }
             }
 

@@ -71,7 +71,7 @@ class Repository(NamedTuple):
         git_clone_command.extend(
             [
                 f"https://github.com/{self.org}/{self.repo}",
-                checkout_dir,
+                str(checkout_dir),
             ],
         )
 

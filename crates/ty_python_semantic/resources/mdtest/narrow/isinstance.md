@@ -174,6 +174,8 @@ python-version = "3.9"
 ```
 
 ```py
+from __future__ import annotations
+
 def _(x: int | str | bytes):
     # error: [unsupported-operator]
     if isinstance(x, int | str):
@@ -565,6 +567,23 @@ def _(x: object):
         x.push(42)
 ```
 
+The same applies when the contravariant type parameter appears inside `type[T]`:
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T", contravariant=True)
+
+class ContravariantType(Generic[T]):
+    def push(self, x: type[T]) -> None: ...
+
+def _(x: object):
+    if isinstance(x, ContravariantType):
+        reveal_type(x)  # revealed: ContravariantType[Never]
+        # error: [invalid-argument-type]
+        x.push(str)
+```
+
 Invariant generics are trickiest. The top materialization, conceptually the type that includes all
 instances of the generic class regardless of the type parameter, cannot be represented directly in
 the type system, so we represent it with the internal `Top[]` special form.
@@ -581,6 +600,39 @@ def _(x: object):
         reveal_type(x.get())  # revealed: object
         # error: [invalid-argument-type] "Argument to bound method `push` is incorrect: Expected `Never`, found `Literal[42]`"
         x.push(42)
+```
+
+When reading attributes from a top-materialized generic, only type parameters should be
+materialized. Unrelated gradual attribute types should be preserved.
+
+```py
+from typing import Any
+
+class InvariantWithAny[T: int]:
+    a: T
+    b: Any
+
+def _(x: object):
+    if isinstance(x, InvariantWithAny):
+        reveal_type(x)  # revealed: Top[InvariantWithAny[Unknown]]
+        reveal_type(x.a)  # revealed: object
+        reveal_type(x.b)  # revealed: Any
+```
+
+The same applies in contravariant positions: `Any` in a parameter type that isn't tied to the
+generic parameter should not be materialized.
+
+```py
+from typing import Any
+
+class ContravariantWithAny[T]:
+    def push(self, x: T, y: Any) -> None: ...
+
+def _(x: object):
+    if isinstance(x, ContravariantWithAny):
+        reveal_type(x)  # revealed: ContravariantWithAny[Never]
+        # error: [invalid-argument-type] "Argument to bound method `push` is incorrect: Expected `Never`, found `Literal[42]`"
+        x.push(42, "hello")
 ```
 
 When more complex types are involved, the `Top[]` type may get simplified away.
@@ -613,6 +665,43 @@ def _(x: type[object], y: type[object], z: type[object]):
         reveal_type(y)  # revealed: type[Contravariant[Never]]
     if issubclass(z, Invariant):
         reveal_type(z)  # revealed: type[Top[Invariant[Unknown]]]
+```
+
+## Narrowing generic defaults in Python 3.13
+
+When a type parameter has a bare `Any` default, narrowing still materializes the substituted
+typevar. The default isn't used during `isinstance` narrowing (the type parameter gets `Unknown`
+instead), so the default value is irrelevant here:
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import Any
+
+class WithAnyDefault[T = Any]:
+    y: tuple[Any, T]
+
+def _(x: object):
+    if isinstance(x, WithAnyDefault):
+        reveal_type(x.y)  # revealed: tuple[Any, object]
+```
+
+Type alias defaults substituted into type parameters still need to be materialized when narrowing:
+
+```py
+from typing import Any
+
+type A = Any
+
+class WithAliasDefault[T = A]:
+    y: tuple[A, T]
+
+def _(x: object):
+    if isinstance(x, WithAliasDefault):
+        reveal_type(x.y)  # revealed: tuple[A, object]
 ```
 
 ## Narrowing with TypedDict unions

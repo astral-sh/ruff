@@ -642,8 +642,74 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 self.evaluate_expression_node_predicate(&unary_op.operand, expression, !is_positive)
             }
             ast::Expr::BoolOp(bool_op) => self.evaluate_bool_op(bool_op, expression, is_positive),
+            ast::Expr::If(expr_if) => self.evaluate_expr_if(expr_if, expression, is_positive),
             ast::Expr::Named(expr_named) => self.evaluate_expr_named(expr_named, is_positive),
             _ => None,
+        }
+    }
+
+    fn merge_optional_constraints_and(
+        left: Option<NarrowingConstraints<'db>>,
+        right: Option<NarrowingConstraints<'db>>,
+    ) -> Option<NarrowingConstraints<'db>> {
+        match (left, right) {
+            (Some(mut left), Some(right)) => {
+                merge_constraints_and(&mut left, right);
+                Some(left)
+            }
+            (Some(left), None) => Some(left),
+            (None, Some(right)) => Some(right),
+            (None, None) => None,
+        }
+    }
+
+    fn merge_optional_constraints_or(
+        left: Option<NarrowingConstraints<'db>>,
+        right: Option<NarrowingConstraints<'db>>,
+    ) -> Option<NarrowingConstraints<'db>> {
+        match (left, right) {
+            (Some(mut left), Some(right)) => {
+                merge_constraints_or(&mut left, right);
+                Some(left)
+            }
+            _ => None,
+        }
+    }
+
+    fn evaluate_expr_if(
+        &mut self,
+        expr_if: &ast::ExprIf,
+        expression: Expression<'db>,
+        is_positive: bool,
+    ) -> Option<NarrowingConstraints<'db>> {
+        let test_truthiness = infer_expression_types(self.db, expression, TypeContext::default())
+            .expression_type(&expr_if.test)
+            .bool(self.db);
+
+        match test_truthiness {
+            Truthiness::AlwaysTrue => {
+                self.evaluate_expression_node_predicate(&expr_if.body, expression, is_positive)
+            }
+            Truthiness::AlwaysFalse => {
+                self.evaluate_expression_node_predicate(&expr_if.orelse, expression, is_positive)
+            }
+            Truthiness::Ambiguous => {
+                let body_constraints = Self::merge_optional_constraints_and(
+                    self.evaluate_expression_node_predicate(&expr_if.test, expression, true),
+                    self.evaluate_expression_node_predicate(&expr_if.body, expression, is_positive),
+                );
+                let orelse_constraints = Self::merge_optional_constraints_and(
+                    self.evaluate_expression_node_predicate(&expr_if.test, expression, false),
+                    self.evaluate_expression_node_predicate(
+                        &expr_if.orelse,
+                        expression,
+                        is_positive,
+                    ),
+                );
+
+                // `a if c else b` is equivalent to `(c and a) or (not c and b)`.
+                Self::merge_optional_constraints_or(body_constraints, orelse_constraints)
+            }
         }
     }
 
@@ -874,7 +940,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     // other string literal could compare equal to it), or it is not a string
                     // literal, in which case (given that it is single-valued), LiteralString
                     // cannot compare equal to it.
-                    Type::LiteralValue(literal) if literal.is_literal_string() => true,
+                    ty if ty.is_subtype_of(db, Type::literal_string()) => true,
                     _ => !could_compare_equal(db, lhs_ty, rhs_ty),
                 }
             }
@@ -981,7 +1047,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                         continue;
                     }
                     // Skip types that are handled specially (LiteralString, bool, enum).
-                    if element.is_literal_string()
+                    if element.is_subtype_of(self.db, Type::literal_string())
                         || element.is_bool(self.db)
                         || (element.is_enum(self.db) && !element.overrides_equality(self.db))
                     {
@@ -1024,7 +1090,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             if let Some(lhs_union) = lhs_ty.as_union() {
                 for element in lhs_union.elements(self.db) {
                     if element.is_single_valued(self.db)
-                        || element.is_literal_string()
+                        || element.is_subtype_of(self.db, Type::literal_string())
                         || element.is_bool(self.db)
                         || (element.is_enum(self.db) && !element.overrides_equality(self.db))
                     {
@@ -1059,28 +1125,6 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         is_positive: bool,
     ) -> Option<Type<'db>> {
         let op = if is_positive { op } else { op.negate() };
-
-        // `Divergent` shows up as an initial value in cycle recovery. If it appears on either side
-        // of a potentially narrowing comparison, we don't want it to turn that comparison into a
-        // no-op (e.g. because `Divergent` is not a singleton in the `IsNot` branch below), because
-        // that could result in an initial type inference result that's too wide. Then, even if the
-        // next cycle iteration resolved all the `Divergent` values and correctly narrowed the
-        // type, we'd be stuck with the too-wide answer from the first iteration, because
-        // `Type::cycle_normalized` only ever widens and never narrows from one iteration to the
-        // next (to avoid oscillations). To prevent this, we have `Divergent` "poison" any value
-        // that's compared to it, so that `Type::cycle_normalized` can see it and skip the widening
-        // union step.
-        //
-        // For an extended discussion of the case that originally encountered this problem, see the
-        // "`Divergent` in narrowing conditions doesn't run afoul of 'monotonic widening' in cycle
-        // recovery" mdtest case in `while_loop.md`. See also
-        // https://github.com/astral-sh/ruff/pull/22794#issuecomment-3852095578.
-        if lhs_ty.is_divergent() {
-            return Some(lhs_ty);
-        }
-        if rhs_ty.is_divergent() {
-            return Some(rhs_ty);
-        }
 
         match op {
             ast::CmpOp::IsNot => {
@@ -2186,6 +2230,8 @@ impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
             }
             // Boolean operations combine places from all sub-expressions
             ast::Expr::BoolOp(bool_op) => self.expr_bool_op(bool_op),
+            // Conditional expressions combine places from all branches and the test.
+            ast::Expr::If(expr_if) => self.expr_if(expr_if),
             // Named expressions narrow both the target and the value
             ast::Expr::Named(expr_named) => {
                 let mut places = self.simple_expr(&expr_named.target);
@@ -2264,6 +2310,13 @@ impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
         for value in &bool_op.values {
             places.extend(self.expression_node(value));
         }
+        places
+    }
+
+    fn expr_if(&self, expr_if: &ast::ExprIf) -> PossiblyNarrowedPlaces {
+        let mut places = self.expression_node(&expr_if.test);
+        places.extend(self.expression_node(&expr_if.body));
+        places.extend(self.expression_node(&expr_if.orelse));
         places
     }
 

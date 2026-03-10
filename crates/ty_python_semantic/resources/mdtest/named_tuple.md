@@ -246,7 +246,7 @@ Dangling calls cannot contain other dangling calls; that's an invalid type form:
 from ty_extensions import reveal_mro
 
 # error: [invalid-type-form]
-class A(NamedTuple("B", [("x", NamedTuple("C", [("x", "A" | None)]))])):
+class A(NamedTuple("B", [("x", NamedTuple("C", [("x", "A | None")]))])):
     pass
 
 # revealed: (<class 'A'>, <class 'B'>, <class 'tuple[Unknown]'>, <class 'Sequence[Unknown]'>, <class 'Reversible[Unknown]'>, <class 'Collection[Unknown]'>, <class 'Iterable[Unknown]'>, <class 'Container[Any]'>, typing.Protocol, typing.Generic, <class 'object'>)

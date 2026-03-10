@@ -1075,5 +1075,19 @@ def g[S: (bool, str)](x: S) -> S:
     return f(x)  # error: [invalid-argument-type]
 ```
 
+## Display ordering
+
+Where possible, we want the types that appear in inferred specializations to line up with the types
+that are listed in the source code. We don't want arbitarily reorder e.g. union elements as part of
+finding a solution.
+
+```py
+from typing import Any
+
+def f(l: list[tuple[Any | str, Any | str]]) -> None:
+    # revealed: dict[Any | str, Any | str]
+    reveal_type(dict(l))
+```
+
 [implies_subtype_of]: ../../type_properties/implies_subtype_of.md
 [ty#2371]: https://github.com/astral-sh/ty/issues/2371

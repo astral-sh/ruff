@@ -840,49 +840,23 @@ impl<'db> Type<'db> {
         // types from each cycle iteration to ensure that our result is monotonic, even if we
         // encounter oscillation.
         //
-        // However, there are a couple of cases where we don't want to do that, and want to use the
-        // later cycle iteration's result directly. This introduces the theoretical possibility of
-        // cycle oscillation involving such types (because we are not strictly widening the type on
-        // each iteration), but so far we have not seen an example of that.
-        match (previous, self) {
-            // Avoid unioning two generic aliases of the same class together; this union will never
-            // simplify and is likely to cause downstream problems.
-            (Type::GenericAlias(prev_alias), Type::GenericAlias(curr_alias))
-                if prev_alias.origin(db) == curr_alias.origin(db) =>
-            {
-                self
-            }
-
-            // Similarly, don't union together two function literals, since there are several parts
-            // of our type inference machinery that assume that we infer a single FunctionLiteral
-            // type for each overload of each function definition.
-            (Type::FunctionLiteral(prev_function), Type::FunctionLiteral(curr_function))
-                if prev_function.definition(db) == curr_function.definition(db) =>
-            {
-                self
-            }
-
-            _ => {
-                // Also avoid unioning in a previous type which contains a Divergent from the
-                // current cycle, if the most-recent type does not. This cannot cause an
-                // oscillation, since Divergent is only introduced at the start of fixpoint
-                // iteration.
-                let has_divergent_type_in_cycle = |ty| {
-                    any_over_type(db, ty, false, |nested_ty| {
-                        nested_ty
-                            .as_divergent()
-                            .is_some_and(|DivergentType { id }| cycle.head_ids().contains(&id))
-                    })
-                };
-                if has_divergent_type_in_cycle(previous) && !has_divergent_type_in_cycle(self) {
-                    self
-                } else {
-                    // The current type is unioned to the previous type. Unioning in the reverse order can cause the fixed-point iterations to converge slowly or even fail.
-                    // Consider the case where the order of union types is different between the previous and current cycle.
-                    // We should use the previous union type as the base and only add new element types in this cycle, if any.
-                    UnionType::from_elements_cycle_recovery(db, [previous, self])
-                }
-            }
+        // However, for the first couple iterations we are prone to get values including Divergent
+        // that will soon converge, but where unioning in the early value causes a loss of
+        // precision that we can't recover from. For example, a narrowing condition that looks like
+        // `is not Divergent` instead of `is not None` in the first iteration may cause us to lose
+        // the effect of that narrowing permanently, due to the union-previous-iteration behavior.
+        // So we avoid unioning in the first couple iterations, and just use the later iteration's
+        // result directly. We still ensure monotonicity after the first couple iterations, which
+        // still ensures convergence in cases that are prone to oscillation.
+        if cycle.iteration() <= 1 {
+            self
+        } else {
+            // The current type is unioned to the previous type. Unioning in the reverse order can
+            // cause the fixed-point iterations to converge slowly or even fail. Consider the case
+            // where the order of union types is different between the previous and current cycle.
+            // We should use the previous union type as the base and only add new element types in
+            // this cycle, if any.
+            UnionType::from_elements_cycle_recovery(db, [previous, self])
         }
         .recursive_type_normalized(db, cycle)
     }
@@ -1236,13 +1210,6 @@ impl<'db> Type<'db> {
         }
     }
 
-    pub(crate) const fn as_divergent(self) -> Option<DivergentType> {
-        match self {
-            Type::Dynamic(DynamicType::Divergent(divergent)) => Some(divergent),
-            _ => None,
-        }
-    }
-
     pub(crate) const fn as_callable(self) -> Option<CallableType<'db>> {
         match self {
             Type::Callable(callable_type) => Some(callable_type),
@@ -1435,11 +1402,6 @@ impl<'db> Type<'db> {
         }
     }
 
-    pub(crate) fn is_literal_string(&self) -> bool {
-        self.as_literal_value()
-            .is_some_and(literal::LiteralValueType::is_literal_string)
-    }
-
     pub(crate) fn is_string_literal(&self) -> bool {
         self.as_literal_value()
             .is_some_and(literal::LiteralValueType::is_string)
@@ -1471,11 +1433,11 @@ impl<'db> Type<'db> {
             union.elements(db).iter().all(|ty| {
                 ty.is_single_valued(db)
                     || ty.is_bool(db)
-                    || ty.is_literal_string()
+                    || ty.is_subtype_of(db, Type::literal_string())
                     || (ty.is_enum(db) && !ty.overrides_equality(db))
             })
         }) || ty.is_bool(db)
-            || ty.is_literal_string()
+            || ty.is_subtype_of(db, Type::literal_string())
             || (ty.is_enum(db) && !ty.overrides_equality(db))
     }
 
@@ -1485,11 +1447,11 @@ impl<'db> Type<'db> {
             union.elements(db).iter().any(|ty| {
                 ty.is_single_valued(db)
                     || ty.is_bool(db)
-                    || ty.is_literal_string()
+                    || ty.is_subtype_of(db, Type::literal_string())
                     || (ty.is_enum(db) && !ty.overrides_equality(db))
             })
         }) || ty.is_bool(db)
-            || ty.is_literal_string()
+            || ty.is_subtype_of(db, Type::literal_string())
             || (ty.is_enum(db) && !ty.overrides_equality(db))
     }
 
@@ -1694,19 +1656,18 @@ impl<'db> Type<'db> {
     /// Note that this function tries to promote literals to a more user-friendly form than their
     /// fallback instance type. For example, `def _() -> int` is promoted to `Callable[[], int]`,
     /// as opposed to `FunctionType`.
-    pub(crate) fn promote_literals(self, db: &'db dyn Db) -> Type<'db> {
+    pub(crate) fn promote(self, db: &'db dyn Db) -> Type<'db> {
         self.apply_type_mapping(
             db,
-            &TypeMapping::PromoteLiterals(PromoteLiteralsMode::On),
+            &TypeMapping::Promote(PromotionMode::On),
             TypeContext::default(),
         )
     }
 
-    /// Like [`Type::promote_literals`], but does not recurse into nested types.
-    fn promote_literals_impl(self, db: &'db dyn Db) -> Type<'db> {
+    /// Like [`Type::promote`], but does not recurse into nested types.
+    fn promote_impl(self, db: &'db dyn Db) -> Type<'db> {
         match self {
             Type::LiteralValue(literal) if literal.is_promotable() => literal.fallback_instance(db),
-            Type::ModuleLiteral(_) => KnownClass::ModuleType.to_instance(db),
             Type::FunctionLiteral(literal) => Type::Callable(literal.into_callable_type(db)),
             _ => self,
         }
@@ -2211,17 +2172,7 @@ impl<'db> Type<'db> {
             }
 
             Type::GenericAlias(alias) => {
-                let attr = Some(ClassType::from(*alias).class_member(db, name, policy));
-                match alias.specialization(db).materialization_kind(db) {
-                    None => attr,
-                    Some(materialization_kind) => attr.map(|attr| {
-                        attr.materialize(
-                            db,
-                            materialization_kind,
-                            &ApplyTypeMappingVisitor::default(),
-                        )
-                    }),
-                }
+                Some(ClassType::from(*alias).class_member(db, name, policy))
             }
 
             Type::SubclassOf(subclass_of_ty) => {
@@ -3209,6 +3160,28 @@ impl<'db> Type<'db> {
             | Type::TypeIs(..)
             | Type::TypeGuard(..)
             | Type::TypedDict(_) => {
+                // Enum members can be accessed through enum instances and other enum members,
+                // e.g. `answer.YES` or `Answer.YES.NO`.
+                let enum_class = match self {
+                    Type::LiteralValue(literal) => literal
+                        .as_enum()
+                        .map(|enum_literal| enum_literal.enum_class(db)),
+                    Type::NominalInstance(instance) => Some(instance.class_literal(db)),
+                    _ => None,
+                };
+
+                if let Some(enum_class) = enum_class
+                    && let Some(metadata) = enum_metadata(db, enum_class)
+                    && let Some(resolved_name) = metadata.resolve_member(&name)
+                {
+                    return Place::bound(Type::enum_literal(EnumLiteralType::new(
+                        db,
+                        enum_class,
+                        resolved_name.clone(),
+                    )))
+                    .into();
+                }
+
                 let fallback = self.instance_member(db, name_str);
 
                 let result = self.invoke_descriptor_protocol(
@@ -5172,19 +5145,17 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         specialization: Specialization<'db>,
     ) -> Type<'db> {
-        let new_specialization = self.apply_type_mapping(
-            db,
-            &TypeMapping::ApplySpecialization(ApplySpecialization::Specialization(specialization)),
-            TypeContext::default(),
-        );
-        match specialization.materialization_kind(db) {
-            None => new_specialization,
-            Some(materialization_kind) => new_specialization.materialize(
-                db,
+        let type_mapping = match specialization.materialization_kind(db) {
+            None => TypeMapping::ApplySpecialization(ApplySpecialization::Specialization(
+                specialization,
+            )),
+            Some(materialization_kind) => TypeMapping::ApplySpecializationWithMaterialization {
+                specialization: ApplySpecialization::Specialization(specialization),
                 materialization_kind,
-                &ApplyTypeMappingVisitor::default(),
-            ),
-        }
+            },
+        };
+
+        self.apply_type_mapping(db, &type_mapping, TypeContext::default())
     }
 
     fn apply_type_mapping<'a>(
@@ -5219,14 +5190,14 @@ impl<'db> Type<'db> {
                 match type_mapping {
                     // Promote the types within the signature before promoting the signature to its
                     // callable form.
-                    TypeMapping::PromoteLiterals(PromoteLiteralsMode::On) => {
+                    TypeMapping::Promote(PromotionMode::On) => {
                         Type::FunctionLiteral(function.apply_type_mapping_impl(
                             db,
                             type_mapping,
                             tcx,
                             visitor,
                         ))
-                        .promote_literals_impl(db)
+                        .promote_impl(db)
                     }
                     _ => Type::FunctionLiteral(function.apply_type_mapping_impl(
                         db,
@@ -5243,7 +5214,7 @@ impl<'db> Type<'db> {
                 method.self_instance(db).apply_type_mapping_impl(db, type_mapping, tcx, visitor),
             )),
 
-            Type::NominalInstance(instance) if matches!(type_mapping, TypeMapping::PromoteLiterals(PromoteLiteralsMode::On)) => {
+            Type::NominalInstance(instance) if matches!(type_mapping, TypeMapping::Promote(PromotionMode::On)) => {
                 match instance.known_class(db) {
                     Some(KnownClass::Complex) => KnownUnion::Complex.to_type(db),
                     Some(KnownClass::Float) => KnownUnion::Float.to_type(db),
@@ -5323,9 +5294,14 @@ impl<'db> Type<'db> {
                     builder =
                         builder.add_positive(positive.apply_type_mapping_impl(db, type_mapping, tcx, visitor));
                 }
-                for negative in intersection.negative(db) {
-                    builder =
-                        builder.add_negative(negative.apply_type_mapping_impl(db, &type_mapping.flip(), tcx, visitor));
+                // Promotion should remove negative contributions from intersections,
+                // so we don't preserve them here when promotion is enabled.
+                if !matches!(type_mapping, TypeMapping::Promote(PromotionMode::On)) {
+                    for negative in intersection.negative(db) {
+                        builder = builder.add_negative(
+                            negative.apply_type_mapping_impl(db, &type_mapping.flip(), tcx, visitor),
+                        );
+                    }
                 }
                 builder.build()
             }
@@ -5381,22 +5357,9 @@ impl<'db> Type<'db> {
                 }
             }
 
-            Type::ModuleLiteral(_) => match type_mapping {
-                TypeMapping::ApplySpecialization(_) |
-                TypeMapping::UniqueSpecialization { .. } |
-                TypeMapping::BindLegacyTypevars(_) |
-                TypeMapping::BindSelf(..) |
-                TypeMapping::ReplaceSelf { .. } |
-                TypeMapping::Materialize(_) |
-                TypeMapping::ReplaceParameterDefaults |
-                TypeMapping::EagerExpansion |
-                TypeMapping::RescopeReturnCallables(_) |
-                TypeMapping::PromoteLiterals(PromoteLiteralsMode::Off) => self,
-                TypeMapping::PromoteLiterals(PromoteLiteralsMode::On) => self.promote_literals_impl(db)
-            }
-
             Type::LiteralValue(_) => match type_mapping {
                 TypeMapping::ApplySpecialization(_) |
+                TypeMapping::ApplySpecializationWithMaterialization { .. } |
                 TypeMapping::UniqueSpecialization { .. } |
                 TypeMapping::BindLegacyTypevars(_) |
                 TypeMapping::BindSelf { .. } |
@@ -5405,17 +5368,18 @@ impl<'db> Type<'db> {
                 TypeMapping::ReplaceParameterDefaults |
                 TypeMapping::EagerExpansion |
                 TypeMapping::RescopeReturnCallables(_) |
-                TypeMapping::PromoteLiterals(PromoteLiteralsMode::Off) => self,
-                TypeMapping::PromoteLiterals(PromoteLiteralsMode::On) => self.promote_literals_impl(db),
+                TypeMapping::Promote(PromotionMode::Off) => self,
+                TypeMapping::Promote(PromotionMode::On) => self.promote_impl(db),
             }
 
             Type::Dynamic(_) => match type_mapping {
                 TypeMapping::ApplySpecialization(_) |
+                TypeMapping::ApplySpecializationWithMaterialization { .. } |
                 TypeMapping::UniqueSpecialization { .. } |
                 TypeMapping::BindLegacyTypevars(_) |
                 TypeMapping::BindSelf(..) |
                 TypeMapping::ReplaceSelf { .. } |
-                TypeMapping::PromoteLiterals(_) |
+                TypeMapping::Promote(_) |
                 TypeMapping::ReplaceParameterDefaults |
                 TypeMapping::EagerExpansion |
                 TypeMapping::RescopeReturnCallables(_) => self,
@@ -5429,6 +5393,7 @@ impl<'db> Type<'db> {
             | Type::AlwaysTruthy
             | Type::AlwaysFalsy
             | Type::WrapperDescriptor(_)
+            | Type::ModuleLiteral(_)
             | Type::KnownBoundMethod(
                 KnownBoundMethodType::StrStartswith(_)
                 | KnownBoundMethodType::ConstraintSetRange
@@ -5751,6 +5716,7 @@ impl<'db> Type<'db> {
             Type::KnownInstance(known_instance) => {
                 Type::string_literal(db, &known_instance.repr(db).to_string())
             }
+            ty if ty.is_subtype_of(db, Type::literal_string()) => Type::literal_string(),
             // TODO: handle more complex types
             _ => KnownClass::Str.to_instance(db),
         }
@@ -6061,16 +6027,16 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize)]
-pub enum PromoteLiteralsMode {
+pub enum PromotionMode {
     On,
     Off,
 }
 
-impl PromoteLiteralsMode {
+impl PromotionMode {
     const fn flip(self) -> Self {
         match self {
-            PromoteLiteralsMode::On => PromoteLiteralsMode::Off,
-            PromoteLiteralsMode::Off => PromoteLiteralsMode::On,
+            PromotionMode::On => PromotionMode::Off,
+            PromotionMode::Off => PromotionMode::On,
         }
     }
 }
@@ -6175,6 +6141,13 @@ impl<'db> SelfBinding<'db> {
 pub enum TypeMapping<'a, 'db> {
     /// Applies a specialization to the type
     ApplySpecialization(ApplySpecialization<'a, 'db>),
+    /// Applies a specialization and materializes only substituted typevars.
+    ///
+    /// The `materialization_kind` is flipped in contravariant positions.
+    ApplySpecializationWithMaterialization {
+        specialization: ApplySpecialization<'a, 'db>,
+        materialization_kind: MaterializationKind,
+    },
     /// Resets any specializations to contain unique synthetic type variables.
     UniqueSpecialization {
         // A list of synthetic type variables, and the types they replaced.
@@ -6182,7 +6155,7 @@ pub enum TypeMapping<'a, 'db> {
     },
     /// Replaces any literal types with their corresponding promoted type form (e.g. `Literal["string"]`
     /// to `str`, or `def _() -> int` to `Callable[[], int]`).
-    PromoteLiterals(PromoteLiteralsMode),
+    Promote(PromotionMode),
     /// Binds a legacy typevar with the generic context (class, function, type alias) that it is
     /// being used in.
     BindLegacyTypevars(BindingContext<'db>),
@@ -6211,7 +6184,8 @@ impl<'db> TypeMapping<'_, 'db> {
         context: GenericContext<'db>,
     ) -> GenericContext<'db> {
         match self {
-            TypeMapping::ApplySpecialization(specialization) => {
+            TypeMapping::ApplySpecialization(specialization)
+            | TypeMapping::ApplySpecializationWithMaterialization { specialization, .. } => {
                 // Filter out type variables that are already specialized
                 // (i.e., mapped to a non-TypeVar type)
                 GenericContext::from_typevar_instances(
@@ -6231,7 +6205,7 @@ impl<'db> TypeMapping<'_, 'db> {
                 )
             }
             TypeMapping::UniqueSpecialization { .. }
-            | TypeMapping::PromoteLiterals(_)
+            | TypeMapping::Promote(_)
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::Materialize(_)
             | TypeMapping::ReplaceParameterDefaults
@@ -6267,7 +6241,14 @@ impl<'db> TypeMapping<'_, 'db> {
             TypeMapping::Materialize(materialization_kind) => {
                 TypeMapping::Materialize(materialization_kind.flip())
             }
-            TypeMapping::PromoteLiterals(mode) => TypeMapping::PromoteLiterals(mode.flip()),
+            TypeMapping::ApplySpecializationWithMaterialization {
+                specialization,
+                materialization_kind,
+            } => TypeMapping::ApplySpecializationWithMaterialization {
+                specialization: specialization.clone(),
+                materialization_kind: materialization_kind.flip(),
+            },
+            TypeMapping::Promote(mode) => TypeMapping::Promote(mode.flip()),
             TypeMapping::ApplySpecialization(_)
             | TypeMapping::UniqueSpecialization { .. }
             | TypeMapping::BindLegacyTypevars(_)

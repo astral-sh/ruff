@@ -10,9 +10,9 @@ use crate::types::cyclic::PairVisitor;
 use crate::types::enums::is_single_member_enum;
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::{
-    CallableType, ClassBase, ClassType, CycleDetector, DynamicType, KnownClass, KnownInstanceType,
-    LiteralValueTypeKind, MemberLookupPolicy, ProtocolInstanceType, SubclassOfInner,
-    TypeVarBoundOrConstraints, UnionType,
+    CallableType, CallableTypes, ClassBase, ClassType, CycleDetector, DynamicType, KnownClass,
+    KnownInstanceType, LiteralValueTypeKind, MemberLookupPolicy, Parameters, ProtocolInstanceType,
+    Signature, SubclassOfInner, TypeVarBoundOrConstraints, UnionType,
 };
 use crate::{
     Db,
@@ -1185,19 +1185,37 @@ impl<'db> Type<'db> {
                 }),
 
             (_, Type::Callable(other_callable)) => {
-                relation_visitor.visit((self, target, relation), || {
-                    self.try_upcast_to_callable(db)
-                        .when_some_and(db, constraints, |callables| {
-                            callables.has_relation_to_impl(
+                // Special-case: upcasting a subclass-of to its `Callable` "supertype" is unsound,
+                // because we don't do Liskov checks for constructor signatures.
+                let upcasted = if let Type::SubclassOf(inner) = self {
+                    match relation {
+                        TypeRelation::Subtyping
+                        | TypeRelation::SubtypingAssuming
+                        | TypeRelation::Redundancy { .. } => {
+                            Some(CallableTypes::one(CallableType::function_like(
                                 db,
-                                other_callable,
-                                constraints,
-                                inferable,
-                                relation,
-                                relation_visitor,
-                                disjointness_visitor,
-                            )
-                        })
+                                Signature::new(Parameters::top(), inner.to_instance(db)),
+                            )))
+                        }
+                        TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability => {
+                            self.try_upcast_to_callable(db)
+                        }
+                    }
+                } else {
+                    self.try_upcast_to_callable(db)
+                };
+                relation_visitor.visit((self, target, relation), || {
+                    upcasted.when_some_and(db, constraints, |callables| {
+                        callables.has_relation_to_impl(
+                            db,
+                            other_callable,
+                            constraints,
+                            inferable,
+                            relation,
+                            relation_visitor,
+                            disjointness_visitor,
+                        )
+                    })
                 })
             }
 
