@@ -27,7 +27,7 @@ use crate::types::class::{ClassLiteral, ClassType, GenericAlias};
 use crate::types::function::{FunctionType, OverloadLiteral};
 use crate::types::generics::{GenericContext, Specialization};
 use crate::types::signatures::{
-    CallableSignature, Parameter, Parameters, ParametersKind, Signature,
+    CallableSignature, ConcatenateTail, Parameter, Parameters, ParametersKind, Signature,
 };
 use crate::types::tuple::TupleSpec;
 use crate::types::typevar::BoundTypeVarIdentity;
@@ -2100,71 +2100,121 @@ struct DisplayParameters<'a, 'db> {
 
 impl<'db> FmtDetailed<'db> for DisplayParameters<'_, 'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
+        fn display_parameters<'db>(
+            display: &DisplayParameters<'_, 'db>,
+            f: &mut TypeWriter<'_, '_, 'db>,
+            parameters: &[Parameter<'db>],
+            arg_separator: &str,
+        ) -> fmt::Result {
+            let mut star_added = false;
+            let mut needs_slash = false;
+            let mut first = true;
+
+            for parameter in parameters {
+                // Handle special separators
+                if !star_added && parameter.is_keyword_only() {
+                    if !first {
+                        f.write_str(arg_separator)?;
+                    }
+                    f.write_char('*')?;
+                    star_added = true;
+                    first = false;
+                }
+                if parameter.is_positional_only() {
+                    needs_slash = true;
+                } else if needs_slash {
+                    if !first {
+                        f.write_str(arg_separator)?;
+                    }
+                    f.write_char('/')?;
+                    needs_slash = false;
+                    first = false;
+                }
+
+                // Add comma before parameter if not first
+                if !first {
+                    f.write_str(arg_separator)?;
+                }
+
+                // Write parameter with range tracking
+                let param_name = parameter
+                    .display_name()
+                    .map(|name| name.to_string())
+                    .unwrap_or_default();
+                parameter
+                    .display_with(display.db, display.settings.singleline())
+                    .fmt_detailed(&mut f.with_detail(TypeDetail::Parameter(param_name)))?;
+
+                first = false;
+            }
+
+            if needs_slash {
+                if !first {
+                    f.write_str(arg_separator)?;
+                }
+                f.write_char('/')?;
+            }
+
+            Ok(())
+        }
+
         // For `ParamSpec` kind, the parameters still contain `*args` and `**kwargs`, but we
         // display them as `**P` instead, so avoid multiline in that case.
+        // For `Concatenate` kind, use multiline only if there are more than 1 prefix parameters.
         // For `Gradual` kind without prefix params (len <= 2), display as `...`.
-        let multiline = self.settings.multiline
-            && self.parameters.len() > 1
-            && !matches!(self.parameters.kind(), ParametersKind::ParamSpec(_))
-            && !matches!(
-                self.parameters.kind(),
-                ParametersKind::Gradual | ParametersKind::Top
-            );
+        let multiline = if self.settings.multiline {
+            match self.parameters.kind() {
+                ParametersKind::Standard => self.parameters.len() > 1,
+                ParametersKind::Gradual | ParametersKind::Top | ParametersKind::ParamSpec(_) => {
+                    false
+                }
+                ParametersKind::Concatenate(_) => {
+                    // The tail already represents 2 parameters. Additionally, there should be more
+                    // than 1 prefix parameters to use multiline, so the limit becomes 3.
+                    self.parameters.len() > 3
+                }
+            }
+        } else {
+            false
+        };
+
         // Opening parenthesis
         f.write_char('(')?;
         if multiline {
             f.write_str("\n    ")?;
         }
+
+        let arg_separator = if multiline { ",\n    " } else { ", " };
+
         match self.parameters.kind() {
-            ParametersKind::Standard | ParametersKind::Concatenate(_) => {
-                let mut star_added = false;
-                let mut needs_slash = false;
-                let mut first = true;
-                let arg_separator = if multiline { ",\n    " } else { ", " };
-
-                for parameter in self.parameters.as_slice() {
-                    // Handle special separators
-                    if !star_added && parameter.is_keyword_only() {
-                        if !first {
-                            f.write_str(arg_separator)?;
-                        }
-                        f.write_char('*')?;
-                        star_added = true;
-                        first = false;
-                    }
-                    if parameter.is_positional_only() {
-                        needs_slash = true;
-                    } else if needs_slash {
-                        if !first {
-                            f.write_str(arg_separator)?;
-                        }
-                        f.write_char('/')?;
-                        needs_slash = false;
-                        first = false;
-                    }
-
-                    // Add comma before parameter if not first
-                    if !first {
+            ParametersKind::Standard => {
+                display_parameters(self, f, self.parameters.as_slice(), arg_separator)?;
+            }
+            ParametersKind::Concatenate(concatenate_tail) => {
+                if let Some(prefix_parameters) = self
+                    .parameters
+                    .as_slice()
+                    .get(..self.parameters.len().saturating_sub(2))
+                {
+                    display_parameters(self, f, prefix_parameters, arg_separator)?;
+                    if !prefix_parameters.is_empty() {
                         f.write_str(arg_separator)?;
                     }
-
-                    // Write parameter with range tracking
-                    let param_name = parameter
-                        .display_name()
-                        .map(|name| name.to_string())
-                        .unwrap_or_default();
-                    parameter
-                        .display_with(self.db, self.settings.singleline())
-                        .fmt_detailed(&mut f.with_detail(TypeDetail::Parameter(param_name)))?;
-
-                    first = false;
-                }
-
-                if needs_slash {
-                    if !first {
-                        f.write_str(arg_separator)?;
+                    match concatenate_tail {
+                        ConcatenateTail::Gradual => f.write_str("...")?,
+                        ConcatenateTail::ParamSpec(bound_typevar) => {
+                            write!(
+                                f.with_type(Type::TypeVar(bound_typevar)),
+                                "{}",
+                                bound_typevar.identity(self.db).display(self.db)
+                            )?;
+                        }
                     }
-                    f.write_char('/')?;
+                } else {
+                    // This should never happen because `Concatenate` kind always ends with 2
+                    // parameters `*args` and `**kwargs`, but just in case, we can fallback to
+                    // displaying all parameters.
+                    display_parameters(self, f, self.parameters.as_slice(), arg_separator)?;
                 }
             }
             ParametersKind::Gradual | ParametersKind::Top => {
@@ -2184,9 +2234,11 @@ impl<'db> FmtDetailed<'db> for DisplayParameters<'_, 'db> {
                 }
             }
         }
+
         if multiline {
             f.write_char('\n')?;
         }
+
         // Closing parenthesis
         f.write_char(')')
     }
