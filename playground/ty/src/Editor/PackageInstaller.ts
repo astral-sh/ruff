@@ -128,150 +128,151 @@ export async function installPackages(
     runtimePackages: [],
   });
 
+  // Resolve all transitive dependencies (network fetch, may throw)
+  let resolved: ResolvedPackage[];
+  let warnings: string[];
   try {
-    // Resolve all transitive dependencies
-    const { packages: resolved, warnings } = await resolveAllDeps(
+    ({ packages: resolved, warnings } = await resolveAllDeps(
       packages,
       pythonVersion,
       signal,
-    );
+    ));
+  } catch (error) {
+    const result = errorResult(error, previousFiles);
+    onProgress(result);
+    return result;
+  }
+
+  if (signal?.aborted) {
+    return IDLE_STATUS;
+  }
+
+  // Remove previously written files (MemoryFS, won't throw)
+  for (const path of previousFiles) {
+    workspace.removeFile(path);
+  }
+
+  // Download and write each package
+  const allWrittenFiles: string[] = [];
+  const allExtractedFiles: Array<{ path: string; contents: string }> = [];
+  const installed: InstalledPackageInfo[] = [];
+  const total = resolved.length;
+
+  for (let i = 0; i < resolved.length; i++) {
+    const pkg = resolved[i];
 
     if (signal?.aborted) {
       return IDLE_STATUS;
     }
 
-    // Remove previously written files
-    for (const path of previousFiles) {
-      workspace.removeFile(path);
-    }
+    const progress = Math.round((i / total) * 100);
 
-    const allWrittenFiles: string[] = [];
-    const allExtractedFiles: Array<{ path: string; contents: string }> = [];
-    const installed: InstalledPackageInfo[] = [];
-    const total = resolved.length;
+    onProgress({
+      state: "installing",
+      message: `Installing ${pkg.name} ${pkg.version}...`,
+      progress,
+      installedPackages: installed,
+      writtenFiles: allWrittenFiles,
+      warnings,
+      extractedPackageFiles: allExtractedFiles,
+      runtimePackages: [],
+    });
 
-    for (let i = 0; i < resolved.length; i++) {
-      const pkg = resolved[i];
+    if (pkg.wheelUrl != null) {
+      let files: Array<{ path: string; contents: string }>;
+      try {
+        files = await downloadAndExtractWheel(pkg.wheelUrl, signal);
+      } catch (error) {
+        const result = errorResult(error, allWrittenFiles);
+        onProgress(result);
+        return result;
+      }
 
       if (signal?.aborted) {
         return IDLE_STATUS;
       }
 
-      const pct = Math.round((i / total) * 100);
-
-      onProgress({
-        state: "installing",
-        message: `Installing ${pkg.name} ${pkg.version}...`,
-        progress: pct,
-        installedPackages: installed,
-        writtenFiles: allWrittenFiles,
-        warnings,
-        extractedPackageFiles: allExtractedFiles,
-        runtimePackages: [],
-      });
-
-      if (pkg.wheelUrl != null) {
-        const files = await downloadAndExtractWheel(pkg.wheelUrl, signal);
-
-        if (signal?.aborted) {
-          return IDLE_STATUS;
+      // For stubs-only, only extract .pyi and py.typed (no .py runtime files)
+      let filteredFiles: typeof files;
+      if (pkg.kind === "stubs-only") {
+        filteredFiles = files.filter(
+          (f) => f.path.endsWith(".pyi") || f.path.endsWith("/py.typed"),
+        );
+        // Wheel had no .pyi files — downgrade to runtime-only
+        if (filteredFiles.length === 0) {
+          pkg.kind = "runtime-only";
+          pkg.stubsSource = undefined;
         }
-
-        // For stubs-only, only extract .pyi and py.typed (no .py runtime files)
-        let filteredFiles: typeof files;
-        if (pkg.kind === "stubs-only") {
-          filteredFiles = files.filter(
-            (f) => f.path.endsWith(".pyi") || f.path.endsWith("/py.typed"),
-          );
-          // Wheel had no .pyi files — downgrade to runtime-only
-          if (filteredFiles.length === 0) {
-            pkg.kind = "runtime-only";
-            pkg.stubsSource = undefined;
-          }
-        } else {
-          filteredFiles = files;
-        }
-
-        const packageFiles = filteredFiles.map(({ path, contents }) => ({
-          path: `${PACKAGES_ROOT}/${path}`,
-          contents,
-        }));
-
-        if (packageFiles.length > 0) {
-          // Always write to ty MemoryFS for type checking
-          for (const { path, contents } of packageFiles) {
-            workspace.writeFile(path, contents);
-          }
-          allWrittenFiles.push(...packageFiles.map((f) => f.path));
-
-          // Only store pure-python files for Pyodide FS (stubs don't need runtime)
-          if (pkg.kind === "pure-python") {
-            allExtractedFiles.push(...packageFiles);
-          }
-        }
+      } else {
+        filteredFiles = files;
       }
 
-      if (pkg.kind === "runtime-only") {
+      const packageFiles = filteredFiles.map(({ path, contents }) => ({
+        path: `${PACKAGES_ROOT}/${path}`,
+        contents,
+      }));
+
+      if (packageFiles.length > 0) {
+        // Always write to ty MemoryFS for type checking
+        for (const { path, contents } of packageFiles) {
+          workspace.writeFile(path, contents);
+        }
+        allWrittenFiles.push(...packageFiles.map((f) => f.path));
+
+        // Only store pure-python files for Pyodide FS (stubs don't need runtime)
+        if (pkg.kind === "pure-python") {
+          allExtractedFiles.push(...packageFiles);
+        }
+      }
+    }
+
+    if (pkg.kind === "runtime-only") {
+      warnings.push(
+        `No type stubs found for '${pkg.name}': runtime execution only`,
+      );
+    }
+
+    installed.push({
+      name: pkg.name,
+      version: pkg.stubsVersion ?? pkg.version,
+      kind: pkg.kind,
+      stubsSource: pkg.stubsSource,
+    });
+  }
+
+  // Track C extension packages for pyodide.loadPackage() at runtime,
+  // but only those actually available in Pyodide's CDN.
+  const allRuntimePackages: string[] = [];
+  const candidateRuntimePkgs = resolved.filter(
+    (pkg) => pkg.kind !== "pure-python",
+  );
+  if (candidateRuntimePkgs.length > 0) {
+    const pyodidePkgs = await fetchPyodidePackages();
+    for (const pkg of candidateRuntimePkgs) {
+      const normalized = normalizePackageName(pkg.name);
+      if (pyodidePkgs.has(normalized)) {
+        allRuntimePackages.push(normalized);
+      } else {
         warnings.push(
-          `No type stubs found for '${pkg.name}': runtime execution only`,
+          `'${pkg.name}' is not available in Pyodide: it cannot be imported at runtime`,
         );
       }
-
-      installed.push({
-        name: pkg.name,
-        version: pkg.stubsVersion ?? pkg.version,
-        kind: pkg.kind,
-        stubsSource: pkg.stubsSource,
-      });
     }
-
-    // Track C extension packages for pyodide.loadPackage() at runtime,
-    // but only those actually available in Pyodide's CDN.
-    const allRuntimePackages: string[] = [];
-    const candidateRuntimePkgs = resolved.filter(
-      (pkg) => pkg.kind !== "pure-python",
-    );
-    if (candidateRuntimePkgs.length > 0) {
-      const pyodidePkgs = await fetchPyodidePackages();
-      for (const pkg of candidateRuntimePkgs) {
-        const normalized = normalizePackageName(pkg.name);
-        if (pyodidePkgs.has(normalized)) {
-          allRuntimePackages.push(normalized);
-        } else {
-          warnings.push(
-            `'${pkg.name}' is not available in Pyodide: it cannot be imported at runtime`,
-          );
-        }
-      }
-    }
-
-    const result: InstallationStatus = {
-      state: "success",
-      message: `Installed ${installed.length} package(s)`,
-      progress: 100,
-      installedPackages: installed,
-      writtenFiles: allWrittenFiles,
-      warnings,
-      extractedPackageFiles: allExtractedFiles,
-      runtimePackages: allRuntimePackages,
-    };
-
-    onProgress(result);
-    return result;
-  } catch (error) {
-    const result: InstallationStatus = {
-      state: "error",
-      message: formatError(error),
-      progress: null,
-      installedPackages: [],
-      writtenFiles: previousFiles,
-      warnings: [],
-      extractedPackageFiles: [],
-      runtimePackages: [],
-    };
-    onProgress(result);
-    return result;
   }
+
+  const result: InstallationStatus = {
+    state: "success",
+    message: `Installed ${installed.length} package(s)`,
+    progress: 100,
+    installedPackages: installed,
+    writtenFiles: allWrittenFiles,
+    warnings,
+    extractedPackageFiles: allExtractedFiles,
+    runtimePackages: allRuntimePackages,
+  };
+
+  onProgress(result);
+  return result;
 }
 
 /**
@@ -840,6 +841,22 @@ async function resolveAllDeps(
   }
 
   return { packages: resolved, warnings };
+}
+
+function errorResult(
+  error: unknown,
+  writtenFiles: string[],
+): InstallationStatus {
+  return {
+    state: "error",
+    message: formatError(error),
+    progress: null,
+    installedPackages: [],
+    writtenFiles,
+    warnings: [],
+    extractedPackageFiles: [],
+    runtimePackages: [],
+  };
 }
 
 export function formatError(error: unknown): string {
