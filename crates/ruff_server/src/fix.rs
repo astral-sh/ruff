@@ -31,6 +31,10 @@ pub(crate) fn fix_all(
     let settings = query.settings();
     let document_path = query.virtual_file_path();
 
+    let SourceType::Python(source_type) = query.source_type() else {
+        return Ok(Fixes::default());
+    };
+
     // If the document is excluded, return an empty list of fixes.
     if is_document_excluded_for_linting(
         &document_path,
@@ -52,10 +56,6 @@ pub(crate) fn fix_all(
         .map(PackageRoot::root)
     } else {
         None
-    };
-
-    let SourceType::Python(source_type) = query.source_type() else {
-        return Ok(Fixes::default());
     };
 
     // We need to iteratively apply all safe fixes onto a single file and then
