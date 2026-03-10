@@ -259,7 +259,7 @@ reveal_type(C().w)  # revealed: Unknown | Weird
 #### Nested augmented assignments after narrowing
 
 ```py
-from unknown_module import unknown  # type: ignore
+from unknown_module import unknown  # error: [unresolved-import]
 
 class Inner:
     value: int = 0
