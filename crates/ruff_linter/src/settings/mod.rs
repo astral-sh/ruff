@@ -659,7 +659,6 @@ pub const PREVIEW_DEFAULT_SELECTORS: &[RuleSelector] = &[
     RuleSelector::rule(RuleCodePrefix::Flake8Pyi(codes::Flake8Pyi::_064)), // PYI064
     RuleSelector::rule(RuleCodePrefix::Flake8Pyi(codes::Flake8Pyi::_066)), // PYI066
     RuleSelector::rule(RuleCodePrefix::Flake8Return(codes::Flake8Return::_501)), // RET501
-    RuleSelector::rule(RuleCodePrefix::Flake8Return(codes::Flake8Return::_504)), // RET504
     RuleSelector::rule(RuleCodePrefix::Ruff(codes::Ruff::_007)), // RUF007
     RuleSelector::rule(RuleCodePrefix::Ruff(codes::Ruff::_008)), // RUF008
     RuleSelector::rule(RuleCodePrefix::Ruff(codes::Ruff::_009)), // RUF009
