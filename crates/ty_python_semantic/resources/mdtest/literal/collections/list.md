@@ -60,6 +60,16 @@ reveal_type(y)  # revealed: list[tuple[int | None, ...]]
 z: list[Sequence[int | str | None]] = [(None,), [None], (None, None)]
 reveal_type(z)  # revealed: list[Sequence[int | str | None]]
 
+xx: list[None] = reveal_type([None])  # revealed: list[None]
+reveal_type(xx)  # revealed: list[None]
+
+yy = reveal_type([None])  # revealed: list[None | Unknown]
+reveal_type(yy)  # revealed: list[None | Unknown]
+
+# Bare `list` in a type expression is equivalent to `list[Unknown]`
+zz: list = [None]
+reveal_type(zz)  # revealed: list[Unknown]
+
 # Promotion only happens if we're in invariant contexts,
 # same as with `Literal` types:
 reveal_type((1, 2, None))  # revealed: tuple[Literal[1], Literal[2], None]

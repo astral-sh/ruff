@@ -6073,7 +6073,7 @@ impl PromotionMode {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, get_size2::GetSize)]
-enum PromotionKind {
+pub enum PromotionKind {
     /// Default promotion behaviour: recurse into nested types
     Regular,
     /// Singleton promotion is shallow: it doesn't recurse
