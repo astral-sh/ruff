@@ -417,9 +417,13 @@ impl Diagnostic {
     /// This is a common pattern for Ruff diagnostics, which want to use the noqa code in general,
     /// but fall back on the `invalid-syntax` identifier for syntax errors, which don't have
     /// secondary codes.
-    pub fn secondary_code_or_id(&self) -> &str {
-        self.secondary_code()
-            .map_or_else(|| self.inner.id.as_str(), SecondaryCode::as_str)
+    pub fn secondary_code_or_id(&self, preview: bool) -> &str {
+        if preview {
+            self.name()
+        } else {
+            self.secondary_code()
+                .map_or_else(|| self.inner.id.as_str(), SecondaryCode::as_str)
+        }
     }
 
     /// Set the secondary code for this diagnostic.

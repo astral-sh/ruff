@@ -117,7 +117,7 @@ impl std::fmt::Display for DisplayDiagnostics<'_> {
                 FullRenderer::new(self.resolver, self.config).render(f, self.diagnostics)?;
             }
             DiagnosticFormat::Azure => {
-                AzureRenderer::new(self.resolver).render(f, self.diagnostics)?;
+                AzureRenderer::new(self.resolver, self.config).render(f, self.diagnostics)?;
             }
             #[cfg(feature = "serde")]
             DiagnosticFormat::Json => {
@@ -133,20 +133,20 @@ impl std::fmt::Display for DisplayDiagnostics<'_> {
                 rdjson::RdjsonRenderer::new(self.resolver).render(f, self.diagnostics)?;
             }
             DiagnosticFormat::Pylint => {
-                PylintRenderer::new(self.resolver).render(f, self.diagnostics)?;
+                PylintRenderer::new(self.resolver, self.config).render(f, self.diagnostics)?;
             }
             #[cfg(feature = "junit")]
             DiagnosticFormat::Junit => {
-                junit::JunitRenderer::new(self.resolver, self.config.program)
+                junit::JunitRenderer::new(self.resolver, self.config)
                     .render(f, self.diagnostics)?;
             }
             #[cfg(feature = "serde")]
             DiagnosticFormat::Gitlab => {
-                gitlab::GitlabRenderer::new(self.resolver).render(f, self.diagnostics)?;
+                gitlab::GitlabRenderer::new(self.resolver, self.config)
+                    .render(f, self.diagnostics)?;
             }
             DiagnosticFormat::Github => {
-                GithubRenderer::new(self.resolver, self.config.program)
-                    .render(f, self.diagnostics)?;
+                GithubRenderer::new(self.resolver, self.config).render(f, self.diagnostics)?;
             }
         }
 
@@ -237,19 +237,7 @@ impl<'a> ResolvedDiagnostic<'a> {
             })
             .collect();
 
-        let id = if config.hide_severity {
-            // Either the rule code alone (e.g. `F401`), or the lint id with a colon (e.g.
-            // `invalid-syntax:`). When Ruff gets real severities, we should put the colon back in
-            // `DisplaySet::format_annotation` for both cases, but this is a small hack to improve
-            // the formatting of syntax errors for now. This should also be kept consistent with the
-            // concise formatting.
-            diag.secondary_code().map_or_else(
-                || format!("{id}:", id = diag.inner.id),
-                |code| code.to_string(),
-            )
-        } else {
-            diag.inner.id.to_string()
-        };
+        let id = format!("{id}:", id = diag.secondary_code_or_id(config.preview));
 
         let level = if config.hide_severity {
             AnnotateLevel::None

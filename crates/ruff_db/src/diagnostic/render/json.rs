@@ -99,7 +99,7 @@ pub(super) fn diagnostic_to_json<'a>(
     // In preview, the locations and filename can be optional.
     if config.preview {
         JsonDiagnostic {
-            code: diagnostic.secondary_code_or_id(),
+            code: diagnostic.secondary_code_or_id(config.preview),
             url: diagnostic.documentation_url(),
             message: diagnostic.concise_message(),
             fix,
@@ -111,7 +111,7 @@ pub(super) fn diagnostic_to_json<'a>(
         }
     } else {
         JsonDiagnostic {
-            code: diagnostic.secondary_code_or_id(),
+            code: diagnostic.secondary_code_or_id(config.preview),
             url: diagnostic.documentation_url(),
             message: diagnostic.concise_message(),
             fix,
