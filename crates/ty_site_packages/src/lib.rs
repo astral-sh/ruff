@@ -1285,7 +1285,9 @@ fn site_packages_directories_from_sys_prefix(
             // On Debian/Ubuntu with sys.prefix=/usr, pip installs packages to
             // /usr/local/lib/pythonX.Y/dist-packages (not under sys.prefix).
             // Mirror Debian's patched site.py behavior.
-            if is_debian_system_prefix {
+            // Only check /usr/local/lib (not lib64): Debian/Ubuntu pip installs
+            // do not use /usr/local/lib64.
+            if is_debian_system_prefix && lib_dir == UnixLibDir::Lib {
                 let usr_local_path = SystemPathBuf::from("/usr/local").join(&relative_path);
                 if system.is_directory(&usr_local_path) {
                     directories.insert(usr_local_path);
@@ -1320,9 +1322,13 @@ fn site_packages_directories_from_sys_prefix(
     // may have been found above (causing an early return) while /usr/local/lib/pythonX.Y/dist-packages
     // still needs to be discovered.
     //
-    // Only enumerate when the version or implementation is unknown; when both are known,
-    // phase 1 already added the version-specific /usr/local path (because
-    // `relative_dist_packages_path` returns `Some` only for known implementations), and
+    // Only enumerate when the version or implementation is unknown. There are two cases
+    // where we need to enumerate:
+    //   1. `python_version` is unknown: we can't compute the exact versioned path, so we
+    //      enumerate to discover it.
+    //   2. `implementation` is unknown: `relative_dist_packages_path` returns `None` for
+    //      unknown implementations, so phase 1 did not add any /usr/local path.
+    // When both are known, phase 1 already added the version-specific /usr/local path, and
     // we must not include packages from other Python versions installed under /usr/local/lib.
     if is_debian_system_prefix
         && (python_version.is_none() || matches!(implementation, PythonImplementation::Unknown))
