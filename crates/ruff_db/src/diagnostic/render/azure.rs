@@ -1,16 +1,17 @@
 use ruff_source_file::LineColumn;
 
-use crate::diagnostic::{Diagnostic, Severity};
+use crate::diagnostic::{Diagnostic, DisplayDiagnosticConfig, Severity};
 
 use super::FileResolver;
 
 pub(super) struct AzureRenderer<'a> {
     resolver: &'a dyn FileResolver,
+    config: &'a DisplayDiagnosticConfig,
 }
 
 impl<'a> AzureRenderer<'a> {
-    pub(super) fn new(resolver: &'a dyn FileResolver) -> Self {
-        Self { resolver }
+    pub(super) fn new(resolver: &'a dyn FileResolver, config: &'a DisplayDiagnosticConfig) -> Self {
+        Self { resolver, config }
     }
 }
 
@@ -51,7 +52,7 @@ impl AzureRenderer<'_> {
             writeln!(
                 f,
                 "code={code};]{body}",
-                code = diag.secondary_code_or_id(),
+                code = diag.secondary_code_or_id(self.config.preview),
                 body = diag.concise_message(),
             )?;
         }
