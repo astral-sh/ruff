@@ -1,5 +1,5 @@
 use ruff_formatter::{FormatRuleWithOptions, RemoveSoftLinesBuffer, format_args, write};
-use ruff_python_ast::{AnyNodeRef, Expr, ExprLambda};
+use ruff_python_ast::{AnyNodeRef, Expr, ExprLambda, ExprStringLiteral, ExprFString, ExprTString};
 use ruff_text_size::Ranged;
 
 use crate::builders::parenthesize_if_expands;
