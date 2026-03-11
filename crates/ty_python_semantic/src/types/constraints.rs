@@ -37,15 +37,15 @@
 //! The key benefit of TDDs over BDDs is that unions are more efficient. When computing the union
 //! of two TDDs with different root constraints, the second operand is "parked" in the uncertain
 //! branch rather than duplicated into both the true and false branches. This avoids an
-//! exponential blowup in diagram size that can occur when ORing together many constraint sets
+//! exponential blowup in diagram size that can occur when OR-ing together many constraint sets
 //! (e.g., when inferring specializations for overloaded callables).
 //!
 //! When `if_uncertain` is `ALWAYS_FALSE` everywhere, the TDD degenerates to a standard BDD, and
 //! all operations have zero overhead compared to the binary case.
 //!
-//! Our TDD operations follow Duboc's algorithms (union, intersection) with one correction: the `n1
-//! > n2` case for difference uses the original Frisch formulation, since Duboc's restructuring of
-//! that case is incorrect. Negation is defined as `1 \ T` (difference from the universe), and
+//! Our TDD operations follow Duboc's algorithms (union, intersection) with one correction: the
+//! `n1 > n2` case for difference uses the original Frisch formulation, since Duboc's restructuring
+//! of that case is incorrect. Negation is defined as `1 \ T` (difference from the universe), and
 //! always produces a flat TDD (all `if_uncertain` branches are `ALWAYS_FALSE`).
 //!
 //! NOTE: This module is currently in a transitional state. We've added the BDD [`ConstraintSet`]
