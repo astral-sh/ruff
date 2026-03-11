@@ -2,7 +2,7 @@ use ruff_text_size::TextRange;
 
 use crate::diagnostic::{
     Annotation, Diagnostic, DisplayDiagnosticConfig, FileResolver, Severity, SubDiagnosticSeverity,
-    UnifiedFile,
+    UnifiedFile, render::display_diagnostic_id,
 };
 
 pub(super) struct GithubRenderer<'a> {
@@ -88,8 +88,8 @@ impl<'a> GithubRenderer<'a> {
 
             write!(
                 f,
-                "{code}:",
-                code = diagnostic.secondary_code_or_id(self.config.preview)
+                "{code}",
+                code = display_diagnostic_id(diagnostic, self.config)
             )?;
             write!(f, " {}", diagnostic.concise_message())?;
 
