@@ -1355,7 +1355,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.is_rule_enabled(Rule::SuppressibleException) {
                 flake8_simplify::rules::suppressible_exception(
-                    checker, stmt, body, handlers, orelse, finalbody,
+                    checker, stmt, body, handlers, orelse, finalbody, try_stmt.is_star,
                 );
             }
             if checker.is_rule_enabled(Rule::ReturnInTryExceptFinally) {

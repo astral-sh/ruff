@@ -2,6 +2,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers;
 use ruff_python_ast::name::UnqualifiedName;
 use ruff_python_ast::{self as ast, ExceptHandler, Stmt};
+use ruff_python_ast::PythonVersion;
 use ruff_source_file::LineRanges;
 use ruff_text_size::Ranged;
 use ruff_text_size::{TextLen, TextRange};
@@ -21,6 +22,12 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// Note that `contextlib.suppress` is slower than using `try`-`except`-`pass`
 /// directly. For performance-critical code, consider retaining the
 /// `try`-`except`-`pass` pattern.
+///
+/// ## Exception handling
+/// This rule is not triggered for `except*` (exception groups) in Python < 3.12,
+/// because `contextlib.suppress` only gained support for `BaseExceptionGroup`
+/// in Python 3.12. In Python 3.11, using `contextlib.suppress` with an
+/// `except*` block would change the program's behavior.
 ///
 /// ## Example
 /// ```python
@@ -87,7 +94,15 @@ pub(crate) fn suppressible_exception(
     handlers: &[ExceptHandler],
     orelse: &[Stmt],
     finalbody: &[Stmt],
+    is_star: bool,
 ) {
+    // `except*` is only valid in Python 3.11+, and `contextlib.suppress` only gained
+    // support for `BaseExceptionGroup` in Python 3.12. So we can't suggest `suppress`
+    // for `except*` in Python < 3.12.
+    if is_star && checker.target_version() < PythonVersion::PY312 {
+        return;
+    }
+
     if !matches!(
         try_body,
         [Stmt::Delete(_)
