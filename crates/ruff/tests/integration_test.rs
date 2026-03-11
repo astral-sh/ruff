@@ -920,7 +920,7 @@ fn full_output_preview() {
     success: false
     exit_code: 1
     ----- stdout -----
-    E741 Ambiguous variable name: `l`
+    ambiguous-variable-name: Ambiguous variable name: `l`
      --> -:1:1
       |
     1 | l = 1
@@ -949,7 +949,7 @@ preview = true
     success: false
     exit_code: 1
     ----- stdout -----
-    E741 Ambiguous variable name: `l`
+    ambiguous-variable-name: Ambiguous variable name: `l`
      --> -:1:1
       |
     1 | l = 1
@@ -1258,12 +1258,12 @@ fn preview_enabled_prefix() {
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:1: RUF900 Hey this is a stable test rule.
-    -:1:1: RUF901 [*] Hey this is a stable test rule with a safe fix.
-    -:1:1: RUF902 Hey this is a stable test rule with an unsafe fix.
-    -:1:1: RUF903 Hey this is a stable test rule with a display only fix.
-    -:1:1: RUF911 Hey this is a preview test rule.
-    -:1:1: RUF950 Hey this is a test rule that was redirected from another.
+    -:1:1: stable-test-rule: Hey this is a stable test rule.
+    -:1:1: stable-test-rule-safe-fix: [*] Hey this is a stable test rule with a safe fix.
+    -:1:1: stable-test-rule-unsafe-fix: Hey this is a stable test rule with an unsafe fix.
+    -:1:1: stable-test-rule-display-only-fix: Hey this is a stable test rule with a display only fix.
+    -:1:1: preview-test-rule: Hey this is a preview test rule.
+    -:1:1: redirected-to-test-rule: Hey this is a test rule that was redirected from another.
     Found 6 errors.
     [*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
 
@@ -1280,14 +1280,14 @@ fn preview_enabled_all() {
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:1: D100 Missing docstring in public module
-    -:1:1: CPY001 Missing copyright notice at top of file
-    -:1:1: RUF900 Hey this is a stable test rule.
-    -:1:1: RUF901 [*] Hey this is a stable test rule with a safe fix.
-    -:1:1: RUF902 Hey this is a stable test rule with an unsafe fix.
-    -:1:1: RUF903 Hey this is a stable test rule with a display only fix.
-    -:1:1: RUF911 Hey this is a preview test rule.
-    -:1:1: RUF950 Hey this is a test rule that was redirected from another.
+    -:1:1: undocumented-public-module: Missing docstring in public module
+    -:1:1: missing-copyright-notice: Missing copyright notice at top of file
+    -:1:1: stable-test-rule: Hey this is a stable test rule.
+    -:1:1: stable-test-rule-safe-fix: [*] Hey this is a stable test rule with a safe fix.
+    -:1:1: stable-test-rule-unsafe-fix: Hey this is a stable test rule with an unsafe fix.
+    -:1:1: stable-test-rule-display-only-fix: Hey this is a stable test rule with a display only fix.
+    -:1:1: preview-test-rule: Hey this is a preview test rule.
+    -:1:1: redirected-to-test-rule: Hey this is a test rule that was redirected from another.
     Found 8 errors.
     [*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
 
@@ -1307,7 +1307,7 @@ fn preview_enabled_direct() {
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:1: RUF911 Hey this is a preview test rule.
+    -:1:1: preview-test-rule: Hey this is a preview test rule.
     Found 1 error.
 
     ----- stderr -----
@@ -1421,12 +1421,12 @@ fn preview_enabled_group_ignore() {
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:1: RUF900 Hey this is a stable test rule.
-    -:1:1: RUF901 [*] Hey this is a stable test rule with a safe fix.
-    -:1:1: RUF902 Hey this is a stable test rule with an unsafe fix.
-    -:1:1: RUF903 Hey this is a stable test rule with a display only fix.
-    -:1:1: RUF911 Hey this is a preview test rule.
-    -:1:1: RUF950 Hey this is a test rule that was redirected from another.
+    -:1:1: stable-test-rule: Hey this is a stable test rule.
+    -:1:1: stable-test-rule-safe-fix: [*] Hey this is a stable test rule with a safe fix.
+    -:1:1: stable-test-rule-unsafe-fix: Hey this is a stable test rule with an unsafe fix.
+    -:1:1: stable-test-rule-display-only-fix: Hey this is a stable test rule with a display only fix.
+    -:1:1: preview-test-rule: Hey this is a preview test rule.
+    -:1:1: redirected-to-test-rule: Hey this is a test rule that was redirected from another.
     Found 6 errors.
     [*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
 
@@ -2401,7 +2401,7 @@ select = ["RUF017"]
     success: false
     exit_code: 1
     ----- stdout -----
-    RUF017 Avoid quadratic list summation
+    quadratic-list-summation: Avoid quadratic list summation
      --> -:3:1
       |
     1 | x = [1, 2, 3]
@@ -2442,7 +2442,7 @@ unfixable = ["RUF"]
     success: false
     exit_code: 1
     ----- stdout -----
-    RUF017 Avoid quadratic list summation
+    quadratic-list-summation: Avoid quadratic list summation
      --> -:3:1
       |
     1 | x = [1, 2, 3]

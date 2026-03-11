@@ -270,7 +270,9 @@ impl Workspace {
             .map(|msg| {
                 let range = msg.range().unwrap_or_default();
                 ExpandedMessage {
-                    code: msg.secondary_code_or_id().to_string(),
+                    code: msg
+                        .secondary_code_or_id(self.settings.linter.preview.is_enabled())
+                        .to_string(),
                     message: msg.concise_message().to_string(),
                     start_location: source_code
                         .source_location(range.start(), self.position_encoding)

@@ -237,7 +237,11 @@ impl<'a> ResolvedDiagnostic<'a> {
             })
             .collect();
 
-        let id = format!("{id}:", id = diag.secondary_code_or_id(config.preview));
+        let id = if config.hide_severity {
+            display_diagnostic_id(diag, config)
+        } else {
+            diag.inner.id.to_string()
+        };
 
         let level = if config.hide_severity {
             AnnotateLevel::None
@@ -1036,6 +1040,23 @@ fn replace_unprintable<'r>(
             annotations,
             text: Cow::Owned(result),
         }
+    }
+}
+
+/// Render the diagnostic id for display to the user.
+/// When in preview mode, render the diagnostic name followed by a colon (eg, `rule-name:`).
+/// Otherwise, render just the secondary code if available (eg, `F401`), or the rule id followed
+/// by a colon (eg, `invalid-syntax:`).
+fn display_diagnostic_id(diagnostic: &Diagnostic, config: &DisplayDiagnosticConfig) -> String {
+    if config.preview {
+        format!(
+            "{name}:",
+            name = diagnostic.secondary_code_or_id(config.preview)
+        )
+    } else if let Some(code) = diagnostic.secondary_code() {
+        code.to_string()
+    } else {
+        format!("{id}:", id = diagnostic.id())
     }
 }
 
