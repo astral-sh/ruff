@@ -1,8 +1,8 @@
 use crate::comments::format::{
     empty_lines_after_leading_comments, empty_lines_before_trailing_comments,
 };
+use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::{Parentheses, Parenthesize};
-use crate::expression::{is_invalid_type_expression, maybe_parenthesize_expression};
 use crate::prelude::*;
 use crate::statement::clause::{ClauseHeader, clause};
 use crate::statement::stmt_class_def::FormatDecorators;
@@ -161,11 +161,6 @@ fn format_function_header(f: &mut PyFormatter, item: &StmtFunctionDef) -> Format
                 return_annotation
                     .format()
                     .with_options(Parentheses::Always)
-                    .fmt(f)
-            } else if is_invalid_type_expression(return_annotation) {
-                return_annotation
-                    .format()
-                    .with_options(Parentheses::Preserve)
                     .fmt(f)
             } else {
                 let parenthesize = if parameters.is_empty() && !comments.has(parameters.as_ref()) {

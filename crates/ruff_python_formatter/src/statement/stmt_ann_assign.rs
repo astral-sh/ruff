@@ -1,8 +1,8 @@
 use ruff_formatter::write;
 use ruff_python_ast::StmtAnnAssign;
 
+use crate::expression::is_splittable_expression;
 use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses, Parentheses};
-use crate::expression::{is_invalid_type_expression, is_splittable_expression};
 use crate::prelude::*;
 use crate::statement::stmt_assign::{
     AnyAssignmentOperator, AnyBeforeOperator, FormatStatementsLastExpression,
@@ -23,12 +23,15 @@ impl FormatNodeRule<StmtAnnAssign> for FormatStmtAnnAssign {
             simple: _,
         } = item;
         let comments = f.context().comments().clone();
-        let preserve_annotation_parentheses = is_invalid_type_expression(annotation);
+        let annotation_parentheses = annotation
+            .as_ref()
+            .needs_parentheses(item.into(), f.context());
 
         write!(f, [target.format(), token(":"), space()])?;
 
         if let Some(value) = value {
-            if !preserve_annotation_parentheses && is_splittable_expression(annotation, f.context())
+            if annotation_parentheses != OptionalParentheses::Always
+                && is_splittable_expression(annotation, f.context())
             {
                 FormatStatementsLastExpression::RightToLeft {
                     before_operator: AnyBeforeOperator::Expression(annotation),
@@ -42,15 +45,9 @@ impl FormatNodeRule<StmtAnnAssign> for FormatStmtAnnAssign {
                 // Ensure we keep the parentheses if the annotation has any comments.
                 let parentheses = if comments.has_leading(annotation.as_ref())
                     || comments.has_trailing(annotation.as_ref())
-                    || matches!(
-                        annotation
-                            .as_ref()
-                            .needs_parentheses(item.into(), f.context()),
-                        OptionalParentheses::Always
-                    ) {
+                    || annotation_parentheses == OptionalParentheses::Always
+                {
                     Parentheses::Always
-                } else if preserve_annotation_parentheses {
-                    Parentheses::Preserve
                 } else {
                     Parentheses::Never
                 };
@@ -67,10 +64,10 @@ impl FormatNodeRule<StmtAnnAssign> for FormatStmtAnnAssign {
                     ]
                 )?;
             }
-        } else if preserve_annotation_parentheses {
+        } else if annotation_parentheses == OptionalParentheses::Always {
             annotation
                 .format()
-                .with_options(Parentheses::Preserve)
+                .with_options(Parentheses::Always)
                 .fmt(f)?;
         } else {
             // Parenthesize the value and inline the comment if it is a "simple" type annotation, similar
