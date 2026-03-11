@@ -1,5 +1,6 @@
 use crate::diagnostic::{
     Diagnostic, DisplayDiagnosticConfig, Severity,
+    render::display_diagnostic_id,
     stylesheet::{DiagnosticStylesheet, fmt_styled, fmt_with_hyperlink},
 };
 
@@ -68,12 +69,15 @@ impl<'a> ConciseRenderer<'a> {
             }
 
             if self.config.hide_severity {
-                let id = diag.secondary_code_or_id(self.config.preview);
                 write!(
                     f,
-                    "{id}: ",
-                    id = fmt_styled(
-                        fmt_with_hyperlink(&id, diag.documentation_url(), &stylesheet),
+                    "{code} ",
+                    code = fmt_styled(
+                        fmt_with_hyperlink(
+                            display_diagnostic_id(diag, self.config),
+                            diag.documentation_url(),
+                            &stylesheet
+                        ),
                         stylesheet.secondary_code
                     )
                 )?;
@@ -163,10 +167,10 @@ mod tests {
         env.fix_applicability(Applicability::DisplayOnly);
         env.preview(true);
         insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @"
-        fib.py:1:8: F401 [*] `os` imported but unused
-        fib.py:6:5: F841 [*] Local variable `x` is assigned to but never used
-        undef.py:1:4: F821 Undefined name `a`
-        fib.py:12:16: F821 Undefined name `fibonaccii`
+        fib.py:1:8: unused-import: [*] `os` imported but unused
+        fib.py:6:5: unused-variable: [*] Local variable `x` is assigned to but never used
+        undef.py:1:4: undefined-name: Undefined name `a`
+        fib.py:12:16: undefined-name: Undefined name `fibonaccii`
         ");
     }
 
