@@ -1890,6 +1890,18 @@ impl<'db> StaticClassLiteral<'db> {
                 )))
             }
             (CodeGeneratorKind::TypedDict, name @ ("__or__" | "__ror__" | "__ior__")) => {
+                // For a TypedDict `TD`, synthesize overloaded signatures:
+                //
+                // ```python
+                // # Overload 1 (all operators): exact same TypedDict
+                // def __or__(self, value: TD, /) -> TD: ...
+                //
+                // # Overload 2 (__or__ / __ror__ only): partial TypedDict (all fields optional)
+                // def __or__(self, value: Partial[TD], /) -> TD: ...
+                //
+                // # Overload 3 (__or__ / __ror__ only): generic dict fallback
+                // def __or__(self, value: dict[str, Any], /) -> dict[str, object]: ...
+                // ```
                 let mut overloads = vec![Signature::new(
                     Parameters::new(
                         db,
@@ -1908,11 +1920,11 @@ impl<'db> StaticClassLiteral<'db> {
                     // fallback during inference so complete dict literals can still be inferred
                     // against the full TypedDict schema first.
 
-                    // A widened update-operand version of this TypedDict so that dict literals
-                    // and compatible TypedDicts with subset updates can preserve the TypedDict
-                    // type.
-                    let update_operand_ty = if let Type::TypedDict(td) = instance_ty {
-                        Type::TypedDict(td.to_update_operand(db))
+                    // A partial version of this TypedDict (all fields optional) so that dict
+                    // literals and compatible TypedDicts with subset updates can preserve the
+                    // TypedDict type.
+                    let partial_ty = if let Type::TypedDict(td) = instance_ty {
+                        Type::TypedDict(td.to_partial(db))
                     } else {
                         instance_ty
                     };
@@ -1939,7 +1951,7 @@ impl<'db> StaticClassLiteral<'db> {
                                 Parameter::positional_only(Some(Name::new_static("self")))
                                     .with_annotated_type(instance_ty),
                                 Parameter::positional_only(Some(Name::new_static("value")))
-                                    .with_annotated_type(update_operand_ty),
+                                    .with_annotated_type(partial_ty),
                             ],
                         ),
                         instance_ty,

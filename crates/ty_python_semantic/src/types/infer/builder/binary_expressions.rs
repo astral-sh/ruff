@@ -110,7 +110,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             if let Type::TypedDict(typed_dict) = right_ty
                 && let Some(ty) = self.try_typed_dict_pep_584_dunder(
                     left,
-                    typed_dict.to_update_operand(self.db()),
+                    typed_dict.to_partial(self.db()),
                     typed_dict,
                     "__ror__",
                 )
@@ -132,7 +132,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             && matches!(right, ast::Expr::Dict(_))
             && let Some(ty) = self.try_typed_dict_pep_584_dunder(
                 right,
-                typed_dict.to_update_operand(self.db()),
+                typed_dict.to_partial(self.db()),
                 typed_dict,
                 "__or__",
             )
@@ -215,7 +215,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         if self
             .try_typed_dict_pep_584_dunder(
                 value_expr,
-                typed_dict.to_update_operand(self.db()),
+                typed_dict.to_partial(self.db()),
                 typed_dict,
                 "__or__",
             )

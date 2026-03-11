@@ -140,10 +140,11 @@ impl<'db> TypedDictType<'db> {
         Self::Synthesized(SynthesizedTypedDictType::patch(db, items))
     }
 
-    /// Returns a synthesized `TypedDict` used to model PEP 584 update operands. This accepts
-    /// dictionary literals that update any subset of known keys, and also accepts other
-    /// `TypedDict`s as long as any overlapping keys are compatible.
-    pub(crate) fn to_update_operand(self, db: &'db dyn Db) -> Self {
+    /// Returns a partial version of this `TypedDict` where all fields are optional. This is used
+    /// to model PEP 584 update operands, accepting dictionary literals that update any subset of
+    /// known keys, and also accepting other `TypedDict`s as long as any overlapping keys are
+    /// compatible.
+    pub(crate) fn to_partial(self, db: &'db dyn Db) -> Self {
         let items: TypedDictSchema<'db> = self
             .items(db)
             .iter()
