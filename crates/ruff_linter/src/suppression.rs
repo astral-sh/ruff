@@ -1,7 +1,7 @@
 use compact_str::CompactString;
 use core::fmt;
 use itertools::Itertools;
-use ruff_db::diagnostic::Diagnostic;
+use ruff_db::diagnostic::{Diagnostic, SecondaryCode};
 use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::token::{TokenKind, Tokens};
 use ruff_python_index::Indexer;
@@ -198,9 +198,8 @@ impl Suppressions {
             return false;
         }
 
-        let Some(code) = diagnostic.secondary_code() else {
-            return false;
-        };
+        let name = diagnostic.name();
+        let code = diagnostic.secondary_code().map(SecondaryCode::as_str);
         let Some(span) = diagnostic.primary_span() else {
             return false;
         };
@@ -211,7 +210,9 @@ impl Suppressions {
         for suppression in &self.valid {
             let suppression_code =
                 get_redirect_target(suppression.code.as_str()).unwrap_or(suppression.code.as_str());
-            if *code == suppression_code && suppression.range.contains_range(range) {
+            if (name == suppression_code || code.is_some_and(|code| code == suppression_code))
+                && suppression.range.contains_range(range)
+            {
                 suppression.used.set(true);
                 return true;
             }
