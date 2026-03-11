@@ -3,6 +3,7 @@ from __future__ import annotations
 import difflib
 import logging
 import re
+import shlex
 import subprocess
 from pathlib import Path
 from typing import Mapping, NamedTuple
@@ -68,8 +69,7 @@ class SnapshotRunner(NamedTuple):
             if command.prepare:
                 logging.info(f"Running prepare: {command.prepare}")
                 subprocess.run(
-                    command.prepare,
-                    shell=True,
+                    shlex.split(command.prepare),
                     cwd=cwd,
                     env=env,
                     capture_output=True,
