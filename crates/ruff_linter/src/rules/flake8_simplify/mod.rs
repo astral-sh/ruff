@@ -80,12 +80,12 @@ mod tests {
 
     #[test_case(
         Rule::SuppressibleException,
-        Path::new("SIM105_1.py"),
+        Path::new("SIM105_5.py"),
         PythonVersion::PY311
     )]
     #[test_case(
         Rule::SuppressibleException,
-        Path::new("SIM105_1.py"),
+        Path::new("SIM105_5.py"),
         PythonVersion::PY312
     )]
     fn version_specific_rules(

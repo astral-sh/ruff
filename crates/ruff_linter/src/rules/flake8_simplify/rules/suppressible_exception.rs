@@ -101,7 +101,8 @@ pub(crate) fn suppressible_exception(
             | Stmt::Pass(_)]
     ) || !orelse.is_empty()
         || !finalbody.is_empty()
-        || checker.target_version() <= PythonVersion::PY311
+        || (stmt.as_try_stmt().is_some_and(|x| x.is_star)
+            && checker.target_version() <= PythonVersion::PY311)
     {
         return;
     }
