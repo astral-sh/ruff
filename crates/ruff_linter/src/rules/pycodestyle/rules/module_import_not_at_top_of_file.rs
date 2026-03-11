@@ -59,6 +59,14 @@ impl Violation for ModuleImportNotAtTopOfFile {
             "Module level import not at top of file".to_string()
         }
     }
+
+    fn fix_title(&self) -> Option<String> {
+        if self.source_type.is_ipynb() {
+            Some("Move module level imports to top of cell".to_string())
+        } else {
+            Some("Move module level imports to top of file".to_string())
+        }
+    }
 }
 
 /// E402
