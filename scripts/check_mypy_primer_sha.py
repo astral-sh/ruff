@@ -16,21 +16,16 @@ SHA_RE = re.compile(r"mypy_primer@([0-9a-f]{40})")
 REV_RE = re.compile(r'rev\s*=\s*"([0-9a-f]{40})"')
 
 
-def extract(pattern: re.Pattern[str], path: Path) -> str | None:
+def extract(pattern: re.Pattern[str], path: Path, label: str) -> str:
     m = pattern.search(path.read_text())
-    return m.group(1) if m else None
+    if m is None:
+        print(f"error: could not find {label} in {path}", file=sys.stderr)
+        sys.exit(1)
+    return m.group(1)
 
 
-sh_sha = extract(SHA_RE, SH_FILE)
-py_sha = extract(REV_RE, PY_FILE)
-
-if sh_sha is None:
-    print(f"error: could not find mypy_primer SHA in {SH_FILE}", file=sys.stderr)
-    sys.exit(1)
-
-if py_sha is None:
-    print(f"error: could not find mypy-primer rev in {PY_FILE}", file=sys.stderr)
-    sys.exit(1)
+sh_sha = extract(SHA_RE, SH_FILE, "mypy_primer SHA")
+py_sha = extract(REV_RE, PY_FILE, "mypy-primer rev")
 
 if sh_sha != py_sha:
     print(
