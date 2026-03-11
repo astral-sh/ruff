@@ -5131,13 +5131,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ))
         };
 
-        // Prefer generic class instances when narrowing.
+        // Prefer the declared type of generic classes or callables when narrowing.
         //
         // Splitting up this loop is not necessary for correctness, but leads to a slight
         // performance improvement.
         for narrowed_ty in narrow_targets
             .iter()
-            .filter(|ty| ty.class_specialization(db).is_some())
+            .filter(|ty| ty.may_prefer_declared_type(db))
         {
             if let Some(result) = try_narrow(*narrowed_ty) {
                 return result;
@@ -5145,7 +5145,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
         for narrowed_ty in narrow_targets
             .iter()
-            .filter(|ty| ty.class_specialization(db).is_none())
+            .filter(|ty| !ty.may_prefer_declared_type(db))
         {
             if let Some(result) = try_narrow(*narrowed_ty) {
                 return result;

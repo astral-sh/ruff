@@ -4,6 +4,7 @@ use ruff_diagnostics::{Edit, Fix};
 use rustc_hash::FxHashMap;
 
 use std::borrow::Cow;
+use std::iter;
 use std::time::Duration;
 
 use bitflags::bitflags;
@@ -50,7 +51,7 @@ use crate::types::bound_super::BoundSuperType;
 use crate::types::call::{Binding, Bindings, CallArguments, CallableBinding};
 pub(crate) use crate::types::callable::{CallableType, CallableTypes};
 pub(crate) use crate::types::class_base::ClassBase;
-use crate::types::constraints::{ConstraintSetBuilder, Solutions};
+use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::context::{LintDiagnosticGuard, LintDiagnosticGuardBuilder};
 use crate::types::diagnostic::{INVALID_AWAIT, INVALID_TYPE_FORM};
 pub use crate::types::display::{DisplaySettings, TypeDetail, TypeDisplayDetails};
@@ -1085,6 +1086,15 @@ impl<'db> Type<'db> {
         specialization
     }
 
+    /// Returns `true` if this type may contain preferred type mappings when provided as type context
+    /// during generic call inference.
+    ///
+    /// This is the case for any type which may contain types in non-covariant position within it,
+    /// e.g., nominal instances of a generic class, or callables.
+    pub(crate) fn may_prefer_declared_type(self, db: &'db dyn Db) -> bool {
+        self.class_specialization(db).is_some() || self.expand_eagerly(db).is_callable_type()
+    }
+
     /// Returns the top materialization (or upper bound materialization) of this type, which is the
     /// most general form of the type that is fully static.
     #[must_use]
@@ -1831,22 +1841,16 @@ impl<'db> Type<'db> {
 
     /// Recursively visit the specialization of a generic class instance.
     ///
-    /// The provided closure will be called with each assignment of a type variable present in this
-    /// type, along with the variance of the outermost type with respect to the type variable.
-    ///
-    /// If a `TypeContext` is provided, it will be narrowed as nested types are visited, if the
-    /// type is a specialized instance of the same class.
-    pub(crate) fn visit_specialization<F>(self, db: &'db dyn Db, tcx: TypeContext<'db>, mut f: F)
+    /// The provided closure will be called on any nested types, along with their variance with
+    /// respect to the outermost type.
+    pub(crate) fn visit_specialization<F>(self, db: &'db dyn Db, mut f: F)
     where
-        F: FnMut(BoundTypeVarInstance<'db>, Type<'db>, TypeVarVariance, TypeContext<'db>),
+        F: FnMut(Type<'db>, TypeVarVariance),
     {
-        let constraints = ConstraintSetBuilder::new();
         self.visit_specialization_impl(
             db,
-            tcx,
             TypeVarVariance::Covariant,
             &mut f,
-            &constraints,
             &SpecializationVisitor::default(),
         );
     }
@@ -1854,103 +1858,64 @@ impl<'db> Type<'db> {
     fn visit_specialization_impl(
         self,
         db: &'db dyn Db,
-        tcx: TypeContext<'db>,
         polarity: TypeVarVariance,
-        f: &mut dyn FnMut(BoundTypeVarInstance<'db>, Type<'db>, TypeVarVariance, TypeContext<'db>),
-        constraints: &ConstraintSetBuilder<'db>,
+        f: &mut dyn FnMut(Type<'db>, TypeVarVariance),
         visitor: &SpecializationVisitor<'db>,
     ) {
-        let Type::NominalInstance(instance) = self else {
+        let Some(specialization) = self.class_specialization(db) else {
             match self {
                 Type::Union(union) => {
                     for element in union.elements(db) {
-                        element.visit_specialization_impl(
-                            db,
-                            tcx,
-                            polarity,
-                            f,
-                            constraints,
-                            visitor,
-                        );
+                        element.visit_specialization_impl(db, polarity, f, visitor);
                     }
                 }
                 Type::Intersection(intersection) => {
                     for element in intersection.positive(db) {
-                        element.visit_specialization_impl(
-                            db,
-                            tcx,
-                            polarity,
-                            f,
-                            constraints,
-                            visitor,
-                        );
+                        element.visit_specialization_impl(db, polarity, f, visitor);
                     }
                 }
                 Type::TypeAlias(alias) => visitor.visit(self, || {
-                    alias.value_type(db).visit_specialization_impl(
-                        db,
-                        tcx,
-                        polarity,
-                        f,
-                        constraints,
-                        visitor,
-                    );
+                    alias
+                        .value_type(db)
+                        .visit_specialization_impl(db, polarity, f, visitor);
                 }),
+                Type::Callable(callable) => {
+                    for signature in callable.signatures(db) {
+                        for parameter in signature.parameters() {
+                            let variance = TypeVarVariance::Contravariant.compose(polarity);
+
+                            f(parameter.annotated_type(), variance);
+
+                            visitor.visit(parameter.annotated_type(), || {
+                                parameter
+                                    .annotated_type()
+                                    .visit_specialization_impl(db, variance, f, visitor);
+                            });
+                        }
+
+                        visitor.visit(signature.return_ty, || {
+                            signature
+                                .return_ty
+                                .visit_specialization_impl(db, polarity, f, visitor);
+                        });
+                    }
+                }
                 _ => {}
             }
 
             return;
         };
 
-        let Some((class_literal, Some(specialization))) =
-            instance.class(db).static_class_literal(db)
-        else {
-            return;
-        };
-        let generic_context = specialization.generic_context(db);
+        for (typevar, ty) in iter::zip(
+            specialization.generic_context(db).variables(db),
+            specialization.types(db),
+        ) {
+            let variance = typevar.variance_with_polarity(db, polarity);
 
-        // Collect the type mappings used to narrow the type context.
-        //
-        // We use a forward CSA check (`alias_instance ≤ tcx`) to infer what each typevar
-        // in the identity specialization maps to in the type context. For example, if
-        // `tcx = list[int]` and `alias_instance = list[T]`, the CSA produces `T = int`.
-        let tcx_mappings: FxHashMap<_, _> = tcx
-            .annotation
-            .and_then(|tcx| {
-                let alias_instance = Type::instance(db, class_literal.identity_specialization(db));
-                let set = alias_instance.when_constraint_set_assignable_to(db, tcx, constraints);
-                match set.solutions(db, constraints) {
-                    Solutions::Constrained(solutions) => {
-                        let mut mappings = FxHashMap::default();
-                        for solution in solutions.iter() {
-                            for binding in solution {
-                                mappings
-                                    .entry(binding.bound_typevar.identity(db))
-                                    .and_modify(|existing| {
-                                        *existing = UnionType::from_two_elements(
-                                            db,
-                                            *existing,
-                                            binding.solution,
-                                        );
-                                    })
-                                    .or_insert(binding.solution);
-                            }
-                        }
-                        Some(mappings)
-                    }
-                    _ => None,
-                }
-            })
-            .unwrap_or_default();
-
-        for (type_var, ty) in generic_context.variables(db).zip(specialization.types(db)) {
-            let variance = type_var.variance_with_polarity(db, polarity);
-            let narrowed_tcx = TypeContext::new(tcx_mappings.get(&type_var.identity(db)).copied());
-
-            f(type_var, *ty, variance, narrowed_tcx);
+            f(*ty, variance);
 
             visitor.visit(*ty, || {
-                ty.visit_specialization_impl(db, narrowed_tcx, variance, f, constraints, visitor);
+                ty.visit_specialization_impl(db, variance, f, visitor);
             });
         }
     }

@@ -181,7 +181,7 @@ def outside_callable[T](t: T) -> Callable[[T], T]:
 # revealed: ty_extensions.GenericContext[T@outside_callable]
 reveal_type(generic_context(outside_callable))
 
-# revealed: (Literal[1], /) -> Literal[1]
+# revealed: (int, /) -> int
 reveal_type(outside_callable(1))
 # revealed: None
 reveal_type(generic_context(outside_callable(1)))
