@@ -18,20 +18,21 @@
 //! particular lower and upper bound. (A type is within a lower and upper bound if it is a
 //! supertype of the lower bound and a subtype of the upper bound.) You can then build up more
 //! complex constraint sets using union, intersection, and negation operations. We use a ternary
-//! decision diagram (TDD), as described in §11.2 of [Duboc's thesis][duboc] to represent a
+//! decision diagram (TDD), as described in §11.2 of [Duboc's thesis][duboc], to represent a
 //! constraint set.
 //!
 //! A TDD is an extension of a binary decision diagram (BDD). Each interior node has three
 //! outgoing edges instead of two:
 //!
-//! - `if_true`: taken when the constraint holds
-//! - `if_uncertain`: included regardless of the constraint's truth value
-//! - `if_false`: taken when the constraint does not hold
+//! - `if_true`: taken when the constraint holds (called `C` by Duboc)
+//! - `if_uncertain`: included regardless of the constraint's truth value (`U`)
+//! - `if_false`: taken when the constraint does not hold (`D`)
 //!
-//! The semantics of a TDD node are:
+//! BDD and TDD nodes can be considered "if-then-else" or ternary operators:
 //!
 //! ```text
-//! ⟦n ? C : U : D⟧ = (n ∩ ⟦C⟧) ∪ ⟦U⟧ ∪ (¬n ∩ ⟦D⟧)
+//! [BDD]  n? T: F    = (n ∧ T) ∨ (¬n ∧ F)
+//! [TDD]  n? C: U: D = (n ∧ C) ∨ U ∨ (¬n ∧ D)
 //! ```
 //!
 //! The key benefit of TDDs over BDDs is that unions are more efficient. When computing the union
@@ -1456,8 +1457,9 @@ impl Node {
             }
             ConstraintAssignment::Unconstrained(constraint) => {
                 // The result holds regardless of the constraint's truth value, so only
-                // `if_uncertain` should be `ALWAYS_TRUE`. We use the factored form
-                // `n ? 0 : 1 : 0` rather than `n ? 1 : 1 : 1`.
+                // `if_uncertain` needs to be `ALWAYS_TRUE` — `n? 0: 1: 0`. It would also be
+                // correct to use `n? 1: 1: 1` (i.e., `ALWAYS_TRUE` for all outgoing edges), but
+                // that would throw away some of the efficiency gains this representation gives us.
                 builder.intern_interior_node(InteriorNodeData {
                     constraint,
                     if_true: ALWAYS_FALSE,
@@ -1611,11 +1613,11 @@ impl NodeId {
                 // from it) causes the if_true edge to become impossible. We want to ignore
                 // impossible paths, and so we treat them as passing the "always satisfied" check.
                 //
-                // Under TDD semantics, when the constraint holds the result is C ∪ U, and when
-                // it doesn't the result is D ∪ U. We fold the uncertain branch into both before
-                // checking, because "C ∪ U is always satisfied" cannot be decomposed into
-                // independent checks on C and U (it's a disjunction). This is zero-cost for
-                // binary BDDs since or(C, ALWAYS_FALSE) = C.
+                // Under TDD semantics, when the constraint holds the result is C ∨ U, and when it
+                // doesn't the result is D ∨ U. We fold the uncertain branch into both before
+                // checking, because "C ∨ U is always satisfied" cannot be decomposed into
+                // independent checks on C and U (it's a disjunction). This is zero-cost for binary
+                // BDDs since `C ∨ false = C`.
                 let interior = builder.interior_node_data(self);
                 let if_true_or_uncertain = interior.if_true.or(builder, interior.if_uncertain);
                 let true_always_satisfied = path
@@ -1670,6 +1672,10 @@ impl NodeId {
                 // walk_edge will return None if this node's constraint (or anything we can derive
                 // from it) causes the if_true edge to become impossible. We want to ignore
                 // impossible paths, and so we treat them as passing the "never satisfied" check.
+                //
+                // Note that unlike `is_always_satisfied`, here we don't have to fold the uncertain
+                // branch into the true and false branches, since C ∨ U is only false when C and U
+                // are each independently false. That lets us check each branch in isolation.
                 let interior = builder.interior_node_data(self);
                 let true_never_satisfied = path
                     .walk_edge(
@@ -2664,9 +2670,10 @@ impl InteriorNode {
                     .or_inner(builder, other_interior.if_false, other_offset),
                 self_interior.source_order,
             ),
-            // This is one of Duboc's optimizations. If self < other, we check self first. Instead
-            // of distributing other into the if_true and if_false branches, we "park" it in the
-            // if_uncertain branch. That causes us to only evaluate other "lazily" when needed.
+            // This is from Frisch's original description of TDDs. If self < other, we check self
+            // first. Instead of distributing other into the if_true and if_false branches, we
+            // "park" it in the if_uncertain branch. That causes us to only evaluate other "lazily"
+            // when needed.
             Ordering::Less => NodeId::with_uncertain(
                 builder,
                 self_interior.constraint,
@@ -3015,7 +3022,7 @@ impl InteriorNode {
                 .unwrap_or(ALWAYS_FALSE);
             // Absorb the uncertain branch into both the true and false branches before
             // constructing the ITE, matching TDD semantics: when the constraint holds the result
-            // is C ∪ U, and when it doesn't the result is D ∪ U.
+            // is C ∨ U, and when it doesn't the result is D ∨ U.
             //
             // NB: We cannot use `Node::new` here, because the recursive calls might introduce new
             // derived constraints into the result, and those constraints might appear before this
@@ -3058,7 +3065,7 @@ impl InteriorNode {
             // variable by replacing this node with the appropriate edge(s). When restricting a
             // TDD, the uncertain branch is folded in.
             if assignment == self_interior.constraint.when_true() {
-                // restrict(n ? C : U : D, n == true) = or(C, U),
+                // restrict(n? C: U: D, n == true) = C ∨ U
                 (
                     self_interior
                         .if_true
@@ -3066,7 +3073,7 @@ impl InteriorNode {
                     true,
                 )
             } else if assignment == self_interior.constraint.when_false() {
-                // restrict(n ? C : U : D, n == false) = or(D, U).
+                // restrict(n? C: U: D, n == false) = D ∨ U
                 (
                     self_interior
                         .if_false
@@ -3074,7 +3081,7 @@ impl InteriorNode {
                     true,
                 )
             } else if assignment == self_interior.constraint.when_unconstrained() {
-                // restrict(n ? C : U : D, n is unconstrained) = or(C, U, D)
+                // restrict(n? C: U: D, n is unconstrained) = C ∨ U ∨ D
                 (
                     self_interior
                         .if_true
