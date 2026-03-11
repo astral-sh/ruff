@@ -2,6 +2,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers;
 use ruff_python_ast::name::UnqualifiedName;
 use ruff_python_ast::{self as ast, ExceptHandler, Stmt};
+use ruff_python_ast::PythonVersion;
 use ruff_source_file::LineRanges;
 use ruff_text_size::Ranged;
 use ruff_text_size::{TextLen, TextRange};
@@ -125,6 +126,18 @@ pub(crate) fn suppressible_exception(
     else {
         return;
     };
+
+    // Check if this is an `except*` (ExceptionGroup) handler.
+    // `contextlib.suppress` only supports `BaseExceptionGroup` in Python 3.12+.
+    // For Python < 3.12, we should not suggest using `contextlib.suppress` for `except*`.
+    let is_except_star_handler = checker
+        .locator()
+        .slice(*range)
+        .starts_with("except*");
+
+    if is_except_star_handler && checker.target_version() < PythonVersion::PY312 {
+        return;
+    }
 
     let exception = if handler_names.is_empty() {
         if type_.is_none() {

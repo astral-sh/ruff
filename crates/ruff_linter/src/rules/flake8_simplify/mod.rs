@@ -11,6 +11,7 @@ mod tests {
     use crate::registry::Rule;
     use crate::settings::LinterSettings;
     use crate::settings::types::PreviewMode;
+    use crate::settings::types::TargetVersion;
     use crate::test::test_path;
     use crate::{assert_diagnostics, settings};
 
@@ -56,6 +57,36 @@ mod tests {
             &settings::LinterSettings::for_rule(rule_code),
         )?;
         assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    /// Test that SIM105 does not trigger for `except*` handlers in Python < 3.12
+    #[test]
+    fn test_sim105_except_star_py311() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("flake8_simplify").join("SIM105_except_star.py").as_path(),
+            &LinterSettings {
+                target_version: TargetVersion::Py311,
+                ..LinterSettings::for_rule(Rule::SuppressibleException)
+            },
+        )?;
+        // No diagnostics should be raised for except* in Python < 3.12
+        assert_diagnostics!("SIM105_SIM105_except_star_py311", diagnostics);
+        Ok(())
+    }
+
+    /// Test that SIM105 DOES trigger for `except*` handlers in Python >= 3.12
+    #[test]
+    fn test_sim105_except_star_py312() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("flake8_simplify").join("SIM105_except_star.py").as_path(),
+            &LinterSettings {
+                target_version: TargetVersion::Py312,
+                ..LinterSettings::for_rule(Rule::SuppressibleException)
+            },
+        )?;
+        // Diagnostics should be raised for except* in Python >= 3.12
+        assert_diagnostics!("SIM105_SIM105_except_star_py312", diagnostics);
         Ok(())
     }
 
