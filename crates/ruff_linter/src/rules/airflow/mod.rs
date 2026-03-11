@@ -15,6 +15,7 @@ mod tests {
 
     #[test_case(Rule::AirflowVariableNameTaskIdMismatch, Path::new("AIR001.py"))]
     #[test_case(Rule::AirflowDagNoScheduleArgument, Path::new("AIR002.py"))]
+    #[test_case(Rule::AirflowXcomPullInTemplateString, Path::new("AIR004.py"))]
     #[test_case(Rule::Airflow3Removal, Path::new("AIR301_args.py"))]
     #[test_case(Rule::Airflow3Removal, Path::new("AIR301_names.py"))]
     #[test_case(Rule::Airflow3Removal, Path::new("AIR301_names_fix.py"))]
