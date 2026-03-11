@@ -116,3 +116,23 @@ help: Use type parameters
 45 | 
 46 | 
 note: This is an unsafe fix and may change runtime behavior
+
+UP047 [*] Generic function `multi_param` should use type parameters
+  --> UP047_0.py:56:5
+   |
+55 | # TypeVar used in multiple parameter annotations should still be detected
+56 | def multi_param(t: list[T], c: Callable[[T], None]) -> T:
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+57 |     c(t[0])
+58 |     return t[1]
+   |
+help: Use type parameters
+53 | 
+54 | 
+55 | # TypeVar used in multiple parameter annotations should still be detected
+   - def multi_param(t: list[T], c: Callable[[T], None]) -> T:
+56 + def multi_param[T: float](t: list[T], c: Callable[[T], None]) -> T:
+57 |     c(t[0])
+58 |     return t[1]
+59 | 
+note: This is an unsafe fix and may change runtime behavior

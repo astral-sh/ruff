@@ -60,7 +60,7 @@ impl<Tag> Default for TypeTransformer<'_, Tag> {
 pub(crate) type PairVisitor<'db, Tag, C> = CycleDetector<Tag, (Type<'db>, Type<'db>), C>;
 
 #[derive(Debug)]
-pub struct CycleDetector<Tag, T, R> {
+pub struct CycleDetector<Tag, T, R, Extra = ()> {
     /// If the type we're visiting is present in `seen`, it indicates that we've hit a cycle (due
     /// to a recursive type); we need to immediately short circuit the whole operation and return
     /// the fallback value. That's why we pop items off the end of `seen` after we've visited them.
@@ -80,16 +80,25 @@ pub struct CycleDetector<Tag, T, R> {
 
     fallback: R,
 
+    pub(crate) extra: Extra,
+
     _tag: PhantomData<Tag>,
 }
 
-impl<Tag, T: Hash + Eq + Clone, R: Clone> CycleDetector<Tag, T, R> {
+impl<Tag, T: Hash + Eq + Clone, R: Clone, Extra: Default> CycleDetector<Tag, T, R, Extra> {
     pub fn new(fallback: R) -> Self {
+        Self::with_extra(fallback, Extra::default())
+    }
+}
+
+impl<Tag, T: Hash + Eq + Clone, R: Clone, Extra> CycleDetector<Tag, T, R, Extra> {
+    pub(crate) fn with_extra(fallback: R, extra: Extra) -> Self {
         CycleDetector {
             seen: RefCell::new(FxIndexSet::default()),
             cache: RefCell::new(FxHashMap::default()),
             depth: Cell::new(0),
             fallback,
+            extra,
             _tag: PhantomData,
         }
     }

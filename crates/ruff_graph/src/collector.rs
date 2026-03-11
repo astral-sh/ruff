@@ -46,6 +46,7 @@ impl<'ast> SourceOrderVisitor<'ast> for Collector<'_> {
                 names,
                 module,
                 level,
+                is_lazy: _,
                 range: _,
                 node_index: _,
             }) => {
@@ -89,6 +90,7 @@ impl<'ast> SourceOrderVisitor<'ast> for Collector<'_> {
             }
             Stmt::Import(ast::StmtImport {
                 names,
+                is_lazy: _,
                 range: _,
                 node_index: _,
             }) => {

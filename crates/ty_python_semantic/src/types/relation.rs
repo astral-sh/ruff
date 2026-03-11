@@ -3,13 +3,16 @@ use ruff_python_ast::name::Name;
 use rustc_hash::FxHashSet;
 
 use crate::place::{DefinedPlace, Place};
-use crate::types::builder::RecursivelyDefined;
-use crate::types::constraints::{IteratorConstraintsExtension, OptionConstraintsExtension};
+use crate::types::constraints::{
+    ConstraintSetBuilder, IteratorConstraintsExtension, OptionConstraintsExtension,
+};
+use crate::types::cyclic::PairVisitor;
 use crate::types::enums::is_single_member_enum;
+use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::{
-    CallableType, ClassBase, ClassType, CycleDetector, DynamicType, KnownClass, KnownInstanceType,
-    MemberLookupPolicy, PairVisitor, ProtocolInstanceType, SubclassOfInner,
-    TypeVarBoundOrConstraints, UnionType,
+    CallableType, CallableTypes, ClassBase, ClassType, CycleDetector, DynamicType, KnownClass,
+    KnownInstanceType, LiteralValueTypeKind, MemberLookupPolicy, Parameters, ProtocolInstanceType,
+    Signature, SubclassOfInner, TypeVarBoundOrConstraints, UnionType,
 };
 use crate::{
     Db,
@@ -18,7 +21,7 @@ use crate::{
 
 /// A non-exhaustive enumeration of relations that can exist between types.
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
-pub(crate) enum TypeRelation<'db> {
+pub(crate) enum TypeRelation {
     /// The "subtyping" relation.
     ///
     /// A [fully static] type `B` is a subtype of a fully static type `A` if and only if
@@ -89,8 +92,10 @@ pub(crate) enum TypeRelation<'db> {
 
     /// The "redundancy" relation.
     ///
-    /// The redundancy relation dictates whether the union `A | B` can be safely simplified
-    /// to the type `A` without downstream consequences on ty's inference of types elsewhere.
+    /// The redundancy relation is really an alternative, less strict, version of subtyping.
+    /// Unlike the subtyping relation, the redundancy relation sometimes allows a non-fully-static
+    /// type to be considered redundant with another type, and allows some types to be considered
+    /// redundant with non-fully-static types.
     ///
     /// For a pair of [fully static] types `A` and `B`, the redundancy relation between `A`
     /// and `B` is the same as the subtyping relation.
@@ -102,19 +107,28 @@ pub(crate) enum TypeRelation<'db> {
     /// of `C | D` is equivalent to the bottom materialization of `C`.
     /// More concisely: `D <: C` iff `Top[C | D] == Top[C]` AND `Bottom[C | D] == Bottom[C]`.
     ///
-    /// Practically speaking, in most respects the redundancy relation is the same as the subtyping
+    /// As stated above, in most respects the redundancy relation is the same as the subtyping
     /// relation. It is redundant to add `bool` to a union that includes `int`, because `bool` is a
     /// subtype of `int`, so inference of attribute access or binary expressions on the union
     /// `int | bool` would always produce a type that represents the same set of possible sets of
     /// runtime values as if ty had inferred the attribute access or binary expression on `int`
     /// alone.
     ///
-    /// Where the redundancy relation differs from the subtyping relation is that there are a
-    /// number of simplifications that can be made when simplifying unions that are not
-    /// strictly permitted by the subtyping relation. For example, it is safe to avoid adding
-    /// `Any` to a union that already includes `Any`, because `Any` already represents an
-    /// unknown set of possible sets of runtime values that can materialize to any type in a
-    /// gradual, permissive way. Inferring attribute access or binary expressions over
+    /// The redundancy relation is used prominently in two places as of 2026-02-25: for
+    /// simplifying unions and intersections in our smart type builders, and for calculating
+    /// equivalence between types. Union simplification is pragmatic, and passes `pure: false`;
+    /// equivalence checking requires "pure redundancy", and thus passes `pure: true`. Practically,
+    /// the behaviour difference here is that we want `Literal[False]` to always be considered
+    /// equivalent to `Literal[False]`, but we don't *necessarily* want `Literal[False]` to always
+    /// be considered redundant with `Literal[False]` if one `Literal[False]` is promotable and the
+    /// other is not.
+    ///
+    /// In comparing the redundancy relation with subtyping, one practical way in which they differ is
+    /// that the redundancy relation permits a number of simplifications that can be made when
+    /// simplifying unions that would not be strictly permitted by the subtyping relation. For example,
+    /// it is safe to avoid adding `Any` to a union that already includes `Any`, because `Any` already
+    /// represents an unknown set of possible sets of runtime values that can materialize to any type in
+    /// a gradual, permissive way. Inferring attribute access or binary expressions over
     /// `Any | Any` could never conceivably yield a type that represents a different set of
     /// possible sets of runtime values to inferring the same expression over `Any` alone;
     /// although `Any` is not a subtype of `Any`, top materialization of both `Any` and
@@ -141,7 +155,7 @@ pub(crate) enum TypeRelation<'db> {
     ///
     /// [fully static]: https://typing.python.org/en/latest/spec/glossary.html#term-fully-static-type
     /// [materializations]: https://typing.python.org/en/latest/spec/glossary.html#term-materialize
-    Redundancy,
+    Redundancy { pure: bool },
 
     /// The "constraint implication" relationship, aka "implies subtype of".
     ///
@@ -178,7 +192,7 @@ pub(crate) enum TypeRelation<'db> {
     ///   subtype check will be vacuously true, even if you're comparing two concrete types that
     ///   are not actually subtypes of each other. (That is, `implies_subtype_of(false, int, str)`
     ///   will return true!)
-    SubtypingAssuming(ConstraintSet<'db>),
+    SubtypingAssuming,
 
     /// A placeholder for the new assignability relation that uses constraint sets to encode
     /// relationships with a typevar. This will eventually replace `Assignability`, but allows us
@@ -186,7 +200,7 @@ pub(crate) enum TypeRelation<'db> {
     ConstraintSetAssignability,
 }
 
-impl TypeRelation<'_> {
+impl TypeRelation {
     pub(crate) const fn is_assignability(self) -> bool {
         matches!(self, TypeRelation::Assignability)
     }
@@ -203,8 +217,8 @@ impl TypeRelation<'_> {
         match self {
             TypeRelation::Assignability
             | TypeRelation::ConstraintSetAssignability
-            | TypeRelation::Redundancy => true,
-            TypeRelation::Subtyping | TypeRelation::SubtypingAssuming(_) => {
+            | TypeRelation::Redundancy { .. } => true,
+            TypeRelation::Subtyping | TypeRelation::SubtypingAssuming => {
                 ty.subtyping_is_always_reflexive()
             }
         }
@@ -213,39 +227,92 @@ impl TypeRelation<'_> {
 
 #[salsa::tracked]
 impl<'db> Type<'db> {
+    /// Return `true` if subtyping is always reflexive for this type; `T <: T` is always true for
+    /// any `T` of this type.
+    ///
+    /// This is true for fully static types, but also for some types that may not be fully static.
+    /// For example, a `ClassLiteral` may inherit `Any`, but its subtyping is still reflexive.
+    ///
+    /// This method may have false negatives, but it should not have false positives. It should be
+    /// a cheap shallow check, not an exhaustive recursive check.
+    const fn subtyping_is_always_reflexive(self) -> bool {
+        match self {
+            Type::Never
+            | Type::FunctionLiteral(..)
+            | Type::BoundMethod(_)
+            | Type::WrapperDescriptor(_)
+            | Type::KnownBoundMethod(_)
+            | Type::DataclassDecorator(_)
+            | Type::DataclassTransformer(_)
+            | Type::ModuleLiteral(..)
+            | Type::LiteralValue(_)
+            | Type::SpecialForm(_)
+            | Type::KnownInstance(_)
+            | Type::AlwaysFalsy
+            | Type::AlwaysTruthy
+            | Type::PropertyInstance(_)
+            // `T` is always a subtype of itself,
+            // and `T` is always a subtype of `T | None`
+            | Type::TypeVar(_)
+            // might inherit `Any`, but subtyping is still reflexive
+            | Type::ClassLiteral(_)
+             => true,
+            Type::Dynamic(_)
+            | Type::NominalInstance(_)
+            | Type::ProtocolInstance(_)
+            | Type::GenericAlias(_)
+            | Type::SubclassOf(_)
+            | Type::Union(_)
+            | Type::Intersection(_)
+            | Type::Callable(_)
+            | Type::BoundSuper(_)
+            | Type::TypeIs(_)
+            | Type::TypeGuard(_)
+            | Type::TypedDict(_)
+            | Type::TypeAlias(_)
+            | Type::NewTypeInstance(_) => false,
+        }
+    }
+
     /// Return true if this type is a subtype of type `target`.
     ///
     /// See [`TypeRelation::Subtyping`] for more details.
     pub(crate) fn is_subtype_of(self, db: &'db dyn Db, target: Type<'db>) -> bool {
-        self.when_subtype_of(db, target, InferableTypeVars::None)
+        let constraints = ConstraintSetBuilder::new();
+        self.when_subtype_of(db, target, &constraints, InferableTypeVars::None)
             .is_always_satisfied(db)
     }
 
-    pub(super) fn when_subtype_of(
+    pub(super) fn when_subtype_of<'c>(
         self,
         db: &'db dyn Db,
         target: Type<'db>,
+        constraints: &'c ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'_, 'db>,
-    ) -> ConstraintSet<'db> {
-        self.has_relation_to(db, target, inferable, TypeRelation::Subtyping)
+    ) -> ConstraintSet<'db, 'c> {
+        self.has_relation_to(db, target, constraints, inferable, TypeRelation::Subtyping)
     }
 
     /// Return the constraints under which this type is a subtype of type `target`, assuming that
     /// all of the restrictions in `constraints` hold.
     ///
     /// See [`TypeRelation::SubtypingAssuming`] for more details.
-    pub(super) fn when_subtype_of_assuming(
+    pub(super) fn when_subtype_of_assuming<'c>(
         self,
         db: &'db dyn Db,
         target: Type<'db>,
-        assuming: ConstraintSet<'db>,
+        assuming: ConstraintSet<'db, 'c>,
+        constraints: &'c ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'_, 'db>,
-    ) -> ConstraintSet<'db> {
-        self.has_relation_to(
+    ) -> ConstraintSet<'db, 'c> {
+        self.has_relation_to_impl(
             db,
             target,
+            constraints,
             inferable,
-            TypeRelation::SubtypingAssuming(assuming),
+            TypeRelation::SubtypingAssuming,
+            &HasRelationToVisitor::with_given(constraints, assuming),
+            &IsDisjointVisitor::default(constraints),
         )
     }
 
@@ -253,7 +320,8 @@ impl<'db> Type<'db> {
     ///
     /// See `TypeRelation::Assignability` for more details.
     pub fn is_assignable_to(self, db: &'db dyn Db, target: Type<'db>) -> bool {
-        self.when_assignable_to(db, target, InferableTypeVars::None)
+        let constraints = ConstraintSetBuilder::new();
+        self.when_assignable_to(db, target, &constraints, InferableTypeVars::None)
             .is_always_satisfied(db)
     }
 
@@ -263,28 +331,38 @@ impl<'db> Type<'db> {
     /// a constraint set and lets `satisfied_by_all_typevars` perform existential vs universal
     /// reasoning depending on inferable typevars.
     pub fn is_constraint_set_assignable_to(self, db: &'db dyn Db, target: Type<'db>) -> bool {
-        self.when_constraint_set_assignable_to(db, target, InferableTypeVars::None)
+        let constraints = ConstraintSetBuilder::new();
+        self.when_constraint_set_assignable_to(db, target, &constraints, InferableTypeVars::None)
             .is_always_satisfied(db)
     }
 
-    pub(super) fn when_assignable_to(
+    pub(super) fn when_assignable_to<'c>(
         self,
         db: &'db dyn Db,
         target: Type<'db>,
+        constraints: &'c ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'_, 'db>,
-    ) -> ConstraintSet<'db> {
-        self.has_relation_to(db, target, inferable, TypeRelation::Assignability)
-    }
-
-    pub(super) fn when_constraint_set_assignable_to(
-        self,
-        db: &'db dyn Db,
-        target: Type<'db>,
-        inferable: InferableTypeVars<'_, 'db>,
-    ) -> ConstraintSet<'db> {
+    ) -> ConstraintSet<'db, 'c> {
         self.has_relation_to(
             db,
             target,
+            constraints,
+            inferable,
+            TypeRelation::Assignability,
+        )
+    }
+
+    pub(super) fn when_constraint_set_assignable_to<'c>(
+        self,
+        db: &'db dyn Db,
+        target: Type<'db>,
+        constraints: &'c ConstraintSetBuilder<'db>,
+        inferable: InferableTypeVars<'_, 'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        self.has_relation_to(
+            db,
+            target,
+            constraints,
             inferable,
             TypeRelation::ConstraintSetAssignability,
         )
@@ -300,8 +378,15 @@ impl<'db> Type<'db> {
             self_ty: Type<'db>,
             other: Type<'db>,
         ) -> bool {
+            let constraints = ConstraintSetBuilder::new();
             self_ty
-                .has_relation_to(db, other, InferableTypeVars::None, TypeRelation::Redundancy)
+                .has_relation_to(
+                    db,
+                    other,
+                    &constraints,
+                    InferableTypeVars::None,
+                    TypeRelation::Redundancy { pure: false },
+                )
                 .is_always_satisfied(db)
         }
 
@@ -312,47 +397,52 @@ impl<'db> Type<'db> {
         is_redundant_with_impl(db, self, other)
     }
 
-    fn has_relation_to(
+    pub(super) fn has_relation_to<'c>(
         self,
         db: &'db dyn Db,
         target: Type<'db>,
+        constraints: &'c ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'_, 'db>,
-        relation: TypeRelation<'db>,
-    ) -> ConstraintSet<'db> {
+        relation: TypeRelation,
+    ) -> ConstraintSet<'db, 'c> {
         self.has_relation_to_impl(
             db,
             target,
+            constraints,
             inferable,
             relation,
-            &HasRelationToVisitor::default(),
-            &IsDisjointVisitor::default(),
+            &HasRelationToVisitor::default(constraints),
+            &IsDisjointVisitor::default(constraints),
         )
     }
 
-    pub(super) fn has_relation_to_impl(
+    #[expect(clippy::too_many_arguments)]
+    pub(super) fn has_relation_to_impl<'c>(
         self,
         db: &'db dyn Db,
         target: Type<'db>,
+        constraints: &'c ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'_, 'db>,
-        relation: TypeRelation<'db>,
-        relation_visitor: &HasRelationToVisitor<'db>,
-        disjointness_visitor: &IsDisjointVisitor<'db>,
-    ) -> ConstraintSet<'db> {
+        relation: TypeRelation,
+        relation_visitor: &HasRelationToVisitor<'db, 'c>,
+        disjointness_visitor: &IsDisjointVisitor<'db, 'c>,
+    ) -> ConstraintSet<'db, 'c> {
         // Subtyping implies assignability, so if subtyping is reflexive and the two types are
         // equal, it is both a subtype and assignable. Assignability is always reflexive.
         //
         // Note that we could do a full equivalence check here, but that would be both expensive
         // and unnecessary. This early return is only an optimisation.
         if relation.can_safely_assume_reflexivity(self) && self == target {
-            return ConstraintSet::from(true);
+            return ConstraintSet::from_bool(constraints, true);
         }
 
         // Handle constraint implication first. If either `self` or `target` is a typevar, check
         // the constraint set to see if the corresponding constraint is satisfied.
-        if let TypeRelation::SubtypingAssuming(constraints) = relation
+        if relation == TypeRelation::SubtypingAssuming
             && (self.is_type_var() || target.is_type_var())
         {
-            return constraints.implies_subtype_of(db, self, target);
+            let given = relation_visitor.extra;
+            return given.implies_subtype_of(db, constraints, self, target);
         }
 
         // Handle the new constraint-set-based assignability relation next. Comparisons with a
@@ -364,31 +454,49 @@ impl<'db> Type<'db> {
             // only has to hold when the typevar has a valid specialization (i.e., one that
             // satisfies the upper bound/constraints).
             if let Type::TypeVar(bound_typevar) = self {
-                return ConstraintSet::constrain_typevar(db, bound_typevar, Type::Never, target);
+                return ConstraintSet::constrain_typevar(
+                    db,
+                    constraints,
+                    bound_typevar,
+                    Type::Never,
+                    target,
+                );
             } else if let Type::TypeVar(bound_typevar) = target {
-                return ConstraintSet::constrain_typevar(db, bound_typevar, self, Type::object());
+                return ConstraintSet::constrain_typevar(
+                    db,
+                    constraints,
+                    bound_typevar,
+                    self,
+                    Type::object(),
+                );
             }
         }
 
         match (self, target) {
             // Everything is a subtype of `object`.
             (_, Type::NominalInstance(instance)) if instance.is_object() => {
-                ConstraintSet::from(true)
+                ConstraintSet::from_bool(constraints, true)
             }
             (_, Type::ProtocolInstance(target)) if target.is_equivalent_to_object(db) => {
-                ConstraintSet::from(true)
+                ConstraintSet::from_bool(constraints, true)
             }
 
             // `Never` is the bottom type, the empty set.
             // It is a subtype of all other types.
-            (Type::Never, _) => ConstraintSet::from(true),
+            (Type::Never, _) => ConstraintSet::from_bool(constraints, true),
+
+            (Type::TypeVar(self_typevar), Type::TypeVar(other_typevar))
+                if self_typevar.is_same_typevar_as(db, other_typevar) =>
+            {
+                ConstraintSet::from_bool(constraints, true)
+            }
 
             // In some specific situations, `Any`/`Unknown`/`@Todo` can be simplified out of unions and intersections,
             // but this is not true for divergent types (and moving this case any lower down appears to cause
             // "too many cycle iterations" panics).
             (Type::Dynamic(DynamicType::Divergent(_)), _)
             | (_, Type::Dynamic(DynamicType::Divergent(_))) => {
-                ConstraintSet::from(relation.is_assignability())
+                ConstraintSet::from_bool(constraints, relation.is_assignability())
             }
 
             (Type::TypeAlias(self_alias), _) => {
@@ -396,6 +504,7 @@ impl<'db> Type<'db> {
                     self_alias.value_type(db).has_relation_to_impl(
                         db,
                         target,
+                        constraints,
                         inferable,
                         relation,
                         relation_visitor,
@@ -409,6 +518,7 @@ impl<'db> Type<'db> {
                     self.has_relation_to_impl(
                         db,
                         target_alias.value_type(db),
+                        constraints,
                         inferable,
                         relation,
                         relation_visitor,
@@ -423,16 +533,19 @@ impl<'db> Type<'db> {
             (Type::KnownInstance(KnownInstanceType::Field(field)), right)
                 if relation.is_assignability() =>
             {
-                field.default_type(db).when_none_or(|default_type| {
-                    default_type.has_relation_to_impl(
-                        db,
-                        right,
-                        inferable,
-                        relation,
-                        relation_visitor,
-                        disjointness_visitor,
-                    )
-                })
+                field
+                    .default_type(db)
+                    .when_none_or(db, constraints, |default_type| {
+                        default_type.has_relation_to_impl(
+                            db,
+                            right,
+                            constraints,
+                            inferable,
+                            relation,
+                            relation_visitor,
+                            disjointness_visitor,
+                        )
+                    })
             }
 
             // Dynamic is only a subtype of `object` and only a supertype of `Never`; both were
@@ -448,31 +561,39 @@ impl<'db> Type<'db> {
                     !matches!(dynamic, DynamicType::Divergent(_)),
                     "DynamicType::Divergent should have been handled in an earlier branch"
                 );
-                ConstraintSet::from(match relation {
-                    TypeRelation::Subtyping | TypeRelation::SubtypingAssuming(_) => false,
+                ConstraintSet::from_bool(
+                    constraints,
+                    match relation {
+                        TypeRelation::Subtyping | TypeRelation::SubtypingAssuming => false,
+                        TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability => {
+                            true
+                        }
+                        TypeRelation::Redundancy { .. } => match target {
+                            Type::Dynamic(_) => true,
+                            Type::Union(union) => union.elements(db).iter().any(Type::is_dynamic),
+                            _ => false,
+                        },
+                    },
+                )
+            }
+            (_, Type::Dynamic(_)) => ConstraintSet::from_bool(
+                constraints,
+                match relation {
+                    TypeRelation::Subtyping | TypeRelation::SubtypingAssuming => false,
                     TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability => true,
-                    TypeRelation::Redundancy => match target {
+                    TypeRelation::Redundancy { .. } => match self {
                         Type::Dynamic(_) => true,
-                        Type::Union(union) => union.elements(db).iter().any(Type::is_dynamic),
+                        Type::Intersection(intersection) => {
+                            // If a `Divergent` type is involved, it must not be eliminated.
+                            intersection
+                                .positive(db)
+                                .iter()
+                                .any(Type::is_non_divergent_dynamic)
+                        }
                         _ => false,
                     },
-                })
-            }
-            (_, Type::Dynamic(_)) => ConstraintSet::from(match relation {
-                TypeRelation::Subtyping | TypeRelation::SubtypingAssuming(_) => false,
-                TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability => true,
-                TypeRelation::Redundancy => match self {
-                    Type::Dynamic(_) => true,
-                    Type::Intersection(intersection) => {
-                        // If a `Divergent` type is involved, it must not be eliminated.
-                        intersection
-                            .positive(db)
-                            .iter()
-                            .any(Type::is_non_divergent_dynamic)
-                    }
-                    _ => false,
                 },
-            }),
+            ),
 
             // In general, a TypeVar `T` is not redundant with a type `S` unless one of the two conditions is satisfied:
             // 1. `T` is a bound TypeVar and `T`'s upper bound is a subtype of `S`.
@@ -485,7 +606,7 @@ impl<'db> Type<'db> {
                 if relation.can_safely_assume_reflexivity(self)
                     && union.elements(db).contains(&self) =>
             {
-                ConstraintSet::from(true)
+                ConstraintSet::from_bool(constraints, true)
             }
 
             // A similar rule applies in reverse to intersection types.
@@ -493,7 +614,7 @@ impl<'db> Type<'db> {
                 if relation.can_safely_assume_reflexivity(target)
                     && intersection.positive(db).contains(&target) =>
             {
-                ConstraintSet::from(true)
+                ConstraintSet::from_bool(constraints, true)
             }
             (Type::Intersection(intersection), _)
                 if relation.is_assignability()
@@ -502,13 +623,13 @@ impl<'db> Type<'db> {
                 // If the intersection contains `Any`/`Unknown`/`@Todo`, it is assignable to any type.
                 // `Any` could materialize to `Never`, `Never & T & ~S` simplifies to `Never` for any
                 // `T` and any `S`, and `Never` is a subtype of all types.
-                ConstraintSet::from(true)
+                ConstraintSet::from_bool(constraints, true)
             }
             (Type::Intersection(intersection), _)
                 if relation.can_safely_assume_reflexivity(target)
                     && intersection.negative(db).contains(&target) =>
             {
-                ConstraintSet::from(false)
+                ConstraintSet::from_bool(constraints, false)
             }
 
             // `type[T]` is a subtype of the class object `A` if every instance of `T` is a subtype of an instance
@@ -517,10 +638,11 @@ impl<'db> Type<'db> {
                 if !subclass_of
                     .into_type_var()
                     .zip(target.to_instance(db))
-                    .when_some_and(|(this_instance, other_instance)| {
+                    .when_some_and(db, constraints, |(this_instance, other_instance)| {
                         Type::TypeVar(this_instance).has_relation_to_impl(
                             db,
                             other_instance,
+                            constraints,
                             inferable,
                             relation,
                             relation_visitor,
@@ -533,10 +655,11 @@ impl<'db> Type<'db> {
                 subclass_of
                     .into_type_var()
                     .zip(target.to_instance(db))
-                    .when_some_and(|(this_instance, other_instance)| {
+                    .when_some_and(db, constraints, |(this_instance, other_instance)| {
                         Type::TypeVar(this_instance).has_relation_to_impl(
                             db,
                             other_instance,
+                            constraints,
                             inferable,
                             relation,
                             relation_visitor,
@@ -549,10 +672,11 @@ impl<'db> Type<'db> {
                 if !subclass_of
                     .into_type_var()
                     .zip(self.to_instance(db))
-                    .when_some_and(|(other_instance, this_instance)| {
+                    .when_some_and(db, constraints, |(other_instance, this_instance)| {
                         this_instance.has_relation_to_impl(
                             db,
                             Type::TypeVar(other_instance),
+                            constraints,
                             inferable,
                             relation,
                             relation_visitor,
@@ -565,10 +689,11 @@ impl<'db> Type<'db> {
                 subclass_of
                     .into_type_var()
                     .zip(self.to_instance(db))
-                    .when_some_and(|(other_instance, this_instance)| {
+                    .when_some_and(db, constraints, |(other_instance, this_instance)| {
                         this_instance.has_relation_to_impl(
                             db,
                             Type::TypeVar(other_instance),
+                            constraints,
                             inferable,
                             relation,
                             relation_visitor,
@@ -590,22 +715,28 @@ impl<'db> Type<'db> {
                         .has_relation_to_impl(
                             db,
                             target,
+                            constraints,
                             inferable,
                             relation,
                             relation_visitor,
                             disjointness_visitor,
                         ),
-                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                        constraints.elements(db).iter().when_all(db, |constraint| {
-                            constraint.has_relation_to_impl(
-                                db,
-                                target,
-                                inferable,
-                                relation,
-                                relation_visitor,
-                                disjointness_visitor,
-                            )
-                        })
+                    Some(TypeVarBoundOrConstraints::Constraints(typevar_constraints)) => {
+                        typevar_constraints.elements(db).iter().when_all(
+                            db,
+                            constraints,
+                            |constraint| {
+                                constraint.has_relation_to_impl(
+                                    db,
+                                    target,
+                                    constraints,
+                                    inferable,
+                                    relation,
+                                    relation_visitor,
+                                    disjointness_visitor,
+                                )
+                            },
+                        )
                     }
                 }
             }
@@ -618,17 +749,20 @@ impl<'db> Type<'db> {
                     && !bound_typevar
                         .typevar(db)
                         .constraints(db)
-                        .when_some_and(|constraints| {
-                            constraints.iter().when_all(db, |constraint| {
-                                self.has_relation_to_impl(
-                                    db,
-                                    *constraint,
-                                    inferable,
-                                    relation,
-                                    relation_visitor,
-                                    disjointness_visitor,
-                                )
-                            })
+                        .when_some_and(db, constraints, |typevar_constraints| {
+                            typevar_constraints
+                                .iter()
+                                .when_all(db, constraints, |constraint| {
+                                    self.has_relation_to_impl(
+                                        db,
+                                        *constraint,
+                                        constraints,
+                                        inferable,
+                                        relation,
+                                        relation_visitor,
+                                        disjointness_visitor,
+                                    )
+                                })
                         })
                         .is_never_satisfied(db) =>
             {
@@ -636,21 +770,25 @@ impl<'db> Type<'db> {
                 // where this arm only engages if it returns true (or in the world of constraints,
                 // not false). Once we're using real constraint sets instead of bool, we should be
                 // able to simplify the typevar logic.
-                bound_typevar
-                    .typevar(db)
-                    .constraints(db)
-                    .when_some_and(|constraints| {
-                        constraints.iter().when_all(db, |constraint| {
-                            self.has_relation_to_impl(
-                                db,
-                                *constraint,
-                                inferable,
-                                relation,
-                                relation_visitor,
-                                disjointness_visitor,
-                            )
-                        })
-                    })
+                bound_typevar.typevar(db).constraints(db).when_some_and(
+                    db,
+                    constraints,
+                    |typevar_constraints| {
+                        typevar_constraints
+                            .iter()
+                            .when_all(db, constraints, |constraint| {
+                                self.has_relation_to_impl(
+                                    db,
+                                    *constraint,
+                                    constraints,
+                                    inferable,
+                                    relation,
+                                    relation_visitor,
+                                    disjointness_visitor,
+                                )
+                            })
+                    },
+                )
             }
 
             (Type::TypeVar(bound_typevar), _) if bound_typevar.is_inferable(db, inferable) => {
@@ -659,14 +797,33 @@ impl<'db> Type<'db> {
 
                 // TODO: record the unification constraints
 
-                ConstraintSet::from(true)
+                ConstraintSet::from_bool(constraints, true)
+            }
+
+            // Fast path for various types that we know `object` is never a subtype of
+            // (`object` can be a subtype of some protocols, or of itself, but those cases are
+            // handled above).
+            (
+                Type::NominalInstance(source),
+                Type::NominalInstance(_)
+                | Type::SubclassOf(_)
+                | Type::Callable(_)
+                | Type::ProtocolInstance(_),
+            ) if source.is_object() => ConstraintSet::from_bool(constraints, false),
+
+            // Fast path: `object` is not a subtype of any non-inferable type variable, since the
+            // type variable could be specialized to a type smaller than `object`.
+            (Type::NominalInstance(source), Type::TypeVar(typevar))
+                if source.is_object() && !typevar.is_inferable(db, inferable) =>
+            {
+                ConstraintSet::from_bool(constraints, false)
             }
 
             // `Never` is the bottom type, the empty set.
-            (_, Type::Never) => ConstraintSet::from(false),
+            (_, Type::Never) => ConstraintSet::from_bool(constraints, false),
 
             (Type::NewTypeInstance(self_newtype), Type::NewTypeInstance(target_newtype)) => {
-                self_newtype.has_relation_to_impl(db, target_newtype)
+                self_newtype.has_relation_to_impl(db, target_newtype, constraints)
             }
             // In the special cases of `NewType`s of `float` or `complex`, the concrete base type
             // can be a union (`int | float` or `int | float | complex`). For that reason,
@@ -697,10 +854,11 @@ impl<'db> Type<'db> {
                 union
                     .elements(db)
                     .iter()
-                    .when_any(db, |&elem_ty| {
+                    .when_any(db, constraints, |&elem_ty| {
                         self.has_relation_to_impl(
                             db,
                             elem_ty,
+                            constraints,
                             inferable,
                             relation,
                             relation_visitor,
@@ -710,44 +868,57 @@ impl<'db> Type<'db> {
                     // Failing that, if the concrete base type is a union, try delegating to that.
                     // Otherwise, this would be equivalent to what we just checked, and we
                     // shouldn't waste time checking it twice.
-                    .or(db, || {
+                    .or(db, constraints, || {
                         let concrete_base = self_newtype.concrete_base_type(db);
                         if matches!(concrete_base, Type::Union(_)) {
                             concrete_base.has_relation_to_impl(
                                 db,
                                 target,
+                                constraints,
                                 inferable,
                                 relation,
                                 relation_visitor,
                                 disjointness_visitor,
                             )
                         } else {
-                            ConstraintSet::from(false)
+                            ConstraintSet::from_bool(constraints, false)
                         }
                     })
             }
 
-            (Type::Union(union), _) => union.elements(db).iter().when_all(db, |&elem_ty| {
-                elem_ty.has_relation_to_impl(
-                    db,
-                    target,
-                    inferable,
-                    relation,
-                    relation_visitor,
-                    disjointness_visitor,
-                )
-            }),
+            (Type::Union(union), _) => {
+                union
+                    .elements(db)
+                    .iter()
+                    .when_all(db, constraints, |&elem_ty| {
+                        elem_ty.has_relation_to_impl(
+                            db,
+                            target,
+                            constraints,
+                            inferable,
+                            relation,
+                            relation_visitor,
+                            disjointness_visitor,
+                        )
+                    })
+            }
 
-            (_, Type::Union(union)) => union.elements(db).iter().when_any(db, |&elem_ty| {
-                self.has_relation_to_impl(
-                    db,
-                    elem_ty,
-                    inferable,
-                    relation,
-                    relation_visitor,
-                    disjointness_visitor,
-                )
-            }),
+            (_, Type::Union(union)) => {
+                union
+                    .elements(db)
+                    .iter()
+                    .when_any(db, constraints, |&elem_ty| {
+                        self.has_relation_to_impl(
+                            db,
+                            elem_ty,
+                            constraints,
+                            inferable,
+                            relation,
+                            relation_visitor,
+                            disjointness_visitor,
+                        )
+                    })
+            }
 
             // If both sides are intersections we need to handle the right side first
             // (A & B & C) is a subtype of (A & B) because the left is a subtype of both A and B,
@@ -755,17 +926,18 @@ impl<'db> Type<'db> {
             (_, Type::Intersection(intersection)) => intersection
                 .positive(db)
                 .iter()
-                .when_all(db, |&pos_ty| {
+                .when_all(db, constraints, |&pos_ty| {
                     self.has_relation_to_impl(
                         db,
                         pos_ty,
+                        constraints,
                         inferable,
                         relation,
                         relation_visitor,
                         disjointness_visitor,
                     )
                 })
-                .and(db, || {
+                .and(db, constraints, || {
                     // For subtyping, we would want to check whether the *top materialization* of `self`
                     // is disjoint from the *top materialization* of `neg_ty`. As an optimization, however,
                     // we can avoid this explicit transformation here, since our `Type::is_disjoint_from`
@@ -781,43 +953,54 @@ impl<'db> Type<'db> {
                     // of redundancy may not generally lead to simpler types in many situations.
                     let self_ty = match relation {
                         TypeRelation::Subtyping
-                        | TypeRelation::Redundancy
-                        | TypeRelation::SubtypingAssuming(_) => self,
+                        | TypeRelation::Redundancy { .. }
+                        | TypeRelation::SubtypingAssuming => self,
                         TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability => {
                             self.bottom_materialization(db)
                         }
                     };
-                    intersection.negative(db).iter().when_all(db, |&neg_ty| {
-                        let neg_ty = match relation {
-                            TypeRelation::Subtyping
-                            | TypeRelation::Redundancy
-                            | TypeRelation::SubtypingAssuming(_) => neg_ty,
-                            TypeRelation::Assignability
-                            | TypeRelation::ConstraintSetAssignability => {
-                                neg_ty.bottom_materialization(db)
-                            }
-                        };
-                        self_ty.is_disjoint_from_impl(
-                            db,
-                            neg_ty,
-                            inferable,
-                            disjointness_visitor,
-                            relation_visitor,
-                        )
-                    })
+                    intersection
+                        .negative(db)
+                        .iter()
+                        .when_all(db, constraints, |&neg_ty| {
+                            let neg_ty = match relation {
+                                TypeRelation::Subtyping
+                                | TypeRelation::Redundancy { .. }
+                                | TypeRelation::SubtypingAssuming => neg_ty,
+                                TypeRelation::Assignability
+                                | TypeRelation::ConstraintSetAssignability => {
+                                    neg_ty.bottom_materialization(db)
+                                }
+                            };
+                            self_ty.is_disjoint_from_impl(
+                                db,
+                                neg_ty,
+                                constraints,
+                                inferable,
+                                disjointness_visitor,
+                                relation_visitor,
+                            )
+                        })
                 }),
 
             (Type::Intersection(intersection), _) => {
-                intersection.positive(db).iter().when_any(db, |&elem_ty| {
-                    elem_ty.has_relation_to_impl(
-                        db,
-                        target,
-                        inferable,
-                        relation,
-                        relation_visitor,
-                        disjointness_visitor,
-                    )
-                })
+                // An intersection type is a subtype of another type if at least one of its
+                // positive elements is a subtype of that type. If there are no positive elements,
+                // we treat `object` as the implicit positive element (e.g., `~str` is semantically
+                // `object & ~str`).
+                intersection
+                    .positive_elements_or_object(db)
+                    .when_any(db, constraints, |elem_ty| {
+                        elem_ty.has_relation_to_impl(
+                            db,
+                            target,
+                            constraints,
+                            inferable,
+                            relation,
+                            relation_visitor,
+                            disjointness_visitor,
+                        )
+                    })
             }
 
             // Other than the special cases checked above, no other types are a subtype of a
@@ -826,7 +1009,7 @@ impl<'db> Type<'db> {
             // bound. This is true even if the bound is a final class, since the typevar can still
             // be specialized to `Never`.)
             (_, Type::TypeVar(bound_typevar)) if !bound_typevar.is_inferable(db, inferable) => {
-                ConstraintSet::from(false)
+                ConstraintSet::from_bool(constraints, false)
             }
 
             (_, Type::TypeVar(typevar))
@@ -837,6 +1020,7 @@ impl<'db> Type<'db> {
                             .has_relation_to_impl(
                                 db,
                                 bound,
+                                constraints,
                                 inferable,
                                 relation,
                                 relation_visitor,
@@ -847,26 +1031,30 @@ impl<'db> Type<'db> {
             {
                 // TODO: record the unification constraints
 
-                typevar.typevar(db).upper_bound(db).when_none_or(|bound| {
-                    self.has_relation_to_impl(
-                        db,
-                        bound,
-                        inferable,
-                        relation,
-                        relation_visitor,
-                        disjointness_visitor,
-                    )
-                })
+                typevar
+                    .typevar(db)
+                    .upper_bound(db)
+                    .when_none_or(db, constraints, |bound| {
+                        self.has_relation_to_impl(
+                            db,
+                            bound,
+                            constraints,
+                            inferable,
+                            relation,
+                            relation_visitor,
+                            disjointness_visitor,
+                        )
+                    })
             }
 
             // TODO: Infer specializations here
             (_, Type::TypeVar(bound_typevar)) if bound_typevar.is_inferable(db, inferable) => {
-                ConstraintSet::from(false)
+                ConstraintSet::from_bool(constraints, false)
             }
             (Type::TypeVar(bound_typevar), _) => {
                 // All inferable cases should have been handled above
                 assert!(!bound_typevar.is_inferable(db, inferable));
-                ConstraintSet::from(false)
+                ConstraintSet::from_bool(constraints, false)
             }
 
             // All other `NewType` assignments fall back to the concrete base type.
@@ -877,6 +1065,7 @@ impl<'db> Type<'db> {
                 self_newtype.concrete_base_type(db).has_relation_to_impl(
                     db,
                     target,
+                    constraints,
                     inferable,
                     relation,
                     relation_visitor,
@@ -886,11 +1075,25 @@ impl<'db> Type<'db> {
 
             // Note that the definition of `Type::AlwaysFalsy` depends on the return value of `__bool__`.
             // If `__bool__` always returns True or False, it can be treated as a subtype of `AlwaysTruthy` or `AlwaysFalsy`, respectively.
-            (left, Type::AlwaysFalsy) => ConstraintSet::from(left.bool(db).is_always_false()),
-            (left, Type::AlwaysTruthy) => ConstraintSet::from(left.bool(db).is_always_true()),
+            (left, Type::AlwaysFalsy) => {
+                ConstraintSet::from_bool(constraints, left.bool(db).is_always_false())
+            }
+            (left, Type::AlwaysTruthy) => {
+                ConstraintSet::from_bool(constraints, left.bool(db).is_always_true())
+            }
             // Currently, the only supertype of `AlwaysFalsy` and `AlwaysTruthy` is the universal set (object instance).
             (Type::AlwaysFalsy | Type::AlwaysTruthy, _) => {
-                target.when_equivalent_to(db, Type::object(), inferable)
+                relation_visitor.visit((self, target, relation), || {
+                    Type::object().has_relation_to_impl(
+                        db,
+                        target,
+                        constraints,
+                        inferable,
+                        relation,
+                        relation_visitor,
+                        disjointness_visitor,
+                    )
+                })
             }
 
             // These clauses handle type variants that include function literals. A function
@@ -902,6 +1105,7 @@ impl<'db> Type<'db> {
                 self_function.has_relation_to_impl(
                     db,
                     target_function,
+                    constraints,
                     inferable,
                     relation,
                     relation_visitor,
@@ -912,6 +1116,7 @@ impl<'db> Type<'db> {
                 .has_relation_to_impl(
                     db,
                     target_method,
+                    constraints,
                     inferable,
                     relation,
                     relation_visitor,
@@ -921,6 +1126,7 @@ impl<'db> Type<'db> {
                 self_method.has_relation_to_impl(
                     db,
                     target_method,
+                    constraints,
                     inferable,
                     relation,
                     relation_visitor,
@@ -928,32 +1134,49 @@ impl<'db> Type<'db> {
                 )
             }
 
+            // All `StringLiteral` types are a subtype of `LiteralString`.
+            (Type::LiteralValue(this), Type::LiteralValue(target))
+                if this.is_string() && target.is_literal_string() =>
+            {
+                ConstraintSet::from_bool(constraints, true)
+            }
+
+            // For union simplification, we want to preserve the unpromotable form of a literal value,
+            // and so redundancy is not symmetric.
+            (Type::LiteralValue(this), Type::LiteralValue(target))
+                if matches!(relation, TypeRelation::Redundancy { pure: false }) =>
+            {
+                ConstraintSet::from_bool(
+                    constraints,
+                    this.kind() == target.kind() && this.is_promotable(),
+                )
+            }
+
+            (Type::LiteralValue(this), Type::LiteralValue(target)) => {
+                ConstraintSet::from_bool(constraints, this.kind() == target.kind())
+            }
+
             // No literal type is a subtype of any other literal type, unless they are the same
             // type (which is handled above). This case is not necessary from a correctness
             // perspective (the fallback cases below will handle it correctly), but it is important
             // for performance of simplifying large unions of literal types.
             (
-                Type::StringLiteral(_)
-                | Type::IntLiteral(_)
-                | Type::BytesLiteral(_)
+                Type::LiteralValue(_)
                 | Type::ClassLiteral(_)
                 | Type::FunctionLiteral(_)
-                | Type::ModuleLiteral(_)
-                | Type::EnumLiteral(_),
-                Type::StringLiteral(_)
-                | Type::IntLiteral(_)
-                | Type::BytesLiteral(_)
+                | Type::ModuleLiteral(_),
+                Type::LiteralValue(_)
                 | Type::ClassLiteral(_)
                 | Type::FunctionLiteral(_)
-                | Type::ModuleLiteral(_)
-                | Type::EnumLiteral(_),
-            ) => ConstraintSet::from(false),
+                | Type::ModuleLiteral(_),
+            ) => ConstraintSet::from_bool(constraints, false),
 
             (Type::Callable(self_callable), Type::Callable(other_callable)) => relation_visitor
                 .visit((self, target, relation), || {
                     self_callable.has_relation_to_impl(
                         db,
                         other_callable,
+                        constraints,
                         inferable,
                         relation,
                         relation_visitor,
@@ -962,11 +1185,31 @@ impl<'db> Type<'db> {
                 }),
 
             (_, Type::Callable(other_callable)) => {
+                // Special-case: upcasting a subclass-of to its `Callable` "supertype" is unsound,
+                // because we don't do Liskov checks for constructor signatures.
+                let upcasted = if let Type::SubclassOf(inner) = self {
+                    match relation {
+                        TypeRelation::Subtyping
+                        | TypeRelation::SubtypingAssuming
+                        | TypeRelation::Redundancy { .. } => {
+                            Some(CallableTypes::one(CallableType::function_like(
+                                db,
+                                Signature::new(Parameters::top(), inner.to_instance(db)),
+                            )))
+                        }
+                        TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability => {
+                            self.try_upcast_to_callable(db)
+                        }
+                    }
+                } else {
+                    self.try_upcast_to_callable(db)
+                };
                 relation_visitor.visit((self, target, relation), || {
-                    self.try_upcast_to_callable(db).when_some_and(|callables| {
+                    upcasted.when_some_and(db, constraints, |callables| {
                         callables.has_relation_to_impl(
                             db,
                             other_callable,
+                            constraints,
                             inferable,
                             relation,
                             relation_visitor,
@@ -989,6 +1232,7 @@ impl<'db> Type<'db> {
                 KnownClass::Type.to_instance(db).has_relation_to_impl(
                     db,
                     target,
+                    constraints,
                     inferable,
                     relation,
                     relation_visitor,
@@ -1001,6 +1245,7 @@ impl<'db> Type<'db> {
                     self.satisfies_protocol(
                         db,
                         protocol,
+                        constraints,
                         inferable,
                         relation,
                         relation_visitor,
@@ -1010,13 +1255,14 @@ impl<'db> Type<'db> {
             }
 
             // A protocol instance can never be a subtype of a nominal type, with the *sole* exception of `object`.
-            (Type::ProtocolInstance(_), _) => ConstraintSet::from(false),
+            (Type::ProtocolInstance(_), _) => ConstraintSet::from_bool(constraints, false),
 
             (Type::TypedDict(self_typeddict), Type::TypedDict(other_typeddict)) => relation_visitor
                 .visit((self, target, relation), || {
                     self_typeddict.has_relation_to_impl(
                         db,
                         other_typeddict,
+                        constraints,
                         inferable,
                         relation,
                         relation_visitor,
@@ -1034,6 +1280,7 @@ impl<'db> Type<'db> {
                     .has_relation_to_impl(
                         db,
                         target,
+                        constraints,
                         inferable,
                         relation,
                         relation_visitor,
@@ -1042,22 +1289,18 @@ impl<'db> Type<'db> {
             }),
 
             // A non-`TypedDict` cannot subtype a `TypedDict`
-            (_, Type::TypedDict(_)) => ConstraintSet::from(false),
-
-            // All `StringLiteral` types are a subtype of `LiteralString`.
-            (Type::StringLiteral(_), Type::LiteralString) => ConstraintSet::from(true),
+            (_, Type::TypedDict(_)) => ConstraintSet::from_bool(constraints, false),
 
             // A string literal `Literal["abc"]` is assignable to `str` *and* to
             // `Sequence[Literal["a", "b", "c"]]` because strings are sequences of their characters.
-            //
-            // Note that this strictly holds true for all type relations!
-            // However, as an optimisation (to avoid interning many single-character string-literal types),
-            // we only recognise this as being true for assignability.
-            (Type::StringLiteral(value), Type::NominalInstance(instance)) => {
+            (Type::LiteralValue(literal), Type::NominalInstance(instance))
+                if literal.is_string() =>
+            {
+                let value = literal.as_string().unwrap();
                 let other_class = instance.class(db);
 
                 if other_class.is_known(db, KnownClass::Str) {
-                    return ConstraintSet::from(true);
+                    return ConstraintSet::from_bool(constraints, true);
                 }
 
                 if let Some(sequence_class) = KnownClass::Sequence.try_to_class_literal(db)
@@ -1067,7 +1310,7 @@ impl<'db> Type<'db> {
                         .map(|class| class.class_literal(db))
                         .contains(&other_class.class_literal(db))
                 {
-                    return ConstraintSet::from(false);
+                    return ConstraintSet::from_bool(constraints, false);
                 }
 
                 let chars: FxHashSet<char> = value.value(db).chars().collect();
@@ -1089,10 +1332,11 @@ impl<'db> Type<'db> {
 
                 KnownClass::Sequence
                     .to_specialized_class_type(db, &[spec])
-                    .when_some_and(|sequence| {
+                    .when_some_and(db, constraints, |sequence| {
                         sequence.has_relation_to_impl(
                             db,
                             other_class,
+                            constraints,
                             inferable,
                             relation,
                             relation_visitor,
@@ -1101,49 +1345,104 @@ impl<'db> Type<'db> {
                     })
             }
 
-            (Type::StringLiteral(_), _) => ConstraintSet::from(false),
+            (Type::LiteralValue(literal), _) if literal.is_string() => {
+                ConstraintSet::from_bool(constraints, false)
+            }
+
+            // A bytes literal `Literal[b"abc"]` is assignable to `bytes` *and* to
+            // `Sequence[Literal[97, 98, 99]]` because bytes are sequences of integers.
+            (Type::LiteralValue(literal), Type::NominalInstance(instance))
+                if literal.is_bytes() =>
+            {
+                let value = literal.as_bytes().unwrap();
+                let other_class = instance.class(db);
+
+                if other_class.is_known(db, KnownClass::Bytes) {
+                    return ConstraintSet::from_bool(constraints, true);
+                }
+
+                if let Some(sequence_class) = KnownClass::Sequence.try_to_class_literal(db)
+                    && !sequence_class
+                        .iter_mro(db, None)
+                        .filter_map(ClassBase::into_class)
+                        .map(|class| class.class_literal(db))
+                        .contains(&other_class.class_literal(db))
+                {
+                    return ConstraintSet::from_bool(constraints, false);
+                }
+
+                let ints: FxHashSet<i64> = value
+                    .value(db)
+                    .iter()
+                    .map(|byte| i64::from(*byte))
+                    .collect();
+
+                let spec = match ints.len() {
+                    0 => Type::Never,
+                    1 => Type::int_literal(*ints.iter().next().unwrap()),
+                    _ => {
+                        let union_elements: Box<[Type<'db>]> =
+                            ints.iter().map(|int| Type::int_literal(*int)).collect();
+                        Type::Union(UnionType::new(db, union_elements, RecursivelyDefined::No))
+                    }
+                };
+
+                KnownClass::Sequence
+                    .to_specialized_class_type(db, &[spec])
+                    .when_some_and(db, constraints, |sequence| {
+                        sequence.has_relation_to_impl(
+                            db,
+                            other_class,
+                            constraints,
+                            inferable,
+                            relation,
+                            relation_visitor,
+                            disjointness_visitor,
+                        )
+                    })
+            }
+
+            (Type::LiteralValue(literal), _) if literal.is_bytes() => {
+                ConstraintSet::from_bool(constraints, false)
+            }
 
             // An instance is a subtype of an enum literal, if it is an instance of the enum class
             // and the enum has only one member.
-            (Type::NominalInstance(_), Type::EnumLiteral(target_enum_literal)) => {
+            (Type::NominalInstance(_), Type::LiteralValue(literal)) if literal.is_enum() => {
+                let target_enum_literal = literal.as_enum().unwrap();
                 if target_enum_literal.enum_class_instance(db) != self {
-                    return ConstraintSet::from(false);
+                    return ConstraintSet::from_bool(constraints, false);
                 }
 
-                ConstraintSet::from(is_single_member_enum(
-                    db,
-                    target_enum_literal.enum_class(db),
-                ))
+                ConstraintSet::from_bool(
+                    constraints,
+                    is_single_member_enum(db, target_enum_literal.enum_class(db)),
+                )
             }
 
-            // Except for the special `LiteralString` and `StringLiteral` cases above,
+            // Except for the special `BytesLiteral`, `LiteralString`, and string literal cases above,
             // most `Literal` types delegate to their instance fallbacks
             // unless `self` is exactly equivalent to `target` (handled above)
-            (
-                Type::LiteralString
-                | Type::BooleanLiteral(_)
-                | Type::IntLiteral(_)
-                | Type::BytesLiteral(_)
-                | Type::ModuleLiteral(_)
-                | Type::EnumLiteral(_)
-                | Type::FunctionLiteral(_),
-                _,
-            ) => (self.literal_fallback_instance(db)).when_some_and(|instance| {
-                instance.has_relation_to_impl(
-                    db,
-                    target,
-                    inferable,
-                    relation,
-                    relation_visitor,
-                    disjointness_visitor,
-                )
-            }),
+            (Type::ModuleLiteral(_) | Type::LiteralValue(_) | Type::FunctionLiteral(_), _) => {
+                (self.literal_fallback_instance(db)).when_some_and(db, constraints, |instance| {
+                    instance.has_relation_to_impl(
+                        db,
+                        target,
+                        constraints,
+                        inferable,
+                        relation,
+                        relation_visitor,
+                        disjointness_visitor,
+                    )
+                })
+            }
 
             // The same reasoning applies for these special callable types:
             (Type::BoundMethod(_), _) => {
                 KnownClass::MethodType.to_instance(db).has_relation_to_impl(
                     db,
                     target,
+                    constraints,
                     inferable,
                     relation,
                     relation_visitor,
@@ -1154,6 +1453,7 @@ impl<'db> Type<'db> {
                 method.class().to_instance(db).has_relation_to_impl(
                     db,
                     target,
+                    constraints,
                     inferable,
                     relation,
                     relation_visitor,
@@ -1165,6 +1465,7 @@ impl<'db> Type<'db> {
                 .has_relation_to_impl(
                     db,
                     target,
+                    constraints,
                     inferable,
                     relation,
                     relation_visitor,
@@ -1173,7 +1474,7 @@ impl<'db> Type<'db> {
 
             (Type::DataclassDecorator(_) | Type::DataclassTransformer(_), _) => {
                 // TODO: Implement subtyping using an equivalent `Callable` type.
-                ConstraintSet::from(false)
+                ConstraintSet::from_bool(constraints, false)
             }
 
             // `TypeIs` is invariant.
@@ -1182,15 +1483,17 @@ impl<'db> Type<'db> {
                 .has_relation_to_impl(
                     db,
                     right.return_type(db),
+                    constraints,
                     inferable,
                     relation,
                     relation_visitor,
                     disjointness_visitor,
                 )
-                .and(db, || {
+                .and(db, constraints, || {
                     right.return_type(db).has_relation_to_impl(
                         db,
                         left.return_type(db),
+                        constraints,
                         inferable,
                         relation,
                         relation_visitor,
@@ -1203,6 +1506,7 @@ impl<'db> Type<'db> {
                 left.return_type(db).has_relation_to_impl(
                     db,
                     right.return_type(db),
+                    constraints,
                     inferable,
                     relation,
                     relation_visitor,
@@ -1215,6 +1519,7 @@ impl<'db> Type<'db> {
                 KnownClass::Bool.to_instance(db).has_relation_to_impl(
                     db,
                     target,
+                    constraints,
                     inferable,
                     relation,
                     relation_visitor,
@@ -1229,6 +1534,7 @@ impl<'db> Type<'db> {
                     .has_relation_to_impl(
                         db,
                         target,
+                        constraints,
                         inferable,
                         relation,
                         relation_visitor,
@@ -1236,14 +1542,19 @@ impl<'db> Type<'db> {
                     )
             }
 
-            (Type::Callable(_), _) => ConstraintSet::from(false),
+            (Type::Callable(_), _) => ConstraintSet::from_bool(constraints, false),
 
-            (Type::BoundSuper(_), Type::BoundSuper(_)) => {
-                self.when_equivalent_to(db, target, inferable)
-            }
+            (Type::BoundSuper(left), Type::BoundSuper(right)) => left.is_equivalent_to_impl(
+                db,
+                right,
+                constraints,
+                relation_visitor,
+                disjointness_visitor,
+            ),
             (Type::BoundSuper(_), _) => KnownClass::Super.to_instance(db).has_relation_to_impl(
                 db,
                 target,
+                constraints,
                 inferable,
                 relation,
                 relation_visitor,
@@ -1253,7 +1564,7 @@ impl<'db> Type<'db> {
             (Type::SubclassOf(subclass_of), _) | (_, Type::SubclassOf(subclass_of))
                 if subclass_of.is_type_var() =>
             {
-                ConstraintSet::from(false)
+                ConstraintSet::from_bool(constraints, false)
             }
 
             // `Literal[<class 'C'>]` is a subtype of `type[B]` if `C` is a subclass of `B`,
@@ -1265,13 +1576,16 @@ impl<'db> Type<'db> {
                     class.default_specialization(db).has_relation_to_impl(
                         db,
                         subclass_of_class,
+                        constraints,
                         inferable,
                         relation,
                         relation_visitor,
                         disjointness_visitor,
                     )
                 })
-                .unwrap_or_else(|| ConstraintSet::from(relation.is_assignability())),
+                .unwrap_or_else(|| {
+                    ConstraintSet::from_bool(constraints, relation.is_assignability())
+                }),
 
             // Similarly, `<class 'C'>` is assignable to `<class 'C[...]'>` (a generic-alias type)
             // if the default specialization of `C` is assignable to `C[...]`. This scenario occurs
@@ -1281,6 +1595,7 @@ impl<'db> Type<'db> {
                 class.default_specialization(db).has_relation_to_impl(
                     db,
                     ClassType::Generic(target_alias),
+                    constraints,
                     inferable,
                     relation,
                     relation_visitor,
@@ -1293,6 +1608,7 @@ impl<'db> Type<'db> {
                 ClassType::Generic(self_alias).has_relation_to_impl(
                     db,
                     ClassType::Generic(target_alias),
+                    constraints,
                     inferable,
                     relation,
                     relation_visitor,
@@ -1307,19 +1623,23 @@ impl<'db> Type<'db> {
                     ClassType::Generic(alias).has_relation_to_impl(
                         db,
                         subclass_of_class,
+                        constraints,
                         inferable,
                         relation,
                         relation_visitor,
                         disjointness_visitor,
                     )
                 })
-                .unwrap_or_else(|| ConstraintSet::from(relation.is_assignability())),
+                .unwrap_or_else(|| {
+                    ConstraintSet::from_bool(constraints, relation.is_assignability())
+                }),
 
             // This branch asks: given two types `type[T]` and `type[S]`, is `type[T]` a subtype of `type[S]`?
             (Type::SubclassOf(self_subclass_ty), Type::SubclassOf(target_subclass_ty)) => {
                 self_subclass_ty.has_relation_to_impl(
                     db,
                     target_subclass_ty,
+                    constraints,
                     inferable,
                     relation,
                     relation_visitor,
@@ -1334,6 +1654,7 @@ impl<'db> Type<'db> {
                 class.metaclass_instance_type(db).has_relation_to_impl(
                     db,
                     target,
+                    constraints,
                     inferable,
                     relation,
                     relation_visitor,
@@ -1345,6 +1666,7 @@ impl<'db> Type<'db> {
                 .has_relation_to_impl(
                     db,
                     target,
+                    constraints,
                     inferable,
                     relation,
                     relation_visitor,
@@ -1358,22 +1680,28 @@ impl<'db> Type<'db> {
                     .has_relation_to_impl(
                         db,
                         other,
+                        constraints,
                         inferable,
                         relation,
                         relation_visitor,
                         disjointness_visitor,
                     )
-                    .or(db, || {
-                        ConstraintSet::from(relation.is_assignability()).and(db, || {
-                            other.has_relation_to_impl(
-                                db,
-                                KnownClass::Type.to_instance(db),
-                                inferable,
-                                relation,
-                                relation_visitor,
-                                disjointness_visitor,
-                            )
-                        })
+                    .or(db, constraints, || {
+                        ConstraintSet::from_bool(constraints, relation.is_assignability()).and(
+                            db,
+                            constraints,
+                            || {
+                                other.has_relation_to_impl(
+                                    db,
+                                    KnownClass::Type.to_instance(db),
+                                    constraints,
+                                    inferable,
+                                    relation,
+                                    relation_visitor,
+                                    disjointness_visitor,
+                                )
+                            },
+                        )
                     })
             }
 
@@ -1384,6 +1712,7 @@ impl<'db> Type<'db> {
                 other.has_relation_to_impl(
                     db,
                     KnownClass::Type.to_instance(db),
+                    constraints,
                     inferable,
                     relation,
                     relation_visitor,
@@ -1406,6 +1735,7 @@ impl<'db> Type<'db> {
                 .has_relation_to_impl(
                     db,
                     target,
+                    constraints,
                     inferable,
                     relation,
                     relation_visitor,
@@ -1418,6 +1748,7 @@ impl<'db> Type<'db> {
             (Type::SpecialForm(left), right) => left.instance_fallback(db).has_relation_to_impl(
                 db,
                 right,
+                constraints,
                 inferable,
                 relation,
                 relation_visitor,
@@ -1427,6 +1758,7 @@ impl<'db> Type<'db> {
             (Type::KnownInstance(left), right) => left.instance_fallback(db).has_relation_to_impl(
                 db,
                 right,
+                constraints,
                 inferable,
                 relation,
                 relation_visitor,
@@ -1440,6 +1772,7 @@ impl<'db> Type<'db> {
                     self_instance.has_relation_to_impl(
                         db,
                         target_instance,
+                        constraints,
                         inferable,
                         relation,
                         relation_visitor,
@@ -1452,6 +1785,7 @@ impl<'db> Type<'db> {
                 KnownClass::Property.to_instance(db).has_relation_to_impl(
                     db,
                     target,
+                    constraints,
                     inferable,
                     relation,
                     relation_visitor,
@@ -1461,6 +1795,7 @@ impl<'db> Type<'db> {
             (_, Type::PropertyInstance(_)) => self.has_relation_to_impl(
                 db,
                 KnownClass::Property.to_instance(db),
+                constraints,
                 inferable,
                 relation,
                 relation_visitor,
@@ -1469,7 +1804,7 @@ impl<'db> Type<'db> {
 
             // Other than the special cases enumerated above, nominal-instance types are never
             // subtypes of any other variants
-            (Type::NominalInstance(_), _) => ConstraintSet::from(false),
+            (Type::NominalInstance(_), _) => ConstraintSet::from_bool(constraints, false),
         }
     }
 
@@ -1486,119 +1821,56 @@ impl<'db> Type<'db> {
     ///
     /// [equivalent to]: https://typing.python.org/en/latest/spec/glossary.html#term-equivalent
     pub(crate) fn is_equivalent_to(self, db: &'db dyn Db, other: Type<'db>) -> bool {
-        self.when_equivalent_to(db, other, InferableTypeVars::None)
+        let constraints = ConstraintSetBuilder::new();
+        self.when_equivalent_to(db, other, &constraints)
             .is_always_satisfied(db)
     }
 
-    pub(crate) fn when_equivalent_to(
+    pub(crate) fn when_equivalent_to<'c>(
         self,
         db: &'db dyn Db,
         other: Type<'db>,
-        inferable: InferableTypeVars<'_, 'db>,
-    ) -> ConstraintSet<'db> {
-        self.is_equivalent_to_impl(db, other, inferable, &IsEquivalentVisitor::default())
+        constraints: &'c ConstraintSetBuilder<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        let relation_visitor = HasRelationToVisitor::default(constraints);
+        let disjointness_visitor = IsDisjointVisitor::default(constraints);
+        self.when_equivalent_to_impl(
+            db,
+            other,
+            constraints,
+            &relation_visitor,
+            &disjointness_visitor,
+        )
     }
 
-    pub(crate) fn is_equivalent_to_impl(
+    pub(crate) fn when_equivalent_to_impl<'c>(
         self,
         db: &'db dyn Db,
         other: Type<'db>,
-        inferable: InferableTypeVars<'_, 'db>,
-        visitor: &IsEquivalentVisitor<'db>,
-    ) -> ConstraintSet<'db> {
-        if self == other {
-            return ConstraintSet::from(true);
-        }
-
-        match (self, other) {
-            // The `Divergent` type is a special type that is not equivalent to other kinds of dynamic types,
-            // which prevents `Divergent` from being eliminated during union reduction.
-            (Type::Dynamic(_), Type::Dynamic(DynamicType::Divergent(_)))
-            | (Type::Dynamic(DynamicType::Divergent(_)), Type::Dynamic(_)) => {
-                ConstraintSet::from(false)
-            }
-            (Type::Dynamic(_), Type::Dynamic(_)) => ConstraintSet::from(true),
-
-            (Type::SubclassOf(first), Type::SubclassOf(second)) => {
-                match (first.subclass_of(), second.subclass_of()) {
-                    (first, second) if first == second => ConstraintSet::from(true),
-                    (SubclassOfInner::Dynamic(_), SubclassOfInner::Dynamic(_)) => {
-                        ConstraintSet::from(true)
-                    }
-                    _ => ConstraintSet::from(false),
-                }
-            }
-
-            (Type::TypeAlias(self_alias), _) => {
-                let self_alias_ty = self_alias.value_type(db).normalized(db);
-                visitor.visit((self_alias_ty, other), || {
-                    self_alias_ty.is_equivalent_to_impl(db, other, inferable, visitor)
-                })
-            }
-
-            (_, Type::TypeAlias(other_alias)) => {
-                let other_alias_ty = other_alias.value_type(db).normalized(db);
-                visitor.visit((self, other_alias_ty), || {
-                    self.is_equivalent_to_impl(db, other_alias_ty, inferable, visitor)
-                })
-            }
-
-            (Type::NewTypeInstance(self_newtype), Type::NewTypeInstance(other_newtype)) => {
-                ConstraintSet::from(self_newtype.is_equivalent_to_impl(db, other_newtype))
-            }
-
-            (Type::NominalInstance(first), Type::NominalInstance(second)) => {
-                first.is_equivalent_to_impl(db, second, inferable, visitor)
-            }
-
-            (Type::Union(first), Type::Union(second)) => {
-                first.is_equivalent_to_impl(db, second, inferable, visitor)
-            }
-
-            (Type::Intersection(first), Type::Intersection(second)) => {
-                first.is_equivalent_to_impl(db, second, inferable, visitor)
-            }
-
-            (Type::FunctionLiteral(self_function), Type::FunctionLiteral(target_function)) => {
-                self_function.is_equivalent_to_impl(db, target_function, inferable, visitor)
-            }
-            (Type::BoundMethod(self_method), Type::BoundMethod(target_method)) => {
-                self_method.is_equivalent_to_impl(db, target_method, inferable, visitor)
-            }
-            (Type::KnownBoundMethod(self_method), Type::KnownBoundMethod(target_method)) => {
-                self_method.is_equivalent_to_impl(db, target_method, inferable, visitor)
-            }
-            (Type::Callable(first), Type::Callable(second)) => {
-                first.is_equivalent_to_impl(db, second, inferable, visitor)
-            }
-
-            (Type::ProtocolInstance(first), Type::ProtocolInstance(second)) => {
-                first.is_equivalent_to_impl(db, second, inferable, visitor)
-            }
-            (Type::ProtocolInstance(protocol), nominal @ Type::NominalInstance(n))
-            | (nominal @ Type::NominalInstance(n), Type::ProtocolInstance(protocol)) => {
-                ConstraintSet::from(n.is_object() && protocol.normalized(db) == nominal)
-            }
-            // An instance of an enum class is equivalent to an enum literal of that class,
-            // if that enum has only has one member.
-            (Type::NominalInstance(instance), Type::EnumLiteral(literal))
-            | (Type::EnumLiteral(literal), Type::NominalInstance(instance)) => {
-                if literal.enum_class_instance(db) != Type::NominalInstance(instance) {
-                    return ConstraintSet::from(false);
-                }
-                ConstraintSet::from(is_single_member_enum(db, instance.class_literal(db)))
-            }
-
-            (Type::PropertyInstance(left), Type::PropertyInstance(right)) => {
-                left.is_equivalent_to_impl(db, right, inferable, visitor)
-            }
-
-            (Type::TypedDict(left), Type::TypedDict(right)) => visitor.visit((self, other), || {
-                left.is_equivalent_to_impl(db, right, inferable, visitor)
-            }),
-
-            _ => ConstraintSet::from(false),
-        }
+        constraints: &'c ConstraintSetBuilder<'db>,
+        relation_visitor: &HasRelationToVisitor<'db, 'c>,
+        disjointness_visitor: &IsDisjointVisitor<'db, 'c>,
+    ) -> ConstraintSet<'db, 'c> {
+        self.has_relation_to_impl(
+            db,
+            other,
+            constraints,
+            InferableTypeVars::None,
+            TypeRelation::Redundancy { pure: true },
+            relation_visitor,
+            disjointness_visitor,
+        )
+        .and(db, constraints, || {
+            other.has_relation_to_impl(
+                db,
+                self,
+                constraints,
+                InferableTypeVars::None,
+                TypeRelation::Redundancy { pure: true },
+                relation_visitor,
+                disjointness_visitor,
+            )
+        })
     }
 
     /// Return true if `self & other` should simplify to `Never`:
@@ -1617,62 +1889,73 @@ impl<'db> Type<'db> {
     /// This function aims to have no false positives, but might return wrong
     /// `false` answers in some cases.
     pub(crate) fn is_disjoint_from(self, db: &'db dyn Db, other: Type<'db>) -> bool {
-        self.when_disjoint_from(db, other, InferableTypeVars::None)
+        let constraints = ConstraintSetBuilder::new();
+        self.when_disjoint_from(db, other, &constraints, InferableTypeVars::None)
             .is_always_satisfied(db)
     }
 
-    pub(crate) fn when_disjoint_from(
+    pub(crate) fn when_disjoint_from<'c>(
         self,
         db: &'db dyn Db,
         other: Type<'db>,
+        constraints: &'c ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'_, 'db>,
-    ) -> ConstraintSet<'db> {
+    ) -> ConstraintSet<'db, 'c> {
         self.is_disjoint_from_impl(
             db,
             other,
+            constraints,
             inferable,
-            &IsDisjointVisitor::default(),
-            &HasRelationToVisitor::default(),
+            &IsDisjointVisitor::default(constraints),
+            &HasRelationToVisitor::default(constraints),
         )
     }
 
-    pub(crate) fn is_disjoint_from_impl(
+    pub(crate) fn is_disjoint_from_impl<'c>(
         self,
         db: &'db dyn Db,
         other: Type<'db>,
+        constraints: &'c ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'_, 'db>,
-        disjointness_visitor: &IsDisjointVisitor<'db>,
-        relation_visitor: &HasRelationToVisitor<'db>,
-    ) -> ConstraintSet<'db> {
-        fn any_protocol_members_absent_or_disjoint<'db>(
+        disjointness_visitor: &IsDisjointVisitor<'db, 'c>,
+        relation_visitor: &HasRelationToVisitor<'db, 'c>,
+    ) -> ConstraintSet<'db, 'c> {
+        fn any_protocol_members_absent_or_disjoint<'db, 'c>(
             db: &'db dyn Db,
             protocol: ProtocolInstanceType<'db>,
             other: Type<'db>,
+            constraints: &'c ConstraintSetBuilder<'db>,
             inferable: InferableTypeVars<'_, 'db>,
-            disjointness_visitor: &IsDisjointVisitor<'db>,
-            relation_visitor: &HasRelationToVisitor<'db>,
-        ) -> ConstraintSet<'db> {
-            protocol.interface(db).members(db).when_any(db, |member| {
-                other
-                    .member(db, member.name())
-                    .place
-                    .ignore_possibly_undefined()
-                    .when_none_or(|attribute_type| {
-                        member.has_disjoint_type_from(
-                            db,
-                            attribute_type,
-                            inferable,
-                            disjointness_visitor,
-                            relation_visitor,
-                        )
-                    })
-            })
+            disjointness_visitor: &IsDisjointVisitor<'db, 'c>,
+            relation_visitor: &HasRelationToVisitor<'db, 'c>,
+        ) -> ConstraintSet<'db, 'c> {
+            protocol
+                .interface(db)
+                .members(db)
+                .when_any(db, constraints, |member| {
+                    other
+                        .member(db, member.name())
+                        .place
+                        .ignore_possibly_undefined()
+                        .when_none_or(db, constraints, |attribute_type| {
+                            member.has_disjoint_type_from(
+                                db,
+                                attribute_type,
+                                constraints,
+                                inferable,
+                                disjointness_visitor,
+                                relation_visitor,
+                            )
+                        })
+                })
         }
 
         match (self, other) {
-            (Type::Never, _) | (_, Type::Never) => ConstraintSet::from(true),
+            (Type::Never, _) | (_, Type::Never) => ConstraintSet::from_bool(constraints, true),
 
-            (Type::Dynamic(_), _) | (_, Type::Dynamic(_)) => ConstraintSet::from(false),
+            (Type::Dynamic(_), _) | (_, Type::Dynamic(_)) => {
+                ConstraintSet::from_bool(constraints, false)
+            }
 
             (Type::TypeAlias(alias), _) => {
                 let self_alias_ty = alias.value_type(db);
@@ -1680,6 +1963,7 @@ impl<'db> Type<'db> {
                     self_alias_ty.is_disjoint_from_impl(
                         db,
                         other,
+                        constraints,
                         inferable,
                         disjointness_visitor,
                         relation_visitor,
@@ -1693,6 +1977,7 @@ impl<'db> Type<'db> {
                     self.is_disjoint_from_impl(
                         db,
                         other_alias_ty,
+                        constraints,
                         inferable,
                         disjointness_visitor,
                         relation_visitor,
@@ -1714,6 +1999,7 @@ impl<'db> Type<'db> {
                 Type::TypeVar(type_var).is_disjoint_from_impl(
                     db,
                     other,
+                    constraints,
                     inferable,
                     disjointness_visitor,
                     relation_visitor,
@@ -1725,10 +2011,11 @@ impl<'db> Type<'db> {
                 if !subclass_of
                     .into_type_var()
                     .zip(other.to_instance(db))
-                    .when_none_or(|(this_instance, other_instance)| {
+                    .when_none_or(db, constraints, |(this_instance, other_instance)| {
                         Type::TypeVar(this_instance).is_disjoint_from_impl(
                             db,
                             other_instance,
+                            constraints,
                             inferable,
                             disjointness_visitor,
                             relation_visitor,
@@ -1740,10 +2027,11 @@ impl<'db> Type<'db> {
                 subclass_of
                     .into_type_var()
                     .zip(other.to_instance(db))
-                    .when_none_or(|(this_instance, other_instance)| {
+                    .when_none_or(db, constraints, |(this_instance, other_instance)| {
                         Type::TypeVar(this_instance).is_disjoint_from_impl(
                             db,
                             other_instance,
+                            constraints,
                             inferable,
                             disjointness_visitor,
                             relation_visitor,
@@ -1759,7 +2047,7 @@ impl<'db> Type<'db> {
                 if !self_bound_typevar.is_inferable(db, inferable)
                     && self_bound_typevar.is_same_typevar_as(db, other_bound_typevar) =>
             {
-                ConstraintSet::from(false)
+                ConstraintSet::from_bool(constraints, false)
             }
 
             (tvar @ Type::TypeVar(bound_typevar), Type::Intersection(intersection))
@@ -1767,7 +2055,7 @@ impl<'db> Type<'db> {
                 if !bound_typevar.is_inferable(db, inferable)
                     && intersection.negative(db).contains(&tvar) =>
             {
-                ConstraintSet::from(true)
+                ConstraintSet::from_bool(constraints, true)
             }
 
             // An unbounded typevar is never disjoint from any other type, since it might be
@@ -1778,37 +2066,46 @@ impl<'db> Type<'db> {
                 if !bound_typevar.is_inferable(db, inferable) =>
             {
                 match bound_typevar.typevar(db).bound_or_constraints(db) {
-                    None => ConstraintSet::from(false),
+                    None => ConstraintSet::from_bool(constraints, false),
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => bound
                         .is_disjoint_from_impl(
                             db,
                             other,
+                            constraints,
                             inferable,
                             disjointness_visitor,
                             relation_visitor,
                         ),
-                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                        constraints.elements(db).iter().when_all(db, |constraint| {
-                            constraint.is_disjoint_from_impl(
-                                db,
-                                other,
-                                inferable,
-                                disjointness_visitor,
-                                relation_visitor,
-                            )
-                        })
+                    Some(TypeVarBoundOrConstraints::Constraints(typevar_constraints)) => {
+                        typevar_constraints.elements(db).iter().when_all(
+                            db,
+                            constraints,
+                            |constraint| {
+                                constraint.is_disjoint_from_impl(
+                                    db,
+                                    other,
+                                    constraints,
+                                    inferable,
+                                    disjointness_visitor,
+                                    relation_visitor,
+                                )
+                            },
+                        )
                     }
                 }
             }
 
             // TODO: Infer specializations here
-            (Type::TypeVar(_), _) | (_, Type::TypeVar(_)) => ConstraintSet::from(false),
+            (Type::TypeVar(_), _) | (_, Type::TypeVar(_)) => {
+                ConstraintSet::from_bool(constraints, false)
+            }
 
             (Type::Union(union), other) | (other, Type::Union(union)) => {
-                union.elements(db).iter().when_all(db, |e| {
+                union.elements(db).iter().when_all(db, constraints, |e| {
                     e.is_disjoint_from_impl(
                         db,
                         other,
+                        constraints,
                         inferable,
                         disjointness_visitor,
                         relation_visitor,
@@ -1824,25 +2121,30 @@ impl<'db> Type<'db> {
                     self_intersection
                         .positive(db)
                         .iter()
-                        .when_any(db, |p| {
+                        .when_any(db, constraints, |p| {
                             p.is_disjoint_from_impl(
                                 db,
                                 other,
+                                constraints,
                                 inferable,
                                 disjointness_visitor,
                                 relation_visitor,
                             )
                         })
-                        .or(db, || {
-                            other_intersection.positive(db).iter().when_any(db, |p| {
-                                p.is_disjoint_from_impl(
-                                    db,
-                                    self,
-                                    inferable,
-                                    disjointness_visitor,
-                                    relation_visitor,
-                                )
-                            })
+                        .or(db, constraints, || {
+                            other_intersection
+                                .positive(db)
+                                .iter()
+                                .when_any(db, constraints, |p| {
+                                    p.is_disjoint_from_impl(
+                                        db,
+                                        self,
+                                        constraints,
+                                        inferable,
+                                        disjointness_visitor,
+                                        relation_visitor,
+                                    )
+                                })
                         })
                 })
             }
@@ -1853,40 +2155,53 @@ impl<'db> Type<'db> {
                     intersection
                         .positive(db)
                         .iter()
-                        .when_any(db, |p| {
+                        .when_any(db, constraints, |p| {
                             p.is_disjoint_from_impl(
                                 db,
                                 non_intersection,
+                                constraints,
                                 inferable,
                                 disjointness_visitor,
                                 relation_visitor,
                             )
                         })
                         // A & B & Not[C] is disjoint from C
-                        .or(db, || {
-                            intersection.negative(db).iter().when_any(db, |&neg_ty| {
-                                non_intersection.has_relation_to_impl(
-                                    db,
-                                    neg_ty,
-                                    inferable,
-                                    TypeRelation::Subtyping,
-                                    relation_visitor,
-                                    disjointness_visitor,
-                                )
-                            })
+                        .or(db, constraints, || {
+                            intersection
+                                .negative(db)
+                                .iter()
+                                .when_any(db, constraints, |&neg_ty| {
+                                    non_intersection.has_relation_to_impl(
+                                        db,
+                                        neg_ty,
+                                        constraints,
+                                        inferable,
+                                        TypeRelation::Subtyping,
+                                        relation_visitor,
+                                        disjointness_visitor,
+                                    )
+                                })
                         })
                 })
+            }
+
+            (Type::LiteralValue(this), Type::LiteralValue(target))
+                if this.is_literal_string() && target.is_literal_string()
+                    || (this.is_string() && target.is_literal_string())
+                    || (this.is_literal_string() && target.is_string()) =>
+            {
+                ConstraintSet::from_bool(constraints, false)
+            }
+
+            (Type::LiteralValue(left), Type::LiteralValue(right)) => {
+                ConstraintSet::from_bool(constraints, left.kind() != right.kind())
             }
 
             // any single-valued type is disjoint from another single-valued type
             // iff the two types are nonequal
             (
-                left @ (Type::BooleanLiteral(..)
-                | Type::IntLiteral(..)
-                | Type::StringLiteral(..)
-                | Type::BytesLiteral(..)
-                | Type::EnumLiteral(..)
-                | Type::FunctionLiteral(..)
+                // note `LiteralString` is not single-valued, but we handle the special case above
+                left @ (Type::FunctionLiteral(..)
                 | Type::BoundMethod(..)
                 | Type::KnownBoundMethod(..)
                 | Type::WrapperDescriptor(..)
@@ -1894,12 +2209,7 @@ impl<'db> Type<'db> {
                 | Type::ClassLiteral(..)
                 | Type::SpecialForm(..)
                 | Type::KnownInstance(..)),
-                right @ (Type::BooleanLiteral(..)
-                | Type::IntLiteral(..)
-                | Type::StringLiteral(..)
-                | Type::BytesLiteral(..)
-                | Type::EnumLiteral(..)
-                | Type::FunctionLiteral(..)
+                right @ (Type::FunctionLiteral(..)
                 | Type::BoundMethod(..)
                 | Type::KnownBoundMethod(..)
                 | Type::WrapperDescriptor(..)
@@ -1907,16 +2217,11 @@ impl<'db> Type<'db> {
                 | Type::ClassLiteral(..)
                 | Type::SpecialForm(..)
                 | Type::KnownInstance(..)),
-            ) => ConstraintSet::from(left != right),
+            ) => ConstraintSet::from_bool(constraints, left != right),
 
             (
                 Type::SubclassOf(_),
-                Type::BooleanLiteral(..)
-                | Type::IntLiteral(..)
-                | Type::StringLiteral(..)
-                | Type::LiteralString
-                | Type::BytesLiteral(..)
-                | Type::EnumLiteral(..)
+                Type::LiteralValue(..)
                 | Type::FunctionLiteral(..)
                 | Type::BoundMethod(..)
                 | Type::KnownBoundMethod(..)
@@ -1924,33 +2229,34 @@ impl<'db> Type<'db> {
                 | Type::ModuleLiteral(..),
             )
             | (
-                Type::BooleanLiteral(..)
-                | Type::IntLiteral(..)
-                | Type::StringLiteral(..)
-                | Type::LiteralString
-                | Type::BytesLiteral(..)
-                | Type::EnumLiteral(..)
+                Type::LiteralValue(..)
                 | Type::FunctionLiteral(..)
                 | Type::BoundMethod(..)
                 | Type::KnownBoundMethod(..)
                 | Type::WrapperDescriptor(..)
                 | Type::ModuleLiteral(..),
                 Type::SubclassOf(_),
-            ) => ConstraintSet::from(true),
+            ) => ConstraintSet::from_bool(constraints, true),
 
             (Type::AlwaysTruthy, ty) | (ty, Type::AlwaysTruthy) => {
                 // `Truthiness::Ambiguous` may include `AlwaysTrue` as a subset, so it's not guaranteed to be disjoint.
                 // Thus, they are only disjoint if `ty.bool() == AlwaysFalse`.
-                ConstraintSet::from(ty.bool(db).is_always_false())
+                ConstraintSet::from_bool(constraints, ty.bool(db).is_always_false())
             }
             (Type::AlwaysFalsy, ty) | (ty, Type::AlwaysFalsy) => {
                 // Similarly, they are only disjoint if `ty.bool() == AlwaysTrue`.
-                ConstraintSet::from(ty.bool(db).is_always_true())
+                ConstraintSet::from_bool(constraints, ty.bool(db).is_always_true())
             }
 
             (Type::ProtocolInstance(left), Type::ProtocolInstance(right)) => disjointness_visitor
                 .visit((self, other), || {
-                    left.is_disjoint_from_impl(db, right, inferable, disjointness_visitor)
+                    left.is_disjoint_from_impl(
+                        db,
+                        right,
+                        constraints,
+                        inferable,
+                        disjointness_visitor,
+                    )
                 }),
 
             (Type::ProtocolInstance(protocol), Type::SpecialForm(special_form))
@@ -1960,6 +2266,7 @@ impl<'db> Type<'db> {
                         db,
                         protocol,
                         special_form.instance_fallback(db),
+                        constraints,
                         inferable,
                         disjointness_visitor,
                         relation_visitor,
@@ -1974,6 +2281,7 @@ impl<'db> Type<'db> {
                         db,
                         protocol,
                         known_instance.instance_fallback(db),
+                        constraints,
                         inferable,
                         disjointness_visitor,
                         relation_visitor,
@@ -2009,35 +2317,26 @@ impl<'db> Type<'db> {
             //     print(Foo.X)
             // ```
             (
-                ty @ (Type::LiteralString
-                | Type::StringLiteral(..)
-                | Type::BytesLiteral(..)
-                | Type::BooleanLiteral(..)
+                ty @ (Type::LiteralValue(..)
                 | Type::ClassLiteral(..)
                 | Type::FunctionLiteral(..)
                 | Type::ModuleLiteral(..)
-                | Type::GenericAlias(..)
-                | Type::IntLiteral(..)
-                | Type::EnumLiteral(..)),
+                | Type::GenericAlias(..)),
                 Type::ProtocolInstance(protocol),
             )
             | (
                 Type::ProtocolInstance(protocol),
-                ty @ (Type::LiteralString
-                | Type::StringLiteral(..)
-                | Type::BytesLiteral(..)
-                | Type::BooleanLiteral(..)
+                ty @ (Type::LiteralValue(..)
                 | Type::ClassLiteral(..)
                 | Type::FunctionLiteral(..)
                 | Type::ModuleLiteral(..)
-                | Type::GenericAlias(..)
-                | Type::IntLiteral(..)
-                | Type::EnumLiteral(..)),
+                | Type::GenericAlias(..)),
             ) => disjointness_visitor.visit((self, other), || {
                 any_protocol_members_absent_or_disjoint(
                     db,
                     protocol,
                     ty,
+                    constraints,
                     inferable,
                     disjointness_visitor,
                     relation_visitor,
@@ -2056,6 +2355,7 @@ impl<'db> Type<'db> {
                         db,
                         protocol,
                         nominal,
+                        constraints,
                         inferable,
                         disjointness_visitor,
                         relation_visitor,
@@ -2066,34 +2366,43 @@ impl<'db> Type<'db> {
             (Type::ProtocolInstance(protocol), other)
             | (other, Type::ProtocolInstance(protocol)) => {
                 disjointness_visitor.visit((self, other), || {
-                    protocol.interface(db).members(db).when_any(db, |member| {
-                        match other.member(db, member.name()).place {
-                            Place::Defined(DefinedPlace {
-                                ty: attribute_type, ..
-                            }) => member.has_disjoint_type_from(
-                                db,
-                                attribute_type,
-                                inferable,
-                                disjointness_visitor,
-                                relation_visitor,
-                            ),
-                            Place::Undefined => ConstraintSet::from(false),
-                        }
-                    })
+                    protocol
+                        .interface(db)
+                        .members(db)
+                        .when_any(db, constraints, |member| {
+                            match other.member(db, member.name()).place {
+                                Place::Defined(DefinedPlace {
+                                    ty: attribute_type, ..
+                                }) => member.has_disjoint_type_from(
+                                    db,
+                                    attribute_type,
+                                    constraints,
+                                    inferable,
+                                    disjointness_visitor,
+                                    relation_visitor,
+                                ),
+                                Place::Undefined => ConstraintSet::from_bool(constraints, false),
+                            }
+                        })
                 })
             }
 
             (Type::SubclassOf(subclass_of_ty), _) | (_, Type::SubclassOf(subclass_of_ty))
                 if subclass_of_ty.is_type_var() =>
             {
-                ConstraintSet::from(true)
+                ConstraintSet::from_bool(constraints, true)
             }
 
             (Type::GenericAlias(left_alias), Type::GenericAlias(right_alias)) => {
-                ConstraintSet::from(left_alias.origin(db) != right_alias.origin(db)).or(db, || {
+                ConstraintSet::from_bool(
+                    constraints,
+                    left_alias.origin(db) != right_alias.origin(db),
+                )
+                .or(db, constraints, || {
                     left_alias.specialization(db).is_disjoint_from_impl(
                         db,
                         right_alias.specialization(db),
+                        constraints,
                         inferable,
                         disjointness_visitor,
                         relation_visitor,
@@ -2105,10 +2414,11 @@ impl<'db> Type<'db> {
             | (other @ Type::GenericAlias(_), Type::ClassLiteral(class_literal)) => class_literal
                 .default_specialization(db)
                 .into_generic_alias()
-                .when_none_or(|alias| {
+                .when_none_or(db, constraints, |alias| {
                     other.is_disjoint_from_impl(
                         db,
                         Type::GenericAlias(alias),
+                        constraints,
                         inferable,
                         disjointness_visitor,
                         relation_visitor,
@@ -2118,9 +2428,14 @@ impl<'db> Type<'db> {
             (Type::SubclassOf(subclass_of_ty), Type::ClassLiteral(class_b))
             | (Type::ClassLiteral(class_b), Type::SubclassOf(subclass_of_ty)) => {
                 match subclass_of_ty.subclass_of() {
-                    SubclassOfInner::Dynamic(_) => ConstraintSet::from(false),
-                    SubclassOfInner::Class(class_a) => ConstraintSet::from(
-                        !class_a.could_exist_in_mro_of(db, ClassType::NonGeneric(class_b)),
+                    SubclassOfInner::Dynamic(_) => ConstraintSet::from_bool(constraints, false),
+                    SubclassOfInner::Class(class_a) => ConstraintSet::from_bool(
+                        constraints,
+                        !class_a.could_exist_in_mro_of(
+                            db,
+                            ClassType::NonGeneric(class_b),
+                            constraints,
+                        ),
                     ),
                     SubclassOfInner::TypeVar(_) => unreachable!(),
                 }
@@ -2129,16 +2444,21 @@ impl<'db> Type<'db> {
             (Type::SubclassOf(subclass_of_ty), Type::GenericAlias(alias_b))
             | (Type::GenericAlias(alias_b), Type::SubclassOf(subclass_of_ty)) => {
                 match subclass_of_ty.subclass_of() {
-                    SubclassOfInner::Dynamic(_) => ConstraintSet::from(false),
-                    SubclassOfInner::Class(class_a) => ConstraintSet::from(
-                        !class_a.could_exist_in_mro_of(db, ClassType::Generic(alias_b)),
+                    SubclassOfInner::Dynamic(_) => ConstraintSet::from_bool(constraints, false),
+                    SubclassOfInner::Class(class_a) => ConstraintSet::from_bool(
+                        constraints,
+                        !class_a.could_exist_in_mro_of(
+                            db,
+                            ClassType::Generic(alias_b),
+                            constraints,
+                        ),
                     ),
                     SubclassOfInner::TypeVar(_) => unreachable!(),
                 }
             }
 
             (Type::SubclassOf(left), Type::SubclassOf(right)) => {
-                left.is_disjoint_from_impl(db, right, inferable, disjointness_visitor)
+                left.is_disjoint_from_impl(db, right, constraints, inferable, disjointness_visitor)
             }
 
             // for `type[Any]`/`type[Unknown]`/`type[Todo]`, we know the type cannot be any larger than `type`,
@@ -2149,6 +2469,7 @@ impl<'db> Type<'db> {
                     KnownClass::Type.to_instance(db).is_disjoint_from_impl(
                         db,
                         other,
+                        constraints,
                         inferable,
                         disjointness_visitor,
                         relation_visitor,
@@ -2158,6 +2479,7 @@ impl<'db> Type<'db> {
                     class.metaclass_instance_type(db).is_disjoint_from_impl(
                         db,
                         other,
+                        constraints,
                         inferable,
                         disjointness_visitor,
                         relation_visitor,
@@ -2168,84 +2490,69 @@ impl<'db> Type<'db> {
 
             (Type::SpecialForm(special_form), Type::NominalInstance(instance))
             | (Type::NominalInstance(instance), Type::SpecialForm(special_form)) => {
-                ConstraintSet::from(!special_form.is_instance_of(db, instance.class(db)))
+                ConstraintSet::from_bool(
+                    constraints,
+                    !special_form.is_instance_of(db, instance.class(db)),
+                )
             }
 
             (Type::KnownInstance(known_instance), Type::NominalInstance(instance))
             | (Type::NominalInstance(instance), Type::KnownInstance(known_instance)) => {
-                ConstraintSet::from(!known_instance.is_instance_of(db, instance.class(db)))
+                ConstraintSet::from_bool(
+                    constraints,
+                    !known_instance.is_instance_of(db, instance.class(db)),
+                )
             }
 
-            (
-                Type::BooleanLiteral(..) | Type::TypeIs(_) | Type::TypeGuard(_),
-                Type::NominalInstance(instance),
-            )
-            | (
-                Type::NominalInstance(instance),
-                Type::BooleanLiteral(..) | Type::TypeIs(_) | Type::TypeGuard(_),
-            ) => {
-                // A `Type::BooleanLiteral()` must be an instance of exactly `bool`
+            (Type::LiteralValue(literal), Type::NominalInstance(instance))
+            | (Type::NominalInstance(instance), Type::LiteralValue(literal)) => {
+                match literal.kind() {
+                    LiteralValueTypeKind::Int(_) => KnownClass::Int
+                        .when_subclass_of(db, instance.class(db), constraints)
+                        .negate(db, constraints),
+                    LiteralValueTypeKind::Bool(_) => KnownClass::Bool
+                        .when_subclass_of(db, instance.class(db), constraints)
+                        .negate(db, constraints),
+                    LiteralValueTypeKind::LiteralString | LiteralValueTypeKind::String(_) => {
+                        KnownClass::Str
+                            .when_subclass_of(db, instance.class(db), constraints)
+                            .negate(db, constraints)
+                    }
+                    LiteralValueTypeKind::Bytes(_) => KnownClass::Bytes
+                        .when_subclass_of(db, instance.class(db), constraints)
+                        .negate(db, constraints),
+                    LiteralValueTypeKind::Enum(enum_literal) => enum_literal
+                        .enum_class_instance(db)
+                        .has_relation_to_impl(
+                            db,
+                            Type::NominalInstance(instance),
+                            constraints,
+                            inferable,
+                            TypeRelation::Subtyping,
+                            relation_visitor,
+                            disjointness_visitor,
+                        )
+                        .negate(db, constraints),
+                }
+            }
+
+            (Type::TypeIs(_) | Type::TypeGuard(_), Type::NominalInstance(instance))
+            | (Type::NominalInstance(instance), Type::TypeIs(_) | Type::TypeGuard(_)) => {
+                // A boolean literal must be an instance of exactly `bool`
                 // (it cannot be an instance of a `bool` subclass)
                 KnownClass::Bool
-                    .when_subclass_of(db, instance.class(db))
-                    .negate(db)
+                    .when_subclass_of(db, instance.class(db), constraints)
+                    .negate(db, constraints)
             }
 
-            (Type::BooleanLiteral(..) | Type::TypeIs(_) | Type::TypeGuard(_), _)
-            | (_, Type::BooleanLiteral(..) | Type::TypeIs(_) | Type::TypeGuard(_)) => {
-                ConstraintSet::from(true)
+            (Type::TypeIs(_) | Type::TypeGuard(_), _)
+            | (_, Type::TypeIs(_) | Type::TypeGuard(_)) => {
+                ConstraintSet::from_bool(constraints, true)
             }
 
-            (Type::IntLiteral(..), Type::NominalInstance(instance))
-            | (Type::NominalInstance(instance), Type::IntLiteral(..)) => {
-                // A `Type::IntLiteral()` must be an instance of exactly `int`
-                // (it cannot be an instance of an `int` subclass)
-                KnownClass::Int
-                    .when_subclass_of(db, instance.class(db))
-                    .negate(db)
+            (Type::LiteralValue(_), _) | (_, Type::LiteralValue(_)) => {
+                ConstraintSet::from_bool(constraints, true)
             }
-
-            (Type::IntLiteral(..), _) | (_, Type::IntLiteral(..)) => ConstraintSet::from(true),
-
-            (Type::StringLiteral(..), Type::LiteralString)
-            | (Type::LiteralString, Type::StringLiteral(..)) => ConstraintSet::from(false),
-
-            (Type::StringLiteral(..) | Type::LiteralString, Type::NominalInstance(instance))
-            | (Type::NominalInstance(instance), Type::StringLiteral(..) | Type::LiteralString) => {
-                // A `Type::StringLiteral()` or a `Type::LiteralString` must be an instance of exactly `str`
-                // (it cannot be an instance of a `str` subclass)
-                KnownClass::Str
-                    .when_subclass_of(db, instance.class(db))
-                    .negate(db)
-            }
-
-            (Type::LiteralString, Type::LiteralString) => ConstraintSet::from(false),
-            (Type::LiteralString, _) | (_, Type::LiteralString) => ConstraintSet::from(true),
-
-            (Type::BytesLiteral(..), Type::NominalInstance(instance))
-            | (Type::NominalInstance(instance), Type::BytesLiteral(..)) => {
-                // A `Type::BytesLiteral()` must be an instance of exactly `bytes`
-                // (it cannot be an instance of a `bytes` subclass)
-                KnownClass::Bytes
-                    .when_subclass_of(db, instance.class(db))
-                    .negate(db)
-            }
-
-            (Type::EnumLiteral(enum_literal), instance @ Type::NominalInstance(_))
-            | (instance @ Type::NominalInstance(_), Type::EnumLiteral(enum_literal)) => {
-                enum_literal
-                    .enum_class_instance(db)
-                    .has_relation_to_impl(
-                        db,
-                        instance,
-                        inferable,
-                        TypeRelation::Subtyping,
-                        relation_visitor,
-                        disjointness_visitor,
-                    )
-                    .negate(db)
-            }
-            (Type::EnumLiteral(..), _) | (_, Type::EnumLiteral(..)) => ConstraintSet::from(true),
 
             // A class-literal type `X` is always disjoint from an instance type `Y`,
             // unless the type expressing "all instances of `Z`" is a subtype of of `Y`,
@@ -2253,8 +2560,8 @@ impl<'db> Type<'db> {
             (Type::ClassLiteral(class), instance @ Type::NominalInstance(_))
             | (instance @ Type::NominalInstance(_), Type::ClassLiteral(class)) => class
                 .metaclass_instance_type(db)
-                .when_subtype_of(db, instance, inferable)
-                .negate(db),
+                .when_subtype_of(db, instance, constraints, inferable)
+                .negate(db, constraints),
             (Type::GenericAlias(alias), instance @ Type::NominalInstance(_))
             | (instance @ Type::NominalInstance(_), Type::GenericAlias(alias)) => {
                 ClassType::from(alias)
@@ -2262,12 +2569,13 @@ impl<'db> Type<'db> {
                     .has_relation_to_impl(
                         db,
                         instance,
+                        constraints,
                         inferable,
                         TypeRelation::Subtyping,
                         relation_visitor,
                         disjointness_visitor,
                     )
-                    .negate(db)
+                    .negate(db, constraints)
             }
 
             (Type::FunctionLiteral(..), Type::NominalInstance(instance))
@@ -2275,8 +2583,8 @@ impl<'db> Type<'db> {
                 // A `Type::FunctionLiteral()` must be an instance of exactly `types.FunctionType`
                 // (it cannot be an instance of a `types.FunctionType` subclass)
                 KnownClass::FunctionType
-                    .when_subclass_of(db, instance.class(db))
-                    .negate(db)
+                    .when_subclass_of(db, instance.class(db), constraints)
+                    .negate(db, constraints)
             }
 
             (Type::BoundMethod(_), other) | (other, Type::BoundMethod(_)) => KnownClass::MethodType
@@ -2284,6 +2592,7 @@ impl<'db> Type<'db> {
                 .is_disjoint_from_impl(
                     db,
                     other,
+                    constraints,
                     inferable,
                     disjointness_visitor,
                     relation_visitor,
@@ -2293,6 +2602,7 @@ impl<'db> Type<'db> {
                 method.class().to_instance(db).is_disjoint_from_impl(
                     db,
                     other,
+                    constraints,
                     inferable,
                     disjointness_visitor,
                     relation_visitor,
@@ -2305,6 +2615,7 @@ impl<'db> Type<'db> {
                     .is_disjoint_from_impl(
                         db,
                         other,
+                        constraints,
                         inferable,
                         disjointness_visitor,
                         relation_visitor,
@@ -2316,15 +2627,7 @@ impl<'db> Type<'db> {
                 // No two callable types are ever disjoint because
                 // `(*args: object, **kwargs: object) -> Never` is a subtype of all fully static
                 // callable types.
-                ConstraintSet::from(false)
-            }
-
-            (Type::Callable(_), Type::StringLiteral(_) | Type::BytesLiteral(_))
-            | (Type::StringLiteral(_) | Type::BytesLiteral(_), Type::Callable(_)) => {
-                // A callable type is disjoint from other literal types. For example,
-                // `Type::StringLiteral` must be an instance of exactly `str`, not a subclass
-                // of `str`, and `str` is not callable. The same applies to other literal types.
-                ConstraintSet::from(true)
+                ConstraintSet::from_bool(constraints, false)
             }
 
             (Type::Callable(_), Type::SpecialForm(special_form))
@@ -2333,7 +2636,7 @@ impl<'db> Type<'db> {
                 // that are callable (like TypedDict and collection constructors).
                 // Most special forms are type constructors/annotations (like `typing.Literal`,
                 // `typing.Union`, etc.) that are subscripted, not called.
-                ConstraintSet::from(!special_form.is_callable())
+                ConstraintSet::from_bool(constraints, !special_form.is_callable())
             }
 
             (
@@ -2351,17 +2654,18 @@ impl<'db> Type<'db> {
                 )
                 .place
                 .ignore_possibly_undefined()
-                .when_none_or(|dunder_call| {
+                .when_none_or(db, constraints, |dunder_call| {
                     dunder_call
                         .has_relation_to_impl(
                             db,
                             Type::Callable(CallableType::unknown(db)),
+                            constraints,
                             inferable,
                             TypeRelation::Assignability,
                             relation_visitor,
                             disjointness_visitor,
                         )
-                        .negate(db)
+                        .negate(db, constraints)
                 }),
 
             (
@@ -2373,7 +2677,7 @@ impl<'db> Type<'db> {
                 Type::Callable(_) | Type::DataclassDecorator(_) | Type::DataclassTransformer(_),
             ) => {
                 // TODO: Implement disjointness for general callable type with other types
-                ConstraintSet::from(false)
+                ConstraintSet::from_bool(constraints, false)
             }
 
             (Type::ModuleLiteral(..), other @ Type::NominalInstance(..))
@@ -2382,6 +2686,7 @@ impl<'db> Type<'db> {
                 other.is_disjoint_from_impl(
                     db,
                     KnownClass::ModuleType.to_instance(db),
+                    constraints,
                     inferable,
                     disjointness_visitor,
                     relation_visitor,
@@ -2393,6 +2698,7 @@ impl<'db> Type<'db> {
                     left.is_disjoint_from_impl(
                         db,
                         right,
+                        constraints,
                         inferable,
                         disjointness_visitor,
                         relation_visitor,
@@ -2400,12 +2706,13 @@ impl<'db> Type<'db> {
                 }),
 
             (Type::NewTypeInstance(left), Type::NewTypeInstance(right)) => {
-                left.is_disjoint_from_impl(db, right)
+                left.is_disjoint_from_impl(db, right, constraints)
             }
             (Type::NewTypeInstance(newtype), other) | (other, Type::NewTypeInstance(newtype)) => {
                 newtype.concrete_base_type(db).is_disjoint_from_impl(
                     db,
                     other,
+                    constraints,
                     inferable,
                     disjointness_visitor,
                     relation_visitor,
@@ -2416,32 +2723,43 @@ impl<'db> Type<'db> {
                 KnownClass::Property.to_instance(db).is_disjoint_from_impl(
                     db,
                     other,
+                    constraints,
                     inferable,
                     disjointness_visitor,
                     relation_visitor,
                 )
             }
 
-            (Type::BoundSuper(_), Type::BoundSuper(_)) => {
-                self.when_equivalent_to(db, other, inferable).negate(db)
-            }
+            (Type::BoundSuper(left), Type::BoundSuper(right)) => left
+                .is_equivalent_to_impl(
+                    db,
+                    right,
+                    constraints,
+                    relation_visitor,
+                    disjointness_visitor,
+                )
+                .negate(db, constraints),
             (Type::BoundSuper(_), other) | (other, Type::BoundSuper(_)) => {
                 KnownClass::Super.to_instance(db).is_disjoint_from_impl(
                     db,
                     other,
+                    constraints,
                     inferable,
                     disjointness_visitor,
                     relation_visitor,
                 )
             }
 
-            (Type::GenericAlias(_), _) | (_, Type::GenericAlias(_)) => ConstraintSet::from(true),
+            (Type::GenericAlias(_), _) | (_, Type::GenericAlias(_)) => {
+                ConstraintSet::from_bool(constraints, true)
+            }
 
             (Type::TypedDict(self_typeddict), Type::TypedDict(other_typeddict)) => {
                 disjointness_visitor.visit((self, other), || {
                     self_typeddict.is_disjoint_from_impl(
                         db,
                         other_typeddict,
+                        constraints,
                         inferable,
                         disjointness_visitor,
                         relation_visitor,
@@ -2458,46 +2776,47 @@ impl<'db> Type<'db> {
                 .has_relation_to_impl(
                     db,
                     other,
+                    constraints,
                     inferable,
                     TypeRelation::Assignability,
                     relation_visitor,
                     disjointness_visitor,
                 )
-                .negate(db),
+                .negate(db, constraints),
         }
     }
 }
 
 /// A [`PairVisitor`] that is used in `has_relation_to` methods.
-pub(crate) type HasRelationToVisitor<'db> =
-    CycleDetector<TypeRelation<'db>, (Type<'db>, Type<'db>, TypeRelation<'db>), ConstraintSet<'db>>;
+pub(crate) type HasRelationToVisitor<'db, 'c> = CycleDetector<
+    TypeRelation,
+    (Type<'db>, Type<'db>, TypeRelation),
+    ConstraintSet<'db, 'c>,
+    ConstraintSet<'db, 'c>,
+>;
 
-impl Default for HasRelationToVisitor<'_> {
-    fn default() -> Self {
-        HasRelationToVisitor::new(ConstraintSet::from(true))
+impl<'db, 'c> HasRelationToVisitor<'db, 'c> {
+    pub(crate) fn default(constraints: &'c ConstraintSetBuilder<'db>) -> Self {
+        HasRelationToVisitor::with_given(constraints, ConstraintSet::from_bool(constraints, false))
+    }
+
+    pub(crate) fn with_given(
+        constraints: &'c ConstraintSetBuilder<'db>,
+        given: ConstraintSet<'db, 'c>,
+    ) -> Self {
+        let fallback = ConstraintSet::from_bool(constraints, true);
+        HasRelationToVisitor::with_extra(fallback, given)
     }
 }
 
 /// A [`PairVisitor`] that is used in `is_disjoint_from` methods.
-pub(crate) type IsDisjointVisitor<'db> = PairVisitor<'db, IsDisjoint, ConstraintSet<'db>>;
+pub(crate) type IsDisjointVisitor<'db, 'c> = PairVisitor<'db, IsDisjoint, ConstraintSet<'db, 'c>>;
 
 #[derive(Debug)]
 pub(crate) struct IsDisjoint;
 
-impl Default for IsDisjointVisitor<'_> {
-    fn default() -> Self {
-        IsDisjointVisitor::new(ConstraintSet::from(false))
-    }
-}
-
-/// A [`PairVisitor`] that is used in `is_equivalent` methods.
-pub(crate) type IsEquivalentVisitor<'db> = PairVisitor<'db, IsEquivalent, ConstraintSet<'db>>;
-
-#[derive(Debug)]
-pub(crate) struct IsEquivalent;
-
-impl Default for IsEquivalentVisitor<'_> {
-    fn default() -> Self {
-        IsEquivalentVisitor::new(ConstraintSet::from(true))
+impl<'db, 'c> IsDisjointVisitor<'db, 'c> {
+    pub(crate) fn default(constraints: &'c ConstraintSetBuilder<'db>) -> Self {
+        IsDisjointVisitor::new(ConstraintSet::from_bool(constraints, false))
     }
 }

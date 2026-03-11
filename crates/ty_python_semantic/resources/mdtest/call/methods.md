@@ -229,9 +229,23 @@ def _(a: object, b: SupportsStr, c: Falsy, d: AlwaysFalsy, e: None, f: Foo | Non
     b.__str__()
     c.__str__()
     d.__str__()
-    # TODO: these should not error
-    e.__str__()  # error: [missing-argument]
-    f.__str__()  # error: [missing-argument]
+    e.__str__()
+    f.__str__()
+```
+
+## Method calls on subclasses of `Any`
+
+```py
+from typing_extensions import assert_type, Any
+
+class SubclassOfAny(Any):
+    def method(self) -> int:
+        return 1
+
+a = SubclassOfAny()
+assert_type(a.method(), int)
+
+assert_type(a.non_existing_method(), Any)
 ```
 
 ## Error cases: Calling `__get__` for methods
@@ -691,6 +705,32 @@ reveal_type(Derived().f)  # revealed: def f(x: int) -> str
 
 reveal_type(Derived.f(1))  # revealed: str
 reveal_type(Derived().f(1))  # revealed: str
+```
+
+### Staticmethod assigned in class body
+
+Assigning a `staticmethod(...)` object directly in the class body should preserve the callable
+behavior of the wrapped function when accessed on both classes and instances.
+
+```py
+def foo(*args, **kwargs) -> None:
+    print("foo", args, kwargs)
+
+class A:
+    __call__ = staticmethod(foo)
+    bar = staticmethod(foo)
+
+a = A()
+a()
+a.bar()
+a(5)
+a.bar(5)
+a(x=10)
+a.bar(x=10)
+
+A.bar()
+A.bar(5)
+A.bar(x=10)
 ```
 
 ### Accessing the staticmethod as a static member

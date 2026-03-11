@@ -104,6 +104,7 @@ a = f"""
 For multiline-interpolation, put the ignore comment on the expression's start or end line:
 
 ```py
+# fmt:off
 a = f"""
 {
   10 /  # type: ignore
@@ -124,7 +125,7 @@ But not at the end of the f-string:
 ```py
 a = f"""
 {
-  10 / 0  # error: [division-by-zero]
+    10 / 0  # error: [division-by-zero]
 }
 """  # error: [unused-type-ignore-comment]  # type: ignore
 ```

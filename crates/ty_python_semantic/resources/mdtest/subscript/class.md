@@ -33,6 +33,7 @@ def _(flag: bool):
         if flag:
             def __class_getitem__(cls, item: int) -> str:
                 return str(item)
+
         else:
             def __class_getitem__(cls, item: int) -> int:
                 return item
@@ -69,6 +70,7 @@ def _(flag: bool):
 
     else:
         class Spam: ...
+
     # error: [not-subscriptable] "Cannot subscript object of type `<class 'Spam'>` with no `__class_getitem__` method"
     # revealed: str | Unknown
     reveal_type(Spam[42])
@@ -89,6 +91,52 @@ def _(flag: bool):
     a = Eggs[42]  # error: "Cannot subscript object of type `Literal[1]` with no `__getitem__` method"
 
     reveal_type(a)  # revealed: str | Unknown
+```
+
+## Class getitem on metaclass
+
+`__class_getitem__` is also looked up on the metaclass.
+
+```py
+class Meta(type):
+    def __class_getitem__(cls, item: int) -> str:
+        return str(item)
+
+class WithMeta(metaclass=Meta): ...
+
+reveal_type(WithMeta[0])  # revealed: str
+```
+
+## Conflicting class and metaclass getitem
+
+`__class_getitem__` on the class takes precedence over the one on the metaclass.
+
+```py
+class Meta(type):
+    def __class_getitem__(cls, item: int) -> str:
+        return str(item)
+
+class WithMetaAndClassGetItem(metaclass=Meta):
+    def __class_getitem__(cls, item: int) -> int:
+        return item
+
+reveal_type(WithMetaAndClassGetItem[0])  # revealed: int
+```
+
+## Class getitem with getitem on metaclass
+
+`__getitem__` on the metaclass takes precedence over `__class_getitem__` on the class.
+
+```py
+class Meta(type):
+    def __getitem__(cls, item: int) -> str:
+        return str(item)
+
+class WithMetaGetItem(metaclass=Meta):
+    def __class_getitem__(cls, item: int) -> int:
+        return item
+
+reveal_type(WithMetaGetItem[0])  # revealed: str
 ```
 
 ## Intersection of nominal-instance types

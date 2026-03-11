@@ -42,7 +42,7 @@ python-version = "3.12"  # typing.TypeAliasType
 ```py
 from typing import Union, TypeAliasType, Sequence, Mapping
 
-A = list["A" | None]
+A = list["A | None"]
 
 def f(x: A):
     # TODO: should be `list[A | None]`?
@@ -54,8 +54,7 @@ JSONPrimitive = Union[str, int, float, bool, None]
 JSONValue = TypeAliasType("JSONValue", 'Union[JSONPrimitive, Sequence["JSONValue"], Mapping[str, "JSONValue"]]')
 
 def _(x: JSONValue):
-    # TODO: should be `JSONValue`
-    reveal_type(x)  # revealed: Divergent
+    reveal_type(x)  # revealed: Sequence[JSONValue] | int | float | None | Mapping[str, JSONValue]
 ```
 
 ## Self-referential legacy type variables
@@ -153,6 +152,76 @@ class Cyclic:
         if isinstance(self.data, str):
             self.data = {"url": self.data}
 
-# revealed: Unknown | str | dict[Unknown, Unknown] | dict[Unknown | str, Unknown | str]
+# revealed: Unknown | str | dict[Unknown, Unknown] | dict[str, str]
 reveal_type(Cyclic("").data)
+```
+
+## Decorator defined on a base class with constrained typevars, accessed from a subclass with decorated generic parameters
+
+This example was minimized from
+[a real issue in `robotframework`](https://github.com/astral-sh/ty/issues/2637#issuecomment-3807037935).
+It created
+[a complicated cycle with multiple cycle heads](https://gist.github.com/oconnor663/c996ed2cc97d172dd4b9a8d8207dc7ac),
+which also involved
+[a tricky Salsa behavior that comes up when a query oscillates between being a cycle head and not being one](https://gist.github.com/oconnor663/c2a7662e3d88048b691754da957121d1).
+
+`entry.py`:
+
+```py
+from derived import Derived
+
+Derived.decorate
+# revealed: bound method <class 'Derived'>.decorate[T](item_class: type[T]) -> type[T]
+reveal_type(Derived.decorate)
+```
+
+`derived.py`:
+
+```py
+from ty_extensions import reveal_mro
+import bases
+
+class Derived(bases.GenericBase["Foo", "Bar"]): ...
+
+@Derived.decorate
+class Foo(bases.Foo): ...
+
+# revealed: <class 'Foo'>
+reveal_type(Foo)
+# revealed: (<class 'derived.Foo'>, <class 'bases.Foo'>, <class 'object'>)
+reveal_mro(Foo)
+
+@Derived.decorate
+class Bar(bases.Bar): ...
+
+# revealed: <class 'Bar'>
+reveal_type(Bar)
+# revealed: (<class 'derived.Bar'>, <class 'bases.Bar'>, <class 'object'>)
+reveal_mro(Bar)
+```
+
+`bases.py`:
+
+```py
+from typing import Generic, TypeVar, Type
+from ty_extensions import reveal_mro
+
+T = TypeVar("T")
+B1 = TypeVar("B1", bound="Foo")
+B2 = TypeVar("B2", bound="Bar")
+
+class GenericBase(Generic[B1, B2]):
+    @classmethod
+    def decorate(cls, item_class: Type[T]) -> Type[T]:
+        return item_class
+
+# revealed: <class 'GenericBase'>
+reveal_type(GenericBase)
+# revealed: (<class 'GenericBase[Unknown, Unknown]'>, typing.Generic, <class 'object'>)
+reveal_mro(GenericBase)
+# revealed: (<class 'GenericBase[Foo, Bar]'>, typing.Generic, <class 'object'>)
+reveal_mro(GenericBase["Foo", "Bar"])
+
+class Foo: ...
+class Bar: ...
 ```

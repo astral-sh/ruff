@@ -387,11 +387,17 @@ fn convert_to_dict_comprehension(
     let comprehension_str =
         format!("{{{key_str}: {value_str} {for_type} {target_str} in {iter_str}{if_str}}}");
 
-    let for_loop_inline_comments = comment_strings_in_range(
-        checker,
-        for_stmt.range,
-        &[key.range(), value.range(), for_stmt.iter.range()],
-    );
+    let mut ranges_to_ignore = vec![
+        key.range(),
+        value.range(),
+        for_stmt.iter.range(),
+        for_stmt.target.range(),
+    ];
+    if let Some(test) = if_test {
+        ranges_to_ignore.push(test.range());
+    }
+    let for_loop_inline_comments =
+        comment_strings_in_range(checker, for_stmt.range, &ranges_to_ignore);
 
     let newline = checker.stylist().line_ending().as_str();
 

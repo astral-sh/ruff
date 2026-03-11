@@ -51,6 +51,66 @@ Methods that are available on `dict`s are also available on `TypedDict`s:
 bob.update(age=26)
 ```
 
+PEP 584-style immutable updates preserve the `TypedDict` type when the other operand is compatible:
+
+```py
+reveal_type(bob | {"age": 27})  # revealed: Person
+reveal_type({"age": 27} | bob)  # revealed: Person
+
+carol_update = Person(name="Carol", age=31)
+reveal_type(bob | carol_update)  # revealed: Person
+```
+
+Compatible `TypedDict` subset updates are also accepted for `|=`:
+
+```py
+class NameOnly(TypedDict, closed=True):
+    name: str
+
+name_update: NameOnly = {"name": "Bobby"}
+
+bob |= {"age": 27}
+bob |= name_update
+```
+
+TODO: protocol matching for synthesized `TypedDict.__or__` should also accept these cases:
+
+```py
+from typing import Callable, Protocol
+
+class PersonOrNameOnly(Protocol):
+    def __or__(self, other: NameOnly) -> Person: ...
+
+class PersonOrNameOnlyAttr(Protocol):
+    __or__: Callable[[NameOnly], Person]
+
+def takes_person_or_name_only(x: PersonOrNameOnly) -> None: ...
+def takes_person_or_name_only_attr(x: PersonOrNameOnlyAttr) -> None: ...
+
+# TODO: this should pass
+# error: [invalid-argument-type] "Argument to function `takes_person_or_name_only` is incorrect: Expected `PersonOrNameOnly`, found `Person`"
+takes_person_or_name_only(bob)
+# TODO: this should pass
+# error: [invalid-argument-type] "Argument to function `takes_person_or_name_only_attr` is incorrect: Expected `PersonOrNameOnlyAttr`, found `Person`"
+takes_person_or_name_only_attr(bob)
+```
+
+When the other operand is not compatible with the `TypedDict`, the result falls back to the normal
+`dict.__or__` return type:
+
+```py
+# Incompatible value type for a key
+reveal_type(bob | {"name": 42})  # revealed: dict[str, object]
+reveal_type({"name": 42} | bob)  # revealed: dict[str, object]
+
+# Key not present in the TypedDict
+reveal_type(bob | {"unknown_key": 1})  # revealed: dict[str, object]
+reveal_type({"unknown_key": 1} | bob)  # revealed: dict[str, object]
+
+# error: [unsupported-operator] "Operator `|=` is not supported between objects of type `Person` and `dict[str, int]`"
+bob |= {"unknown_key": 1}
+```
+
 `TypedDict` keys do not have to be string literals, as long as they can be statically determined
 (inferred to be of type string `Literal`).
 
@@ -142,11 +202,20 @@ plot3: Plot = {"y": homogeneous_list(1, 2, 3), "x": homogeneous_list(1, 2, 3)}
 reveal_type(plot3["y"])  # revealed: list[int | None]
 reveal_type(plot3["x"])  # revealed: list[int | None]
 
+plot3["y"] = homogeneous_list(1, 2, 3)
+reveal_type(plot3["y"])  # revealed: list[int | None]
+
+reveal_type(plot1 | {"y": homogeneous_list(1, 2, 3)})  # revealed: Plot
+reveal_type({"y": homogeneous_list(1, 2, 3)} | plot1)  # revealed: Plot
+
 Y = "y"
 X = "x"
 
 plot4: Plot = {Y: [1, 2, 3], X: None}
 plot5: Plot = {Y: homogeneous_list(1, 2, 3), X: None}
+
+reveal_type(plot1 | {Y: homogeneous_list(1, 2, 3)})  # revealed: Plot
+reveal_type({Y: homogeneous_list(1, 2, 3)} | plot1)  # revealed: Plot
 
 class Items(TypedDict):
     items: list[int | str]
@@ -202,6 +271,13 @@ reveal_type(alice["inner"]["non_existing"])  # revealed: Unknown
 
 # error: [invalid-key] "Unknown key "extra" for TypedDict `Inner`"
 alice: Person = {"inner": {"name": "Alice", "age": 30, "extra": 1}}
+
+class Box(TypedDict):
+    inner: Inner
+
+box: Box = {"inner": {"name": "Alice", "age": 30}}
+reveal_type(box | {"inner": {"age": 31, "name": "Alice"}})  # revealed: Box
+reveal_type({"inner": {"age": 31, "name": "Alice"}} | box)  # revealed: Box
 ```
 
 ## Validation of `TypedDict` construction
@@ -256,6 +332,40 @@ house.owner = {"name": "Alice"}
 a_person: Person
 # error: [missing-typed-dict-key] "Missing required key 'age' in TypedDict `Person` constructor"
 a_person = {"name": "Alice"}
+```
+
+Constructor validation should also run when the call target is a generic alias or a `type[...]`
+value:
+
+```py
+from typing import Generic, TypeVar, TypedDict
+
+T = TypeVar("T")
+
+class MyGenTD(TypedDict, Generic[T]):
+    a: int
+    b: T
+
+class MyTD(TypedDict):
+    a: int
+
+MyStrTD = MyGenTD[str]
+
+# error: [invalid-argument-type] "Invalid argument to key "a""
+x = MyStrTD(a="foo", b="ok")
+
+# No error: `a` is int, `b` is str (matches T=str)
+w = MyStrTD(a=1, b="ok")
+
+# error: [invalid-argument-type] "Invalid argument to key "b""
+v = MyStrTD(a=1, b=42)
+
+# error: [invalid-argument-type]
+y = MyTD(a="foo")
+
+def _(ATD: type[MyTD]):
+    # error: [invalid-argument-type]
+    z = ATD(a="foo")
 ```
 
 All of these have an invalid type for the `name` field:
@@ -422,6 +532,190 @@ user3 = User({"name": None, "age": 25})
 
 # error: [invalid-key] "Unknown key "extra" for TypedDict `User`"
 user4 = User({"name": "Charlie", "age": 30, "extra": True})
+```
+
+## Constructing TypedDict from existing TypedDict
+
+A `TypedDict` can be constructed from an existing `TypedDict` of the same type using either
+positional argument passing or keyword unpacking:
+
+```py
+from typing import TypedDict
+
+class Data(TypedDict):
+    id: int
+    name: str
+    value: float
+
+def process_data_positional(data: Data) -> Data:
+    return Data(data)
+
+def process_data_unpacking(data: Data) -> Data:
+    return Data(**data)
+```
+
+Constructing from a compatible TypedDict (with same fields) works:
+
+```py
+from typing import TypedDict
+
+class PersonBase(TypedDict):
+    name: str
+    age: int
+
+class PersonAlias(TypedDict):
+    name: str
+    age: int
+
+def copy_person(p: PersonBase) -> PersonAlias:
+    return PersonAlias(**p)
+
+def copy_person_positional(p: PersonBase) -> PersonAlias:
+    return PersonAlias(p)
+```
+
+Unpacking a TypedDict with extra keys flags the extra keys as errors, for consistency with the
+behavior when passing all keys as explicit keyword arguments:
+
+```py
+from typing import TypedDict
+
+class Person(TypedDict):
+    name: str
+    age: int
+
+class Employee(Person):
+    employee_id: int
+
+def get_person_from_employee(emp: Employee) -> Person:
+    # error: [invalid-key] "Unknown key "employee_id" for TypedDict `Person`"
+    return Person(**emp)
+```
+
+However, the positional form allows extra keys, by analogy with the fact that assignment
+`p: Person = emp` is allowed (structural subtyping). It's not consistent that `Person(emp)` is more
+lenient than `Person(**emp)`; ultimately this is because extra keys _should_ be always allowed for a
+non-closed `TypedDict`, but we want to disallow explicit extra keys in order to catch typos, and so
+we have to bite the inconsistency bullet somewhere.
+
+```py
+def get_person_from_employee_positional(emp: Employee) -> Person:
+    return Person(emp)
+```
+
+Type mismatches in unpacked TypedDict fields should be detected:
+
+```py
+from typing import TypedDict
+
+class Source(TypedDict):
+    name: int  # Note: int, not str
+    age: int
+
+class Target(TypedDict):
+    name: str
+    age: int
+
+def convert(src: Source) -> Target:
+    # error: [invalid-argument-type]
+    return Target(**src)
+
+def convert_positional(src: Source) -> Target:
+    # error: [invalid-argument-type]
+    return Target(src)
+```
+
+Unpacking `Never` or a dynamic type (`Any`, `Unknown`) passes unconditionally, since these types can
+have any keys:
+
+```py
+from typing import Any, TypedDict, Never
+
+class Info(TypedDict):
+    name: str
+    value: int
+
+def unpack_never(data: Never) -> Info:
+    return Info(**data)
+
+def unpack_any(data: Any) -> Info:
+    return Info(**data)
+```
+
+PEP 695 type aliases to TypedDict types are also supported:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import TypedDict
+
+class Record(TypedDict):
+    id: int
+    name: str
+
+type RecordAlias = Record
+
+def process_aliased(data: RecordAlias) -> Record:
+    return Record(data)
+
+def process_aliased_unpacking(data: RecordAlias) -> Record:
+    return Record(**data)
+```
+
+Intersection types containing a TypedDict (e.g., from truthiness narrowing) are also supported. With
+`total=False`, TypedDicts can be empty (falsy), so truthiness narrowing creates an intersection:
+
+```py
+from typing import TypedDict
+
+class OptionalInfo(TypedDict, total=False):
+    id: int
+    name: str
+
+def process_truthy(data: OptionalInfo) -> OptionalInfo:
+    if data:
+        reveal_type(data)  # revealed: OptionalInfo & ~AlwaysFalsy
+        # Here data is `OptionalInfo & ~AlwaysFalsy`, but we can still construct OptionalInfo from it
+        return OptionalInfo(data)
+    return {}
+
+def process_truthy_unpacking(data: OptionalInfo) -> OptionalInfo:
+    if data:
+        return OptionalInfo(**data)
+    return {}
+```
+
+When we have an intersection of multiple TypedDict types, we extract ALL keys from ALL TypedDicts
+(union of keys), because a value of an intersection type must satisfy all TypedDicts and therefore
+has all their keys. For keys that appear in multiple TypedDicts, the types are intersected:
+
+```py
+from typing import TypedDict
+from ty_extensions import Intersection
+
+class TdA(TypedDict):
+    name: str
+    a_only: int
+
+class TdB(TypedDict):
+    name: str
+    b_only: int
+
+class NameOnly(TypedDict):
+    name: str
+
+# Positional form allows extra keys (like assignment)
+def construct_from_intersection(data: Intersection[TdA, TdB]) -> NameOnly:
+    return NameOnly(data)
+
+# Unpacking form flags extra keys as errors
+def construct_from_intersection_unpacking(data: Intersection[TdA, TdB]) -> NameOnly:
+    # error: [invalid-key] "Unknown key "a_only" for TypedDict `NameOnly`"
+    # error: [invalid-key] "Unknown key "b_only" for TypedDict `NameOnly`"
+    return NameOnly(**data)
 ```
 
 ## Optional fields with `total=False`
@@ -761,7 +1055,7 @@ _: Mapping[str, int] = alice
 _: Mapping[str, str | int | None] = alice
 ```
 
-They *cannot* be assigned to `dict[str, object]`, as that would allow them to be mutated in unsafe
+They _cannot_ be assigned to `dict[str, object]`, as that would allow them to be mutated in unsafe
 ways:
 
 ```py
@@ -834,7 +1128,7 @@ a: A = a_from_b(b_from_c(c))
 a["y"] = 42
 ```
 
-If the additional, optional item in the target is read-only, the requirements are *somewhat*
+If the additional, optional item in the target is read-only, the requirements are _somewhat_
 relaxed. In this case, because the source might contain have undeclared extra items of any type, the
 target item must be assignable from `object`:
 
@@ -979,9 +1273,7 @@ def f(var: Foo | int):
     assert_type(var, Foo | int)
     assert_type(var, Bar | int)
     assert_type(var, Baz | int)
-    # TODO: Union simplification compares `TypedDict`s by name/identity to avoid cycles. This assert
-    # should also pass once that's fixed.
-    assert_type(var, Foo | Bar | Baz | int)  # error: [type-assertion-failure]
+    assert_type(var, Foo | Bar | Baz | int)
 ```
 
 Here are several cases that are not equivalent. In particular, assignability does not imply
@@ -1061,11 +1353,11 @@ from ty_extensions import static_assert, is_assignable_to, is_equivalent_to
 
 class Node1(TypedDict):
     value: int
-    next: "Node1" | None
+    next: "Node1 | None"
 
 class Node2(TypedDict):
     value: int
-    next: "Node2" | None
+    next: "Node2 | None"
 
 static_assert(is_assignable_to(Node1, Node2))
 static_assert(is_equivalent_to(Node1, Node2))
@@ -1165,6 +1457,7 @@ class Person(TypedDict):
     name: str
     surname: str
     age: int | None
+    leg: str
 
 class Animal(TypedDict):
     name: str
@@ -1177,8 +1470,8 @@ def _(person: Person):
     person["name"] = "Alice"
     person["age"] = 30
 
-    # error: [invalid-key] "Unknown key "naem" for TypedDict `Person` - did you mean "name"?"
-    person["naem"] = "Alice"
+    # error: [invalid-key] "Unknown key "nane" for TypedDict `Person` - did you mean "name"?"
+    person["nane"] = "Alice"
 
 def _(person: Person):
     person[NAME_FINAL] = "Alice"
@@ -1201,8 +1494,8 @@ def _(being: Person | Animal):
     # error: [invalid-assignment] "Invalid assignment to key "name" with declared type `str` on TypedDict `Animal`: value of type `Literal[1]`"
     being["name"] = 1
 
-    # error: [invalid-key] "Unknown key "surname" for TypedDict `Animal` - did you mean "name"?"
-    being["surname"] = "unknown"
+    # error: [invalid-key] "Unknown key "leg" for TypedDict `Animal` - did you mean "legs"?"
+    being["leg"] = "unknown"
 
 def _(centaur: Intersection[Person, Animal]):
     centaur["name"] = "Chiron"
@@ -1386,7 +1679,7 @@ def _(person: Person) -> None:
     type(person).__optional_keys__  # error: [unresolved-attribute]
 ```
 
-But they *can* be accessed on `type[Person]`, because this function would accept the class object
+But they _can_ be accessed on `type[Person]`, because this function would accept the class object
 `Person` as an argument:
 
 ```py
@@ -1423,8 +1716,11 @@ def combine(p: Person, e: Employee):
     reveal_type(p | p)  # revealed: Person
     reveal_type(e | e)  # revealed: Employee
 
-    # TODO: Should be `Person`; simplifying TypedDicts in Unions is pending better cycle handling
-    reveal_type(p | e)  # revealed: Person | Employee
+    # `Employee` is assignable to `Person`, so the result is `Person` in both directions.
+    # The result dict will also contain the `employee_id` key at runtime, but that's
+    # compatible with `Person` (which simply doesn't require it).
+    reveal_type(p | e)  # revealed: Person
+    reveal_type(e | p)  # revealed: Person
 ```
 
 When inheriting from a `TypedDict` with a different `total` setting, inherited fields maintain their
@@ -1632,7 +1928,7 @@ msg = Message(id=1, content="Hello")
 # No errors for yet-unsupported features (`closed`):
 OtherMessage = TypedDict("OtherMessage", {"id": int, "content": str}, closed=True)
 
-reveal_type(Message.__required_keys__)  # revealed: @Todo(Support for functional `TypedDict`)
+reveal_type(Message.__required_keys__)  # revealed: @Todo(Functional TypedDicts)
 
 # TODO: this should be an error
 msg.content
@@ -1664,6 +1960,53 @@ def bad(
     # error: [invalid-type-form] "`ReadOnly` is not allowed in function parameter annotations"
     c: ReadOnly[int],
 ): ...
+```
+
+### `Required` and `NotRequired` not allowed outside `TypedDict`
+
+```py
+from typing_extensions import Required, NotRequired, TypedDict
+
+# error: [invalid-type-form] "`Required` is only allowed in TypedDict fields"
+x: Required[int]
+# error: [invalid-type-form] "`NotRequired` is only allowed in TypedDict fields"
+y: NotRequired[str]
+
+class MyClass:
+    # error: [invalid-type-form] "`Required` is only allowed in TypedDict fields"
+    x: Required[int]
+    # error: [invalid-type-form] "`NotRequired` is only allowed in TypedDict fields"
+    y: NotRequired[str]
+
+def f():
+    # error: [invalid-type-form] "`Required` is only allowed in TypedDict fields"
+    x: Required[int] = 1
+    # error: [invalid-type-form] "`NotRequired` is only allowed in TypedDict fields"
+    y: NotRequired[str] = ""
+
+# fine
+MyFunctionalTypedDict = TypedDict("MyFunctionalTypedDict", {"not-an-identifier": Required[int]})
+
+class FunctionalTypedDictSubclass(MyFunctionalTypedDict):
+    y: NotRequired[int]  # fine
+```
+
+### Nested `Required` and `NotRequired`
+
+`Required` and `NotRequired` cannot be nested inside each other:
+
+```py
+from typing_extensions import TypedDict, Required, NotRequired
+
+class TD(TypedDict):
+    # error: [invalid-type-form] "`typing.Required` cannot be nested inside `Required` or `NotRequired`"
+    a: Required[Required[int]]
+    # error: [invalid-type-form] "`typing.NotRequired` cannot be nested inside `Required` or `NotRequired`"
+    b: NotRequired[NotRequired[int]]
+    # error: [invalid-type-form] "`typing.Required` cannot be nested inside `Required` or `NotRequired`"
+    c: Required[NotRequired[int]]
+    # error: [invalid-type-form] "`typing.NotRequired` cannot be nested inside `Required` or `NotRequired`"
+    d: NotRequired[Required[int]]
 ```
 
 ### `dict`-subclass inhabitants
@@ -1700,6 +2043,20 @@ def _(obj: object, obj2: type):
     issubclass(obj2, Person)
 ```
 
+The same applies when a `TypedDict` class appears inside a tuple, including non-literal tuples:
+
+```py
+def _(obj: object, obj2: type):
+    isinstance(obj, (int, Person))  # error: [isinstance-against-typed-dict]
+    issubclass(obj2, (int, Person))  # error: [isinstance-against-typed-dict]
+    isinstance(obj, (int, (str, Person)))  # error: [isinstance-against-typed-dict]
+
+classes = (int, Person)
+
+def _(obj: object):
+    isinstance(obj, classes)  # error: [isinstance-against-typed-dict]
+```
+
 They also cannot be used in class patterns for `match` statements:
 
 ```py
@@ -1727,9 +2084,9 @@ class Person(TypedDict):
     age: int | None
 
 def access_invalid_literal_string_key(person: Person):
-    person["naem"]  # error: [invalid-key]
+    person["nane"]  # error: [invalid-key]
 
-NAME_KEY: Final = "naem"
+NAME_KEY: Final = "nane"
 
 def access_invalid_key(person: Person):
     person[NAME_KEY]  # error: [invalid-key]
@@ -1741,7 +2098,7 @@ def write_to_key_with_wrong_type(person: Person):
     person["age"] = "42"  # error: [invalid-assignment]
 
 def write_to_non_existing_key(person: Person):
-    person["naem"] = "Alice"  # error: [invalid-key]
+    person["nane"] = "Alice"  # error: [invalid-key]
 
 def write_to_non_literal_string_key(person: Person, str_key: str):
     person[str_key] = "Alice"  # error: [invalid-key]
@@ -1772,7 +2129,7 @@ If the key uses single quotes, the autofix preserves that quoting style:
 ```py
 def write_to_non_existing_key_single_quotes(person: Person):
     # error: [invalid-key]
-    person['naem'] = "Alice"  # fmt: skip
+    person['nane'] = "Alice"  # fmt: skip
 ```
 
 ## Import aliases
@@ -1863,7 +2220,7 @@ class DisjointTD2(TypedDict):
 static_assert(is_disjoint_from(DisjointTD1, DisjointTD2))
 ```
 
-However, note that most pairs of non-final classes are *not* disjoint from each other, even if
+However, note that most pairs of non-final classes are _not_ disjoint from each other, even if
 neither inherits from the other, because we could define a third class that multiply-inherits from
 both. `TypedDict` disjointness takes this into account. For example:
 
@@ -1908,7 +2265,7 @@ static_assert(not is_disjoint_from(CommonSubTD, NonDisjointTD2))
 
 We made the important fields `ReadOnly` above, because those only establish disjointness when
 they're disjoint themselves. However, the rules for mutable fields are stricter. Mutable fields in
-common need to have *compatible* types (in the fully-static case, equivalent types):
+common need to have _compatible_ types (in the fully-static case, equivalent types):
 
 ```py
 from typing import Any, Generic, TypeVar
@@ -2018,7 +2375,7 @@ static_assert(is_disjoint_from(ReadOnlyBoolTD, IntTD))
 With mutability above we were able to make the simplifying assumption that the "third `TypedDict`
 that's assignable to both" has only mutable fields, because a mutable field is always assignable to
 its immutable counterpart. However, `Required` vs `NotRequired` are more complicated, because a a
-`Required` field is *not* necessarily assignable to its `NotRequired` counterpart. In particular, if
+`Required` field is _not_ necessarily assignable to its `NotRequired` counterpart. In particular, if
 a `NotRequired` field is also mutable (intuitively, if we're allowed to `del` it), then no
 `Required` field is ever assignable to it. So, if either side is `NotRequired` and mutable, and the
 other side is `Required` (regardless of mutability), then that's sufficient to establish
@@ -2141,7 +2498,7 @@ class Bing(TypedDict):
 def _(u: Foo | Bar | Baz | Bing):
     if u["tag"] == "foo":
         reveal_type(u)  # revealed: Foo
-    elif u["tag"] == 42:
+    elif 42 == u["tag"]:
         reveal_type(u)  # revealed: Bar
     elif u["tag"] == b"baz":
         reveal_type(u)  # revealed: Baz
@@ -2265,7 +2622,7 @@ def _(u: Foo | Bar | NotADict):
 It would be nice if we could also narrow `TypedDict` unions by checking whether a key (which only
 shows up in a subset of the union members) is present, but that isn't generally correct, because
 "extra items" are allowed by default. For example, even though `Bar` here doesn't define a `"foo"`
-field, it could be *assigned to* with another `TypedDict` that does:
+field, it could be _assigned to_ with another `TypedDict` that does:
 
 ```py
 from typing_extensions import Literal
@@ -2397,6 +2754,33 @@ def match_non_literal(u: Foo | NonLiteralTD):
         case _:
             # ...(but we *can* narrow here)...
             reveal_type(u)  # revealed: NonLiteralTD
+```
+
+and it is also restricted to `match` patterns that solely consist of value patterns:
+
+```py
+class Config:
+    MODE: str = "default"
+
+class Foo(TypedDict):
+    tag: Literal["foo"]
+    data: int
+
+class Bar(TypedDict):
+    tag: Literal["bar"]
+    data: str
+
+def test_or_pattern_with_non_literal(u: Foo | Bar):
+    match u["tag"]:
+        case Config.MODE | "foo":
+            # Config.mode has type `str` (not a literal), which could match
+            # any string value at runtime. We cannot narrow based on "foo" alone
+            # because the actual match might have been against Config.mode.
+            reveal_type(u)  # revealed: Foo | Bar
+        case "bar":
+            # Since the previous case could match any string, this case can
+            # still narrow to `Bar` when tag equals "bar".
+            reveal_type(u)  # revealed: Bar
 ```
 
 We can still narrow `Literal` tags even when non-`TypedDict` types are present in the union:

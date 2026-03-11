@@ -27,8 +27,8 @@ impl EnvVars {
     /// Accepted values:
     ///
     /// * `short` - Display short memory report
-    /// * `mypy_primer` - Display `mypy_primer` format and suppress workspace diagnostics
     /// * `full` - Display full memory report
+    /// * `json` - Display machine-readable JSON format and suppress workspace diagnostics
     #[attr_hidden]
     pub const TY_MEMORY_REPORT: &'static str = "TY_MEMORY_REPORT";
 
@@ -46,6 +46,13 @@ impl EnvVars {
     ///
     /// Equivalent to the `--config-file` command-line argument.
     pub const TY_CONFIG_FILE: &'static str = "TY_CONFIG_FILE";
+
+    /// The format to use for printing diagnostic messages.
+    ///
+    /// When set, ty will use this format for output instead of the default.
+    ///
+    /// Accepts the same values as the `--output-format` command-line argument.
+    pub const TY_OUTPUT_FORMAT: &'static str = "TY_OUTPUT_FORMAT";
 
     /// Used to detect an activated virtual environment.
     pub const VIRTUAL_ENV: &'static str = "VIRTUAL_ENV";

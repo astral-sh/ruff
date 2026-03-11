@@ -137,14 +137,16 @@ impl std::fmt::Display for DisplayDiagnostics<'_> {
             }
             #[cfg(feature = "junit")]
             DiagnosticFormat::Junit => {
-                junit::JunitRenderer::new(self.resolver).render(f, self.diagnostics)?;
+                junit::JunitRenderer::new(self.resolver, self.config.program)
+                    .render(f, self.diagnostics)?;
             }
             #[cfg(feature = "serde")]
             DiagnosticFormat::Gitlab => {
                 gitlab::GitlabRenderer::new(self.resolver).render(f, self.diagnostics)?;
             }
             DiagnosticFormat::Github => {
-                GithubRenderer::new(self.resolver, "ty").render(f, self.diagnostics)?;
+                GithubRenderer::new(self.resolver, self.config.program)
+                    .render(f, self.diagnostics)?;
             }
         }
 
@@ -2538,7 +2540,7 @@ watermelon
         pub(super) fn new() -> TestEnvironment {
             TestEnvironment {
                 db: TestDb::new(),
-                config: DisplayDiagnosticConfig::default(),
+                config: DisplayDiagnosticConfig::new("ty"),
             }
         }
 
@@ -2549,16 +2551,14 @@ watermelon
             // be `Copy` (which it could be, at time of writing, 2025-03-07),
             // but it seems likely to me that it will grow non-`Copy`
             // configuration. So just deal with this inconvenience for now.
-            let mut config = std::mem::take(&mut self.config);
-            config = config.context(lines);
-            self.config = config;
+            let config = self.config.clone();
+            self.config = config.context(lines);
         }
 
         /// Set the output format to use in diagnostic rendering.
         pub(super) fn format(&mut self, format: DiagnosticFormat) {
-            let mut config = std::mem::take(&mut self.config);
-            config = config.format(format);
-            self.config = config;
+            let config = self.config.clone();
+            self.config = config.format(format);
         }
 
         /// Enable preview functionality for diagnostic rendering.
@@ -2567,37 +2567,32 @@ watermelon
             reason = "This is currently only used for JSON but will be needed soon for other formats"
         )]
         pub(super) fn preview(&mut self, yes: bool) {
-            let mut config = std::mem::take(&mut self.config);
-            config = config.preview(yes);
-            self.config = config;
+            let config = self.config.clone();
+            self.config = config.preview(yes);
         }
 
         /// Hide diagnostic severity when rendering.
         pub(super) fn hide_severity(&mut self, yes: bool) {
-            let mut config = std::mem::take(&mut self.config);
-            config = config.hide_severity(yes);
-            self.config = config;
+            let config = self.config.clone();
+            self.config = config.hide_severity(yes);
         }
 
         /// Show fix availability when rendering.
         pub(super) fn show_fix_status(&mut self, yes: bool) {
-            let mut config = std::mem::take(&mut self.config);
-            config = config.with_show_fix_status(yes);
-            self.config = config;
+            let config = self.config.clone();
+            self.config = config.with_show_fix_status(yes);
         }
 
         /// Show a diff for the fix when rendering.
         pub(super) fn show_fix_diff(&mut self, yes: bool) {
-            let mut config = std::mem::take(&mut self.config);
-            config = config.show_fix_diff(yes);
-            self.config = config;
+            let config = self.config.clone();
+            self.config = config.show_fix_diff(yes);
         }
 
         /// The lowest fix applicability to show when rendering.
         pub(super) fn fix_applicability(&mut self, applicability: Applicability) {
-            let mut config = std::mem::take(&mut self.config);
-            config = config.with_fix_applicability(applicability);
-            self.config = config;
+            let config = self.config.clone();
+            self.config = config.with_fix_applicability(applicability);
         }
 
         /// Add a file with the given path and contents to this environment.
@@ -2803,6 +2798,16 @@ watermelon
             self
         }
 
+        /// Adds a sub-diagnostic constructed with this diagnostic's environment.
+        fn sub(
+            mut self,
+            f: impl Fn(&mut TestEnvironment) -> SubDiagnostic,
+        ) -> DiagnosticBuilder<'e> {
+            let sub = f(self.env);
+            self.diag.sub(sub);
+            self
+        }
+
         /// Set the documentation URL for the diagnostic.
         pub(super) fn documentation_url(mut self, url: impl Into<String>) -> DiagnosticBuilder<'e> {
             self.diag.set_documentation_url(Some(url.into()));
@@ -2906,7 +2911,7 @@ def fibonacci(n):
     elif n == 1:
         return 1
     else:
-        return fibonacci(n - 1) + fibonacci(n - 2)
+        return fibonaccii(n - 1) + fibonacci(n - 2)
 "#,
         );
         env.add("undef.py", r"if a == 1: pass");
@@ -2945,6 +2950,26 @@ def fibonacci(n):
                 .noqa_offset(TextSize::from(3))
                 .documentation_url("https://docs.astral.sh/ruff/rules/undefined-name")
                 .build(),
+            env.builder(
+                "undefined-name",
+                Severity::Error,
+                "Undefined name `fibonaccii`",
+            )
+            .primary("fib.py", "12:15", "12:25", "")
+            .secondary_code("F821")
+            .noqa_offset(ruff_text_size::TextSize::from(0))
+            .documentation_url("https://docs.astral.sh/ruff/rules/undefined-name")
+            .secondary("fib.py", "12:35", "12:36", "")
+            .sub(|env| {
+                env.sub_builder(
+                    SubDiagnosticSeverity::Info,
+                    "Did you mean to import it from `/some/path/def.py`?",
+                )
+                .primary("fib.py", "4:4", "4:13", "`fibonacci` is defined here")
+                .secondary("fib.py", "5:4", "5", "`fibonacci` is documented here")
+                .build()
+            })
+            .build(),
         ];
 
         (env, diagnostics)

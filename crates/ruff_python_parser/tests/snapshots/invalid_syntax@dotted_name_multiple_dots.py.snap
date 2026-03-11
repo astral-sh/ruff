@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
-input_file: crates/ruff_python_parser/resources/inline/err/dotted_name_multiple_dots.py
 ---
 ## AST
 
@@ -26,6 +25,7 @@ Module(
                             asname: None,
                         },
                     ],
+                    is_lazy: false,
                 },
             ),
             Import(
@@ -44,6 +44,7 @@ Module(
                             asname: None,
                         },
                     ],
+                    is_lazy: false,
                 },
             ),
             Expr(

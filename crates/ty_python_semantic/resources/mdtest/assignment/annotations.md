@@ -16,6 +16,16 @@ reveal_type(y)  # revealed: Literal[1]
 x: int = "foo"  # error: [invalid-assignment] "Object of type `Literal["foo"]` is not assignable to `int`"
 ```
 
+## Numbers special case
+
+<!-- snapshot-diagnostics -->
+
+```py
+from numbers import Number
+
+a: Number = 1  # error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to `Number`"
+```
+
 ## Violates previous annotation
 
 ```py
@@ -59,7 +69,7 @@ reveal_type(d)  # revealed: tuple[tuple[str, str], tuple[int, int]]
 reveal_type(e)  # revealed: tuple[str, ...]
 
 reveal_type(f)  # revealed: tuple[str, *tuple[int, ...], bytes]
-reveal_type(g)  # revealed: tuple[@Todo(PEP 646), ...]
+reveal_type(g)  # revealed: tuple[str, *tuple[int, ...], bytes]
 
 reveal_type(h)  # revealed: tuple[list[int], list[int]]
 reveal_type(i)  # revealed: tuple[str | int, str | int]
@@ -389,7 +399,7 @@ reveal_type(x)  # revealed: Foo
 
 ```pyi
 x: int = 1
-reveal_type(x) # revealed: Literal[1]
+reveal_type(x)  # revealed: Literal[1]
 ```
 
 ## Annotations influence generic call inference
@@ -398,8 +408,6 @@ reveal_type(x) # revealed: Literal[1]
 [environment]
 python-version = "3.12"
 ```
-
-`generic_list.py`:
 
 ```py
 from typing import Literal, Sequence
@@ -437,18 +445,24 @@ reveal_type(x8)  # revealed: Literal[True]
 x9: int | str = f2(True)
 reveal_type(x9)  # revealed: Literal[True]
 
-# TODO: We could choose a concrete type here.
+# TODO: Should not error. We could choose a concrete type here (pyright arbitrarily picks the
+# first), or keep the union (pyrefly does this). Mypy infers `list[int]` and errors.
+# error: [invalid-assignment]
 x10: list[int | str] | list[int | None] = [1, 2, 3]
-reveal_type(x10)  # revealed: list[Unknown | int]
+reveal_type(x10)  # revealed: list[int | str] | list[int | None]
 
-# TODO: And here similarly.
 x11: Sequence[int | str] | Sequence[int | None] = [1, 2, 3]
-reveal_type(x11)  # revealed: list[Unknown | int]
+reveal_type(x11)  # revealed: list[int]
+```
+
+## Annotations influence generic call argument inference
+
+```toml
+[environment]
+python-version = "3.13"
 ```
 
 A function's arguments are also inferred using the type context:
-
-`typed_dict.py`:
 
 ```py
 from typing import TypedDict
@@ -456,40 +470,35 @@ from typing import TypedDict
 class TD(TypedDict):
     x: int
 
-def f[T](x: list[T]) -> T:
+def first[T](x: list[T]) -> T:
     return x[0]
 
-a: TD = f([{"x": 0}, {"x": 1}])
-reveal_type(a)  # revealed: TD
+x1: TD = first([{"x": 0}, {"x": 1}])
+reveal_type(x1)  # revealed: TD
 
-b: TD | None = f([{"x": 0}, {"x": 1}])
-reveal_type(b)  # revealed: TD
-
-# error: [missing-typed-dict-key] "Missing required key 'x' in TypedDict `TD` constructor"
-# error: [invalid-key] "Unknown key "y" for TypedDict `TD`"
-# error: [invalid-assignment] "Object of type `TD | dict[Unknown | str, Unknown | int]` is not assignable to `TD`"
-c: TD = f([{"y": 0}, {"x": 1}])
+x2: TD | None = first([{"x": 0}, {"x": 1}])
+reveal_type(x2)  # revealed: TD
 
 # error: [missing-typed-dict-key] "Missing required key 'x' in TypedDict `TD` constructor"
 # error: [invalid-key] "Unknown key "y" for TypedDict `TD`"
-# error: [invalid-assignment] "Object of type `TD | None | dict[Unknown | str, Unknown | int]` is not assignable to `TD | None`"
-c: TD | None = f([{"y": 0}, {"x": 1}])
+# error: [invalid-assignment] "Object of type `TD | dict[str, int]` is not assignable to `TD`"
+x3: TD = first([{"y": 0}, {"x": 1}])
+
+# error: [missing-typed-dict-key] "Missing required key 'x' in TypedDict `TD` constructor"
+# error: [invalid-key] "Unknown key "y" for TypedDict `TD`"
+# error: [invalid-assignment] "Object of type `TD | None | dict[str, int]` is not assignable to `TD | None`"
+x4: TD | None = first([{"y": 0}, {"x": 1}])
 ```
 
 But not in a way that leads to assignability errors:
 
-`dict_any.py`:
-
 ```py
 from typing import TypedDict, Any
-
-class TD(TypedDict, total=False):
-    x: str
 
 class TD2(TypedDict):
     x: str
 
-def f(self, dt: dict[str, Any], key: str):
+def _(dt: dict[str, Any], key: str):
     x1: TD = dt.get(key, {})
     reveal_type(x1)  # revealed: Any
 
@@ -513,6 +522,55 @@ def f(self, dt: dict[str, Any], key: str):
 
     x8: TD2 | None = dt.get(key, {"x": 0})
     reveal_type(x8)  # revealed: Any
+```
+
+Partially specialized type context is not ignored:
+
+```py
+from typing import TypeVar
+
+U = TypeVar("U", default=Any)
+
+class X: ...
+
+def lst[T](x: T) -> list[T]:
+    return [x]
+
+def two_lists[T](x: list[T | int], y: list[T | str]) -> T:
+    raise NotImplementedError
+
+def two_lists_default(x: list[U | int], y: list[U | str]) -> U:
+    raise NotImplementedError
+
+def dct[K, V](k: K, v: V) -> dict[K, V]:
+    return {k: v}
+
+def two_dicts[T](x: dict[T | int, Any], y: dict[T | str, Any]) -> T:
+    raise NotImplementedError
+
+def two_dicts_default(x: dict[U | int, Any], y: dict[U | str, Any]) -> U:
+    raise NotImplementedError
+
+def _():
+    # revealed: list[int | X]
+    # revealed: list[str | X]
+    x1 = two_lists(reveal_type(lst(X())), reveal_type(lst(X())))
+    reveal_type(x1)  # revealed: X
+
+    # revealed: list[int | X]
+    # revealed: list[str | X]
+    x2 = two_lists_default(reveal_type(lst(X())), reveal_type(lst(X())))
+    reveal_type(x2)  # revealed: X
+
+    # revealed: dict[int | X, Any]
+    # revealed: dict[str | X, Any]
+    x3 = two_dicts(reveal_type(dct(X(), X())), reveal_type(dct(X(), X())))
+    reveal_type(x3)  # revealed: X
+
+    # revealed: dict[int | X, Any]
+    # revealed: dict[str | X, Any]
+    x4 = two_dicts_default(reveal_type(dct(X(), X())), reveal_type(dct(X(), X())))
+    reveal_type(x4)  # revealed: X
 ```
 
 ## Prefer the declared type of generic classes
@@ -651,19 +709,16 @@ x6: Iterable[list[Any]] = [[1, 2, 3]]
 reveal_type(x6)  # revealed: list[list[Any]]
 
 x7: Sequence[Any] = [i for i in [1, 2, 3]]
-# TODO: This should infer `list[int]`.
-reveal_type(x7)  # revealed: list[Unknown | int]
+reveal_type(x7)  # revealed: list[int]
 
 x8: MutableSequence[Any] = [i for i in [1, 2, 3]]
 reveal_type(x8)  # revealed: list[Any]
 
 x9: Iterable[Any] = [i for i in [1, 2, 3]]
-# TODO: This should infer `list[int]`.
-reveal_type(x9)  # revealed: list[Unknown | int]
+reveal_type(x9)  # revealed: list[int]
 
 x10: Iterable[Iterable[Any]] = [[i] for i in [1, 2, 3]]
-# TODO: This should infer `list[list[int]]`.
-reveal_type(x10)  # revealed: list[list[Unknown | int]]
+reveal_type(x10)  # revealed: list[list[int]]
 
 x11: list[Iterable[Any]] = [[i] for i in [1, 2, 3]]
 reveal_type(x11)  # revealed: list[Iterable[Any]]
@@ -870,7 +925,7 @@ def _(a: int | None):
 
 Regression test for [#1611](https://github.com/astral-sh/ty/issues/1611).
 
-<!-- blacken-docs:off -->
+<!-- fmt:off -->
 
 ```py
 # error: [invalid-syntax]
@@ -878,4 +933,4 @@ Regression test for [#1611](https://github.com/astral-sh/ty/issues/1611).
 a:'
 ```
 
-<!-- blacken-docs:on -->
+<!-- fmt:on -->

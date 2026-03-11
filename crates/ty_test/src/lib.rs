@@ -98,25 +98,19 @@ pub fn run(
                     EmbeddedFileSourceMap::new(&md_index, test_failures.backtick_offsets);
 
                 for (relative_line_number, failures) in test_failures.by_line.iter() {
-                    let file = match output_format {
-                        OutputFormat::Cli => relative_fixture_path.as_str(),
-                        OutputFormat::GitHub => absolute_fixture_path.as_str(),
-                    };
+                    let file = relative_fixture_path.as_str();
 
                     let absolute_line_number =
                         match source_map.to_absolute_line_number(relative_line_number) {
                             Ok(line_number) => line_number,
                             Err(last_line_number) => {
-                                let _ = writeln!(
-                                    assertion,
-                                    "{}",
-                                    output_format.display_error(
-                                        file,
-                                        last_line_number,
-                                        "Found a trailing assertion comment \
+                                output_format.write_error(
+                                    &mut assertion,
+                                    file,
+                                    last_line_number,
+                                    "Found a trailing assertion comment \
                                         (e.g., `# revealed:` or `# error:`) \
-                                        not followed by any statement."
-                                    )
+                                        not followed by any statement.",
                                 );
 
                                 continue;
@@ -124,10 +118,11 @@ pub fn run(
                         };
 
                     for failure in failures {
-                        let _ = writeln!(
-                            assertion,
-                            "{}",
-                            output_format.display_error(file, absolute_line_number, failure)
+                        output_format.write_error(
+                            &mut assertion,
+                            file,
+                            absolute_line_number,
+                            failure,
                         );
                     }
                 }
@@ -136,18 +131,11 @@ pub fn run(
         if let Err(inconsistencies) = inconsistencies {
             any_failures = true;
             for inconsistency in inconsistencies {
-                match output_format {
-                    OutputFormat::Cli => {
-                        let info = relative_fixture_path.to_string().cyan();
-                        let _ = writeln!(assertion, "  {info} {inconsistency}");
-                    }
-                    OutputFormat::GitHub => {
-                        let _ = writeln!(
-                            assertion,
-                            "::error file={absolute_fixture_path}::{inconsistency}"
-                        );
-                    }
-                }
+                output_format.write_inconsistency(
+                    &mut assertion,
+                    relative_fixture_path,
+                    &inconsistency,
+                );
             }
         }
 
@@ -191,46 +179,55 @@ impl OutputFormat {
         matches!(self, OutputFormat::Cli)
     }
 
-    fn display_error(self, file: &str, line: OneIndexed, failure: impl Display) -> impl Display {
-        struct Display<'a, T> {
-            format: OutputFormat,
-            file: &'a str,
-            line: OneIndexed,
-            failure: T,
-        }
-
-        impl<T> std::fmt::Display for Display<'_, T>
-        where
-            T: std::fmt::Display,
-        {
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                let Display {
-                    format,
-                    file,
-                    line,
-                    failure,
-                } = self;
-
-                match format {
-                    OutputFormat::Cli => {
-                        write!(
-                            f,
-                            "  {file_line} {failure}",
-                            file_line = format!("{file}:{line}").cyan()
-                        )
-                    }
-                    OutputFormat::GitHub => {
-                        write!(f, "::error file={file},line={line}::{failure}")
-                    }
-                }
+    /// Write a test error in the appropriate format.
+    ///
+    /// For CLI format, errors are appended to `assertion_buf` so they appear
+    /// in the assertion-failure message.
+    ///
+    /// For GitHub format, errors are printed directly to stdout so that GitHub
+    /// Actions can detect them as workflow commands. Workflow commands must
+    /// appear at the beginning of a line in stdout to be parsed by GitHub.
+    #[expect(clippy::print_stdout)]
+    fn write_error(
+        self,
+        assertion_buf: &mut String,
+        file: &str,
+        line: OneIndexed,
+        failure: impl Display,
+    ) {
+        match self {
+            OutputFormat::Cli => {
+                let _ = writeln!(
+                    assertion_buf,
+                    "  {file_line} {failure}",
+                    file_line = format!("{file}:{line}").cyan()
+                );
+            }
+            OutputFormat::GitHub => {
+                println!("::error file={file},line={line}::{failure}");
             }
         }
+    }
 
-        Display {
-            format: self,
-            file,
-            line,
-            failure,
+    /// Write a module-resolution inconsistency in the appropriate format.
+    ///
+    /// See [`write_error`](Self::write_error) for details on why GitHub-format
+    /// messages must be printed directly to stdout.
+    #[expect(clippy::print_stdout)]
+    fn write_inconsistency(
+        self,
+        assertion_buf: &mut String,
+        fixture_path: &Utf8Path,
+        inconsistency: &impl Display,
+    ) {
+        match self {
+            OutputFormat::Cli => {
+                let info = fixture_path.to_string().cyan();
+                let _ = writeln!(assertion_buf, "  {info} {inconsistency}");
+            }
+            OutputFormat::GitHub => {
+                println!("::error file={fixture_path}::{inconsistency}");
+            }
         }
     }
 }
@@ -470,6 +467,7 @@ fn run_test(
 
     Program::init_or_update(db, settings);
     db.update_analysis_options(configuration.analysis.as_ref());
+    db.set_verbosity(test.configuration().verbose());
 
     // When snapshot testing is enabled, this is populated with
     // all diagnostics. Otherwise it remains empty.
@@ -744,7 +742,7 @@ fn create_diagnostic_snapshot(
     test: &parser::MarkdownTest,
     diagnostics: impl IntoIterator<Item = Diagnostic>,
 ) -> String {
-    let display_config = DisplayDiagnosticConfig::default()
+    let display_config = DisplayDiagnosticConfig::new("ty")
         .color(false)
         .show_fix_diff(true)
         .with_fix_applicability(Applicability::DisplayOnly);

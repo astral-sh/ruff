@@ -32,7 +32,7 @@ tk.mainloop()
 
 import _tkinter
 import sys
-from _typeshed import Incomplete, MaybeNone, StrOrBytesPath
+from _typeshed import FileDescriptorLike, Incomplete, MaybeNone, StrOrBytesPath
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from tkinter.constants import *
 from tkinter.font import _FontDescription
@@ -1367,9 +1367,9 @@ class Misc:
     def pack_propagate(self, flag: bool) -> bool | None:
         """Set or get the status for propagation of geometry information.
 
-        A boolean argument specifies whether the geometry information
-        of the slaves will determine the size of this widget. If no argument
-        is given the current setting will be returned.
+        A boolean argument specifies whether the size of this container will
+        be determined by the geometry information of its content.
+        If no argument is given the current setting will be returned.
         """
 
     @overload
@@ -1377,7 +1377,7 @@ class Misc:
     propagate = pack_propagate
     def grid_anchor(self, anchor: Literal["nw", "n", "ne", "w", "center", "e", "sw", "s", "se"] | None = None) -> None:
         """The anchor value controls how to place the grid within the
-        master when no row/column has any weight.
+        container widget when no row/column has any weight.
 
         The default anchor is nw.
         """
@@ -1395,7 +1395,7 @@ class Misc:
         starts at that cell.
 
         The returned integers specify the offset of the upper left
-        corner in the master widget and the width and height.
+        corner in the container widget and the width and height.
         """
 
     @overload
@@ -1440,7 +1440,7 @@ class Misc:
     rowconfigure = grid_rowconfigure
     def grid_location(self, x: float | str, y: float | str) -> tuple[int, int]:
         """Return a tuple of column and row which identify the cell
-        at which the pixel at position X and Y inside the master
+        at which the pixel at position X and Y inside the container
         widget is located.
         """
 
@@ -1448,9 +1448,9 @@ class Misc:
     def grid_propagate(self, flag: bool) -> None:
         """Set or get the status for propagation of geometry information.
 
-        A boolean argument specifies whether the geometry information
-        of the slaves will determine the size of this widget. If no argument
-        is given, the current setting will be returned.
+        A boolean argument specifies whether the size of this container will
+        be determined by the geometry information of its content.
+        If no argument is given the current setting will be returned.
         """
 
     @overload
@@ -1460,18 +1460,22 @@ class Misc:
     size = grid_size
     # Widget because Toplevel or Tk is never a slave
     def pack_slaves(self) -> list[Widget]:
-        """Return a list of all slaves of this widget
-        in its packing order.
+        """Returns a list of all of the content widgets in the packing order
+        for this container.
         """
 
     def grid_slaves(self, row: int | None = None, column: int | None = None) -> list[Widget]:
-        """Return a list of all slaves of this widget
-        in its packing order.
+        """Returns a list of the content widgets.
+
+        If no arguments are supplied, a list of all of the content in this
+        container widget is returned, most recently managed first.
+        If ROW or COLUMN is specified, only the content in the row or
+        column is returned.
         """
 
     def place_slaves(self) -> list[Widget]:
-        """Return a list of all slaves of this widget
-        in its packing order.
+        """Returns a list of all the content widgets for which this widget is
+        the container.
         """
     slaves = pack_slaves
     def event_add(self, virtual: str, *sequences: str) -> None:
@@ -2297,34 +2301,43 @@ class Tk(Misc, Wm):
     # Tk has __getattr__ so that tk_instance.foo falls back to tk_instance.tk.foo
     # Please keep in sync with _tkinter.TkappType.
     # Some methods are intentionally missing because they are inherited from Misc instead.
-    def adderrorinfo(self, msg: str, /): ...
+    def adderrorinfo(self, msg: str, /) -> None: ...
     def call(self, command: Any, /, *args: Any) -> Any: ...
-    def createcommand(self, name: str, func, /): ...
+    # TODO: Figure out what arguments the following `func` callbacks should accept
+    def createcommand(self, name: str, func: Callable[..., object], /) -> None: ...
     if sys.platform != "win32":
-        def createfilehandler(self, file, mask: int, func, /): ...
-        def deletefilehandler(self, file, /) -> None: ...
+        def createfilehandler(self, file: FileDescriptorLike, mask: int, func: Callable[..., object], /) -> None: ...
+        def deletefilehandler(self, file: FileDescriptorLike, /) -> None: ...
 
-    def createtimerhandler(self, milliseconds: int, func, /): ...
-    def dooneevent(self, flags: int = 0, /): ...
+    def createtimerhandler(self, milliseconds: int, func: Callable[..., object], /): ...
+    def dooneevent(self, flags: int = 0, /) -> int: ...
     def eval(self, script: str, /) -> str: ...
-    def evalfile(self, fileName: str, /): ...
-    def exprboolean(self, s: str, /): ...
-    def exprdouble(self, s: str, /): ...
-    def exprlong(self, s: str, /): ...
-    def exprstring(self, s: str, /): ...
+    def evalfile(self, fileName: str, /) -> str: ...
+    def exprboolean(self, s: str, /) -> Literal[0, 1]: ...
+    def exprdouble(self, s: str, /) -> float: ...
+    def exprlong(self, s: str, /) -> int: ...
+    def exprstring(self, s: str, /) -> str: ...
     def globalgetvar(self, *args, **kwargs): ...
     def globalsetvar(self, *args, **kwargs): ...
     def globalunsetvar(self, *args, **kwargs): ...
     def interpaddr(self) -> int: ...
     def loadtk(self) -> None: ...
-    def record(self, script: str, /): ...
+    def record(self, script: str, /) -> str: ...
     if sys.version_info < (3, 11):
         @deprecated("Deprecated since Python 3.9; removed in Python 3.11. Use `splitlist()` instead.")
         def split(self, arg, /): ...
 
-    def splitlist(self, arg, /): ...
+    def splitlist(self, arg, /) -> tuple[Incomplete, ...]: ...
     def unsetvar(self, *args, **kwargs): ...
-    def wantobjects(self, *args, **kwargs): ...
+    if sys.version_info >= (3, 14):
+        @overload
+        def wantobjects(self) -> Literal[0, 1]: ...
+    else:
+        @overload
+        def wantobjects(self) -> bool: ...
+
+    @overload
+    def wantobjects(self, wantobjects: Literal[0, 1] | bool, /) -> None: ...
     def willdispatch(self) -> None: ...
 
 def Tcl(screenName: str | None = None, baseName: str | None = None, className: str = "Tk", useTk: bool = False) -> Tk: ...
@@ -2380,8 +2393,8 @@ class Pack:
         before=widget - pack it before you will pack widget
         expand=bool - expand widget if parent size grows
         fill=NONE or X or Y or BOTH - fill widget if widget grows
-        in=master - use master to contain this widget
-        in_=master - see 'in' option description
+        in=container - use the container widget to contain this widget
+        in_=container - see 'in' option description
         ipadx=amount - add internal padding in x direction
         ipady=amount - add internal padding in y direction
         padx=amount - add padding in x direction
@@ -2438,25 +2451,31 @@ class Place:
         **kw: Any,  # allow keyword argument named 'in', see #4836
     ) -> None:
         """Place a widget in the parent widget. Use as options:
-        in=master - master relative to which the widget is placed
-        in_=master - see 'in' option description
-        x=amount - locate anchor of this widget at position x of master
-        y=amount - locate anchor of this widget at position y of master
+        in=container - the container widget relative to which this widget is
+                       placed
+        in_=container - see 'in' option description
+        x=amount - locate anchor of this widget at position x of the
+                   container widget
+        y=amount - locate anchor of this widget at position y of the
+                   container widget
         relx=amount - locate anchor of this widget between 0.0 and 1.0
-                      relative to width of master (1.0 is right edge)
+                      relative to width of the container widget (1.0 is
+                       right edge)
         rely=amount - locate anchor of this widget between 0.0 and 1.0
-                      relative to height of master (1.0 is bottom edge)
-        anchor=NSEW (or subset) - position anchor according to given direction
+                      relative to height of the container widget (1.0 is
+                      bottom edge)
+        anchor=NSEW (or subset) - position anchor according to given
+                                  direction
         width=amount - width of this widget in pixel
         height=amount - height of this widget in pixel
         relwidth=amount - width of this widget between 0.0 and 1.0
-                          relative to width of master (1.0 is the same width
-                          as the master)
+                          relative to width of the container widget (1.0 is
+                          the same width as the container widget)
         relheight=amount - height of this widget between 0.0 and 1.0
-                           relative to height of master (1.0 is the same
-                           height as the master)
+                           relative to height of the container widget (1.0
+                           is the same height as the container widget)
         bordermode="inside" or "outside" - whether to take border width of
-                                           master widget into account
+                                           the container widget into account
         """
 
     def place_forget(self) -> None:
@@ -2506,8 +2525,8 @@ class Grid:
         """Position a widget in the parent widget in a grid. Use as options:
         column=number - use cell identified with given column (starting with 0)
         columnspan=number - this widget will span several columns
-        in=master - use master to contain this widget
-        in_=master - see 'in' option description
+        in=container - use the container widget to contain this widget
+        in_=container - see 'in' option description
         ipadx=amount - add internal padding in x direction
         ipady=amount - add internal padding in y direction
         padx=amount - add padding in x direction

@@ -22,6 +22,7 @@ use crate::place::{DefinedPlace, Place};
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::scope::{FileScopeId, ScopeKind};
 use crate::semantic_index::semantic_index;
+use crate::types::callable::CallableTypeKind;
 use crate::types::class::{ClassLiteral, ClassType, GenericAlias};
 use crate::types::function::{FunctionType, OverloadLiteral};
 use crate::types::generics::{GenericContext, Specialization};
@@ -29,10 +30,11 @@ use crate::types::signatures::{
     CallableSignature, Parameter, Parameters, ParametersKind, Signature,
 };
 use crate::types::tuple::TupleSpec;
+use crate::types::typevar::BoundTypeVarIdentity;
 use crate::types::visitor::TypeVisitor;
 use crate::types::{
-    BindingContext, BoundTypeVarIdentity, CallableType, CallableTypeKind, IntersectionType,
-    KnownBoundMethodType, KnownClass, KnownInstanceType, MaterializationKind, Protocol,
+    BindingContext, CallableType, IntersectionType, KnownBoundMethodType, KnownClass,
+    KnownInstanceType, LiteralValueType, LiteralValueTypeKind, MaterializationKind, Protocol,
     ProtocolInstanceType, SpecialFormType, StringLiteralType, SubclassOfInner, SubclassOfType,
     Type, TypeAliasType, TypeGuardLike, TypedDictType, UnionType, WrapperDescriptorKind, visitor,
 };
@@ -86,6 +88,9 @@ pub struct DisplaySettings<'db> {
     /// whose type parameters are currently being displayed).
     /// Used to suppress redundant `@{scope}` suffixes for type variables.
     pub active_scopes: Rc<FxHashSet<Definition<'db>>>,
+    /// Function types that are currently being displayed.
+    /// Used to prevent infinite recursion when displaying self-referential function types.
+    pub visited_function_types: Rc<FxHashSet<FunctionType<'db>>>,
 }
 
 impl<'db> DisplaySettings<'db> {
@@ -503,8 +508,10 @@ impl<'db> TypeVisitor<'db> for AmbiguousNameCollector<'db> {
     fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
         match ty {
             Type::ClassLiteral(class) => self.record_class(db, class),
-            Type::EnumLiteral(literal) => {
-                self.record_class(db, literal.enum_class(db));
+            Type::LiteralValue(literal) => {
+                if let LiteralValueTypeKind::Enum(literal) = literal.kind() {
+                    self.record_class(db, literal.enum_class(db));
+                }
             }
             Type::GenericAlias(alias) => {
                 self.record_class(db, ClassLiteral::Static(alias.origin(db)));
@@ -583,12 +590,14 @@ impl<'db> DisplayType<'db> {
 impl<'db> FmtDetailed<'db> for DisplayType<'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
         let representation = self.ty.representation(self.db, self.settings.clone());
-        match self.ty {
-            Type::IntLiteral(_)
-            | Type::BooleanLiteral(_)
-            | Type::StringLiteral(_)
-            | Type::BytesLiteral(_)
-            | Type::EnumLiteral(_) => {
+        match self.ty.as_literal_value_kind() {
+            Some(
+                LiteralValueTypeKind::Int(_)
+                | LiteralValueTypeKind::Bool(_)
+                | LiteralValueTypeKind::String(_)
+                | LiteralValueTypeKind::Bytes(_)
+                | LiteralValueTypeKind::Enum(_),
+            ) => {
                 f.with_type(Type::SpecialForm(SpecialFormType::Literal))
                     .write_str("Literal")?;
                 f.write_char('[')?;
@@ -637,8 +646,8 @@ fn fmt_file_location<'db>(
 /// Returns the qualified name components for a scope, excluding the item itself.
 ///
 /// This is the shared logic used by both [`QualifiedClassName`](super::class::QualifiedClassName)
-/// and [`QualifiedTypeAliasName`](super::QualifiedTypeAliasName) to compute the path components
-/// (module, enclosing classes, functions) leading to an item.
+/// and [`QualifiedTypeAliasName`](super::type_alias::QualifiedTypeAliasName) to compute the path
+/// components (module, enclosing classes, functions) leading to an item.
 ///
 /// # Returns
 /// A vector of path components in order (e.g., `["module", "OuterClass", "InnerClass"]`)
@@ -762,14 +771,13 @@ impl<'db> FmtDetailed<'db> for TypeAliasDisplay<'db> {
         }
 
         if qualification_level == Some(&QualificationLevel::FileAndLineNumber) {
-            if let Some(definition) = self.type_alias.definition(self.db) {
-                let file = definition.file(self.db);
-                let offset = definition
-                    .focus_range(self.db, &parsed_module(self.db, file).load(self.db))
-                    .range()
-                    .start();
-                fmt_file_location(self.db, file, offset, f)?;
-            }
+            let definition = self.type_alias.definition(self.db);
+            let file = definition.file(self.db);
+            let offset = definition
+                .focus_range(self.db, &parsed_module(self.db, file).load(self.db))
+                .range()
+                .start();
+            fmt_file_location(self.db, file, offset, f)?;
         }
         Ok(())
     }
@@ -1051,7 +1059,9 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                         KnownClass::Property,
                         "startswith",
                         "string",
-                        Type::StringLiteral(literal),
+                        Type::LiteralValue(LiteralValueType::promotable(
+                            LiteralValueTypeKind::String(literal),
+                        )),
                         Some(literal.value(self.db)),
                     ),
                     KnownBoundMethodType::ConstraintSetRange => {
@@ -1072,9 +1082,6 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                     KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_) => {
                         return f
                             .write_str("bound method `ConstraintSet.satisfied_by_all_typevars`");
-                    }
-                    KnownBoundMethodType::GenericContextSpecializeConstrained(_) => {
-                        return f.write_str("bound method `GenericContext.specialize_constrained`");
                     }
                 };
 
@@ -1137,40 +1144,45 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
             Type::Intersection(intersection) => intersection
                 .display_with(self.db, self.settings.clone())
                 .fmt_detailed(f),
-            Type::IntLiteral(n) => write!(f.with_type(self.ty), "{n}"),
-            Type::BooleanLiteral(boolean) => {
-                f.with_type(self.ty)
-                    .write_str(if boolean { "True" } else { "False" })
-            }
-            Type::StringLiteral(string) => {
-                write!(
-                    f.with_type(self.ty),
-                    "{}",
-                    string.display_with(self.db, self.settings.clone())
-                )
-            }
-            // an alternative would be to use `Type::SpecialForm(SpecialFormType::LiteralString)` here,
-            // which would mean users would be able to jump to the definition of `LiteralString` from the
-            // inlay hint, but that seems less useful than the definition of `str` for a variable that is
-            // inferred as an *inhabitant* of `LiteralString` (since that variable will just be a string
-            // at runtime)
-            Type::LiteralString => f.with_type(self.ty).write_str("LiteralString"),
-            Type::BytesLiteral(bytes) => {
-                let escape = AsciiEscape::with_preferred_quote(bytes.value(self.db), Quote::Double);
+            Type::LiteralValue(literal) => match literal.kind() {
+                LiteralValueTypeKind::Int(n) => write!(f.with_type(self.ty), "{n}"),
+                LiteralValueTypeKind::Bool(boolean) => {
+                    f.with_type(self.ty)
+                        .write_str(if boolean { "True" } else { "False" })
+                }
+                LiteralValueTypeKind::String(string) => {
+                    write!(
+                        f.with_type(self.ty),
+                        "{}",
+                        string.display_with(self.db, self.settings.clone()),
+                    )
+                }
+                // an alternative would be to use `Type::SpecialForm(SpecialFormType::LiteralString)` here,
+                // which would mean users would be able to jump to the definition of `LiteralString` from the
+                // inlay hint, but that seems less useful than the definition of `str` for a variable that is
+                // inferred as an *inhabitant* of `LiteralString` (since that variable will just be a string
+                // at runtime)
+                LiteralValueTypeKind::LiteralString => {
+                    f.with_type(self.ty).write_str("LiteralString")
+                }
+                LiteralValueTypeKind::Bytes(bytes) => {
+                    let escape =
+                        AsciiEscape::with_preferred_quote(bytes.value(self.db), Quote::Double);
 
-                write!(
-                    f.with_type(self.ty),
-                    "{}",
-                    escape.bytes_repr(TripleQuotes::No)
-                )
-            }
-            Type::EnumLiteral(enum_literal) => {
-                enum_literal
-                    .enum_class(self.db)
-                    .display_with(self.db, self.settings.clone())
-                    .fmt_detailed(f)?;
-                write!(f, ".{}", enum_literal.name(self.db))
-            }
+                    write!(
+                        f.with_type(self.ty),
+                        "{}",
+                        escape.bytes_repr(TripleQuotes::No)
+                    )
+                }
+                LiteralValueTypeKind::Enum(enum_literal) => {
+                    enum_literal
+                        .enum_class(self.db)
+                        .display_with(self.db, self.settings.clone())
+                        .fmt_detailed(f)?;
+                    write!(f, ".{}", enum_literal.name(self.db))
+                }
+            },
             Type::TypeVar(bound_typevar) => {
                 f.set_invalid_type_annotation();
                 write!(
@@ -1454,6 +1466,24 @@ pub(crate) struct DisplayFunctionType<'db> {
 
 impl<'db> FmtDetailed<'db> for DisplayFunctionType<'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
+        // Detect self-referential function types to prevent infinite recursion,
+        // and limit display depth for chains of different function types
+        // (e.g. multiple redefinitions with `TypeOf[foo]` return types).
+        const MAX_FUNCTION_TYPE_DISPLAY_DEPTH: usize = 4;
+        if self.settings.visited_function_types.contains(&self.ty)
+            || self.settings.visited_function_types.len() >= MAX_FUNCTION_TYPE_DISPLAY_DEPTH
+        {
+            f.set_invalid_type_annotation();
+            f.write_str("def ")?;
+            write!(f, "{}", self.ty.name(self.db))?;
+            return f.write_str("(...)");
+        }
+
+        let mut settings = self.settings.clone();
+        let mut visited = (*settings.visited_function_types).clone();
+        visited.insert(self.ty);
+        settings.visited_function_types = Rc::new(visited);
+
         let signature = self.ty.signature(self.db);
 
         match signature.overloads.as_slice() {
@@ -1463,7 +1493,7 @@ impl<'db> FmtDetailed<'db> for DisplayFunctionType<'db> {
                 let type_parameters = DisplayOptionalGenericContext {
                     generic_context: signature.generic_context.as_ref(),
                     db: self.db,
-                    settings: self.settings.clone(),
+                    settings: settings.clone(),
                     hide_unused_self,
                 };
                 f.set_invalid_type_annotation();
@@ -1471,24 +1501,24 @@ impl<'db> FmtDetailed<'db> for DisplayFunctionType<'db> {
                 write!(f, "{}", self.ty.name(self.db))?;
                 type_parameters.fmt_detailed(f)?;
                 signature
-                    .display_with(self.db, self.settings.disallow_signature_name())
+                    .display_with(self.db, settings.disallow_signature_name())
                     .fmt_detailed(f)
             }
             signatures => {
                 // TODO: How to display overloads?
-                if !self.settings.multiline {
+                if !settings.multiline {
                     // TODO: This should ideally have a TypeDetail but we actually
                     // don't have a type for @overload (we just detect the decorator)
                     f.write_str("Overload")?;
                     f.write_char('[')?;
                 }
-                let separator = if self.settings.multiline { "\n" } else { ", " };
+                let separator = if settings.multiline { "\n" } else { ", " };
                 let mut join = f.join(separator);
                 for signature in signatures {
-                    join.entry(&signature.display_with(self.db, self.settings.clone()));
+                    join.entry(&signature.display_with(self.db, settings.clone()));
                 }
                 join.finish()?;
-                if !self.settings.multiline {
+                if !settings.multiline {
                     f.write_str("]")?;
                 }
                 Ok(())
@@ -2010,9 +2040,18 @@ impl<'db> FmtDetailed<'db> for DisplaySignature<'_, 'db> {
 
         // Return type
         f.write_str(" -> ")?;
+
+        let should_parenthesize_return_type =
+            should_parenthesize_callable_type(self.return_ty, self.db);
+        if should_parenthesize_return_type {
+            f.write_char('(')?;
+        }
         self.return_ty
             .display_with(self.db, settings.singleline())
             .fmt_detailed(&mut f)?;
+        if should_parenthesize_return_type {
+            f.write_char(')')?;
+        }
 
         if self.parameters.is_top() {
             f.write_str("]")?;
@@ -2135,8 +2174,12 @@ impl<'db> FmtDetailed<'db> for DisplayParameters<'_, 'db> {
             }
             ParametersKind::ParamSpec(typevar) => {
                 write!(f, "**{}", typevar.name(self.db))?;
-                if let Some(name) = typevar.binding_context(self.db).name(self.db) {
-                    write!(f, "@{name}")?;
+                let binding_context = typevar.binding_context(self.db);
+                if let Some(binding_context_name) = binding_context.name(self.db)
+                    && let Some(definition) = binding_context.definition()
+                    && !self.settings.active_scopes.contains(&definition)
+                {
+                    write!(f, "@{binding_context_name}")?;
                 }
             }
         }
@@ -2193,11 +2236,16 @@ impl<'db> FmtDetailed<'db> for DisplayParameter<'_, 'db> {
                     f.write_str("=")?;
                 }
                 match default_type {
-                    Type::IntLiteral(_)
-                    | Type::BooleanLiteral(_)
-                    | Type::StringLiteral(_)
-                    | Type::EnumLiteral(_)
-                    | Type::BytesLiteral(_) => {
+                    Type::LiteralValue(literal)
+                        if matches!(
+                            literal.kind(),
+                            LiteralValueTypeKind::Int(_)
+                                | LiteralValueTypeKind::Bool(_)
+                                | LiteralValueTypeKind::String(_)
+                                | LiteralValueTypeKind::Enum(_)
+                                | LiteralValueTypeKind::Bytes(_)
+                        ) =>
+                    {
                         // For Literal types display the value without `Literal[..]` wrapping
                         let representation =
                             default_type.representation(self.db, self.settings.clone());
@@ -2313,12 +2361,14 @@ impl<'db> FmtDetailed<'db> for DisplayUnionType<'_, 'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
         fn is_condensable(ty: Type<'_>) -> bool {
             matches!(
-                ty,
-                Type::IntLiteral(_)
-                    | Type::StringLiteral(_)
-                    | Type::BytesLiteral(_)
-                    | Type::BooleanLiteral(_)
-                    | Type::EnumLiteral(_)
+                ty.as_literal_value_kind(),
+                Some(
+                    LiteralValueTypeKind::Int(_)
+                        | LiteralValueTypeKind::String(_)
+                        | LiteralValueTypeKind::Bytes(_)
+                        | LiteralValueTypeKind::Bool(_)
+                        | LiteralValueTypeKind::Enum(_)
+                )
             )
         }
 
@@ -2602,6 +2652,22 @@ impl Display for DisplayMaybeNegatedType<'_> {
     }
 }
 
+/// Returns `true` if the given type is a callable type that should be parenthesized
+/// when appearing as a parameter annotation or return type of another callable.
+///
+/// Callable types with arrow syntax like `(int, str) -> bool` are parenthesized to
+/// avoid ambiguity in nested callable displays. The exceptions are:
+/// - Overloaded callables, which display as `Overload[...]` (already unambiguous)
+/// - Callables with top-materialization parameters, which display as `Top[...]` (already unambiguous)
+fn should_parenthesize_callable_type(ty: Type<'_>, db: &dyn Db) -> bool {
+    if let Type::Callable(callable) = ty {
+        let overloads = &callable.signatures(db).overloads;
+        overloads.len() == 1 && !overloads[0].parameters().is_top()
+    } else {
+        false
+    }
+}
+
 struct DisplayMaybeParenthesizedType<'db> {
     ty: Type<'db>,
     db: &'db dyn Db,
@@ -2619,14 +2685,7 @@ impl<'db> FmtDetailed<'db> for DisplayMaybeParenthesizedType<'db> {
             f.write_char(')')
         };
         match self.ty {
-            Type::Callable(callable)
-                if callable.signatures(self.db).overloads.len() == 1
-                    && !callable.signatures(self.db).overloads[0]
-                        .parameters()
-                        .is_top() =>
-            {
-                write_parentheses(f)
-            }
+            ty if should_parenthesize_callable_type(ty, self.db) => write_parentheses(f),
             Type::KnownBoundMethod(_)
             | Type::FunctionLiteral(_)
             | Type::BoundMethod(_)
@@ -2915,11 +2974,7 @@ mod tests {
 
     use crate::Db;
     use crate::db::tests::setup_db;
-    use crate::place::typing_extensions_symbol;
-    use crate::types::typed_dict::{
-        SynthesizedTypedDictType, TypedDictFieldBuilder, TypedDictSchema,
-    };
-    use crate::types::{KnownClass, Parameter, Parameters, Signature, Type, TypedDictType};
+    use crate::types::{KnownClass, Parameter, Parameters, Signature, Type};
 
     #[test]
     fn string_literal_display() {
@@ -2936,62 +2991,6 @@ mod tests {
         assert_eq!(
             Type::string_literal(&db, r#"""#).display(&db).to_string(),
             r#"Literal["\""]"#
-        );
-    }
-
-    #[test]
-    fn synthesized_protocol_display() {
-        let db = setup_db();
-
-        // Call `.normalized()` to turn the class-based protocol into a nameless synthesized one.
-        let supports_index_synthesized = KnownClass::SupportsIndex.to_instance(&db).normalized(&db);
-        assert_eq!(
-            supports_index_synthesized.display(&db).to_string(),
-            "<Protocol with members '__index__'>"
-        );
-
-        let iterator_synthesized = typing_extensions_symbol(&db, "Iterator")
-            .place
-            .ignore_possibly_undefined()
-            .unwrap()
-            .to_instance(&db)
-            .unwrap()
-            .normalized(&db); // Call `.normalized()` to turn the class-based protocol into a nameless synthesized one.
-
-        assert_eq!(
-            iterator_synthesized.display(&db).to_string(),
-            "<Protocol with members '__iter__', '__next__'>"
-        );
-    }
-
-    #[test]
-    fn synthesized_typeddict_display() {
-        let db = setup_db();
-
-        let mut items = TypedDictSchema::default();
-        items.insert(
-            Name::new("foo"),
-            TypedDictFieldBuilder::new(Type::IntLiteral(42))
-                .required(true)
-                .build(),
-        );
-        items.insert(
-            Name::new("bar"),
-            TypedDictFieldBuilder::new(Type::string_literal(&db, "hello"))
-                .required(true)
-                .build(),
-        );
-
-        let synthesized = SynthesizedTypedDictType::new(&db, items);
-        let type_ = Type::TypedDict(TypedDictType::Synthesized(synthesized));
-        // Fields are sorted internally, even prior to normalization.
-        assert_eq!(
-            type_.display(&db).to_string(),
-            "<TypedDict with items 'bar', 'foo'>",
-        );
-        assert_eq!(
-            type_.normalized(&db).display(&db).to_string(),
-            "<TypedDict with items 'bar', 'foo'>",
         );
     }
 
@@ -3121,22 +3120,22 @@ mod tests {
                     Parameter::positional_only(Some(Name::new_static("b")))
                         .with_annotated_type(KnownClass::Int.to_instance(&db)),
                     Parameter::positional_only(Some(Name::new_static("c")))
-                        .with_default_type(Type::IntLiteral(1)),
+                        .with_default_type(Type::int_literal(1)),
                     Parameter::positional_only(Some(Name::new_static("d")))
                         .with_annotated_type(KnownClass::Int.to_instance(&db))
-                        .with_default_type(Type::IntLiteral(2)),
+                        .with_default_type(Type::int_literal(2)),
                     Parameter::positional_or_keyword(Name::new_static("e"))
-                        .with_default_type(Type::IntLiteral(3)),
+                        .with_default_type(Type::int_literal(3)),
                     Parameter::positional_or_keyword(Name::new_static("f"))
                         .with_annotated_type(KnownClass::Int.to_instance(&db))
-                        .with_default_type(Type::IntLiteral(4)),
+                        .with_default_type(Type::int_literal(4)),
                     Parameter::variadic(Name::new_static("args"))
                         .with_annotated_type(Type::object()),
                     Parameter::keyword_only(Name::new_static("g"))
-                        .with_default_type(Type::IntLiteral(5)),
+                        .with_default_type(Type::int_literal(5)),
                     Parameter::keyword_only(Name::new_static("h"))
                         .with_annotated_type(KnownClass::Int.to_instance(&db))
-                        .with_default_type(Type::IntLiteral(6)),
+                        .with_default_type(Type::int_literal(6)),
                     Parameter::keyword_variadic(Name::new_static("kwargs"))
                         .with_annotated_type(KnownClass::Str.to_instance(&db)),
                 ],
@@ -3275,22 +3274,22 @@ mod tests {
                     Parameter::positional_only(Some(Name::new_static("b")))
                         .with_annotated_type(KnownClass::Int.to_instance(&db)),
                     Parameter::positional_only(Some(Name::new_static("c")))
-                        .with_default_type(Type::IntLiteral(1)),
+                        .with_default_type(Type::int_literal(1)),
                     Parameter::positional_only(Some(Name::new_static("d")))
                         .with_annotated_type(KnownClass::Int.to_instance(&db))
-                        .with_default_type(Type::IntLiteral(2)),
+                        .with_default_type(Type::int_literal(2)),
                     Parameter::positional_or_keyword(Name::new_static("e"))
-                        .with_default_type(Type::IntLiteral(3)),
+                        .with_default_type(Type::int_literal(3)),
                     Parameter::positional_or_keyword(Name::new_static("f"))
                         .with_annotated_type(KnownClass::Int.to_instance(&db))
-                        .with_default_type(Type::IntLiteral(4)),
+                        .with_default_type(Type::int_literal(4)),
                     Parameter::variadic(Name::new_static("args"))
                         .with_annotated_type(Type::object()),
                     Parameter::keyword_only(Name::new_static("g"))
-                        .with_default_type(Type::IntLiteral(5)),
+                        .with_default_type(Type::int_literal(5)),
                     Parameter::keyword_only(Name::new_static("h"))
                         .with_annotated_type(KnownClass::Int.to_instance(&db))
-                        .with_default_type(Type::IntLiteral(6)),
+                        .with_default_type(Type::int_literal(6)),
                     Parameter::keyword_variadic(Name::new_static("kwargs"))
                         .with_annotated_type(KnownClass::Str.to_instance(&db)),
                 ],

@@ -1,11 +1,17 @@
 use std::{fmt, vec};
 
+use rustc_hash::FxHashMap;
+
+use crate::importer::{ImportAction, ImportRequest, Importer, MembersInScope};
 use crate::{Db, HasNavigationTargets, NavigationTarget};
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
+use ruff_db::source::source_text;
 use ruff_python_ast::visitor::source_order::{self, SourceOrderVisitor, TraversalSignal};
 use ruff_python_ast::{AnyNodeRef, ArgOrKeyword, Expr, ExprUnaryOp, Stmt, UnaryOp};
+use ruff_python_codegen::Stylist;
 use ruff_text_size::{Ranged, TextRange, TextSize};
+use ty_module_resolver::file_to_module;
 use ty_python_semantic::types::ide_support::inlay_hint_call_argument_details;
 use ty_python_semantic::types::{Type, TypeDetail};
 use ty_python_semantic::{HasType, SemanticModel};
@@ -20,20 +26,29 @@ pub struct InlayHint {
 
 impl InlayHint {
     fn variable_type(
+        context: InlayHintImportContext,
         expr: &Expr,
         rhs: &Expr,
         ty: Type,
-        db: &dyn Db,
         allow_edits: bool,
     ) -> Option<Self> {
+        let InlayHintImportContext {
+            db,
+            file,
+            importer,
+            dynamic_imports,
+        } = context;
+
         let position = expr.range().end();
         // Render the type to a string, and get subspans for all the types that make it up
         let details = ty.display(db).to_string_parts();
 
-        // Filter out a reptitive hints like `x: T = T()`
+        // Filter out repetitive hints like `x: T = T()`
         if call_matches_name(rhs, &details.label) {
             return None;
         }
+
+        let mut dynamic_importer = DynamicImporter::new(importer, expr, dynamic_imports);
 
         // Ok so the idea here is that we potentially have a random soup of spans here,
         // and each byte of the string can have at most one target associate with it.
@@ -44,6 +59,12 @@ impl InlayHint {
         // check if it's further along in the string. If it is, great, we give it the
         // span for its range, and then advance where we are.
         let mut offset = 0;
+
+        // This edit label could be different from the original label if we need to
+        // qualify certain imported symbols. `A` could turn into `foo.A`.
+        let mut edit_label = details.label.clone();
+        let mut edit_offset: isize = 0;
+
         let mut label_parts = vec![": ".into()];
         for (target, detail) in details.targets.iter().zip(&details.details) {
             match detail {
@@ -54,9 +75,56 @@ impl InlayHint {
                     if start > offset {
                         label_parts.push(details.label[offset..start].into());
                     }
+
+                    // Possibly import the current type and return the qualified name
+                    let qualified_name = |dynamic_importer: &mut DynamicImporter| {
+                        let type_definition = ty.definition(db)?;
+                        let definition = type_definition.definition()?;
+
+                        // Don't try to import symbols in scope
+                        if definition.file(db) == file {
+                            return None;
+                        }
+
+                        let definition_name = definition.name(db);
+
+                        // Fallback to the label if we cannot find the name
+                        let definition_name = definition_name
+                            .as_deref()
+                            .unwrap_or(&details.label[start..end]);
+
+                        let module = file_to_module(db, definition.file(db))?;
+
+                        if should_skip_import(db, module, *ty) {
+                            return None;
+                        }
+
+                        let module_name = module.name(db).as_str();
+
+                        dynamic_importer.import_symbol(
+                            db,
+                            ty,
+                            module_name,
+                            definition_name,
+                            &details.label[start..end],
+                        )
+                    };
+
                     // Ok, this is the first type that claimed these bytes, give it the target
                     if start >= offset {
+                        // Try to import the symbol and update the edit label if required
+                        if let Some(qualified_name) = qualified_name(&mut dynamic_importer) {
+                            let edit_start = (start.cast_signed() + edit_offset).cast_unsigned();
+                            let edit_end = (end.cast_signed() + edit_offset).cast_unsigned();
+
+                            edit_label.replace_range(edit_start..edit_end, &qualified_name);
+                            edit_offset +=
+                                qualified_name.len().cast_signed() - (end - start).cast_signed();
+                        }
+
                         let target = ty.navigation_targets(db).into_iter().next();
+
+                        // Always use original text for the label part
                         label_parts.push(
                             InlayHintLabelPart::new(&details.label[start..end]).with_target(target),
                         );
@@ -70,16 +138,21 @@ impl InlayHint {
                 }
             }
         }
+
         // "flush" the rest of the label without any target
         if offset < details.label.len() {
             label_parts.push(details.label[offset..details.label.len()].into());
         }
 
         let text_edits = if details.is_valid_syntax && allow_edits {
-            vec![InlayHintTextEdit {
+            let mut text_edits = vec![InlayHintTextEdit {
                 range: TextRange::new(position, position),
-                new_text: format!(": {}", details.label),
-            }]
+                new_text: format!(": {edit_label}"),
+            }];
+
+            text_edits.extend(dynamic_importer.text_edits());
+
+            text_edits
         } else {
             vec![]
         };
@@ -211,9 +284,13 @@ pub fn inlay_hints(
     range: TextRange,
     settings: &InlayHintSettings,
 ) -> Vec<InlayHint> {
-    let mut visitor = InlayHintVisitor::new(db, file, range, settings);
-
     let ast = parsed_module(db, file).load(db);
+
+    let source = source_text(db, file);
+    let stylist = Stylist::from_tokens(ast.tokens(), source.as_str());
+    let importer = Importer::new(db, &stylist, file, source.as_str(), &ast);
+
+    let mut visitor = InlayHintVisitor::new(db, file, importer, range, settings);
 
     visitor.visit_body(ast.suite());
 
@@ -257,9 +334,20 @@ impl Default for InlayHintSettings {
     }
 }
 
+struct InlayHintImportContext<'a, 'db> {
+    db: &'db dyn Db,
+    file: File,
+    importer: &'a Importer<'db>,
+    dynamic_imports: &'a mut FxHashMap<DynamicallyImportedMember, ImportAction>,
+}
+
 struct InlayHintVisitor<'a, 'db> {
     db: &'db dyn Db,
     model: SemanticModel<'db>,
+    /// Imports that we have already created.
+    /// We store these imports so that we don't create multiple imports for the same symbol.
+    dynamic_imports: FxHashMap<DynamicallyImportedMember, ImportAction>,
+    importer: Importer<'db>,
     hints: Vec<InlayHint>,
     assignment_rhs: Option<&'a Expr>,
     range: TextRange,
@@ -268,10 +356,18 @@ struct InlayHintVisitor<'a, 'db> {
 }
 
 impl<'a, 'db> InlayHintVisitor<'a, 'db> {
-    fn new(db: &'db dyn Db, file: File, range: TextRange, settings: &'a InlayHintSettings) -> Self {
+    fn new(
+        db: &'db dyn Db,
+        file: File,
+        importer: Importer<'db>,
+        range: TextRange,
+        settings: &'a InlayHintSettings,
+    ) -> Self {
         Self {
             db,
             model: SemanticModel::new(db, file),
+            dynamic_imports: FxHashMap::default(),
+            importer,
             hints: Vec::new(),
             assignment_rhs: None,
             range,
@@ -289,7 +385,14 @@ impl<'a, 'db> InlayHintVisitor<'a, 'db> {
             return;
         }
 
-        if let Some(inlay_hint) = InlayHint::variable_type(expr, rhs, ty, self.db, allow_edits) {
+        let context = InlayHintImportContext {
+            db: self.db,
+            file: self.model.file(),
+            importer: &self.importer,
+            dynamic_imports: &mut self.dynamic_imports,
+        };
+
+        if let Some(inlay_hint) = InlayHint::variable_type(context, expr, rhs, ty, allow_edits) {
             self.hints.push(inlay_hint);
         }
     }
@@ -484,6 +587,10 @@ fn type_hint_is_excessive_for_expr(expr: &Expr) -> bool {
     }
 }
 
+fn should_skip_import(db: &dyn Db, module: ty_module_resolver::Module, ty: Type) -> bool {
+    module.is_known(db, ty_module_resolver::KnownModule::Builtins) || ty.is_none(db)
+}
+
 fn annotations_are_valid_syntax(stmt_assign: &ruff_python_ast::StmtAssign) -> bool {
     if stmt_assign.targets.len() > 1 {
         return false;
@@ -509,6 +616,120 @@ fn is_ignored_variable_assignment_target(expr: &Expr) -> bool {
     let is_dunder = name.starts_with("__") && name.ends_with("__") && name.len() > 4;
 
     name.starts_with('_') && !is_dunder
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+struct DynamicallyImportedMember {
+    module: String,
+    name: String,
+}
+
+struct DynamicImporter<'a, 'db> {
+    importer: &'a Importer<'db>,
+    /// The expression node used to compute members in scope (lazily).
+    scope_node: AnyNodeRef<'a>,
+    scope_offset: TextSize,
+    members: Option<MembersInScope<'db>>,
+    dynamic_imports: &'a mut FxHashMap<DynamicallyImportedMember, ImportAction>,
+    imported_members: Vec<DynamicallyImportedMember>,
+}
+
+impl<'a, 'db> DynamicImporter<'a, 'db> {
+    fn new(
+        importer: &'a Importer<'db>,
+        expr: &'a Expr,
+        dynamic_imports: &'a mut FxHashMap<DynamicallyImportedMember, ImportAction>,
+    ) -> Self {
+        Self {
+            importer,
+            scope_node: expr.into(),
+            scope_offset: expr.range().start(),
+            members: None,
+            dynamic_imports,
+            imported_members: Vec::new(),
+        }
+    }
+
+    /// Attempts to import a given symbol.
+    /// If the symbol in the text edit needs to be qualified, we return the qualified symbol text.
+    fn import_symbol(
+        &mut self,
+        db: &dyn Db,
+        ty: &Type,
+        module_name: &str,
+        symbol_name: &str,
+        label_text: &str,
+    ) -> Option<String> {
+        use std::collections::hash_map::Entry;
+
+        // Ensure members are computed before borrowing other fields.
+        let members = self.members.get_or_insert_with(|| {
+            self.importer
+                .members_in_scope_at(self.scope_node, self.scope_offset)
+        });
+
+        // Check if the label is like `foo.A`
+        let mut is_possibly_qualified_name = label_text.contains('.');
+
+        if let Some(member) = members.find_member(symbol_name) {
+            if member.ty.definition(db) == ty.definition(db) {
+                return None;
+            }
+
+            // There is another member in scope with the same name,
+            // so we need to qualify this so we don't reference the
+            // in scope member.
+            is_possibly_qualified_name = true;
+        }
+
+        let key = DynamicallyImportedMember {
+            module: module_name.to_string(),
+            name: symbol_name.to_string(),
+        };
+
+        match self.dynamic_imports.entry(key.clone()) {
+            Entry::Vacant(entry) => {
+                let request = if is_possibly_qualified_name {
+                    ImportRequest::import(module_name, symbol_name).force()
+                } else {
+                    ImportRequest::import_from(module_name, symbol_name)
+                };
+
+                let import_action = self.importer.import(request, members);
+                let action = entry.insert(import_action);
+
+                self.imported_members.push(key);
+
+                qualified_symbol_text(action).map(str::to_string)
+            }
+            Entry::Occupied(entry) => qualified_symbol_text(entry.get()).map(str::to_string),
+        }
+    }
+
+    /// Builds the text edits from all collected imports.
+    fn text_edits(&self) -> Vec<InlayHintTextEdit> {
+        self.imported_members
+            .iter()
+            .filter_map(|member| self.dynamic_imports.get(member))
+            .filter_map(|import_action| {
+                import_action.import().and_then(|edit| {
+                    edit.content().map(|content| InlayHintTextEdit {
+                        range: edit.range(),
+                        new_text: content.to_string(),
+                    })
+                })
+            })
+            .collect()
+    }
+}
+
+/// If the import action requires qualifying the symbol (e.g. `import foo` instead of
+/// `from foo import A`), returns the qualified symbol text. Otherwise returns `None`.
+fn qualified_symbol_text(import_action: &ImportAction) -> Option<&str> {
+    if import_action.import().is_some() {
+        return None;
+    }
+    Some(import_action.symbol_text())
 }
 
 #[cfg(test)]
@@ -613,7 +834,7 @@ mod tests {
 
             let mut offset = 0;
 
-            let mut edit_offset = 0;
+            let mut all_edits = Vec::new();
 
             for hint in hints {
                 let end_position = hint.position.to_usize() + offset;
@@ -630,23 +851,23 @@ mod tests {
                     hint_str.push_str(part.text());
                 }
 
-                for edit in hint.text_edits {
-                    let start = edit.range.start().to_usize() + edit_offset;
-                    let end = edit.range.end().to_usize() + edit_offset;
-
-                    text_edit_buf.replace_range(start..end, &edit.new_text);
-
-                    if start == end {
-                        edit_offset += edit.new_text.len();
-                    } else {
-                        edit_offset += edit.new_text.len() - edit.range.len().to_usize();
-                    }
-                }
+                all_edits.extend(hint.text_edits);
 
                 hint_str.push(']');
                 offset += hint_str.len();
 
                 inlay_hint_buf.insert_str(end_position, &hint_str);
+            }
+
+            let mut edit_offset = 0;
+
+            for edit in all_edits.iter().sorted_by_key(|edit| edit.range.start()) {
+                let start = edit.range.start().to_usize() + edit_offset;
+                let end = edit.range.end().to_usize() + edit_offset;
+
+                text_edit_buf.replace_range(start..end, &edit.new_text);
+
+                edit_offset += edit.new_text.len() - edit.range.len().to_usize();
             }
 
             self.db.write_file("main2.py", &inlay_hint_buf).unwrap();
@@ -671,7 +892,9 @@ mod tests {
                 );
             }
 
-            let rendered_edit_diagnostic = if edit_offset != 0 {
+            let rendered_edit_diagnostic = if all_edits.is_empty() {
+                String::new()
+            } else {
                 let edit_diagnostic = InlayHintEditDiagnostic::new(text_edit_buf);
                 let text_edit_buf = self.render_diagnostic(edit_diagnostic);
 
@@ -680,8 +903,6 @@ mod tests {
                     crate::MarkupKind::PlainText.horizontal_line(),
                     text_edit_buf
                 )
-            } else {
-                String::new()
             };
 
             format!("{inlay_hint_buf}{rendered_diagnostics}{rendered_edit_diagnostic}",)
@@ -695,7 +916,7 @@ mod tests {
 
             let mut buf = String::new();
 
-            let config = DisplayDiagnosticConfig::default()
+            let config = DisplayDiagnosticConfig::new("ty")
                 .color(false)
                 .format(DiagnosticFormat::Full);
 
@@ -852,6 +1073,7 @@ mod tests {
         ---------------------------------------------
         info[inlay-hint-edit]: File after edits
         info: Source
+        from typing import Literal
 
         def i(x: int, /) -> int:
             return x
@@ -1047,6 +1269,73 @@ mod tests {
     }
 
     #[test]
+    fn test_starred_unpacked_tuple_assignment() {
+        let mut test = inlay_hint_test(
+            "
+            def foo(x: tuple[int, ...]):
+                (a, *b) = x
+            ",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r#"
+
+        def foo(x: tuple[int, ...]):
+            (a[: int], *b[: list[int]]) = x
+
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/builtins.pyi:348:7
+            |
+        347 | @disjoint_base
+        348 | class int:
+            |       ^^^
+        349 |     """int([x]) -> integer
+        350 |     int(x, base=10) -> integer
+            |
+        info: Source
+         --> main2.py:3:10
+          |
+        2 | def foo(x: tuple[int, ...]):
+        3 |     (a[: int], *b[: list[int]]) = x
+          |          ^^^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+            --> stdlib/builtins.pyi:2829:7
+             |
+        2828 | @disjoint_base
+        2829 | class list(MutableSequence[_T]):
+             |       ^^^^
+        2830 |     """Built-in mutable sequence.
+             |
+        info: Source
+         --> main2.py:3:21
+          |
+        2 | def foo(x: tuple[int, ...]):
+        3 |     (a[: int], *b[: list[int]]) = x
+          |                     ^^^^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/builtins.pyi:348:7
+            |
+        347 | @disjoint_base
+        348 | class int:
+            |       ^^^
+        349 |     """int([x]) -> integer
+        350 |     int(x, base=10) -> integer
+            |
+        info: Source
+         --> main2.py:3:26
+          |
+        2 | def foo(x: tuple[int, ...]):
+        3 |     (a[: int], *b[: list[int]]) = x
+          |                          ^^^
+          |
+        "#);
+    }
+
+    #[test]
     fn test_leading_underscore_variable_assignment_has_no_type_inlay_hint() {
         let mut test = inlay_hint_test(
             "
@@ -1059,7 +1348,7 @@ mod tests {
             ",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r#"
+        assert_snapshot!(test.inlay_hints(), @"
 
         def i(x: int, /) -> int:
             return x
@@ -1067,7 +1356,7 @@ mod tests {
         _ = i(1)
         _ignored = i(1)
         __ignored = i(1)
-        "#);
+        ");
     }
 
     #[test]
@@ -1597,6 +1886,7 @@ mod tests {
         ---------------------------------------------
         info[inlay-hint-edit]: File after edits
         info: Source
+        from typing import Literal
 
         def i(x: int, /) -> int:
             return x
@@ -1946,6 +2236,7 @@ mod tests {
         ---------------------------------------------
         info[inlay-hint-edit]: File after edits
         info: Source
+        from typing import Literal
 
         def i(x: int, /) -> int:
             return x
@@ -2033,10 +2324,10 @@ mod tests {
           --> stdlib/ty_extensions.pyi:14:1
            |
         13 | # Types
-        14 | Unknown = object()
+        14 | Unknown: _SpecialForm
            | ^^^^^^^
-        15 | AlwaysTruthy = object()
-        16 | AlwaysFalsy = object()
+        15 | AlwaysTruthy: _SpecialForm
+        16 | AlwaysFalsy: _SpecialForm
            |
         info: Source
          --> main2.py:5:18
@@ -2071,6 +2362,7 @@ mod tests {
         ---------------------------------------------
         info[inlay-hint-edit]: File after edits
         info: Source
+        from ty_extensions import Unknown
 
         class A:
             def __init__(self, y):
@@ -2374,17 +2666,17 @@ mod tests {
 
         assert_snapshot!(test.inlay_hints(), @r#"
 
-        a[: list[Unknown | int]] = [1, 2]
-        b[: list[Unknown | int | float]] = [1.0, 2.0]
-        c[: list[Unknown | bool]] = [True, False]
-        d[: list[Unknown | None]] = [None, None]
-        e[: list[Unknown | str]] = ["hel", "lo"]
-        f[: list[Unknown | str]] = ['the', 're']
-        g[: list[Unknown | str]] = [f"{ft}", f"{ft}"]
-        h[: list[Unknown | Template]] = [t"wow %d", t"wow %d"]
-        i[: list[Unknown | bytes]] = [b'/x01', b'/x02']
-        j[: list[Unknown | int | float]] = [+1, +2.0]
-        k[: list[Unknown | int | float]] = [-1, -2.0]
+        a[: list[int]] = [1, 2]
+        b[: list[int | float]] = [1.0, 2.0]
+        c[: list[bool]] = [True, False]
+        d[: list[None]] = [None, None]
+        e[: list[str]] = ["hel", "lo"]
+        f[: list[str]] = ['the', 're']
+        g[: list[str]] = [f"{ft}", f"{ft}"]
+        h[: list[Template]] = [t"wow %d", t"wow %d"]
+        i[: list[bytes]] = [b'/x01', b'/x02']
+        j[: list[int | float]] = [+1, +2.0]
+        k[: list[int | float]] = [-1, -2.0]
 
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
@@ -2398,28 +2690,10 @@ mod tests {
         info: Source
          --> main2.py:2:5
           |
-        2 | a[: list[Unknown | int]] = [1, 2]
+        2 | a[: list[int]] = [1, 2]
           |     ^^^^
-        3 | b[: list[Unknown | int | float]] = [1.0, 2.0]
-        4 | c[: list[Unknown | bool]] = [True, False]
-          |
-
-        info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:14:1
-           |
-        13 | # Types
-        14 | Unknown = object()
-           | ^^^^^^^
-        15 | AlwaysTruthy = object()
-        16 | AlwaysFalsy = object()
-           |
-        info: Source
-         --> main2.py:2:10
-          |
-        2 | a[: list[Unknown | int]] = [1, 2]
-          |          ^^^^^^^
-        3 | b[: list[Unknown | int | float]] = [1.0, 2.0]
-        4 | c[: list[Unknown | bool]] = [True, False]
+        3 | b[: list[int | float]] = [1.0, 2.0]
+        4 | c[: list[bool]] = [True, False]
           |
 
         info[inlay-hint-location]: Inlay Hint Target
@@ -2432,12 +2706,12 @@ mod tests {
         350 |     int(x, base=10) -> integer
             |
         info: Source
-         --> main2.py:2:20
+         --> main2.py:2:10
           |
-        2 | a[: list[Unknown | int]] = [1, 2]
-          |                    ^^^
-        3 | b[: list[Unknown | int | float]] = [1.0, 2.0]
-        4 | c[: list[Unknown | bool]] = [True, False]
+        2 | a[: list[int]] = [1, 2]
+          |          ^^^
+        3 | b[: list[int | float]] = [1.0, 2.0]
+        4 | c[: list[bool]] = [True, False]
           |
 
         info[inlay-hint-location]: Inlay Hint Target
@@ -2451,30 +2725,11 @@ mod tests {
         info: Source
          --> main2.py:3:5
           |
-        2 | a[: list[Unknown | int]] = [1, 2]
-        3 | b[: list[Unknown | int | float]] = [1.0, 2.0]
+        2 | a[: list[int]] = [1, 2]
+        3 | b[: list[int | float]] = [1.0, 2.0]
           |     ^^^^
-        4 | c[: list[Unknown | bool]] = [True, False]
-        5 | d[: list[Unknown | None]] = [None, None]
-          |
-
-        info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:14:1
-           |
-        13 | # Types
-        14 | Unknown = object()
-           | ^^^^^^^
-        15 | AlwaysTruthy = object()
-        16 | AlwaysFalsy = object()
-           |
-        info: Source
-         --> main2.py:3:10
-          |
-        2 | a[: list[Unknown | int]] = [1, 2]
-        3 | b[: list[Unknown | int | float]] = [1.0, 2.0]
-          |          ^^^^^^^
-        4 | c[: list[Unknown | bool]] = [True, False]
-        5 | d[: list[Unknown | None]] = [None, None]
+        4 | c[: list[bool]] = [True, False]
+        5 | d[: list[None]] = [None, None]
           |
 
         info[inlay-hint-location]: Inlay Hint Target
@@ -2487,13 +2742,13 @@ mod tests {
         350 |     int(x, base=10) -> integer
             |
         info: Source
-         --> main2.py:3:20
+         --> main2.py:3:10
           |
-        2 | a[: list[Unknown | int]] = [1, 2]
-        3 | b[: list[Unknown | int | float]] = [1.0, 2.0]
-          |                    ^^^
-        4 | c[: list[Unknown | bool]] = [True, False]
-        5 | d[: list[Unknown | None]] = [None, None]
+        2 | a[: list[int]] = [1, 2]
+        3 | b[: list[int | float]] = [1.0, 2.0]
+          |          ^^^
+        4 | c[: list[bool]] = [True, False]
+        5 | d[: list[None]] = [None, None]
           |
 
         info[inlay-hint-location]: Inlay Hint Target
@@ -2505,13 +2760,13 @@ mod tests {
         662 |     """Convert a string or number to a floating-point number, if possible."""
             |
         info: Source
-         --> main2.py:3:26
+         --> main2.py:3:16
           |
-        2 | a[: list[Unknown | int]] = [1, 2]
-        3 | b[: list[Unknown | int | float]] = [1.0, 2.0]
-          |                          ^^^^^
-        4 | c[: list[Unknown | bool]] = [True, False]
-        5 | d[: list[Unknown | None]] = [None, None]
+        2 | a[: list[int]] = [1, 2]
+        3 | b[: list[int | float]] = [1.0, 2.0]
+          |                ^^^^^
+        4 | c[: list[bool]] = [True, False]
+        5 | d[: list[None]] = [None, None]
           |
 
         info[inlay-hint-location]: Inlay Hint Target
@@ -2525,32 +2780,12 @@ mod tests {
         info: Source
          --> main2.py:4:5
           |
-        2 | a[: list[Unknown | int]] = [1, 2]
-        3 | b[: list[Unknown | int | float]] = [1.0, 2.0]
-        4 | c[: list[Unknown | bool]] = [True, False]
+        2 | a[: list[int]] = [1, 2]
+        3 | b[: list[int | float]] = [1.0, 2.0]
+        4 | c[: list[bool]] = [True, False]
           |     ^^^^
-        5 | d[: list[Unknown | None]] = [None, None]
-        6 | e[: list[Unknown | str]] = ["hel", "lo"]
-          |
-
-        info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:14:1
-           |
-        13 | # Types
-        14 | Unknown = object()
-           | ^^^^^^^
-        15 | AlwaysTruthy = object()
-        16 | AlwaysFalsy = object()
-           |
-        info: Source
-         --> main2.py:4:10
-          |
-        2 | a[: list[Unknown | int]] = [1, 2]
-        3 | b[: list[Unknown | int | float]] = [1.0, 2.0]
-        4 | c[: list[Unknown | bool]] = [True, False]
-          |          ^^^^^^^
-        5 | d[: list[Unknown | None]] = [None, None]
-        6 | e[: list[Unknown | str]] = ["hel", "lo"]
+        5 | d[: list[None]] = [None, None]
+        6 | e[: list[str]] = ["hel", "lo"]
           |
 
         info[inlay-hint-location]: Inlay Hint Target
@@ -2563,14 +2798,14 @@ mod tests {
         2620 |     The builtins True and False are the only two instances of the class bool.
              |
         info: Source
-         --> main2.py:4:20
+         --> main2.py:4:10
           |
-        2 | a[: list[Unknown | int]] = [1, 2]
-        3 | b[: list[Unknown | int | float]] = [1.0, 2.0]
-        4 | c[: list[Unknown | bool]] = [True, False]
-          |                    ^^^^
-        5 | d[: list[Unknown | None]] = [None, None]
-        6 | e[: list[Unknown | str]] = ["hel", "lo"]
+        2 | a[: list[int]] = [1, 2]
+        3 | b[: list[int | float]] = [1.0, 2.0]
+        4 | c[: list[bool]] = [True, False]
+          |          ^^^^
+        5 | d[: list[None]] = [None, None]
+        6 | e[: list[str]] = ["hel", "lo"]
           |
 
         info[inlay-hint-location]: Inlay Hint Target
@@ -2584,32 +2819,12 @@ mod tests {
         info: Source
          --> main2.py:5:5
           |
-        3 | b[: list[Unknown | int | float]] = [1.0, 2.0]
-        4 | c[: list[Unknown | bool]] = [True, False]
-        5 | d[: list[Unknown | None]] = [None, None]
+        3 | b[: list[int | float]] = [1.0, 2.0]
+        4 | c[: list[bool]] = [True, False]
+        5 | d[: list[None]] = [None, None]
           |     ^^^^
-        6 | e[: list[Unknown | str]] = ["hel", "lo"]
-        7 | f[: list[Unknown | str]] = ['the', 're']
-          |
-
-        info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:14:1
-           |
-        13 | # Types
-        14 | Unknown = object()
-           | ^^^^^^^
-        15 | AlwaysTruthy = object()
-        16 | AlwaysFalsy = object()
-           |
-        info: Source
-         --> main2.py:5:10
-          |
-        3 | b[: list[Unknown | int | float]] = [1.0, 2.0]
-        4 | c[: list[Unknown | bool]] = [True, False]
-        5 | d[: list[Unknown | None]] = [None, None]
-          |          ^^^^^^^
-        6 | e[: list[Unknown | str]] = ["hel", "lo"]
-        7 | f[: list[Unknown | str]] = ['the', 're']
+        6 | e[: list[str]] = ["hel", "lo"]
+        7 | f[: list[str]] = ['the', 're']
           |
 
         info[inlay-hint-location]: Inlay Hint Target
@@ -2622,14 +2837,14 @@ mod tests {
         970 |         """The type of the None singleton."""
             |
         info: Source
-         --> main2.py:5:20
+         --> main2.py:5:10
           |
-        3 | b[: list[Unknown | int | float]] = [1.0, 2.0]
-        4 | c[: list[Unknown | bool]] = [True, False]
-        5 | d[: list[Unknown | None]] = [None, None]
-          |                    ^^^^
-        6 | e[: list[Unknown | str]] = ["hel", "lo"]
-        7 | f[: list[Unknown | str]] = ['the', 're']
+        3 | b[: list[int | float]] = [1.0, 2.0]
+        4 | c[: list[bool]] = [True, False]
+        5 | d[: list[None]] = [None, None]
+          |          ^^^^
+        6 | e[: list[str]] = ["hel", "lo"]
+        7 | f[: list[str]] = ['the', 're']
           |
 
         info[inlay-hint-location]: Inlay Hint Target
@@ -2643,32 +2858,12 @@ mod tests {
         info: Source
          --> main2.py:6:5
           |
-        4 | c[: list[Unknown | bool]] = [True, False]
-        5 | d[: list[Unknown | None]] = [None, None]
-        6 | e[: list[Unknown | str]] = ["hel", "lo"]
+        4 | c[: list[bool]] = [True, False]
+        5 | d[: list[None]] = [None, None]
+        6 | e[: list[str]] = ["hel", "lo"]
           |     ^^^^
-        7 | f[: list[Unknown | str]] = ['the', 're']
-        8 | g[: list[Unknown | str]] = [f"{ft}", f"{ft}"]
-          |
-
-        info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:14:1
-           |
-        13 | # Types
-        14 | Unknown = object()
-           | ^^^^^^^
-        15 | AlwaysTruthy = object()
-        16 | AlwaysFalsy = object()
-           |
-        info: Source
-         --> main2.py:6:10
-          |
-        4 | c[: list[Unknown | bool]] = [True, False]
-        5 | d[: list[Unknown | None]] = [None, None]
-        6 | e[: list[Unknown | str]] = ["hel", "lo"]
-          |          ^^^^^^^
-        7 | f[: list[Unknown | str]] = ['the', 're']
-        8 | g[: list[Unknown | str]] = [f"{ft}", f"{ft}"]
+        7 | f[: list[str]] = ['the', 're']
+        8 | g[: list[str]] = [f"{ft}", f"{ft}"]
           |
 
         info[inlay-hint-location]: Inlay Hint Target
@@ -2681,14 +2876,14 @@ mod tests {
         917 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
             |
         info: Source
-         --> main2.py:6:20
+         --> main2.py:6:10
           |
-        4 | c[: list[Unknown | bool]] = [True, False]
-        5 | d[: list[Unknown | None]] = [None, None]
-        6 | e[: list[Unknown | str]] = ["hel", "lo"]
-          |                    ^^^
-        7 | f[: list[Unknown | str]] = ['the', 're']
-        8 | g[: list[Unknown | str]] = [f"{ft}", f"{ft}"]
+        4 | c[: list[bool]] = [True, False]
+        5 | d[: list[None]] = [None, None]
+        6 | e[: list[str]] = ["hel", "lo"]
+          |          ^^^
+        7 | f[: list[str]] = ['the', 're']
+        8 | g[: list[str]] = [f"{ft}", f"{ft}"]
           |
 
         info[inlay-hint-location]: Inlay Hint Target
@@ -2702,32 +2897,12 @@ mod tests {
         info: Source
          --> main2.py:7:5
           |
-        5 | d[: list[Unknown | None]] = [None, None]
-        6 | e[: list[Unknown | str]] = ["hel", "lo"]
-        7 | f[: list[Unknown | str]] = ['the', 're']
+        5 | d[: list[None]] = [None, None]
+        6 | e[: list[str]] = ["hel", "lo"]
+        7 | f[: list[str]] = ['the', 're']
           |     ^^^^
-        8 | g[: list[Unknown | str]] = [f"{ft}", f"{ft}"]
-        9 | h[: list[Unknown | Template]] = [t"wow %d", t"wow %d"]
-          |
-
-        info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:14:1
-           |
-        13 | # Types
-        14 | Unknown = object()
-           | ^^^^^^^
-        15 | AlwaysTruthy = object()
-        16 | AlwaysFalsy = object()
-           |
-        info: Source
-         --> main2.py:7:10
-          |
-        5 | d[: list[Unknown | None]] = [None, None]
-        6 | e[: list[Unknown | str]] = ["hel", "lo"]
-        7 | f[: list[Unknown | str]] = ['the', 're']
-          |          ^^^^^^^
-        8 | g[: list[Unknown | str]] = [f"{ft}", f"{ft}"]
-        9 | h[: list[Unknown | Template]] = [t"wow %d", t"wow %d"]
+        8 | g[: list[str]] = [f"{ft}", f"{ft}"]
+        9 | h[: list[Template]] = [t"wow %d", t"wow %d"]
           |
 
         info[inlay-hint-location]: Inlay Hint Target
@@ -2740,14 +2915,14 @@ mod tests {
         917 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
             |
         info: Source
-         --> main2.py:7:20
+         --> main2.py:7:10
           |
-        5 | d[: list[Unknown | None]] = [None, None]
-        6 | e[: list[Unknown | str]] = ["hel", "lo"]
-        7 | f[: list[Unknown | str]] = ['the', 're']
-          |                    ^^^
-        8 | g[: list[Unknown | str]] = [f"{ft}", f"{ft}"]
-        9 | h[: list[Unknown | Template]] = [t"wow %d", t"wow %d"]
+        5 | d[: list[None]] = [None, None]
+        6 | e[: list[str]] = ["hel", "lo"]
+        7 | f[: list[str]] = ['the', 're']
+          |          ^^^
+        8 | g[: list[str]] = [f"{ft}", f"{ft}"]
+        9 | h[: list[Template]] = [t"wow %d", t"wow %d"]
           |
 
         info[inlay-hint-location]: Inlay Hint Target
@@ -2761,32 +2936,12 @@ mod tests {
         info: Source
           --> main2.py:8:5
            |
-         6 | e[: list[Unknown | str]] = ["hel", "lo"]
-         7 | f[: list[Unknown | str]] = ['the', 're']
-         8 | g[: list[Unknown | str]] = [f"{ft}", f"{ft}"]
+         6 | e[: list[str]] = ["hel", "lo"]
+         7 | f[: list[str]] = ['the', 're']
+         8 | g[: list[str]] = [f"{ft}", f"{ft}"]
            |     ^^^^
-         9 | h[: list[Unknown | Template]] = [t"wow %d", t"wow %d"]
-        10 | i[: list[Unknown | bytes]] = [b'/x01', b'/x02']
-           |
-
-        info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:14:1
-           |
-        13 | # Types
-        14 | Unknown = object()
-           | ^^^^^^^
-        15 | AlwaysTruthy = object()
-        16 | AlwaysFalsy = object()
-           |
-        info: Source
-          --> main2.py:8:10
-           |
-         6 | e[: list[Unknown | str]] = ["hel", "lo"]
-         7 | f[: list[Unknown | str]] = ['the', 're']
-         8 | g[: list[Unknown | str]] = [f"{ft}", f"{ft}"]
-           |          ^^^^^^^
-         9 | h[: list[Unknown | Template]] = [t"wow %d", t"wow %d"]
-        10 | i[: list[Unknown | bytes]] = [b'/x01', b'/x02']
+         9 | h[: list[Template]] = [t"wow %d", t"wow %d"]
+        10 | i[: list[bytes]] = [b'/x01', b'/x02']
            |
 
         info[inlay-hint-location]: Inlay Hint Target
@@ -2799,14 +2954,14 @@ mod tests {
         917 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
             |
         info: Source
-          --> main2.py:8:20
+          --> main2.py:8:10
            |
-         6 | e[: list[Unknown | str]] = ["hel", "lo"]
-         7 | f[: list[Unknown | str]] = ['the', 're']
-         8 | g[: list[Unknown | str]] = [f"{ft}", f"{ft}"]
-           |                    ^^^
-         9 | h[: list[Unknown | Template]] = [t"wow %d", t"wow %d"]
-        10 | i[: list[Unknown | bytes]] = [b'/x01', b'/x02']
+         6 | e[: list[str]] = ["hel", "lo"]
+         7 | f[: list[str]] = ['the', 're']
+         8 | g[: list[str]] = [f"{ft}", f"{ft}"]
+           |          ^^^
+         9 | h[: list[Template]] = [t"wow %d", t"wow %d"]
+        10 | i[: list[bytes]] = [b'/x01', b'/x02']
            |
 
         info[inlay-hint-location]: Inlay Hint Target
@@ -2820,32 +2975,12 @@ mod tests {
         info: Source
           --> main2.py:9:5
            |
-         7 | f[: list[Unknown | str]] = ['the', 're']
-         8 | g[: list[Unknown | str]] = [f"{ft}", f"{ft}"]
-         9 | h[: list[Unknown | Template]] = [t"wow %d", t"wow %d"]
+         7 | f[: list[str]] = ['the', 're']
+         8 | g[: list[str]] = [f"{ft}", f"{ft}"]
+         9 | h[: list[Template]] = [t"wow %d", t"wow %d"]
            |     ^^^^
-        10 | i[: list[Unknown | bytes]] = [b'/x01', b'/x02']
-        11 | j[: list[Unknown | int | float]] = [+1, +2.0]
-           |
-
-        info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:14:1
-           |
-        13 | # Types
-        14 | Unknown = object()
-           | ^^^^^^^
-        15 | AlwaysTruthy = object()
-        16 | AlwaysFalsy = object()
-           |
-        info: Source
-          --> main2.py:9:10
-           |
-         7 | f[: list[Unknown | str]] = ['the', 're']
-         8 | g[: list[Unknown | str]] = [f"{ft}", f"{ft}"]
-         9 | h[: list[Unknown | Template]] = [t"wow %d", t"wow %d"]
-           |          ^^^^^^^
-        10 | i[: list[Unknown | bytes]] = [b'/x01', b'/x02']
-        11 | j[: list[Unknown | int | float]] = [+1, +2.0]
+        10 | i[: list[bytes]] = [b'/x01', b'/x02']
+        11 | j[: list[int | float]] = [+1, +2.0]
            |
 
         info[inlay-hint-location]: Inlay Hint Target
@@ -2857,14 +2992,14 @@ mod tests {
         11 |     """Template object"""
            |
         info: Source
-          --> main2.py:9:20
+          --> main2.py:9:10
            |
-         7 | f[: list[Unknown | str]] = ['the', 're']
-         8 | g[: list[Unknown | str]] = [f"{ft}", f"{ft}"]
-         9 | h[: list[Unknown | Template]] = [t"wow %d", t"wow %d"]
-           |                    ^^^^^^^^
-        10 | i[: list[Unknown | bytes]] = [b'/x01', b'/x02']
-        11 | j[: list[Unknown | int | float]] = [+1, +2.0]
+         7 | f[: list[str]] = ['the', 're']
+         8 | g[: list[str]] = [f"{ft}", f"{ft}"]
+         9 | h[: list[Template]] = [t"wow %d", t"wow %d"]
+           |          ^^^^^^^^
+        10 | i[: list[bytes]] = [b'/x01', b'/x02']
+        11 | j[: list[int | float]] = [+1, +2.0]
            |
 
         info[inlay-hint-location]: Inlay Hint Target
@@ -2878,32 +3013,12 @@ mod tests {
         info: Source
           --> main2.py:10:5
            |
-         8 | g[: list[Unknown | str]] = [f"{ft}", f"{ft}"]
-         9 | h[: list[Unknown | Template]] = [t"wow %d", t"wow %d"]
-        10 | i[: list[Unknown | bytes]] = [b'/x01', b'/x02']
+         8 | g[: list[str]] = [f"{ft}", f"{ft}"]
+         9 | h[: list[Template]] = [t"wow %d", t"wow %d"]
+        10 | i[: list[bytes]] = [b'/x01', b'/x02']
            |     ^^^^
-        11 | j[: list[Unknown | int | float]] = [+1, +2.0]
-        12 | k[: list[Unknown | int | float]] = [-1, -2.0]
-           |
-
-        info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:14:1
-           |
-        13 | # Types
-        14 | Unknown = object()
-           | ^^^^^^^
-        15 | AlwaysTruthy = object()
-        16 | AlwaysFalsy = object()
-           |
-        info: Source
-          --> main2.py:10:10
-           |
-         8 | g[: list[Unknown | str]] = [f"{ft}", f"{ft}"]
-         9 | h[: list[Unknown | Template]] = [t"wow %d", t"wow %d"]
-        10 | i[: list[Unknown | bytes]] = [b'/x01', b'/x02']
-           |          ^^^^^^^
-        11 | j[: list[Unknown | int | float]] = [+1, +2.0]
-        12 | k[: list[Unknown | int | float]] = [-1, -2.0]
+        11 | j[: list[int | float]] = [+1, +2.0]
+        12 | k[: list[int | float]] = [-1, -2.0]
            |
 
         info[inlay-hint-location]: Inlay Hint Target
@@ -2916,14 +3031,14 @@ mod tests {
         1450 |     bytes(string, encoding[, errors]) -> bytes
              |
         info: Source
-          --> main2.py:10:20
+          --> main2.py:10:10
            |
-         8 | g[: list[Unknown | str]] = [f"{ft}", f"{ft}"]
-         9 | h[: list[Unknown | Template]] = [t"wow %d", t"wow %d"]
-        10 | i[: list[Unknown | bytes]] = [b'/x01', b'/x02']
-           |                    ^^^^^
-        11 | j[: list[Unknown | int | float]] = [+1, +2.0]
-        12 | k[: list[Unknown | int | float]] = [-1, -2.0]
+         8 | g[: list[str]] = [f"{ft}", f"{ft}"]
+         9 | h[: list[Template]] = [t"wow %d", t"wow %d"]
+        10 | i[: list[bytes]] = [b'/x01', b'/x02']
+           |          ^^^^^
+        11 | j[: list[int | float]] = [+1, +2.0]
+        12 | k[: list[int | float]] = [-1, -2.0]
            |
 
         info[inlay-hint-location]: Inlay Hint Target
@@ -2937,30 +3052,11 @@ mod tests {
         info: Source
           --> main2.py:11:5
            |
-         9 | h[: list[Unknown | Template]] = [t"wow %d", t"wow %d"]
-        10 | i[: list[Unknown | bytes]] = [b'/x01', b'/x02']
-        11 | j[: list[Unknown | int | float]] = [+1, +2.0]
+         9 | h[: list[Template]] = [t"wow %d", t"wow %d"]
+        10 | i[: list[bytes]] = [b'/x01', b'/x02']
+        11 | j[: list[int | float]] = [+1, +2.0]
            |     ^^^^
-        12 | k[: list[Unknown | int | float]] = [-1, -2.0]
-           |
-
-        info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:14:1
-           |
-        13 | # Types
-        14 | Unknown = object()
-           | ^^^^^^^
-        15 | AlwaysTruthy = object()
-        16 | AlwaysFalsy = object()
-           |
-        info: Source
-          --> main2.py:11:10
-           |
-         9 | h[: list[Unknown | Template]] = [t"wow %d", t"wow %d"]
-        10 | i[: list[Unknown | bytes]] = [b'/x01', b'/x02']
-        11 | j[: list[Unknown | int | float]] = [+1, +2.0]
-           |          ^^^^^^^
-        12 | k[: list[Unknown | int | float]] = [-1, -2.0]
+        12 | k[: list[int | float]] = [-1, -2.0]
            |
 
         info[inlay-hint-location]: Inlay Hint Target
@@ -2973,13 +3069,13 @@ mod tests {
         350 |     int(x, base=10) -> integer
             |
         info: Source
-          --> main2.py:11:20
+          --> main2.py:11:10
            |
-         9 | h[: list[Unknown | Template]] = [t"wow %d", t"wow %d"]
-        10 | i[: list[Unknown | bytes]] = [b'/x01', b'/x02']
-        11 | j[: list[Unknown | int | float]] = [+1, +2.0]
-           |                    ^^^
-        12 | k[: list[Unknown | int | float]] = [-1, -2.0]
+         9 | h[: list[Template]] = [t"wow %d", t"wow %d"]
+        10 | i[: list[bytes]] = [b'/x01', b'/x02']
+        11 | j[: list[int | float]] = [+1, +2.0]
+           |          ^^^
+        12 | k[: list[int | float]] = [-1, -2.0]
            |
 
         info[inlay-hint-location]: Inlay Hint Target
@@ -2991,13 +3087,13 @@ mod tests {
         662 |     """Convert a string or number to a floating-point number, if possible."""
             |
         info: Source
-          --> main2.py:11:26
+          --> main2.py:11:16
            |
-         9 | h[: list[Unknown | Template]] = [t"wow %d", t"wow %d"]
-        10 | i[: list[Unknown | bytes]] = [b'/x01', b'/x02']
-        11 | j[: list[Unknown | int | float]] = [+1, +2.0]
-           |                          ^^^^^
-        12 | k[: list[Unknown | int | float]] = [-1, -2.0]
+         9 | h[: list[Template]] = [t"wow %d", t"wow %d"]
+        10 | i[: list[bytes]] = [b'/x01', b'/x02']
+        11 | j[: list[int | float]] = [+1, +2.0]
+           |                ^^^^^
+        12 | k[: list[int | float]] = [-1, -2.0]
            |
 
         info[inlay-hint-location]: Inlay Hint Target
@@ -3011,28 +3107,10 @@ mod tests {
         info: Source
           --> main2.py:12:5
            |
-        10 | i[: list[Unknown | bytes]] = [b'/x01', b'/x02']
-        11 | j[: list[Unknown | int | float]] = [+1, +2.0]
-        12 | k[: list[Unknown | int | float]] = [-1, -2.0]
+        10 | i[: list[bytes]] = [b'/x01', b'/x02']
+        11 | j[: list[int | float]] = [+1, +2.0]
+        12 | k[: list[int | float]] = [-1, -2.0]
            |     ^^^^
-           |
-
-        info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:14:1
-           |
-        13 | # Types
-        14 | Unknown = object()
-           | ^^^^^^^
-        15 | AlwaysTruthy = object()
-        16 | AlwaysFalsy = object()
-           |
-        info: Source
-          --> main2.py:12:10
-           |
-        10 | i[: list[Unknown | bytes]] = [b'/x01', b'/x02']
-        11 | j[: list[Unknown | int | float]] = [+1, +2.0]
-        12 | k[: list[Unknown | int | float]] = [-1, -2.0]
-           |          ^^^^^^^
            |
 
         info[inlay-hint-location]: Inlay Hint Target
@@ -3045,12 +3123,12 @@ mod tests {
         350 |     int(x, base=10) -> integer
             |
         info: Source
-          --> main2.py:12:20
+          --> main2.py:12:10
            |
-        10 | i[: list[Unknown | bytes]] = [b'/x01', b'/x02']
-        11 | j[: list[Unknown | int | float]] = [+1, +2.0]
-        12 | k[: list[Unknown | int | float]] = [-1, -2.0]
-           |                    ^^^
+        10 | i[: list[bytes]] = [b'/x01', b'/x02']
+        11 | j[: list[int | float]] = [+1, +2.0]
+        12 | k[: list[int | float]] = [-1, -2.0]
+           |          ^^^
            |
 
         info[inlay-hint-location]: Inlay Hint Target
@@ -3062,29 +3140,30 @@ mod tests {
         662 |     """Convert a string or number to a floating-point number, if possible."""
             |
         info: Source
-          --> main2.py:12:26
+          --> main2.py:12:16
            |
-        10 | i[: list[Unknown | bytes]] = [b'/x01', b'/x02']
-        11 | j[: list[Unknown | int | float]] = [+1, +2.0]
-        12 | k[: list[Unknown | int | float]] = [-1, -2.0]
-           |                          ^^^^^
+        10 | i[: list[bytes]] = [b'/x01', b'/x02']
+        11 | j[: list[int | float]] = [+1, +2.0]
+        12 | k[: list[int | float]] = [-1, -2.0]
+           |                ^^^^^
            |
 
         ---------------------------------------------
         info[inlay-hint-edit]: File after edits
         info: Source
+        from string.templatelib import Template
 
-        a: list[Unknown | int] = [1, 2]
-        b: list[Unknown | int | float] = [1.0, 2.0]
-        c: list[Unknown | bool] = [True, False]
-        d: list[Unknown | None] = [None, None]
-        e: list[Unknown | str] = ["hel", "lo"]
-        f: list[Unknown | str] = ['the', 're']
-        g: list[Unknown | str] = [f"{ft}", f"{ft}"]
-        h: list[Unknown | Template] = [t"wow %d", t"wow %d"]
-        i: list[Unknown | bytes] = [b'/x01', b'/x02']
-        j: list[Unknown | int | float] = [+1, +2.0]
-        k: list[Unknown | int | float] = [-1, -2.0]
+        a: list[int] = [1, 2]
+        b: list[int | float] = [1.0, 2.0]
+        c: list[bool] = [True, False]
+        d: list[None] = [None, None]
+        e: list[str] = ["hel", "lo"]
+        f: list[str] = ['the', 're']
+        g: list[str] = [f"{ft}", f"{ft}"]
+        h: list[Template] = [t"wow %d", t"wow %d"]
+        i: list[bytes] = [b'/x01', b'/x02']
+        j: list[int | float] = [+1, +2.0]
+        k: list[int | float] = [-1, -2.0]
         "#);
     }
 
@@ -3277,10 +3356,10 @@ mod tests {
                 self.x[: list[T@MyClass]] = x
                 self.y[: tuple[U@MyClass, U@MyClass]] = y
 
-        x[: MyClass[Unknown | int, str]] = MyClass([x=][42], [y=]("a", "b"))
-        y[: tuple[MyClass[Unknown | int, str], MyClass[Unknown | int, str]]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b")))
-        a[: MyClass[Unknown | int, str]], b[: MyClass[Unknown | int, str]] = MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b"))
-        c[: MyClass[Unknown | int, str]], d[: MyClass[Unknown | int, str]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b")))
+        x[: MyClass[int, str]] = MyClass([x=][42], [y=]("a", "b"))
+        y[: tuple[MyClass[int, str], MyClass[int, str]]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b")))
+        a[: MyClass[int, str]], b[: MyClass[int, str]] = MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b"))
+        c[: MyClass[int, str]], d[: MyClass[int, str]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b")))
 
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
@@ -3317,7 +3396,7 @@ mod tests {
         5 |         self.y[: tuple[U@MyClass, U@MyClass]] = y
           |                  ^^^^^
         6 |
-        7 | x[: MyClass[Unknown | int, str]] = MyClass([x=][42], [y=]("a", "b"))
+        7 | x[: MyClass[int, str]] = MyClass([x=][42], [y=]("a", "b"))
           |
 
         info[inlay-hint-location]: Inlay Hint Target
@@ -3333,30 +3412,10 @@ mod tests {
           |
         5 |         self.y[: tuple[U@MyClass, U@MyClass]] = y
         6 |
-        7 | x[: MyClass[Unknown | int, str]] = MyClass([x=][42], [y=]("a", "b"))
+        7 | x[: MyClass[int, str]] = MyClass([x=][42], [y=]("a", "b"))
           |     ^^^^^^^
-        8 | y[: tuple[MyClass[Unknown | int, str], MyClass[Unknown | int, str]]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a",…
-        9 | a[: MyClass[Unknown | int, str]], b[: MyClass[Unknown | int, str]] = MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b…
-          |
-
-        info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:14:1
-           |
-        13 | # Types
-        14 | Unknown = object()
-           | ^^^^^^^
-        15 | AlwaysTruthy = object()
-        16 | AlwaysFalsy = object()
-           |
-        info: Source
-         --> main2.py:7:13
-          |
-        5 |         self.y[: tuple[U@MyClass, U@MyClass]] = y
-        6 |
-        7 | x[: MyClass[Unknown | int, str]] = MyClass([x=][42], [y=]("a", "b"))
-          |             ^^^^^^^
-        8 | y[: tuple[MyClass[Unknown | int, str], MyClass[Unknown | int, str]]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a",…
-        9 | a[: MyClass[Unknown | int, str]], b[: MyClass[Unknown | int, str]] = MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b…
+        8 | y[: tuple[MyClass[int, str], MyClass[int, str]]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b")))
+        9 | a[: MyClass[int, str]], b[: MyClass[int, str]] = MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b"))
           |
 
         info[inlay-hint-location]: Inlay Hint Target
@@ -3369,14 +3428,14 @@ mod tests {
         350 |     int(x, base=10) -> integer
             |
         info: Source
-         --> main2.py:7:23
+         --> main2.py:7:13
           |
         5 |         self.y[: tuple[U@MyClass, U@MyClass]] = y
         6 |
-        7 | x[: MyClass[Unknown | int, str]] = MyClass([x=][42], [y=]("a", "b"))
-          |                       ^^^
-        8 | y[: tuple[MyClass[Unknown | int, str], MyClass[Unknown | int, str]]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a",…
-        9 | a[: MyClass[Unknown | int, str]], b[: MyClass[Unknown | int, str]] = MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b…
+        7 | x[: MyClass[int, str]] = MyClass([x=][42], [y=]("a", "b"))
+          |             ^^^
+        8 | y[: tuple[MyClass[int, str], MyClass[int, str]]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b")))
+        9 | a[: MyClass[int, str]], b[: MyClass[int, str]] = MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b"))
           |
 
         info[inlay-hint-location]: Inlay Hint Target
@@ -3389,14 +3448,14 @@ mod tests {
         917 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
             |
         info: Source
-         --> main2.py:7:28
+         --> main2.py:7:18
           |
         5 |         self.y[: tuple[U@MyClass, U@MyClass]] = y
         6 |
-        7 | x[: MyClass[Unknown | int, str]] = MyClass([x=][42], [y=]("a", "b"))
-          |                            ^^^
-        8 | y[: tuple[MyClass[Unknown | int, str], MyClass[Unknown | int, str]]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a",…
-        9 | a[: MyClass[Unknown | int, str]], b[: MyClass[Unknown | int, str]] = MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b…
+        7 | x[: MyClass[int, str]] = MyClass([x=][42], [y=]("a", "b"))
+          |                  ^^^
+        8 | y[: tuple[MyClass[int, str], MyClass[int, str]]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b")))
+        9 | a[: MyClass[int, str]], b[: MyClass[int, str]] = MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b"))
           |
 
         info[inlay-hint-location]: Inlay Hint Target
@@ -3409,14 +3468,14 @@ mod tests {
         5 |         self.y = y
           |
         info: Source
-         --> main2.py:7:45
+         --> main2.py:7:35
           |
         5 |         self.y[: tuple[U@MyClass, U@MyClass]] = y
         6 |
-        7 | x[: MyClass[Unknown | int, str]] = MyClass([x=][42], [y=]("a", "b"))
-          |                                             ^
-        8 | y[: tuple[MyClass[Unknown | int, str], MyClass[Unknown | int, str]]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a",…
-        9 | a[: MyClass[Unknown | int, str]], b[: MyClass[Unknown | int, str]] = MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b…
+        7 | x[: MyClass[int, str]] = MyClass([x=][42], [y=]("a", "b"))
+          |                                   ^
+        8 | y[: tuple[MyClass[int, str], MyClass[int, str]]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b")))
+        9 | a[: MyClass[int, str]], b[: MyClass[int, str]] = MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b"))
           |
 
         info[inlay-hint-location]: Inlay Hint Target
@@ -3429,14 +3488,14 @@ mod tests {
         5 |         self.y = y
           |
         info: Source
-         --> main2.py:7:55
+         --> main2.py:7:45
           |
         5 |         self.y[: tuple[U@MyClass, U@MyClass]] = y
         6 |
-        7 | x[: MyClass[Unknown | int, str]] = MyClass([x=][42], [y=]("a", "b"))
-          |                                                       ^
-        8 | y[: tuple[MyClass[Unknown | int, str], MyClass[Unknown | int, str]]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a",…
-        9 | a[: MyClass[Unknown | int, str]], b[: MyClass[Unknown | int, str]] = MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b…
+        7 | x[: MyClass[int, str]] = MyClass([x=][42], [y=]("a", "b"))
+          |                                             ^
+        8 | y[: tuple[MyClass[int, str], MyClass[int, str]]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b")))
+        9 | a[: MyClass[int, str]], b[: MyClass[int, str]] = MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b"))
           |
 
         info[inlay-hint-location]: Inlay Hint Target
@@ -3450,11 +3509,11 @@ mod tests {
         info: Source
           --> main2.py:8:5
            |
-         7 | x[: MyClass[Unknown | int, str]] = MyClass([x=][42], [y=]("a", "b"))
-         8 | y[: tuple[MyClass[Unknown | int, str], MyClass[Unknown | int, str]]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a",…
+         7 | x[: MyClass[int, str]] = MyClass([x=][42], [y=]("a", "b"))
+         8 | y[: tuple[MyClass[int, str], MyClass[int, str]]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b")))
            |     ^^^^^
-         9 | a[: MyClass[Unknown | int, str]], b[: MyClass[Unknown | int, str]] = MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b…
-        10 | c[: MyClass[Unknown | int, str]], d[: MyClass[Unknown | int, str]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "…
+         9 | a[: MyClass[int, str]], b[: MyClass[int, str]] = MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b"))
+        10 | c[: MyClass[int, str]], d[: MyClass[int, str]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b")))
            |
 
         info[inlay-hint-location]: Inlay Hint Target
@@ -3468,30 +3527,11 @@ mod tests {
         info: Source
           --> main2.py:8:11
            |
-         7 | x[: MyClass[Unknown | int, str]] = MyClass([x=][42], [y=]("a", "b"))
-         8 | y[: tuple[MyClass[Unknown | int, str], MyClass[Unknown | int, str]]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a",…
+         7 | x[: MyClass[int, str]] = MyClass([x=][42], [y=]("a", "b"))
+         8 | y[: tuple[MyClass[int, str], MyClass[int, str]]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b")))
            |           ^^^^^^^
-         9 | a[: MyClass[Unknown | int, str]], b[: MyClass[Unknown | int, str]] = MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b…
-        10 | c[: MyClass[Unknown | int, str]], d[: MyClass[Unknown | int, str]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "…
-           |
-
-        info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:14:1
-           |
-        13 | # Types
-        14 | Unknown = object()
-           | ^^^^^^^
-        15 | AlwaysTruthy = object()
-        16 | AlwaysFalsy = object()
-           |
-        info: Source
-          --> main2.py:8:19
-           |
-         7 | x[: MyClass[Unknown | int, str]] = MyClass([x=][42], [y=]("a", "b"))
-         8 | y[: tuple[MyClass[Unknown | int, str], MyClass[Unknown | int, str]]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a",…
-           |                   ^^^^^^^
-         9 | a[: MyClass[Unknown | int, str]], b[: MyClass[Unknown | int, str]] = MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b…
-        10 | c[: MyClass[Unknown | int, str]], d[: MyClass[Unknown | int, str]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "…
+         9 | a[: MyClass[int, str]], b[: MyClass[int, str]] = MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b"))
+        10 | c[: MyClass[int, str]], d[: MyClass[int, str]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b")))
            |
 
         info[inlay-hint-location]: Inlay Hint Target
@@ -3504,13 +3544,13 @@ mod tests {
         350 |     int(x, base=10) -> integer
             |
         info: Source
-          --> main2.py:8:29
+          --> main2.py:8:19
            |
-         7 | x[: MyClass[Unknown | int, str]] = MyClass([x=][42], [y=]("a", "b"))
-         8 | y[: tuple[MyClass[Unknown | int, str], MyClass[Unknown | int, str]]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a",…
-           |                             ^^^
-         9 | a[: MyClass[Unknown | int, str]], b[: MyClass[Unknown | int, str]] = MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b…
-        10 | c[: MyClass[Unknown | int, str]], d[: MyClass[Unknown | int, str]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "…
+         7 | x[: MyClass[int, str]] = MyClass([x=][42], [y=]("a", "b"))
+         8 | y[: tuple[MyClass[int, str], MyClass[int, str]]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b")))
+           |                   ^^^
+         9 | a[: MyClass[int, str]], b[: MyClass[int, str]] = MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b"))
+        10 | c[: MyClass[int, str]], d[: MyClass[int, str]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b")))
            |
 
         info[inlay-hint-location]: Inlay Hint Target
@@ -3523,13 +3563,13 @@ mod tests {
         917 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
             |
         info: Source
-          --> main2.py:8:34
+          --> main2.py:8:24
            |
-         7 | x[: MyClass[Unknown | int, str]] = MyClass([x=][42], [y=]("a", "b"))
-         8 | y[: tuple[MyClass[Unknown | int, str], MyClass[Unknown | int, str]]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a",…
-           |                                  ^^^
-         9 | a[: MyClass[Unknown | int, str]], b[: MyClass[Unknown | int, str]] = MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b…
-        10 | c[: MyClass[Unknown | int, str]], d[: MyClass[Unknown | int, str]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "…
+         7 | x[: MyClass[int, str]] = MyClass([x=][42], [y=]("a", "b"))
+         8 | y[: tuple[MyClass[int, str], MyClass[int, str]]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b")))
+           |                        ^^^
+         9 | a[: MyClass[int, str]], b[: MyClass[int, str]] = MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b"))
+        10 | c[: MyClass[int, str]], d[: MyClass[int, str]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b")))
            |
 
         info[inlay-hint-location]: Inlay Hint Target
@@ -3541,32 +3581,13 @@ mod tests {
         4 |         self.x = x
           |
         info: Source
-          --> main2.py:8:40
+          --> main2.py:8:30
            |
-         7 | x[: MyClass[Unknown | int, str]] = MyClass([x=][42], [y=]("a", "b"))
-         8 | y[: tuple[MyClass[Unknown | int, str], MyClass[Unknown | int, str]]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a",…
-           |                                        ^^^^^^^
-         9 | a[: MyClass[Unknown | int, str]], b[: MyClass[Unknown | int, str]] = MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b…
-        10 | c[: MyClass[Unknown | int, str]], d[: MyClass[Unknown | int, str]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "…
-           |
-
-        info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:14:1
-           |
-        13 | # Types
-        14 | Unknown = object()
-           | ^^^^^^^
-        15 | AlwaysTruthy = object()
-        16 | AlwaysFalsy = object()
-           |
-        info: Source
-          --> main2.py:8:48
-           |
-         7 | x[: MyClass[Unknown | int, str]] = MyClass([x=][42], [y=]("a", "b"))
-         8 | y[: tuple[MyClass[Unknown | int, str], MyClass[Unknown | int, str]]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a",…
-           |                                                ^^^^^^^
-         9 | a[: MyClass[Unknown | int, str]], b[: MyClass[Unknown | int, str]] = MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b…
-        10 | c[: MyClass[Unknown | int, str]], d[: MyClass[Unknown | int, str]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "…
+         7 | x[: MyClass[int, str]] = MyClass([x=][42], [y=]("a", "b"))
+         8 | y[: tuple[MyClass[int, str], MyClass[int, str]]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b")))
+           |                              ^^^^^^^
+         9 | a[: MyClass[int, str]], b[: MyClass[int, str]] = MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b"))
+        10 | c[: MyClass[int, str]], d[: MyClass[int, str]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b")))
            |
 
         info[inlay-hint-location]: Inlay Hint Target
@@ -3579,13 +3600,13 @@ mod tests {
         350 |     int(x, base=10) -> integer
             |
         info: Source
-          --> main2.py:8:58
+          --> main2.py:8:38
            |
-         7 | x[: MyClass[Unknown | int, str]] = MyClass([x=][42], [y=]("a", "b"))
-         8 | y[: tuple[MyClass[Unknown | int, str], MyClass[Unknown | int, str]]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a",…
-           |                                                          ^^^
-         9 | a[: MyClass[Unknown | int, str]], b[: MyClass[Unknown | int, str]] = MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b…
-        10 | c[: MyClass[Unknown | int, str]], d[: MyClass[Unknown | int, str]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "…
+         7 | x[: MyClass[int, str]] = MyClass([x=][42], [y=]("a", "b"))
+         8 | y[: tuple[MyClass[int, str], MyClass[int, str]]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b")))
+           |                                      ^^^
+         9 | a[: MyClass[int, str]], b[: MyClass[int, str]] = MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b"))
+        10 | c[: MyClass[int, str]], d[: MyClass[int, str]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b")))
            |
 
         info[inlay-hint-location]: Inlay Hint Target
@@ -3598,51 +3619,13 @@ mod tests {
         917 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
             |
         info: Source
-          --> main2.py:8:63
+          --> main2.py:8:43
            |
-         7 | x[: MyClass[Unknown | int, str]] = MyClass([x=][42], [y=]("a", "b"))
-         8 | y[: tuple[MyClass[Unknown | int, str], MyClass[Unknown | int, str]]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a",…
-           |                                                               ^^^
-         9 | a[: MyClass[Unknown | int, str]], b[: MyClass[Unknown | int, str]] = MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b…
-        10 | c[: MyClass[Unknown | int, str]], d[: MyClass[Unknown | int, str]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "…
-           |
-
-        info[inlay-hint-location]: Inlay Hint Target
-         --> main.py:3:24
-          |
-        2 | class MyClass[T, U]:
-        3 |     def __init__(self, x: list[T], y: tuple[U, U]):
-          |                        ^
-        4 |         self.x = x
-        5 |         self.y = y
-          |
-        info: Source
-          --> main2.py:8:82
-           |
-         7 | x[: MyClass[Unknown | int, str]] = MyClass([x=][42], [y=]("a", "b"))
-         8 | y[: tuple[MyClass[Unknown | int, str], MyClass[Unknown | int, str]]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a",…
-           |                                                                                  ^
-         9 | a[: MyClass[Unknown | int, str]], b[: MyClass[Unknown | int, str]] = MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b…
-        10 | c[: MyClass[Unknown | int, str]], d[: MyClass[Unknown | int, str]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "…
-           |
-
-        info[inlay-hint-location]: Inlay Hint Target
-         --> main.py:3:36
-          |
-        2 | class MyClass[T, U]:
-        3 |     def __init__(self, x: list[T], y: tuple[U, U]):
-          |                                    ^
-        4 |         self.x = x
-        5 |         self.y = y
-          |
-        info: Source
-          --> main2.py:8:92
-           |
-         7 | x[: MyClass[Unknown | int, str]] = MyClass([x=][42], [y=]("a", "b"))
-         8 | y[: tuple[MyClass[Unknown | int, str], MyClass[Unknown | int, str]]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a",…
-           |                                                                                            ^
-         9 | a[: MyClass[Unknown | int, str]], b[: MyClass[Unknown | int, str]] = MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b…
-        10 | c[: MyClass[Unknown | int, str]], d[: MyClass[Unknown | int, str]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "…
+         7 | x[: MyClass[int, str]] = MyClass([x=][42], [y=]("a", "b"))
+         8 | y[: tuple[MyClass[int, str], MyClass[int, str]]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b")))
+           |                                           ^^^
+         9 | a[: MyClass[int, str]], b[: MyClass[int, str]] = MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b"))
+        10 | c[: MyClass[int, str]], d[: MyClass[int, str]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b")))
            |
 
         info[inlay-hint-location]: Inlay Hint Target
@@ -3655,13 +3638,13 @@ mod tests {
         5 |         self.y = y
           |
         info: Source
-          --> main2.py:8:117
+          --> main2.py:8:62
            |
-         7 | x[: MyClass[Unknown | int, str]] = MyClass([x=][42], [y=]("a", "b"))
-         8 | y[: tuple[MyClass[Unknown | int, str], MyClass[Unknown | int, str]]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a",…
-           |                                                                                                                     ^
-         9 | a[: MyClass[Unknown | int, str]], b[: MyClass[Unknown | int, str]] = MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b…
-        10 | c[: MyClass[Unknown | int, str]], d[: MyClass[Unknown | int, str]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "…
+         7 | x[: MyClass[int, str]] = MyClass([x=][42], [y=]("a", "b"))
+         8 | y[: tuple[MyClass[int, str], MyClass[int, str]]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b")))
+           |                                                              ^
+         9 | a[: MyClass[int, str]], b[: MyClass[int, str]] = MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b"))
+        10 | c[: MyClass[int, str]], d[: MyClass[int, str]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b")))
            |
 
         info[inlay-hint-location]: Inlay Hint Target
@@ -3674,13 +3657,51 @@ mod tests {
         5 |         self.y = y
           |
         info: Source
-          --> main2.py:8:127
+          --> main2.py:8:72
            |
-         7 | x[: MyClass[Unknown | int, str]] = MyClass([x=][42], [y=]("a", "b"))
-         8 | y[: tuple[MyClass[Unknown | int, str], MyClass[Unknown | int, str]]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a",…
-           |                                                                                                                               ^
-         9 | a[: MyClass[Unknown | int, str]], b[: MyClass[Unknown | int, str]] = MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b…
-        10 | c[: MyClass[Unknown | int, str]], d[: MyClass[Unknown | int, str]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "…
+         7 | x[: MyClass[int, str]] = MyClass([x=][42], [y=]("a", "b"))
+         8 | y[: tuple[MyClass[int, str], MyClass[int, str]]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b")))
+           |                                                                        ^
+         9 | a[: MyClass[int, str]], b[: MyClass[int, str]] = MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b"))
+        10 | c[: MyClass[int, str]], d[: MyClass[int, str]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b")))
+           |
+
+        info[inlay-hint-location]: Inlay Hint Target
+         --> main.py:3:24
+          |
+        2 | class MyClass[T, U]:
+        3 |     def __init__(self, x: list[T], y: tuple[U, U]):
+          |                        ^
+        4 |         self.x = x
+        5 |         self.y = y
+          |
+        info: Source
+          --> main2.py:8:97
+           |
+         7 | x[: MyClass[int, str]] = MyClass([x=][42], [y=]("a", "b"))
+         8 | y[: tuple[MyClass[int, str], MyClass[int, str]]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b")))
+           |                                                                                                 ^
+         9 | a[: MyClass[int, str]], b[: MyClass[int, str]] = MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b"))
+        10 | c[: MyClass[int, str]], d[: MyClass[int, str]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b")))
+           |
+
+        info[inlay-hint-location]: Inlay Hint Target
+         --> main.py:3:36
+          |
+        2 | class MyClass[T, U]:
+        3 |     def __init__(self, x: list[T], y: tuple[U, U]):
+          |                                    ^
+        4 |         self.x = x
+        5 |         self.y = y
+          |
+        info: Source
+          --> main2.py:8:107
+           |
+         7 | x[: MyClass[int, str]] = MyClass([x=][42], [y=]("a", "b"))
+         8 | y[: tuple[MyClass[int, str], MyClass[int, str]]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b")))
+           |                                                                                                           ^
+         9 | a[: MyClass[int, str]], b[: MyClass[int, str]] = MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b"))
+        10 | c[: MyClass[int, str]], d[: MyClass[int, str]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b")))
            |
 
         info[inlay-hint-location]: Inlay Hint Target
@@ -3694,30 +3715,11 @@ mod tests {
         info: Source
           --> main2.py:9:5
            |
-         7 | x[: MyClass[Unknown | int, str]] = MyClass([x=][42], [y=]("a", "b"))
-         8 | y[: tuple[MyClass[Unknown | int, str], MyClass[Unknown | int, str]]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a",…
-         9 | a[: MyClass[Unknown | int, str]], b[: MyClass[Unknown | int, str]] = MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b…
+         7 | x[: MyClass[int, str]] = MyClass([x=][42], [y=]("a", "b"))
+         8 | y[: tuple[MyClass[int, str], MyClass[int, str]]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b")))
+         9 | a[: MyClass[int, str]], b[: MyClass[int, str]] = MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b"))
            |     ^^^^^^^
-        10 | c[: MyClass[Unknown | int, str]], d[: MyClass[Unknown | int, str]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "…
-           |
-
-        info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:14:1
-           |
-        13 | # Types
-        14 | Unknown = object()
-           | ^^^^^^^
-        15 | AlwaysTruthy = object()
-        16 | AlwaysFalsy = object()
-           |
-        info: Source
-          --> main2.py:9:13
-           |
-         7 | x[: MyClass[Unknown | int, str]] = MyClass([x=][42], [y=]("a", "b"))
-         8 | y[: tuple[MyClass[Unknown | int, str], MyClass[Unknown | int, str]]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a",…
-         9 | a[: MyClass[Unknown | int, str]], b[: MyClass[Unknown | int, str]] = MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b…
-           |             ^^^^^^^
-        10 | c[: MyClass[Unknown | int, str]], d[: MyClass[Unknown | int, str]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "…
+        10 | c[: MyClass[int, str]], d[: MyClass[int, str]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b")))
            |
 
         info[inlay-hint-location]: Inlay Hint Target
@@ -3730,13 +3732,13 @@ mod tests {
         350 |     int(x, base=10) -> integer
             |
         info: Source
-          --> main2.py:9:23
+          --> main2.py:9:13
            |
-         7 | x[: MyClass[Unknown | int, str]] = MyClass([x=][42], [y=]("a", "b"))
-         8 | y[: tuple[MyClass[Unknown | int, str], MyClass[Unknown | int, str]]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a",…
-         9 | a[: MyClass[Unknown | int, str]], b[: MyClass[Unknown | int, str]] = MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b…
-           |                       ^^^
-        10 | c[: MyClass[Unknown | int, str]], d[: MyClass[Unknown | int, str]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "…
+         7 | x[: MyClass[int, str]] = MyClass([x=][42], [y=]("a", "b"))
+         8 | y[: tuple[MyClass[int, str], MyClass[int, str]]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b")))
+         9 | a[: MyClass[int, str]], b[: MyClass[int, str]] = MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b"))
+           |             ^^^
+        10 | c[: MyClass[int, str]], d[: MyClass[int, str]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b")))
            |
 
         info[inlay-hint-location]: Inlay Hint Target
@@ -3749,13 +3751,13 @@ mod tests {
         917 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
             |
         info: Source
-          --> main2.py:9:28
+          --> main2.py:9:18
            |
-         7 | x[: MyClass[Unknown | int, str]] = MyClass([x=][42], [y=]("a", "b"))
-         8 | y[: tuple[MyClass[Unknown | int, str], MyClass[Unknown | int, str]]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a",…
-         9 | a[: MyClass[Unknown | int, str]], b[: MyClass[Unknown | int, str]] = MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b…
-           |                            ^^^
-        10 | c[: MyClass[Unknown | int, str]], d[: MyClass[Unknown | int, str]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "…
+         7 | x[: MyClass[int, str]] = MyClass([x=][42], [y=]("a", "b"))
+         8 | y[: tuple[MyClass[int, str], MyClass[int, str]]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b")))
+         9 | a[: MyClass[int, str]], b[: MyClass[int, str]] = MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b"))
+           |                  ^^^
+        10 | c[: MyClass[int, str]], d[: MyClass[int, str]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b")))
            |
 
         info[inlay-hint-location]: Inlay Hint Target
@@ -3767,32 +3769,13 @@ mod tests {
         4 |         self.x = x
           |
         info: Source
-          --> main2.py:9:39
+          --> main2.py:9:29
            |
-         7 | x[: MyClass[Unknown | int, str]] = MyClass([x=][42], [y=]("a", "b"))
-         8 | y[: tuple[MyClass[Unknown | int, str], MyClass[Unknown | int, str]]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a",…
-         9 | a[: MyClass[Unknown | int, str]], b[: MyClass[Unknown | int, str]] = MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b…
-           |                                       ^^^^^^^
-        10 | c[: MyClass[Unknown | int, str]], d[: MyClass[Unknown | int, str]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "…
-           |
-
-        info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:14:1
-           |
-        13 | # Types
-        14 | Unknown = object()
-           | ^^^^^^^
-        15 | AlwaysTruthy = object()
-        16 | AlwaysFalsy = object()
-           |
-        info: Source
-          --> main2.py:9:47
-           |
-         7 | x[: MyClass[Unknown | int, str]] = MyClass([x=][42], [y=]("a", "b"))
-         8 | y[: tuple[MyClass[Unknown | int, str], MyClass[Unknown | int, str]]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a",…
-         9 | a[: MyClass[Unknown | int, str]], b[: MyClass[Unknown | int, str]] = MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b…
-           |                                               ^^^^^^^
-        10 | c[: MyClass[Unknown | int, str]], d[: MyClass[Unknown | int, str]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "…
+         7 | x[: MyClass[int, str]] = MyClass([x=][42], [y=]("a", "b"))
+         8 | y[: tuple[MyClass[int, str], MyClass[int, str]]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b")))
+         9 | a[: MyClass[int, str]], b[: MyClass[int, str]] = MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b"))
+           |                             ^^^^^^^
+        10 | c[: MyClass[int, str]], d[: MyClass[int, str]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b")))
            |
 
         info[inlay-hint-location]: Inlay Hint Target
@@ -3805,13 +3788,13 @@ mod tests {
         350 |     int(x, base=10) -> integer
             |
         info: Source
-          --> main2.py:9:57
+          --> main2.py:9:37
            |
-         7 | x[: MyClass[Unknown | int, str]] = MyClass([x=][42], [y=]("a", "b"))
-         8 | y[: tuple[MyClass[Unknown | int, str], MyClass[Unknown | int, str]]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a",…
-         9 | a[: MyClass[Unknown | int, str]], b[: MyClass[Unknown | int, str]] = MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b…
-           |                                                         ^^^
-        10 | c[: MyClass[Unknown | int, str]], d[: MyClass[Unknown | int, str]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "…
+         7 | x[: MyClass[int, str]] = MyClass([x=][42], [y=]("a", "b"))
+         8 | y[: tuple[MyClass[int, str], MyClass[int, str]]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b")))
+         9 | a[: MyClass[int, str]], b[: MyClass[int, str]] = MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b"))
+           |                                     ^^^
+        10 | c[: MyClass[int, str]], d[: MyClass[int, str]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b")))
            |
 
         info[inlay-hint-location]: Inlay Hint Target
@@ -3824,51 +3807,13 @@ mod tests {
         917 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
             |
         info: Source
-          --> main2.py:9:62
+          --> main2.py:9:42
            |
-         7 | x[: MyClass[Unknown | int, str]] = MyClass([x=][42], [y=]("a", "b"))
-         8 | y[: tuple[MyClass[Unknown | int, str], MyClass[Unknown | int, str]]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a",…
-         9 | a[: MyClass[Unknown | int, str]], b[: MyClass[Unknown | int, str]] = MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b…
-           |                                                              ^^^
-        10 | c[: MyClass[Unknown | int, str]], d[: MyClass[Unknown | int, str]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "…
-           |
-
-        info[inlay-hint-location]: Inlay Hint Target
-         --> main.py:3:24
-          |
-        2 | class MyClass[T, U]:
-        3 |     def __init__(self, x: list[T], y: tuple[U, U]):
-          |                        ^
-        4 |         self.x = x
-        5 |         self.y = y
-          |
-        info: Source
-          --> main2.py:9:79
-           |
-         7 | x[: MyClass[Unknown | int, str]] = MyClass([x=][42], [y=]("a", "b"))
-         8 | y[: tuple[MyClass[Unknown | int, str], MyClass[Unknown | int, str]]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a",…
-         9 | a[: MyClass[Unknown | int, str]], b[: MyClass[Unknown | int, str]] = MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b…
-           |                                                                               ^
-        10 | c[: MyClass[Unknown | int, str]], d[: MyClass[Unknown | int, str]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "…
-           |
-
-        info[inlay-hint-location]: Inlay Hint Target
-         --> main.py:3:36
-          |
-        2 | class MyClass[T, U]:
-        3 |     def __init__(self, x: list[T], y: tuple[U, U]):
-          |                                    ^
-        4 |         self.x = x
-        5 |         self.y = y
-          |
-        info: Source
-          --> main2.py:9:89
-           |
-         7 | x[: MyClass[Unknown | int, str]] = MyClass([x=][42], [y=]("a", "b"))
-         8 | y[: tuple[MyClass[Unknown | int, str], MyClass[Unknown | int, str]]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a",…
-         9 | a[: MyClass[Unknown | int, str]], b[: MyClass[Unknown | int, str]] = MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b…
-           |                                                                                         ^
-        10 | c[: MyClass[Unknown | int, str]], d[: MyClass[Unknown | int, str]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "…
+         7 | x[: MyClass[int, str]] = MyClass([x=][42], [y=]("a", "b"))
+         8 | y[: tuple[MyClass[int, str], MyClass[int, str]]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b")))
+         9 | a[: MyClass[int, str]], b[: MyClass[int, str]] = MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b"))
+           |                                          ^^^
+        10 | c[: MyClass[int, str]], d[: MyClass[int, str]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b")))
            |
 
         info[inlay-hint-location]: Inlay Hint Target
@@ -3881,13 +3826,13 @@ mod tests {
         5 |         self.y = y
           |
         info: Source
-          --> main2.py:9:114
+          --> main2.py:9:59
            |
-         7 | x[: MyClass[Unknown | int, str]] = MyClass([x=][42], [y=]("a", "b"))
-         8 | y[: tuple[MyClass[Unknown | int, str], MyClass[Unknown | int, str]]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a",…
-         9 | a[: MyClass[Unknown | int, str]], b[: MyClass[Unknown | int, str]] = MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b…
-           |                                                                                                                  ^
-        10 | c[: MyClass[Unknown | int, str]], d[: MyClass[Unknown | int, str]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "…
+         7 | x[: MyClass[int, str]] = MyClass([x=][42], [y=]("a", "b"))
+         8 | y[: tuple[MyClass[int, str], MyClass[int, str]]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b")))
+         9 | a[: MyClass[int, str]], b[: MyClass[int, str]] = MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b"))
+           |                                                           ^
+        10 | c[: MyClass[int, str]], d[: MyClass[int, str]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b")))
            |
 
         info[inlay-hint-location]: Inlay Hint Target
@@ -3900,13 +3845,51 @@ mod tests {
         5 |         self.y = y
           |
         info: Source
-          --> main2.py:9:124
+          --> main2.py:9:69
            |
-         7 | x[: MyClass[Unknown | int, str]] = MyClass([x=][42], [y=]("a", "b"))
-         8 | y[: tuple[MyClass[Unknown | int, str], MyClass[Unknown | int, str]]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a",…
-         9 | a[: MyClass[Unknown | int, str]], b[: MyClass[Unknown | int, str]] = MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b…
-           |                                                                                                                            ^
-        10 | c[: MyClass[Unknown | int, str]], d[: MyClass[Unknown | int, str]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "…
+         7 | x[: MyClass[int, str]] = MyClass([x=][42], [y=]("a", "b"))
+         8 | y[: tuple[MyClass[int, str], MyClass[int, str]]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b")))
+         9 | a[: MyClass[int, str]], b[: MyClass[int, str]] = MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b"))
+           |                                                                     ^
+        10 | c[: MyClass[int, str]], d[: MyClass[int, str]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b")))
+           |
+
+        info[inlay-hint-location]: Inlay Hint Target
+         --> main.py:3:24
+          |
+        2 | class MyClass[T, U]:
+        3 |     def __init__(self, x: list[T], y: tuple[U, U]):
+          |                        ^
+        4 |         self.x = x
+        5 |         self.y = y
+          |
+        info: Source
+          --> main2.py:9:94
+           |
+         7 | x[: MyClass[int, str]] = MyClass([x=][42], [y=]("a", "b"))
+         8 | y[: tuple[MyClass[int, str], MyClass[int, str]]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b")))
+         9 | a[: MyClass[int, str]], b[: MyClass[int, str]] = MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b"))
+           |                                                                                              ^
+        10 | c[: MyClass[int, str]], d[: MyClass[int, str]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b")))
+           |
+
+        info[inlay-hint-location]: Inlay Hint Target
+         --> main.py:3:36
+          |
+        2 | class MyClass[T, U]:
+        3 |     def __init__(self, x: list[T], y: tuple[U, U]):
+          |                                    ^
+        4 |         self.x = x
+        5 |         self.y = y
+          |
+        info: Source
+          --> main2.py:9:104
+           |
+         7 | x[: MyClass[int, str]] = MyClass([x=][42], [y=]("a", "b"))
+         8 | y[: tuple[MyClass[int, str], MyClass[int, str]]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b")))
+         9 | a[: MyClass[int, str]], b[: MyClass[int, str]] = MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b"))
+           |                                                                                                        ^
+        10 | c[: MyClass[int, str]], d[: MyClass[int, str]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b")))
            |
 
         info[inlay-hint-location]: Inlay Hint Target
@@ -3920,28 +3903,10 @@ mod tests {
         info: Source
           --> main2.py:10:5
            |
-         8 | y[: tuple[MyClass[Unknown | int, str], MyClass[Unknown | int, str]]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a",…
-         9 | a[: MyClass[Unknown | int, str]], b[: MyClass[Unknown | int, str]] = MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b…
-        10 | c[: MyClass[Unknown | int, str]], d[: MyClass[Unknown | int, str]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "…
+         8 | y[: tuple[MyClass[int, str], MyClass[int, str]]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b")))
+         9 | a[: MyClass[int, str]], b[: MyClass[int, str]] = MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b"))
+        10 | c[: MyClass[int, str]], d[: MyClass[int, str]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b")))
            |     ^^^^^^^
-           |
-
-        info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:14:1
-           |
-        13 | # Types
-        14 | Unknown = object()
-           | ^^^^^^^
-        15 | AlwaysTruthy = object()
-        16 | AlwaysFalsy = object()
-           |
-        info: Source
-          --> main2.py:10:13
-           |
-         8 | y[: tuple[MyClass[Unknown | int, str], MyClass[Unknown | int, str]]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a",…
-         9 | a[: MyClass[Unknown | int, str]], b[: MyClass[Unknown | int, str]] = MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b…
-        10 | c[: MyClass[Unknown | int, str]], d[: MyClass[Unknown | int, str]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "…
-           |             ^^^^^^^
            |
 
         info[inlay-hint-location]: Inlay Hint Target
@@ -3954,12 +3919,12 @@ mod tests {
         350 |     int(x, base=10) -> integer
             |
         info: Source
-          --> main2.py:10:23
+          --> main2.py:10:13
            |
-         8 | y[: tuple[MyClass[Unknown | int, str], MyClass[Unknown | int, str]]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a",…
-         9 | a[: MyClass[Unknown | int, str]], b[: MyClass[Unknown | int, str]] = MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b…
-        10 | c[: MyClass[Unknown | int, str]], d[: MyClass[Unknown | int, str]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "…
-           |                       ^^^
+         8 | y[: tuple[MyClass[int, str], MyClass[int, str]]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b")))
+         9 | a[: MyClass[int, str]], b[: MyClass[int, str]] = MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b"))
+        10 | c[: MyClass[int, str]], d[: MyClass[int, str]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b")))
+           |             ^^^
            |
 
         info[inlay-hint-location]: Inlay Hint Target
@@ -3972,12 +3937,12 @@ mod tests {
         917 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
             |
         info: Source
-          --> main2.py:10:28
+          --> main2.py:10:18
            |
-         8 | y[: tuple[MyClass[Unknown | int, str], MyClass[Unknown | int, str]]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a",…
-         9 | a[: MyClass[Unknown | int, str]], b[: MyClass[Unknown | int, str]] = MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b…
-        10 | c[: MyClass[Unknown | int, str]], d[: MyClass[Unknown | int, str]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "…
-           |                            ^^^
+         8 | y[: tuple[MyClass[int, str], MyClass[int, str]]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b")))
+         9 | a[: MyClass[int, str]], b[: MyClass[int, str]] = MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b"))
+        10 | c[: MyClass[int, str]], d[: MyClass[int, str]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b")))
+           |                  ^^^
            |
 
         info[inlay-hint-location]: Inlay Hint Target
@@ -3989,30 +3954,12 @@ mod tests {
         4 |         self.x = x
           |
         info: Source
-          --> main2.py:10:39
+          --> main2.py:10:29
            |
-         8 | y[: tuple[MyClass[Unknown | int, str], MyClass[Unknown | int, str]]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a",…
-         9 | a[: MyClass[Unknown | int, str]], b[: MyClass[Unknown | int, str]] = MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b…
-        10 | c[: MyClass[Unknown | int, str]], d[: MyClass[Unknown | int, str]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "…
-           |                                       ^^^^^^^
-           |
-
-        info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:14:1
-           |
-        13 | # Types
-        14 | Unknown = object()
-           | ^^^^^^^
-        15 | AlwaysTruthy = object()
-        16 | AlwaysFalsy = object()
-           |
-        info: Source
-          --> main2.py:10:47
-           |
-         8 | y[: tuple[MyClass[Unknown | int, str], MyClass[Unknown | int, str]]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a",…
-         9 | a[: MyClass[Unknown | int, str]], b[: MyClass[Unknown | int, str]] = MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b…
-        10 | c[: MyClass[Unknown | int, str]], d[: MyClass[Unknown | int, str]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "…
-           |                                               ^^^^^^^
+         8 | y[: tuple[MyClass[int, str], MyClass[int, str]]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b")))
+         9 | a[: MyClass[int, str]], b[: MyClass[int, str]] = MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b"))
+        10 | c[: MyClass[int, str]], d[: MyClass[int, str]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b")))
+           |                             ^^^^^^^
            |
 
         info[inlay-hint-location]: Inlay Hint Target
@@ -4025,12 +3972,12 @@ mod tests {
         350 |     int(x, base=10) -> integer
             |
         info: Source
-          --> main2.py:10:57
+          --> main2.py:10:37
            |
-         8 | y[: tuple[MyClass[Unknown | int, str], MyClass[Unknown | int, str]]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a",…
-         9 | a[: MyClass[Unknown | int, str]], b[: MyClass[Unknown | int, str]] = MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b…
-        10 | c[: MyClass[Unknown | int, str]], d[: MyClass[Unknown | int, str]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "…
-           |                                                         ^^^
+         8 | y[: tuple[MyClass[int, str], MyClass[int, str]]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b")))
+         9 | a[: MyClass[int, str]], b[: MyClass[int, str]] = MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b"))
+        10 | c[: MyClass[int, str]], d[: MyClass[int, str]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b")))
+           |                                     ^^^
            |
 
         info[inlay-hint-location]: Inlay Hint Target
@@ -4043,48 +3990,12 @@ mod tests {
         917 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
             |
         info: Source
-          --> main2.py:10:62
+          --> main2.py:10:42
            |
-         8 | y[: tuple[MyClass[Unknown | int, str], MyClass[Unknown | int, str]]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a",…
-         9 | a[: MyClass[Unknown | int, str]], b[: MyClass[Unknown | int, str]] = MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b…
-        10 | c[: MyClass[Unknown | int, str]], d[: MyClass[Unknown | int, str]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "…
-           |                                                              ^^^
-           |
-
-        info[inlay-hint-location]: Inlay Hint Target
-         --> main.py:3:24
-          |
-        2 | class MyClass[T, U]:
-        3 |     def __init__(self, x: list[T], y: tuple[U, U]):
-          |                        ^
-        4 |         self.x = x
-        5 |         self.y = y
-          |
-        info: Source
-          --> main2.py:10:80
-           |
-         8 | y[: tuple[MyClass[Unknown | int, str], MyClass[Unknown | int, str]]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a",…
-         9 | a[: MyClass[Unknown | int, str]], b[: MyClass[Unknown | int, str]] = MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b…
-        10 | c[: MyClass[Unknown | int, str]], d[: MyClass[Unknown | int, str]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "…
-           |                                                                                ^
-           |
-
-        info[inlay-hint-location]: Inlay Hint Target
-         --> main.py:3:36
-          |
-        2 | class MyClass[T, U]:
-        3 |     def __init__(self, x: list[T], y: tuple[U, U]):
-          |                                    ^
-        4 |         self.x = x
-        5 |         self.y = y
-          |
-        info: Source
-          --> main2.py:10:90
-           |
-         8 | y[: tuple[MyClass[Unknown | int, str], MyClass[Unknown | int, str]]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a",…
-         9 | a[: MyClass[Unknown | int, str]], b[: MyClass[Unknown | int, str]] = MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b…
-        10 | c[: MyClass[Unknown | int, str]], d[: MyClass[Unknown | int, str]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "…
-           |                                                                                          ^
+         8 | y[: tuple[MyClass[int, str], MyClass[int, str]]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b")))
+         9 | a[: MyClass[int, str]], b[: MyClass[int, str]] = MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b"))
+        10 | c[: MyClass[int, str]], d[: MyClass[int, str]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b")))
+           |                                          ^^^
            |
 
         info[inlay-hint-location]: Inlay Hint Target
@@ -4097,12 +4008,12 @@ mod tests {
         5 |         self.y = y
           |
         info: Source
-          --> main2.py:10:115
+          --> main2.py:10:60
            |
-         8 | y[: tuple[MyClass[Unknown | int, str], MyClass[Unknown | int, str]]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a",…
-         9 | a[: MyClass[Unknown | int, str]], b[: MyClass[Unknown | int, str]] = MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b…
-        10 | c[: MyClass[Unknown | int, str]], d[: MyClass[Unknown | int, str]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "…
-           |                                                                                                                   ^
+         8 | y[: tuple[MyClass[int, str], MyClass[int, str]]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b")))
+         9 | a[: MyClass[int, str]], b[: MyClass[int, str]] = MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b"))
+        10 | c[: MyClass[int, str]], d[: MyClass[int, str]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b")))
+           |                                                            ^
            |
 
         info[inlay-hint-location]: Inlay Hint Target
@@ -4115,12 +4026,48 @@ mod tests {
         5 |         self.y = y
           |
         info: Source
-          --> main2.py:10:125
+          --> main2.py:10:70
            |
-         8 | y[: tuple[MyClass[Unknown | int, str], MyClass[Unknown | int, str]]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a",…
-         9 | a[: MyClass[Unknown | int, str]], b[: MyClass[Unknown | int, str]] = MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b…
-        10 | c[: MyClass[Unknown | int, str]], d[: MyClass[Unknown | int, str]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "…
-           |                                                                                                                             ^
+         8 | y[: tuple[MyClass[int, str], MyClass[int, str]]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b")))
+         9 | a[: MyClass[int, str]], b[: MyClass[int, str]] = MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b"))
+        10 | c[: MyClass[int, str]], d[: MyClass[int, str]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b")))
+           |                                                                      ^
+           |
+
+        info[inlay-hint-location]: Inlay Hint Target
+         --> main.py:3:24
+          |
+        2 | class MyClass[T, U]:
+        3 |     def __init__(self, x: list[T], y: tuple[U, U]):
+          |                        ^
+        4 |         self.x = x
+        5 |         self.y = y
+          |
+        info: Source
+          --> main2.py:10:95
+           |
+         8 | y[: tuple[MyClass[int, str], MyClass[int, str]]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b")))
+         9 | a[: MyClass[int, str]], b[: MyClass[int, str]] = MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b"))
+        10 | c[: MyClass[int, str]], d[: MyClass[int, str]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b")))
+           |                                                                                               ^
+           |
+
+        info[inlay-hint-location]: Inlay Hint Target
+         --> main.py:3:36
+          |
+        2 | class MyClass[T, U]:
+        3 |     def __init__(self, x: list[T], y: tuple[U, U]):
+          |                                    ^
+        4 |         self.x = x
+        5 |         self.y = y
+          |
+        info: Source
+          --> main2.py:10:105
+           |
+         8 | y[: tuple[MyClass[int, str], MyClass[int, str]]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b")))
+         9 | a[: MyClass[int, str]], b[: MyClass[int, str]] = MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b"))
+        10 | c[: MyClass[int, str]], d[: MyClass[int, str]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b")))
+           |                                                                                                         ^
            |
 
         ---------------------------------------------
@@ -4132,8 +4079,8 @@ mod tests {
                 self.x = x
                 self.y = y
 
-        x: MyClass[Unknown | int, str] = MyClass([42], ("a", "b"))
-        y: tuple[MyClass[Unknown | int, str], MyClass[Unknown | int, str]] = (MyClass([42], ("a", "b")), MyClass([42], ("a", "b")))
+        x: MyClass[int, str] = MyClass([42], ("a", "b"))
+        y: tuple[MyClass[int, str], MyClass[int, str]] = (MyClass([42], ("a", "b")), MyClass([42], ("a", "b")))
         a, b = MyClass([42], ("a", "b")), MyClass([42], ("a", "b"))
         c, d = (MyClass([42], ("a", "b")), MyClass([42], ("a", "b")))
         "#);
@@ -4443,8 +4390,8 @@ mod tests {
         assert_snapshot!(test.inlay_hints(), @r#"
 
         def foo(x: int): pass
-        x[: list[Unknown | int]] = [1]
-        y[: list[Unknown | int]] = [2]
+        x[: list[int]] = [1]
+        y[: list[int]] = [2]
 
         foo(x[0])
         foo([x=]y[0])
@@ -4461,27 +4408,9 @@ mod tests {
          --> main2.py:3:5
           |
         2 | def foo(x: int): pass
-        3 | x[: list[Unknown | int]] = [1]
+        3 | x[: list[int]] = [1]
           |     ^^^^
-        4 | y[: list[Unknown | int]] = [2]
-          |
-
-        info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:14:1
-           |
-        13 | # Types
-        14 | Unknown = object()
-           | ^^^^^^^
-        15 | AlwaysTruthy = object()
-        16 | AlwaysFalsy = object()
-           |
-        info: Source
-         --> main2.py:3:10
-          |
-        2 | def foo(x: int): pass
-        3 | x[: list[Unknown | int]] = [1]
-          |          ^^^^^^^
-        4 | y[: list[Unknown | int]] = [2]
+        4 | y[: list[int]] = [2]
           |
 
         info[inlay-hint-location]: Inlay Hint Target
@@ -4494,12 +4423,12 @@ mod tests {
         350 |     int(x, base=10) -> integer
             |
         info: Source
-         --> main2.py:3:20
+         --> main2.py:3:10
           |
         2 | def foo(x: int): pass
-        3 | x[: list[Unknown | int]] = [1]
-          |                    ^^^
-        4 | y[: list[Unknown | int]] = [2]
+        3 | x[: list[int]] = [1]
+          |          ^^^
+        4 | y[: list[int]] = [2]
           |
 
         info[inlay-hint-location]: Inlay Hint Target
@@ -4514,29 +4443,9 @@ mod tests {
          --> main2.py:4:5
           |
         2 | def foo(x: int): pass
-        3 | x[: list[Unknown | int]] = [1]
-        4 | y[: list[Unknown | int]] = [2]
+        3 | x[: list[int]] = [1]
+        4 | y[: list[int]] = [2]
           |     ^^^^
-        5 |
-        6 | foo(x[0])
-          |
-
-        info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:14:1
-           |
-        13 | # Types
-        14 | Unknown = object()
-           | ^^^^^^^
-        15 | AlwaysTruthy = object()
-        16 | AlwaysFalsy = object()
-           |
-        info: Source
-         --> main2.py:4:10
-          |
-        2 | def foo(x: int): pass
-        3 | x[: list[Unknown | int]] = [1]
-        4 | y[: list[Unknown | int]] = [2]
-          |          ^^^^^^^
         5 |
         6 | foo(x[0])
           |
@@ -4551,12 +4460,12 @@ mod tests {
         350 |     int(x, base=10) -> integer
             |
         info: Source
-         --> main2.py:4:20
+         --> main2.py:4:10
           |
         2 | def foo(x: int): pass
-        3 | x[: list[Unknown | int]] = [1]
-        4 | y[: list[Unknown | int]] = [2]
-          |                    ^^^
+        3 | x[: list[int]] = [1]
+        4 | y[: list[int]] = [2]
+          |          ^^^
         5 |
         6 | foo(x[0])
           |
@@ -4582,8 +4491,8 @@ mod tests {
         info: Source
 
         def foo(x: int): pass
-        x: list[Unknown | int] = [1]
-        y: list[Unknown | int] = [2]
+        x: list[int] = [1]
+        y: list[int] = [2]
 
         foo(x[0])
         foo(y[0])
@@ -5616,10 +5525,10 @@ mod tests {
           --> stdlib/ty_extensions.pyi:14:1
            |
         13 | # Types
-        14 | Unknown = object()
+        14 | Unknown: _SpecialForm
            | ^^^^^^^
-        15 | AlwaysTruthy = object()
-        16 | AlwaysFalsy = object()
+        15 | AlwaysTruthy: _SpecialForm
+        16 | AlwaysFalsy: _SpecialForm
            |
         info: Source
          --> main2.py:2:14
@@ -5634,10 +5543,10 @@ mod tests {
           --> stdlib/ty_extensions.pyi:14:1
            |
         13 | # Types
-        14 | Unknown = object()
+        14 | Unknown: _SpecialForm
            | ^^^^^^^
-        15 | AlwaysTruthy = object()
-        16 | AlwaysFalsy = object()
+        15 | AlwaysTruthy: _SpecialForm
+        16 | AlwaysFalsy: _SpecialForm
            |
         info: Source
          --> main2.py:3:17
@@ -5842,6 +5751,7 @@ mod tests {
         ---------------------------------------------
         info[inlay-hint-edit]: File after edits
         info: Source
+        from typing import Literal
 
         def branch(cond: int):
             if cond < 10:
@@ -6191,13 +6101,14 @@ mod tests {
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-         --> main.py:5:9
+         --> main.py:7:9
           |
-        4 | @overload
         5 | def foo(x: int) -> str: ...
-          |         ^
         6 | @overload
         7 | def foo(x: str) -> int: ...
+          |         ^
+        8 | def foo(x):
+        9 |     return x
           |
         info: Source
           --> main2.py:12:6
@@ -6205,6 +6116,146 @@ mod tests {
         11 | foo([x=]42)
         12 | foo([x=]'hello')
            |      ^
+           |
+        ");
+    }
+
+    #[test]
+    fn test_overloaded_function_calls_different_params() {
+        let mut test = inlay_hint_test(
+            "
+            from typing import overload, Optional, Sequence
+
+            @overload
+            def S(name: str, is_symmetric: Optional[bool] = None) -> str: ...
+            @overload
+            def S(*names: str, is_symmetric: Optional[bool] = None) -> Sequence[str]: ...
+            def S():
+                pass
+
+            b = S('x', 'y')",
+        );
+
+        // The call S('x', 'y') should match the second overload (*names: str),
+        // and since *names is variadic, no parameter name hints should be shown.
+        // Before the fix, this incorrectly showed `name=` and `is_symmetric=` hints
+        // from the first overload.
+        assert_snapshot!(test.inlay_hints(), @r#"
+
+        from typing import overload, Optional, Sequence
+
+        @overload
+        def S(name: str, is_symmetric: Optional[bool] = None) -> str: ...
+        @overload
+        def S(*names: str, is_symmetric: Optional[bool] = None) -> Sequence[str]: ...
+        def S():
+            pass
+
+        b[: Sequence[str]] = S('x', 'y')
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+            --> stdlib/typing.pyi:1565:7
+             |
+        1563 |     def __len__(self) -> int: ...
+        1564 |
+        1565 | class Sequence(Reversible[_T_co], Collection[_T_co]):
+             |       ^^^^^^^^
+        1566 |     """All the operations on a read-only sequence.
+             |
+        info: Source
+          --> main2.py:11:5
+           |
+         9 |     pass
+        10 |
+        11 | b[: Sequence[str]] = S('x', 'y')
+           |     ^^^^^^^^
+           |
+
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/builtins.pyi:915:7
+            |
+        914 | @disjoint_base
+        915 | class str(Sequence[str]):
+            |       ^^^
+        916 |     """str(object='') -> str
+        917 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
+            |
+        info: Source
+          --> main2.py:11:14
+           |
+         9 |     pass
+        10 |
+        11 | b[: Sequence[str]] = S('x', 'y')
+           |              ^^^
+           |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: File after edits
+        info: Source
+
+        from typing import overload, Optional, Sequence
+
+        @overload
+        def S(name: str, is_symmetric: Optional[bool] = None) -> str: ...
+        @overload
+        def S(*names: str, is_symmetric: Optional[bool] = None) -> Sequence[str]: ...
+        def S():
+            pass
+
+        b: Sequence[str] = S('x', 'y')
+        "#);
+    }
+
+    #[test]
+    fn test_overloaded_function_calls_no_matching_overload() {
+        let mut test = inlay_hint_test(
+            "
+            from typing import overload
+
+            @overload
+            def f(x: int) -> str: ...
+            @overload
+            def f(x: str, y: str) -> int: ...
+            def f(x):
+                return x
+
+            f([])
+            ",
+        );
+
+        // Neither overload matches via type checking (list[Unknown] is neither int nor str),
+        // so `matching_overloads()` returns empty. The arity-based fallback picks the first
+        // overload (1 matched arg out of 1 required), and we should see the `x=` hint.
+        assert_snapshot!(test.inlay_hints(), @"
+
+        from typing import overload
+
+        @overload
+        def f(x: int) -> str: ...
+        @overload
+        def f(x: str, y: str) -> int: ...
+        def f(x):
+            return x
+
+        f([x=][])
+
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+         --> main.py:5:7
+          |
+        4 | @overload
+        5 | def f(x: int) -> str: ...
+          |       ^
+        6 | @overload
+        7 | def f(x: str, y: str) -> int: ...
+          |
+        info: Source
+          --> main2.py:11:4
+           |
+         9 |     return x
+        10 |
+        11 | f([x=][])
+           |    ^
            |
         ");
     }
@@ -6479,10 +6530,10 @@ mod tests {
           --> stdlib/ty_extensions.pyi:14:1
            |
         13 | # Types
-        14 | Unknown = object()
+        14 | Unknown: _SpecialForm
            | ^^^^^^^
-        15 | AlwaysTruthy = object()
-        16 | AlwaysFalsy = object()
+        15 | AlwaysTruthy: _SpecialForm
+        16 | AlwaysFalsy: _SpecialForm
            |
         info: Source
          --> main2.py:4:63
@@ -7082,14 +7133,14 @@ mod tests {
         A = TypeAliasType([name=]'A', [value=]str)
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-            --> stdlib/typing.pyi:2546:26
+            --> stdlib/typing.pyi:2561:26
              |
-        2544 |         """
-        2545 |
-        2546 |         def __new__(cls, name: str, value: Any, *, type_params: tuple[_TypeParameter, ...] = ()) -> Self: ...
+        2559 |         """
+        2560 |
+        2561 |         def __new__(cls, name: str, value: Any, *, type_params: tuple[_TypeParameter, ...] = ()) -> Self: ...
              |                          ^^^^
-        2547 |         @property
-        2548 |         def __value__(self) -> Any: ...  # AnnotationForm
+        2562 |         @property
+        2563 |         def __value__(self) -> Any: ...  # AnnotationForm
              |
         info: Source
          --> main2.py:3:20
@@ -7100,14 +7151,14 @@ mod tests {
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-            --> stdlib/typing.pyi:2546:37
+            --> stdlib/typing.pyi:2561:37
              |
-        2544 |         """
-        2545 |
-        2546 |         def __new__(cls, name: str, value: Any, *, type_params: tuple[_TypeParameter, ...] = ()) -> Self: ...
+        2559 |         """
+        2560 |
+        2561 |         def __new__(cls, name: str, value: Any, *, type_params: tuple[_TypeParameter, ...] = ()) -> Self: ...
              |                                     ^^^^^
-        2547 |         @property
-        2548 |         def __value__(self) -> Any: ...  # AnnotationForm
+        2562 |         @property
+        2563 |         def __value__(self) -> Any: ...  # AnnotationForm
              |
         info: Source
          --> main2.py:3:32
@@ -7209,10 +7260,10 @@ mod tests {
           --> stdlib/ty_extensions.pyi:14:1
            |
         13 | # Types
-        14 | Unknown = object()
+        14 | Unknown: _SpecialForm
            | ^^^^^^^
-        15 | AlwaysTruthy = object()
-        16 | AlwaysFalsy = object()
+        15 | AlwaysTruthy: _SpecialForm
+        16 | AlwaysFalsy: _SpecialForm
            |
         info: Source
          --> main2.py:4:22
@@ -7226,11 +7277,1048 @@ mod tests {
         ---------------------------------------------
         info[inlay-hint-edit]: File after edits
         info: Source
+        from ty_extensions import Top
+        from ty_extensions import Unknown
 
         def f(xyxy: object):
             if isinstance(xyxy, list):
                 x: Top[list[Unknown]] = xyxy
         "#);
+    }
+
+    #[test]
+    fn test_auto_import_with_qualification_of_names() {
+        let mut test = inlay_hint_test(
+            "
+            import foo
+
+            a = foo.C().foo()
+            ",
+        );
+
+        test.with_extra_file(
+            "foo.py",
+            "
+            import bar
+
+            class A[T]: ...
+
+            class B[T]: ...
+
+            class C:
+                def foo(self) -> B[A[bar.D[int, list[str | A[B[int]]]]]]:
+                    raise NotImplementedError
+                    ",
+        );
+
+        test.with_extra_file(
+            "bar.py",
+            "
+            class D[T, U]: ...
+            ",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r#"
+
+        import foo
+
+        a[: B[A[D[int, list[str | A[B[int]]]]]]] = foo.C().foo()
+
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+         --> foo.py:6:19
+          |
+        4 |             class A[T]: ...
+        5 |
+        6 |             class B[T]: ...
+          |                   ^
+        7 |
+        8 |             class C:
+          |
+        info: Source
+         --> main2.py:4:5
+          |
+        2 | import foo
+        3 |
+        4 | a[: B[A[D[int, list[str | A[B[int]]]]]]] = foo.C().foo()
+          |     ^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+         --> foo.py:4:19
+          |
+        2 |             import bar
+        3 |
+        4 |             class A[T]: ...
+          |                   ^
+        5 |
+        6 |             class B[T]: ...
+          |
+        info: Source
+         --> main2.py:4:7
+          |
+        2 | import foo
+        3 |
+        4 | a[: B[A[D[int, list[str | A[B[int]]]]]]] = foo.C().foo()
+          |       ^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+         --> bar.py:2:19
+          |
+        2 |             class D[T, U]: ...
+          |                   ^
+          |
+        info: Source
+         --> main2.py:4:9
+          |
+        2 | import foo
+        3 |
+        4 | a[: B[A[D[int, list[str | A[B[int]]]]]]] = foo.C().foo()
+          |         ^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/builtins.pyi:348:7
+            |
+        347 | @disjoint_base
+        348 | class int:
+            |       ^^^
+        349 |     """int([x]) -> integer
+        350 |     int(x, base=10) -> integer
+            |
+        info: Source
+         --> main2.py:4:11
+          |
+        2 | import foo
+        3 |
+        4 | a[: B[A[D[int, list[str | A[B[int]]]]]]] = foo.C().foo()
+          |           ^^^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+            --> stdlib/builtins.pyi:2829:7
+             |
+        2828 | @disjoint_base
+        2829 | class list(MutableSequence[_T]):
+             |       ^^^^
+        2830 |     """Built-in mutable sequence.
+             |
+        info: Source
+         --> main2.py:4:16
+          |
+        2 | import foo
+        3 |
+        4 | a[: B[A[D[int, list[str | A[B[int]]]]]]] = foo.C().foo()
+          |                ^^^^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/builtins.pyi:915:7
+            |
+        914 | @disjoint_base
+        915 | class str(Sequence[str]):
+            |       ^^^
+        916 |     """str(object='') -> str
+        917 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
+            |
+        info: Source
+         --> main2.py:4:21
+          |
+        2 | import foo
+        3 |
+        4 | a[: B[A[D[int, list[str | A[B[int]]]]]]] = foo.C().foo()
+          |                     ^^^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+         --> foo.py:4:19
+          |
+        2 |             import bar
+        3 |
+        4 |             class A[T]: ...
+          |                   ^
+        5 |
+        6 |             class B[T]: ...
+          |
+        info: Source
+         --> main2.py:4:27
+          |
+        2 | import foo
+        3 |
+        4 | a[: B[A[D[int, list[str | A[B[int]]]]]]] = foo.C().foo()
+          |                           ^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+         --> foo.py:6:19
+          |
+        4 |             class A[T]: ...
+        5 |
+        6 |             class B[T]: ...
+          |                   ^
+        7 |
+        8 |             class C:
+          |
+        info: Source
+         --> main2.py:4:29
+          |
+        2 | import foo
+        3 |
+        4 | a[: B[A[D[int, list[str | A[B[int]]]]]]] = foo.C().foo()
+          |                             ^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/builtins.pyi:348:7
+            |
+        347 | @disjoint_base
+        348 | class int:
+            |       ^^^
+        349 |     """int([x]) -> integer
+        350 |     int(x, base=10) -> integer
+            |
+        info: Source
+         --> main2.py:4:31
+          |
+        2 | import foo
+        3 |
+        4 | a[: B[A[D[int, list[str | A[B[int]]]]]]] = foo.C().foo()
+          |                               ^^^
+          |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: File after edits
+        info: Source
+        from bar import D
+
+        import foo
+
+        a: foo.B[foo.A[D[int, list[str | foo.A[foo.B[int]]]]]] = foo.C().foo()
+        "#);
+    }
+
+    #[test]
+    fn test_auto_import_with_update_import_from_statement() {
+        let mut test = inlay_hint_test(
+            "
+            from foo import C
+
+            a = C().foo()
+            ",
+        );
+
+        test.with_extra_file(
+            "foo.py",
+            "
+            import bar
+
+            class A[T]: ...
+
+            class B[T]: ...
+
+            class C:
+                def foo(self) -> B[A[bar.D[int, list[str | A[B[int]]]]]]:
+                    raise NotImplementedError
+                    ",
+        );
+
+        test.with_extra_file(
+            "bar.py",
+            "
+            class D[T, U]: ...
+            ",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r#"
+
+        from foo import C
+
+        a[: B[A[D[int, list[str | A[B[int]]]]]]] = C().foo()
+
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+         --> foo.py:6:19
+          |
+        4 |             class A[T]: ...
+        5 |
+        6 |             class B[T]: ...
+          |                   ^
+        7 |
+        8 |             class C:
+          |
+        info: Source
+         --> main2.py:4:5
+          |
+        2 | from foo import C
+        3 |
+        4 | a[: B[A[D[int, list[str | A[B[int]]]]]]] = C().foo()
+          |     ^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+         --> foo.py:4:19
+          |
+        2 |             import bar
+        3 |
+        4 |             class A[T]: ...
+          |                   ^
+        5 |
+        6 |             class B[T]: ...
+          |
+        info: Source
+         --> main2.py:4:7
+          |
+        2 | from foo import C
+        3 |
+        4 | a[: B[A[D[int, list[str | A[B[int]]]]]]] = C().foo()
+          |       ^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+         --> bar.py:2:19
+          |
+        2 |             class D[T, U]: ...
+          |                   ^
+          |
+        info: Source
+         --> main2.py:4:9
+          |
+        2 | from foo import C
+        3 |
+        4 | a[: B[A[D[int, list[str | A[B[int]]]]]]] = C().foo()
+          |         ^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/builtins.pyi:348:7
+            |
+        347 | @disjoint_base
+        348 | class int:
+            |       ^^^
+        349 |     """int([x]) -> integer
+        350 |     int(x, base=10) -> integer
+            |
+        info: Source
+         --> main2.py:4:11
+          |
+        2 | from foo import C
+        3 |
+        4 | a[: B[A[D[int, list[str | A[B[int]]]]]]] = C().foo()
+          |           ^^^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+            --> stdlib/builtins.pyi:2829:7
+             |
+        2828 | @disjoint_base
+        2829 | class list(MutableSequence[_T]):
+             |       ^^^^
+        2830 |     """Built-in mutable sequence.
+             |
+        info: Source
+         --> main2.py:4:16
+          |
+        2 | from foo import C
+        3 |
+        4 | a[: B[A[D[int, list[str | A[B[int]]]]]]] = C().foo()
+          |                ^^^^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/builtins.pyi:915:7
+            |
+        914 | @disjoint_base
+        915 | class str(Sequence[str]):
+            |       ^^^
+        916 |     """str(object='') -> str
+        917 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
+            |
+        info: Source
+         --> main2.py:4:21
+          |
+        2 | from foo import C
+        3 |
+        4 | a[: B[A[D[int, list[str | A[B[int]]]]]]] = C().foo()
+          |                     ^^^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+         --> foo.py:4:19
+          |
+        2 |             import bar
+        3 |
+        4 |             class A[T]: ...
+          |                   ^
+        5 |
+        6 |             class B[T]: ...
+          |
+        info: Source
+         --> main2.py:4:27
+          |
+        2 | from foo import C
+        3 |
+        4 | a[: B[A[D[int, list[str | A[B[int]]]]]]] = C().foo()
+          |                           ^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+         --> foo.py:6:19
+          |
+        4 |             class A[T]: ...
+        5 |
+        6 |             class B[T]: ...
+          |                   ^
+        7 |
+        8 |             class C:
+          |
+        info: Source
+         --> main2.py:4:29
+          |
+        2 | from foo import C
+        3 |
+        4 | a[: B[A[D[int, list[str | A[B[int]]]]]]] = C().foo()
+          |                             ^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/builtins.pyi:348:7
+            |
+        347 | @disjoint_base
+        348 | class int:
+            |       ^^^
+        349 |     """int([x]) -> integer
+        350 |     int(x, base=10) -> integer
+            |
+        info: Source
+         --> main2.py:4:31
+          |
+        2 | from foo import C
+        3 |
+        4 | a[: B[A[D[int, list[str | A[B[int]]]]]]] = C().foo()
+          |                               ^^^
+          |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: File after edits
+        info: Source
+        from bar import D
+
+        from foo import C, B, A
+
+        a: B[A[D[int, list[str | A[B[int]]]]]] = C().foo()
+        "#);
+    }
+
+    #[test]
+    fn test_auto_import_symbol_imported_from_different_path() {
+        let mut test = inlay_hint_test(
+            "
+            from foo import D
+
+            class Baz: ...
+
+            a = D(Baz)
+            ",
+        );
+
+        test.with_extra_file(
+            "foo/__init__.py",
+            "
+            from foo.bar import D
+                    ",
+        );
+
+        test.with_extra_file(
+            "foo/bar.py",
+            "
+            class D[T]:
+                def __init__(self, x: type[T]):
+                    pass
+            ",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @"
+
+        from foo import D
+
+        class Baz: ...
+
+        a[: D[Baz]] = D([x=]Baz)
+
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+         --> foo/bar.py:2:19
+          |
+        2 |             class D[T]:
+          |                   ^
+        3 |                 def __init__(self, x: type[T]):
+        4 |                     pass
+          |
+        info: Source
+         --> main2.py:6:5
+          |
+        4 | class Baz: ...
+        5 |
+        6 | a[: D[Baz]] = D([x=]Baz)
+          |     ^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+         --> main.py:4:7
+          |
+        2 | from foo import D
+        3 |
+        4 | class Baz: ...
+          |       ^^^
+        5 |
+        6 | a = D(Baz)
+          |
+        info: Source
+         --> main2.py:6:7
+          |
+        4 | class Baz: ...
+        5 |
+        6 | a[: D[Baz]] = D([x=]Baz)
+          |       ^^^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+         --> foo/bar.py:3:36
+          |
+        2 |             class D[T]:
+        3 |                 def __init__(self, x: type[T]):
+          |                                    ^
+        4 |                     pass
+          |
+        info: Source
+         --> main2.py:6:18
+          |
+        4 | class Baz: ...
+        5 |
+        6 | a[: D[Baz]] = D([x=]Baz)
+          |                  ^
+          |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: File after edits
+        info: Source
+
+        from foo import D
+
+        class Baz: ...
+
+        a: D[Baz] = D(Baz)
+        ");
+    }
+
+    #[test]
+    fn test_auto_import_typing_literal() {
+        let mut test = inlay_hint_test(
+            r#"
+            from typing import Any
+
+            def foo(x: Any):
+                a = getattr(x, 'foo', "some")
+            "#,
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r#"
+
+        from typing import Any
+
+        def foo(x: Any):
+            a[: Any | Literal["some"]] = getattr(x, 'foo', "some")
+
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/typing.pyi:166:7
+            |
+        164 | # from _typeshed import AnnotationForm
+        165 |
+        166 | class Any:
+            |       ^^^
+        167 |     """Special type indicating an unconstrained type.
+            |
+        info: Source
+         --> main2.py:5:9
+          |
+        4 | def foo(x: Any):
+        5 |     a[: Any | Literal["some"]] = getattr(x, 'foo', "some")
+          |         ^^^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/typing.pyi:487:1
+            |
+        485 | """
+        486 |
+        487 | Literal: _SpecialForm
+            | ^^^^^^^
+        488 | """Special typing form to define literal types (a.k.a. value types).
+            |
+        info: Source
+         --> main2.py:5:15
+          |
+        4 | def foo(x: Any):
+        5 |     a[: Any | Literal["some"]] = getattr(x, 'foo', "some")
+          |               ^^^^^^^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/builtins.pyi:915:7
+            |
+        914 | @disjoint_base
+        915 | class str(Sequence[str]):
+            |       ^^^
+        916 |     """str(object='') -> str
+        917 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
+            |
+        info: Source
+         --> main2.py:5:23
+          |
+        4 | def foo(x: Any):
+        5 |     a[: Any | Literal["some"]] = getattr(x, 'foo', "some")
+          |                       ^^^^^^
+          |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: File after edits
+        info: Source
+
+        from typing import Any, Literal
+
+        def foo(x: Any):
+            a: Any | Literal["some"] = getattr(x, 'foo', "some")
+        "#);
+    }
+
+    #[test]
+    fn test_auto_import_other_symbols() {
+        let mut test = inlay_hint_test(
+            r#"
+            from foo import foo
+
+            a = foo()
+            "#,
+        );
+
+        test.with_extra_file(
+            "foo.py",
+            r#"
+        from typing import TypeVar, Any
+
+        def foo() -> dict[TypeVar, Any] | None: ...
+        "#,
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r#"
+
+        from foo import foo
+
+        a[: dict[TypeVar, Any] | None] = foo()
+
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+            --> stdlib/builtins.pyi:2947:7
+             |
+        2946 | @disjoint_base
+        2947 | class dict(MutableMapping[_KT, _VT]):
+             |       ^^^^
+        2948 |     """dict() -> new empty dictionary
+        2949 |     dict(mapping) -> new dictionary initialized from a mapping object's
+             |
+        info: Source
+         --> main2.py:4:5
+          |
+        2 | from foo import foo
+        3 |
+        4 | a[: dict[TypeVar, Any] | None] = foo()
+          |     ^^^^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/typing.pyi:211:7
+            |
+        210 | @final
+        211 | class TypeVar:
+            |       ^^^^^^^
+        212 |     """Type variable.
+            |
+        info: Source
+         --> main2.py:4:10
+          |
+        2 | from foo import foo
+        3 |
+        4 | a[: dict[TypeVar, Any] | None] = foo()
+          |          ^^^^^^^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/typing.pyi:166:7
+            |
+        164 | # from _typeshed import AnnotationForm
+        165 |
+        166 | class Any:
+            |       ^^^
+        167 |     """Special type indicating an unconstrained type.
+            |
+        info: Source
+         --> main2.py:4:19
+          |
+        2 | from foo import foo
+        3 |
+        4 | a[: dict[TypeVar, Any] | None] = foo()
+          |                   ^^^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/types.pyi:969:11
+            |
+        967 | if sys.version_info >= (3, 10):
+        968 |     @final
+        969 |     class NoneType:
+            |           ^^^^^^^^
+        970 |         """The type of the None singleton."""
+            |
+        info: Source
+         --> main2.py:4:26
+          |
+        2 | from foo import foo
+        3 |
+        4 | a[: dict[TypeVar, Any] | None] = foo()
+          |                          ^^^^
+          |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: File after edits
+        info: Source
+        from typing import TypeVar
+        from typing import Any
+
+        from foo import foo
+
+        a: dict[TypeVar, Any] | None = foo()
+        "#);
+    }
+
+    /// Tests that if we have an inlay hint containing two symbols with the same name
+    /// from unimported modules, then we add two `import <module>` statements, and
+    /// qualify both symbols (<module1.<symbol1>, <module2.<symbol1>).
+    #[test]
+    fn test_auto_import_same_name_different_modules_both_qualified() {
+        let mut test = inlay_hint_test(
+            r#"
+            from foo import foo
+
+            a = foo()
+            "#,
+        );
+
+        test.with_extra_file(
+            "foo.py",
+            r#"
+        import bar
+        import baz
+
+        def foo() -> bar.A | baz.A:
+            return bar.A()
+        "#,
+        );
+
+        test.with_extra_file(
+            "bar.py",
+            r#"
+            class A: ...
+        "#,
+        );
+
+        test.with_extra_file(
+            "baz.py",
+            r#"
+            class A: ...
+        "#,
+        );
+
+        assert_snapshot!(test.inlay_hints(), @"
+
+        from foo import foo
+
+        a[: bar.A | baz.A] = foo()
+
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+         --> bar.py:2:19
+          |
+        2 |             class A: ...
+          |                   ^
+          |
+        info: Source
+         --> main2.py:4:5
+          |
+        2 | from foo import foo
+        3 |
+        4 | a[: bar.A | baz.A] = foo()
+          |     ^^^^^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+         --> baz.py:2:19
+          |
+        2 |             class A: ...
+          |                   ^
+          |
+        info: Source
+         --> main2.py:4:13
+          |
+        2 | from foo import foo
+        3 |
+        4 | a[: bar.A | baz.A] = foo()
+          |             ^^^^^
+          |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: File after edits
+        info: Source
+        import bar
+        import baz
+
+        from foo import foo
+
+        a: bar.A | baz.A = foo()
+        ");
+    }
+
+    /// Tests that if we have an inlay hint containing two symbols with the same name
+    /// from two modules, one which is imported already via a "import from" statement,
+    /// then we still add two `import <module>` statements.
+    ///
+    /// We also show here that we don't add repeated import statements.
+    #[test]
+    fn test_auto_import_same_name_different_modules_one_qualified() {
+        let mut test = inlay_hint_test(
+            r#"
+               from foo import foo
+               from bar import B
+
+               a = foo()
+               "#,
+        );
+
+        test.with_extra_file(
+            "foo.py",
+            r#"
+           import bar
+           import baz
+
+           def foo() -> bar.A | baz.A | list[bar.A | baz.A]:
+               return bar.A()
+           "#,
+        );
+
+        test.with_extra_file(
+            "bar.py",
+            r#"
+               class A: ...
+               class B: ...
+           "#,
+        );
+
+        test.with_extra_file(
+            "baz.py",
+            r#"
+               class A: ...
+           "#,
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r#"
+
+        from foo import foo
+        from bar import B
+
+        a[: bar.A | baz.A | list[bar.A | baz.A]] = foo()
+
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+         --> bar.py:2:22
+          |
+        2 |                class A: ...
+          |                      ^
+        3 |                class B: ...
+          |
+        info: Source
+         --> main2.py:5:5
+          |
+        3 | from bar import B
+        4 |
+        5 | a[: bar.A | baz.A | list[bar.A | baz.A]] = foo()
+          |     ^^^^^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+         --> baz.py:2:22
+          |
+        2 |                class A: ...
+          |                      ^
+          |
+        info: Source
+         --> main2.py:5:13
+          |
+        3 | from bar import B
+        4 |
+        5 | a[: bar.A | baz.A | list[bar.A | baz.A]] = foo()
+          |             ^^^^^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+            --> stdlib/builtins.pyi:2829:7
+             |
+        2828 | @disjoint_base
+        2829 | class list(MutableSequence[_T]):
+             |       ^^^^
+        2830 |     """Built-in mutable sequence.
+             |
+        info: Source
+         --> main2.py:5:21
+          |
+        3 | from bar import B
+        4 |
+        5 | a[: bar.A | baz.A | list[bar.A | baz.A]] = foo()
+          |                     ^^^^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+         --> bar.py:2:22
+          |
+        2 |                class A: ...
+          |                      ^
+        3 |                class B: ...
+          |
+        info: Source
+         --> main2.py:5:26
+          |
+        3 | from bar import B
+        4 |
+        5 | a[: bar.A | baz.A | list[bar.A | baz.A]] = foo()
+          |                          ^^^^^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+         --> baz.py:2:22
+          |
+        2 |                class A: ...
+          |                      ^
+          |
+        info: Source
+         --> main2.py:5:34
+          |
+        3 | from bar import B
+        4 |
+        5 | a[: bar.A | baz.A | list[bar.A | baz.A]] = foo()
+          |                                  ^^^^^
+          |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: File after edits
+        info: Source
+        import bar
+        import baz
+
+        from foo import foo
+        from bar import B
+
+        a: bar.A | baz.A | list[bar.A | baz.A] = foo()
+        "#);
+    }
+
+    /// Tests that if we have an inlay hint containing a symbol that is referenced
+    /// in another module, that we qualify the inlay hint symbol with the module name,
+    /// so we don't accidentally reference the in scope symbol.
+    #[test]
+    fn test_auto_import_symbol_in_scope_same_name() {
+        let mut test = inlay_hint_test(
+            r#"
+                from dataclasses import dataclass
+                import foo
+
+                class A: ...
+
+                @dataclass
+                class B[T]:
+                    x: T
+
+                b = B(foo.A())
+               "#,
+        );
+
+        test.with_extra_file(
+            "foo.py",
+            r#"
+            class A: ...
+           "#,
+        );
+
+        assert_snapshot!(test.inlay_hints(), @"
+
+        from dataclasses import dataclass
+        import foo
+
+        class A: ...
+
+        @dataclass
+        class B[T]:
+            x: T
+
+        b[: B[A]] = B([x=]foo.A())
+
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+         --> main.py:8:7
+          |
+        7 | @dataclass
+        8 | class B[T]:
+          |       ^
+        9 |     x: T
+          |
+        info: Source
+          --> main2.py:11:5
+           |
+         9 |     x: T
+        10 |
+        11 | b[: B[A]] = B([x=]foo.A())
+           |     ^
+           |
+
+        info[inlay-hint-location]: Inlay Hint Target
+         --> foo.py:2:19
+          |
+        2 |             class A: ...
+          |                   ^
+          |
+        info: Source
+          --> main2.py:11:7
+           |
+         9 |     x: T
+        10 |
+        11 | b[: B[A]] = B([x=]foo.A())
+           |       ^
+           |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: File after edits
+        info: Source
+
+        from dataclasses import dataclass
+        import foo
+
+        class A: ...
+
+        @dataclass
+        class B[T]:
+            x: T
+
+        b: B[foo.A] = B(foo.A())
+        ");
     }
 
     struct InlayHintLocationDiagnostic {

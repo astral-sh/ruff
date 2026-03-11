@@ -23,7 +23,7 @@ jobs:
   ty-ecosystem-report:
     name: Create ecosystem report
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-32' || 'ubuntu-latest' }}
-    timeout-minutes: 20
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -32,10 +32,10 @@ jobs:
           persist-credentials: false
 
       - name: Install the latest version of uv
-        uses: astral-sh/setup-uv@61cb8a9741eeb8a550a1b8544337180c0fc8476b # v7.2.0
+        uses: astral-sh/setup-uv@5a095e7a2014a4212f075830d4f7277575a9d098 # v7.3.1
         with:
           enable-cache: true
-          version: "0.9.26"
+          version: "0.10.9"
 
       - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
         with:
@@ -56,11 +56,12 @@ jobs:
 
           cd ..
 
-          uv tool install "git+https://github.com/astral-sh/ecosystem-analyzer@2e1816eac09c90140b1ba51d19afc5f59da460f5"
+          uv tool install "git+https://github.com/astral-sh/ecosystem-analyzer@3b27e0b28a5314240c218e939bde0c6c02a39652"
 
           ecosystem-analyzer \
             --verbose \
             --repository ruff \
+            --flaky-runs 20 \
             analyze \
             --profile=profiling \
             --projects ruff/crates/ty_python_semantic/resources/primer/good.txt \
@@ -77,7 +78,7 @@ jobs:
       # NOTE: astral-sh-bot uses this artifact to publish the ecosystem report.
       # Make sure to update the bot if you rename the artifact.
       - name: "Upload ecosystem report"
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: full-report
           path: dist/

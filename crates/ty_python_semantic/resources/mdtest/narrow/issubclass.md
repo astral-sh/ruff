@@ -179,14 +179,49 @@ def _(x: type[int | list | bytes]):
     # error: [invalid-argument-type]
     if issubclass(x, int | list[int]):
         reveal_type(x)  # revealed: type[int | list[Unknown] | bytes]
-    # TODO: This should be an error
+    # error: [invalid-argument-type]
     elif isinstance(x, (list[int] | bytes, int)):
         reveal_type(x)  # revealed: type[int | list[Unknown] | bytes]
-    # TODO: This should be an error
+    # error: [invalid-argument-type]
     elif isinstance(x, (int, str | Literal[42])):
         reveal_type(x)  # revealed: type[int | list[Unknown] | bytes]
-    # TODO: This should be an error
+    # error: [invalid-argument-type]
     elif isinstance(x, (int, (str, (bytes, memoryview | Literal[42])))):
+        reveal_type(x)  # revealed: type[int | list[Unknown] | bytes]
+    else:
+        reveal_type(x)  # revealed: type[int | list[Unknown] | bytes]
+```
+
+The same validation also applies when an invalid `UnionType` is nested inside a tuple:
+
+```py
+def _(x: type[int | list | bytes]):
+    # error: [invalid-argument-type]
+    if issubclass(x, (int, list[int] | bytes)):
+        reveal_type(x)  # revealed: type[int | list[Unknown] | bytes]
+    else:
+        reveal_type(x)  # revealed: type[int | list[Unknown] | bytes]
+```
+
+Including nested tuples:
+
+```py
+def _(x: type[int | list | bytes]):
+    # error: [invalid-argument-type]
+    if issubclass(x, (int, (str, list[int] | bytes))):
+        reveal_type(x)  # revealed: type[int | list[Unknown] | bytes]
+    else:
+        reveal_type(x)  # revealed: type[int | list[Unknown] | bytes]
+```
+
+And non-literal tuples:
+
+```py
+classes = (int, list[int] | bytes)
+
+def _(x: type[int | list | bytes]):
+    # error: [invalid-argument-type]
+    if issubclass(x, classes):
         reveal_type(x)  # revealed: type[int | list[Unknown] | bytes]
     else:
         reveal_type(x)  # revealed: type[int | list[Unknown] | bytes]
@@ -220,7 +255,7 @@ from typing import Union
 
 IntOrStr = Union[int, str]
 
-reveal_type(IntOrStr)  # revealed: <types.UnionType special-form 'int | str'>
+reveal_type(IntOrStr)  # revealed: <types.UnionType special-form 'IntOrStr'>
 
 def f(x: type[int | str | bytes | range]):
     if issubclass(x, IntOrStr):

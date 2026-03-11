@@ -181,10 +181,10 @@ mod tests {
           --> stdlib/ty_extensions.pyi:15:1
            |
         13 | # Types
-        14 | Unknown = object()
-        15 | AlwaysTruthy = object()
+        14 | Unknown: _SpecialForm
+        15 | AlwaysTruthy: _SpecialForm
            | ------------
-        16 | AlwaysFalsy = object()
+        16 | AlwaysFalsy: _SpecialForm
            |
         ");
     }
@@ -717,8 +717,26 @@ mod tests {
             "#,
         );
 
-        // TODO: This should jump to the definition of `Alias` above.
-        assert_snapshot!(test.goto_type_definition(), @"No type definitions found");
+        assert_snapshot!(test.goto_type_definition(), @r#"
+        info[goto-type definition]: Go to type definition
+         --> main.py:6:1
+          |
+        4 | Alias = TypeAliasType("Alias", tuple[int, int])
+        5 |
+        6 | Alias
+          | ^^^^^ Clicking here
+          |
+        info: Found 1 type definition
+         --> main.py:4:1
+          |
+        2 | from typing_extensions import TypeAliasType
+        3 |
+        4 | Alias = TypeAliasType("Alias", tuple[int, int])
+          | -----
+        5 |
+        6 | Alias
+          |
+        "#);
     }
 
     #[test]
@@ -921,10 +939,10 @@ mod tests {
           --> stdlib/ty_extensions.pyi:14:1
            |
         13 | # Types
-        14 | Unknown = object()
+        14 | Unknown: _SpecialForm
            | -------
-        15 | AlwaysTruthy = object()
-        16 | AlwaysFalsy = object()
+        15 | AlwaysTruthy: _SpecialForm
+        16 | AlwaysFalsy: _SpecialForm
            |
         "#);
     }
@@ -985,10 +1003,10 @@ mod tests {
           --> stdlib/ty_extensions.pyi:14:1
            |
         13 | # Types
-        14 | Unknown = object()
+        14 | Unknown: _SpecialForm
            | -------
-        15 | AlwaysTruthy = object()
-        16 | AlwaysFalsy = object()
+        15 | AlwaysTruthy: _SpecialForm
+        16 | AlwaysFalsy: _SpecialForm
            |
         "#);
     }
@@ -1012,10 +1030,10 @@ mod tests {
           --> stdlib/ty_extensions.pyi:14:1
            |
         13 | # Types
-        14 | Unknown = object()
+        14 | Unknown: _SpecialForm
            | -------
-        15 | AlwaysTruthy = object()
-        16 | AlwaysFalsy = object()
+        15 | AlwaysTruthy: _SpecialForm
+        16 | AlwaysFalsy: _SpecialForm
            |
         "#);
     }
@@ -1039,10 +1057,10 @@ mod tests {
           --> stdlib/ty_extensions.pyi:14:1
            |
         13 | # Types
-        14 | Unknown = object()
+        14 | Unknown: _SpecialForm
            | -------
-        15 | AlwaysTruthy = object()
-        16 | AlwaysFalsy = object()
+        15 | AlwaysTruthy: _SpecialForm
+        16 | AlwaysFalsy: _SpecialForm
            |
         "#);
     }
@@ -1231,10 +1249,10 @@ mod tests {
           --> stdlib/ty_extensions.pyi:14:1
            |
         13 | # Types
-        14 | Unknown = object()
+        14 | Unknown: _SpecialForm
            | -------
-        15 | AlwaysTruthy = object()
-        16 | AlwaysFalsy = object()
+        15 | AlwaysTruthy: _SpecialForm
+        16 | AlwaysFalsy: _SpecialForm
            |
         "#);
     }
@@ -2024,10 +2042,10 @@ def function():
           --> stdlib/ty_extensions.pyi:14:1
            |
         13 | # Types
-        14 | Unknown = object()
+        14 | Unknown: _SpecialForm
            | -------
-        15 | AlwaysTruthy = object()
-        16 | AlwaysFalsy = object()
+        15 | AlwaysTruthy: _SpecialForm
+        16 | AlwaysFalsy: _SpecialForm
            |
         ");
     }

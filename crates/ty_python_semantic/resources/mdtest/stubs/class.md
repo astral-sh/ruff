@@ -14,7 +14,6 @@ In type stubs, classes can reference themselves in their base class definitions.
 from ty_extensions import reveal_mro
 
 class Foo[T]: ...
-
 class Bar(Foo[Bar]): ...
 
 reveal_type(Bar)  # revealed: <class 'Bar'>

@@ -1,14 +1,13 @@
 use crate::types::class::CodeGeneratorKind;
 use crate::types::generics::{ApplySpecialization, Specialization};
 use crate::types::mro::MroIterator;
-use crate::{Db, DisplaySettings};
-
 use crate::types::tuple::TupleType;
 use crate::types::{
     ApplyTypeMappingVisitor, ClassLiteral, ClassType, DynamicType, KnownClass, KnownInstanceType,
-    MaterializationKind, NormalizedVisitor, SpecialFormType, StaticMroError, Type, TypeContext,
-    TypeMapping, todo_type,
+    MaterializationKind, SpecialFormType, StaticMroError, Type, TypeContext, TypeMapping,
+    todo_type,
 };
+use crate::{Db, DisplaySettings};
 
 /// Enumeration of the possible kinds of types we allow in class bases.
 ///
@@ -37,14 +36,6 @@ impl<'db> ClassBase<'db> {
         Self::Dynamic(DynamicType::Unknown)
     }
 
-    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
-        match self {
-            Self::Dynamic(dynamic) => Self::Dynamic(dynamic.normalized()),
-            Self::Class(class) => Self::Class(class.normalized_impl(db, visitor)),
-            Self::Protocol | Self::Generic | Self::TypedDict => self,
-        }
-    }
-
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
@@ -65,8 +56,10 @@ impl<'db> ClassBase<'db> {
             ClassBase::Class(class) => class.name(db),
             ClassBase::Dynamic(DynamicType::Any) => "Any",
             ClassBase::Dynamic(DynamicType::Unknown | DynamicType::UnknownGeneric(_)) => "Unknown",
+            ClassBase::Dynamic(DynamicType::UnspecializedTypeVar) => "UnspecializedTypeVar",
             ClassBase::Dynamic(
                 DynamicType::Todo(_)
+                | DynamicType::TodoFunctionalTypedDict
                 | DynamicType::TodoUnpack
                 | DynamicType::TodoStarredExpression
                 | DynamicType::TodoTypeVarTuple,
@@ -93,7 +86,7 @@ impl<'db> ClassBase<'db> {
     pub(super) fn try_from_type(
         db: &'db dyn Db,
         ty: Type<'db>,
-        subclass: ClassLiteral<'db>,
+        subclass: Option<ClassLiteral<'db>>,
     ) -> Option<Self> {
         match ty {
             Type::Dynamic(dynamic) => Some(Self::Dynamic(dynamic)),
@@ -159,7 +152,7 @@ impl<'db> ClassBase<'db> {
             }
 
             Type::PropertyInstance(_)
-            | Type::BooleanLiteral(_)
+            | Type::LiteralValue(_)
             | Type::FunctionLiteral(_)
             | Type::Callable(..)
             | Type::BoundMethod(_)
@@ -167,11 +160,6 @@ impl<'db> ClassBase<'db> {
             | Type::WrapperDescriptor(_)
             | Type::DataclassDecorator(_)
             | Type::DataclassTransformer(_)
-            | Type::BytesLiteral(_)
-            | Type::IntLiteral(_)
-            | Type::EnumLiteral(_)
-            | Type::StringLiteral(_)
-            | Type::LiteralString
             | Type::ModuleLiteral(_)
             | Type::TypeVar(_)
             | Type::BoundSuper(_)
@@ -217,23 +205,20 @@ impl<'db> ClassBase<'db> {
             },
 
             Type::SpecialForm(special_form) => match special_form {
+                SpecialFormType::TypeQualifier(_) => None,
+
                 SpecialFormType::Annotated
                 | SpecialFormType::Literal
                 | SpecialFormType::LiteralString
                 | SpecialFormType::Union
                 | SpecialFormType::NoReturn
                 | SpecialFormType::Never
-                | SpecialFormType::Final
-                | SpecialFormType::NotRequired
                 | SpecialFormType::TypeGuard
                 | SpecialFormType::TypeIs
                 | SpecialFormType::TypingSelf
                 | SpecialFormType::Unpack
-                | SpecialFormType::ClassVar
                 | SpecialFormType::Concatenate
-                | SpecialFormType::Required
                 | SpecialFormType::TypeAlias
-                | SpecialFormType::ReadOnly
                 | SpecialFormType::Optional
                 | SpecialFormType::Not
                 | SpecialFormType::Top
@@ -246,12 +231,12 @@ impl<'db> ClassBase<'db> {
 
                 SpecialFormType::Any => Some(Self::Dynamic(DynamicType::Any)),
                 SpecialFormType::Unknown => Some(Self::unknown()),
-
                 SpecialFormType::Protocol => Some(Self::Protocol),
                 SpecialFormType::Generic => Some(Self::Generic),
+                SpecialFormType::TypedDict => Some(Self::TypedDict),
 
                 SpecialFormType::NamedTuple => {
-                    let class = subclass.as_static()?;
+                    let class = subclass?.as_static()?;
                     let fields = class.own_fields(db, None, CodeGeneratorKind::NamedTuple);
                     Self::try_from_type(
                         db,
@@ -265,41 +250,19 @@ impl<'db> ClassBase<'db> {
                     )
                 }
 
-                // TODO: Classes inheriting from `typing.Type` et al. also have `Generic` in their MRO
-                SpecialFormType::Dict => {
-                    Self::try_from_type(db, KnownClass::Dict.to_class_literal(db), subclass)
-                }
-                SpecialFormType::List => {
-                    Self::try_from_type(db, KnownClass::List.to_class_literal(db), subclass)
-                }
+                // TODO: Classes inheriting from `typing.Type` also have `Generic` in their MRO
                 SpecialFormType::Type => {
                     Self::try_from_type(db, KnownClass::Type.to_class_literal(db), subclass)
                 }
+
                 SpecialFormType::Tuple => {
                     Self::try_from_type(db, KnownClass::Tuple.to_class_literal(db), subclass)
                 }
-                SpecialFormType::Set => {
-                    Self::try_from_type(db, KnownClass::Set.to_class_literal(db), subclass)
+
+                SpecialFormType::LegacyStdlibAlias(alias) => {
+                    Self::try_from_type(db, alias.aliased_class().to_class_literal(db), subclass)
                 }
-                SpecialFormType::FrozenSet => {
-                    Self::try_from_type(db, KnownClass::FrozenSet.to_class_literal(db), subclass)
-                }
-                SpecialFormType::ChainMap => {
-                    Self::try_from_type(db, KnownClass::ChainMap.to_class_literal(db), subclass)
-                }
-                SpecialFormType::Counter => {
-                    Self::try_from_type(db, KnownClass::Counter.to_class_literal(db), subclass)
-                }
-                SpecialFormType::DefaultDict => {
-                    Self::try_from_type(db, KnownClass::DefaultDict.to_class_literal(db), subclass)
-                }
-                SpecialFormType::Deque => {
-                    Self::try_from_type(db, KnownClass::Deque.to_class_literal(db), subclass)
-                }
-                SpecialFormType::OrderedDict => {
-                    Self::try_from_type(db, KnownClass::OrderedDict.to_class_literal(db), subclass)
-                }
-                SpecialFormType::TypedDict => Some(Self::TypedDict),
+
                 SpecialFormType::Callable => Self::try_from_type(
                     db,
                     todo_type!("Support for Callable as a base class"),

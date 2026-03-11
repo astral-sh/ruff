@@ -21,7 +21,7 @@ pub fn goto_definition(
     let goto_target = find_goto_target(&model, &module, offset)?;
     let definition_targets = goto_target
         .get_definition_targets(&model, ImportAliasResolution::ResolveAliases)?
-        .definition_targets(db)?;
+        .definition_targets(&model, &goto_target)?;
 
     Some(RangedValue {
         range: FileRange::new(file, goto_target.range()),
@@ -435,13 +435,12 @@ class MyOtherClass:
         3 | x = MyClass(0)
           |     ^^^^^^^ Clicking here
           |
-        info: Found 2 definitions
+        info: Found 1 definition
          --> mymodule.py:2:7
           |
         2 | class MyClass:
           |       -------
         3 |     def __init__(self, val):
-          |         --------
         4 |         self.val = val
           |
         ");
@@ -1649,6 +1648,181 @@ Traceb<CURSOR>ackType
         assert_snapshot!(test.goto_definition(), @"No goto target found");
     }
 
+    /// goto-definition on a class init opening parenthesis should go to constructor
+    #[test]
+    fn goto_definition_class_init_parenthesis_opening() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+class MyClass:
+    def __init__(self, val):
+        self.val = val
+x = MyClass<CURSOR>()
+",
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+         --> main.py:5:5
+          |
+        3 |     def __init__(self, val):
+        4 |         self.val = val
+        5 | x = MyClass()
+          |     ^^^^^^^ Clicking here
+          |
+        info: Found 1 definition
+         --> main.py:3:9
+          |
+        2 | class MyClass:
+        3 |     def __init__(self, val):
+          |         --------
+        4 |         self.val = val
+        5 | x = MyClass()
+          |
+        ");
+    }
+
+    /// goto-definition on a class init closing parenthesis should go to constructor
+    #[test]
+    fn goto_definition_class_init_parenthesis_closing() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+class MyClass:
+    def __init__(self, val):
+        self.val = val
+x = MyClass(<CURSOR>)
+",
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+         --> main.py:5:5
+          |
+        3 |     def __init__(self, val):
+        4 |         self.val = val
+        5 | x = MyClass()
+          |     ^^^^^^^ Clicking here
+          |
+        info: Found 1 definition
+         --> main.py:3:9
+          |
+        2 | class MyClass:
+        3 |     def __init__(self, val):
+          |         --------
+        4 |         self.val = val
+        5 | x = MyClass()
+          |
+        ");
+    }
+
+    /// goto-definition on a class init closing parenthesis
+    /// when there is an argument is somewhat ambiguous, and
+    /// so doesn't find any defs.
+    #[test]
+    fn goto_definition_class_init_parenthesis_ambiguous_closing() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+class MyClass:
+    def __init__(self, val):
+        self.val = val
+x = MyClass(0<CURSOR>)
+",
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @"No goto target found");
+    }
+
+    /// goto-definition on a class init closing parenthesis when there
+    /// is an argument with its own definition is somewhat ambiguous,
+    /// and but we currently go to the definition of the argument.
+    #[test]
+    fn goto_definition_class_init_parenthesis_ambiguous_argument_closing() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+foo = 1
+
+class MyClass:
+    def __init__(self, val):
+        self.val = val
+x = MyClass(foo<CURSOR>)
+",
+            )
+            .build();
+
+        assert_snapshot!(
+            test.goto_definition(),
+            @"
+        info[goto-definition]: Go to definition
+         --> main.py:7:13
+          |
+        5 |     def __init__(self, val):
+        6 |         self.val = val
+        7 | x = MyClass(foo)
+          |             ^^^ Clicking here
+          |
+        info: Found 1 definition
+         --> main.py:2:1
+          |
+        2 | foo = 1
+          | ---
+        3 |
+        4 | class MyClass:
+          |
+        ",
+        );
+    }
+
+    /// goto-definition on a class init parenthesis includes `__new__`
+    #[test]
+    fn goto_definition_class_init_parenthesis_includes_new() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+class MyClass:
+    def __init__(self, val):
+        self.val = val
+    def __new__(self, val):
+        self.val = val
+x = MyClass<CURSOR>()
+",
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+         --> main.py:7:5
+          |
+        5 |     def __new__(self, val):
+        6 |         self.val = val
+        7 | x = MyClass()
+          |     ^^^^^^^ Clicking here
+          |
+        info: Found 2 definitions
+         --> main.py:3:9
+          |
+        2 | class MyClass:
+        3 |     def __init__(self, val):
+          |         --------
+        4 |         self.val = val
+        5 |     def __new__(self, val):
+          |         -------
+        6 |         self.val = val
+        7 | x = MyClass()
+          |
+        ");
+    }
+
     /// goto-definition on a dynamic class literal (created via `type()`)
     #[test]
     fn goto_definition_dynamic_class_literal() {
@@ -1672,15 +1846,46 @@ x = DynCla<CURSOR>ss()
         4 | x = DynClass()
           |     ^^^^^^^^ Clicking here
           |
-        info: Found 2 definitions
-           --> main.py:2:1
-            |
-          2 | DynClass = type("DynClass", (), {})
-            | --------
-          3 |
-          4 | x = DynClass()
-            |
-           ::: stdlib/builtins.pyi:137:9
+        info: Found 1 definition
+         --> main.py:2:1
+          |
+        2 | DynClass = type("DynClass", (), {})
+          | --------
+        3 |
+        4 | x = DynClass()
+          |
+        "#);
+    }
+
+    /// goto-definition on a dynamic class literal (created via `type()`)
+    /// when on the opening parenthesis.
+    ///
+    /// Unlike when the cursor is on the `DynClass` name itself, this
+    /// will report the constructor method as the definition.
+    #[test]
+    fn goto_definition_dynamic_class_literal_parenthesis() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+DynClass = type("DynClass", (), {})
+
+x = DynClass<CURSOR>()
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r#"
+        info[goto-definition]: Go to definition
+         --> main.py:4:5
+          |
+        2 | DynClass = type("DynClass", (), {})
+        3 |
+        4 | x = DynClass()
+          |     ^^^^^^^^ Clicking here
+          |
+        info: Found 1 definition
+           --> stdlib/builtins.pyi:137:9
             |
         135 |     def __class__(self, type: type[Self], /) -> None: ...
         136 |     def __init__(self) -> None: ...
@@ -1720,6 +1925,50 @@ from collections import namedtuple
 Point = namedtuple("Point", ["x", "y"])
 
 p = Poi<CURSOR>nt(1, 2)
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r#"
+        info[goto-definition]: Go to definition
+         --> main.py:6:5
+          |
+        4 | Point = namedtuple("Point", ["x", "y"])
+        5 |
+        6 | p = Point(1, 2)
+          |     ^^^^^ Clicking here
+          |
+        info: Found 1 definition
+         --> main.py:4:1
+          |
+        2 | from collections import namedtuple
+        3 |
+        4 | Point = namedtuple("Point", ["x", "y"])
+          | -----
+        5 |
+        6 | p = Point(1, 2)
+          |
+        "#);
+    }
+
+    /// goto-definition on a dynamic namedtuple class literal via opening parenthesis.
+    ///
+    /// At time of writing (2026-02-04), goto-def doesn't report
+    /// any possible constructor methods for this case. But normally,
+    /// clicking on an opening parenthesis only goes to constructor
+    /// methods. So this tests that even in that case, we still go
+    /// to the actual definition.
+    #[test]
+    fn goto_definition_dynamic_namedtuple_literal_parenthesis() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+from collections import namedtuple
+
+Point = namedtuple("Point", ["x", "y"])
+
+p = Point<CURSOR>(1, 2)
 "#,
             )
             .build();
@@ -1806,7 +2055,7 @@ p = Poi<CURSOR>nt(1, 2)
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r#"
+        assert_snapshot!(test.goto_definition(), @"
         info[goto-definition]: Go to definition
          --> main.py:4:5
           |
@@ -1825,7 +2074,7 @@ p = Poi<CURSOR>nt(1, 2)
         263 |     @property
         264 |     def __flags__(self) -> int: ...
             |
-        "#);
+        ");
     }
 
     /// Goto-definition performs lookups on the metaclass when attributes are not found.
@@ -1844,7 +2093,7 @@ p = Poi<CURSOR>nt(1, 2)
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r#"
+        assert_snapshot!(test.goto_definition(), @"
         info[goto-definition]: Go to definition
          --> main.py:6:5
           |
@@ -1861,7 +2110,7 @@ p = Poi<CURSOR>nt(1, 2)
         4 |
         5 | class Bar(metaclass=Foo): ...
           |
-        "#);
+        ");
     }
 
     /// Goto-definition does not look up instance members on the metaclass.
@@ -1880,7 +2129,7 @@ p = Poi<CURSOR>nt(1, 2)
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r#"No goto target found"#);
+        assert_snapshot!(test.goto_definition(), @"No goto target found");
     }
 
     /// Check that we don't fall into infinite recursion when e.g.
@@ -1892,7 +2141,7 @@ p = Poi<CURSOR>nt(1, 2)
             .source("main.py", "type.<CURSOR>a")
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r#"No goto target found"#);
+        assert_snapshot!(test.goto_definition(), @"No goto target found");
     }
 
     /// Check that we don't fall into infinite recursion when e.g.
@@ -1921,6 +2170,78 @@ p = Poi<CURSOR>nt(1, 2)
         263 |     @property
         264 |     def __flags__(self) -> int: ...
             |
+        ");
+    }
+
+    /// Go-to-definition should not point to while-loop header definitions.
+    #[test]
+    fn goto_definition_does_not_point_to_while_loop_header() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+while True:
+    variable = 1
+
+    vari<CURSOR>able
+",
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r"
+        info[goto-definition]: Go to definition
+         --> main.py:5:5
+          |
+        3 |     variable = 1
+        4 |
+        5 |     variable
+          |     ^^^^^^^^ Clicking here
+          |
+        info: Found 1 definition
+         --> main.py:3:5
+          |
+        2 | while True:
+        3 |     variable = 1
+          |     --------
+        4 |
+        5 |     variable
+          |
+        ");
+    }
+
+    /// Go-to-definition should not point to for-loop header definitions.
+    #[test]
+    fn goto_definition_does_not_point_to_for_loop_header() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+for x in range(10):
+    variable = 1
+
+    vari<CURSOR>able
+",
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r"
+        info[goto-definition]: Go to definition
+         --> main.py:5:5
+          |
+        3 |     variable = 1
+        4 |
+        5 |     variable
+          |     ^^^^^^^^ Clicking here
+          |
+        info: Found 1 definition
+         --> main.py:3:5
+          |
+        2 | for x in range(10):
+        3 |     variable = 1
+          |     --------
+        4 |
+        5 |     variable
+          |
         ");
     }
 

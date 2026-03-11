@@ -164,6 +164,11 @@ isinstance("", t.Callable | t.Deque)
 # `Any` is valid in `issubclass()` calls but not `isinstance()` calls
 issubclass(list, t.Any)
 issubclass(list, t.Any | t.Dict)
+
+# `Dict` and `Callable` are only accepted directly, not when nested inside tuples
+isinstance("", (int, t.Dict))  # error: [invalid-argument-type]
+isinstance("", (int, t.Callable))  # error: [invalid-argument-type]
+issubclass(list, (int, t.Any))
 ```
 
 But for other special forms that are not permitted as the second argument, we still emit an error:
@@ -173,6 +178,9 @@ isinstance("", t.TypeGuard)  # error: [invalid-argument-type]
 isinstance("", t.ClassVar)  # error: [invalid-argument-type]
 isinstance("", t.Final)  # error: [invalid-argument-type]
 isinstance("", t.Any)  # error: [invalid-argument-type]
+
+# The same applies when `Any` is nested inside a tuple
+isinstance("", (int, t.Any))  # error: [invalid-argument-type]
 ```
 
 ## The builtin `NotImplemented` constant is not callable

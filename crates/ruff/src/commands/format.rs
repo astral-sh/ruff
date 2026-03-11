@@ -38,7 +38,7 @@ use ruff_source_file::{LineIndex, LineRanges, OneIndexed, SourceFileBuilder};
 use ruff_text_size::{TextLen, TextRange, TextSize};
 use ruff_workspace::FormatterSettings;
 use ruff_workspace::resolver::{
-    PyprojectConfig, ResolvedFile, Resolver, match_exclusion, python_files_in_path,
+    PyprojectConfig, ResolvedFile, Resolver, match_exclusion, project_files_in_path,
 };
 
 use crate::args::{ConfigArguments, FormatArguments, FormatRange};
@@ -75,7 +75,7 @@ pub(crate) fn format(
 ) -> Result<ExitStatus> {
     let mode = FormatMode::from_cli(&cli);
     let files = resolve_default_files(cli.files, false);
-    let (paths, resolver) = python_files_in_path(&files, pyproject_config, config_arguments)?;
+    let (paths, resolver) = project_files_in_path(&files, pyproject_config, config_arguments)?;
 
     let output_format = pyproject_config.settings.output_format;
     let preview = pyproject_config.settings.formatter.preview;
@@ -123,10 +123,7 @@ pub(crate) fn format(
                     let path = resolved_file.path();
                     let settings = resolver.resolve(path);
 
-                    let source_type = match settings.formatter.extension.get(path) {
-                        None => SourceType::from(path),
-                        Some(language) => SourceType::Python(PySourceType::from(language)),
-                    };
+                    let source_type = settings.formatter.extension.get_source_type(path);
                     if source_type.is_toml() {
                         // Ignore TOML files.
                         return None;
@@ -205,17 +202,19 @@ pub(crate) fn format(
     }
 
     let results = FormatResults::new(results.as_slice(), mode);
-    match mode {
-        FormatMode::Write => {}
-        FormatMode::Check => {
-            if preview.is_enabled() {
-                results.write_changed_preview(&mut stdout().lock(), output_format, &errors)?;
-            } else {
-                results.write_changed(&mut stdout().lock())?;
+    if config_arguments.log_level > LogLevel::Silent {
+        match mode {
+            FormatMode::Write => {}
+            FormatMode::Check => {
+                if preview.is_enabled() {
+                    results.write_changed_preview(&mut stdout().lock(), output_format, &errors)?;
+                } else {
+                    results.write_changed(&mut stdout().lock())?;
+                }
             }
-        }
-        FormatMode::Diff => {
-            results.write_diff(&mut stdout().lock())?;
+            FormatMode::Diff => {
+                results.write_diff(&mut stdout().lock())?;
+            }
         }
     }
 
@@ -625,7 +624,7 @@ impl<'a> FormatResults<'a> {
             .collect();
 
         let context = EmitterContext::new(&notebook_index);
-        let config = DisplayDiagnosticConfig::default()
+        let config = DisplayDiagnosticConfig::new("ruff")
             .hide_severity(true)
             .show_fix_diff(true)
             .color(!cfg!(test) && colored::control::SHOULD_COLORIZE.should_colorize());

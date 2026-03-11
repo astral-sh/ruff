@@ -213,8 +213,8 @@ reveal_type(d)  # revealed: Literal[2]
 
 ```py
 a, b = [1, 2]
-reveal_type(a)  # revealed: Unknown | int
-reveal_type(b)  # revealed: Unknown | int
+reveal_type(a)  # revealed: int
+reveal_type(b)  # revealed: int
 ```
 
 ### Simple unpacking
@@ -489,19 +489,13 @@ def f(x: MixedTupleSubclass):
 
     [n, o, *p] = x
     reveal_type(n)  # revealed: I0
-
-    # TODO: `I1 | I2` might be better here? (https://github.com/astral-sh/ty/issues/947)
-    reveal_type(o)  # revealed: I1
-
+    reveal_type(o)  # revealed: I1 | I2
     reveal_type(p)  # revealed: list[I1 | I2]
 
     [o, p, q, *r] = x
     reveal_type(o)  # revealed: I0
-
-    # TODO: `I1 | I2` might be better for both of these? (https://github.com/astral-sh/ty/issues/947)
-    reveal_type(p)  # revealed: I1
-    reveal_type(q)  # revealed: I1
-
+    reveal_type(p)  # revealed: I1 | I2
+    reveal_type(q)  # revealed: I1 | I2
     reveal_type(r)  # revealed: list[I1 | I2]
 
     s, *t, u = x

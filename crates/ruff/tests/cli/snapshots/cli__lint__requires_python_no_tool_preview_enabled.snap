@@ -63,6 +63,7 @@ file_resolver.include = [
 	"*.pyw",
 	"*.ipynb",
 	"**/pyproject.toml",
+	"*.md",
 ]
 file_resolver.extend_include = []
 file_resolver.respect_gitignore = true
@@ -146,14 +147,18 @@ linter.flake8_import_conventions.aliases = {
 	pandas = pd,
 	panel = pn,
 	plotly.express = px,
+	plotly.graph_objects = go,
 	polars = pl,
 	pyarrow = pa,
 	seaborn = sns,
+	statsmodels.api = sm,
 	tensorflow = tf,
 	tkinter = tk,
 	xml.etree.ElementTree = ET,
 }
-linter.flake8_import_conventions.banned_aliases = {}
+linter.flake8_import_conventions.banned_aliases = {
+	geopandas = [gpd],
+}
 linter.flake8_import_conventions.banned_from = []
 linter.flake8_pytest_style.fixture_parentheses = false
 linter.flake8_pytest_style.parametrize_names_type = tuple
@@ -186,6 +191,8 @@ linter.flake8_self.ignore_names = [
 linter.flake8_tidy_imports.ban_relative_imports = "parents"
 linter.flake8_tidy_imports.banned_api = {}
 linter.flake8_tidy_imports.banned_module_level_imports = []
+linter.flake8_tidy_imports.require_lazy = []
+linter.flake8_tidy_imports.ban_lazy = []
 linter.flake8_type_checking.strict = false
 linter.flake8_type_checking.exempt_modules = [
 	typing,
@@ -212,6 +219,7 @@ linter.isort.classes = []
 linter.isort.constants = []
 linter.isort.variables = []
 linter.isort.no_lines_before = []
+linter.isort.import_headings = {}
 linter.isort.lines_after_imports = -1
 linter.isort.lines_between_types = 0
 linter.isort.forced_separate = []

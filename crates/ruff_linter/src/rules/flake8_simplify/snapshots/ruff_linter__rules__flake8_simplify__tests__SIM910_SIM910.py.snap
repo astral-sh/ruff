@@ -171,6 +171,83 @@ help: Replace `dict.get("Cat", None)` with `dict.get("Cat")`
 59 | 
 60 | # https://github.com/astral-sh/ruff/issues/20341
 
+SIM910 [*] Use `ages.get(key_source.get("Thomas", "Tom"))` instead of `ages.get(key_source.get("Thomas", "Tom"), None)`
+  --> SIM910.py:64:7
+   |
+62 | ages = {"Tom": 23, "Maria": 23, "Dog": 11}
+63 | key_source = {"Thomas": "Tom"}
+64 | age = ages.get(key_source.get("Thomas", "Tom"), None)
+   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+65 |
+66 | # Property access as key
+   |
+help: Replace `ages.get(key_source.get("Thomas", "Tom"), None)` with `ages.get(key_source.get("Thomas", "Tom"))`
+61 | # Method call as key
+62 | ages = {"Tom": 23, "Maria": 23, "Dog": 11}
+63 | key_source = {"Thomas": "Tom"}
+   - age = ages.get(key_source.get("Thomas", "Tom"), None)
+64 + age = ages.get(key_source.get("Thomas", "Tom"))
+65 | 
+66 | # Property access as key
+67 | class Data:
+
+SIM910 [*] Use `ages.get(data.name)` instead of `ages.get(data.name, None)`
+  --> SIM910.py:73:7
+   |
+71 | data = Data()
+72 | ages = {"Tom": 23, "Maria": 23, "Dog": 11}
+73 | age = ages.get(data.name, None)
+   |       ^^^^^^^^^^^^^^^^^^^^^^^^^
+74 |
+75 | # Complex expression as key
+   |
+help: Replace `ages.get(data.name, None)` with `ages.get(data.name)`
+70 | 
+71 | data = Data()
+72 | ages = {"Tom": 23, "Maria": 23, "Dog": 11}
+   - age = ages.get(data.name, None)
+73 + age = ages.get(data.name)
+74 | 
+75 | # Complex expression as key
+76 | ages = {"Tom": 23, "Maria": 23, "Dog": 11}
+
+SIM910 [*] Use `ages.get("Tom" if True else "Maria")` instead of `ages.get("Tom" if True else "Maria", None)`
+  --> SIM910.py:77:7
+   |
+75 | # Complex expression as key
+76 | ages = {"Tom": 23, "Maria": 23, "Dog": 11}
+77 | age = ages.get("Tom" if True else "Maria", None)
+   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+78 |
+79 | # Function call as key
+   |
+help: Replace `ages.get("Tom" if True else "Maria", None)` with `ages.get("Tom" if True else "Maria")`
+74 | 
+75 | # Complex expression as key
+76 | ages = {"Tom": 23, "Maria": 23, "Dog": 11}
+   - age = ages.get("Tom" if True else "Maria", None)
+77 + age = ages.get("Tom" if True else "Maria")
+78 | 
+79 | # Function call as key
+80 | def get_key():
+
+SIM910 [*] Use `ages.get(get_key())` instead of `ages.get(get_key(), None)`
+  --> SIM910.py:84:7
+   |
+83 | ages = {"Tom": 23, "Maria": 23, "Dog": 11}
+84 | age = ages.get(get_key(), None)
+   |       ^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+help: Replace `ages.get(get_key(), None)` with `ages.get(get_key())`
+81 |     return "Tom"
+82 | 
+83 | ages = {"Tom": 23, "Maria": 23, "Dog": 11}
+   - age = ages.get(get_key(), None)
+84 + age = ages.get(get_key())
+85 | 
+86 | 
+87 | age = ages.get(
+
 SIM910 [*] Use `dict.get()` without default value
   --> SIM910.py:87:7
    |

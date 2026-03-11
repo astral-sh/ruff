@@ -489,4 +489,30 @@ help: Use `dataclasses.InitVar` instead
 141 +     """
 142 +     def __post_init__(self, x: int) -> None:
 143 |         self.x = x
+144 | 
+145 | 
 note: This is an unsafe fix and may change runtime behavior
+
+RUF033 `__post_init__` method with argument defaults
+   --> RUF033.py:149:60
+    |
+147 | @dataclass
+148 | class E:
+149 |     def __post_init__[T: (str, bytes)](self, a: T | None = None, b: T | None = None) -> None:
+    |                                                            ^^^^
+150 |         self.a = str(a)
+151 |         self.b = str(b)
+    |
+help: Use `dataclasses.InitVar` instead
+
+RUF033 `__post_init__` method with argument defaults
+   --> RUF033.py:149:80
+    |
+147 | @dataclass
+148 | class E:
+149 |     def __post_init__[T: (str, bytes)](self, a: T | None = None, b: T | None = None) -> None:
+    |                                                                                ^^^^
+150 |         self.a = str(a)
+151 |         self.b = str(b)
+    |
+help: Use `dataclasses.InitVar` instead

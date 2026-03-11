@@ -6,7 +6,6 @@ use ruff_python_semantic::SemanticModel;
 use ruff_text_size::{Ranged, TextSize};
 
 use crate::checkers::ast::Checker;
-use crate::preview::is_safe_super_call_with_parameters_fix_enabled;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -49,10 +48,6 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// This rule's fix is marked as unsafe because removing the arguments from a call
 /// may delete comments that are attached to the arguments.
 ///
-/// In [preview], the fix is marked safe if no comments are present.
-///
-/// [preview]: https://docs.astral.sh/ruff/preview/
-///
 /// ## References
 /// - [Python documentation: `super`](https://docs.python.org/3/library/functions.html#super)
 /// - [super/MRO, Python's most misunderstood feature.](https://www.youtube.com/watch?v=X1PQ7zzltz4)
@@ -88,7 +83,6 @@ pub(crate) fn super_call_with_parameters(checker: &Checker, call: &ast::ExprCall
     }
 
     let mut parents = checker.semantic().current_statements();
-
     // For a `super` invocation to be unnecessary, the first argument needs to match
     // the enclosing class, and the second argument needs to match the first
     // argument to the enclosing function.
@@ -128,26 +122,49 @@ pub(crate) fn super_call_with_parameters(checker: &Checker, call: &ast::ExprCall
         return;
     };
 
-    let (
-        Expr::Name(ast::ExprName {
-            id: first_arg_id, ..
-        }),
-        Expr::Name(ast::ExprName {
-            id: second_arg_id, ..
-        }),
-    ) = (first_arg, second_arg)
+    let Expr::Name(ast::ExprName {
+        id: second_arg_id, ..
+    }) = second_arg
     else {
         return;
     };
 
-    // The `super(__class__, self)` and `super(ParentClass, self)` patterns are redundant in Python 3
-    // when the first argument refers to the implicit `__class__` cell or to the enclosing class.
-    // Avoid triggering if a local variable shadows either name.
-    if !(((first_arg_id == "__class__") || (first_arg_id == parent_name.as_str()))
-        && !checker.semantic().current_scope().has(first_arg_id)
-        && second_arg_id == parent_arg.name().as_str())
-    {
+    if second_arg_id != parent_arg.name().as_str() {
         return;
+    }
+
+    // Verify the first argument matches the enclosing class chain.
+    // For `super(__class__, self)` or `super(ClassName, self)`, just check the immediate class.
+    // For `super(Outer.Inner, self)`, verify each segment matches the enclosing class nesting.
+    match first_arg {
+        Expr::Name(ast::ExprName { id, .. }) => {
+            if !((id == "__class__" || id == parent_name.as_str())
+                && !checker.semantic().current_scope().has(id))
+            {
+                return;
+            }
+        }
+        Expr::Attribute(_) => {
+            let chain = collect_attribute_chain(first_arg);
+            // The innermost name must match the immediately enclosing class.
+            if chain.last() != Some(&parent_name.as_str()) {
+                return;
+            }
+            // Each preceding name must match the next enclosing class.
+            for name in chain.iter().rev().skip(1) {
+                let Some(Stmt::ClassDef(ast::StmtClassDef {
+                    name: enclosing_name,
+                    ..
+                })) = parents.find(|stmt| stmt.is_class_def_stmt())
+                else {
+                    return;
+                };
+                if *name != enclosing_name.as_str() {
+                    return;
+                }
+            }
+        }
+        _ => return,
     }
 
     drop(parents);
@@ -186,12 +203,10 @@ pub(crate) fn super_call_with_parameters(checker: &Checker, call: &ast::ExprCall
 
     // Only provide a fix if there are no keyword arguments, since super() doesn't accept keyword arguments
     if call.arguments.keywords.is_empty() {
-        let applicability = if !checker.comment_ranges().intersects(call.arguments.range())
-            && is_safe_super_call_with_parameters_fix_enabled(checker.settings())
-        {
-            Applicability::Safe
-        } else {
+        let applicability = if checker.comment_ranges().intersects(call.arguments.range()) {
             Applicability::Unsafe
+        } else {
+            Applicability::Safe
         };
 
         diagnostic.set_fix(Fix::applicable_edit(
@@ -202,6 +217,29 @@ pub(crate) fn super_call_with_parameters(checker: &Checker, call: &ast::ExprCall
             applicability,
         ));
     }
+}
+
+/// Collects the chain of names from an attribute expression.
+///
+/// For example, `A.B.C` returns `["A", "B", "C"]`.
+fn collect_attribute_chain(expr: &Expr) -> Vec<&str> {
+    let mut chain = Vec::new();
+    let mut current = expr;
+    loop {
+        match current {
+            Expr::Attribute(ast::ExprAttribute { value, attr, .. }) => {
+                chain.push(attr.id.as_str());
+                current = value;
+            }
+            Expr::Name(ast::ExprName { id, .. }) => {
+                chain.push(id.as_str());
+                break;
+            }
+            _ => return Vec::new(),
+        }
+    }
+    chain.reverse();
+    chain
 }
 
 /// Returns `true` if a call is an argumented `super` invocation.

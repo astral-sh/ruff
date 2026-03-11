@@ -405,8 +405,7 @@ pub fn add_noqa_to_path(
     );
 
     // Parse range suppression comments
-    let suppressions =
-        Suppressions::from_tokens(settings, locator.contents(), parsed.tokens(), &indexer);
+    let suppressions = Suppressions::from_tokens(locator.contents(), parsed.tokens(), &indexer);
 
     // Generate diagnostics, ignoring any existing `noqa` directives.
     let diagnostics = check_path(
@@ -480,8 +479,7 @@ pub fn lint_only(
     );
 
     // Parse range suppression comments
-    let suppressions =
-        Suppressions::from_tokens(settings, locator.contents(), parsed.tokens(), &indexer);
+    let suppressions = Suppressions::from_tokens(locator.contents(), parsed.tokens(), &indexer);
 
     // Generate diagnostics.
     let diagnostics = check_path(
@@ -598,8 +596,7 @@ pub fn lint_fix<'a>(
         );
 
         // Parse range suppression comments
-        let suppressions =
-            Suppressions::from_tokens(settings, locator.contents(), parsed.tokens(), &indexer);
+        let suppressions = Suppressions::from_tokens(locator.contents(), parsed.tokens(), &indexer);
 
         // Generate diagnostics.
         let diagnostics = check_path(
@@ -981,8 +978,7 @@ mod tests {
             &locator,
             &indexer,
         );
-        let suppressions =
-            Suppressions::from_tokens(settings, locator.contents(), parsed.tokens(), &indexer);
+        let suppressions = Suppressions::from_tokens(locator.contents(), parsed.tokens(), &indexer);
         let mut diagnostics = check_path(
             path,
             None,
@@ -1023,6 +1019,7 @@ mod tests {
     #[test_case(Path::new("invalid_expression.py"), PythonVersion::PY312)]
     #[test_case(Path::new("global_parameter.py"), PythonVersion::PY310)]
     #[test_case(Path::new("annotated_global.py"), PythonVersion::PY314)]
+    #[test_case(Path::new("lazy_future_import.py"), PythonVersion::PY315)]
     fn test_semantic_errors(path: &Path, python_version: PythonVersion) -> Result<()> {
         let snapshot = format!(
             "semantic_syntax_error_{}_{}",
@@ -1226,6 +1223,30 @@ mod tests {
             settings,
         )
         .0;
+        assert_diagnostics!(snapshot, diagnostics);
+    }
+
+    #[test_case(
+        "on_line_one",
+        r#"#!/usr/bin/env python #noqa:D100
+"#
+    )]
+    #[test_case(
+        "on_line_two",
+        r#"#!/usr/bin/env python
+#noqa: D100
+"#
+    )]
+    #[test_case(
+        "on_line_three",
+        r#"#!/usr/bin/env python
+
+#noqa: D100"#
+    )]
+    fn test_shebang_noqa(name: &str, contents: &str) {
+        let snapshot = format!("shebang_noqa_{name}");
+        let settings = LinterSettings::for_rule(Rule::UndocumentedPublicModule);
+        let diagnostics = test_snippet(contents, &settings);
         assert_diagnostics!(snapshot, diagnostics);
     }
 }

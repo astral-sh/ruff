@@ -14,7 +14,8 @@ pub use program::{Program, ProgramSettings};
 pub use python_platform::PythonPlatform;
 use rustc_hash::FxHasher;
 pub use semantic_model::{
-    Completion, HasDefinition, HasType, MemberDefinition, NameKind, SemanticModel,
+    Completion, HasDefinition, HasOptionalDefinition, HasType, MemberDefinition, NameKind,
+    SemanticModel,
 };
 pub use suppression::{
     UNUSED_IGNORE_COMMENT, is_unused_ignore_comment_lint, suppress_all, suppress_single,
@@ -25,18 +26,18 @@ pub use ty_site_packages::{
     PythonEnvironment, PythonVersionFileSource, PythonVersionSource, PythonVersionWithSource,
     SitePackagesPaths, SysPrefixPathOrigin,
 };
-pub use types::DisplaySettings;
 pub use types::ide_support::{
-    ImportAliasResolution, ResolvedDefinition, definitions_for_attribute, definitions_for_bin_op,
-    definitions_for_imported_symbol, definitions_for_name, definitions_for_unary_op,
-    map_stub_definition,
+    ImportAliasResolution, ResolvedDefinition, TypeHierarchyClass, definitions_for_attribute,
+    definitions_for_bin_op, definitions_for_imported_symbol, definitions_for_name,
+    definitions_for_unary_op, map_stub_definition, type_hierarchy_prepare, type_hierarchy_subtypes,
+    type_hierarchy_supertypes,
 };
+pub use types::{DisplaySettings, TypeQualifiers};
 
 pub mod ast_node_ref;
 mod db;
 mod dunder_all;
 pub mod lint;
-pub(crate) mod list;
 mod node_key;
 pub(crate) mod place;
 mod program;
@@ -90,6 +91,8 @@ pub struct AnalysisSettings {
     pub respect_type_ignore_comments: bool,
 
     pub allowed_unresolved_imports: ModuleGlobSet,
+
+    pub replace_imports_with_any: ModuleGlobSet,
 }
 
 impl Default for AnalysisSettings {
@@ -97,6 +100,7 @@ impl Default for AnalysisSettings {
         Self {
             respect_type_ignore_comments: true,
             allowed_unresolved_imports: ModuleGlobSet::empty(),
+            replace_imports_with_any: ModuleGlobSet::empty(),
         }
     }
 }

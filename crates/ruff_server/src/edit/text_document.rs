@@ -27,6 +27,7 @@ pub struct TextDocument {
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum LanguageId {
     Python,
+    Markdown,
     Other,
 }
 
@@ -34,6 +35,7 @@ impl From<&str> for LanguageId {
     fn from(language_id: &str) -> Self {
         match language_id {
             "python" => Self::Python,
+            "markdown" => Self::Markdown,
             _ => Self::Other,
         }
     }

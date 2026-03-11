@@ -399,7 +399,29 @@ impl RelativePathBuf {
             ValueSource::Cli | ValueSource::Editor => system.current_directory(),
         };
 
-        SystemPath::absolute(&self.0, relative_to)
+        // Expand tildes and environment variables in the path (e.g. `~/.cache/foo`).
+        // Use `full_with_context` to route lookups through the `System` trait,
+        // ensuring correct behavior in tests, WASM, and the LSP.
+        let expanded = shellexpand::full_with_context(
+            self.0.as_str(),
+            || system.env_var("HOME").ok(),
+            |var| match system.env_var(var) {
+                Ok(val) => Ok(Some(val)),
+                Err(std::env::VarError::NotPresent) => Ok(None),
+                Err(e) => Err(e),
+            },
+        );
+
+        match &expanded {
+            Ok(path) => SystemPath::absolute(SystemPath::new(path.as_ref()), relative_to),
+            Err(err) => {
+                tracing::warn!(
+                    "Failed to expand variables in path `{}`: {err}",
+                    self.0.as_str()
+                );
+                SystemPath::absolute(&self.0, relative_to)
+            }
+        }
     }
 }
 
@@ -459,5 +481,80 @@ impl RelativeGlobPattern {
 impl std::fmt::Display for RelativeGlobPattern {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.0.fmt(f)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use ruff_db::system::{SystemPath, SystemPathBuf, TestSystem};
+
+    use super::{RelativePathBuf, ValueSource};
+
+    #[test]
+    fn tilde_expansion_uses_system_env() {
+        let system = TestSystem::default();
+        system.set_env_var("HOME", "/test/home");
+
+        let path = RelativePathBuf::new(
+            "~/projects",
+            ValueSource::File(Arc::new(SystemPathBuf::from("/project"))),
+        );
+        let resolved = path.absolute(SystemPath::new("/project"), &system);
+
+        assert_eq!(resolved, SystemPathBuf::from("/test/home/projects"));
+    }
+
+    #[test]
+    fn env_var_expansion_uses_system_env() {
+        let system = TestSystem::default();
+        system.set_env_var("MY_DIR", "/custom/dir");
+
+        let path = RelativePathBuf::new(
+            "$MY_DIR/sub",
+            ValueSource::File(Arc::new(SystemPathBuf::from("/project"))),
+        );
+        let resolved = path.absolute(SystemPath::new("/project"), &system);
+
+        assert_eq!(resolved, SystemPathBuf::from("/custom/dir/sub"));
+    }
+
+    #[test]
+    fn undefined_env_var_falls_back_to_literal() {
+        let system = TestSystem::default();
+
+        let path = RelativePathBuf::new(
+            "$NONEXISTENT/foo",
+            ValueSource::File(Arc::new(SystemPathBuf::from("/project"))),
+        );
+        let resolved = path.absolute(SystemPath::new("/project"), &system);
+
+        // When the variable is not found, the original path is used as a fallback.
+        assert_eq!(resolved, SystemPathBuf::from("/project/$NONEXISTENT/foo"));
+    }
+
+    #[test]
+    fn no_expansion_needed() {
+        let system = TestSystem::default();
+
+        let path = RelativePathBuf::new(
+            "src/lib.rs",
+            ValueSource::File(Arc::new(SystemPathBuf::from("/project"))),
+        );
+        let resolved = path.absolute(SystemPath::new("/project"), &system);
+
+        assert_eq!(resolved, SystemPathBuf::from("/project/src/lib.rs"));
+    }
+
+    #[test]
+    fn cli_source_resolves_relative_to_cwd() {
+        let system = TestSystem::default();
+        system.set_env_var("HOME", "/test/home");
+
+        let path = RelativePathBuf::cli("~/config");
+        let resolved = path.absolute(SystemPath::new("/project"), &system);
+
+        assert_eq!(resolved, SystemPathBuf::from("/test/home/config"));
     }
 }

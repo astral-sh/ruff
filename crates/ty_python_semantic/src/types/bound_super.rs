@@ -9,12 +9,15 @@ use crate::{
     place::{Place, PlaceAndQualifiers},
     types::{
         BoundTypeVarInstance, ClassBase, ClassType, DynamicType, IntersectionBuilder, KnownClass,
-        MemberLookupPolicy, NominalInstanceType, NormalizedVisitor, SpecialFormType,
-        SubclassOfInner, SubclassOfType, Type, TypeVarBoundOrConstraints, TypeVarConstraints,
-        TypeVarInstance, UnionBuilder,
+        MemberLookupPolicy, NominalInstanceType, SpecialFormType, SubclassOfInner, SubclassOfType,
+        Type, TypeVarBoundOrConstraints, UnionBuilder,
+        constraints::{ConstraintSet, ConstraintSetBuilder},
         context::InferContext,
         diagnostic::{INVALID_SUPER_ARGUMENT, UNAVAILABLE_IMPLICIT_SUPER_ARGUMENTS},
-        todo_type, visitor,
+        relation::{HasRelationToVisitor, IsDisjointVisitor},
+        todo_type,
+        typevar::{TypeVarConstraints, TypeVarInstance},
+        visitor,
     },
 };
 
@@ -195,30 +198,6 @@ pub enum SuperOwnerKind<'db> {
 }
 
 impl<'db> SuperOwnerKind<'db> {
-    fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
-        match self {
-            SuperOwnerKind::Dynamic(dynamic) => SuperOwnerKind::Dynamic(dynamic.normalized()),
-            SuperOwnerKind::Class(class) => {
-                SuperOwnerKind::Class(class.normalized_impl(db, visitor))
-            }
-            SuperOwnerKind::Instance(instance) => instance
-                .normalized_impl(db, visitor)
-                .as_nominal_instance()
-                .map(Self::Instance)
-                .unwrap_or(Self::Dynamic(DynamicType::Any)),
-            SuperOwnerKind::InstanceTypeVar(bound_typevar, class) => {
-                SuperOwnerKind::InstanceTypeVar(
-                    bound_typevar.normalized_impl(db, visitor),
-                    class.normalized_impl(db, visitor),
-                )
-            }
-            SuperOwnerKind::ClassTypeVar(bound_typevar, class) => SuperOwnerKind::ClassTypeVar(
-                bound_typevar.normalized_impl(db, visitor),
-                class.normalized_impl(db, visitor),
-            ),
-        }
-    }
-
     fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
@@ -557,16 +536,10 @@ impl<'db> BoundSuperType<'db> {
                     }
                 }
             }
-            Type::BooleanLiteral(_) | Type::TypeIs(_) | Type::TypeGuard(_) => {
+            Type::TypeIs(_) | Type::TypeGuard(_) => {
                 return delegate_to(KnownClass::Bool.to_instance(db));
             }
-            Type::IntLiteral(_) => return delegate_to(KnownClass::Int.to_instance(db)),
-            Type::StringLiteral(_) | Type::LiteralString => {
-                return delegate_to(KnownClass::Str.to_instance(db));
-            }
-            Type::BytesLiteral(_) => {
-                return delegate_to(KnownClass::Bytes.to_instance(db));
-            }
+            Type::LiteralValue(literal) => return delegate_to(literal.fallback_instance(db)),
             Type::SpecialForm(special_form) => {
                 return delegate_to(special_form.instance_fallback(db));
             }
@@ -588,9 +561,6 @@ impl<'db> BoundSuperType<'db> {
             }
             Type::GenericAlias(_) => return delegate_to(KnownClass::GenericAlias.to_instance(db)),
             Type::PropertyInstance(_) => return delegate_to(KnownClass::Property.to_instance(db)),
-            Type::EnumLiteral(enum_literal_type) => {
-                return delegate_to(enum_literal_type.enum_class_instance(db));
-            }
             Type::BoundSuper(_) => return delegate_to(KnownClass::Super.to_instance(db)),
             Type::TypedDict(td) => {
                 // In general it isn't sound to upcast a `TypedDict` to a `dict`,
@@ -691,13 +661,7 @@ impl<'db> BoundSuperType<'db> {
             // Also, invoking a descriptor on a dynamic attribute is meaningless, so we don't handle this.
             SuperOwnerKind::Dynamic(_) => None,
             SuperOwnerKind::Class(_) => Some(
-                Type::try_call_dunder_get_on_attribute(
-                    db,
-                    attribute,
-                    Type::none(db),
-                    owner.owner_type(db),
-                )
-                .0,
+                Type::try_call_dunder_get_on_attribute(db, attribute, None, owner.owner_type(db)).0,
             ),
             SuperOwnerKind::Instance(_) | SuperOwnerKind::InstanceTypeVar(..) => {
                 let owner_type = owner.owner_type(db);
@@ -705,7 +669,7 @@ impl<'db> BoundSuperType<'db> {
                     Type::try_call_dunder_get_on_attribute(
                         db,
                         attribute,
-                        owner_type,
+                        Some(owner_type),
                         owner_type.to_meta_type(db),
                     )
                     .0,
@@ -713,15 +677,7 @@ impl<'db> BoundSuperType<'db> {
             }
             SuperOwnerKind::ClassTypeVar(..) => {
                 let owner_type = owner.owner_type(db);
-                Some(
-                    Type::try_call_dunder_get_on_attribute(
-                        db,
-                        attribute,
-                        Type::none(db),
-                        owner_type,
-                    )
-                    .0,
-                )
+                Some(Type::try_call_dunder_get_on_attribute(db, attribute, None, owner_type).0)
             }
         }
     }
@@ -770,14 +726,6 @@ impl<'db> BoundSuperType<'db> {
         }
     }
 
-    pub(super) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
-        Self::new(
-            db,
-            self.pivot_class(db).normalized_impl(db, visitor),
-            self.owner(db).normalized_impl(db, visitor),
-        )
-    }
-
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
@@ -791,5 +739,128 @@ impl<'db> BoundSuperType<'db> {
             self.owner(db)
                 .recursive_type_normalized_impl(db, div, nested)?,
         ))
+    }
+
+    /// Check whether two `BoundSuperType`s are equivalent by recursing into
+    /// their fields.
+    ///
+    /// Despite the name, this is called from `Type::has_relation_to_impl`,
+    /// not from `Type::is_equivalent_to_impl`. `Type::has_relation_to_impl`
+    /// cannot simply delegate to `Type::is_equivalent_to_impl` for this
+    /// case, because `Type::is_equivalent_to_impl` itself delegates back to
+    /// `Type::has_relation_to_impl`, which would cause an infinite loop.
+    pub(crate) fn is_equivalent_to_impl<'c>(
+        self,
+        db: &'db dyn Db,
+        other: Self,
+        constraints: &'c ConstraintSetBuilder<'db>,
+        relation_visitor: &HasRelationToVisitor<'db, 'c>,
+        disjointness_visitor: &IsDisjointVisitor<'db, 'c>,
+    ) -> ConstraintSet<'db, 'c> {
+        let mut class_equivalence = match (self.pivot_class(db), other.pivot_class(db)) {
+            (ClassBase::Class(left), ClassBase::Class(right)) => Type::from(left)
+                .when_equivalent_to_impl(
+                    db,
+                    Type::from(right),
+                    constraints,
+                    relation_visitor,
+                    disjointness_visitor,
+                ),
+            (ClassBase::Class(_), _) => ConstraintSet::from_bool(constraints, false),
+
+            // A `Divergent` type is only equivalent to itself
+            (
+                ClassBase::Dynamic(DynamicType::Divergent(l)),
+                ClassBase::Dynamic(DynamicType::Divergent(r)),
+            ) => ConstraintSet::from_bool(constraints, l == r),
+            (ClassBase::Dynamic(DynamicType::Divergent(_)), _)
+            | (_, ClassBase::Dynamic(DynamicType::Divergent(_))) => {
+                ConstraintSet::from_bool(constraints, false)
+            }
+            (ClassBase::Dynamic(_), ClassBase::Dynamic(_)) => {
+                ConstraintSet::from_bool(constraints, true)
+            }
+            (ClassBase::Dynamic(_), _) => ConstraintSet::from_bool(constraints, false),
+
+            (ClassBase::Generic, ClassBase::Generic) => ConstraintSet::from_bool(constraints, true),
+            (ClassBase::Generic, _) => ConstraintSet::from_bool(constraints, false),
+
+            (ClassBase::Protocol, ClassBase::Protocol) => {
+                ConstraintSet::from_bool(constraints, true)
+            }
+            (ClassBase::Protocol, _) => ConstraintSet::from_bool(constraints, false),
+
+            (ClassBase::TypedDict, ClassBase::TypedDict) => {
+                ConstraintSet::from_bool(constraints, true)
+            }
+            (ClassBase::TypedDict, _) => ConstraintSet::from_bool(constraints, false),
+        };
+        if class_equivalence.is_never_satisfied(db) {
+            return ConstraintSet::from_bool(constraints, false);
+        }
+        let owner_equivalence = match (self.owner(db), other.owner(db)) {
+            (SuperOwnerKind::Class(left), SuperOwnerKind::Class(right)) => Type::from(left)
+                .when_equivalent_to_impl(
+                    db,
+                    Type::from(right),
+                    constraints,
+                    relation_visitor,
+                    disjointness_visitor,
+                ),
+            (SuperOwnerKind::Class(_), _) => ConstraintSet::from_bool(constraints, false),
+
+            (SuperOwnerKind::Instance(left), SuperOwnerKind::Instance(right)) => Type::from(left)
+                .when_equivalent_to_impl(
+                    db,
+                    Type::from(right),
+                    constraints,
+                    relation_visitor,
+                    disjointness_visitor,
+                ),
+            (SuperOwnerKind::Instance(_), _) => ConstraintSet::from_bool(constraints, false),
+
+            // A `Divergent` type is only equivalent to itself
+            (
+                SuperOwnerKind::Dynamic(DynamicType::Divergent(l)),
+                SuperOwnerKind::Dynamic(DynamicType::Divergent(r)),
+            ) => ConstraintSet::from_bool(constraints, l == r),
+            (SuperOwnerKind::Dynamic(DynamicType::Divergent(_)), _)
+            | (_, SuperOwnerKind::Dynamic(DynamicType::Divergent(_))) => {
+                ConstraintSet::from_bool(constraints, false)
+            }
+            (SuperOwnerKind::Dynamic(_), SuperOwnerKind::Dynamic(_)) => {
+                ConstraintSet::from_bool(constraints, true)
+            }
+            (SuperOwnerKind::Dynamic(_), _) => ConstraintSet::from_bool(constraints, false),
+
+            (
+                SuperOwnerKind::InstanceTypeVar(l_typevar, l_class),
+                SuperOwnerKind::InstanceTypeVar(r_typevar, r_class),
+            )
+            | (
+                SuperOwnerKind::ClassTypeVar(l_typevar, l_class),
+                SuperOwnerKind::ClassTypeVar(r_typevar, r_class),
+            ) => Type::TypeVar(l_typevar)
+                .when_equivalent_to_impl(
+                    db,
+                    Type::TypeVar(r_typevar),
+                    constraints,
+                    relation_visitor,
+                    disjointness_visitor,
+                )
+                .and(db, constraints, || {
+                    Type::from(l_class).when_equivalent_to_impl(
+                        db,
+                        Type::from(r_class),
+                        constraints,
+                        relation_visitor,
+                        disjointness_visitor,
+                    )
+                }),
+            (SuperOwnerKind::InstanceTypeVar(..) | SuperOwnerKind::ClassTypeVar(..), _) => {
+                ConstraintSet::from_bool(constraints, false)
+            }
+        };
+        class_equivalence.intersect(db, constraints, owner_equivalence)
     }
 }

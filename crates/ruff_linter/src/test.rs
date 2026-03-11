@@ -243,8 +243,7 @@ pub(crate) fn test_contents<'a>(
         &locator,
         &indexer,
     );
-    let suppressions =
-        Suppressions::from_tokens(settings, locator.contents(), parsed.tokens(), &indexer);
+    let suppressions = Suppressions::from_tokens(locator.contents(), parsed.tokens(), &indexer);
     let messages = check_path(
         path,
         path.parent()
@@ -312,7 +311,7 @@ pub(crate) fn test_contents<'a>(
             );
 
             let suppressions =
-                Suppressions::from_tokens(settings, locator.contents(), parsed.tokens(), &indexer);
+                Suppressions::from_tokens(locator.contents(), parsed.tokens(), &indexer);
             let fixed_messages = check_path(
                 path,
                 None,
@@ -461,7 +460,7 @@ pub(crate) fn print_jupyter_messages(
     path: &Path,
     notebook: &Notebook,
 ) -> String {
-    let config = DisplayDiagnosticConfig::default()
+    let config = DisplayDiagnosticConfig::new("ruff")
         .format(DiagnosticFormat::Full)
         .hide_severity(true)
         .with_show_fix_status(true)
@@ -480,7 +479,7 @@ pub(crate) fn print_jupyter_messages(
 }
 
 pub(crate) fn print_messages(diagnostics: &[Diagnostic]) -> String {
-    let config = DisplayDiagnosticConfig::default()
+    let config = DisplayDiagnosticConfig::new("ruff")
         .format(DiagnosticFormat::Full)
         .hide_severity(true)
         .with_show_fix_status(true)

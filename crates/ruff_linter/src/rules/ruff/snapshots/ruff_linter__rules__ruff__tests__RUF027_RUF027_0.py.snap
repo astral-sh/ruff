@@ -320,3 +320,108 @@ help: Add `f` prefix
 76 | # fstrings are never correct as type definitions
 77 | # so we should always skip those
 note: This is an unsafe fix and may change runtime behavior
+
+RUF027 [*] Possible f-string without an `f` prefix
+  --> RUF027_0.py:92:11
+   |
+90 | def backslash_test():
+91 |     x = "test"
+92 |     print("Hello {'\\n'}{x}")  # Should not trigger RUF027 for Python < 3.12
+   |           ^^^^^^^^^^^^^^^^^^
+93 |
+94 | # Test case for comment handling in f-string interpolations
+   |
+help: Add `f` prefix
+89 | # Should not trigger RUF027 for Python < 3.12 due to backslashes in interpolations
+90 | def backslash_test():
+91 |     x = "test"
+   -     print("Hello {'\\n'}{x}")  # Should not trigger RUF027 for Python < 3.12
+92 +     print(f"Hello {'\\n'}{x}")  # Should not trigger RUF027 for Python < 3.12
+93 | 
+94 | # Test case for comment handling in f-string interpolations
+95 | # Should not trigger RUF027 for Python < 3.12 due to comments in interpolations
+note: This is an unsafe fix and may change runtime behavior
+
+RUF027 [*] Possible f-string without an `f` prefix
+   --> RUF027_0.py:98:11
+    |
+ 96 |   def comment_test():
+ 97 |       x = "!"
+ 98 |       print("""{x  # }
+    |  ___________^
+ 99 | | }""")
+    | |____^
+100 |
+101 |   # Test case for `#` inside a nested string literal in interpolation
+    |
+help: Add `f` prefix
+95  | # Should not trigger RUF027 for Python < 3.12 due to comments in interpolations
+96  | def comment_test():
+97  |     x = "!"
+    -     print("""{x  # }
+98  +     print(f"""{x  # }
+99  | }""")
+100 | 
+101 | # Test case for `#` inside a nested string literal in interpolation
+note: This is an unsafe fix and may change runtime behavior
+
+RUF027 [*] Possible f-string without an `f` prefix
+   --> RUF027_0.py:105:11
+    |
+103 | def hash_in_string_test():
+104 |     x = "world"
+105 |     print("Hello {'#'}{x}")   # RUF027: `#` is inside a string, not a comment
+    |           ^^^^^^^^^^^^^^^^
+106 |     print("Hello {\"#\"}{x}") # RUF027: same, double-quoted
+    |
+help: Add `f` prefix
+102 | # `#` inside a string is NOT a comment — should trigger RUF027 even on Python < 3.12
+103 | def hash_in_string_test():
+104 |     x = "world"
+    -     print("Hello {'#'}{x}")   # RUF027: `#` is inside a string, not a comment
+105 +     print(f"Hello {'#'}{x}")   # RUF027: `#` is inside a string, not a comment
+106 |     print("Hello {\"#\"}{x}") # RUF027: same, double-quoted
+107 | 
+108 | # Test case for `#` in format spec (e.g., `{1:#x}`)
+note: This is an unsafe fix and may change runtime behavior
+
+RUF027 [*] Possible f-string without an `f` prefix
+   --> RUF027_0.py:112:11
+    |
+110 | def hash_in_format_spec_test():
+111 |     n = 255
+112 |     print("Hex: {n:#x}")   # RUF027: `#` is in format spec, not a comment
+    |           ^^^^^^^^^^^^^
+113 |     print("Oct: {n:#o}")   # RUF027: same
+    |
+help: Add `f` prefix
+109 | # `#` in a format spec is NOT a comment — should trigger RUF027 even on Python < 3.12
+110 | def hash_in_format_spec_test():
+111 |     n = 255
+    -     print("Hex: {n:#x}")   # RUF027: `#` is in format spec, not a comment
+112 +     print(f"Hex: {n:#x}")   # RUF027: `#` is in format spec, not a comment
+113 |     print("Oct: {n:#o}")   # RUF027: same
+114 | 
+115 | # Test case for `#` in nested interpolation inside format spec (e.g., `{1:{x #}}`)
+note: This is an unsafe fix and may change runtime behavior
+
+RUF027 [*] Possible f-string without an `f` prefix
+   --> RUF027_0.py:113:11
+    |
+111 |     n = 255
+112 |     print("Hex: {n:#x}")   # RUF027: `#` is in format spec, not a comment
+113 |     print("Oct: {n:#o}")   # RUF027: same
+    |           ^^^^^^^^^^^^^
+114 |
+115 | # Test case for `#` in nested interpolation inside format spec (e.g., `{1:{x #}}`)
+    |
+help: Add `f` prefix
+110 | def hash_in_format_spec_test():
+111 |     n = 255
+112 |     print("Hex: {n:#x}")   # RUF027: `#` is in format spec, not a comment
+    -     print("Oct: {n:#o}")   # RUF027: same
+113 +     print(f"Oct: {n:#o}")   # RUF027: same
+114 | 
+115 | # Test case for `#` in nested interpolation inside format spec (e.g., `{1:{x #}}`)
+116 | # The `#` is a comment inside a nested interpolation — should NOT trigger RUF027 on Python < 3.12
+note: This is an unsafe fix and may change runtime behavior

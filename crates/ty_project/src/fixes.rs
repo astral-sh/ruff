@@ -183,7 +183,7 @@ pub fn suppress_all_diagnostics(
                 "Introduced syntax errors:\n\n{}",
                 DisplayDiagnostics::new(
                     &file_db,
-                    &DisplayDiagnosticConfig::default(),
+                    &DisplayDiagnosticConfig::new("ty"),
                     &parse_diagnostics
                 )
             ));
@@ -421,7 +421,7 @@ mod tests {
             suppress_all_in(r#"
                 a = b + 10"#
         ),
-         @r"
+         @"
         Added 1 suppressions
 
         ## Fixed source
@@ -438,7 +438,7 @@ mod tests {
             suppress_all_in(r#"
                 a = b + 10 + c"#
         ),
-         @r"
+         @"
         Added 2 suppressions
 
         ## Fixed source
@@ -456,7 +456,7 @@ mod tests {
                 import sys
                 a = b + 10 + sys.veeersion"#
         ),
-         @r"
+         @"
         Added 2 suppressions
 
         ## Fixed source
@@ -475,7 +475,7 @@ mod tests {
                 import sys
                 a = 5 + 10  # ty: ignore[unresolved-reference]"#
         ),
-         @r"
+         @"
         Added 0 suppressions
 
         ## Fixed source
@@ -506,7 +506,7 @@ mod tests {
                 a = x +
                 "#
         ),
-         @r"
+         @"
         Added 0 suppressions
 
         ## Fixed source
@@ -712,7 +712,7 @@ class B(A):
                 "## Diagnostics after applying fixes\n\n{diagnostics}\n",
                 diagnostics = DisplayDiagnostics::new(
                     &db,
-                    &DisplayDiagnosticConfig::default(),
+                    &DisplayDiagnosticConfig::new("ty"),
                     &fixes.diagnostics
                 )
             )
@@ -733,7 +733,7 @@ class B(A):
                 "## New diagnostics after re-checking file\n\n{diagnostics}\n",
                 diagnostics = DisplayDiagnostics::new(
                     &db,
-                    &DisplayDiagnosticConfig::default(),
+                    &DisplayDiagnosticConfig::new("ty"),
                     &new_diagnostics
                 )
             )

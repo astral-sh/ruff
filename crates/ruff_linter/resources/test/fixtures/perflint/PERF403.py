@@ -210,6 +210,24 @@ def issue_19153_2():
 
 def issue_19153_3():
     v = {}
-    for o, (x,) in ["ox"]: 
-        v[(x,)] = o 
+    for o, (x,) in ["ox"]:
+        v[(x,)] = o
     return v
+
+def f():
+    # comment duplication in if test (https://github.com/astral-sh/ruff/issues/18787)
+    result = {}
+    for k in ["a", "b", "c"]:
+        if (
+            k
+            # comment
+        ):
+            result[k] = k
+
+def f():
+    # comment duplication in target (https://github.com/astral-sh/ruff/issues/18787)
+    result = {}
+    for (
+        k  # comment
+    ) in ["a", "b", "c"]:
+        result[k] = k

@@ -721,6 +721,55 @@ if __name__ == "__main__":
 }
 
 #[test]
+fn check_silent_mode_no_output() -> Result<()> {
+    // Write code that requires formatting,
+    // but there should be no "reformat" output in silent mode
+    let test = CliTest::with_file("main.py", "def     foo():\n                pass\n")?;
+
+    assert_cmd_snapshot!(test.format_command().args(["--check", "--silent"]), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+
+    ----- stderr -----
+    ");
+    Ok(())
+}
+
+#[test]
+fn check_quiet_mode_shows_diagnostics_only() -> Result<()> {
+    // should show diagnostics but not summary
+    let test = CliTest::with_file("main.py", "def     foo():\n                pass\n")?;
+
+    assert_cmd_snapshot!(test.format_command().args(["--check", "--quiet"]), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    Would reformat: main.py
+
+    ----- stderr -----
+    ");
+    Ok(())
+}
+
+#[test]
+fn check_default_mode_shows_diagnostics_and_summary() -> Result<()> {
+    // default mode should show both diagnostics and summary
+    let test = CliTest::with_file("main.py", "def     foo():\n                pass\n")?;
+
+    assert_cmd_snapshot!(test.format_command().args(["--check"]), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    Would reformat: main.py
+    1 file would be reformatted
+
+    ----- stderr -----
+    ");
+    Ok(())
+}
+
+#[test]
 fn force_exclude() -> Result<()> {
     let test = CliTest::with_files([
         (
@@ -2458,6 +2507,66 @@ fn markdown_formatting_stdin() -> Result<()> {
     def foo():
         pass
     ```
+
+    ----- stderr -----
+    "#);
+    Ok(())
+}
+
+#[test]
+fn format_mapped_extension_files() -> Result<()> {
+    let test = CliTest::with_files([
+        (
+            "pyproject.toml",
+            r#"
+[tool.ruff]
+extension = {foo="python", bar="markdown"}
+"#,
+        ),
+        (
+            "test.foo",
+            r"
+print( 'hello' )
+",
+        ),
+        (
+            "test.bar",
+            r"
+Text string
+
+```py
+print( 'hello' )
+```
+",
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(
+            test.format_command()
+                .args(["format", "--preview", "--check", "."]),
+            @r#"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+    io: [TMP]/format: No such file or directory (os error 2)
+    --> format:1:1
+
+    unformatted: File would be reformatted
+     --> test.bar:1:1
+    2 | Text string
+    3 | 
+    4 | ```py
+      - print( 'hello' )
+    5 + print("hello")
+    6 | ```
+
+    unformatted: File would be reformatted
+     --> test.foo:1:1
+      - 
+      - print( 'hello' )
+    1 + print("hello")
+
+    2 files would be reformatted
 
     ----- stderr -----
     "#);

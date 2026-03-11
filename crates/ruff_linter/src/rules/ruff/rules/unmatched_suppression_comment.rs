@@ -31,7 +31,7 @@ use crate::Violation;
 /// ## References
 /// - [Ruff error suppression](https://docs.astral.sh/ruff/linter/#error-suppression)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.14.11")]
+#[violation_metadata(stable_since = "0.15.0")]
 pub(crate) struct UnmatchedSuppressionComment;
 
 impl Violation for UnmatchedSuppressionComment {

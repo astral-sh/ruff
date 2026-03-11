@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
-input_file: crates/ruff_python_parser/resources/inline/err/debug_shadow_import.py
 ---
 ## AST
 
@@ -26,6 +25,7 @@ Module(
                             asname: None,
                         },
                     ],
+                    is_lazy: false,
                 },
             ),
             Import(
@@ -50,6 +50,7 @@ Module(
                             ),
                         },
                     ],
+                    is_lazy: false,
                 },
             ),
             ImportFrom(
@@ -76,6 +77,7 @@ Module(
                         },
                     ],
                     level: 0,
+                    is_lazy: false,
                 },
             ),
             ImportFrom(
@@ -108,6 +110,7 @@ Module(
                         },
                     ],
                     level: 0,
+                    is_lazy: false,
                 },
             ),
         ],
