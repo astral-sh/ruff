@@ -52,7 +52,7 @@ Run ty:
 cargo run --bin ty -- check path/to/file.py
 ```
 
-## Reproducing ty ecosystem changes
+## Reproducing and minimizing ty ecosystem changes
 
 If asked to reproduce changes in the ty ecosystem, use this script to clone the project to some
 directory and install its dependencies into `.venv`:
@@ -60,6 +60,8 @@ directory and install its dependencies into `.venv`:
 ```sh
 uv run scripts/setup_primer_project.py <project-name> <some-temp-dir>
 ```
+
+If asked to *minimize* a change in the ty ecosystem, you should start off with the above command to ensure that the change reproduces. You should then attempt to minimize the Python code required to demonstrate a behaviour difference between ty on your feature branch and ty on the main branch. Your minimization process should consist of systematically removing files from the cloned ecosystem project, and stripping content from existing files, until the behaviour difference between your branch and `main` no longer reproduces.
 
 ## Pull Requests
 
