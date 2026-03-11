@@ -4344,6 +4344,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             _ => {
+                if let Some(typed_dict_update_ty) = self
+                    .try_infer_typed_dict_pep_584_augmented_assignment(
+                        assignment,
+                        target_type,
+                        value_expr,
+                        infer_value_ty,
+                    )
+                {
+                    return typed_dict_update_ty;
+                }
+
                 let ast_arguments = [ArgOrKeyword::Arg(value_expr)];
                 let mut call_arguments = CallArguments::positional([Type::unknown()]);
 
