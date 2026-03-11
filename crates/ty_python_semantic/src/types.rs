@@ -2466,6 +2466,25 @@ impl<'db> Type<'db> {
             owner.display(db)
         );
         match self {
+            Type::FunctionLiteral(function) if function.is_staticmethod(db) => {
+                return Some((self, AttributeKind::NormalOrNonDataDescriptor));
+            }
+            Type::FunctionLiteral(function) if function.is_classmethod(db) => {
+                return Some((
+                    Type::BoundMethod(BoundMethodType::new(db, function, owner)),
+                    AttributeKind::NormalOrNonDataDescriptor,
+                ));
+            }
+            Type::FunctionLiteral(function) => {
+                return Some((
+                    if let Some(instance) = instance {
+                        Type::BoundMethod(BoundMethodType::new(db, function, instance))
+                    } else {
+                        self
+                    },
+                    AttributeKind::NormalOrNonDataDescriptor,
+                ));
+            }
             Type::Callable(callable) if callable.is_staticmethod_like(db) => {
                 // For "staticmethod-like" callables, model the behavior of `staticmethod.__get__`.
                 // The underlying function is returned as-is, without binding self.
@@ -2495,22 +2514,6 @@ impl<'db> Type<'db> {
                         AttributeKind::NormalOrNonDataDescriptor,
                     ))
                 };
-            }
-            Type::FunctionLiteral(function)
-                if instance.is_some_and(|ty| ty.is_none(db))
-                    && !function.is_staticmethod(db)
-                    && !function.is_classmethod(db) =>
-            {
-                // When the instance is of type `None` (`NoneType`), we must handle
-                // `FunctionType.__get__` here rather than falling through to the generic
-                // `__get__` path. The stubs for `FunctionType.__get__` use an overload
-                // with `instance: None` to indicate class-level access (returning the
-                // unbound function). This incorrectly matches when the instance is actually
-                // an instance of `None`
-                return Some((
-                    Type::BoundMethod(BoundMethodType::new(db, function, instance.unwrap())),
-                    AttributeKind::NormalOrNonDataDescriptor,
-                ));
             }
             _ => {}
         }
@@ -2730,6 +2733,7 @@ impl<'db> Type<'db> {
     fn invoke_descriptor_protocol(
         self,
         db: &'db dyn Db,
+        bound_self: Type<'db>,
         name: &str,
         fallback: PlaceAndQualifiers<'db>,
         policy: InstanceFallbackShadowsNonDataDescriptor,
@@ -2744,8 +2748,8 @@ impl<'db> Type<'db> {
         ) = Self::try_call_dunder_get_on_attribute(
             db,
             self.class_member_with_policy(db, name.into(), member_policy),
-            Some(self),
-            self.to_meta_type(db),
+            Some(bound_self),
+            bound_self.to_meta_type(db),
         );
 
         let PlaceAndQualifiers {
@@ -2842,6 +2846,100 @@ impl<'db> Type<'db> {
 
             // If the attribute is not found on the meta-type, we simply return the fallback.
             (Place::Undefined, _, fallback) => fallback.with_qualifiers(fallback_qualifiers),
+        }
+    }
+
+    fn member_lookup_instance_like(
+        self,
+        db: &'db dyn Db,
+        bound_self: Type<'db>,
+        name: &Name,
+        policy: MemberLookupPolicy,
+    ) -> PlaceAndQualifiers<'db> {
+        let name_str = name.as_str();
+
+        // Enum members can be accessed through enum instances and other enum members,
+        // e.g. `answer.YES` or `Answer.YES.NO`.
+        let enum_class = match self {
+            Type::LiteralValue(literal) => literal
+                .as_enum()
+                .map(|enum_literal| enum_literal.enum_class(db)),
+            Type::NominalInstance(instance) => Some(instance.class_literal(db)),
+            _ => None,
+        };
+
+        if let Some(enum_class) = enum_class
+            && let Some(metadata) = enum_metadata(db, enum_class)
+            && let Some(resolved_name) = metadata.resolve_member(name)
+        {
+            return Place::bound(Type::enum_literal(EnumLiteralType::new(
+                db,
+                enum_class,
+                resolved_name.clone(),
+            )))
+            .into();
+        }
+
+        let fallback = self.instance_member(db, name_str);
+
+        let result = self.invoke_descriptor_protocol(
+            db,
+            bound_self,
+            name_str,
+            fallback,
+            InstanceFallbackShadowsNonDataDescriptor::No,
+            policy,
+        );
+
+        if result.is_class_var() && bound_self.is_typed_dict() {
+            // `ClassVar`s on `TypedDictFallback` cannot be accessed on inhabitants of `SomeTypedDict`.
+            // They can only be accessed on `SomeTypedDict` directly.
+            return Place::Undefined.into();
+        }
+
+        let result = self.fallback_to_getattr(db, name, result, policy);
+
+        result.map_type(|ty| ty.bind_self_typevars(db, bound_self))
+    }
+
+    fn project_typevar_member_lookup(
+        self,
+        db: &'db dyn Db,
+        lookup_ty: Type<'db>,
+        name: Name,
+        policy: MemberLookupPolicy,
+    ) -> PlaceAndQualifiers<'db> {
+        match lookup_ty {
+            Type::Union(union) => union.map_with_boundness_and_qualifiers(db, |elem| {
+                self.project_typevar_member_lookup(db, *elem, name.clone(), policy)
+            }),
+            Type::Intersection(intersection) => intersection
+                .map_with_boundness_and_qualifiers(db, |elem| {
+                    self.project_typevar_member_lookup(db, *elem, name.clone(), policy)
+                }),
+            Type::TypeAlias(alias) => {
+                self.project_typevar_member_lookup(db, alias.value_type(db), name, policy)
+            }
+            Type::NominalInstance(..)
+            | Type::ProtocolInstance(..)
+            | Type::NewTypeInstance(..)
+            | Type::LiteralValue(..)
+            | Type::SpecialForm(..)
+            | Type::KnownInstance(..)
+            | Type::PropertyInstance(..)
+            | Type::FunctionLiteral(..)
+            | Type::AlwaysTruthy
+            | Type::AlwaysFalsy
+            | Type::TypeIs(..)
+            | Type::TypeGuard(..)
+            | Type::TypedDict(_) => {
+                let bound_self = IntersectionBuilder::new(db)
+                    .add_positive(self)
+                    .add_positive(lookup_ty)
+                    .build();
+                lookup_ty.member_lookup_instance_like(db, bound_self, &name, policy)
+            }
+            _ => lookup_ty.member_lookup_with_policy(db, name, policy),
         }
     }
 
@@ -3091,9 +3189,41 @@ impl<'db> Type<'db> {
                     .concrete_base_type(db)
                     .member_lookup_with_policy(db, name, policy)
             }
+            Type::TypeVar(typevar) => {
+                if name_str == "args" && typevar.is_paramspec(db) {
+                    Place::declared(Type::TypeVar(
+                        typevar.with_paramspec_attr(db, ParamSpecAttrKind::Args),
+                    ))
+                    .into()
+                } else if name_str == "kwargs" && typevar.is_paramspec(db) {
+                    Place::declared(Type::TypeVar(
+                        typevar.with_paramspec_attr(db, ParamSpecAttrKind::Kwargs),
+                    ))
+                    .into()
+                } else {
+                    match typevar.typevar(db).bound_or_constraints(db) {
+                        None => {
+                            self.project_typevar_member_lookup(db, Type::object(), name, policy)
+                        }
+                        Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                            self.project_typevar_member_lookup(db, bound, name, policy)
+                        }
+                        Some(TypeVarBoundOrConstraints::Constraints(constraints)) => constraints
+                            .map_with_boundness_and_qualifiers(db, |constraint| {
+                                self.project_typevar_member_lookup(
+                                    db,
+                                    *constraint,
+                                    name.clone(),
+                                    policy,
+                                )
+                            }),
+                    }
+                }
+            }
 
             _ if policy.no_instance_fallback() => self.invoke_descriptor_protocol(
                 db,
+                self,
                 name_str,
                 Place::Undefined.into(),
                 InstanceFallbackShadowsNonDataDescriptor::No,
@@ -3125,19 +3255,6 @@ impl<'db> Type<'db> {
                     .into()
             }
 
-            Type::TypeVar(typevar) if name_str == "args" && typevar.is_paramspec(db) => {
-                Place::declared(Type::TypeVar(
-                    typevar.with_paramspec_attr(db, ParamSpecAttrKind::Args),
-                ))
-                .into()
-            }
-            Type::TypeVar(typevar) if name_str == "kwargs" && typevar.is_paramspec(db) => {
-                Place::declared(Type::TypeVar(
-                    typevar.with_paramspec_attr(db, ParamSpecAttrKind::Kwargs),
-                ))
-                .into()
-            }
-
             Type::NominalInstance(instance)
                 if matches!(name_str, "name" | "_name_" | "value" | "_value_")
                     && enum_metadata(db, instance.class_literal(db)).is_some() =>
@@ -3162,7 +3279,6 @@ impl<'db> Type<'db> {
             | Type::ProtocolInstance(..)
             | Type::NewTypeInstance(..)
             | Type::LiteralValue(..)
-            | Type::TypeVar(..)
             | Type::SpecialForm(..)
             | Type::KnownInstance(..)
             | Type::PropertyInstance(..)
@@ -3171,49 +3287,7 @@ impl<'db> Type<'db> {
             | Type::AlwaysFalsy
             | Type::TypeIs(..)
             | Type::TypeGuard(..)
-            | Type::TypedDict(_) => {
-                // Enum members can be accessed through enum instances and other enum members,
-                // e.g. `answer.YES` or `Answer.YES.NO`.
-                let enum_class = match self {
-                    Type::LiteralValue(literal) => literal
-                        .as_enum()
-                        .map(|enum_literal| enum_literal.enum_class(db)),
-                    Type::NominalInstance(instance) => Some(instance.class_literal(db)),
-                    _ => None,
-                };
-
-                if let Some(enum_class) = enum_class
-                    && let Some(metadata) = enum_metadata(db, enum_class)
-                    && let Some(resolved_name) = metadata.resolve_member(&name)
-                {
-                    return Place::bound(Type::enum_literal(EnumLiteralType::new(
-                        db,
-                        enum_class,
-                        resolved_name.clone(),
-                    )))
-                    .into();
-                }
-
-                let fallback = self.instance_member(db, name_str);
-
-                let result = self.invoke_descriptor_protocol(
-                    db,
-                    name_str,
-                    fallback,
-                    InstanceFallbackShadowsNonDataDescriptor::No,
-                    policy,
-                );
-
-                if result.is_class_var() && self.is_typed_dict() {
-                    // `ClassVar`s on `TypedDictFallback` cannot be accessed on inhabitants of `SomeTypedDict`.
-                    // They can only be accessed on `SomeTypedDict` directly.
-                    return Place::Undefined.into();
-                }
-
-                let result = self.fallback_to_getattr(db, &name, result, policy);
-
-                result.map_type(|ty| ty.bind_self_typevars(db, self))
-            }
+            | Type::TypedDict(_) => self.member_lookup_instance_like(db, self, &name, policy),
 
             Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..) => {
                 let enum_class = match self {
@@ -3251,6 +3325,7 @@ impl<'db> Type<'db> {
 
                 let result = self.invoke_descriptor_protocol(
                     db,
+                    self,
                     name_str,
                     class_attr_fallback,
                     InstanceFallbackShadowsNonDataDescriptor::Yes,

@@ -756,6 +756,7 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
                     }) = other
                         .invoke_descriptor_protocol(
                             db,
+                            other,
                             self.name,
                             Place::Undefined.into(),
                             InstanceFallbackShadowsNonDataDescriptor::No,

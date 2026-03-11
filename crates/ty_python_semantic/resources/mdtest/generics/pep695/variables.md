@@ -930,6 +930,24 @@ def constrained[T: (Callable[[], int], Callable[[], str])](f: T):
     reveal_type(f())  # revealed: int | str
 ```
 
+Bound and constrained typevars also support method calls by binding `self` to the matching branch:
+
+```py
+class A:
+    def method(self) -> int:
+        return 0
+
+class B:
+    def method(self) -> str:
+        return ""
+
+def bound_method[T: A | B](x: T):
+    reveal_type(x.method())  # revealed: int | str
+
+def constrained_method[T: (A, B)](x: T):
+    reveal_type(x.method())  # revealed: int | str
+```
+
 ## Meta-type
 
 The meta-type of a typevar is `type[T]`.
@@ -1042,6 +1060,17 @@ class D[T = T]:
     x: T
 
 reveal_type(D().x)  # revealed: Unknown
+```
+
+## Regression
+
+### Missing attribute on an upper bound still errors
+
+```py
+class C[T: str]:
+    def f(self, x: T):
+        x.capitalize()
+        x.is_integer()  # error: [unresolved-attribute]
 ```
 
 [pep 695]: https://peps.python.org/pep-0695/

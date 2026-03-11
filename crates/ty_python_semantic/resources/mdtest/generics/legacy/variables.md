@@ -558,6 +558,27 @@ def constrained(f: T):
     reveal_type(f())  # revealed: int | str
 ```
 
+Bound and constrained typevars also support method calls by binding `self` to the matching branch:
+
+```py
+class A:
+    def method(self) -> int:
+        return 0
+
+class B:
+    def method(self) -> str:
+        return ""
+
+T_bound = TypeVar("T_bound", bound=A | B)
+T_constrained = TypeVar("T_constrained", A, B)
+
+def bound_method(x: T_bound):
+    reveal_type(x.method())  # revealed: int | str
+
+def constrained_method(x: T_constrained):
+    reveal_type(x.method())  # revealed: int | str
+```
+
 ## Meta-type
 
 The meta-type of a typevar is `type[T]`.
@@ -699,6 +720,18 @@ class Event(Generic[_DataT]):
 def async_fire_internal(event_data: _DataT):
     event: Event[_DataT] | None = None
     event = Event(event_data)
+```
+
+### Missing attribute on an upper bound still errors
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T", bound=str)
+
+def f(x: T):
+    x.capitalize()
+    x.is_integer()  # error: [unresolved-attribute]
 ```
 
 [generics]: https://typing.python.org/en/latest/spec/generics.html
