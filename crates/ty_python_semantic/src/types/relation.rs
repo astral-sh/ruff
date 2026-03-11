@@ -2817,6 +2817,11 @@ pub(crate) struct IsDisjoint;
 
 impl<'db, 'c> IsDisjointVisitor<'db, 'c> {
     pub(crate) fn default(constraints: &'c ConstraintSetBuilder<'db>) -> Self {
-        IsDisjointVisitor::new(ConstraintSet::from_bool(constraints, false))
+        IsDisjointVisitor::with_custom_cache_fn(
+            ConstraintSet::from_bool(constraints, false),
+            Box::new(|(t1, t2), constraints, cache| {
+                cache.borrow_mut().insert((t2, t1), constraints)
+            }),
+        )
     }
 }

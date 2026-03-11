@@ -59,7 +59,6 @@ impl<Tag> Default for TypeTransformer<'_, Tag> {
 
 pub(crate) type PairVisitor<'db, Tag, C> = CycleDetector<Tag, (Type<'db>, Type<'db>), C>;
 
-#[derive(Debug)]
 pub struct CycleDetector<Tag, T, R, Extra = ()> {
     /// If the type we're visiting is present in `seen`, it indicates that we've hit a cycle (due
     /// to a recursive type); we need to immediately short circuit the whole operation and return
@@ -82,12 +81,31 @@ pub struct CycleDetector<Tag, T, R, Extra = ()> {
 
     pub(crate) extra: Extra,
 
+    #[expect(clippy::type_complexity)]
+    custom_cache_fn: Option<Box<dyn Fn(T, R, &RefCell<FxHashMap<T, R>>) -> Option<R>>>,
+
     _tag: PhantomData<Tag>,
 }
 
 impl<Tag, T: Hash + Eq + Clone, R: Clone, Extra: Default> CycleDetector<Tag, T, R, Extra> {
     pub fn new(fallback: R) -> Self {
         Self::with_extra(fallback, Extra::default())
+    }
+
+    #[expect(clippy::type_complexity)]
+    pub(crate) fn with_custom_cache_fn(
+        fallback: R,
+        cache_fn: Box<dyn Fn(T, R, &RefCell<FxHashMap<T, R>>) -> Option<R>>,
+    ) -> Self {
+        CycleDetector {
+            seen: RefCell::new(FxIndexSet::default()),
+            cache: RefCell::new(FxHashMap::default()),
+            depth: Cell::new(0),
+            fallback,
+            extra: Extra::default(),
+            custom_cache_fn: Some(cache_fn),
+            _tag: PhantomData,
+        }
     }
 }
 
@@ -99,6 +117,7 @@ impl<Tag, T: Hash + Eq + Clone, R: Clone, Extra> CycleDetector<Tag, T, R, Extra>
             depth: Cell::new(0),
             fallback,
             extra,
+            custom_cache_fn: None,
             _tag: PhantomData,
         }
     }
@@ -126,7 +145,13 @@ impl<Tag, T: Hash + Eq + Clone, R: Clone, Extra> CycleDetector<Tag, T, R, Extra>
 
         self.depth.set(current_depth);
         self.seen.borrow_mut().pop();
-        self.cache.borrow_mut().insert(item, ret.clone());
+
+        if let Some(custom_cache_fn) = self.custom_cache_fn.as_deref() {
+            self.cache.borrow_mut().insert(item.clone(), ret.clone());
+            custom_cache_fn(item, ret.clone(), &self.cache);
+        } else {
+            self.cache.borrow_mut().insert(item, ret.clone());
+        }
 
         ret
     }
