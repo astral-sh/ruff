@@ -430,6 +430,54 @@ impl Format<PyFormatContext<'_>> for FormatBody<'_> {
         //     zzzzzzzzzzzzzzzzzzzz
         // ]
         // ```
+        // Implicit string concatenation needs special handling to ensure proper parenthesization
+        // when the string is split across lines. Without parentheses, splitting an implicit
+        // string concatenation would create separate strings instead of a single concatenated string.
+        // For example:
+        // ```py
+        // lambda x: 'hello ' 'world {x}'.format(x=x)
+        // ```
+        // Should parenthesize when split to avoid:
+        // ```py
+        // lambda x: "hello "
+        // "world {x}".format(x=x)  # This is now two separate strings!
+        // ```
+        else if matches!(body, Expr::StringLiteral(_) | Expr::FString(_) | Expr::TString(_) | Expr::BytesLiteral(_))
+            && is_implicit_string_concatenation(body)
+        {
+            let unparenthesized = body.format().with_options(Parentheses::Never);
+            let unparenthesized = unparenthesized.memoized();
+            if unparenthesized.inspect(f)?.will_break() {
+                expand_parent().fmt(f)?;
+            }
+
+            best_fitting![
+                // body all flat
+                unparenthesized,
+                // body expanded
+                group(&unparenthesized).should_expand(true),
+                // parenthesized
+                format_args![token("("), block_indent(&unparenthesized), token(")")]
+            ]
+            .fmt(f)
+        }
+        // For other cases with their own parentheses, such as lists, sets, dicts, tuples,
+        // etc., we can just format the body directly. Their own formatting results in the
+        // lambda being formatted well too. For example:
+        //
+        // ```py
+        // lambda xxxxxxxxxxxxxxxxxxxx, yyyyyyyyyyyyyyyyyyyy, zzzzzzzzzzzzzzzzzzzz: [xxxxxxxxxxxxxxxxxxxx, yyyyyyyyyyyyyyyyyyyy, zzzzzzzzzzzzzzzzzzzz]
+        // ```
+        //
+        // gets formatted as:
+        //
+        // ```py
+        // lambda xxxxxxxxxxxxxxxxxxxx, yyyyyyyyyyyyyyyyyyyy, zzzzzzzzzzzzzzzzzzzz: [
+        //     xxxxxxxxxxxxxxxxxxxxxx,
+        //     yyyyyyyyyyyyyyyyyyyy,
+        //     zzzzzzzzzzzzzzzzzzzz
+        // ]
+        // ```
         else if has_own_parentheses(body, f.context()).is_some() {
             body.format().fmt(f)
         }
@@ -472,5 +520,16 @@ impl Format<PyFormatContext<'_>> for FormatBody<'_> {
         else {
             parenthesize_if_expands(&body.format().with_options(Parentheses::Never)).fmt(f)
         }
+    }
+}
+
+/// Returns `true` if the expression is an implicit string concatenation.
+fn is_implicit_string_concatenation(expr: &Expr) -> bool {
+    match expr {
+        Expr::StringLiteral(string) => string.value.is_implicit_concatenated(),
+        Expr::FString(fstring) => fstring.value.is_implicit_concatenated(),
+        Expr::TString(tstring) => tstring.value.is_implicit_concatenated(),
+        Expr::BytesLiteral(bytes) => bytes.value.is_implicit_concatenated(),
+        _ => false,
     }
 }
