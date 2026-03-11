@@ -12,8 +12,8 @@ E402 [*] Module level import not at top of file
 7 | # Prevent F403
   |
 help: Move module level imports to top of file
-1 + import os
-2 | from __future__ import annotations
+1 | from __future__ import annotations
+2 + import os
 3 | 
 4 | print("something")
 5 | 

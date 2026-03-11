@@ -12,12 +12,10 @@ E402 [*] Module level import not at top of file
 11 | # Prevent F403
    |
 help: Move module level imports to top of file
-1  | #!/usr/bin/python3
-2  | 
 3  | """docstring"""
-4  + import os
-5  | 
-6  | from __future__ import annotations
+4  | 
+5  | from __future__ import annotations
+6  + import os
 7  | 
 8  | print("something")
 9  | 

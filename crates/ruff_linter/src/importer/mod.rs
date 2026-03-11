@@ -77,23 +77,22 @@ impl<'a> Importer<'a> {
             // Insert after the last top-level import.
             Insertion::end_of_statement(stmt, self.source, self.stylist).into_edit(&required_import)
         } else {
-            // Check if there are any future imports that we need to respect
-            if let Some(last_future_import) = self.find_last_future_import() {
-                // Insert after the last future import
-                Insertion::end_of_statement(last_future_import, self.source, self.stylist)
-                    .into_edit(&required_import)
-            } else {
-                // Insert at the start of the file.
-                Insertion::start_of_file(self.python_ast, self.source, self.stylist, None)
-                    .into_edit(&required_import)
-            }
+            self.add_at_start(&required_import, None)
         }
     }
 
     /// Add a statement to the start of the file.
     pub(crate) fn add_at_start(&self, text: &str, within_range: Option<TextRange>) -> Edit {
-        Insertion::start_of_file(self.python_ast, self.source, self.stylist, within_range)
-            .into_edit(text)
+        // Check if there are any future imports that we need to respect
+        if let Some(last_future_import) = self.find_last_future_import(within_range) {
+            // Insert after the last future import
+            Insertion::end_of_statement(last_future_import, self.source, self.stylist)
+                .into_edit(text)
+        } else {
+            // Insert at the start of the file.
+            Insertion::start_of_file(self.python_ast, self.source, self.stylist, within_range)
+                .into_edit(text)
+        }
     }
 
     /// Move an existing import to the top-level, thereby making it available at runtime.
@@ -541,8 +540,22 @@ impl<'a> Importer<'a> {
     }
 
     /// Find the last `from __future__` import statement in the AST.
-    fn find_last_future_import(&self) -> Option<&'a Stmt> {
-        let mut body = self.python_ast.iter().peekable();
+    fn find_last_future_import(&self, within_range: Option<TextRange>) -> Option<&'a Stmt> {
+        // When operating within notebook cells we might only want to look at a
+        // range of the AST, yet can still encounter future imports at the top
+        // of a cell.
+        let full_body = self.python_ast;
+        let mut body = within_range
+            .map(|range| {
+                let start = full_body.partition_point(|stmt| stmt.start() < range.start());
+                let end = full_body.partition_point(|stmt| stmt.end() <= range.end());
+
+                &full_body[start..end]
+            })
+            .unwrap_or(full_body)
+            .iter()
+            .peekable();
+
         let _docstring = body.next_if(|stmt| ast::helpers::is_docstring_stmt(stmt));
 
         body.take_while(|stmt| {
