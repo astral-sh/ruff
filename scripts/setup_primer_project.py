@@ -5,7 +5,7 @@
 # dependencies = ["mypy-primer"]
 #
 # [tool.uv.sources]
-# mypy-primer = { git = "https://github.com/hauntsaninja/mypy_primer" }
+# mypy-primer = { git = "https://github.com/hauntsaninja/mypy_primer", rev = "850d65d9da947ef9e02498b6f07598e7c8401641" }
 # ///
 
 """Clone a mypy-primer project and set up a virtualenv with its dependencies installed.
