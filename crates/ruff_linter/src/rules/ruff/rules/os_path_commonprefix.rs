@@ -3,6 +3,7 @@ use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::importer::ImportRequest;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -64,11 +65,13 @@ pub(crate) fn os_path_commonprefix(checker: &Checker, call: &ast::ExprCall, segm
     let mut diagnostic = checker.report_diagnostic(OsPathCommonprefix, call.func.range());
     diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
 
-    let func_text = checker.locator().slice(call.func.range());
-    if let Some(prefix) = func_text.strip_suffix("commonprefix") {
-        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-            format!("{prefix}commonpath"),
-            call.func.range(),
-        )));
-    }
+    diagnostic.try_set_fix(|| {
+        let (import_edit, binding) = checker.importer().get_or_import_symbol(
+            &ImportRequest::import_from("os.path", "commonpath"),
+            call.func.start(),
+            checker.semantic(),
+        )?;
+        let reference_edit = Edit::range_replacement(binding, call.func.range());
+        Ok(Fix::unsafe_edits(import_edit, [reference_edit]))
+    });
 }
