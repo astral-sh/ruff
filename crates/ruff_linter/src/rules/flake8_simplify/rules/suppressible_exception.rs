@@ -88,6 +88,13 @@ pub(crate) fn suppressible_exception(
     orelse: &[Stmt],
     finalbody: &[Stmt],
 ) {
+    // Skip `except*` (ExceptionGroup) handlers as `contextlib.suppress` only gained
+    // support for `BaseExceptionGroup` in Python 3.12.
+    // See: <https://github.com/astral-sh/ruff/issues/23798>
+    if let Stmt::Try(ast::StmtTry { is_star: true, .. }) = stmt {
+        return;
+    }
+
     if !matches!(
         try_body,
         [Stmt::Delete(_)
