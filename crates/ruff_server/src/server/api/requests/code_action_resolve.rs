@@ -128,8 +128,14 @@ pub(super) fn organize_imports_edit(
 ) -> crate::Result<Fixes> {
     let mut linter_settings = query.settings().linter.clone();
     linter_settings.rules = [
-        Rule::UnsortedImports,            // I001
-        Rule::MissingRequiredImport,      // I002
+        Rule::UnsortedImports,       // I001
+        Rule::MissingRequiredImport, // I002
+        // Note: ModuleImportNotAtTopOfFile's fixes are unsafe. We include them
+        // here in order to match isort's behaviour and what we believe
+        // developers want. Since the fixes are unsafe, we're relying on this
+        // edit action not performing them unless the user has opted-in to these
+        // fixes in their settings (i.e: `extend-safe-fixes` in the
+        // `pyproject.toml` or similar).
         Rule::ModuleImportNotAtTopOfFile, // E402
     ]
     .into_iter()
