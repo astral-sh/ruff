@@ -95,13 +95,25 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
         self.unpack_inner(target, value_expr.into(), value_type);
     }
 
-    /// Preserve per-element precision for fixed tuple/list assignment RHSes.
+    /// In regular tuple assignments like `a, b = 1, 2` {or even `a, (b, c) = 1, (2, 3)`}, map each
+    /// expression on the left individually to the corresponding element type on the right, rather
+    /// than trying to walk the tuple type of the entire RHS.
     ///
-    /// If the RHS sequence is the cycle head, recursive normalization can flatten its
-    /// tuple/list structure to a single level. That's desirable for values like
-    /// `x = (0, x)`, but for unpacking it can collapse `(foo(), bar(), baz())` to a
-    /// tuple of recursive element types and lose per-element precision. Reusing the
-    /// already-inferred subexpression types preserves the fixed outer sequence shape.
+    /// We avoid infinitely growing types in cycle resolution by preserving only the
+    /// topmost/outermost part of types that have `Divergent` components. For example, if the
+    /// assignment `x = (0, x)` shows up in a loop, we need to avoid infinite looping on a
+    /// never-ending type like `tuple[Literal[0], tuple[Literal[0], tuple[...]]]`. So when we see
+    /// an intermediate result like `tuple[Literal[0], tuple[Literal[0], Divergent]]`, we simplify
+    /// that to `tuple[Literal[0], Divergent]`.
+    ///
+    /// The problem here is that, when `Divergent` shows up on the RHS, we end up simplifying that
+    /// tuple to e.g. `tuple[Divergent, Divergent]`. If we proceed by unpacking that type, we won't
+    /// accumulate any information about the elements, and the user will end up seeing `Divergent`
+    /// as the type of their variables.
+    ///
+    /// This function avoids that problem by walking the AST on the RHS and looking directly at the
+    /// individual element types. That gives us one more level of structure for those types, which
+    /// is enough to resolve a lot of common cycles.
     fn unpack_assignment_sequence_from_inference(
         &mut self,
         target: &ast::Expr,
