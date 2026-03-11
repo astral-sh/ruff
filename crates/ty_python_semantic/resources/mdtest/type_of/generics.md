@@ -129,6 +129,23 @@ def narrow_a[B: A](a: A, b: B):
         reveal_type(type_of_a)  # revealed: type[B@narrow_a]
 ```
 
+Narrowing through `type[T]` or `Type[T]` should preserve the type variable identity, so the narrowed
+value remains assignable to `T`:
+
+```py
+from typing import Type, TypeVar
+
+LegacyT = TypeVar("LegacyT", int, str)
+
+def legacy_typevar_narrowing(x: int | str, t: Type[LegacyT]) -> LegacyT:
+    assert isinstance(x, t)
+    return x
+
+def pep695_typevar_narrowing[T: (int, str)](x: int | str, t: type[T]) -> T:
+    assert isinstance(x, t)
+    return x
+```
+
 ## `__class__`
 
 ```py

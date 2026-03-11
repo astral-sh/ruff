@@ -2,6 +2,7 @@ mod args;
 mod logging;
 mod printer;
 mod python_version;
+mod rule;
 mod version;
 
 use std::fmt::Write;
@@ -30,7 +31,7 @@ use ty_project::{ProjectDatabase, ProjectMetadata};
 use ty_server::run_server;
 use ty_static::EnvVars;
 
-use crate::args::{CheckCommand, Command, TerminalColor, VersionFormat};
+use crate::args::{CheckCommand, Command, ExplainCommand, HelpFormat, TerminalColor};
 use crate::logging::{VerbosityLevel, setup_tracing};
 use crate::printer::Printer;
 pub use args::Cli;
@@ -54,18 +55,31 @@ pub fn run() -> anyhow::Result<ExitStatus> {
             shell.generate(&mut Cli::command(), &mut stdout());
             Ok(ExitStatus::Success)
         }
+        Command::Explain { command } => match command {
+            ExplainCommand::Rule {
+                rule,
+                output_format,
+            } => {
+                if let Some(name) = rule {
+                    rule::rule(&name, output_format)?;
+                } else {
+                    rule::rules(output_format)?;
+                }
+                Ok(ExitStatus::Success)
+            }
+        },
     }
 }
 
-pub(crate) fn version(output_format: VersionFormat) -> Result<()> {
+pub(crate) fn version(output_format: HelpFormat) -> Result<()> {
     let mut stdout = Printer::default().stream_for_requested_summary().lock();
     let version_info = crate::version::version();
 
     match output_format {
-        VersionFormat::Text => {
+        HelpFormat::Text => {
             writeln!(stdout, "ty {}", &version_info)?;
         }
-        VersionFormat::Json => {
+        HelpFormat::Json => {
             serde_json::to_writer_pretty(&mut stdout, &version_info)?;
         }
     }

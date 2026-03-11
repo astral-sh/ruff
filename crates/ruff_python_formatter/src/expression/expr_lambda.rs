@@ -1,5 +1,5 @@
 use ruff_formatter::{FormatRuleWithOptions, RemoveSoftLinesBuffer, format_args, write};
-use ruff_python_ast::{AnyNodeRef, Expr, ExprLambda};
+use ruff_python_ast::{AnyNodeRef, Expr, ExprLambda, ast};
 use ruff_text_size::Ranged;
 
 use crate::builders::parenthesize_if_expands;
@@ -387,16 +387,25 @@ impl Format<PyFormatContext<'_>> for FormatBody<'_> {
         // )
         // ```
         else if matches!(body, Expr::Call(_) | Expr::Subscript(_)) {
-            let unparenthesized = body.format().with_options(Parentheses::Never);
-            if CallChainLayout::from_expression(
-                body.into(),
-                comments.ranges(),
-                f.context().source(),
-            )
-            .is_fluent()
-            {
-                parenthesize_if_expands(&unparenthesized).fmt(f)
+            // Check if the callee is an implicit concatenated string that needs special handling.
+            // For calls like `'string1' 'string2'.format(x=x)`, the string is implicit concatenated
+            // and when it breaks across lines, it needs parentheses to preserve semantics.
+            let is_call_on_implicit_concatenated_string = if let Expr::Call(call) = body {
+                matches!(
+                    call.func.as_ref(),
+                    Expr::StringLiteral(ast::ExprStringLiteral { value, .. })
+                    | Expr::FString(ast::ExprFString { value, .. })
+                    | Expr::TString(ast::ExprTString { value, .. })
+                    if value.is_implicit_concatenated()
+                )
             } else {
+                false
+            };
+
+            // For implicit concatenated strings with method calls, we need to check if the
+            // whole expression will break, not just the callee.
+            if is_call_on_implicit_concatenated_string {
+                let unparenthesized = body.format().with_options(Parentheses::Never);
                 let unparenthesized = unparenthesized.memoized();
                 if unparenthesized.inspect(f)?.will_break() {
                     expand_parent().fmt(f)?;
@@ -411,7 +420,79 @@ impl Format<PyFormatContext<'_>> for FormatBody<'_> {
                     format_args![token("("), block_indent(&unparenthesized), token(")")]
                 ]
                 .fmt(f)
+            } else if matches!(body, Expr::Call(_) | Expr::Subscript(_)) {
+                let unparenthesized = body.format().with_options(Parentheses::Never);
+                if CallChainLayout::from_expression(
+                    body.into(),
+                    comments.ranges(),
+                    f.context().source(),
+                )
+                .is_fluent()
+                {
+                    parenthesize_if_expands(&unparenthesized).fmt(f)
+                } else {
+                    let unparenthesized = unparenthesized.memoized();
+                    if unparenthesized.inspect(f)?.will_break() {
+                        expand_parent().fmt(f)?;
+                    }
+
+                    best_fitting![
+                        // body all flat
+                        unparenthesized,
+                        // body expanded
+                        group(&unparenthesized).should_expand(true),
+                        // parenthesized
+                        format_args![token("("), block_indent(&unparenthesized), token(")")]
+                    ]
+                    .fmt(f)
+                }
+            } else {
+                body.format().fmt(f)
             }
+        }
+        // Implicit concatenated strings require special handling because when they break
+        // across lines, they need parentheses to preserve the semantics. Without parentheses,
+        // the string gets split into separate strings, which breaks format strings that
+        // reference lambda parameters. For example:
+        //
+        // ```py
+        // foo = lambda x: 'hello {x}' 'world'.format(x=x)
+        // ```
+        //
+        // Without parentheses, this becomes two separate strings:
+        // ```py
+        // foo = lambda x: "hello {x}"
+        // "world".format(x=x)  # x is not defined here!
+        // ```
+        //
+        // With parentheses, it formats correctly:
+        // ```py
+        // foo = lambda x: (
+        //     "hello {x}" "world"
+        // ).format(x=x)
+        // ```
+        else if matches!(
+            body,
+            Expr::StringLiteral(ast::ExprStringLiteral { value, .. }
+                | Expr::FString(ast::ExprFString { value, .. })
+                | Expr::TString(ast::ExprTString { value, .. })
+                if value.is_implicit_concatenated()
+        ) {
+            let unparenthesized = body.format().with_options(Parentheses::Never);
+            let unparenthesized = unparenthesized.memoized();
+            if unparenthesized.inspect(f)?.will_break() {
+                expand_parent().fmt(f)?;
+            }
+
+            best_fitting![
+                // body all flat
+                unparenthesized,
+                // body expanded
+                group(&unparenthesized).should_expand(true),
+                // parenthesized
+                format_args![token("("), block_indent(&unparenthesized), token(")")]
+            ]
+            .fmt(f)
         }
         // For other cases with their own parentheses, such as lists, sets, dicts, tuples,
         // etc., we can just format the body directly. Their own formatting results in the

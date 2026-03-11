@@ -8,7 +8,7 @@ use crate::Db;
 use crate::files::File;
 use crate::system::{
     CaseSensitivity, DirectoryEntry, GlobError, MemoryFileSystem, Metadata, Result, System,
-    SystemPath, SystemPathBuf, SystemVirtualPath,
+    SystemPath, SystemPathBuf, SystemVirtualPath, WhichError, WhichResult,
 };
 
 use super::WritableSystem;
@@ -121,10 +121,6 @@ impl System for TestSystem {
         self.system().read_virtual_path_to_notebook(path)
     }
 
-    fn is_executable(&self, path: &SystemPath) -> bool {
-        self.system().is_executable(path)
-    }
-
     fn current_directory(&self) -> &SystemPath {
         self.system().current_directory()
     }
@@ -135,6 +131,10 @@ impl System for TestSystem {
 
     fn cache_dir(&self) -> Option<SystemPathBuf> {
         self.system().cache_dir()
+    }
+
+    fn which(&self, _name: &str) -> WhichResult {
+        Err(WhichError::CannotFindBinaryPath)
     }
 
     fn read_directory<'a>(
@@ -197,10 +197,7 @@ impl System for TestSystem {
 
 impl Default for TestSystem {
     fn default() -> Self {
-        Self {
-            inner: Arc::new(InMemorySystem::default()),
-            env_overrides: Arc::new(Mutex::new(FxHashMap::default())),
-        }
+        Self::new(InMemorySystem::default())
     }
 }
 
@@ -395,10 +392,6 @@ impl System for InMemorySystem {
         Notebook::from_source_code(&content)
     }
 
-    fn is_executable(&self, path: &SystemPath) -> bool {
-        self.memory_fs.is_executable(path)
-    }
-
     fn current_directory(&self) -> &SystemPath {
         self.memory_fs.current_directory()
     }
@@ -409,6 +402,10 @@ impl System for InMemorySystem {
 
     fn cache_dir(&self) -> Option<SystemPathBuf> {
         None
+    }
+
+    fn which(&self, _name: &str) -> WhichResult {
+        Err(WhichError::CannotFindBinaryPath)
     }
 
     fn read_directory<'a>(

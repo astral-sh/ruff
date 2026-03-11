@@ -4,6 +4,7 @@ mod exit_code;
 mod file_selection;
 mod fixes;
 mod python_environment;
+mod rule;
 mod rule_selection;
 
 use anyhow::Context as _;

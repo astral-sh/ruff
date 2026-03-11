@@ -51,6 +51,66 @@ Methods that are available on `dict`s are also available on `TypedDict`s:
 bob.update(age=26)
 ```
 
+PEP 584-style immutable updates preserve the `TypedDict` type when the other operand is compatible:
+
+```py
+reveal_type(bob | {"age": 27})  # revealed: Person
+reveal_type({"age": 27} | bob)  # revealed: Person
+
+carol_update = Person(name="Carol", age=31)
+reveal_type(bob | carol_update)  # revealed: Person
+```
+
+Compatible `TypedDict` subset updates are also accepted for `|=`:
+
+```py
+class NameOnly(TypedDict, closed=True):
+    name: str
+
+name_update: NameOnly = {"name": "Bobby"}
+
+bob |= {"age": 27}
+bob |= name_update
+```
+
+TODO: protocol matching for synthesized `TypedDict.__or__` should also accept these cases:
+
+```py
+from typing import Callable, Protocol
+
+class PersonOrNameOnly(Protocol):
+    def __or__(self, other: NameOnly) -> Person: ...
+
+class PersonOrNameOnlyAttr(Protocol):
+    __or__: Callable[[NameOnly], Person]
+
+def takes_person_or_name_only(x: PersonOrNameOnly) -> None: ...
+def takes_person_or_name_only_attr(x: PersonOrNameOnlyAttr) -> None: ...
+
+# TODO: this should pass
+# error: [invalid-argument-type] "Argument to function `takes_person_or_name_only` is incorrect: Expected `PersonOrNameOnly`, found `Person`"
+takes_person_or_name_only(bob)
+# TODO: this should pass
+# error: [invalid-argument-type] "Argument to function `takes_person_or_name_only_attr` is incorrect: Expected `PersonOrNameOnlyAttr`, found `Person`"
+takes_person_or_name_only_attr(bob)
+```
+
+When the other operand is not compatible with the `TypedDict`, the result falls back to the normal
+`dict.__or__` return type:
+
+```py
+# Incompatible value type for a key
+reveal_type(bob | {"name": 42})  # revealed: dict[str, object]
+reveal_type({"name": 42} | bob)  # revealed: dict[str, object]
+
+# Key not present in the TypedDict
+reveal_type(bob | {"unknown_key": 1})  # revealed: dict[str, object]
+reveal_type({"unknown_key": 1} | bob)  # revealed: dict[str, object]
+
+# error: [unsupported-operator] "Operator `|=` is not supported between objects of type `Person` and `dict[str, int]`"
+bob |= {"unknown_key": 1}
+```
+
 `TypedDict` keys do not have to be string literals, as long as they can be statically determined
 (inferred to be of type string `Literal`).
 
@@ -142,11 +202,20 @@ plot3: Plot = {"y": homogeneous_list(1, 2, 3), "x": homogeneous_list(1, 2, 3)}
 reveal_type(plot3["y"])  # revealed: list[int | None]
 reveal_type(plot3["x"])  # revealed: list[int | None]
 
+plot3["y"] = homogeneous_list(1, 2, 3)
+reveal_type(plot3["y"])  # revealed: list[int | None]
+
+reveal_type(plot1 | {"y": homogeneous_list(1, 2, 3)})  # revealed: Plot
+reveal_type({"y": homogeneous_list(1, 2, 3)} | plot1)  # revealed: Plot
+
 Y = "y"
 X = "x"
 
 plot4: Plot = {Y: [1, 2, 3], X: None}
 plot5: Plot = {Y: homogeneous_list(1, 2, 3), X: None}
+
+reveal_type(plot1 | {Y: homogeneous_list(1, 2, 3)})  # revealed: Plot
+reveal_type({Y: homogeneous_list(1, 2, 3)} | plot1)  # revealed: Plot
 
 class Items(TypedDict):
     items: list[int | str]
@@ -202,6 +271,13 @@ reveal_type(alice["inner"]["non_existing"])  # revealed: Unknown
 
 # error: [invalid-key] "Unknown key "extra" for TypedDict `Inner`"
 alice: Person = {"inner": {"name": "Alice", "age": 30, "extra": 1}}
+
+class Box(TypedDict):
+    inner: Inner
+
+box: Box = {"inner": {"name": "Alice", "age": 30}}
+reveal_type(box | {"inner": {"age": 31, "name": "Alice"}})  # revealed: Box
+reveal_type({"inner": {"age": 31, "name": "Alice"}} | box)  # revealed: Box
 ```
 
 ## Validation of `TypedDict` construction
@@ -1640,8 +1716,11 @@ def combine(p: Person, e: Employee):
     reveal_type(p | p)  # revealed: Person
     reveal_type(e | e)  # revealed: Employee
 
-    # TODO: Should be `Person`; simplifying TypedDicts in Unions is pending better cycle handling
-    reveal_type(p | e)  # revealed: Person | Employee
+    # `Employee` is assignable to `Person`, so the result is `Person` in both directions.
+    # The result dict will also contain the `employee_id` key at runtime, but that's
+    # compatible with `Person` (which simply doesn't require it).
+    reveal_type(p | e)  # revealed: Person
+    reveal_type(e | p)  # revealed: Person
 ```
 
 When inheriting from a `TypedDict` with a different `total` setting, inherited fields maintain their

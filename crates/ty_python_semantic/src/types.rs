@@ -840,49 +840,23 @@ impl<'db> Type<'db> {
         // types from each cycle iteration to ensure that our result is monotonic, even if we
         // encounter oscillation.
         //
-        // However, there are a couple of cases where we don't want to do that, and want to use the
-        // later cycle iteration's result directly. This introduces the theoretical possibility of
-        // cycle oscillation involving such types (because we are not strictly widening the type on
-        // each iteration), but so far we have not seen an example of that.
-        match (previous, self) {
-            // Avoid unioning two generic aliases of the same class together; this union will never
-            // simplify and is likely to cause downstream problems.
-            (Type::GenericAlias(prev_alias), Type::GenericAlias(curr_alias))
-                if prev_alias.origin(db) == curr_alias.origin(db) =>
-            {
-                self
-            }
-
-            // Similarly, don't union together two function literals, since there are several parts
-            // of our type inference machinery that assume that we infer a single FunctionLiteral
-            // type for each overload of each function definition.
-            (Type::FunctionLiteral(prev_function), Type::FunctionLiteral(curr_function))
-                if prev_function.definition(db) == curr_function.definition(db) =>
-            {
-                self
-            }
-
-            _ => {
-                // Also avoid unioning in a previous type which contains a Divergent from the
-                // current cycle, if the most-recent type does not. This cannot cause an
-                // oscillation, since Divergent is only introduced at the start of fixpoint
-                // iteration.
-                let has_divergent_type_in_cycle = |ty| {
-                    any_over_type(db, ty, false, |nested_ty| {
-                        nested_ty
-                            .as_divergent()
-                            .is_some_and(|DivergentType { id }| cycle.head_ids().contains(&id))
-                    })
-                };
-                if has_divergent_type_in_cycle(previous) && !has_divergent_type_in_cycle(self) {
-                    self
-                } else {
-                    // The current type is unioned to the previous type. Unioning in the reverse order can cause the fixed-point iterations to converge slowly or even fail.
-                    // Consider the case where the order of union types is different between the previous and current cycle.
-                    // We should use the previous union type as the base and only add new element types in this cycle, if any.
-                    UnionType::from_elements_cycle_recovery(db, [previous, self])
-                }
-            }
+        // However, for the first couple iterations we are prone to get values including Divergent
+        // that will soon converge, but where unioning in the early value causes a loss of
+        // precision that we can't recover from. For example, a narrowing condition that looks like
+        // `is not Divergent` instead of `is not None` in the first iteration may cause us to lose
+        // the effect of that narrowing permanently, due to the union-previous-iteration behavior.
+        // So we avoid unioning in the first couple iterations, and just use the later iteration's
+        // result directly. We still ensure monotonicity after the first couple iterations, which
+        // still ensures convergence in cases that are prone to oscillation.
+        if cycle.iteration() <= 1 {
+            self
+        } else {
+            // The current type is unioned to the previous type. Unioning in the reverse order can
+            // cause the fixed-point iterations to converge slowly or even fail. Consider the case
+            // where the order of union types is different between the previous and current cycle.
+            // We should use the previous union type as the base and only add new element types in
+            // this cycle, if any.
+            UnionType::from_elements_cycle_recovery(db, [previous, self])
         }
         .recursive_type_normalized(db, cycle)
     }
@@ -1236,13 +1210,6 @@ impl<'db> Type<'db> {
         }
     }
 
-    pub(crate) const fn as_divergent(self) -> Option<DivergentType> {
-        match self {
-            Type::Dynamic(DynamicType::Divergent(divergent)) => Some(divergent),
-            _ => None,
-        }
-    }
-
     pub(crate) const fn as_callable(self) -> Option<CallableType<'db>> {
         match self {
             Type::Callable(callable_type) => Some(callable_type),
@@ -1435,11 +1402,6 @@ impl<'db> Type<'db> {
         }
     }
 
-    pub(crate) fn is_literal_string(&self) -> bool {
-        self.as_literal_value()
-            .is_some_and(literal::LiteralValueType::is_literal_string)
-    }
-
     pub(crate) fn is_string_literal(&self) -> bool {
         self.as_literal_value()
             .is_some_and(literal::LiteralValueType::is_string)
@@ -1471,11 +1433,11 @@ impl<'db> Type<'db> {
             union.elements(db).iter().all(|ty| {
                 ty.is_single_valued(db)
                     || ty.is_bool(db)
-                    || ty.is_literal_string()
+                    || ty.is_subtype_of(db, Type::literal_string())
                     || (ty.is_enum(db) && !ty.overrides_equality(db))
             })
         }) || ty.is_bool(db)
-            || ty.is_literal_string()
+            || ty.is_subtype_of(db, Type::literal_string())
             || (ty.is_enum(db) && !ty.overrides_equality(db))
     }
 
@@ -1485,11 +1447,11 @@ impl<'db> Type<'db> {
             union.elements(db).iter().any(|ty| {
                 ty.is_single_valued(db)
                     || ty.is_bool(db)
-                    || ty.is_literal_string()
+                    || ty.is_subtype_of(db, Type::literal_string())
                     || (ty.is_enum(db) && !ty.overrides_equality(db))
             })
         }) || ty.is_bool(db)
-            || ty.is_literal_string()
+            || ty.is_subtype_of(db, Type::literal_string())
             || (ty.is_enum(db) && !ty.overrides_equality(db))
     }
 
@@ -5754,6 +5716,7 @@ impl<'db> Type<'db> {
             Type::KnownInstance(known_instance) => {
                 Type::string_literal(db, &known_instance.repr(db).to_string())
             }
+            ty if ty.is_subtype_of(db, Type::literal_string()) => Type::literal_string(),
             // TODO: handle more complex types
             _ => KnownClass::Str.to_instance(db),
         }

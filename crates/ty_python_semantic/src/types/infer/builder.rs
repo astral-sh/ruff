@@ -1988,39 +1988,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ) -> bool {
         let db = self.db();
 
-        let mut first_tcx = None;
-
-        // A wrapper over `infer_value_ty` that allows inferring the value type multiple times
-        // during attribute resolution.
-        let pure_infer_value_ty = infer_value_ty;
-        let mut infer_value_ty = |builder: &mut Self, tcx: TypeContext<'db>| -> Type<'db> {
-            // Overwrite the previously inferred value, preferring later inferences, which are
-            // likely more precise. Note that we still ensure each inference is assignable to
-            // its declared type, so this mainly affects the IDE hover type.
-            let prev_multi_inference_state =
-                builder.set_multi_inference_state(MultiInferenceState::Overwrite);
-
-            // If we are inferring the argument multiple times, silence diagnostics to avoid duplicated warnings.
-            let was_in_multi_inference = if let Some(first_tcx) = first_tcx {
-                // The first time we infer an argument during multi-inference must be without type context,
-                // to avoid leaking diagnostics for bidirectional inference attempts.
-                debug_assert_eq!(first_tcx, TypeContext::default());
-
-                builder.context.set_multi_inference(true)
-            } else {
-                builder.context.is_in_multi_inference()
-            };
-
-            let value_ty = pure_infer_value_ty(builder, tcx);
-
-            // Reset the multi-inference state.
-            first_tcx.get_or_insert(tcx);
-            builder.multi_inference_state = prev_multi_inference_state;
-            builder.context.set_multi_inference(was_in_multi_inference);
-
-            value_ty
-        };
-
         // This closure should only be called if `value_ty` was inferred with `attr_ty` as type context.
         let ensure_assignable_to =
             |builder: &Self, value_ty: Type<'db>, attr_ty: Type<'db>| -> bool {
@@ -2111,16 +2078,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         match object_ty {
             Type::Union(union) => {
-                // First infer the value without type context, and then again for each union element.
-                let value_ty = infer_value_ty(self, TypeContext::default());
+                let mut infer_value_ty = MultiInferenceGuard::new(infer_value_ty);
+
+                // Perform loud inference without type context, as there may be multiple
+                // equally applicable type contexts for each union member.
+                let value_ty = infer_value_ty.infer_loud(self, TypeContext::default());
 
                 if union.elements(self.db()).iter().all(|elem| {
                     self.validate_attribute_assignment(
                         target,
                         *elem,
                         attribute,
-                        // Note that `infer_value_ty` silences diagnostics after the first inference.
-                        &mut infer_value_ty,
+                        &mut |builder, tcx| infer_value_ty.infer_silent(builder, tcx),
                         false,
                     )
                 }) {
@@ -2144,8 +2113,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             Type::Intersection(intersection) => {
-                // First infer the value without type context, and then again for each union element.
-                let value_ty = infer_value_ty(self, TypeContext::default());
+                let mut infer_value_ty = MultiInferenceGuard::new(infer_value_ty);
 
                 // TODO: Handle negative intersection elements
                 if intersection.positive(db).iter().any(|elem| {
@@ -2153,13 +2121,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         target,
                         *elem,
                         attribute,
-                        // Note that `infer_value_ty` silences diagnostics after the first inference.
-                        &mut infer_value_ty,
+                        &mut |builder, tcx| infer_value_ty.infer_silent(builder, tcx),
                         false,
                     )
                 }) {
+                    // Perform loud inference using the narrowed type context.
+                    infer_value_ty.infer_loud(self, infer_value_ty.last_tcx());
                     true
                 } else {
+                    // Otherwise, perform loud inference without type context, as we failed to
+                    // narrow to any given intersection element.
+                    let value_ty = infer_value_ty.infer_loud(self, TypeContext::default());
+
                     if emit_diagnostics
                         && let Some(builder) = self.context.report_lint(&INVALID_ASSIGNMENT, target)
                     {
@@ -2180,7 +2153,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 target,
                 alias.value_type(self.db()),
                 attribute,
-                pure_infer_value_ty,
+                infer_value_ty,
                 emit_diagnostics,
             ),
 
@@ -2238,13 +2211,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             | Type::TypeGuard(_)
             | Type::TypedDict(_)
             | Type::NewTypeInstance(_) => {
-                // TODO: We could use the annotated parameter type of `__setattr__` as type context here.
-                // However, we would still have to perform the first inference without type context.
-                let value_ty = infer_value_ty(self, TypeContext::default());
+                // We may infer the value type multiple times with distinct type context during
+                // attribute resolution.
+                let mut infer_value_ty = MultiInferenceGuard::new(infer_value_ty);
+
+                // Perform loud inference without type context, as we may encounter multiple equally
+                // applicable type contexts during attribute resolution.
+                let value_ty = infer_value_ty.infer_loud(self, TypeContext::default());
 
                 // Infer `__setattr__` once upfront. We use this result for:
                 // 1. Checking if it returns `Never` (indicating an immutable class)
                 // 2. As a fallback when no explicit attribute is found
+                //
+                // TODO: We could re-infer `value_ty` with type context here.
                 let setattr_dunder_call_result = object_ty.try_call_dunder_with_policy(
                     db,
                     "__setattr__",
@@ -2363,8 +2342,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                             dunder_set_result.is_ok()
                         } else {
-                            let value_ty =
-                                infer_value_ty(self, TypeContext::new(Some(meta_attr_ty)));
+                            let value_ty = infer_value_ty
+                                .infer_silent(self, TypeContext::new(Some(meta_attr_ty)));
 
                             ensure_assignable_to(self, value_ty, meta_attr_ty)
                         };
@@ -2386,8 +2365,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 // Bind `Self` via MRO matching.
                                 let instance_attr_ty =
                                     instance_attr_ty.bind_self_typevars(db, object_ty);
-                                let value_ty =
-                                    infer_value_ty(self, TypeContext::new(Some(instance_attr_ty)));
+                                let value_ty = infer_value_ty
+                                    .infer_silent(self, TypeContext::new(Some(instance_attr_ty)));
                                 if invalid_assignment_to_final(self, qualifiers) {
                                     return false;
                                 }
@@ -2434,8 +2413,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             // Bind `Self` via MRO matching.
                             let instance_attr_ty =
                                 instance_attr_ty.bind_self_typevars(db, object_ty);
-                            let value_ty =
-                                infer_value_ty(self, TypeContext::new(Some(instance_attr_ty)));
+                            let value_ty = infer_value_ty
+                                .infer_silent(self, TypeContext::new(Some(instance_attr_ty)));
                             if invalid_assignment_to_final(self, qualifiers) {
                                 return false;
                             }
@@ -2501,13 +2480,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             }),
                         qualifiers,
                     } => {
-                        // We may have to perform multi-inference if the meta attribute is possibly unbound.
-                        // However, we are required to perform the first inference without type context.
-                        let value_ty = infer_value_ty(self, TypeContext::default());
-
                         if invalid_assignment_to_final(self, qualifiers) {
+                            infer_value_ty(self, TypeContext::default());
                             return false;
                         }
+
+                        // We may infer the value type multiple times with distinct type context during
+                        // attribute resolution.
+                        let mut infer_value_ty = MultiInferenceGuard::new(infer_value_ty);
+
+                        // Perform loud inference without type context, as we may encounter multiple equally
+                        // applicable type contexts during attribute resolution.
+                        let value_ty = infer_value_ty.infer_loud(self, TypeContext::default());
 
                         let assignable_to_meta_attr = if let Place::Defined(DefinedPlace {
                             ty: meta_dunder_set,
@@ -2536,8 +2520,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                             dunder_set_result.is_ok()
                         } else {
-                            let value_ty =
-                                infer_value_ty(self, TypeContext::new(Some(meta_attr_ty)));
+                            let value_ty = infer_value_ty
+                                .infer_silent(self, TypeContext::new(Some(meta_attr_ty)));
                             ensure_assignable_to(self, value_ty, meta_attr_ty)
                         };
 
@@ -2553,8 +2537,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 .expect("called on Type::ClassLiteral or Type::SubclassOf")
                                 .place
                             {
-                                let value_ty =
-                                    infer_value_ty(self, TypeContext::new(Some(class_attr_ty)));
+                                let value_ty = infer_value_ty
+                                    .infer_silent(self, TypeContext::new(Some(class_attr_ty)));
                                 (
                                     ensure_assignable_to(self, value_ty, class_attr_ty),
                                     class_attr_boundness,
@@ -4343,37 +4327,34 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         match target_type {
             Type::Union(union) => {
-                // The first time we infer an argument during multi-inference must be without type context,
-                // to avoid leaking diagnostics for bidirectional inference attempts.
-                let old_multi_inference_state =
-                    self.set_multi_inference_state(MultiInferenceState::Ignore);
-                infer_value_ty(self, TypeContext::default());
-                self.set_multi_inference_state(old_multi_inference_state);
+                let mut infer_value_ty = MultiInferenceGuard::new(infer_value_ty);
 
-                let infer_value_ty = &mut |builder: &mut Self, tcx| {
-                    // Disable diagnostics for subsequent multi-inference attempts.
-                    let was_in_multi_inference = builder.context.set_multi_inference(true);
-
-                    // We may infer the value multiple times with distinct type context, and so take
-                    // the intersection of every inferred type.
-                    let old_multi_inference_state =
-                        builder.set_multi_inference_state(MultiInferenceState::Intersect);
-
-                    let inferred_ty = infer_value_ty(builder, tcx);
-
-                    // Restore the multi-inference state.
-                    builder.context.set_multi_inference(was_in_multi_inference);
-                    builder.set_multi_inference_state(old_multi_inference_state);
-
-                    inferred_ty
-                };
+                // Perform loud inference without type context, as there may be multiple
+                // equally applicable type contexts for each union member.
+                infer_value_ty.infer_loud(self, TypeContext::default());
 
                 union.map(db, |&elem_type| {
-                    self.infer_augmented_op(assignment, elem_type, value_expr, infer_value_ty)
+                    self.infer_augmented_op(
+                        assignment,
+                        elem_type,
+                        value_expr,
+                        &mut |builder, tcx| infer_value_ty.infer_silent(builder, tcx),
+                    )
                 })
             }
 
             _ => {
+                if let Some(typed_dict_update_ty) = self
+                    .try_infer_typed_dict_pep_584_augmented_assignment(
+                        assignment,
+                        target_type,
+                        value_expr,
+                        infer_value_ty,
+                    )
+                {
+                    return typed_dict_update_ty;
+                }
+
                 let ast_arguments = [ArgOrKeyword::Arg(value_expr)];
                 let mut call_arguments = CallArguments::positional([Type::unknown()]);
 
@@ -5488,10 +5469,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 assert_eq!(previous, None);
             }
 
-            MultiInferenceState::Overwrite => {
-                self.expressions.insert(expression.into(), ty);
-            }
-
             MultiInferenceState::Intersect => {
                 self.expressions
                     .entry(expression.into())
@@ -5615,7 +5592,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                     let str_ty = ty.str(self.db());
                                     if let Some(literal) = str_ty.as_string_literal() {
                                         collector.push_str(literal.value(self.db()));
-                                    } else if str_ty.is_literal_string() {
+                                    } else if str_ty
+                                        .is_subtype_of(self.db(), Type::literal_string())
+                                    {
                                         collector.add_literal_string_expression();
                                     } else {
                                         collector.add_non_literal_string_expression();
@@ -8808,6 +8787,82 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 }
 
+/// Manages the inference of a given expression.
+struct MultiInferenceGuard<'db, 'ast, 'infer> {
+    infer_expr:
+        &'infer mut dyn FnMut(&mut TypeInferenceBuilder<'db, 'ast>, TypeContext<'db>) -> Type<'db>,
+    last_tcx: Option<TypeContext<'db>>,
+    finalized: bool,
+}
+
+impl<'db, 'ast, 'infer> MultiInferenceGuard<'db, 'ast, 'infer> {
+    /// Creates a [`MultiInferenceGuard`] for the given expression.
+    fn new(
+        infer_expr: &'infer mut dyn FnMut(
+            &mut TypeInferenceBuilder<'db, 'ast>,
+            TypeContext<'db>,
+        ) -> Type<'db>,
+    ) -> Self {
+        Self {
+            infer_expr,
+            last_tcx: None,
+            finalized: false,
+        }
+    }
+
+    /// Infer the expression with diagnostics enabled.
+    ///
+    /// This method must be called exactly once in the lifetime of the [`MultiInferenceGuard`].
+    fn infer_loud(
+        &mut self,
+        builder: &mut TypeInferenceBuilder<'db, 'ast>,
+        tcx: TypeContext<'db>,
+    ) -> Type<'db> {
+        debug_assert!(
+            !self.finalized,
+            "called `infer_loud` multiple times on a `MultiInferenceGuard`"
+        );
+
+        self.finalized = true;
+        (self.infer_expr)(builder, tcx)
+    }
+
+    /// Infer the expression silently, with diagnostics disabled.
+    ///
+    /// This method may be called an unlimited number of times.
+    fn infer_silent(
+        &mut self,
+        builder: &mut TypeInferenceBuilder<'db, 'ast>,
+        tcx: TypeContext<'db>,
+    ) -> Type<'db> {
+        let prev_multi_inference_state =
+            builder.set_multi_inference_state(MultiInferenceState::Ignore);
+        let was_in_multi_inference = builder.context.set_multi_inference(true);
+
+        let value_ty = (self.infer_expr)(builder, tcx);
+        self.last_tcx = Some(tcx);
+
+        // Reset the multi-inference state.
+        builder.set_multi_inference_state(prev_multi_inference_state);
+        builder.context.set_multi_inference(was_in_multi_inference);
+
+        value_ty
+    }
+
+    fn last_tcx(&self) -> TypeContext<'db> {
+        self.last_tcx.unwrap_or_default()
+    }
+}
+
+impl Drop for MultiInferenceGuard<'_, '_, '_> {
+    fn drop(&mut self) {
+        debug_assert!(
+            self.finalized,
+            "dropped `MultiInferenceGuard` without calling `infer_loud`"
+        );
+    }
+}
+
 /// An expression representing the function argument at the given index, along with its type
 /// context.
 type ArgExpr<'db, 'ast> = (usize, &'ast ast::Expr, TypeContext<'db>);
@@ -8846,12 +8901,6 @@ enum MultiInferenceState {
     /// Panic if the expression has already been inferred.
     #[default]
     Panic,
-
-    /// Overwrite the previously inferred value.
-    ///
-    /// Note that `Overwrite` does not interact well with nested inferences:
-    /// it overwrites values that were written with `MultiInferenceState::Intersect`.
-    Overwrite,
 
     /// Ignore the newly inferred value.
     Ignore,
