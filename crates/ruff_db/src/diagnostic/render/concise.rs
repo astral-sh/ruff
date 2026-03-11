@@ -68,28 +68,20 @@ impl<'a> ConciseRenderer<'a> {
             }
 
             if self.config.hide_severity {
-                if let Some(code) = diag.secondary_code() {
-                    write!(
-                        f,
-                        "{code} ",
-                        code = fmt_styled(
-                            fmt_with_hyperlink(&code, diag.documentation_url(), &stylesheet),
-                            stylesheet.secondary_code
-                        )
-                    )?;
-                } else {
-                    write!(
-                        f,
-                        "{id}: ",
-                        id = fmt_styled(
-                            fmt_with_hyperlink(
-                                &diag.inner.id,
-                                diag.documentation_url(),
-                                &stylesheet
-                            ),
-                            stylesheet.secondary_code
-                        )
-                    )?;
+                let id = diag.secondary_code_or_id(self.config.preview);
+                write!(
+                    f,
+                    "{id}: ",
+                    id = fmt_styled(
+                        fmt_with_hyperlink(&id, diag.documentation_url(), &stylesheet),
+                        stylesheet.secondary_code
+                    )
+                )?;
+                if self.config.show_fix_status {
+                    // Do not display an indicator for inapplicable fixes
+                    if diag.has_applicable_fix(self.config.fix_applicability()) {
+                        write!(f, "[{fix}] ", fix = fmt_styled("*", stylesheet.separator))?;
+                    }
                 }
             } else {
                 let (severity, severity_style) = match diag.severity() {
@@ -104,7 +96,7 @@ impl<'a> ConciseRenderer<'a> {
                     severity = fmt_styled(severity, severity_style),
                     id = fmt_styled(
                         fmt_with_hyperlink(
-                            &diag.secondary_code_or_id(),
+                            &diag.secondary_code_or_id(self.config.preview),
                             diag.documentation_url(),
                             &stylesheet
                         ),
