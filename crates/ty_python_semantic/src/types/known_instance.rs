@@ -441,7 +441,9 @@ impl<'db> UnionTypeInstance<'db> {
     ) -> Self {
         Self::new(
             db,
-            UnionTypeInstanceInner::Lazy(LazyUnionTypeInstance { name, definition }),
+            UnionTypeInstanceInner::Lazy(LazyUnionTypeInstance {
+                type_alias: ImplicitTypeAliasType::new(db, name, definition),
+            }),
         )
     }
 
@@ -532,17 +534,16 @@ impl<'db> UnionTypeInstance<'db> {
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub struct LazyUnionTypeInstance<'db> {
-    name: Name,
-    definition: Definition<'db>,
+    type_alias: ImplicitTypeAliasType<'db>,
 }
 
 impl<'db> LazyUnionTypeInstance<'db> {
-    fn to_implicit_type_alias(&self, db: &'db dyn Db) -> ImplicitTypeAliasType<'db> {
-        ImplicitTypeAliasType::new(db, self.name.clone(), self.definition)
+    fn to_implicit_type_alias(&self, _db: &'db dyn Db) -> ImplicitTypeAliasType<'db> {
+        self.type_alias
     }
 
     fn value_type(&self, db: &'db dyn Db, kind: ExpressionKind) -> Type<'db> {
-        infer_implicit_assignment_value_type(db, self.definition, kind)
+        infer_implicit_assignment_value_type(db, self.type_alias.definition(db), kind)
     }
 
     fn value_expression_types(
@@ -558,7 +559,7 @@ impl<'db> LazyUnionTypeInstance<'db> {
                         invalid_expressions: smallvec::smallvec_inline![
                             super::InvalidTypeExpression::InvalidType(
                                 ty,
-                                self.definition.scope(db)
+                                self.type_alias.definition(db).scope(db)
                             )
                         ],
                     }),
@@ -567,7 +568,10 @@ impl<'db> LazyUnionTypeInstance<'db> {
             other => Err(InvalidTypeExpressionError {
                 fallback_type: Type::unknown(),
                 invalid_expressions: smallvec::smallvec_inline![
-                    super::InvalidTypeExpression::InvalidType(other, self.definition.scope(db))
+                    super::InvalidTypeExpression::InvalidType(
+                        other,
+                        self.type_alias.definition(db).scope(db)
+                    )
                 ],
             }),
         }

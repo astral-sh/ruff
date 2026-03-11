@@ -20,6 +20,11 @@ use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 
+#[salsa::tracked(
+    cycle_fn=implicit_assignment_value_type_cycle_recover,
+    cycle_initial=|_, id, _, _| Type::divergent(id),
+    heap_size=ruff_memory_usage::heap_size
+)]
 pub(super) fn infer_implicit_assignment_value_type<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
@@ -44,6 +49,17 @@ pub(super) fn infer_implicit_assignment_value_type<'db>(
     );
 
     infer_expression_type(db, value_expression, TypeContext::default())
+}
+
+fn implicit_assignment_value_type_cycle_recover<'db>(
+    db: &'db dyn Db,
+    cycle: &salsa::Cycle,
+    previous_ty: &Type<'db>,
+    current_ty: Type<'db>,
+    _definition: Definition<'db>,
+    _expression_kind: ExpressionKind,
+) -> Type<'db> {
+    current_ty.cycle_normalized(db, *previous_ty, cycle)
 }
 
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
@@ -229,13 +245,7 @@ pub(super) fn walk_implicit_type_alias<'db, V: visitor::TypeVisitor<'db> + ?Size
     visitor.visit_type(db, type_alias.value_type(db));
 }
 
-#[salsa::tracked]
 impl<'db> ImplicitTypeAliasType<'db> {
-    #[salsa::tracked(
-        cycle_fn=implicit_value_type_cycle_recover,
-        cycle_initial=implicit_value_type_cycle_initial,
-        heap_size=ruff_memory_usage::heap_size
-    )]
     pub(crate) fn value_type(self, db: &'db dyn Db) -> Type<'db> {
         infer_implicit_assignment_value_type(
             db,
@@ -243,24 +253,6 @@ impl<'db> ImplicitTypeAliasType<'db> {
             ExpressionKind::TypeExpression,
         )
     }
-}
-
-fn implicit_value_type_cycle_recover<'db>(
-    db: &'db dyn Db,
-    cycle: &salsa::Cycle,
-    previous_ty: &Type<'db>,
-    current_ty: Type<'db>,
-    _self: ImplicitTypeAliasType<'db>,
-) -> Type<'db> {
-    current_ty.cycle_normalized(db, *previous_ty, cycle)
-}
-
-fn implicit_value_type_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    id: salsa::Id,
-    _self: ImplicitTypeAliasType<'db>,
-) -> Type<'db> {
-    Type::divergent(id)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
