@@ -96,9 +96,15 @@ impl Violation for SingleLineImplicitStringConcatenation {
 pub(crate) struct MultiLineImplicitStringConcatenation;
 
 impl Violation for MultiLineImplicitStringConcatenation {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         "Implicitly concatenated string literals over multiple lines".to_string()
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        Some("Parenthesize string literals".to_string())
     }
 }
 
@@ -159,10 +165,16 @@ pub(crate) fn implicit(
         };
 
         if locator.contains_line_break(TextRange::new(a_range.end(), b_range.start())) {
-            context.report_diagnostic_if_enabled(
+            if let Some(mut diagnostic) = context.report_diagnostic_if_enabled(
                 MultiLineImplicitStringConcatenation,
                 TextRange::new(a_range.start(), b_range.end()),
-            );
+            ) {
+                if let Some(fix) = parenthesize_strings(
+                    a_token, b_token, a_range, b_range, locator,
+                ) {
+                    diagnostic.set_fix(fix);
+                }
+            }
         } else {
             if let Some(mut diagnostic) = context.report_diagnostic_if_enabled(
                 SingleLineImplicitStringConcatenation,
@@ -267,4 +279,113 @@ fn has_odd_consecutive_backslashes(mut itr: impl Iterator<Item = u8>) -> bool {
         odd_backslashes = !odd_backslashes;
     }
     odd_backslashes
+}
+
+/// Parenthesizes multi-line implicit string concatenation
+///
+/// Converts:
+/// ```python
+/// z = "The quick brown fox jumps over the lazy "\
+///     "dog."
+/// ```
+///
+/// To:
+/// ```python
+/// z = (
+///     "The quick brown fox jumps over the lazy "
+///     "dog."
+/// )
+/// ```
+fn parenthesize_strings(
+    a_token: &Token,
+    b_token: &Token,
+    a_range: TextRange,
+    b_range: TextRange,
+    locator: &Locator,
+) -> Option<Fix> {
+    // For now, we only support simple string-to-string concatenation
+    // (not f-string combinations) to keep the fix simple and reliable
+    if !matches!(a_token.kind(), TokenKind::String)
+        || !matches!(b_token.kind(), TokenKind::String)
+    {
+        return None;
+    }
+
+    let a_string_flags = a_token.string_flags()?;
+    let b_string_flags = b_token.string_flags()?;
+
+    // Require that the strings have the same prefix, quote style, and number of quotes
+    if a_string_flags.prefix() != b_string_flags.prefix()
+        || a_string_flags.quote_style() != b_string_flags.quote_style()
+        || a_string_flags.is_triple_quoted() != b_string_flags.is_triple_quoted()
+        || a_string_flags.is_unclosed()
+        || b_string_flags.is_unclosed()
+    {
+        return None;
+    }
+
+    // Get the full text of both strings
+    let a_text = locator.slice(a_range);
+    let b_text = locator.slice(b_range);
+
+    // Get the indentation from the second string's line
+    let b_start = b_range.start();
+
+    // Find the start of the line containing the second string
+    let line_start = locator.line_start(b_start);
+
+    // Get the whitespace/indentation at the start of that line
+    let indent = locator.slice(TextRange::new(line_start, b_start));
+
+    // Determine if there's a backslash between the strings
+    let a_end = a_range.end();
+    let between_text = locator.slice(TextRange::new(a_end, b_start));
+    let has_backslash = between_text.contains('\\');
+
+    // Get the indentation for the first line (after the opening paren)
+    let first_line_indent = if has_backslash {
+        // For backslash continuation, find the indentation of the first string's line
+        let first_line_start = locator.line_start(a_range.start());
+        let before_first_string =
+            locator.slice(TextRange::new(first_line_start, a_range.start()));
+        // Extract just the leading whitespace
+        let first_line_indent = before_first_string.trim_end_matches(|c| c != ' ' && c != '\t');
+        first_line_indent.to_owned()
+    } else {
+        // For implicit continuation (adjacent strings on different lines), use the second line's
+        // indent
+        indent.to_owned()
+    };
+
+    let quotes = a_string_flags.quote_str();
+    let a_prefix = a_string_flags.prefix();
+    let b_prefix = b_string_flags.prefix();
+
+    // Extract the string bodies (without quotes)
+    let opener_len = a_string_flags.opener_len();
+    let closer_len = a_string_flags.closer_len();
+
+    let a_body = &a_text[TextRange::new(opener_len, a_text.text_len() - closer_len)];
+    let b_body = &b_text[TextRange::new(opener_len, b_text.text_len() - closer_len)];
+
+    // Build the parenthesized version
+    let reformatted = format!(
+        "({}{}{}{}{}{}{}{}{})",
+        if has_backslash { "\n" } else { "" },
+        first_line_indent,
+        a_prefix,
+        quotes,
+        a_body,
+        quotes,
+        "\n",
+        indent,
+        format!("{}{}{}{}", b_prefix, quotes, b_body, quotes)
+    );
+
+    let range = TextRange::new(a_range.start(), b_range.end());
+
+    Some(Fix::safe_edit(Edit::range_replacement(
+        reformatted,
+        range,
+    )))
 }
