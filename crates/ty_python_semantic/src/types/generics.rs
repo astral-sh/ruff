@@ -1315,7 +1315,7 @@ impl<'db> Specialization<'db> {
                 .iter()
                 .zip(self.generic_context(db).variables(db))
                 .map(|(ty, typevar)| {
-                    // Create a unique synthetic type variable.
+                    // Create a unique synthetic type variable representing each assigned type.
                     let name = format!("_T{}", specialization.len());
                     let synthetic =
                         BoundTypeVarInstance::synthetic(db, Name::new(name), typevar.variance(db));

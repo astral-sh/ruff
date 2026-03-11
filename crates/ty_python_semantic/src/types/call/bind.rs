@@ -3724,11 +3724,15 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             FxHashSet::default();
 
         // Attempt to to solve the specialization while preferring the declared type of non-covariant
-        // type parameters from generic classes.
+        // type parameters from generic classes, or callable parameters.
         let preferred_type_mappings = return_with_tcx
             .and_then(|(return_ty, tcx)| {
-                tcx.filter_union(self.db, |ty| ty.class_specialization(self.db).is_some())
-                    .class_specialization(self.db)?;
+                if !tcx
+                    .filter_union(self.db, |ty| ty.may_prefer_declared_type(self.db))
+                    .may_prefer_declared_type(self.db)
+                {
+                    return None;
+                }
 
                 builder
                     .infer_reverse_map(
@@ -3815,18 +3819,16 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             let mut variance_in_return = TypeVarVariance::Bivariant;
 
             // Find all occurrences of the type variable in the return type.
-            let visit_return_ty = |_, ty, variance, _| {
+            return_ty.visit_specialization(self.db, |ty, variance| {
                 if ty != Type::TypeVar(typevar) {
                     return;
                 }
 
                 variance_in_return = variance_in_return.join(variance);
-            };
+            });
 
-            return_ty.visit_specialization(self.db, self.call_expression_tcx, visit_return_ty);
-
-            // Promotion is only useful if the type variable is in invariant or contravariant
-            // position in the return type.
+            // Promotion is only useful if the type variable is in non-covariant position
+            // in the return type.
             if variance_in_return.is_covariant() {
                 return ty;
             }

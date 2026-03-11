@@ -5042,10 +5042,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ))
         };
 
-        // Prefer the declared type of generic classes.
+        // Prefer the declared type of generic classes or callables.
         for narrowed_ty in narrow_targets
             .iter()
-            .filter(|ty| ty.class_specialization(db).is_some())
+            .filter(|ty| ty.may_prefer_declared_type(db))
         {
             if let Some(result) = try_narrow(*narrowed_ty) {
                 return result;
@@ -5058,7 +5058,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // leads to similar performance issues.
         for narrowed_ty in narrow_targets
             .iter()
-            .filter(|ty| ty.class_specialization(db).is_none())
+            .filter(|ty| !ty.may_prefer_declared_type(db))
         {
             if let Some(result) = try_narrow(*narrowed_ty) {
                 return result;
@@ -6011,8 +6011,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // TODO: We could perform multi-inference here.
                 && tcx
                     .filter_union(self.db(), |ty| ty.class_specialization(self.db()).is_some())
-                    .class_specialization(self.db())
-                    .is_some()
+                    .class_specialization(self.db()).is_some()
             {
                 let collection_instance =
                     Type::instance(self.db(), ClassType::Generic(collection_alias));

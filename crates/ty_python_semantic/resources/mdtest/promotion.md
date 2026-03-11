@@ -96,6 +96,8 @@ We promote in non-covariant position in the return type of a generic function, o
 generic class:
 
 ```py
+from typing import Callable, Literal
+
 class Bivariant[T]:
     def __init__(self, value: T): ...
 
@@ -124,6 +126,7 @@ def f8[T](x: T) -> Invariant[T] | Covariant[T] | None: ...
 def f9[T](x: T) -> tuple[Invariant[T], Invariant[T]] | None: ...
 def f10[T, U](x: T, y: U) -> tuple[Invariant[T], Covariant[U]] | None: ...
 def f11[T, U](x: T, y: U) -> tuple[Invariant[Covariant[T] | None], Covariant[U]] | None: ...
+def f12[T](x: T) -> Callable[[T], bool] | None: ...
 
 reveal_type(Bivariant(1))  # revealed: Bivariant[Literal[1]]
 reveal_type(Covariant(1))  # revealed: Covariant[Literal[1]]
@@ -144,6 +147,8 @@ reveal_type(f9(1))  # revealed: tuple[Invariant[int], Invariant[int]] | None
 
 reveal_type(f10(1, 1))  # revealed: tuple[Invariant[int], Covariant[Literal[1]]] | None
 reveal_type(f11(1, 1))  # revealed: tuple[Invariant[Covariant[int] | None], Covariant[Literal[1]]] | None
+
+reveal_type(f12(1))  # revealed: ((int, /) -> bool) | None
 ```
 
 ## Promotion is recursive
@@ -190,6 +195,7 @@ declared in a promotable position:
 ```py
 from enum import Enum
 from typing import Sequence, Literal, LiteralString
+from typing import Callable
 
 class Color(Enum):
     RED = "red"
@@ -274,6 +280,19 @@ reveal_type(x21)  # revealed: X[Literal[1]]
 
 x22: X[Literal[1]] | None = x([1])
 reveal_type(x22)  # revealed: X[Literal[1]]
+
+def make_callable[T](x: T) -> Callable[[T], bool]:
+    raise NotImplementedError
+
+def maybe_make_callable[T](x: T) -> Callable[[T], bool] | None:
+    raise NotImplementedError
+
+x23: Callable[[Literal[1]], bool] = make_callable(1)
+reveal_type(x23)  # revealed: (Literal[1], /) -> bool
+
+x24: Callable[[Literal[1]], bool] | None = maybe_make_callable(1)
+# TODO: Better constraint solver.
+reveal_type(x24)  # revealed: ((int, /) -> bool) | None
 ```
 
 ## Literal annotations see through subtyping
@@ -403,7 +422,7 @@ later used in a promotable position:
 
 ```py
 from enum import Enum
-from typing import Literal
+from typing import Callable, Literal
 
 def promote[T](x: T) -> list[T]:
     return [x]
@@ -449,6 +468,16 @@ class MyEnum(Enum):
 def _(x: Literal[MyEnum.A, MyEnum.B]):
     reveal_type(x)  # revealed: Literal[MyEnum.A, MyEnum.B]
     reveal_type([x])  # revealed: list[Literal[MyEnum.A, MyEnum.B]]
+
+def make_callable[T](x: T) -> Callable[[T], bool]:
+    raise NotImplementedError
+
+def maybe_make_callable[T](x: T) -> Callable[[T], bool] | None:
+    raise NotImplementedError
+
+def _(x: Literal[1]):
+    reveal_type(make_callable(x))  # revealed: (Literal[1], /) -> bool
+    reveal_type(maybe_make_callable(x))  # revealed: ((Literal[1], /) -> bool) | None
 ```
 
 Literal promotability is respected by unions:
