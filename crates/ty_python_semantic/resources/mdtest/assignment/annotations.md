@@ -608,8 +608,7 @@ e: list[Any] | None = [1]
 reveal_type(e)  # revealed: list[Any]
 
 f: list[Any] | None = f2(1)
-# TODO: Better constraint solver.
-reveal_type(f)  # revealed: list[int] | None
+reveal_type(f)  # revealed: list[Any] | None
 
 g: list[Any] | dict[Any, Any] = f3(1)
 # TODO: Better constraint solver.
