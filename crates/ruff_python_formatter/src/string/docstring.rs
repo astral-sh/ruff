@@ -1074,7 +1074,7 @@ impl<'src> CodeExampleRst<'src> {
         // [code-block]: https://www.sphinx-doc.org/en/master/usage/restructuredtext/directives.html#directive-code-block
         static DIRECTIVE_START: LazyLock<Regex> = LazyLock::new(|| {
             Regex::new(
-                r"(?m)^\s*\.\. \s*(?i:code-block|sourcecode)::\s*(?i:python|py|python3|py3)$",
+                r"(?m)^\s*\.\. \s*(?i:code-block|sourcecode):*\s*\S+$",
             )
             .unwrap()
         });
