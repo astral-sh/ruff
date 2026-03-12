@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/expressions/bin_op/missing_rhs_0.py
 ---
 ## AST
 
@@ -7,7 +8,7 @@ source: crates/ruff_python_parser/tests/fixtures.rs
 Module(
     ModModule {
         node_index: NodeIndex(None),
-        range: 0..11,
+        range: 0..10,
         body: [
             Expr(
                 StmtExpr {

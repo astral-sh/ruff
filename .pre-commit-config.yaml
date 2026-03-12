@@ -27,18 +27,9 @@ repos:
       - id: check-merge-conflict
         priority: 0
       - id: end-of-file-fixer
-        # Rust files are handled by rustfmt, which also avoids a known cycle
-        # where end-of-file-fixer truncates newline-only .rs files to 0 bytes,
-        # then rustfmt adds a newline back (rust-lang/rustfmt#5364).
-        #
-        # Files with eol=crlf or eol=cr in .gitattributes are excluded because
-        # adding a trailing LF creates cross-platform snapshot mismatches.
-        exclude_types: [rust]
-        exclude: |
-          (?x)^(
-            crates/ruff_python_parser/resources/invalid/re_lexing/line_continuation_windows_eol\.py|
-            crates/ruff_python_parser/resources/invalid/re_lex_logical_token_mac_eol\.py
-          )$
+        # Don't run this on all files: the absence of trailing newlines is often
+        # intentional in parser/linter/formatter tests
+        files: '^((crates/ty_python_semantic/resources/corpus/.*)|(.*\.toml))$'
         priority: 0
 
   - repo: https://github.com/abravalheri/validate-pyproject

@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/re_lex_logical_token.py
 ---
 ## AST
 
@@ -7,7 +8,7 @@ source: crates/ruff_python_parser/tests/fixtures.rs
 Module(
     ModModule {
         node_index: NodeIndex(None),
-        range: 0..980,
+        range: 0..979,
         body: [
             If(
                 StmtIf {
@@ -944,6 +945,7 @@ Module(
 
 
    |
+55 | if call(f"hello
 56 |     def bar():
 57 |         pass
    |             ^ Syntax Error: Expected a statement

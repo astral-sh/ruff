@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/expressions/named/missing_expression_3.py
 ---
 ## AST
 
@@ -7,7 +8,7 @@ source: crates/ruff_python_parser/tests/fixtures.rs
 Module(
     ModModule {
         node_index: NodeIndex(None),
-        range: 0..113,
+        range: 0..112,
         body: [
             Expr(
                 StmtExpr {
@@ -59,6 +60,8 @@ Module(
 ## Errors
 
   |
+4 | (x :=
+5 |
 6 | x + y
   |      ^ Syntax Error: unexpected EOF while parsing
   |

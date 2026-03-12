@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/expressions/dict/missing_closing_brace_0.py
 ---
 ## AST
 
@@ -7,16 +8,16 @@ source: crates/ruff_python_parser/tests/fixtures.rs
 Module(
     ModModule {
         node_index: NodeIndex(None),
-        range: 0..25,
+        range: 0..24,
         body: [
             Expr(
                 StmtExpr {
                     node_index: NodeIndex(None),
-                    range: 0..25,
+                    range: 0..24,
                     value: Dict(
                         ExprDict {
                             node_index: NodeIndex(None),
-                            range: 0..25,
+                            range: 0..24,
                             items: [
                                 DictItem {
                                     key: Some(
