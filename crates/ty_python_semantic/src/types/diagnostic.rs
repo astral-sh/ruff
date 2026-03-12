@@ -2079,7 +2079,7 @@ declare_lint! {
     pub(crate) static POSSIBLY_MISSING_ATTRIBUTE = {
         summary: "detects references to possibly missing attributes",
         status: LintStatus::stable("0.0.1-alpha.22"),
-        default_level: Level::Warn,
+        default_level: Level::Ignore,
     }
 }
 

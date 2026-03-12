@@ -3026,7 +3026,7 @@ f(x=1)  # Error raised here
 ## `possibly-missing-attribute`
 
 <small>
-Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'warn'."><code>warn</code></a> ·
+Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'ignore'."><code>ignore</code></a> ·
 Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.22">0.0.1-alpha.22</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20%22possibly-missing-attribute%22" target="_blank">Related issues</a> ·
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L2060" target="_blank">View source</a>
