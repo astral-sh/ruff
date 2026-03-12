@@ -40,10 +40,8 @@ names to avoid implying that the union contains duplicate elements:
 ```py
 def f(flag: bool):
     x = str.upper if flag else str.lower
-    # fmt: off
     # revealed: (Overload[def upper(self: LiteralString) -> LiteralString, def upper(self) -> str]) | (Overload[def lower(self: LiteralString) -> LiteralString, def lower(self) -> str])
     reveal_type(x)
-    # fmt: on
 ```
 
 ### Top
