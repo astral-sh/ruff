@@ -67,10 +67,10 @@ use crate::types::diagnostic::{
     INVALID_DECLARATION, INVALID_ENUM_MEMBER_ANNOTATION, INVALID_LEGACY_TYPE_VARIABLE,
     INVALID_NEWTYPE, INVALID_PARAMSPEC, INVALID_TYPE_ALIAS_TYPE, INVALID_TYPE_FORM,
     INVALID_TYPE_GUARD_CALL, INVALID_TYPE_VARIABLE_BOUND, INVALID_TYPE_VARIABLE_CONSTRAINTS,
-    IncompatibleBases, NO_MATCHING_OVERLOAD, POSSIBLY_MISSING_ATTRIBUTE,
-    POSSIBLY_MISSING_IMPLICIT_CALL, SUBCLASS_OF_FINAL_CLASS, UNDEFINED_REVEAL,
-    UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_REFERENCE, UNSUPPORTED_DYNAMIC_BASE,
-    UNSUPPORTED_OPERATOR, UNUSED_AWAITABLE, hint_if_stdlib_attribute_exists_on_other_versions,
+    IncompatibleBases, NO_MATCHING_OVERLOAD, POSSIBLY_MISSING_IMPLICIT_CALL,
+    POSSIBLY_MISSING_SUBMODULE, SUBCLASS_OF_FINAL_CLASS, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE,
+    UNRESOLVED_GLOBAL, UNRESOLVED_REFERENCE, UNSUPPORTED_DYNAMIC_BASE, UNSUPPORTED_OPERATOR,
+    UNUSED_AWAITABLE, hint_if_stdlib_attribute_exists_on_other_versions,
     report_attempted_protocol_instantiation, report_bad_dunder_set_call,
     report_call_to_abstract_method, report_cannot_pop_required_field_on_typed_dict,
     report_conflicting_metaclass_from_bases, report_instance_layout_conflict,
@@ -7993,11 +7993,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             if resolve_module(db, self.file(), &maybe_submodule_name).is_some() {
                                 if let Some(builder) = self
                                     .context
-                                    .report_lint(&POSSIBLY_MISSING_ATTRIBUTE, attribute)
+                                    .report_lint(&POSSIBLY_MISSING_SUBMODULE, attribute)
                                 {
                                     let mut diag = builder.into_diagnostic(format_args!(
-                                        "Submodule `{attr_name}` may not be available as an \
-                                        attribute on module `{module_name}`"
+                                        "Submodule `{attr_name}` might not have been imported"
                                     ));
                                     diag.help(format_args!(
                                         "Consider explicitly importing `{maybe_submodule_name}`"

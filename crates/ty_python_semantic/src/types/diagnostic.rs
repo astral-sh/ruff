@@ -116,6 +116,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&UNSUPPORTED_BOOL_CONVERSION);
     registry.register_lint(&PARAMETER_ALREADY_ASSIGNED);
     registry.register_lint(&POSSIBLY_MISSING_ATTRIBUTE);
+    registry.register_lint(&POSSIBLY_MISSING_SUBMODULE);
     registry.register_lint(&POSSIBLY_MISSING_IMPORT);
     registry.register_lint(&POSSIBLY_UNRESOLVED_REFERENCE);
     registry.register_lint(&SHADOWED_TYPE_VARIABLE);
@@ -2063,6 +2064,10 @@ declare_lint! {
     /// ## Why is this bad?
     /// Attempting to access a missing attribute will raise an `AttributeError` at runtime.
     ///
+    /// ## Rule status
+    /// This rule is currently disabled by default because of the number of
+    /// false positives it can produce.
+    ///
     /// ## Examples
     /// ```python
     /// class A:
@@ -2074,6 +2079,27 @@ declare_lint! {
     pub(crate) static POSSIBLY_MISSING_ATTRIBUTE = {
         summary: "detects references to possibly missing attributes",
         status: LintStatus::stable("0.0.1-alpha.22"),
+        default_level: Level::Warn,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for accesses of submodules that might not've been imported.
+    ///
+    /// ## Why is this bad?
+    /// When module `a` has a submodule `b`, `import a` isn't generally enough to let you access
+    /// `a.b.` You either need to explicitly `import a.b`, or else you need the `__init__.py` file
+    /// of `a` to include `from . import b`. Without one of those, `a.b` is an `AttributeError`.
+    ///
+    /// ## Examples
+    /// ```python
+    /// import html
+    /// html.parser  # AttributeError: module 'html' has no attribute 'parser'
+    /// ```
+    pub(crate) static POSSIBLY_MISSING_SUBMODULE = {
+        summary: "detects accesses of submodules that may not be available as attributes on their parent module",
+        status: LintStatus::stable("0.0.23"),
         default_level: Level::Warn,
     }
 }
