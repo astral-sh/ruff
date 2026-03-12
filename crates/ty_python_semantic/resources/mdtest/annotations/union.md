@@ -83,3 +83,45 @@ X = int | str
 def f(y: X):
     reveal_type(y)  # revealed: int | str
 ```
+
+## Diagnostics for PEP-604 unions used on Python less than 3.10
+
+<!-- snapshot-diagnostics -->
+
+PEP-604 unions generally don't work on Python \<=3.9:
+
+```toml
+[environment]
+python-version = "3.9"
+```
+
+`a.py`:
+
+```py
+x: int | str  # error: [unsupported-operator]
+
+class Foo:
+    def __init__(self):
+        self.x: int | str = 42  # error: [unsupported-operator]
+
+d = {}
+d[0]: int | str = 42  # error: [unsupported-operator]
+```
+
+But these runtime errors can be avoided if you add `from __future__ import annotations` to the top
+of your file:
+
+`b.py`:
+
+```py
+from __future__ import annotations
+
+x: int | str
+
+class Foo:
+    def __init__(self):
+        self.x: int | str = 42
+
+d = {}
+d[0]: int | str = 42
+```

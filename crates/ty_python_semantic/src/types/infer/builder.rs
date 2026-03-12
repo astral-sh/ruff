@@ -3780,8 +3780,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 target,
                 simple: _,
             } = assignment;
-            let annotated =
-                self.infer_annotation_expression(annotation, DeferredExpressionState::None);
+            let annotated = self.infer_annotation_expression(
+                annotation,
+                DeferredExpressionState::from(self.defer_annotations()),
+            );
 
             if !annotated.qualifiers.is_empty() {
                 for qualifier in [TypeQualifiers::CLASS_VAR, TypeQualifiers::INIT_VAR] {
