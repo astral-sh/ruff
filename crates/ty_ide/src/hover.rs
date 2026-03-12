@@ -30,17 +30,17 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
         _ => None,
     };
 
-    let definitions = if typed_dict_key.is_some() {
+    let docs = if typed_dict_key.is_some() {
         None
     } else {
-        goto_target.get_definition_targets(
-            &model,
-            ty_python_semantic::ImportAliasResolution::ResolveAliases,
-        )
+        goto_target
+            .get_definition_targets(
+                &model,
+                ty_python_semantic::ImportAliasResolution::ResolveAliases,
+            )
+            .and_then(|definitions| definitions.docstring(db))
+            .map(HoverContent::Docstring)
     };
-    let docs = definitions
-        .and_then(|definitions| definitions.docstring(db))
-        .map(HoverContent::Docstring);
 
     let mut contents = Vec::new();
     if let Some(signature) = goto_target.call_type_simplified_by_overloads(&model) {
