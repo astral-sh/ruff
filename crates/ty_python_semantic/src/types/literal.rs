@@ -9,49 +9,70 @@ use crate::types::{ClassLiteral, KnownClass, Type};
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 pub struct LiteralValueType<'db>(LiteralValueTypeInner<'db>);
 
-/// This enum encodes three orthogonal properties in its discriminant:
-///   - kind (`Int, Bool, String, Enum, Bytes, LiteralString`)
-///   - promotability (Promotable vs Unpromotable)
-///   - whether it is recursively defined (Yes vs No)
-///
-/// Resulting in 6 x 2 x 2 = 24 variants, all fitting in a single u8 discriminant
-/// while keeping the maximum payload at 8 bytes (`IntLiteralType`).
+/// Each variant carries a [`LiteralFlags`] byte alongside its payload.
+/// Because the flags byte fits into the padding between the enum discriminant
+/// (1 byte) and the 4-byte-aligned payload, the overall size of this enum
+/// stays at 12 bytes, the same as the original flagless representation.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 enum LiteralValueTypeInner<'db> {
-    PromotableInt(IntLiteralType),
-    PromotableBool(bool),
-    PromotableString(StringLiteralType<'db>),
-    PromotableEnum(EnumLiteralType<'db>),
-    PromotableBytes(BytesLiteralType<'db>),
-    PromotableLiteralString,
-    UnpromotableInt(IntLiteralType),
-    UnpromotableBool(bool),
-    UnpromotableString(StringLiteralType<'db>),
-    UnpromotableEnum(EnumLiteralType<'db>),
-    UnpromotableBytes(BytesLiteralType<'db>),
-    UnpromotableLiteralString,
-    RecPromotableInt(IntLiteralType),
-    RecPromotableBool(bool),
-    RecPromotableString(StringLiteralType<'db>),
-    RecPromotableEnum(EnumLiteralType<'db>),
-    RecPromotableBytes(BytesLiteralType<'db>),
-    RecPromotableLiteralString,
-    RecUnpromotableInt(IntLiteralType),
-    RecUnpromotableBool(bool),
-    RecUnpromotableString(StringLiteralType<'db>),
-    RecUnpromotableEnum(EnumLiteralType<'db>),
-    RecUnpromotableBytes(BytesLiteralType<'db>),
-    RecUnpromotableLiteralString,
+    Int(IntLiteralType, LiteralFlags),
+    Bool(bool, LiteralFlags),
+    String(StringLiteralType<'db>, LiteralFlags),
+    Enum(EnumLiteralType<'db>, LiteralFlags),
+    Bytes(BytesLiteralType<'db>, LiteralFlags),
+    LiteralString(LiteralFlags),
 }
 
-use LiteralValueTypeInner::{
-    PromotableBool, PromotableBytes, PromotableEnum, PromotableInt, PromotableLiteralString,
-    PromotableString, RecPromotableBool, RecPromotableBytes, RecPromotableEnum, RecPromotableInt,
-    RecPromotableLiteralString, RecPromotableString, RecUnpromotableBool, RecUnpromotableBytes,
-    RecUnpromotableEnum, RecUnpromotableInt, RecUnpromotableLiteralString, RecUnpromotableString,
-    UnpromotableBool, UnpromotableBytes, UnpromotableEnum, UnpromotableInt,
-    UnpromotableLiteralString, UnpromotableString,
-};
+/// Bit-packed flags for promotability and recursive-definition status.
+///
+/// Stored in each [`LiteralValueTypeInner`] variant, fitting into the
+/// discriminant's padding so that the enum size is unchanged.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+struct LiteralFlags(u8);
+
+impl LiteralFlags {
+    const PROMOTABLE: u8 = 1 << 0;
+    const RECURSIVELY_DEFINED: u8 = 1 << 1;
+
+    const fn new(promotable: bool, recursively_defined: RecursivelyDefined) -> Self {
+        let mut bits = 0;
+        if promotable {
+            bits |= Self::PROMOTABLE;
+        }
+        if recursively_defined.is_yes() {
+            bits |= Self::RECURSIVELY_DEFINED;
+        }
+        Self(bits)
+    }
+
+    const fn is_promotable(self) -> bool {
+        self.0 & Self::PROMOTABLE != 0
+    }
+
+    const fn recursively_defined(self) -> RecursivelyDefined {
+        if self.0 & Self::RECURSIVELY_DEFINED != 0 {
+            RecursivelyDefined::Yes
+        } else {
+            RecursivelyDefined::No
+        }
+    }
+
+    const fn with_promotable(self, promotable: bool) -> Self {
+        if promotable {
+            Self(self.0 | Self::PROMOTABLE)
+        } else {
+            Self(self.0 & !Self::PROMOTABLE)
+        }
+    }
+
+    const fn with_recursively_defined(self, value: RecursivelyDefined) -> Self {
+        if value.is_yes() {
+            Self(self.0 | Self::RECURSIVELY_DEFINED)
+        } else {
+            Self(self.0 & !Self::RECURSIVELY_DEFINED)
+        }
+    }
+}
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 pub(crate) enum LiteralValueTypeKind<'db> {
@@ -82,155 +103,85 @@ impl<'db> LiteralValueType<'db> {
         }
     }
 
-    pub(crate) fn with_recursively_defined(self, value: RecursivelyDefined) -> Self {
-        Self(match value {
-            RecursivelyDefined::Yes => match self.0 {
-                PromotableInt(v) => RecPromotableInt(v),
-                PromotableBool(v) => RecPromotableBool(v),
-                PromotableString(v) => RecPromotableString(v),
-                PromotableEnum(v) => RecPromotableEnum(v),
-                PromotableBytes(v) => RecPromotableBytes(v),
-                PromotableLiteralString => RecPromotableLiteralString,
-                UnpromotableInt(v) => RecUnpromotableInt(v),
-                UnpromotableBool(v) => RecUnpromotableBool(v),
-                UnpromotableString(v) => RecUnpromotableString(v),
-                UnpromotableEnum(v) => RecUnpromotableEnum(v),
-                UnpromotableBytes(v) => RecUnpromotableBytes(v),
-                UnpromotableLiteralString => RecUnpromotableLiteralString,
-                already_rec => already_rec,
-            },
-            RecursivelyDefined::No => match self.0 {
-                RecPromotableInt(v) => PromotableInt(v),
-                RecPromotableBool(v) => PromotableBool(v),
-                RecPromotableString(v) => PromotableString(v),
-                RecPromotableEnum(v) => PromotableEnum(v),
-                RecPromotableBytes(v) => PromotableBytes(v),
-                RecPromotableLiteralString => PromotableLiteralString,
-                RecUnpromotableInt(v) => UnpromotableInt(v),
-                RecUnpromotableBool(v) => UnpromotableBool(v),
-                RecUnpromotableString(v) => UnpromotableString(v),
-                RecUnpromotableEnum(v) => UnpromotableEnum(v),
-                RecUnpromotableBytes(v) => UnpromotableBytes(v),
-                RecUnpromotableLiteralString => UnpromotableLiteralString,
-                already_normal => already_normal,
-            },
+    fn flags(self) -> LiteralFlags {
+        match self.0 {
+            LiteralValueTypeInner::Int(_, f)
+            | LiteralValueTypeInner::Bool(_, f)
+            | LiteralValueTypeInner::String(_, f)
+            | LiteralValueTypeInner::Enum(_, f)
+            | LiteralValueTypeInner::Bytes(_, f)
+            | LiteralValueTypeInner::LiteralString(f) => f,
+        }
+    }
+
+    fn map_flags(self, func: impl FnOnce(LiteralFlags) -> LiteralFlags) -> Self {
+        Self(match self.0 {
+            LiteralValueTypeInner::Int(v, f) => LiteralValueTypeInner::Int(v, func(f)),
+            LiteralValueTypeInner::Bool(v, f) => LiteralValueTypeInner::Bool(v, func(f)),
+            LiteralValueTypeInner::String(v, f) => LiteralValueTypeInner::String(v, func(f)),
+            LiteralValueTypeInner::Enum(v, f) => LiteralValueTypeInner::Enum(v, func(f)),
+            LiteralValueTypeInner::Bytes(v, f) => LiteralValueTypeInner::Bytes(v, func(f)),
+            LiteralValueTypeInner::LiteralString(f) => {
+                LiteralValueTypeInner::LiteralString(func(f))
+            }
         })
     }
 
+    pub(crate) fn with_recursively_defined(self, value: RecursivelyDefined) -> Self {
+        self.map_flags(|f| f.with_recursively_defined(value))
+    }
+
     pub(crate) fn recursively_defined(self) -> RecursivelyDefined {
-        match self.0 {
-            RecPromotableInt(_)
-            | RecPromotableBool(_)
-            | RecPromotableString(_)
-            | RecPromotableEnum(_)
-            | RecPromotableBytes(_)
-            | RecPromotableLiteralString
-            | RecUnpromotableInt(_)
-            | RecUnpromotableBool(_)
-            | RecUnpromotableString(_)
-            | RecUnpromotableEnum(_)
-            | RecUnpromotableBytes(_)
-            | RecUnpromotableLiteralString => RecursivelyDefined::Yes,
-            _ => RecursivelyDefined::No,
-        }
+        self.flags().recursively_defined()
     }
 
     /// Creates a literal value that may be promoted.
     pub(crate) fn promotable(kind: impl Into<LiteralValueTypeKind<'db>>) -> LiteralValueType<'db> {
-        let repr = match kind.into() {
-            LiteralValueTypeKind::Int(int) => LiteralValueTypeInner::PromotableInt(int),
-            LiteralValueTypeKind::Bool(bool) => LiteralValueTypeInner::PromotableBool(bool),
-            LiteralValueTypeKind::String(string) => LiteralValueTypeInner::PromotableString(string),
-            LiteralValueTypeKind::Enum(e) => LiteralValueTypeInner::PromotableEnum(e),
-            LiteralValueTypeKind::Bytes(bytes) => LiteralValueTypeInner::PromotableBytes(bytes),
-            LiteralValueTypeKind::LiteralString => LiteralValueTypeInner::PromotableLiteralString,
-        };
-
-        Self(repr)
+        let flags = LiteralFlags::new(true, RecursivelyDefined::No);
+        Self(match kind.into() {
+            LiteralValueTypeKind::Int(v) => LiteralValueTypeInner::Int(v, flags),
+            LiteralValueTypeKind::Bool(v) => LiteralValueTypeInner::Bool(v, flags),
+            LiteralValueTypeKind::String(v) => LiteralValueTypeInner::String(v, flags),
+            LiteralValueTypeKind::Enum(v) => LiteralValueTypeInner::Enum(v, flags),
+            LiteralValueTypeKind::Bytes(v) => LiteralValueTypeInner::Bytes(v, flags),
+            LiteralValueTypeKind::LiteralString => LiteralValueTypeInner::LiteralString(flags),
+        })
     }
 
     /// Creates a literal value that should not be promoted.
     pub(crate) fn unpromotable(
         kind: impl Into<LiteralValueTypeKind<'db>>,
     ) -> LiteralValueType<'db> {
-        let repr = match kind.into() {
-            LiteralValueTypeKind::Int(int) => LiteralValueTypeInner::UnpromotableInt(int),
-            LiteralValueTypeKind::Bool(bool) => LiteralValueTypeInner::UnpromotableBool(bool),
-            LiteralValueTypeKind::String(string) => {
-                LiteralValueTypeInner::UnpromotableString(string)
-            }
-            LiteralValueTypeKind::Enum(e) => LiteralValueTypeInner::UnpromotableEnum(e),
-            LiteralValueTypeKind::Bytes(bytes) => LiteralValueTypeInner::UnpromotableBytes(bytes),
-            LiteralValueTypeKind::LiteralString => LiteralValueTypeInner::UnpromotableLiteralString,
-        };
-
-        Self(repr)
+        let flags = LiteralFlags::new(false, RecursivelyDefined::No);
+        Self(match kind.into() {
+            LiteralValueTypeKind::Int(v) => LiteralValueTypeInner::Int(v, flags),
+            LiteralValueTypeKind::Bool(v) => LiteralValueTypeInner::Bool(v, flags),
+            LiteralValueTypeKind::String(v) => LiteralValueTypeInner::String(v, flags),
+            LiteralValueTypeKind::Enum(v) => LiteralValueTypeInner::Enum(v, flags),
+            LiteralValueTypeKind::Bytes(v) => LiteralValueTypeInner::Bytes(v, flags),
+            LiteralValueTypeKind::LiteralString => LiteralValueTypeInner::LiteralString(flags),
+        })
     }
 
     /// Returns the unpromotable form of this literal value.
     #[must_use]
     pub(crate) fn to_unpromotable(self) -> Self {
-        Self(match self.0 {
-            PromotableInt(v) => UnpromotableInt(v),
-            PromotableBool(v) => UnpromotableBool(v),
-            PromotableString(v) => UnpromotableString(v),
-            PromotableEnum(v) => UnpromotableEnum(v),
-            PromotableBytes(v) => UnpromotableBytes(v),
-            PromotableLiteralString => UnpromotableLiteralString,
-            RecPromotableInt(v) => RecUnpromotableInt(v),
-            RecPromotableBool(v) => RecUnpromotableBool(v),
-            RecPromotableString(v) => RecUnpromotableString(v),
-            RecPromotableEnum(v) => RecUnpromotableEnum(v),
-            RecPromotableBytes(v) => RecUnpromotableBytes(v),
-            RecPromotableLiteralString => RecUnpromotableLiteralString,
-            already_unpromotable => already_unpromotable,
-        })
+        self.map_flags(|f| f.with_promotable(false))
     }
 
     /// Returns `true` if this literal value should be eagerly promoted to its instance type.
     pub(crate) fn is_promotable(self) -> bool {
-        matches!(
-            self.0,
-            PromotableInt(_)
-                | PromotableBool(_)
-                | PromotableString(_)
-                | PromotableEnum(_)
-                | PromotableBytes(_)
-                | PromotableLiteralString
-                | RecPromotableInt(_)
-                | RecPromotableBool(_)
-                | RecPromotableString(_)
-                | RecPromotableEnum(_)
-                | RecPromotableBytes(_)
-                | RecPromotableLiteralString
-        )
+        self.flags().is_promotable()
     }
 
     pub(crate) fn kind(self) -> LiteralValueTypeKind<'db> {
         match self.0 {
-            PromotableInt(v) | UnpromotableInt(v) | RecPromotableInt(v) | RecUnpromotableInt(v) => {
-                LiteralValueTypeKind::Int(v)
-            }
-            PromotableBool(v)
-            | UnpromotableBool(v)
-            | RecPromotableBool(v)
-            | RecUnpromotableBool(v) => LiteralValueTypeKind::Bool(v),
-            PromotableString(v)
-            | UnpromotableString(v)
-            | RecPromotableString(v)
-            | RecUnpromotableString(v) => LiteralValueTypeKind::String(v),
-            PromotableEnum(v)
-            | UnpromotableEnum(v)
-            | RecPromotableEnum(v)
-            | RecUnpromotableEnum(v) => LiteralValueTypeKind::Enum(v),
-            PromotableBytes(v)
-            | UnpromotableBytes(v)
-            | RecPromotableBytes(v)
-            | RecUnpromotableBytes(v) => LiteralValueTypeKind::Bytes(v),
-            PromotableLiteralString
-            | UnpromotableLiteralString
-            | RecPromotableLiteralString
-            | RecUnpromotableLiteralString => LiteralValueTypeKind::LiteralString,
+            LiteralValueTypeInner::Int(v, _) => LiteralValueTypeKind::Int(v),
+            LiteralValueTypeInner::Bool(v, _) => LiteralValueTypeKind::Bool(v),
+            LiteralValueTypeInner::String(v, _) => LiteralValueTypeKind::String(v),
+            LiteralValueTypeInner::Enum(v, _) => LiteralValueTypeKind::Enum(v),
+            LiteralValueTypeInner::Bytes(v, _) => LiteralValueTypeKind::Bytes(v),
+            LiteralValueTypeInner::LiteralString(_) => LiteralValueTypeKind::LiteralString,
         }
     }
 
