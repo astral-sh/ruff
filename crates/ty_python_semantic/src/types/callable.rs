@@ -41,6 +41,14 @@ impl<'db> Type<'db> {
     }
 
     pub(crate) fn try_upcast_to_callable(self, db: &'db dyn Db) -> Option<CallableTypes<'db>> {
+        self.try_upcast_to_callable_with_policy(db, UpcastPolicy::default())
+    }
+
+    pub(crate) fn try_upcast_to_callable_with_policy(
+        self,
+        db: &'db dyn Db,
+        policy: UpcastPolicy,
+    ) -> Option<CallableTypes<'db>> {
         match self {
             Type::Callable(callable) => Some(CallableTypes::one(callable)),
 
@@ -68,7 +76,7 @@ impl<'db> Type<'db> {
                 if let Place::Defined(place) = call_symbol
                     && place.is_definitely_defined()
                 {
-                    place.ty.try_upcast_to_callable(db)
+                    place.ty.try_upcast_to_callable_with_policy(db, policy)
                 } else {
                     None
                 }
@@ -79,8 +87,15 @@ impl<'db> Type<'db> {
 
             Type::GenericAlias(alias) => Some(ClassType::Generic(alias).into_callable(db)),
 
-            Type::NewTypeInstance(newtype) => {
-                newtype.concrete_base_type(db).try_upcast_to_callable(db)
+            Type::NewTypeInstance(newtype) => newtype
+                .concrete_base_type(db)
+                .try_upcast_to_callable_with_policy(db, policy),
+
+            Type::SubclassOf(subclass_of_ty) if policy == UpcastPolicy::Sound => {
+                Some(CallableTypes::one(CallableType::function_like(
+                    db,
+                    Signature::new(Parameters::top(), subclass_of_ty.to_instance(db)),
+                )))
             }
 
             // TODO: This is unsound so in future we can consider an opt-in option to disable it.
@@ -88,7 +103,9 @@ impl<'db> Type<'db> {
                 SubclassOfInner::Class(class) => Some(class.into_callable(db)),
                 SubclassOfInner::TypeVar(tvar) => match tvar.typevar(db).bound_or_constraints(db) {
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                        let upcast_callables = bound.to_meta_type(db).try_upcast_to_callable(db)?;
+                        let upcast_callables = bound
+                            .to_meta_type(db)
+                            .try_upcast_to_callable_with_policy(db, policy)?;
                         Some(upcast_callables.map(|callable| {
                             let signatures = callable
                                 .signatures(db)
@@ -104,8 +121,9 @@ impl<'db> Type<'db> {
                     Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
                         let mut callables = SmallVec::new();
                         for constraint in constraints.elements(db) {
-                            let element_upcast =
-                                constraint.to_meta_type(db).try_upcast_to_callable(db)?;
+                            let element_upcast = constraint
+                                .to_meta_type(db)
+                                .try_upcast_to_callable_with_policy(db, policy)?;
                             for callable in element_upcast.into_inner() {
                                 let signatures = callable
                                     .signatures(db)
@@ -134,7 +152,8 @@ impl<'db> Type<'db> {
             Type::Union(union) => {
                 let mut callables = SmallVec::new();
                 for element in union.elements(db) {
-                    let element_callable = element.try_upcast_to_callable(db)?;
+                    let element_callable =
+                        element.try_upcast_to_callable_with_policy(db, policy)?;
                     callables.extend(element_callable.into_inner());
                 }
                 Some(CallableTypes::new(callables))
@@ -143,11 +162,13 @@ impl<'db> Type<'db> {
             Type::LiteralValue(literal) => match literal.kind() {
                 LiteralValueTypeKind::Enum(enum_literal) => enum_literal
                     .enum_class_instance(db)
-                    .try_upcast_to_callable(db),
+                    .try_upcast_to_callable_with_policy(db, policy),
                 _ => None,
             },
 
-            Type::TypeAlias(alias) => alias.value_type(db).try_upcast_to_callable(db),
+            Type::TypeAlias(alias) => alias
+                .value_type(db)
+                .try_upcast_to_callable_with_policy(db, policy),
 
             Type::KnownBoundMethod(method) => Some(CallableTypes::one(CallableType::new(
                 db,
@@ -218,6 +239,50 @@ pub enum CallableTypeKind {
 
     /// Represents the value bound to a `typing.ParamSpec` type variable.
     ParamSpecValue,
+}
+
+/// A "policy" enum that describes how `type[]` types should be upcast
+/// to `Callable` types.
+///
+/// `type[T]` is generally considered assignable to
+/// `Callable[<constructor signature of T>, T]` in Python, and most
+/// type-checking in Python uses assignability rather than subtyping
+/// when determining whether to emit errors on code, so -- despite its
+/// scary name -- [`UpcastPolicy::Unsound`] is actually the policy that
+/// you probably want in most situations. We *have* to use
+/// [`UpcastPolicy::Sound`], however, when doing subtyping or redundancy
+/// checks, because constructor signatures in subclasses are not checked
+/// for Liskov substitutability: `type[S]` may not be a subtype of
+/// `Callable[<constructor signature of T>, T]` even if `S` is a subtype
+/// of `T`. If this unsoundness leaked into our union simplification or
+/// subtyping checks, it would ead to nontransitivity of subtyping,
+/// breaking fundamental assumptions in our model.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Default)]
+pub(crate) enum UpcastPolicy {
+    /// Only upcast types to callables in a sound fashion.
+    ///
+    /// This means that `type[T]` is upcast to `Top[Callable[..., T]]`
+    /// rather than `Callable[<constructor signature of T>, T]`,
+    /// since the former is sound while the latter is not.
+    Sound,
+
+    /// Allow unsound upcasts to callables, such as treating `type[T]` as
+    /// `Callable[<constructor signature of T>, T`.
+    #[default]
+    Unsound,
+}
+
+impl From<TypeRelation> for UpcastPolicy {
+    fn from(relation: TypeRelation) -> Self {
+        match relation {
+            TypeRelation::Subtyping
+            | TypeRelation::Redundancy { .. }
+            | TypeRelation::SubtypingAssuming => UpcastPolicy::Sound,
+            TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability => {
+                UpcastPolicy::Unsound
+            }
+        }
+    }
 }
 
 /// This type represents the set of all callable objects with a certain, possibly overloaded,

@@ -6,9 +6,9 @@ use itertools::Itertools;
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHashMap;
 
-use crate::types::TypeContext;
 use crate::types::callable::CallableTypeKind;
 use crate::types::relation::{HasRelationToVisitor, IsDisjointVisitor, TypeRelation};
+use crate::types::{TypeContext, UpcastPolicy};
 use crate::{
     Db, FxOrderSet,
     place::{
@@ -780,10 +780,9 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
                 // With the new solver, we should be to replace all of this with an additional
                 // constraint that enforces what `Self` can specialize to.
                 let fallback_other = other.literal_fallback_instance(db).unwrap_or(other);
-                attribute_type.try_upcast_to_callable(db).when_some_and(
-                    db,
-                    constraints,
-                    |callables| {
+                attribute_type
+                    .try_upcast_to_callable_with_policy(db, UpcastPolicy::from(relation))
+                    .when_some_and(db, constraints, |callables| {
                         callables
                             .map(|callable| callable.apply_self(db, fallback_other))
                             .has_relation_to_impl(
@@ -795,8 +794,7 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
                                 relation_visitor,
                                 disjointness_visitor,
                             )
-                    },
-                )
+                    })
             }
             // TODO: consider the types of the attribute on `other` for property members
             ProtocolMemberKind::Property(_) => ConstraintSet::from_bool(
