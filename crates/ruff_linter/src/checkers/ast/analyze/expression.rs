@@ -343,9 +343,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                     if checker.is_rule_enabled(Rule::NonLowercaseVariableInFunction) {
                         if checker.semantic.current_scope().kind.is_function() {
                             pep8_naming::rules::non_lowercase_variable_in_function(
-                                checker,
-                                expr.range(),
-                                id,
+                                checker, expr, id,
                             );
                         }
                     }
@@ -353,10 +351,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                         if let ScopeKind::Class(class_def) = &checker.semantic.current_scope().kind
                         {
                             pep8_naming::rules::mixed_case_variable_in_class_scope(
-                                checker,
-                                expr.range(),
-                                id,
-                                class_def,
+                                checker, expr, id, class_def,
                             );
                         }
                     }
@@ -366,9 +361,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                     if checker.is_rule_enabled(Rule::MixedCaseVariableInGlobalScope) {
                         if matches!(checker.semantic.current_scope().kind, ScopeKind::Module) {
                             pep8_naming::rules::mixed_case_variable_in_global_scope(
-                                checker,
-                                expr.range(),
-                                id,
+                                checker, expr, id,
                             );
                         }
                     }
