@@ -1781,7 +1781,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
                 let Some(callable_type) =
                     argument_type.try_upcast_to_callable(db).map(|callables| {
-                        if matches!(special_form, SpecialFormType::RegularCallableTypeOf) {
+                        if special_form == SpecialFormType::RegularCallableTypeOf {
                             callables
                                 .map(|callable| callable.into_regular(db))
                                 .into_type(db)

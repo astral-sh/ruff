@@ -1301,7 +1301,7 @@ impl<'db> Bindings<'db> {
                                 continue;
                             };
                             let Some(callables) = ty.try_upcast_to_callable(db).map(|callables| {
-                                if matches!(into_callable, KnownFunction::IntoRegularCallable) {
+                                if into_callable == KnownFunction::IntoRegularCallable {
                                     callables.map(|callable| callable.into_regular(db))
                                 } else {
                                     callables
