@@ -41,7 +41,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// - [Why `os.path.commonprefix` is deprecated](https://sethmlarson.dev/deprecate-confusing-apis-like-os-path-commonprefix)
 /// - [CPython deprecation issue](https://github.com/python/cpython/issues/144347)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "NEXT_RUFF_VERSION")]
+#[violation_metadata(preview_since = "0.15.6")]
 pub(crate) struct OsPathCommonprefix;
 
 impl Violation for OsPathCommonprefix {
