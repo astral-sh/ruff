@@ -471,9 +471,13 @@ reveal_type(foo)  # revealed: def foo() -> def foo() -> def foo() -> def foo() -
 
 ## `CallableTypeOf`
 
-The `CallableTypeOf` special form can be used to extract the `Callable` structural type inhabited by
-a given callable object. This can be used to get the externally visibly signature of the object,
-which can then be used to test various type properties.
+The `CallableTypeOf` special form can be used to extract the callable type inhabited by a given
+callable object. This can be used to get the externally visible signature of the object, which can
+then be used to test various type properties.
+
+Unlike a plain `typing.Callable[...]`, `CallableTypeOf[...]` preserves function-like behavior. This
+means method-like and descriptor-like callables remain distinct from regular callables in some
+type-theoretic checks.
 
 It accepts a single type parameter which is expected to be a callable object.
 
@@ -545,4 +549,25 @@ def _(
     reveal_type(c6)  # revealed: (x: int) -> Foo
     reveal_type(c7)  # revealed: (x: int) -> Foo
     reveal_type(c8)  # revealed: (x: int) -> str
+```
+
+## `RegularCallableTypeOf`
+
+The `RegularCallableTypeOf` special form also extracts a callable type from a callable object, but
+it normalizes the result to a regular `typing.Callable`-style type.
+
+This keeps the callable signatures while discarding function-like behavior. Use it when you want to
+compare a callable against ordinary `Callable[...]` types without preserving descriptor semantics.
+
+It accepts a single type parameter which is expected to be a callable object.
+
+```py
+from typing import Callable
+from ty_extensions import CallableTypeOf, RegularCallableTypeOf, is_assignable_to, static_assert
+
+def f(x: int, /) -> None:
+    ...
+
+static_assert(not is_assignable_to(Callable[[int], None], CallableTypeOf[f]))
+static_assert(is_assignable_to(Callable[[int], None], RegularCallableTypeOf[f]))
 ```
