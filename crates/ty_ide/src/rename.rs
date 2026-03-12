@@ -1726,6 +1726,64 @@ result = func(10, y=20)
     }
 
     #[test]
+    fn rename_overloaded_method_usage() {
+        let test = CursorTest::builder()
+            .source(
+                "lib.py",
+                r#"
+                from typing import overload, Any
+
+                class Test:
+                    @overload
+                    def test() -> None: ...
+                    @overload
+                    def test(a: str) -> str: ...
+                    @overload
+                    def test(a: int) -> int: ...
+
+                    def test(a: Any) -> Any:
+                        return a
+                "#,
+            )
+            .source(
+                "main.py",
+                r#"
+                from lib import Test
+
+                Test().te<CURSOR>st("test")
+                "#,
+            )
+            .build();
+
+        assert_snapshot!(test.rename("better_name"), @r#"
+        info[rename]: Rename symbol (found 5 locations)
+          --> lib.py:5:9
+           |
+         4 | class Test:
+         5 |     @overload
+         6 |     def test() -> None: ...
+           |         ----
+         7 |     @overload
+         8 |     def test(a: str) -> str: ...
+           |         ----
+         9 |     @overload
+        10 |     def test(a: int) -> int: ...
+           |         ----
+        11 |
+        12 |     def test(a: Any) -> Any:
+           |         ----
+           |
+          ::: main.py:4:8
+           |
+         2 | from lib import Test
+         3 |
+         4 | Test().test("test")
+           |        ----
+           |
+        "#);
+    }
+
+    #[test]
     fn rename_property() {
         let test = CursorTest::builder()
             .source(

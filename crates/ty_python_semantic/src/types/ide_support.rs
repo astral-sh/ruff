@@ -95,26 +95,17 @@ pub fn definitions_for_name<'db>(
 
             if let Some(global_symbol_id) = global_place_table.symbol_id(name_str) {
                 let global_use_def_map = ty_python_core::use_def_map(db, global_scope_id);
-                let global_bindings =
-                    global_use_def_map.reachable_symbol_bindings(global_symbol_id);
-                let global_declarations =
-                    global_use_def_map.reachable_symbol_declarations(global_symbol_id);
-
-                for binding in global_bindings {
-                    if let Some(def) = binding.binding.definition() {
-                        if def.kind(db).is_user_visible() {
-                            all_definitions.insert(def);
-                        }
-                    }
-                }
-
-                for declaration in global_declarations {
-                    if let Some(def) = declaration.declaration.definition() {
-                        if def.kind(db).is_user_visible() {
-                            all_definitions.insert(def);
-                        }
-                    }
-                }
+                all_definitions.extend(reachable_definitions(
+                    db,
+                    global_use_def_map
+                        .reachable_symbol_bindings(global_symbol_id)
+                        .filter_map(|binding| binding.binding.definition())
+                        .chain(
+                            global_use_def_map
+                                .reachable_symbol_declarations(global_symbol_id)
+                                .filter_map(|declaration| declaration.declaration.definition()),
+                        ),
+                ));
             }
             break;
         }
@@ -128,24 +119,17 @@ pub fn definitions_for_name<'db>(
         let use_def_map = index.use_def_map(scope_id);
 
         // Get all definitions (both bindings and declarations) for this place
-        let bindings = use_def_map.reachable_symbol_bindings(symbol_id);
-        let declarations = use_def_map.reachable_symbol_declarations(symbol_id);
-
-        for binding in bindings {
-            if let Some(def) = binding.binding.definition() {
-                if def.kind(db).is_user_visible() {
-                    all_definitions.insert(def);
-                }
-            }
-        }
-
-        for declaration in declarations {
-            if let Some(def) = declaration.declaration.definition() {
-                if def.kind(db).is_user_visible() {
-                    all_definitions.insert(def);
-                }
-            }
-        }
+        all_definitions.extend(reachable_definitions(
+            db,
+            use_def_map
+                .reachable_symbol_bindings(symbol_id)
+                .filter_map(|binding| binding.binding.definition())
+                .chain(
+                    use_def_map
+                        .reachable_symbol_declarations(symbol_id)
+                        .filter_map(|declaration| declaration.declaration.definition()),
+                ),
+        ));
 
         // If we found definitions in this scope, we can stop searching
         if !all_definitions.is_empty() {
@@ -360,37 +344,20 @@ fn definitions_for_attribute_in_class_hierarchy<'db>(
         // Look for class-level declarations and bindings
         if let Some(place_id) = class_place_table.symbol_id(attribute_name) {
             let use_def = use_def_map(db, class_scope);
-            let mut ancestor_resolved = Vec::new();
-
-            // Declarations take precedence over bindings, but attribute go-to-definition
-            // should return all co-definitions for the chosen class scope.
-            for decl in use_def.reachable_symbol_declarations(place_id) {
-                if let Some(def) = decl.declaration.definition() {
-                    ancestor_resolved.extend(resolve_definition(
-                        db,
-                        def,
-                        Some(attribute_name),
-                        ImportAliasResolution::ResolveAliases,
-                    ));
-                }
-            }
-
-            // If no declarations found, check bindings
-            if ancestor_resolved.is_empty() {
-                for binding in use_def.reachable_symbol_bindings(place_id) {
-                    if let Some(def) = binding.binding.definition() {
-                        ancestor_resolved.extend(resolve_definition(
-                            db,
-                            def,
-                            Some(attribute_name),
-                            ImportAliasResolution::ResolveAliases,
-                        ));
-                    }
-                }
-            }
-
-            if !ancestor_resolved.is_empty() {
-                resolved.extend(ancestor_resolved);
+            let resolved_in_scope = resolve_reachable_definitions(
+                db,
+                attribute_name,
+                use_def
+                    .reachable_symbol_declarations(place_id)
+                    .filter_map(|declaration| declaration.declaration.definition())
+                    .chain(
+                        use_def
+                            .reachable_symbol_bindings(place_id)
+                            .filter_map(|binding| binding.binding.definition()),
+                    ),
+            );
+            if !resolved_in_scope.is_empty() {
+                resolved.extend(resolved_in_scope);
                 break 'scopes;
             }
         }
@@ -405,37 +372,20 @@ fn definitions_for_attribute_in_class_hierarchy<'db>(
                 .member_id_by_instance_attribute_name(attribute_name)
             {
                 let use_def = index.use_def_map(function_scope_id);
-                let mut scope_resolved = Vec::new();
-
-                // Declarations take precedence over bindings, but return all
-                // co-definitions from the chosen method scope.
-                for decl in use_def.reachable_member_declarations(place_id) {
-                    if let Some(def) = decl.declaration.definition() {
-                        scope_resolved.extend(resolve_definition(
-                            db,
-                            def,
-                            Some(attribute_name),
-                            ImportAliasResolution::ResolveAliases,
-                        ));
-                    }
-                }
-
-                // If no declarations found, check bindings
-                if scope_resolved.is_empty() {
-                    for binding in use_def.reachable_member_bindings(place_id) {
-                        if let Some(def) = binding.binding.definition() {
-                            scope_resolved.extend(resolve_definition(
-                                db,
-                                def,
-                                Some(attribute_name),
-                                ImportAliasResolution::ResolveAliases,
-                            ));
-                        }
-                    }
-                }
-
-                if !scope_resolved.is_empty() {
-                    resolved.extend(scope_resolved);
+                let resolved_in_scope = resolve_reachable_definitions(
+                    db,
+                    attribute_name,
+                    use_def
+                        .reachable_member_declarations(place_id)
+                        .filter_map(|declaration| declaration.declaration.definition())
+                        .chain(
+                            use_def
+                                .reachable_member_bindings(place_id)
+                                .filter_map(|binding| binding.binding.definition()),
+                        ),
+                );
+                if !resolved_in_scope.is_empty() {
+                    resolved.extend(resolved_in_scope);
                     break 'scopes;
                 }
             }
@@ -443,6 +393,34 @@ fn definitions_for_attribute_in_class_hierarchy<'db>(
     }
 
     resolved
+}
+
+fn reachable_definitions<'db>(
+    db: &'db dyn Db,
+    definitions: impl IntoIterator<Item = Definition<'db>>,
+) -> FxIndexSet<Definition<'db>> {
+    definitions
+        .into_iter()
+        .filter(|definition| definition.kind(db).is_user_visible())
+        .collect()
+}
+
+fn resolve_reachable_definitions<'db>(
+    db: &'db dyn Db,
+    symbol_name: &str,
+    definitions: impl IntoIterator<Item = Definition<'db>>,
+) -> Vec<ResolvedDefinition<'db>> {
+    reachable_definitions(db, definitions)
+        .into_iter()
+        .flat_map(|definition| {
+            resolve_definition(
+                db,
+                definition,
+                Some(symbol_name),
+                ImportAliasResolution::ResolveAliases,
+            )
+        })
+        .collect()
 }
 
 pub struct TypedDictKeyHover<'db> {
@@ -1363,25 +1341,19 @@ mod resolve_definition {
 
         pub fn docstring(&self, db: &'db dyn Db) -> Option<String> {
             match self {
-                ResolvedDefinition::Definition(definition) => {
-                    definition_docstring_with_overload_fallback(db, *definition)
-                }
+                ResolvedDefinition::Definition(definition) => definition
+                    .docstring(db)
+                    .or_else(|| sibling_definition_docstring(db, *definition)),
                 ResolvedDefinition::Module(file) => module_docstring(db, *file),
                 ResolvedDefinition::FileWithRange(_) => None,
             }
         }
     }
 
-    fn definition_docstring_with_overload_fallback<'db>(
-        db: &'db dyn Db,
-        definition: Definition<'db>,
-    ) -> Option<String> {
-        definition
-            .docstring(db)
-            .or_else(|| overload_implementation_docstring(db, definition))
-    }
-
-    fn overload_implementation_docstring<'db>(
+    // Overload declarations often omit docstrings, while the implementation
+    // carries the user-facing documentation. Fall back to sibling definitions
+    // of the same symbol in this scope to recover that docstring.
+    fn sibling_definition_docstring<'db>(
         db: &'db dyn Db,
         definition: Definition<'db>,
     ) -> Option<String> {
@@ -1395,12 +1367,12 @@ mod resolve_definition {
         let use_def = use_def_map(db, scope);
 
         use_def
-            .reachable_symbol_bindings(symbol_id)
-            .filter_map(|binding| binding.binding.definition())
+            .reachable_symbol_declarations(symbol_id)
+            .filter_map(|declaration| declaration.declaration.definition())
             .chain(
                 use_def
-                    .reachable_symbol_declarations(symbol_id)
-                    .filter_map(|declaration| declaration.declaration.definition()),
+                    .reachable_symbol_bindings(symbol_id)
+                    .filter_map(|binding| binding.binding.definition()),
             )
             .filter(|candidate| *candidate != definition)
             .find_map(|candidate| candidate.docstring(db))
