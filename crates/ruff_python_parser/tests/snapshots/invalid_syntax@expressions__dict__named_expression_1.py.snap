@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
-input_file: crates/ruff_python_parser/resources/invalid/expressions/dict/named_expression_1.py
 ---
 ## AST
 
@@ -8,7 +7,7 @@ input_file: crates/ruff_python_parser/resources/invalid/expressions/dict/named_e
 Module(
     ModModule {
         node_index: NodeIndex(None),
-        range: 0..86,
+        range: 0..87,
         body: [
             Expr(
                 StmtExpr {

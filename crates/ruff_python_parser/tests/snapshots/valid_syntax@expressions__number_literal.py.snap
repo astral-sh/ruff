@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
-input_file: crates/ruff_python_parser/resources/valid/expressions/number_literal.py
 ---
 ## AST
 
@@ -8,7 +7,7 @@ input_file: crates/ruff_python_parser/resources/valid/expressions/number_literal
 Module(
     ModModule {
         node_index: NodeIndex(None),
-        range: 0..700,
+        range: 0..701,
         body: [
             Assign(
                 StmtAssign {

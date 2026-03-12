@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
-input_file: crates/ruff_python_parser/resources/invalid/statements/with/unclosed_ambiguous_lpar.py
 ---
 ## AST
 
@@ -8,7 +7,7 @@ input_file: crates/ruff_python_parser/resources/invalid/statements/with/unclosed
 Module(
     ModModule {
         node_index: NodeIndex(None),
-        range: 0..14,
+        range: 0..15,
         body: [
             With(
                 StmtWith {
@@ -78,8 +77,6 @@ Module(
 
 
   |
-1 | with (:
-2 |
 3 | x + y
   |      ^ Syntax Error: unexpected EOF while parsing
   |

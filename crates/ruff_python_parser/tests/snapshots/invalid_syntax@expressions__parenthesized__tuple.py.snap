@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
-input_file: crates/ruff_python_parser/resources/invalid/expressions/parenthesized/tuple.py
 ---
 ## AST
 
@@ -8,7 +7,7 @@ input_file: crates/ruff_python_parser/resources/invalid/expressions/parenthesize
 Module(
     ModModule {
         node_index: NodeIndex(None),
-        range: 0..267,
+        range: 0..268,
         body: [
             Expr(
                 StmtExpr {

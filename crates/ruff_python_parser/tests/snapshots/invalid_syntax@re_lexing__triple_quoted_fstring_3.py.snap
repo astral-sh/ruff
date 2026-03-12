@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
-input_file: crates/ruff_python_parser/resources/invalid/re_lexing/triple_quoted_fstring_3.py
 ---
 ## AST
 
@@ -8,7 +7,7 @@ input_file: crates/ruff_python_parser/resources/invalid/re_lexing/triple_quoted_
 Module(
     ModModule {
         node_index: NodeIndex(None),
-        range: 0..262,
+        range: 0..263,
         body: [
             If(
                 StmtIf {

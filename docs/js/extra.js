@@ -56,4 +56,3 @@ function setCopyText() {
 document$.subscribe(function () {
   setCopyText();
 });
-

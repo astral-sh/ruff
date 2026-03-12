@@ -184,4 +184,3 @@ In addition, ruff publishes the following images:
 
 As with the distroless image, each image is published with ruff version tags as
 `ruff:{major}.{minor}.{patch}-{base}` and `ruff:{major}.{minor}-{base}`, e.g., `ruff:0.6.6-alpine`.
-

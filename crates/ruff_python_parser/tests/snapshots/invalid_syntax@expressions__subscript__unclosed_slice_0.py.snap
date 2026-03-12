@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
-input_file: crates/ruff_python_parser/resources/invalid/expressions/subscript/unclosed_slice_0.py
 ---
 ## AST
 
@@ -8,7 +7,7 @@ input_file: crates/ruff_python_parser/resources/invalid/expressions/subscript/un
 Module(
     ModModule {
         node_index: NodeIndex(None),
-        range: 0..10,
+        range: 0..11,
         body: [
             Expr(
                 StmtExpr {
@@ -71,8 +70,6 @@ Module(
 ## Errors
 
   |
-1 | x[:
-2 |
 3 | x + y
   |      ^ Syntax Error: unexpected EOF while parsing
   |

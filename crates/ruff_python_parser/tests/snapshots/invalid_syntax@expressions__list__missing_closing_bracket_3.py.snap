@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
-input_file: crates/ruff_python_parser/resources/invalid/expressions/list/missing_closing_bracket_3.py
 ---
 ## AST
 
@@ -8,7 +7,7 @@ input_file: crates/ruff_python_parser/resources/invalid/expressions/list/missing
 Module(
     ModModule {
         node_index: NodeIndex(None),
-        range: 0..140,
+        range: 0..141,
         body: [
             Expr(
                 StmtExpr {

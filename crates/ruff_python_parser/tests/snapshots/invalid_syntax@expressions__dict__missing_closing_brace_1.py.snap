@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
-input_file: crates/ruff_python_parser/resources/invalid/expressions/dict/missing_closing_brace_1.py
 ---
 ## AST
 
@@ -8,16 +7,16 @@ input_file: crates/ruff_python_parser/resources/invalid/expressions/dict/missing
 Module(
     ModModule {
         node_index: NodeIndex(None),
-        range: 0..10,
+        range: 0..11,
         body: [
             Expr(
                 StmtExpr {
                     node_index: NodeIndex(None),
-                    range: 0..10,
+                    range: 0..11,
                     value: Dict(
                         ExprDict {
                             node_index: NodeIndex(None),
-                            range: 0..10,
+                            range: 0..11,
                             items: [
                                 DictItem {
                                     key: Some(
@@ -68,8 +67,6 @@ Module(
 ## Errors
 
   |
-1 | {x:
-2 |
 3 | 1 + 2
   |      ^ Syntax Error: unexpected EOF while parsing
   |

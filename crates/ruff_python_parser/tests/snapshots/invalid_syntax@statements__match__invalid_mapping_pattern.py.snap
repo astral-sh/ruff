@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
-input_file: crates/ruff_python_parser/resources/invalid/statements/match/invalid_mapping_pattern.py
 ---
 ## AST
 
@@ -8,7 +7,7 @@ input_file: crates/ruff_python_parser/resources/invalid/statements/match/invalid
 Module(
     ModModule {
         node_index: NodeIndex(None),
-        range: 0..509,
+        range: 0..510,
         body: [
             Match(
                 StmtMatch {

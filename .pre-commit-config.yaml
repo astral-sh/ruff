@@ -5,7 +5,6 @@ exclude: |
     .github/workflows/release.yml|
     crates/ty_vendored/vendor/.*|
     crates/ty_project/resources/.*|
-    crates/ty_python_semantic/resources/corpus/.*|
     crates/ty/docs/(configuration|rules|cli|environment).md|
     crates/ruff_benchmark/resources/.*|
     crates/ruff_linter/resources/.*|
@@ -26,6 +25,20 @@ repos:
     rev: v6.0.0
     hooks:
       - id: check-merge-conflict
+        priority: 0
+      - id: end-of-file-fixer
+        # NOTE: end-of-file-fixer truncates newline-only .rs files to 0 bytes,
+        # then rustfmt adds a newline back, causing an infinite cycle.
+        # If you hit this, add a comment to the empty file so it has real content.
+        # See: https://github.com/rust-lang/rustfmt/issues/5364
+        #
+        # Files with eol=crlf or eol=cr in .gitattributes are excluded because
+        # adding a trailing LF creates cross-platform snapshot mismatches.
+        exclude: |
+          (?x)^(
+            crates/ruff_python_parser/resources/invalid/re_lexing/line_continuation_windows_eol\.py|
+            crates/ruff_python_parser/resources/invalid/re_lex_logical_token_mac_eol\.py
+          )$
         priority: 0
 
   - repo: https://github.com/abravalheri/validate-pyproject
@@ -96,10 +109,12 @@ repos:
     rev: v0.15.4
     hooks:
       - id: ruff-format
+        exclude: crates/ty_python_semantic/resources/corpus/
         priority: 0
       - id: ruff-check
         args: [--fix, --exit-non-zero-on-fix]
         types_or: [python, pyi]
+        exclude: crates/ty_python_semantic/resources/corpus/
         require_serial: true
         priority: 1
 

@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
-input_file: crates/ruff_python_parser/resources/invalid/expressions/await/no_expression_0.py
 ---
 ## AST
 
@@ -8,7 +7,7 @@ input_file: crates/ruff_python_parser/resources/invalid/expressions/await/no_exp
 Module(
     ModModule {
         node_index: NodeIndex(None),
-        range: 0..73,
+        range: 0..74,
         body: [
             Expr(
                 StmtExpr {

@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
-input_file: crates/ruff_python_parser/resources/invalid/statements/with/unclosed_ambiguous_lpar_eof.py
 ---
 ## AST
 
@@ -8,12 +7,12 @@ input_file: crates/ruff_python_parser/resources/invalid/statements/with/unclosed
 Module(
     ModModule {
         node_index: NodeIndex(None),
-        range: 0..6,
+        range: 0..7,
         body: [
             With(
                 StmtWith {
                     node_index: NodeIndex(None),
-                    range: 0..6,
+                    range: 0..7,
                     is_async: false,
                     items: [
                         WithItem {

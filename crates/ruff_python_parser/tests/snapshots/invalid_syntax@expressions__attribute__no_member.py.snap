@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
-input_file: crates/ruff_python_parser/resources/invalid/expressions/attribute/no_member.py
 ---
 ## AST
 
@@ -8,7 +7,7 @@ input_file: crates/ruff_python_parser/resources/invalid/expressions/attribute/no
 Module(
     ModModule {
         node_index: NodeIndex(None),
-        range: 0..141,
+        range: 0..142,
         body: [
             Expr(
                 StmtExpr {

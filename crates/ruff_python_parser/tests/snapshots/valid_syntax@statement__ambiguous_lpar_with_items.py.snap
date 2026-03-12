@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
-input_file: crates/ruff_python_parser/resources/valid/statement/ambiguous_lpar_with_items.py
 ---
 ## AST
 
@@ -8,7 +7,7 @@ input_file: crates/ruff_python_parser/resources/valid/statement/ambiguous_lpar_w
 Module(
     ModModule {
         node_index: NodeIndex(None),
-        range: 0..3620,
+        range: 0..3621,
         body: [
             With(
                 StmtWith {

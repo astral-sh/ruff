@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
-input_file: crates/ruff_python_parser/resources/invalid/expressions/list/missing_closing_bracket_0.py
 ---
 ## AST
 
@@ -8,16 +7,16 @@ input_file: crates/ruff_python_parser/resources/invalid/expressions/list/missing
 Module(
     ModModule {
         node_index: NodeIndex(None),
-        range: 0..43,
+        range: 0..44,
         body: [
             Expr(
                 StmtExpr {
                     node_index: NodeIndex(None),
-                    range: 42..43,
+                    range: 42..44,
                     value: List(
                         ExprList {
                             node_index: NodeIndex(None),
-                            range: 42..43,
+                            range: 42..44,
                             elts: [
                                 Name(
                                     ExprName {
@@ -40,8 +39,6 @@ Module(
 ## Errors
 
   |
-1 | # Missing closing bracket 0: No elements
-2 |
 3 | [
   |  ^ Syntax Error: unexpected EOF while parsing
   |

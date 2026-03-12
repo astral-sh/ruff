@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
-input_file: crates/ruff_python_parser/resources/invalid/re_lexing/triple_quoted_fstring_1.py
 ---
 ## AST
 
@@ -8,7 +7,7 @@ input_file: crates/ruff_python_parser/resources/invalid/re_lexing/triple_quoted_
 Module(
     ModModule {
         node_index: NodeIndex(None),
-        range: 0..198,
+        range: 0..199,
         body: [
             Expr(
                 StmtExpr {
@@ -76,7 +75,7 @@ Module(
 5 |   f"""hello {x # comment    
   |  ___________________________^
 6 | | y = 1
-  | |_____^ Syntax Error: f-string: unterminated triple-quoted string
+  | |______^ Syntax Error: f-string: unterminated triple-quoted string
   |
 
 
@@ -93,7 +92,7 @@ Module(
 5 |   f"""hello {x # comment    
   |  ___________________________^
 6 | | y = 1
-  | |_____^ Syntax Error: Expected FStringEnd, found FStringMiddle
+  | |______^ Syntax Error: Expected FStringEnd, found FStringMiddle
   |
 
 

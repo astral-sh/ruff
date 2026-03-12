@@ -20,13 +20,13 @@ pub(crate) fn main(args: &Args) -> Result<()> {
     let settings = SchemaSettings::draft07();
     let generator = settings.into_generator();
     let schema = generator.into_root_schema_for::<Options>();
-    let schema_string = serde_json::to_string_pretty(&schema).unwrap();
+    let schema_string = serde_json::to_string_pretty(&schema).unwrap() + "\n";
     let filename = "ruff.schema.json";
     let schema_path = PathBuf::from(ROOT_DIR).join(filename);
 
     match args.mode {
         Mode::DryRun => {
-            println!("{schema_string}");
+            print!("{schema_string}");
         }
         Mode::Check => {
             let current = fs::read_to_string(schema_path)?;

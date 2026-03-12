@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
-input_file: crates/ruff_python_parser/resources/valid/statement/type.py
 ---
 ## AST
 
@@ -8,7 +7,7 @@ input_file: crates/ruff_python_parser/resources/valid/statement/type.py
 Module(
     ModModule {
         node_index: NodeIndex(None),
-        range: 0..1828,
+        range: 0..1829,
         body: [
             TypeAlias(
                 StmtTypeAlias {

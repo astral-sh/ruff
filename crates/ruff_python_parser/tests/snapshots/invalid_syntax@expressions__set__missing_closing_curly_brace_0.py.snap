@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
-input_file: crates/ruff_python_parser/resources/invalid/expressions/set/missing_closing_curly_brace_0.py
 ---
 ## AST
 
@@ -8,16 +7,16 @@ input_file: crates/ruff_python_parser/resources/invalid/expressions/set/missing_
 Module(
     ModModule {
         node_index: NodeIndex(None),
-        range: 0..47,
+        range: 0..48,
         body: [
             Expr(
                 StmtExpr {
                     node_index: NodeIndex(None),
-                    range: 46..47,
+                    range: 46..48,
                     value: Set(
                         ExprSet {
                             node_index: NodeIndex(None),
-                            range: 46..47,
+                            range: 46..48,
                             elts: [
                                 Name(
                                     ExprName {
@@ -39,8 +38,6 @@ Module(
 ## Errors
 
   |
-1 | # Missing closing curly brace 0: No elements
-2 |
 3 | {
   |  ^ Syntax Error: unexpected EOF while parsing
   |

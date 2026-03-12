@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
-input_file: crates/ruff_python_parser/resources/invalid/expressions/if/missing_orelse_expr_1.py
 ---
 ## AST
 
@@ -8,7 +7,7 @@ input_file: crates/ruff_python_parser/resources/invalid/expressions/if/missing_o
 Module(
     ModModule {
         node_index: NodeIndex(None),
-        range: 0..76,
+        range: 0..77,
         body: [
             Expr(
                 StmtExpr {

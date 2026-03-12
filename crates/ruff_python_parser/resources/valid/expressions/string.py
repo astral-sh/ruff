@@ -14,4 +14,3 @@
 )
 b'hello world'
 b'bytes' b'concatenated'
-
