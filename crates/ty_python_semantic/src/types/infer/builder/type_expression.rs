@@ -1752,8 +1752,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 type_of_type
             }
 
-            callable_type_of @ (SpecialFormType::CallableTypeOf
-            | SpecialFormType::RegularCallableTypeOf) => {
+            SpecialFormType::CallableTypeOf | SpecialFormType::RegularCallableTypeOf => {
                 let arguments = if let ast::Expr::Tuple(tuple) = arguments_slice {
                     &*tuple.elts
                 } else {
