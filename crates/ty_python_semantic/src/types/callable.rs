@@ -241,17 +241,33 @@ pub enum CallableTypeKind {
     ParamSpecValue,
 }
 
+/// A "policy" enum that describes how `type[]` types should be upcast
+/// to `Callable` types.
+///
+/// `type[T]` is generally considered assignable to
+/// `Callable[<constructor signature of T>, T]` in Python, and most
+/// type-checking in Python uses assignability rather than subtyping
+/// when determining whether to emit errors on code, so -- despite its
+/// scary name -- [`UpcastPolicy::Unsound`] is actually the policy that
+/// you probably want in most situations. We *have* to use
+/// [`UpcastPolicy::Sound`], however, when doing subtyping or redundancy
+/// checks, because constructor signatures in subclasses are not checked
+/// for Liskov substitutability: `type[S]` may not be a subtype of
+/// `Callable[<constructor signature of T>, T]` even if `S` is a subtype
+/// of `T`. If this unsoundness leaked into our union simplification or
+/// subtyping checks, it would ead to nontransitivity of subtyping,
+/// breaking fundamental assumptions in our model.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Default)]
 pub(crate) enum UpcastPolicy {
     /// Only upcast types to callables in a sound fashion.
     ///
-    /// This means that `type[]` types are upcast to `Top[Callable[..., <instance of class>]]`
-    /// rather than `Callable[<constructor signature>, <instance of class>]`,
+    /// This means that `type[T]` is upcast to `Top[Callable[..., T]]`
+    /// rather than `Callable[<constructor signature of T>, T]`,
     /// since the former is sound while the latter is not.
     Sound,
 
-    /// Allow unsound upcasts to callables, such as treating `type[]` as
-    /// `Callable[<constructor signature>, <instance of class>]`.
+    /// Allow unsound upcasts to callables, such as treating `type[T]` as
+    /// `Callable[<constructor signature of T>, T`.
     #[default]
     Unsound,
 }
