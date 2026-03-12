@@ -1341,11 +1341,16 @@ mod resolve_definition {
 
         pub fn docstring(&self, db: &'db dyn Db) -> Option<String> {
             match self {
-                ResolvedDefinition::Definition(definition) => definition
-                    .docstring(db)
-                    .or_else(|| sibling_definition_docstring(db, *definition)),
+                ResolvedDefinition::Definition(definition) => definition.docstring(db),
                 ResolvedDefinition::Module(file) => module_docstring(db, *file),
                 ResolvedDefinition::FileWithRange(_) => None,
+            }
+        }
+
+        pub fn sibling_docstring(&self, db: &'db dyn Db) -> Option<String> {
+            match self {
+                ResolvedDefinition::Definition(definition) => sibling_docstring(db, *definition),
+                ResolvedDefinition::Module(_) | ResolvedDefinition::FileWithRange(_) => None,
             }
         }
     }
@@ -1353,10 +1358,7 @@ mod resolve_definition {
     // Overload declarations often omit docstrings, while the implementation
     // carries the user-facing documentation. Fall back to sibling definitions
     // of the same symbol in this scope to recover that docstring.
-    fn sibling_definition_docstring<'db>(
-        db: &'db dyn Db,
-        definition: Definition<'db>,
-    ) -> Option<String> {
+    fn sibling_docstring<'db>(db: &'db dyn Db, definition: Definition<'db>) -> Option<String> {
         let DefinitionKind::Function(_) = definition.kind(db) else {
             return None;
         };

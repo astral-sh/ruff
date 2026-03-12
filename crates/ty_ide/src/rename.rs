@@ -1757,7 +1757,14 @@ result = func(10, y=20)
 
         assert_snapshot!(test.rename("better_name"), @r#"
         info[rename]: Rename symbol (found 5 locations)
-          --> lib.py:5:9
+          --> main.py:4:8
+           |
+         2 | from lib import Test
+         3 |
+         4 | Test().test("test")
+           |        ^^^^
+           |
+          ::: lib.py:6:9
            |
          4 | class Test:
          5 |     @overload
@@ -1772,13 +1779,7 @@ result = func(10, y=20)
         11 |
         12 |     def test(a: Any) -> Any:
            |         ----
-           |
-          ::: main.py:4:8
-           |
-         2 | from lib import Test
-         3 |
-         4 | Test().test("test")
-           |        ----
+        13 |         return a
            |
         "#);
     }
