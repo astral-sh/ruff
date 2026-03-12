@@ -565,8 +565,7 @@ It accepts a single type parameter which is expected to be a callable object.
 from typing import Callable
 from ty_extensions import CallableTypeOf, RegularCallableTypeOf, is_assignable_to, static_assert
 
-def f(x: int, /) -> None:
-    ...
+def f(x: int, /) -> None: ...
 
 static_assert(not is_assignable_to(Callable[[int], None], CallableTypeOf[f]))
 static_assert(is_assignable_to(Callable[[int], None], RegularCallableTypeOf[f]))
