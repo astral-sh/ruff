@@ -88,19 +88,6 @@ fn split_truthiness_guarded_intersection<'db>(
     Some((core.build(), guard))
 }
 
-fn is_type_guard_like_for_cycle_recovery<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
-    match ty {
-        Type::TypeIs(_) | Type::TypeGuard(_) => true,
-        Type::TypeAlias(alias) => {
-            matches!(
-                alias.raw_value_type(db),
-                Type::TypeIs(_) | Type::TypeGuard(_)
-            )
-        }
-        _ => false,
-    }
-}
-
 /// Try to merge a complementary guarded pair into an unguarded core.
 ///
 /// e.g.
@@ -763,16 +750,6 @@ impl<'db> UnionBuilder<'db> {
 
             if ty == element_type {
                 return;
-            }
-
-            // During cycle recovery we skip the full redundancy relation, but `object` still
-            // soundly absorbs `TypeIs[...]` and `TypeGuard[...]`.
-            if is_type_guard_like_for_cycle_recovery(self.db, ty) && element_type.is_object() {
-                return;
-            }
-            if is_type_guard_like_for_cycle_recovery(self.db, element_type) && ty.is_object() {
-                to_remove.push(i);
-                continue;
             }
 
             // Fold `(T & ~AlwaysTruthy) | (T & ~AlwaysFalsy)` to `T`.

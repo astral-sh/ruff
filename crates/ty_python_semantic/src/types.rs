@@ -848,43 +848,15 @@ impl<'db> Type<'db> {
         // So we avoid unioning in the first couple iterations, and just use the later iteration's
         // result directly. We still ensure monotonicity after the first couple iterations, which
         // still ensures convergence in cases that are prone to oscillation.
-        match (previous, self) {
-            // `TypeIs` and `TypeGuard` wrap a single type. When they participate in a cycle, we
-            // need to widen their wrapped types rather than unioning the wrappers together.
-            (Type::TypeIs(prev_type_is), Type::TypeIs(curr_type_is))
-                if prev_type_is.place_info(db) == curr_type_is.place_info(db) =>
-            {
-                curr_type_is.with_type(
-                    db,
-                    UnionType::from_elements_cycle_recovery(
-                        db,
-                        [prev_type_is.return_type(db), curr_type_is.return_type(db)],
-                    ),
-                )
-            }
-
-            (Type::TypeGuard(prev_type_guard), Type::TypeGuard(curr_type_guard))
-                if prev_type_guard.place_info(db) == curr_type_guard.place_info(db) =>
-            {
-                curr_type_guard.with_type(
-                    db,
-                    UnionType::from_elements_cycle_recovery(
-                        db,
-                        [prev_type_guard.return_type(db), curr_type_guard.return_type(db)],
-                    ),
-                )
-            }
-
-            _ if cycle.iteration() <= 1 => self,
-
-            _ => {
-                // The current type is unioned to the previous type. Unioning in the reverse
-                // order can cause the fixed-point iterations to converge slowly or even fail.
-                // Consider the case where the order of union types is different between the
-                // previous and current cycle. We should use the previous union type as the
-                // base and only add new element types in this cycle, if any.
-                UnionType::from_elements_cycle_recovery(db, [previous, self])
-            }
+        if cycle.iteration() <= 1 {
+            self
+        } else {
+            // The current type is unioned to the previous type. Unioning in the reverse order can
+            // cause the fixed-point iterations to converge slowly or even fail. Consider the case
+            // where the order of union types is different between the previous and current cycle.
+            // We should use the previous union type as the base and only add new element types in
+            // this cycle, if any.
+            UnionType::from_elements_cycle_recovery(db, [previous, self])
         }
         .recursive_type_normalized(db, cycle)
     }
@@ -5365,19 +5337,9 @@ impl<'db> Type<'db> {
             }
 
             // TODO(jelle): Materialize should be handled differently, since TypeIs is invariant
-            Type::TypeIs(type_is) => type_is.with_type(
-                db,
-                type_is
-                    .return_type(db)
-                    .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-            ),
+            Type::TypeIs(type_is) => type_is.with_type(db, type_is.return_type(db).apply_type_mapping(db, type_mapping, tcx)),
 
-            Type::TypeGuard(type_guard) => type_guard.with_type(
-                db,
-                type_guard
-                    .return_type(db)
-                    .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-            ),
+            Type::TypeGuard(type_guard) => type_guard.with_type(db, type_guard.return_type(db).apply_type_mapping(db, type_mapping, tcx)),
 
             Type::TypeAlias(alias) => {
                 // For EagerExpansion, expand the raw value type. This path relies on Salsa's cycle
@@ -5410,13 +5372,6 @@ impl<'db> Type<'db> {
                         }
                     }
                 });
-
-                // Materialization is a direct transform of the alias RHS. Don't run the
-                // alias-preservation and recursion-probing heuristic below, as that can
-                // re-enter recursive aliases outside the current visitor.
-                if matches!(type_mapping, TypeMapping::Materialize(_)) {
-                    return mapped;
-                }
 
                 let is_recursive = any_over_type(db, alias.raw_value_type(db).expand_eagerly(db), false, |ty| ty.is_divergent());
 
