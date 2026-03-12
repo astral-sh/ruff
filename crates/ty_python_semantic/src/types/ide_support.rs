@@ -1086,11 +1086,47 @@ mod resolve_definition {
 
         pub fn docstring(&self, db: &'db dyn Db) -> Option<String> {
             match self {
-                ResolvedDefinition::Definition(definition) => definition.docstring(db),
+                ResolvedDefinition::Definition(definition) => {
+                    definition_docstring_with_overload_fallback(db, *definition)
+                }
                 ResolvedDefinition::Module(file) => module_docstring(db, *file),
                 ResolvedDefinition::FileWithRange(_) => None,
             }
         }
+    }
+
+    fn definition_docstring_with_overload_fallback<'db>(
+        db: &'db dyn Db,
+        definition: Definition<'db>,
+    ) -> Option<String> {
+        definition
+            .docstring(db)
+            .or_else(|| overload_implementation_docstring(db, definition))
+    }
+
+    fn overload_implementation_docstring<'db>(
+        db: &'db dyn Db,
+        definition: Definition<'db>,
+    ) -> Option<String> {
+        let DefinitionKind::Function(_) = definition.kind(db) else {
+            return None;
+        };
+
+        let name = definition.name(db)?;
+        let scope = definition.scope(db);
+        let symbol_id = place_table(db, scope).symbol_id(&name)?;
+        let use_def = use_def_map(db, scope);
+
+        use_def
+            .reachable_symbol_bindings(symbol_id)
+            .filter_map(|binding| binding.binding.definition())
+            .chain(
+                use_def
+                    .reachable_symbol_declarations(symbol_id)
+                    .filter_map(|declaration| declaration.declaration.definition()),
+            )
+            .filter(|candidate| *candidate != definition)
+            .find_map(|candidate| candidate.docstring(db))
     }
 
     /// Resolve import definitions to their targets.

@@ -30,17 +30,17 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
         _ => None,
     };
 
-    let docs = if typed_dict_key.is_some() {
+    let definitions = if typed_dict_key.is_some() {
         None
     } else {
-        goto_target
-            .get_definition_targets(
-                &model,
-                ty_python_semantic::ImportAliasResolution::ResolveAliases,
-            )
-            .and_then(|definitions| definitions.docstring(db))
-            .map(HoverContent::Docstring)
+        goto_target.get_definition_targets(
+            &model,
+            ty_python_semantic::ImportAliasResolution::ResolveAliases,
+        )
     };
+    let docs = definitions
+        .and_then(|definitions| definitions.docstring(db))
+        .map(HoverContent::Docstring);
 
     let mut contents = Vec::new();
     if let Some(signature) = goto_target.call_type_simplified_by_overloads(&model) {
@@ -766,6 +766,29 @@ mod tests {
            |   source
            |
         ");
+    }
+
+    #[test]
+    fn hover_overloaded_method_implementation_docstring() {
+        let test = cursor_test(
+            r#"
+        from typing import overload
+
+        class MyTestClass:
+            @overload
+            def foo(self, x: int) -> int: ...
+            @overload
+            def foo(self, x: str) -> str: ...
+            def foo(self, x: int | str) -> int | str:
+                """Sample docstring"""
+                return x
+
+        my_class = MyTestClass()
+        my_class.f<CURSOR>oo(1)
+        "#,
+        );
+
+        assert_snapshot!(test.hover());
     }
 
     #[test]
