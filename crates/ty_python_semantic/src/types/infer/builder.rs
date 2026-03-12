@@ -4977,14 +4977,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         let mut try_narrow = |narrowed_ty| {
-            let mut speculated_bindings = bindings.clone();
             let narrowed_tcx = TypeContext::new(Some(narrowed_ty));
 
-            // We silence diagnostics until we successfully narrow to a specific type.
-            let was_in_multi_inference = self.context.set_multi_inference(true);
+            let mut speculative_bindings = bindings.clone();
+            let mut speculative_builder = self.speculate();
 
             // Attempt to infer the argument types using the narrowed type context.
-            self.infer_all_argument_types(
+            speculative_builder.infer_all_argument_types(
                 ast_arguments.clone(),
                 argument_types,
                 infer_argument_ty,
@@ -4993,11 +4992,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 MultiInferenceState::Ignore,
             );
 
-            // Restore the multi-inference state.
-            self.context.set_multi_inference(was_in_multi_inference);
-
             // Ensure the argument types match their annotated types.
-            if speculated_bindings
+            if speculative_bindings
                 .check_types_impl(
                     db,
                     &constraints,
@@ -5007,35 +5003,25 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 )
                 .is_err()
             {
+                speculative_builder.discard();
                 return None;
             }
 
-            // Ensure the inferred return type is assignable to the (narrowed) declared type.
+            // Ensure the inferred return type is assignable to the narrowed declared type.
             //
             // TODO: Checking assignability against the full declared type could help avoid
             // cases where the constraint solver is not smart enough to solve complex unions.
             // We should see revisit this after the new constraint solver is implemented.
-            if !speculated_bindings
+            if !speculative_bindings
                 .return_type(db)
                 .is_assignable_to(db, narrowed_ty)
             {
+                speculative_builder.discard();
                 return None;
             }
 
             // Successfully narrowed to an element of the union.
-            //
-            // If necessary, infer the argument types again with diagnostics enabled.
-            if !was_in_multi_inference {
-                self.infer_all_argument_types(
-                    ast_arguments.clone(),
-                    argument_types,
-                    infer_argument_ty,
-                    bindings,
-                    narrowed_tcx,
-                    MultiInferenceState::Intersect,
-                );
-            }
-
+            self.extend(speculative_builder);
             Some(bindings.check_types_impl(
                 db,
                 &constraints,
@@ -5968,41 +5954,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         let mut try_narrow = |narrowed_ty| {
-            let narrowed_tcx = TypeContext::new(Some(narrowed_ty));
-
-            // We silence diagnostics until we successfully narrow to a specific type.
-            let prev_multi_inference = self.set_multi_inference_state(MultiInferenceState::Ignore);
-            let was_in_multi_inference = self.context.set_multi_inference(true);
+            let mut speculative_builder = self.speculate();
 
             // Attempt to infer the collection literal using the narrowed type context.
-            let inferred_ty = self.infer_collection_literal_impl(
+            let inferred_ty = speculative_builder.infer_collection_literal_impl(
                 collection_class,
                 elts,
                 infer_elt_expression,
-                narrowed_tcx,
+                TypeContext::new(Some(narrowed_ty)),
             )?;
 
-            // Restore the multi-inference state.
-            self.context.set_multi_inference(was_in_multi_inference);
-            self.set_multi_inference_state(prev_multi_inference);
-
-            // Ensure the inferred return type is assignable to the (narrowed) declared type.
+            // Ensure the inferred return type is assignable to the narrowed declared type.
             if !inferred_ty.is_assignable_to(db, narrowed_ty) {
+                speculative_builder.discard();
                 return None;
             }
 
             // Successfully narrowed to an element of the union.
-            //
-            // If necessary, infer the collection literal again with diagnostics enabled.
-            if !was_in_multi_inference {
-                self.infer_collection_literal_impl(
-                    collection_class,
-                    elts,
-                    infer_elt_expression,
-                    narrowed_tcx,
-                );
-            }
-
+            self.extend(speculative_builder);
             Some(inferred_ty)
         };
 
@@ -8853,6 +8822,79 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         expressions.shrink_to_fit();
 
         ScopeInference { expressions, extra }
+    }
+
+    /// Returns a fresh [`TypeInferenceBuilder`] for the current scope that can be used
+    /// to speculatively infer expressions during multi-inference.
+    ///
+    /// The inference results can be merged into the current inference region using
+    /// [`TypeInferenceBuilder::extend`], or ignored using [`TypeInferenceBuilder::discard`].
+    fn speculate(&mut self) -> Self {
+        TypeInferenceBuilder::new(self.db(), self.region, self.index, self.module())
+    }
+
+    /// Extend the current region with the results of a speculative [`TypeInferenceBuilder`].
+    fn extend(&mut self, other: Self) {
+        let Self {
+            context,
+            expressions,
+            string_annotations,
+            scope,
+            bindings,
+            declarations,
+            deferred,
+            cycle_recovery,
+            dataclass_field_specifiers: _,
+
+            // Ignored; only relevant to definition regions
+            undecorated_type: _,
+
+            // builder only state
+            all_definitely_bound: _,
+            typevar_binding_context: _,
+            inference_flags: _,
+            deferred_state: _,
+            multi_inference_state: _,
+            inner_expression_inference_state: _,
+            inferring_vararg_annotation: _,
+            called_functions: _,
+            index: _,
+            region: _,
+            return_types_and_ranges: _,
+        } = other;
+
+        let diagnostics = context.finish();
+        let _ = scope;
+
+        assert!(
+            declarations.is_empty(),
+            "speculative `TypeInferenceBuilder` should only be used for expression inference"
+        );
+        assert!(
+            deferred.is_empty(),
+            "speculative `TypeInferenceBuilder` should only be used for expression inference"
+        );
+
+        self.expressions.extend(expressions.iter());
+        self.context.extend(&diagnostics);
+        self.extend_cycle_recovery(cycle_recovery);
+        self.string_annotations
+            .extend(string_annotations.iter().copied());
+
+        if !matches!(self.region, InferenceRegion::Scope(..)) {
+            self.bindings.extend(
+                bindings.iter().map(|(def, ty)| (*def, *ty)),
+                self.multi_inference_state,
+            );
+        }
+    }
+
+    /// Ignore the results of this [`TypeInferenceBuilder`].
+    ///
+    /// Note that dropping a [`TypeInferenceBuilder`] without calling this method will result
+    /// in a panic.
+    fn discard(self) {
+        let _ = self.context.finish();
     }
 }
 
