@@ -34,6 +34,16 @@ def _(flag: bool, c: CallableTypeOf[f]):
     reveal_type(x)  # revealed: Overload[(x: int) -> bool, (x: str) -> str] | Literal[True]
 ```
 
+When a union would otherwise display two distinct overloaded callables identically, we include their
+names to avoid implying that the union contains duplicate elements:
+
+```py
+def f(flag: bool):
+    x = str.upper if flag else str.lower
+    # revealed: (Overload[def upper(self: LiteralString) -> LiteralString, def upper(self) -> str]) | (Overload[def lower(self: LiteralString) -> LiteralString, def lower(self) -> str])
+    reveal_type(x)
+```
+
 ### Top
 
 And we don't parenthesize the top callable, since it is wrapped in `Top[...]`:
