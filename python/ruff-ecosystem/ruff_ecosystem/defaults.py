@@ -26,7 +26,7 @@ DEFAULT_TARGETS = [
         config_overrides={
             # Broken symlink
             "exclude": [
-                "task-sdk/src/airflow/sdk/_shared/AGENTS.md",
+                # "task-sdk/src/airflow/sdk/_shared/AGENTS.md",
             ]
         },
     ),
