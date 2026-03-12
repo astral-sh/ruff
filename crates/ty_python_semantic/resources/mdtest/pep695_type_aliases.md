@@ -548,3 +548,15 @@ def foo(a: int, b: int) -> RecursiveT:
     # error: [invalid-return-type] "Return type does not match returned value: expected `RecursiveT`, found `list[int]`"
     return list(some_intermediate_var)
 ```
+
+### Recursive `TypeIs` and `TypeGuard` aliases don't stack overflow
+
+```py
+from typing_extensions import TypeGuard, TypeIs
+
+type RecursiveIs = TypeIs[RecursiveIs]
+type RecursiveGuard = TypeGuard[RecursiveGuard]
+
+type AliasIs = RecursiveIs
+type AliasGuard = RecursiveGuard
+```

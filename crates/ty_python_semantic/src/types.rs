@@ -848,17 +848,46 @@ impl<'db> Type<'db> {
         // So we avoid unioning in the first couple iterations, and just use the later iteration's
         // result directly. We still ensure monotonicity after the first couple iterations, which
         // still ensures convergence in cases that are prone to oscillation.
-        if cycle.iteration() <= 1 {
+        let normalized = if cycle.iteration() <= 1 {
             self
         } else {
-            // The current type is unioned to the previous type. Unioning in the reverse order can
-            // cause the fixed-point iterations to converge slowly or even fail. Consider the case
-            // where the order of union types is different between the previous and current cycle.
-            // We should use the previous union type as the base and only add new element types in
-            // this cycle, if any.
-            UnionType::from_elements_cycle_recovery(db, [previous, self])
-        }
-        .recursive_type_normalized(db, cycle)
+            match (previous, self) {
+                (Type::TypeIs(previous), Type::TypeIs(current))
+                    if previous.place_info(db) == current.place_info(db) =>
+                {
+                    current.with_type(
+                        db,
+                        current.return_type(db).cycle_normalized(
+                            db,
+                            previous.return_type(db),
+                            cycle,
+                        ),
+                    )
+                }
+                (Type::TypeGuard(previous), Type::TypeGuard(current))
+                    if previous.place_info(db) == current.place_info(db) =>
+                {
+                    current.with_type(
+                        db,
+                        current.return_type(db).cycle_normalized(
+                            db,
+                            previous.return_type(db),
+                            cycle,
+                        ),
+                    )
+                }
+                _ => {
+                    // The current type is unioned to the previous type. Unioning in the reverse order can
+                    // cause the fixed-point iterations to converge slowly or even fail. Consider the case
+                    // where the order of union types is different between the previous and current cycle.
+                    // We should use the previous union type as the base and only add new element types in
+                    // this cycle, if any.
+                    UnionType::from_elements_cycle_recovery(db, [previous, self])
+                }
+            }
+        };
+
+        normalized.recursive_type_normalized(db, cycle)
     }
 
     pub fn is_none(&self, db: &'db dyn Db) -> bool {
@@ -5337,9 +5366,23 @@ impl<'db> Type<'db> {
             }
 
             // TODO(jelle): Materialize should be handled differently, since TypeIs is invariant
-            Type::TypeIs(type_is) => type_is.with_type(db, type_is.return_type(db).apply_type_mapping(db, type_mapping, tcx)),
+            Type::TypeIs(type_is) => visitor.visit(self, || {
+                type_is.with_type(
+                    db,
+                    type_is
+                        .return_type(db)
+                        .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                )
+            }),
 
-            Type::TypeGuard(type_guard) => type_guard.with_type(db, type_guard.return_type(db).apply_type_mapping(db, type_mapping, tcx)),
+            Type::TypeGuard(type_guard) => visitor.visit(self, || {
+                type_guard.with_type(
+                    db,
+                    type_guard
+                        .return_type(db)
+                        .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                )
+            }),
 
             Type::TypeAlias(alias) => {
                 // For EagerExpansion, expand the raw value type. This path relies on Salsa's cycle
