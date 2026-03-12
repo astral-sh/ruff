@@ -20,7 +20,7 @@ We don't parenthesize display of an overloaded callable, since it is already wra
 
 ```py
 from typing import overload, Callable
-from ty_extensions import CallableTypeOf
+from ty_extensions import RegularCallableTypeOf
 
 @overload
 def f(x: int) -> bool: ...
@@ -29,7 +29,7 @@ def f(x: str) -> str: ...
 def f(x: int | str) -> bool | str:
     return bool(x) if isinstance(x, int) else str(x)
 
-def _(flag: bool, c: CallableTypeOf[f]):
+def _(flag: bool, c: RegularCallableTypeOf[f]):
     x = c if flag else True
     reveal_type(x)  # revealed: Overload[(x: int) -> bool, (x: str) -> str] | Literal[True]
 ```

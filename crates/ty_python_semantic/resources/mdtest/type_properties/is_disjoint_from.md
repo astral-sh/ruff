@@ -715,13 +715,13 @@ As such, for any two callable types, it is possible to conceive of a runtime cal
 would inhabit both types simultaneously.
 
 ```py
-from ty_extensions import CallableTypeOf, is_disjoint_from, static_assert
+from ty_extensions import RegularCallableTypeOf, is_disjoint_from, static_assert
 from typing_extensions import Callable, Literal, Never
 
 def mixed(a: int, /, b: str, *args: int, c: int = 2, **kwargs: int) -> None: ...
 
-static_assert(not is_disjoint_from(Callable[[], Never], CallableTypeOf[mixed]))
-static_assert(not is_disjoint_from(Callable[[int, str], float], CallableTypeOf[mixed]))
+static_assert(not is_disjoint_from(Callable[[], Never], RegularCallableTypeOf[mixed]))
+static_assert(not is_disjoint_from(Callable[[int, str], float], RegularCallableTypeOf[mixed]))
 
 # Using gradual form
 static_assert(not is_disjoint_from(Callable[..., None], Callable[[], None]))
@@ -736,7 +736,7 @@ static_assert(not is_disjoint_from(Callable[[Never], str], Callable[[Never], int
 A callable type is disjoint from all literal types.
 
 ```py
-from ty_extensions import CallableTypeOf, is_disjoint_from, static_assert
+from ty_extensions import RegularCallableTypeOf, is_disjoint_from, static_assert
 from typing_extensions import Callable, Literal, Never
 
 static_assert(is_disjoint_from(Callable[[], None], Literal[""]))
@@ -749,7 +749,7 @@ A callable type is disjoint from nominal instance types where the classes are fi
 `__call__` is not callable.
 
 ```py
-from ty_extensions import CallableTypeOf, is_disjoint_from, static_assert
+from ty_extensions import RegularCallableTypeOf, is_disjoint_from, static_assert
 from typing_extensions import Any, Callable, final
 
 @final

@@ -7241,14 +7241,14 @@ mod tests {
 
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:25:1
+          --> stdlib/ty_extensions.pyi:44:1
            |
-        23 | RegularCallableTypeOf: _SpecialForm
-        24 |
-        25 | Top: _SpecialForm
+        42 | """
+        43 |
+        44 | Top: _SpecialForm
            | ^^^
-        26 | """
-        27 | `Top[T]` represents the "top materialization" of `T`.
+        45 | """
+        46 | `Top[T]` represents the "top materialization" of `T`.
            |
         info: Source
          --> main2.py:4:13
