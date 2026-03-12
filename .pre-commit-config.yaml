@@ -27,13 +27,13 @@ repos:
       - id: check-merge-conflict
         priority: 0
       - id: end-of-file-fixer
-        # NOTE: end-of-file-fixer truncates newline-only .rs files to 0 bytes,
-        # then rustfmt adds a newline back, causing an infinite cycle.
-        # If you hit this, add a comment to the empty file so it has real content.
-        # See: https://github.com/rust-lang/rustfmt/issues/5364
+        # Rust files are handled by rustfmt, which also avoids a known cycle
+        # where end-of-file-fixer truncates newline-only .rs files to 0 bytes,
+        # then rustfmt adds a newline back (rust-lang/rustfmt#5364).
         #
         # Files with eol=crlf or eol=cr in .gitattributes are excluded because
         # adding a trailing LF creates cross-platform snapshot mismatches.
+        exclude_types: [rust]
         exclude: |
           (?x)^(
             crates/ruff_python_parser/resources/invalid/re_lexing/line_continuation_windows_eol\.py|
