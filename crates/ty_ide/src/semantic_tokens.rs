@@ -1840,7 +1840,7 @@ obj = MyClass()
 x = os.path              # path should be namespace (module)
 y = obj.method           # method should be method (bound method)
 z = obj.CONSTANT         # CONSTANT should be variable with readonly modifier
-w = obj.prop             # prop should be variable on an instance
+w = obj.prop             # prop should be property
 v = MyClass.method       # method should be method (function)
 u = List.__name__        # __name__ should be variable
 t = MyClass.prop          # prop should be property on the class itself
@@ -1881,15 +1881,15 @@ t = MyClass.prop          # prop should be property on the class itself
         "w" @ 483..484: Variable [definition]
         "obj" @ 487..490: Variable
         "prop" @ 491..495: Variable
-        "v" @ 549..550: Variable [definition]
-        "MyClass" @ 553..560: Class
-        "method" @ 561..567: Method
-        "u" @ 611..612: Variable [definition]
-        "List" @ 615..619: Variable
-        "__name__" @ 620..628: Variable
-        "t" @ 666..667: Variable [definition]
-        "MyClass" @ 670..677: Class
-        "prop" @ 678..682: Property
+        "v" @ 534..535: Variable [definition]
+        "MyClass" @ 538..545: Class
+        "method" @ 546..552: Method
+        "u" @ 596..597: Variable [definition]
+        "List" @ 600..604: Variable
+        "__name__" @ 605..613: Variable
+        "t" @ 651..652: Variable [definition]
+        "MyClass" @ 655..662: Class
+        "prop" @ 663..667: Property
         "#);
     }
 
