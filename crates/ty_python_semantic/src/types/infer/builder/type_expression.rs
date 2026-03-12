@@ -3,6 +3,7 @@ use ruff_python_ast::{self as ast, PythonVersion};
 
 use super::{DeferredExpressionState, TypeInferenceBuilder};
 use crate::semantic_index::scope::ScopeKind;
+use crate::types::callable::CallableTypeKind;
 use crate::types::diagnostic::{
     self, INVALID_TYPE_FORM, NOT_SUBSCRIPTABLE, UNBOUND_TYPE_VARIABLE, UNSUPPORTED_OPERATOR,
     report_invalid_argument_number_to_special_form, report_invalid_arguments_to_callable,
@@ -1779,9 +1780,18 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
                 let argument_type = self.infer_expression(&arguments[0], TypeContext::default());
 
-                let Some(callable_type) = argument_type
-                    .try_upcast_to_callable(db)
-                    .map(|callables| callables.into_type(self.db()))
+                let Some(callable_type) =
+                    argument_type.try_upcast_to_callable(db).map(|callables| {
+                        callables
+                            .map(|callable| {
+                                CallableType::new(
+                                    db,
+                                    callable.signatures(db),
+                                    CallableTypeKind::Regular,
+                                )
+                            })
+                            .into_type(self.db())
+                    })
                 else {
                     if let Some(builder) = self
                         .context
