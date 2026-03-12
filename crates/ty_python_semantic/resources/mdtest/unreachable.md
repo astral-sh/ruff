@@ -464,8 +464,8 @@ if False:
             print(x)
 ```
 
-This also applies to deferred annotations on Python 3.14+, which otherwise make the unreachable
-scope look more "real" during body checking:
+This also applies to deferred annotations on Python 3.14+, which are resolved from the perspective
+of the end of the scope, which may not be part of the unreachable section.
 
 ```toml
 [environment]

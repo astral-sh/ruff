@@ -187,12 +187,14 @@ elif TYPE_CHECKING:
     def j() -> str: ...
 
 else:
-    def j_() -> str: ...  # error: [empty-body]
+    def j():
+        raise NotImplementedError
 
 if False:
     pass
 elif not TYPE_CHECKING:
-    def k_() -> str: ...  # error: [empty-body]
+    def k() -> str:
+        raise NotImplementedError
 
 else:
     def k() -> str: ...
@@ -224,19 +226,22 @@ if typing.TYPE_CHECKING:
     def o() -> str: ...
 
 if not typing.TYPE_CHECKING:
-    def p() -> str: ...  # error: [empty-body]
+    def p() -> str:
+        raise NotImplementedError
 
 if compat.sub.sub.TYPE_CHECKING:
     def q() -> str: ...
 
 if not compat.sub.sub.TYPE_CHECKING:
-    def r() -> str: ...  # error: [empty-body]
+    def r() -> str:
+        raise NotImplementedError
 
 if t.TYPE_CHECKING:
     def s() -> str: ...
 
 if not t.TYPE_CHECKING:
-    def t() -> str: ...  # error: [empty-body]
+    def t() -> str:
+        raise NotImplementedError
 ```
 
 ## Conditional return type

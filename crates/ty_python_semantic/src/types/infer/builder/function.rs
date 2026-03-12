@@ -56,8 +56,25 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let has_empty_body = self.return_types_and_ranges.is_empty()
                 && function_body_kind(db, function, |expr| self.expression_type(expr))
                     == FunctionBodyKind::Stub;
+
+            let mut enclosing_class_context = None;
+
             if has_empty_body {
-                return;
+                if self.in_stub() {
+                    return;
+                }
+                if self.in_function_overload_or_abstractmethod() {
+                    return;
+                }
+                if self.scope().scope(db).in_type_checking_block() {
+                    return;
+                }
+                if let Some(class) = self.class_context_of_current_method() {
+                    enclosing_class_context = Some(class);
+                    if class.is_protocol(db) {
+                        return;
+                    }
+                }
             }
 
             let enclosing_function = nearest_enclosing_function(db, self.index, self.scope())
@@ -131,7 +148,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 && !Type::none(db).is_assignable_to(db, expected_ty)
             {
                 let no_return = self.return_types_and_ranges.is_empty();
-                report_implicit_return_type(&self.context, returns.range(), declared_ty, no_return);
+                report_implicit_return_type(
+                    &self.context,
+                    returns.range(),
+                    declared_ty,
+                    has_empty_body,
+                    enclosing_class_context,
+                    no_return,
+                );
             }
         }
     }

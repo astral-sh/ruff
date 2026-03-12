@@ -1,13 +1,11 @@
 use crate::{
     diagnostic::format_enumeration,
-    semantic_index::{definition::Definition, semantic_index},
+    semantic_index::definition::Definition,
     types::{
-        DynamicType, KnownClass, KnownInstanceType, Signature, Type, TypeVarKind, binding_type,
+        KnownInstanceType, Signature, Type, TypeVarKind,
         context::InferContext,
-        diagnostic::{
-            INVALID_LEGACY_POSITIONAL_PARAMETER, INVALID_TYPE_VARIABLE_DEFAULT, report_empty_body,
-        },
-        function::{FunctionBodyKind, KnownFunction, OverloadLiteral, function_body_kind},
+        diagnostic::{INVALID_LEGACY_POSITIONAL_PARAMETER, INVALID_TYPE_VARIABLE_DEFAULT},
+        function::OverloadLiteral,
         infer_definition_types,
         typevar::TypeVarInstance,
         visitor::find_over_type,
@@ -37,69 +35,9 @@ pub(crate) fn check_function_definition<'db>(
     let last_definition = function_type.literal(db).last_definition(db);
     let signature = last_definition.raw_signature(db);
 
-    check_empty_body(context, last_definition, &signature, file_expression_type);
     check_legacy_positional_only_convention(context, last_definition, &signature);
     check_legacy_typevar_defaults(context, last_definition, &signature, file_expression_type);
     check_legacy_typevar_ordering(context, last_definition, &signature, file_expression_type);
-}
-
-fn check_empty_body<'db>(
-    context: &InferContext<'db, '_>,
-    last_definition: OverloadLiteral<'db>,
-    signature: &Signature<'db>,
-    file_expression_type: &impl Fn(&ast::Expr) -> Type<'db>,
-) {
-    let db = context.db();
-    let node = last_definition.node(db, context.file(), context.module());
-    let Some(returns) = node.returns.as_deref() else {
-        return;
-    };
-
-    if function_body_kind(db, node, file_expression_type) != FunctionBodyKind::Stub {
-        return;
-    }
-
-    let enclosing_class = semantic_index(db, context.file())
-        .class_definition_of_method(last_definition.body_scope(db).file_scope_id(db))
-        .and_then(|class_definition| binding_type(db, class_definition).to_class_type(db));
-
-    if context.in_stub()
-        || last_definition
-            .body_scope(db)
-            .scope(db)
-            .in_type_checking_block()
-        || enclosing_class.is_some_and(|class| class.is_protocol(db))
-        || node
-            .decorator_list
-            .iter()
-            .map(|decorator| file_expression_type(&decorator.expression))
-            .any(|decorator_type| match decorator_type {
-                Type::FunctionLiteral(function) => matches!(
-                    function.known(db),
-                    Some(KnownFunction::Overload | KnownFunction::AbstractMethod)
-                ),
-                Type::Never | Type::Dynamic(DynamicType::Divergent(_)) => true,
-                _ => false,
-            })
-    {
-        return;
-    }
-
-    let expected_ty = match signature.return_ty {
-        Type::TypeIs(_) | Type::TypeGuard(_) => KnownClass::Bool.to_instance(db),
-        ty => ty,
-    };
-
-    if Type::none(db).is_assignable_to(db, expected_ty) {
-        return;
-    }
-
-    report_empty_body(
-        context,
-        returns.range(),
-        signature.return_ty,
-        enclosing_class,
-    );
 }
 
 /// Check for invalid applications of the pre-PEP-570 positional-only parameter convention.

@@ -3638,50 +3638,42 @@ pub(super) fn report_implicit_return_type(
     context: &InferContext,
     range: impl Ranged,
     expected_ty: Type,
+    has_empty_body: bool,
+    enclosing_class_of_method: Option<ClassType>,
     no_return: bool,
 ) {
     let db = context.db();
 
-    let Some(builder) = context.report_lint(&INVALID_RETURN_TYPE, range) else {
+    // Use EMPTY_BODY lint for functions with empty bodies, INVALID_RETURN_TYPE for others
+    let lint_to_use = if has_empty_body {
+        &EMPTY_BODY
+    } else {
+        &INVALID_RETURN_TYPE
+    };
+
+    let Some(builder) = context.report_lint(lint_to_use, range) else {
         return;
     };
 
     // If no return statement is defined in the function, then the function always returns `None`
-    if no_return {
-        let mut diagnostic = builder.into_diagnostic(format_args!(
+    let mut diagnostic = if no_return {
+        let mut diag = builder.into_diagnostic(format_args!(
             "Function always implicitly returns `None`, which is not assignable to return type `{}`",
             expected_ty.display(db),
         ));
-        diagnostic.info(
+        diag.info(
             "Consider changing the return annotation to `-> None` or adding a `return` statement",
         );
+        diag
     } else {
         builder.into_diagnostic(format_args!(
             "Function can implicitly return `None`, which is not assignable to return type `{}`",
             expected_ty.display(db),
-        ));
-    }
-}
-
-pub(super) fn report_empty_body(
-    context: &InferContext,
-    range: impl Ranged,
-    expected_ty: Type,
-    enclosing_class_of_method: Option<ClassType>,
-) {
-    let db = context.db();
-
-    let Some(builder) = context.report_lint(&EMPTY_BODY, range) else {
-        return;
+        ))
     };
-
-    let mut diagnostic = builder.into_diagnostic(format_args!(
-        "Function always implicitly returns `None`, which is not assignable to return type `{}`",
-        expected_ty.display(db),
-    ));
-    diagnostic.info(
-        "Consider changing the return annotation to `-> None` or adding a `return` statement",
-    );
+    if !has_empty_body {
+        return;
+    }
     diagnostic.info("Functions with empty bodies and non-`None` return types are only permitted:");
     diagnostic.info(" - in stub files");
     diagnostic.info(" - in `if TYPE_CHECKING` blocks");
