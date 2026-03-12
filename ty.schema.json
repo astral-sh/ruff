@@ -1207,7 +1207,7 @@
         "possibly-missing-attribute": {
           "title": "detects references to possibly missing attributes",
           "description": "## What it does\nChecks for possibly missing attributes.\n\n## Why is this bad?\nAttempting to access a missing attribute will raise an `AttributeError` at runtime.\n\n## Rule status\nThis rule is currently disabled by default because of the number of\nfalse positives it can produce.\n\n## Examples\n```python\nclass A:\n    if b:\n        c = 0\n\nA.c  # AttributeError: type object 'A' has no attribute 'c'\n```",
-          "default": "warn",
+          "default": "ignore",
           "oneOf": [
             {
               "$ref": "#/definitions/Level"
