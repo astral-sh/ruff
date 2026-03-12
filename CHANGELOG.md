@@ -30,6 +30,7 @@ Released on 2026-03-12.
 - [formatter] Fix lambda body formatting for multiline calls and subscripts ([#23866](https://github.com/astral-sh/ruff/pull/23866))
 - [formatter] Preserve required annotation parentheses in annotated assignments ([#23865](https://github.com/astral-sh/ruff/pull/23865))
 - [formatter] Preserve type-expression parentheses in the formatter ([#23867](https://github.com/astral-sh/ruff/pull/23867))
+- \[`flake8-annotations`\] Fix stack overflow in `ANN401` on quoted annotations with escape sequences ([#23912](https://github.com/astral-sh/ruff/pull/23912))
 - \[`pep8-naming`\] Check naming conventions in `match` pattern bindings (`N806`, `N815`, `N816`) ([#23899](https://github.com/astral-sh/ruff/pull/23899))
 - \[`perflint`\] Fix comment duplication in fixes (`PERF401`, `PERF403`) ([#23729](https://github.com/astral-sh/ruff/pull/23729))
 - \[`pyupgrade`\] Properly trigger `super` change in nested class (`UP008`) ([#22677](https://github.com/astral-sh/ruff/pull/22677))
