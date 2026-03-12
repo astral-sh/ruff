@@ -4976,12 +4976,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             _ => &[],
         };
 
-        // We silence diagnostics until we successfully narrow to a specific type.
-        let was_in_multi_inference = self.context.set_multi_inference(true);
-
         let mut try_narrow = |narrowed_ty| {
             let mut speculated_bindings = bindings.clone();
             let narrowed_tcx = TypeContext::new(Some(narrowed_ty));
+
+            // We silence diagnostics until we successfully narrow to a specific type.
+            let was_in_multi_inference = self.context.set_multi_inference(true);
 
             // Attempt to infer the argument types using the narrowed type context.
             self.infer_all_argument_types(
@@ -4992,6 +4992,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 narrowed_tcx,
                 MultiInferenceState::Ignore,
             );
+
+            // Restore the multi-inference state.
+            self.context.set_multi_inference(was_in_multi_inference);
 
             // Ensure the argument types match their annotated types.
             if speculated_bindings
@@ -5023,8 +5026,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             //
             // If necessary, infer the argument types again with diagnostics enabled.
             if !was_in_multi_inference {
-                self.context.set_multi_inference(was_in_multi_inference);
-
                 self.infer_all_argument_types(
                     ast_arguments.clone(),
                     argument_types,
@@ -5067,9 +5068,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
-        // Re-enable diagnostics, and infer against the entire union as a fallback.
-        self.context.set_multi_inference(was_in_multi_inference);
-
+        // Infer against the entire union as a fallback.
         self.infer_all_argument_types(
             ast_arguments,
             argument_types,
@@ -5968,12 +5967,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             _ => &[],
         };
 
-        // We silence diagnostics until we successfully narrow to a specific type.
-        let prev_multi_inference = self.set_multi_inference_state(MultiInferenceState::Ignore);
-        let was_in_multi_inference = self.context.set_multi_inference(true);
-
         let mut try_narrow = |narrowed_ty| {
             let narrowed_tcx = TypeContext::new(Some(narrowed_ty));
+
+            // We silence diagnostics until we successfully narrow to a specific type.
+            let prev_multi_inference = self.set_multi_inference_state(MultiInferenceState::Ignore);
+            let was_in_multi_inference = self.context.set_multi_inference(true);
 
             // Attempt to infer the collection literal using the narrowed type context.
             let inferred_ty = self.infer_collection_literal_impl(
@@ -5982,6 +5981,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 infer_elt_expression,
                 narrowed_tcx,
             )?;
+
+            // Restore the multi-inference state.
+            self.context.set_multi_inference(was_in_multi_inference);
+            self.set_multi_inference_state(prev_multi_inference);
 
             // Ensure the inferred return type is assignable to the (narrowed) declared type.
             if !inferred_ty.is_assignable_to(db, narrowed_ty) {
@@ -5992,9 +5995,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             //
             // If necessary, infer the collection literal again with diagnostics enabled.
             if !was_in_multi_inference {
-                self.context.set_multi_inference(was_in_multi_inference);
-                self.set_multi_inference_state(prev_multi_inference);
-
                 self.infer_collection_literal_impl(
                     collection_class,
                     elts,
@@ -6014,10 +6014,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 return Some(result);
             }
         }
-
-        // Re-enable diagnostics, and fallback to the entire type context.
-        self.context.set_multi_inference(was_in_multi_inference);
-        self.set_multi_inference_state(prev_multi_inference);
 
         self.infer_collection_literal_impl(collection_class, elts, infer_elt_expression, tcx)
     }
