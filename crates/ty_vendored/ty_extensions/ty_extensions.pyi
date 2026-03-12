@@ -20,6 +20,7 @@ Not: _SpecialForm
 Intersection: _SpecialForm
 TypeOf: _SpecialForm
 CallableTypeOf: _SpecialForm
+RegularCallableTypeOf: _SpecialForm
 
 Top: _SpecialForm
 """
@@ -194,6 +195,12 @@ def into_callable(ty: Any) -> Any:
     """Converts a value into a `Callable`, if possible.
 
     This is the value equivalent of `CallableTypeOf`, which operates on types.
+    """
+
+def into_regular_callable(ty: Any) -> Any:
+    """Converts a value into a regular `Callable`, if possible.
+
+    This is the value equivalent of `RegularCallableTypeOf`, which operates on types.
     """
 
 def dunder_all_names(module: Any) -> tuple[LiteralString, ...] | None:
