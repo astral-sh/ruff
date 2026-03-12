@@ -54,7 +54,7 @@ use crate::rules::airflow::helpers::is_airflow_task;
 /// )
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "NEXT_RUFF_VERSION")]
+#[violation_metadata(preview_since = "0.15.6")]
 pub(crate) struct AirflowVariableGetOutsideTask {
     in_function: bool,
 }
