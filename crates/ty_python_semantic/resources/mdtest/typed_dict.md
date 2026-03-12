@@ -3098,6 +3098,23 @@ def _(extra: Extra) -> None:
         reveal_type(item)  # revealed: tuple[str, object]
 ```
 
+### A closed `TypedDict` is equivalent to `extra_items=Never`
+
+```py
+from typing_extensions import TypedDict, Never
+from ty_extensions import static_assert, is_equivalent_to, is_subtype_of
+
+class Extra(TypedDict, extra_items=Never):
+    x: int
+
+class Closed(TypedDict, closed=True):
+    x: int
+
+static_assert(is_equivalent_to(Extra, Closed))
+static_assert(is_subtype_of(Extra, Closed))
+static_assert(is_subtype_of(Closed, Extra))
+```
+
 ### Empty closed TypedDict is known to be falsy
 
 An empty `closed=True` TypedDict cannot contain any keys, so it is always empty and always falsy.
