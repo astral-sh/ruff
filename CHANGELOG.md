@@ -6,52 +6,45 @@ Released on 2026-03-12.
 
 ### Preview features
 
-- Add a rule to enforce lazy imports ([#23777](https://github.com/astral-sh/ruff/pull/23777))
+- Add support for `lazy` import parsing ([#23755](https://github.com/astral-sh/ruff/pull/23755))
+- Add support for star-unpacking of comprehensions (PEP 798) ([#23788](https://github.com/astral-sh/ruff/pull/23788))
+- Reject semantic syntax errors for lazy imports ([#23757](https://github.com/astral-sh/ruff/pull/23757))
 - Drop a few rules from the preview default set ([#23879](https://github.com/astral-sh/ruff/pull/23879))
-- Limit RUF036 to typing contexts; make it unsafe for non-typing-only ([#23765](https://github.com/astral-sh/ruff/pull/23765))
-- Retain `lazy` keyword when sorting imports ([#23762](https://github.com/astral-sh/ruff/pull/23762))
-- Support `newline` parameter in FURB101 for Python 3.13+ ([#23754](https://github.com/astral-sh/ruff/pull/23754))
-- Use starred unpacking for RUF017 in Python 3.15+ ([#23789](https://github.com/astral-sh/ruff/pull/23789))
 - \[`airflow`\] Flag `Variable.get()` calls outside of task execution context (`AIR003`) ([#23584](https://github.com/astral-sh/ruff/pull/23584))
 - \[`airflow`\] Flag runtime-varying values in DAG/task constructor arguments (`AIR304`) ([#23631](https://github.com/astral-sh/ruff/pull/23631))
 - \[`flake8-bugbear`\] Implement `delattr-with-constant` (`B043`) ([#23737](https://github.com/astral-sh/ruff/pull/23737))
+- \[`flake8-tidy-imports`\] Add `TID254` to enforce lazy imports ([#23777](https://github.com/astral-sh/ruff/pull/23777))
+- \[`flake8-tidy-imports`\] Allow users to ban lazy imports with `TID254` ([#23847](https://github.com/astral-sh/ruff/pull/23847))
+- \[`isort`\] Retain `lazy` keyword when sorting imports ([#23762](https://github.com/astral-sh/ruff/pull/23762))
 - \[`pyupgrade`\] Add `from __future__ import annotations` automatically (`UP006`) ([#23260](https://github.com/astral-sh/ruff/pull/23260))
+- \[`refurb`\] Support `newline` parameter in `FURB101` for Python 3.13+ ([#23754](https://github.com/astral-sh/ruff/pull/23754))
 - \[`ruff`\] Add `os-path-commonprefix` (`RUF071`) ([#23814](https://github.com/astral-sh/ruff/pull/23814))
 - \[`ruff`\] Add unsafe fix for os-path-commonprefix (`RUF071`) ([#23852](https://github.com/astral-sh/ruff/pull/23852))
+- \[`ruff`\] Limit `RUF036` to typing contexts; make it unsafe for non-typing-only ([#23765](https://github.com/astral-sh/ruff/pull/23765))
+- \[`ruff`\] Use starred unpacking for `RUF017` in Python 3.15+ ([#23789](https://github.com/astral-sh/ruff/pull/23789))
 
 ### Bug fixes
 
-- Avoid syntax errors in RUF036 fixes ([#23764](https://github.com/astral-sh/ruff/pull/23764))
 - Fix `--add-noqa` creating unwanted leading whitespace ([#23773](https://github.com/astral-sh/ruff/pull/23773))
-- Fix lambda body formatting for multiline calls and subscripts ([#23866](https://github.com/astral-sh/ruff/pull/23866))
-- Preserve required annotation parentheses in annotated assignments ([#23865](https://github.com/astral-sh/ruff/pull/23865))
-- Preserve type-expression parentheses in the formatter ([#23867](https://github.com/astral-sh/ruff/pull/23867))
+- Fix `--add-noqa` breaking shebangs ([#23577](https://github.com/astral-sh/ruff/pull/23577))
+- [formatter] Fix lambda body formatting for multiline calls and subscripts ([#23866](https://github.com/astral-sh/ruff/pull/23866))
+- [formatter] Preserve required annotation parentheses in annotated assignments ([#23865](https://github.com/astral-sh/ruff/pull/23865))
+- [formatter] Preserve type-expression parentheses in the formatter ([#23867](https://github.com/astral-sh/ruff/pull/23867))
 - \[`pep8-naming`\] Check naming conventions in `match` pattern bindings (`N806`, `N815`, `N816`) ([#23899](https://github.com/astral-sh/ruff/pull/23899))
 - \[`perflint`\] Fix comment duplication in fixes (`PERF401`, `PERF403`) ([#23729](https://github.com/astral-sh/ruff/pull/23729))
 - \[`pyupgrade`\] Properly trigger `super` change in nested class (`UP008`) ([#22677](https://github.com/astral-sh/ruff/pull/22677))
-- [ruff] Fix `--add-noqa` breaking shebangs ([#23577](https://github.com/astral-sh/ruff/pull/23577))
+- \[`ruff`\] Avoid syntax errors in `RUF036` fixes ([#23764](https://github.com/astral-sh/ruff/pull/23764))
 
 ### Rule changes
 
-- Allow users to ban lazy imports ([#23847](https://github.com/astral-sh/ruff/pull/23847))
-- Fix WSL detection in non-Docker containers ([#22879](https://github.com/astral-sh/ruff/pull/22879))
-- Ignore `pprint` calls with `stream=` ([#23787](https://github.com/astral-sh/ruff/pull/23787))
-- \[`flake8-bandit`\] flag `S501` with `requests.request` ([#23873](https://github.com/astral-sh/ruff/pull/23873))
+- \[`flake8-bandit`\] Flag `S501` with `requests.request` ([#23873](https://github.com/astral-sh/ruff/pull/23873))
+- \[`flake8-executable`\] Fix WSL detection in non-Docker containers ([#22879](https://github.com/astral-sh/ruff/pull/22879))
+- \[`flake8-print`\] Ignore `pprint` calls with `stream=` ([#23787](https://github.com/astral-sh/ruff/pull/23787))
 
 ### Documentation
 
 - Update docs for Markdown code block formatting ([#23871](https://github.com/astral-sh/ruff/pull/23871))
 - \[`flake8-bugbear`\] Fix misleading description for `B904` ([#23731](https://github.com/astral-sh/ruff/pull/23731))
-
-### Other changes
-
-- Add support for `lazy` import parsing ([#23755](https://github.com/astral-sh/ruff/pull/23755))
-- Add support for star-unpacking of comprehensions (PEP 798) ([#23788](https://github.com/astral-sh/ruff/pull/23788))
-- CLAUDE.md -> AGENTS.md ([#23791](https://github.com/astral-sh/ruff/pull/23791))
-- Exit earlier in LSP when source type unknown ([#23874](https://github.com/astral-sh/ruff/pull/23874))
-- Reject semantic syntax errors for lazy imports ([#23757](https://github.com/astral-sh/ruff/pull/23757))
-- \[`ruff`\] use `bitcode` instead of `bincode` ([#23544](https://github.com/astral-sh/ruff/pull/23544))
-- installers: Download releases from Astral's mirror first ([#23617](https://github.com/astral-sh/ruff/pull/23617))
 
 ### Contributors
 
