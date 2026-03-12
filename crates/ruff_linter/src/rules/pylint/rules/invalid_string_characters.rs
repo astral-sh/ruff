@@ -1,6 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::PythonVersion;
-use ruff_python_ast::token::{Token, TokenKind};
+use ruff_python_ast::token::Token;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::Locator;
@@ -191,17 +190,11 @@ pub(crate) fn invalid_string_characters(
     context: &LintContext,
     token: &Token,
     locator: &Locator,
-    in_interpolation: bool,
-    target_version: PythonVersion,
+    suppress_fix: bool,
 ) {
-    let text = match token.kind() {
-        // We can't use the `value` field since it's decoded and e.g. for f-strings removed a curly
-        // brace that escaped another curly brace, which would gives us wrong column information.
-        TokenKind::String | TokenKind::FStringMiddle | TokenKind::TStringMiddle => {
-            locator.slice(token)
-        }
-        _ => return,
-    };
+    // We can't use the `value` field since it's decoded and e.g. for f-strings removed a curly
+    // brace that escaped another curly brace, which would gives us wrong column information.
+    let text = locator.slice(token);
 
     for (column, match_) in text.match_indices(&['\x08', '\x1a', '\x1b', '\0', '\u{200b}']) {
         let location = token.start() + TextSize::try_from(column).unwrap();
@@ -246,12 +239,8 @@ pub(crate) fn invalid_string_characters(
             continue;
         };
 
-        // Don't suggest a fix if the token is inside an f-string interpolation and the
-        // target version doesn't support PEP 701 (Python < 3.12), because the fix would
-        // introduce a backslash inside `{...}` which is a syntax error in older Python.
-        let can_fix = !token.unwrap_string_flags().is_raw_string()
-            && !is_escaped
-            && (!in_interpolation || target_version.supports_pep_701());
+        let can_fix =
+            !suppress_fix && !token.unwrap_string_flags().is_raw_string() && !is_escaped;
         if can_fix {
             let edit = Edit::range_replacement(replacement.to_string(), range);
             diagnostic.set_fix(Fix::safe_edit(edit));

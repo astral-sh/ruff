@@ -284,24 +284,14 @@ mod tests {
     }
 
     #[test]
-    fn invalid_characters_fstring_py39() -> Result<()> {
-        let diagnostics = test_path(
+    fn invalid_characters_fstring() -> Result<()> {
+        assert_diagnostics_diff!(
             Path::new("pylint/invalid_characters_fstring.py"),
             &LinterSettings::for_rule(Rule::InvalidCharacterBackspace)
                 .with_target_version(PythonVersion::PY39),
-        )?;
-        assert_diagnostics!(diagnostics);
-        Ok(())
-    }
-
-    #[test]
-    fn invalid_characters_fstring_py312() -> Result<()> {
-        let diagnostics = test_path(
-            Path::new("pylint/invalid_characters_fstring.py"),
             &LinterSettings::for_rule(Rule::InvalidCharacterBackspace)
                 .with_target_version(PythonVersion::PY312),
-        )?;
-        assert_diagnostics!(diagnostics);
+        );
         Ok(())
     }
 
