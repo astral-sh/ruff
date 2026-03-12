@@ -1,0 +1,25 @@
+---
+source: crates/ty_ide/src/hover.rs
+expression: test.hover()
+---
+def foo(x: int) -> int
+---------------------------------------------
+Sample docstring
+
+---------------------------------------------
+```python
+def foo(x: int) -> int
+```
+---
+Sample docstring
+---------------------------------------------
+info[hover]: Hovered content is
+  --> main.py:14:10
+   |
+13 | my_class = MyTestClass()
+14 | my_class.foo(1)
+   |          ^-^
+   |          ||
+   |          |Cursor offset
+   |          source
+   |
