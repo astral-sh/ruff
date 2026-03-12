@@ -829,3 +829,13 @@ foo = lambda: (result := some_really_long_callable_expression)(extra_argument_on
 foo = lambda: (result := some_really_long_subscriptable_expression)[extra_long_index_expression]
 
 foo = lambda: (await some_coroutine)(extra_argument_one, extra_argument_two, extra_argument_three)
+
+foo = lambda: call()(extra_argument_one, extra_argument_two, extra_argument_threeeeeeeee)
+
+foo = lambda: call()(extra_argument_one, extra_argument_twooooooooooooooooooo, extra_argument_threeeeeeeee)
+
+foo = lambda: call(argument_one,)(extra_argument_one, extra_argument_twooooooooooooooooooo, extra_argument_threeeeeeeee)
+
+foo = lambda: call(argument_one, argument_two, argument_threeeeeeeeeeeeeeeeeeeeeeeeeeee)(extra_argument_one, extra_argument_twooooooooooooooooooo, extra_argument_threeeeeeeee)
+
+foo = lambda: callllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllll(argument_one, argument_two, argument_threeeeeeeeeeeeeeeeeeeeeeeeeeee)(extra_argument_one, extra_argument_twooooooooooooooooooo, extra_argument_threeeeeeeee)
