@@ -24,6 +24,7 @@ use crate::semantic_index::scope::{FileScopeId, ScopeKind};
 use crate::semantic_index::semantic_index;
 use crate::types::callable::CallableTypeKind;
 use crate::types::class::{ClassLiteral, ClassType, GenericAlias};
+use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::function::{FunctionType, OverloadLiteral};
 use crate::types::generics::{GenericContext, Specialization};
 use crate::types::signatures::{
@@ -2965,8 +2966,17 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'db> {
                 }
                 Ok(())
             }
-            KnownInstanceType::ConstraintSet(_) => {
-                f.with_type(ty).write_str("ty_extensions.ConstraintSet")
+            KnownInstanceType::ConstraintSet(interned_set) => {
+                f.with_type(ty).write_str("ConstraintSet")?;
+                let constraints = ConstraintSetBuilder::new();
+                let set = constraints.load(self.db, interned_set.constraints(self.db));
+                if set.is_always_satisfied(self.db) {
+                    f.write_str("[Literal[True]]")
+                } else if set.is_never_satisfied(self.db) {
+                    f.write_str("[Literal[False]]")
+                } else {
+                    f.write_str("[bool]")
+                }
             }
             KnownInstanceType::GenericContext(generic_context) => {
                 f.with_type(ty).write_str("ty_extensions.GenericContext")?;

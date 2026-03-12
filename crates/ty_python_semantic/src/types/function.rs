@@ -1987,7 +1987,7 @@ impl KnownFunction {
                     } else if truthiness.is_always_false() {
                         builder.into_diagnostic(format_args!(
                             "Static assertion error: argument of type `{parameter_ty}` \
-                            is statically known to be falsy",
+                            is always falsy",
                             parameter_ty = parameter_ty.display(db)
                         ))
                     } else {

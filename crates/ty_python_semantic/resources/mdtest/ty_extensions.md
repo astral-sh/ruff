@@ -203,19 +203,19 @@ from ty_extensions import static_assert
 static_assert(True)
 static_assert(False)  # error: "Static assertion error: argument evaluates to `False`"
 
-static_assert(None)  # error: "Static assertion error: argument of type `None` is statically known to be falsy"
+static_assert(None)  # error: "Static assertion error: argument of type `None` is always falsy"
 
 static_assert(1)
-static_assert(0)  # error: "Static assertion error: argument of type `Literal[0]` is statically known to be falsy"
+static_assert(0)  # error: "Static assertion error: argument of type `Literal[0]` is always falsy"
 
 static_assert((0,))
-static_assert(())  # error: "Static assertion error: argument of type `tuple[()]` is statically known to be falsy"
+static_assert(())  # error: "Static assertion error: argument of type `tuple[()]` is always falsy"
 
 static_assert("a")
-static_assert("")  # error: "Static assertion error: argument of type `Literal[""]` is statically known to be falsy"
+static_assert("")  # error: "Static assertion error: argument of type `Literal[""]` is always falsy"
 
 static_assert(b"a")
-static_assert(b"")  # error: "Static assertion error: argument of type `Literal[b""]` is statically known to be falsy"
+static_assert(b"")  # error: "Static assertion error: argument of type `Literal[b""]` is always falsy"
 ```
 
 ### Error messages
@@ -398,7 +398,7 @@ the expression `str`:
 from ty_extensions import TypeOf, is_subtype_of, static_assert
 
 # This is incorrect and therefore fails with ...
-# error: "Static assertion error: argument of type `ty_extensions.ConstraintSet` is statically known to be falsy"
+# error: "Static assertion error: argument of type `ConstraintSet[Literal[False]]` is always falsy"
 static_assert(is_subtype_of(str, type[str]))
 
 # Correct, returns True:
