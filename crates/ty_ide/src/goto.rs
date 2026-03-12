@@ -319,6 +319,42 @@ impl<'db> Definitions<'db> {
 
         None
     }
+
+    /// Get the docstring for hover content.
+    ///
+    /// Overload declarations often omit docstrings while the implementation carries the
+    /// user-facing documentation, so hover falls back to sibling definitions of the same
+    /// symbol when direct docstring lookup misses.
+    pub(crate) fn hover_docstring(self, db: &'db dyn crate::Db) -> Option<Docstring> {
+        for definition in &self.0 {
+            if let Some(docstring) = definition.docstring(db) {
+                return Some(Docstring::new(docstring));
+            }
+        }
+
+        for definition in &self.0 {
+            if let Some(docstring) = definition.sibling_docstring(db) {
+                return Some(Docstring::new(docstring));
+            }
+        }
+
+        let stub_mapper = StubMapper::new(db);
+        let mapped_definitions = stub_mapper.map_definitions(self.0);
+
+        for definition in &mapped_definitions {
+            if let Some(docstring) = definition.docstring(db) {
+                return Some(Docstring::new(docstring));
+            }
+        }
+
+        for definition in &mapped_definitions {
+            if let Some(docstring) = definition.sibling_docstring(db) {
+                return Some(Docstring::new(docstring));
+            }
+        }
+
+        None
+    }
 }
 
 impl GotoTarget<'_> {

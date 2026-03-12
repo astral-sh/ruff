@@ -38,7 +38,7 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
                 &model,
                 ty_python_semantic::ImportAliasResolution::ResolveAliases,
             )
-            .and_then(|definitions| definitions.docstring(db))
+            .and_then(|definitions| definitions.hover_docstring(db))
             .map(HoverContent::Docstring)
     };
 
