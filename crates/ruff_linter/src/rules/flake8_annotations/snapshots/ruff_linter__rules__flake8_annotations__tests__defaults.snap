@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_annotations/mod.rs
+assertion_line: 36
 ---
 ANN201 [*] Missing return type annotation for public function `foo`
  --> annotation_presence.py:5:5
@@ -319,4 +320,31 @@ help: Add return type annotation: `None`
     -     def __init__(self):
 165 +     def __init__(self) -> None:
 166 |         print(f"{self.attr=}")
+167 | 
+168 | 
 note: This is an unsafe fix and may change runtime behavior
+
+ANN201 [*] Missing return type annotation for public function `quoted_escape`
+   --> annotation_presence.py:172:5
+    |
+170 | # A quoted annotation containing a nested string with an escape sequence
+171 | # should not cause a stack overflow.
+172 | def quoted_escape(x: "'in\x74'"): pass
+    |     ^^^^^^^^^^^^^
+    |
+help: Add return type annotation: `None`
+169 | # Regression test for: https://github.com/astral-sh/ruff/issues/14695
+170 | # A quoted annotation containing a nested string with an escape sequence
+171 | # should not cause a stack overflow.
+    - def quoted_escape(x: "'in\x74'"): pass
+172 + def quoted_escape(x: "'in\x74'") -> None: pass
+note: This is an unsafe fix and may change runtime behavior
+
+ANN401 Dynamically typed expressions (typing.Any) are disallowed in `x`
+   --> annotation_presence.py:172:22
+    |
+170 | # A quoted annotation containing a nested string with an escape sequence
+171 | # should not cause a stack overflow.
+172 | def quoted_escape(x: "'in\x74'"): pass
+    |                      ^^^^^^^^^^
+    |
