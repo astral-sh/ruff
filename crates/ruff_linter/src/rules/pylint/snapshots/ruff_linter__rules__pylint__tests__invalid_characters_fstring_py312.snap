@@ -1,0 +1,73 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+PLE2510 [*] Invalid unescaped character backspace, use "\b" instead
+ --> invalid_characters_fstring.py:6:14
+  |
+5 | # Control char in string literal inside f-string interpolation
+6 | a = f"{'hello␈world'}"
+  |              ^
+7 |
+8 | # Control char in format spec (FStringMiddle inside interpolation)
+  |
+help: Replace with escape sequence
+3 | # The fix should be suppressed when target-version < 3.12.
+4 | 
+5 | # Control char in string literal inside f-string interpolation
+  - a = f"{'hello␈world'}"
+6 + a = f"{'hello\bworld'}"
+7 | 
+8 | # Control char in format spec (FStringMiddle inside interpolation)
+9 | a = f"{42:␈>10}"
+
+PLE2510 [*] Invalid unescaped character backspace, use "\b" instead
+  --> invalid_characters_fstring.py:9:11
+   |
+ 8 | # Control char in format spec (FStringMiddle inside interpolation)
+ 9 | a = f"{42:␈>10}"
+   |           ^
+10 |
+11 | # Control char in f-string literal part (not interpolation) - fix should always apply
+   |
+help: Replace with escape sequence
+6  | a = f"{'hello␈world'}"
+7  | 
+8  | # Control char in format spec (FStringMiddle inside interpolation)
+   - a = f"{42:␈>10}"
+9  + a = f"{42:\b>10}"
+10 | 
+11 | # Control char in f-string literal part (not interpolation) - fix should always apply
+12 | a = f"hello␈world"
+
+PLE2510 [*] Invalid unescaped character backspace, use "\b" instead
+  --> invalid_characters_fstring.py:12:12
+   |
+11 | # Control char in f-string literal part (not interpolation) - fix should always apply
+12 | a = f"hello␈world"
+   |            ^
+13 |
+14 | # Control char in regular string - fix should always apply
+   |
+help: Replace with escape sequence
+9  | a = f"{42:␈>10}"
+10 | 
+11 | # Control char in f-string literal part (not interpolation) - fix should always apply
+   - a = f"hello␈world"
+12 + a = f"hello\bworld"
+13 | 
+14 | # Control char in regular string - fix should always apply
+15 | a = "hello␈world"
+
+PLE2510 [*] Invalid unescaped character backspace, use "\b" instead
+  --> invalid_characters_fstring.py:15:11
+   |
+14 | # Control char in regular string - fix should always apply
+15 | a = "hello␈world"
+   |           ^
+   |
+help: Replace with escape sequence
+12 | a = f"hello␈world"
+13 | 
+14 | # Control char in regular string - fix should always apply
+   - a = "hello␈world"
+15 + a = "hello\bworld"

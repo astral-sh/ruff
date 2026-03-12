@@ -1,4 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::PythonVersion;
 use ruff_python_ast::token::{Token, TokenKind};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
@@ -186,7 +187,13 @@ impl Violation for InvalidCharacterZeroWidthSpace {
 }
 
 /// PLE2510, PLE2512, PLE2513, PLE2514, PLE2515
-pub(crate) fn invalid_string_characters(context: &LintContext, token: &Token, locator: &Locator) {
+pub(crate) fn invalid_string_characters(
+    context: &LintContext,
+    token: &Token,
+    locator: &Locator,
+    in_interpolation: bool,
+    target_version: PythonVersion,
+) {
     let text = match token.kind() {
         // We can't use the `value` field since it's decoded and e.g. for f-strings removed a curly
         // brace that escaped another curly brace, which would gives us wrong column information.
@@ -239,7 +246,13 @@ pub(crate) fn invalid_string_characters(context: &LintContext, token: &Token, lo
             continue;
         };
 
-        if !token.unwrap_string_flags().is_raw_string() && !is_escaped {
+        // Don't suggest a fix if the token is inside an f-string interpolation and the
+        // target version doesn't support PEP 701 (Python < 3.12), because the fix would
+        // introduce a backslash inside `{...}` which is a syntax error in older Python.
+        let can_fix = !token.unwrap_string_flags().is_raw_string()
+            && !is_escaped
+            && (!in_interpolation || target_version.supports_pep_701());
+        if can_fix {
             let edit = Edit::range_replacement(replacement.to_string(), range);
             diagnostic.set_fix(Fix::safe_edit(edit));
         }

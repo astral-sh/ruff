@@ -4,7 +4,7 @@ use std::path::Path;
 
 use ruff_notebook::CellOffsets;
 use ruff_python_ast::PySourceType;
-use ruff_python_ast::token::Tokens;
+use ruff_python_ast::token::{TokenKind, Tokens};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
 
@@ -77,8 +77,41 @@ pub(crate) fn check_tokens(
         Rule::InvalidCharacterNul,
         Rule::InvalidCharacterZeroWidthSpace,
     ]) {
+        let target_version = context
+            .settings()
+            .resolve_target_version(path)
+            .linter_version();
+        // Track f-string/t-string interpolation nesting to detect tokens inside `{...}`.
+        // Each entry is the brace depth for that f-string level (0 = literal part, >0 = interpolation).
+        let mut fstring_nesting: Vec<u32> = Vec::new();
         for token in tokens {
-            pylint::rules::invalid_string_characters(context, token, locator);
+            match token.kind() {
+                TokenKind::FStringStart | TokenKind::TStringStart => {
+                    fstring_nesting.push(0);
+                }
+                TokenKind::FStringEnd | TokenKind::TStringEnd => {
+                    fstring_nesting.pop();
+                }
+                TokenKind::Lbrace if !fstring_nesting.is_empty() => {
+                    if let Some(depth) = fstring_nesting.last_mut() {
+                        *depth += 1;
+                    }
+                }
+                TokenKind::Rbrace if !fstring_nesting.is_empty() => {
+                    if let Some(depth) = fstring_nesting.last_mut() {
+                        *depth = depth.saturating_sub(1);
+                    }
+                }
+                _ => {}
+            }
+            let in_interpolation = fstring_nesting.last().is_some_and(|&depth| depth > 0);
+            pylint::rules::invalid_string_characters(
+                context,
+                token,
+                locator,
+                in_interpolation,
+                target_version,
+            );
         }
     }
 
