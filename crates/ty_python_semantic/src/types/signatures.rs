@@ -903,17 +903,70 @@ impl<'db> Signature<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
-        Self {
-            generic_context: self
-                .generic_context
-                .map(|context| type_mapping.update_signature_generic_context(db, context)),
-            definition: self.definition,
-            parameters: self
-                .parameters
-                .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-            return_ty: self
-                .return_ty
-                .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+        if let TypeMapping::UniqueSpecialization { specialization } = type_mapping {
+            let mut specialization = specialization.borrow_mut();
+
+            // Note that unique specializations are typically applied to type context, so we only
+            // care about the standard `Callable` form here.
+            let parameters = if self.parameters.is_standard() {
+                let parameters = self.parameters.iter().map(|parameter| {
+                    if !parameter.is_positional() {
+                        return parameter.clone();
+                    }
+
+                    // Create a unique synthetic type variable representing each parameter.
+                    let name = format!("_T{}", specialization.len());
+                    let synthetic = BoundTypeVarInstance::synthetic(
+                        db,
+                        Name::new(name),
+                        TypeVarVariance::Contravariant,
+                    );
+
+                    specialization.push((synthetic, parameter.annotated_type()));
+
+                    Parameter {
+                        annotated_type: Type::TypeVar(synthetic),
+                        ..parameter.clone()
+                    }
+                });
+
+                Parameters::new(db, parameters)
+            } else {
+                self.parameters.clone()
+            };
+
+            // Create a unique synthetic type variable representing the return type.
+            let return_ty = {
+                let name = format!("_T{}", specialization.len());
+                let synthetic = BoundTypeVarInstance::synthetic(
+                    db,
+                    Name::new(name),
+                    TypeVarVariance::Covariant,
+                );
+
+                specialization.push((synthetic, self.return_ty));
+                Type::TypeVar(synthetic)
+            };
+
+            Self {
+                return_ty,
+                parameters,
+                generic_context: self.generic_context,
+                definition: self.definition,
+            }
+        } else {
+            Self {
+                generic_context: self
+                    .generic_context
+                    .map(|context| type_mapping.update_signature_generic_context(db, context)),
+                definition: self.definition,
+                parameters: self
+                    .parameters
+                    .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                return_ty: self
+                    .return_ty
+                    .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+            }
         }
     }
 
@@ -1845,6 +1898,10 @@ impl<'db> Parameters<'db> {
 
     pub(crate) const fn kind(&self) -> ParametersKind<'db> {
         self.kind
+    }
+
+    pub(crate) const fn is_standard(&self) -> bool {
+        matches!(self.kind, ParametersKind::Standard)
     }
 
     pub(crate) const fn is_gradual(&self) -> bool {
