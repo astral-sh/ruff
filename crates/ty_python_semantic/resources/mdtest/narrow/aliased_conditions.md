@@ -98,6 +98,10 @@ def _(a: A):
     else:
         reveal_type(a.x)  # revealed: int
 
+    class Inner:
+        if is_none:
+            reveal_type(a.x)  # revealed: None
+
 def _(a: A):
     is_none = a.x is None
     a.x = 1
@@ -122,6 +126,10 @@ def _(l: list[int | None]):
         reveal_type(l[0])  # revealed: None
     else:
         reveal_type(l[0])  # revealed: int
+
+    class Inner:
+        if is_none:
+            reveal_type(l[0])  # revealed: None
 
 def _(l: list[int | None], lb: list[bool]):
     # Same as above: subscript targets are not treated as aliases.

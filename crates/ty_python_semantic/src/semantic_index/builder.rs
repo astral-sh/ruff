@@ -83,41 +83,66 @@ impl Loop {
     }
 }
 
-struct ExprNameUseVisitor<'builder, 'db, 'ast> {
+struct ExprUseVisitor<'builder, 'db, 'ast> {
     builder: &'builder mut SemanticIndexBuilder<'db, 'ast>,
 }
 
-impl<'ast> ExprNameUseVisitor<'_, '_, 'ast> {
-    fn record_name_use(&mut self, name: &'ast ast::ExprName) {
-        let name_expr = ast::ExprRef::from(name);
-        let key = ExpressionNodeKey::from(name_expr);
+impl<'ast> ExprUseVisitor<'_, '_, 'ast> {
+    fn record_place_use(&mut self, expr: &'ast ast::Expr) {
+        let key = ExpressionNodeKey::from(expr);
         if self.builder.current_ast_ids().has_use(key) {
             return;
         }
-        let place_expr = PlaceExpr::from_expr_name(name);
+
+        let Some(mut place_expr) = PlaceExpr::try_from_expr(expr) else {
+            return;
+        };
+
+        if let Some(method_scope_id) = self.builder.is_method_or_eagerly_executed_in_method() {
+            if let PlaceExpr::Member(member) = &mut place_expr
+                && member.is_instance_attribute_candidate()
+            {
+                let accessed_object_refers_to_first_parameter = self
+                    .builder
+                    .current_first_parameter_name
+                    .is_some_and(|first| {
+                        member.symbol_name() == first
+                            && !self.builder.is_symbol_bound_in_intermediate_eager_scopes(
+                                first,
+                                method_scope_id,
+                            )
+                    });
+
+                if accessed_object_refers_to_first_parameter {
+                    member.mark_instance_attribute();
+                }
+            }
+        }
+
         let place_id = self.builder.add_place(place_expr);
         if let ScopedPlaceId::Symbol(symbol_id) = place_id {
             self.builder.mark_symbol_used(symbol_id);
         }
-        let use_id = self.builder.current_ast_ids().record_use(name_expr);
-        let node_key = NodeKey::from_node(name);
+        let use_id = self.builder.current_ast_ids().record_use(expr);
+        let node_key = NodeKey::from_node(expr);
         self.builder
             .current_use_def_map_mut()
             .record_use(place_id, use_id, node_key);
     }
 }
 
-impl<'ast> Visitor<'ast> for ExprNameUseVisitor<'_, '_, 'ast> {
+impl<'ast> Visitor<'ast> for ExprUseVisitor<'_, '_, 'ast> {
     fn visit_expr(&mut self, expr: &'ast ast::Expr) {
         match expr {
-            ast::Expr::Name(name) => self.record_name_use(name),
+            ast::Expr::Name(_) | ast::Expr::Attribute(_) | ast::Expr::Subscript(_) => {
+                self.record_place_use(expr);
+                walk_expr(self, expr);
+            }
             ast::Expr::Compare(_)
             | ast::Expr::Call(_)
             | ast::Expr::UnaryOp(_)
             | ast::Expr::BoolOp(_)
-            | ast::Expr::Tuple(_)
-            | ast::Expr::Attribute(_)
-            | ast::Expr::Subscript(_) => walk_expr(self, expr),
+            | ast::Expr::Tuple(_) => walk_expr(self, expr),
             _ => {}
         }
     }
@@ -1365,7 +1390,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     /// in a nested eager scope. The type inference builder expects all Name references to
     /// have use IDs registered in the scope where the expression is evaluated.
     fn register_expr_name_uses(&mut self, expr: &'ast ast::Expr) {
-        ExprNameUseVisitor { builder: self }.visit_expr(expr);
+        ExprUseVisitor { builder: self }.visit_expr(expr);
     }
 
     /// Negates the given predicate and then adds it as a narrowing constraint to the places
