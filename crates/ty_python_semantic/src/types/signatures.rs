@@ -1211,9 +1211,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 _ => {}
             }
 
-            !result
-                .intersect(db, self.constraints, self.check_type_pair(db, type1, type2))
-                .is_never_satisfied(db)
+            result.intersect(
+                db,
+                self.constraints,
+                &self.check_type_pair(db, type1, type2),
+            );
+            !result.is_never_satisfied(db)
         };
 
         // Return types are covariant.
@@ -1250,14 +1253,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         if source.parameters.is_gradual() || target.parameters.is_gradual() {
             return match self.relation {
                 TypeRelation::Subtyping | TypeRelation::SubtypingAssuming => self.never(),
-                TypeRelation::Redundancy { .. } => result.intersect(
-                    db,
-                    self.constraints,
+                TypeRelation::Redundancy { .. } => result.and(db, self.constraints, || {
                     ConstraintSet::from_bool(
                         self.constraints,
                         source.parameters.is_gradual() && target.parameters.is_gradual(),
-                    ),
-                ),
+                    )
+                }),
                 TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability => result,
             };
         }
@@ -1277,7 +1278,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         Type::TypeVar(target_tvar),
                         Type::TypeVar(target_tvar),
                     );
-                    result.intersect(db, self.constraints, param_spec_matches);
+                    result.intersect(db, self.constraints, &param_spec_matches);
                     return result;
                 }
 
@@ -1298,7 +1299,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         Type::Never,
                         upper,
                     );
-                    result.intersect(db, self.constraints, param_spec_matches);
+                    result.intersect(db, self.constraints, &param_spec_matches);
                     return result;
                 }
 
@@ -1319,7 +1320,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         lower,
                         Type::object(),
                     );
-                    result.intersect(db, self.constraints, param_spec_matches);
+                    result.intersect(db, self.constraints, &param_spec_matches);
                     return result;
                 }
 

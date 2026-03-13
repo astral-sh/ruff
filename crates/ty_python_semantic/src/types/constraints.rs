@@ -238,7 +238,7 @@ pub struct OwnedConstraintSet<'db> {
 /// [`or`][Self::or] in a consistent order.
 ///
 /// [POPL2015]: https://doi.org/10.1145/2676726.2676991
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct ConstraintSet<'db, 'c> {
     /// The BDD representing this constraint set
     node: NodeId,
@@ -291,17 +291,17 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
 
     /// Verifies that this constraint set was created by `builder`
     #[track_caller]
-    fn verify_builder(self, builder: &'c ConstraintSetBuilder<'db>) {
+    fn verify_builder(&self, builder: &'c ConstraintSetBuilder<'db>) {
         debug_assert!(std::ptr::eq(self.builder, builder));
     }
 
     /// Returns whether this constraint set never holds
-    pub(crate) fn is_never_satisfied(self, db: &'db dyn Db) -> bool {
+    pub(crate) fn is_never_satisfied(&self, db: &'db dyn Db) -> bool {
         self.node.is_never_satisfied(db, self.builder)
     }
 
     /// Returns whether this constraint set always holds
-    pub(crate) fn is_always_satisfied(self, db: &'db dyn Db) -> bool {
+    pub(crate) fn is_always_satisfied(&self, db: &'db dyn Db) -> bool {
         self.node.is_always_satisfied(db, self.builder)
     }
 
@@ -315,7 +315,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
     /// `(T ≤ list[U]) ∧ (U ≤ list[T])` does not violate our lower/upper bounds restrictions, since
     /// neither bound _is_ a typevar. And it's not something we can create a specialization from,
     /// since we would endlessly substitute until we stack overflow.
-    pub(crate) fn is_cyclic(self, db: &'db dyn Db) -> bool {
+    pub(crate) fn is_cyclic(&self, db: &'db dyn Db) -> bool {
         #[derive(Default)]
         struct CollectReachability<'db> {
             reachable_typevars: RefCell<FxHashSet<BoundTypeVarIdentity<'db>>>,
@@ -418,7 +418,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
     /// constraints in this constraint set hold. Panics if neither of the types being compared are
     /// a typevar. (That case is handled by `Type::has_relation_to`.)
     pub(crate) fn implies_subtype_of(
-        self,
+        &self,
         db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
         lhs: Type<'db>,
@@ -460,11 +460,10 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         &mut self,
         _db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
-        other: Self,
-    ) -> Self {
+        other: &Self,
+    ) {
         self.verify_builder(builder);
         self.node = self.node.or_with_offset(builder, other.node);
-        *self
     }
 
     /// Updates this constraint set to hold the intersection of itself and another constraint set.
@@ -475,11 +474,10 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         &mut self,
         _db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
-        other: Self,
-    ) -> Self {
+        other: &Self,
+    ) {
         self.verify_builder(builder);
         self.node = self.node.and_with_offset(builder, other.node);
-        *self
     }
 
     /// Returns the negation of this constraint set.
@@ -504,7 +502,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         if !self.is_never_satisfied(db) {
             let other = other();
             other.verify_builder(builder);
-            self.intersect(db, builder, other);
+            self.intersect(db, builder, &other);
         }
         self
     }
@@ -525,7 +523,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         if !self.is_always_satisfied(db) {
             let other = other();
             other.verify_builder(builder);
-            self.union(db, builder, other);
+            self.union(db, builder, &other);
         }
         self
     }
@@ -551,7 +549,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         self,
         _db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
-        other: Self,
+        other: &Self,
     ) -> Self {
         self.verify_builder(builder);
         Self::from_node(builder, self.node.iff_with_offset(builder, other.node))

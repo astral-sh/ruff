@@ -759,7 +759,7 @@ impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
         left: BoundSuperType<'db>,
         right: BoundSuperType<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        let mut class_equivalence = match (left.pivot_class(db), right.pivot_class(db)) {
+        let class_equivalence = match (left.pivot_class(db), right.pivot_class(db)) {
             (ClassBase::Class(left), ClassBase::Class(right)) => {
                 self.check_type_pair(db, Type::from(left), Type::from(right))
             }
@@ -826,6 +826,6 @@ impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
                 self.never()
             }
         };
-        class_equivalence.intersect(db, self.constraints, owner_equivalence)
+        class_equivalence.and(db, self.constraints, || owner_equivalence)
     }
 }
