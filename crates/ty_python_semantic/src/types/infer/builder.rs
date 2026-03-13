@@ -7088,6 +7088,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         );
 
         // Validate `TypedDict` constructor calls after argument type inference.
+        //
+        // Dict-literal positional args (e.g., `TD({"a": 1})`) are excluded here because the
+        // synthesized `__new__` mapping overload already handles them via normal callable checking.
         if let Some(typed_dict) = typed_dict_constructor
             && !has_positional_dict_literal
             && typed_dict_constructor_shape_supported
@@ -7103,6 +7106,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let mut bindings = match bindings_result {
             Ok(()) => bindings,
+            // For TypedDict constructors with supported call shapes (keyword-only or single
+            // positional mapping), suppress binding errors from the synthesized `__new__` — the
+            // TypedDict-specific validator above produces more precise diagnostics.
             Err(CallErrorKind::BindingError) if typed_dict_constructor_shape_supported => {
                 return bindings.return_type(self.db());
             }

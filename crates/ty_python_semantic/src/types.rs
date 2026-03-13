@@ -2181,7 +2181,12 @@ impl<'db> Type<'db> {
             }
 
             Type::GenericAlias(alias) if alias.is_typed_dict(db) => {
-                Some(alias.origin(db).typed_dict_member(db, None, name, policy))
+                Some(alias.origin(db).typed_dict_member(
+                    db,
+                    Some(alias.specialization(db)),
+                    name,
+                    policy,
+                ))
             }
 
             Type::GenericAlias(alias) => {
@@ -4219,60 +4224,8 @@ impl<'db> Type<'db> {
                 binding
             })
         }
-        fn typed_dict_constructor_bindings<'db>(
-            db: &'db dyn Db,
-            owner: Type<'db>,
-            signature_class: ClassType<'db>,
-            constructor_instance_ty: Type<'db>,
-        ) -> Bindings<'db> {
-            let (class_literal, class_specialization) =
-                signature_class.class_literal_and_specialization(db);
-            let ClassLiteral::Static(class_literal) = class_literal else {
-                return Binding::single(
-                    owner,
-                    Signature::new(Parameters::gradual_form(), constructor_instance_ty),
-                )
-                .into();
-            };
 
-            let typed_dict = TypedDictType::new(signature_class);
-            let fields = class_literal.fields(
-                db,
-                class_specialization,
-                class::CodeGeneratorKind::TypedDict,
-            );
-
-            let keyword_signature = Signature::new(
-                Parameters::new(
-                    db,
-                    fields.iter().map(|(name, field)| {
-                        let parameter = Parameter::keyword_only(name.clone())
-                            .with_annotated_type(field.declared_ty);
-                        if field.is_required() {
-                            parameter
-                        } else {
-                            parameter.with_default_type(field.declared_ty)
-                        }
-                    }),
-                ),
-                constructor_instance_ty,
-            );
-
-            let positional_signature = Signature::new(
-                Parameters::new(
-                    db,
-                    [
-                        Parameter::positional_only(Some(Name::new_static("mapping")))
-                            .with_annotated_type(Type::TypedDict(typed_dict)),
-                    ],
-                ),
-                constructor_instance_ty,
-            );
-
-            CallableBinding::from_overloads(owner, [keyword_signature, positional_signature]).into()
-        }
-
-        let (class_literal, class_specialization) = class.class_literal_and_specialization(db);
+        let (class_literal, _) = class.class_literal_and_specialization(db);
         let class_generic_context = class_literal.generic_context(db);
 
         let self_type = match self {
@@ -4307,20 +4260,6 @@ impl<'db> Type<'db> {
             )
             .into()
         };
-
-        if class_literal.is_typed_dict(db)
-            || class::CodeGeneratorKind::TypedDict.matches(db, class_literal, class_specialization)
-        {
-            let signature_class = self_type.to_class_type(db).unwrap_or(class);
-            return typed_dict_constructor_bindings(
-                db,
-                self,
-                signature_class,
-                constructor_instance_ty,
-            )
-            .with_generic_context(db, class_generic_context)
-            .with_constructor_instance_type(constructor_instance_ty);
-        }
 
         // These cases are checked in `Type::known_class_literal_bindings`, but currently we only
         // call that for `ClassLiteral` types, so we need a permissive fallback here. TODO Ideally
