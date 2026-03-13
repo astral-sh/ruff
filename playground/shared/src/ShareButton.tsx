@@ -7,6 +7,7 @@ import {
   MenuTrigger,
   Popover,
   Pressable,
+  Separator,
 } from "react-aria-components";
 import AstralButton from "./AstralButton";
 
@@ -17,10 +18,12 @@ export default function ShareButton({
   onShare,
   onCopyMarkdownLink,
   onCopyMarkdown,
+  onDownload,
 }: {
   onShare: () => Promise<void>;
   onCopyMarkdownLink: () => Promise<void>;
   onCopyMarkdown: () => Promise<void>;
+  onDownload(): void;
 }) {
   const [status, dispatch, isPending] = useActionState(
     async (_previousStatus: ShareStatus, action: ShareAction) => {
@@ -101,6 +104,8 @@ export default function ShareButton({
           >
             Markdown
           </ShareMenuItem>
+          <Separator className="my-1 border-t border-gray-200 dark:border-gray-700" />
+          <ShareMenuItem onAction={onDownload}>Download ZIP</ShareMenuItem>
         </Menu>
       </Popover>
     </MenuTrigger>

@@ -1,6 +1,6 @@
 import ruffSchema from "../../../../ruff.schema.json";
 import { useCallback, useMemo, useRef, useState } from "react";
-import { Header, useTheme, setupMonaco } from "shared";
+import { Header, useTheme, setupMonaco, downloadZip } from "shared";
 import {
   copyAsMarkdown,
   copyAsMarkdownLink,
@@ -42,6 +42,24 @@ export default function Chrome() {
       return;
     }
     await copyAsMarkdown(settings, pythonSource);
+  }, [pythonSource, settings]);
+
+  const handleDownload = useCallback(async () => {
+    if (settings == null || pythonSource == null) {
+      return;
+    }
+
+    const toml = await import("smol-toml");
+
+    const files: { [name: string]: string } = { "main.py": pythonSource };
+
+    try {
+      files["ruff.toml"] = toml.stringify(JSON.parse(settings));
+    } catch {
+      files["ruff.json"] = settings;
+    }
+
+    await downloadZip(files, "ruff-playground");
   }, [pythonSource, settings]);
 
   if (initPromise.current == null) {
@@ -110,6 +128,7 @@ export default function Chrome() {
         onShare={handleShare}
         onCopyMarkdownLink={handleCopyMarkdownLink}
         onCopyMarkdown={handleCopyMarkdown}
+        onDownload={handleDownload}
         onReset={handleResetClicked}
       />
 

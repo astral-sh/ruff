@@ -9,7 +9,13 @@ import {
   useRef,
   useState,
 } from "react";
-import { ErrorMessage, Header, setupMonaco, useTheme } from "shared";
+import {
+  ErrorMessage,
+  Header,
+  setupMonaco,
+  useTheme,
+  downloadZip,
+} from "shared";
 import { FileHandle, PositionEncoding, Workspace } from "ty_wasm";
 import {
   copyAsMarkdown,
@@ -18,7 +24,6 @@ import {
   persistLocal,
   restore,
 } from "./Editor/persist";
-import { downloadZip } from "./Editor/downloadZip";
 import { loader } from "@monaco-editor/react";
 import tySchema from "../../../ty.schema.json";
 import Chrome, { formatError } from "./Editor/Chrome";
@@ -85,7 +90,22 @@ export default function Playground() {
     const serialized = serializeFiles(files);
 
     if (serialized != null) {
-      await downloadZip(serialized.files);
+      const downloadFiles = { ...serialized.files };
+
+      if (SETTINGS_FILE_NAME in downloadFiles) {
+        try {
+          const toml = await import("smol-toml");
+          const tomlContent = toml.stringify(
+            JSON.parse(downloadFiles[SETTINGS_FILE_NAME]),
+          );
+          delete downloadFiles[SETTINGS_FILE_NAME];
+          downloadFiles["ty.toml"] = tomlContent;
+        } catch {
+          // Keep the original JSON file if conversion fails.
+        }
+      }
+
+      await downloadZip(downloadFiles, "ty-playground");
     }
   }, [files]);
   const handleFileAdded = useCallback((workspace: Workspace, name: string) => {

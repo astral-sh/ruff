@@ -4,9 +4,10 @@ import { strToU8, zipSync } from "fflate";
  * Creates a ZIP archive from the given files and triggers a browser download.
  * The filename includes a short content hash for uniqueness.
  */
-export async function downloadZip(files: {
-  [name: string]: string;
-}): Promise<void> {
+export async function downloadZip(
+  files: { [name: string]: string },
+  prefix = "playground",
+): Promise<void> {
   const data: { [name: string]: Uint8Array } = {};
 
   for (const [name, content] of Object.entries(files)) {
@@ -24,7 +25,7 @@ export async function downloadZip(files: {
 
   const a = document.createElement("a");
   a.href = url;
-  a.download = `ty-playground-${hash}.zip`;
+  a.download = `${prefix}-${hash}.zip`;
   a.click();
 
   URL.revokeObjectURL(url);
