@@ -1,6 +1,6 @@
 //! Cycle detection for recursive types.
 //!
-//! The visitors here ([`TypeTransformer`] and [`PairVisitor`]) are used in methods that
+//! The visitors here ([`TypeTransformer`] and [`CycleDetector`]) are used in methods that
 //! recursively visit types to transform them (e.g. [`Type::apply_type_mapping`]) or to
 //! decide a relation between a pair of types (e.g. [`Type::has_relation_to`]).
 //!
@@ -58,10 +58,8 @@ impl<Tag> Default for TypeTransformer<'_, Tag> {
     }
 }
 
-pub(crate) type PairVisitor<'db, Tag, C> = CycleDetector<Tag, (Type<'db>, Type<'db>), C>;
-
 #[derive(Debug)]
-pub struct CycleDetector<Tag, T, R, Extra = ()> {
+pub struct CycleDetector<Tag, T, R> {
     /// If the type we're visiting is present in `seen`, it indicates that we've hit a cycle (due
     /// to a recursive type); we need to immediately short circuit the whole operation and return
     /// the fallback value. That's why we pop items off the end of `seen` after we've visited them.
@@ -81,37 +79,32 @@ pub struct CycleDetector<Tag, T, R, Extra = ()> {
 
     fallback: R,
 
-    pub(crate) extra: Extra,
-
     _tag: PhantomData<Tag>,
 }
 
-impl<Tag, T: Hash + Eq + Clone, R: Clone, Extra: Default> CycleDetector<Tag, T, R, Extra> {
-    pub fn new(fallback: R) -> Self {
-        Self::with_extra(fallback, Extra::default())
-    }
-}
-
-impl<Tag, T: Hash + Eq + Clone, R: Clone, Extra> CycleDetector<Tag, T, R, Extra> {
-    pub(crate) fn with_extra(fallback: R, extra: Extra) -> Self {
-        CycleDetector {
+impl<Tag, T: Hash + Eq + Clone, R: Clone> CycleDetector<Tag, T, R> {
+    pub(crate) fn new(fallback: R) -> Self {
+        Self {
             seen: RefCell::new(FxIndexSet::default()),
             cache: RefCell::new(FxHashMap::default()),
             depth: Cell::new(0),
             fallback,
-            extra,
             _tag: PhantomData,
         }
     }
 
     pub fn visit(&self, item: T, func: impl FnOnce() -> R) -> R {
+        self.visit_with_fallback(item, &self.fallback, func)
+    }
+
+    pub fn visit_with_fallback(&self, item: T, fallback: &R, func: impl FnOnce() -> R) -> R {
         if let Some(val) = self.cache.borrow().get(&item) {
             return val.clone();
         }
 
         // We hit a cycle
         if !self.seen.borrow_mut().insert(item.clone()) {
-            return self.fallback.clone();
+            return fallback.clone();
         }
 
         // Check depth limit to prevent stack overflow from recursive generic types
@@ -119,7 +112,7 @@ impl<Tag, T: Hash + Eq + Clone, R: Clone, Extra> CycleDetector<Tag, T, R, Extra>
         let current_depth = self.depth.get();
         if current_depth >= MAX_RECURSION_DEPTH {
             self.seen.borrow_mut().pop();
-            return self.fallback.clone();
+            return fallback.clone();
         }
         self.depth.set(current_depth + 1);
 
