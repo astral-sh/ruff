@@ -24,7 +24,6 @@ ruff_python_formatter = { workspace = true, optional = true }
 ruff_python_parser = { workspace = true, optional = true }
 ruff_python_trivia = { workspace = true, optional = true }
 ty_project = { workspace = true, optional = true }
-ty_python_semantic = { workspace = true, optional = true }
 
 anyhow = { workspace = true }
 codspeed-criterion-compat = { workspace = true, default-features = false, optional = true }
