@@ -31,7 +31,7 @@ use thiserror::Error;
 use ty_python_semantic::lint::RuleSelection;
 use ty_python_semantic::types::check_types;
 use ty_python_semantic::{
-    FailStrategy, MisconfigurationStrategy, add_inferred_python_version_hint_to_diagnostic,
+    FallibleStrategy, MisconfigurationStrategy, add_inferred_python_version_hint_to_diagnostic,
 };
 
 mod db;
@@ -247,7 +247,7 @@ impl Project {
         if &metadata != self.metadata(db) {
             match metadata
                 .options()
-                .to_settings(db, metadata.root(), &FailStrategy)
+                .to_settings(db, metadata.root(), &FallibleStrategy)
             {
                 Ok((settings, settings_diagnostics)) => {
                     if self.settings(db) != &settings {

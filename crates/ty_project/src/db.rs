@@ -554,7 +554,7 @@ pub(crate) mod tests {
     use ty_module_resolver::SearchPathSettings;
     use ty_python_semantic::lint::{LintRegistry, RuleSelection};
     use ty_python_semantic::{
-        AnalysisSettings, FailStrategy, Program, ProgramSettings, PythonPlatform,
+        AnalysisSettings, FallibleStrategy, Program, ProgramSettings, PythonPlatform,
         PythonVersionWithSource,
     };
 
@@ -592,7 +592,7 @@ pub(crate) mod tests {
                 project: None,
             };
 
-            let project = Project::from_metadata(&db, project, &FailStrategy).unwrap();
+            let project = Project::from_metadata(&db, project, &FallibleStrategy).unwrap();
             db.project = Some(project);
             db
         }
@@ -608,7 +608,7 @@ pub(crate) mod tests {
             let root = self.project().root(self);
 
             let search_paths = SearchPathSettings::new(vec![root.to_path_buf()])
-                .to_search_paths(self.system(), self.vendored(), &FailStrategy)
+                .to_search_paths(self.system(), self.vendored(), &FallibleStrategy)
                 .expect("Valid search path settings");
 
             Program::from_settings(

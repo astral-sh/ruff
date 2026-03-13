@@ -11,7 +11,7 @@ use ruff_db::files::{File, FileRootKind, Files};
 use ruff_db::system::SystemPath;
 use rustc_hash::FxHashSet;
 use salsa::Setter;
-use ty_python_semantic::{FailStrategy, Program};
+use ty_python_semantic::{FallibleStrategy, Program};
 
 /// Represents the result of applying changes to the project database.
 pub struct ChangeResult {
@@ -266,7 +266,7 @@ impl ProjectDatabase {
                     match metadata.to_program_settings(
                         self.system(),
                         self.vendored(),
-                        &FailStrategy,
+                        &FallibleStrategy,
                     ) {
                         Ok(program_settings) => {
                             let program = Program::get(self);
@@ -283,7 +283,7 @@ impl ProjectDatabase {
                         tracing::debug!("Reloading project after structural change");
                         project.reload(self, metadata);
                     } else {
-                        match Project::from_metadata(self, metadata, &FailStrategy) {
+                        match Project::from_metadata(self, metadata, &FallibleStrategy) {
                             Ok(new_project) => {
                                 tracing::debug!("Replace project after structural change");
                                 project = new_project;
@@ -314,7 +314,7 @@ impl ProjectDatabase {
             match project.metadata(self).to_program_settings(
                 self.system(),
                 self.vendored(),
-                &FailStrategy,
+                &FallibleStrategy,
             ) {
                 Ok(program_settings) => {
                     program.update_from_settings(self, program_settings);

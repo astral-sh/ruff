@@ -23,8 +23,8 @@ use ty_module_resolver::{
 use ty_python_semantic::pull_types::pull_types;
 use ty_python_semantic::types::{UNDEFINED_REVEAL, check_types};
 use ty_python_semantic::{
-    FailStrategy, Program, ProgramSettings, PythonEnvironment, PythonPlatform, PythonVersionSource,
-    PythonVersionWithSource, SysPrefixPathOrigin,
+    FallibleStrategy, Program, ProgramSettings, PythonEnvironment, PythonPlatform,
+    PythonVersionSource, PythonVersionWithSource, SysPrefixPathOrigin,
 };
 
 mod assertion;
@@ -463,7 +463,7 @@ fn run_test(
             site_packages_paths,
             real_stdlib_path: None,
         }
-        .to_search_paths(db.system(), db.vendored(), &FailStrategy)
+        .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
         .expect("Failed to resolve search path settings"),
     };
 

@@ -11,7 +11,7 @@ use crate::suppression::{
 pub use db::Db;
 pub use diagnostic::add_inferred_python_version_hint_to_diagnostic;
 pub use program::{
-    FailStrategy, MisconfigurationStrategy, Never, Program, ProgramSettings, UseDefaultStrategy,
+    FallibleStrategy, MisconfigurationStrategy, Program, ProgramSettings, UseDefaultStrategy,
 };
 pub use python_platform::PythonPlatform;
 use rustc_hash::FxHasher;

@@ -2,7 +2,7 @@ use std::convert::Infallible;
 
 /// Generic handling of two possible approaches to an Error:
 ///
-/// * [`FailStrategy`]: The code should simply fail
+/// * [`FallibleStrategy`]: The code should simply fail
 /// * [`UseDefaultStrategy`]: The code should apply default values and never fail
 ///
 /// Any function that wants to be made generic over these approaches should be changed thusly.
@@ -35,7 +35,7 @@ use std::convert::Infallible;
 /// The key trick is instead of returning `Result<T, E>` your function should
 /// return `Result<T, Strategy::Error<E>>`. Which simplifies to:
 ///
-/// * [`FailStrategy`]: `Result<T, E>`
+/// * [`FallibleStrategy`]: `Result<T, E>`
 /// * [`UseDefaultStrategy`]: `Result<T, Infallible>` ~= `T`
 ///
 /// Notably, if your function returns `Result<T, Strategy::Error<E>>` you will
@@ -48,7 +48,7 @@ use std::convert::Infallible;
 /// to write `let Ok(val) = do_thing(&UseDefaultStrategy);` instead of having to
 /// write an `unwrap()`.
 pub trait MisconfigurationStrategy {
-    /// * [`FailStrategy`][]: `E`
+    /// * [`FallibleStrategy`][]: `E`
     /// * [`UseDefaultStrategy`][]: [`Infallible`]
     type Error<E>;
 
@@ -57,7 +57,7 @@ pub trait MisconfigurationStrategy {
     /// If [`UseDefaultStrategy`], on `Err` this will call `fallback_fn` to compute
     /// a default value and always return `Ok`.
     ///
-    /// If [`FailStrategy`] this is a no-op and will return the Result.
+    /// If [`FallibleStrategy`] this is a no-op and will return the Result.
     fn fallback<T, E>(
         &self,
         result: Result<T, E>,
@@ -69,7 +69,7 @@ pub trait MisconfigurationStrategy {
     /// If [`UseDefaultStrategy`], this will call `fallback_fn` to report an issue
     /// (i.e. you can invoke `tracing::debug!` or something) and then return `None`.
     ///
-    /// If [`FailStrategy`] this is a no-op and will return the Result (but `Ok` => `Ok(Some)`).
+    /// If [`FallibleStrategy`] this is a no-op and will return the Result (but `Ok` => `Ok(Some)`).
     fn fallback_opt<T, E>(
         &self,
         result: Result<T, E>,
@@ -145,9 +145,9 @@ impl MisconfigurationStrategy for UseDefaultStrategy {
 /// A [`MisconfigurationStrategy`] that happily fails whenever
 /// an important `Err` is encountered.
 #[derive(Default, Copy, Clone, Debug, PartialEq, Eq)]
-pub struct FailStrategy;
+pub struct FallibleStrategy;
 
-impl MisconfigurationStrategy for FailStrategy {
+impl MisconfigurationStrategy for FallibleStrategy {
     type Error<E> = E;
 
     fn fallback<T, E>(

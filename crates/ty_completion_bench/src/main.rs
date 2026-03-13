@@ -18,7 +18,7 @@ use ty_project::metadata::Options;
 use ty_project::metadata::options::EnvironmentOptions;
 use ty_project::metadata::value::RelativePathBuf;
 use ty_project::{ProjectDatabase, ProjectMetadata};
-use ty_python_semantic::FailStrategy;
+use ty_python_semantic::FallibleStrategy;
 
 #[derive(Debug, clap::Parser)]
 #[command(
@@ -100,7 +100,7 @@ fn main() -> anyhow::Result<ExitCode> {
         ..Options::default()
     });
     project_metadata.apply_configuration_files(&system)?;
-    let db = ProjectDatabase::new(project_metadata, system, &FailStrategy)?;
+    let db = ProjectDatabase::new(project_metadata, system, &FallibleStrategy)?;
 
     let start = std::time::Instant::now();
     let mut completions = get_completions(&db, &args.file, offset)?;

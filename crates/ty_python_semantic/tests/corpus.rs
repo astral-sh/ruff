@@ -11,8 +11,8 @@ use ty_module_resolver::SearchPathSettings;
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
 use ty_python_semantic::pull_types::pull_types;
 use ty_python_semantic::{
-    AnalysisSettings, FailStrategy, Program, ProgramSettings, PythonPlatform, PythonVersionSource,
-    PythonVersionWithSource, default_lint_registry,
+    AnalysisSettings, FallibleStrategy, Program, ProgramSettings, PythonPlatform,
+    PythonVersionSource, PythonVersionWithSource, default_lint_registry,
 };
 
 use test_case::test_case;
@@ -205,7 +205,7 @@ impl CorpusDb {
                 },
                 python_platform: PythonPlatform::default(),
                 search_paths: SearchPathSettings::new(vec![])
-                    .to_search_paths(db.system(), db.vendored(), &FailStrategy)
+                    .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
                     .unwrap(),
             },
         );

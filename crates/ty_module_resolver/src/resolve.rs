@@ -1810,7 +1810,7 @@ mod tests {
     use crate::db::tests::TestDb;
     use crate::module::ModuleKind;
     use crate::module_name::ModuleName;
-    use crate::strategy::FailStrategy;
+    use crate::strategy::FallibleStrategy;
     use crate::testing::{FileSpec, MockedTypeshed, TestCase, TestCaseBuilder};
 
     use super::*;
@@ -2371,7 +2371,7 @@ mod tests {
                 site_packages_paths: vec![site_packages],
                 ..SearchPathSettings::empty()
             }
-            .to_search_paths(db.system(), db.vendored(), &FailStrategy)
+            .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
             .expect("Valid search path settings"),
         );
 
@@ -2910,7 +2910,7 @@ not_a_directory
                 site_packages_paths: vec![venv_site_packages, system_site_packages],
                 ..SearchPathSettings::new(vec![SystemPathBuf::from("/src")])
             }
-            .to_search_paths(db.system(), db.vendored(), &FailStrategy)
+            .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
             .expect("Valid search path settings"),
         );
 
@@ -2978,7 +2978,7 @@ not_a_directory
 
         db.set_search_paths(
             SearchPathSettings::new(vec![src])
-                .to_search_paths(db.system(), db.vendored(), &FailStrategy)
+                .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
                 .expect("Valid search path settings"),
         );
 
@@ -3016,7 +3016,7 @@ not_a_directory
             site_packages_paths: vec![site_packages.clone()],
             ..SearchPathSettings::empty()
         }
-        .to_search_paths(db.system(), db.vendored(), &FailStrategy)
+        .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
         .expect("Valid search path settings");
         db.set_search_paths(search_paths);
 

@@ -9,7 +9,7 @@ use ty_module_resolver::SearchPaths;
 use ty_site_packages::PythonVersionWithSource;
 
 // Re-export the misconfiguration strategy types from ty_module_resolver.
-pub use ty_module_resolver::{FailStrategy, MisconfigurationStrategy, UseDefaultStrategy};
+pub use ty_module_resolver::{FallibleStrategy, MisconfigurationStrategy, UseDefaultStrategy};
 
 #[salsa::input(singleton, heap_size=ruff_memory_usage::heap_size)]
 pub struct Program {

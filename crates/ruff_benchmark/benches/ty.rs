@@ -1,7 +1,7 @@
 #![allow(clippy::disallowed_names)]
 use ruff_benchmark::criterion;
 use ruff_benchmark::real_world_projects::{InstalledProject, RealWorldProject};
-use ty_python_semantic::FailStrategy;
+use ty_python_semantic::FallibleStrategy;
 
 use std::fmt::Write;
 use std::ops::Range;
@@ -93,7 +93,7 @@ fn setup_tomllib_case() -> Case {
         ..Options::default()
     });
 
-    let mut db = ProjectDatabase::new(metadata, system, &FailStrategy).unwrap();
+    let mut db = ProjectDatabase::new(metadata, system, &FallibleStrategy).unwrap();
     let mut tomllib_files = FxHashSet::default();
     let mut re: Option<File> = None;
 
@@ -240,7 +240,7 @@ fn setup_micro_case(code: &str) -> Case {
         ..Options::default()
     });
 
-    let mut db = ProjectDatabase::new(metadata, system, &FailStrategy).unwrap();
+    let mut db = ProjectDatabase::new(metadata, system, &FallibleStrategy).unwrap();
     let file = system_path_to_file(&db, SystemPathBuf::from(file_path)).unwrap();
 
     db.set_check_mode(CheckMode::OpenFiles);
@@ -813,7 +813,7 @@ impl<'a> ProjectBenchmark<'a> {
             ..Options::default()
         });
 
-        let mut db = ProjectDatabase::new(metadata, system, &FailStrategy).unwrap();
+        let mut db = ProjectDatabase::new(metadata, system, &FallibleStrategy).unwrap();
 
         db.project().set_included_paths(
             &mut db,

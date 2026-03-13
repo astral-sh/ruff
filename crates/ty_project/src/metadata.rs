@@ -5,7 +5,7 @@ use ruff_python_ast::name::Name;
 use std::sync::Arc;
 use thiserror::Error;
 use ty_combine::Combine;
-use ty_python_semantic::{FailStrategy, MisconfigurationStrategy, ProgramSettings};
+use ty_python_semantic::{FallibleStrategy, MisconfigurationStrategy, ProgramSettings};
 
 use crate::metadata::options::ProjectOptionsOverrides;
 use crate::metadata::pyproject::{Project, PyProject, PyProjectError, ResolveRequiresPythonError};
@@ -83,7 +83,7 @@ impl ProjectMetadata {
             pyproject.tool.and_then(|tool| tool.ty).unwrap_or_default(),
             root,
             pyproject.project.as_ref(),
-            &FailStrategy,
+            &FallibleStrategy,
         )
     }
 
@@ -203,7 +203,7 @@ impl ProjectMetadata {
                     pyproject
                         .as_ref()
                         .and_then(|pyproject| pyproject.project.as_ref()),
-                    &FailStrategy,
+                    &FallibleStrategy,
                 )
                 .map_err(|err| {
                     ProjectMetadataError::InvalidRequiresPythonConstraint {
