@@ -1,3 +1,4 @@
+use bitflags::bitflags;
 use compact_str::CompactString;
 use ruff_python_ast::name::Name;
 
@@ -23,54 +24,48 @@ enum LiteralValueTypeInner<'db> {
     LiteralString(LiteralFlags),
 }
 
-/// Bit-packed flags for promotability and recursive-definition status.
-///
-/// Stored in each [`LiteralValueTypeInner`] variant, fitting into the
-/// discriminant's padding so that the enum size is unchanged.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
-struct LiteralFlags(u8);
+bitflags! {
+    /// Bit-packed flags for promotability and recursive-definition status.
+    ///
+    /// Stored in each [`LiteralValueTypeInner`] variant, fitting into the
+    /// discriminant's padding so that the enum size is unchanged.
+    #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, salsa::Update)]
+    struct LiteralFlags: u8 {
+        const PROMOTABLE = 1 << 0;
+        const RECURSIVELY_DEFINED = 1 << 1;
+    }
+}
+
+impl get_size2::GetSize for LiteralFlags {}
 
 impl LiteralFlags {
-    const PROMOTABLE: u8 = 1 << 0;
-    const RECURSIVELY_DEFINED: u8 = 1 << 1;
-
-    const fn new(promotable: bool, recursively_defined: RecursivelyDefined) -> Self {
-        let mut bits = 0;
-        if promotable {
-            bits |= Self::PROMOTABLE;
-        }
-        if recursively_defined.is_yes() {
-            bits |= Self::RECURSIVELY_DEFINED;
-        }
-        Self(bits)
+    fn new(promotable: bool, recursively_defined: RecursivelyDefined) -> Self {
+        let mut flags = Self::empty();
+        flags.set(Self::PROMOTABLE, promotable);
+        flags.set(Self::RECURSIVELY_DEFINED, recursively_defined.is_yes());
+        flags
     }
 
     const fn is_promotable(self) -> bool {
-        self.0 & Self::PROMOTABLE != 0
+        self.intersects(Self::PROMOTABLE)
     }
 
     const fn recursively_defined(self) -> RecursivelyDefined {
-        if self.0 & Self::RECURSIVELY_DEFINED != 0 {
+        if self.intersects(Self::RECURSIVELY_DEFINED) {
             RecursivelyDefined::Yes
         } else {
             RecursivelyDefined::No
         }
     }
 
-    const fn with_promotable(self, promotable: bool) -> Self {
-        if promotable {
-            Self(self.0 | Self::PROMOTABLE)
-        } else {
-            Self(self.0 & !Self::PROMOTABLE)
-        }
+    fn with_promotable(mut self, promotable: bool) -> Self {
+        self.set(Self::PROMOTABLE, promotable);
+        self
     }
 
-    const fn with_recursively_defined(self, value: RecursivelyDefined) -> Self {
-        if value.is_yes() {
-            Self(self.0 | Self::RECURSIVELY_DEFINED)
-        } else {
-            Self(self.0 & !Self::RECURSIVELY_DEFINED)
-        }
+    fn with_recursively_defined(mut self, value: RecursivelyDefined) -> Self {
+        self.set(Self::RECURSIVELY_DEFINED, value.is_yes());
+        self
     }
 }
 
