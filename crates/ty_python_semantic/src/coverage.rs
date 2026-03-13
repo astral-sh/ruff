@@ -4,16 +4,10 @@
 use crate::types::Type;
 use crate::types::visitor::any_over_type;
 use crate::{Db, HasType, SemanticModel};
-use ruff_db::{
-    files::File,
-    parsed::parsed_module,
-    source::{SourceText, source_text},
-};
+use ruff_db::{files::File, parsed::parsed_module};
 use ruff_python_ast::{
     self as ast, visitor::source_order, visitor::source_order::SourceOrderVisitor,
 };
-use ruff_source_file::LineIndex;
-use ruff_text_size::{Ranged, TextRange};
 
 #[derive(Debug, Default, Clone, Copy)]
 pub struct CoverageStats {
@@ -64,10 +58,7 @@ fn classify(db: &dyn Db, ty: Type<'_>) -> TypeCoverage {
     if any_over_type(db, ty, true, |t: Type<'_>| t.is_todo()) {
         return TypeCoverage::Todo;
     }
-    // Exclude divergent types from dynamic coverage.
-    if any_over_type(db, ty, true, |t: Type<'_>| {
-        t.is_dynamic() && !t.is_divergent()
-    }) {
+    if any_over_type(db, ty, true, |t: Type<'_>| t.is_dynamic()) {
         return TypeCoverage::Dynamic;
     }
     TypeCoverage::Known
@@ -82,67 +73,32 @@ pub fn coverage_types(db: &dyn Db, file: File) -> CoverageStats {
 
 struct CoverageVisitor<'db> {
     db: &'db dyn Db,
-    path: String,
-    source: SourceText,
-    line_index: LineIndex,
     model: SemanticModel<'db>,
     stats: CoverageStats,
 }
 
 impl<'db> CoverageVisitor<'db> {
     fn new(db: &'db dyn Db, file: File) -> Self {
-        let source = source_text(db, file);
-        let line_index = LineIndex::from_source_text(&source);
         Self {
             db,
-            path: file
-                .path(db)
-                .as_system_path()
-                .and_then(|p| p.file_name())
-                .map(ToString::to_string)
-                .unwrap_or_else(|| file.path(db).to_string()),
-            source,
-            line_index,
             model: SemanticModel::new(db, file),
             stats: CoverageStats::default(),
         }
     }
 
-    fn record(&mut self, ty: Option<Type<'db>>, range: TextRange) {
+    fn record(&mut self, ty: Option<Type<'db>>) {
         let Some(ty) = ty else {
             return;
         };
-
-        if ty.is_divergent() {
-            return;
-        }
 
         self.stats.total += 1;
 
         match classify(self.db, ty) {
             TypeCoverage::Todo => {
                 self.stats.todo += 1;
-                let loc = self.line_index.line_column(range.start(), &self.source);
-                tracing::debug!(
-                    "{}:{}:{}: todo `{}`: {}",
-                    self.path,
-                    loc.line,
-                    loc.column,
-                    &self.source.as_str()[range],
-                    ty.display(self.db)
-                );
             }
             TypeCoverage::Dynamic => {
                 self.stats.dynamic += 1;
-                let loc = self.line_index.line_column(range.start(), &self.source);
-                tracing::debug!(
-                    "{}:{}:{}: dynamic `{}`: {}",
-                    self.path,
-                    loc.line,
-                    loc.column,
-                    &self.source.as_str()[range],
-                    ty.display(self.db)
-                );
             }
             TypeCoverage::Known => {}
         }
@@ -163,13 +119,16 @@ impl<'db> CoverageVisitor<'db> {
 
 impl SourceOrderVisitor<'_> for CoverageVisitor<'_> {
     fn visit_stmt(&mut self, stmt: &ast::Stmt) {
+        // Record types for statements that introduce named bindings directly,
+        // then delegate to walk_stmt for child traversal.
         match stmt {
             ast::Stmt::FunctionDef(function) => {
-                self.record(function.inferred_type(&self.model), function.name.range());
+                self.record(function.inferred_type(&self.model));
             }
             ast::Stmt::ClassDef(class) => {
-                self.record(class.inferred_type(&self.model), class.name.range());
+                self.record(class.inferred_type(&self.model));
             }
+            // For assignment targets, use visit_target to handle unpacking correctly.
             ast::Stmt::Assign(assign) => {
                 for target in &assign.targets {
                     self.visit_target(target);
@@ -220,10 +179,12 @@ impl SourceOrderVisitor<'_> for CoverageVisitor<'_> {
     }
 
     fn visit_expr(&mut self, expr: &ast::Expr) {
-        self.record(expr.inferred_type(&self.model), expr.range());
+        self.record(expr.inferred_type(&self.model));
         source_order::walk_expr(self, expr);
     }
 
+    // Overridden to use visit_target for the comprehension variable, which handles
+    // unpacking assignments correctly rather than treating them as plain expressions.
     fn visit_comprehension(&mut self, comprehension: &ast::Comprehension) {
         self.visit_expr(&comprehension.iter);
         self.visit_target(&comprehension.target);
@@ -233,12 +194,12 @@ impl SourceOrderVisitor<'_> for CoverageVisitor<'_> {
     }
 
     fn visit_parameter(&mut self, parameter: &ast::Parameter) {
-        self.record(parameter.inferred_type(&self.model), parameter.name.range());
+        self.record(parameter.inferred_type(&self.model));
         source_order::walk_parameter(self, parameter);
     }
 
     fn visit_alias(&mut self, alias: &ast::Alias) {
-        self.record(alias.inferred_type(&self.model), alias.range());
+        self.record(alias.inferred_type(&self.model));
         source_order::walk_alias(self, alias);
     }
 }

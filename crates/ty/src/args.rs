@@ -317,9 +317,13 @@ pub(crate) struct CoverageCommand {
     #[arg(long, env = EnvVars::TY_CONFIG_FILE, value_name = "PATH")]
     pub(crate) config_file: Option<SystemPathBuf>,
 
-    /// Output format for coverage results.
-    #[arg(long, value_name = "FORMAT", default_value = "text")]
-    pub(crate) format: CoverageOutputFormat,
+    /// Output results as JSON.
+    #[arg(long)]
+    pub(crate) json: bool,
+
+    /// Include the count of `Todo` types in the output.
+    #[arg(long, hide = true)]
+    pub(crate) todo: bool,
 
     /// Control when colored output is used.
     #[arg(
@@ -329,21 +333,6 @@ pub(crate) struct CoverageCommand {
         display_order = 1000
     )]
     pub(crate) color: Option<TerminalColor>,
-}
-
-/// Output format for `ty coverage`.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Default, clap::ValueEnum)]
-pub(crate) enum CoverageOutputFormat {
-    /// One line per file, plus a summary total (default).
-    #[default]
-    #[value(name = "text")]
-    Text,
-    /// ASCII table with aligned columns, plus a summary row.
-    #[value(name = "table")]
-    Table,
-    /// JSON array of per-file objects plus a `"total"` key.
-    #[value(name = "json")]
-    Json,
 }
 
 impl CoverageCommand {
