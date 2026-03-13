@@ -39,6 +39,45 @@ src="https://astral.sh/static/GIF/v0.4.5/format_vscode.gif"
 alt="Formatting a document in VS Code"
 />
 
+### Markdown code blocks
+
+*This feature is currently only available in
+[preview mode](https://docs.astral.sh/ruff/preview/preview.md#preview).*
+
+The Ruff formatter can also format Python code blocks in Markdown files.
+The Ruff VS Code extension provides the `Ruff: Format document` command for
+Markdown files, which will then format the code blocks with the same settings
+as used for regular Python files.
+
+Note that Ruff will not format any other parts of Markdown files. If you want
+to use Ruff formatting in addition to another Markdown formatting extension,
+then you will need to set one as the "default" in VS Code, and manually run
+the `Format Document With...` (or `Ruff: Format document`) command to run any
+other formatters separately.
+
+To enable preview mode for formatting in VS Code, add the following to your
+`settings.json`:
+
+```json
+{
+  "ruff.format.preview": true,
+}
+```
+
+To set Ruff as the default formatter for Markdown files in VS Code, add the
+following to your `settings.json`:
+
+```json
+{
+  "[markdown]": {
+    "editor.defaultFormatter": "charliermarsh.ruff"
+  }
+}
+```
+
+See the [formatter documentation](https://docs.astral.sh/ruff/formatter/#markdown-code-formatting)
+for more details.
+
 ## Code Actions
 
 Code actions are context-sensitive suggestions that can help you fix issues in your code. They are
