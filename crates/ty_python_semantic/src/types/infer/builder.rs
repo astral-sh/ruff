@@ -2553,6 +2553,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             | Type::TypeIs(_)
             | Type::TypeGuard(_)
             | Type::TypeForm(_)
+            | Type::TypedDictTop
             | Type::TypedDict(_)
             | Type::NewTypeInstance(_) => {
                 // We may infer the value type multiple times with distinct type context during
@@ -3173,6 +3174,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             | Type::TypeGuard(_)
             | Type::TypeForm(_)
             | Type::TypedDict(_)
+            | Type::TypedDictTop
             | Type::NewTypeInstance(_) => {
                 let delattr_dunder_call_result = object_ty.try_call_dunder_with_policy(
                     db,
@@ -3347,7 +3349,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::Divergent(_)
                 | Type::Never
                 | Type::ModuleLiteral(..)
-                | Type::BoundSuper(..) => return None,
+                | Type::BoundSuper(..)
+                | Type::TypedDictTop => return None,
             })
         } else {
             None
@@ -5140,6 +5143,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::TypeIs(_)
                 | Type::TypeGuard(_)
                 | Type::TypeForm(_)
+                | Type::TypedDictTop
                 | Type::TypedDict(_)
                 | Type::NewTypeInstance(_) => None,
             }
@@ -9852,6 +9856,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::TypeIs(_)
                 | Type::TypeGuard(_)
                 | Type::TypeForm(_)
+                | Type::TypedDictTop
                 | Type::TypedDict(_)
                 | Type::NewTypeInstance(_),
             ) => fallback_unary_expression_type(),

@@ -784,6 +784,7 @@ impl<'db> Type<'db> {
                 | Type::TypeIs(_)
                 | Type::TypeGuard(_)
                 | Type::TypeForm(_)
+                | Type::TypedDictTop
                 | Type::TypedDict(_)
                 | Type::NewTypeInstance(_)
                 | Type::NominalInstance(_)
