@@ -80,6 +80,7 @@ select = [
     "PGH", # pygrep-hooks
     "PYI", # flake8-pyi
     "RUF",
+    "S602", # flake8-bandit: subprocess-popen-with-shell-equals-true
 ]
 
 ignore = [
