@@ -100,13 +100,12 @@ use crate::types::typed_dict::{validate_typed_dict_constructor, validate_typed_d
 use crate::types::typevar::{BoundTypeVarIdentity, TypeVarConstraints, TypeVarIdentity};
 use crate::types::{
     CallDunderError, CallableBinding, CallableType, ClassType, DynamicType, EvaluationMode,
-    InferenceFlags, InternedConstraintSet, InternedType, IntersectionBuilder, IntersectionType,
-    KnownClass, KnownInstanceType, KnownUnion, LiteralValueTypeKind, MemberLookupPolicy,
-    ParamSpecAttrKind, Parameter, ParameterForm, Parameters, Signature, SpecialFormType,
-    SubclassOfType, Truthiness, Type, TypeAliasType, TypeAndQualifiers, TypeContext,
-    TypeQualifiers, TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, TypedDictType,
-    UnionBuilder, UnionType, binding_type, definition_expression_type, infer_complete_scope_types,
-    infer_scope_types, todo_type,
+    InferenceFlags, InternedConstraintSet, InternedType, IntersectionBuilder, KnownClass,
+    KnownInstanceType, KnownUnion, LiteralValueTypeKind, MemberLookupPolicy, ParamSpecAttrKind,
+    Parameter, ParameterForm, Parameters, Signature, SpecialFormType, SubclassOfType, Truthiness,
+    Type, TypeAliasType, TypeAndQualifiers, TypeContext, TypeQualifiers, TypeVarBoundOrConstraints,
+    TypeVarKind, TypeVarVariance, TypedDictType, UnionBuilder, UnionType, binding_type,
+    definition_expression_type, infer_complete_scope_types, infer_scope_types, todo_type,
 };
 use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
 use crate::unpack::UnpackPosition;
@@ -5416,29 +5415,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ty = Type::LiteralValue(literal.to_unpromotable());
         }
 
-        self.store_expression_type_impl(expression, ty, tcx);
+        self.store_expression_type(expression, ty);
 
         ty
     }
 
     #[track_caller]
     fn store_expression_type(&mut self, expression: &ast::Expr, ty: Type<'db>) {
-        self.store_expression_type_impl(expression, ty, TypeContext::default());
-    }
-
-    #[track_caller]
-    fn store_expression_type_impl(
-        &mut self,
-        expression: &ast::Expr,
-        ty: Type<'db>,
-        tcx: TypeContext<'db>,
-    ) {
         if self.inner_expression_inference_state.is_get() {
             // If `inner_expression_inference_state` is `Get`, the expression type has already been stored.
             return;
         }
-
-        let db = self.db();
 
         match self.multi_inference_state {
             MultiInferenceState::Ignore => {}
@@ -5446,22 +5433,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             MultiInferenceState::Panic => {
                 let previous = self.expressions.insert(expression.into(), ty);
                 assert_eq!(previous, None);
-            }
-
-            MultiInferenceState::Intersect => {
-                self.expressions
-                    .entry(expression.into())
-                    .and_modify(|current| {
-                        // Avoid storing "failed" multi-inference attempts, which can lead to
-                        // unnecessary union simplification overhead.
-                        if tcx
-                            .annotation
-                            .is_none_or(|tcx| ty.is_assignable_to(db, tcx))
-                        {
-                            *current = IntersectionType::from_two_elements(db, *current, ty);
-                        }
-                    })
-                    .or_insert(ty);
             }
         }
     }
@@ -5809,52 +5780,41 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     return ty;
                 }
             } else if let Type::Union(tcx) = tcx {
-                // Otherwise, disable diagnostics as we attempt to narrow to specific elements of the union.
+                // Otherwise, we have to narrow to specific elements of the union.
+                //
+                // Infer all expressions with diagnostics enabled before starting multi-inference.
+                for item in items {
+                    self.infer_optional_expression(item.key.as_ref(), TypeContext::default());
+                    self.infer_expression(&item.value, TypeContext::default());
+                }
+
+                // Disable diagnostics as we attempt to narrow to specific elements of the union.
                 let old_multi_inference = self.context.set_multi_inference(true);
                 let old_multi_inference_state =
                     self.set_multi_inference_state(MultiInferenceState::Ignore);
 
-                let mut narrowed_typed_dicts = Vec::new();
+                let mut narrowed_tys = Vec::new();
                 for element in tcx.elements(self.db()) {
                     let typed_dict = element
                         .as_typed_dict()
                         .expect("filtered out non-typed-dict types above");
 
-                    if self
-                        .infer_typed_dict_expression(dict, typed_dict, &mut item_types)
-                        .is_some()
+                    if let Some(inferred_ty) =
+                        self.infer_typed_dict_expression(dict, typed_dict, &mut item_types)
                     {
-                        narrowed_typed_dicts.push(typed_dict);
+                        narrowed_tys.push(inferred_ty);
                     }
 
                     item_types.clear();
                 }
 
-                if !narrowed_typed_dicts.is_empty() {
-                    // Now that we know which typed dict annotations are valid, re-infer with diagnostics enabled,
-                    self.context.set_multi_inference(old_multi_inference);
-
-                    // We may have to infer the same expression multiple times with distinct type context,
-                    // so we take the intersection of all valid inferences for a given expression.
-                    self.set_multi_inference_state(MultiInferenceState::Intersect);
-
-                    let mut narrowed_tys = Vec::new();
-                    for typed_dict in narrowed_typed_dicts {
-                        let mut item_types = FxHashMap::default();
-
-                        let ty = self
-                            .infer_typed_dict_expression(dict, typed_dict, &mut item_types)
-                            .expect("ensured the typed dict is valid above");
-
-                        narrowed_tys.push(ty);
-                    }
-
-                    self.set_multi_inference_state(old_multi_inference_state);
-                    return UnionType::from_elements(self.db(), narrowed_tys);
-                }
-
                 self.context.set_multi_inference(old_multi_inference);
                 self.set_multi_inference_state(old_multi_inference_state);
+
+                // Successfully narrowed to a subset of typed dicts.
+                if !narrowed_tys.is_empty() {
+                    return UnionType::from_elements(self.db(), narrowed_tys);
+                }
             }
         }
 
@@ -5874,9 +5834,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // dictionary literal as a `TypedDict`. This also allows us to infer using the
         // type context of the expected `TypedDict` field.
         let mut infer_elt_ty = |builder: &mut Self, (_, elt, tcx): ArgExpr<'db, '_>| {
-            item_types
-                .get(&elt.node_index().load())
-                .copied()
+            builder
+                .try_expression_type(elt)
                 .unwrap_or_else(|| builder.infer_expression(elt, tcx))
         };
 
@@ -9006,9 +8965,6 @@ enum MultiInferenceState {
 
     /// Ignore the newly inferred value.
     Ignore,
-
-    /// Store the intersection of all types inferred for the expression.
-    Intersect,
 }
 
 impl MultiInferenceState {
