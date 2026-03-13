@@ -1,12 +1,15 @@
 use crate::Db;
 use crate::semantic_index::expression::Expression;
-use crate::semantic_index::place::{PlaceExpr, PlaceTable, PlaceTableBuilder, ScopedPlaceId};
+use crate::semantic_index::place::{
+    PlaceExpr, PlaceExprRef, PlaceTable, PlaceTableBuilder, ScopedPlaceId,
+};
 use crate::semantic_index::place_table;
 use crate::semantic_index::predicate::{
     CallableAndCallExpr, ClassPatternKind, PatternPredicate, PatternPredicateKind, Predicate,
     PredicateNode,
 };
 use crate::semantic_index::scope::ScopeId;
+use crate::semantic_index::semantic_index;
 use crate::subscript::PyIndex;
 use crate::types::enums::{enum_member_literals, enum_metadata};
 use crate::types::function::KnownFunction;
@@ -629,7 +632,23 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
         match expression_node {
-            ast::Expr::Name(_) | ast::Expr::Attribute(_) | ast::Expr::Subscript(_) => {
+            ast::Expr::Name(_) => {
+                let file = expression.file(self.db);
+                let index = semantic_index(self.db, file);
+                let constraints = self.evaluate_simple_expr(expression_node, is_positive);
+                // Check for aliased conditional expressions (e.g. `is_none = x is None; if is_none: ...`)
+                if let Some(alias_predicate) = index.alias_predicate(expression_node) {
+                    if alias_predicate.is_guard_invalidated(self.db, index) {
+                        return constraints;
+                    }
+                    let aliased_constraints =
+                        self.evaluate_expression_predicate(alias_predicate.expression, is_positive);
+                    Self::merge_optional_constraints_and(constraints, aliased_constraints)
+                } else {
+                    constraints
+                }
+            }
+            ast::Expr::Attribute(_) | ast::Expr::Subscript(_) => {
                 self.evaluate_simple_expr(expression_node, is_positive)
             }
             ast::Expr::Compare(expr_compare) => {
@@ -2185,17 +2204,36 @@ fn all_matching_tuple_elements_have_literal_types<'db>(
     })
 }
 
+pub(crate) trait PlaceIdLookup {
+    fn place_id<'e>(&self, expression: impl Into<PlaceExprRef<'e>>) -> Option<ScopedPlaceId>;
+}
+
+impl PlaceIdLookup for PlaceTableBuilder {
+    fn place_id<'e>(&self, expression: impl Into<PlaceExprRef<'e>>) -> Option<ScopedPlaceId> {
+        self.place_id(expression.into())
+    }
+}
+
+impl PlaceIdLookup for PlaceTable {
+    fn place_id<'e>(&self, expression: impl Into<PlaceExprRef<'e>>) -> Option<ScopedPlaceId> {
+        self.place_id(expression.into())
+    }
+}
+
 /// Builder for computing the conservative set of places that could possibly be narrowed.
 ///
 /// This mirrors the structure of `NarrowingConstraintsBuilder` but only computes which places
 /// *could* be narrowed, without performing type inference to determine the actual constraints.
-pub(crate) struct PossiblyNarrowedPlacesBuilder<'db, 'a> {
+pub(crate) struct PossiblyNarrowedPlacesBuilder<'db, 'a, P = PlaceTableBuilder> {
     db: &'db dyn Db,
-    places: &'a PlaceTableBuilder,
+    places: &'a P,
 }
 
-impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
-    pub(crate) fn new(db: &'db dyn Db, places: &'a PlaceTableBuilder) -> Self {
+impl<'db, 'a, P> PossiblyNarrowedPlacesBuilder<'db, 'a, P>
+where
+    P: PlaceIdLookup,
+{
+    pub(crate) fn new(db: &'db dyn Db, places: &'a P) -> Self {
         Self { db, places }
     }
 
@@ -2245,7 +2283,7 @@ impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
     fn simple_expr(&self, expr: &ast::Expr) -> PossiblyNarrowedPlaces {
         let mut places = PossiblyNarrowedPlaces::default();
         if let Some(place_expr) = PlaceExpr::try_from_expr(expr) {
-            if let Some(place) = self.places.place_id((&place_expr).into()) {
+            if let Some(place) = self.places.place_id(&place_expr) {
                 places.insert(place);
             }
         }
@@ -2270,7 +2308,7 @@ impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
         for expr in std::iter::once(&*expr_compare.left).chain(&expr_compare.comparators) {
             if let ast::Expr::Subscript(subscript) = expr
                 && let Some(place_expr) = PlaceExpr::try_from_expr(&subscript.value)
-                && let Some(place) = self.places.place_id((&place_expr).into())
+                && let Some(place) = self.places.place_id(&place_expr)
             {
                 places.insert(place);
             }
@@ -2287,7 +2325,7 @@ impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
         // Most narrowing calls narrow their first argument
         if let Some(first_arg) = expr_call.arguments.args.first() {
             if let Some(place_expr) = PlaceExpr::try_from_expr(first_arg) {
-                if let Some(place) = self.places.place_id((&place_expr).into()) {
+                if let Some(place) = self.places.place_id(&place_expr) {
                     places.insert(place);
                 }
             }
@@ -2327,7 +2365,7 @@ impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
             | ast::Expr::Subscript(_)
             | ast::Expr::Named(_) => {
                 if let Some(place_expr) = PlaceExpr::try_from_expr(expr) {
-                    if let Some(place) = self.places.place_id((&place_expr).into()) {
+                    if let Some(place) = self.places.place_id(&place_expr) {
                         places.insert(place);
                     }
                 }
@@ -2336,7 +2374,7 @@ impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
             ast::Expr::Call(call) if call.arguments.args.len() == 1 => {
                 if let Some(first_arg) = call.arguments.args.first() {
                     if let Some(place_expr) = PlaceExpr::try_from_expr(first_arg) {
-                        if let Some(place) = self.places.place_id((&place_expr).into()) {
+                        if let Some(place) = self.places.place_id(&place_expr) {
                             places.insert(place);
                         }
                     }
@@ -2358,7 +2396,7 @@ impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
         // The match subject can always be narrowed by a pattern
         let subject_node = subject.node_ref(self.db, module);
         if let Some(subject_place_expr) = PlaceExpr::try_from_expr(subject_node) {
-            if let Some(place) = self.places.place_id((&subject_place_expr).into()) {
+            if let Some(place) = self.places.place_id(&subject_place_expr) {
                 places.insert(place);
             }
         }
@@ -2366,7 +2404,7 @@ impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
         // For subscript subjects, the subscript base can also be narrowed (TypedDict/tuple narrowing)
         if let ast::Expr::Subscript(subscript) = subject_node {
             if let Some(place_expr) = PlaceExpr::try_from_expr(&subscript.value) {
-                if let Some(place) = self.places.place_id((&place_expr).into()) {
+                if let Some(place) = self.places.place_id(&place_expr) {
                     places.insert(place);
                 }
             }
