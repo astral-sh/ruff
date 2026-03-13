@@ -239,7 +239,7 @@ pub struct OwnedConstraintSet<'db> {
 ///
 /// [POPL2015]: https://doi.org/10.1145/2676726.2676991
 #[derive(Clone, Copy)]
-pub struct ConstraintSet<'db, 'c> {
+pub(crate) struct ConstraintSet<'db, 'c> {
     /// The BDD representing this constraint set
     node: NodeId,
 

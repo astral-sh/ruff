@@ -6,12 +6,11 @@ use crate::Db;
 use crate::types::call::{CallArguments, CallDunderError};
 use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::context::InferContext;
-use crate::types::cyclic::CycleDetector;
 use crate::types::tuple::TupleSpec;
 use crate::types::{
-    DynamicType, IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType,
-    LiteralValueType, LiteralValueTypeKind, MemberLookupPolicy, Truthiness, Type, TypeContext,
-    TypeVarBoundOrConstraints, UnionBuilder,
+    CycleDetectorWithFallback, DynamicType, IntersectionBuilder, IntersectionType, KnownClass,
+    KnownInstanceType, LiteralValueType, LiteralValueTypeKind, MemberLookupPolicy, Truthiness,
+    Type, TypeContext, TypeVarBoundOrConstraints, UnionBuilder,
 };
 
 /// Whether the intersection type is on the left or right side of the comparison.
@@ -21,8 +20,8 @@ enum IntersectionOn {
     Right,
 }
 
-/// A [`CycleDetector`] that is used in [`infer_binary_type_comparison`].
-pub(super) type BinaryComparisonVisitor<'db> = CycleDetector<
+/// A [`CycleDetectorWithFallback`] that is used in [`infer_binary_type_comparison`].
+pub(super) type BinaryComparisonVisitor<'db> = CycleDetectorWithFallback<
     ast::CmpOp,
     (Type<'db>, ast::CmpOp, Type<'db>),
     Result<Type<'db>, UnsupportedComparisonError<'db>>,

@@ -6,12 +6,12 @@ use crate::place::{DefinedPlace, Place};
 use crate::types::constraints::{
     ConstraintSetBuilder, IteratorConstraintsExtension, OptionConstraintsExtension,
 };
-use crate::types::cyclic::PairVisitor;
+use crate::types::cyclic::CycleDetector;
 use crate::types::enums::is_single_member_enum;
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::{
-    CallableType, ClassBase, ClassType, CycleDetector, DynamicType, KnownBoundMethodType,
-    KnownClass, KnownInstanceType, LiteralValueTypeKind, MemberLookupPolicy, PropertyInstanceType,
+    CallableType, ClassBase, ClassType, DynamicType, KnownBoundMethodType, KnownClass,
+    KnownInstanceType, LiteralValueTypeKind, MemberLookupPolicy, PropertyInstanceType,
     ProtocolInstanceType, SubclassOfInner, TypeVarBoundOrConstraints, UnionType, UpcastPolicy,
 };
 use crate::{
@@ -20,6 +20,23 @@ use crate::{
 };
 
 /// A non-exhaustive enumeration of relations that can exist between types.
+///
+/// This enum should really be called `TypeRelation`, but then the enum
+/// currently called `TypeRelation` would have to be called
+/// `PositiveTypeRelation`, which is far too much of a mouthful, and that
+/// enum is used much more often.
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
+pub(crate) enum TypeRelationOrDisjointness {
+    Positive(TypeRelation),
+    Disjointness,
+}
+
+/// "Positive" relations that can exist between types.
+///
+/// This enum should really be called `PositiveTypeRelation`, since
+/// disjointness is also a relation between types but that is not included
+/// in this enum. However, `PositiveTypeRelation` is a bit too much of a
+/// mouthful.
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
 pub(crate) enum TypeRelation {
     /// The "subtyping" relation.
@@ -323,8 +340,8 @@ impl<'db> Type<'db> {
             constraints,
             inferable,
             relation: TypeRelation::SubtypingAssuming,
-            relation_visitor: &HasRelationToVisitor::with_given(constraints, assuming),
-            disjointness_visitor: &IsDisjointVisitor::default(constraints),
+            visitor: &RelationVisitor::new(constraints),
+            given: assuming,
         };
         checker.check_type_pair(db, self, target)
     }
@@ -421,8 +438,8 @@ impl<'db> Type<'db> {
             constraints,
             inferable,
             relation,
-            relation_visitor: &HasRelationToVisitor::default(constraints),
-            disjointness_visitor: &IsDisjointVisitor::default(constraints),
+            visitor: &RelationVisitor::new(constraints),
+            given: ConstraintSet::from_bool(constraints, false),
         };
         checker.check_type_pair(db, self, target)
     }
@@ -452,8 +469,8 @@ impl<'db> Type<'db> {
     ) -> ConstraintSet<'db, 'c> {
         let checker = EquivalenceChecker {
             constraints,
-            relation_visitor: &HasRelationToVisitor::default(constraints),
-            disjointness_visitor: &IsDisjointVisitor::default(constraints),
+            visitor: &RelationVisitor::new(constraints),
+            given: ConstraintSet::from_bool(constraints, false),
         };
         checker.check_type_pair(db, self, other)
     }
@@ -489,44 +506,48 @@ impl<'db> Type<'db> {
         let checker = DisjointnessChecker {
             constraints,
             inferable,
-            disjointness_visitor: &IsDisjointVisitor::default(constraints),
-            relation_visitor: &HasRelationToVisitor::default(constraints),
+            visitor: &RelationVisitor::new(constraints),
+            given: ConstraintSet::from_bool(constraints, false),
         };
         checker.check_type_pair(db, self, other)
     }
 }
 
-/// A [`PairVisitor`] that is used in `has_relation_to` methods.
-pub(crate) type HasRelationToVisitor<'db, 'c> = CycleDetector<
-    TypeRelation,
-    (Type<'db>, Type<'db>, TypeRelation),
-    ConstraintSet<'db, 'c>,
-    ConstraintSet<'db, 'c>,
->;
+/// A [`CycleDetector`] that is used in `has_relation_to` and
+/// `is_disjoint_from` methods.
+pub(super) struct RelationVisitor<'db, 'c> {
+    inner: CycleDetector<
+        TypeRelationOrDisjointness,
+        (Type<'db>, Type<'db>, TypeRelationOrDisjointness),
+        ConstraintSet<'db, 'c>,
+    >,
 
-impl<'db, 'c> HasRelationToVisitor<'db, 'c> {
-    pub(crate) fn default(constraints: &'c ConstraintSetBuilder<'db>) -> Self {
-        HasRelationToVisitor::with_given(constraints, ConstraintSet::from_bool(constraints, false))
-    }
-
-    pub(crate) fn with_given(
-        constraints: &'c ConstraintSetBuilder<'db>,
-        given: ConstraintSet<'db, 'c>,
-    ) -> Self {
-        let fallback = ConstraintSet::from_bool(constraints, true);
-        HasRelationToVisitor::with_extra(fallback, given)
-    }
+    positive_default: ConstraintSet<'db, 'c>,
+    negative_default: ConstraintSet<'db, 'c>,
 }
 
-/// A [`PairVisitor`] that is used in `is_disjoint_from` methods.
-pub(crate) type IsDisjointVisitor<'db, 'c> = PairVisitor<'db, IsDisjoint, ConstraintSet<'db, 'c>>;
+impl<'db, 'c> RelationVisitor<'db, 'c> {
+    pub(crate) fn new(constraints: &'c ConstraintSetBuilder<'db>) -> Self {
+        Self {
+            inner: CycleDetector::default(),
+            positive_default: ConstraintSet::from_bool(constraints, true),
+            negative_default: ConstraintSet::from_bool(constraints, false),
+        }
+    }
 
-#[derive(Debug)]
-pub(crate) struct IsDisjoint;
-
-impl<'db, 'c> IsDisjointVisitor<'db, 'c> {
-    pub(crate) fn default(constraints: &'c ConstraintSetBuilder<'db>) -> Self {
-        IsDisjointVisitor::new(ConstraintSet::from_bool(constraints, false))
+    fn visit(
+        &self,
+        t1: Type<'db>,
+        t2: Type<'db>,
+        relation: TypeRelationOrDisjointness,
+        func: impl FnOnce() -> ConstraintSet<'db, 'c>,
+    ) -> ConstraintSet<'db, 'c> {
+        let fallback = if relation == TypeRelationOrDisjointness::Disjointness {
+            self.negative_default
+        } else {
+            self.positive_default
+        };
+        self.inner.visit((t1, t2, relation), &fallback, func)
     }
 }
 
@@ -535,31 +556,42 @@ pub(super) struct TypeRelationChecker<'a, 'c, 'db> {
     pub(super) constraints: &'c ConstraintSetBuilder<'db>,
     pub(super) inferable: InferableTypeVars<'a, 'db>,
     pub(super) relation: TypeRelation,
+    given: ConstraintSet<'db, 'c>,
 
-    // N.B. these fields are private to reduce the risk of
+    // N.B. this field is private to reduce the risk of
     // "double-visiting" a given pair of types. You should
-    // generally only ever call `self.relation_visitor.visit()`
-    // or `self.disjointness_visitor.visit()` from
-    // `check_type_pair`, never from `check_typeddict_pair` or
-    // any other more "low-level" method.
-    relation_visitor: &'a HasRelationToVisitor<'db, 'c>,
-    disjointness_visitor: &'a IsDisjointVisitor<'db, 'c>,
+    // generally only ever call `self.visitor.visit()` from
+    // `check_type_pair`, never from `check_typeddict_pair`
+    // or any other more "low-level" method.
+    visitor: &'a RelationVisitor<'db, 'c>,
 }
 
 impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
-    pub(super) fn new(
+    pub(super) fn subtyping(
         constraints: &'c ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'a, 'db>,
-        relation: TypeRelation,
-        relation_visitor: &'a HasRelationToVisitor<'db, 'c>,
-        disjointness_visitor: &'a IsDisjointVisitor<'db, 'c>,
+        visitor: &'a RelationVisitor<'db, 'c>,
     ) -> Self {
         Self {
             constraints,
             inferable,
-            relation,
-            relation_visitor,
-            disjointness_visitor,
+            relation: TypeRelation::Subtyping,
+            visitor,
+            given: ConstraintSet::from_bool(constraints, false),
+        }
+    }
+
+    pub(super) fn constraint_set_assignability(
+        constraints: &'c ConstraintSetBuilder<'db>,
+        inferable: InferableTypeVars<'a, 'db>,
+        visitor: &'a RelationVisitor<'db, 'c>,
+    ) -> Self {
+        Self {
+            constraints,
+            inferable,
+            relation: TypeRelation::ConstraintSetAssignability,
+            visitor,
+            given: ConstraintSet::from_bool(constraints, false),
         }
     }
 
@@ -584,8 +616,12 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         target: Type<'db>,
         work: impl FnOnce() -> ConstraintSet<'db, 'c>,
     ) -> ConstraintSet<'db, 'c> {
-        self.relation_visitor
-            .visit((source, target, self.relation), work)
+        self.visitor.visit(
+            source,
+            target,
+            TypeRelationOrDisjointness::Positive(self.relation),
+            work,
+        )
     }
 
     pub(super) fn check_type_pair(
@@ -608,8 +644,9 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         if self.relation == TypeRelation::SubtypingAssuming
             && (source.is_type_var() || target.is_type_var())
         {
-            let given = self.relation_visitor.extra;
-            return given.implies_subtype_of(db, self.constraints, source, target);
+            return self
+                .given
+                .implies_subtype_of(db, self.constraints, source, target);
         }
 
         // Handle the constraint-set-based assignability relation next. Comparisons with a
@@ -1521,8 +1558,8 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
     pub(super) fn as_equivalence_checker(&self) -> EquivalenceChecker<'_, 'c, 'db> {
         EquivalenceChecker {
             constraints: self.constraints,
-            relation_visitor: self.relation_visitor,
-            disjointness_visitor: self.disjointness_visitor,
+            visitor: self.visitor,
+            given: self.given,
         }
     }
 
@@ -1530,8 +1567,8 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         DisjointnessChecker {
             constraints: self.constraints,
             inferable: self.inferable,
-            relation_visitor: self.relation_visitor,
-            disjointness_visitor: self.disjointness_visitor,
+            visitor: self.visitor,
+            given: self.given,
         }
     }
 }
@@ -1539,14 +1576,13 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 pub(super) struct EquivalenceChecker<'a, 'c, 'db> {
     pub(super) constraints: &'c ConstraintSetBuilder<'db>,
 
-    // N.B. these fields are private to reduce the risk of
+    // N.B. this field is private to reduce the risk of
     // "double-visiting" a given pair of types. You should
-    // generally only ever call `self.relation_visitor.visit()`
-    // or `self.disjointness_visitor.visit()` from
-    // `check_type_pair`, never from `check_typeddict_pair` or
-    // any other more "low-level" method.
-    relation_visitor: &'a HasRelationToVisitor<'db, 'c>,
-    disjointness_visitor: &'a IsDisjointVisitor<'db, 'c>,
+    // generally only ever call `self.visitor.visit()` from
+    // `check_type_pair`, never from `check_typeddict_pair`
+    // or any other more "low-level" method.
+    visitor: &'a RelationVisitor<'db, 'c>,
+    given: ConstraintSet<'db, 'c>,
 }
 
 impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
@@ -1555,8 +1591,8 @@ impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
             relation: TypeRelation::Redundancy { pure: true },
             constraints: self.constraints,
             inferable: InferableTypeVars::None,
-            relation_visitor: self.relation_visitor,
-            disjointness_visitor: self.disjointness_visitor,
+            visitor: self.visitor,
+            given: self.given,
         }
     }
 
@@ -1586,29 +1622,27 @@ impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
 pub(super) struct DisjointnessChecker<'a, 'c, 'db> {
     pub(super) constraints: &'c ConstraintSetBuilder<'db>,
     pub(super) inferable: InferableTypeVars<'a, 'db>,
+    given: ConstraintSet<'db, 'c>,
 
-    // N.B. these fields are private to reduce the risk of
+    // N.B. this field is private to reduce the risk of
     // "double-visiting" a given pair of types. You should
-    // generally only ever call `self.relation_visitor.visit()`
-    // or `self.disjointness_visitor.visit()` from
+    // generally only ever call `self.visitor.visit()` from
     // `check_type_pair`, never from `check_typeddict_pair` or
     // any other more "low-level" method.
-    disjointness_visitor: &'a IsDisjointVisitor<'db, 'c>,
-    relation_visitor: &'a HasRelationToVisitor<'db, 'c>,
+    visitor: &'a RelationVisitor<'db, 'c>,
 }
 
 impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
     pub(super) fn new(
         constraints: &'c ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'a, 'db>,
-        relation_visitor: &'a HasRelationToVisitor<'db, 'c>,
-        disjointness_visitor: &'a IsDisjointVisitor<'db, 'c>,
+        visitor: &'a RelationVisitor<'db, 'c>,
     ) -> Self {
         Self {
             constraints,
             inferable,
-            disjointness_visitor,
-            relation_visitor,
+            visitor,
+            given: ConstraintSet::from_bool(constraints, false),
         }
     }
 
@@ -1620,16 +1654,16 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             relation,
             constraints: self.constraints,
             inferable: self.inferable,
-            relation_visitor: self.relation_visitor,
-            disjointness_visitor: self.disjointness_visitor,
+            visitor: self.visitor,
+            given: self.given,
         }
     }
 
     pub(super) fn as_equivalence_checker(&self) -> EquivalenceChecker<'_, 'c, 'db> {
         EquivalenceChecker {
             constraints: self.constraints,
-            relation_visitor: self.relation_visitor,
-            disjointness_visitor: self.disjointness_visitor,
+            visitor: self.visitor,
+            given: self.given,
         }
     }
 
@@ -1639,7 +1673,12 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
         target: Type<'db>,
         work: impl FnOnce() -> ConstraintSet<'db, 'c>,
     ) -> ConstraintSet<'db, 'c> {
-        self.disjointness_visitor.visit((source, target), work)
+        self.visitor.visit(
+            source,
+            target,
+            TypeRelationOrDisjointness::Disjointness,
+            work,
+        )
     }
 
     fn any_protocol_members_absent_or_disjoint(

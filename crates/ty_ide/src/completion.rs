@@ -17,7 +17,7 @@ use ty_python_semantic::HasType;
 use ty_python_semantic::types::{SpecialFormType, UnionType};
 use ty_python_semantic::{
     Completion as SemanticCompletion, NameKind, SemanticModel,
-    types::{CycleDetector, KnownClass, Type},
+    types::{CycleDetectorWithFallback, KnownClass, Type},
 };
 
 use crate::docstring::Docstring;
@@ -2448,7 +2448,7 @@ fn token_suffix_by_kinds<const N: usize>(
 /// on `CompletionBuilder`.
 fn completion_kind_from_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<CompletionKind> {
     type CompletionKindVisitor<'db> =
-        CycleDetector<CompletionKind, Type<'db>, Option<CompletionKind>>;
+        CycleDetectorWithFallback<CompletionKind, Type<'db>, Option<CompletionKind>>;
 
     fn imp<'db>(
         db: &'db dyn Db,
