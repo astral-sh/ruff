@@ -21,6 +21,7 @@
     "monaco-editor": "^0.55.0",
     "pyodide": "^0.29.0",
     "react": "^19.0.0",
+    "react-aria-components": "^1.16.0",
     "react-dom": "^19.0.0",
     "react-resizable-panels": "^4.0.0",
     "shared": "0.0.0",

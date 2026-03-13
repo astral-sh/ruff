@@ -1,13 +1,13 @@
-import type { ButtonHTMLAttributes } from "react";
+import { forwardRef, type ButtonHTMLAttributes } from "react";
 import classNames from "classnames";
 
-export default function AstralButton({
-  className,
-  children,
-  ...otherProps
-}: ButtonHTMLAttributes<any>) {
+const AstralButton = forwardRef<
+  HTMLButtonElement,
+  ButtonHTMLAttributes<HTMLButtonElement>
+>(({ className, children, ...otherProps }, ref) => {
   return (
     <button
+      ref={ref}
       className={classNames(
         "uppercase",
         "ease-in-out",
@@ -34,4 +34,6 @@ export default function AstralButton({
       {children}
     </button>
   );
-}
+});
+
+export default AstralButton;
