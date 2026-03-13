@@ -18,7 +18,6 @@ import {
   persistLocal,
   restore,
 } from "./Editor/persist";
-import ShareButton from "./Editor/ShareButton";
 import { loader } from "@monaco-editor/react";
 import tySchema from "../../../ty.schema.json";
 import Chrome, { formatError } from "./Editor/Chrome";
@@ -202,14 +201,10 @@ export default function Playground() {
         tool="ty"
         version={version}
         onChangeTheme={setTheme}
-        shareContent={
-          <ShareButton
-            key={files.revision}
-            onShare={handleShare}
-            onCopyMarkdownLink={handleCopyMarkdownLink}
-            onCopyMarkdown={handleCopyMarkdown}
-          />
-        }
+        edit={files.revision}
+        onShare={handleShare}
+        onCopyMarkdownLink={handleCopyMarkdownLink}
+        onCopyMarkdown={handleCopyMarkdown}
         onReset={workspace == null ? undefined : handleReset}
       />
 

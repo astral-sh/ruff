@@ -6,6 +6,7 @@
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",
     "classnames": "^2.3.2",
+    "react-aria-components": "^1.16.0",
     "react": "^19.0.0",
     "react-resizable-panels": "^4.0.0"
   },

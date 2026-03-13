@@ -5,15 +5,14 @@ function getLanguageTag(filename: string): string {
   const extension = filename.split(".").pop()?.toLowerCase();
   switch (extension) {
     case "py":
-      return "python";
     case "pyi":
-      return "python";
+      return "py";
     case "json":
       return "json";
     case "toml":
       return "toml";
     default:
-      return "python"; // Default to python for ty playground
+      return extension ?? "";
   }
 }
 
@@ -24,7 +23,7 @@ function getLanguageTag(filename: string): string {
  * @returns Formatted markdown link string
  */
 export function generatePlaygroundMarkdownLink(shareUrl: string): string {
-  return `Code sample in [ty playground](${shareUrl})`;
+  return `[Playground](${shareUrl})`;
 }
 
 /**
@@ -38,19 +37,19 @@ export function generatePlaygroundMarkdown(
   files: { [name: string]: string },
   shareUrl: string,
 ): string {
-  const parts: string[] = [];
-  parts.push(generatePlaygroundMarkdownLink(shareUrl));
-  parts.push("");
+  let markdown = `## [Playground](${shareUrl})
 
-  // Add each file with a heading and code block
+`;
+
   for (const [filename, content] of Object.entries(files)) {
-    const language = getLanguageTag(filename);
-    parts.push(`### ${filename}`);
-    parts.push(`\`\`\`${language}`);
-    parts.push(content);
-    parts.push("```");
-    parts.push("");
+    markdown += `### \`${filename}\`
+
+\`\`\`${getLanguageTag(filename)}
+${content}
+\`\`\`
+
+`;
   }
 
-  return parts.join("\n").trimEnd();
+  return markdown;
 }
