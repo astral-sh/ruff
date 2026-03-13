@@ -10,9 +10,9 @@ use crate::types::cyclic::PairVisitor;
 use crate::types::enums::is_single_member_enum;
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::{
-    CallableType, CallableTypes, ClassBase, ClassType, CycleDetector, DynamicType, KnownClass,
-    KnownInstanceType, LiteralValueTypeKind, MemberLookupPolicy, Parameters, ProtocolInstanceType,
-    Signature, SubclassOfInner, TypeVarBoundOrConstraints, UnionType,
+    CallableType, ClassBase, ClassType, CycleDetector, DynamicType, KnownBoundMethodType,
+    KnownClass, KnownInstanceType, LiteralValueTypeKind, MemberLookupPolicy, PropertyInstanceType,
+    ProtocolInstanceType, SubclassOfInner, TypeVarBoundOrConstraints, UnionType, UpcastPolicy,
 };
 use crate::{
     Db,
@@ -225,6 +225,121 @@ impl TypeRelation {
     }
 }
 
+#[expect(clippy::too_many_arguments)]
+fn optional_property_method_has_relation<'db, 'c>(
+    db: &'db dyn Db,
+    left: Option<Type<'db>>,
+    right: Option<Type<'db>>,
+    constraints: &'c ConstraintSetBuilder<'db>,
+    inferable: InferableTypeVars<'_, 'db>,
+    relation: TypeRelation,
+    relation_visitor: &HasRelationToVisitor<'db, 'c>,
+    disjointness_visitor: &IsDisjointVisitor<'db, 'c>,
+) -> ConstraintSet<'db, 'c> {
+    match (left, right) {
+        (None, None) => ConstraintSet::from_bool(constraints, true),
+        (Some(left), Some(right)) => left.has_relation_to_impl(
+            db,
+            right,
+            constraints,
+            inferable,
+            relation,
+            relation_visitor,
+            disjointness_visitor,
+        ),
+        (None | Some(_), None | Some(_)) => ConstraintSet::from_bool(constraints, false),
+    }
+}
+
+fn optional_property_method_is_disjoint<'db, 'c>(
+    db: &'db dyn Db,
+    left: Option<Type<'db>>,
+    right: Option<Type<'db>>,
+    constraints: &'c ConstraintSetBuilder<'db>,
+    inferable: InferableTypeVars<'_, 'db>,
+    disjointness_visitor: &IsDisjointVisitor<'db, 'c>,
+    relation_visitor: &HasRelationToVisitor<'db, 'c>,
+) -> ConstraintSet<'db, 'c> {
+    match (left, right) {
+        (None, None) => ConstraintSet::from_bool(constraints, false),
+        (Some(left), Some(right)) => left.is_disjoint_from_impl(
+            db,
+            right,
+            constraints,
+            inferable,
+            disjointness_visitor,
+            relation_visitor,
+        ),
+        (None | Some(_), None | Some(_)) => ConstraintSet::from_bool(constraints, true),
+    }
+}
+
+#[expect(clippy::too_many_arguments)]
+fn property_instance_has_relation<'db, 'c>(
+    db: &'db dyn Db,
+    left: PropertyInstanceType<'db>,
+    right: PropertyInstanceType<'db>,
+    constraints: &'c ConstraintSetBuilder<'db>,
+    inferable: InferableTypeVars<'_, 'db>,
+    relation: TypeRelation,
+    relation_visitor: &HasRelationToVisitor<'db, 'c>,
+    disjointness_visitor: &IsDisjointVisitor<'db, 'c>,
+) -> ConstraintSet<'db, 'c> {
+    optional_property_method_has_relation(
+        db,
+        left.getter(db),
+        right.getter(db),
+        constraints,
+        inferable,
+        relation,
+        relation_visitor,
+        disjointness_visitor,
+    )
+    .and(db, constraints, || {
+        optional_property_method_has_relation(
+            db,
+            left.setter(db),
+            right.setter(db),
+            constraints,
+            inferable,
+            relation,
+            relation_visitor,
+            disjointness_visitor,
+        )
+    })
+}
+
+fn property_instance_is_disjoint<'db, 'c>(
+    db: &'db dyn Db,
+    left: PropertyInstanceType<'db>,
+    right: PropertyInstanceType<'db>,
+    constraints: &'c ConstraintSetBuilder<'db>,
+    inferable: InferableTypeVars<'_, 'db>,
+    disjointness_visitor: &IsDisjointVisitor<'db, 'c>,
+    relation_visitor: &HasRelationToVisitor<'db, 'c>,
+) -> ConstraintSet<'db, 'c> {
+    optional_property_method_is_disjoint(
+        db,
+        left.getter(db),
+        right.getter(db),
+        constraints,
+        inferable,
+        disjointness_visitor,
+        relation_visitor,
+    )
+    .or(db, constraints, || {
+        optional_property_method_is_disjoint(
+            db,
+            left.setter(db),
+            right.setter(db),
+            constraints,
+            inferable,
+            disjointness_visitor,
+            relation_visitor,
+        )
+    })
+}
+
 #[salsa::tracked]
 impl<'db> Type<'db> {
     /// Return `true` if subtyping is always reflexive for this type; `T <: T` is always true for
@@ -241,7 +356,17 @@ impl<'db> Type<'db> {
             | Type::FunctionLiteral(..)
             | Type::BoundMethod(_)
             | Type::WrapperDescriptor(_)
-            | Type::KnownBoundMethod(_)
+            | Type::KnownBoundMethod(
+                KnownBoundMethodType::FunctionTypeDunderGet(_)
+                | KnownBoundMethodType::FunctionTypeDunderCall(_)
+                | KnownBoundMethodType::StrStartswith(_)
+                | KnownBoundMethodType::ConstraintSetRange
+                | KnownBoundMethodType::ConstraintSetAlways
+                | KnownBoundMethodType::ConstraintSetNever
+                | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)
+                | KnownBoundMethodType::ConstraintSetSatisfies(_)
+                | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_),
+            )
             | Type::DataclassDecorator(_)
             | Type::DataclassTransformer(_)
             | Type::ModuleLiteral(..)
@@ -250,7 +375,6 @@ impl<'db> Type<'db> {
             | Type::KnownInstance(_)
             | Type::AlwaysFalsy
             | Type::AlwaysTruthy
-            | Type::PropertyInstance(_)
             // `T` is always a subtype of itself,
             // and `T` is always a subtype of `T | None`
             | Type::TypeVar(_)
@@ -265,6 +389,11 @@ impl<'db> Type<'db> {
             | Type::Union(_)
             | Type::Intersection(_)
             | Type::Callable(_)
+            | Type::KnownBoundMethod(
+                KnownBoundMethodType::PropertyDunderGet(_)
+                | KnownBoundMethodType::PropertyDunderSet(_),
+            )
+            | Type::PropertyInstance(_)
             | Type::BoundSuper(_)
             | Type::TypeIs(_)
             | Type::TypeGuard(_)
@@ -1185,37 +1314,19 @@ impl<'db> Type<'db> {
                 }),
 
             (_, Type::Callable(other_callable)) => {
-                // Special-case: upcasting a subclass-of to its `Callable` "supertype" is unsound,
-                // because we don't do Liskov checks for constructor signatures.
-                let upcasted = if let Type::SubclassOf(inner) = self {
-                    match relation {
-                        TypeRelation::Subtyping
-                        | TypeRelation::SubtypingAssuming
-                        | TypeRelation::Redundancy { .. } => {
-                            Some(CallableTypes::one(CallableType::function_like(
-                                db,
-                                Signature::new(Parameters::top(), inner.to_instance(db)),
-                            )))
-                        }
-                        TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability => {
-                            self.try_upcast_to_callable(db)
-                        }
-                    }
-                } else {
-                    self.try_upcast_to_callable(db)
-                };
                 relation_visitor.visit((self, target, relation), || {
-                    upcasted.when_some_and(db, constraints, |callables| {
-                        callables.has_relation_to_impl(
-                            db,
-                            other_callable,
-                            constraints,
-                            inferable,
-                            relation,
-                            relation_visitor,
-                            disjointness_visitor,
-                        )
-                    })
+                    self.try_upcast_to_callable_with_policy(db, UpcastPolicy::from(relation))
+                        .when_some_and(db, constraints, |callables| {
+                            callables.has_relation_to_impl(
+                                db,
+                                other_callable,
+                                constraints,
+                                inferable,
+                                relation,
+                                relation_visitor,
+                                disjointness_visitor,
+                            )
+                        })
                 })
             }
 
@@ -1781,6 +1892,21 @@ impl<'db> Type<'db> {
                 })
             }
 
+            (Type::PropertyInstance(self_property), Type::PropertyInstance(target_property)) => {
+                relation_visitor.visit((self, target, relation), || {
+                    property_instance_has_relation(
+                        db,
+                        self_property,
+                        target_property,
+                        constraints,
+                        inferable,
+                        relation,
+                        relation_visitor,
+                        disjointness_visitor,
+                    )
+                })
+            }
+
             (Type::PropertyInstance(_), _) => {
                 KnownClass::Property.to_instance(db).has_relation_to_impl(
                     db,
@@ -2196,6 +2322,35 @@ impl<'db> Type<'db> {
             (Type::LiteralValue(left), Type::LiteralValue(right)) => {
                 ConstraintSet::from_bool(constraints, left.kind() != right.kind())
             }
+
+            (Type::PropertyInstance(left), Type::PropertyInstance(right)) => {
+                property_instance_is_disjoint(
+                    db,
+                    left,
+                    right,
+                    constraints,
+                    inferable,
+                    disjointness_visitor,
+                    relation_visitor,
+                )
+            }
+
+            (
+                Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderGet(left)),
+                Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderGet(right)),
+            )
+            | (
+                Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderSet(left)),
+                Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderSet(right)),
+            ) => property_instance_is_disjoint(
+                db,
+                left,
+                right,
+                constraints,
+                inferable,
+                disjointness_visitor,
+                relation_visitor,
+            ),
 
             // any single-valued type is disjoint from another single-valued type
             // iff the two types are nonequal

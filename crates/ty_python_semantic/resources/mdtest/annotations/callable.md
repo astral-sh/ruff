@@ -514,7 +514,7 @@ def f_okay(c: Callable[[], None]):
 ### Subclasses should return themselves, not superclass
 
 ```py
-from ty_extensions import into_callable
+from ty_extensions import into_regular_callable
 
 class Base:
     def __init__(self) -> None:
@@ -524,7 +524,7 @@ class A(Base):
     pass
 
 # revealed: () -> A
-reveal_type(into_callable(A))
+reveal_type(into_regular_callable(A))
 ```
 
 [gradual form]: https://typing.python.org/en/latest/spec/glossary.html#term-gradual-form

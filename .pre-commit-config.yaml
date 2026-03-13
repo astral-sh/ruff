@@ -5,7 +5,6 @@ exclude: |
     .github/workflows/release.yml|
     crates/ty_vendored/vendor/.*|
     crates/ty_project/resources/.*|
-    crates/ty_python_semantic/resources/corpus/.*|
     crates/ty/docs/(configuration|rules|cli|environment).md|
     crates/ruff_benchmark/resources/.*|
     crates/ruff_linter/resources/.*|
@@ -26,6 +25,11 @@ repos:
     rev: v6.0.0
     hooks:
       - id: check-merge-conflict
+        priority: 0
+      - id: end-of-file-fixer
+        # Don't run this on all files: the absence of trailing newlines is often
+        # intentional in parser/linter/formatter tests
+        files: '^((crates/ty_python_semantic/resources/corpus/.*)|(.*\.toml))$'
         priority: 0
 
   - repo: https://github.com/abravalheri/validate-pyproject
@@ -96,10 +100,12 @@ repos:
     rev: v0.15.4
     hooks:
       - id: ruff-format
+        exclude: crates/ty_python_semantic/resources/corpus/
         priority: 0
       - id: ruff-check
         args: [--fix, --exit-non-zero-on-fix]
         types_or: [python, pyi]
+        exclude: crates/ty_python_semantic/resources/corpus/
         require_serial: true
         priority: 1
 

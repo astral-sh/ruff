@@ -1,0 +1,96 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: union.md - Union - Diagnostics for PEP-604 unions used on Python less than 3.10
+mdtest path: crates/ty_python_semantic/resources/mdtest/annotations/union.md
+---
+
+# Python source files
+
+## a.py
+
+```
+1 | x: int | str  # error: [unsupported-operator]
+2 | 
+3 | class Foo:
+4 |     def __init__(self):
+5 |         self.x: int | str = 42  # error: [unsupported-operator]
+6 | 
+7 | d = {}
+8 | d[0]: int | str = 42  # error: [unsupported-operator]
+```
+
+## b.py
+
+```
+ 1 | from __future__ import annotations
+ 2 | 
+ 3 | x: int | str
+ 4 | 
+ 5 | class Foo:
+ 6 |     def __init__(self):
+ 7 |         self.x: int | str = 42
+ 8 | 
+ 9 | d = {}
+10 | d[0]: int | str = 42
+```
+
+# Diagnostics
+
+```
+error[unsupported-operator]: Unsupported `|` operation
+ --> src/a.py:1:4
+  |
+1 | x: int | str  # error: [unsupported-operator]
+  |    ---^^^---
+  |    |     |
+  |    |     Has type `<class 'str'>`
+  |    Has type `<class 'int'>`
+2 |
+3 | class Foo:
+  |
+info: PEP 604 `|` unions are only available on Python 3.10+ unless they are quoted
+info: Python 3.9 was assumed when inferring types because it was specified on the command line
+info: rule `unsupported-operator` is enabled by default
+
+```
+
+```
+error[unsupported-operator]: Unsupported `|` operation
+ --> src/a.py:5:17
+  |
+3 | class Foo:
+4 |     def __init__(self):
+5 |         self.x: int | str = 42  # error: [unsupported-operator]
+  |                 ---^^^---
+  |                 |     |
+  |                 |     Has type `<class 'str'>`
+  |                 Has type `<class 'int'>`
+6 |
+7 | d = {}
+  |
+info: PEP 604 `|` unions are only available on Python 3.10+ unless they are quoted
+info: Python 3.9 was assumed when inferring types because it was specified on the command line
+info: rule `unsupported-operator` is enabled by default
+
+```
+
+```
+error[unsupported-operator]: Unsupported `|` operation
+ --> src/a.py:8:7
+  |
+7 | d = {}
+8 | d[0]: int | str = 42  # error: [unsupported-operator]
+  |       ---^^^---
+  |       |     |
+  |       |     Has type `<class 'str'>`
+  |       Has type `<class 'int'>`
+  |
+info: PEP 604 `|` unions are only available on Python 3.10+ unless they are quoted
+info: Python 3.9 was assumed when inferring types because it was specified on the command line
+info: rule `unsupported-operator` is enabled by default
+
+```

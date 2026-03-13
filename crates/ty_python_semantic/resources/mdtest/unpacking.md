@@ -213,8 +213,8 @@ reveal_type(d)  # revealed: Literal[2]
 
 ```py
 a, b = [1, 2]
-reveal_type(a)  # revealed: int
-reveal_type(b)  # revealed: int
+reveal_type(a)  # revealed: Literal[1]
+reveal_type(b)  # revealed: Literal[2]
 ```
 
 ### Simple unpacking

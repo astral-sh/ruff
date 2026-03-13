@@ -111,14 +111,16 @@ KNOWN_FORMATTING_VIOLATIONS = [
 
 # For some docs, Ruff is unable to parse the example code.
 KNOWN_PARSE_ERRORS = [
-    "banned-eager-imports",  # requires Python 3.15
+    "ban-lazy",  # requires Python 3.15
     "blank-line-with-whitespace",
     "indented-form-feed",
+    "lazy-import-mismatch",  # requires Python 3.15
     "missing-newline-at-end-of-file",
     "mixed-spaces-and-tabs",
     "no-indented-block",
     "non-pep695-type-alias",  # requires Python 3.12
     "quadratic-list-summation",  # requires Python 3.15
+    "require-lazy",  # requires Python 3.15
     "syntax-error",
     "tab-after-comma",
     "tab-after-keyword",

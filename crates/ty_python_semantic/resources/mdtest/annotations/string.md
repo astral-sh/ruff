@@ -170,7 +170,12 @@ from __future__ import annotations
 def f(v: int | "Foo"):  # fine
     reveal_type(v)  # revealed: int | Foo
 
-class Foo: ...
+class Foo:
+    def __init__(self):
+        self.x: "int" | "str" = 42
+
+d = {}
+d[0]: "int" | "str" = 42
 
 # error: [unsupported-operator]
 X = list["int" | None]

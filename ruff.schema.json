@@ -864,19 +864,6 @@
         "type": "string"
       }
     },
-    "BannedEagerImports": {
-      "anyOf": [
-        {
-          "$ref": "#/definitions/AllImports"
-        },
-        {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        }
-      ]
-    },
     "ConstantType": {
       "type": "string",
       "enum": [
@@ -1451,6 +1438,17 @@
       "description": "Options for the `flake8-tidy-imports` plugin",
       "type": "object",
       "properties": {
+        "ban-lazy": {
+          "description": "Specific modules that may not be imported lazily, or `\"all\"` to forbid lazy imports except\nfor any modules excluded from the selector. This rule is only enforced when targeting\nPython 3.15 or newer.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ImportSelector"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "ban-relative-imports": {
           "description": "Whether to ban all relative imports (`\"all\"`), or only those imports\nthat extend into the parent module or beyond (`\"parents\"`).",
           "anyOf": [
@@ -1472,17 +1470,6 @@
             "$ref": "#/definitions/ApiBan"
           }
         },
-        "banned-eager-imports": {
-          "description": "Specific modules that may not be imported eagerly in contexts where lazy imports are legal,\nor `\"all\"` to require every lazily-convertible import to use the `lazy` keyword. Ruff\nignores contexts where `lazy import` is invalid, such as functions, classes,\n`try`/`except` blocks, `__future__` imports, and `from ... import *` statements. This rule\nis only enforced when targeting Python 3.15 or newer.",
-          "anyOf": [
-            {
-              "$ref": "#/definitions/BannedEagerImports"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
         "banned-module-level-imports": {
           "description": "List of specific modules that may not be imported at module level, and should instead be\nimported lazily (e.g., within a function definition, or an `if TYPE_CHECKING:`\nblock, or some other nested context). This also affects the rule `import-outside-top-level`\nif `banned-module-level-imports` is enabled.",
           "type": [
@@ -1492,6 +1479,17 @@
           "items": {
             "type": "string"
           }
+        },
+        "require-lazy": {
+          "description": "Specific modules that must be imported lazily in contexts where `lazy import` is legal, or\n`\"all\"` to require every lazily-convertible import to use the `lazy` keyword. Ruff ignores\ncontexts where `lazy import` is invalid, such as functions, classes, `try`/`except`\nblocks, `__future__` imports, and `from ... import *` statements. This rule is only\nenforced when targeting Python 3.15 or newer.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ImportSelector"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "additionalProperties": false
@@ -1651,6 +1649,48 @@
         {
           "type": "string"
         }
+      ]
+    },
+    "ImportSelection": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/AllImports"
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      ]
+    },
+    "ImportSelector": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/ImportSelection"
+        },
+        {
+          "$ref": "#/definitions/ImportSelectorSettings"
+        }
+      ]
+    },
+    "ImportSelectorSettings": {
+      "type": "object",
+      "properties": {
+        "exclude": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          }
+        },
+        "include": {
+          "$ref": "#/definitions/ImportSelection"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "include"
       ]
     },
     "ImportType": {
@@ -3063,6 +3103,7 @@
         "AIR00",
         "AIR001",
         "AIR002",
+        "AIR003",
         "AIR3",
         "AIR30",
         "AIR301",

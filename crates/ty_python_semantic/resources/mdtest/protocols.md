@@ -3079,6 +3079,23 @@ class Nominal:
 static_assert(not is_disjoint_from(Proto, Nominal))
 ```
 
+### Regression test: recursive protocol through `dict.items()`
+
+```py
+from __future__ import annotations
+
+from typing import Protocol
+
+class IntArray(Protocol):
+    def __add__(self, other: IntArray | int) -> IntArray: ...
+    def __getitem__(self, key: slice) -> IntArray: ...
+
+data: dict[str, IntArray] = {}
+indexed_data = {k: v[0:10] for k, v in data.items()}
+
+reveal_type(indexed_data)  # revealed: dict[str, IntArray]
+```
+
 ### Regression test: narrowing with self-referential protocols
 
 This snippet caused us to panic on an early version of the implementation for protocols.
