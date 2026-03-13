@@ -7330,3 +7330,9 @@ impl EvaluationMode {
 #[cfg(not(debug_assertions))]
 #[cfg(target_pointer_width = "64")]
 static_assertions::assert_eq_size!(Type, [u8; 16]);
+
+// Make sure that `LiteralValueTypeInner` stays at 12 bytes.
+// The `LiteralFlags` byte must fit in the discriminant's padding.
+#[cfg(not(debug_assertions))]
+#[cfg(target_pointer_width = "64")]
+static_assertions::assert_eq_size!(literal::LiteralValueType, [u8; 12]);
