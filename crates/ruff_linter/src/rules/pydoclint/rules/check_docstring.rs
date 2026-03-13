@@ -1,9 +1,9 @@
 use itertools::Itertools;
-use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::{map_callable, map_subscript};
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::visitor::Visitor;
-use ruff_python_ast::{self as ast, Expr, Stmt, visitor};
+use ruff_python_ast::{self as ast, visitor, Expr, Stmt};
 use ruff_python_semantic::analyze::{function_type, visibility};
 use ruff_python_semantic::{Definition, SemanticModel};
 use ruff_python_stdlib::identifiers::is_identifier;
@@ -11,13 +11,70 @@ use ruff_source_file::{LineRanges, NewlineWithTrailingNewline};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use rustc_hash::FxHashMap;
 
-use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::docstrings::Docstring;
 use crate::docstrings::sections::{SectionContext, SectionContexts, SectionKind};
 use crate::docstrings::styles::SectionStyle;
+use crate::docstrings::Docstring;
 use crate::registry::Rule;
 use crate::rules::pydocstyle::settings::Convention;
+use crate::Violation;
+
+/// ## What it does
+/// Checks arguments are the same in the docstring and the function signature
+/// and are in same order.
+///
+/// ## Why is this bad?
+/// If arguments in docstring in different order from function signature
+/// it may be confuse while read docstring and use function.
+///
+/// ## Example
+/// ```python
+/// def calculate_speed(distance: float, time: float) -> float:
+///     """Calculate speed as distance divided by time.
+///
+///     Args:
+///         time: Time spent traveling.
+///         distance: Distance traveled.
+///
+///     Returns:
+///         Speed as distance divided by time.
+///     """
+///     return distance / time
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def calculate_speed(distance: float, time: float) -> float:
+///     """Calculate speed as distance divided by time.
+///
+///     Args:
+///         distance: Distance traveled.
+///         time: Time spent traveling.
+///
+///     Returns:
+///         Speed as distance divided by time.
+///     """
+///     return distance / time
+/// ```
+///
+/// ## Options
+///
+/// - `lint.pydoclint.ignore-one-line-docstrings`
+/// - `lint.pydocstyle.convention`
+#[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "NEXT_RUFF_VERSION")]
+pub(crate) struct DocstringDifferentOrderParameters;
+
+impl Violation for DocstringDifferentOrderParameters {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        "Arguments are the same in the docstring and the function signature, but are in a different order.".to_string()
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        Some("Arrange the arguments in the same order as in the function signature".to_string())
+    }
+}
 
 /// ## What it does
 /// Checks for function docstrings that include parameters which are not
@@ -1156,24 +1213,16 @@ fn generator_annotation_arguments<'a>(
 ) -> Option<GeneratorOrIteratorArguments<'a>> {
     let qualified_name = semantic.resolve_qualified_name(map_subscript(expr))?;
     match qualified_name.segments() {
-        [
-            "typing" | "typing_extensions",
-            "Iterable" | "AsyncIterable" | "Iterator" | "AsyncIterator",
-        ]
-        | [
-            "collections",
-            "abc",
-            "Iterable" | "AsyncIterable" | "Iterator" | "AsyncIterator",
-        ] => match expr {
-            Expr::Subscript(ast::ExprSubscript { slice, .. }) => {
-                Some(GeneratorOrIteratorArguments::Single(slice))
+        ["typing" | "typing_extensions", "Iterable" | "AsyncIterable" | "Iterator" | "AsyncIterator"]
+        | ["collections", "abc", "Iterable" | "AsyncIterable" | "Iterator" | "AsyncIterator"] => {
+            match expr {
+                Expr::Subscript(ast::ExprSubscript { slice, .. }) => {
+                    Some(GeneratorOrIteratorArguments::Single(slice))
+                }
+                _ => Some(GeneratorOrIteratorArguments::Unparameterized),
             }
-            _ => Some(GeneratorOrIteratorArguments::Unparameterized),
-        },
-        [
-            "typing" | "typing_extensions",
-            "Generator" | "AsyncGenerator",
-        ]
+        }
+        ["typing" | "typing_extensions", "Generator" | "AsyncGenerator"]
         | ["collections", "abc", "Generator" | "AsyncGenerator"] => match expr {
             Expr::Subscript(ast::ExprSubscript { slice, .. }) => {
                 if let Expr::Tuple(tuple) = &**slice {
@@ -1360,7 +1409,7 @@ pub(crate) fn check_docstring(
     if checker.is_rule_enabled(Rule::DocstringExtraneousParameter) {
         // Don't report extraneous parameters if the signature defines *args or **kwargs
         if function_def.parameters.vararg.is_none() && function_def.parameters.kwarg.is_none() {
-            if let Some(docstring_params) = docstring_sections.parameters {
+            if let Some(ref docstring_params) = docstring_sections.parameters {
                 for docstring_param in &docstring_params.parameters {
                     if !signature_parameters.contains(&docstring_param.name) {
                         checker.report_diagnostic(
@@ -1371,6 +1420,33 @@ pub(crate) fn check_docstring(
                         );
                     }
                 }
+            }
+        }
+    }
+
+    // DOC104
+    if checker.is_rule_enabled(Rule::DocstringDifferentOrderParameters) {
+        if let Some(ref docstring_params) = docstring_sections.parameters {
+            let fn_sign_names: Vec<&str> = function_def
+                .parameters
+                .args
+                .iter()
+                .map(|arg| arg.name().id.as_str())
+                .filter(|name| *name != "self")
+                .collect();
+            let docstring_names: Vec<&str> = docstring_params
+                .parameters
+                .iter()
+                .map(|param| param.name)
+                .collect();
+
+            if fn_sign_names.len() == docstring_names.len()
+                && !fn_sign_names
+                    .iter()
+                    .zip(docstring_names.iter())
+                    .all(|(a, b)| a == b)
+            {
+                checker.report_diagnostic(DocstringDifferentOrderParameters, docstring.range());
             }
         }
     }
