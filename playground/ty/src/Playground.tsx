@@ -9,7 +9,13 @@ import {
   useRef,
   useState,
 } from "react";
-import { ErrorMessage, Header, setupMonaco, useTheme } from "shared";
+import {
+  ErrorMessage,
+  Header,
+  setupMonaco,
+  useTheme,
+  downloadZip,
+} from "shared";
 import { FileHandle, PositionEncoding, Workspace } from "ty_wasm";
 import {
   copyAsMarkdown,
@@ -80,6 +86,28 @@ export default function Playground() {
     }
   }, [files]);
 
+  const handleDownload = useCallback(async () => {
+    const serialized = serializeFiles(files);
+
+    if (serialized != null) {
+      const downloadFiles = { ...serialized.files };
+
+      if (SETTINGS_FILE_NAME in downloadFiles) {
+        try {
+          const toml = await import("smol-toml");
+          const tomlContent = toml.stringify(
+            JSON.parse(downloadFiles[SETTINGS_FILE_NAME]),
+          );
+          delete downloadFiles[SETTINGS_FILE_NAME];
+          downloadFiles["ty.toml"] = tomlContent;
+        } catch {
+          // Keep the original JSON file if conversion fails.
+        }
+      }
+
+      await downloadZip(downloadFiles, "ty-playground");
+    }
+  }, [files]);
   const handleFileAdded = useCallback((workspace: Workspace, name: string) => {
     let handle = null;
 
@@ -205,6 +233,7 @@ export default function Playground() {
         onShare={handleShare}
         onCopyMarkdownLink={handleCopyMarkdownLink}
         onCopyMarkdown={handleCopyMarkdown}
+        onDownload={handleDownload}
         onReset={workspace == null ? undefined : handleReset}
       />
 

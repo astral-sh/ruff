@@ -6,6 +6,7 @@ export * as Icons from "./Icons";
 export { type Theme, useTheme } from "./theme";
 export { HorizontalResizeHandle, VerticalResizeHandle } from "./ResizeHandle";
 export { setupMonaco } from "./setupMonaco";
+export { downloadZip } from "./downloadZip";
 export {
   default as SideBar,
   SideBarEntry,

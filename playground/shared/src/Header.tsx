@@ -16,6 +16,7 @@ export default function Header({
   onShare,
   onCopyMarkdownLink,
   onCopyMarkdown,
+  onDownload,
 }: {
   theme: Theme;
   tool: "ruff" | "ty";
@@ -26,6 +27,7 @@ export default function Header({
   onShare: () => Promise<void>;
   onCopyMarkdownLink: () => Promise<void>;
   onCopyMarkdown: () => Promise<void>;
+  onDownload(): void;
 }) {
   return (
     <div
@@ -61,6 +63,7 @@ export default function Header({
             onShare={onShare}
             onCopyMarkdownLink={onCopyMarkdownLink}
             onCopyMarkdown={onCopyMarkdown}
+            onDownload={onDownload}
           />
         </div>
         <Divider />
