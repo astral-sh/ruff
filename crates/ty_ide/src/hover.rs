@@ -1,5 +1,5 @@
 use crate::docstring::Docstring;
-use crate::goto::{GotoTarget, find_goto_target};
+use crate::goto::{Definitions, GotoTarget, find_goto_target};
 use crate::{Db, MarkupKind, RangedValue};
 use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::parsed_module;
@@ -7,9 +7,11 @@ use ruff_python_ast as ast;
 use ruff_text_size::{Ranged, TextSize};
 use std::fmt;
 use std::fmt::Formatter;
-use ty_python_semantic::types::ide_support::typed_dict_key_hover;
+use ty_python_semantic::types::ide_support::{resolved_call_signature, typed_dict_key_hover};
 use ty_python_semantic::types::{KnownInstanceType, Type, TypeVarVariance};
-use ty_python_semantic::{DisplaySettings, SemanticModel, TypeQualifiers};
+use ty_python_semantic::{
+    DisplaySettings, HasType, ResolvedDefinition, SemanticModel, TypeQualifiers,
+};
 
 pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Hover<'_>>> {
     let parsed = parsed_module(db, file).load(db);
@@ -32,13 +34,40 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
 
     let docs = if typed_dict_key.is_some() {
         None
+    } else if let GotoTarget::Call { callable, call, .. } = goto_target {
+        resolved_call_signature(&model, call)
+            .and_then(|details| {
+                let definition = details.definition?;
+                Definitions(vec![ResolvedDefinition::Definition(definition)])
+                    .docstring(db)
+                    .or_else(|| {
+                        ResolvedDefinition::Definition(definition)
+                            .implementation_docstring(db)
+                            .map(Docstring::new)
+                    })
+            })
+            .or_else(|| {
+                callable
+                    .inferred_type(&model)
+                    .is_some_and(|ty| ty.is_class_literal())
+                    .then(|| {
+                        goto_target
+                            .get_definition_targets(
+                                &model,
+                                ty_python_semantic::ImportAliasResolution::ResolveAliases,
+                            )
+                            .and_then(|definitions| definitions.docstring(db))
+                    })
+                    .flatten()
+            })
+            .map(HoverContent::Docstring)
     } else {
         goto_target
             .get_definition_targets(
                 &model,
                 ty_python_semantic::ImportAliasResolution::ResolveAliases,
             )
-            .and_then(|definitions| definitions.hover_docstring(db))
+            .and_then(|definitions| definitions.docstring(db))
             .map(HoverContent::Docstring)
     };
 
@@ -789,6 +818,47 @@ mod tests {
         );
 
         assert_snapshot!(test.hover());
+    }
+
+    #[test]
+    fn hover_overloaded_function_does_not_use_unrelated_sibling_docstring() {
+        let test = cursor_test(
+            r#"
+        from typing import overload
+
+        @overload
+        def test() -> str: ...
+
+        @overload
+        def test(arg: str) -> str:
+            """A second overload"""
+
+        def test(arg: str | None = None) -> str:
+            return "test"
+
+        t<CURSOR>est()
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r#"
+        def test() -> str
+        ---------------------------------------------
+        ```python
+        def test() -> str
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+          --> main.py:14:1
+           |
+        12 |     return "test"
+        13 |
+        14 | test()
+           | ^-^^
+           | ||
+           | |Cursor offset
+           | source
+           |
+        "#);
     }
 
     #[test]
@@ -1636,14 +1706,14 @@ def ab(a: str):
         assert_snapshot!(test.hover(), @r#"
         def ab(a: str) -> Unknown
         ---------------------------------------------
-        the int overload
+        the str overload
 
         ---------------------------------------------
         ```python
         def ab(a: str) -> Unknown
         ```
         ---
-        the int overload
+        the str overload
         ---------------------------------------------
         info[hover]: Hovered content is
          --> main.py:4:1
@@ -1762,14 +1832,14 @@ def ab(a: int):
         assert_snapshot!(test.hover(), @"
         def ab(a: int) -> Unknown
         ---------------------------------------------
-        the two arg overload
+        the one arg overload
 
         ---------------------------------------------
         ```python
         def ab(a: int) -> Unknown
         ```
         ---
-        the two arg overload
+        the one arg overload
         ---------------------------------------------
         info[hover]: Hovered content is
          --> main.py:4:1
@@ -1830,7 +1900,7 @@ def ab(a: int, *, c: int):
             b: int
         ) -> Unknown
         ---------------------------------------------
-        keywordless overload
+        b overload
 
         ---------------------------------------------
         ```python
@@ -1841,7 +1911,7 @@ def ab(a: int, *, c: int):
         ) -> Unknown
         ```
         ---
-        keywordless overload
+        b overload
         ---------------------------------------------
         info[hover]: Hovered content is
          --> main.py:4:1
@@ -1902,7 +1972,7 @@ def ab(a: int, *, c: int):
             c: int
         ) -> Unknown
         ---------------------------------------------
-        keywordless overload
+        c overload
 
         ---------------------------------------------
         ```python
@@ -1913,7 +1983,7 @@ def ab(a: int, *, c: int):
         ) -> Unknown
         ```
         ---
-        keywordless overload
+        c overload
         ---------------------------------------------
         info[hover]: Hovered content is
          --> main.py:4:1

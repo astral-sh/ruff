@@ -897,7 +897,7 @@ pub fn find_active_signature_from_details(
 /// using full type checking (not just arity matching) for overload resolution.
 ///
 /// Falls back to arity-based matching if type-based resolution fails.
-fn resolve_call_signature<'db>(
+pub fn resolved_call_signature<'db>(
     model: &SemanticModel<'db>,
     call_expr: &ast::ExprCall,
 ) -> Option<CallSignatureDetails<'db>> {
@@ -959,7 +959,7 @@ pub fn inlay_hint_call_argument_details<'db>(
     model: &SemanticModel<'db>,
     call_expr: &ast::ExprCall,
 ) -> Option<InlayHintCallArgumentDetails> {
-    let resolved = resolve_call_signature(model, call_expr)?;
+    let resolved = resolved_call_signature(model, call_expr)?;
 
     let parameters = resolved.signature.parameters();
 
@@ -1084,18 +1084,23 @@ mod resolve_definition {
             }
         }
 
-        pub fn sibling_docstring(&self, db: &'db dyn Db) -> Option<String> {
+        pub fn implementation_docstring(&self, db: &'db dyn Db) -> Option<String> {
             match self {
-                ResolvedDefinition::Definition(definition) => sibling_docstring(db, *definition),
+                ResolvedDefinition::Definition(definition) => {
+                    implementation_docstring(db, *definition)
+                }
                 ResolvedDefinition::Module(_) | ResolvedDefinition::FileWithRange(_) => None,
             }
         }
     }
 
-    // Overload declarations often omit docstrings, while the implementation
-    // carries the user-facing documentation. Fall back to sibling definitions
-    // of the same symbol in this scope to recover that docstring.
-    fn sibling_docstring<'db>(db: &'db dyn Db, definition: Definition<'db>) -> Option<String> {
+    // Overload declarations often omit docstrings, while the runtime
+    // implementation appears as the last sibling binding for the same symbol.
+    // Fall back to that binding's docstring when the resolved overload has none.
+    fn implementation_docstring<'db>(
+        db: &'db dyn Db,
+        definition: Definition<'db>,
+    ) -> Option<String> {
         let DefinitionKind::Function(_) = definition.kind(db) else {
             return None;
         };
@@ -1105,16 +1110,13 @@ mod resolve_definition {
         let symbol_id = place_table(db, scope).symbol_id(&name)?;
         let use_def = use_def_map(db, scope);
 
-        use_def
-            .reachable_symbol_declarations(symbol_id)
-            .filter_map(|declaration| declaration.declaration.definition())
-            .chain(
-                use_def
-                    .reachable_symbol_bindings(symbol_id)
-                    .filter_map(|binding| binding.binding.definition()),
-            )
+        let implementation = use_def
+            .reachable_symbol_bindings(symbol_id)
+            .filter_map(|binding| binding.binding.definition())
             .filter(|candidate| *candidate != definition)
-            .find_map(|candidate| candidate.docstring(db))
+            .last()?;
+
+        implementation.docstring(db)
     }
 
     /// Resolve import definitions to their targets.
