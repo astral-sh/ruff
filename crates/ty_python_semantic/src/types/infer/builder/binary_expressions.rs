@@ -998,6 +998,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 | Type::TypeVar(_)
                 | Type::TypeIs(_)
                 | Type::TypeGuard(_)
+                | Type::TypedDictTop
                 | Type::TypedDict(_),
                 Type::FunctionLiteral(_)
                 | Type::Callable(..)
@@ -1023,6 +1024,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 | Type::TypeVar(_)
                 | Type::TypeIs(_)
                 | Type::TypeGuard(_)
+                | Type::TypedDictTop
                 | Type::TypedDict(_),
                 op,
             ) => Type::try_call_bin_op_return_type(db, left_ty, op, right_ty),

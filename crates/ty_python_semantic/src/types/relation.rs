@@ -292,6 +292,7 @@ impl<'db> Type<'db> {
             | Type::BoundSuper(_)
             | Type::TypeIs(_)
             | Type::TypeGuard(_)
+            | Type::TypedDictTop
             | Type::TypedDict(_)
             | Type::TypeAlias(_)
             | Type::NewTypeInstance(_) => false,
@@ -1570,27 +1571,32 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 })
             }
 
+            (Type::TypedDict(_) | Type::TypedDictTop, Type::TypedDictTop) => self.always(),
+
             // TODO: When we support `closed` and/or `extra_items`, we could allow assignments to other
             // compatible `Mapping`s. `extra_items` could also allow for some assignments to `dict`, as
             // long as `total=False`. (But then again, does anyone want a non-total `TypedDict` where all
             // key types are a supertype of the extra items type?)
-            (Type::TypedDict(typed_dict), _) => self.with_recursion_guard(source, target, || {
-                let spec = &[KnownClass::Str.to_instance(db), Type::object()];
-                let str_object_map = KnownClass::Mapping.to_specialized_instance(db, spec);
-                let result = self.check_type_pair(db, str_object_map, target);
-                if result.is_never_satisfied(db) {
-                    if let Type::NominalInstance(instance) = target
+            (Type::TypedDict(_) | Type::TypedDictTop, _) => {
+                self.with_recursion_guard(source, target, || {
+                    let spec = &[KnownClass::Str.to_instance(db), Type::object()];
+                    let str_object_map = KnownClass::Mapping.to_specialized_instance(db, spec);
+                    let result = self.check_type_pair(db, str_object_map, target);
+                    if result.is_never_satisfied(db)
+                        && let Type::NominalInstance(instance) = target
                         && instance.class(db).is_known(db, KnownClass::Dict)
+                        && let Type::TypedDict(typed_dict) = source
                     {
                         self.provide_context(|| {
                             ErrorContext::TypedDictNotAssignableToDict(typed_dict)
                         });
                     }
-                }
-                result
-            }),
+                    result
+                })
+            }
 
             // A non-`TypedDict` cannot subtype a `TypedDict`
+            (_, Type::TypedDictTop) => self.never(),
             (_, Type::TypedDict(_)) => self.never(),
 
             // A string literal `Literal["abc"]` is assignable to `str` *and* to
@@ -2468,6 +2474,23 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 })
             }
 
+            (Type::ProtocolInstance(protocol), Type::TypedDictTop)
+            | (Type::TypedDictTop, Type::ProtocolInstance(protocol)) => {
+                self.with_recursion_guard(left, right, || {
+                    self.any_protocol_members_absent_or_disjoint(
+                        db,
+                        protocol,
+                        KnownClass::TypedDictFallback.to_instance(db),
+                    )
+                })
+            }
+
+            (Type::ProtocolInstance(protocol), typed_dict @ Type::TypedDict(_))
+            | (typed_dict @ Type::TypedDict(_), Type::ProtocolInstance(protocol)) => self
+                .with_recursion_guard(left, right, || {
+                    self.any_protocol_members_absent_or_disjoint(db, protocol, typed_dict)
+                }),
+
             (Type::ProtocolInstance(protocol), other)
             | (other, Type::ProtocolInstance(protocol)) => {
                 self.with_recursion_guard(left, right, || {
@@ -2812,16 +2835,19 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 })
             }
 
-            // For any type `T`, if `dict[str, Any]` is not assignable to `T`, then all `TypedDict`
-            // types will always be disjoint from `T`. This doesn't cover all cases -- in fact
-            // `dict` *itself* is almost always disjoint from `TypedDict` -- but it's a good
-            // approximation, and some false negatives are acceptable.
-            (Type::TypedDict(_), other) | (other, Type::TypedDict(_)) => {
-                let dict_str_any = KnownClass::Dict
+            (Type::TypedDictTop | Type::TypedDict(_), Type::TypedDictTop)
+            | (Type::TypedDictTop, Type::TypedDict(_)) => self.never(),
+
+            // Other than the special cases enumerated above,
+            // a typeddict type is always disjoint from any type that is not
+            // a supertype of `Top[Mapping[str, Any]]`.
+            (Type::TypedDictTop | Type::TypedDict(_), other)
+            | (other, Type::TypedDictTop | Type::TypedDict(_)) => {
+                let mapping_str_any = KnownClass::Mapping
                     .to_specialized_instance(db, &[KnownClass::Str.to_instance(db), Type::any()]);
 
                 self.as_relation_checker(TypeRelation::Assignability)
-                    .check_type_pair(db, dict_str_any, other)
+                    .check_type_pair(db, mapping_str_any, other)
                     .negate(db, self.constraints)
             }
         }

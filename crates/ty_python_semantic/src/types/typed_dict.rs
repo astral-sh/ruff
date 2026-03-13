@@ -977,6 +977,7 @@ pub(crate) fn extract_unpacked_typed_dict_keys_from_value_type<'db>(
 
             Some(result)
         }
+        Type::TypedDictTop => None,
         Type::TypeAlias(alias) => {
             extract_unpacked_typed_dict_keys_from_value_type(db, alias.value_type(db))
         }
