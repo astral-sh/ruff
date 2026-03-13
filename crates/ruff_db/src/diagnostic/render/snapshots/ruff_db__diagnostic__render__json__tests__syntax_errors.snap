@@ -18,6 +18,7 @@ expression: env.render_diagnostics(&diagnostics)
     },
     "message": "Expected one or more symbol names after import",
     "noqa_row": null,
+    "severity": "error",
     "url": null
   },
   {
@@ -35,6 +36,7 @@ expression: env.render_diagnostics(&diagnostics)
     },
     "message": "Expected ')', found newline",
     "noqa_row": null,
+    "severity": "error",
     "url": null
   }
 ]

@@ -248,7 +248,7 @@ impl<'a> ResolvedDiagnostic<'a> {
                 |code| code.to_string(),
             )
         } else {
-            diag.inner.id.to_string()
+            diag.secondary_code_or_id().to_string()
         };
 
         let level = if config.hide_severity {

@@ -2727,15 +2727,15 @@ fn nested_implicit_namespace_package() -> Result<()> {
         .arg("--select")
         .arg("INP")
         .arg("--preview")
-        , @"
+        , @r###"
     success: false
     exit_code: 1
     ----- stdout -----
-    foo/bar/baz/__init__.py:1:1: INP001 File `foo/bar/baz/__init__.py` declares a package, but is nested under an implicit namespace package. Add an `__init__.py` to `foo/bar`.
+    foo/bar/baz/__init__.py:1:1: error[INP001] File `foo/bar/baz/__init__.py` declares a package, but is nested under an implicit namespace package. Add an `__init__.py` to `foo/bar`.
     Found 1 error.
 
     ----- stderr -----
-    ");
+    "###);
 
     Ok(())
 }
@@ -3112,7 +3112,7 @@ class Foo[_T, __T]:
     pass
 "#
         ),
-        @"
+        @r###"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -3121,9 +3121,9 @@ class Foo[_T, __T]:
         pass
 
     ----- stderr -----
-    test.py:2:14: UP049 Generic class uses private type parameters
+    test.py:2:14: error[UP049] Generic class uses private type parameters
     Found 2 errors (1 fixed, 1 remaining).
-    "
+    "###
     );
 }
 
@@ -3263,16 +3263,16 @@ T = TypeVar("T")
 class A(Generic[T]):
     var: T
 "#),
-        @"
+        @r###"
     success: false
     exit_code: 1
     ----- stdout -----
-    test.py:6:9: UP046 Generic class `A` uses `Generic` subclass instead of type parameters
+    test.py:6:9: error[UP046] Generic class `A` uses `Generic` subclass instead of type parameters
     Found 1 error.
     No fixes available (1 hidden fix can be enabled with the `--unsafe-fixes` option).
 
     ----- stderr -----
-    "
+    "###
     );
 
     // with per-file-target-version, there should be no errors because the new generic syntax is
@@ -3405,15 +3405,15 @@ match 2:
         print("it's one")
 "#
         ),
-        @"
+        @r###"
     success: false
     exit_code: 1
     ----- stdout -----
-    test.py:2:1: invalid-syntax: Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)
+    test.py:2:1: error[invalid-syntax] Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)
     Found 1 error.
 
     ----- stderr -----
-    "
+    "###
     );
 }
 
@@ -3431,27 +3431,27 @@ fn cache_syntax_errors() -> Result<()> {
 
     assert_cmd_snapshot!(
         cmd,
-        @"
+        @r###"
     success: false
     exit_code: 1
     ----- stdout -----
-    main.py:1:1: invalid-syntax: Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)
+    main.py:1:1: error[invalid-syntax] Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)
 
     ----- stderr -----
-    "
+    "###
     );
 
     // this should *not* be cached, like normal parse errors
     assert_cmd_snapshot!(
         cmd,
-        @"
+        @r###"
     success: false
     exit_code: 1
     ----- stdout -----
-    main.py:1:1: invalid-syntax: Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)
+    main.py:1:1: error[invalid-syntax] Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)
 
     ----- stderr -----
-    "
+    "###
     );
 
     Ok(())
@@ -3552,29 +3552,29 @@ fn semantic_syntax_errors() -> Result<()> {
 
     assert_cmd_snapshot!(
         cmd,
-        @"
+        @r###"
     success: false
     exit_code: 1
     ----- stdout -----
-    main.py:1:3: invalid-syntax: assignment expression cannot rebind comprehension variable
-    main.py:1:20: F821 Undefined name `foo`
+    main.py:1:3: error[invalid-syntax] assignment expression cannot rebind comprehension variable
+    main.py:1:20: error[F821] Undefined name `foo`
 
     ----- stderr -----
-    "
+    "###
     );
 
     // this should *not* be cached, like normal parse errors
     assert_cmd_snapshot!(
         cmd,
-        @"
+        @r###"
     success: false
     exit_code: 1
     ----- stdout -----
-    main.py:1:3: invalid-syntax: assignment expression cannot rebind comprehension variable
-    main.py:1:20: F821 Undefined name `foo`
+    main.py:1:3: error[invalid-syntax] assignment expression cannot rebind comprehension variable
+    main.py:1:20: error[F821] Undefined name `foo`
 
     ----- stderr -----
-    "
+    "###
     );
 
     // ensure semantic errors are caught even without AST-based rules selected
@@ -3584,15 +3584,15 @@ fn semantic_syntax_errors() -> Result<()> {
             .arg("--preview")
             .arg("-")
             .pass_stdin(contents),
-        @"
+        @r###"
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:3: invalid-syntax: assignment expression cannot rebind comprehension variable
+    -:1:3: error[invalid-syntax] assignment expression cannot rebind comprehension variable
     Found 1 error.
 
     ----- stderr -----
-    "
+    "###
     );
 
     Ok(())
@@ -3741,11 +3741,11 @@ fn show_fixes_in_full_output_with_preview_enabled() {
             .arg("--preview")
             .arg("-")
             .pass_stdin("import math"),
-        @"
+        @r###"
     success: false
     exit_code: 1
     ----- stdout -----
-    F401 [*] `math` imported but unused
+    error[F401][*]: `math` imported but unused
      --> -:1:8
       |
     1 | import math
@@ -3758,7 +3758,7 @@ fn show_fixes_in_full_output_with_preview_enabled() {
     [*] 1 fixable with the `--fix` option.
 
     ----- stderr -----
-    ",
+    "###,
     );
 }
 
@@ -3772,17 +3772,17 @@ fn rule_panic_mixed_results_concise() -> Result<()> {
         fixture.check_command()
             .args(["--select", "RUF9", "--preview"])
             .args(["normal.py", "panic.py"]),
-        @"
+        @r###"
     success: false
     exit_code: 2
     ----- stdout -----
-    normal.py:1:1: RUF900 Hey this is a stable test rule.
-    normal.py:1:1: RUF901 [*] Hey this is a stable test rule with a safe fix.
-    normal.py:1:1: RUF902 Hey this is a stable test rule with an unsafe fix.
-    normal.py:1:1: RUF903 Hey this is a stable test rule with a display only fix.
-    normal.py:1:1: RUF911 Hey this is a preview test rule.
-    normal.py:1:1: RUF950 Hey this is a test rule that was redirected from another.
-    panic.py: panic: Panicked at <location> when checking `[TMP]/panic.py`: `This is a fake panic for testing.`
+    normal.py:1:1: error[RUF900] Hey this is a stable test rule.
+    normal.py:1:1: error[RUF901] [*] Hey this is a stable test rule with a safe fix.
+    normal.py:1:1: error[RUF902] Hey this is a stable test rule with an unsafe fix.
+    normal.py:1:1: error[RUF903] Hey this is a stable test rule with a display only fix.
+    normal.py:1:1: error[RUF911] Hey this is a preview test rule.
+    normal.py:1:1: error[RUF950] Hey this is a test rule that was redirected from another.
+    panic.py: fatal[panic] Panicked at <location> when checking `[TMP]/panic.py`: `This is a fake panic for testing.`
     Found 7 errors.
     [*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
 
@@ -3792,7 +3792,7 @@ fn rule_panic_mixed_results_concise() -> Result<()> {
     https://github.com/astral-sh/ruff/issues/new?title=%5BLinter%20panic%5D
 
     ...with the relevant file contents, the `pyproject.toml` settings, and the stack trace above, we'd be very appreciative!
-    ");
+    "###);
 
     Ok(())
 }
@@ -3807,31 +3807,31 @@ fn rule_panic_mixed_results_full() -> Result<()> {
         fixture.command()
             .args(["check", "--select", "RUF9", "--preview", "--output-format=full", "--no-cache"])
             .args(["normal.py", "panic.py"]),
-        @"
+        @r###"
     success: false
     exit_code: 2
     ----- stdout -----
-    RUF900 Hey this is a stable test rule.
+    error[RUF900]: Hey this is a stable test rule.
     --> normal.py:1:1
 
-    RUF901 [*] Hey this is a stable test rule with a safe fix.
+    error[RUF901][*]: Hey this is a stable test rule with a safe fix.
     --> normal.py:1:1
     1 + # fix from stable-test-rule-safe-fix
     2 | import os
 
-    RUF902 Hey this is a stable test rule with an unsafe fix.
+    error[RUF902]: Hey this is a stable test rule with an unsafe fix.
     --> normal.py:1:1
 
-    RUF903 Hey this is a stable test rule with a display only fix.
+    error[RUF903]: Hey this is a stable test rule with a display only fix.
     --> normal.py:1:1
 
-    RUF911 Hey this is a preview test rule.
+    error[RUF911]: Hey this is a preview test rule.
     --> normal.py:1:1
 
-    RUF950 Hey this is a test rule that was redirected from another.
+    error[RUF950]: Hey this is a test rule that was redirected from another.
     --> normal.py:1:1
 
-    panic: Panicked at <location> when checking `[TMP]/panic.py`: `This is a fake panic for testing.`
+    error[panic]: Panicked at <location> when checking `[TMP]/panic.py`: `This is a fake panic for testing.`
     --> panic.py:1:1
     info: This indicates a bug in Ruff.
     info: If you could open an issue at https://github.com/astral-sh/ruff/issues/new?title=%5Bpanic%5D, we'd be very appreciative!
@@ -3846,7 +3846,7 @@ fn rule_panic_mixed_results_full() -> Result<()> {
     https://github.com/astral-sh/ruff/issues/new?title=%5BLinter%20panic%5D
 
     ...with the relevant file contents, the `pyproject.toml` settings, and the stack trace above, we'd be very appreciative!
-    ");
+    "###);
 
     Ok(())
 }
@@ -3996,19 +3996,19 @@ fn supported_file_extensions_preview_enabled() -> Result<()> {
         fixture.check_command()
             .args(["--select", "F401", "--preview"])
             .arg("src"),
-        @"
+        @r###"
     success: false
     exit_code: 1
     ----- stdout -----
-    src/thing.ipynb:cell 1:1:8: F401 [*] `os` imported but unused
-    src/thing.py:1:8: F401 [*] `os` imported but unused
-    src/thing.pyi:1:8: F401 [*] `os` imported but unused
-    src/thing.pyw:1:8: F401 [*] `os` imported but unused
+    src/thing.ipynb:cell 1:1:8: error[F401] [*] `os` imported but unused
+    src/thing.py:1:8: error[F401] [*] `os` imported but unused
+    src/thing.pyi:1:8: error[F401] [*] `os` imported but unused
+    src/thing.pyw:1:8: error[F401] [*] `os` imported but unused
     Found 4 errors.
     [*] 4 fixable with the `--fix` option.
 
     ----- stderr -----
-    ");
+    "###);
     Ok(())
 }
 

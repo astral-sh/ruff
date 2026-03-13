@@ -19,7 +19,7 @@ use ruff_linter::{
     linter::check_path,
     package::PackageRoot,
     packaging::detect_package_root,
-    settings::flags,
+    settings::{flags, types::PreviewMode},
     source_kind::SourceKind,
     suppression::Suppressions,
 };
@@ -181,6 +181,7 @@ pub(crate) fn check(
                         &source_kind,
                         locator.to_index(),
                         encoding,
+                        settings.linter.preview,
                     ))
                 }
             });
@@ -242,6 +243,7 @@ fn to_lsp_diagnostic(
     source_kind: &SourceKind,
     index: &LineIndex,
     encoding: PositionEncoding,
+    preview: PreviewMode,
 ) -> (usize, lsp_types::Diagnostic) {
     let diagnostic_range = diagnostic.range().unwrap_or_default();
     let name = diagnostic.name();
@@ -292,7 +294,9 @@ fn to_lsp_diagnostic(
         range = diagnostic_range.to_range(source_kind.source_code(), index, encoding);
     }
 
-    let (severity, code) = if let Some(code) = code {
+    let (severity, code) = if let Some(code) = code
+        && preview.is_disabled()
+    {
         (severity(code), code.to_string())
     } else {
         (
@@ -302,7 +306,7 @@ fn to_lsp_diagnostic(
                 ruff_db::diagnostic::Severity::Error => lsp_types::DiagnosticSeverity::ERROR,
                 ruff_db::diagnostic::Severity::Fatal => lsp_types::DiagnosticSeverity::ERROR,
             },
-            diagnostic.id().to_string(),
+            diagnostic.secondary_code_or_id().to_string(),
         )
     };
 
