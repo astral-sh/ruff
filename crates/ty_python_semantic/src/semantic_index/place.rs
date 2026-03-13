@@ -6,12 +6,20 @@ use crate::semantic_index::scope::FileScopeId;
 use crate::semantic_index::symbol::{ScopedSymbolId, Symbol, SymbolTable, SymbolTableBuilder};
 use ruff_index::IndexVec;
 use ruff_python_ast as ast;
+use ruff_python_ast::name::Name;
 use smallvec::SmallVec;
 use std::hash::Hash;
 use std::iter::FusedIterator;
 
+/// A structural key for a place expression that ignores semantic-index flags.
+#[derive(Clone, Eq, PartialEq, Debug, get_size2::GetSize, salsa::Update)]
+pub(crate) enum PlaceKey {
+    Symbol(Name),
+    Member(MemberExpr),
+}
+
 /// An expression that can be the target of a `Definition`.
-#[derive(Eq, PartialEq, Debug, get_size2::GetSize)]
+#[derive(Clone, Eq, PartialEq, Debug, get_size2::GetSize, salsa::Update)]
 pub(crate) enum PlaceExpr {
     /// A simple symbol, e.g. `x`.
     Symbol(Symbol),
@@ -137,6 +145,24 @@ impl<'a> From<&'a PlaceExpr> for PlaceExprRef<'a> {
     }
 }
 
+impl<'a> From<PlaceExprRef<'a>> for PlaceKey {
+    fn from(value: PlaceExprRef<'a>) -> Self {
+        match value {
+            PlaceExprRef::Symbol(symbol) => Self::Symbol(symbol.name().clone()),
+            PlaceExprRef::Member(member) => Self::Member(member.expression().clone()),
+        }
+    }
+}
+
+impl From<&PlaceExpr> for PlaceKey {
+    fn from(value: &PlaceExpr) -> Self {
+        match value {
+            PlaceExpr::Symbol(symbol) => Self::Symbol(symbol.name().clone()),
+            PlaceExpr::Member(member) => Self::Member(member.expression().clone()),
+        }
+    }
+}
+
 impl std::fmt::Display for PlaceExprRef<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -230,6 +256,13 @@ impl PlaceTable {
         }
     }
 
+    pub(crate) fn place_id_by_key(&self, place_key: &PlaceKey) -> Option<ScopedPlaceId> {
+        match place_key {
+            PlaceKey::Symbol(name) => self.symbols.symbol_id(name).map(Into::into),
+            PlaceKey::Member(member) => self.members.member_id(member).map(Into::into),
+        }
+    }
+
     /// Returns the place expression for the given place ID.
     ///
     /// ## Panics
@@ -266,6 +299,21 @@ impl PlaceTableBuilder {
             PlaceExprRef::Symbol(symbol) => self.symbols.symbol_id(symbol.name()).map(Into::into),
             PlaceExprRef::Member(member) => {
                 self.member.member_id(member.expression()).map(Into::into)
+            }
+        }
+    }
+
+    /// Iterate over the "root" expressions of the place (e.g. `x.y.z`, `x.y`, `x` for `x.y.z[0]`).
+    ///
+    /// Note, this iterator may skip some parents if they are not defined in the current scope.
+    pub(crate) fn parents<'a>(
+        &'a self,
+        place_expr: impl Into<PlaceExprRef<'a>>,
+    ) -> ParentPlaceIter<'a> {
+        match place_expr.into() {
+            PlaceExprRef::Symbol(_) => ParentPlaceIter::for_symbol(),
+            PlaceExprRef::Member(member) => {
+                ParentPlaceIter::for_member(member.expression(), &self.symbols, &self.member)
             }
         }
     }

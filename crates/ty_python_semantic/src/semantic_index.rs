@@ -5,6 +5,7 @@ use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_index::{IndexSlice, IndexVec};
 use ruff_python_ast::NodeIndex;
+use ruff_python_ast::name::Name;
 use ruff_python_parser::semantic_errors::SemanticSyntaxError;
 use ruff_text_size::TextRange;
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -13,7 +14,7 @@ use salsa::plumbing::AsId;
 use smallvec::SmallVec;
 use ty_module_resolver::ModuleName;
 
-use crate::semantic_index::place::ScopedPlaceId;
+use crate::semantic_index::place::{PlaceKey, ScopedPlaceId};
 
 use crate::Db;
 use crate::semantic_index::ast_ids::AstIds;
@@ -30,6 +31,7 @@ use crate::semantic_index::scope::{
 use crate::semantic_index::symbol::ScopedSymbolId;
 use crate::semantic_index::use_def::{EnclosingSnapshotKey, ScopedEnclosingSnapshotId, UseDefMap};
 use crate::semantic_model::HasTrackedScope;
+use crate::types::PossiblyNarrowedPlacesBuilder;
 
 pub mod ast_ids;
 mod builder;
@@ -350,6 +352,96 @@ pub(crate) struct SemanticIndex<'db> {
 
     /// Set of all generator functions in this file.
     generator_functions: FxHashSet<FileScopeId>,
+
+    /// Alias metadata for predicate leaf names.
+    /// When a predicate contains alias variables (e.g., `is_none`, `is_none or is_int`),
+    /// each alias Name node is mapped to the aliased expression and any lazy-scope guard
+    /// needed to validate it at constraint-generation time.
+    alias_predicates: FxHashMap<ExpressionNodeKey, AliasPredicate<'db>>,
+}
+
+/// Guard information for an alias-derived narrowing predicate.
+/// The alias is only valid if none of the guarded places have been reassigned
+/// in the visible enclosing scope.
+#[derive(Debug, Clone, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+pub(crate) struct AliasGuard {
+    pub(crate) enclosing_scope: FileScopeId,
+    pub(crate) guard_scope: FileScopeId,
+    pub(crate) alias_name: Name,
+}
+
+impl AliasGuard {
+    fn place_keys<'db>(
+        &self,
+        db: &'db dyn Db,
+        index: &SemanticIndex<'db>,
+        expression: Expression<'db>,
+    ) -> Vec<PlaceKey> {
+        let file = expression.file(db);
+        let module = parsed_module(db, file).load(db);
+        let place_table = index.place_table(self.guard_scope);
+        let narrowed_places = PossiblyNarrowedPlacesBuilder::new(db, place_table)
+            .expression(expression.node_ref(db, &module));
+        let mut guard_places = vec![PlaceKey::Symbol(self.alias_name.clone())];
+
+        for place_id in narrowed_places {
+            let place_expr = place_table.place(place_id);
+            let place_key = PlaceKey::from(place_expr);
+            if !guard_places.contains(&place_key) {
+                guard_places.push(place_key);
+            }
+
+            for parent_id in place_table.parents(place_expr) {
+                let parent_key = PlaceKey::from(place_table.place(parent_id));
+                if !guard_places.contains(&parent_key) {
+                    guard_places.push(parent_key);
+                }
+            }
+        }
+
+        guard_places
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+pub(crate) struct AliasPredicate<'db> {
+    pub(crate) expression: Expression<'db>,
+    pub(crate) guard: Option<AliasGuard>,
+}
+
+fn is_guard_place_reassigned(place_table: &PlaceTable, guard_place: &PlaceKey) -> bool {
+    let Some(place_id) = place_table.place_id_by_key(guard_place) else {
+        return false;
+    };
+
+    match place_table.place(place_id) {
+        PlaceExprRef::Symbol(symbol) => symbol.is_reassigned(),
+        PlaceExprRef::Member(member) => member.is_bound(),
+    }
+}
+
+impl<'db> AliasPredicate<'db> {
+    /// Check if an alias-derived predicate has been invalidated by place reassignment.
+    ///
+    /// Walks up the visible scope chain from the enclosing scope to the module scope, checking
+    /// whether any guarded place was reassigned. This handles cases where the narrowed
+    /// place is reassigned several scopes above the alias use site while still respecting
+    /// Python's name-resolution rules for nested scopes.
+    pub(super) fn is_guard_invalidated(&self, db: &'db dyn Db, index: &SemanticIndex<'db>) -> bool {
+        let Some(guard) = &self.guard else {
+            return false;
+        };
+        let guard_places = guard.place_keys(db, index, self.expression);
+        for (scope_id, _) in index.visible_ancestor_scopes(guard.enclosing_scope) {
+            let place_table = index.place_table(scope_id);
+            for guard_place in &guard_places {
+                if is_guard_place_reassigned(place_table, guard_place) {
+                    return true;
+                }
+            }
+        }
+        false
+    }
 }
 
 impl<'db> SemanticIndex<'db> {
@@ -374,6 +466,14 @@ impl<'db> SemanticIndex<'db> {
     #[track_caller]
     pub(crate) fn ast_ids(&self, scope_id: FileScopeId) -> &AstIds {
         &self.ast_ids[scope_id]
+    }
+
+    /// Returns alias metadata for an alias Name node in a predicate, if one exists.
+    pub(crate) fn alias_predicate(
+        &self,
+        key: impl Into<ExpressionNodeKey>,
+    ) -> Option<&AliasPredicate<'db>> {
+        self.alias_predicates.get(&key.into())
     }
 
     /// Returns the ID of the `expression`'s enclosing scope.
