@@ -1509,23 +1509,17 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         source: PropertyInstanceType<'db>,
         target: PropertyInstanceType<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        self.check_optional_property_method_pair(db, source.getter(db), target.getter(db))
-            .and(db, self.constraints, || {
-                self.check_optional_property_method_pair(db, source.setter(db), target.setter(db))
-            })
-    }
-
-    fn check_optional_property_method_pair(
-        &self,
-        db: &'db dyn Db,
-        source: Option<Type<'db>>,
-        target: Option<Type<'db>>,
-    ) -> ConstraintSet<'db, 'c> {
-        match (source, target) {
+        let check_optional_methods = |source, target| match (source, target) {
             (None, None) => self.always(),
             (Some(source), Some(target)) => self.check_type_pair(db, source, target),
             (None | Some(_), None | Some(_)) => self.never(),
-        }
+        };
+
+        check_optional_methods(source.getter(db), target.getter(db)).and(
+            db,
+            self.constraints,
+            || check_optional_methods(source.setter(db), target.setter(db)),
+        )
     }
 
     pub(super) fn as_equivalence_checker(&self) -> EquivalenceChecker<'_, 'c, 'db> {
@@ -2308,22 +2302,14 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
         left: PropertyInstanceType<'db>,
         right: PropertyInstanceType<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        self.check_optional_property_method_pair(db, left.getter(db), right.getter(db))
-            .or(db, self.constraints, || {
-                self.check_optional_property_method_pair(db, left.setter(db), right.setter(db))
-            })
-    }
-
-    fn check_optional_property_method_pair(
-        &self,
-        db: &'db dyn Db,
-        left: Option<Type<'db>>,
-        right: Option<Type<'db>>,
-    ) -> ConstraintSet<'db, 'c> {
-        match (left, right) {
+        let check_optional_methods = |left, right| match (left, right) {
             (None, None) => self.never(),
             (Some(left), Some(right)) => self.check_type_pair(db, left, right),
             (None | Some(_), None | Some(_)) => self.always(),
-        }
+        };
+
+        check_optional_methods(left.getter(db), right.getter(db)).or(db, self.constraints, || {
+            check_optional_methods(left.setter(db), right.setter(db))
+        })
     }
 }
