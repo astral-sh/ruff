@@ -34,9 +34,10 @@ use crate::{
         call::{CallError, CallErrorKind},
         callable::CallableTypeKind,
         class::{
-            ClassMemberResult, CodeGeneratorKind, DisjointBase, Field, FieldKind,
-            InstanceMemberResult, MetaclassError, MetaclassErrorKind, MethodDecorator, MroLookup,
-            NamedTupleField, SlotsKind, synthesize_namedtuple_class_member,
+            ClassMemberResult, CodeGeneratorKind, DataclassFieldInfo, DisjointBase, Field,
+            FieldKind, InstanceMemberResult, MetaclassError, MetaclassErrorKind, MethodDecorator,
+            MroLookup, NamedTupleField, SlotsKind, synthesize_dataclass_class_member,
+            synthesize_dataclass_dunder_method, synthesize_namedtuple_class_member,
         },
         context::InferContext,
         declaration_type, definition_expression_type, determine_upper_bound,
@@ -217,6 +218,13 @@ impl<'db> StaticClassLiteral<'db> {
                     }
                     // Dynamic namedtuples don't define their own ordering methods.
                     ClassLiteral::DynamicNamedTuple(_) => {}
+                    // Dynamic dataclasses can have ordering methods if order=True.
+                    ClassLiteral::DynamicDataclass(dataclass) => {
+                        let member = dataclass.own_class_member(db, name);
+                        if let Some(ty) = member.ignore_possibly_undefined() {
+                            return Some(ty);
+                        }
+                    }
                 }
             }
         }
@@ -667,7 +675,7 @@ impl<'db> StaticClassLiteral<'db> {
             .filter_map(ClassBase::into_class)
             .any(|base| match base.class_literal(db) {
                 ClassLiteral::DynamicNamedTuple(_) => true,
-                ClassLiteral::Dynamic(_) => false,
+                ClassLiteral::Dynamic(_) | ClassLiteral::DynamicDataclass(_) => false,
                 ClassLiteral::Static(class) => class
                     .explicit_bases(db)
                     .contains(&Type::SpecialForm(SpecialFormType::NamedTuple)),
@@ -767,6 +775,17 @@ impl<'db> StaticClassLiteral<'db> {
         }
     }
 
+    /// Returns the combined dataclass flags from both `dataclass_params` and `transformer_params`.
+    fn combined_dataclass_flags(
+        self,
+        db: &'db dyn Db,
+        field_policy: CodeGeneratorKind<'db>,
+    ) -> DataclassFlags {
+        let (dataclass_params, transformer_params) = self.merged_dataclass_params(db, field_policy);
+        dataclass_params.map_or(DataclassFlags::empty(), |p| p.flags(db))
+            | transformer_params.map_or(DataclassFlags::empty(), |p| p.flags(db))
+    }
+
     /// Checks if the given dataclass parameter flag is set for this class.
     /// This checks both the `dataclass_params` and `transformer_params`.
     fn has_dataclass_param(
@@ -775,9 +794,8 @@ impl<'db> StaticClassLiteral<'db> {
         field_policy: CodeGeneratorKind<'db>,
         param: DataclassFlags,
     ) -> bool {
-        let (dataclass_params, transformer_params) = self.merged_dataclass_params(db, field_policy);
-        dataclass_params.is_some_and(|params| params.flags(db).contains(param))
-            || transformer_params.is_some_and(|params| params.flags(db).contains(param))
+        self.combined_dataclass_flags(db, field_policy)
+            .contains(param)
     }
 
     /// Return the explicit `metaclass` of this class, if one is defined.
@@ -1395,74 +1413,41 @@ impl<'db> StaticClassLiteral<'db> {
                     specialization.map(|s| s.generic_context(db)),
                 )
             }
-            (CodeGeneratorKind::DataclassLike(_), "__lt__" | "__le__" | "__gt__" | "__ge__") => {
-                if !self.has_dataclass_param(db, field_policy, DataclassFlags::ORDER) {
-                    return None;
-                }
-
-                let signature = Signature::new(
-                    Parameters::new(
-                        db,
-                        [
-                            Parameter::positional_or_keyword(Name::new_static("self"))
-                                // TODO: could be `Self`.
-                                .with_annotated_type(instance_ty),
-                            Parameter::positional_or_keyword(Name::new_static("other"))
-                                // TODO: could be `Self`.
-                                .with_annotated_type(instance_ty),
-                        ],
-                    ),
-                    KnownClass::Bool.to_instance(db),
-                );
-
-                Some(Type::function_like_callable(db, signature))
-            }
-            (CodeGeneratorKind::DataclassLike(_), "__hash__") => {
-                let unsafe_hash =
-                    self.has_dataclass_param(db, field_policy, DataclassFlags::UNSAFE_HASH);
-                let frozen = self.has_dataclass_param(db, field_policy, DataclassFlags::FROZEN);
-                let eq = self.has_dataclass_param(db, field_policy, DataclassFlags::EQ);
-
-                if unsafe_hash || (frozen && eq) {
-                    let signature = Signature::new(
-                        Parameters::new(
-                            db,
-                            [Parameter::positional_or_keyword(Name::new_static("self"))
-                                .with_annotated_type(instance_ty)],
-                        ),
-                        KnownClass::Int.to_instance(db),
-                    );
-
-                    Some(Type::function_like_callable(db, signature))
-                } else if eq && !frozen {
-                    Some(Type::none(db))
-                } else {
-                    // No `__hash__` is generated, fall back to `object.__hash__`
-                    None
-                }
-            }
+            (
+                CodeGeneratorKind::DataclassLike(_),
+                "__lt__" | "__le__" | "__gt__" | "__ge__" | "__hash__",
+            ) => synthesize_dataclass_dunder_method(
+                db,
+                name,
+                instance_ty,
+                self.combined_dataclass_flags(db, field_policy),
+            ),
             (CodeGeneratorKind::DataclassLike(_), "__match_args__")
                 if Program::get(db).python_version(db) >= PythonVersion::PY310 =>
             {
-                if !self.has_dataclass_param(db, field_policy, DataclassFlags::MATCH_ARGS) {
-                    return None;
-                }
-
-                let kw_only_default =
-                    self.has_dataclass_param(db, field_policy, DataclassFlags::KW_ONLY);
-
+                let has_dataclass_param = |param| self.has_dataclass_param(db, field_policy, param);
+                let kw_only_default = has_dataclass_param(DataclassFlags::KW_ONLY);
                 let fields = self.fields(db, specialization, field_policy);
-                let match_args = fields
-                    .iter()
-                    .filter(|(_, field)| {
-                        if let FieldKind::Dataclass { init, kw_only, .. } = &field.kind {
-                            *init && !kw_only.unwrap_or(kw_only_default)
-                        } else {
-                            false
-                        }
-                    })
-                    .map(|(name, _)| Type::string_literal(db, name));
-                Some(Type::heterogeneous_tuple(db, match_args))
+                let fields_iter = fields.iter().filter_map(|(name, field)| {
+                    if let FieldKind::Dataclass { init, kw_only, .. } = &field.kind {
+                        Some(DataclassFieldInfo {
+                            name: name.clone(),
+                            ty: field.declared_ty,
+                            default_ty: None,
+                            init: *init,
+                            kw_only: kw_only.unwrap_or(kw_only_default),
+                        })
+                    } else {
+                        None
+                    }
+                });
+                synthesize_dataclass_class_member(
+                    db,
+                    name,
+                    instance_ty,
+                    self.combined_dataclass_flags(db, field_policy),
+                    fields_iter,
+                )
             }
             (CodeGeneratorKind::DataclassLike(_), "__weakref__")
                 if Program::get(db).python_version(db) >= PythonVersion::PY311 =>
@@ -1515,23 +1500,21 @@ impl<'db> StaticClassLiteral<'db> {
                 signature_from_fields(vec![self_parameter], instance_ty)
             }
             (CodeGeneratorKind::DataclassLike(_), "__setattr__") => {
+                // Use `is_frozen_dataclass` rather than `combined_dataclass_flags` here,
+                // because transformer base classes (e.g. a class whose explicit metaclass
+                // is decorated with `@dataclass_transform(frozen_default=True)`) should
+                // not synthesize a frozen `__setattr__`; the `frozen_default` only applies
+                // to their subclasses.
                 if self.is_frozen_dataclass(db) == Some(true) {
-                    let signature = Signature::new(
-                        Parameters::new(
-                            db,
-                            [
-                                Parameter::positional_or_keyword(Name::new_static("self"))
-                                    .with_annotated_type(instance_ty),
-                                Parameter::positional_or_keyword(Name::new_static("name")),
-                                Parameter::positional_or_keyword(Name::new_static("value")),
-                            ],
-                        ),
-                        Type::Never,
-                    );
-
-                    return Some(Type::function_like_callable(db, signature));
+                    synthesize_dataclass_dunder_method(
+                        db,
+                        name,
+                        instance_ty,
+                        self.combined_dataclass_flags(db, field_policy),
+                    )
+                } else {
+                    None
                 }
-                None
             }
             (CodeGeneratorKind::DataclassLike(_), "__slots__")
                 if Program::get(db).python_version(db) >= PythonVersion::PY310 =>

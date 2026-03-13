@@ -50,11 +50,11 @@ use crate::types::tuple::{TupleLength, TupleSpec, TupleType};
 use crate::types::typevar::BoundTypeVarIdentity;
 use crate::types::{
     BoundMethodType, BoundTypeVarInstance, CallableType, ClassLiteral, DATACLASS_FLAGS,
-    DataclassFlags, DataclassParams, EvaluationMode, GenericAlias, InternedConstraintSet,
-    IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
-    MemberLookupPolicy, NominalInstanceType, PropertyInstanceType, SpecialFormType, TypeAliasType,
-    TypeContext, TypeVarBoundOrConstraints, TypeVarVariance, UnionBuilder, UnionType,
-    WrapperDescriptorKind, enums, list_members,
+    DataclassFlags, DataclassParams, EvaluationMode, InternedConstraintSet, IntersectionType,
+    KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind, MemberLookupPolicy,
+    NominalInstanceType, PropertyInstanceType, SpecialFormType, TypeAliasType, TypeContext,
+    TypeVarBoundOrConstraints, TypeVarVariance, UnionBuilder, UnionType, WrapperDescriptorKind,
+    enums, list_members,
 };
 use crate::{DisplaySettings, Program};
 use ruff_db::diagnostic::{Annotation, Diagnostic, SubDiagnostic, SubDiagnosticSeverity};
@@ -1000,21 +1000,18 @@ impl<'db> Bindings<'db> {
                                 overload
                                     .errors
                                     .push(BindingError::InvalidDataclassApplication(target));
-                            } else {
-                                overload.set_return_type(Type::from(
-                                    class_literal.with_dataclass_params(db, Some(params)),
-                                ));
+                            } else if let Some(return_ty) = Type::ClassLiteral(*class_literal)
+                                .try_with_dataclass_params(db, params)
+                            {
+                                overload.set_return_type(return_ty);
                             }
                         }
-                        [Some(Type::GenericAlias(generic_alias))] => {
-                            let new_origin = generic_alias
-                                .origin(db)
-                                .with_dataclass_params(db, Some(params));
-                            overload.set_return_type(Type::GenericAlias(GenericAlias::new(
-                                db,
-                                new_origin,
-                                generic_alias.specialization(db),
-                            )));
+                        [Some(class_like_ty @ Type::GenericAlias(_))] => {
+                            if let Some(return_ty) =
+                                class_like_ty.try_with_dataclass_params(db, params)
+                            {
+                                overload.set_return_type(return_ty);
+                            }
                         }
                         _ => {}
                     },
@@ -1487,61 +1484,55 @@ impl<'db> Bindings<'db> {
                         }
 
                         Some(KnownFunction::Dataclass) => {
-                            if let [
-                                init,
-                                repr,
-                                eq,
-                                order,
-                                unsafe_hash,
-                                frozen,
-                                match_args,
-                                kw_only,
-                                slots,
-                                weakref_slot,
-                            ] = overload.parameter_types()
-                            {
+                            let dataclass_params = {
                                 let mut flags = DataclassFlags::empty();
 
-                                if to_bool(init, true) {
+                                let has_flag = |name: &str, default| {
+                                    let ty =
+                                        overload.parameter_type_by_name(name, true).ok().flatten();
+                                    to_bool(&ty, default)
+                                };
+
+                                if has_flag("init", true) {
                                     flags |= DataclassFlags::INIT;
                                 }
-                                if to_bool(repr, true) {
+                                if has_flag("repr", true) {
                                     flags |= DataclassFlags::REPR;
                                 }
-                                if to_bool(eq, true) {
+                                if has_flag("eq", true) {
                                     flags |= DataclassFlags::EQ;
                                 }
-                                if to_bool(order, false) {
+                                if has_flag("order", false) {
                                     flags |= DataclassFlags::ORDER;
                                 }
-                                if to_bool(unsafe_hash, false) {
+                                if has_flag("unsafe_hash", false) {
                                     flags |= DataclassFlags::UNSAFE_HASH;
                                 }
-                                if to_bool(frozen, false) {
+                                if has_flag("frozen", false) {
                                     flags |= DataclassFlags::FROZEN;
                                 }
-                                if to_bool(match_args, true) {
+                                if has_flag("match_args", true) {
                                     if Program::get(db).python_version(db) >= PythonVersion::PY310 {
                                         flags |= DataclassFlags::MATCH_ARGS;
                                     } else {
                                         // TODO: emit diagnostic
                                     }
                                 }
-                                if to_bool(kw_only, false) {
+                                if has_flag("kw_only", false) {
                                     if Program::get(db).python_version(db) >= PythonVersion::PY310 {
                                         flags |= DataclassFlags::KW_ONLY;
                                     } else {
                                         // TODO: emit diagnostic
                                     }
                                 }
-                                if to_bool(slots, false) {
+                                if has_flag("slots", false) {
                                     if Program::get(db).python_version(db) >= PythonVersion::PY310 {
                                         flags |= DataclassFlags::SLOTS;
                                     } else {
                                         // TODO: emit diagnostic
                                     }
                                 }
-                                if to_bool(weakref_slot, false) {
+                                if has_flag("weakref_slot", false) {
                                     if Program::get(db).python_version(db) >= PythonVersion::PY311 {
                                         flags |= DataclassFlags::WEAKREF_SLOT;
                                     } else {
@@ -1549,23 +1540,46 @@ impl<'db> Bindings<'db> {
                                     }
                                 }
 
-                                let params = DataclassParams::from_flags(db, flags);
+                                DataclassParams::from_flags(db, flags)
+                            };
 
-                                overload.set_return_type(Type::DataclassDecorator(params));
-                            }
+                            let direct_class_arg = overload
+                                .signature
+                                .parameters()
+                                .iter()
+                                .zip(overload.parameter_types())
+                                .filter(|(param, ty)| ty.is_some() && !param.is_keyword_only())
+                                .map(|(_, ty)| ty)
+                                .next()
+                                .copied()
+                                .flatten();
 
-                            // `dataclass` being used as a non-decorator (i.e., `dataclass(SomeClass)`)
-                            if let [Some(Type::ClassLiteral(class_literal)), ..] =
-                                overload.parameter_types()
-                            {
-                                if let Some(target) = invalid_dataclass_target(db, class_literal) {
-                                    overload
-                                        .errors
-                                        .push(BindingError::InvalidDataclassApplication(target));
-                                } else {
-                                    let params = DataclassParams::default_params(db);
-                                    overload.set_return_type(Type::from(
-                                        class_literal.with_dataclass_params(db, Some(params)),
+                            match direct_class_arg {
+                                Some(Type::ClassLiteral(class_literal)) => {
+                                    if let Some(target) =
+                                        invalid_dataclass_target(db, &class_literal)
+                                    {
+                                        overload.errors.push(
+                                            BindingError::InvalidDataclassApplication(target),
+                                        );
+                                    } else if let Some(return_ty) =
+                                        Type::ClassLiteral(class_literal)
+                                            .try_with_dataclass_params(db, dataclass_params)
+                                    {
+                                        overload.set_return_type(return_ty);
+                                    }
+                                }
+                                Some(class_like_ty @ Type::GenericAlias(_)) => {
+                                    if let Some(return_ty) = class_like_ty
+                                        .try_with_dataclass_params(db, dataclass_params)
+                                    {
+                                        overload.set_return_type(return_ty);
+                                    }
+                                }
+                                Some(_) => {}
+                                None => {
+                                    overload.set_return_type(Type::DataclassDecorator(
+                                        dataclass_params,
                                     ));
                                 }
                             }
@@ -1725,28 +1739,23 @@ impl<'db> Bindings<'db> {
                                         Some(Some(Type::ClassLiteral(class_literal)))
                                             if returns_class() =>
                                         {
-                                            overload.set_return_type(Type::from(
-                                                class_literal.with_dataclass_params(
-                                                    db,
-                                                    Some(dataclass_params),
-                                                ),
-                                            ));
-                                            continue;
+                                            if let Some(return_ty) =
+                                                Type::ClassLiteral(*class_literal)
+                                                    .try_with_dataclass_params(db, dataclass_params)
+                                            {
+                                                overload.set_return_type(return_ty);
+                                                continue;
+                                            }
                                         }
-                                        Some(Some(Type::GenericAlias(generic_alias)))
+                                        Some(Some(class_like_ty @ Type::GenericAlias(_)))
                                             if returns_class() =>
                                         {
-                                            let new_origin = generic_alias
-                                                .origin(db)
-                                                .with_dataclass_params(db, Some(dataclass_params));
-                                            overload.set_return_type(Type::GenericAlias(
-                                                GenericAlias::new(
-                                                    db,
-                                                    new_origin,
-                                                    generic_alias.specialization(db),
-                                                ),
-                                            ));
-                                            continue;
+                                            if let Some(return_ty) = class_like_ty
+                                                .try_with_dataclass_params(db, dataclass_params)
+                                            {
+                                                overload.set_return_type(return_ty);
+                                                continue;
+                                            }
                                         }
                                         _ => {}
                                     }
