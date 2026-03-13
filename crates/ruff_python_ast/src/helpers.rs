@@ -40,6 +40,49 @@ where
     matches!(id, "list" | "tuple" | "set" | "dict" | "frozenset") && is_builtin(id)
 }
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq, is_macro::Is)]
+pub enum SideEffect {
+    No,
+    Maybe,
+    Yes,
+}
+
+impl SideEffect {
+    #[must_use]
+    pub const fn merge(self, other: SideEffect) -> SideEffect {
+        match (self, other) {
+            (SideEffect::Yes, _) | (_, SideEffect::Yes) => SideEffect::Yes,
+            (SideEffect::Maybe, _) | (_, SideEffect::Maybe) => SideEffect::Maybe,
+            _ => SideEffect::No,
+        }
+    }
+}
+
+fn is_definitely_side_effect_free_interpolation_expr(expr: &Expr) -> bool {
+    match expr {
+        Expr::StringLiteral(_)
+        | Expr::BytesLiteral(_)
+        | Expr::NumberLiteral(_)
+        | Expr::BooleanLiteral(_)
+        | Expr::NoneLiteral(_)
+        | Expr::EllipsisLiteral(_) => true,
+        Expr::UnaryOp(ast::ExprUnaryOp { operand, .. }) => {
+            is_definitely_side_effect_free_interpolation_expr(operand)
+        }
+        Expr::Tuple(ast::ExprTuple { elts, .. })
+        | Expr::List(ast::ExprList { elts, .. })
+        | Expr::Set(ast::ExprSet { elts, .. }) => elts
+            .iter()
+            .all(is_definitely_side_effect_free_interpolation_expr),
+        Expr::Dict(ast::ExprDict { items, .. }) => items.iter().all(|DictItem { key, value }| {
+            key.as_ref()
+                .is_none_or(is_definitely_side_effect_free_interpolation_expr)
+                && is_definitely_side_effect_free_interpolation_expr(value)
+        }),
+        _ => false,
+    }
+}
+
 /// Return `true` if the `Expr` contains an expression that appears to include a
 /// side-effect (like a function call).
 ///
@@ -48,7 +91,22 @@ pub fn contains_effect<F>(expr: &Expr, is_builtin: F) -> bool
 where
     F: Fn(&str) -> bool,
 {
-    any_over_expr(expr, &|expr| {
+    side_effect(expr, is_builtin).is_yes()
+}
+
+/// Return whether `expr` has no side effects, maybe has side effects, or definitely
+/// has side effects.
+///
+/// Unlike [`contains_effect`], which returns a simple `bool`, this function distinguishes
+/// between expressions that are definitely side-effect-free, definitely side-effectful,
+/// and those that may invoke user-defined code (e.g., formatting a non-literal f-string
+/// interpolation can call `__format__` or `__str__`).
+pub fn side_effect<F>(expr: &Expr, is_builtin: F) -> SideEffect
+where
+    F: Fn(&str) -> bool,
+{
+    let mut effect = SideEffect::No;
+    any_over_expr_mut(expr, &mut |expr| {
         // Accept empty initializers.
         if let Expr::Call(ast::ExprCall {
             func,
@@ -57,10 +115,10 @@ where
             node_index: _,
         }) = expr
         {
-            // Ex) `list()`
             if arguments.is_empty() {
                 if let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
                     if !is_iterable_initializer(id.as_str(), |id| is_builtin(id)) {
+                        effect = SideEffect::Yes;
                         return true;
                     }
                     return false;
@@ -87,6 +145,7 @@ where
                     | Expr::SetComp(_)
                     | Expr::DictComp(_)
             ) {
+                effect = SideEffect::Yes;
                 return true;
             }
             if !matches!(
@@ -106,13 +165,29 @@ where
                     | Expr::SetComp(_)
                     | Expr::DictComp(_)
             ) {
+                effect = SideEffect::Yes;
                 return true;
             }
             return false;
         }
 
+        // FString/TString: non-literal interpolation may invoke `__format__`/`__str__`.
+        // Return `false` to let the traversal descend and detect any `Yes` effects inside.
+        if let Expr::FString(ast::ExprFString { value, .. }) = expr {
+            if value.elements().any(has_uncertain_interpolation) {
+                effect = effect.merge(SideEffect::Maybe);
+            }
+            return false;
+        }
+        if let Expr::TString(ast::ExprTString { value, .. }) = expr {
+            if value.elements().any(has_uncertain_interpolation) {
+                effect = effect.merge(SideEffect::Maybe);
+            }
+            return false;
+        }
+
         // Otherwise, avoid all complex expressions.
-        matches!(
+        if matches!(
             expr,
             Expr::Await(_)
                 | Expr::Call(_)
@@ -124,50 +199,82 @@ where
                 | Expr::Yield(_)
                 | Expr::YieldFrom(_)
                 | Expr::IpyEscapeCommand(_)
-        )
-    })
+        ) {
+            effect = SideEffect::Yes;
+            return true;
+        }
+
+        false
+    });
+    effect
+}
+
+/// Returns `true` if the interpolated string element may invoke user-defined code
+/// when formatted (i.e., the interpolation expression is not a known-safe literal).
+fn has_uncertain_interpolation(element: &InterpolatedStringElement) -> bool {
+    match element {
+        InterpolatedStringElement::Literal(_) => false,
+        InterpolatedStringElement::Interpolation(interp) => {
+            !is_definitely_side_effect_free_interpolation_expr(&interp.expression)
+                || interp
+                    .format_spec
+                    .as_ref()
+                    .is_some_and(|spec| spec.elements.iter().any(has_uncertain_interpolation))
+        }
+    }
 }
 
 /// Call `func` over every `Expr` in `expr`, returning `true` if any expression
-/// returns `true`..
+/// returns `true`.
 pub fn any_over_expr(expr: &Expr, func: &dyn Fn(&Expr) -> bool) -> bool {
+    any_over_expr_mut(expr, &mut |e| func(e))
+}
+
+/// Like [`any_over_expr`], but accepts an [`FnMut`] closure, allowing the caller
+/// to accumulate state across the traversal via captured mutable variables.
+pub fn any_over_expr_mut(expr: &Expr, func: &mut dyn FnMut(&Expr) -> bool) -> bool {
     if func(expr) {
         return true;
     }
     match expr {
         Expr::BoolOp(ast::ExprBoolOp { values, .. }) => {
-            values.iter().any(|expr| any_over_expr(expr, func))
+            values.iter().any(|expr| any_over_expr_mut(expr, func))
         }
         Expr::FString(ast::ExprFString { value, .. }) => value
             .elements()
-            .any(|expr| any_over_interpolated_string_element(expr, func)),
+            .any(|expr| any_over_interpolated_string_element_mut(expr, func)),
         Expr::TString(ast::ExprTString { value, .. }) => value
             .elements()
-            .any(|expr| any_over_interpolated_string_element(expr, func)),
+            .any(|expr| any_over_interpolated_string_element_mut(expr, func)),
         Expr::Named(ast::ExprNamed {
             target,
             value,
             range: _,
             node_index: _,
-        }) => any_over_expr(target, func) || any_over_expr(value, func),
+        }) => any_over_expr_mut(target, func) || any_over_expr_mut(value, func),
         Expr::BinOp(ast::ExprBinOp { left, right, .. }) => {
-            any_over_expr(left, func) || any_over_expr(right, func)
+            any_over_expr_mut(left, func) || any_over_expr_mut(right, func)
         }
-        Expr::UnaryOp(ast::ExprUnaryOp { operand, .. }) => any_over_expr(operand, func),
-        Expr::Lambda(ast::ExprLambda { body, .. }) => any_over_expr(body, func),
+        Expr::UnaryOp(ast::ExprUnaryOp { operand, .. }) => any_over_expr_mut(operand, func),
+        Expr::Lambda(ast::ExprLambda { body, .. }) => any_over_expr_mut(body, func),
         Expr::If(ast::ExprIf {
             test,
             body,
             orelse,
             range: _,
             node_index: _,
-        }) => any_over_expr(test, func) || any_over_expr(body, func) || any_over_expr(orelse, func),
+        }) => {
+            any_over_expr_mut(test, func)
+                || any_over_expr_mut(body, func)
+                || any_over_expr_mut(orelse, func)
+        }
         Expr::Dict(ast::ExprDict {
             items,
             range: _,
             node_index: _,
         }) => items.iter().any(|ast::DictItem { key, value }| {
-            any_over_expr(value, func) || key.as_ref().is_some_and(|key| any_over_expr(key, func))
+            any_over_expr_mut(value, func)
+                || key.as_ref().is_some_and(|key| any_over_expr_mut(key, func))
         }),
         Expr::Set(ast::ExprSet {
             elts,
@@ -185,7 +292,7 @@ pub fn any_over_expr(expr: &Expr, func: &dyn Fn(&Expr) -> bool) -> bool {
             range: _,
             node_index: _,
             ..
-        }) => elts.iter().any(|expr| any_over_expr(expr, func)),
+        }) => elts.iter().any(|expr| any_over_expr_mut(expr, func)),
         Expr::ListComp(ast::ExprListComp {
             elt,
             generators,
@@ -205,11 +312,14 @@ pub fn any_over_expr(expr: &Expr, func: &dyn Fn(&Expr) -> bool) -> bool {
             node_index: _,
             parenthesized: _,
         }) => {
-            any_over_expr(elt, func)
+            any_over_expr_mut(elt, func)
                 || generators.iter().any(|generator| {
-                    any_over_expr(&generator.target, func)
-                        || any_over_expr(&generator.iter, func)
-                        || generator.ifs.iter().any(|expr| any_over_expr(expr, func))
+                    any_over_expr_mut(&generator.target, func)
+                        || any_over_expr_mut(&generator.iter, func)
+                        || generator
+                            .ifs
+                            .iter()
+                            .any(|expr| any_over_expr_mut(expr, func))
                 })
         }
         Expr::DictComp(ast::ExprDictComp {
@@ -219,12 +329,15 @@ pub fn any_over_expr(expr: &Expr, func: &dyn Fn(&Expr) -> bool) -> bool {
             range: _,
             node_index: _,
         }) => {
-            any_over_expr(key, func)
-                || any_over_expr(value, func)
+            any_over_expr_mut(key, func)
+                || any_over_expr_mut(value, func)
                 || generators.iter().any(|generator| {
-                    any_over_expr(&generator.target, func)
-                        || any_over_expr(&generator.iter, func)
-                        || generator.ifs.iter().any(|expr| any_over_expr(expr, func))
+                    any_over_expr_mut(&generator.target, func)
+                        || any_over_expr_mut(&generator.iter, func)
+                        || generator
+                            .ifs
+                            .iter()
+                            .any(|expr| any_over_expr_mut(expr, func))
                 })
         }
         Expr::Await(ast::ExprAwait {
@@ -248,33 +361,40 @@ pub fn any_over_expr(expr: &Expr, func: &dyn Fn(&Expr) -> bool) -> bool {
             range: _,
             node_index: _,
             ..
-        }) => any_over_expr(value, func),
+        }) => any_over_expr_mut(value, func),
         Expr::Yield(ast::ExprYield {
             value,
             range: _,
             node_index: _,
         }) => value
             .as_ref()
-            .is_some_and(|value| any_over_expr(value, func)),
+            .is_some_and(|value| any_over_expr_mut(value, func)),
         Expr::Compare(ast::ExprCompare {
             left, comparators, ..
-        }) => any_over_expr(left, func) || comparators.iter().any(|expr| any_over_expr(expr, func)),
+        }) => {
+            any_over_expr_mut(left, func)
+                || comparators.iter().any(|expr| any_over_expr_mut(expr, func))
+        }
         Expr::Call(ast::ExprCall {
             func: call_func,
             arguments,
             range: _,
             node_index: _,
         }) => {
-            any_over_expr(call_func, func)
+            any_over_expr_mut(call_func, func)
                 // Note that this is the evaluation order but not necessarily the declaration order
                 // (e.g. for `f(*args, a=2, *args2, **kwargs)` it's not)
-                || arguments.args.iter().any(|expr| any_over_expr(expr, func))
-                || arguments.keywords
+                || arguments
+                    .args
                     .iter()
-                    .any(|keyword| any_over_expr(&keyword.value, func))
+                    .any(|expr| any_over_expr_mut(expr, func))
+                || arguments
+                    .keywords
+                    .iter()
+                    .any(|keyword| any_over_expr_mut(&keyword.value, func))
         }
         Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
-            any_over_expr(value, func) || any_over_expr(slice, func)
+            any_over_expr_mut(value, func) || any_over_expr_mut(slice, func)
         }
         Expr::Slice(ast::ExprSlice {
             lower,
@@ -285,13 +405,13 @@ pub fn any_over_expr(expr: &Expr, func: &dyn Fn(&Expr) -> bool) -> bool {
         }) => {
             lower
                 .as_ref()
-                .is_some_and(|value| any_over_expr(value, func))
+                .is_some_and(|value| any_over_expr_mut(value, func))
                 || upper
                     .as_ref()
-                    .is_some_and(|value| any_over_expr(value, func))
+                    .is_some_and(|value| any_over_expr_mut(value, func))
                 || step
                     .as_ref()
-                    .is_some_and(|value| any_over_expr(value, func))
+                    .is_some_and(|value| any_over_expr_mut(value, func))
         }
         Expr::Name(_)
         | Expr::StringLiteral(_)
@@ -373,6 +493,14 @@ pub fn any_over_interpolated_string_element(
     element: &ast::InterpolatedStringElement,
     func: &dyn Fn(&Expr) -> bool,
 ) -> bool {
+    any_over_interpolated_string_element_mut(element, &mut |e| func(e))
+}
+
+/// Like [`any_over_interpolated_string_element`], but accepts an [`FnMut`] closure.
+pub fn any_over_interpolated_string_element_mut(
+    element: &ast::InterpolatedStringElement,
+    func: &mut dyn FnMut(&Expr) -> bool,
+) -> bool {
     match element {
         ast::InterpolatedStringElement::Literal(_) => false,
         ast::InterpolatedStringElement::Interpolation(ast::InterpolatedElement {
@@ -380,10 +508,10 @@ pub fn any_over_interpolated_string_element(
             format_spec,
             ..
         }) => {
-            any_over_expr(expression, func)
+            any_over_expr_mut(expression, func)
                 || format_spec.as_ref().is_some_and(|spec| {
                     spec.elements.iter().any(|spec_element| {
-                        any_over_interpolated_string_element(spec_element, func)
+                        any_over_interpolated_string_element_mut(spec_element, func)
                     })
                 })
         }
@@ -1665,7 +1793,6 @@ pub fn comment_indentation_after(
 mod tests {
     use std::borrow::Cow;
     use std::cell::RefCell;
-    use std::vec;
 
     use ruff_text_size::TextRange;
 
