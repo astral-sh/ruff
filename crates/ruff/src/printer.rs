@@ -14,8 +14,9 @@ use ruff_linter::fs::relativize_path;
 use ruff_linter::logging::LogLevel;
 use ruff_linter::message::{EmitterContext, render_diagnostics};
 use ruff_linter::notify_user;
+use ruff_linter::preview::is_warning_severity_enabled;
 use ruff_linter::settings::flags::{self};
-use ruff_linter::settings::types::{OutputFormat, UnsafeFixes};
+use ruff_linter::settings::types::{OutputFormat, PreviewMode, UnsafeFixes};
 
 use crate::diagnostics::{Diagnostics, FixMap};
 
@@ -208,7 +209,7 @@ impl Printer {
         &self,
         diagnostics: &Diagnostics,
         writer: &mut dyn Write,
-        preview: bool,
+        preview: PreviewMode,
     ) -> Result<()> {
         if matches!(self.log_level, LogLevel::Silent) {
             return Ok(());
@@ -235,12 +236,12 @@ impl Printer {
         let fixables = FixableStatistics::try_from(diagnostics, self.unsafe_fixes);
 
         let config = DisplayDiagnosticConfig::new("ruff")
-            .preview(preview)
-            .hide_severity(!preview)
+            .preview(preview.is_enabled())
+            .hide_severity(!is_warning_severity_enabled(preview))
             .color(!cfg!(test) && colored::control::SHOULD_COLORIZE.should_colorize())
             .with_show_fix_status(show_fix_status(self.fix_mode, fixables.as_ref()))
             .with_fix_applicability(self.unsafe_fixes.required_applicability())
-            .show_fix_diff(preview);
+            .show_fix_diff(preview.is_enabled());
 
         render_diagnostics(writer, self.format, config, &context, &diagnostics.inner)?;
 
@@ -382,7 +383,7 @@ impl Printer {
         &self,
         writer: &mut dyn Write,
         diagnostics: &Diagnostics,
-        preview: bool,
+        preview: PreviewMode,
     ) -> Result<()> {
         if matches!(self.log_level, LogLevel::Silent) {
             return Ok(());
@@ -409,12 +410,12 @@ impl Printer {
 
             let context = EmitterContext::new(&diagnostics.notebook_indexes);
             let config = DisplayDiagnosticConfig::new("ruff")
-                .preview(preview)
-                .hide_severity(!preview)
+                .preview(preview.is_enabled())
+                .hide_severity(!is_warning_severity_enabled(preview))
                 .color(!cfg!(test) && colored::control::SHOULD_COLORIZE.should_colorize())
                 .with_show_fix_status(show_fix_status(self.fix_mode, fixables.as_ref()))
                 .with_fix_applicability(self.unsafe_fixes.required_applicability())
-                .show_fix_diff(preview);
+                .show_fix_diff(preview.is_enabled());
             render_diagnostics(writer, self.format, config, &context, &diagnostics.inner)?;
         }
         writer.flush()?;
