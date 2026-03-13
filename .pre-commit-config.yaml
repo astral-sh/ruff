@@ -52,6 +52,13 @@ repos:
         language: system
         types: [rust]
         priority: 0
+      - id: check-mypy-primer-sha
+        name: Check mypy-primer SHA is in sync
+        entry: python3 scripts/check_mypy_primer_sha.py
+        language: system
+        pass_filenames: false
+        files: ^scripts/(mypy_primer\.sh|setup_primer_project\.py)$
+        priority: 0
 
   # Prettier
   - repo: https://github.com/rbubley/mirrors-prettier

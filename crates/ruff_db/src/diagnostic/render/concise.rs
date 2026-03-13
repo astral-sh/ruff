@@ -81,12 +81,6 @@ impl<'a> ConciseRenderer<'a> {
                         stylesheet.secondary_code
                     )
                 )?;
-                if self.config.show_fix_status {
-                    // Do not display an indicator for inapplicable fixes
-                    if diag.has_applicable_fix(self.config) {
-                        write!(f, "[{fix}] ", fix = fmt_styled("*", stylesheet.separator))?;
-                    }
-                }
             } else {
                 let (severity, severity_style) = match diag.severity() {
                     Severity::Info => ("info", stylesheet.info),
@@ -107,6 +101,12 @@ impl<'a> ConciseRenderer<'a> {
                         stylesheet.emphasis
                     )
                 )?;
+            }
+            if self.config.show_fix_status {
+                // Do not display an indicator for inapplicable fixes
+                if diag.has_applicable_fix(self.config) {
+                    write!(f, "[{fix}] ", fix = fmt_styled("*", stylesheet.separator))?;
+                }
             }
 
             writeln!(f, "{message}", message = diag.concise_message())?;
@@ -131,12 +131,12 @@ mod tests {
     #[test]
     fn output() {
         let (env, diagnostics) = create_diagnostics(DiagnosticFormat::Concise);
-        insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @"
+        insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @r###"
         fib.py:1:8: error[F401] `os` imported but unused
         fib.py:6:5: error[F841] Local variable `x` is assigned to but never used
         undef.py:1:4: error[F821] Undefined name `a`
         fib.py:12:16: error[F821] Undefined name `fibonaccii`
-        ");
+        "###);
     }
 
     #[test]
@@ -192,11 +192,11 @@ mod tests {
     #[test]
     fn notebook_output() {
         let (env, diagnostics) = create_notebook_diagnostics(DiagnosticFormat::Concise);
-        insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @"
+        insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @r###"
         notebook.ipynb:cell 1:2:8: error[F401] `os` imported but unused
         notebook.ipynb:cell 2:2:8: error[F401] `math` imported but unused
         notebook.ipynb:cell 3:4:5: error[F841] Local variable `x` is assigned to but never used
-        ");
+        "###);
     }
 
     #[test]

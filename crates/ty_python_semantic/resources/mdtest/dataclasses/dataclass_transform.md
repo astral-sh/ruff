@@ -218,60 +218,99 @@ reveal_type(TestWithBase(1) < TestWithBase(2))  # revealed: bool
 
 ### `kw_only_default`
 
-When provided, sets the default value for the `kw_only` parameter of `field()`.
+When provided, sets the default value for the `kw_only` parameter of dataclass fields:
 
 ```py
 from typing import dataclass_transform
-from dataclasses import field
 
 @dataclass_transform(kw_only_default=True)
 def create_model(*, kw_only: bool = True): ...
 
 @create_model()
-class A:
+class Model1:
     name: str
 
-a = A(name="Harry")
+reveal_type(Model1.__init__)  # revealed: (self: Model1, *, name: str) -> None
+
+Model1(name="Harry")
 # error: [missing-argument]
 # error: [too-many-positional-arguments]
-a = A("Harry")
+Model1("Harry")
 ```
 
 This can be overridden by setting `kw_only=False` when applying the decorator:
 
 ```py
 @create_model(kw_only=False)
-class CustomerModel:
-    id: int
+class Model1KwOnlyFalse:
     name: str
 
-c = CustomerModel(1, "Harry")
+reveal_type(Model1KwOnlyFalse.__init__)  # revealed: (self: Model1KwOnlyFalse, name: str) -> None
+
+Model1KwOnlyFalse(name="Harry")
+Model1KwOnlyFalse("Harry")
 ```
 
 This also works for metaclass-based transformers:
 
 ```py
 @dataclass_transform(kw_only_default=True)
-class ModelMeta(type): ...
+class ModelMeta(type):
+    def __new__(
+        cls,
+        name,
+        bases,
+        namespace,
+        *,
+        kw_only: bool = True,
+    ): ...
 
 class ModelBase(metaclass=ModelMeta): ...
 
-class TestMeta(ModelBase):
+class Model2(ModelBase):
     name: str
 
-reveal_type(TestMeta.__init__)  # revealed: (self: TestMeta, *, name: str) -> None
+reveal_type(Model2.__init__)  # revealed: (self: Model2, *, name: str) -> None
+
+Model2(name="Harry")
+# error: [missing-argument]
+# error: [too-many-positional-arguments]
+Model2("Harry")
+
+class Model2KwOnlyFalse(ModelBase, kw_only=False):
+    name: str
+
+reveal_type(Model2KwOnlyFalse.__init__)  # revealed: (self: Model2KwOnlyFalse, name: str) -> None
+
+Model2KwOnlyFalse(name="Harry")
+Model2KwOnlyFalse("Harry")
 ```
 
 And for base-class-based transformers:
 
 ```py
 @dataclass_transform(kw_only_default=True)
-class ModelBase: ...
+class ModelBase:
+    def __init_subclass__(cls, kw_only: bool = False) -> None:
+        pass
 
-class TestBase(ModelBase):
+class Model3(ModelBase):
     name: str
 
-reveal_type(TestBase.__init__)  # revealed: (self: TestBase, *, name: str) -> None
+reveal_type(Model3.__init__)  # revealed: (self: Model3, *, name: str) -> None
+
+Model3(name="Harry")
+# error: [missing-argument]
+# error: [too-many-positional-arguments]
+Model3("Harry")
+
+class Model3KwOnlyFalse(ModelBase, kw_only=False):
+    name: str
+
+reveal_type(Model3KwOnlyFalse.__init__)  # revealed: (self: Model3KwOnlyFalse, name: str) -> None
+
+Model3KwOnlyFalse(name="Harry")
+Model3KwOnlyFalse("Harry")
 ```
 
 ### `frozen_default`

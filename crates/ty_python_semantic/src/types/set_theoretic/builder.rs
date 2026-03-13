@@ -462,6 +462,8 @@ impl<'db> UnionBuilder<'db> {
                 }
             }
             Type::LiteralValue(literal) => {
+                self.recursively_defined =
+                    self.recursively_defined.or(literal.recursively_defined());
                 match literal.kind() {
                     // If adding a string literal, look for an existing `UnionElement::StringLiterals` to
                     // add it to, or an existing element that is a super-type of string literals, which
@@ -825,22 +827,34 @@ impl<'db> UnionBuilder<'db> {
             match element {
                 UnionElement::IntLiterals(literals) => {
                     types.extend(literals.into_iter().map(|(literal, promotable)| {
-                        Type::from(LiteralValueType::new(literal, promotable))
+                        Type::from(
+                            LiteralValueType::new(literal, promotable)
+                                .with_recursively_defined(self.recursively_defined),
+                        )
                     }));
                 }
                 UnionElement::StringLiterals(literals) => {
                     types.extend(literals.into_iter().map(|(literal, promotable)| {
-                        Type::from(LiteralValueType::new(literal, promotable))
+                        Type::from(
+                            LiteralValueType::new(literal, promotable)
+                                .with_recursively_defined(self.recursively_defined),
+                        )
                     }));
                 }
                 UnionElement::BytesLiterals(literals) => {
                     types.extend(literals.into_iter().map(|(literal, promotable)| {
-                        Type::from(LiteralValueType::new(literal, promotable))
+                        Type::from(
+                            LiteralValueType::new(literal, promotable)
+                                .with_recursively_defined(self.recursively_defined),
+                        )
                     }));
                 }
                 UnionElement::EnumLiterals { literals, .. } => {
                     types.extend(literals.into_iter().map(|(literal, promotable)| {
-                        Type::from(LiteralValueType::new(literal, promotable))
+                        Type::from(
+                            LiteralValueType::new(literal, promotable)
+                                .with_recursively_defined(self.recursively_defined),
+                        )
                     }));
                 }
                 UnionElement::Type(ty) => types.push(ty),

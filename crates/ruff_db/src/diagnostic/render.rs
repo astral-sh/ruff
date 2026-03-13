@@ -240,7 +240,7 @@ impl<'a> ResolvedDiagnostic<'a> {
         let id = if config.hide_severity {
             display_diagnostic_id(diag, config)
         } else {
-            diag.inner.id.to_string()
+            diag.secondary_code_or_id(config.preview).to_string()
         };
 
         let level = if config.hide_severity {

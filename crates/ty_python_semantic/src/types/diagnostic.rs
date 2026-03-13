@@ -11,7 +11,7 @@ use crate::lint::{Level, LintRegistryBuilder, LintStatus};
 use crate::place::{DefinedPlace, Place};
 use crate::semantic_index::definition::{Definition, DefinitionKind};
 use crate::semantic_index::place::{PlaceTable, ScopedPlaceId};
-use crate::semantic_index::{global_scope, place_table, use_def_map};
+use crate::semantic_index::{SemanticIndex, global_scope, place_table, use_def_map};
 use crate::suppression::FileSuppressionId;
 use crate::types::call::CallError;
 use crate::types::class::{CodeGeneratorKind, DisjointBase, DisjointBaseKind, MethodDecorator};
@@ -116,6 +116,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&UNSUPPORTED_BOOL_CONVERSION);
     registry.register_lint(&PARAMETER_ALREADY_ASSIGNED);
     registry.register_lint(&POSSIBLY_MISSING_ATTRIBUTE);
+    registry.register_lint(&POSSIBLY_MISSING_SUBMODULE);
     registry.register_lint(&POSSIBLY_MISSING_IMPORT);
     registry.register_lint(&POSSIBLY_UNRESOLVED_REFERENCE);
     registry.register_lint(&SHADOWED_TYPE_VARIABLE);
@@ -2063,6 +2064,10 @@ declare_lint! {
     /// ## Why is this bad?
     /// Attempting to access a missing attribute will raise an `AttributeError` at runtime.
     ///
+    /// ## Rule status
+    /// This rule is currently disabled by default because of the number of
+    /// false positives it can produce.
+    ///
     /// ## Examples
     /// ```python
     /// class A:
@@ -2074,6 +2079,27 @@ declare_lint! {
     pub(crate) static POSSIBLY_MISSING_ATTRIBUTE = {
         summary: "detects references to possibly missing attributes",
         status: LintStatus::stable("0.0.1-alpha.22"),
+        default_level: Level::Ignore,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for accesses of submodules that might not've been imported.
+    ///
+    /// ## Why is this bad?
+    /// When module `a` has a submodule `b`, `import a` isn't generally enough to let you access
+    /// `a.b.` You either need to explicitly `import a.b`, or else you need the `__init__.py` file
+    /// of `a` to include `from . import b`. Without one of those, `a.b` is an `AttributeError`.
+    ///
+    /// ## Examples
+    /// ```python
+    /// import html
+    /// html.parser  # AttributeError: module 'html' has no attribute 'parser'
+    /// ```
+    pub(crate) static POSSIBLY_MISSING_SUBMODULE = {
+        summary: "detects accesses of submodules that may not be available as attributes on their parent module",
+        status: LintStatus::stable("0.0.23"),
         default_level: Level::Warn,
     }
 }
@@ -5673,6 +5699,7 @@ pub(super) fn report_unsupported_augmented_assignment<'db>(
 
 pub(super) fn report_unsupported_binary_operation<'db>(
     context: &InferContext<'db, '_>,
+    index: &SemanticIndex<'db>,
     binary_expression: &ast::ExprBinOp,
     left_ty: Type<'db>,
     right_ty: Type<'db>,
@@ -5698,11 +5725,21 @@ pub(super) fn report_unsupported_binary_operation<'db>(
             || right_ty.is_subtype_of(db, KnownClass::Type.to_instance(db)))
         && Program::get(db).python_version(db) < PythonVersion::PY310
     {
-        diagnostic.info(
-            "Note that `X | Y` PEP 604 union syntax is only available in Python 3.10 and later",
-        );
-        add_inferred_python_version_hint_to_diagnostic(db, &mut diagnostic, "resolving types");
+        note_py_version_too_old_for_pep_604(db, index, &mut diagnostic);
     }
+}
+
+pub(super) fn note_py_version_too_old_for_pep_604<'db>(
+    db: &'db dyn Db,
+    index: &SemanticIndex<'db>,
+    diagnostic: &mut Diagnostic,
+) {
+    diagnostic.info("PEP 604 `|` unions are only available on Python 3.10+ unless they are quoted");
+    if index.has_future_annotations() {
+        diagnostic
+            .info("`from __future__ import annotations` has no effect outside type annotations");
+    }
+    add_inferred_python_version_hint_to_diagnostic(db, diagnostic, "resolving types");
 }
 
 #[derive(Debug, Copy, Clone)]

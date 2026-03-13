@@ -67,10 +67,10 @@ use crate::types::diagnostic::{
     INVALID_DECLARATION, INVALID_ENUM_MEMBER_ANNOTATION, INVALID_LEGACY_TYPE_VARIABLE,
     INVALID_NEWTYPE, INVALID_PARAMSPEC, INVALID_TYPE_ALIAS_TYPE, INVALID_TYPE_FORM,
     INVALID_TYPE_GUARD_CALL, INVALID_TYPE_VARIABLE_BOUND, INVALID_TYPE_VARIABLE_CONSTRAINTS,
-    IncompatibleBases, NO_MATCHING_OVERLOAD, POSSIBLY_MISSING_ATTRIBUTE,
-    POSSIBLY_MISSING_IMPLICIT_CALL, SUBCLASS_OF_FINAL_CLASS, UNDEFINED_REVEAL,
-    UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_REFERENCE, UNSUPPORTED_DYNAMIC_BASE,
-    UNSUPPORTED_OPERATOR, UNUSED_AWAITABLE, hint_if_stdlib_attribute_exists_on_other_versions,
+    IncompatibleBases, NO_MATCHING_OVERLOAD, POSSIBLY_MISSING_IMPLICIT_CALL,
+    POSSIBLY_MISSING_SUBMODULE, SUBCLASS_OF_FINAL_CLASS, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE,
+    UNRESOLVED_GLOBAL, UNRESOLVED_REFERENCE, UNSUPPORTED_DYNAMIC_BASE, UNSUPPORTED_OPERATOR,
+    UNUSED_AWAITABLE, hint_if_stdlib_attribute_exists_on_other_versions,
     report_attempted_protocol_instantiation, report_bad_dunder_set_call,
     report_call_to_abstract_method, report_cannot_pop_required_field_on_typed_dict,
     report_conflicting_metaclass_from_bases, report_instance_layout_conflict,
@@ -4976,25 +4976,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             _ => &[],
         };
 
-        // We silence diagnostics until we successfully narrow to a specific type.
-        let was_in_multi_inference = self.context.set_multi_inference(true);
-
         let mut try_narrow = |narrowed_ty| {
-            let mut speculated_bindings = bindings.clone();
             let narrowed_tcx = TypeContext::new(Some(narrowed_ty));
 
+            let mut speculative_bindings = bindings.clone();
+            let mut speculative_builder = self.speculate();
+
             // Attempt to infer the argument types using the narrowed type context.
-            self.infer_all_argument_types(
+            speculative_builder.infer_all_argument_types(
                 ast_arguments.clone(),
                 argument_types,
                 infer_argument_ty,
                 bindings,
                 narrowed_tcx,
-                MultiInferenceState::Ignore,
             );
 
             // Ensure the argument types match their annotated types.
-            if speculated_bindings
+            if speculative_bindings
                 .check_types_impl(
                     db,
                     &constraints,
@@ -5004,37 +5002,25 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 )
                 .is_err()
             {
+                speculative_builder.discard();
                 return None;
             }
 
-            // Ensure the inferred return type is assignable to the (narrowed) declared type.
+            // Ensure the inferred return type is assignable to the narrowed declared type.
             //
             // TODO: Checking assignability against the full declared type could help avoid
             // cases where the constraint solver is not smart enough to solve complex unions.
             // We should see revisit this after the new constraint solver is implemented.
-            if !speculated_bindings
+            if !speculative_bindings
                 .return_type(db)
                 .is_assignable_to(db, narrowed_ty)
             {
+                speculative_builder.discard();
                 return None;
             }
 
             // Successfully narrowed to an element of the union.
-            //
-            // If necessary, infer the argument types again with diagnostics enabled.
-            if !was_in_multi_inference {
-                self.context.set_multi_inference(was_in_multi_inference);
-
-                self.infer_all_argument_types(
-                    ast_arguments.clone(),
-                    argument_types,
-                    infer_argument_ty,
-                    bindings,
-                    narrowed_tcx,
-                    MultiInferenceState::Intersect,
-                );
-            }
-
+            self.extend(speculative_builder);
             Some(bindings.check_types_impl(
                 db,
                 &constraints,
@@ -5067,16 +5053,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
-        // Re-enable diagnostics, and infer against the entire union as a fallback.
-        self.context.set_multi_inference(was_in_multi_inference);
-
+        // Infer against the entire union as a fallback.
         self.infer_all_argument_types(
             ast_arguments,
             argument_types,
             infer_argument_ty,
             bindings,
             call_expression_tcx,
-            MultiInferenceState::Intersect,
         );
 
         bindings.check_types_impl(
@@ -5100,7 +5083,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         infer_argument_ty: &mut dyn FnMut(&mut Self, ArgExpr<'db, '_>) -> Type<'db>,
         bindings: &Bindings<'db>,
         call_expression_tcx: TypeContext<'db>,
-        multi_inference_state: MultiInferenceState,
     ) {
         debug_assert_eq!(arguments_types.len(), bindings.argument_forms().len());
 
@@ -5136,7 +5118,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .flatten()
             .collect::<Vec<_>>();
 
-        let old_multi_inference_state = self.set_multi_inference_state(multi_inference_state);
+        // Each type is a valid independent inference of the given argument, and we may require
+        // different permutations of argument types to correctly perform argument expansion during
+        // overload evaluation, so we take the intersection of all the types we inferred for each
+        // argument.
+        let old_multi_inference_state =
+            self.set_multi_inference_state(MultiInferenceState::Intersect);
 
         for (argument_index, (_, argument_type), argument_form, ast_argument) in iter {
             let ast_argument = match ast_argument {
@@ -5259,11 +5246,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         continue;
                     }
 
-                    // Each type is a valid independent inference of the given argument, and we may require different
-                    // permutations of argument types to correctly perform argument expansion during overload evaluation,
-                    // so we take the intersection of all the types we inferred for each argument.
-                    //
-                    // TODO: intersecting the inferred argument types is correct for unions of
+                    // TODO: Intersecting the inferred argument types is correct for unions of
                     // callables, since the argument must satisfy each callable, but it's not clear
                     // that it's correct for an intersection of callables, or for a case where
                     // different overloads provide different type context; unioning may be more
@@ -5784,11 +5767,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ctx: _,
         } = list;
 
-        let mut elts = elts.iter().map(|elt| [Some(elt)]);
+        let elts = elts.iter().map(|elt| [Some(elt)]).collect_vec();
         let mut infer_elt_ty =
             |builder: &mut Self, (_, elt, tcx)| builder.infer_expression(elt, tcx);
 
-        self.infer_collection_literal(KnownClass::List, &mut elts, &mut infer_elt_ty, tcx)
+        self.infer_collection_literal(KnownClass::List, &elts, &mut infer_elt_ty, tcx)
             .unwrap_or_else(|| {
                 KnownClass::List.to_specialized_instance(self.db(), &[Type::unknown()])
             })
@@ -5801,11 +5784,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             elts,
         } = set;
 
-        let mut elts = elts.iter().map(|elt| [Some(elt)]);
+        let elts = elts.iter().map(|elt| [Some(elt)]).collect_vec();
         let mut infer_elt_ty =
             |builder: &mut Self, (_, elt, tcx)| builder.infer_expression(elt, tcx);
 
-        self.infer_collection_literal(KnownClass::Set, &mut elts, &mut infer_elt_ty, tcx)
+        self.infer_collection_literal(KnownClass::Set, &elts, &mut infer_elt_ty, tcx)
             .unwrap_or_else(|| {
                 KnownClass::Set.to_specialized_instance(self.db(), &[Type::unknown()])
             })
@@ -5888,9 +5871,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .to_specialized_instance(self.db(), &[Type::unknown(), Type::unknown()]);
         }
 
-        let mut items = items
+        let items = items
             .iter()
-            .map(|item| [item.key.as_ref(), Some(&item.value)]);
+            .map(|item| [item.key.as_ref(), Some(&item.value)])
+            .collect_vec();
 
         // Avoid inferring the items multiple times if we already attempted to infer the
         // dictionary literal as a `TypedDict`. This also allows us to infer using the
@@ -5902,7 +5886,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .unwrap_or_else(|| builder.infer_expression(elt, tcx))
         };
 
-        self.infer_collection_literal(KnownClass::Dict, &mut items, &mut infer_elt_ty, tcx)
+        self.infer_collection_literal(KnownClass::Dict, &items, &mut infer_elt_ty, tcx)
             .unwrap_or_else(|| {
                 KnownClass::Dict
                     .to_specialized_instance(self.db(), &[Type::unknown(), Type::unknown()])
@@ -5955,7 +5939,57 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn infer_collection_literal<'expr, const N: usize>(
         &mut self,
         collection_class: KnownClass,
-        elts: &mut dyn Iterator<Item = [Option<&'expr ast::Expr>; N]>,
+        elts: &[[Option<&'expr ast::Expr>; N]],
+        infer_elt_expression: &mut dyn FnMut(&mut Self, ArgExpr<'db, 'expr>) -> Type<'db>,
+        tcx: TypeContext<'db>,
+    ) -> Option<Type<'db>> {
+        let db = self.db();
+
+        // If the type context is a union, attempt to narrow to a specific element.
+        let narrow_targets: &[_] = match tcx.annotation {
+            Some(Type::Union(union)) => union.elements(db),
+            _ => &[],
+        };
+
+        let mut try_narrow = |narrowed_ty| {
+            let mut speculative_builder = self.speculate();
+
+            // Attempt to infer the collection literal using the narrowed type context.
+            let inferred_ty = speculative_builder.infer_collection_literal_impl(
+                collection_class,
+                elts,
+                infer_elt_expression,
+                TypeContext::new(Some(narrowed_ty)),
+            )?;
+
+            // Ensure the inferred return type is assignable to the narrowed declared type.
+            if !inferred_ty.is_assignable_to(db, narrowed_ty) {
+                speculative_builder.discard();
+                return None;
+            }
+
+            // Successfully narrowed to an element of the union.
+            self.extend(speculative_builder);
+            Some(inferred_ty)
+        };
+
+        for narrowed_ty in narrow_targets
+            .iter()
+            .filter(|ty| ty.class_specialization(db).is_some())
+        {
+            if let Some(result) = try_narrow(*narrowed_ty) {
+                return Some(result);
+            }
+        }
+
+        self.infer_collection_literal_impl(collection_class, elts, infer_elt_expression, tcx)
+    }
+
+    // Infer the type of a collection literal expression.
+    fn infer_collection_literal_impl<'expr, const N: usize>(
+        &mut self,
+        collection_class: KnownClass,
+        elts: &[[Option<&'expr ast::Expr>; N]],
         infer_elt_expression: &mut dyn FnMut(&mut Self, ArgExpr<'db, 'expr>) -> Type<'db>,
         tcx: TypeContext<'db>,
     ) -> Option<Type<'db>> {
@@ -5980,7 +6014,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let Some((collection_alias, generic_context, elt_tys)) = elt_tys(collection_class) else {
             // Infer the element types without type context, and fallback to `Unknown` for
             // custom typesheds.
-            for (i, elt) in elts.flatten().flatten().enumerate() {
+            for (i, elt) in elts.iter().flatten().flatten().enumerate() {
                 infer_elt_expression(self, (i, elt, TypeContext::default()));
             }
 
@@ -6009,12 +6043,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 FxHashMap::default();
 
             if let Some(tcx) = tcx.annotation
-                // If there are multiple potential type contexts, we fallback to `Unknown`.
-                // TODO: We could perform multi-inference here.
-                && tcx
-                    .filter_union(self.db(), |ty| ty.class_specialization(self.db()).is_some())
-                    .class_specialization(self.db())
-                    .is_some()
+                && tcx.class_specialization(self.db()).is_some()
             {
                 let collection_instance =
                     Type::instance(self.db(), ClassType::Generic(collection_alias));
@@ -6245,15 +6274,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn infer_comprehension_specialization<const N: usize>(
         &mut self,
         collection_class: KnownClass,
-        elements: &[Option<&ast::Expr>; N],
+        elements: [Option<&ast::Expr>; N],
         inference: &ScopeInference<'db>,
         tcx: TypeContext<'db>,
     ) -> Option<Type<'db>> {
-        let mut elements = [elements].into_iter().copied();
         let mut infer_element_ty =
             |_builder: &mut Self, (_, elt, _)| inference.expression_type(elt);
 
-        self.infer_collection_literal(collection_class, &mut elements, &mut infer_element_ty, tcx)
+        self.infer_collection_literal(collection_class, &[elements], &mut infer_element_ty, tcx)
     }
 
     fn infer_list_comprehension_expression(
@@ -6280,7 +6308,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let inference = infer_scope_types(self.db(), scope, tcx);
         self.extend_scope(inference);
 
-        self.infer_comprehension_specialization(KnownClass::List, &[Some(elt)], inference, tcx)
+        self.infer_comprehension_specialization(KnownClass::List, [Some(elt)], inference, tcx)
             .unwrap_or_else(|| {
                 KnownClass::List.to_specialized_instance(self.db(), &[Type::unknown()])
             })
@@ -6310,7 +6338,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let inference = infer_scope_types(self.db(), scope, tcx);
         self.extend_scope(inference);
 
-        self.infer_comprehension_specialization(KnownClass::Set, &[Some(elt)], inference, tcx)
+        self.infer_comprehension_specialization(KnownClass::Set, [Some(elt)], inference, tcx)
             .unwrap_or_else(|| {
                 KnownClass::Set.to_specialized_instance(self.db(), &[Type::unknown()])
             })
@@ -6343,7 +6371,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         self.infer_comprehension_specialization(
             KnownClass::Dict,
-            &[Some(key), Some(value)],
+            [Some(key), Some(value)],
             inference,
             tcx,
         )
@@ -6378,10 +6406,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = listcomp;
 
         // Infer the element type using the outer type context.
-        let mut elts = [[Some(elt.as_ref())]].into_iter();
+        let elts = [[Some(elt.as_ref())]];
         let mut infer_elt_ty =
             |builder: &mut Self, (_, elt, tcx)| builder.infer_expression(elt, tcx);
-        self.infer_collection_literal(KnownClass::List, &mut elts, &mut infer_elt_ty, tcx);
+        self.infer_collection_literal(KnownClass::List, &elts, &mut infer_elt_ty, tcx);
 
         self.infer_comprehensions(generators);
     }
@@ -6399,10 +6427,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = setcomp;
 
         // Infer the element type using the outer type context.
-        let mut elts = [[Some(elt.as_ref())]].into_iter();
+        let elts = [[Some(elt.as_ref())]];
         let mut infer_elt_ty =
             |builder: &mut Self, (_, elt, tcx)| builder.infer_expression(elt, tcx);
-        self.infer_collection_literal(KnownClass::Set, &mut elts, &mut infer_elt_ty, tcx);
+        self.infer_collection_literal(KnownClass::Set, &elts, &mut infer_elt_ty, tcx);
 
         self.infer_comprehensions(generators);
     }
@@ -6421,10 +6449,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = dictcomp;
 
         // Infer the key and value types using the outer type context.
-        let mut elts = [[Some(key.as_ref()), Some(value.as_ref())]].into_iter();
+        let elts = [[Some(key.as_ref()), Some(value.as_ref())]];
         let mut infer_elt_ty =
             |builder: &mut Self, (_, elt, tcx)| builder.infer_expression(elt, tcx);
-        self.infer_collection_literal(KnownClass::Dict, &mut elts, &mut infer_elt_ty, tcx);
+        self.infer_collection_literal(KnownClass::Dict, &elts, &mut infer_elt_ty, tcx);
 
         self.infer_comprehensions(generators);
     }
@@ -7993,11 +8021,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             if resolve_module(db, self.file(), &maybe_submodule_name).is_some() {
                                 if let Some(builder) = self
                                     .context
-                                    .report_lint(&POSSIBLY_MISSING_ATTRIBUTE, attribute)
+                                    .report_lint(&POSSIBLY_MISSING_SUBMODULE, attribute)
                                 {
                                     let mut diag = builder.into_diagnostic(format_args!(
-                                        "Submodule `{attr_name}` may not be available as an \
-                                        attribute on module `{module_name}`"
+                                        "Submodule `{attr_name}` might not have been imported"
                                     ));
                                     diag.help(format_args!(
                                         "Consider explicitly importing `{maybe_submodule_name}`"
@@ -8792,6 +8819,79 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         expressions.shrink_to_fit();
 
         ScopeInference { expressions, extra }
+    }
+
+    /// Returns a fresh [`TypeInferenceBuilder`] for the current scope that can be used
+    /// to speculatively infer expressions during multi-inference.
+    ///
+    /// The inference results can be merged into the current inference region using
+    /// [`TypeInferenceBuilder::extend`], or ignored using [`TypeInferenceBuilder::discard`].
+    fn speculate(&mut self) -> Self {
+        TypeInferenceBuilder::new(self.db(), self.region, self.index, self.module())
+    }
+
+    /// Extend the current region with the results of a speculative [`TypeInferenceBuilder`].
+    fn extend(&mut self, other: Self) {
+        let Self {
+            context,
+            expressions,
+            string_annotations,
+            scope,
+            bindings,
+            declarations,
+            deferred,
+            cycle_recovery,
+            dataclass_field_specifiers: _,
+
+            // Ignored; only relevant to definition regions
+            undecorated_type: _,
+
+            // builder only state
+            all_definitely_bound: _,
+            typevar_binding_context: _,
+            inference_flags: _,
+            deferred_state: _,
+            multi_inference_state: _,
+            inner_expression_inference_state: _,
+            inferring_vararg_annotation: _,
+            called_functions: _,
+            index: _,
+            region: _,
+            return_types_and_ranges: _,
+        } = other;
+
+        let diagnostics = context.finish();
+        let _ = scope;
+
+        assert!(
+            declarations.is_empty(),
+            "speculative `TypeInferenceBuilder` should only be used for expression inference"
+        );
+        assert!(
+            deferred.is_empty(),
+            "speculative `TypeInferenceBuilder` should only be used for expression inference"
+        );
+
+        self.expressions.extend(expressions.iter());
+        self.context.extend(&diagnostics);
+        self.extend_cycle_recovery(cycle_recovery);
+        self.string_annotations
+            .extend(string_annotations.iter().copied());
+
+        if !matches!(self.region, InferenceRegion::Scope(..)) {
+            self.bindings.extend(
+                bindings.iter().map(|(def, ty)| (*def, *ty)),
+                self.multi_inference_state,
+            );
+        }
+    }
+
+    /// Ignore the results of this [`TypeInferenceBuilder`].
+    ///
+    /// Note that dropping a [`TypeInferenceBuilder`] without calling this method will result
+    /// in a panic.
+    fn discard(self) {
+        let _ = self.context.finish();
     }
 }
 
