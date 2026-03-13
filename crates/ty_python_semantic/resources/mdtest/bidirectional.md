@@ -319,6 +319,17 @@ def list_or_set2[T, U](x: T, y: U) -> list[T] | set[U]:
 # error: [no-matching-overload]
 x8 = f6(reveal_type(list_or_set2(1, 1)))  # revealed: list[int] | set[int]
 reveal_type(x8)  # revealed: Unknown
+
+@overload
+def f7(y: list[int | str]) -> list[int | str]: ...
+@overload
+def f7[T](y: list[T]) -> list[T]: ...
+def f7(y: object) -> object:
+    raise NotImplementedError
+
+# TODO: We should reveal `list[int | str]` here.
+x9 = f7(reveal_type(["Sheet1"]))  # revealed: list[str]
+reveal_type(x9)  # revealed: list[int | str]
 ```
 
 ## Class constructor parameters

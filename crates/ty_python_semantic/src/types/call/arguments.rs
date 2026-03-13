@@ -53,14 +53,14 @@ pub(crate) struct CallArguments<'a, 'db> {
 /// with type context across multiple bindings.
 #[derive(Clone, Debug, Default)]
 pub(crate) struct CallArgumentTypes<'db> {
-    fallback_ty: Option<Type<'db>>,
+    fallback_type: Option<Type<'db>>,
     types: FxHashMap<Type<'db>, Type<'db>>,
 }
 
 impl<'db> CallArgumentTypes<'db> {
     pub(crate) fn new(fallback_ty: Option<Type<'db>>) -> Self {
         Self {
-            fallback_ty,
+            fallback_type: fallback_ty,
             types: FxHashMap::default(),
         }
     }
@@ -78,7 +78,7 @@ impl<'db> CallArgumentTypes<'db> {
             return Some(*exact_ty);
         }
 
-        self.fallback_ty
+        self.fallback_type
     }
 
     /// Returns the type of this argument when inferred against the provided declared type.
@@ -93,7 +93,7 @@ impl<'db> CallArgumentTypes<'db> {
     /// Insert the type of this argument when inferred with the provided type context.
     pub(crate) fn insert(&mut self, tcx: impl Into<TypeContext<'db>>, ty: Type<'db>) {
         match tcx.into().annotation {
-            None => self.fallback_ty = Some(ty),
+            None => self.fallback_type = Some(ty),
             Some(tcx) => {
                 self.types.insert(tcx, ty);
             }
@@ -104,7 +104,7 @@ impl<'db> CallArgumentTypes<'db> {
         self.types
             .iter()
             .map(|(tcx, ty)| (TypeContext::new(Some(*tcx)), *ty))
-            .chain(self.fallback_ty.map(|ty| (TypeContext::default(), ty)))
+            .chain(self.fallback_type.map(|ty| (TypeContext::default(), ty)))
     }
 }
 
