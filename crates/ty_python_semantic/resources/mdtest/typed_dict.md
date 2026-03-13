@@ -1564,10 +1564,14 @@ config["port"] = 80
 from typing import TypedDict
 from typing_extensions import NotRequired
 
+class Inner(TypedDict):
+    inner: int
+
 class Person(TypedDict):
     name: str
     age: int | None
     extra: NotRequired[str]
+    inner: NotRequired[Inner]
 
 def _(p: Person) -> None:
     reveal_type(p.keys())  # revealed: dict_keys[str, object]
@@ -1587,6 +1591,10 @@ def _(p: Person) -> None:
 
     # The type of the default parameter can be anything:
     reveal_type(p.get("extra", 0))  # revealed: str | Literal[0]
+
+    # Even another typed dict:
+    # TODO: This should evaluate to `Inner`.
+    reveal_type(p.get("inner", {"inner": 0}))  # revealed: Inner | dict[str, int]
 
     # We allow access to unknown keys (they could be set for a subtype of Person)
     reveal_type(p.get("unknown"))  # revealed: Unknown | None
