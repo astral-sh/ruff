@@ -2718,6 +2718,66 @@ def ab(a: int, *, c: int): ...
     }
 
     #[test]
+    fn goto_declaration_overloaded_method_usage() {
+        let test = CursorTest::builder()
+            .source(
+                "lib.py",
+                r#"
+                from typing import overload, Any
+
+                class Test:
+                    @overload
+                    def test() -> None: ...
+                    @overload
+                    def test(a: str) -> str: ...
+                    @overload
+                    def test(a: int) -> int: ...
+
+                    def test(a: Any) -> Any:
+                        return a
+                "#,
+            )
+            .source(
+                "main.py",
+                r#"
+                from lib import Test
+
+                Test().te<CURSOR>st("test")
+                "#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_declaration(), @r#"
+        info[goto-declaration]: Go to declaration
+         --> main.py:4:8
+          |
+        2 | from lib import Test
+        3 |
+        4 | Test().test("test")
+          |        ^^^^ Clicking here
+          |
+        info: Found 4 declarations
+          --> lib.py:6:9
+           |
+         4 | class Test:
+         5 |     @overload
+         6 |     def test() -> None: ...
+           |         ----
+         7 |     @overload
+         8 |     def test(a: str) -> str: ...
+           |         ----
+         9 |     @overload
+        10 |     def test(a: int) -> int: ...
+           |         ----
+        11 |
+        12 |     def test(a: Any) -> Any:
+           |         ----
+        13 |         return a
+           |
+        "#);
+    }
+
+    #[test]
     fn goto_declaration_submodule_import_from_use() {
         let test = CursorTest::builder()
             .source(
