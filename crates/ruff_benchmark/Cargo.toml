@@ -57,10 +57,10 @@ ruff_instrumented = [
     "tikv-jemallocator",
 ]
 # Enables the ty instrumented benchmarks
-ty_instrumented = ["criterion", "ty_project", "ruff_python_trivia", "ty_python_semantic"]
+ty_instrumented = ["criterion", "ty_project", "ruff_python_trivia"]
 codspeed = ["codspeed-criterion-compat"]
 # Enables the ty_walltime benchmarks
-ty_walltime = ["ruff_db/os", "ty_project", "ty_python_semantic", "divan"]
+ty_walltime = ["ruff_db/os", "ty_project", "divan"]
 
 [[bench]]
 name = "linter"

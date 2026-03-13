@@ -135,8 +135,7 @@ impl Workspace {
         )
         .map_err(into_error)?;
 
-        let mut db =
-            ProjectDatabase::new(project, system.clone(), &FallibleStrategy).map_err(into_error)?;
+        let mut db = ProjectDatabase::fallible(project, system.clone()).map_err(into_error)?;
 
         // By default, it will check all files in the project but we only want to check the open
         // files in the playground.

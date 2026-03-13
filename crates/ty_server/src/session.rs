@@ -27,7 +27,7 @@ use ty_project::watch::{ChangeEvent, CreatedKind};
 use ty_project::{ChangeResult, Db as _, ProjectDatabase, ProjectMetadata};
 
 use index::DocumentError;
-use ty_python_semantic::{FallibleStrategy, UseDefaultStrategy};
+use ty_python_semantic::UseDefaultStrategy;
 
 pub(crate) use self::options::InitializationOptions;
 pub use self::options::{ClientOptions, DiagnosticMode, GlobalOptions, WorkspaceOptions};
@@ -611,7 +611,7 @@ impl Session {
                     metadata.apply_overrides(overrides);
                 }
 
-                ProjectDatabase::new(metadata, system.clone(), &FallibleStrategy)
+                ProjectDatabase::fallible(metadata, system.clone())
             });
 
         let (root, db) = match project {
@@ -633,8 +633,7 @@ impl Session {
                     None,
                     &UseDefaultStrategy,
                 );
-                let Ok(db_with_default_settings) =
-                    ProjectDatabase::new(metadata, system, &UseDefaultStrategy);
+                let db_with_default_settings = ProjectDatabase::use_defaults(metadata, system);
                 let default_root = db_with_default_settings
                     .project()
                     .root(&db_with_default_settings)

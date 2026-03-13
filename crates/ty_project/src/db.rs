@@ -16,7 +16,10 @@ use ruff_db::vendored::VendoredFileSystem;
 use salsa::{Database, Event, Setter};
 use ty_module_resolver::SearchPaths;
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
-use ty_python_semantic::{AnalysisSettings, Db as SemanticDb, MisconfigurationStrategy, Program};
+use ty_python_semantic::{
+    AnalysisSettings, Db as SemanticDb, FallibleStrategy, MisconfigurationStrategy, Program,
+    UseDefaultStrategy,
+};
 
 mod changes;
 
@@ -45,7 +48,24 @@ pub struct ProjectDatabase {
 }
 
 impl ProjectDatabase {
-    pub fn new<S, Strategy: MisconfigurationStrategy>(
+    /// Creates a new database, returning an error if the project metadata is misconfigured.
+    pub fn fallible<S>(project_metadata: ProjectMetadata, system: S) -> anyhow::Result<Self>
+    where
+        S: System + 'static + Send + Sync + RefUnwindSafe,
+    {
+        Self::new(project_metadata, system, &FallibleStrategy)
+    }
+
+    /// Creates a new database, substituting default values for any misconfigured settings.
+    pub fn use_defaults<S>(project_metadata: ProjectMetadata, system: S) -> Self
+    where
+        S: System + 'static + Send + Sync + RefUnwindSafe,
+    {
+        let Ok(db) = Self::new(project_metadata, system, &UseDefaultStrategy);
+        db
+    }
+
+    fn new<S, Strategy: MisconfigurationStrategy>(
         project_metadata: ProjectMetadata,
         system: S,
         strategy: &Strategy,

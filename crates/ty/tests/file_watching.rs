@@ -16,7 +16,7 @@ use ty_project::metadata::pyproject::{PyProject, Tool};
 use ty_project::metadata::value::{RangedValue, RelativePathBuf};
 use ty_project::watch::{ChangeEvent, ProjectWatcher, directory_watcher};
 use ty_project::{Db, ProjectDatabase, ProjectMetadata};
-use ty_python_semantic::{FallibleStrategy, PythonPlatform};
+use ty_python_semantic::PythonPlatform;
 
 struct TestCase {
     db: ProjectDatabase,
@@ -435,7 +435,7 @@ where
         }
     }
 
-    let mut db = ProjectDatabase::new(project, system, &FallibleStrategy)?;
+    let mut db = ProjectDatabase::fallible(project, system)?;
 
     if let Some(included_paths) = included_paths {
         db.project().set_included_paths(&mut db, included_paths);
