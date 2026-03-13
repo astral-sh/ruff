@@ -3007,11 +3007,12 @@ impl<'db> VarianceInferable<'db> for StaticClassLiteral<'db> {
             // not considered here, since they don't use field types in their signatures. TODO:
             // ideally we'd have a single source of truth for information about synthesized
             // methods, so we just look them up normally and don't hardcode this knowledge here.
-            let is_frozen_dataclass = Program::get(db).python_version(db) <= PythonVersion::PY312
-                && self
-                    .dataclass_params(db)
-                    .is_some_and(|params| params.flags(db).contains(DataclassFlags::FROZEN));
-            if is_namedtuple || is_frozen_dataclass {
+            let is_frozen_dataclass_prior_to_313 = Program::get(db).python_version(db)
+                <= PythonVersion::PY312
+                && CodeGeneratorKind::from_static_class(db, self, None)
+                    .is_some_and(|kind| self.has_dataclass_param(db, kind, DataclassFlags::FROZEN));
+
+            if is_namedtuple || is_frozen_dataclass_prior_to_313 {
                 TypeVarVariance::Covariant
             } else {
                 TypeVarVariance::Invariant
