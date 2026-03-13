@@ -20,3 +20,10 @@ pub(crate) const fn is_hug_parens_with_braces_and_square_brackets_enabled(
 pub(crate) const fn is_fluent_layout_split_first_call_enabled(context: &PyFormatContext) -> bool {
     context.is_preview()
 }
+
+/// Returns `true` if the
+/// [`never_break_literal_subscripts`]() preview
+/// style is enabled.
+pub(crate) const fn is_never_break_literal_subscripts_enabled(context: &PyFormatContext) -> bool {
+    context.is_preview()
+}
