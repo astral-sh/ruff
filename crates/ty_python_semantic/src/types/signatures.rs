@@ -1330,21 +1330,168 @@ impl<'db> Signature<'db> {
         // If either of the parameter lists is gradual (`...`), then it is assignable to and from
         // any other parameter list, but not a subtype or supertype of any other parameter list.
         if self.parameters.is_gradual() || other.parameters.is_gradual() {
-            if self.parameters.is_concatenate_gradual() && other.parameters.is_concatenate_gradual()
-            {
-                // When both parameter lists are `Concatenate` gradual forms, the overlapping
-                // prefix parameters must be checked contravariantly. Any extra prefix params
-                // on either side are absorbed by the gradual tail.
-                let self_prefix =
-                    &self.parameters.value[..self.parameters.value.len().saturating_sub(2)];
-                let other_prefix =
-                    &other.parameters.value[..other.parameters.value.len().saturating_sub(2)];
+            match (self.parameters.kind(), other.parameters.kind()) {
+                // Both parameter lists are `Concatenate` with gradual forms. All prefix parameters
+                // are going to be positional-only.
+                (
+                    ParametersKind::Concatenate(ConcatenateTail::Gradual),
+                    ParametersKind::Concatenate(ConcatenateTail::Gradual),
+                ) => {
+                    let self_prefix_params =
+                        &self.parameters.value[..self.parameters.len().saturating_sub(2)];
+                    let other_prefix_params =
+                        &other.parameters.value[..other.parameters.len().saturating_sub(2)];
 
-                for (self_param, other_param) in self_prefix.iter().zip(other_prefix.iter()) {
-                    if !check_types(other_param.annotated_type(), self_param.annotated_type()) {
-                        return result;
+                    for (self_param, other_param) in
+                        self_prefix_params.iter().zip(other_prefix_params.iter())
+                    {
+                        if !check_types(other_param.annotated_type(), self_param.annotated_type()) {
+                            return result;
+                        }
                     }
                 }
+
+                // Self is a `Concatenate` with gradual form while other is a regular non-gradual
+                // callable
+                (
+                    ParametersKind::Concatenate(ConcatenateTail::Gradual),
+                    ParametersKind::Standard,
+                ) => {
+                    let self_prefix_params =
+                        &self.parameters.value[..self.parameters.len().saturating_sub(2)];
+
+                    for param in self_prefix_params
+                        .iter()
+                        .zip_longest(other.parameters.iter())
+                    {
+                        match param {
+                            EitherOrBoth::Left(_) => {
+                                // Concatenate (self) has additional positional-only parameters but
+                                // other does not.
+                                return ConstraintSet::from_bool(constraints, false);
+                            }
+                            EitherOrBoth::Right(_) => {
+                                // Once the left (self) iterator is exhausted, all the remaining
+                                // parameters in other will be consumed by the gradual form of
+                                // `Concatenate`.
+                                break;
+                            }
+                            EitherOrBoth::Both(self_param, other_param) => {
+                                if let (
+                                    ParameterKind::PositionalOnly { .. },
+                                    ParameterKind::PositionalOnly {
+                                        default_type: other_default,
+                                        ..
+                                    },
+                                ) = (self_param.kind(), other_param.kind())
+                                {
+                                    // `self`'s default is always going to be `None` because it comes
+                                    // from the `Concatenate` form which cannot have default value.
+                                    if other_default.is_some() {
+                                        return ConstraintSet::from_bool(constraints, false);
+                                    }
+                                    if !check_types(
+                                        other_param.annotated_type(),
+                                        self_param.annotated_type(),
+                                    ) {
+                                        return result;
+                                    }
+                                } else {
+                                    return ConstraintSet::from_bool(constraints, false);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Other is a `Concatenate` with gradual form while self is a regular non-gradual
+                // callable
+                (
+                    ParametersKind::Standard,
+                    ParametersKind::Concatenate(ConcatenateTail::Gradual),
+                ) => {
+                    let other_prefix_params =
+                        &other.parameters.value[..other.parameters.len().saturating_sub(2)];
+
+                    let mut parameters = ParametersZip {
+                        current_self: None,
+                        current_other: None,
+                        iter_self: self.parameters.iter(),
+                        iter_other: other_prefix_params.iter(),
+                    };
+
+                    loop {
+                        let Some(parameter) = parameters.next() else {
+                            break;
+                        };
+
+                        match parameter {
+                            EitherOrBoth::Left(_) => {
+                                // Once the right (other) iterator is exhausted, all the remaining
+                                // parameters in self will be consumed by the gradual form of
+                                // `Concatenate`.
+                                break;
+                            }
+                            EitherOrBoth::Right(_) => {
+                                // Concatenate (other) has additional positional-only parameters but
+                                // self does not.
+                                return ConstraintSet::from_bool(constraints, false);
+                            }
+                            EitherOrBoth::Both(self_param, other_param) => {
+                                match self_param.kind() {
+                                    ParameterKind::PositionalOnly {
+                                        default_type: self_default,
+                                        ..
+                                    }
+                                    | ParameterKind::PositionalOrKeyword {
+                                        default_type: self_default,
+                                        ..
+                                    } => {
+                                        if self_default.is_none()
+                                            && other_param.default_type().is_some()
+                                        {
+                                            return ConstraintSet::from_bool(constraints, false);
+                                        }
+                                        if !check_types(
+                                            other_param.annotated_type(),
+                                            self_param.annotated_type(),
+                                        ) {
+                                            return result;
+                                        }
+                                    }
+                                    ParameterKind::Variadic { .. } => {
+                                        if !check_types(
+                                            other_param.annotated_type(),
+                                            self_param.annotated_type(),
+                                        ) {
+                                            return result;
+                                        }
+
+                                        loop {
+                                            let Some(other_param) = parameters.peek_other() else {
+                                                break;
+                                            };
+                                            if !check_types(
+                                                other_param.annotated_type(),
+                                                self_param.annotated_type(),
+                                            ) {
+                                                return result;
+                                            }
+                                            parameters.next_other();
+                                        }
+                                    }
+                                    _ => {
+                                        // self has other parameter kinds but other only has
+                                        // positional-only parameters, so they cannot be compatible.
+                                        return ConstraintSet::from_bool(constraints, false);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                _ => {}
             }
 
             return match relation {
@@ -2399,15 +2546,6 @@ impl<'db> Parameters<'db> {
         matches!(
             self.kind,
             ParametersKind::Gradual | ParametersKind::Concatenate(ConcatenateTail::Gradual)
-        )
-    }
-
-    /// Returns `true` if the parameters represent a `Concatenate` form with `...` as the last
-    /// argument.
-    const fn is_concatenate_gradual(&self) -> bool {
-        matches!(
-            self.kind,
-            ParametersKind::Concatenate(ConcatenateTail::Gradual)
         )
     }
 
