@@ -1252,7 +1252,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         if source.parameters.is_gradual() || target.parameters.is_gradual() {
             return match self.relation {
                 TypeRelation::Subtyping | TypeRelation::SubtypingAssuming => self.never(),
-                TypeRelation::Redundancy { .. } => result.intersect(
+                TypeRelation::Redundancy => result.intersect(
                     db,
                     self.constraints,
                     ConstraintSet::from_bool(

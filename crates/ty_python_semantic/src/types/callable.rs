@@ -275,7 +275,7 @@ impl From<TypeRelation> for UpcastPolicy {
     fn from(relation: TypeRelation) -> Self {
         match relation {
             TypeRelation::Subtyping
-            | TypeRelation::Redundancy { .. }
+            | TypeRelation::Redundancy
             | TypeRelation::SubtypingAssuming => UpcastPolicy::Sound,
             TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability => {
                 UpcastPolicy::Unsound

@@ -1420,7 +1420,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 None,
                 Some(target_mat),
                 TypeRelation::Subtyping
-                | TypeRelation::Redundancy { .. }
+                | TypeRelation::Redundancy
                 | TypeRelation::SubtypingAssuming,
             ) => self.check_subtyping_in_invariant_position(
                 db,
@@ -1433,7 +1433,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 Some(source_mat),
                 None,
                 TypeRelation::Subtyping
-                | TypeRelation::Redundancy { .. }
+                | TypeRelation::Redundancy
                 | TypeRelation::SubtypingAssuming,
             ) => self.check_subtyping_in_invariant_position(
                 db,

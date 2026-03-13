@@ -155,7 +155,7 @@ pub(crate) enum TypeRelation {
     ///
     /// [fully static]: https://typing.python.org/en/latest/spec/glossary.html#term-fully-static-type
     /// [materializations]: https://typing.python.org/en/latest/spec/glossary.html#term-materialize
-    Redundancy { pure: bool },
+    Redundancy,
 
     /// The "constraint implication" relationship, aka "implies subtype of".
     ///
@@ -217,7 +217,7 @@ impl TypeRelation {
         match self {
             TypeRelation::Assignability
             | TypeRelation::ConstraintSetAssignability
-            | TypeRelation::Redundancy { .. } => true,
+            | TypeRelation::Redundancy => true,
             TypeRelation::Subtyping | TypeRelation::SubtypingAssuming => {
                 ty.subtyping_is_always_reflexive()
             }
@@ -397,7 +397,7 @@ impl<'db> Type<'db> {
                     other,
                     &ConstraintSetBuilder::new(),
                     InferableTypeVars::None,
-                    TypeRelation::Redundancy { pure: false },
+                    TypeRelation::Redundancy,
                 )
                 .is_always_satisfied(db)
         }
@@ -699,7 +699,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                         TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability => {
                             true
                         }
-                        TypeRelation::Redundancy { .. } => match target {
+                        TypeRelation::Redundancy => match target {
                             Type::Dynamic(_) => true,
                             Type::Union(union) => union.elements(db).iter().any(Type::is_dynamic),
                             _ => false,
@@ -712,7 +712,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 match self.relation {
                     TypeRelation::Subtyping | TypeRelation::SubtypingAssuming => false,
                     TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability => true,
-                    TypeRelation::Redundancy { .. } => match source {
+                    TypeRelation::Redundancy => match source {
                         Type::Dynamic(_) => true,
                         Type::Intersection(intersection) => {
                             // If a `Divergent` type is involved, it must not be eliminated.
@@ -975,7 +975,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     // of redundancy may not generally lead to simpler types in many situations.
                     let source_ty = match self.relation {
                         TypeRelation::Subtyping
-                        | TypeRelation::Redundancy { .. }
+                        | TypeRelation::Redundancy
                         | TypeRelation::SubtypingAssuming => source,
                         TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability => {
                             source.bottom_materialization(db)
@@ -987,7 +987,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                         .when_all(db, self.constraints, |&neg_ty| {
                             let neg_ty = match self.relation {
                                 TypeRelation::Subtyping
-                                | TypeRelation::Redundancy { .. }
+                                | TypeRelation::Redundancy
                                 | TypeRelation::SubtypingAssuming => neg_ty,
                                 TypeRelation::Assignability
                                 | TypeRelation::ConstraintSetAssignability => {
@@ -1099,7 +1099,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // For union simplification, we want to preserve the unpromotable form of a literal value,
             // and so redundancy is not symmetric.
             (Type::LiteralValue(source), Type::LiteralValue(target))
-                if matches!(self.relation, TypeRelation::Redundancy { pure: false }) =>
+                if self.relation == TypeRelation::Redundancy =>
             {
                 ConstraintSet::from_bool(
                     self.constraints,
@@ -1562,7 +1562,7 @@ pub(super) struct EquivalenceChecker<'a, 'c, 'db> {
 impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
     fn as_relation_checker(&self) -> TypeRelationChecker<'_, 'c, 'db> {
         TypeRelationChecker {
-            relation: TypeRelation::Redundancy { pure: true },
+            relation: TypeRelation::Subtyping,
             constraints: self.constraints,
             inferable: InferableTypeVars::None,
             relation_visitor: self.relation_visitor,
@@ -1585,10 +1585,21 @@ impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
         right: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
         let relation_checker = self.as_relation_checker();
+        let left_top = left.top_materialization(db);
+        let right_top = right.top_materialization(db);
         relation_checker
-            .check_type_pair(db, left, right)
+            .check_type_pair(db, left_top, right_top)
             .and(db, self.constraints, || {
-                relation_checker.check_type_pair(db, right, left)
+                relation_checker.check_type_pair(db, right_top, left_top)
+            })
+            .and(db, self.constraints, || {
+                let left_bottom = left.bottom_materialization(db);
+                let right_bottom = right.bottom_materialization(db);
+                relation_checker
+                    .check_type_pair(db, left_bottom, right_bottom)
+                    .and(db, self.constraints, || {
+                        relation_checker.check_type_pair(db, right_bottom, left_bottom)
+                    })
             })
     }
 }

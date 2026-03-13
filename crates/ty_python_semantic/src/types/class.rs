@@ -1847,7 +1847,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             match base {
                 ClassBase::Dynamic(_) => match self.relation {
                     TypeRelation::Subtyping
-                    | TypeRelation::Redundancy { .. }
+                    | TypeRelation::Redundancy
                     | TypeRelation::SubtypingAssuming => {
                         ConstraintSet::from_bool(self.constraints, target.is_object(db))
                     }
