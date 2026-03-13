@@ -1502,17 +1502,17 @@ static_assert(is_assignable_to(Callable[..., None], Callable[Concatenate[int, st
 ### Assignable from bottom callable
 
 ```py
-from ty_extensions import static_assert, is_assignable_to, CallableTypeOf
+from ty_extensions import static_assert, is_assignable_to, RegularCallableTypeOf
 from typing import Callable, Concatenate, Never
 
 def bottom(*args: object, **kwargs: object) -> Never:
     raise NotImplementedError
 
-static_assert(is_assignable_to(CallableTypeOf[bottom], Callable[Concatenate[int, ...], None]))
-static_assert(is_assignable_to(CallableTypeOf[bottom], Callable[Concatenate[int, str, ...], None]))
+static_assert(is_assignable_to(RegularCallableTypeOf[bottom], Callable[Concatenate[int, ...], None]))
+static_assert(is_assignable_to(RegularCallableTypeOf[bottom], Callable[Concatenate[int, str, ...], None]))
 
-static_assert(not is_assignable_to(Callable[Concatenate[int, ...], None], CallableTypeOf[bottom]))
-static_assert(not is_assignable_to(Callable[Concatenate[int, str, ...], None], CallableTypeOf[bottom]))
+static_assert(not is_assignable_to(Callable[Concatenate[int, ...], None], RegularCallableTypeOf[bottom]))
+static_assert(not is_assignable_to(Callable[Concatenate[int, str, ...], None], RegularCallableTypeOf[bottom]))
 ```
 
 ### Contravariance of parameters
@@ -1580,6 +1580,88 @@ class A: ...
 def with_paramspec[**P](_: Callable[P, None]):
     static_assert(is_assignable_to(Callable[Concatenate[int, P], None], Callable[..., None]))
     static_assert(is_assignable_to(Callable[..., None], Callable[Concatenate[int, P], None]))
+```
+
+### Gradual `Concatenate` with regular function
+
+```py
+from ty_extensions import RegularCallableTypeOf, static_assert, is_assignable_to
+from typing import Callable, Concatenate
+
+class A: ...
+class B: ...
+class C: ...
+```
+
+A `Concatenate` form that ends with `...` means that all of the parameters before `...` are
+positional-only.
+
+```py
+def positional_only(a: A, b: B, /) -> None: ...
+def with_default(a: A, b: B = B(), /) -> None: ...
+
+static_assert(is_assignable_to(RegularCallableTypeOf[positional_only], Callable[Concatenate[A, ...], None]))
+static_assert(is_assignable_to(Callable[Concatenate[A, ...], None], RegularCallableTypeOf[positional_only]))
+
+static_assert(is_assignable_to(RegularCallableTypeOf[positional_only], Callable[Concatenate[A, B, ...], None]))
+static_assert(is_assignable_to(Callable[Concatenate[A, B, ...], None], RegularCallableTypeOf[positional_only]))
+
+# Concatenate has an additional required positional-only parameter which isn't present in the
+# function definition, so they aren't assignable.
+static_assert(not is_assignable_to(RegularCallableTypeOf[positional_only], Callable[Concatenate[A, B, C, ...], None]))
+static_assert(not is_assignable_to(Callable[Concatenate[A, B, C, ...], None], RegularCallableTypeOf[positional_only]))
+
+static_assert(is_assignable_to(RegularCallableTypeOf[with_default], Callable[Concatenate[A, ...], None]))
+static_assert(is_assignable_to(Callable[Concatenate[A, ...], None], RegularCallableTypeOf[with_default]))
+
+# For an optional parameter (with default value), it is assignable to a non-optional parameter, but
+# the reverse is not true.
+static_assert(is_assignable_to(RegularCallableTypeOf[with_default], Callable[Concatenate[A, B, ...], None]))
+static_assert(not is_assignable_to(Callable[Concatenate[A, B, ...], None], RegularCallableTypeOf[with_default]))
+```
+
+But, a regular callable can contain a positional-or-keyword parameter which is sometimes compatible
+with the `Concatenate` with gradual form.
+
+```py
+def positional_or_keyword(a: A, b: B) -> None: ...
+
+static_assert(is_assignable_to(RegularCallableTypeOf[positional_or_keyword], Callable[Concatenate[A, ...], None]))
+static_assert(not is_assignable_to(Callable[Concatenate[A, ...], None], RegularCallableTypeOf[positional_or_keyword]))
+
+static_assert(is_assignable_to(RegularCallableTypeOf[positional_or_keyword], Callable[Concatenate[A, B, ...], None]))
+static_assert(not is_assignable_to(Callable[Concatenate[A, B, ...], None], RegularCallableTypeOf[positional_or_keyword]))
+```
+
+For variadic parameter, it is assignable only when the type of the variadic parameter is compatible
+with the type of all the prefix parameters in the `Concatenate` form.
+
+```py
+def variadic_a(*args: A) -> None: ...
+def variadic_b(*args: B) -> None: ...
+
+static_assert(is_assignable_to(RegularCallableTypeOf[variadic_a], Callable[Concatenate[A, ...], None]))
+static_assert(is_assignable_to(RegularCallableTypeOf[variadic_a], Callable[Concatenate[A, A, ...], None]))
+static_assert(not is_assignable_to(Callable[Concatenate[A, ...], None], RegularCallableTypeOf[variadic_a]))
+
+static_assert(not is_assignable_to(RegularCallableTypeOf[variadic_a], Callable[Concatenate[A, B, ...], None]))
+static_assert(not is_assignable_to(Callable[Concatenate[A, B, ...], None], RegularCallableTypeOf[variadic_a]))
+
+static_assert(not is_assignable_to(RegularCallableTypeOf[variadic_b], Callable[Concatenate[A, ...], None]))
+static_assert(not is_assignable_to(Callable[Concatenate[A, ...], None], RegularCallableTypeOf[variadic_b]))
+```
+
+For all the other parameter kinds, it is not assignable in either direction.
+
+```py
+def keyword_only(*, a: A, b: B) -> None: ...
+def keyword_variadic(**kwargs: A) -> None: ...
+
+static_assert(not is_assignable_to(RegularCallableTypeOf[keyword_only], Callable[Concatenate[A, B, ...], None]))
+static_assert(not is_assignable_to(Callable[Concatenate[A, B, ...], None], RegularCallableTypeOf[keyword_only]))
+
+static_assert(not is_assignable_to(RegularCallableTypeOf[keyword_variadic], Callable[Concatenate[A, ...], None]))
+static_assert(not is_assignable_to(Callable[Concatenate[A, ...], None], RegularCallableTypeOf[keyword_variadic]))
 ```
 
 [gradual form]: https://typing.python.org/en/latest/spec/glossary.html#term-gradual-form

@@ -551,3 +551,57 @@ from typing_extensions import Callable, Concatenate
 def _(c: Callable[Concatenate[int, str, ...], bool]):
     reveal_type(c)  # revealed: (int, str, /, *args: Any, **kwargs: Any) -> bool
 ```
+
+## Assignability
+
+### Implicit concatenate to non-concatenated callable
+
+As per the [spec](https://typing.python.org/en/latest/spec/generics.html#id5):
+
+> A function declared as `def inner(a: A, b: B, *args: P.args, **kwargs: P.kwargs) -> R` has type
+> `Callable[Concatenate[A, B, P], R]`.
+
+```py
+from typing import Callable, Concatenate
+
+def decorator[**P](func: Callable[P, None]) -> Callable[P, None]:
+    def wrapper(*args: P.args, **kwargs: P.kwargs) -> None:
+        func(*args, **kwargs)
+
+    return wrapper
+
+@decorator
+def f1[**P](fn: Callable[P, None], x: int, *args: P.args, **kwargs: P.kwargs) -> None:
+    pass
+
+reveal_type(f1)  # revealed: [**P](fn: (**P) -> None, x: int, P@f1) -> None
+
+def test(a: str) -> None: ...
+
+reveal_type(f1(test, 1, ""))  # revealed: None
+
+# error: [missing-argument] "No argument provided for required parameter `x`"
+# error: [missing-argument] "No argument provided for required parameter `a`"
+reveal_type(f1(test))  # revealed: None
+
+# TODO: Currently, this is allowed but should probably raise a diagnostic given that
+# `x` is now a positional-only parameter because of the Concatenate form but it might
+# be too strict.
+reveal_type(f1(fn=test, x=1, a=""))  # revealed: None
+```
+
+### Non-concatenated to concatenated callable
+
+```py
+from typing import Callable, Concatenate
+
+def decorator[**P1](func: Callable[Concatenate[int, P1], None]) -> Callable[P1, None]:
+    def wrapper(*args: P1.args, **kwargs: P1.kwargs) -> None:
+        pass
+    return wrapper
+
+def foo[**P2](f: Callable[P2, None]) -> None:
+    reveal_type(f)  # revealed: [**P2](**P2) -> None
+    # TODO: This should raise an invalid-argument-type error
+    reveal_type(decorator(f))  # revealed: (...) -> None
+```
