@@ -160,7 +160,7 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     let project_options_overrides = ProjectOptionsOverrides::new(config_file, args.into_options());
     project_metadata.apply_overrides(&project_options_overrides);
 
-    let mut db = ProjectDatabase::new(project_metadata, system)?;
+    let mut db = ProjectDatabase::fallible(project_metadata, system)?;
     let project = db.project();
 
     project.set_verbose(&mut db, verbosity >= VerbosityLevel::Verbose);

@@ -26,7 +26,7 @@ use ty_project::metadata::value::ValueSource;
 use ty_project::watch::{ChangeEvent, ChangedKind, CreatedKind, DeletedKind};
 use ty_project::{CheckMode, ProjectMetadata};
 use ty_project::{Db, ProjectDatabase};
-use ty_python_semantic::{MisconfigurationMode, Program};
+use ty_python_semantic::{FallibleStrategy, Program};
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
@@ -131,11 +131,11 @@ impl Workspace {
             options,
             SystemPathBuf::from(root),
             None,
-            MisconfigurationMode::Fail,
+            &FallibleStrategy,
         )
         .map_err(into_error)?;
 
-        let mut db = ProjectDatabase::new(project, system.clone()).map_err(into_error)?;
+        let mut db = ProjectDatabase::fallible(project, system.clone()).map_err(into_error)?;
 
         // By default, it will check all files in the project but we only want to check the open
         // files in the playground.
@@ -160,12 +160,12 @@ impl Workspace {
             options,
             self.db.project().root(&self.db).to_path_buf(),
             None,
-            MisconfigurationMode::Fail,
+            &FallibleStrategy,
         )
         .map_err(into_error)?;
 
         let program_settings = project
-            .to_program_settings(&self.system, self.db.vendored())
+            .to_program_settings(&self.system, self.db.vendored(), &FallibleStrategy)
             .map_err(into_error)?;
         Program::get(&self.db).update_from_settings(&mut self.db, program_settings);
 
