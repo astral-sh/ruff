@@ -4792,6 +4792,9 @@ pub(crate) fn report_invalid_key_on_typed_dict<'db>(
                     ));
                 } else {
                     diagnostic.set_primary_message(format_args!("Unknown key \"{key}\""));
+                    diagnostic.set_concise_message(format_args!(
+                        "Unknown key \"{key}\" for TypedDict `{typed_dict_name}`",
+                    ));
                 }
             }
             _ => {
