@@ -4,7 +4,7 @@ expression: code_actions
 ---
 [
   {
-    "title": "Ignore 'possibly-missing-attribute' for this line",
+    "title": "Ignore 'possibly-missing-submodule' for this line",
     "kind": "quickfix",
     "diagnostics": [
       {
@@ -19,12 +19,12 @@ expression: code_actions
           }
         },
         "severity": 2,
-        "code": "possibly-missing-attribute",
+        "code": "possibly-missing-submodule",
         "codeDescription": {
-          "href": "https://ty.dev/rules#possibly-missing-attribute"
+          "href": "https://ty.dev/rules#possibly-missing-submodule"
         },
         "source": "ty",
-        "message": "Submodule `parser` may not be available as an attribute on module `html`"
+        "message": "Submodule `parser` might not have been imported"
       }
     ],
     "edit": {
@@ -41,7 +41,7 @@ expression: code_actions
                 "character": 11
               }
             },
-            "newText": "  # ty:ignore[possibly-missing-attribute]"
+            "newText": "  # ty:ignore[possibly-missing-submodule]"
           }
         ]
       }

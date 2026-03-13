@@ -1443,6 +1443,15 @@ pub(crate) fn is_splittable_expression(expr: &Expr, context: &PyFormatContext) -
     }
 }
 
+/// Returns `true` if `expr` is invalid in a type-expression position unless the source keeps it
+/// parenthesized.
+pub(crate) const fn is_invalid_type_expression(expr: &Expr) -> bool {
+    matches!(
+        expr,
+        Expr::Named(_) | Expr::Await(_) | Expr::Yield(_) | Expr::YieldFrom(_)
+    )
+}
+
 /// Returns the sub-expression to which the left-most character in expression belongs.
 ///
 /// For example, in the expression `a + b * c`, the left-most subexpression is `a`. But for

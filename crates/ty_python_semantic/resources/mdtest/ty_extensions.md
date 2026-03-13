@@ -203,19 +203,19 @@ from ty_extensions import static_assert
 static_assert(True)
 static_assert(False)  # error: "Static assertion error: argument evaluates to `False`"
 
-static_assert(None)  # error: "Static assertion error: argument of type `None` is statically known to be falsy"
+static_assert(None)  # error: "Static assertion error: argument of type `None` is always falsy"
 
 static_assert(1)
-static_assert(0)  # error: "Static assertion error: argument of type `Literal[0]` is statically known to be falsy"
+static_assert(0)  # error: "Static assertion error: argument of type `Literal[0]` is always falsy"
 
 static_assert((0,))
-static_assert(())  # error: "Static assertion error: argument of type `tuple[()]` is statically known to be falsy"
+static_assert(())  # error: "Static assertion error: argument of type `tuple[()]` is always falsy"
 
 static_assert("a")
-static_assert("")  # error: "Static assertion error: argument of type `Literal[""]` is statically known to be falsy"
+static_assert("")  # error: "Static assertion error: argument of type `Literal[""]` is always falsy"
 
 static_assert(b"a")
-static_assert(b"")  # error: "Static assertion error: argument of type `Literal[b""]` is statically known to be falsy"
+static_assert(b"")  # error: "Static assertion error: argument of type `Literal[b""]` is always falsy"
 ```
 
 ### Error messages
@@ -398,7 +398,7 @@ the expression `str`:
 from ty_extensions import TypeOf, is_subtype_of, static_assert
 
 # This is incorrect and therefore fails with ...
-# error: "Static assertion error: argument of type `ty_extensions.ConstraintSet` is statically known to be falsy"
+# error: "Static assertion error: argument of type `ConstraintSet[Literal[False]]` is always falsy"
 static_assert(is_subtype_of(str, type[str]))
 
 # Correct, returns True:
@@ -471,9 +471,13 @@ reveal_type(foo)  # revealed: def foo() -> def foo() -> def foo() -> def foo() -
 
 ## `CallableTypeOf`
 
-The `CallableTypeOf` special form can be used to extract the `Callable` structural type inhabited by
-a given callable object. This can be used to get the externally visibly signature of the object,
-which can then be used to test various type properties.
+The `CallableTypeOf` special form can be used to extract the callable type inhabited by a given
+callable object. This can be used to get the externally visible signature of the object, which can
+then be used to test various type properties.
+
+Unlike a plain `typing.Callable[...]`, `CallableTypeOf[...]` preserves function-like behavior. This
+means method-like and descriptor-like callables remain distinct from regular callables in some
+type-theoretic checks.
 
 It accepts a single type parameter which is expected to be a callable object.
 
@@ -545,4 +549,24 @@ def _(
     reveal_type(c6)  # revealed: (x: int) -> Foo
     reveal_type(c7)  # revealed: (x: int) -> Foo
     reveal_type(c8)  # revealed: (x: int) -> str
+```
+
+## `RegularCallableTypeOf`
+
+The `RegularCallableTypeOf` special form also extracts a callable type from a callable object, but
+it normalizes the result to a regular `typing.Callable`-style type.
+
+This keeps the callable signatures while discarding function-like behavior. Use it when you want to
+compare a callable against ordinary `Callable[...]` types without preserving descriptor semantics.
+
+It accepts a single type parameter which is expected to be a callable object.
+
+```py
+from typing import Callable
+from ty_extensions import CallableTypeOf, RegularCallableTypeOf, is_assignable_to, static_assert
+
+def f(x: int, /) -> None: ...
+
+static_assert(not is_assignable_to(Callable[[int], None], CallableTypeOf[f]))
+static_assert(is_assignable_to(Callable[[int], None], RegularCallableTypeOf[f]))
 ```

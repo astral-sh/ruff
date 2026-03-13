@@ -73,6 +73,10 @@ pub(crate) fn check(
     let settings = query.settings();
     let document_path = query.virtual_file_path();
 
+    let SourceType::Python(source_type) = query.source_type() else {
+        return DiagnosticsMap::default();
+    };
+
     // If the document is excluded, return an empty list of diagnostics.
     if is_document_excluded_for_linting(
         &document_path,
@@ -94,10 +98,6 @@ pub(crate) fn check(
         .map(PackageRoot::root)
     } else {
         None
-    };
-
-    let SourceType::Python(source_type) = query.source_type() else {
-        return DiagnosticsMap::default();
     };
 
     let target_version = settings.linter.resolve_target_version(&document_path);

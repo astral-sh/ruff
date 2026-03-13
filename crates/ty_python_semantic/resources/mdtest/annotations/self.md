@@ -895,12 +895,12 @@ reveal_type(generic_context(C.f))
 This makes sure that we don't bind `self` if it's not a positional parameter:
 
 ```py
-from ty_extensions import CallableTypeOf
+from ty_extensions import RegularCallableTypeOf
 
 class C:
     def method(*args, **kwargs) -> None: ...
 
-def _(c: CallableTypeOf[C().method]):
+def _(c: RegularCallableTypeOf[C().method]):
     reveal_type(c)  # revealed: (...) -> None
 ```
 

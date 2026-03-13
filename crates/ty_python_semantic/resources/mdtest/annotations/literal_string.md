@@ -92,6 +92,13 @@ def _(literal_a: LiteralString, literal_b: LiteralString, a_str: str):
     reveal_type(f"{literal_a} {literal_b}")  # revealed: LiteralString
     reveal_type(f"{literal_a} {a_str}")  # revealed: str
 
+    if literal_a != "foo":
+        reveal_type(literal_a)  # revealed: LiteralString & ~Literal["foo"]
+
+        # the handling for `LiteralString` works even for subtypes of `LiteralString`,
+        # such as `LiteralString & ~Literal["foo]`, not just `LiteralString` itself
+        reveal_type(f"{literal_a} {literal_b}")  # revealed: LiteralString
+
     # Repetition
     reveal_type(literal_a * 10)  # revealed: LiteralString
 ```

@@ -3593,6 +3593,15 @@ impl Deref for TypeParams {
     }
 }
 
+impl<'a> IntoIterator for &'a TypeParams {
+    type Item = &'a TypeParam;
+    type IntoIter = std::slice::Iter<'a, TypeParam>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.type_params.iter()
+    }
+}
+
 /// A suite represents a [Vec] of [Stmt].
 ///
 /// See: <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-suite>

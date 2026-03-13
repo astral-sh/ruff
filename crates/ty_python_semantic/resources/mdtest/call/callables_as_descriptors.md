@@ -13,7 +13,7 @@ instance to the first argument. The bound-method object therefore has a differen
 the first argument:
 
 ```py
-from ty_extensions import CallableTypeOf
+from ty_extensions import RegularCallableTypeOf
 from typing import Callable
 
 class C1:
@@ -21,8 +21,8 @@ class C1:
         return str(x)
 
 def _(
-    accessed_on_class: CallableTypeOf[C1.method],
-    accessed_on_instance: CallableTypeOf[C1().method],
+    accessed_on_class: RegularCallableTypeOf[C1.method],
+    accessed_on_instance: RegularCallableTypeOf[C1().method],
 ):
     reveal_type(accessed_on_class)  # revealed: (self: C1, x: int) -> str
     reveal_type(accessed_on_instance)  # revealed:        (x: int) -> str
@@ -41,8 +41,8 @@ class C2:
     non_descriptor_callable: NonDescriptorCallable2 = NonDescriptorCallable2()
 
 def _(
-    accessed_on_class: CallableTypeOf[C2.non_descriptor_callable],
-    accessed_on_instance: CallableTypeOf[C2().non_descriptor_callable],
+    accessed_on_class: RegularCallableTypeOf[C2.non_descriptor_callable],
+    accessed_on_instance: RegularCallableTypeOf[C2().non_descriptor_callable],
 ):
     reveal_type(accessed_on_class)  # revealed:    (c2: C2, x: int) -> str
     reveal_type(accessed_on_instance)  # revealed: (c2: C2, x: int) -> str
@@ -68,8 +68,8 @@ However, when they are accessed on instances of `C3`, they have different signat
 
 ```py
 def _(
-    method_accessed_on_instance: CallableTypeOf[C3().method],
-    callable_accessed_on_instance: CallableTypeOf[C3().non_descriptor_callable],
+    method_accessed_on_instance: RegularCallableTypeOf[C3().method],
+    callable_accessed_on_instance: RegularCallableTypeOf[C3().non_descriptor_callable],
 ):
     reveal_type(method_accessed_on_instance)  # revealed:           (x: int) -> str
     reveal_type(callable_accessed_on_instance)  # revealed: (c3: C3, x: int) -> str
@@ -301,7 +301,7 @@ The callable type of a type object is not function-like.
 
 ```py
 from typing import ClassVar
-from ty_extensions import CallableTypeOf
+from ty_extensions import RegularCallableTypeOf
 
 class WithNew:
     def __new__(self, x: int) -> WithNew:
@@ -312,8 +312,8 @@ class WithInit:
         pass
 
 class C:
-    with_new: ClassVar[CallableTypeOf[WithNew]]
-    with_init: ClassVar[CallableTypeOf[WithInit]]
+    with_new: ClassVar[RegularCallableTypeOf[WithNew]]
+    with_init: ClassVar[RegularCallableTypeOf[WithInit]]
 
 C.with_new(1)
 C().with_new(1)

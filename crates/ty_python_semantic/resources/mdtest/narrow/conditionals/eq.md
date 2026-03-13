@@ -291,6 +291,10 @@ from typing_extensions import Literal, LiteralString, Any
 def _(s: LiteralString | None, t: LiteralString | Any):
     if s == "foo":
         reveal_type(s)  # revealed: Literal["foo"]
+    elif s == "bar":
+        reveal_type(s)  # revealed: Literal["bar"]
+    else:
+        reveal_type(s)  # revealed: (LiteralString & ~Literal["foo"] & ~Literal["bar"]) | None
 
     if s == 1:
         reveal_type(s)  # revealed: Never

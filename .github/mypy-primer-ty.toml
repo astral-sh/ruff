@@ -3,7 +3,8 @@
 
 # Enable off-by-default rules.
 [rules]
-possibly-unresolved-reference = "warn"
-possibly-missing-import = "warn"
 division-by-zero = "warn"
+possibly-missing-attribute = "warn"
+possibly-missing-import = "warn"
+possibly-unresolved-reference = "warn"
 unsupported-dynamic-base = "warn"

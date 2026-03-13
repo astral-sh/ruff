@@ -848,7 +848,7 @@ properties are understood correctly for these functions and methods.
 ```py
 import types
 from typing import Callable
-from ty_extensions import static_assert, CallableTypeOf, is_assignable_to, TypeOf
+from ty_extensions import static_assert, RegularCallableTypeOf, is_assignable_to, TypeOf
 
 def f(obj: type) -> None: ...
 
@@ -912,18 +912,18 @@ reveal_type("foo".startswith)
 static_assert(is_assignable_to(TypeOf["foo".startswith], Callable))
 
 def _(
-    a: CallableTypeOf[types.FunctionType.__get__],
-    b: CallableTypeOf[f],
-    c: CallableTypeOf[f.__get__],
-    d: CallableTypeOf[types.FunctionType.__call__],
-    e: CallableTypeOf[f.__call__],
-    f: CallableTypeOf[property],
-    g: CallableTypeOf[property.__get__],
-    h: CallableTypeOf[MyClass.my_property.__get__],
-    i: CallableTypeOf[property.__set__],
-    j: CallableTypeOf[MyClass.my_property.__set__],
-    k: CallableTypeOf[str.startswith],
-    l: CallableTypeOf["foo".startswith],
+    a: RegularCallableTypeOf[types.FunctionType.__get__],
+    b: RegularCallableTypeOf[f],
+    c: RegularCallableTypeOf[f.__get__],
+    d: RegularCallableTypeOf[types.FunctionType.__call__],
+    e: RegularCallableTypeOf[f.__call__],
+    f: RegularCallableTypeOf[property],
+    g: RegularCallableTypeOf[property.__get__],
+    h: RegularCallableTypeOf[MyClass.my_property.__get__],
+    i: RegularCallableTypeOf[property.__set__],
+    j: RegularCallableTypeOf[MyClass.my_property.__set__],
+    k: RegularCallableTypeOf[str.startswith],
+    l: RegularCallableTypeOf["foo".startswith],
 ):
     # revealed: Overload[(self: FunctionType, instance: None, owner: type, /) -> Unknown, (self: FunctionType, instance: object, owner: type | None = None, /) -> Unknown]
     reveal_type(a)
