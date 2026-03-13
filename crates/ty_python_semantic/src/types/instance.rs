@@ -19,9 +19,7 @@ use crate::types::generics::{InferableTypeVars, walk_specialization};
 use crate::types::protocol_class::{
     ProtocolClass, has_all_protocol_members_defined, walk_protocol_interface,
 };
-use crate::types::relation::{
-    DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelationChecker,
-};
+use crate::types::relation::{DisjointnessChecker, RelationVisitor, TypeRelationChecker};
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::{
     ApplyTypeMappingVisitor, ClassBase, ClassLiteral, FindLegacyTypeVarsVisitor,
@@ -703,14 +701,9 @@ impl<'db> ProtocolInstanceType<'db> {
             _: (),
         ) -> bool {
             let constraints = ConstraintSetBuilder::new();
-            let relation_visitor = HasRelationToVisitor::default(&constraints);
-            let disjointness_visitor = IsDisjointVisitor::default(&constraints);
-            let checker = TypeRelationChecker::subtyping(
-                &constraints,
-                InferableTypeVars::None,
-                &relation_visitor,
-                &disjointness_visitor,
-            );
+            let visitor = RelationVisitor::new(&constraints);
+            let checker =
+                TypeRelationChecker::subtyping(&constraints, InferableTypeVars::None, &visitor);
             checker
                 .check_type_satisfies_protocol(db, Type::object(), protocol)
                 .is_always_satisfied(db)

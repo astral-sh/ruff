@@ -20,7 +20,7 @@ use smallvec::smallvec_inline;
 use ty_module_resolver::{KnownModule, Module, ModuleName, resolve_module};
 
 pub(crate) use self::callable::UpcastPolicy;
-pub use self::cyclic::CycleDetector;
+pub use self::cyclic::CycleDetectorWithFallback;
 pub(crate) use self::cyclic::TypeTransformer;
 pub(crate) use self::diagnostic::register_lints;
 pub use self::diagnostic::{TypeCheckDiagnostics, UNDEFINED_REVEAL, UNRESOLVED_REFERENCE};
@@ -236,14 +236,16 @@ fn definition_expression_type<'db>(
 /// A [`TypeTransformer`] that is used in `apply_type_mapping` methods.
 pub(crate) type ApplyTypeMappingVisitor<'db> = TypeTransformer<'db, TypeMapping<'db, 'db>>;
 
-/// A [`CycleDetector`] that is used in `find_legacy_typevars` methods.
-pub(crate) type FindLegacyTypeVarsVisitor<'db> = CycleDetector<FindLegacyTypeVars, Type<'db>, ()>;
+/// A [`CycleDetectorWithFallback`] that is used in `find_legacy_typevars` methods.
+pub(crate) type FindLegacyTypeVarsVisitor<'db> =
+    CycleDetectorWithFallback<FindLegacyTypeVars, Type<'db>, ()>;
 
 #[derive(Debug)]
 pub(crate) struct FindLegacyTypeVars;
 
-/// A [`CycleDetector`] that is used in `visit_specialization` methods.
-pub(crate) type SpecializationVisitor<'db> = CycleDetector<VisitSpecialization, Type<'db>, ()>;
+/// A [`CycleDetectorWithFallback`] that is used in `visit_specialization` methods.
+pub(crate) type SpecializationVisitor<'db> =
+    CycleDetectorWithFallback<VisitSpecialization, Type<'db>, ()>;
 pub(crate) struct VisitSpecialization;
 
 /// How a generic type has been specialized.

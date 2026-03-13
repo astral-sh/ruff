@@ -1,6 +1,6 @@
 //! Cycle detection for recursive types.
 //!
-//! The visitors here ([`TypeTransformer`] and [`PairVisitor`]) are used in methods that
+//! The visitors here ([`TypeTransformer`] and [`CycleDetector`]) are used in methods that
 //! recursively visit types to transform them (e.g. [`Type::apply_type_mapping`]) or to
 //! decide a relation between a pair of types (e.g. [`Type::has_relation_to`]).
 //!
@@ -46,7 +46,7 @@ use crate::types::Type;
 /// ensures we bail out before hitting a stack overflow.
 const MAX_RECURSION_DEPTH: u32 = 64;
 
-pub(crate) type TypeTransformer<'db, Tag> = CycleDetector<Tag, Type<'db>, Type<'db>>;
+pub(crate) type TypeTransformer<'db, Tag> = CycleDetectorWithFallback<Tag, Type<'db>, Type<'db>>;
 
 impl<Tag> Default for TypeTransformer<'_, Tag> {
     fn default() -> Self {
@@ -54,14 +54,39 @@ impl<Tag> Default for TypeTransformer<'_, Tag> {
 
         // This must be Any, not e.g. a todo type, because Any is the normalized form of the
         // dynamic type (that is, todo types are normalized to Any).
-        CycleDetector::new(Type::any())
+        CycleDetectorWithFallback::new(Type::any())
     }
 }
 
-pub(crate) type PairVisitor<'db, Tag, C> = CycleDetector<Tag, (Type<'db>, Type<'db>), C>;
+#[derive(Debug)]
+pub struct CycleDetectorWithFallback<Tag, T, R> {
+    detector: CycleDetector<Tag, T, R>,
+    fallback: R,
+}
+
+impl<Tag, T, R> CycleDetectorWithFallback<Tag, T, R> {
+    pub(crate) fn new(fallback: R) -> Self {
+        Self {
+            detector: CycleDetector::default(),
+            fallback,
+        }
+    }
+}
+
+impl<Tag, T: Hash + Eq + Clone, R: Clone> CycleDetectorWithFallback<Tag, T, R> {
+    pub fn visit(&self, item: T, func: impl FnOnce() -> R) -> R {
+        self.detector.visit(item, &self.fallback, func)
+    }
+}
+
+impl<Tag, T, R: Default> Default for CycleDetectorWithFallback<Tag, T, R> {
+    fn default() -> Self {
+        CycleDetectorWithFallback::new(R::default())
+    }
+}
 
 #[derive(Debug)]
-pub struct CycleDetector<Tag, T, R> {
+pub(crate) struct CycleDetector<Tag, T, R> {
     /// If the type we're visiting is present in `seen`, it indicates that we've hit a cycle (due
     /// to a recursive type); we need to immediately short circuit the whole operation and return
     /// the fallback value. That's why we pop items off the end of `seen` after we've visited them.
@@ -79,32 +104,18 @@ pub struct CycleDetector<Tag, T, R> {
     /// infinitely growing type specializations that don't trigger exact-match cycle detection.
     depth: Cell<u32>,
 
-    fallback: R,
-
     _tag: PhantomData<Tag>,
 }
 
-impl<Tag, T, R> CycleDetector<Tag, T, R> {
-    pub fn new(fallback: R) -> Self {
-        CycleDetector {
-            seen: RefCell::new(FxIndexSet::default()),
-            cache: RefCell::new(FxHashMap::default()),
-            depth: Cell::new(0),
-            fallback,
-            _tag: PhantomData,
-        }
-    }
-}
-
 impl<Tag, T: Hash + Eq + Clone, R: Clone> CycleDetector<Tag, T, R> {
-    pub fn visit(&self, item: T, func: impl FnOnce() -> R) -> R {
+    pub(crate) fn visit(&self, item: T, fallback: &R, func: impl FnOnce() -> R) -> R {
         if let Some(val) = self.cache.borrow().get(&item) {
             return val.clone();
         }
 
         // We hit a cycle
         if !self.seen.borrow_mut().insert(item.clone()) {
-            return self.fallback.clone();
+            return fallback.clone();
         }
 
         // Check depth limit to prevent stack overflow from recursive generic types
@@ -112,7 +123,7 @@ impl<Tag, T: Hash + Eq + Clone, R: Clone> CycleDetector<Tag, T, R> {
         let current_depth = self.depth.get();
         if current_depth >= MAX_RECURSION_DEPTH {
             self.seen.borrow_mut().pop();
-            return self.fallback.clone();
+            return fallback.clone();
         }
         self.depth.set(current_depth + 1);
 
@@ -126,8 +137,13 @@ impl<Tag, T: Hash + Eq + Clone, R: Clone> CycleDetector<Tag, T, R> {
     }
 }
 
-impl<Tag, T, R: Default> Default for CycleDetector<Tag, T, R> {
+impl<Tag, T, R> Default for CycleDetector<Tag, T, R> {
     fn default() -> Self {
-        CycleDetector::new(R::default())
+        Self {
+            seen: RefCell::new(FxIndexSet::default()),
+            cache: RefCell::new(FxHashMap::default()),
+            depth: Cell::new(0),
+            _tag: PhantomData,
+        }
     }
 }

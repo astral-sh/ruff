@@ -4,8 +4,8 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::{
     Db,
     types::{
-        CallArguments, CallDunderError, ClassType, CycleDetector, KnownClass, KnownInstanceType,
-        LiteralValueTypeKind, SubclassOfInner, Truthiness, Type, TypeContext,
+        CallArguments, CallDunderError, ClassType, CycleDetectorWithFallback, KnownClass,
+        KnownInstanceType, LiteralValueTypeKind, SubclassOfInner, Truthiness, Type, TypeContext,
         TypeVarBoundOrConstraints, UnionType, call::CallErrorKind,
         constraints::ConstraintSetBuilder, context::InferContext,
         diagnostic::UNSUPPORTED_BOOL_CONVERSION, typed_dict::TypedDictField,
@@ -318,9 +318,9 @@ impl<'db> Type<'db> {
     }
 }
 
-/// A [`CycleDetector`] that is used in `try_bool` methods.
+/// A [`CycleDetectorWithFallback`] that is used in `try_bool` methods.
 pub(crate) type TryBoolVisitor<'db> =
-    CycleDetector<TryBool, Type<'db>, Result<Truthiness, BoolError<'db>>>;
+    CycleDetectorWithFallback<TryBool, Type<'db>, Result<Truthiness, BoolError<'db>>>;
 pub(crate) struct TryBool;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
