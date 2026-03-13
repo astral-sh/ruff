@@ -1178,23 +1178,17 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
             (Type::TypedDict(_) | Type::TypedDictTop, Type::TypedDictTop) => self.always(),
 
-            (Type::TypedDictTop, _) => {
-                self.relation_visitor
-                    .visit((source, target, self.relation), || {
-                        let fallback = KnownClass::TypedDictFallback.to_instance(db);
-                        self.check_type_pair(db, fallback, target)
-                    })
-            }
-
             // TODO: When we support `closed` and/or `extra_items`, we could allow assignments to other
             // compatible `Mapping`s. `extra_items` could also allow for some assignments to `dict`, as
             // long as `total=False`. (But then again, does anyone want a non-total `TypedDict` where all
             // key types are a supertype of the extra items type?)
-            (Type::TypedDict(_), _) => self.with_recursion_guard(source, target, || {
-                let spec = &[KnownClass::Str.to_instance(db), Type::object()];
-                let str_object_map = KnownClass::Mapping.to_specialized_instance(db, spec);
-                self.check_type_pair(db, str_object_map, target)
-            }),
+            (Type::TypedDict(_) | Type::TypedDictTop, _) => {
+                self.with_recursion_guard(source, target, || {
+                    let spec = &[KnownClass::Str.to_instance(db), Type::object()];
+                    let str_object_map = KnownClass::Mapping.to_specialized_instance(db, spec);
+                    self.check_type_pair(db, str_object_map, target)
+                })
+            }
 
             // A non-`TypedDict` cannot subtype a `TypedDict`
             (_, Type::TypedDictTop) => self.never(),

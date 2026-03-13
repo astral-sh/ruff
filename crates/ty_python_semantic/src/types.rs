@@ -1579,7 +1579,6 @@ impl<'db> Type<'db> {
             // `TypedDict` and `Protocol` can be synthesized,
             // but it's always possible to create an equivalent type using a class definition.
             | Type::TypedDict(_)
-            | Type::TypedDictTop
             | Type::ProtocolInstance(_)
             // Not all `Callable` types are spellable using the `Callable` type form,
             // but they are all spellable using callback protocols.
@@ -1607,7 +1606,8 @@ impl<'db> Type<'db> {
             | Type::DataclassTransformer(_)
             | Type::ClassLiteral(_)
             | Type::GenericAlias(_)
-            | Type::KnownInstance(_) => false,
+            | Type::KnownInstance(_)
+            | Type::TypedDictTop => false,
             Type::Union(union) => union.elements(db).iter().all(|ty| ty.is_spellable(db)),
         }
     }

@@ -711,6 +711,7 @@ def _(x: object):
 <https://github.com/astral-sh/ty/issues/2451>.
 
 ```py
+from collections.abc import MutableMapping
 from typing import TypedDict
 
 class A(TypedDict):
@@ -732,6 +733,12 @@ def narrow_single_typeddict(x: list | A) -> None:
         reveal_type(x)  # revealed: A
     else:
         reveal_type(x)  # revealed: list[Unknown]
+
+def narrow_mutable_mapping_or_typeddict(x: dict[str, str] | A) -> None:
+    if isinstance(x, MutableMapping):
+        reveal_type(x)  # revealed: dict[str, str] | A
+    else:
+        reveal_type(x)  # revealed: Never
 
 def narrow_dict_or_typeddict(x: dict[str, str] | A) -> None:
     if isinstance(x, dict):
