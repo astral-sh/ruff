@@ -38,16 +38,18 @@ use ruff_python_ast::visitor::source_order::{
     walk_interpolated_string_element, walk_stmt,
 };
 use ruff_python_ast::{
-    self as ast, AnyNodeRef, BytesLiteral, Expr, InterpolatedStringElement, Stmt, StringLiteral,
-    TypeParam,
+    self as ast, AnyNodeRef, ArgOrKeyword, BytesLiteral, Expr, InterpolatedStringElement, Stmt,
+    StringLiteral, TypeParam,
 };
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use std::ops::Deref;
 use ty_python_semantic::semantic_index::definition::Definition;
 use ty_python_semantic::types::TypeVarKind;
 use ty_python_semantic::{
-    HasType, SemanticModel, semantic_index::definition::DefinitionKind, types::Type,
-    types::ide_support::definition_for_name,
+    HasType, SemanticModel,
+    semantic_index::definition::DefinitionKind,
+    types::Type,
+    types::ide_support::{CallArgumentForm, call_argument_forms, definition_for_name},
 };
 
 /// Semantic token types supported by the language server.
@@ -904,6 +906,26 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
                     self.tokens.extend(sub_visitor.tokens);
                 } else {
                     walk_expr(self, expr);
+                }
+            }
+            ast::Expr::Call(call) => {
+                self.visit_expr(call.func.as_ref());
+                let argument_forms = call_argument_forms(self.model, call);
+
+                for (argument_index, argument) in
+                    call.arguments.arguments_source_order().enumerate()
+                {
+                    if matches!(
+                        argument_forms.get(argument_index).copied(),
+                        Some(CallArgumentForm::Type)
+                    ) {
+                        self.visit_annotation(argument.value());
+                    } else {
+                        match argument {
+                            ArgOrKeyword::Arg(argument) => self.visit_expr(argument),
+                            ArgOrKeyword::Keyword(keyword) => self.visit_keyword(keyword),
+                        }
+                    }
                 }
             }
             _ => {
@@ -2009,6 +2031,118 @@ z2 = os.PathLike[str]
         assert!(
             pathlike_types.len() >= 5,
             "expected import plus annotation tokens, got {pathlike_types:?}"
+        );
+
+        assert_eq!(
+            pathlike_types[1..5],
+            [
+                SemanticTokenType::Class,
+                SemanticTokenType::Class,
+                SemanticTokenType::Class,
+                SemanticTokenType::Class,
+            ]
+        );
+    }
+
+    #[test]
+    fn generic_class_members_in_cast() {
+        let test = SemanticTokenTest::new(
+            r#"
+import os
+import typing
+from os import PathLike
+from typing import cast
+
+x1 = cast(os.PathLike[str], "")
+x2 = cast(PathLike[str], "")
+x3 = typing.cast(os.PathLike[str], "")
+"#,
+        );
+
+        let tokens = test.highlight_file();
+        let source = ruff_db::source::source_text(&test.db, test.file);
+        let pathlike_types: Vec<_> = tokens
+            .iter()
+            .filter_map(|token| (&source[token.range()] == "PathLike").then_some(token.token_type))
+            .collect();
+
+        assert!(
+            pathlike_types.len() >= 4,
+            "expected import plus cast tokens, got {pathlike_types:?}"
+        );
+
+        assert_eq!(
+            pathlike_types[1..4],
+            [
+                SemanticTokenType::Class,
+                SemanticTokenType::Class,
+                SemanticTokenType::Class,
+            ]
+        );
+    }
+
+    #[test]
+    fn generic_class_members_in_assert_type() {
+        let test = SemanticTokenTest::new(
+            r#"
+import os
+import typing
+from os import PathLike
+from typing import assert_type
+
+x1 = assert_type("", os.PathLike[str])
+x2 = assert_type("", PathLike[str])
+x3 = typing.assert_type("", os.PathLike[str])
+"#,
+        );
+
+        let tokens = test.highlight_file();
+        let source = ruff_db::source::source_text(&test.db, test.file);
+        let pathlike_types: Vec<_> = tokens
+            .iter()
+            .filter_map(|token| (&source[token.range()] == "PathLike").then_some(token.token_type))
+            .collect();
+
+        assert!(
+            pathlike_types.len() >= 4,
+            "expected import plus assert_type tokens, got {pathlike_types:?}"
+        );
+
+        assert_eq!(
+            pathlike_types[1..4],
+            [
+                SemanticTokenType::Class,
+                SemanticTokenType::Class,
+                SemanticTokenType::Class,
+            ]
+        );
+    }
+
+    #[test]
+    fn generic_class_members_in_type_form_keyword_arguments() {
+        let test = SemanticTokenTest::new(
+            r#"
+import os
+from os import PathLike
+from typing import assert_type, cast
+
+x1 = cast(typ=os.PathLike[str], val="")
+x2 = cast(val="", typ=PathLike[str])
+x3 = assert_type(type=os.PathLike[str], value="")
+x4 = assert_type(value="", type=PathLike[str])
+"#,
+        );
+
+        let tokens = test.highlight_file();
+        let source = ruff_db::source::source_text(&test.db, test.file);
+        let pathlike_types: Vec<_> = tokens
+            .iter()
+            .filter_map(|token| (&source[token.range()] == "PathLike").then_some(token.token_type))
+            .collect();
+
+        assert!(
+            pathlike_types.len() >= 5,
+            "expected import plus keyword-argument type-form tokens, got {pathlike_types:?}"
         );
 
         assert_eq!(

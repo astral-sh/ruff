@@ -1,7 +1,11 @@
 use super::*;
+use crate::SemanticModel;
 use crate::db::tests::{TestDbBuilder, setup_db};
 use crate::place::{typing_extensions_symbol, typing_symbol};
+use crate::types::ide_support::{CallArgumentForm, call_argument_forms};
 use crate::types::type_alias::PEP695TypeAliasType;
+use ruff_db::files::system_path_to_file;
+use ruff_db::parsed::parsed_module;
 use ruff_db::system::DbWithWritableSystem as _;
 use ruff_python_ast::PythonVersion;
 use test_case::test_case;
@@ -342,4 +346,38 @@ type H[T] = G[T]
 
     let h = get_type_alias(&db, "H");
     assert_eq!(h.expand_eagerly(&db).display(&db).to_string(), "Divergent",);
+}
+
+#[test]
+fn keyword_call_argument_forms_follow_source_order() -> anyhow::Result<()> {
+    let db = TestDbBuilder::new()
+        .with_file(
+            "/src/foo.py",
+            r#"
+from typing import cast
+
+cast(val="", typ=int)
+"#,
+        )
+        .build()?;
+
+    let file = system_path_to_file(&db, "/src/foo.py").unwrap();
+    let parsed = parsed_module(&db, file).load(&db);
+    let call = parsed
+        .suite()
+        .last()
+        .unwrap()
+        .as_expr_stmt()
+        .unwrap()
+        .value
+        .as_call_expr()
+        .unwrap();
+    let model = SemanticModel::new(&db, file);
+
+    assert_eq!(
+        call_argument_forms(&model, call),
+        [CallArgumentForm::Value, CallArgumentForm::Type]
+    );
+
+    Ok(())
 }

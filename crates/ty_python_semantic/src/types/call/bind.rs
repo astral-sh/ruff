@@ -326,6 +326,16 @@ impl<'db> Bindings<'db> {
         &self.argument_forms.values
     }
 
+    pub(crate) fn non_conflicting_argument_forms(
+        &self,
+    ) -> impl Iterator<Item = Option<ParameterForm>> + '_ {
+        self.argument_forms
+            .values
+            .iter()
+            .zip(self.argument_forms.conflicting.iter())
+            .map(|(form, conflicting)| (!conflicting).then_some(*form).flatten())
+    }
+
     pub(crate) fn has_implicit_dunder_new_is_possibly_unbound(&self) -> bool {
         self.implicit_dunder_new_is_possibly_unbound
     }
