@@ -467,6 +467,142 @@ def _(ATD: type[MyTD]):
     z = ATD(a="foo")
 ```
 
+Constructor validation should also work when the call target is a union or intersection of
+`type[...]` values:
+
+```py
+from typing import Any, List, Union
+from ty_extensions import Intersection
+
+class CtorRequired(TypedDict):
+    a: int
+
+class CtorOptional(TypedDict, total=False):
+    a: int
+
+def _(ATD: Union[type[CtorRequired], type[CtorOptional]]):
+    ok = ATD(a=1)
+
+    # Both union variants reject the `str` argument for `a`.
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    bad = ATD(a="foo")
+
+    # 0-arg construction is still invalid because the `CtorRequired` arm requires `a`.
+    # error: [missing-typed-dict-key] "Missing required key 'a' in TypedDict `CtorRequired` constructor"
+    no_args = ATD()
+
+    # Dict-literal construction through a union.
+    ok_dict = ATD({"a": 1})
+
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    bad_dict = ATD({"a": "foo"})
+
+def _(ATD: Intersection[type[CtorRequired], type[CtorRequired]]):
+    ok = ATD(a=1)
+
+    # error: [invalid-argument-type]
+    bad = ATD(a="foo")
+
+def _(ATD: Intersection[type[CtorRequired], type[CtorOptional]]):
+    ok = ATD(a=1)
+
+    # Both intersection members check the argument independently.
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    bad = ATD(a="foo")
+
+    # Dict-literal construction through an intersection.
+    ok_dict = ATD({"a": 1})
+
+class CtorOverride(TypedDict, total=False):
+    a: str
+
+def _(ATD: Union[type[CtorRequired], type[CtorOptional]], override: CtorOverride):
+    ok_merge = ATD(override, a=1)
+    ok_literal_merge = ATD({"a": "wrong"}, a=1)
+
+class Comparison(TypedDict):
+    field: str
+    value: Any
+
+class LogicalA(TypedDict):
+    tag: str
+    conditions: List["Filter"]
+
+class LogicalB(TypedDict):
+    tag: str
+    conditions: List["Filter"]
+
+Filter = Union[Comparison, LogicalA, LogicalB]
+
+def _(T: Union[type[LogicalA], type[LogicalB]]):
+    ok_recursive = T(tag="x", conditions=[Comparison(field="a", value="b")])
+    ok_recursive_dict = T({"tag": "x", "conditions": [Comparison(field="a", value="b")]})
+    ok_recursive_merge = T({"conditions": [Comparison(field="a", value="b")]}, tag="x")
+```
+
+TypedDict constructors also support the `dict(mapping, **kwargs)`-style merge form. Keyword
+arguments should override the positional mapping when validating the final shape:
+
+```py
+from typing import Union
+
+class BaseKwargs(TypedDict, total=False):
+    name: str
+
+class ChildKwargs(BaseKwargs, total=False):
+    count: int
+
+class OverrideCountKwargs(TypedDict, total=False):
+    count: str
+
+def _(base: BaseKwargs, override: OverrideCountKwargs):
+    ok = ChildKwargs(base, count=1)
+    overridden = ChildKwargs(override, count=1)
+    overridden_literal = ChildKwargs({"count": "wrong"}, count=1)
+
+    # error: [invalid-argument-type]
+    bad_value = ChildKwargs({"name": 1}, count=1)
+
+    # error: [invalid-argument-type]
+    bad_mapping = ChildKwargs(1, count=1)
+
+def _(flag: bool):
+    contextual_merge = ChildKwargs({"count": 1} if flag else {"count": 2}, name="x")
+    reveal_type(contextual_merge)  # revealed: ChildKwargs
+
+class UnionBaseLeft(TypedDict):
+    name: str
+
+class UnionBaseRight(TypedDict):
+    name: str
+
+class UnionChildKwargs(TypedDict):
+    name: str
+    count: int
+
+def _(base: Union[UnionBaseLeft, UnionBaseRight]):
+    ok_union_mapping = UnionChildKwargs(base, count=1)
+```
+
+Unpacked optional keys are not guaranteed to satisfy required target fields:
+
+```py
+from typing import TypedDict
+
+class MaybeName(TypedDict, total=False):
+    name: str
+
+class NeedsName(TypedDict):
+    name: str
+
+def _(maybe: MaybeName):
+    # error: [missing-typed-dict-key] "Missing required key 'name' in TypedDict `NeedsName` constructor"
+    NeedsName(**maybe)
+```
+
 All of these have an invalid type for the `name` field:
 
 ```py
@@ -2346,6 +2482,28 @@ class BadMerge(L[int], R[str]): ...
 class BadMergeGeneric[T](L[int], R[T]): ...
 ```
 
+### Unspecialized generic `TypedDict` constructors use the default specialization
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import TypedDict
+
+class Box[T](TypedDict):
+    value: T
+
+x = Box(value="ok")
+reveal_type(x)  # revealed: Box[Unknown]
+y: str = x["value"]
+
+src: Box[str] = {"value": "ok"}
+mapped = Box(src)
+z: str = mapped["value"]
+```
+
 ## Recursive `TypedDict`
 
 `TypedDict`s can also be recursive, allowing for nested structures:
@@ -2380,6 +2538,27 @@ def _(node: Node, person: Person):
     _: Node = person
 
 _: Node = Person(name="Alice", parent=Node(name="Bob", parent=Person(name="Charlie", parent=None)))
+```
+
+TypedDict constructor calls should also use field type context when inferring nested recursive
+values:
+
+```py
+from typing import Any, List, TypedDict, Union
+from typing_extensions import NotRequired
+
+class Comparison(TypedDict):
+    field: str
+    op: NotRequired[str]
+    value: Any
+
+class Logical(TypedDict):
+    op: NotRequired[str]
+    conditions: List["Filter"]
+
+Filter = Union[Comparison, Logical]
+
+logical = Logical(conditions=[Comparison(field="a", value="b")])
 ```
 
 ## Function/assignment syntax

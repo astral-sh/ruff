@@ -2323,7 +2323,12 @@ impl<'db> Type<'db> {
             }
 
             Type::GenericAlias(alias) if alias.is_typed_dict(db) => {
-                Some(alias.origin(db).typed_dict_member(db, None, name, policy))
+                Some(alias.origin(db).typed_dict_member(
+                    db,
+                    Some(alias.specialization(db)),
+                    name,
+                    policy,
+                ))
             }
 
             Type::GenericAlias(alias) => {
@@ -4379,6 +4384,85 @@ impl<'db> Type<'db> {
     // Build bindings for constructor calls by combining `__new__`/`__init__` signatures.
     // Returns fallback bindings for cases that intentionally keep bespoke call behavior.
     fn constructor_bindings(self, db: &'db dyn Db, class: ClassType<'db>) -> Bindings<'db> {
+        fn typed_dict_constructor_bindings<'db>(
+            db: &'db dyn Db,
+            owner: Type<'db>,
+            signature_class: ClassType<'db>,
+            constructor_instance_ty: Type<'db>,
+        ) -> Bindings<'db> {
+            let (class_literal, class_specialization) =
+                signature_class.class_literal_and_specialization(db);
+            let ClassLiteral::Static(class_literal) = class_literal else {
+                return Binding::single(
+                    owner,
+                    Signature::new(Parameters::gradual_form(), constructor_instance_ty),
+                )
+                .into();
+            };
+
+            let typed_dict = TypedDictType::new(signature_class);
+            let fields = class_literal.fields(
+                db,
+                class_specialization,
+                class::CodeGeneratorKind::TypedDict,
+            );
+
+            let keyword_signature = Signature::new(
+                Parameters::new(
+                    db,
+                    fields.iter().map(|(name, field)| {
+                        let parameter = Parameter::keyword_only(name.clone())
+                            .with_annotated_type(field.declared_ty);
+                        if field.is_required() {
+                            parameter
+                        } else {
+                            parameter.with_default_type(field.declared_ty)
+                        }
+                    }),
+                ),
+                constructor_instance_ty,
+            );
+
+            let positional_signature = Signature::new(
+                Parameters::new(
+                    db,
+                    [
+                        Parameter::positional_only(Some(Name::new_static("mapping")))
+                            .with_annotated_type(Type::TypedDict(typed_dict)),
+                    ],
+                ),
+                constructor_instance_ty,
+            );
+
+            // `TypedDict(mapping, **kwargs)` needs a permissive mapping parameter so keyword
+            // overrides can replace incompatible values from the positional mapping. The
+            // TypedDict-specific validator checks the merged result precisely after inference.
+            let mapping_and_keywords_signature = Signature::new(
+                Parameters::new(
+                    db,
+                    std::iter::once(
+                        Parameter::positional_only(Some(Name::new_static("mapping")))
+                            .with_annotated_type(Type::unknown()),
+                    )
+                    .chain(fields.iter().map(|(name, field)| {
+                        Parameter::keyword_only(name.clone())
+                            .with_annotated_type(field.declared_ty)
+                            .with_default_type(field.declared_ty)
+                    })),
+                ),
+                constructor_instance_ty,
+            );
+
+            CallableBinding::from_overloads(
+                owner,
+                [
+                    keyword_signature,
+                    positional_signature,
+                    mapping_and_keywords_signature,
+                ],
+            )
+            .into()
+        }
         fn resolve_dunder_new_callable<'db>(
             db: &'db dyn Db,
             owner: Type<'db>,
@@ -4440,13 +4524,28 @@ impl<'db> Type<'db> {
             .into()
         };
 
-        // Checking TypedDict construction happens in `infer_call_expression_impl`, so here we just
-        // return a permissive fallback binding. TODO maybe we should just synthesize bindings for
-        // a TypedDict constructor? That would handle unions/intersections correctly.
+        // Synthesize TypedDict constructor bindings so constructor calls participate in normal
+        // overload handling.
         if class_literal.is_typed_dict(db)
             || class::CodeGeneratorKind::TypedDict.matches(db, class_literal, class_specialization)
         {
-            return fallback_bindings();
+            // Unlike ordinary generic class constructors, unspecialized generic TypedDict
+            // constructors should preserve the class literal's default specialization here.
+            // That keeps their synthesized field types gradual (`Unknown`) instead of leaking
+            // unresolved class type variables into user code.
+            let self_type = self;
+            let Some(constructor_instance_ty) = self_type.to_instance(db) else {
+                return fallback_bindings();
+            };
+            let signature_class = self_type.to_class_type(db).unwrap_or(class);
+            return typed_dict_constructor_bindings(
+                db,
+                self,
+                signature_class,
+                constructor_instance_ty,
+            )
+            .into_constructor_bindings(constructor_instance_ty, ConstructorCallableKind::Init)
+            .with_generic_context(db, class_generic_context);
         }
 
         // These cases are checked in `Type::known_class_literal_bindings`, but currently we only

@@ -3,6 +3,7 @@ use std::fmt::Display;
 
 use itertools::{Either, Itertools};
 use ruff_python_ast as ast;
+use ruff_python_ast::HasNodeIndex;
 use rustc_hash::FxHashMap;
 
 use crate::Db;
@@ -227,6 +228,32 @@ impl<'a, 'db> CallArguments<'a, 'db> {
         &mut self,
     ) -> impl Iterator<Item = (Argument<'a>, &mut CallArgumentTypes<'db>)> + '_ {
         (self.arguments.iter().copied()).zip(self.types.iter_mut())
+    }
+
+    pub(crate) fn expression_type(
+        &self,
+        arguments: &'a ast::Arguments,
+        expr: &ast::Expr,
+        tcx: TypeContext<'db>,
+    ) -> Option<Type<'db>> {
+        arguments
+            .arguments_source_order()
+            .zip(self.iter())
+            .find_map(|(ast_argument, (_, argument_types))| {
+                let candidate = match ast_argument {
+                    ast::ArgOrKeyword::Arg(argument) => argument,
+                    ast::ArgOrKeyword::Keyword(ast::Keyword { value, .. }) => value,
+                };
+
+                (candidate.node_index().load() == expr.node_index().load())
+                    .then(|| match tcx.annotation {
+                        Some(declared_ty) => argument_types.iter().find_map(|(cached_tcx, ty)| {
+                            (cached_tcx.annotation == Some(declared_ty)).then_some(ty)
+                        }),
+                        None => argument_types.get_default(),
+                    })
+                    .flatten()
+            })
     }
 
     /// Create a new [`CallArguments`] starting from the specified index.
