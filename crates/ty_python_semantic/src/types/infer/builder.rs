@@ -510,22 +510,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    /// Check if a given AST node is reachable.
-    ///
-    /// Note that this only works if reachability is explicitly tracked for this specific
-    /// type of node (see `node_reachability` in the use-def map).
-    fn is_reachable<'a, N>(&self, node: N) -> bool
-    where
-        N: Into<AnyNodeRef<'a>>,
-    {
-        let file_scope_id = self.scope().file_scope_id(self.db());
-        self.index.is_node_reachable(
-            self.db(),
-            file_scope_id,
-            self.enclosing_node_key(node.into()),
-        )
-    }
-
     fn in_stub(&self) -> bool {
         self.context.in_stub()
     }
@@ -7745,9 +7729,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     TypeAndQualifiers::new(Type::unknown(), TypeOrigin::Inferred, qualifiers)
                 }
                 LookupError::PossiblyUndefined(type_when_bound) => {
-                    if self.is_reachable(name_node) {
-                        report_possibly_unresolved_reference(&self.context, name_node);
-                    }
+                    report_possibly_unresolved_reference(&self.context, name_node);
                     type_when_bound
                 }
             });
@@ -8127,10 +8109,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     pub(super) fn report_unresolved_reference(&self, expr_name_node: &ast::ExprName) {
-        if !self.is_reachable(expr_name_node) {
-            return;
-        }
-
         let Some(builder) = self
             .context
             .report_lint(&UNRESOLVED_REFERENCE, expr_name_node)
@@ -8321,10 +8299,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             TypeQualifiers::empty(),
                         )
                     };
-
-                    if !self.is_reachable(attribute) {
-                        return fallback();
-                    }
 
                     let bound_on_instance = match value_type {
                         Type::ClassLiteral(class) => {

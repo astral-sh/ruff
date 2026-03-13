@@ -487,25 +487,18 @@ impl<'db> SemanticIndex<'db> {
             })
     }
 
-    /// Returns true if a given AST node is reachable from the start of the scope. For example,
-    /// in the following code, expression `2` is reachable, but expressions `1` and `3` are not:
-    /// ```py
-    /// def f():
-    ///     x = 1
-    ///     if False:
-    ///         x  # 1
-    ///     x  # 2
-    ///     return
-    ///     x  # 3
-    /// ```
-    pub(crate) fn is_node_reachable(
+    pub(crate) fn try_is_node_reachable(
         &self,
         db: &'db dyn crate::Db,
         scope_id: FileScopeId,
         node_key: NodeKey,
-    ) -> bool {
-        self.is_scope_reachable(db, scope_id)
-            && self.use_def_map(scope_id).is_node_reachable(db, node_key)
+    ) -> Option<bool> {
+        Some(self.is_scope_reachable(db, scope_id))
+            .filter(|reachable| *reachable)
+            .and_then(|_| {
+                self.use_def_map(scope_id)
+                    .try_is_node_reachable(db, node_key)
+            })
     }
 
     /// Returns an iterator over the descendent scopes of `scope`.
@@ -873,6 +866,7 @@ mod tests {
 
     use crate::Db;
     use crate::db::tests::{TestDb, TestDbBuilder};
+    use crate::semantic_index::NodeKey;
     use crate::semantic_index::ast_ids::{HasScopedUseId, ScopedUseId};
     use crate::semantic_index::definition::{Definition, DefinitionKind};
     use crate::semantic_index::place::PlaceTable;
@@ -1588,6 +1582,30 @@ class C[T]:
             panic!("should be a number literal")
         };
         assert_eq!(*num, 1);
+    }
+
+    #[test]
+    fn unreachable_statement_node() {
+        let TestCase { db, file } = test_case(
+            r"
+def f():
+    if False:
+        x
+",
+        );
+
+        let module = parsed_module(&db, file).load(&db);
+        let index = semantic_index(&db, file);
+        let function_scope_id = index.child_scopes(FileScopeId::global()).next().unwrap().0;
+
+        let function = module.syntax().body[0].as_function_def_stmt().unwrap();
+        let if_stmt = function.body[0].as_if_stmt().unwrap();
+        let expr_stmt = if_stmt.body[0].as_expr_stmt().unwrap();
+
+        assert_eq!(
+            index.try_is_node_reachable(&db, function_scope_id, NodeKey::from_node(expr_stmt),),
+            Some(false)
+        );
     }
 
     #[test]
