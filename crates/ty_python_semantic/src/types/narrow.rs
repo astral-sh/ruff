@@ -1,4 +1,5 @@
 use crate::Db;
+use crate::place::known_module_symbol;
 use crate::reachability::ReachabilityConstraintsExtension;
 use crate::subscript::PyIndex;
 use crate::types::enums::{enum_member_literals, enum_metadata};
@@ -33,6 +34,7 @@ use ruff_python_ast::{BoolOp, ExprBoolOp};
 use rustc_hash::FxHashMap;
 use smallvec::{SmallVec, smallvec, smallvec_inline};
 use std::collections::hash_map::Entry;
+use ty_module_resolver::KnownModule;
 
 /// Return the type constraint that `test` (if true) would place on `symbol`, if any.
 ///
@@ -148,7 +150,15 @@ impl ClassInfoConstraintFunction {
     ) -> Option<Type<'db>> {
         let constraint_from_class_literal = |class: ClassLiteral<'db>| match self {
             ClassInfoConstraintFunction::IsInstance => {
-                Type::instance(db, class.top_materialization(db))
+                let constraint = Type::instance(db, class.top_materialization(db));
+                if class_literal_matches_typed_dict_runtime_supertype(db, class) {
+                    UnionBuilder::new(db)
+                        .add(constraint)
+                        .add(Type::TypedDictTop)
+                        .build()
+                } else {
+                    constraint
+                }
             }
             ClassInfoConstraintFunction::IsSubclass => {
                 SubclassOfType::from(db, class.top_materialization(db))
@@ -295,10 +305,30 @@ impl ClassInfoConstraintFunction {
             | Type::TypeGuard(_)
             | Type::WrapperDescriptor(_)
             | Type::DataclassTransformer(_)
+            | Type::TypedDictTop
             | Type::TypedDict(_)
             | Type::NewTypeInstance(_) => None,
         }
     }
+}
+
+/// Returns `true` for classes that are runtime supertypes of all `TypedDict` instances
+/// (`dict` and `MutableMapping`), so that `isinstance()` narrowing can include a
+/// `TypedDictTop` arm alongside the ordinary top-materialized instance.
+///
+/// `Mapping` is intentionally excluded: `TypedDict` is already statically compatible with
+/// `Mapping[str, object]`, so the extra `TypedDictTop` arm would simplify away during
+/// intersection and is not needed.
+fn class_literal_matches_typed_dict_runtime_supertype<'db>(
+    db: &'db dyn Db,
+    class: ClassLiteral<'db>,
+) -> bool {
+    let mutable_mapping = known_module_symbol(db, KnownModule::Typing, "MutableMapping")
+        .place
+        .ignore_possibly_undefined()
+        .and_then(Type::as_class_literal);
+
+    class.is_known(db, KnownClass::Dict) || mutable_mapping == Some(class)
 }
 
 #[derive(Hash, PartialEq, Debug, Eq, Clone, salsa::Update, get_size2::GetSize)]
@@ -307,14 +337,16 @@ struct Conjunctions<'db> {
 }
 
 impl<'db> Conjunctions<'db> {
-    fn singleton(ty: Type<'db>) -> Self {
+    fn singleton(constraint: Type<'db>) -> Self {
         Self {
-            conjuncts: smallvec![ty],
+            conjuncts: smallvec![constraint],
         }
     }
 
     fn and_with(mut self, other: Self) -> Self {
-        if self.conjuncts.iter().any(Type::is_never) || other.conjuncts.iter().any(Type::is_never) {
+        let has_never = |constraint: &Type<'db>| constraint.is_never();
+
+        if self.conjuncts.iter().any(has_never) || other.conjuncts.iter().any(has_never) {
             return Self::singleton(Type::Never);
         }
 
@@ -326,12 +358,8 @@ impl<'db> Conjunctions<'db> {
         self
     }
 
-    fn evaluate_constraint_type(self, db: &'db dyn Db) -> Type<'db> {
-        if self.conjuncts.len() == 1 {
-            return self.conjuncts[0];
-        }
-
-        let mut intersection = IntersectionBuilder::new(db);
+    fn evaluate_constraint_type(self, db: &'db dyn Db, base_ty: Type<'db>) -> Type<'db> {
+        let mut intersection = IntersectionBuilder::new(db).add_positive(base_ty);
         for conjunct in self.conjuncts {
             intersection = intersection.add_positive(conjunct);
         }
@@ -393,6 +421,10 @@ impl<'db> NarrowingConstraint<'db> {
         }
     }
 
+    fn classinfo(constraint: Type<'db>) -> Self {
+        Self::intersection(constraint)
+    }
+
     /// Merge two constraints, taking their intersection but respecting "replacement" semantics (with
     /// `other` winning)
     pub(crate) fn merge_constraint_and(&self, other: Self) -> Self {
@@ -446,17 +478,14 @@ impl<'db> NarrowingConstraint<'db> {
         }
     }
 
-    /// Evaluate the type this effectively constrains to
-    ///
-    /// Forgets whether each constraint originated from a `replacement` disjunct or not
-    pub(crate) fn evaluate_constraint_type(self, db: &'db dyn Db) -> Type<'db> {
+    /// Apply the constraint to a base type.
+    pub(crate) fn narrow_base_type(self, db: &'db dyn Db, base_ty: Type<'db>) -> Type<'db> {
         let mut union = UnionBuilder::new(db);
-        for conjunctions in self
-            .replacement_disjuncts
-            .into_iter()
-            .chain(self.intersection_disjuncts)
-        {
-            union = union.add(conjunctions.evaluate_constraint_type(db));
+        for conjunctions in self.replacement_disjuncts {
+            union = union.add(conjunctions.evaluate_constraint_type(db, Type::object()));
+        }
+        for conjunctions in self.intersection_disjuncts {
+            union = union.add(conjunctions.evaluate_constraint_type(db, base_ty));
         }
         union.build()
     }
@@ -1551,10 +1580,10 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 }
             }
             Type::FunctionLiteral(function_type) if expr_call.arguments.keywords.is_empty() => {
-                let [first_arg, second_arg] = &*expr_call.arguments.args else {
+                let [first_arg_node, second_arg] = &*expr_call.arguments.args else {
                     return None;
                 };
-                let first_arg = PlaceExpr::try_from_expr(first_arg)?;
+                let first_arg = PlaceExpr::try_from_expr(first_arg_node)?;
                 let function = function_type.known(self.db)?;
                 let place = self.expect_place(&first_arg);
 
@@ -1583,15 +1612,17 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
 
                 let function = function.into_classinfo_constraint_function()?;
 
-                let class_info_ty = inference.expression_type(second_arg);
-
                 function
-                    .generate_constraint(self.db, class_info_ty, is_positive)
-                    .map(|constraint| {
+                    .generate_constraint(
+                        self.db,
+                        inference.expression_type(second_arg),
+                        is_positive,
+                    )
+                    .map(|classinfo| {
                         NarrowingConstraints::from_iter([(
                             place,
-                            NarrowingConstraint::intersection(
-                                constraint.negate_if(self.db, !is_positive),
+                            NarrowingConstraint::classinfo(
+                                classinfo.negate_if(self.db, !is_positive),
                             ),
                         )])
                     })
@@ -2014,6 +2045,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
 fn is_or_contains_typeddict<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
     match ty {
         Type::TypedDict(_) => true,
+        Type::TypedDictTop => false,
         Type::Intersection(intersection) => intersection
             .positive(db)
             .iter()
@@ -2086,6 +2118,7 @@ fn all_matching_typeddict_fields_have_literal_types<'db>(
 
     match ty {
         Type::TypedDict(td) => matching_field_is_literal(&td),
+        Type::TypedDictTop => false,
         Type::Union(union) => union.elements(db).iter().all(|union_member_ty| {
             !is_or_contains_typeddict(db, *union_member_ty)
                 || all_matching_typeddict_fields_have_literal_types(

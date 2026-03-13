@@ -926,6 +926,7 @@ fn extract_unpacked_typed_dict_keys<'db>(
 
             Some(result)
         }
+        Type::TypedDictTop => None,
         Type::TypeAlias(alias) => extract_unpacked_typed_dict_keys(db, alias.value_type(db)),
         // All other types cannot contain a TypedDict
         Type::Dynamic(_)

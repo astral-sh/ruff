@@ -12,8 +12,8 @@ pub(super) use self::named_tuple::{
 pub(crate) use self::static_literal::StaticClassLiteral;
 pub(super) use self::typed_dict::{DynamicTypedDictAnchor, DynamicTypedDictLiteral};
 use super::{
-    BoundTypeVarInstance, MemberLookupPolicy, MroIterator, SpecialFormType, SubclassOfType, Type,
-    TypeQualifiers, class_base::ClassBase, function::FunctionType,
+    BoundTypeVarInstance, MaterializationKind, MemberLookupPolicy, MroIterator, SpecialFormType,
+    SubclassOfType, Type, TypeQualifiers, class_base::ClassBase, function::FunctionType,
 };
 use super::{TypeVarVariance, display};
 use crate::place::{DefinedPlace, TypeOrigin};
@@ -1334,12 +1334,21 @@ impl<'db> ClassType<'db> {
     ) -> PlaceAndQualifiers<'db> {
         match self {
             Self::NonGeneric(class) => class.class_member(db, name, policy),
-            Self::Generic(generic) => generic.origin(db).class_member_inner(
-                db,
-                Some(generic.specialization(db)),
-                name,
-                policy,
-            ),
+            Self::Generic(generic) => {
+                let class_literal = generic.origin(db);
+                let specialization = generic.specialization(db);
+
+                if let Some(readonly_projection) =
+                    Self::dict_top_readonly_projection(db, class_literal, specialization)
+                {
+                    let projected_member = readonly_projection.class_member(db, name, policy);
+                    if !projected_member.is_undefined() {
+                        return projected_member;
+                    }
+                }
+
+                class_literal.class_member_inner(db, Some(specialization), name, policy)
+            }
         }
     }
 
@@ -1680,15 +1689,24 @@ impl<'db> ClassType<'db> {
             }
             Self::Generic(generic) => {
                 let class_literal = generic.origin(db);
-                let specialization = Some(generic.specialization(db));
+                let specialization = generic.specialization(db);
 
                 if class_literal.is_typed_dict(db) {
                     return Place::Undefined.into();
                 }
 
+                if let Some(readonly_projection) =
+                    Self::dict_top_readonly_projection(db, class_literal, specialization)
+                {
+                    let projected_member = readonly_projection.instance_member(db, name);
+                    if !projected_member.is_undefined() {
+                        return projected_member;
+                    }
+                }
+
                 class_literal
-                    .instance_member(db, specialization, name)
-                    .map_type(|ty| ty.apply_optional_specialization(db, specialization))
+                    .instance_member(db, Some(specialization), name)
+                    .map_type(|ty| ty.apply_optional_specialization(db, Some(specialization)))
             }
         }
     }
@@ -1714,6 +1732,23 @@ impl<'db> ClassType<'db> {
                 | ClassLiteral::DynamicEnum(_),
             ) => None,
         }
+    }
+
+    /// Top-materialized `dict`s can project read-only members through `Mapping` so lookups
+    /// preserve observer signatures without also loosening mutation APIs.
+    fn dict_top_readonly_projection(
+        db: &'db dyn Db,
+        class_literal: StaticClassLiteral<'db>,
+        specialization: Specialization<'db>,
+    ) -> Option<ClassType<'db>> {
+        if specialization.materialization_kind(db) != Some(MaterializationKind::Top)
+            || !specialization.types(db).iter().all(Type::is_unknown)
+            || class_literal.known(db) != Some(KnownClass::Dict)
+        {
+            return None;
+        }
+
+        KnownClass::Mapping.to_specialized_class_type(db, specialization.types(db))
     }
 
     /// A helper function for `instance_member` that looks up the `name` attribute only on

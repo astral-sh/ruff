@@ -439,7 +439,7 @@ In order to preserve the gradual guarantee, we intersect with the type of the se
 type of the second argument is a dynamic type:
 
 ```py
-from typing import Any
+from typing import Any, TypedDict
 from something_unresolvable import SomethingUnknown  # error: [unresolved-import]
 
 class Foo: ...
@@ -450,6 +450,13 @@ def f(a: Foo, b: Any):
 
     if isinstance(a, b):
         reveal_type(a)  # revealed: Foo & Any
+
+class Bar(TypedDict):
+    status: str
+
+def g(a: Bar | int):
+    if isinstance(a, SomethingUnknown):
+        reveal_type(a)  # revealed: (Bar & Unknown) | (int & Unknown)
 ```
 
 ## Narrowing if an object with an intersection/union/TypeVar type is used as the second argument
@@ -655,6 +662,107 @@ def _(x: Invariant[int] | Covariant[str]):
         reveal_type(x)  # revealed: Covariant[str] & ~Top[Invariant[Unknown]]
 ```
 
+For dict-like runtime checks, we include `Top[TypedDict]` alongside the ordinary top dict-like
+constraint when it contributes additional information. For `Mapping`, that extra arm simplifies away
+because `TypedDict` is already statically compatible there:
+
+```py
+from collections.abc import Mapping, MutableMapping
+from typing import TypedDict
+
+class Movie(TypedDict):
+    title: str
+
+def _(x: object, y: Movie):
+    if isinstance(x, dict):
+        reveal_type(x)  # revealed: Top[dict[Unknown, Unknown]] | Top[TypedDict]
+
+    if isinstance(x, Mapping):
+        reveal_type(x)  # revealed: Top[Mapping[Unknown, object]]
+
+    if isinstance(x, MutableMapping):
+        reveal_type(x)  # revealed: Top[MutableMapping[Unknown, Unknown]] | Top[TypedDict]
+
+    if isinstance(y, dict):
+        reveal_type(y)  # revealed: Movie
+
+    if isinstance(y, Mapping):
+        reveal_type(y)  # revealed: Movie
+
+    if isinstance(y, MutableMapping):
+        reveal_type(y)  # revealed: Movie
+```
+
+When the original type already contains a concrete `TypedDict` arm, runtime narrowing keeps that arm
+directly instead of routing it through the fallback:
+
+```py
+def _(z: int | Movie):
+    if isinstance(z, dict):
+        reveal_type(z)  # revealed: Movie
+    else:
+        reveal_type(z)  # revealed: int
+```
+
+When a gradual arm remains after narrowing, that `Top[TypedDict]` fallback remains visible too.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def _(value: Movie | T):
+    if isinstance(value, dict):
+        reveal_type(value)  # revealed: (T@_ & Top[dict[Unknown, Unknown]]) | Movie | (T@_ & Top[TypedDict])
+```
+
+This also needs to preserve common dict-key correlations from ecosystem code:
+
+```py
+def compare_common_keys(value: object, default: object):
+    if isinstance(value, dict) and isinstance(default, dict):
+        reveal_type(value)  # revealed: Top[dict[Unknown, Unknown]] | Top[TypedDict]
+        for key in value.keys() & default.keys():
+            reveal_type(key)  # revealed: Unknown | str
+            reveal_type(value[key])  # revealed: object
+            reveal_type(default[key])  # revealed: object
+            reveal_type(default.get(key))  # revealed: object
+```
+
+It should also keep `dict` methods callable for concrete `dict` unions keyed by `IntEnum` values:
+
+```py
+from enum import IntEnum
+from typing import Dict, Optional, Protocol, Union
+
+class DiagnosticField(IntEnum):
+    MESSAGE = 77
+
+class PGresult(Protocol):
+    def error_field(self, fieldcode: int) -> Optional[bytes]: ...
+
+ErrorInfo = Union[PGresult, Dict[int, Optional[bytes]], None]
+
+def _(info: ErrorInfo):
+    if isinstance(info, dict):
+        reveal_type(info)  # revealed: (PGresult & Top[dict[Unknown, Unknown]]) | dict[int, bytes | None]
+        reveal_type(info.get(DiagnosticField.MESSAGE))  # revealed: Unknown | None | bytes
+    elif info:
+        reveal_type(info)  # revealed: PGresult & ~Top[dict[Unknown, Unknown]] & ~AlwaysFalsy
+        reveal_type(info.error_field(DiagnosticField.MESSAGE))  # revealed: bytes | None
+```
+
+But plain-dict mutation APIs should still be rejected when the narrowed value may be a `TypedDict`:
+
+```py
+def takes_dict(value: dict[str, object]) -> None: ...
+def mutate_dict_like(value: object) -> None:
+    if isinstance(value, dict):
+        reveal_type(value)  # revealed: Top[dict[Unknown, Unknown]] | Top[TypedDict]
+        value.popitem()  # error: [unresolved-attribute]
+        takes_dict(value)  # error: [invalid-argument-type]
+```
+
 The behavior of `issubclass()` is similar.
 
 ```py
@@ -706,12 +814,13 @@ def _(x: object):
 
 ## Narrowing with TypedDict unions
 
-Narrowing unions of `int` and multiple TypedDicts using `isinstance(x, dict)` should not panic
-during type ordering of normalized intersection types. Regression test for
+`TypedDict` unions should narrow cleanly through `isinstance(x, dict)` without leaving behind
+`Top[dict[...]]` intersections. This also covers the previous panic regression from
 <https://github.com/astral-sh/ty/issues/2451>.
 
 ```py
-from typing import Any, TypedDict, cast
+from collections.abc import MutableMapping
+from typing import TypedDict
 
 class A(TypedDict):
     x: str
@@ -721,11 +830,59 @@ class B(TypedDict):
 
 T = int | A | B
 
-def test(a: Any, items: list[T]) -> None:
-    combined = a or items
-    v = combined[0]
+def narrow_typeddict_union(v: T) -> None:
     if isinstance(v, dict):
-        cast(T, v)  # no panic
+        reveal_type(v)  # revealed: A | B
+    else:
+        reveal_type(v)  # revealed: int
+
+def narrow_single_typeddict(x: list | A) -> None:
+    if isinstance(x, dict):
+        reveal_type(x)  # revealed: A
+    else:
+        reveal_type(x)  # revealed: list[Unknown]
+
+def narrow_mutable_mapping_or_typeddict(x: dict[str, str] | A) -> None:
+    if isinstance(x, MutableMapping):
+        reveal_type(x)  # revealed: dict[str, str] | A
+    else:
+        reveal_type(x)  # revealed: Never
+
+def narrow_dict_or_typeddict(x: dict[str, str] | A) -> None:
+    if isinstance(x, dict):
+        reveal_type(x)  # revealed: dict[str, str] | A
+    else:
+        reveal_type(x)  # revealed: Never
+
+class Package:
+    ecosystem: str
+
+class Vulnerability:
+    package: Package
+    patched_versions: str | None
+
+def narrow_typeddict_or_class(value: A | Vulnerability) -> None:
+    if isinstance(value, dict):
+        pass
+    else:
+        reveal_type(value)  # revealed: Vulnerability & ~Top[dict[Unknown, Unknown]]
+        reveal_type(value.package.ecosystem)  # revealed: str
+```
+
+`dict` methods should also remain callable on the narrowed value, even when the original type only
+exposed `Mapping` or `Iterable` APIs.
+
+```py
+from typing import Any, Iterable, Mapping
+
+def sink(x: object) -> None: ...
+def narrow_mapping_items(value: Mapping[str, Any] | Iterable[tuple[str, Any]]) -> None:
+    if isinstance(value, dict):
+        sink(value.items())
+
+def narrow_iterable_keys(choices: Iterable[Any] | None) -> None:
+    if isinstance(choices, dict):
+        sink(choices.keys())
 ```
 
 ## Narrowing with named expressions (walrus operator)
