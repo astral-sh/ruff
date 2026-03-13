@@ -1,7 +1,14 @@
 import ruffSchema from "../../../../ruff.schema.json";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { Header, useTheme, setupMonaco } from "shared";
-import { persist, persistLocal, restore, stringify } from "./settings";
+import {
+  copyAsMarkdown,
+  copyAsMarkdownLink,
+  persist,
+  persistLocal,
+  restore,
+  stringify,
+} from "./settings";
 import { default as Editor, Source } from "./Editor";
 import { loader } from "@monaco-editor/react";
 import { DEFAULT_PYTHON_SOURCE } from "../constants";
@@ -21,6 +28,20 @@ export default function Chrome() {
       return;
     }
     await persist(settings, pythonSource);
+  }, [pythonSource, settings]);
+
+  const handleCopyMarkdownLink = useCallback(async () => {
+    if (settings == null || pythonSource == null) {
+      return;
+    }
+    await copyAsMarkdownLink(settings, pythonSource);
+  }, [pythonSource, settings]);
+
+  const handleCopyMarkdown = useCallback(async () => {
+    if (settings == null || pythonSource == null) {
+      return;
+    }
+    await copyAsMarkdown(settings, pythonSource);
   }, [pythonSource, settings]);
 
   if (initPromise.current == null) {
@@ -81,12 +102,14 @@ export default function Chrome() {
   return (
     <main className="flex flex-col h-full bg-ayu-background dark:bg-ayu-background-dark">
       <Header
-        edit={revision}
         theme={theme}
         tool="ruff"
         version={`v${ruffVersion}`}
         onChangeTheme={setTheme}
+        edit={revision}
         onShare={handleShare}
+        onCopyMarkdownLink={handleCopyMarkdownLink}
+        onCopyMarkdown={handleCopyMarkdown}
         onReset={handleResetClicked}
       />
 
