@@ -3195,11 +3195,11 @@ def function():
         );
 
         // TODO: Should this be constravariant instead?
-        assert_snapshot!(test.hover(), @"
-        P@Alias (bivariant)
+        assert_snapshot!(test.hover(), @r###"
+        P@Alias (covariant)
         ---------------------------------------------
         ```python
-        P@Alias (bivariant)
+        P@Alias (covariant)
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
@@ -3210,7 +3210,7 @@ def function():
           |                                         |
           |                                         source
           |
-        ");
+        "###);
     }
 
     #[test]
