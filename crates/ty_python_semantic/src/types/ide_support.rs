@@ -28,6 +28,43 @@ pub use resolve_definition::{ImportAliasResolution, ResolvedDefinition, map_stub
 use resolve_definition::{find_symbol_in_scope, resolve_definition};
 pub use unused_binding_support::{UnusedBinding, unused_bindings};
 
+/// Whether a call argument is interpreted as a value expression or a type expression.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CallArgumentForm {
+    Unknown,
+    Value,
+    Type,
+}
+
+fn full_type_bindings_for_call<'db>(
+    model: &SemanticModel<'db>,
+    call_expr: &ast::ExprCall,
+) -> Option<crate::types::call::Bindings<'db>> {
+    let db = model.db();
+    let func_type = call_expr.func.inferred_type(model)?;
+    let call_arguments =
+        CallArguments::from_arguments_typed(&call_expr.arguments, |splatted_value| {
+            splatted_value
+                .inferred_type(model)
+                .unwrap_or(Type::unknown())
+        });
+    let constraints = ConstraintSetBuilder::new();
+
+    Some(
+        func_type
+            .bindings(db)
+            .match_parameters(db, &call_arguments)
+            .check_types(
+                db,
+                &constraints,
+                &call_arguments,
+                TypeContext::default(),
+                &[],
+            )
+            .unwrap_or_else(|CallError(_, bindings)| *bindings),
+    )
+}
+
 /// Get the primary definition kind for a name expression within a specific file.
 /// Returns the first definition kind that is reachable for this name in its scope.
 /// This is useful for IDE features like semantic tokens.
@@ -867,6 +904,29 @@ fn resolve_single_overload<'db>(
     }
 
     resolved.pop()
+}
+
+/// Returns the form of each argument in a call, in source order.
+///
+/// `CallArgumentForm::Unknown` indicates that the argument form is unknown or conflicting across
+/// overloads.
+pub fn call_argument_forms(
+    model: &SemanticModel<'_>,
+    call_expr: &ast::ExprCall,
+) -> Vec<CallArgumentForm> {
+    let Some(bindings) = full_type_bindings_for_call(model, call_expr) else {
+        return Vec::new();
+    };
+
+    bindings
+        .non_conflicting_argument_forms()
+        .map(|form| {
+            form.map_or(CallArgumentForm::Unknown, |form| match form {
+                crate::types::signatures::ParameterForm::Value => CallArgumentForm::Value,
+                crate::types::signatures::ParameterForm::Type => CallArgumentForm::Type,
+            })
+        })
+        .collect()
 }
 
 /// Given a call expression that has overloads, and whose overload is resolved to a
