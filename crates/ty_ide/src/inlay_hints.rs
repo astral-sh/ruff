@@ -7235,21 +7235,20 @@ mod tests {
         );
 
         assert_snapshot!(test.inlay_hints(), @r#"
-
         def f(xyxy: object):
             if isinstance(xyxy, list):
                 x[: Top[list[Unknown]]] = xyxy
 
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:24:1
+          --> stdlib/ty_extensions.pyi:44:1
            |
-        22 | CallableTypeOf: _SpecialForm
-        23 |
-        24 | Top: _SpecialForm
+        42 | """
+        43 |
+        44 | Top: _SpecialForm
            | ^^^
-        25 | """
-        26 | `Top[T]` represents the "top materialization" of `T`.
+        45 | """
+        46 | `Top[T]` represents the "top materialization" of `T`.
            |
         info: Source
          --> main2.py:4:13

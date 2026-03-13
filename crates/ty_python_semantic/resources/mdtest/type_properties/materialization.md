@@ -237,7 +237,7 @@ Materializing an overloaded callable materializes each overload separately.
 
 ```py
 from typing import overload
-from ty_extensions import CallableTypeOf
+from ty_extensions import RegularCallableTypeOf
 
 @overload
 def f(x: int) -> Any: ...
@@ -246,7 +246,7 @@ def f(*args: Any, **kwargs: Any) -> str: ...
 def f(*args: object, **kwargs: object) -> object:
     pass
 
-def _(top: Top[CallableTypeOf[f]], bottom: Bottom[CallableTypeOf[f]]):
+def _(top: Top[RegularCallableTypeOf[f]], bottom: Bottom[RegularCallableTypeOf[f]]):
     reveal_type(top)  # revealed: Overload[(x: int) -> object, Top[(...) -> str]]
     reveal_type(bottom)  # revealed: Overload[(x: int) -> Never, (*args: object, **kwargs: object) -> str]
 ```
@@ -271,7 +271,7 @@ type TopCallable = Top[Callable[..., Any]]
 def takes_objects(*args: object, **kwargs: object) -> object:
     pass
 
-static_assert(not is_subtype_of(TopCallable, CallableTypeOf[takes_objects]))
+static_assert(not is_subtype_of(TopCallable, RegularCallableTypeOf[takes_objects]))
 ```
 
 ## Tuple

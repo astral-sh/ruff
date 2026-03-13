@@ -1720,6 +1720,8 @@ pub enum KnownFunction {
     GenericContext,
     /// `ty_extensions.into_callable`
     IntoCallable,
+    /// `ty_extensions.into_regular_callable`
+    IntoRegularCallable,
     /// `ty_extensions.dunder_all_names`
     DunderAllNames,
     /// `ty_extensions.enum_members`
@@ -1807,6 +1809,7 @@ impl KnownFunction {
             | Self::IsSubtypeOf
             | Self::GenericContext
             | Self::IntoCallable
+            | Self::IntoRegularCallable
             | Self::DunderAllNames
             | Self::EnumMembers
             | Self::StaticAssert
@@ -2294,6 +2297,7 @@ pub(crate) mod tests {
                 | KnownFunction::IsSubtypeOf
                 | KnownFunction::GenericContext
                 | KnownFunction::IntoCallable
+                | KnownFunction::IntoRegularCallable
                 | KnownFunction::DunderAllNames
                 | KnownFunction::EnumMembers
                 | KnownFunction::StaticAssert

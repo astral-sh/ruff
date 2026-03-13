@@ -357,6 +357,10 @@ impl<'db> CallableType<'db> {
         matches!(self.kind(db), CallableTypeKind::StaticMethodLike)
     }
 
+    pub(crate) fn into_regular(self, db: &'db dyn Db) -> CallableType<'db> {
+        CallableType::new(db, self.signatures(db), CallableTypeKind::Regular)
+    }
+
     pub(crate) fn bind_self(
         self,
         db: &'db dyn Db,
