@@ -253,10 +253,12 @@ impl<'db> KnownBoundMethodType<'db> {
             | (
                 KnownBoundMethodType::PropertyDunderSet(self_property),
                 KnownBoundMethodType::PropertyDunderSet(other_property),
-            ) => Type::PropertyInstance(self_property).when_equivalent_to_impl(
+            ) => Type::PropertyInstance(self_property).has_relation_to_impl(
                 db,
                 Type::PropertyInstance(other_property),
                 constraints,
+                inferable,
+                relation,
                 relation_visitor,
                 disjointness_visitor,
             ),
