@@ -1554,35 +1554,12 @@ impl<'db> Signature<'db> {
                 // self: `P`
                 // other: `Concatenate[<prefix_params>, P]`
                 (
-                    Some(([], self_bound_typevar)),
-                    Some((other_prefix_params, other_bound_typevar)),
+                    Some(([], _self_bound_typevar)),
+                    Some((_other_prefix_params, _other_bound_typevar)),
                 ) => {
-                    let lower = Type::Callable(CallableType::new(
-                        db,
-                        CallableSignature::single(Signature::new_generic(
-                            other.generic_context,
-                            Parameters::new(db, other_prefix_params.iter().cloned()),
-                            Type::unknown(),
-                        )),
-                        CallableTypeKind::ParamSpecValue,
-                    ));
-                    let param_spec_prefix_matches = ConstraintSet::constrain_typevar(
-                        db,
-                        constraints,
-                        other_bound_typevar,
-                        lower,
-                        Type::object(),
-                    );
-                    result.intersect(db, constraints, param_spec_prefix_matches);
-                    let param_spec_matches = ConstraintSet::constrain_typevar(
-                        db,
-                        constraints,
-                        other_bound_typevar,
-                        Type::TypeVar(self_bound_typevar),
-                        Type::TypeVar(self_bound_typevar),
-                    );
-                    result.intersect(db, constraints, param_spec_matches);
-                    return result;
+                    // This is always false because the `Concatenate` case requires at least one
+                    // required positional-only parameter.
+                    return ConstraintSet::from_bool(constraints, false);
                 }
 
                 // self: `Concatenate[<prefix_params>, P]`
