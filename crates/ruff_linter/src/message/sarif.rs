@@ -34,13 +34,28 @@ impl Emitter for SarifEmitter {
             .map(SarifResult::from_message)
             .collect::<Result<Vec<_>>>()?;
 
-        let unique_rules: HashSet<_> = results
+        let unique_rules_and_severities: HashSet<_> = results
             .iter()
-            .filter_map(|result| result.rule_id.as_secondary_code())
+            // Here we implicitly assume that, for a fixed rule, all diagnostics
+            // have the same severity. If we ever introduce a way for users
+            // to locally change the severity of a diagnostic we will have to
+            // refactor in such a way that we know the _configured_ severity at
+            // this point (rather than just the severities of each diagnostic).
+            .filter_map(|result| {
+                let code = result.rule_id.as_secondary_code()?;
+                Some((code, result.level))
+            })
             .collect();
-        let mut rules: Vec<SarifRule> = unique_rules.into_iter().map(SarifRule::from).collect();
-        rules.sort_by(|a, b| a.id.cmp(b.id));
-
+        let mut rules: Vec<SarifRule> = unique_rules_and_severities
+            .into_iter()
+            .map(SarifRule::from)
+            .collect();
+        rules.sort_by(|a, b| {
+            a.properties
+                .problem_severity
+                .cmp(&b.properties.problem_severity)
+                .then_with(|| a.id.cmp(b.id))
+        });
         let output = SarifOutput {
             schema: "https://json.schemastore.org/sarif-2.1.0.json",
             version: "2.1.0",
@@ -102,8 +117,9 @@ struct SarifRule<'a> {
     short_description: SarifMessage<'a>,
 }
 
-impl<'a> From<&'a SecondaryCode> for SarifRule<'a> {
-    fn from(code: &'a SecondaryCode) -> Self {
+impl<'a> From<(&'a SecondaryCode, SarifLevel)> for SarifRule<'a> {
+    fn from(code_and_level: (&'a SecondaryCode, SarifLevel)) -> Self {
+        let (code, level) = code_and_level;
         // This is a manual re-implementation of Rule::from_code, but we also want the Linter. This
         // avoids calling Linter::parse_code twice.
         let (linter, suffix) = Linter::parse_code(code).unwrap();
@@ -127,7 +143,7 @@ impl<'a> From<&'a SecondaryCode> for SarifRule<'a> {
                 id: code,
                 kind: linter.name(),
                 name: rule.into(),
-                problem_severity: Severity::Error,
+                problem_severity: level,
             },
         }
     }
@@ -262,10 +278,10 @@ struct SarifProperties<'a> {
     kind: &'a str,
     name: &'a str,
     #[serde(rename = "problem.severity")]
-    problem_severity: Severity,
+    problem_severity: SarifLevel,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Copy, PartialOrd, Ord, PartialEq, Eq, Hash, Serialize)]
 #[serde(rename_all = "camelCase")]
 enum SarifLevel {
     Note,
