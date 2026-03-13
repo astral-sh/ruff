@@ -419,6 +419,31 @@ def _(ATD: Intersection[type[CtorRequired], type[CtorOptional]]):
     ok_dict = ATD({"a": 1})
 ```
 
+TypedDict constructors also support the `dict(mapping, **kwargs)`-style merge form. Keyword
+arguments should override the positional mapping when validating the final shape:
+
+```py
+class BaseKwargs(TypedDict, total=False):
+    name: str
+
+class ChildKwargs(BaseKwargs, total=False):
+    count: int
+
+class OverrideCountKwargs(TypedDict, total=False):
+    count: str
+
+def _(base: BaseKwargs, override: OverrideCountKwargs):
+    ok = ChildKwargs(base, count=1)
+    overridden = ChildKwargs(override, count=1)
+    overridden_literal = ChildKwargs({"count": "wrong"}, count=1)
+
+    # error: [invalid-argument-type]
+    bad_value = ChildKwargs({"name": 1}, count=1)
+
+    # error: [invalid-argument-type]
+    bad_mapping = ChildKwargs(1, count=1)
+```
+
 All of these have an invalid type for the `name` field:
 
 ```py

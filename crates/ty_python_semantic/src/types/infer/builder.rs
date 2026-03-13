@@ -96,7 +96,10 @@ use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::subclass_of::SubclassOfInner;
 use crate::types::tuple::{Tuple, TupleLength, TupleSpecBuilder, TupleType};
 use crate::types::type_alias::{ManualPEP695TypeAliasType, PEP695TypeAliasType};
-use crate::types::typed_dict::{validate_typed_dict_constructor, validate_typed_dict_dict_literal};
+use crate::types::typed_dict::{
+    TypedDictConstructorCallKind, typed_dict_constructor_call_kind,
+    validate_typed_dict_constructor, validate_typed_dict_dict_literal,
+};
 use crate::types::typevar::{BoundTypeVarIdentity, TypeVarConstraints, TypeVarIdentity};
 use crate::types::{
     CallDunderError, CallableBinding, CallableType, ClassType, DynamicType, EvaluationMode,
@@ -7064,12 +7067,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .then_some(TypedDictType::new(class))
         });
 
-        let typed_dict_constructor_shape_supported = typed_dict_constructor.is_some()
-            && (arguments.args.is_empty()
-                || (arguments.args.len() == 1 && arguments.keywords.is_empty()));
-        let has_positional_dict_literal = arguments.args.len() == 1
-            && arguments.keywords.is_empty()
-            && arguments.args[0].is_dict_expr();
+        let typed_dict_constructor_call_kind = typed_dict_constructor
+            .map(|_| typed_dict_constructor_call_kind(arguments))
+            .unwrap_or(TypedDictConstructorCallKind::Unsupported);
+        let typed_dict_constructor_shape_supported =
+            typed_dict_constructor_call_kind != TypedDictConstructorCallKind::Unsupported;
 
         report_missing_implicit_constructor_call(
             &self.context,
@@ -7092,8 +7094,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Dict-literal positional args (e.g., `TD({"a": 1})`) are excluded here because the
         // synthesized `__new__` mapping overload already handles them via normal callable checking.
         if let Some(typed_dict) = typed_dict_constructor
-            && !has_positional_dict_literal
             && typed_dict_constructor_shape_supported
+            && typed_dict_constructor_call_kind
+                != TypedDictConstructorCallKind::PositionalDictLiteralOnly
         {
             validate_typed_dict_constructor(
                 &self.context,
