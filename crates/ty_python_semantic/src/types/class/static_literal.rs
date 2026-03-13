@@ -43,8 +43,8 @@ use crate::{
         diagnostic::INVALID_DATACLASS_OVERRIDE,
         enums::{enum_metadata, is_enum_class_by_inheritance, try_unwrap_nonmember_value},
         function::{
-            DataclassTransformerFlags, DataclassTransformerParams, KnownFunction,
-            is_implicit_classmethod, is_implicit_staticmethod,
+            DataclassTransformerParams, KnownFunction, is_implicit_classmethod,
+            is_implicit_staticmethod,
         },
         generics::Specialization,
         infer::infer_unpack_types,
@@ -2291,18 +2291,7 @@ impl<'db> StaticClassLiteral<'db> {
                     ..
                 } = field.kind
                 {
-                    let class_kw_only_default = self
-                        .dataclass_params(db)
-                        .is_some_and(|params| params.flags(db).contains(DataclassFlags::KW_ONLY))
-                        // TODO this next part should not be necessary, if we were properly
-                        // initializing `dataclass_params` from the dataclass-transform params, for
-                        // metaclass and base-class-based dataclass-transformers.
-                        || matches!(
-                            field_policy,
-                            CodeGeneratorKind::DataclassLike(Some(transformer_params))
-                                if transformer_params.flags(db).contains(DataclassTransformerFlags::KW_ONLY_DEFAULT)
-                        );
-                    *kw = Some(class_kw_only_default);
+                    *kw = Some(self.has_dataclass_param(db, field_policy, DataclassFlags::KW_ONLY));
                 }
 
                 attributes.insert(symbol.name().clone(), field);
