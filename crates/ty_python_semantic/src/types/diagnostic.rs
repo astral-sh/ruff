@@ -76,6 +76,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_KEY);
     registry.register_lint(&ISINSTANCE_AGAINST_PROTOCOL);
     registry.register_lint(&ISINSTANCE_AGAINST_TYPED_DICT);
+    registry.register_lint(&UNSAFE_ISINSTANCE_NARROWING);
     registry.register_lint(&INVALID_ARGUMENT_TYPE);
     registry.register_lint(&INVALID_RETURN_TYPE);
     registry.register_lint(&INVALID_ASSIGNMENT);
@@ -892,6 +893,43 @@ declare_lint! {
     pub(crate) static ISINSTANCE_AGAINST_TYPED_DICT = {
         summary: "reports runtime checks against `TypedDict` classes",
         status: LintStatus::stable("0.0.15"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Reports `isinstance()` or `issubclass()` calls where the type of the
+    /// first argument unsafely overlaps with a runtime-checkable protocol.
+    ///
+    /// ## Why is this bad?
+    /// A type `X` unsafely overlaps with a protocol `P` if `X` is not
+    /// assignable to `P`, but all members of `P` are available as attributes on
+    /// `X` (just with incompatible types). In this case, `isinstance()` would
+    /// return `True` at runtime (since the runtime check only verifies the
+    /// presence of members, not their types), but the type checker cannot safely
+    /// narrow the type.
+    ///
+    /// ## Examples
+    /// ```python
+    /// from typing import Protocol, runtime_checkable
+    ///
+    /// @runtime_checkable
+    /// class HasMethod(Protocol):
+    ///     def method(self, x: int) -> int: ...
+    ///
+    /// class MyClass:
+    ///     def method(self, x: str) -> None: ...  # same name, incompatible type
+    ///
+    /// def f(x: MyClass):
+    ///     isinstance(x, HasMethod)  # error: [unsafe-isinstance-narrowing]
+    /// ```
+    ///
+    /// ## References
+    /// - [Typing specification: Runtime-checkable protocols](https://typing.python.org/en/latest/spec/protocol.html#runtime-checkable-decorator-and-narrowing-types-by-isinstance)
+    pub(crate) static UNSAFE_ISINSTANCE_NARROWING = {
+        summary: "reports `isinstance()` or `issubclass()` calls with unsafe protocol overlap",
+        status: LintStatus::stable("0.0.23"),
         default_level: Level::Error,
     }
 }
@@ -4335,6 +4373,40 @@ pub(crate) fn report_runtime_check_against_typed_dict(
         function_name = function.name()
     ));
     diagnostic.set_primary_message("This call will raise `TypeError` at runtime");
+}
+
+pub(crate) fn report_unsafe_isinstance_narrowing<'db>(
+    context: &InferContext<'db, '_>,
+    call: &ast::ExprCall,
+    subject_type: Type<'db>,
+    protocol: ProtocolClass<'db>,
+    function: KnownFunction,
+) {
+    let Some(builder) = context.report_lint(&UNSAFE_ISINSTANCE_NARROWING, call) else {
+        return;
+    };
+    let db = context.db();
+    let protocol_name = protocol.name(db);
+    let function_name = function.name();
+    let subject_display = subject_type.display(db);
+    let mut diagnostic = builder.into_diagnostic(format_args!(
+        "`{subject_display}` unsafely overlaps with protocol `{protocol_name}`",
+    ));
+    if let [first, _] = &*call.arguments.args {
+        diagnostic.annotate(
+            context
+                .secondary(first)
+                .message(format_args!("Has type `{subject_display}`")),
+        );
+    }
+    diagnostic.info(format_args!(
+        "`{subject_display}` has all the members of `{protocol_name}`, \
+        but with incompatible types"
+    ));
+    diagnostic.info(format_args!(
+        "Runtime `{function_name}` checks against protocols only check \
+        for the presence of the required members, not their types",
+    ));
 }
 
 pub(crate) fn report_match_pattern_against_non_runtime_checkable_protocol<T: Ranged>(

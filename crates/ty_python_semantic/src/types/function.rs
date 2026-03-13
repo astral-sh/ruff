@@ -74,7 +74,7 @@ use crate::types::diagnostic::{
     report_bad_argument_to_protocol_interface, report_invalid_total_ordering_call,
     report_issubclass_check_against_protocol_with_non_method_members,
     report_runtime_check_against_non_runtime_checkable_protocol,
-    report_runtime_check_against_typed_dict,
+    report_runtime_check_against_typed_dict, report_unsafe_isinstance_narrowing,
 };
 use crate::types::display::DisplaySettings;
 use crate::types::generics::{GenericContext, typing_self};
@@ -82,6 +82,7 @@ use crate::types::infer::nearest_enclosing_class;
 use crate::types::known_instance::DeprecatedInstance;
 use crate::types::list_members::all_members;
 use crate::types::narrow::ClassInfoConstraintFunction;
+use crate::types::protocol_class::ProtocolClass;
 use crate::types::relation::TypeRelationChecker;
 use crate::types::signatures::{CallableSignature, Signature};
 use crate::types::visitor::any_over_type;
@@ -1262,6 +1263,7 @@ fn check_classinfo_in_isinstance<'db>(
     context: &InferContext<'db, '_>,
     call_expression: &ast::ExprCall,
     function: KnownFunction,
+    first_arg_type: Type<'db>,
     classinfo: Type<'db>,
     classinfo_expr: Option<&ast::Expr>,
 ) {
@@ -1277,7 +1279,9 @@ fn check_classinfo_in_isinstance<'db>(
                         protocol_class,
                         function,
                     );
-                } else if function == KnownFunction::IsSubclass {
+                    return;
+                }
+                if function == KnownFunction::IsSubclass {
                     let non_method_members = protocol_class.interface(db).non_method_members(db);
                     if !non_method_members.is_empty() {
                         report_issubclass_check_against_protocol_with_non_method_members(
@@ -1286,8 +1290,17 @@ fn check_classinfo_in_isinstance<'db>(
                             protocol_class,
                             &non_method_members,
                         );
+                        return;
                     }
                 }
+                check_unsafe_overlap_with_protocol(
+                    db,
+                    context,
+                    call_expression,
+                    function,
+                    &first_arg_type,
+                    protocol_class,
+                );
             }
         }
         Type::SpecialForm(SpecialFormType::Any) if function == KnownFunction::IsInstance => {
@@ -1322,6 +1335,7 @@ fn check_classinfo_in_isinstance<'db>(
                         context,
                         call_expression,
                         function,
+                        first_arg_type,
                         element,
                         element_expr,
                     );
@@ -1329,6 +1343,65 @@ fn check_classinfo_in_isinstance<'db>(
             }
         }
         _ => {}
+    }
+}
+
+/// Check if the first argument to `isinstance()`/`issubclass()` has an unsafe overlap
+/// with a runtime-checkable protocol.
+///
+/// A type `X` unsafely overlaps with a protocol `P` if `X` is not assignable to `P`,
+/// but all members of `P` are available as attributes on `X` (i.e., `X` is assignable
+/// to the "type-erased" version of `P` where all members have type `Any`).
+fn check_unsafe_overlap_with_protocol<'db>(
+    db: &'db dyn Db,
+    context: &InferContext<'db, '_>,
+    call_expression: &ast::ExprCall,
+    function: KnownFunction,
+    first_arg_type: &Type<'db>,
+    protocol_class: ProtocolClass<'db>,
+) {
+    let protocol_interface = protocol_class.interface(db);
+    // Use the top materialization of the protocol (type params replaced with their upper
+    // bounds) so that e.g. `Collection[int]` is correctly seen as assignable to `Collection`.
+    let protocol_instance_type =
+        Type::instance(db, protocol_class.class_literal(db).top_materialization(db));
+
+    // If the first argument is a union, each element is checked individually,
+    // since the spec states that if any element of a union unsafely overlaps
+    // with a protocol, the whole union unsafely overlaps.
+    let types_to_check = match first_arg_type {
+        Type::Union(union) => union.elements(db),
+        other => std::slice::from_ref(other),
+    };
+
+    for subject_type in types_to_check {
+        let subject_type = if function == KnownFunction::IsSubclass {
+            let Some(instance_type) = subject_type.to_instance(db) else {
+                continue;
+            };
+            instance_type
+        } else {
+            *subject_type
+        };
+
+        if subject_type.is_assignable_to(db, protocol_instance_type) {
+            continue;
+        }
+
+        // Check if the subject type has all member names from the protocol.
+        let has_all_members = protocol_interface
+            .members(db)
+            .all(|member| !subject_type.member(db, member.name()).place.is_undefined());
+
+        if has_all_members {
+            report_unsafe_isinstance_narrowing(
+                context,
+                call_expression,
+                subject_type,
+                protocol_class,
+                function,
+            );
+        }
     }
 }
 
@@ -2156,6 +2229,7 @@ impl KnownFunction {
                     context,
                     call_expression,
                     self,
+                    *first_arg,
                     *second_argument,
                     call_expression.arguments.args.get(1),
                 );

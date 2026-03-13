@@ -1,0 +1,119 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: protocols.md - Protocols - Unsafe overlap with runtime-checkable protocols
+mdtest path: crates/ty_python_semantic/resources/mdtest/protocols.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from typing import Protocol, runtime_checkable
+ 2 | 
+ 3 | @runtime_checkable
+ 4 | class HasMethod(Protocol):
+ 5 |     def method(self, x: int) -> int: ...
+ 6 | 
+ 7 | class Compatible:
+ 8 |     def method(self, x: int) -> int:
+ 9 |         return x
+10 | 
+11 | class IncompatibleSignature:
+12 |     def method(self, x: str) -> None: ...
+13 | 
+14 | class IncompatibleAttribute:
+15 |     method: int
+16 | 
+17 | class NoOverlap:
+18 |     pass
+19 | 
+20 | def check_isinstance(
+21 |     compatible: Compatible,
+22 |     incompatible_sig: IncompatibleSignature,
+23 |     incompatible_attr: IncompatibleAttribute,
+24 |     no_overlap: NoOverlap,
+25 | ):
+26 |     isinstance(compatible, HasMethod)  # no error: `Compatible` is assignable to `HasMethod`
+27 | 
+28 |     isinstance(incompatible_sig, HasMethod)  # error: [unsafe-isinstance-narrowing]
+29 | 
+30 |     isinstance(incompatible_attr, HasMethod)  # error: [unsafe-isinstance-narrowing]
+31 | 
+32 |     isinstance(no_overlap, HasMethod)  # no error: `NoOverlap` does not have all members of `HasMethod`
+33 | from typing import TypeVar
+34 | 
+35 | T = TypeVar("T")
+36 | 
+37 | @runtime_checkable
+38 | class GenericProto(Protocol[T]):
+39 |     def get(self) -> T: ...
+40 | 
+41 | def check_generic_no_overlap(x: GenericProto[int]):
+42 |     isinstance(x, GenericProto)  # no error: `GenericProto[int]` is assignable to `GenericProto`
+43 | class BadGenericOverlap:
+44 |     get: int  # has `get`, but it's an attribute, not a callable
+45 | 
+46 | def check_generic_overlap(x: BadGenericOverlap):
+47 |     isinstance(x, GenericProto)  # error: [unsafe-isinstance-narrowing]
+```
+
+# Diagnostics
+
+```
+error[unsafe-isinstance-narrowing]: `IncompatibleSignature` unsafely overlaps with protocol `HasMethod`
+  --> src/mdtest_snippet.py:28:5
+   |
+26 |     isinstance(compatible, HasMethod)  # no error: `Compatible` is assignable to `HasMethod`
+27 |
+28 |     isinstance(incompatible_sig, HasMethod)  # error: [unsafe-isinstance-narrowing]
+   |     ^^^^^^^^^^^----------------^^^^^^^^^^^^
+   |                |
+   |                Has type `IncompatibleSignature`
+29 |
+30 |     isinstance(incompatible_attr, HasMethod)  # error: [unsafe-isinstance-narrowing]
+   |
+info: `IncompatibleSignature` has all the members of `HasMethod`, but with incompatible types
+info: Runtime `isinstance` checks against protocols only check for the presence of the required members, not their types
+info: rule `unsafe-isinstance-narrowing` is enabled by default
+
+```
+
+```
+error[unsafe-isinstance-narrowing]: `IncompatibleAttribute` unsafely overlaps with protocol `HasMethod`
+  --> src/mdtest_snippet.py:30:5
+   |
+28 |     isinstance(incompatible_sig, HasMethod)  # error: [unsafe-isinstance-narrowing]
+29 |
+30 |     isinstance(incompatible_attr, HasMethod)  # error: [unsafe-isinstance-narrowing]
+   |     ^^^^^^^^^^^-----------------^^^^^^^^^^^^
+   |                |
+   |                Has type `IncompatibleAttribute`
+31 |
+32 |     isinstance(no_overlap, HasMethod)  # no error: `NoOverlap` does not have all members of `HasMethod`
+   |
+info: `IncompatibleAttribute` has all the members of `HasMethod`, but with incompatible types
+info: Runtime `isinstance` checks against protocols only check for the presence of the required members, not their types
+info: rule `unsafe-isinstance-narrowing` is enabled by default
+
+```
+
+```
+error[unsafe-isinstance-narrowing]: `BadGenericOverlap` unsafely overlaps with protocol `GenericProto`
+  --> src/mdtest_snippet.py:47:5
+   |
+46 | def check_generic_overlap(x: BadGenericOverlap):
+47 |     isinstance(x, GenericProto)  # error: [unsafe-isinstance-narrowing]
+   |     ^^^^^^^^^^^-^^^^^^^^^^^^^^^
+   |                |
+   |                Has type `BadGenericOverlap`
+   |
+info: `BadGenericOverlap` has all the members of `GenericProto`, but with incompatible types
+info: Runtime `isinstance` checks against protocols only check for the presence of the required members, not their types
+info: rule `unsafe-isinstance-narrowing` is enabled by default
+
+```
