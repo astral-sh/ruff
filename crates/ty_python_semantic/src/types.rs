@@ -2323,6 +2323,20 @@ impl<'db> Type<'db> {
                 }
             }
 
+            Type::TypedDictTop => KnownClass::TypedDictFallback
+                .to_class_literal(db)
+                .find_name_in_mro_with_policy(db, name.as_str(), policy)
+                .expect("`find_name_in_mro` should return `Some` for a class literal")
+                .map_type(|ty| {
+                    ty.apply_type_mapping(
+                        db,
+                        &TypeMapping::ReplaceSelf {
+                            new_upper_bound: Type::TypedDictTop,
+                        },
+                        TypeContext::default(),
+                    )
+                }),
+
             _ => self
                 .to_meta_type(db)
                 .find_name_in_mro_with_policy(db, name.as_str(), policy)

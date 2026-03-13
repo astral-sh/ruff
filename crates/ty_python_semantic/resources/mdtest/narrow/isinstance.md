@@ -740,6 +740,22 @@ def narrow_dict_or_typeddict(x: dict[str, str] | A) -> None:
         reveal_type(x)  # revealed: Never
 ```
 
+`dict` methods should also remain callable on the narrowed value, even when the original type only
+exposed `Mapping` or `Iterable` APIs.
+
+```py
+from typing import Any, Iterable, Mapping
+
+def sink(x: object) -> None: ...
+def narrow_mapping_items(value: Mapping[str, Any] | Iterable[tuple[str, Any]]) -> None:
+    if isinstance(value, dict):
+        sink(value.items())
+
+def narrow_iterable_keys(choices: Iterable[Any] | None) -> None:
+    if isinstance(choices, dict):
+        sink(choices.keys())
+```
+
 ## Narrowing with named expressions (walrus operator)
 
 When `isinstance()` is used with a named expression, the target of the named expression should be
