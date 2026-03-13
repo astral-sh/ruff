@@ -1414,6 +1414,7 @@ AGE_FINAL: Final[Literal["age"]] = "age"
 
 def _(
     person: Person,
+    animal: Animal,
     being: Person | Animal,
     literal_key: Literal["age"],
     union_of_keys: Literal["age", "name"],
@@ -1439,12 +1440,13 @@ def _(
     # No error here:
     reveal_type(person[unknown_key])  # revealed: Unknown
 
+    # error: [invalid-key] "Unknown key "anything" for TypedDict `Animal`"
+    reveal_type(animal["anything"])  # revealed: Unknown
+
     reveal_type(being["name"])  # revealed: str
 
-    # TODO: A type of `int | None | Unknown` might be better here. The `str` is mixed in
-    # because `Animal.__getitem__` can only return `str`.
     # error: [invalid-key] "Unknown key "age" for TypedDict `Animal`"
-    reveal_type(being["age"])  # revealed: int | None | str
+    reveal_type(being["age"])  # revealed: int | None | Unknown
 ```
 
 ### Writing
