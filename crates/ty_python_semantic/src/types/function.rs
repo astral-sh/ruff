@@ -66,7 +66,7 @@ use crate::semantic_index::scope::ScopeId;
 use crate::semantic_index::{FileScopeId, SemanticIndex, semantic_index};
 use crate::types::call::{Binding, CallArguments};
 use crate::types::callable::CallableTypeKind;
-use crate::types::constraints::{ConstraintSet, ConstraintSetBuilder};
+use crate::types::constraints::ConstraintSet;
 use crate::types::context::InferContext;
 use crate::types::diagnostic::{
     ASSERT_TYPE_UNSPELLABLE_SUBTYPE, INVALID_ARGUMENT_TYPE, REDUNDANT_CAST, STATIC_ASSERT_ERROR,
@@ -77,12 +77,12 @@ use crate::types::diagnostic::{
     report_runtime_check_against_typed_dict,
 };
 use crate::types::display::DisplaySettings;
-use crate::types::generics::{GenericContext, InferableTypeVars, typing_self};
+use crate::types::generics::{GenericContext, typing_self};
 use crate::types::infer::nearest_enclosing_class;
 use crate::types::known_instance::DeprecatedInstance;
 use crate::types::list_members::all_members;
 use crate::types::narrow::ClassInfoConstraintFunction;
-use crate::types::relation::{HasRelationToVisitor, IsDisjointVisitor, TypeRelation};
+use crate::types::relation::TypeRelationChecker;
 use crate::types::signatures::{CallableSignature, Signature};
 use crate::types::visitor::any_over_type;
 use crate::types::{
@@ -1189,34 +1189,6 @@ impl<'db> FunctionType<'db> {
         BoundMethodType::new(db, self, self_instance)
     }
 
-    #[expect(clippy::too_many_arguments)]
-    pub(crate) fn has_relation_to_impl<'c>(
-        self,
-        db: &'db dyn Db,
-        other: Self,
-        constraints: &'c ConstraintSetBuilder<'db>,
-        inferable: InferableTypeVars<'_, 'db>,
-        relation: TypeRelation,
-        relation_visitor: &HasRelationToVisitor<'db, 'c>,
-        disjointness_visitor: &IsDisjointVisitor<'db, 'c>,
-    ) -> ConstraintSet<'db, 'c> {
-        if self.literal(db) != other.literal(db) {
-            return ConstraintSet::from_bool(constraints, false);
-        }
-
-        let self_signature = self.signature(db);
-        let other_signature = other.signature(db);
-        self_signature.has_relation_to_impl(
-            db,
-            other_signature,
-            constraints,
-            inferable,
-            relation,
-            relation_visitor,
-            disjointness_visitor,
-        )
-    }
-
     pub(crate) fn find_legacy_typevars_impl(
         self,
         db: &'db dyn Db,
@@ -1259,6 +1231,20 @@ impl<'db> FunctionType<'db> {
         enclosing_class: ClassType<'db>,
     ) -> Option<AbstractMethodKind> {
         self.literal(db).as_abstract_method(db, enclosing_class)
+    }
+}
+
+impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
+    pub(super) fn check_function_pair(
+        &self,
+        db: &'db dyn Db,
+        source: FunctionType<'db>,
+        target: FunctionType<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        if source.literal(db) != target.literal(db) {
+            return self.never();
+        }
+        self.check_callable_signature_pair(db, source.signature(db), target.signature(db))
     }
 }
 

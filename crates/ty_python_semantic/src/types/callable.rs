@@ -10,9 +10,8 @@ use crate::{
         KnownInstanceType, LiteralValueTypeKind, MemberLookupPolicy, Parameter, Parameters,
         Signature, SubclassOfInner, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
         UnionType,
-        constraints::{ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension},
-        generics::InferableTypeVars,
-        relation::{HasRelationToVisitor, IsDisjointVisitor, TypeRelation},
+        constraints::{ConstraintSet, IteratorConstraintsExtension},
+        relation::{TypeRelation, TypeRelationChecker},
         signatures::CallableSignature,
         visitor, walk_signature,
     },
@@ -432,35 +431,6 @@ impl<'db> CallableType<'db> {
         self.signatures(db)
             .find_legacy_typevars_impl(db, binding_context, typevars, visitor);
     }
-
-    /// Check whether this callable type has the given relation to another callable type.
-    ///
-    /// See [`Type::is_subtype_of`] and [`Type::is_assignable_to`] for more details.
-    #[expect(clippy::too_many_arguments)]
-    pub(super) fn has_relation_to_impl<'c>(
-        self,
-        db: &'db dyn Db,
-        other: Self,
-        constraints: &'c ConstraintSetBuilder<'db>,
-        inferable: InferableTypeVars<'_, 'db>,
-        relation: TypeRelation,
-        relation_visitor: &HasRelationToVisitor<'db, 'c>,
-        disjointness_visitor: &IsDisjointVisitor<'db, 'c>,
-    ) -> ConstraintSet<'db, 'c> {
-        if other.is_function_like(db) && !self.is_function_like(db) {
-            return ConstraintSet::from_bool(constraints, false);
-        }
-
-        self.signatures(db).has_relation_to_impl(
-            db,
-            other.signatures(db),
-            constraints,
-            inferable,
-            relation,
-            relation_visitor,
-            disjointness_visitor,
-        )
-    }
 }
 
 /// Converting a type "into a callable" can possibly return a _union_ of callables. Eventually,
@@ -504,6 +474,10 @@ impl<'db> CallableTypes<'db> {
         self.0
     }
 
+    pub(super) fn iter(&self) -> std::slice::Iter<'_, CallableType<'db>> {
+        self.0.iter()
+    }
+
     pub(crate) fn into_type(self, db: &'db dyn Db) -> Type<'db> {
         match self.0.as_slice() {
             [] => unreachable!("CallableTypes should not be empty"),
@@ -515,28 +489,41 @@ impl<'db> CallableTypes<'db> {
     pub(crate) fn map(self, mut f: impl FnMut(CallableType<'db>) -> CallableType<'db>) -> Self {
         Self::from_elements(self.0.iter().map(|element| f(*element)))
     }
+}
 
-    #[expect(clippy::too_many_arguments)]
-    pub(crate) fn has_relation_to_impl<'c>(
-        self,
+impl<'a, 'db> IntoIterator for &'a CallableTypes<'db> {
+    type IntoIter = std::slice::Iter<'a, CallableType<'db>>;
+    type Item = &'a CallableType<'db>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.iter()
+    }
+}
+
+impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
+    /// Check whether one callable type has the given relation to another callable type.
+    ///
+    /// See [`Type::is_subtype_of`] and [`Type::is_assignable_to`] for more details.
+    pub(super) fn check_callable_pair(
+        &self,
         db: &'db dyn Db,
-        other: CallableType<'db>,
-        constraints: &'c ConstraintSetBuilder<'db>,
-        inferable: InferableTypeVars<'_, 'db>,
-        relation: TypeRelation,
-        relation_visitor: &HasRelationToVisitor<'db, 'c>,
-        disjointness_visitor: &IsDisjointVisitor<'db, 'c>,
+        source: CallableType<'db>,
+        target: CallableType<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        self.0.iter().when_all(db, constraints, |element| {
-            element.has_relation_to_impl(
-                db,
-                other,
-                constraints,
-                inferable,
-                relation,
-                relation_visitor,
-                disjointness_visitor,
-            )
+        if target.is_function_like(db) && !source.is_function_like(db) {
+            return self.never();
+        }
+        self.check_callable_signature_pair(db, source.signatures(db), target.signatures(db))
+    }
+
+    pub(super) fn check_callables_vs_callable(
+        &self,
+        db: &'db dyn Db,
+        source: &CallableTypes<'db>,
+        target: CallableType<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        source.iter().when_all(db, self.constraints, |element| {
+            self.check_callable_pair(db, *element, target)
         })
     }
 }
