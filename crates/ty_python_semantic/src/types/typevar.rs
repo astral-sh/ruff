@@ -12,11 +12,11 @@ use crate::{
         semantic_index,
     },
     types::{
-        ApplySpecialization, ApplyTypeMappingVisitor, CycleDetector, DynamicType, KnownClass,
-        KnownInstanceType, MaterializationKind, Parameter, Parameters, Type, TypeAliasType,
-        TypeContext, TypeMapping, TypeVarVariance, UnionBuilder, UnionType, any_over_type,
-        binding_type, definition_expression_type, tuple::Tuple, variance::VarianceInferable,
-        visitor,
+        ApplySpecialization, ApplyTypeMappingVisitor, CycleDetectorWithFallback, DynamicType,
+        KnownClass, KnownInstanceType, MaterializationKind, Parameter, Parameters, Type,
+        TypeAliasType, TypeContext, TypeMapping, TypeVarVariance, UnionBuilder, UnionType,
+        any_over_type, binding_type, definition_expression_type, tuple::Tuple,
+        variance::VarianceInferable, visitor,
     },
 };
 
@@ -1386,7 +1386,7 @@ impl<'db> TypeVarBoundOrConstraints<'db> {
     }
 }
 
-/// A [`CycleDetector`] that is used in `TypeVarInstance::default_type`.
+/// A [`CycleDetectorWithFallback`] that is used in `TypeVarInstance::default_type`.
 pub(crate) type TypeVarDefaultVisitor<'db> =
-    CycleDetector<VisitTypeVarDefault, TypeVarInstance<'db>, Option<Type<'db>>>;
+    CycleDetectorWithFallback<VisitTypeVarDefault, TypeVarInstance<'db>, Option<Type<'db>>>;
 pub(crate) struct VisitTypeVarDefault;

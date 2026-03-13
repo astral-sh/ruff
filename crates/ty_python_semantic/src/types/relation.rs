@@ -6,11 +6,12 @@ use crate::place::{DefinedPlace, Place};
 use crate::types::constraints::{
     ConstraintSetBuilder, IteratorConstraintsExtension, OptionConstraintsExtension,
 };
+use crate::types::cyclic::CycleDetector;
 use crate::types::enums::is_single_member_enum;
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::{
-    CallableType, ClassBase, ClassType, CycleDetector, DynamicType, KnownBoundMethodType,
-    KnownClass, KnownInstanceType, LiteralValueTypeKind, MemberLookupPolicy, PropertyInstanceType,
+    CallableType, ClassBase, ClassType, DynamicType, KnownBoundMethodType, KnownClass,
+    KnownInstanceType, LiteralValueTypeKind, MemberLookupPolicy, PropertyInstanceType,
     ProtocolInstanceType, SubclassOfInner, TypeVarBoundOrConstraints, UnionType, UpcastPolicy,
 };
 use crate::{
@@ -528,7 +529,7 @@ pub(super) struct RelationVisitor<'db, 'c> {
 impl<'db, 'c> RelationVisitor<'db, 'c> {
     pub(crate) fn new(constraints: &'c ConstraintSetBuilder<'db>) -> Self {
         Self {
-            inner: CycleDetector::new(ConstraintSet::from_bool(constraints, true)),
+            inner: CycleDetector::default(),
             positive_default: ConstraintSet::from_bool(constraints, true),
             negative_default: ConstraintSet::from_bool(constraints, false),
         }
@@ -546,8 +547,7 @@ impl<'db, 'c> RelationVisitor<'db, 'c> {
         } else {
             self.positive_default
         };
-        self.inner
-            .visit_with_fallback((t1, t2, relation), &fallback, func)
+        self.inner.visit((t1, t2, relation), &fallback, func)
     }
 }
 
