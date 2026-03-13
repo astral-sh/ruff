@@ -2230,6 +2230,7 @@ impl<'db> FmtDetailed<'db> for DisplayParameters<'_, 'db> {
                 if let Some(prefix_parameters) = self
                     .parameters
                     .as_slice()
+                    // concatenate tail always has 2 parameters `*args` and `**kwargs`
                     .get(..self.parameters.len().saturating_sub(2))
                 {
                     display_parameters(self, f, prefix_parameters, arg_separator)?;
@@ -2241,7 +2242,7 @@ impl<'db> FmtDetailed<'db> for DisplayParameters<'_, 'db> {
                         ConcatenateTail::ParamSpec(bound_typevar) => {
                             write!(
                                 f.with_type(Type::TypeVar(bound_typevar)),
-                                "{}",
+                                "**{}",
                                 bound_typevar.identity(self.db).display(self.db)
                             )?;
                         }
