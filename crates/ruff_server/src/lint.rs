@@ -19,6 +19,7 @@ use ruff_linter::{
     linter::check_path,
     package::PackageRoot,
     packaging::detect_package_root,
+    preview::is_warning_severity_enabled,
     settings::{flags, types::PreviewMode},
     source_kind::SourceKind,
     suppression::Suppressions,
@@ -295,7 +296,7 @@ fn to_lsp_diagnostic(
     }
 
     let (severity, code) = if let Some(code) = code
-        && preview.is_disabled()
+        && !is_warning_severity_enabled(preview)
     {
         (severity(code), code.to_string())
     } else {
