@@ -7,12 +7,15 @@ use ruff_db::{
     diagnostic::{Annotation, Diagnostic, DiagnosticId, IntoDiagnosticMessage, Severity, Span},
     files::File,
 };
+use ruff_python_ast::AnyNodeRef;
+use ruff_python_ast::find_node::covering_node;
 use ruff_text_size::{Ranged, TextRange};
 
 use super::{Type, TypeCheckDiagnostics, infer_definition_types};
 
 use crate::diagnostic::DiagnosticGuard;
 use crate::lint::LintSource;
+use crate::semantic_index::scope::NodeWithScopeRef;
 use crate::semantic_index::scope::ScopeId;
 use crate::semantic_index::semantic_index;
 use crate::types::function::FunctionDecorators;
@@ -214,6 +217,54 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
     /// Are we currently inferring types in a stub file?
     pub(crate) fn in_stub(&self) -> bool {
         self.file.is_stub(self.db())
+    }
+
+    fn is_statement_reachable(&self, range: TextRange) -> bool {
+        let root = self.module.syntax();
+        if !root.range().contains_range(range) {
+            return true;
+        }
+
+        let Ok(covering) = covering_node(root.into(), range).find_first(AnyNodeRef::is_statement)
+        else {
+            return true;
+        };
+
+        let index = semantic_index(self.db, self.file);
+        let ancestors = covering.ancestors().collect::<Vec<_>>();
+
+        ancestors
+            .iter()
+            .enumerate()
+            .all(|(index_in_ancestors, ancestor)| {
+                if !ancestor.is_statement() {
+                    return true;
+                }
+
+                let scope_id = ancestors[index_in_ancestors + 1..]
+                    .iter()
+                    .find_map(|ancestor| match ancestor {
+                        AnyNodeRef::StmtFunctionDef(function) => {
+                            Some(index.node_scope(NodeWithScopeRef::Function(function)))
+                        }
+                        AnyNodeRef::StmtClassDef(class) => {
+                            Some(index.node_scope(NodeWithScopeRef::Class(class)))
+                        }
+                        AnyNodeRef::StmtTypeAlias(type_alias) => {
+                            Some(index.node_scope(NodeWithScopeRef::TypeAlias(type_alias)))
+                        }
+                        _ => None,
+                    })
+                    .unwrap_or_else(crate::semantic_index::scope::FileScopeId::global);
+
+                index
+                    .try_is_node_reachable(
+                        self.db,
+                        scope_id,
+                        crate::node_key::NodeKey::from_node(*ancestor),
+                    )
+                    .unwrap_or(true)
+            })
     }
 
     #[must_use]
@@ -454,6 +505,10 @@ impl<'db, 'ctx> LintDiagnosticGuardBuilder<'db, 'ctx> {
         let lint_id = LintId::of(lint);
 
         let (severity, source) = Self::severity_and_source(ctx, lint_id)?;
+
+        if !ctx.is_statement_reachable(range) {
+            return None;
+        }
 
         let suppressions = suppressions(ctx.db(), ctx.file());
         if let Some(suppression) = suppressions.find_suppression(range, lint_id) {

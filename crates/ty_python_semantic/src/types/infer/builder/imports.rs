@@ -36,18 +36,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn report_unresolved_import(
         &self,
-        import_node: ast::AnyNodeRef<'_>,
+        _import_node: ast::AnyNodeRef<'_>,
         range: TextRange,
         level: u32,
         module: Option<&str>,
         module_name: Option<&ModuleName>,
     ) {
         let db = self.db();
-        let is_import_reachable = self.is_reachable(import_node);
-
-        if !is_import_reachable {
-            return;
-        }
 
         if let Some(module_name) = &module_name
             && (self
@@ -496,10 +491,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return;
         }
 
-        if !self.is_reachable(import_from) {
-            return;
-        }
-
         if self
             .settings()
             .allowed_unresolved_imports
@@ -626,10 +617,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .matches(&full_submodule_name)
             .is_include()
         {
-            return;
-        }
-
-        if !self.is_reachable(import_from) {
             return;
         }
 
