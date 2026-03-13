@@ -455,10 +455,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             let nominally_satisfied =
                 self.check_type_pair(db, type_to_test, Type::NominalInstance(nominal_instance));
 
-            if result
-                .union(db, self.constraints, nominally_satisfied)
-                .is_always_satisfied(db)
-            {
+            result = result.union(db, self.constraints, &nominally_satisfied);
+            if result.is_always_satisfied(db) {
                 return result;
             }
         }
@@ -539,10 +537,8 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
         if let Some(left_spec) = left.tuple_spec(db) {
             if let Some(right_spec) = right.tuple_spec(db) {
                 let compatible = self.check_tuple_spec_pair(db, &left_spec, &right_spec);
-                if result
-                    .union(db, self.constraints, compatible)
-                    .is_always_satisfied(db)
-                {
+                result = result.union(db, self.constraints, &compatible);
+                if result.is_always_satisfied(db) {
                     return result;
                 }
             }
