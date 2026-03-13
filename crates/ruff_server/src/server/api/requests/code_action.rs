@@ -370,8 +370,7 @@ mod tests {
         .unwrap();
 
         let file_url = Url::from_file_path(workspace_dir.join(file_name)).unwrap();
-        let document =
-            TextDocument::new(content.to_string(), 0).with_language_id(language_id);
+        let document = TextDocument::new(content.to_string(), 0).with_language_id(language_id);
         session.open_text_document(file_url.clone(), document);
 
         (session, file_url)
@@ -414,8 +413,7 @@ mod tests {
 
     #[test]
     fn code_actions_for_python() {
-        let (session, file_url) =
-            create_session_and_snapshot("test.py", "python", "import os\n");
+        let (session, file_url) = create_session_and_snapshot("test.py", "python", "import os\n");
 
         let snapshot = session.take_snapshot(file_url.clone()).unwrap();
 
