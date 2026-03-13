@@ -3566,15 +3566,15 @@ fn semantic_syntax_errors() -> Result<()> {
     // this should *not* be cached, like normal parse errors
     assert_cmd_snapshot!(
         cmd,
-        @r###"
+        @"
     success: false
     exit_code: 1
     ----- stdout -----
     main.py:1:3: error[invalid-syntax] assignment expression cannot rebind comprehension variable
-    main.py:1:20: error[F821] Undefined name `foo`
+    main.py:1:20: error[undefined-name] Undefined name `foo`
 
     ----- stderr -----
-    "###
+    "
     );
 
     // ensure semantic errors are caught even without AST-based rules selected
