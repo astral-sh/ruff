@@ -152,7 +152,13 @@ impl ClassInfoConstraintFunction {
     ) -> Option<Type<'db>> {
         let constraint_from_class_literal = |class: ClassLiteral<'db>| match self {
             ClassInfoConstraintFunction::IsInstance => {
-                Type::instance(db, class.top_materialization(db))
+                let instance_constraint = Type::instance(db, class.top_materialization(db));
+
+                if class.is_known(db, KnownClass::Dict) {
+                    UnionType::from_two_elements(db, instance_constraint, Type::TypedDictTop)
+                } else {
+                    instance_constraint
+                }
             }
             ClassInfoConstraintFunction::IsSubclass => {
                 SubclassOfType::from(db, class.top_materialization(db))
@@ -294,6 +300,7 @@ impl ClassInfoConstraintFunction {
             | Type::TypeGuard(_)
             | Type::WrapperDescriptor(_)
             | Type::DataclassTransformer(_)
+            | Type::TypedDictTop
             | Type::TypedDict(_)
             | Type::NewTypeInstance(_) => None,
         }
@@ -2015,6 +2022,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
 fn is_or_contains_typeddict<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
     match ty {
         Type::TypedDict(_) => true,
+        Type::TypedDictTop => false,
         Type::Intersection(intersection) => intersection
             .positive(db)
             .iter()
@@ -2086,6 +2094,7 @@ fn all_matching_typeddict_fields_have_literal_types<'db>(
 
     match ty {
         Type::TypedDict(td) => matching_field_is_literal(&td),
+        Type::TypedDictTop => false,
         Type::Union(union) => union.elements(db).iter().all(|union_member_ty| {
             !is_or_contains_typeddict(db, *union_member_ty)
                 || all_matching_typeddict_fields_have_literal_types(

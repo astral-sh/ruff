@@ -191,6 +191,7 @@ impl<'db> Type<'db> {
                 | Type::BoundSuper(_)
                 | Type::TypeIs(_)
                 | Type::TypeGuard(_)
+                | Type::TypedDictTop
                 | Type::TypedDict(_) => None
             }
         }

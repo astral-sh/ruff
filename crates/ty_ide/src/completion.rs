@@ -2471,6 +2471,7 @@ fn completion_kind_from_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Comp
             Type::NominalInstance(_)
             | Type::PropertyInstance(_)
             | Type::BoundSuper(_)
+            | Type::TypedDictTop
             | Type::TypedDict(_)
             | Type::NewTypeInstance(_) => CompletionKind::Struct,
             Type::LiteralValue(literal) if literal.is_enum() => CompletionKind::Enum,

@@ -163,6 +163,7 @@ impl<'db> From<Type<'db>> for TypeKind<'db> {
             | Type::ModuleLiteral(_)
             | Type::ClassLiteral(_)
             | Type::SpecialForm(_)
+            | Type::TypedDictTop
             | Type::Dynamic(_) => TypeKind::Atomic,
 
             // Non-atomic types

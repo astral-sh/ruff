@@ -706,12 +706,12 @@ def _(x: object):
 
 ## Narrowing with TypedDict unions
 
-Narrowing unions of `int` and multiple TypedDicts using `isinstance(x, dict)` should not panic
-during type ordering of normalized intersection types. Regression test for
+`TypedDict` unions should narrow cleanly through `isinstance(x, dict)` without leaving behind
+`Top[dict[...]]` intersections. This also covers the previous panic regression from
 <https://github.com/astral-sh/ty/issues/2451>.
 
 ```py
-from typing import Any, TypedDict, cast
+from typing import TypedDict
 
 class A(TypedDict):
     x: str
@@ -721,11 +721,23 @@ class B(TypedDict):
 
 T = int | A | B
 
-def test(a: Any, items: list[T]) -> None:
-    combined = a or items
-    v = combined[0]
+def narrow_typeddict_union(v: T) -> None:
     if isinstance(v, dict):
-        cast(T, v)  # no panic
+        reveal_type(v)  # revealed: A | B
+    else:
+        reveal_type(v)  # revealed: int
+
+def narrow_single_typeddict(x: list | A) -> None:
+    if isinstance(x, dict):
+        reveal_type(x)  # revealed: A
+    else:
+        reveal_type(x)  # revealed: list[Unknown]
+
+def narrow_dict_or_typeddict(x: dict[str, str] | A) -> None:
+    if isinstance(x, dict):
+        reveal_type(x)  # revealed: dict[str, str] | A
+    else:
+        reveal_type(x)  # revealed: Never
 ```
 
 ## Narrowing with named expressions (walrus operator)
