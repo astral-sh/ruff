@@ -4989,7 +4989,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 infer_argument_ty,
                 bindings,
                 narrowed_tcx,
-                MultiInferenceState::Ignore,
             );
 
             // Ensure the argument types match their annotated types.
@@ -5061,7 +5060,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             infer_argument_ty,
             bindings,
             call_expression_tcx,
-            MultiInferenceState::Intersect,
         );
 
         bindings.check_types_impl(
@@ -5085,7 +5083,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         infer_argument_ty: &mut dyn FnMut(&mut Self, ArgExpr<'db, '_>) -> Type<'db>,
         bindings: &Bindings<'db>,
         call_expression_tcx: TypeContext<'db>,
-        multi_inference_state: MultiInferenceState,
     ) {
         debug_assert_eq!(arguments_types.len(), bindings.argument_forms().len());
 
@@ -5121,7 +5118,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .flatten()
             .collect::<Vec<_>>();
 
-        let old_multi_inference_state = self.set_multi_inference_state(multi_inference_state);
+        // Each type is a valid independent inference of the given argument, and we may require
+        // different permutations of argument types to correctly perform argument expansion during
+        // overload evaluation, so we take the intersection of all the types we inferred for each
+        // argument.
+        let old_multi_inference_state =
+            self.set_multi_inference_state(MultiInferenceState::Intersect);
 
         for (argument_index, (_, argument_type), argument_form, ast_argument) in iter {
             let ast_argument = match ast_argument {
@@ -5244,11 +5246,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         continue;
                     }
 
-                    // Each type is a valid independent inference of the given argument, and we may require different
-                    // permutations of argument types to correctly perform argument expansion during overload evaluation,
-                    // so we take the intersection of all the types we inferred for each argument.
-                    //
-                    // TODO: intersecting the inferred argument types is correct for unions of
+                    // TODO: Intersecting the inferred argument types is correct for unions of
                     // callables, since the argument must satisfy each callable, but it's not clear
                     // that it's correct for an intersection of callables, or for a case where
                     // different overloads provide different type context; unioning may be more
