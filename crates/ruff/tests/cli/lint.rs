@@ -3571,7 +3571,7 @@ fn semantic_syntax_errors() -> Result<()> {
     exit_code: 1
     ----- stdout -----
     main.py:1:3: error[invalid-syntax] assignment expression cannot rebind comprehension variable
-    main.py:1:20: error[F821] Undefined name `foo`
+    main.py:1:20: error[undefined-name] Undefined name `foo`
 
     ----- stderr -----
     "
