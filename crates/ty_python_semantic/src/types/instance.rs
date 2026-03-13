@@ -9,7 +9,7 @@ use ty_module_resolver::{ModuleName, file_to_module};
 
 use super::protocol_class::ProtocolInterface;
 use super::{BoundTypeVarInstance, ClassType, KnownClass, SubclassOfType, Type, TypeVarVariance};
-use crate::place::PlaceAndQualifiers;
+use crate::place::{DefinedPlace, Definedness, Place, PlaceAndQualifiers};
 use crate::semantic_index::definition::Definition;
 use crate::types::constraints::{
     ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
@@ -428,6 +428,34 @@ impl<'db> From<NominalInstanceType<'db>> for Type<'db> {
 }
 
 impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
+    /// Protocol compatibility can only succeed if every required member is present. Check that
+    /// necessary condition up front so we can avoid expensive per-member type comparisons and
+    /// generic protocol solving when the actual type is plainly missing a member.
+    fn has_all_protocol_members_defined(
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        protocol: ProtocolInstanceType<'db>,
+    ) -> bool {
+        let target_interface = protocol.inner.interface(db);
+
+        match ty {
+            Type::ProtocolInstance(source_protocol) => target_interface.members(db).all(|member| {
+                source_protocol
+                    .interface(db)
+                    .includes_member(db, member.name())
+            }),
+            _ => target_interface.members(db).all(|member| {
+                matches!(
+                    ty.member(db, member.name()).place,
+                    Place::Defined(DefinedPlace {
+                        definedness: Definedness::AlwaysDefined,
+                        ..
+                    })
+                )
+            }),
+        }
+    }
+
     /// Return `true` if `ty` conforms to the interface described by `protocol`.
     pub(super) fn check_type_satisfies_protocol(
         &self,
@@ -474,6 +502,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             && proto_class.is_known(db, KnownClass::Generator)
             && Program::get(db).python_version(db) < PythonVersion::PY313
         {
+            return result;
+        }
+
+        if !Self::has_all_protocol_members_defined(db, ty, protocol) {
             return result;
         }
 
