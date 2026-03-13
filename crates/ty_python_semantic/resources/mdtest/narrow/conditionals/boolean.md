@@ -183,7 +183,7 @@ def _(x: A | B | C):
     if isinstance(x, A) or (isinstance(x, B) and not isinstance(x, C)):
         reveal_type(x)  # revealed:  A | (B & ~C)
     else:
-        # ~(A | (B & ~C)) -> ~A & ~(B & ~C) -> ~A & (~B | C) -> (~A & C) | (~A ~ B)
+        # ~(A | (B & ~C)) -> ~A & ~(B & ~C) -> ~A & (~B | C) -> (~A & C) | (~A & ~B)
         reveal_type(x)  # revealed:  C & ~A
 ```
 

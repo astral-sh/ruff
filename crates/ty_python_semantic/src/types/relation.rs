@@ -741,7 +741,21 @@ impl<'db> Type<'db> {
             // A similar rule applies in reverse to intersection types.
             (Type::Intersection(intersection), _)
                 if relation.can_safely_assume_reflexivity(target)
-                    && intersection.positive(db).contains(&target) =>
+                    && target
+                        .as_intersection()
+                        .map(|rhs_intersection| {
+                            // If the positive elements of the left are a superset of the
+                            // positive elements of the right, and the negative elements of the
+                            // left are a superset of the negative elements of the right,
+                            // then the left is redundant with the right.
+                            rhs_intersection
+                                .positive(db)
+                                .is_subset(intersection.positive(db))
+                                && rhs_intersection
+                                    .negative(db)
+                                    .is_subset(intersection.negative(db))
+                        })
+                        .unwrap_or_else(|| intersection.positive(db).contains(&target)) =>
             {
                 ConstraintSet::from_bool(constraints, true)
             }
