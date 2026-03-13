@@ -36,6 +36,12 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/annotations/union.md
  8 | 
  9 | d = {}
 10 | d[0]: int | str = 42
+11 | 
+12 | # these are still errors: `from __future__ import annotations`
+13 | # only stringifies *type annotations*, not arbitrary runtime expressions
+14 | 
+15 | X = str | int  # error: [unsupported-operator]
+16 | Y = tuple[str | int, ...]  # error: [unsupported-operator]
 ```
 
 # Diagnostics
@@ -53,7 +59,7 @@ error[unsupported-operator]: Unsupported `|` operation
 3 | class Foo:
   |
 info: PEP 604 `|` unions are only available on Python 3.10+ unless they are quoted
-info: Python 3.9 was assumed when inferring types because it was specified on the command line
+info: Python 3.9 was assumed when resolving types because it was specified on the command line
 info: rule `unsupported-operator` is enabled by default
 
 ```
@@ -73,7 +79,7 @@ error[unsupported-operator]: Unsupported `|` operation
 7 | d = {}
   |
 info: PEP 604 `|` unions are only available on Python 3.10+ unless they are quoted
-info: Python 3.9 was assumed when inferring types because it was specified on the command line
+info: Python 3.9 was assumed when resolving types because it was specified on the command line
 info: rule `unsupported-operator` is enabled by default
 
 ```
@@ -90,7 +96,45 @@ error[unsupported-operator]: Unsupported `|` operation
   |       Has type `<class 'int'>`
   |
 info: PEP 604 `|` unions are only available on Python 3.10+ unless they are quoted
-info: Python 3.9 was assumed when inferring types because it was specified on the command line
+info: Python 3.9 was assumed when resolving types because it was specified on the command line
+info: rule `unsupported-operator` is enabled by default
+
+```
+
+```
+error[unsupported-operator]: Unsupported `|` operation
+  --> src/b.py:15:5
+   |
+13 | # only stringifies *type annotations*, not arbitrary runtime expressions
+14 |
+15 | X = str | int  # error: [unsupported-operator]
+   |     ---^^^---
+   |     |     |
+   |     |     Has type `<class 'int'>`
+   |     Has type `<class 'str'>`
+16 | Y = tuple[str | int, ...]  # error: [unsupported-operator]
+   |
+info: PEP 604 `|` unions are only available on Python 3.10+ unless they are quoted
+info: `from __future__ import annotations` has no effect outside type annotations
+info: Python 3.9 was assumed when resolving types because it was specified on the command line
+info: rule `unsupported-operator` is enabled by default
+
+```
+
+```
+error[unsupported-operator]: Unsupported `|` operation
+  --> src/b.py:16:11
+   |
+15 | X = str | int  # error: [unsupported-operator]
+16 | Y = tuple[str | int, ...]  # error: [unsupported-operator]
+   |           ---^^^---
+   |           |     |
+   |           |     Has type `<class 'int'>`
+   |           Has type `<class 'str'>`
+   |
+info: PEP 604 `|` unions are only available on Python 3.10+ unless they are quoted
+info: `from __future__ import annotations` has no effect outside type annotations
+info: Python 3.9 was assumed when resolving types because it was specified on the command line
 info: rule `unsupported-operator` is enabled by default
 
 ```

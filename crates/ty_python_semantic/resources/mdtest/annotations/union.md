@@ -124,4 +124,10 @@ class Foo:
 
 d = {}
 d[0]: int | str = 42
+
+# these are still errors: `from __future__ import annotations`
+# only stringifies *type annotations*, not arbitrary runtime expressions
+
+X = str | int  # error: [unsupported-operator]
+Y = tuple[str | int, ...]  # error: [unsupported-operator]
 ```

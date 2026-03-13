@@ -48,7 +48,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         self.infer_binary_expression_type(binary.into(), false, left_ty, right_ty, *op)
             .unwrap_or_else(|| {
-                report_unsupported_binary_operation(&self.context, binary, left_ty, right_ty, *op);
+                report_unsupported_binary_operation(
+                    &self.context,
+                    self.index,
+                    binary,
+                    left_ty,
+                    right_ty,
+                    *op,
+                );
                 Type::unknown()
             })
     }

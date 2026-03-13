@@ -11,7 +11,7 @@ use crate::lint::{Level, LintRegistryBuilder, LintStatus};
 use crate::place::{DefinedPlace, Place};
 use crate::semantic_index::definition::{Definition, DefinitionKind};
 use crate::semantic_index::place::{PlaceTable, ScopedPlaceId};
-use crate::semantic_index::{global_scope, place_table, use_def_map};
+use crate::semantic_index::{SemanticIndex, global_scope, place_table, use_def_map};
 use crate::suppression::FileSuppressionId;
 use crate::types::call::CallError;
 use crate::types::class::{CodeGeneratorKind, DisjointBase, DisjointBaseKind, MethodDecorator};
@@ -5699,6 +5699,7 @@ pub(super) fn report_unsupported_augmented_assignment<'db>(
 
 pub(super) fn report_unsupported_binary_operation<'db>(
     context: &InferContext<'db, '_>,
+    index: &SemanticIndex<'db>,
     binary_expression: &ast::ExprBinOp,
     left_ty: Type<'db>,
     right_ty: Type<'db>,
@@ -5724,11 +5725,21 @@ pub(super) fn report_unsupported_binary_operation<'db>(
             || right_ty.is_subtype_of(db, KnownClass::Type.to_instance(db)))
         && Program::get(db).python_version(db) < PythonVersion::PY310
     {
-        diagnostic.info(
-            "Note that `X | Y` PEP 604 union syntax is only available in Python 3.10 and later",
-        );
-        add_inferred_python_version_hint_to_diagnostic(db, &mut diagnostic, "resolving types");
+        note_py_version_too_old_for_pep_604(db, index, &mut diagnostic);
     }
+}
+
+pub(super) fn note_py_version_too_old_for_pep_604<'db>(
+    db: &'db dyn Db,
+    index: &SemanticIndex<'db>,
+    diagnostic: &mut Diagnostic,
+) {
+    diagnostic.info("PEP 604 `|` unions are only available on Python 3.10+ unless they are quoted");
+    if index.has_future_annotations() {
+        diagnostic
+            .info("`from __future__ import annotations` has no effect outside type annotations");
+    }
+    add_inferred_python_version_hint_to_diagnostic(db, diagnostic, "resolving types");
 }
 
 #[derive(Debug, Copy, Clone)]
