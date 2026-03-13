@@ -173,16 +173,16 @@ where
         builder: &'c ConstraintSetBuilder<'db>,
         mut f: impl FnMut(T) -> ConstraintSet<'db, 'c>,
     ) -> ConstraintSet<'db, 'c> {
-        let node = NodeId::distributed_or(
+        let (node, support) = NodeId::distributed_or(
             db,
             builder,
             self.map(|element| {
                 let constraint = f(element);
                 constraint.verify_builder(builder);
-                constraint.node
+                (constraint.node, constraint.support)
             }),
         );
-        ConstraintSet::from_node(builder, node)
+        ConstraintSet::from_node_and_support(builder, node, support)
     }
 
     fn when_all<'db, 'c>(
@@ -191,16 +191,16 @@ where
         builder: &'c ConstraintSetBuilder<'db>,
         mut f: impl FnMut(T) -> ConstraintSet<'db, 'c>,
     ) -> ConstraintSet<'db, 'c> {
-        let node = NodeId::distributed_and(
+        let (node, support) = NodeId::distributed_and(
             db,
             builder,
             self.map(|element| {
                 let constraint = f(element);
                 constraint.verify_builder(builder);
-                constraint.node
+                (constraint.node, constraint.support)
             }),
         );
-        ConstraintSet::from_node(builder, node)
+        ConstraintSet::from_node_and_support(builder, node, support)
     }
 }
 
@@ -226,6 +226,9 @@ pub struct OwnedConstraintSet<'db> {
     /// The nodes arena for this BDD. This is extracted from the [`ConstraintSetBuilder`] when an
     /// owned constraint set is constructed.
     nodes: IndexVec<NodeId, InteriorNodeData>,
+
+    /// Materialized support for this constraint set, in deterministic order.
+    support: Box<[ConstraintId]>,
 }
 
 /// A set of constraints under which a type property holds.
@@ -243,6 +246,9 @@ pub struct ConstraintSet<'db, 'c> {
     /// The BDD representing this constraint set
     node: NodeId,
 
+    /// Support expression for this constraint set.
+    support: SupportId,
+
     /// A reference to the builder that holds the storage for this constraint set's BDD
     builder: &'c ConstraintSetBuilder<'db>,
 
@@ -251,20 +257,25 @@ pub struct ConstraintSet<'db, 'c> {
 }
 
 impl<'db, 'c> ConstraintSet<'db, 'c> {
-    fn from_node(builder: &'c ConstraintSetBuilder<'db>, node: NodeId) -> Self {
+    fn from_node_and_support(
+        builder: &'c ConstraintSetBuilder<'db>,
+        node: NodeId,
+        support: SupportId,
+    ) -> Self {
         Self {
             node,
+            support,
             builder,
             _invariant: PhantomData,
         }
     }
 
     fn never(builder: &'c ConstraintSetBuilder<'db>) -> Self {
-        Self::from_node(builder, ALWAYS_FALSE)
+        Self::from_node_and_support(builder, ALWAYS_FALSE, SupportId::Empty)
     }
 
     fn always(builder: &'c ConstraintSetBuilder<'db>) -> Self {
-        Self::from_node(builder, ALWAYS_TRUE)
+        Self::from_node_and_support(builder, ALWAYS_TRUE, SupportId::Empty)
     }
 
     pub(crate) fn from_bool(builder: &'c ConstraintSetBuilder<'db>, b: bool) -> Self {
@@ -283,10 +294,8 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         lower: Type<'db>,
         upper: Type<'db>,
     ) -> Self {
-        Self::from_node(
-            builder,
-            Constraint::new_node(db, builder, typevar, lower, upper),
-        )
+        let (node, support) = Constraint::new_node_with_support(db, builder, typevar, lower, upper);
+        Self::from_node_and_support(builder, node, support)
     }
 
     /// Verifies that this constraint set was created by `builder`
@@ -425,7 +434,10 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         rhs: Type<'db>,
     ) -> Self {
         self.verify_builder(builder);
-        Self::from_node(builder, self.node.implies_subtype_of(db, builder, lhs, rhs))
+        let (node, support) = self
+            .node
+            .implies_subtype_of(db, builder, lhs, rhs, self.support);
+        Self::from_node_and_support(builder, node, support)
     }
 
     /// Returns whether this constraint set is satisfied by all of the typevars that it mentions.
@@ -464,6 +476,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
     ) -> Self {
         self.verify_builder(builder);
         self.node = self.node.or_with_offset(builder, other.node);
+        self.support = builder.ordered_union_support(self.support, other.support);
         *self
     }
 
@@ -479,13 +492,14 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
     ) -> Self {
         self.verify_builder(builder);
         self.node = self.node.and_with_offset(builder, other.node);
+        self.support = builder.ordered_union_support(self.support, other.support);
         *self
     }
 
     /// Returns the negation of this constraint set.
     pub(crate) fn negate(self, _db: &'db dyn Db, builder: &'c ConstraintSetBuilder<'db>) -> Self {
         self.verify_builder(builder);
-        Self::from_node(builder, self.node.negate(builder))
+        Self::from_node_and_support(builder, self.node.negate(builder), self.support)
     }
 
     /// Returns the intersection of this constraint set and another. The other constraint set is
@@ -554,7 +568,9 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         other: Self,
     ) -> Self {
         self.verify_builder(builder);
-        Self::from_node(builder, self.node.iff_with_offset(builder, other.node))
+        let node = self.node.iff_with_offset(builder, other.node);
+        let support = builder.ordered_union_support(self.support, other.support);
+        Self::from_node_and_support(builder, node, support)
     }
 
     /// Reduces the set of inferable typevars for this constraint set. You provide an iterator of
@@ -569,7 +585,8 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         to_remove: impl IntoIterator<Item = BoundTypeVarIdentity<'db>>,
     ) -> Self {
         self.verify_builder(builder);
-        Self::from_node(builder, self.node.exists(db, builder, to_remove))
+        let (node, support) = self.node.exists(db, builder, self.support, to_remove);
+        Self::from_node_and_support(builder, node, support)
     }
 
     pub(crate) fn solutions(
@@ -585,7 +602,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
             return Solutions::Unsatisfiable;
         }
 
-        self.node.solutions(db, builder)
+        self.node.solutions(db, builder, self.support)
     }
 
     #[expect(dead_code)] // Keep this around for debugging purposes
@@ -662,6 +679,15 @@ struct ConstraintSetStorage<'db> {
     /// The BDD nodes that appear in any of the constraint sets constructed in this builder.
     nodes: IndexVec<NodeId, InteriorNodeData>,
 
+    /// Support expression nodes that represent ordered unions of supports.
+    union_supports: IndexVec<UnionSupportId, UnionSupportData>,
+
+    /// Support expression nodes that remove a single constraint from a base support.
+    remove_supports: IndexVec<RemoveSupportId, RemoveSupportData>,
+
+    /// Support expression nodes that add one derived constraint next to an origin.
+    add_derived_supports: IndexVec<AddDerivedSupportId, AddDerivedSupportData>,
+
     // Everything below are the memoization tables for the arenas and for our BDD operations.
     constraint_cache: FxHashMap<Constraint<'db>, ConstraintId>,
     typevar_cache: FxHashMap<BoundTypeVarIdentity<'db>, TypeVarId>,
@@ -671,10 +697,10 @@ struct ConstraintSetStorage<'db> {
     or_cache: FxHashMap<(NodeId, NodeId, usize), NodeId>,
     and_cache: FxHashMap<(NodeId, NodeId, usize), NodeId>,
     iff_cache: FxHashMap<(NodeId, NodeId, usize), NodeId>,
-    exists_one_cache: FxHashMap<(NodeId, BoundTypeVarIdentity<'db>), NodeId>,
-    retain_one_cache: FxHashMap<(NodeId, BoundTypeVarIdentity<'db>), NodeId>,
+    exists_one_cache:
+        FxHashMap<(NodeId, SupportId, BoundTypeVarIdentity<'db>), (NodeId, SupportId)>,
     restrict_one_cache: FxHashMap<(NodeId, ConstraintAssignment), (NodeId, bool)>,
-    solutions_cache: FxHashMap<NodeId, Vec<Solution<'db>>>,
+    solutions_cache: FxHashMap<(NodeId, SupportId), Vec<Solution<'db>>>,
     simplify_cache: FxHashMap<NodeId, NodeId>,
 
     single_sequent_cache: FxHashMap<ConstraintId, SequentMap>,
@@ -700,11 +726,13 @@ impl<'db> ConstraintSetBuilder<'db> {
         // the original builder aren't relevant to the new builder, and don't need to be retained.
         let constraint = f(&self);
         let node = constraint.node;
+        let support = self.build_support(constraint.support).into_iter().collect();
         let storage = self.storage.into_inner();
         OwnedConstraintSet {
             node,
             constraints: storage.constraints,
             nodes: storage.nodes,
+            support,
         }
     }
 
@@ -757,7 +785,19 @@ impl<'db> ConstraintSetBuilder<'db> {
         // Maps NodeIds in the OwnedConstraintSet to the corresponding NodeIds in this builder.
         let mut cache = FxHashMap::default();
         let node = rebuild_node(db, self, other, &mut cache, other.node);
-        ConstraintSet::from_node(self, node)
+
+        let support =
+            other
+                .support
+                .iter()
+                .copied()
+                .fold(SupportId::Empty, |support, old_constraint| {
+                    let old_constraint_data = other.constraints[old_constraint];
+                    let remapped_constraint = self.intern_constraint(db, old_constraint_data);
+                    self.ordered_union_support(support, SupportId::Singleton(remapped_constraint))
+                });
+
+        ConstraintSet::from_node_and_support(self, node, support)
     }
 
     /// Interns a single typevar, giving it a stable order in this builder
@@ -863,6 +903,114 @@ impl<'db> ConstraintSetBuilder<'db> {
     fn interior_node_data(&self, node: NodeId) -> InteriorNodeData {
         self.storage.borrow().nodes[node]
     }
+
+    fn union_support_data(&self, support: UnionSupportId) -> UnionSupportData {
+        self.storage.borrow().union_supports[support]
+    }
+
+    fn remove_support_data(&self, support: RemoveSupportId) -> RemoveSupportData {
+        self.storage.borrow().remove_supports[support]
+    }
+
+    fn add_derived_support_data(&self, support: AddDerivedSupportId) -> AddDerivedSupportData {
+        self.storage.borrow().add_derived_supports[support]
+    }
+
+    fn ordered_union_support(&self, lhs: SupportId, rhs: SupportId) -> SupportId {
+        match (lhs, rhs) {
+            (SupportId::Empty, rhs) => rhs,
+            (lhs, SupportId::Empty) => lhs,
+            (lhs, rhs) => {
+                let mut storage = self.storage.borrow_mut();
+                let id = storage.union_supports.push(UnionSupportData { lhs, rhs });
+                SupportId::OrderedUnion(id)
+            }
+        }
+    }
+
+    fn remove_support(&self, base: SupportId, constraint: ConstraintId) -> SupportId {
+        let mut storage = self.storage.borrow_mut();
+        let id = storage
+            .remove_supports
+            .push(RemoveSupportData { base, constraint });
+        SupportId::Remove(id)
+    }
+
+    fn add_derived_support(
+        &self,
+        base: SupportId,
+        origin: ConstraintId,
+        derived: ConstraintId,
+    ) -> SupportId {
+        let mut storage = self.storage.borrow_mut();
+        let id = storage.add_derived_supports.push(AddDerivedSupportData {
+            base,
+            origin,
+            derived,
+        });
+        SupportId::AddDerived(id)
+    }
+
+    fn build_support(&self, support: SupportId) -> FxIndexSet<ConstraintId> {
+        fn build_into(
+            builder: &ConstraintSetBuilder<'_>,
+            support: SupportId,
+            constraints: &mut FxIndexSet<ConstraintId>,
+        ) {
+            match support {
+                SupportId::Empty => {}
+
+                SupportId::Singleton(constraint) => {
+                    constraints.insert(constraint);
+                }
+
+                SupportId::OrderedUnion(union_support) => {
+                    let union_support = builder.union_support_data(union_support);
+                    build_into(builder, union_support.lhs, constraints);
+                    build_into(builder, union_support.rhs, constraints);
+                }
+
+                SupportId::Remove(remove_support) => {
+                    let remove_support = builder.remove_support_data(remove_support);
+
+                    // We should not remove any constraints that were already present before
+                    // building this node's base. That happens if e.g. we're going to union the
+                    // result of this remove node with some other node:
+                    //
+                    //       union([a], remove(base=[a,b], constraint=a))
+                    //    -> union([a], [b])
+                    //    -> [a,b]
+                    //
+                    // In this example, the base is [a,b], and we do want to remove [a] from that
+                    // base. But since [a] is already present in the lhs of the union, it will
+                    // still be in the final result.
+                    let base_index = constraints.len();
+                    build_into(builder, remove_support.base, constraints);
+                    let removed_index = constraints
+                        .get_index_of(&remove_support.constraint)
+                        .expect("constraint should exist in support");
+                    if removed_index >= base_index {
+                        constraints.shift_remove_index(removed_index);
+                    }
+                }
+
+                SupportId::AddDerived(add_derived) => {
+                    let add_derived = builder.add_derived_support_data(add_derived);
+                    build_into(builder, add_derived.base, constraints);
+                    let origin_index = constraints
+                        .get_index_of(&add_derived.origin)
+                        .expect("constraint should exist in support");
+                    if !constraints.contains(&add_derived.derived) {
+                        constraints.shift_insert(origin_index + 1, add_derived.derived);
+                    }
+                }
+            }
+        }
+
+        let mut constraints = FxIndexSet::default();
+        build_into(self, support, &mut constraints);
+        constraints
+    }
 }
 
 impl<'db> BoundTypeVarInstance<'db> {
@@ -908,6 +1056,46 @@ pub struct TypeVarId;
 #[derive(salsa::Update, get_size2::GetSize)]
 pub struct ConstraintId;
 
+#[newtype_index]
+#[derive(salsa::Update, get_size2::GetSize)]
+struct UnionSupportId;
+
+#[newtype_index]
+#[derive(salsa::Update, get_size2::GetSize)]
+struct RemoveSupportId;
+
+#[newtype_index]
+#[derive(salsa::Update, get_size2::GetSize)]
+struct AddDerivedSupportId;
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
+enum SupportId {
+    Empty,
+    Singleton(ConstraintId),
+    OrderedUnion(UnionSupportId),
+    Remove(RemoveSupportId),
+    AddDerived(AddDerivedSupportId),
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
+struct UnionSupportData {
+    lhs: SupportId,
+    rhs: SupportId,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
+struct RemoveSupportData {
+    base: SupportId,
+    constraint: ConstraintId,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
+struct AddDerivedSupportData {
+    base: SupportId,
+    origin: ConstraintId,
+    derived: ConstraintId,
+}
+
 /// An individual constraint in a constraint set. This restricts a single typevar to be within a
 /// lower and upper bound.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
@@ -944,9 +1132,20 @@ impl<'db> Constraint<'db> {
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
         typevar: BoundTypeVarInstance<'db>,
+        lower: Type<'db>,
+        upper: Type<'db>,
+    ) -> NodeId {
+        let (node, _) = Self::new_node_with_support(db, builder, typevar, lower, upper);
+        node
+    }
+
+    fn new_node_with_support(
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        typevar: BoundTypeVarInstance<'db>,
         mut lower: Type<'db>,
         mut upper: Type<'db>,
-    ) -> NodeId {
+    ) -> (NodeId, SupportId) {
         // It's not useful for an upper bound to be an intersection type, or for a lower bound to
         // be a union type. Because the following equivalences hold, we can break these bounds
         // apart and create an equivalent BDD with more nodes but simpler constraints. (Fewer,
@@ -957,13 +1156,14 @@ impl<'db> Constraint<'db> {
         //   (α | β) ≤ T   ⇔ (α ≤ T) ∧ (β ≤ T)
         if let Type::Union(lower_union) = lower {
             let mut result = ALWAYS_TRUE;
+            let mut support = SupportId::Empty;
             for lower_element in lower_union.elements(db) {
-                result = result.and_with_offset(
-                    builder,
-                    Constraint::new_node(db, builder, typevar, *lower_element, upper),
-                );
+                let (next_node, next_support) =
+                    Constraint::new_node_with_support(db, builder, typevar, *lower_element, upper);
+                result = result.and_with_offset(builder, next_node);
+                support = builder.ordered_union_support(support, next_support);
             }
-            return result;
+            return (result, support);
         }
         // A negated type ¬α is represented as an intersection with no positive elements, and a
         // single negative element. We _don't_ want to treat that an "intersection" for the
@@ -972,19 +1172,25 @@ impl<'db> Constraint<'db> {
             && !upper_intersection.is_simple_negation(db)
         {
             let mut result = ALWAYS_TRUE;
+            let mut support = SupportId::Empty;
             for upper_element in upper_intersection.iter_positive(db) {
-                result = result.and_with_offset(
-                    builder,
-                    Constraint::new_node(db, builder, typevar, lower, upper_element),
-                );
+                let (next_node, next_support) =
+                    Constraint::new_node_with_support(db, builder, typevar, lower, upper_element);
+                result = result.and_with_offset(builder, next_node);
+                support = builder.ordered_union_support(support, next_support);
             }
             for upper_element in upper_intersection.iter_negative(db) {
-                result = result.and_with_offset(
+                let (next_node, next_support) = Constraint::new_node_with_support(
+                    db,
                     builder,
-                    Constraint::new_node(db, builder, typevar, lower, upper_element.negate(db)),
+                    typevar,
+                    lower,
+                    upper_element.negate(db),
                 );
+                result = result.and_with_offset(builder, next_node);
+                support = builder.ordered_union_support(support, next_support);
             }
-            return result;
+            return (result, support);
         }
 
         // Two identical typevars must always solve to the same type, so it is not useful to have
@@ -1011,12 +1217,11 @@ impl<'db> Constraint<'db> {
                     })
                 }) =>
             {
-                return Node::new_constraint(
-                    builder,
-                    ConstraintId::new(db, builder, typevar, Type::Never, Type::object()),
-                    1,
-                )
-                .negate(builder);
+                let constraint =
+                    ConstraintId::new(db, builder, typevar, Type::Never, Type::object());
+                let node = Node::new_constraint(builder, constraint, 1).negate(builder);
+                let support = SupportId::Singleton(constraint);
+                return (node, support);
             }
             _ => {}
         }
@@ -1041,7 +1246,7 @@ impl<'db> Constraint<'db> {
         // If `lower ≰ upper`, then the constraint cannot be satisfied, since there is no type that
         // is both greater than `lower`, and less than `upper`.
         if !lower.is_constraint_set_assignable_to(db, upper) {
-            return ALWAYS_FALSE;
+            return (ALWAYS_FALSE, SupportId::Empty);
         }
 
         builder.intern_constraint_typevars(db, typevar, lower, upper);
@@ -1060,17 +1265,16 @@ impl<'db> Constraint<'db> {
                 } else {
                     (typevar, lower)
                 };
-                Node::new_constraint(
+                let constraint = ConstraintId::new(
+                    db,
                     builder,
-                    ConstraintId::new(
-                        db,
-                        builder,
-                        typevar,
-                        Type::TypeVar(bound),
-                        Type::TypeVar(bound),
-                    ),
-                    1,
-                )
+                    typevar,
+                    Type::TypeVar(bound),
+                    Type::TypeVar(bound),
+                );
+                let node = Node::new_constraint(builder, constraint, 1);
+                let support = SupportId::Singleton(constraint);
+                (node, support)
             }
 
             // L ≤ T ≤ U == ([L] ≤ T) && (T ≤ [U])
@@ -1078,54 +1282,58 @@ impl<'db> Constraint<'db> {
                 if typevar.can_be_bound_for(db, builder, lower)
                     && typevar.can_be_bound_for(db, builder, upper) =>
             {
-                let lower = Node::new_constraint(
-                    builder,
-                    ConstraintId::new(db, builder, lower, Type::Never, Type::TypeVar(typevar)),
-                    1,
+                let lower_constraint =
+                    ConstraintId::new(db, builder, lower, Type::Never, Type::TypeVar(typevar));
+                let lower = Node::new_constraint(builder, lower_constraint, 1);
+                let upper_constraint =
+                    ConstraintId::new(db, builder, upper, Type::TypeVar(typevar), Type::object());
+                let upper = Node::new_constraint(builder, upper_constraint, 1);
+                let node = lower.and(builder, upper);
+                let support = builder.ordered_union_support(
+                    SupportId::Singleton(lower_constraint),
+                    SupportId::Singleton(upper_constraint),
                 );
-                let upper = Node::new_constraint(
-                    builder,
-                    ConstraintId::new(db, builder, upper, Type::TypeVar(typevar), Type::object()),
-                    1,
-                );
-                lower.and(builder, upper)
+                (node, support)
             }
 
             // L ≤ T ≤ U == ([L] ≤ T) && ([T] ≤ U)
             (Type::TypeVar(lower), _) if typevar.can_be_bound_for(db, builder, lower) => {
-                let lower = Node::new_constraint(
-                    builder,
-                    ConstraintId::new(db, builder, lower, Type::Never, Type::TypeVar(typevar)),
-                    1,
-                );
-                let upper = if upper.is_object() {
-                    ALWAYS_TRUE
+                let lower_constraint =
+                    ConstraintId::new(db, builder, lower, Type::Never, Type::TypeVar(typevar));
+                let lower = Node::new_constraint(builder, lower_constraint, 1);
+                let (upper, upper_support) = if upper.is_object() {
+                    (ALWAYS_TRUE, SupportId::Empty)
                 } else {
-                    Constraint::new_node(db, builder, typevar, Type::Never, upper)
+                    Constraint::new_node_with_support(db, builder, typevar, Type::Never, upper)
                 };
-                lower.and(builder, upper)
+                let node = lower.and(builder, upper);
+                let support = builder
+                    .ordered_union_support(SupportId::Singleton(lower_constraint), upper_support);
+                (node, support)
             }
 
             // L ≤ T ≤ U == (L ≤ [T]) && (T ≤ [U])
             (_, Type::TypeVar(upper)) if typevar.can_be_bound_for(db, builder, upper) => {
-                let lower = if lower.is_never() {
-                    ALWAYS_TRUE
+                let (lower, lower_support) = if lower.is_never() {
+                    (ALWAYS_TRUE, SupportId::Empty)
                 } else {
-                    Constraint::new_node(db, builder, typevar, lower, Type::object())
+                    Constraint::new_node_with_support(db, builder, typevar, lower, Type::object())
                 };
-                let upper = Node::new_constraint(
-                    builder,
-                    ConstraintId::new(db, builder, upper, Type::TypeVar(typevar), Type::object()),
-                    1,
-                );
-                lower.and(builder, upper)
+                let upper_constraint =
+                    ConstraintId::new(db, builder, upper, Type::TypeVar(typevar), Type::object());
+                let upper = Node::new_constraint(builder, upper_constraint, 1);
+                let node = lower.and(builder, upper);
+                let support = builder
+                    .ordered_union_support(lower_support, SupportId::Singleton(upper_constraint));
+                (node, support)
             }
 
-            _ => Node::new_constraint(
-                builder,
-                ConstraintId::new(db, builder, typevar, lower, upper),
-                1,
-            ),
+            _ => {
+                let constraint = ConstraintId::new(db, builder, typevar, lower, upper);
+                let node = Node::new_constraint(builder, constraint, 1);
+                let support = SupportId::Singleton(constraint);
+                (node, support)
+            }
         }
     }
 }
@@ -1524,31 +1732,33 @@ impl NodeId {
         }
     }
 
-    fn for_each_path<'db>(
+    fn for_each_path_with_support<'db>(
         self,
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
-        mut f: impl FnMut(&PathAssignments),
+        support: SupportId,
+        mut f: impl FnMut(&PathAssignments, SupportId),
     ) {
         match self.node() {
             Node::AlwaysTrue => {}
             Node::AlwaysFalse => {}
             Node::Interior(interior) => {
                 let mut path = interior.path_assignments(builder);
-                self.for_each_path_inner(db, builder, &mut f, &mut path);
+                self.for_each_path_inner_with_support(db, builder, support, &mut f, &mut path);
             }
         }
     }
 
-    fn for_each_path_inner<'db>(
+    fn for_each_path_inner_with_support<'db>(
         self,
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
-        f: &mut dyn FnMut(&PathAssignments),
+        support: SupportId,
+        f: &mut dyn FnMut(&PathAssignments, SupportId),
         path: &mut PathAssignments,
     ) {
         match self.node() {
-            Node::AlwaysTrue => f(path),
+            Node::AlwaysTrue => f(path, support),
             Node::AlwaysFalse => {}
             Node::Interior(_) => {
                 let interior = builder.interior_node_data(self);
@@ -1557,14 +1767,42 @@ impl NodeId {
                     builder,
                     interior.constraint.when_true(),
                     interior.source_order,
-                    |path, _| interior.if_true.for_each_path_inner(db, builder, f, path),
+                    |path, new_range| {
+                        let support = path.assignments[new_range]
+                            .iter()
+                            .rev() // add_derived supports are applied in reverse order
+                            .fold(support, |support, (assignment, _)| {
+                                builder.add_derived_support(
+                                    support,
+                                    interior.constraint,
+                                    assignment.constraint(),
+                                )
+                            });
+                        interior
+                            .if_true
+                            .for_each_path_inner_with_support(db, builder, support, f, path);
+                    },
                 );
                 path.walk_edge(
                     db,
                     builder,
                     interior.constraint.when_false(),
                     interior.source_order,
-                    |path, _| interior.if_false.for_each_path_inner(db, builder, f, path),
+                    |path, new_range| {
+                        let support = path.assignments[new_range]
+                            .iter()
+                            .rev() // add_derived supports are applied in reverse order
+                            .fold(support, |support, (assignment, _)| {
+                                builder.add_derived_support(
+                                    support,
+                                    interior.constraint,
+                                    assignment.constraint(),
+                                )
+                            });
+                        interior
+                            .if_false
+                            .for_each_path_inner_with_support(db, builder, support, f, path);
+                    },
                 );
             }
         }
@@ -1694,11 +1932,12 @@ impl NodeId {
         self,
         db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
+        support: SupportId,
     ) -> Solutions<'db, 'c> {
         match self.node() {
             Node::AlwaysTrue => Solutions::Unconstrained,
             Node::AlwaysFalse => Solutions::Unsatisfiable,
-            Node::Interior(interior) => interior.solutions(db, builder),
+            Node::Interior(interior) => interior.solutions(db, builder, support),
         }
     }
 
@@ -1788,11 +2027,11 @@ impl NodeId {
     fn tree_fold<'db>(
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
-        nodes: impl Iterator<Item = Self>,
+        nodes: impl Iterator<Item = (Self, SupportId)>,
         zero: Self,
         is_one: impl Fn(Self, &'db dyn Db, &ConstraintSetBuilder<'db>) -> bool,
         mut combine: impl FnMut(Self, &ConstraintSetBuilder<'db>, Self) -> Self,
-    ) -> Self {
+    ) -> (Self, SupportId) {
         // To implement the "linear" shape described above, we could collect the iterator elements
         // into a vector, and then use the fold at the bottom of this method to combine the
         // elements using the operator.
@@ -1817,40 +2056,48 @@ impl NodeId {
         //
         // We use a SmallVec for the accumulator so that we don't have to spill over to the heap
         // until the iterator passes 256 elements.
-        let mut accumulator: SmallVec<[(NodeId, u8); 8]> = SmallVec::default();
-        for node in nodes {
+        let mut accumulator: SmallVec<[((NodeId, SupportId), u8); 8]> = SmallVec::default();
+        for (node, support) in nodes {
             if is_one(node, db, builder) {
-                return node;
+                return (node, support);
             }
 
-            let (mut node, mut depth) = (node, 0);
+            let (mut node, mut support, mut depth) = (node, support, 0);
             while accumulator
                 .last()
                 .is_some_and(|(_, existing)| *existing == depth)
             {
-                let (existing, _) = accumulator.pop().expect("accumulator should not be empty");
-                node = combine(existing, builder, node);
+                let ((existing_node, existing_support), _) =
+                    accumulator.pop().expect("accumulator should not be empty");
+                node = combine(existing_node, builder, node);
+                support = builder.ordered_union_support(existing_support, support);
                 if is_one(node, db, builder) {
-                    return node;
+                    return (node, support);
                 }
                 depth += 1;
             }
-            accumulator.push((node, depth));
+            accumulator.push(((node, support), depth));
         }
 
         // At this point, we've consumed all of the iterator. The length of the accumulator will be
         // the same as the number of 1 bits in the length of the iterator. We do a final fold to
         // produce the overall result.
-        accumulator
-            .into_iter()
-            .fold(zero, |result, (node, _)| combine(result, builder, node))
+        accumulator.into_iter().fold(
+            (zero, SupportId::Empty),
+            |(result_node, result_support), ((node, support), _)| {
+                (
+                    combine(result_node, builder, node),
+                    builder.ordered_union_support(result_support, support),
+                )
+            },
+        )
     }
 
     fn distributed_or<'db>(
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
-        nodes: impl Iterator<Item = NodeId>,
-    ) -> Self {
+        nodes: impl Iterator<Item = (NodeId, SupportId)>,
+    ) -> (NodeId, SupportId) {
         Self::tree_fold(
             db,
             builder,
@@ -1864,8 +2111,8 @@ impl NodeId {
     fn distributed_and<'db>(
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
-        nodes: impl Iterator<Item = NodeId>,
-    ) -> Self {
+        nodes: impl Iterator<Item = (NodeId, SupportId)>,
+    ) -> (NodeId, SupportId) {
         Self::tree_fold(
             db,
             builder,
@@ -1998,24 +2245,25 @@ impl NodeId {
         builder: &ConstraintSetBuilder<'db>,
         lhs: Type<'db>,
         rhs: Type<'db>,
-    ) -> Self {
+        support: SupportId,
+    ) -> (Self, SupportId) {
         // When checking subtyping involving a typevar, we can turn the subtyping check into a
-        // constraint (i.e, "is `T` a subtype of `int` becomes the constraint `T ≤ int`), and then
+        // constraint (i.e, "is `T` a subtype of `int`" becomes the constraint `T ≤ int`), and then
         // check when the BDD implies that constraint.
         //
         // Note that we are NOT guaranteed that `lhs` and `rhs` will always be fully static, since
         // these types are coming in from arbitrary subtyping checks that the caller might want to
         // perform. So we have to take the appropriate materialization when translating the check
         // into a constraint.
-        let constraint = match (lhs, rhs) {
-            (Type::TypeVar(bound_typevar), _) => Constraint::new_node(
+        let (constraint_node, constraint_support) = match (lhs, rhs) {
+            (Type::TypeVar(bound_typevar), _) => Constraint::new_node_with_support(
                 db,
                 builder,
                 bound_typevar,
                 Type::Never,
                 rhs.bottom_materialization(db),
             ),
-            (_, Type::TypeVar(bound_typevar)) => Constraint::new_node(
+            (_, Type::TypeVar(bound_typevar)) => Constraint::new_node_with_support(
                 db,
                 builder,
                 bound_typevar,
@@ -2025,7 +2273,10 @@ impl NodeId {
             _ => panic!("at least one type should be a typevar"),
         };
 
-        self.implies(builder, constraint)
+        (
+            self.implies(builder, constraint_node),
+            builder.ordered_union_support(support, constraint_support),
+        )
     }
 
     fn satisfied_by_all_typevars<'db>(
@@ -2107,12 +2358,13 @@ impl NodeId {
         self,
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
+        support: SupportId,
         bound_typevars: impl IntoIterator<Item = BoundTypeVarIdentity<'db>>,
-    ) -> Self {
+    ) -> (Self, SupportId) {
         bound_typevars
             .into_iter()
-            .fold(self, |abstracted, bound_typevar| {
-                abstracted.exists_one(db, builder, bound_typevar)
+            .fold((self, support), |(node, support), bound_typevar| {
+                node.exists_one(db, builder, support, bound_typevar)
             })
     }
 
@@ -2120,12 +2372,12 @@ impl NodeId {
         self,
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
+        support: SupportId,
         bound_typevar: BoundTypeVarIdentity<'db>,
-    ) -> Self {
+    ) -> (Self, SupportId) {
         match self.node() {
-            Node::AlwaysTrue => ALWAYS_TRUE,
-            Node::AlwaysFalse => ALWAYS_FALSE,
-            Node::Interior(interior) => interior.exists_one(db, builder, bound_typevar),
+            Node::AlwaysTrue | Node::AlwaysFalse => (self, support),
+            Node::Interior(interior) => interior.exists_one(db, builder, support, bound_typevar),
         }
     }
 
@@ -2133,14 +2385,14 @@ impl NodeId {
         self,
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
+        support: SupportId,
         should_remove: &mut dyn FnMut(ConstraintId) -> bool,
         path: &mut PathAssignments,
-    ) -> Self {
+    ) -> (Self, SupportId) {
         match self.node() {
-            Node::AlwaysTrue => ALWAYS_TRUE,
-            Node::AlwaysFalse => ALWAYS_FALSE,
+            Node::AlwaysTrue | Node::AlwaysFalse => (self, support),
             Node::Interior(interior) => {
-                interior.abstract_one_inner(db, builder, should_remove, path)
+                interior.abstract_one_inner(db, builder, support, should_remove, path)
             }
         }
     }
@@ -2754,9 +3006,10 @@ impl InteriorNode {
         self,
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
+        support: SupportId,
         bound_typevar: BoundTypeVarIdentity<'db>,
-    ) -> NodeId {
-        let key = (self.node(), bound_typevar);
+    ) -> (NodeId, SupportId) {
+        let key = (self.node(), support, bound_typevar);
         let storage = builder.storage.borrow();
         if let Some(result) = storage.exists_one_cache.get(&key) {
             return *result;
@@ -2771,6 +3024,7 @@ impl InteriorNode {
         let result = self.abstract_one_inner(
             db,
             builder,
+            support,
             // Remove any node that constrains `bound_typevar`, or that has a lower/upper bound
             // that mentions `bound_typevar`.
             // TODO: This will currently remove constraints that mention a typevar, but the sequent
@@ -2803,9 +3057,10 @@ impl InteriorNode {
         self,
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
+        support: SupportId,
         should_remove: &mut dyn FnMut(ConstraintId) -> bool,
         path: &mut PathAssignments,
-    ) -> NodeId {
+    ) -> (NodeId, SupportId) {
         let self_interior = builder.interior_node_data(self.node());
         if should_remove(self_interior.constraint) {
             // If we should remove constraints involving this typevar, then we replace this node
@@ -2820,110 +3075,137 @@ impl InteriorNode {
             // TODO: This might not be stable enough, if we add more than one derived fact for this
             // constraint. If we still see inconsistent test output, we might need a more complex
             // way of tracking source order for derived facts.
-            let if_true = path
+            let (if_true_node, if_true_support) = path
                 .walk_edge(
                     db,
                     builder,
                     self_interior.constraint.when_true(),
                     self_interior.source_order,
                     |path, new_range| {
-                        let branch = self_interior.if_true.abstract_one_inner(
-                            db,
-                            builder,
-                            should_remove,
-                            path,
-                        );
+                        let (branch_node, branch_support) = self_interior
+                            .if_true
+                            .abstract_one_inner(db, builder, support, should_remove, path);
                         path.assignments[new_range]
                             .iter()
+                            .rev() // add_derived supports are applied in reverse order
                             .filter(|(assignment, _)| {
                                 // Don't add back any derived facts if they are ones that we would have
                                 // removed!
                                 !should_remove(assignment.constraint())
                             })
-                            .fold(branch, |branch, (assignment, source_order)| {
-                                branch.and(
-                                    builder,
-                                    Node::new_satisfied_constraint(
+                            .fold(
+                                (branch_node, branch_support),
+                                |(branch_node, branch_support), (assignment, source_order)| {
+                                    let constraint = Node::new_satisfied_constraint(
                                         builder,
                                         *assignment,
                                         *source_order,
-                                    ),
-                                )
-                            })
+                                    );
+                                    (
+                                        branch_node.and(builder, constraint),
+                                        builder.add_derived_support(
+                                            branch_support,
+                                            self_interior.constraint,
+                                            assignment.constraint(),
+                                        ),
+                                    )
+                                },
+                            )
                     },
                 )
-                .unwrap_or(ALWAYS_FALSE);
-            let if_false = path
+                .unwrap_or((ALWAYS_FALSE, SupportId::Empty));
+            let (if_false_node, if_false_support) = path
                 .walk_edge(
                     db,
                     builder,
                     self_interior.constraint.when_false(),
                     self_interior.source_order,
                     |path, new_range| {
-                        let branch = self_interior.if_false.abstract_one_inner(
-                            db,
-                            builder,
-                            should_remove,
-                            path,
-                        );
+                        let (branch_node, branch_support) = self_interior
+                            .if_false
+                            .abstract_one_inner(db, builder, support, should_remove, path);
                         path.assignments[new_range]
                             .iter()
+                            .rev() // add_derived supports are applied in reverse order
                             .filter(|(assignment, _)| {
                                 // Don't add back any derived facts if they are ones that we would have
                                 // removed!
                                 !should_remove(assignment.constraint())
                             })
-                            .fold(branch, |branch, (assignment, source_order)| {
-                                branch.and(
-                                    builder,
-                                    Node::new_satisfied_constraint(
+                            .fold(
+                                (branch_node, branch_support),
+                                |(branch_node, branch_support), (assignment, source_order)| {
+                                    let constraint = Node::new_satisfied_constraint(
                                         builder,
                                         *assignment,
                                         *source_order,
-                                    ),
-                                )
-                            })
+                                    );
+                                    (
+                                        branch_node.and(builder, constraint),
+                                        builder.add_derived_support(
+                                            branch_support,
+                                            self_interior.constraint,
+                                            assignment.constraint(),
+                                        ),
+                                    )
+                                },
+                            )
                     },
                 )
-                .unwrap_or(ALWAYS_FALSE);
-            if_true.or(builder, if_false)
+                .unwrap_or((ALWAYS_FALSE, SupportId::Empty));
+            let node = if_true_node.or(builder, if_false_node);
+            let support = builder.ordered_union_support(if_true_support, if_false_support);
+            let support = builder.remove_support(support, self_interior.constraint);
+            (node, support)
         } else {
             // Otherwise, we abstract the if_false/if_true edges recursively.
-            let if_true = path
+            let (if_true_node, if_true_support) = path
                 .walk_edge(
                     db,
                     builder,
                     self_interior.constraint.when_true(),
                     self_interior.source_order,
                     |path, _| {
-                        self_interior
-                            .if_true
-                            .abstract_one_inner(db, builder, should_remove, path)
+                        self_interior.if_true.abstract_one_inner(
+                            db,
+                            builder,
+                            support,
+                            should_remove,
+                            path,
+                        )
                     },
                 )
-                .unwrap_or(ALWAYS_FALSE);
-            let if_false = path
+                .unwrap_or((ALWAYS_FALSE, SupportId::Empty));
+            let (if_false_node, if_false_support) = path
                 .walk_edge(
                     db,
                     builder,
                     self_interior.constraint.when_false(),
                     self_interior.source_order,
                     |path, _| {
-                        self_interior
-                            .if_false
-                            .abstract_one_inner(db, builder, should_remove, path)
+                        self_interior.if_false.abstract_one_inner(
+                            db,
+                            builder,
+                            support,
+                            should_remove,
+                            path,
+                        )
                     },
                 )
-                .unwrap_or(ALWAYS_FALSE);
+                .unwrap_or((ALWAYS_FALSE, SupportId::Empty));
             // NB: We cannot use `Node::new` here, because the recursive calls might introduce new
             // derived constraints into the result, and those constraints might appear before this
             // one in the BDD ordering.
-            Node::new_constraint(
+            let constraint = Node::new_constraint(
                 builder,
                 self_interior.constraint,
                 self_interior.source_order,
-            )
-            .ite(builder, if_true, if_false)
+            );
+            let node = constraint.ite(builder, if_true_node, if_false_node);
+            let support = builder.ordered_union_support(if_true_support, if_false_support);
+            let support = builder
+                .ordered_union_support(SupportId::Singleton(self_interior.constraint), support);
+            (node, support)
         }
     }
 
@@ -2981,6 +3263,7 @@ impl InteriorNode {
         self,
         db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
+        support: SupportId,
     ) -> Solutions<'db, 'c> {
         #[derive(Default)]
         struct Bounds<'db> {
@@ -3024,8 +3307,9 @@ impl InteriorNode {
             db: &'db dyn Db,
             builder: &'c ConstraintSetBuilder<'db>,
             interior: NodeId,
+            support: SupportId,
         ) -> Ref<'c, Vec<Solution<'db>>> {
-            let key = interior;
+            let key = (interior, support);
             let storage = builder.storage.borrow();
             if let Ok(solutions) =
                 Ref::filter_map(storage, |storage| storage.solutions_cache.get(&key))
@@ -3039,8 +3323,17 @@ impl InteriorNode {
             // "tied" constraints will still be ordered in a stable way. So we need a stable sort to
             // retain that stable per-tie ordering.
             let mut sorted_paths = Vec::new();
-            interior.for_each_path(db, builder, |path| {
-                let mut path: Vec<_> = path.positive_constraints().collect();
+            interior.for_each_path_with_support(db, builder, support, |path, path_support| {
+                let support_order = builder.build_support(path_support);
+                let mut path: Vec<_> = path
+                    .positive_constraints()
+                    .map(|(constraint, _source_order)| {
+                        let source_order = support_order
+                            .get_index_of(&constraint)
+                            .expect("constraint should exist in support order");
+                        (constraint, source_order)
+                    })
+                    .collect();
                 path.sort_by_key(|(_, source_order)| *source_order);
                 sorted_paths.push(path);
             });
@@ -3158,7 +3451,7 @@ impl InteriorNode {
             Ref::map(storage, |storage| &storage.solutions_cache[&key])
         }
 
-        let solutions = solutions_inner(db, builder, self.node());
+        let solutions = solutions_inner(db, builder, self.node(), support);
         if solutions.is_empty() {
             return Solutions::Unsatisfiable;
         }
