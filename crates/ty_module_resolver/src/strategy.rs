@@ -1,8 +1,4 @@
-/// A type that never exists.
-///
-/// In Rust if you have `Result<T, Never>` the compiler knows `Err` is impossible
-/// and you can just write `let Ok(val) = result;`
-pub enum Never {}
+use std::convert::Infallible;
 
 /// Generic handling of two possible approaches to an Error:
 ///
@@ -40,7 +36,7 @@ pub enum Never {}
 /// return `Result<T, Strategy::Error<E>>`. Which simplifies to:
 ///
 /// * [`FailStrategy`]: `Result<T, E>`
-/// * [`UseDefaultStrategy`]: `Result<T, Never>` ~= `T`
+/// * [`UseDefaultStrategy`]: `Result<T, Infallible>` ~= `T`
 ///
 /// Notably, if your function returns `Result<T, Strategy::Error<E>>` you will
 /// be *statically prevented* from returning an `Err` without going through
@@ -53,7 +49,7 @@ pub enum Never {}
 /// write an `unwrap()`.
 pub trait MisconfigurationStrategy {
     /// * [`FailStrategy`][]: `E`
-    /// * [`UseDefaultStrategy`][]: `Never`
+    /// * [`UseDefaultStrategy`][]: [`Infallible`]
     type Error<E>;
 
     /// Try to get the value out of a Result that we need to proceed.
@@ -102,7 +98,7 @@ pub trait MisconfigurationStrategy {
 pub struct UseDefaultStrategy;
 
 impl MisconfigurationStrategy for UseDefaultStrategy {
-    type Error<E> = Never;
+    type Error<E> = Infallible;
     fn fallback<T, E>(
         &self,
         result: Result<T, E>,
