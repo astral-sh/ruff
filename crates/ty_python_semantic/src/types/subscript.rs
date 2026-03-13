@@ -694,14 +694,6 @@ impl<'db> Type<'db> {
                 Some(Ok(Type::Dynamic(DynamicType::TodoUnpack)))
             }
 
-            (Type::SpecialForm(special_form), _) if special_form.class().is_special_form() => {
-                Some(Ok(todo_type!("Inference of subscript on special form")))
-            }
-
-            (Type::KnownInstance(known_instance), _) if known_instance.class(db).is_special_form() => {
-                Some(Ok(todo_type!("Inference of subscript on special form")))
-            }
-
             (
                 Type::FunctionLiteral(_)
                 | Type::WrapperDescriptor(_)

@@ -143,10 +143,6 @@ impl KnownClass {
         matches!(self, Self::Bool)
     }
 
-    pub(crate) const fn is_special_form(self) -> bool {
-        matches!(self, Self::SpecialForm)
-    }
-
     /// Determine whether instances of this class are always truthy, always falsy,
     /// or have an ambiguous truthiness.
     ///

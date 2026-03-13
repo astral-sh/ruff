@@ -606,11 +606,10 @@ def f() -> Final[None]: ...
 def f[T](x: T) -> Final[T]:
     return x
 
-# TODO: This should be an error
+# error: [invalid-base]
 class Foo(Final[tuple[int]]): ...
 
-# TODO: Show `Unknown` instead of `@Todo` type in the MRO; or ignore `Final` and show the MRO as if `Final` was not there
-# revealed: (<class 'Foo'>, @Todo(Inference of subscript on special form), <class 'object'>)
+# revealed: (<class 'Foo'>, Unknown, <class 'object'>)
 reveal_mro(Foo)
 ```
 
