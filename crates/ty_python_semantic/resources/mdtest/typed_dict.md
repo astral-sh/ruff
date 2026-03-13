@@ -3248,10 +3248,10 @@ def _(extra: Extra, key: str) -> None:
     reveal_type(extra["name"])  # revealed: str
     # TODO: should be `int` (the extra_items type) with no error
     # error: [invalid-key]
-    reveal_type(extra["anything"])  # revealed: str
+    reveal_type(extra["anything"])  # revealed: Unknown
     # TODO: should be `str | int` with no error
     # error: [invalid-key]
-    reveal_type(extra[key])  # revealed: str
+    reveal_type(extra[key])  # revealed: Unknown
 ```
 
 For closed TypedDicts, indexing into the dictionary with a non-literal `str` is an error, just like
