@@ -92,9 +92,7 @@ export default function ShareButton({
             Link
           </ShareMenuItem>
           <ShareMenuItem
-            onAction={() =>
-              startTransition(() => dispatch("copyMarkdownLink"))
-            }
+            onAction={() => startTransition(() => dispatch("copyMarkdownLink"))}
           >
             Markdown Link
           </ShareMenuItem>
