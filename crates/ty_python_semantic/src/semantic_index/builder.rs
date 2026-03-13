@@ -139,12 +139,36 @@ impl<'ast> Visitor<'ast> for ExprUseVisitor<'_, '_, 'ast> {
                 self.record_place_use(expr);
                 walk_expr(self, expr);
             }
-            ast::Expr::Compare(_)
-            | ast::Expr::Call(_)
+            ast::Expr::Lambda(_)
+            | ast::Expr::BooleanLiteral(_)
+            | ast::Expr::NoneLiteral(_)
+            | ast::Expr::NumberLiteral(_)
+            | ast::Expr::BytesLiteral(_)
+            | ast::Expr::EllipsisLiteral(_)
+            | ast::Expr::StringLiteral(_) => {}
+            ast::Expr::SetComp(_)
+            | ast::Expr::ListComp(_)
+            | ast::Expr::Generator(_)
+            | ast::Expr::DictComp(_) => {}
+            ast::Expr::BoolOp(_)
+            | ast::Expr::Named(_)
+            | ast::Expr::BinOp(_)
             | ast::Expr::UnaryOp(_)
-            | ast::Expr::BoolOp(_)
-            | ast::Expr::Tuple(_) => walk_expr(self, expr),
-            _ => {}
+            | ast::Expr::If(_)
+            | ast::Expr::Starred(_)
+            | ast::Expr::Call(_)
+            | ast::Expr::Compare(_)
+            | ast::Expr::Yield(_)
+            | ast::Expr::YieldFrom(_)
+            | ast::Expr::FString(_)
+            | ast::Expr::TString(_)
+            | ast::Expr::Tuple(_)
+            | ast::Expr::List(_)
+            | ast::Expr::Slice(_)
+            | ast::Expr::IpyEscapeCommand(_)
+            | ast::Expr::Dict(_)
+            | ast::Expr::Set(_)
+            | ast::Expr::Await(_) => walk_expr(self, expr),
         }
     }
 }
@@ -767,6 +791,24 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         guard_places
     }
 
+    fn can_register_narrowing_alias(value: &ast::Expr) -> bool {
+        match value {
+            ast::Expr::Name(_)
+            | ast::Expr::Attribute(_)
+            | ast::Expr::Subscript(_)
+            | ast::Expr::Compare(_)
+            | ast::Expr::Call(_) => true,
+            ast::Expr::UnaryOp(unary) if unary.op == ast::UnaryOp::Not => {
+                Self::can_register_narrowing_alias(&unary.operand)
+            }
+            ast::Expr::BoolOp(bool_op) => bool_op
+                .values
+                .iter()
+                .all(Self::can_register_narrowing_alias),
+            _ => false,
+        }
+    }
+
     fn flow_snapshot(&self) -> FlowSnapshot {
         self.current_use_def_map().snapshot()
     }
@@ -1347,6 +1389,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 self.narrowing_aliases.insert(target_name.clone(), existing);
                 return;
             }
+        }
+
+        if !Self::can_register_narrowing_alias(value) {
+            self.narrowing_aliases.remove(target_name);
+            return;
         }
 
         let narrowed_places =
