@@ -3,10 +3,15 @@ from __future__ import annotations
 import difflib
 import logging
 import re
-import shlex
 import subprocess
+import sys
 from pathlib import Path
 from typing import Mapping, NamedTuple
+
+if sys.platform == "win32":
+    import mslex as shlex
+else:
+    import shlex
 
 from benchmark import Command
 
