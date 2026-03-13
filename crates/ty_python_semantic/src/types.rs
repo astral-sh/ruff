@@ -4219,14 +4219,72 @@ impl<'db> Type<'db> {
                 binding
             })
         }
+        fn typed_dict_constructor_bindings<'db>(
+            db: &'db dyn Db,
+            owner: Type<'db>,
+            signature_class: ClassType<'db>,
+            constructor_instance_ty: Type<'db>,
+        ) -> Bindings<'db> {
+            let (class_literal, class_specialization) =
+                signature_class.class_literal_and_specialization(db);
+            let ClassLiteral::Static(class_literal) = class_literal else {
+                return Binding::single(
+                    owner,
+                    Signature::new(Parameters::gradual_form(), constructor_instance_ty),
+                )
+                .into();
+            };
+
+            let typed_dict = TypedDictType::new(signature_class);
+            let fields = class_literal.fields(
+                db,
+                class_specialization,
+                class::CodeGeneratorKind::TypedDict,
+            );
+
+            let keyword_signature = Signature::new(
+                Parameters::new(
+                    db,
+                    fields.iter().map(|(name, field)| {
+                        let parameter = Parameter::keyword_only(name.clone())
+                            .with_annotated_type(field.declared_ty);
+                        if field.is_required() {
+                            parameter
+                        } else {
+                            parameter.with_default_type(field.declared_ty)
+                        }
+                    }),
+                ),
+                constructor_instance_ty,
+            );
+
+            let positional_signature = Signature::new(
+                Parameters::new(
+                    db,
+                    [
+                        Parameter::positional_only(Some(Name::new_static("mapping")))
+                            .with_annotated_type(Type::TypedDict(typed_dict)),
+                    ],
+                ),
+                constructor_instance_ty,
+            );
+
+            CallableBinding::from_overloads(owner, [keyword_signature, positional_signature]).into()
+        }
 
         let (class_literal, class_specialization) = class.class_literal_and_specialization(db);
         let class_generic_context = class_literal.generic_context(db);
 
-        // Keep bespoke constructor behavior for cases that don't map cleanly to `__new__`/`__init__`.
-        let fallback_bindings = || {
+        let self_type = match self {
+            Type::ClassLiteral(class) if class.generic_context(db).is_some() => {
+                Type::from(class.identity_specialization(db))
+            }
+            _ => self,
+        };
+
+        let Some(constructor_instance_ty) = self_type.to_instance(db) else {
             let return_type = self.to_instance(db).unwrap_or(Type::unknown());
-            Binding::single(
+            return Binding::single(
                 self,
                 Signature::new_generic(
                     class_generic_context,
@@ -4234,16 +4292,34 @@ impl<'db> Type<'db> {
                     return_type,
                 ),
             )
+            .into();
+        };
+
+        // Keep bespoke constructor behavior for cases that don't map cleanly to `__new__`/`__init__`.
+        let fallback_bindings = || {
+            Binding::single(
+                self,
+                Signature::new_generic(
+                    class_generic_context,
+                    Parameters::gradual_form(),
+                    constructor_instance_ty,
+                ),
+            )
             .into()
         };
 
-        // Checking TypedDict construction happens in `infer_call_expression_impl`, so here we just
-        // return a permissive fallback binding. TODO maybe we should just synthesize bindings for
-        // a TypedDict constructor? That would handle unions/intersections correctly.
         if class_literal.is_typed_dict(db)
             || class::CodeGeneratorKind::TypedDict.matches(db, class_literal, class_specialization)
         {
-            return fallback_bindings();
+            let signature_class = self_type.to_class_type(db).unwrap_or(class);
+            return typed_dict_constructor_bindings(
+                db,
+                self,
+                signature_class,
+                constructor_instance_ty,
+            )
+            .with_generic_context(db, class_generic_context)
+            .with_constructor_instance_type(constructor_instance_ty);
         }
 
         // These cases are checked in `Type::known_class_literal_bindings`, but currently we only
@@ -4278,21 +4354,6 @@ impl<'db> Type<'db> {
             return fallback_bindings();
         }
 
-        // If we are trying to construct a non-specialized generic class, we should use the
-        // constructor parameters to try to infer the class specialization. To do this, we need to
-        // tweak our member lookup logic a bit. Normally, when looking up a class or instance
-        // member, we first apply the class's default specialization, and apply that specialization
-        // to the type of the member. To infer a specialization from the argument types, we need to
-        // have the class's typevars still in the method signature when we attempt to call it. To
-        // do this, we instead use the _identity_ specialization, which maps each of the class's
-        // generic typevars to itself.
-        let self_type = match self {
-            Type::ClassLiteral(class) if class.generic_context(db).is_some() => {
-                Type::from(class.identity_specialization(db))
-            }
-            _ => self,
-        };
-
         // As of now we do not model custom `__call__` on meta-classes, so the code below
         // only deals with interplay between `__new__` and `__init__` methods.
         // The logic is roughly as follows:
@@ -4319,10 +4380,6 @@ impl<'db> Type<'db> {
         // Note that `__new__` is a static method, so we must bind the `cls` argument when forming
         // constructor-call bindings.
         let new_method = self_type.lookup_dunder_new(db);
-
-        let Some(constructor_instance_ty) = self_type.to_instance(db) else {
-            return fallback_bindings();
-        };
 
         // Construct an instance type to look up `__init__`. We use `self_type` (possibly identity-
         // specialized) so the instance retains inferable class typevars during constructor checking.

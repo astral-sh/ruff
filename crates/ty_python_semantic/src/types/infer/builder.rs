@@ -7057,6 +7057,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .bindings(self.db())
             .match_parameters(self.db(), &call_arguments);
 
+        let typed_dict_constructor = class.and_then(|class| {
+            class
+                .class_literal(self.db())
+                .is_typed_dict(self.db())
+                .then_some(TypedDictType::new(class))
+        });
+
+        let typed_dict_constructor_shape_supported = typed_dict_constructor.is_some()
+            && (arguments.args.is_empty()
+                || (arguments.args.len() == 1 && arguments.keywords.is_empty()));
+        let has_positional_dict_literal = arguments.args.len() == 1
+            && arguments.keywords.is_empty()
+            && arguments.args[0].is_dict_expr();
+
         report_missing_implicit_constructor_call(
             &self.context,
             self.db(),
@@ -7074,12 +7088,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         );
 
         // Validate `TypedDict` constructor calls after argument type inference.
-        if let Some(class) = class
-            && class.class_literal(self.db()).is_typed_dict(self.db())
+        if let Some(typed_dict) = typed_dict_constructor
+            && !has_positional_dict_literal
+            && typed_dict_constructor_shape_supported
         {
             validate_typed_dict_constructor(
                 &self.context,
-                TypedDictType::new(class),
+                typed_dict,
                 arguments,
                 func.as_ref().into(),
                 |expr| self.expression_type(expr),
@@ -7088,6 +7103,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let mut bindings = match bindings_result {
             Ok(()) => bindings,
+            Err(CallErrorKind::BindingError) if typed_dict_constructor_shape_supported => {
+                return bindings.return_type(self.db());
+            }
             Err(_) => {
                 bindings.report_diagnostics(&self.context, call_expression.into());
                 return bindings.return_type(self.db());
