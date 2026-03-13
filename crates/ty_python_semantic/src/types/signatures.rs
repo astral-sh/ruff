@@ -2290,75 +2290,91 @@ pub(crate) struct Parameters<'db> {
 impl<'db> Parameters<'db> {
     /// Create a new parameter list from an iterator of parameters.
     ///
-    /// The kind of the parameter list is determined based on the provided parameters.
-    /// Specifically, if the parameters is made up of `*args` and `**kwargs` only, it checks
-    /// their annotated types to determine if they represent a gradual form or a `ParamSpec`.
+    /// The kind of the parameter list is determined based on the provided parameters. Specifically,
+    /// if the parameter list contains `*args` and `**kwargs`, then it checks their annotated types
+    /// and the presence of other parameter kinds to determine if they represent a gradual form, a
+    /// `ParamSpec`, or a `Concatenate` form.
     pub(crate) fn new(
         db: &'db dyn Db,
         parameters: impl IntoIterator<Item = Parameter<'db>>,
     ) -> Self {
-        fn new_impl<'db>(db: &'db dyn Db, value: Vec<Parameter<'db>>) -> Parameters<'db> {
-            let mut kind = ParametersKind::Standard;
-            if let [prefix_params @ .., args, kwargs] = value.as_slice()
-                && args.is_variadic()
-                && kwargs.is_keyword_variadic()
-            {
-                let has_prefix_params = !prefix_params.is_empty();
+        let value: Vec<Parameter<'db>> = parameters.into_iter().collect();
+        let mut kind = ParametersKind::Standard;
 
-                // As per the spec:
-                //
-                // > A function declared as
-                // > `def inner(a: A, b: B, *args: P.args, **kwargs: P.kwargs) -> R` has type
-                // > `Callable[Concatenate[A, B, P], R]`.
-                // >
-                // > https://typing.python.org/en/latest/spec/generics.html#id5
-                //
-                // which means that if a signature ends with the components of a `ParamSpec` type
-                // variable, then any parameters before those components must become positional-only
-                // even though the function can be called with keyword arguments like
-                // `inner(a=A(), b=B())` is a valid call for the above signature.
-                let prefix_params_are_positional =
-                    prefix_params.iter().all(Parameter::is_positional);
+        let variadic_param = value
+            .iter()
+            .find_position(|param| param.is_variadic())
+            .map(|(index, param)| (index, param.annotated_type));
+        let keyword_variadic_param = value
+            .iter()
+            .find_position(|param| param.is_keyword_variadic())
+            .map(|(index, param)| (index, param.annotated_type));
 
-                match (args.annotated_type(), kwargs.annotated_type()) {
-                    (Type::Dynamic(_), Type::Dynamic(_)) => {
-                        if has_prefix_params {
-                            if prefix_params_are_positional {
-                                kind = ParametersKind::Concatenate(ConcatenateTail::Gradual);
-                            }
-                        } else {
-                            kind = ParametersKind::Gradual;
-                        }
+        if let (
+            Some((variadic_index, variadic_type)),
+            Some((keyword_variadic_index, keyword_variadic_type)),
+        ) = (variadic_param, keyword_variadic_param)
+        {
+            let prefix_params = value.get(..variadic_index).unwrap_or(&[]);
+            let keyword_only_params = value
+                .get(variadic_index + 1..keyword_variadic_index)
+                .unwrap_or(&[]);
+
+            match (variadic_type, keyword_variadic_type) {
+                // > If the input signature in a function definition includes both a `*args` and
+                // > `**kwargs` parameter and both are typed as Any (explicitly or implicitly
+                // > because it has no annotation), a type checker should treat this as the
+                // > equivalent of `...`. Any other parameters in the signature are unaffected and
+                // > are retained as part of the signature.
+                //
+                // https://typing.python.org/en/latest/spec/callables.html#meaning-of-in-callable
+                (Type::Dynamic(_), Type::Dynamic(_)) => {
+                    if keyword_only_params.is_empty()
+                        && !prefix_params.is_empty()
+                        && prefix_params.iter().all(Parameter::is_positional_only)
+                    {
+                        kind = ParametersKind::Concatenate(ConcatenateTail::Gradual);
+                    } else {
+                        kind = ParametersKind::Gradual;
                     }
-                    (Type::TypeVar(args_typevar), Type::TypeVar(kwargs_typevar)) => {
-                        if let (Some(ParamSpecAttrKind::Args), Some(ParamSpecAttrKind::Kwargs)) = (
-                            args_typevar.paramspec_attr(db),
-                            kwargs_typevar.paramspec_attr(db),
-                        ) {
-                            let typevar = args_typevar.without_paramspec_attr(db);
-                            if typevar
-                                .is_same_typevar_as(db, kwargs_typevar.without_paramspec_attr(db))
-                            {
-                                if has_prefix_params {
-                                    if prefix_params_are_positional {
-                                        kind = ParametersKind::Concatenate(
-                                            ConcatenateTail::ParamSpec(typevar),
-                                        );
-                                    }
-                                } else {
-                                    kind = ParametersKind::ParamSpec(typevar);
-                                }
-                            }
-                        }
-                    }
-                    _ => {}
                 }
+
+                // > A function declared as
+                // > `def inner(a: A, b: B, *args: P.args, **kwargs: P.kwargs) -> R`
+                // > has type `Callable[Concatenate[A, B, P], R]`. Placing keyword-only parameters
+                // > between the `*args` and `**kwargs` is forbidden.
+                //
+                // https://typing.python.org/en/latest/spec/generics.html#id5
+                (Type::TypeVar(variadic_typevar), Type::TypeVar(keyword_variadic_typevar))
+                    if keyword_only_params.is_empty() =>
+                {
+                    if let (Some(ParamSpecAttrKind::Args), Some(ParamSpecAttrKind::Kwargs)) = (
+                        variadic_typevar.paramspec_attr(db),
+                        keyword_variadic_typevar.paramspec_attr(db),
+                    ) {
+                        let typevar = variadic_typevar.without_paramspec_attr(db);
+                        if typevar.is_same_typevar_as(
+                            db,
+                            keyword_variadic_typevar.without_paramspec_attr(db),
+                        ) {
+                            if prefix_params.is_empty() {
+                                kind = ParametersKind::ParamSpec(typevar);
+                            } else if prefix_params.iter().all(Parameter::is_positional) {
+                                // TODO: Currently, we accept both positional-only and
+                                // positional-or-keyword parameter but we should raise a warning to
+                                // let users know that these parameters should be positional-only
+                                kind = ParametersKind::Concatenate(ConcatenateTail::ParamSpec(
+                                    typevar,
+                                ));
+                            }
+                        }
+                    }
+                }
+                _ => {}
             }
-            Parameters { value, kind }
         }
 
-        let value: Vec<Parameter<'db>> = parameters.into_iter().collect();
-        new_impl(db, value)
+        Parameters { value, kind }
     }
 
     /// Create an empty parameter list.
