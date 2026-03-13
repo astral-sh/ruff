@@ -1439,6 +1439,9 @@ impl<'db> InnerIntersectionBuilder<'db> {
     /// - If the intersection contains negative entries for all but one of the constraints, we can
     ///   add that remaining constraint as a positive entry.
     ///
+    /// - If the intersection contains other positive entries that are disjoint from all but one
+    ///   of the constraints, we can also add that remaining constraint as a positive entry.
+    ///
     /// - If the intersection contains negative entries for all of the constraints, the overall
     ///   intersection is `Never`.
     fn simplify_constrained_typevars(&mut self, db: &'db dyn Db) {
@@ -1466,6 +1469,22 @@ impl<'db> InnerIntersectionBuilder<'db> {
                     .filter(|(_, c)| c.is_subtype_of(db, *negative));
                 for (constraint_index, _) in matching_constraints {
                     remaining_constraints[constraint_index] = None;
+                }
+            }
+
+            for positive in &self.positive {
+                if positive == ty {
+                    continue;
+                }
+
+                for (constraint_index, constraint) in constraints.iter().enumerate() {
+                    if remaining_constraints[constraint_index].is_none() {
+                        continue;
+                    }
+
+                    if constraint.is_disjoint_from(db, *positive) {
+                        remaining_constraints[constraint_index] = None;
+                    }
                 }
             }
 

@@ -728,6 +728,23 @@ def test(a: Any, items: list[T]) -> None:
         cast(T, v)  # no panic
 ```
 
+Constrained `TypeVar`s should also eliminate impossible constraints when narrowed by
+`isinstance(x, dict)`:
+
+```py
+from typing import Mapping, TypeVar, TypedDict
+
+class TD(TypedDict, total=False):
+    x: str
+
+T = TypeVar("T", list[str], TD)
+
+def takes_mapping(value: Mapping[str, object]) -> None: ...
+def _(x: T):
+    if isinstance(x, dict):
+        takes_mapping(x)
+```
+
 ## Narrowing with named expressions (walrus operator)
 
 When `isinstance()` is used with a named expression, the target of the named expression should be
