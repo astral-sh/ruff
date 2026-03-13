@@ -2590,71 +2590,6 @@ impl<'db> CallableBinding<'db> {
             }
         }
 
-        let mut union_argument_type_builders = std::iter::repeat_with(|| UnionBuilder::new(db))
-            .take(max_parameter_count)
-            .collect::<Vec<_>>();
-
-        // The following loop is trying to construct a tuple of argument types that correspond to
-        // the participating parameter indexes. Considering the following example:
-        //
-        // ```python
-        // @overload
-        // def f(x: Literal[1], y: Literal[2]) -> tuple[int, int]: ...
-        // @overload
-        // def f(*args: Any) -> tuple[Any, ...]: ...
-        //
-        // f(1, 2)
-        // ```
-        //
-        // Here, only the first parameter participates in the filtering process because only one
-        // overload has the second parameter. So, while going through the argument types, the
-        // second argument needs to be skipped but for the second overload both arguments map to
-        // the first parameter and that parameter is considered for the filtering process. This
-        // flag is to handle that special case of many-to-one mapping from arguments to parameters.
-        let mut variadic_parameter_handled = false;
-
-        for (argument_index, argument_types) in arguments.types().iter().enumerate() {
-            if variadic_parameter_handled {
-                continue;
-            }
-            for overload_index in matching_overload_indexes {
-                let overload = &self.overloads[*overload_index];
-                for (parameter_index, variadic_argument_type) in
-                    overload.argument_matches[argument_index].iter()
-                {
-                    let parameter = &overload.signature.parameters()[parameter_index];
-                    if parameter.is_variadic() {
-                        variadic_parameter_handled = true;
-                    }
-                    if !participating_parameter_indexes.contains(&parameter_index) {
-                        continue;
-                    }
-                    let argument_type =
-                        argument_types.get_for_declared_type(parameter.annotated_type());
-                    union_argument_type_builders[parameter_index].add_in_place(
-                        variadic_argument_type
-                            .unwrap_or(argument_type)
-                            .top_materialization(db),
-                    );
-                }
-            }
-        }
-
-        // These only contain the top materialized argument types for the corresponding
-        // participating parameter indexes.
-        let top_materialized_argument_type = Type::heterogeneous_tuple(
-            db,
-            union_argument_type_builders
-                .into_iter()
-                .filter_map(|builder| {
-                    if builder.is_empty() {
-                        None
-                    } else {
-                        Some(builder.build())
-                    }
-                }),
-        );
-
         // A flag to indicate whether we've found the overload that makes the remaining overloads
         // unmatched for the given argument types.
         let mut filter_remaining_overloads = false;
@@ -2664,6 +2599,84 @@ impl<'db> CallableBinding<'db> {
                 self.overloads[*current_index].mark_as_unmatched_overload();
                 continue;
             }
+
+            let mut union_argument_type_builders = std::iter::repeat_with(|| UnionBuilder::new(db))
+                .take(max_parameter_count)
+                .collect::<Vec<_>>();
+
+            // The following loop is trying to construct a tuple of argument types that correspond to
+            // the participating parameter indexes. Considering the following example:
+            //
+            // ```python
+            // @overload
+            // def f(x: Literal[1], y: Literal[2]) -> tuple[int, int]: ...
+            // @overload
+            // def f(*args: Any) -> tuple[Any, ...]: ...
+            //
+            // f(1, 2)
+            // ```
+            //
+            // Here, only the first parameter participates in the filtering process because only one
+            // overload has the second parameter. So, while going through the argument types, the
+            // second argument needs to be skipped but for the second overload both arguments map to
+            // the first parameter and that parameter is considered for the filtering process. This
+            // flag is to handle that special case of many-to-one mapping from arguments to parameters.
+            let mut variadic_parameter_handled = false;
+
+            for (argument_index, argument_types) in arguments.types().iter().enumerate() {
+                if variadic_parameter_handled {
+                    continue;
+                }
+
+                // Get the argument type as inferred against the target overload.
+                let current_overload = &self.overloads[*current_index];
+                let argument_type =
+                    match *current_overload.argument_matches[argument_index].parameters {
+                        [parameter_index] => {
+                            let declared_type = current_overload.signature.parameters()
+                                [parameter_index]
+                                .annotated_type();
+                            argument_types.get_for_declared_type(declared_type)
+                        }
+                        // Splatted arguments are inferred without type context.
+                        _ => argument_types.get_default().unwrap_or(Type::unknown()),
+                    };
+
+                for overload_index in matching_overload_indexes {
+                    let overload = &self.overloads[*overload_index];
+                    for (parameter_index, variadic_argument_type) in
+                        overload.argument_matches[argument_index].iter()
+                    {
+                        let parameter = &overload.signature.parameters()[parameter_index];
+                        if parameter.is_variadic() {
+                            variadic_parameter_handled = true;
+                        }
+                        if !participating_parameter_indexes.contains(&parameter_index) {
+                            continue;
+                        }
+                        union_argument_type_builders[parameter_index].add_in_place(
+                            variadic_argument_type
+                                .unwrap_or(argument_type)
+                                .top_materialization(db),
+                        );
+                    }
+                }
+            }
+
+            // These only contain the top materialized argument types for the corresponding
+            // participating parameter indexes.
+            let top_materialized_argument_type = Type::heterogeneous_tuple(
+                db,
+                union_argument_type_builders
+                    .into_iter()
+                    .filter_map(|builder| {
+                        if builder.is_empty() {
+                            None
+                        } else {
+                            Some(builder.build())
+                        }
+                    }),
+            );
 
             let mut union_parameter_types = std::iter::repeat_with(|| UnionBuilder::new(db))
                 .take(max_parameter_count)
