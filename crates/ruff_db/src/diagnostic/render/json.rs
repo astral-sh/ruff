@@ -103,7 +103,7 @@ pub(super) fn diagnostic_to_json<'a>(
     if config.preview {
         JsonDiagnostic {
             code: diagnostic.secondary_code_or_id(),
-            severity: Some(diagnostic.severity()),
+            severity: diagnostic.severity(),
             url: diagnostic.documentation_url(),
             message: diagnostic.concise_message(),
             fix,
@@ -116,7 +116,7 @@ pub(super) fn diagnostic_to_json<'a>(
     } else {
         JsonDiagnostic {
             code: diagnostic.secondary_code_or_id(),
-            severity: None,
+            severity: Severity::Error,
             url: diagnostic.documentation_url(),
             message: diagnostic.concise_message(),
             fix,
@@ -227,8 +227,7 @@ impl Serialize for ExpandedEdits<'_> {
 pub(crate) struct JsonDiagnostic<'a> {
     cell: Option<OneIndexed>,
     code: &'a str,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    severity: Option<Severity>,
+    severity: Severity,
     end_location: Option<JsonLocation>,
     filename: Option<&'a str>,
     fix: Option<JsonFix<'a>>,
