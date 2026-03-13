@@ -45,13 +45,13 @@ alt="Formatting a document in VS Code"
 [preview mode](https://docs.astral.sh/ruff/preview/preview.md#preview).*
 
 The Ruff formatter can also format Python code blocks in Markdown files.
-The Ruff VS Code extension provides the `Ruff: Format document` command for
+The Ruff VS Code extension provides the `Format Document` command for
 Markdown files, which will then format the code blocks with the same settings
 as used for regular Python files.
 
 Note that Ruff will not format any other parts of Markdown files. If you want
 to use Ruff formatting in addition to another Markdown formatting extension,
-then you will need to set one as the "default" in VS Code, and manually run
+then you will need to set one as the default in VS Code, and manually run
 the `Format Document With...` (or `Ruff: Format document`) command to run any
 other formatters separately.
 
@@ -71,6 +71,18 @@ following to your `settings.json`:
 {
   "[markdown]": {
     "editor.defaultFormatter": "charliermarsh.ruff"
+  }
+}
+```
+
+Note that Ruff does not support range formatting for Markdown files, so if you
+have format-on-save enabled, you may also need to specify the following:
+
+```json
+{
+  "[markdown]": {
+    "editor.formatOnSave": true,
+    "editor.formatOnSaveMode": "file"
   }
 }
 ```
