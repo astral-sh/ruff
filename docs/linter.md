@@ -19,6 +19,14 @@ $ ruff check --watch          # Lint files in the current directory and re-lint 
 $ ruff check path/to/code/    # Lint files in `path/to/code`.
 ```
 
+You can also pass arguments via an argfile by prefixing the filename with `@`:
+
+```console
+$ ruff check @arguments.txt
+```
+
+Each argument in the file should be on its own line. This is useful for long file lists and paths that contain spaces.
+
 For the full list of supported options, run `ruff check --help`.
 
 ## Rule selection
