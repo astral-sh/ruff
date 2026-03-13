@@ -448,7 +448,39 @@ impl<'db> SemanticTokenVisitor<'db> {
         if let Some(classification) = self.classify_annotation_type_expr(ty) {
             return classification;
         }
-
+        // If we are dealing with a union type, classify all elements of the union and check if
+        // the classifications equal.
+        if let Type::Union(union) = ty
+            && let Ok(Some(classification)) = union
+                .elements(self.model.db())
+                .iter()
+                .map(|ty| self.classify_from_type_for_attribute(*ty, attr_name))
+                // Would be a lot cleaner with `try_reduce`, but that is still experimental
+                .try_fold(None, |prev, (class, mods)| {
+                    match prev {
+                        // First element gets special handling, because accumulator starts with None
+                        None => Ok(Some((class, mods))),
+                        // Later iterations have the comparison logic
+                        Some((class_prev, mods_prev)) => {
+                            if std::mem::discriminant(&class_prev) == std::mem::discriminant(&class)
+                            {
+                                Ok(Some((
+                                    class,
+                                    if mods_prev == mods {
+                                        mods
+                                    } else {
+                                        SemanticTokenModifier::empty()
+                                    },
+                                )))
+                            } else {
+                                Err(()) // Short-circuits when classes don't match
+                            }
+                        }
+                    }
+                })
+        {
+            return classification;
+        }
         // Classify based on the inferred type of the attribute
         match ty {
             Type::ClassLiteral(_) => (SemanticTokenType::Class, modifiers),
@@ -469,37 +501,13 @@ impl<'db> SemanticTokenVisitor<'db> {
                 (SemanticTokenType::Property, modifiers)
             }
             _ => {
-                // If we got a union type, check if all elements of the union belong to the same
-                // type variant and if so, recursively call `classify_from_type_for_attribute`
-                // for that variant.
-                if let Type::Union(union) = ty
-                    && let Some(classification) = (|| {
-                        let elements: Vec<_> = union.elements(self.model.db()).iter().collect();
-                        if elements.is_empty() {
-                            return None;
-                        }
-
-                        let first = elements[0];
-                        if elements
-                            .iter()
-                            .all(|ty| std::mem::discriminant(*ty) == std::mem::discriminant(first))
-                        {
-                            Some(self.classify_from_type_for_attribute(*first, attr_name))
-                        } else {
-                            None
-                        }
-                    })()
-                {
-                    classification
-                } else {
-                    // Check for constant naming convention
-                    if Self::is_constant_name(attr_name_str) {
-                        modifiers |= SemanticTokenModifier::READONLY;
-                    }
-
-                    // For other types (variables, constants, etc.), classify as variable
-                    (SemanticTokenType::Variable, modifiers)
+                // Check for constant naming convention
+                if Self::is_constant_name(attr_name_str) {
+                    modifiers |= SemanticTokenModifier::READONLY;
                 }
+
+                // For other types (variables, constants, etc.), classify as variable
+                (SemanticTokenType::Variable, modifiers)
             }
         }
     }
@@ -1925,7 +1933,7 @@ y = obj.unknown_attr     # Should fall back to variable
     }
 
     #[test]
-    fn attribute_on_union() {
+    fn attribute_on_union_1() {
         let test = SemanticTokenTest::new(
             "
 from random import random
@@ -1937,24 +1945,24 @@ class Foo:
         return \"hello\"
 
     @property
-    def prop(self):
-        return self.CONSTANT
+    def prop(self) -> str:
+        return \"hello\"
 
 class Bar:
     CONSTANT = 24
 
-    def method(self, x: int = 1):
-        return \"bye\"
+    def method(self, x: int = 1) -> int:
+        return 42
 
     @property
-    def prop(self):
+    def prop(self) -> int:
         return self.CONSTANT
 
 
-foobar: Foo | Bar = Foo() if random() else Bar()
+foobar = Foo() if random() else Bar()
 y = foobar.method                                # method should be method (bound method)
 z = foobar.CONSTANT                              # CONSTANT should be variable with readonly modifier
-w = foobar.prop                                  # prop should be variable on an instance
+w = foobar.prop                                  # prop should be property
 foobar_cls = Foo if random() else Bar
 v = foobar_cls.method                            # method should be method (function)
 x = foobar_cls.prop                              # prop should be property
@@ -1975,47 +1983,128 @@ x = foobar_cls.prop                              # prop should be property
         "property" @ 109..117: Decorator
         "prop" @ 126..130: Method [definition]
         "self" @ 131..135: SelfParameter [definition]
-        "self" @ 153..157: SelfParameter
-        "CONSTANT" @ 158..166: Variable [readonly]
-        "Bar" @ 174..177: Class [definition]
-        "CONSTANT" @ 183..191: Variable [definition, readonly]
-        "24" @ 194..196: Number
-        "method" @ 206..212: Method [definition]
-        "self" @ 213..217: SelfParameter [definition]
-        "x" @ 219..220: Parameter [definition]
-        "int" @ 222..225: Class
-        "1" @ 228..229: Number
-        "\"bye\"" @ 247..252: String
-        "property" @ 259..267: Decorator
-        "prop" @ 276..280: Method [definition]
-        "self" @ 281..285: SelfParameter [definition]
-        "self" @ 303..307: SelfParameter
-        "CONSTANT" @ 308..316: Variable [readonly]
-        "foobar" @ 319..325: Variable [definition]
-        "Foo" @ 327..330: Class
-        "Bar" @ 333..336: Class
-        "Foo" @ 339..342: Class
-        "random" @ 348..354: Variable
-        "Bar" @ 362..365: Class
-        "y" @ 368..369: Variable [definition]
-        "foobar" @ 372..378: Variable
-        "method" @ 379..385: Method
-        "z" @ 458..459: Variable [definition]
-        "foobar" @ 462..468: Variable
-        "CONSTANT" @ 469..477: Variable [readonly]
-        "w" @ 560..561: Variable [definition]
-        "foobar" @ 564..570: Variable
-        "prop" @ 571..575: Variable
-        "foobar_cls" @ 650..660: Variable [definition]
-        "Foo" @ 663..666: Class
-        "random" @ 670..676: Variable
-        "Bar" @ 684..687: Class
-        "v" @ 688..689: Variable [definition]
-        "foobar_cls" @ 692..702: Variable
-        "method" @ 703..709: Method
-        "x" @ 774..775: Variable [definition]
-        "foobar_cls" @ 778..788: Variable
-        "prop" @ 789..793: Property
+        "str" @ 140..143: Class
+        "\"hello\"" @ 160..167: String
+        "Bar" @ 175..178: Class [definition]
+        "CONSTANT" @ 184..192: Variable [definition, readonly]
+        "24" @ 195..197: Number
+        "method" @ 207..213: Method [definition]
+        "self" @ 214..218: SelfParameter [definition]
+        "x" @ 220..221: Parameter [definition]
+        "int" @ 223..226: Class
+        "1" @ 229..230: Number
+        "int" @ 235..238: Class
+        "42" @ 255..257: Number
+        "property" @ 264..272: Decorator
+        "prop" @ 281..285: Method [definition]
+        "self" @ 286..290: SelfParameter [definition]
+        "int" @ 295..298: Class
+        "self" @ 315..319: SelfParameter
+        "CONSTANT" @ 320..328: Variable [readonly]
+        "foobar" @ 331..337: Variable [definition]
+        "Foo" @ 340..343: Class
+        "random" @ 349..355: Variable
+        "Bar" @ 363..366: Class
+        "y" @ 369..370: Variable [definition]
+        "foobar" @ 373..379: Variable
+        "method" @ 380..386: Method
+        "z" @ 459..460: Variable [definition]
+        "foobar" @ 463..469: Variable
+        "CONSTANT" @ 470..478: Variable [readonly]
+        "w" @ 561..562: Variable [definition]
+        "foobar" @ 565..571: Variable
+        "prop" @ 572..576: Variable
+        "foobar_cls" @ 636..646: Variable [definition]
+        "Foo" @ 649..652: Class
+        "random" @ 656..662: Variable
+        "Bar" @ 670..673: Class
+        "v" @ 674..675: Variable [definition]
+        "foobar_cls" @ 678..688: Variable
+        "method" @ 689..695: Method
+        "x" @ 760..761: Variable [definition]
+        "foobar_cls" @ 764..774: Variable
+        "prop" @ 775..779: Property
+        "#);
+    }
+
+    #[test]
+    fn attribute_on_union_2() {
+        let test = SemanticTokenTest::new(
+            "
+from random import random
+
+# There is also this way to create union types:
+class Baz:
+    if random():
+        CONSTANT = 42
+
+        def method(self) -> int:
+            return 42
+
+        @property
+        def prop(self) -> int:
+            return 42
+    else:
+        CONSTANT = \"hello\"
+
+        def method(self) -> str:
+            return \"hello\"
+
+        @property
+        def prop(self) -> str:
+            return \"hello\"
+
+baz = Baz()
+s = baz.method      # method should be bound method
+t = baz.CONSTANT    # CONSTANT should be variable with readonly
+r = baz.prop        # prop should be property
+q = Baz.prop        # prop should be property on the class as well
+",
+        );
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "random" @ 6..12: Namespace
+        "random" @ 20..26: Method
+        "Baz" @ 82..85: Class [definition]
+        "random" @ 94..100: Variable
+        "CONSTANT" @ 112..120: Variable [definition, readonly]
+        "42" @ 123..125: Number
+        "method" @ 139..145: Method [definition]
+        "self" @ 146..150: SelfParameter [definition]
+        "int" @ 155..158: Class
+        "42" @ 179..181: Number
+        "property" @ 192..200: Decorator
+        "prop" @ 213..217: Method [definition]
+        "self" @ 218..222: SelfParameter [definition]
+        "int" @ 227..230: Class
+        "42" @ 251..253: Number
+        "CONSTANT" @ 272..280: Variable [definition, readonly]
+        "\"hello\"" @ 283..290: String
+        "method" @ 304..310: Method [definition]
+        "self" @ 311..315: SelfParameter [definition]
+        "str" @ 320..323: Class
+        "\"hello\"" @ 344..351: String
+        "property" @ 362..370: Decorator
+        "prop" @ 383..387: Method [definition]
+        "self" @ 388..392: SelfParameter [definition]
+        "str" @ 397..400: Class
+        "\"hello\"" @ 421..428: String
+        "baz" @ 430..433: Variable [definition]
+        "Baz" @ 436..439: Class
+        "s" @ 442..443: Variable [definition]
+        "baz" @ 446..449: Variable
+        "method" @ 450..456: Method
+        "t" @ 494..495: Variable [definition]
+        "baz" @ 498..501: Variable
+        "CONSTANT" @ 502..510: Variable [readonly]
+        "r" @ 558..559: Variable [definition]
+        "baz" @ 562..565: Variable
+        "prop" @ 566..570: Variable
+        "q" @ 604..605: Variable [definition]
+        "Baz" @ 608..611: Class
+        "prop" @ 612..616: Property
         "#);
     }
 
