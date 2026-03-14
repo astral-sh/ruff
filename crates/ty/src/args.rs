@@ -321,6 +321,10 @@ pub(crate) struct CoverageCommand {
     #[arg(long)]
     pub(crate) json: bool,
 
+    /// Write a self-contained HTML coverage report to PATH.
+    #[arg(long, value_name = "PATH")]
+    pub(crate) html: Option<SystemPathBuf>,
+
     /// Include the count of `Todo` types in the output.
     #[arg(long, hide = true)]
     pub(crate) todo: bool,

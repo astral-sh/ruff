@@ -1,4 +1,5 @@
 mod args;
+mod html;
 mod logging;
 mod printer;
 mod python_version;
@@ -227,6 +228,7 @@ fn run_coverage(args: CoverageCommand) -> anyhow::Result<ExitStatus> {
     assert!(colored::control::set_virtual_terminal(true).is_ok());
 
     let json = args.json;
+    let html_path = args.html.clone();
     let show_todo = args.todo;
     set_colored_override(args.color);
 
@@ -272,20 +274,24 @@ fn run_coverage(args: CoverageCommand) -> anyhow::Result<ExitStatus> {
 
     let files = db.project().files(&db);
 
-    // Collect per-file stats and file paths.
-    let mut per_file: Vec<(SystemPathBuf, ty_python_semantic::coverage::CoverageStats)> = files
+    // Collect per-file details (stats + per-line map) and file handles.
+    let mut per_file: Vec<(
+        SystemPathBuf,
+        ruff_db::files::File,
+        ty_python_semantic::coverage::FileCoverageDetails,
+    )> = files
         .iter()
         .filter_map(|file| {
             let path = file.path(&db).as_system_path()?.to_path_buf();
-            let stats = ty_python_semantic::coverage::coverage_types(&db, *file);
-            Some((path, stats))
+            let details = ty_python_semantic::coverage::coverage_details(&db, *file);
+            Some((path, *file, details))
         })
         .collect();
 
     // Sort by dynamic percentage descending, then by path for stable output.
-    per_file.sort_by(|(path_a, stats_a), (path_b, stats_b)| {
-        let pct_a = stats_a.dynamic_percentage().unwrap_or(0.0);
-        let pct_b = stats_b.dynamic_percentage().unwrap_or(0.0);
+    per_file.sort_by(|(path_a, _, details_a), (path_b, _, details_b)| {
+        let pct_a = details_a.stats.dynamic_percentage().unwrap_or(0.0);
+        let pct_b = details_b.stats.dynamic_percentage().unwrap_or(0.0);
         pct_b
             .partial_cmp(&pct_a)
             .unwrap_or(std::cmp::Ordering::Equal)
@@ -294,11 +300,11 @@ fn run_coverage(args: CoverageCommand) -> anyhow::Result<ExitStatus> {
 
     let total = per_file.iter().fold(
         ty_python_semantic::coverage::CoverageStats::default(),
-        |acc, (_, s)| acc.merge(*s),
+        |acc, (_, _, d)| acc.merge(d.stats),
     );
 
     // Compute common directory prefix to strip from displayed paths.
-    let prefix = common_path_prefix(per_file.iter().map(|(p, _)| p.as_path()));
+    let prefix = common_path_prefix(per_file.iter().map(|(p, _, _)| p.as_path()));
 
     let display_path =
         |p: &SystemPath| -> String { p.strip_prefix(&prefix).unwrap_or(p).as_str().to_owned() };
@@ -308,11 +314,13 @@ fn run_coverage(args: CoverageCommand) -> anyhow::Result<ExitStatus> {
     if json {
         let files_json: Vec<serde_json::Value> = per_file
             .iter()
-            .map(|(path, s)| {
+            .map(|(path, _, d)| {
+                let s = &d.stats;
                 let mut obj = serde_json::json!({
                     "path": display_path(path),
                     "total": s.total,
                     "dynamic": s.dynamic,
+                    "imprecise": s.imprecise,
                 });
                 if show_todo {
                     obj["todo"] = serde_json::json!(s.todo);
@@ -324,9 +332,17 @@ fn run_coverage(args: CoverageCommand) -> anyhow::Result<ExitStatus> {
         let mut summary = serde_json::json!({
             "total": total.total,
             "dynamic": total.dynamic,
+            "imprecise": total.imprecise,
+            "lines": {
+                "precise": total.lines.precise,
+                "imprecise": total.lines.imprecise,
+                "dynamic": total.lines.dynamic,
+                "empty": total.lines.empty,
+            },
         });
         if show_todo {
             summary["todo"] = serde_json::json!(total.todo);
+            summary["lines"]["todo"] = serde_json::json!(total.lines.todo);
         }
 
         let output = serde_json::json!({
@@ -342,6 +358,7 @@ fn run_coverage(args: CoverageCommand) -> anyhow::Result<ExitStatus> {
             Column::new("File", Align::Left),
             Column::new("Total", Align::Right),
             Column::new("Dynamic", Align::Right),
+            Column::new("Imprecise", Align::Right),
             Column::new(if show_todo { "Dyn %" } else { "%" }, Align::Right),
         ];
         if show_todo {
@@ -351,11 +368,13 @@ fn run_coverage(args: CoverageCommand) -> anyhow::Result<ExitStatus> {
 
         let mut tbl = AsciiTable::new(columns);
 
-        for (path, s) in &per_file {
+        for (path, _, d) in &per_file {
+            let s = &d.stats;
             let mut row = vec![
                 display_path(path),
                 s.total.to_string(),
                 s.dynamic.to_string(),
+                s.imprecise.to_string(),
                 format!("{:.2}%", s.dynamic_percentage().unwrap_or(0.0)),
             ];
             if show_todo {
@@ -369,6 +388,7 @@ fn run_coverage(args: CoverageCommand) -> anyhow::Result<ExitStatus> {
             "Total".to_owned(),
             total.total.to_string(),
             total.dynamic.to_string(),
+            total.imprecise.to_string(),
             format!("{:.2}%", total.dynamic_percentage().unwrap_or(0.0)),
         ];
         if show_todo {
@@ -378,6 +398,12 @@ fn run_coverage(args: CoverageCommand) -> anyhow::Result<ExitStatus> {
         tbl.set_footer(footer);
 
         tbl.render(&mut stdout)?;
+    }
+
+    if let Some(html_out) = &html_path {
+        let abs = ruff_db::system::SystemPath::absolute(html_out, &cwd);
+        html::write_html_report(&abs, &per_file, &prefix, &db, show_todo)?;
+        writeln!(stdout, "HTML report written to {abs}")?;
     }
 
     std::mem::forget(db);
