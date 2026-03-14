@@ -689,7 +689,7 @@ def test[T: int](items: list[T]) -> list[T]:
 from typing import overload
 
 def outer[T](t: T) -> None:
-    def inner[T](t: T) -> None: ...
+    def inner[T](t: T) -> None: ...  # error: [shadowed-type-variable]
 
     inner(t)
 
@@ -792,7 +792,7 @@ specializations of a generic function.
 
 ```py
 from typing import Any, Callable, NoReturn, overload, Self
-from ty_extensions import generic_context, into_callable
+from ty_extensions import generic_context, into_regular_callable
 
 def accepts_callable[**P, R](callable: Callable[P, R]) -> Callable[P, R]:
     return callable
@@ -801,7 +801,7 @@ def returns_int() -> int:
     raise NotImplementedError
 
 # revealed: () -> int
-reveal_type(into_callable(returns_int))
+reveal_type(into_regular_callable(returns_int))
 # revealed: () -> int
 reveal_type(accepts_callable(returns_int))
 # revealed: int
@@ -810,7 +810,7 @@ reveal_type(accepts_callable(returns_int)())
 class ClassWithoutConstructor: ...
 
 # revealed: () -> ClassWithoutConstructor
-reveal_type(into_callable(ClassWithoutConstructor))
+reveal_type(into_regular_callable(ClassWithoutConstructor))
 # revealed: () -> ClassWithoutConstructor
 reveal_type(accepts_callable(ClassWithoutConstructor))
 # revealed: ClassWithoutConstructor
@@ -821,7 +821,7 @@ class ClassWithNew:
         raise NotImplementedError
 
 # revealed: (...) -> ClassWithNew
-reveal_type(into_callable(ClassWithNew))
+reveal_type(into_regular_callable(ClassWithNew))
 # revealed: (...) -> ClassWithNew
 reveal_type(accepts_callable(ClassWithNew))
 # revealed: ClassWithNew
@@ -831,7 +831,7 @@ class ClassWithInit:
     def __init__(self) -> None: ...
 
 # revealed: () -> ClassWithInit
-reveal_type(into_callable(ClassWithInit))
+reveal_type(into_regular_callable(ClassWithInit))
 # revealed: () -> ClassWithInit
 reveal_type(accepts_callable(ClassWithInit))
 # revealed: ClassWithInit
@@ -845,7 +845,7 @@ class ClassWithNewAndInit:
 
 # TODO: We do not currently solve a common behavioral supertype for the two solutions of P.
 # revealed: ((...) -> ClassWithNewAndInit) | ((x: int) -> ClassWithNewAndInit)
-reveal_type(into_callable(ClassWithNewAndInit))
+reveal_type(into_regular_callable(ClassWithNewAndInit))
 # TODO: revealed: ((...) -> ClassWithNewAndInit) | ((x: int) -> ClassWithNewAndInit)
 # revealed: (...) -> ClassWithNewAndInit
 reveal_type(accepts_callable(ClassWithNewAndInit))
@@ -863,7 +863,7 @@ class ClassWithNoReturnMetatype(metaclass=Meta):
 # TODO: The return types here are wrong, because we end up creating a constraint (Never ≤ R), which
 # we confuse with "R has no lower bound".
 # revealed: (...) -> Never
-reveal_type(into_callable(ClassWithNoReturnMetatype))
+reveal_type(into_regular_callable(ClassWithNoReturnMetatype))
 # TODO: revealed: (...) -> Never
 # revealed: (...) -> Unknown
 reveal_type(accepts_callable(ClassWithNoReturnMetatype))
@@ -880,7 +880,7 @@ class ClassWithIgnoredInit:
     def __init__(self, x: int) -> None: ...
 
 # revealed: () -> Proxy
-reveal_type(into_callable(ClassWithIgnoredInit))
+reveal_type(into_regular_callable(ClassWithIgnoredInit))
 # revealed: () -> Proxy
 reveal_type(accepts_callable(ClassWithIgnoredInit))
 # revealed: Proxy
@@ -902,7 +902,7 @@ class ClassWithOverloadedInit[T]:
 # solution.
 
 # revealed: Overload[[T](x: int) -> ClassWithOverloadedInit[int], [T](x: str) -> ClassWithOverloadedInit[str]]
-reveal_type(into_callable(ClassWithOverloadedInit))
+reveal_type(into_regular_callable(ClassWithOverloadedInit))
 # TODO: revealed: Overload[(x: int) -> ClassWithOverloadedInit[int], (x: str) -> ClassWithOverloadedInit[str]]
 # revealed: Overload[[T](x: int) -> ClassWithOverloadedInit[int] | ClassWithOverloadedInit[str], [T](x: str) -> ClassWithOverloadedInit[int] | ClassWithOverloadedInit[str]]
 reveal_type(accepts_callable(ClassWithOverloadedInit))
@@ -921,9 +921,9 @@ class GenericClass[T]:
 
 def _(x: list[str]):
     # revealed: [T](x: list[T], y: list[T]) -> GenericClass[T]
-    reveal_type(into_callable(GenericClass))
+    reveal_type(into_regular_callable(GenericClass))
     # revealed: ty_extensions.GenericContext[T@GenericClass]
-    reveal_type(generic_context(into_callable(GenericClass)))
+    reveal_type(generic_context(into_regular_callable(GenericClass)))
 
     # revealed: [T](x: list[T], y: list[T]) -> GenericClass[T]
     reveal_type(accepts_callable(GenericClass))
@@ -1073,6 +1073,20 @@ def f[T: (int, str)](x: T) -> T:
 
 def g[S: (bool, str)](x: S) -> S:
     return f(x)  # error: [invalid-argument-type]
+```
+
+## Display ordering
+
+Where possible, we want the types that appear in inferred specializations to line up with the types
+that are listed in the source code. We don't want arbitarily reorder e.g. union elements as part of
+finding a solution.
+
+```py
+from typing import Any
+
+def f(l: list[tuple[Any | str, Any | str]]) -> None:
+    # revealed: dict[Any | str, Any | str]
+    reveal_type(dict(l))
 ```
 
 [implies_subtype_of]: ../../type_properties/implies_subtype_of.md

@@ -24,16 +24,13 @@ use smallvec::{SmallVec, smallvec_inline};
 
 use crate::semantic_index::definition::Definition;
 use crate::subscript::{Nth, OutOfBoundsError, PyIndex, PySlice, StepSizeZeroError};
-use crate::types::builder::RecursivelyDefined;
 use crate::types::class::{ClassType, KnownClass};
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
-use crate::types::generics::InferableTypeVars;
-use crate::types::relation::{
-    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, TypeRelation,
-};
+use crate::types::relation::{DisjointnessChecker, TypeRelationChecker};
+use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, FindLegacyTypeVarsVisitor, IntersectionType,
-    NormalizedVisitor, Type, TypeMapping, UnionBuilder, UnionType,
+    Type, TypeMapping, UnionBuilder, UnionType,
 };
 use crate::types::{Truthiness, TypeContext};
 use crate::{Db, FxOrderSet, Program};
@@ -128,11 +125,7 @@ impl TupleLength {
     }
 }
 
-/// # Ordering
-/// Ordering is based on the tuple's salsa-assigned id and not on its elements.
-/// The id may change between runs, or when the tuple was garbage collected and recreated.
 #[salsa::interned(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
-#[derive(PartialOrd, Ord)]
 pub struct TupleType<'db> {
     #[returns(ref)]
     pub(crate) tuple: TupleSpec<'db>,
@@ -223,18 +216,6 @@ impl<'db> TupleType<'db> {
         })
     }
 
-    /// Return a normalized version of `self`.
-    ///
-    /// See [`Type::normalized`] for more details.
-    #[must_use]
-    pub(crate) fn normalized_impl(
-        self,
-        db: &'db dyn Db,
-        visitor: &NormalizedVisitor<'db>,
-    ) -> Option<Self> {
-        TupleType::new(db, &self.tuple(db).normalized_impl(db, visitor))
-    }
-
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
@@ -274,55 +255,311 @@ impl<'db> TupleType<'db> {
             .find_legacy_typevars_impl(db, binding_context, typevars, visitor);
     }
 
-    pub(crate) fn has_relation_to_impl(
-        self,
-        db: &'db dyn Db,
-        other: Self,
-        inferable: InferableTypeVars<'_, 'db>,
-        relation: TypeRelation<'db>,
-        relation_visitor: &HasRelationToVisitor<'db>,
-        disjointness_visitor: &IsDisjointVisitor<'db>,
-    ) -> ConstraintSet<'db> {
-        self.tuple(db).has_relation_to_impl(
-            db,
-            other.tuple(db),
-            inferable,
-            relation,
-            relation_visitor,
-            disjointness_visitor,
-        )
-    }
-
-    pub(crate) fn is_disjoint_from_impl(
-        self,
-        db: &'db dyn Db,
-        other: Self,
-        inferable: InferableTypeVars<'_, 'db>,
-        disjointness_visitor: &IsDisjointVisitor<'db>,
-        relation_visitor: &HasRelationToVisitor<'db>,
-    ) -> ConstraintSet<'db> {
-        self.tuple(db).is_disjoint_from_impl(
-            db,
-            other.tuple(db),
-            inferable,
-            disjointness_visitor,
-            relation_visitor,
-        )
-    }
-
-    pub(crate) fn is_equivalent_to_impl(
-        self,
-        db: &'db dyn Db,
-        other: Self,
-        inferable: InferableTypeVars<'_, 'db>,
-        visitor: &IsEquivalentVisitor<'db>,
-    ) -> ConstraintSet<'db> {
-        self.tuple(db)
-            .is_equivalent_to_impl(db, other.tuple(db), inferable, visitor)
-    }
-
     pub(crate) fn is_single_valued(self, db: &'db dyn Db) -> bool {
         self.tuple(db).is_single_valued(db)
+    }
+}
+
+impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
+    pub(super) fn check_tuple_type_pair(
+        &self,
+        db: &'db dyn Db,
+        source: TupleType<'db>,
+        target: TupleType<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        self.check_tuple_spec_pair(db, source.tuple(db), target.tuple(db))
+    }
+
+    fn check_tuple_spec_pair(
+        &self,
+        db: &'db dyn Db,
+        source: &TupleSpec<'db>,
+        target: &TupleSpec<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        match source {
+            Tuple::Fixed(source) => self.check_fixed_length_tuple_vs_tuple_spec(db, source, target),
+            Tuple::Variable(source) => self.check_variable_length_vs_tuple_spec(db, source, target),
+        }
+    }
+
+    fn check_fixed_length_tuple_vs_tuple_spec(
+        &self,
+        db: &'db dyn Db,
+        source: &FixedLengthTuple<Type<'db>>,
+        target: &TupleSpec<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        match target {
+            Tuple::Fixed(target) => ConstraintSet::from_bool(
+                self.constraints,
+                source.0.len() == target.0.len(),
+            )
+            .and(db, self.constraints, || {
+                (source.0.iter().zip(&target.0)).when_all(
+                    db,
+                    self.constraints,
+                    |(&source, &target)| self.check_type_pair(db, source, target),
+                )
+            }),
+
+            Tuple::Variable(target) => {
+                // This tuple must have enough elements to match up with the other tuple's prefix
+                // and suffix, and each of those elements must pairwise satisfy the relation.
+                let mut result = self.always();
+                let mut source_iter = source.0.iter();
+                for &target_ty in target.prefix_elements() {
+                    let Some(&source_ty) = source_iter.next() else {
+                        return self.never();
+                    };
+                    let element_constraints = self.check_type_pair(db, source_ty, target_ty);
+                    if result
+                        .intersect(db, self.constraints, element_constraints)
+                        .is_never_satisfied(db)
+                    {
+                        return result;
+                    }
+                }
+                for target_ty in target.iter_suffix_elements().rev() {
+                    let Some(&source_ty) = source_iter.next_back() else {
+                        return self.never();
+                    };
+                    let element_constraints = self.check_type_pair(db, source_ty, target_ty);
+                    if result
+                        .intersect(db, self.constraints, element_constraints)
+                        .is_never_satisfied(db)
+                    {
+                        return result;
+                    }
+                }
+
+                // In addition, any remaining elements in this tuple must satisfy the
+                // variable-length portion of the other tuple.
+                result.and(db, self.constraints, || {
+                    source_iter.when_all(db, self.constraints, |&source_ty| {
+                        self.check_type_pair(db, source_ty, target.variable())
+                    })
+                })
+            }
+        }
+    }
+
+    fn check_variable_length_vs_tuple_spec(
+        &self,
+        db: &'db dyn Db,
+        source: &VariableLengthTuple<Type<'db>>,
+        target: &TupleSpec<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        match target {
+            Tuple::Fixed(target) => {
+                // The `...` length specifier of a variable-length tuple type is interpreted
+                // differently depending on the type of the variable-length elements.
+                //
+                // It typically represents the _union_ of all possible lengths. That means that a
+                // variable-length tuple type is not a subtype of _any_ fixed-length tuple type.
+                //
+                // However, as a special case, if the variable-length portion of the tuple is `Any`
+                // (or any other dynamic type), then the `...` is the _gradual choice_ of all
+                // possible lengths. This means that `tuple[Any, ...]` can match any tuple of any
+                // length.
+                if !self.relation.is_assignability() || !source.variable().is_dynamic() {
+                    return self.never();
+                }
+
+                // In addition, the other tuple must have enough elements to match up with this
+                // tuple's prefix and suffix, and each of those elements must pairwise satisfy the
+                // relation.
+                let mut result = self.always();
+                let mut target_iter = target.iter_all_elements();
+                for source_ty in source.prenormalized_prefix_elements(db, None) {
+                    let Some(target_ty) = target_iter.next() else {
+                        return self.never();
+                    };
+                    let element_constraints = self.check_type_pair(db, source_ty, target_ty);
+                    if result
+                        .intersect(db, self.constraints, element_constraints)
+                        .is_never_satisfied(db)
+                    {
+                        return result;
+                    }
+                }
+                let suffix: Vec<_> = source.prenormalized_suffix_elements(db, None).collect();
+                for &source_ty in suffix.iter().rev() {
+                    let Some(target_ty) = target_iter.next_back() else {
+                        return self.never();
+                    };
+                    let element_constraints = self.check_type_pair(db, source_ty, target_ty);
+                    if result
+                        .intersect(db, self.constraints, element_constraints)
+                        .is_never_satisfied(db)
+                    {
+                        return result;
+                    }
+                }
+
+                result
+            }
+
+            Tuple::Variable(target) => {
+                // When prenormalizing below, we assume that a dynamic variable-length portion of
+                // one tuple materializes to the variable-length portion of the other tuple.
+                let source_prenormalize_variable = match source.variable() {
+                    Type::Dynamic(_) => Some(target.variable()),
+                    _ => None,
+                };
+                let target_prenormalize_variable = match target.variable() {
+                    Type::Dynamic(_) => Some(source.variable()),
+                    _ => None,
+                };
+
+                // The overlapping parts of the prefixes and suffixes must satisfy the relation.
+                // Any remaining parts must satisfy the relation with the other tuple's
+                // variable-length part.
+                let mut result = self.always();
+                let pairwise = source
+                    .prenormalized_prefix_elements(db, source_prenormalize_variable)
+                    .zip_longest(
+                        target.prenormalized_prefix_elements(db, target_prenormalize_variable),
+                    );
+                for pair in pairwise {
+                    let pair_constraints = match pair {
+                        EitherOrBoth::Both(self_ty, other_ty) => {
+                            self.check_type_pair(db, self_ty, other_ty)
+                        }
+                        EitherOrBoth::Left(self_ty) => {
+                            self.check_type_pair(db, self_ty, target.variable())
+                        }
+                        EitherOrBoth::Right(other_ty) => {
+                            // The rhs has a required element that the lhs is not guaranteed to
+                            // provide, unless the lhs has a dynamic variable-length portion
+                            // that can materialize to provide it (for assignability only),
+                            // as in `tuple[Any, ...]` matching `tuple[int, int]`.
+                            if !self.relation.is_assignability() || !source.variable().is_dynamic()
+                            {
+                                return self.never();
+                            }
+                            self.check_type_pair(db, source.variable(), other_ty)
+                        }
+                    };
+                    if result
+                        .intersect(db, self.constraints, pair_constraints)
+                        .is_never_satisfied(db)
+                    {
+                        return result;
+                    }
+                }
+
+                let source_suffix: Vec<_> = source
+                    .prenormalized_suffix_elements(db, source_prenormalize_variable)
+                    .collect();
+                let target_suffix: Vec<_> = target
+                    .prenormalized_suffix_elements(db, target_prenormalize_variable)
+                    .collect();
+                let pairwise = source_suffix
+                    .iter()
+                    .rev()
+                    .zip_longest(target_suffix.iter().rev());
+                for pair in pairwise {
+                    let pair_constraints = match pair {
+                        EitherOrBoth::Both(&source_ty, &target_ty) => {
+                            self.check_type_pair(db, source_ty, target_ty)
+                        }
+                        EitherOrBoth::Left(&source_ty) => {
+                            self.check_type_pair(db, source_ty, target.variable())
+                        }
+                        EitherOrBoth::Right(&target_ty) => {
+                            // The rhs has a required element that the lhs is not guaranteed to
+                            // provide, unless the lhs has a dynamic variable-length portion
+                            // that can materialize to provide it (for assignability only),
+                            // as in `tuple[Any, ...]` matching `tuple[int, int]`.
+                            if !self.relation.is_assignability() || !source.variable().is_dynamic()
+                            {
+                                return self.never();
+                            }
+                            self.check_type_pair(db, source.variable(), target_ty)
+                        }
+                    };
+                    if result
+                        .intersect(db, self.constraints, pair_constraints)
+                        .is_never_satisfied(db)
+                    {
+                        return result;
+                    }
+                }
+
+                // And lastly, the variable-length portions must satisfy the relation.
+                result.and(db, self.constraints, || {
+                    self.check_type_pair(db, source.variable(), target.variable())
+                })
+            }
+        }
+    }
+}
+
+impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
+    pub(super) fn check_tuple_type_pair(
+        &self,
+        db: &'db dyn Db,
+        left: TupleType<'db>,
+        right: TupleType<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        self.check_tuple_spec_pair(db, left.tuple(db), right.tuple(db))
+    }
+
+    pub(super) fn check_tuple_spec_pair(
+        &self,
+        db: &'db dyn Db,
+        left: &TupleSpec<'db>,
+        right: &TupleSpec<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        // Two tuples with an incompatible number of required elements must always be disjoint.
+        let (self_min, self_max) = left.len().size_hint();
+        let (other_min, other_max) = right.len().size_hint();
+        if self_max.is_some_and(|max| max < other_min) {
+            return self.always();
+        }
+        if other_max.is_some_and(|max| max < self_min) {
+            return self.always();
+        }
+
+        // If any of the required elements are pairwise disjoint, the tuples are disjoint as well.
+        let any_disjoint = |a: &[Type<'db>], b: &[Type<'db>], rev: bool| {
+            if rev {
+                std::iter::zip(a.iter().rev(), b.iter().rev()).when_any(
+                    db,
+                    self.constraints,
+                    |(&left_elem, &right_elem)| self.check_type_pair(db, left_elem, right_elem),
+                )
+            } else {
+                std::iter::zip(a, b).when_any(db, self.constraints, |(&left_elem, &right_elem)| {
+                    self.check_type_pair(db, left_elem, right_elem)
+                })
+            }
+        };
+
+        match (left, right) {
+            (Tuple::Fixed(left), Tuple::Fixed(right)) => {
+                any_disjoint(left.all_elements(), right.all_elements(), false)
+            }
+
+            // Note that we don't compare the variable-length portions; two pure homogeneous tuples
+            // `tuple[A, ...]` and `tuple[B, ...]` can never be disjoint even if A and B are
+            // disjoint, because `tuple[()]` would be assignable to both.
+            (Tuple::Variable(left), Tuple::Variable(right)) => {
+                any_disjoint(left.prefix_elements(), right.prefix_elements(), false).or(
+                    db,
+                    self.constraints,
+                    || any_disjoint(left.suffix_elements(), right.suffix_elements(), true),
+                )
+            }
+
+            (Tuple::Fixed(fixed), Tuple::Variable(variable))
+            | (Tuple::Variable(variable), Tuple::Fixed(fixed)) => {
+                any_disjoint(fixed.all_elements(), variable.prefix_elements(), false).or(
+                    db,
+                    self.constraints,
+                    || any_disjoint(fixed.all_elements(), variable.suffix_elements(), true),
+                )
+            }
+        }
     }
 }
 
@@ -427,11 +664,6 @@ impl<'db> FixedLengthTuple<Type<'db>> {
         }
     }
 
-    #[must_use]
-    fn normalized_impl(&self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
-        Self::from_elements(self.0.iter().map(|ty| ty.normalized_impl(db, visitor)))
-    }
-
     fn recursive_type_normalized_impl(
         &self,
         db: &'db dyn Db,
@@ -503,109 +735,6 @@ impl<'db> FixedLengthTuple<Type<'db>> {
         for ty in &self.0 {
             ty.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
         }
-    }
-
-    fn has_relation_to_impl(
-        &self,
-        db: &'db dyn Db,
-        other: &Tuple<Type<'db>>,
-        inferable: InferableTypeVars<'_, 'db>,
-        relation: TypeRelation<'db>,
-        relation_visitor: &HasRelationToVisitor<'db>,
-        disjointness_visitor: &IsDisjointVisitor<'db>,
-    ) -> ConstraintSet<'db> {
-        match other {
-            Tuple::Fixed(other) => {
-                ConstraintSet::from(self.0.len() == other.0.len()).and(db, || {
-                    (self.0.iter().zip(&other.0)).when_all(db, |(self_ty, other_ty)| {
-                        self_ty.has_relation_to_impl(
-                            db,
-                            *other_ty,
-                            inferable,
-                            relation,
-                            relation_visitor,
-                            disjointness_visitor,
-                        )
-                    })
-                })
-            }
-
-            Tuple::Variable(other) => {
-                // This tuple must have enough elements to match up with the other tuple's prefix
-                // and suffix, and each of those elements must pairwise satisfy the relation.
-                let mut result = ConstraintSet::from(true);
-                let mut self_iter = self.0.iter();
-                for other_ty in other.prefix_elements() {
-                    let Some(self_ty) = self_iter.next() else {
-                        return ConstraintSet::from(false);
-                    };
-                    let element_constraints = self_ty.has_relation_to_impl(
-                        db,
-                        *other_ty,
-                        inferable,
-                        relation,
-                        relation_visitor,
-                        disjointness_visitor,
-                    );
-                    if result
-                        .intersect(db, element_constraints)
-                        .is_never_satisfied(db)
-                    {
-                        return result;
-                    }
-                }
-                for other_ty in other.iter_suffix_elements().rev() {
-                    let Some(self_ty) = self_iter.next_back() else {
-                        return ConstraintSet::from(false);
-                    };
-                    let element_constraints = self_ty.has_relation_to_impl(
-                        db,
-                        other_ty,
-                        inferable,
-                        relation,
-                        relation_visitor,
-                        disjointness_visitor,
-                    );
-                    if result
-                        .intersect(db, element_constraints)
-                        .is_never_satisfied(db)
-                    {
-                        return result;
-                    }
-                }
-
-                // In addition, any remaining elements in this tuple must satisfy the
-                // variable-length portion of the other tuple.
-                result.and(db, || {
-                    self_iter.when_all(db, |self_ty| {
-                        self_ty.has_relation_to_impl(
-                            db,
-                            other.variable(),
-                            inferable,
-                            relation,
-                            relation_visitor,
-                            disjointness_visitor,
-                        )
-                    })
-                })
-            }
-        }
-    }
-
-    fn is_equivalent_to_impl(
-        &self,
-        db: &'db dyn Db,
-        other: &Self,
-        inferable: InferableTypeVars<'_, 'db>,
-        visitor: &IsEquivalentVisitor<'db>,
-    ) -> ConstraintSet<'db> {
-        ConstraintSet::from(self.0.len() == other.0.len()).and(db, || {
-            (self.0.iter())
-                .zip(&other.0)
-                .when_all(db, |(self_ty, other_ty)| {
-                    self_ty.is_equivalent_to_impl(db, *other_ty, inferable, visitor)
-                })
-        })
     }
 
     fn is_single_valued(&self, db: &'db dyn Db) -> bool {
@@ -924,18 +1053,6 @@ impl<'db> VariableLengthTuple<Type<'db>> {
         }
     }
 
-    #[must_use]
-    fn normalized_impl(&self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> TupleSpec<'db> {
-        let prefix = self
-            .prenormalized_prefix_elements(db, None)
-            .map(|ty| ty.normalized_impl(db, visitor));
-        let suffix = self
-            .prenormalized_suffix_elements(db, None)
-            .map(|ty| ty.normalized_impl(db, visitor));
-        let variable = self.variable().normalized_impl(db, visitor);
-        TupleSpec::Variable(Self::new(prefix, variable, suffix))
-    }
-
     fn recursive_type_normalized_impl(
         &self,
         db: &'db dyn Db,
@@ -1012,248 +1129,6 @@ impl<'db> VariableLengthTuple<Type<'db>> {
         for ty in self.suffix_elements() {
             ty.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
         }
-    }
-
-    fn has_relation_to_impl(
-        &self,
-        db: &'db dyn Db,
-        other: &Tuple<Type<'db>>,
-        inferable: InferableTypeVars<'_, 'db>,
-        relation: TypeRelation<'db>,
-        relation_visitor: &HasRelationToVisitor<'db>,
-        disjointness_visitor: &IsDisjointVisitor<'db>,
-    ) -> ConstraintSet<'db> {
-        match other {
-            Tuple::Fixed(other) => {
-                // The `...` length specifier of a variable-length tuple type is interpreted
-                // differently depending on the type of the variable-length elements.
-                //
-                // It typically represents the _union_ of all possible lengths. That means that a
-                // variable-length tuple type is not a subtype of _any_ fixed-length tuple type.
-                //
-                // However, as a special case, if the variable-length portion of the tuple is `Any`
-                // (or any other dynamic type), then the `...` is the _gradual choice_ of all
-                // possible lengths. This means that `tuple[Any, ...]` can match any tuple of any
-                // length.
-                if !relation.is_assignability() || !self.variable().is_dynamic() {
-                    return ConstraintSet::from(false);
-                }
-
-                // In addition, the other tuple must have enough elements to match up with this
-                // tuple's prefix and suffix, and each of those elements must pairwise satisfy the
-                // relation.
-                let mut result = ConstraintSet::from(true);
-                let mut other_iter = other.iter_all_elements();
-                for self_ty in self.prenormalized_prefix_elements(db, None) {
-                    let Some(other_ty) = other_iter.next() else {
-                        return ConstraintSet::from(false);
-                    };
-                    let element_constraints = self_ty.has_relation_to_impl(
-                        db,
-                        other_ty,
-                        inferable,
-                        relation,
-                        relation_visitor,
-                        disjointness_visitor,
-                    );
-                    if result
-                        .intersect(db, element_constraints)
-                        .is_never_satisfied(db)
-                    {
-                        return result;
-                    }
-                }
-                let suffix: Vec<_> = self.prenormalized_suffix_elements(db, None).collect();
-                for self_ty in suffix.iter().rev() {
-                    let Some(other_ty) = other_iter.next_back() else {
-                        return ConstraintSet::from(false);
-                    };
-                    let element_constraints = self_ty.has_relation_to_impl(
-                        db,
-                        other_ty,
-                        inferable,
-                        relation,
-                        relation_visitor,
-                        disjointness_visitor,
-                    );
-                    if result
-                        .intersect(db, element_constraints)
-                        .is_never_satisfied(db)
-                    {
-                        return result;
-                    }
-                }
-
-                result
-            }
-
-            Tuple::Variable(other) => {
-                // When prenormalizing below, we assume that a dynamic variable-length portion of
-                // one tuple materializes to the variable-length portion of the other tuple.
-                let self_prenormalize_variable = match self.variable() {
-                    Type::Dynamic(_) => Some(other.variable()),
-                    _ => None,
-                };
-                let other_prenormalize_variable = match other.variable() {
-                    Type::Dynamic(_) => Some(self.variable()),
-                    _ => None,
-                };
-
-                // The overlapping parts of the prefixes and suffixes must satisfy the relation.
-                // Any remaining parts must satisfy the relation with the other tuple's
-                // variable-length part.
-                let mut result = ConstraintSet::from(true);
-                let pairwise = self
-                    .prenormalized_prefix_elements(db, self_prenormalize_variable)
-                    .zip_longest(
-                        other.prenormalized_prefix_elements(db, other_prenormalize_variable),
-                    );
-                for pair in pairwise {
-                    let pair_constraints = match pair {
-                        EitherOrBoth::Both(self_ty, other_ty) => self_ty.has_relation_to_impl(
-                            db,
-                            other_ty,
-                            inferable,
-                            relation,
-                            relation_visitor,
-                            disjointness_visitor,
-                        ),
-                        EitherOrBoth::Left(self_ty) => self_ty.has_relation_to_impl(
-                            db,
-                            other.variable(),
-                            inferable,
-                            relation,
-                            relation_visitor,
-                            disjointness_visitor,
-                        ),
-                        EitherOrBoth::Right(other_ty) => {
-                            // The rhs has a required element that the lhs is not guaranteed to
-                            // provide, unless the lhs has a dynamic variable-length portion
-                            // that can materialize to provide it (for assignability only),
-                            // as in `tuple[Any, ...]` matching `tuple[int, int]`.
-                            if !relation.is_assignability() || !self.variable().is_dynamic() {
-                                return ConstraintSet::from(false);
-                            }
-                            self.variable().has_relation_to_impl(
-                                db,
-                                other_ty,
-                                inferable,
-                                relation,
-                                relation_visitor,
-                                disjointness_visitor,
-                            )
-                        }
-                    };
-                    if result
-                        .intersect(db, pair_constraints)
-                        .is_never_satisfied(db)
-                    {
-                        return result;
-                    }
-                }
-
-                let self_suffix: Vec<_> = self
-                    .prenormalized_suffix_elements(db, self_prenormalize_variable)
-                    .collect();
-                let other_suffix: Vec<_> = other
-                    .prenormalized_suffix_elements(db, other_prenormalize_variable)
-                    .collect();
-                let pairwise = self_suffix
-                    .iter()
-                    .rev()
-                    .zip_longest(other_suffix.iter().rev());
-                for pair in pairwise {
-                    let pair_constraints = match pair {
-                        EitherOrBoth::Both(self_ty, other_ty) => self_ty.has_relation_to_impl(
-                            db,
-                            *other_ty,
-                            inferable,
-                            relation,
-                            relation_visitor,
-                            disjointness_visitor,
-                        ),
-                        EitherOrBoth::Left(self_ty) => self_ty.has_relation_to_impl(
-                            db,
-                            other.variable(),
-                            inferable,
-                            relation,
-                            relation_visitor,
-                            disjointness_visitor,
-                        ),
-                        EitherOrBoth::Right(other_ty) => {
-                            // The rhs has a required element that the lhs is not guaranteed to
-                            // provide, unless the lhs has a dynamic variable-length portion
-                            // that can materialize to provide it (for assignability only),
-                            // as in `tuple[Any, ...]` matching `tuple[int, int]`.
-                            if !relation.is_assignability() || !self.variable().is_dynamic() {
-                                return ConstraintSet::from(false);
-                            }
-                            self.variable().has_relation_to_impl(
-                                db,
-                                *other_ty,
-                                inferable,
-                                relation,
-                                relation_visitor,
-                                disjointness_visitor,
-                            )
-                        }
-                    };
-                    if result
-                        .intersect(db, pair_constraints)
-                        .is_never_satisfied(db)
-                    {
-                        return result;
-                    }
-                }
-
-                // And lastly, the variable-length portions must satisfy the relation.
-                result.and(db, || {
-                    self.variable().has_relation_to_impl(
-                        db,
-                        other.variable(),
-                        inferable,
-                        relation,
-                        relation_visitor,
-                        disjointness_visitor,
-                    )
-                })
-            }
-        }
-    }
-
-    fn is_equivalent_to_impl(
-        &self,
-        db: &'db dyn Db,
-        other: &Self,
-        inferable: InferableTypeVars<'_, 'db>,
-        visitor: &IsEquivalentVisitor<'db>,
-    ) -> ConstraintSet<'db> {
-        self.variable()
-            .is_equivalent_to_impl(db, other.variable(), inferable, visitor)
-            .and(db, || {
-                self.prenormalized_prefix_elements(db, None)
-                    .zip_longest(other.prenormalized_prefix_elements(db, None))
-                    .when_all(db, |pair| match pair {
-                        EitherOrBoth::Both(self_ty, other_ty) => {
-                            self_ty.is_equivalent_to_impl(db, other_ty, inferable, visitor)
-                        }
-                        EitherOrBoth::Left(_) | EitherOrBoth::Right(_) => {
-                            ConstraintSet::from(false)
-                        }
-                    })
-            })
-            .and(db, || {
-                self.prenormalized_suffix_elements(db, None)
-                    .zip_longest(other.prenormalized_suffix_elements(db, None))
-                    .when_all(db, |pair| match pair {
-                        EitherOrBoth::Both(self_ty, other_ty) => {
-                            self_ty.is_equivalent_to_impl(db, other_ty, inferable, visitor)
-                        }
-                        EitherOrBoth::Left(_) | EitherOrBoth::Right(_) => {
-                            ConstraintSet::from(false)
-                        }
-                    })
-            })
     }
 }
 
@@ -1419,17 +1294,6 @@ impl<'db> Tuple<Type<'db>> {
         }
     }
 
-    pub(crate) fn normalized_impl(
-        &self,
-        db: &'db dyn Db,
-        visitor: &NormalizedVisitor<'db>,
-    ) -> Self {
-        match self {
-            Tuple::Fixed(tuple) => Tuple::Fixed(tuple.normalized_impl(db, visitor)),
-            Tuple::Variable(tuple) => tuple.normalized_impl(db, visitor),
-        }
-    }
-
     pub(super) fn recursive_type_normalized_impl(
         &self,
         db: &'db dyn Db,
@@ -1475,174 +1339,6 @@ impl<'db> Tuple<Type<'db>> {
             Tuple::Variable(tuple) => {
                 tuple.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
             }
-        }
-    }
-
-    fn has_relation_to_impl(
-        &self,
-        db: &'db dyn Db,
-        other: &Self,
-        inferable: InferableTypeVars<'_, 'db>,
-        relation: TypeRelation<'db>,
-        relation_visitor: &HasRelationToVisitor<'db>,
-        disjointness_visitor: &IsDisjointVisitor<'db>,
-    ) -> ConstraintSet<'db> {
-        match self {
-            Tuple::Fixed(self_tuple) => self_tuple.has_relation_to_impl(
-                db,
-                other,
-                inferable,
-                relation,
-                relation_visitor,
-                disjointness_visitor,
-            ),
-            Tuple::Variable(self_tuple) => self_tuple.has_relation_to_impl(
-                db,
-                other,
-                inferable,
-                relation,
-                relation_visitor,
-                disjointness_visitor,
-            ),
-        }
-    }
-
-    fn is_equivalent_to_impl(
-        &self,
-        db: &'db dyn Db,
-        other: &Self,
-        inferable: InferableTypeVars<'_, 'db>,
-        visitor: &IsEquivalentVisitor<'db>,
-    ) -> ConstraintSet<'db> {
-        match (self, other) {
-            (Tuple::Fixed(self_tuple), Tuple::Fixed(other_tuple)) => {
-                self_tuple.is_equivalent_to_impl(db, other_tuple, inferable, visitor)
-            }
-            (Tuple::Variable(self_tuple), Tuple::Variable(other_tuple)) => {
-                self_tuple.is_equivalent_to_impl(db, other_tuple, inferable, visitor)
-            }
-            (Tuple::Fixed(_), Tuple::Variable(_)) | (Tuple::Variable(_), Tuple::Fixed(_)) => {
-                ConstraintSet::from(false)
-            }
-        }
-    }
-
-    pub(super) fn is_disjoint_from_impl(
-        &self,
-        db: &'db dyn Db,
-        other: &Self,
-        inferable: InferableTypeVars<'_, 'db>,
-        disjointness_visitor: &IsDisjointVisitor<'db>,
-        relation_visitor: &HasRelationToVisitor<'db>,
-    ) -> ConstraintSet<'db> {
-        // Two tuples with an incompatible number of required elements must always be disjoint.
-        let (self_min, self_max) = self.len().size_hint();
-        let (other_min, other_max) = other.len().size_hint();
-        if self_max.is_some_and(|max| max < other_min) {
-            return ConstraintSet::from(true);
-        }
-        if other_max.is_some_and(|max| max < self_min) {
-            return ConstraintSet::from(true);
-        }
-
-        // If any of the required elements are pairwise disjoint, the tuples are disjoint as well.
-        #[allow(clippy::items_after_statements)]
-        fn any_disjoint<'s, 'db>(
-            db: &'db dyn Db,
-            a: &'s [Type<'db>],
-            b: &'s [Type<'db>],
-            inferable: InferableTypeVars<'_, 'db>,
-            disjointness_visitor: &IsDisjointVisitor<'db>,
-            relation_visitor: &HasRelationToVisitor<'db>,
-            rev: bool,
-        ) -> ConstraintSet<'db>
-        where
-            'db: 's,
-        {
-            if rev {
-                a.iter()
-                    .rev()
-                    .zip(b.iter().rev())
-                    .when_any(db, |(self_element, other_element)| {
-                        self_element.is_disjoint_from_impl(
-                            db,
-                            *other_element,
-                            inferable,
-                            disjointness_visitor,
-                            relation_visitor,
-                        )
-                    })
-            } else {
-                a.iter()
-                    .zip(b)
-                    .when_any(db, |(self_element, other_element)| {
-                        self_element.is_disjoint_from_impl(
-                            db,
-                            *other_element,
-                            inferable,
-                            disjointness_visitor,
-                            relation_visitor,
-                        )
-                    })
-            }
-        }
-
-        match (self, other) {
-            (Tuple::Fixed(self_tuple), Tuple::Fixed(other_tuple)) => any_disjoint(
-                db,
-                self_tuple.all_elements(),
-                other_tuple.all_elements(),
-                inferable,
-                disjointness_visitor,
-                relation_visitor,
-                false,
-            ),
-
-            // Note that we don't compare the variable-length portions; two pure homogeneous tuples
-            // `tuple[A, ...]` and `tuple[B, ...]` can never be disjoint even if A and B are
-            // disjoint, because `tuple[()]` would be assignable to both.
-            (Tuple::Variable(self_tuple), Tuple::Variable(other_tuple)) => any_disjoint(
-                db,
-                self_tuple.prefix_elements(),
-                other_tuple.prefix_elements(),
-                inferable,
-                disjointness_visitor,
-                relation_visitor,
-                false,
-            )
-            .or(db, || {
-                any_disjoint(
-                    db,
-                    self_tuple.suffix_elements(),
-                    other_tuple.suffix_elements(),
-                    inferable,
-                    disjointness_visitor,
-                    relation_visitor,
-                    true,
-                )
-            }),
-
-            (Tuple::Fixed(fixed), Tuple::Variable(variable))
-            | (Tuple::Variable(variable), Tuple::Fixed(fixed)) => any_disjoint(
-                db,
-                fixed.all_elements(),
-                variable.prefix_elements(),
-                inferable,
-                disjointness_visitor,
-                relation_visitor,
-                false,
-            )
-            .or(db, || {
-                any_disjoint(
-                    db,
-                    fixed.all_elements(),
-                    variable.suffix_elements(),
-                    inferable,
-                    disjointness_visitor,
-                    relation_visitor,
-                    true,
-                )
-            }),
         }
     }
 
@@ -2136,11 +1832,11 @@ impl<'db> TupleSpecBuilder<'db> {
                     && suffix.len() == var.suffix_elements().len()
                 {
                     for (existing, new) in prefix.iter_mut().zip(var.prefix_elements()) {
-                        *existing = IntersectionType::from_elements(db, [*existing, *new]);
+                        *existing = IntersectionType::from_two_elements(db, *existing, *new);
                     }
-                    *variable = IntersectionType::from_elements(db, [*variable, var.variable()]);
+                    *variable = IntersectionType::from_two_elements(db, *variable, var.variable());
                     for (existing, new) in suffix.iter_mut().zip(var.suffix_elements()) {
-                        *existing = IntersectionType::from_elements(db, [*existing, *new]);
+                        *existing = IntersectionType::from_two_elements(db, *existing, *new);
                     }
                     return Some(self);
                 }

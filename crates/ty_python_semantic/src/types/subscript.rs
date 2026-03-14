@@ -23,7 +23,7 @@ use super::special_form::SpecialFormType;
 use super::tuple::TupleSpec;
 use super::{
     DynamicType, IntersectionBuilder, IntersectionType, KnownInstanceType, Type, TypeAliasType,
-    UnionBuilder, UnionType, todo_type,
+    TypedDictType, UnionBuilder, UnionType, todo_type,
 };
 
 /// The kind of subscriptable type that had an out-of-bounds index.
@@ -120,6 +120,11 @@ pub(crate) enum SubscriptErrorKind<'db> {
         kind: CallErrorKind,
         bindings: Box<Bindings<'db>>,
     },
+    /// A `TypedDict` was subscripted with an invalid key.
+    InvalidTypedDictKey {
+        typed_dict: TypedDictType<'db>,
+        slice_ty: Type<'db>,
+    },
     /// The type does not support subscripting via the expected dunder.
     NotSubscriptable {
         value_ty: Type<'db>,
@@ -207,13 +212,17 @@ impl<'db> SubscriptErrorKind<'db> {
             }
             Self::NonGenericTypeAlias { alias } => {
                 if let Some(builder) = context.report_lint(&NOT_SUBSCRIPTABLE, subscript) {
+                    let mut diagnostic = builder.into_diagnostic(format_args!(
+                        "Cannot subscript non-generic type alias `{}`",
+                        alias.name(db)
+                    ));
                     let value_type = alias.raw_value_type(db);
-                    let mut diagnostic =
-                        builder.into_diagnostic("Cannot subscript non-generic type alias");
-                    if value_type.is_definition_generic(db) {
-                        diagnostic.set_primary_message(format_args!(
-                            "`{}` is already specialized",
-                            value_type.display(db)
+                    if value_type.is_specialized_generic(db) {
+                        diagnostic.annotate(context.secondary(&*subscript.value).message(
+                            format_args!(
+                                "Alias to `{}`, which is already specialized",
+                                value_type.display(db)
+                            ),
                         ));
                     }
                 }
@@ -276,6 +285,21 @@ impl<'db> SubscriptErrorKind<'db> {
                     }
                 }
             },
+            Self::InvalidTypedDictKey {
+                typed_dict,
+                slice_ty,
+            } => {
+                let typed_dict_ty = Type::TypedDict(*typed_dict);
+                report_invalid_key_on_typed_dict(
+                    context,
+                    value_node.into(),
+                    slice_node.into(),
+                    typed_dict_ty,
+                    None,
+                    *slice_ty,
+                    typed_dict.items(db),
+                );
+            }
             Self::NotSubscriptable { value_ty, method } => {
                 report_not_subscriptable(context, subscript, *value_ty, method.as_str());
             }
@@ -407,6 +431,45 @@ where
     ))
 }
 
+// `TypedDict` subscripts need custom handling because invalid keys should still
+// recover with `Unknown` while emitting `invalid-key`, which is not naturally
+// representable via synthesized `__getitem__` overloads alone.
+fn typed_dict_subscript<'db>(
+    db: &'db dyn Db,
+    typed_dict: TypedDictType<'db>,
+    slice_ty: Type<'db>,
+) -> Result<Type<'db>, SubscriptError<'db>> {
+    if slice_ty.is_dynamic() {
+        return Ok(Type::unknown());
+    }
+
+    let Some(key) = slice_ty
+        .as_string_literal()
+        .map(|literal| literal.value(db))
+    else {
+        return Err(SubscriptError::new(
+            Type::unknown(),
+            SubscriptErrorKind::InvalidTypedDictKey {
+                typed_dict,
+                slice_ty,
+            },
+        ));
+    };
+
+    typed_dict.items(db).get(key).map_or_else(
+        || {
+            Err(SubscriptError::new(
+                Type::unknown(),
+                SubscriptErrorKind::InvalidTypedDictKey {
+                    typed_dict,
+                    slice_ty,
+                },
+            ))
+        },
+        |field| Ok(field.declared_ty),
+    )
+}
+
 impl<'db> Type<'db> {
     pub(super) fn subscript(
         self,
@@ -445,6 +508,11 @@ impl<'db> Type<'db> {
                 Some(map_intersection_subscript(db, intersection, |element| {
                     value_ty.subscript(db, element, expr_context)
                 }))
+            }
+
+            // Ex) Given `person["name"]`, return `str`
+            (Type::TypedDict(typed_dict), _) if expr_context != ast::ExprContext::Store => {
+                Some(typed_dict_subscript(db, typed_dict, slice_ty))
             }
 
             // Ex) Given `("a", "b", "c", "d")[1]`, return `"b"`

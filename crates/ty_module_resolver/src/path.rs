@@ -325,6 +325,10 @@ impl ModulePath {
             relative_path: relative_path.with_extension("py"),
         })
     }
+
+    pub(crate) fn into_search_path(self) -> SearchPath {
+        self.search_path
+    }
 }
 
 impl PartialEq<SystemPathBuf> for ModulePath {

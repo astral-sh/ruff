@@ -213,7 +213,10 @@ fields = [{ name = "test", type = "Expr" }, { name = "msg", type = "Expr?" }]
 
 [Stmt.nodes.StmtImport]
 doc = "See also [Import](https://docs.python.org/3/library/ast.html#ast.Import)"
-fields = [{ name = "names", type = "Alias*" }]
+fields = [
+  { name = "names", type = "Alias*" },
+  { name = "is_lazy", type = "bool" },
+]
 
 [Stmt.nodes.StmtImportFrom]
 doc = "See also [ImportFrom](https://docs.python.org/3/library/ast.html#ast.ImportFrom)"
@@ -221,6 +224,7 @@ fields = [
   { name = "module", type = "Identifier?" },
   { name = "names", type = "Alias*" },
   { name = "level", type = "u32" },
+  { name = "is_lazy", type = "bool" },
 ]
 
 [Stmt.nodes.StmtGlobal]

@@ -2,6 +2,7 @@ use std::cell::{OnceCell, RefCell};
 use std::sync::Arc;
 
 use except_handlers::TryNodeContextStackManager;
+use itertools::Itertools;
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use ruff_db::files::File;
@@ -10,10 +11,10 @@ use ruff_db::source::{SourceText, source_text};
 use ruff_index::IndexVec;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::visitor::{Visitor, walk_expr, walk_pattern, walk_stmt};
-use ruff_python_ast::{self as ast, NodeIndex, PySourceType, PythonVersion};
+use ruff_python_ast::{self as ast, AtomicNodeIndex, NodeIndex, PySourceType, PythonVersion};
 use ruff_python_parser::semantic_errors::{
-    SemanticSyntaxChecker, SemanticSyntaxContext, SemanticSyntaxError, SemanticSyntaxErrorKind,
-    YieldOutsideFunctionKind,
+    LazyImportContext, SemanticSyntaxChecker, SemanticSyntaxContext, SemanticSyntaxError,
+    SemanticSyntaxErrorKind, YieldOutsideFunctionKind,
 };
 use ruff_text_size::TextRange;
 use ty_module_resolver::{ModuleName, resolve_module};
@@ -34,8 +35,8 @@ use crate::semantic_index::expression::{Expression, ExpressionKind};
 use crate::semantic_index::member::MemberExprBuilder;
 use crate::semantic_index::place::{PlaceExpr, PlaceTableBuilder, ScopedPlaceId};
 use crate::semantic_index::predicate::{
-    CallableAndCallExpr, ClassPatternKind, PatternPredicate, PatternPredicateKind, Predicate,
-    PredicateNode, PredicateOrLiteral, ScopedPredicateId, StarImportPlaceholderPredicate,
+    ClassPatternKind, PatternPredicate, PatternPredicateKind, Predicate, PredicateNode,
+    PredicateOrLiteral, ScopedPredicateId, StarImportPlaceholderPredicate,
 };
 use crate::semantic_index::re_exports::exported_names;
 use crate::semantic_index::reachability_constraints::{
@@ -47,16 +48,16 @@ use crate::semantic_index::scope::{
 use crate::semantic_index::scope::{Scope, ScopeId, ScopeKind, ScopeLaziness};
 use crate::semantic_index::symbol::{ScopedSymbolId, Symbol};
 use crate::semantic_index::use_def::{
-    EnclosingSnapshotKey, FlowSnapshot, PreviousDefinitions, ScopedEnclosingSnapshotId,
-    UseDefMapBuilder,
+    EnclosingSnapshotKey, FlowSnapshot, PreviousDefinitions, ScopedDefinitionId,
+    ScopedEnclosingSnapshotId, UseDefMapBuilder,
 };
 use crate::semantic_index::{
     ExpressionsScopeMap, LoopHeader, LoopToken, SemanticIndex, VisibleAncestorsIter,
     get_loop_header,
 };
 use crate::semantic_model::HasTrackedScope;
-use crate::types::PossiblyNarrowedPlaces;
-use crate::unpack::{EvaluationMode, Unpack, UnpackKind, UnpackPosition, UnpackValue};
+use crate::types::{EvaluationMode, PossiblyNarrowedPlaces};
+use crate::unpack::{Unpack, UnpackKind, UnpackPosition, UnpackValue};
 use crate::{Db, Program};
 
 mod except_handlers;
@@ -113,6 +114,7 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     python_version: PythonVersion,
     source_text: OnceCell<SourceText>,
     semantic_checker: SemanticSyntaxChecker,
+    in_try: bool,
 
     // Semantic Index fields
     scopes: IndexVec<FileScopeId, Scope>,
@@ -172,6 +174,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             python_version: Program::get(db).python_version(db),
             source_text: OnceCell::new(),
             semantic_checker: SemanticSyntaxChecker::default(),
+            in_try: false,
             semantic_syntax_errors: RefCell::default(),
         };
 
@@ -788,27 +791,60 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
     // Creates a definition for each key-value assignment in the dictionary.
     //
-    // If there are multiple targets, a given key-value definition will be created multiple
-    // times for each target.
+    // If there are multiple targets, no definitions will be created.
     fn add_dict_key_assignment_definitions(
         &mut self,
         targets: impl IntoIterator<Item = &'ast ast::Expr> + Copy,
-        dict: &'ast ast::ExprDict,
+        dict: &'ast ast::Expr,
         assignment: Definition<'db>,
     ) {
-        for target in targets {
-            if let Some(target) = MemberExprBuilder::visit_expr(target.into()) {
-                self.add_dict_key_assignment_definitions_impl(&target, dict, assignment);
-            }
+        // TODO: Although we synthesize place expressions for each dictionary key, the definition
+        // is still uniquely associated with the AST node of the key expression, and so multiple target
+        // places cannot refer to the same key.
+        let Ok(target) = targets.into_iter().exactly_one() else {
+            return;
+        };
+
+        if let Some(target) = MemberExprBuilder::visit_expr(target.into()) {
+            self.add_dict_key_assignment_definitions_impl(&target, dict.into(), assignment);
         }
     }
 
     fn add_dict_key_assignment_definitions_impl(
         &mut self,
         target: &MemberExprBuilder,
-        dict: &'ast ast::ExprDict,
+        expr: ast::ExprRef<'ast>,
         assignment: Definition<'db>,
     ) {
+        let ruff_python_ast::ExprRef::Dict(dict) = expr else {
+            let items = match expr {
+                ruff_python_ast::ExprRef::List(list) => &list.elts,
+                ruff_python_ast::ExprRef::Tuple(tuple) => &tuple.elts,
+                _ => return,
+            };
+
+            // Traverse into nested collections that may contain dictionary literals.
+            for (i, item) in items
+                .iter()
+                // Ignore starred expressions and any elements that follow them, as we cannot
+                // determine the index to narrow on.
+                .take_while(|e| !e.is_starred_expr())
+                .enumerate()
+            {
+                if let Some(target) = MemberExprBuilder::visit_subscript_expr(
+                    target.clone(),
+                    &ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
+                        value: ast::Number::Int(ast::Int::from(i as u64)),
+                        range: TextRange::default(),
+                        node_index: AtomicNodeIndex::NONE,
+                    }),
+                ) {
+                    self.add_dict_key_assignment_definitions_impl(&target, item.into(), assignment);
+                }
+            }
+            return;
+        };
+
         for item in &dict.items {
             let Some(key) = item.key.as_ref() else {
                 continue;
@@ -820,9 +856,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             };
 
             // Recurse into nested dictionaries.
-            if let ast::Expr::Dict(dict_value) = &item.value {
-                self.add_dict_key_assignment_definitions_impl(&member_expr, dict_value, assignment);
-            }
+            self.add_dict_key_assignment_definitions_impl(
+                &member_expr,
+                (&item.value).into(),
+                assignment,
+            );
 
             if let Some(place_expr) = PlaceExpr::try_from_member_expr(member_expr) {
                 let place_id = self.add_place(place_expr);
@@ -840,12 +878,13 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     }
 
     /// Create loop header definitions for all places that are bound within a loop. Return the
-    /// `LoopToken` referenced by those definitions, and the set of bound place IDs.
+    /// `LoopToken` referenced by those definitions, the set of bound place IDs, and the lower
+    /// bound `ScopedDefinitionId` for definitions created within the loop.
     fn synthesize_loop_header_definitions(
         &mut self,
         loop_stmt: LoopStmtRef<'ast>,
         bound_places: Vec<PlaceExpr>,
-    ) -> (LoopToken<'db>, FxHashSet<ScopedPlaceId>) {
+    ) -> (LoopToken<'db>, FxHashSet<ScopedPlaceId>, ScopedDefinitionId) {
         let loop_token = LoopToken::new(self.db);
         let mut bound_place_ids: FxHashSet<ScopedPlaceId> = FxHashSet::default();
         for place_expr in bound_places {
@@ -860,7 +899,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 self.push_additional_definition(place_id, loop_header_ref);
             }
         }
-        (loop_token, bound_place_ids)
+        let loop_min_definition_id = self.current_use_def_map_mut().next_definition_id();
+        (loop_token, bound_place_ids, loop_min_definition_id)
     }
 
     /// Build a `LoopHeader` that tracks all the variables bound in a loop, which will be visible
@@ -871,13 +911,18 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         &mut self,
         loop_header_places: &FxHashSet<ScopedPlaceId>,
         loop_token: LoopToken<'db>,
+        loop_min_definition_id: ScopedDefinitionId,
     ) {
         let mut loop_header = LoopHeader::new();
         let use_def = self.current_use_def_map_mut();
-        // Collect bindings.
+        // Collect all the bindings within the loop that reached a loop back edge. Use the minimum
+        // definition ID to filter out all the pre-loop bindings. The loop header doesn't shadow
+        // them, so there's no need to duplicate them.
         for place_id in loop_header_places {
             for live_binding in use_def.loop_back_bindings(*place_id) {
-                loop_header.add_binding(*place_id, live_binding);
+                if live_binding.binding >= loop_min_definition_id {
+                    loop_header.add_binding(*place_id, live_binding);
+                }
             }
         }
         // Mark the reachability and narrowing constraints as used.
@@ -1129,6 +1174,15 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         ClassPatternKind::Refutable
                     },
                 )
+            }
+            ast::Pattern::MatchMapping(pattern) => {
+                // `case {}` and `case {**rest}` match every mapping, while keyed mapping
+                // patterns are refutable (`case {"x": _}` may fail for some mappings).
+                PatternPredicateKind::Mapping(if pattern.keys.is_empty() {
+                    ClassPatternKind::Irrefutable
+                } else {
+                    ClassPatternKind::Refutable
+                })
             }
             ast::Pattern::MatchOr(pattern) => {
                 let predicates = pattern
@@ -1471,9 +1525,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 ));
                 Some(unpackable.as_current_assignment(unpack))
             }
-            ast::Expr::Name(_) | ast::Expr::Attribute(_) | ast::Expr::Subscript(_) => {
-                Some(unpackable.as_current_assignment(None))
-            }
+            ast::Expr::Name(_)
+            | ast::Expr::Starred(_)
+            | ast::Expr::Attribute(_)
+            | ast::Expr::Subscript(_) => Some(unpackable.as_current_assignment(None)),
             _ => None,
         };
 
@@ -1903,12 +1958,13 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         (&alias.name.id, is_self_import)
                     };
 
-                    // Look for imports `from __future__ import annotations`, ignore `as ...`
+                    // Look for eager imports `from __future__ import annotations`, ignore `as ...`
                     // We intentionally don't enforce the rules about location of `__future__`
                     // imports here, we assume the user's intent was to apply the `__future__`
                     // import, so we still check using it (and will also emit a diagnostic about a
                     // miss-placed `__future__` import.)
-                    self.has_future_annotations |= alias.name.id == "annotations"
+                    self.has_future_annotations |= !node.is_lazy
+                        && alias.name.id == "annotations"
                         && node.module.as_deref() == Some("__future__");
 
                     let symbol = self.add_symbol(symbol_name.clone());
@@ -2210,8 +2266,10 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
 
                 // Collect all the loop-back bindings (including the `continue` states we just
                 // merged) and populate the `LoopHeader`.
-                if let Some((loop_token, bound_place_ids)) = maybe_loop_header_info {
-                    self.populate_loop_header(&bound_place_ids, loop_token);
+                if let Some((loop_token, bound_place_ids, loop_min_definition_id)) =
+                    maybe_loop_header_info
+                {
+                    self.populate_loop_header(&bound_place_ids, loop_token, loop_min_definition_id);
                 }
 
                 // We execute the `else` branch once the condition evaluates to false. This could
@@ -2318,8 +2376,10 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
 
                 // Collect all the loop-back bindings (including the `continue` states we just
                 // merged) and populate the `LoopHeader`.
-                if let Some((loop_token, bound_place_ids)) = maybe_loop_header_info {
-                    self.populate_loop_header(&bound_place_ids, loop_token);
+                if let Some((loop_token, bound_place_ids, loop_min_definition_id)) =
+                    maybe_loop_header_info
+                {
+                    self.populate_loop_header(&bound_place_ids, loop_token, loop_min_definition_id);
                 }
 
                 // We may execute the `else` clause without ever executing the body, so merge in
@@ -2448,6 +2508,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 range: _,
                 node_index: _,
             }) => {
+                let was_in_try = std::mem::replace(&mut self.in_try, true);
                 self.record_ambiguous_reachability();
 
                 // Save the state prior to visiting any of the `try` block.
@@ -2557,6 +2618,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 // - https://astral-sh.notion.site/Exception-handler-control-flow-11348797e1ca80bb8ce1e9aedbbe439d
                 // - https://github.com/astral-sh/ruff/pull/13633#discussion_r1788626702
                 self.visit_body(finalbody);
+                self.in_try = was_in_try;
             }
 
             ast::Stmt::Raise(_) | ast::Stmt::Return(_) => {
@@ -2708,8 +2770,9 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
 
                 self.visit_expr(value);
 
-                // If the statement is a call, it could possibly be a call to a function
-                // marked with `NoReturn` (for example, `sys.exit()`). In this case, we use a special
+                // If the statement is a call (or an `await` wrapping a call), it could
+                // possibly be a call to a function marked with `NoReturn` (for example,
+                // `sys.exit()` or `await async_exit()`). In this case, we use a special
                 // kind of constraint to mark the following code as unreachable.
                 //
                 // Ideally, these constraints should be added for every call expression, even those in
@@ -2721,30 +2784,29 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 // We also only add these inside function scopes, since considering module-level
                 // constraints can affect the type of imported symbols, leading to a lot more
                 // work in third-party code.
-                if let ast::Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() {
-                    if !self.source_type.is_stub() && self.in_function_scope() {
-                        let callable = self.add_standalone_expression(func);
-                        let call_expr = self.add_standalone_expression(value.as_ref());
+                let is_call = match value.as_ref() {
+                    ast::Expr::Call(_) => true,
+                    ast::Expr::Await(ast::ExprAwait { value: inner, .. }) => inner.is_call_expr(),
+                    _ => false,
+                };
 
-                        let predicate = Predicate {
-                            node: PredicateNode::ReturnsNever(CallableAndCallExpr {
-                                callable,
-                                call_expr,
-                            }),
-                            is_positive: false,
-                        };
-                        let constraint = self.record_reachability_constraint(
-                            PredicateOrLiteral::Predicate(predicate),
-                        );
+                if is_call && !self.source_type.is_stub() && self.in_function_scope() {
+                    let call_expr = self.add_standalone_expression(value.as_ref());
 
-                        // Also gate narrowing by this constraint: if the call returns
-                        // `Never`, any narrowing in the current branch should be
-                        // invalidated (since this path is unreachable). This enables
-                        // narrowing to be preserved after if-statements where one branch
-                        // calls a `NoReturn` function like `sys.exit()`.
-                        self.current_use_def_map_mut()
-                            .record_narrowing_constraint_for_all_places(constraint);
-                    }
+                    let predicate = Predicate {
+                        node: PredicateNode::ReturnsNever(call_expr),
+                        is_positive: false,
+                    };
+                    let constraint = self
+                        .record_reachability_constraint(PredicateOrLiteral::Predicate(predicate));
+
+                    // Also gate narrowing by this constraint: if the call returns
+                    // `Never`, any narrowing in the current branch should be
+                    // invalidated (since this path is unreachable). This enables
+                    // narrowing to be preserved after if-statements where one branch
+                    // calls a `NoReturn` function like `sys.exit()`.
+                    self.current_use_def_map_mut()
+                        .record_narrowing_constraint_for_all_places(constraint);
                 }
             }
             _ => {
@@ -2822,13 +2884,11 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                                     },
                                 );
 
-                                if let ast::Expr::Dict(dict) = &*node.value {
-                                    self.add_dict_key_assignment_definitions(
-                                        &node.targets,
-                                        dict,
-                                        assignment,
-                                    );
-                                }
+                                self.add_dict_key_assignment_definitions(
+                                    &node.targets,
+                                    &node.value,
+                                    assignment,
+                                );
                             }
                             Some(CurrentAssignment::AnnAssign(ann_assign)) => {
                                 self.add_standalone_type_expression(&ann_assign.annotation);
@@ -2842,10 +2902,10 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                                     },
                                 );
 
-                                if let Some(ast::Expr::Dict(dict)) = ann_assign.value.as_deref() {
+                                if let Some(value) = ann_assign.value.as_deref() {
                                     self.add_dict_key_assignment_definitions(
                                         [&*ann_assign.target],
-                                        dict,
+                                        value,
                                         assignment,
                                     );
                                 }
@@ -3155,6 +3215,27 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
 impl SemanticSyntaxContext for SemanticIndexBuilder<'_, '_> {
     fn future_annotations_or_stub(&self) -> bool {
         self.has_future_annotations
+    }
+
+    fn lazy_import_context(&self) -> Option<LazyImportContext> {
+        match self.scopes[self.current_scope()].kind() {
+            // Possible, but invalid positions.
+            ScopeKind::Function => return Some(LazyImportContext::Function),
+            ScopeKind::Class => return Some(LazyImportContext::Class),
+            // Valid position.
+            ScopeKind::Module => {}
+            // Impossible positions because lambdas and comprehensions can't contain statements.
+            ScopeKind::Comprehension
+            | ScopeKind::Lambda
+            | ScopeKind::TypeAlias
+            | ScopeKind::TypeParams => {}
+        }
+
+        if self.in_try {
+            return Some(LazyImportContext::TryExceptBlocks);
+        }
+
+        None
     }
 
     fn python_version(&self) -> PythonVersion {

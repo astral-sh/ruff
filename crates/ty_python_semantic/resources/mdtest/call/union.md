@@ -299,16 +299,16 @@ class RecursiveAttr2:
         self.i = 0
 
     def update(self):
-        self.i = (self.i + 1) % 9
+        self.i = (self.i + 1) % 4
 
-reveal_type(RecursiveAttr2().i)  # revealed: Unknown | Literal[0, 1, 2, 3, 4, 5, 6, 7, 8]
+reveal_type(RecursiveAttr2().i)  # revealed: Unknown | Literal[0, 1, 2, 3]
 
 class RecursiveAttr3:
     def __init__(self):
         self.i = 0
 
     def update(self):
-        self.i = (self.i + 1) % 10
+        self.i = (self.i + 1) % 5
 
 # Going beyond the MAX_RECURSIVE_UNION_LITERALS limit:
 reveal_type(RecursiveAttr3().i)  # revealed: Unknown | int
@@ -853,12 +853,12 @@ Type inference accounts for parameter type annotations across all signatures in 
 ```py
 from typing import TypedDict, overload
 
-class T(TypedDict):
+class TD(TypedDict):
     x: int
 
 def _(flag: bool):
     if flag:
-        def f(x: T) -> int:
+        def f(x: TD) -> int:
             return 1
 
     else:
@@ -867,7 +867,7 @@ def _(flag: bool):
     x = f({"x": 1})
     reveal_type(x)  # revealed: int
 
-    # error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `T`, found `dict[str, int] & dict[Unknown | str, Unknown | int]`"
+    # error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `TD`, found `dict[str, int]`"
     f({"y": 1})
 ```
 

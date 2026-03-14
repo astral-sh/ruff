@@ -664,18 +664,18 @@ from typing import Protocol, TypeVar, TypedDict
 
 ListOfInts = list[int]
 
-# error: [not-subscriptable] "Cannot subscript non-generic type: `<class 'list[int]'>` is already specialized"
+# error: [not-subscriptable] "Cannot subscript non-generic type `<class 'list[int]'>`"
 def _(doubly_specialized: ListOfInts[int]):
     reveal_type(doubly_specialized)  # revealed: Unknown
 
 type ListOfInts2 = list[int]
-# error: [not-subscriptable] "Cannot subscript non-generic type alias: `list[int]` is already specialized"
+# error: [not-subscriptable] "Cannot subscript non-generic type alias `ListOfInts2`"
 DoublySpecialized = ListOfInts2[int]
 
 def _(doubly_specialized: DoublySpecialized):
     reveal_type(doubly_specialized)  # revealed: Unknown
 
-# error: [not-subscriptable] "Cannot subscript non-generic type: `<class 'list[int]'>` is already specialized"
+# error: [not-subscriptable] "Cannot subscript non-generic type `<class 'list[int]'>`"
 List = list[int][int]
 
 def _(doubly_specialized: List):
@@ -683,7 +683,7 @@ def _(doubly_specialized: List):
 
 Tuple = tuple[int, str]
 
-# error: [not-subscriptable] "Cannot subscript non-generic type: `<class 'tuple[int, str]'>` is already specialized"
+# error: [not-subscriptable] "Cannot subscript non-generic type `<class 'tuple[int, str]'>`"
 def _(doubly_specialized: Tuple[int]):
     reveal_type(doubly_specialized)  # revealed: Unknown
 
@@ -694,7 +694,7 @@ class LegacyProto(Protocol[T]):
 
 LegacyProtoInt = LegacyProto[int]
 
-# error: [not-subscriptable] "Cannot subscript non-generic type: `<class 'LegacyProto[int]'>` is already specialized"
+# error: [not-subscriptable] "Cannot subscript non-generic type `<class 'LegacyProto[int]'>`"
 def _(doubly_specialized: LegacyProtoInt[int]):
     reveal_type(doubly_specialized)  # revealed: Unknown
 
@@ -703,12 +703,13 @@ class Proto[T](Protocol):
 
 ProtoInt = Proto[int]
 
-# error: [not-subscriptable] "Cannot subscript non-generic type: `<class 'Proto[int]'>` is already specialized"
+# error: [not-subscriptable] "Cannot subscript non-generic type `<class 'Proto[int]'>`"
 def _(doubly_specialized: ProtoInt[int]):
     reveal_type(doubly_specialized)  # revealed: Unknown
 
 # TODO: TypedDict is just a function object at runtime, we should emit an error
 class LegacyDict(TypedDict[T]):
+    # error: [unbound-type-variable]
     x: T
 
 # TODO: should be a `not-subscriptable` error
@@ -724,20 +725,20 @@ class Dict[T](TypedDict):
 
 DictInt = Dict[int]
 
-# error: [not-subscriptable] "Cannot subscript non-generic type: `<class 'Dict[int]'>` is already specialized"
+# error: [not-subscriptable] "Cannot subscript non-generic type `<class 'Dict[int]'>`"
 def _(doubly_specialized: DictInt[int]):
     reveal_type(doubly_specialized)  # revealed: Unknown
 
 Union = list[str] | list[int]
 
-# error: [not-subscriptable] "Cannot subscript non-generic type: `<types.UnionType special-form 'list[str] | list[int]'>` is already specialized"
+# error: [not-subscriptable] "Cannot subscript non-generic type `<types.UnionType special-form 'list[str] | list[int]'>`"
 def _(doubly_specialized: Union[int]):
     reveal_type(doubly_specialized)  # revealed: Unknown
 
 type MyListAlias[T] = list[T]
 MyListOfInts = MyListAlias[int]
 
-# error: [not-subscriptable] "Cannot subscript non-generic type alias: Double specialization is not allowed"
+# error: [not-subscriptable] "Cannot specialize non-generic type alias: Double specialization is not allowed"
 def _(doubly_specialized: MyListOfInts[int]):
     reveal_type(doubly_specialized)  # revealed: Unknown
 ```
@@ -784,12 +785,45 @@ def _(
 Similarly, if you try to specialize a union type without a binding context, we emit an error:
 
 ```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
 # error: [not-subscriptable] "Cannot subscript non-generic type"
+# error: [unbound-type-variable]
+# error: [unbound-type-variable]
 x: (list[T] | set[T])[int]
 
 def _():
     # TODO: `list[Unknown] | set[Unknown]` might be better
     reveal_type(x)  # revealed: Unknown
+```
+
+### Snapshots for verbose diagnostics
+
+<!-- snapshot-diagnostics -->
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+type ListOfInts2 = list[int]
+
+# error: [not-subscriptable] "Cannot subscript non-generic type alias `ListOfInts2`"
+DoublySpecialized = ListOfInts2[int]
+
+ThreeInts = tuple[int, int, int]
+
+class A[T]: ...
+
+AliasForA = A[int]
+
+def f(
+    a: AliasForA[int],  # error: [not-subscriptable]
+    b: ThreeInts[int],  # error: [not-subscriptable]
+): ...
 ```
 
 ### Multiple definitions
@@ -1443,7 +1477,7 @@ from typing import List, Dict
 # error: [invalid-type-form] "Int literals are not allowed in this context in a type expression"
 InvalidList = List[1]
 
-# error: [invalid-type-form] "`typing.List` requires exactly one argument"
+# error: [invalid-type-form] "`typing.List` requires exactly 1 argument, got 2"
 ListTooManyArgs = List[int, str]
 
 # error: [invalid-type-form] "Int literals are not allowed in this context in a type expression"
@@ -1452,10 +1486,10 @@ InvalidDict1 = Dict[1, str]
 # error: [invalid-type-form] "Int literals are not allowed in this context in a type expression"
 InvalidDict2 = Dict[str, 2]
 
-# error: [invalid-type-form] "`typing.Dict` requires exactly two arguments, got 1"
+# error: [invalid-type-form] "`typing.Dict` requires exactly 2 arguments, got 1"
 DictTooFewArgs = Dict[str]
 
-# error: [invalid-type-form] "`typing.Dict` requires exactly two arguments, got 3"
+# error: [invalid-type-form] "`typing.Dict` requires exactly 2 arguments, got 3"
 DictTooManyArgs = Dict[str, int, float]
 
 def _(
@@ -1470,7 +1504,7 @@ def _(
     reveal_type(list_too_many_args)  # revealed: list[Unknown]
     reveal_type(invalid_dict1)  # revealed: dict[Unknown, str]
     reveal_type(invalid_dict2)  # revealed: dict[str, Unknown]
-    reveal_type(dict_too_few_args)  # revealed: dict[str, Unknown]
+    reveal_type(dict_too_few_args)  # revealed: dict[Unknown, Unknown]
     reveal_type(dict_too_many_args)  # revealed: dict[Unknown, Unknown]
 ```
 
@@ -1610,10 +1644,10 @@ python-version = "3.12"
 ```py
 from typing import List, Dict
 
-RecursiveList1 = list["RecursiveList1" | None]
-RecursiveList2 = List["RecursiveList2" | None]
-RecursiveDict1 = dict[str, "RecursiveDict1" | None]
-RecursiveDict2 = Dict[str, "RecursiveDict2" | None]
+RecursiveList1 = list["RecursiveList1 | None"]
+RecursiveList2 = List["RecursiveList2 | None"]
+RecursiveDict1 = dict[str, "RecursiveDict1 | None"]
+RecursiveDict2 = Dict[str, "RecursiveDict2 | None"]
 RecursiveDict3 = dict["RecursiveDict3", int]
 RecursiveDict4 = Dict["RecursiveDict4", int]
 

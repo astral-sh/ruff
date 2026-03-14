@@ -2512,3 +2512,63 @@ fn markdown_formatting_stdin() -> Result<()> {
     "#);
     Ok(())
 }
+
+#[test]
+fn format_mapped_extension_files() -> Result<()> {
+    let test = CliTest::with_files([
+        (
+            "pyproject.toml",
+            r#"
+[tool.ruff]
+extension = {foo="python", bar="markdown"}
+"#,
+        ),
+        (
+            "test.foo",
+            r"
+print( 'hello' )
+",
+        ),
+        (
+            "test.bar",
+            r"
+Text string
+
+```py
+print( 'hello' )
+```
+",
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(
+            test.format_command()
+                .args(["format", "--preview", "--check", "."]),
+            @r#"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+    io: [TMP]/format: No such file or directory (os error 2)
+    --> format:1:1
+
+    unformatted: File would be reformatted
+     --> test.bar:1:1
+    2 | Text string
+    3 | 
+    4 | ```py
+      - print( 'hello' )
+    5 + print("hello")
+    6 | ```
+
+    unformatted: File would be reformatted
+     --> test.foo:1:1
+      - 
+      - print( 'hello' )
+    1 + print("hello")
+
+    2 files would be reformatted
+
+    ----- stderr -----
+    "#);
+    Ok(())
+}

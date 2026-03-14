@@ -59,7 +59,7 @@ impl Violation for FallibleContextManager {
     }
 }
 
-/// RUF071
+/// RUF072
 pub(crate) fn fallible_context_manager(checker: &Checker, function_def: &StmtFunctionDef) {
     if !has_contextmanager_decorator(checker, function_def) {
         return;

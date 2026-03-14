@@ -1726,8 +1726,7 @@ from ty_extensions import is_equivalent_to
 class HasMutableXAttr(Protocol):
     x: int
 
-# TODO: should pass
-static_assert(is_equivalent_to(HasMutableXAttr, HasMutableXProperty))  # error: [static-assert-error]
+static_assert(is_equivalent_to(HasMutableXAttr, HasMutableXProperty))
 
 static_assert(is_subtype_of(HasMutableXAttr, HasXProperty))
 static_assert(is_assignable_to(HasMutableXAttr, HasXProperty))
@@ -2042,6 +2041,31 @@ static_assert(is_assignable_to(str, SupportsLessThan))
 static_assert(is_assignable_to(int, Invertable))
 ```
 
+Literal values should satisfy protocols with method members via their instance fallback type:
+
+```py
+from typing import Literal, Protocol, TypeVar
+
+reveal_type(abs(5))  # revealed: int
+
+def f(x: Literal[5]) -> None:
+    reveal_type(abs(x))  # revealed: int
+
+InT = TypeVar("InT")
+OutT = TypeVar("OutT")
+
+class CanMul(Protocol[InT, OutT]):
+    def __mul__(self, x: InT, /) -> OutT: ...
+
+def x2(x: CanMul[int, OutT], /) -> OutT:
+    return x * 2
+
+def g(x: int) -> None:
+    reveal_type(x2(x))  # revealed: int
+
+reveal_type(x2(1))  # revealed: int
+```
+
 ## Subtyping of protocols with generic method members
 
 Protocol method members can be generic. They can have generic contexts scoped to the class:
@@ -2064,16 +2088,14 @@ S = TypeVar("S")
 class LegacyClassScoped(Protocol[S]):
     def method(self, input: S) -> None: ...
 
-# TODO: these should pass
-static_assert(is_equivalent_to(NewStyleClassScoped, LegacyClassScoped))  # error: [static-assert-error]
-static_assert(is_equivalent_to(NewStyleClassScoped[int], LegacyClassScoped[int]))  # error: [static-assert-error]
+static_assert(is_equivalent_to(NewStyleClassScoped, LegacyClassScoped))
+static_assert(is_equivalent_to(NewStyleClassScoped[int], LegacyClassScoped[int]))
 
 class NominalGeneric[T]:
     def method(self, input: T) -> None: ...
 
 def _[T](x: T) -> T:
-    # TODO: should pass
-    static_assert(is_equivalent_to(NewStyleClassScoped[T], LegacyClassScoped[T]))  # error: [static-assert-error]
+    static_assert(is_equivalent_to(NewStyleClassScoped[T], LegacyClassScoped[T]))
     static_assert(is_subtype_of(NominalGeneric[T], NewStyleClassScoped[T]))
     static_assert(is_subtype_of(NominalGeneric[T], LegacyClassScoped[T]))
     return x
@@ -2151,9 +2173,7 @@ class NominalReturningOtherClass:
     def g(self) -> Other:
         raise NotImplementedError
 
-# TODO: should pass
-static_assert(is_equivalent_to(LegacyFunctionScoped, NewStyleFunctionScoped))  # error: [static-assert-error]
-
+static_assert(is_equivalent_to(LegacyFunctionScoped, NewStyleFunctionScoped))
 static_assert(is_assignable_to(NominalNewStyle, NewStyleFunctionScoped))
 static_assert(is_assignable_to(NominalNewStyle, LegacyFunctionScoped))
 static_assert(is_subtype_of(NominalNewStyle, NewStyleFunctionScoped))
@@ -2361,9 +2381,7 @@ class P4(Protocol):
     def z(self, value: int) -> None: ...
 
 static_assert(is_equivalent_to(P1, P2))
-
-# TODO: should pass
-static_assert(is_equivalent_to(P3, P4))  # error: [static-assert-error]
+static_assert(is_equivalent_to(P3, P4))
 ```
 
 As with protocols that only have non-method members, this also holds true when they appear in
@@ -2374,9 +2392,7 @@ class A: ...
 class B: ...
 
 static_assert(is_equivalent_to(A | B | P1, P2 | B | A))
-
-# TODO: should pass
-static_assert(is_equivalent_to(A | B | P3, P4 | B | A))  # error: [static-assert-error]
+static_assert(is_equivalent_to(A | B | P3, P4 | B | A))
 ```
 
 ## Subtyping between two protocol types with method members
@@ -2583,6 +2599,41 @@ def f(arg1: type):
         reveal_type(arg1)  # revealed: type[OnlyClassmethodMembers]
     else:
         reveal_type(arg1)  # revealed: type & ~type[OnlyClassmethodMembers]
+```
+
+The same diagnostics are also emitted when protocol classes appear inside a tuple passed as the
+second argument to `isinstance()` or `issubclass()`:
+
+```py
+def g(arg: object, arg2: type):
+    isinstance(arg, (HasX, RuntimeCheckableHasX))  # error: [isinstance-against-protocol]
+    isinstance(arg, (HasX, int))  # error: [isinstance-against-protocol]
+
+    # error: [isinstance-against-protocol]
+    # error: [isinstance-against-protocol]
+    issubclass(arg2, (HasX, RuntimeCheckableHasX))
+
+    issubclass(arg2, (HasX, OnlyMethodMembers))  # error: [isinstance-against-protocol]
+```
+
+This includes nested tuples:
+
+```py
+def g2(arg: object, arg2: type):
+    isinstance(arg, (int, (HasX, str)))  # error: [isinstance-against-protocol]
+
+    # error: [isinstance-against-protocol]
+    # error: [isinstance-against-protocol]
+    issubclass(arg2, (int, (HasX, RuntimeCheckableHasX)))
+```
+
+This also works when the tuple is not a literal in the source:
+
+```py
+classes = (HasX, int)
+
+def h(arg: object):
+    isinstance(arg, classes)  # error: [isinstance-against-protocol]
 ```
 
 ## Match class patterns and protocols
@@ -2923,8 +2974,6 @@ class Bar(Protocol):
     @property
     def x(self) -> "Bar": ...
 
-# TODO: this should pass
-# error: [static-assert-error]
 static_assert(is_equivalent_to(Foo, Bar))
 
 T = TypeVar("T", bound="TypeVarRecursive")
@@ -3030,16 +3079,71 @@ class Nominal:
 static_assert(not is_disjoint_from(Proto, Nominal))
 ```
 
+### Regression test: recursive protocol through `dict.items()`
+
+```py
+from __future__ import annotations
+
+from typing import Protocol
+
+class IntArray(Protocol):
+    def __add__(self, other: IntArray | int) -> IntArray: ...
+    def __getitem__(self, key: slice) -> IntArray: ...
+
+data: dict[str, IntArray] = {}
+indexed_data = {k: v[0:10] for k, v in data.items()}
+
+reveal_type(indexed_data)  # revealed: dict[str, IntArray]
+```
+
+### Regression test: `dict()` overloads with tuple-of-tuples input
+
+This is a regression test for [ty#3026](https://github.com/astral-sh/ty/issues/3026). Matching the
+`dict()` overloads that accept `_typeshed.SupportsKeysAndGetItem` against a tuple of tuples used to
+trigger exponential behavior before we rejected the protocol candidates.
+
+```py
+output = dict((
+    ("0", 0),
+    ("1", 1),
+    ("2", 2),
+    ("3", 3),
+    ("4", 4),
+    ("5", 5),
+    ("6", 6),
+    ("7", 7),
+    ("8", 8),
+    ("9", 9),
+    ("10", 10),
+    ("11", 11),
+    ("12", 12),
+    ("13", 13),
+    ("14", 14),
+    ("15", 15),
+    ("16", 16),
+    ("17", 17),
+    ("18", 18),
+    ("19", 19),
+    ("20", 20),
+    ("21", 21),
+    ("22", 22),
+    ("23", 23),
+))
+reveal_type(output)  # revealed: dict[str, int]
+```
+
 ### Regression test: narrowing with self-referential protocols
 
 This snippet caused us to panic on an early version of the implementation for protocols.
 
 ```py
-from typing import Protocol
+from typing import Protocol, runtime_checkable
 
+@runtime_checkable
 class A(Protocol):
     def x(self) -> "B | A": ...
 
+@runtime_checkable
 class B(Protocol):
     def y(self): ...
 
@@ -3157,6 +3261,8 @@ S = TypeVar("S")
 class Bar(Protocol[S]):
     def x(self) -> "S | Bar[S]": ...
 
+# error: [unbound-type-variable]
+# error: [unbound-type-variable]
 z: S | Bar[S]
 ```
 
@@ -3392,6 +3498,118 @@ reveal_type(T4.__bound__)  # revealed: B1[Any]
 # error: [invalid-type-arguments]
 def g(x: B2[int]):
     pass
+```
+
+## The `Generator` protocol's `_ReturnT_co` needs special casing prior to Python 3.13
+
+The `_ReturnT_co` type parameter in the `Generator` protocol is the value of a `yield from` over
+that generator, and it's also in the pathway for the return values from `async` functions. (In the
+`Awaitable` protocol, `__await__` returns a `Generator`.) So of course if we're asking whether one
+type of `Generator` is e.g. assignable to another, and we see that one of them has a `_ReturnT_co`
+type of `float` while the other has `str`, we should decide that they're not assignable.
+
+However, zooming in to the implementation details, `_ReturnT_co` is actually the type of the `value`
+attribute on the `StopIteration` exception that the `Generator` raises when it's finished. This is
+awkward, because protocols don't describe the exceptions that their methods raise. How is ty
+supposed to see that incompatible `_ReturnT_co` types imply incompatible `Generator`s?
+
+As of Python 3.13, the `Generator` protocol's `close` method was changed from returning `None` to
+returning `_ReturnT_co | None`. This was motivated by an edge case (you tried to cancel a generator,
+but it caught the related exception and returned something anyway), but coincidentally it tells ty
+what it needs to know: `_ReturnT_co` is something that some method in this protocol returns.
+Something with a method that returns `float` isn't assignable to something where the same method
+returns `str`. Problem solved.
+
+However, prior to 3.13, the `_ReturnT_co` type only appeared in the `__iter__` method.
+Unfortunately, the `__iter__` method on a `Generator` just returns `self`; its return type is the
+same `Generator`. That isn't helpful for the assignability question, because all we can say by
+looking at `__iter__` is that "`Generator` `A` is assignable to `Generator` `B` if...`Generator` `A`
+is assignable to `Generator` `B`." In practice we break this recursive cycle by inserting `Any`, and
+we end up ignoring `_ReturnT_co` entirely and saying that things are assignable when they shouldn't
+be. But how we break the cycle isn't really the problem; the problem is that the `Generator`
+protocol (prior to 3.13) genuinely tells us nothing about how `_ReturnT_co` interacts with
+assignability.
+
+As a special case workaround for this, we compare `Generator` implementations *nominally* when the
+target Python version is 3.12 or earlier in `has_relation_to`.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from ty_extensions import is_equivalent_to, is_subtype_of, static_assert, is_assignable_to
+from typing import Generator, Awaitable, Protocol, TypeVar, Any, Protocol
+
+T_co = TypeVar("T_co", covariant=True)
+
+class A: ...
+class B: ...
+
+static_assert(not is_equivalent_to(Generator[None, None, A], Generator[None, None, B]))
+static_assert(not is_subtype_of(Generator[None, None, A], Generator[None, None, B]))
+static_assert(not is_subtype_of(Generator[None, None, B], Generator[None, None, A]))
+
+static_assert(is_equivalent_to(Generator[None, None, A], Generator[None, None, A]))
+static_assert(is_subtype_of(Generator[None, None, A], Generator[None, None, A]))
+static_assert(is_subtype_of(Generator[None, None, A], Generator[None, None, A]))
+
+# Awaitable is also impacted, since `Awaitable.__await__` returns `Generator`
+
+static_assert(not is_equivalent_to(Awaitable[A], Awaitable[B]))
+static_assert(not is_equivalent_to(Awaitable[A], Awaitable[Any]))
+static_assert(not is_subtype_of(Awaitable[A], Awaitable[B]))
+static_assert(not is_assignable_to(Awaitable[A], Awaitable[B]))
+
+class CustomCovariantProtocol(Protocol[T_co]):
+    def foo(self) -> tuple[list[Generator[None, None, T_co]]]: ...
+
+static_assert(not is_equivalent_to(CustomCovariantProtocol[A], CustomCovariantProtocol[B]))
+static_assert(not is_equivalent_to(CustomCovariantProtocol[A], CustomCovariantProtocol[Any]))
+static_assert(not is_subtype_of(CustomCovariantProtocol[A], CustomCovariantProtocol[B]))
+static_assert(not is_assignable_to(CustomCovariantProtocol[A], CustomCovariantProtocol[B]))
+```
+
+## The `Generator` protocol's `_ReturnT_co` does not need special casing as of Python 3.13
+
+The same test cases as above, but for Python 3.13 instead of 3.12. In this version `_ReturnT_co`
+appears in `Generator`'s `close` method, and no special case is needed.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from ty_extensions import is_equivalent_to, is_subtype_of, static_assert, is_assignable_to
+from typing import Generator, Awaitable, TypeVar, Protocol, Any
+
+T_co = TypeVar("T_co", covariant=True)
+
+class A: ...
+class B: ...
+
+static_assert(not is_equivalent_to(Generator[None, None, A], Generator[None, None, B]))
+static_assert(not is_subtype_of(Generator[None, None, A], Generator[None, None, B]))
+static_assert(not is_subtype_of(Generator[None, None, B], Generator[None, None, A]))
+
+static_assert(is_equivalent_to(Generator[None, None, A], Generator[None, None, A]))
+static_assert(is_subtype_of(Generator[None, None, A], Generator[None, None, A]))
+static_assert(is_subtype_of(Generator[None, None, A], Generator[None, None, A]))
+
+static_assert(not is_equivalent_to(Awaitable[A], Awaitable[B]))
+static_assert(not is_equivalent_to(Awaitable[A], Awaitable[Any]))
+static_assert(not is_subtype_of(Awaitable[A], Awaitable[B]))
+static_assert(not is_assignable_to(Awaitable[A], Awaitable[B]))
+
+class CustomCovariantProtocol(Protocol[T_co]):
+    def foo(self) -> tuple[list[Generator[None, None, T_co]]]: ...
+
+static_assert(not is_equivalent_to(CustomCovariantProtocol[A], CustomCovariantProtocol[B]))
+static_assert(not is_equivalent_to(CustomCovariantProtocol[A], CustomCovariantProtocol[Any]))
+static_assert(not is_subtype_of(CustomCovariantProtocol[A], CustomCovariantProtocol[B]))
+static_assert(not is_assignable_to(CustomCovariantProtocol[A], CustomCovariantProtocol[B]))
 ```
 
 ## TODO

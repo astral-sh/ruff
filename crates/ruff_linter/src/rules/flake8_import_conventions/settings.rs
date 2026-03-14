@@ -8,6 +8,8 @@ use serde::{Deserialize, Serialize};
 use ruff_macros::CacheKey;
 
 use crate::display_settings;
+use crate::preview::is_expanded_import_conventions_enabled;
+use crate::settings::types::PreviewMode;
 
 const CONVENTIONAL_ALIASES: &[(&str, &str)] = &[
     ("altair", "alt"),
@@ -27,6 +29,9 @@ const CONVENTIONAL_ALIASES: &[(&str, &str)] = &[
     ("pyarrow", "pa"),
     ("xml.etree.ElementTree", "ET"),
 ];
+
+const PREVIEW_ALIASES: &[(&str, &str)] =
+    &[("plotly.graph_objects", "go"), ("statsmodels.api", "sm")];
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize, CacheKey)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
@@ -66,18 +71,49 @@ pub struct Settings {
     pub banned_from: FxHashSet<String>,
 }
 
-pub fn default_aliases() -> FxHashMap<String, String> {
-    CONVENTIONAL_ALIASES
+pub fn default_aliases(preview: PreviewMode) -> FxHashMap<String, String> {
+    let mut aliases = CONVENTIONAL_ALIASES
         .iter()
         .map(|(k, v)| ((*k).to_string(), (*v).to_string()))
-        .collect::<FxHashMap<_, _>>()
+        .collect::<FxHashMap<_, _>>();
+
+    if is_expanded_import_conventions_enabled(preview) {
+        aliases.extend(
+            PREVIEW_ALIASES
+                .iter()
+                .map(|(k, v)| ((*k).to_string(), (*v).to_string())),
+        );
+    }
+
+    aliases
+}
+
+pub fn default_banned_aliases(preview: PreviewMode) -> FxHashMap<String, BannedAliases> {
+    if is_expanded_import_conventions_enabled(preview) {
+        FxHashMap::from_iter([(
+            "geopandas".to_string(),
+            BannedAliases::from_iter(["gpd".to_string()]),
+        )])
+    } else {
+        FxHashMap::default()
+    }
+}
+
+impl Settings {
+    pub fn new(preview: PreviewMode) -> Self {
+        Self {
+            aliases: default_aliases(preview),
+            banned_aliases: default_banned_aliases(preview),
+            banned_from: FxHashSet::default(),
+        }
+    }
 }
 
 impl Default for Settings {
     fn default() -> Self {
         Self {
-            aliases: default_aliases(),
-            banned_aliases: FxHashMap::default(),
+            aliases: default_aliases(PreviewMode::Disabled),
+            banned_aliases: default_banned_aliases(PreviewMode::Disabled),
             banned_from: FxHashSet::default(),
         }
     }

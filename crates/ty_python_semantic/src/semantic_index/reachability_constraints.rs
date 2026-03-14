@@ -205,11 +205,10 @@ use crate::rank::RankBitBox;
 use crate::semantic_index::place::ScopedPlaceId;
 use crate::semantic_index::place_table;
 use crate::semantic_index::predicate::{
-    CallableAndCallExpr, PatternPredicate, PatternPredicateKind, Predicate, PredicateNode,
-    Predicates, ScopedPredicateId,
+    PatternPredicate, PatternPredicateKind, Predicate, PredicateNode, Predicates, ScopedPredicateId,
 };
 use crate::types::{
-    CallableTypes, IntersectionBuilder, NarrowingConstraint, Truthiness, Type, TypeContext,
+    IntersectionBuilder, KnownClass, NarrowingConstraint, Truthiness, Type, TypeContext,
     UnionBuilder, UnionType, infer_expression_type, infer_narrowing_constraint,
 };
 
@@ -330,6 +329,10 @@ fn singleton_to_type(db: &dyn Db, singleton: ruff_python_ast::Singleton) -> Type
     ty
 }
 
+fn mapping_pattern_type(db: &dyn Db) -> Type<'_> {
+    KnownClass::Mapping.to_instance(db).top_materialization(db)
+}
+
 /// Turn a `match` pattern kind into a type that represents the set of all values that would definitely
 /// match that pattern.
 fn pattern_kind_to_type<'db>(db: &'db dyn Db, kind: &PatternPredicateKind<'db>) -> Type<'db> {
@@ -352,6 +355,13 @@ fn pattern_kind_to_type<'db>(db: &'db dyn Db, kind: &PatternPredicateKind<'db>) 
                     .to_instance(db)
                     .unwrap_or(Type::Never)
                     .top_materialization(db)
+            } else {
+                Type::Never
+            }
+        }
+        PatternPredicateKind::Mapping(kind) => {
+            if kind.is_irrefutable() {
+                mapping_pattern_type(db)
             } else {
                 Type::Never
             }
@@ -756,12 +766,11 @@ impl ReachabilityConstraintsBuilder {
 
 /// AND a new optional narrowing constraint with an accumulated one.
 fn accumulate_constraint<'db>(
-    db: &'db dyn Db,
     accumulated: Option<NarrowingConstraint<'db>>,
     new: Option<NarrowingConstraint<'db>>,
 ) -> Option<NarrowingConstraint<'db>> {
     match (accumulated, new) {
-        (Some(acc), Some(new_c)) => Some(new_c.merge_constraint_and(acc, db)),
+        (Some(acc), Some(new_c)) => Some(new_c.merge_constraint_and(acc)),
         (None, Some(new_c)) => Some(new_c),
         (Some(acc), None) => Some(acc),
         (None, None) => None,
@@ -828,7 +837,7 @@ impl ReachabilityConstraints {
                 // Apply all accumulated narrowing constraints to the base type
                 match accumulated {
                     Some(constraint) => NarrowingConstraint::intersection(base_ty)
-                        .merge_constraint_and(constraint, db)
+                        .merge_constraint_and(constraint)
                         .evaluate_constraint_type(db),
                     None => base_ty,
                 }
@@ -877,7 +886,7 @@ impl ReachabilityConstraints {
                         is_positive: !predicate.is_positive,
                     };
                     let neg_constraint = infer_narrowing_constraint(db, neg_predicate, place);
-                    let false_accumulated = accumulate_constraint(db, accumulated, neg_constraint);
+                    let false_accumulated = accumulate_constraint(accumulated, neg_constraint);
                     return self.narrow_by_constraint_inner(
                         db,
                         predicates,
@@ -890,7 +899,7 @@ impl ReachabilityConstraints {
 
                 // If the false branch is statically unreachable, skip it entirely.
                 if node.if_false == ALWAYS_FALSE {
-                    let true_accumulated = accumulate_constraint(db, accumulated, pos_constraint);
+                    let true_accumulated = accumulate_constraint(accumulated, pos_constraint);
                     return self.narrow_by_constraint_inner(
                         db,
                         predicates,
@@ -902,8 +911,7 @@ impl ReachabilityConstraints {
                 }
 
                 // True branch: predicate holds → accumulate positive narrowing
-                let true_accumulated =
-                    accumulate_constraint(db, accumulated.clone(), pos_constraint);
+                let true_accumulated = accumulate_constraint(accumulated.clone(), pos_constraint);
                 let true_ty = self.narrow_by_constraint_inner(
                     db,
                     predicates,
@@ -919,7 +927,7 @@ impl ReachabilityConstraints {
                     is_positive: !predicate.is_positive,
                 };
                 let neg_constraint = infer_narrowing_constraint(db, neg_predicate, place);
-                let false_accumulated = accumulate_constraint(db, accumulated, neg_constraint);
+                let false_accumulated = accumulate_constraint(accumulated, neg_constraint);
                 let false_ty = self.narrow_by_constraint_inner(
                     db,
                     predicates,
@@ -929,7 +937,7 @@ impl ReachabilityConstraints {
                     false_accumulated,
                 );
 
-                UnionType::from_elements(db, [true_ty, false_ty])
+                UnionType::from_two_elements(db, true_ty, false_ty)
             }
         }
     }
@@ -1050,6 +1058,20 @@ impl ReachabilityConstraints {
                     }
                 })
             }
+            PatternPredicateKind::Mapping(kind) => {
+                let mapping_ty = mapping_pattern_type(db);
+                if subject_ty.is_subtype_of(db, mapping_ty) {
+                    if kind.is_irrefutable() {
+                        Truthiness::AlwaysTrue
+                    } else {
+                        Truthiness::Ambiguous
+                    }
+                } else if subject_ty.is_disjoint_from(db, mapping_ty) {
+                    Truthiness::AlwaysFalse
+                } else {
+                    Truthiness::Ambiguous
+                }
+            }
             PatternPredicateKind::As(pattern, _) => pattern
                 .as_deref()
                 .map(|p| Self::analyze_single_pattern_predicate_kind(db, p, subject_ty))
@@ -1067,61 +1089,12 @@ impl ReachabilityConstraints {
                     .bool(db)
                     .negate_if(!predicate.is_positive)
             }
-            PredicateNode::ReturnsNever(CallableAndCallExpr {
-                callable,
-                call_expr,
-            }) => {
-                // We first infer just the type of the callable. In the most likely case that the
-                // function is not marked with `NoReturn`, or that it always returns `NoReturn`,
-                // doing so allows us to avoid the more expensive work of inferring the entire call
-                // expression (which could involve inferring argument types to possibly run the overload
-                // selection algorithm).
-                // Avoiding this on the happy-path is important because these constraints can be
-                // very large in number, since we add them on all statement level function calls.
-                let ty = infer_expression_type(db, callable, TypeContext::default());
-
-                // Short-circuit for well known types that are known not to return `Never` when called.
-                // Without the short-circuit, we've seen that threads keep blocking each other
-                // because they all try to acquire Salsa's `CallableType` lock that ensures each type
-                // is only interned once. The lock is so heavily congested because there are only
-                // very few dynamic types, in which case Salsa's sharding the locks by value
-                // doesn't help much.
-                // See <https://github.com/astral-sh/ty/issues/968>.
-                if matches!(ty, Type::Dynamic(_)) {
-                    return Truthiness::AlwaysFalse.negate_if(!predicate.is_positive);
-                }
-
-                let overloads_iterator = if let Some(callable) = ty
-                    .try_upcast_to_callable(db)
-                    .and_then(CallableTypes::exactly_one)
-                {
-                    callable.signatures(db).overloads.iter()
-                } else {
-                    return Truthiness::AlwaysFalse.negate_if(!predicate.is_positive);
-                };
-
-                let mut no_overloads_return_never = true;
-                let mut all_overloads_return_never = true;
-                let mut any_overload_is_generic = false;
-
-                for overload in overloads_iterator {
-                    let returns_never = overload.return_ty.is_equivalent_to(db, Type::Never);
-                    no_overloads_return_never &= !returns_never;
-                    all_overloads_return_never &= returns_never;
-                    any_overload_is_generic |= overload.return_ty.has_typevar(db);
-                }
-
-                if no_overloads_return_never && !any_overload_is_generic {
-                    Truthiness::AlwaysFalse
-                } else if all_overloads_return_never {
+            PredicateNode::ReturnsNever(call_expr) => {
+                let call_expr_ty = infer_expression_type(db, call_expr, TypeContext::default());
+                if call_expr_ty.is_equivalent_to(db, Type::Never) {
                     Truthiness::AlwaysTrue
                 } else {
-                    let call_expr_ty = infer_expression_type(db, call_expr, TypeContext::default());
-                    if call_expr_ty.is_equivalent_to(db, Type::Never) {
-                        Truthiness::AlwaysTrue
-                    } else {
-                        Truthiness::AlwaysFalse
-                    }
+                    Truthiness::AlwaysFalse
                 }
                 .negate_if(!predicate.is_positive)
             }

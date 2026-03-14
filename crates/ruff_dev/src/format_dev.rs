@@ -36,7 +36,7 @@ use ruff_python_formatter::{
     FormatModuleError, MagicTrailingComma, PreviewMode, PyFormatOptions, format_module_source,
 };
 use ruff_python_parser::ParseError;
-use ruff_workspace::resolver::{PyprojectConfig, ResolvedFile, Resolver, python_files_in_path};
+use ruff_workspace::resolver::{PyprojectConfig, ResolvedFile, Resolver, project_files_in_path};
 
 fn parse_cli(dirs: &[PathBuf]) -> anyhow::Result<(FormatArguments, ConfigArguments)> {
     let args_matches = FormatCommand::command()
@@ -68,7 +68,7 @@ fn ruff_check_paths<'a>(
     cli: &FormatArguments,
     config_arguments: &ConfigArguments,
 ) -> anyhow::Result<(Vec<Result<ResolvedFile, ignore::Error>>, Resolver<'a>)> {
-    let (paths, resolver) = python_files_in_path(&cli.files, pyproject_config, config_arguments)?;
+    let (paths, resolver) = project_files_in_path(&cli.files, pyproject_config, config_arguments)?;
     Ok((paths, resolver))
 }
 

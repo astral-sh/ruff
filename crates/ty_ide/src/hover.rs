@@ -303,7 +303,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.hover(), @"
+        assert_snapshot!(test.hover(), @r"
         def my_func(
             a,
             b
@@ -358,7 +358,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.hover(), @"
+        assert_snapshot!(test.hover(), @r"
         def my_func(
             a,
             b
@@ -427,7 +427,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.hover(), @"
+        assert_snapshot!(test.hover(), @r"
         <class 'MyClass'>
         ---------------------------------------------
         This is such a great class!!
@@ -489,7 +489,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.hover(), @"
+        assert_snapshot!(test.hover(), @r"
         <class 'MyClass'>
         ---------------------------------------------
         This is such a great class!!
@@ -664,7 +664,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.hover(), @"
+        assert_snapshot!(test.hover(), @r"
         <class 'MyClass'>
         ---------------------------------------------
         This is such a great class!!
@@ -729,7 +729,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.hover(), @"
+        assert_snapshot!(test.hover(), @r"
         bound method MyClass.my_method(
             a,
             b
@@ -2045,7 +2045,7 @@ def ab(a: int, *, c: int):
         )
         .unwrap();
 
-        assert_snapshot!(test.hover(), @"
+        assert_snapshot!(test.hover(), @r"
         <module 'lib'>
         ---------------------------------------------
         The cool lib_py module!
@@ -2519,10 +2519,10 @@ def function():
         // TODO: This should just be `**AB@Alias2 (<variance>)`
         // https://github.com/astral-sh/ty/issues/1581
         assert_snapshot!(test.hover(), @"
-        (**AB@Alias2) -> tuple[AB@Alias2]
+        (**AB@Alias2) -> tuple[Unknown]
         ---------------------------------------------
         ```python
-        (**AB@Alias2) -> tuple[AB@Alias2]
+        (**AB@Alias2) -> tuple[Unknown]
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
@@ -2599,7 +2599,7 @@ def function():
         )
         .unwrap();
 
-        assert_snapshot!(test.hover(), @"
+        assert_snapshot!(test.hover(), @r"
         <module 'lib'>
         ---------------------------------------------
         The cool lib_py module!
@@ -2999,7 +2999,7 @@ def function():
         "#,
         );
 
-        assert_snapshot!(test.hover(), @"
+        assert_snapshot!(test.hover(), @r"
         int
         ---------------------------------------------
         This is the docs for this value
@@ -3088,7 +3088,7 @@ def function():
         "#,
         );
 
-        assert_snapshot!(test.hover(), @"
+        assert_snapshot!(test.hover(), @r"
         int
         ---------------------------------------------
         This is the docs for this value
@@ -4547,11 +4547,11 @@ def function():
         "#,
         );
 
-        assert_snapshot!(test.hover(), @"
-        list[Unknown | int]
+        assert_snapshot!(test.hover(), @r###"
+        list[int]
         ---------------------------------------------
         ```python
-        list[Unknown | int]
+        list[int]
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
@@ -4562,7 +4562,7 @@ def function():
           |      |
           |      source
           |
-        ");
+        "###);
 
         let test = cursor_test(
             r#"
@@ -4584,6 +4584,115 @@ def function():
           |                             ^^^- Cursor offset
           |                             |
           |                             source
+          |
+        ");
+    }
+
+    #[test]
+    fn hover_multi_inference() {
+        let test = cursor_test(
+            r#"
+            def list1[T](x: T) -> list[T]:
+                return [x]
+
+            def f(x: int, y: int) -> list[int] | list[str]:
+                return list1(x<CURSOR> + y)
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r"
+        int
+        ---------------------------------------------
+        ```python
+        int
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:6:18
+          |
+        5 | def f(x: int, y: int) -> list[int] | list[str]:
+        6 |     return list1(x + y)
+          |                  ^- Cursor offset
+          |                  |
+          |                  source
+          |
+        ");
+
+        let test = cursor_test(
+            r#"
+            def f(x: int, y: int) -> list[int] | list[str]:
+                return [x<CURSOR> + y]
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r"
+        int
+        ---------------------------------------------
+        ```python
+        int
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:3:13
+          |
+        2 | def f(x: int, y: int) -> list[int] | list[str]:
+        3 |     return [x + y]
+          |             ^- Cursor offset
+          |             |
+          |             source
+          |
+        ");
+
+        let test = cursor_test(
+            r#"
+            def list1[T](x: T) -> list[T]:
+                return [x]
+
+            def f(x: int, y: int) -> list[int] | list[str]:
+                return (_<CURSOR> := list1(x + y))
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r"
+        list[int]
+        ---------------------------------------------
+        ```python
+        list[int]
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:6:13
+          |
+        5 | def f(x: int, y: int) -> list[int] | list[str]:
+        6 |     return (_ := list1(x + y))
+          |             ^- Cursor offset
+          |             |
+          |             source
+          |
+        ");
+
+        let test = cursor_test(
+            r#"
+            def f(x: int, y: int) -> list[int] | list[str]:
+                return (_<CURSOR> := [x + y])
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r"
+        list[int]
+        ---------------------------------------------
+        ```python
+        list[int]
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:3:13
+          |
+        2 | def f(x: int, y: int) -> list[int] | list[str]:
+        3 |     return (_ := [x + y])
+          |             ^- Cursor offset
+          |             |
+          |             source
           |
         ");
     }
@@ -4950,6 +5059,20 @@ def function():
           | source
           |
         ");
+    }
+
+    // Ref: https://github.com/astral-sh/ty/issues/2401
+    #[test]
+    fn hover_incomplete_except_handler() {
+        let test = cursor_test(
+            "\
+try:
+    print()
+except <CURSOR># Trigger completion/hover here
+",
+        );
+
+        assert_snapshot!(test.hover(), @"Hover provided no content");
     }
 
     impl CursorTest {

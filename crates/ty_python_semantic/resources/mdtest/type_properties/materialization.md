@@ -215,10 +215,7 @@ class EquivalentToBottom(Protocol):
 
 static_assert(is_subtype_of(EquivalentToBottom, Bottom[Callable[..., Never]]))
 static_assert(is_subtype_of(Bottom[Callable[..., Never]], EquivalentToBottom))
-
-# TODO: is_equivalent_to only considers types of the same kind equivalent (Callable vs ProtocolInstance),
-# so this fails even though mutual subtyping proves semantic equivalence.
-static_assert(is_equivalent_to(Bottom[Callable[..., Never]], EquivalentToBottom))  # error: [static-assert-error]
+static_assert(is_equivalent_to(Bottom[Callable[..., Never]], EquivalentToBottom))
 
 # Top-materialized callables are not equivalent to non-top-materialized callables, even if their
 # signatures would otherwise be equivalent after materialization.
@@ -240,7 +237,7 @@ Materializing an overloaded callable materializes each overload separately.
 
 ```py
 from typing import overload
-from ty_extensions import CallableTypeOf
+from ty_extensions import RegularCallableTypeOf
 
 @overload
 def f(x: int) -> Any: ...
@@ -249,7 +246,7 @@ def f(*args: Any, **kwargs: Any) -> str: ...
 def f(*args: object, **kwargs: object) -> object:
     pass
 
-def _(top: Top[CallableTypeOf[f]], bottom: Bottom[CallableTypeOf[f]]):
+def _(top: Top[RegularCallableTypeOf[f]], bottom: Bottom[RegularCallableTypeOf[f]]):
     reveal_type(top)  # revealed: Overload[(x: int) -> object, Top[(...) -> str]]
     reveal_type(bottom)  # revealed: Overload[(x: int) -> Never, (*args: object, **kwargs: object) -> str]
 ```
@@ -274,7 +271,7 @@ type TopCallable = Top[Callable[..., Any]]
 def takes_objects(*args: object, **kwargs: object) -> object:
     pass
 
-static_assert(not is_subtype_of(TopCallable, CallableTypeOf[takes_objects]))
+static_assert(not is_subtype_of(TopCallable, RegularCallableTypeOf[takes_objects]))
 ```
 
 ## Tuple
@@ -536,6 +533,29 @@ static_assert(is_equivalent_to(Bottom[GenericCovariant[Any]], GenericCovariant[N
 
 static_assert(is_equivalent_to(Top[GenericContravariant[Any]], GenericContravariant[Never]))
 static_assert(is_equivalent_to(Bottom[GenericContravariant[Any]], GenericContravariant[object]))
+```
+
+When all invariant type parameters are fully static (e.g. type variables rather than gradual types
+like `Any`), `Top` simplifies away since there is no dynamic component to materialize:
+
+```py
+class Foo: ...
+
+T_bounded = TypeVar("T_bounded", bound=Foo)
+T_unbounded = TypeVar("T_unbounded")
+
+class InvariantBounded(Generic[T_bounded]):
+    x: T_bounded
+
+class InvariantUnbounded(Generic[T_unbounded]):
+    x: T_unbounded
+
+def f(
+    bounded: Top[InvariantBounded[T_bounded]],
+    unbounded: Top[InvariantUnbounded[T_unbounded]],
+):
+    reveal_type(bounded)  # revealed: InvariantBounded[T_bounded@f]
+    reveal_type(unbounded)  # revealed: InvariantUnbounded[T_unbounded@f]
 ```
 
 Parameters in callable are contravariant, so the variance should be flipped:

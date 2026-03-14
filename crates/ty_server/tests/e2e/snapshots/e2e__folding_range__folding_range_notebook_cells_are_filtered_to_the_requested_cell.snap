@@ -1,0 +1,60 @@
+---
+source: crates/ty_server/tests/e2e/folding_range.rs
+assertion_line: 84
+expression: "[first_cell_ranges, second_cell_ranges]"
+---
+[
+  [
+    {
+      "startLine": 0,
+      "startCharacter": 0,
+      "endLine": 1,
+      "endCharacter": 14,
+      "kind": "imports"
+    },
+    {
+      "startLine": 6,
+      "startCharacter": 0,
+      "endLine": 13,
+      "endCharacter": 20
+    },
+    {
+      "startLine": 7,
+      "startCharacter": 4,
+      "endLine": 13,
+      "endCharacter": 20
+    },
+    {
+      "startLine": 9,
+      "startCharacter": 8,
+      "endLine": 10,
+      "endCharacter": 16
+    },
+    {
+      "startLine": 11,
+      "startCharacter": 8,
+      "endLine": 13,
+      "endCharacter": 20
+    },
+    {
+      "startLine": 12,
+      "startCharacter": 12,
+      "endLine": 13,
+      "endCharacter": 20
+    }
+  ],
+  [
+    {
+      "startLine": 0,
+      "startCharacter": 5,
+      "endLine": 2,
+      "endCharacter": 1
+    },
+    {
+      "startLine": 4,
+      "startCharacter": 5,
+      "endLine": 12,
+      "endCharacter": 1
+    }
+  ]
+]

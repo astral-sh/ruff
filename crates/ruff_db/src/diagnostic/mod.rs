@@ -5,6 +5,8 @@ use ruff_source_file::{LineColumn, SourceCode, SourceFile};
 
 use ruff_annotate_snippets::Level as AnnotateLevel;
 use ruff_text_size::{Ranged, TextRange, TextSize};
+#[cfg(feature = "serde")]
+use serde::Serialize;
 
 pub use self::render::{
     DisplayDiagnostic, DisplayDiagnostics, DummyFileResolver, FileResolver, Input,
@@ -317,17 +319,7 @@ impl Diagnostic {
 
     /// Returns all annotations, skipping the first primary annotation.
     pub fn secondary_annotations(&self) -> impl Iterator<Item = &Annotation> {
-        let mut seen_primary = false;
-        self.inner.annotations.iter().filter(move |ann| {
-            if seen_primary {
-                true
-            } else if ann.is_primary {
-                seen_primary = true;
-                false
-            } else {
-                true
-            }
-        })
+        secondary_annotations(self.inner.annotations.iter())
     }
 
     pub fn sub_diagnostics(&self) -> &[SubDiagnostic] {
@@ -669,6 +661,11 @@ impl SubDiagnostic {
         &self.inner.annotations
     }
 
+    /// Returns all annotations, skipping the first primary annotation.
+    pub fn secondary_annotations(&self) -> impl Iterator<Item = &Annotation> {
+        secondary_annotations(self.inner.annotations.iter())
+    }
+
     /// Returns a mutable borrow of the annotations of this sub-diagnostic.
     pub fn annotations_mut(&mut self) -> impl Iterator<Item = &mut Annotation> {
         self.inner.annotations.iter_mut()
@@ -707,6 +704,10 @@ impl SubDiagnostic {
             ConciseMessage::Both { main, annotation }
         }
     }
+
+    pub(crate) fn severity(&self) -> SubDiagnosticSeverity {
+        self.inner.severity
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, get_size2::GetSize)]
@@ -714,6 +715,23 @@ struct SubDiagnosticInner {
     severity: SubDiagnosticSeverity,
     message: DiagnosticMessage,
     annotations: Vec<Annotation>,
+}
+
+/// Returns all annotations, skipping the first primary annotation.
+fn secondary_annotations<'a>(
+    annotations: impl Iterator<Item = &'a Annotation>,
+) -> impl Iterator<Item = &'a Annotation> {
+    let mut seen_primary = false;
+    annotations.filter(move |ann| {
+        if seen_primary {
+            true
+        } else if ann.is_primary {
+            seen_primary = true;
+            false
+        } else {
+            true
+        }
+    })
 }
 
 /// A pointer to a subsequence in the end user's input.
@@ -1261,6 +1279,8 @@ impl From<crate::files::FileRange> for Span {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Ord, PartialOrd, Hash, get_size2::GetSize)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "lowercase"))]
 pub enum Severity {
     Info,
     Warning,
