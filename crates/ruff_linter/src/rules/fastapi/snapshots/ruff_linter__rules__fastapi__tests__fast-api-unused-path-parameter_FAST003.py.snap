@@ -517,3 +517,20 @@ FAST003 Parameter `thing_id` appears in route path, but not in `read_thing_poson
 301 | async def read_thing_posonly_with_regular(query: str = "", /, x=None): ...
     |
 help: Add `thing_id` to function signature
+
+FAST003 [*] Parameter `thing_id` appears in route path, but not in `read_thing_init_and_call_instance_default` signature
+   --> FAST003.py:370:19
+    |
+368 | async def read_thing_callable_dep_instance_default(query: str = Depends(CallableQuery())): ...
+369 | # Error: `__call__` has `other`, not `thing_id`.
+370 | @app.get("/things/{thing_id}")
+    |                   ^^^^^^^^^^
+371 | async def read_thing_init_and_call_instance_default(query: str = Depends(InitAndCallQuery())): ...
+    |
+help: Add `thing_id` to function signature
+368 | async def read_thing_callable_dep_instance_default(query: str = Depends(CallableQuery())): ...
+369 | # Error: `__call__` has `other`, not `thing_id`.
+370 | @app.get("/things/{thing_id}")
+    - async def read_thing_init_and_call_instance_default(query: str = Depends(InitAndCallQuery())): ...
+371 + async def read_thing_init_and_call_instance_default(thing_id, query: str = Depends(InitAndCallQuery())): ...
+note: This is an unsafe fix and may change runtime behavior

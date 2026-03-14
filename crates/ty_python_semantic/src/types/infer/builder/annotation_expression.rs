@@ -5,6 +5,7 @@ use crate::place::TypeOrigin;
 use crate::types::diagnostic::{
     INVALID_TYPE_FORM, REDUNDANT_FINAL_CLASSVAR, report_invalid_arguments_to_annotated,
 };
+use crate::types::infer::builder::InferenceFlags;
 use crate::types::infer::nearest_enclosing_class;
 use crate::types::string_annotation::{
     BYTE_STRING_TYPE_ANNOTATION, FSTRING_TYPE_ANNOTATION, parse_string_annotation,
@@ -71,7 +72,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         };
 
         let previous_deferred_state = std::mem::replace(&mut self.deferred_state, state);
+        let previous_check_unbound_typevars = self
+            .inference_flags
+            .replace(InferenceFlags::CHECK_UNBOUND_TYPEVARS, true);
         let annotation_ty = self.infer_annotation_expression_impl(annotation, pep_613_policy);
+        self.inference_flags.set(
+            InferenceFlags::CHECK_UNBOUND_TYPEVARS,
+            previous_check_unbound_typevars,
+        );
         self.deferred_state = previous_deferred_state;
         annotation_ty
     }
@@ -134,21 +142,23 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             };
 
             special_case.unwrap_or_else(|| {
-                TypeAndQualifiers::declared(
-                    ty.default_specialize(builder.db())
-                        .in_type_expression(
-                            builder.db(),
-                            builder.scope(),
-                            builder.typevar_binding_context,
+                let result_ty = ty
+                    .default_specialize(builder.db())
+                    .in_type_expression(
+                        builder.db(),
+                        builder.scope(),
+                        builder.typevar_binding_context,
+                        builder.inference_flags,
+                    )
+                    .unwrap_or_else(|error| {
+                        error.into_fallback_type(
+                            &builder.context,
+                            annotation,
+                            builder.is_reachable(annotation),
                         )
-                        .unwrap_or_else(|error| {
-                            error.into_fallback_type(
-                                &builder.context,
-                                annotation,
-                                builder.is_reachable(annotation),
-                            )
-                        }),
-                )
+                    });
+                let result_ty = builder.check_for_unbound_type_variable(annotation, result_ty);
+                TypeAndQualifiers::declared(result_ty)
             })
         }
 
@@ -309,6 +319,23 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                         "`ClassVar` cannot contain type variables",
                                     );
                                 }
+
+                                // Reject nested `Required`/`NotRequired`, e.g.
+                                // `Required[Required[int]]` or `Required[NotRequired[int]]`.
+                                if matches!(
+                                    qualifier,
+                                    TypeQualifier::Required | TypeQualifier::NotRequired
+                                ) && type_and_qualifiers.qualifiers.intersects(
+                                    TypeQualifiers::REQUIRED | TypeQualifiers::NOT_REQUIRED,
+                                ) && let Some(builder) =
+                                    self.context.report_lint(&INVALID_TYPE_FORM, subscript)
+                                {
+                                    builder.into_diagnostic(format_args!(
+                                        "`{qualifier}` cannot be nested inside \
+                                        `Required` or `NotRequired`",
+                                    ));
+                                }
+
                                 type_and_qualifiers.with_qualifier(TypeQualifiers::from(qualifier))
                             } else {
                                 for element in arguments {

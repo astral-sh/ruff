@@ -22,7 +22,7 @@ mod tests {
     use crate::rules::pydocstyle::settings::Settings as PydocstyleSettings;
     use crate::settings::LinterSettings;
     use crate::settings::types::{CompiledPerFileIgnoreList, PerFileIgnore, PreviewMode};
-    use crate::test::{test_path, test_resource_path};
+    use crate::test::{test_path, test_resource_path, test_snippet};
     use crate::{assert_diagnostics, assert_diagnostics_diff, settings};
 
     #[test_case(Rule::CollectionLiteralConcatenation, Path::new("RUF005.py"))]
@@ -225,6 +225,36 @@ mod tests {
             },
         )?;
         assert_diagnostics!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn none_not_at_end_of_union_py313() {
+        let diagnostics = test_snippet(
+            r"
+            def func(arg: None | int):
+                ...
+
+            print(None | (int)and 2)
+            ",
+            &settings::LinterSettings {
+                unresolved_target_version: PythonVersion::PY313.into(),
+                ..settings::LinterSettings::for_rule(Rule::NoneNotAtEndOfUnion)
+            },
+        );
+        assert_diagnostics!("PY313_RUF036_runtime_evaluated", diagnostics);
+    }
+
+    #[test]
+    fn quadratic_list_summation_py315() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("ruff/RUF017_0.py"),
+            &settings::LinterSettings {
+                unresolved_target_version: PythonVersion::PY315.into(),
+                ..settings::LinterSettings::for_rule(Rule::QuadraticListSummation)
+            },
+        )?;
+        assert_diagnostics!("PY315_RUF017_RUF017_0.py", diagnostics);
         Ok(())
     }
 
@@ -637,7 +667,8 @@ mod tests {
     #[test_case(Rule::ImplicitClassVarInDataclass, Path::new("RUF045.py"))]
     #[test_case(Rule::FloatEqualityComparison, Path::new("RUF069.py"))]
     #[test_case(Rule::UnnecessaryAssignBeforeYield, Path::new("RUF070.py"))]
-    #[test_case(Rule::IncorrectDecoratorOrder, Path::new("RUF071.py"))]
+    #[test_case(Rule::OsPathCommonprefix, Path::new("RUF071.py"))]
+    #[test_case(Rule::IncorrectDecoratorOrder, Path::new("RUF072.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",

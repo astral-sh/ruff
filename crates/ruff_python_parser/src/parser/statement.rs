@@ -263,8 +263,14 @@ impl<'src> Parser<'src> {
     fn parse_simple_statement(&mut self) -> Stmt {
         match self.current_token_kind() {
             TokenKind::Return => Stmt::Return(self.parse_return_statement()),
-            TokenKind::Import => Stmt::Import(self.parse_import_statement()),
-            TokenKind::From => Stmt::ImportFrom(self.parse_from_import_statement()),
+            TokenKind::Import => {
+                let start = self.node_start();
+                Stmt::Import(self.parse_import_statement(start, false))
+            }
+            TokenKind::From => {
+                let start = self.node_start();
+                Stmt::ImportFrom(self.parse_from_import_statement(start, false))
+            }
             TokenKind::Pass => Stmt::Pass(self.parse_pass_statement()),
             TokenKind::Continue => Stmt::Continue(self.parse_continue_statement()),
             TokenKind::Break => Stmt::Break(self.parse_break_statement()),
@@ -277,6 +283,59 @@ impl<'src> Parser<'src> {
                 Stmt::IpyEscapeCommand(self.parse_ipython_escape_command_statement())
             }
             token => {
+                if token == TokenKind::Lazy {
+                    let start = self.node_start();
+                    let lazy_range = self.current_token_range();
+
+                    match self.peek() {
+                        // test_ok lazy_import_stmt_py315
+                        // # parse_options: {"target-version": "3.15"}
+                        // lazy import foo
+                        // lazy import foo as bar
+                        // lazy from bar import baz
+                        // lazy from sys import x as y
+                        // lazy = 1
+                        // import foo as lazy
+                        // from lazy import qux
+
+                        // test_ok lazy_import_relative_py315
+                        // # parse_options: {"target-version": "3.15"}
+                        // lazy from . import basic2
+                        // lazy from .basic2 import x, f
+                        // lazy from . import b, x
+
+                        // test_ok lazy_import_soft_keyword_split_py315
+                        // # parse_options: {"target-version": "3.15"}
+                        // lazy
+                        // import os
+                        //
+                        // lazy  # comment
+                        // from sys import path
+
+                        // test_err lazy_import_stmt_py314
+                        // # parse_options: {"target-version": "3.14"}
+                        // lazy import foo
+                        // lazy from bar import baz
+                        TokenKind::Import => {
+                            self.bump(TokenKind::Lazy);
+                            self.add_unsupported_syntax_error(
+                                UnsupportedSyntaxErrorKind::LazyImportStatement,
+                                lazy_range,
+                            );
+                            return Stmt::Import(self.parse_import_statement(start, true));
+                        }
+                        TokenKind::From => {
+                            self.bump(TokenKind::Lazy);
+                            self.add_unsupported_syntax_error(
+                                UnsupportedSyntaxErrorKind::LazyImportStatement,
+                                lazy_range,
+                            );
+                            return Stmt::ImportFrom(self.parse_from_import_statement(start, true));
+                        }
+                        _ => {}
+                    }
+                }
+
                 if token == TokenKind::Type {
                     // Type is considered a soft keyword, so we will treat it as an identifier if
                     // it's followed by an unexpected token.
@@ -535,8 +594,7 @@ impl<'src> Parser<'src> {
     /// If the parser isn't positioned at an `import` token.
     ///
     /// See: <https://docs.python.org/3/reference/simple_stmts.html#the-import-statement>
-    fn parse_import_statement(&mut self) -> ast::StmtImport {
-        let start = self.node_start();
+    fn parse_import_statement(&mut self, start: TextSize, is_lazy: bool) -> ast::StmtImport {
         self.bump(TokenKind::Import);
 
         // test_err import_stmt_parenthesized_names
@@ -563,8 +621,9 @@ impl<'src> Parser<'src> {
         }
 
         ast::StmtImport {
-            range: self.node_range(start),
             names,
+            is_lazy,
+            range: self.node_range(start),
             node_index: AtomicNodeIndex::NONE,
         }
     }
@@ -576,8 +635,11 @@ impl<'src> Parser<'src> {
     /// If the parser isn't positioned at a `from` token.
     ///
     /// See: <https://docs.python.org/3/reference/simple_stmts.html#grammar-token-python-grammar-import_stmt>
-    fn parse_from_import_statement(&mut self) -> ast::StmtImportFrom {
-        let start = self.node_start();
+    fn parse_from_import_statement(
+        &mut self,
+        start: TextSize,
+        is_lazy: bool,
+    ) -> ast::StmtImportFrom {
         self.bump(TokenKind::From);
 
         let mut leading_dots = 0;
@@ -600,6 +662,7 @@ impl<'src> Parser<'src> {
             // from match import pattern
             // from type import bar
             // from case import pattern
+            // from lazy import qux
             // from match.type.case import foo
             Some(self.parse_dotted_name())
         } else {
@@ -676,6 +739,7 @@ impl<'src> Parser<'src> {
             module,
             names,
             level: leading_dots,
+            is_lazy,
             range: self.node_range(start),
             node_index: AtomicNodeIndex::NONE,
         }
@@ -713,6 +777,7 @@ impl<'src> Parser<'src> {
                 // import foo as match
                 // import bar as case
                 // import baz as type
+                // import qux as lazy
                 Some(self.parse_identifier())
             } else {
                 // test_err import_alias_missing_asname

@@ -405,13 +405,8 @@ x = 1
 y = 2
 while random():
     x, y = y, x
-    # Note that we get correct types in the "avoid oscillations" test case below, but not here. I
-    # believe the difference is that in this case the Salsa "cycle head" is the tuple on the RHS of
-    # the assignment, which triggers our recursive type handling, whereas below it's `x`.
-    # TODO: should be Literal[2, 1]
-    reveal_type(x)  # revealed: Divergent
-    # TODO: should be Literal[1, 2]
-    reveal_type(y)  # revealed: Divergent
+    reveal_type(x)  # revealed: Literal[2, 1]
+    reveal_type(y)  # revealed: Literal[1, 2]
 ```
 
 ### Tuple assignments are inferred correctly
@@ -423,8 +418,7 @@ def random() -> bool:
 x = 0
 while random():
     x, y = x + 1, None
-    # TODO: should be int
-    reveal_type(x)  # revealed: Divergent
+    reveal_type(x)  # revealed: int
 ```
 
 ### Avoid oscillations
@@ -518,12 +512,15 @@ a nested cycle, but we strip out _that_ `Divergent` in another part of cycle rec
 get the narrowing right and infer that `node` is of type `Node`, but then our monotonic widening
 step will union `Node` with `Node | None` from the previous iteration, reproduce the same wrong
 answer, and declare that to be the fixpoint. Finally we get false-positive warnings from the fact
-that `Node` doesn't have a `.next` field.
+that `None` doesn't have a `.next` field.
 
 So, because we do monotonic widening in cycle recovery, we need to make sure that temporarily
 `Divergent` expressions in narrowing constraints don't lead to too-wide-but-not-visibly-`Divergent`
 types. Instead, `Divergent` should "poison" any value we try to narrow against it, so that our cycle
 recovery logic doesn't carry that result forward.
+
+Addendum: #23563 fixed the implementation of `Type::cycle_normalized`, so that such "tainted
+previous values" are no longer unioned.
 
 ### `global` and `nonlocal` keywords in a loop
 

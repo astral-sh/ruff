@@ -243,6 +243,7 @@ help: Replace with `s.replace(r'abc', "")`
 98  + s.replace(r'abc', "")
 99  | re.sub(r"""abc""", "", s)
 100 | re.sub(r'''abc''', "", s)
+101 | 
 
 RUF055 [*] Plain string pattern passed to `re` function
    --> RUF055_0.py:99:1
@@ -260,6 +261,8 @@ help: Replace with `s.replace(r"""abc""", "")`
     - re.sub(r"""abc""", "", s)
 99  + s.replace(r"""abc""", "")
 100 | re.sub(r'''abc''', "", s)
+101 | 
+102 | # Empty pattern: re.split("", s) should not be flagged because
 
 RUF055 [*] Plain string pattern passed to `re` function
    --> RUF055_0.py:100:1
@@ -268,6 +271,8 @@ RUF055 [*] Plain string pattern passed to `re` function
  99 | re.sub(r"""abc""", "", s)
 100 | re.sub(r'''abc''', "", s)
     | ^^^^^^^^^^^^^^^^^^^^^^^^^
+101 |
+102 | # Empty pattern: re.split("", s) should not be flagged because
     |
 help: Replace with `s.replace(r'''abc''', "")`
 97  | # these double as tests for preserving raw string quoting style
@@ -275,3 +280,6 @@ help: Replace with `s.replace(r'''abc''', "")`
 99  | re.sub(r"""abc""", "", s)
     - re.sub(r'''abc''', "", s)
 100 + s.replace(r'''abc''', "")
+101 | 
+102 | # Empty pattern: re.split("", s) should not be flagged because
+103 | # str.split("") raises ValueError while re.split("", s) succeeds

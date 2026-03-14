@@ -84,11 +84,11 @@ reveal_type(Baz.__supertype__)  # revealed: type | NewType
 ```py
 from collections.abc import Callable
 from typing_extensions import NewType
-from ty_extensions import CallableTypeOf
+from ty_extensions import RegularCallableTypeOf
 
 Foo = NewType("Foo", int)
 
-def _(obj: CallableTypeOf[Foo]):
+def _(obj: RegularCallableTypeOf[Foo]):
     reveal_type(obj)  # revealed: (int, /) -> Foo
 
 def f(_: Callable[[int], Foo]): ...
@@ -105,15 +105,15 @@ g(Foo)  # error: [invalid-argument-type]
 
 ```py
 from typing import NewType, Callable, Any
-from ty_extensions import CallableTypeOf
+from ty_extensions import RegularCallableTypeOf
 
 N = NewType("N", int)
 i = N(42)
 
 y: Callable[..., Any] = i  # error: [invalid-assignment] "Object of type `N` is not assignable to `(...) -> Any`"
 
-# error: [invalid-type-form] "Expected the first argument to `ty_extensions.CallableTypeOf` to be a callable object, but got an object of type `N`"
-def f(x: CallableTypeOf[i]):
+# error: [invalid-type-form] "Expected the first argument to `ty_extensions.RegularCallableTypeOf` to be a callable object, but got an object of type `N`"
+def f(x: RegularCallableTypeOf[i]):
     reveal_type(x)  # revealed: Unknown
 
 class SomethingCallable:
@@ -125,7 +125,7 @@ j = N2(SomethingCallable())
 
 z: Callable[[str], bytes] = j  # fine
 
-def g(x: CallableTypeOf[j]):
+def g(x: RegularCallableTypeOf[j]):
     reveal_type(x)  # revealed: (a: str) -> bytes
 ```
 
@@ -350,6 +350,20 @@ Bing() + 3.14  # error: [unsupported-operator]
 3.14 < Bing()  # error: [unsupported-operator]
 Bing() < 3.14  # error: [unsupported-operator]
 3.14 in Bing()  # error: [unsupported-operator]
+```
+
+`Unknown` should still propagate through these operations.
+
+```py
+from typing import NewType
+from doesnotexist import unknown  # error: [unresolved-import]
+
+MyFloat = NewType("MyFloat", float)
+
+reveal_type(unknown)  # revealed: Unknown
+reveal_type(1.0 * unknown)  # revealed: Unknown
+reveal_type(MyFloat(1.0) * unknown)  # revealed: Unknown
+reveal_type(unknown * MyFloat(1.0))  # revealed: Unknown
 ```
 
 Unary operations take a different codepath and need their own test cases:

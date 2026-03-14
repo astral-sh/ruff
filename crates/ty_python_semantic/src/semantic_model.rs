@@ -304,12 +304,11 @@ impl<'db> SemanticModel<'db> {
                     .scope(self.db)
                     .file_scope_id(self.db),
             ),
-            ast::AnyNodeRef::ExceptHandlerExceptHandler(handler) => Some(
-                handler
-                    .definition(self)
-                    .scope(self.db)
-                    .file_scope_id(self.db),
-            ),
+            ast::AnyNodeRef::ExceptHandlerExceptHandler(handler) => handler
+                .optional_definition(self)
+                .map(|definition| definition.scope(self.db).file_scope_id(self.db))
+                .or_else(|| index.try_expression_scope_id(handler.type_.as_deref()?))
+                .or(Some(FileScopeId::global())),
             ast::AnyNodeRef::TypeParamTypeVar(var) => {
                 Some(var.definition(self).scope(self.db).file_scope_id(self.db))
             }
@@ -517,6 +516,14 @@ pub trait HasDefinition {
     fn definition<'db>(&self, model: &SemanticModel<'db>) -> Definition<'db>;
 }
 
+pub trait HasOptionalDefinition {
+    /// Returns the definition of `self`, if it has one.
+    ///
+    /// ## Panics
+    /// May panic if `self` is from another file than `model`.
+    fn optional_definition<'db>(&self, model: &SemanticModel<'db>) -> Option<Definition<'db>>;
+}
+
 impl HasType for ast::ExprRef<'_> {
     fn inferred_type<'db>(&self, model: &SemanticModel<'db>) -> Option<Type<'db>> {
         let index = semantic_index(model.db, model.file);
@@ -641,7 +648,6 @@ impl_binding_has_ty_def!(ast::StmtFunctionDef);
 impl_binding_has_ty_def!(ast::StmtClassDef);
 impl_binding_has_ty_def!(ast::Parameter);
 impl_binding_has_ty_def!(ast::ParameterWithDefault);
-impl_binding_has_ty_def!(ast::ExceptHandlerExceptHandler);
 impl_binding_has_ty_def!(ast::TypeParamTypeVar);
 
 impl HasType for ast::Alias {
@@ -651,6 +657,21 @@ impl HasType for ast::Alias {
         }
         let index = semantic_index(model.db, model.file);
         Some(binding_type(model.db, index.expect_single_definition(self)))
+    }
+}
+
+impl HasOptionalDefinition for ast::ExceptHandlerExceptHandler {
+    fn optional_definition<'db>(&self, model: &SemanticModel<'db>) -> Option<Definition<'db>> {
+        self.name.as_ref()?;
+        let index = semantic_index(model.db, model.file);
+        Some(index.expect_single_definition(self))
+    }
+}
+
+impl HasType for ast::ExceptHandlerExceptHandler {
+    fn inferred_type<'db>(&self, model: &SemanticModel<'db>) -> Option<Type<'db>> {
+        let definition = self.optional_definition(model)?;
+        Some(binding_type(model.db, definition))
     }
 }
 

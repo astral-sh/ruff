@@ -1,0 +1,44 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: invalid_assignment_details.md - Invalid assignment diagnostics - Multiple nested incompatibilities
+mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/invalid_assignment_details.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from typing import Protocol
+ 2 | 
+ 3 | class SupportsCheck(Protocol):
+ 4 |     def check1(self, x: str): ...
+ 5 |     def check2(self, x: int) -> bool: ...
+ 6 | 
+ 7 | class Incompatible:
+ 8 |     def check1(self, x: bytes): ...
+ 9 |     def check2(self, x: int) -> None: ...
+10 | 
+11 | def _(source: Incompatible):
+12 |     target: SupportsCheck = source  # error: [invalid-assignment]
+```
+
+# Diagnostics
+
+```
+error[invalid-assignment]: Object of type `Incompatible` is not assignable to `SupportsCheck`
+  --> src/mdtest_snippet.py:12:13
+   |
+11 | def _(source: Incompatible):
+12 |     target: SupportsCheck = source  # error: [invalid-assignment]
+   |             -------------   ^^^^^^ Incompatible value of type `Incompatible`
+   |             |
+   |             Declared type
+   |
+info: rule `invalid-assignment` is enabled by default
+
+```

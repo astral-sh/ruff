@@ -535,6 +535,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
         }
         Stmt::Import(ast::StmtImport {
             names,
+            is_lazy: _,
             range: _,
             node_index: _,
         }) => {
@@ -583,6 +584,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
 
             if checker.is_rule_enabled(Rule::BannedModuleLevelImports) {
                 flake8_tidy_imports::rules::banned_module_level_imports(checker, stmt);
+            }
+            if checker.is_rule_enabled(Rule::LazyImportMismatch) {
+                flake8_tidy_imports::rules::lazy_import_mismatch(checker, stmt);
             }
 
             for alias in names {
@@ -693,6 +697,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 names,
                 module,
                 level,
+                is_lazy: _,
                 range: _,
                 node_index: _,
             },
@@ -786,6 +791,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.is_rule_enabled(Rule::BannedModuleLevelImports) {
                 flake8_tidy_imports::rules::banned_module_level_imports(checker, stmt);
+            }
+            if checker.is_rule_enabled(Rule::LazyImportMismatch) {
+                flake8_tidy_imports::rules::lazy_import_mismatch(checker, stmt);
             }
 
             if checker.is_rule_enabled(Rule::PytestIncorrectPytestImport) {
@@ -1184,11 +1192,11 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.is_rule_enabled(Rule::RedefinedLoopName) {
                 pylint::rules::redefined_loop_name(checker, stmt);
             }
-            if checker.is_rule_enabled(Rule::ReadWholeFile) {
-                refurb::rules::read_whole_file(checker, with_stmt);
-            }
-            if checker.is_rule_enabled(Rule::WriteWholeFile) {
-                refurb::rules::write_whole_file(checker, with_stmt);
+            if checker.any_rule_enabled(&[Rule::ReadWholeFile, Rule::WriteWholeFile]) {
+                checker
+                    .analyze
+                    .with_statements
+                    .push(checker.semantic.snapshot());
             }
             if checker.is_rule_enabled(Rule::UselessWithLock) {
                 pylint::rules::useless_with_lock(checker, with_stmt);

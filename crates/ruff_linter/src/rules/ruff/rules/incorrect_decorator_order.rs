@@ -61,7 +61,7 @@ impl Violation for IncorrectDecoratorOrder {
     }
 }
 
-/// RUF071
+/// RUF072
 pub(crate) fn incorrect_decorator_order(checker: &Checker, decorator_list: &[Decorator]) {
     for (outer_decorator, inner_decorator) in decorator_list.iter().tuple_windows() {
         let (Some(outer), Some(inner)) = (

@@ -1,0 +1,89 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+---
+## AST
+
+```
+Module(
+    ModModule {
+        node_index: NodeIndex(None),
+        range: 0..97,
+        body: [
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 44..48,
+                    value: Name(
+                        ExprName {
+                            node_index: NodeIndex(None),
+                            range: 44..48,
+                            id: Name("lazy"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Import(
+                StmtImport {
+                    node_index: NodeIndex(None),
+                    range: 49..58,
+                    names: [
+                        Alias {
+                            range: 56..58,
+                            node_index: NodeIndex(None),
+                            name: Identifier {
+                                id: Name("os"),
+                                range: 56..58,
+                                node_index: NodeIndex(None),
+                            },
+                            asname: None,
+                        },
+                    ],
+                    is_lazy: false,
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 60..64,
+                    value: Name(
+                        ExprName {
+                            node_index: NodeIndex(None),
+                            range: 60..64,
+                            id: Name("lazy"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            ImportFrom(
+                StmtImportFrom {
+                    node_index: NodeIndex(None),
+                    range: 76..96,
+                    module: Some(
+                        Identifier {
+                            id: Name("sys"),
+                            range: 81..84,
+                            node_index: NodeIndex(None),
+                        },
+                    ),
+                    names: [
+                        Alias {
+                            range: 92..96,
+                            node_index: NodeIndex(None),
+                            name: Identifier {
+                                id: Name("path"),
+                                range: 92..96,
+                                node_index: NodeIndex(None),
+                            },
+                            asname: None,
+                        },
+                    ],
+                    level: 0,
+                    is_lazy: false,
+                },
+            ),
+        ],
+    },
+)
+```

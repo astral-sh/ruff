@@ -724,6 +724,7 @@ impl<'src> Lexer<'src> {
             "import" => TokenKind::Import,
             "in" => TokenKind::In,
             "is" => TokenKind::Is,
+            "lazy" => TokenKind::Lazy,
             "lambda" => TokenKind::Lambda,
             "match" => TokenKind::Match,
             "nonlocal" => TokenKind::Nonlocal,
