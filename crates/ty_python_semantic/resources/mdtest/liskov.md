@@ -328,16 +328,14 @@ class G3(A3):
     def method(self: object) -> Self: ...  # fine
 
 class H3(A3):
-    # TODO: we should emit `invalid-method-override` here
     # (`A3.method()` can be called on any instance of `A3`,
     # but `H3.method()` can only be called on objects that are
     # instances of `str`)
-    def method(self: str) -> Self: ...
+    def method(self: str) -> Self: ...  # error: [invalid-method-override]
 
 class I3(A3):
-    # TODO: we should emit `invalid-method-override` here
     # (`I3.method()` cannot be called with any inhabited type!)
-    def method(self: Never) -> Self: ...
+    def method(self: Never) -> Self: ...  # error: [invalid-method-override]
 
 class A4:
     def method[T: int](self, x: T) -> T: ...
@@ -651,6 +649,15 @@ class GoodChild(Base):
 class BadChild(Base):
     # `x` has no default, so `obj.method(a=1)` would fail
     def method(self, x: int, /, **kwargs: int) -> None: ...  # error: [invalid-method-override]
+```
+
+## Overloads narrowed by `self` do not make general overrides invalid
+
+```pyi
+from collections.abc import Iterator
+
+class MyStr(str):
+    def __iter__(self) -> Iterator[str]: ...
 ```
 
 ## Definitely bound members with no reachable definitions(!)

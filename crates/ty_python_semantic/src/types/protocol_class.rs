@@ -641,7 +641,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         self.check_callables_vs_callable(
                             db,
                             &callables.map(|callable| callable.apply_self(db, fallback_other)),
-                            protocol_bind_self(db, *method, Some(fallback_other)),
+                            self.protocol_bind_self(db, *method, Some(fallback_other)),
                         )
                     })
             }
@@ -725,7 +725,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                 self.check_type_pair(
                                     db,
                                     source_type,
-                                    Type::Callable(protocol_bind_self(db, target_callable, None)),
+                                    Type::Callable(self.protocol_bind_self(
+                                        db,
+                                        target_callable,
+                                        None,
+                                    )),
                                 )
                             }),
 
@@ -735,7 +739,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             ) => self.check_callable_pair(
                                 db,
                                 source_method.bind_self(db, None),
-                                protocol_bind_self(db, target_method, None),
+                                self.protocol_bind_self(db, target_method, None),
                             ),
 
                             (
@@ -955,16 +959,25 @@ fn proto_interface_cycle_initial<'db>(
 /// This additional upcasting is required in order for protocols with `__call__` method
 /// members to be considered assignable to `Callable` types, since the `Callable` supertype
 /// of the `__call__` method will be function-like but a `Callable` type is not.
-fn protocol_bind_self<'db>(
-    db: &'db dyn Db,
-    callable: CallableType<'db>,
-    self_type: Option<Type<'db>>,
-) -> CallableType<'db> {
-    CallableType::new(
-        db,
-        callable.signatures(db).bind_self(db, self_type),
-        CallableTypeKind::Regular,
-    )
+impl<'db> TypeRelationChecker<'_, '_, 'db> {
+    fn protocol_bind_self(
+        &self,
+        db: &'db dyn Db,
+        callable: CallableType<'db>,
+        self_type: Option<Type<'db>>,
+    ) -> CallableType<'db> {
+        let signatures = match self_type {
+            Some(self_type) => self.bind_callable_signature_with_receiver(
+                db,
+                callable.signatures(db),
+                self_type,
+                self_type,
+            ),
+            None => callable.signatures(db).bind_self(db, None),
+        };
+
+        CallableType::new(db, signatures, CallableTypeKind::Regular)
+    }
 }
 
 /// Protocol compatibility can only succeed if every required member is present.

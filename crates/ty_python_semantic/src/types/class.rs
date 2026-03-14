@@ -1639,7 +1639,11 @@ impl<'db> ClassType<'db> {
             let instance_ty = Type::instance(db, self);
             let dunder_new_bound_method = CallableType::new(
                 db,
-                dunder_new_signature.bind_self(db, Some(instance_ty)),
+                dunder_new_signature.bind_self_with_receiver(
+                    db,
+                    Some(instance_ty),
+                    Some(instance_ty),
+                ),
                 CallableTypeKind::Regular,
             );
 

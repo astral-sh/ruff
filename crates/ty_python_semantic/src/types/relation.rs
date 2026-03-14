@@ -570,6 +570,13 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         }
     }
 
+    pub(super) fn with_relation(&self, relation: TypeRelation) -> Self {
+        Self {
+            relation,
+            ..self.clone()
+        }
+    }
+
     pub(super) fn always(&self) -> ConstraintSet<'db, 'c> {
         ConstraintSet::from_bool(self.constraints, true)
     }

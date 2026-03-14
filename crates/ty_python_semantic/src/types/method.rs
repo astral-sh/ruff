@@ -7,8 +7,7 @@ use crate::{
         CallableType, KnownClass, LiteralValueType, LiteralValueTypeKind, Parameter, Parameters,
         PropertyInstanceType, Signature, StringLiteralType, Type, UnionType,
         callable::CallableTypeKind, constraints::ConstraintSet, function::FunctionType,
-        known_instance::InternedConstraintSet, relation::TypeRelationChecker,
-        signatures::CallableSignature, visitor,
+        known_instance::InternedConstraintSet, relation::TypeRelationChecker, visitor,
     },
 };
 
@@ -70,17 +69,14 @@ impl<'db> BoundMethodType<'db> {
     #[salsa::tracked(cycle_initial=into_callable_type_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> CallableType<'db> {
         let function = self.function(db);
+        let receiver = self.self_instance(db);
         let self_instance = self.typing_self_type(db);
 
         CallableType::new(
             db,
-            CallableSignature::from_overloads(
-                function
-                    .signature(db)
-                    .overloads
-                    .iter()
-                    .map(|signature| signature.bind_self(db, Some(self_instance))),
-            ),
+            function
+                .signature(db)
+                .bind_self_with_receiver(db, Some(receiver), Some(self_instance)),
             CallableTypeKind::FunctionLike,
         )
     }
