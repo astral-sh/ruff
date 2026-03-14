@@ -5,6 +5,7 @@ use ruff_db::diagnostic::{Annotation, DiagnosticId, Severity};
 use ruff_db::files::File;
 use ruff_db::parsed::ParsedModuleRef;
 use ruff_db::source::source_text;
+use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{
     self as ast, AnyNodeRef, ArgOrKeyword, ArgumentsSourceOrder, ExprContext, HasNodeIndex,
@@ -1751,12 +1752,106 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let narrowed_ty = use_def
                 .narrowing_evaluator(reachable_binding.narrowing_constraint)
                 .narrow(db, binding_ty, place);
+            let narrowed_ty = self.promote_simple_integer_loop_binding(
+                loop_header_kind,
+                reachable_binding.definition,
+                narrowed_ty,
+            );
 
             union.add_in_place(narrowed_ty);
         }
 
         self.bindings
             .insert(definition, union.build(), self.multi_inference_state);
+    }
+
+    /// Promote `binding_ty` if it's a simple integer loop binding, e.g. `i += 1`, `i = 2 * i` (where `i` is of literal int type).
+    /// This is an optimization that accelerate the fixed-point convergence of the entire loop body inference.
+    fn promote_simple_integer_loop_binding(
+        &self,
+        loop_header_kind: &LoopHeaderDefinitionKind<'db>,
+        binding: Definition<'db>,
+        binding_ty: Type<'db>,
+    ) -> Type<'db> {
+        fn is_promotable_integer_loop_update(
+            definition_kind: &DefinitionKind<'_>,
+            module: &ParsedModuleRef,
+            symbol_name: &Name,
+        ) -> bool {
+            fn contains_symbol(expr: &ast::Expr, symbol_name: &Name) -> bool {
+                any_over_expr(expr, &|expr| {
+                    expr.as_name_expr()
+                        .is_some_and(|name| name.id == *symbol_name)
+                })
+            }
+
+            match definition_kind {
+                DefinitionKind::AugmentedAssignment(augmented) => {
+                    let stmt = augmented.node(module);
+                    stmt.target
+                        .as_name_expr()
+                        .is_some_and(|name| name.id == *symbol_name)
+                }
+                DefinitionKind::Assignment(assignment)
+                    if matches!(assignment.target_kind(), TargetKind::Single) =>
+                {
+                    assignment
+                        .target(module)
+                        .as_name_expr()
+                        .is_some_and(|name| name.id == *symbol_name)
+                        && contains_symbol(assignment.value(module), symbol_name)
+                }
+                DefinitionKind::AnnotatedAssignment(assignment) => {
+                    assignment
+                        .target(module)
+                        .as_name_expr()
+                        .is_some_and(|name| name.id == *symbol_name)
+                        && assignment
+                            .value(module)
+                            .is_some_and(|value| contains_symbol(value, symbol_name))
+                }
+                _ => false,
+            }
+        }
+
+        fn is_promotable_integer<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
+            match ty.resolve_type_alias(db) {
+                Type::Union(union) => {
+                    let mut saw_int_literal = false;
+                    for &element in union.elements(db) {
+                        match element.resolve_type_alias(db) {
+                            Type::LiteralValue(literal) if literal.is_int() => {
+                                saw_int_literal = true;
+                            }
+                            Type::LiteralValue(_) | Type::FunctionLiteral(_) => return false,
+                            _ => {}
+                        }
+                    }
+
+                    saw_int_literal
+                }
+                Type::LiteralValue(literal) => literal.is_int(),
+                _ => false,
+            }
+        }
+
+        if let Some(symbol_id) = loop_header_kind.place().as_symbol() {
+            let place_table = self
+                .index
+                .place_table(self.scope().file_scope_id(self.db()));
+            let symbol_name = place_table.symbol(symbol_id).name();
+
+            if is_promotable_integer_loop_update(
+                binding.kind(self.db()),
+                self.module(),
+                symbol_name,
+            ) && is_promotable_integer(self.db(), binding_ty)
+            {
+                return binding_ty.promote(self.db());
+            }
+        }
+
+        binding_ty
     }
 
     fn infer_match_statement(&mut self, match_statement: &ast::StmtMatch) {
