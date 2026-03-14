@@ -758,6 +758,13 @@ fn recursive_type_normalize_type_guard_like<'db, T: TypeGuardLike<'db>>(
     Some(guard.with_type(db, ty))
 }
 
+#[derive(Debug, Clone, Copy)]
+struct GeneratorTypes<'db> {
+    yielded: Option<Type<'db>>,
+    sent: Option<Type<'db>>,
+    returned: Option<Type<'db>>,
+}
+
 #[salsa::tracked]
 impl<'db> Type<'db> {
     pub(crate) const fn any() -> Self {
@@ -4735,7 +4742,7 @@ impl<'db> Type<'db> {
     ///
     /// This corresponds to the `ReturnT` parameter of the generic `typing.Generator[YieldT, SendT, ReturnT]`
     /// protocol.
-    fn generator_return_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
+    fn generator_types(self, db: &'db dyn Db) -> Option<GeneratorTypes<'db>> {
         // TODO: Ideally, we would first try to upcast `self` to an instance of `Generator` and *then*
         // match on the protocol instance to get the `ReturnType` type parameter. For now, implement
         // an ad-hoc solution that works for protocols and instances of classes that explicitly inherit
@@ -4743,12 +4750,36 @@ impl<'db> Type<'db> {
 
         let from_class_base = |base: ClassBase<'db>| {
             let class = base.into_class()?;
+            let (_, Some(specialization)) = class.static_class_literal_specialized(db, None)?
+            else {
+                return None;
+            };
+
             if class.is_known(db, KnownClass::Generator)
-                && let Some((_, Some(specialization))) =
-                    class.static_class_literal_specialized(db, None)
-                && let [_, _, return_ty] = specialization.types(db)
+                && let [yield_ty, send_ty, return_ty] = specialization.types(db)
             {
-                Some(*return_ty)
+                Some(GeneratorTypes {
+                    yielded: Some(*yield_ty),
+                    sent: Some(*send_ty),
+                    returned: Some(*return_ty),
+                })
+            } else if class.is_known(db, KnownClass::AsyncGenerator)
+                && let [yield_ty, send_ty] = specialization.types(db)
+            {
+                Some(GeneratorTypes {
+                    yielded: Some(*yield_ty),
+                    sent: Some(*send_ty),
+                    returned: None,
+                })
+            } else if (class.is_known(db, KnownClass::Iterator)
+                || class.is_known(db, KnownClass::AsyncIterator))
+                && let [yield_ty] = specialization.types(db)
+            {
+                Some(GeneratorTypes {
+                    yielded: Some(*yield_ty),
+                    sent: Some(Type::none(db)),
+                    returned: Some(Type::none(db)),
+                })
             } else {
                 None
             }
@@ -4765,24 +4796,70 @@ impl<'db> Type<'db> {
                     None
                 }
             }
-            Type::Union(union) => union.try_map(db, |ty| ty.generator_return_type(db)),
+            Type::Union(union) => {
+                let yielded = union.try_map(db, |ty| ty.generator_types(db)?.yielded);
+                let sent = union.try_map(db, |ty| ty.generator_types(db)?.sent);
+                let returned = union.try_map(db, |ty| ty.generator_types(db)?.returned);
+
+                (yielded.is_some() || sent.is_some() || returned.is_some()).then_some(
+                    GeneratorTypes {
+                        yielded,
+                        sent,
+                        returned,
+                    },
+                )
+            }
             Type::Intersection(intersection) => {
-                let mut builder = IntersectionBuilder::new(db);
-                let mut any_success = false;
+                let mut yielded_builder = IntersectionBuilder::new(db);
+                let mut sent_builder = IntersectionBuilder::new(db);
+                let mut returned_builder = IntersectionBuilder::new(db);
+                let mut any_yielded = false;
+                let mut any_sent = false;
+                let mut any_returned = false;
+
                 // Using `positive()` rather than `positive_elements_or_object()` is safe
                 // here because `object` is not a generator, so falling back to it would
                 // still return `None`.
                 for ty in intersection.positive(db) {
-                    if let Some(return_ty) = ty.generator_return_type(db) {
-                        builder = builder.add_positive(return_ty);
-                        any_success = true;
+                    if let Some(expected_types) = ty.generator_types(db) {
+                        if let Some(yield_ty) = expected_types.yielded {
+                            yielded_builder = yielded_builder.add_positive(yield_ty);
+                            any_yielded = true;
+                        }
+                        if let Some(sent_ty) = expected_types.sent {
+                            sent_builder = sent_builder.add_positive(sent_ty);
+                            any_sent = true;
+                        }
+                        if let Some(return_ty) = expected_types.returned {
+                            returned_builder = returned_builder.add_positive(return_ty);
+                            any_returned = true;
+                        }
                     }
                 }
-                any_success.then(|| builder.build())
+
+                (any_yielded || any_sent || any_returned).then_some(GeneratorTypes {
+                    yielded: any_yielded.then(|| yielded_builder.build()),
+                    sent: any_sent.then(|| sent_builder.build()),
+                    returned: any_returned.then(|| returned_builder.build()),
+                })
             }
-            ty @ (Type::Dynamic(_) | Type::Never) => Some(ty),
+            ty @ (Type::Dynamic(_) | Type::Never) => Some(GeneratorTypes {
+                yielded: Some(ty),
+                sent: Some(ty),
+                returned: Some(ty),
+            }),
             _ => None,
         }
+    }
+
+    fn generator_return_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        self.generator_types(db)
+            .and_then(|expected_types| expected_types.returned)
+    }
+
+    fn generator_send_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        self.generator_types(db)
+            .and_then(|expected_types| expected_types.sent)
     }
 
     #[must_use]

@@ -13,8 +13,7 @@ def inner_generator() -> Generator[int, bytes, str]:
     yield 2
     x = yield 3
 
-    # TODO: this should be `bytes`
-    reveal_type(x)  # revealed: @Todo(yield expressions)
+    reveal_type(x)  # revealed: bytes
 
     return "done"
 
@@ -82,14 +81,56 @@ def inner_generator() -> GeneratorType[int, bytes, str]:
     yield 2
     x = yield 3
 
-    # TODO: this should be `bytes`
-    reveal_type(x)  # revealed: @Todo(yield expressions)
+    reveal_type(x)  # revealed: bytes
 
     return "done"
 
 def outer_generator():
     result = yield from inner_generator()
     reveal_type(result)  # revealed: str
+```
+
+## `yield` expression send type inference
+
+```py
+from typing import AsyncGenerator, AsyncIterator, Generator, Iterator
+
+def unannotated():
+    x = yield 1
+    reveal_type(x)  # revealed: Unknown
+
+def default_generator() -> Generator:
+    x = yield
+    reveal_type(x)  # revealed: None
+
+def generator_one_arg() -> Generator[int]:
+    x = yield 1
+    reveal_type(x)  # revealed: None
+
+def generator_send_str() -> Generator[int, str]:
+    x = yield 1
+    reveal_type(x)  # revealed: str
+
+def iterator_send_none() -> Iterator[int]:
+    x = yield 1
+    reveal_type(x)  # revealed: None
+
+async def async_generator_default() -> AsyncGenerator[int]:
+    x = yield 1
+    reveal_type(x)  # revealed: None
+
+async def async_generator_send_str() -> AsyncGenerator[int, str]:
+    x = yield 1
+    reveal_type(x)  # revealed: str
+
+async def async_iterator_send_none() -> AsyncIterator[int]:
+    x = yield 1
+    reveal_type(x)  # revealed: None
+
+def mixing_generator_async_generator() -> Generator[int, int, None] | AsyncGenerator[int, str]:
+    x = yield 1
+    reveal_type(x)  # revealed: int | str
+    return None
 ```
 
 ## Error cases
@@ -108,23 +149,34 @@ def generator() -> Generator:
 ```py
 from typing import Generator
 
-# TODO: This should be an error. Claims to yield `int`, but yields `str`.
-def invalid_generator() -> Generator[int, None, None]:
-    yield "not an int"  # This should be an `int`
+def invalid_generator() -> Generator[int, int, None]:
+    # error: [invalid-return-type] "Yielded type does not match annotated yield type: expected yielded type assignable to `int`, found `Literal[""]`"
+    yield ""
 ```
 
-### Invalid return type
+### Invalid annotation
+
+```py
+from typing import AsyncGenerator, Generator
+
+def returns_str() -> str:  # error: [invalid-return-type]
+    x = yield 1
+    reveal_type(x)  # revealed: Unknown
+
+# error: [invalid-return-type]
+def sync_returns_async_generator() -> AsyncGenerator[int, str]:
+    x = yield 1
+    reveal_type(x)  # revealed: str
+```
+
+### Using a generator with incompatible annotation in `yield from`
 
 ```py
 from typing import Generator
 
-# TODO: should emit an error (does not return `str`)
-def invalid_generator1() -> Generator[int, None, str]:
-    yield 1
+def f() -> Generator[None, float, None]:
+    x = yield
 
-# TODO: should emit an error (does not return `int`)
-def invalid_generator2() -> Generator[int, None, None]:
-    yield 1
-
-    return "done"
+def g() -> Generator[None, int, None]:
+    yield from f()
 ```

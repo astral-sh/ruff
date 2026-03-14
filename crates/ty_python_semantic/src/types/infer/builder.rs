@@ -77,8 +77,8 @@ use crate::types::diagnostic::{
     report_invalid_assignment, report_invalid_attribute_assignment,
     report_invalid_class_match_pattern, report_invalid_exception_caught,
     report_invalid_exception_cause, report_invalid_exception_raised,
-    report_invalid_exception_tuple_caught, report_invalid_key_on_typed_dict,
-    report_invalid_type_checking_constant,
+    report_invalid_exception_tuple_caught, report_invalid_generator_yield_type,
+    report_invalid_key_on_typed_dict, report_invalid_type_checking_constant,
     report_match_pattern_against_non_runtime_checkable_protocol,
     report_match_pattern_against_typed_dict, report_possibly_missing_attribute,
     report_possibly_unresolved_reference, report_unsupported_augmented_assignment,
@@ -7196,8 +7196,43 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             node_index: _,
             value,
         } = yield_expression;
-        self.infer_optional_expression(value.as_deref(), TypeContext::default());
-        todo_type!("yield expressions")
+        let yielded_ty = self
+            .infer_optional_expression(value.as_deref(), TypeContext::default())
+            .unwrap_or_else(|| Type::none(self.db()));
+
+        let Some(enclosing_function) =
+            nearest_enclosing_function(self.db(), self.index, self.scope())
+        else {
+            return Type::unknown();
+        };
+        let declared_return_ty = enclosing_function
+            .last_definition_raw_signature(self.db())
+            .return_ty;
+        let return_type_span = enclosing_function.spans(self.db()).return_type;
+
+        let Some(generator_type_params) = declared_return_ty.generator_types(self.db()) else {
+            return Type::unknown();
+        };
+
+        let expected_yield_ty = generator_type_params.yielded;
+        let diagnostic_node: AnyNodeRef = value
+            .as_deref()
+            .map_or_else(|| yield_expression.into(), AnyNodeRef::from);
+
+        if let Some(expected_yield_ty) = expected_yield_ty
+            && !yielded_ty.is_assignable_to(self.db(), expected_yield_ty)
+        {
+            report_invalid_generator_yield_type(
+                &self.context,
+                diagnostic_node,
+                return_type_span,
+                declared_return_ty,
+                expected_yield_ty,
+                yielded_ty,
+            );
+        }
+
+        generator_type_params.sent.unwrap_or_else(Type::unknown)
     }
 
     fn infer_yield_from_expression(&mut self, yield_from: &ast::ExprYieldFrom) -> Type<'db> {
@@ -7208,13 +7243,59 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = yield_from;
 
         let iterable_type = self.infer_expression(value, TypeContext::default());
-        iterable_type
+
+        let Some(enclosing_function) =
+            nearest_enclosing_function(self.db(), self.index, self.scope())
+        else {
+            return Type::unknown();
+        };
+        let declared_return_ty = enclosing_function
+            .last_definition_raw_signature(self.db())
+            .return_ty;
+
+        let Some(outer_expected) = declared_return_ty.generator_types(self.db()) else {
+            return Type::unknown();
+        };
+
+        let (inner_yield_ty, inner_is_iterable) = iterable_type
             .try_iterate(self.db())
-            .map(|tuple| tuple.homogeneous_element_type(self.db()))
+            .map(|tuple| (tuple.homogeneous_element_type(self.db()), true))
             .unwrap_or_else(|err| {
                 err.report_diagnostic(&self.context, iterable_type, value.as_ref().into());
-                err.fallback_element_type(self.db())
+                (err.fallback_element_type(self.db()), false)
             });
+
+        if inner_is_iterable {
+            if let Some(outer_yield_ty) = outer_expected.yielded
+                && !inner_yield_ty.is_assignable_to(self.db(), outer_yield_ty)
+                && let Some(builder) = self
+                    .context
+                    .report_lint(&INVALID_ASSIGNMENT, value.as_ref())
+            {
+                builder.into_diagnostic(format_args!(
+                    "Object of type `{}` is not assignable to `{}`",
+                    inner_yield_ty.display(self.db()),
+                    outer_yield_ty.display(self.db()),
+                ));
+            }
+
+            if let Some(outer_send_ty) = outer_expected.sent {
+                let inner_send_ty = iterable_type
+                    .generator_send_type(self.db())
+                    .unwrap_or_else(|| Type::none(self.db()));
+                if !outer_send_ty.is_assignable_to(self.db(), inner_send_ty)
+                    && let Some(builder) = self
+                        .context
+                        .report_lint(&INVALID_ASSIGNMENT, value.as_ref())
+                {
+                    builder.into_diagnostic(format_args!(
+                        "Object of type `{}` is not assignable to `{}`",
+                        outer_send_ty.display(self.db()),
+                        inner_send_ty.display(self.db()),
+                    ));
+                }
+            }
+        }
 
         iterable_type
             .generator_return_type(self.db())
