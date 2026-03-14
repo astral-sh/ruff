@@ -686,6 +686,17 @@ def _(x: object, y: Movie):
         reveal_type(y)  # revealed: Movie
 ```
 
+When the original type already contains a concrete `TypedDict` arm, runtime narrowing keeps that arm
+directly instead of routing it through the fallback:
+
+```py
+def _(z: int | Movie):
+    if isinstance(z, dict):
+        reveal_type(z)  # revealed: Movie
+    else:
+        reveal_type(z)  # revealed: int
+```
+
 The behavior of `issubclass()` is similar.
 
 ```py

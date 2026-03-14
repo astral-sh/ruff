@@ -836,9 +836,7 @@ impl ReachabilityConstraints {
             ALWAYS_TRUE | AMBIGUOUS => {
                 // Apply all accumulated narrowing constraints to the base type
                 match accumulated {
-                    Some(constraint) => NarrowingConstraint::intersection(base_ty)
-                        .merge_constraint_and(constraint)
-                        .evaluate_constraint_type(db),
+                    Some(constraint) => constraint.narrow_base_type(db, base_ty),
                     None => base_ty,
                 }
             }
