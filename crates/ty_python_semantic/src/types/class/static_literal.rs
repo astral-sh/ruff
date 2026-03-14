@@ -16,7 +16,7 @@ use crate::{
         place_from_bindings, place_from_declarations,
     },
     semantic_index::{
-        DeclarationWithConstraint, attribute_assignments, attribute_declarations, attribute_scopes,
+        attribute_assignments, attribute_declarations, attribute_scopes,
         definition::{Definition, DefinitionKind, DefinitionState, TargetKind},
         place_table,
         scope::{Scope, ScopeId},
@@ -2180,17 +2180,14 @@ impl<'db> StaticClassLiteral<'db> {
             // want to improve this, we could instead pass a definition-kind filter to the use-def map
             // query, or to the `symbol_from_declarations` call below. Doing so would potentially require
             // us to generate a union of `__init__` methods.
-            if !declarations
-                .clone()
-                .all(|DeclarationWithConstraint { declaration, .. }| {
-                    declaration.is_undefined_or(|declaration| {
-                        matches!(
-                            declaration.kind(db),
-                            DefinitionKind::AnnotatedAssignment(..)
-                        )
-                    })
+            if !declarations.clone().all_reachable(db, |declaration| {
+                declaration.is_undefined_or(|declaration| {
+                    matches!(
+                        declaration.kind(db),
+                        DefinitionKind::AnnotatedAssignment(..)
+                    )
                 })
-            {
+            }) {
                 continue;
             }
 
