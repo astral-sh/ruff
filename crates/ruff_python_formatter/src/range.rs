@@ -4,6 +4,7 @@ use ruff_formatter::printer::SourceMapGeneration;
 use ruff_formatter::{
     FormatContext, FormatError, FormatOptions, IndentStyle, PrintedRange, SourceCode, format,
 };
+use ruff_python_ast::token::Token;
 use ruff_python_ast::visitor::source_order::{SourceOrderVisitor, TraversalSignal, walk_body};
 use ruff_python_ast::{AnyNodeRef, Stmt, StmtMatch, StmtTry};
 use ruff_python_parser::{ParseOptions, parse};
@@ -15,7 +16,7 @@ use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use crate::comments::Comments;
 use crate::context::{IndentLevel, NodeLevel};
 use crate::prelude::*;
-use crate::statement::suite::{DocstringStmt, skip_range};
+use crate::statement::suite::{DocstringStmt, new_logical_line_between_statements, skip_range};
 use crate::verbatim::{ends_suppression, starts_suppression};
 use crate::{FormatModuleError, PyFormatOptions, format_module_source};
 
@@ -75,6 +76,7 @@ pub fn format_range(
     assert_valid_char_boundaries(range, source);
 
     let parsed = parse(source, ParseOptions::from(options.source_type()))?;
+
     let source_code = SourceCode::new(source);
     let comment_ranges = CommentRanges::from(parsed.tokens());
     let comments = Comments::from_ast(parsed.syntax(), source_code, &comment_ranges);
@@ -86,16 +88,25 @@ pub fn format_range(
         parsed.tokens(),
     );
 
-    let (enclosing_node, base_indent) =
+    let (enclosing_node, base_indent, in_semicolon_separated_statement) =
         match find_enclosing_node(range, AnyNodeRef::from(parsed.syntax()), &context) {
-            EnclosingNode::Node { node, indent_level } => (node, indent_level),
+            EnclosingNode::Node {
+                node,
+                indent_level,
+                in_semicolon_separated_statement,
+            } => (node, indent_level, in_semicolon_separated_statement),
             EnclosingNode::Suppressed => {
                 // The entire range falls into a suppressed range. There's nothing to format.
                 return Ok(PrintedRange::empty());
             }
         };
 
-    let narrowed_range = narrow_range(range, enclosing_node, &context);
+    let narrowed_range = narrow_range(
+        range,
+        enclosing_node,
+        in_semicolon_separated_statement,
+        &context,
+    );
     assert_valid_char_boundaries(narrowed_range, source);
 
     // Correctly initialize the node level for the blank line rules.
@@ -143,6 +154,12 @@ pub fn format_range(
 /// Code that uses indentations that don't match the configured [`IndentStyle`] and
 /// [`IndentWidth`](ruff_formatter::IndentWidth) are excluded from the search, because formatting
 /// such nodes on their own can lead to indentation mismatch with its sibling nodes.
+///
+/// ## Semicolon-separated statements
+/// Semicolon-separated statements on the same line form a single logical line.
+/// If the range falls within such a group, the search stops at the group's parent
+/// node and sets [`EnclosingNode::Node::in_semicolon_separated_statement`] to `true`.
+/// [`narrow_range`] then uses token scanning to find the full logical line boundaries.
 ///
 /// ## Suppression comments
 /// The search ends when `range` falls into a suppressed range because there's nothing to format. It also avoids that the
@@ -231,7 +248,11 @@ impl<'ast> SourceOrderVisitor<'ast> for FindEnclosingNode<'_, 'ast> {
             return TraversalSignal::Skip;
         };
 
-        self.closest = EnclosingNode::Node { node, indent_level };
+        self.closest = EnclosingNode::Node {
+            node,
+            indent_level,
+            in_semicolon_separated_statement: false,
+        };
 
         TraversalSignal::Traverse
     }
@@ -253,6 +274,7 @@ impl<'ast> SourceOrderVisitor<'ast> for FindEnclosingNode<'_, 'ast> {
         debug_assert!(self.suppressed.is_no());
 
         let mut iter = body.iter();
+        let mut prev: Option<&Stmt> = None;
 
         while let Some(stmt) = iter.next() {
             // If the range intersects a skip range then we need to
@@ -272,7 +294,54 @@ impl<'ast> SourceOrderVisitor<'ast> for FindEnclosingNode<'_, 'ast> {
             {
                 break;
             }
+
+            // Semicolon-separated statements form a single logical line and must be
+            // formatted as a unit to produce the same result as formatting the entire file.
+            // If this statement is part of a semicolon group and the range touches it,
+            // don't descend — keep the parent as the enclosing node so the entire group
+            // is formatted together. `narrow_range` will use token scanning to find the
+            // full logical line boundaries.
+            //
+            // Two cases:
+            // 1. The statement fully contains the range (single-statement range within a group)
+            // 2. The statement intersects the range (multi-statement range crossing into/out of a group)
+            if stmt.range().contains_range(self.range)
+                || self.range.intersect(stmt.range()).is_some()
+            {
+                let in_semicolon_group = prev.is_some_and(|previous| {
+                    !new_logical_line_between_statements(
+                        self.context.source(),
+                        TextRange::new(previous.end(), stmt.start()),
+                    )
+                }) || iter.as_slice().first().is_some_and(|next| {
+                    !new_logical_line_between_statements(
+                        self.context.source(),
+                        TextRange::new(stmt.end(), next.start()),
+                    )
+                });
+
+                if in_semicolon_group {
+                    if let EnclosingNode::Node {
+                        in_semicolon_separated_statement,
+                        ..
+                    } = &mut self.closest
+                    {
+                        *in_semicolon_separated_statement = true;
+                    }
+
+                    // For single-statement ranges, stop immediately. For multi-statement
+                    // ranges, continue to detect additional semicolon groups further in
+                    // the range — but skip descending into the statement.
+                    if stmt.range().contains_range(self.range) {
+                        break;
+                    }
+                    prev = Some(stmt);
+                    continue;
+                }
+            }
+
             self.visit_stmt(stmt);
+            prev = Some(stmt);
         }
         self.suppressed = Suppressed::No;
     }
@@ -287,6 +356,11 @@ enum EnclosingNode<'a> {
     Node {
         node: AnyNodeRef<'a>,
         indent_level: u16,
+
+        /// Whether the range falls within a semicolon-separated statement group.
+        /// When `true`, `narrow_range` uses token scanning to find the full
+        /// logical line instead of the normal AST-based narrowing.
+        in_semicolon_separated_statement: bool,
     },
 }
 
@@ -315,6 +389,13 @@ enum EnclosingNode<'a> {
 /// indentation than the unformatted sibling nodes. This would be tolerable in non whitespace
 /// sensitive languages like JavaScript but results in lexical errors in Python.
 ///
+/// ## Semicolon-separated statements
+/// When `in_semicolon_separated_statement` is `true`, the normal AST-based narrowing
+/// is skipped. Instead, the tokens are scanned backward from `range.start` and
+/// forward from `range.end` to find the closest `Newline` tokens. Scanning from both
+/// ends handles ranges that cross logical line boundaries (e.g., starting before a
+/// semicolon group and ending within it, or vice versa).
+///
 /// ## Implementation
 /// It would probably be possible to merge this visitor with [`FindEnclosingNode`] but they are separate because
 /// it avoids some unnecessary work for nodes that aren't the `enclosing_node` and I found reasoning
@@ -325,8 +406,32 @@ enum EnclosingNode<'a> {
 fn narrow_range(
     range: TextRange,
     enclosing_node: AnyNodeRef,
+    in_semicolon_separated_statement: bool,
     context: &PyFormatContext,
 ) -> TextRange {
+    if in_semicolon_separated_statement {
+        // Scan tokens to find the logical lines covering the range.
+        // We scan backward from range.start and forward from range.end to handle
+        // ranges that cross logical line boundaries (e.g., starting before a
+        // semicolon group and ending within it, or vice versa).
+        let tokens: &[Token] = context.tokens();
+        let split_start = tokens.partition_point(|t| t.start() < range.start());
+        let split_end = tokens.partition_point(|t| t.start() < range.end());
+
+        let narrowed_start = tokens[..split_start]
+            .iter()
+            .rev()
+            .find(|t| t.kind().is_any_newline())
+            .map_or(enclosing_node.start(), Ranged::end);
+
+        let narrowed_end = tokens[split_end..]
+            .iter()
+            .find(|t| t.kind().is_any_newline())
+            .map_or(enclosing_node.end(), Ranged::start);
+
+        return TextRange::new(narrowed_start, narrowed_end);
+    }
+
     let enclosing_indent = indentation_at_offset(enclosing_node.start(), context.source())
         .expect("Expected enclosing to never be a same line body statement.");
 
