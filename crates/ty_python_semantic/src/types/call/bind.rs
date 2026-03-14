@@ -554,12 +554,12 @@ impl<'db> Bindings<'db> {
         db: &'db dyn Db,
         constructor_instance_type: Type<'db>,
         bindings: impl IntoIterator<Item = &'a CallableBinding<'db>>,
-    ) -> Option<Type<'db>>
+    ) -> Type<'db>
     where
         'db: 'a,
     {
         let Some(class_specialization) = constructor_instance_type.class_specialization(db) else {
-            return Some(constructor_instance_type);
+            return constructor_instance_type;
         };
         let class_context = class_specialization.generic_context(db);
 
@@ -590,12 +590,16 @@ impl<'db> Bindings<'db> {
         // specialization to avoid leaking inferable typevars in the constructed instance.
         let specialization =
             combined.unwrap_or_else(|| class_context.default_specialization(db, None));
-        Some(constructor_instance_type.apply_specialization(db, specialization))
+        constructor_instance_type.apply_specialization(db, specialization)
     }
 
     // Constructor calls should combine `__new__`/`__init__` specializations instead of unioning.
     fn constructor_return_type(&self, db: &'db dyn Db) -> Option<Type<'db>> {
-        Self::combine_constructor_return_type(db, self.constructor_instance_type?, self.iter_flat())
+        Some(Self::combine_constructor_return_type(
+            db,
+            self.constructor_instance_type?,
+            self.iter_flat(),
+        ))
     }
 
     /// Returns the return type of the call. For successful calls, this is the actual return type.
@@ -642,7 +646,7 @@ impl<'db> Bindings<'db> {
             element_return_types.push(element_return_type);
         }
 
-        element_return_types.extend(constructor_groups.into_iter().filter_map(
+        element_return_types.extend(constructor_groups.into_iter().map(
             |(constructor_instance_type, bindings)| {
                 Self::combine_constructor_return_type(db, constructor_instance_type, bindings)
             },
