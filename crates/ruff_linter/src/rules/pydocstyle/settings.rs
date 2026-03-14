@@ -51,6 +51,7 @@ impl Convention {
                 Rule::MissingTerminalPunctuation,
                 Rule::MissingSectionNameColon,
                 Rule::UndocumentedParam,
+                Rule::PropertyDocstringStartsWithVerb,
             ],
             Convention::Pep257 => &[
                 Rule::IncorrectBlankLineBeforeClass,
@@ -71,6 +72,7 @@ impl Convention {
                 Rule::MissingSectionNameColon,
                 Rule::UndocumentedParam,
                 Rule::IncorrectSectionOrder,
+                Rule::PropertyDocstringStartsWithVerb,
             ],
         }
     }
