@@ -554,9 +554,9 @@ def foo(a: int, b: int) -> RecursiveT:
 ```py
 from typing_extensions import TypeGuard, TypeIs
 
-type RecursiveIs = TypeIs[RecursiveIs]
+type RecursiveIs = TypeIs[RecursiveIs]  # error: [cyclic-type-alias-definition]
 type RecursiveGuard = TypeGuard[RecursiveGuard]
 
-type AliasIs = RecursiveIs
+type AliasIs = RecursiveIs  # error: [cyclic-type-alias-definition]
 type AliasGuard = RecursiveGuard
 ```
