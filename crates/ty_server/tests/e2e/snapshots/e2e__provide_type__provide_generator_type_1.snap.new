@@ -1,0 +1,12 @@
+---
+source: crates/ty_server/tests/e2e/provide_type.rs
+assertion_line: 296
+expression: provide_type_response
+---
+Some(
+    ProvideTypeResponse {
+        tys: [
+            "types.GeneratorType[builtins.str, None, None]",
+        ],
+    },
+)
