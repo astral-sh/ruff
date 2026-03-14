@@ -261,11 +261,15 @@ class C(metaclass=Meta):
 C.META_FINAL_A = 2
 # error: [invalid-assignment] "Cannot assign to final attribute `META_FINAL_B` on type `<class 'C'>`"
 C.META_FINAL_B = 2
+# error: [invalid-assignment] "Cannot assign to final attribute `META_FINAL_A` on type `<class 'C'>`"
+C.META_FINAL_A += 1
 
 # error: [invalid-assignment] "Cannot assign to final attribute `CLASS_FINAL_A` on type `<class 'C'>`"
 C.CLASS_FINAL_A = 2
 # error: [invalid-assignment] "Cannot assign to final attribute `CLASS_FINAL_B` on type `<class 'C'>`"
 C.CLASS_FINAL_B = 2
+# error: [invalid-assignment] "Cannot assign to final attribute `CLASS_FINAL_A` on type `<class 'C'>`"
+C.CLASS_FINAL_A += 1
 
 c = C()
 # error: [invalid-assignment] "Cannot assign to final attribute `CLASS_FINAL_A` on type `C`"
@@ -278,6 +282,8 @@ c.INSTANCE_FINAL_A = 2
 c.INSTANCE_FINAL_B = 2
 # error: [invalid-assignment] "Cannot assign to final attribute `INSTANCE_FINAL_C` on type `C`"
 c.INSTANCE_FINAL_C = 2
+# error: [invalid-assignment] "Cannot assign to final attribute `INSTANCE_FINAL_A` on type `C`"
+c.INSTANCE_FINAL_A += 1
 ```
 
 ## Mutability
@@ -624,7 +630,7 @@ from typing import Final
 
 class C:
     def some_method(self):
-        # TODO: This should be an error
+        # error: [invalid-assignment]
         self.x: Final[int] = 1
 ```
 
@@ -889,7 +895,7 @@ python-version = "3.11"
 ```
 
 ```py
-from typing import Final, Self
+from typing import Final, Generic, Self, TypeVar
 
 class ClassA:
     ID4: Final[int]  # OK because initialized in __init__
@@ -907,8 +913,17 @@ class ClassB:
     def __init__(self):  # Without Self annotation
         self.ID5 = 1  # Should also be OK
 
+T = TypeVar("T")
+
+class ClassC(Generic[T]):
+    value: Final[T]
+
+    def __init__(self: Self, value: T):
+        self.value = value
+
 reveal_type(ClassA().ID4)  # revealed: int
 reveal_type(ClassB().ID5)  # revealed: int
+reveal_type(ClassC(1).value)  # revealed: int
 ```
 
 ## Reassignment to Final in `__init__`

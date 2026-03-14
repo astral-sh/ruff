@@ -256,6 +256,28 @@ class C:
 reveal_type(C().w)  # revealed: Unknown | Weird
 ```
 
+#### Nested augmented assignments after narrowing
+
+```py
+from unknown_module import unknown  # error: [unresolved-import]
+
+class Inner:
+    value: int = 0
+
+class Outer:
+    def __init__(self) -> None:
+        self.inner = None
+        self.load()
+
+    def load(self) -> None:
+        self.inner = Inner() if unknown else unknown
+
+    def update(self) -> None:
+        if self.inner is None:
+            return
+        self.inner.value += unknown
+```
+
 #### Attributes defined in tuple unpackings
 
 ```py
