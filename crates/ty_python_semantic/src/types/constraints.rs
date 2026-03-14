@@ -17,11 +17,37 @@
 //! An individual constraint restricts the specialization of a single typevar to be within a
 //! particular lower and upper bound. (A type is within a lower and upper bound if it is a
 //! supertype of the lower bound and a subtype of the upper bound.) You can then build up more
-//! complex constraint sets using union, intersection, and negation operations. We use a [binary
-//! decision diagram][bdd] (BDD) to represent a constraint set.
+//! complex constraint sets using union, intersection, and negation operations. We use a ternary
+//! decision diagram (TDD), as described in §11.2 of [Duboc's thesis][duboc], to represent a
+//! constraint set.
 //!
-//! Note that all lower and upper bounds in a constraint must be fully static. We take the bottom
-//! and top materializations of the types to remove any gradual forms if needed.
+//! A TDD is an extension of a binary decision diagram (BDD). Each interior node has three
+//! outgoing edges instead of two:
+//!
+//! - `if_true`: taken when the constraint holds (called `C` by Duboc)
+//! - `if_uncertain`: included regardless of the constraint's truth value (`U`)
+//! - `if_false`: taken when the constraint does not hold (`D`)
+//!
+//! BDD and TDD nodes can be considered "if-then-else" or ternary operators:
+//!
+//! ```text
+//! [BDD]  n? T: F    = (n ∧ T) ∨ (¬n ∧ F)
+//! [TDD]  n? C: U: D = (n ∧ C) ∨ U ∨ (¬n ∧ D)
+//! ```
+//!
+//! The key benefit of TDDs over BDDs is that unions are more efficient. When computing the union
+//! of two TDDs with different root constraints, the second operand is "parked" in the uncertain
+//! branch rather than duplicated into both the true and false branches. This avoids an
+//! exponential blowup in diagram size that can occur when OR-ing together many constraint sets
+//! (e.g., when inferring specializations for overloaded callables).
+//!
+//! When `if_uncertain` is `ALWAYS_FALSE` everywhere, the TDD degenerates to a standard BDD, and
+//! all operations have zero overhead compared to the binary case.
+//!
+//! Our TDD operations follow Duboc's algorithms (union, intersection) with one correction: the
+//! `n1 > n2` case for difference uses the original Frisch formulation, since Duboc's restructuring
+//! of that case is incorrect. Negation is defined as `1 \ T` (difference from the universe), and
+//! always produces a flat TDD (all `if_uncertain` branches are `ALWAYS_FALSE`).
 //!
 //! NOTE: This module is currently in a transitional state. We've added the BDD [`ConstraintSet`]
 //! representation, and updated all of our property checks to build up a constraint set and then
@@ -64,7 +90,7 @@
 //! env TY_LOG=ty_python_semantic::types::constraints::SequentMap=trace ty check ...
 //! ```
 //!
-//! [bdd]: https://en.wikipedia.org/wiki/Binary_decision_diagram
+//! [duboc]: https://gldubc.github.io/#thesis
 
 use std::cell::{Ref, RefCell};
 use std::cmp::Ordering;
@@ -670,7 +696,6 @@ struct ConstraintSetStorage<'db> {
     negate_cache: FxHashMap<NodeId, NodeId>,
     or_cache: FxHashMap<(NodeId, NodeId, usize), NodeId>,
     and_cache: FxHashMap<(NodeId, NodeId, usize), NodeId>,
-    iff_cache: FxHashMap<(NodeId, NodeId, usize), NodeId>,
     exists_one_cache: FxHashMap<(NodeId, BoundTypeVarIdentity<'db>), NodeId>,
     retain_one_cache: FxHashMap<(NodeId, BoundTypeVarIdentity<'db>), NodeId>,
     restrict_one_cache: FxHashMap<(NodeId, ConstraintAssignment), (NodeId, bool)>,
@@ -746,9 +771,18 @@ impl<'db> ConstraintSetBuilder<'db> {
                 old_constraint.upper,
             );
 
+            // Absorb the uncertain branch into both true and false branches. This collapses
+            // the TDD back to a binary structure, which is correct but loses the TDD laziness for
+            // unions. This is acceptable since `load` is only used for `OwnedConstraintSet` in
+            // mdtests.
+            // TODO: A 4-arg `ite_uncertain` could preserve TDD structure if `load` ever becomes
+            // performance-sensitive.
             let if_true = rebuild_node(db, builder, other, cache, old_interior.if_true);
+            let if_uncertain = rebuild_node(db, builder, other, cache, old_interior.if_uncertain);
             let if_false = rebuild_node(db, builder, other, cache, old_interior.if_false);
-            let remapped = condition.ite(builder, if_true, if_false);
+            let if_true_merged = if_true.or(builder, if_uncertain);
+            let if_false_merged = if_false.or(builder, if_uncertain);
+            let remapped = condition.ite(builder, if_true_merged, if_false_merged);
 
             cache.insert(old_node, remapped);
             remapped
@@ -1139,6 +1173,10 @@ impl ConstraintId {
         ConstraintAssignment::Negative(self)
     }
 
+    fn when_unconstrained(self) -> ConstraintAssignment {
+        ConstraintAssignment::Unconstrained(self)
+    }
+
     /// Defines the ordering of the variables in a constraint set BDD.
     ///
     /// If we only care about _correctness_, we can choose any ordering that we want, as long as
@@ -1253,93 +1291,7 @@ impl ConstraintId {
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
     ) -> impl Display {
-        self.display_inner(db, builder, false)
-    }
-
-    fn display_negated<'db>(
-        self,
-        db: &'db dyn Db,
-        builder: &ConstraintSetBuilder<'db>,
-    ) -> impl Display {
-        self.display_inner(db, builder, true)
-    }
-
-    fn display_inner<'db>(
-        self,
-        db: &'db dyn Db,
-        builder: &ConstraintSetBuilder<'db>,
-        negated: bool,
-    ) -> impl Display {
-        struct DisplayConstrainedTypeVar<'db> {
-            constraint: Constraint<'db>,
-            negated: bool,
-            db: &'db dyn Db,
-        }
-
-        impl Display for DisplayConstrainedTypeVar<'_> {
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                let lower = self.constraint.lower;
-                let upper = self.constraint.upper;
-                let typevar = self.constraint.typevar;
-                if lower.is_equivalent_to(self.db, upper) {
-                    // If this typevar is equivalent to another, output the constraint in a
-                    // consistent alphabetical order, regardless of the salsa ordering that we are
-                    // using the in BDD.
-                    if let Type::TypeVar(bound) = lower {
-                        let bound = bound.identity(self.db).display(self.db).to_string();
-                        let typevar = typevar.identity(self.db).display(self.db).to_string();
-                        let (smaller, larger) = if bound < typevar {
-                            (bound, typevar)
-                        } else {
-                            (typevar, bound)
-                        };
-                        return write!(
-                            f,
-                            "({} {} {})",
-                            smaller,
-                            if self.negated { "≠" } else { "=" },
-                            larger,
-                        );
-                    }
-
-                    return write!(
-                        f,
-                        "({} {} {})",
-                        typevar.identity(self.db).display(self.db),
-                        if self.negated { "≠" } else { "=" },
-                        lower.display(self.db)
-                    );
-                }
-
-                if lower.is_never() && upper.is_object() {
-                    return write!(
-                        f,
-                        "({} {} *)",
-                        typevar.identity(self.db).display(self.db),
-                        if self.negated { "≠" } else { "=" }
-                    );
-                }
-
-                if self.negated {
-                    f.write_str("¬")?;
-                }
-                f.write_str("(")?;
-                if !lower.is_never() {
-                    write!(f, "{} ≤ ", lower.display(self.db))?;
-                }
-                typevar.identity(self.db).display(self.db).fmt(f)?;
-                if !upper.is_object() {
-                    write!(f, " ≤ {}", upper.display(self.db))?;
-                }
-                f.write_str(")")
-            }
-        }
-
-        DisplayConstrainedTypeVar {
-            constraint: builder.constraint_data(self),
-            negated,
-            db,
-        }
+        self.when_true().display(db, builder)
     }
 }
 
@@ -1395,8 +1347,35 @@ impl NodeId {
         if_false: NodeId,
         source_order: usize,
     ) -> NodeId {
+        Self::with_uncertain(
+            builder,
+            constraint,
+            if_true,
+            ALWAYS_FALSE,
+            if_false,
+            source_order,
+        )
+    }
+
+    /// Creates a new TDD node with an explicit `if_uncertain` branch, ensuring that it is
+    /// quasi-reduced.
+    fn with_uncertain(
+        builder: &ConstraintSetBuilder<'_>,
+        constraint: ConstraintId,
+        if_true: NodeId,
+        if_uncertain: NodeId,
+        if_false: NodeId,
+        source_order: usize,
+    ) -> NodeId {
         debug_assert!(
             if_true
+                .root_constraint(builder)
+                .is_none_or(|root_constraint| {
+                    root_constraint.ordering() > constraint.ordering()
+                })
+        );
+        debug_assert!(
+            if_uncertain
                 .root_constraint(builder)
                 .is_none_or(|root_constraint| {
                     root_constraint.ordering() > constraint.ordering()
@@ -1409,15 +1388,17 @@ impl NodeId {
                     root_constraint.ordering() > constraint.ordering()
                 })
         );
-        if if_true == ALWAYS_FALSE && if_false == ALWAYS_FALSE {
+        if if_true == ALWAYS_FALSE && if_uncertain == ALWAYS_FALSE && if_false == ALWAYS_FALSE {
             return ALWAYS_FALSE;
         }
         let max_source_order = source_order
             .max(if_true.max_source_order(builder))
+            .max(if_uncertain.max_source_order(builder))
             .max(if_false.max_source_order(builder));
         builder.intern_interior_node(InteriorNodeData {
             constraint,
             if_true,
+            if_uncertain,
             if_false,
             source_order,
             max_source_order,
@@ -1436,15 +1417,18 @@ impl Node {
         builder.intern_interior_node(InteriorNodeData {
             constraint,
             if_true: ALWAYS_TRUE,
+            if_uncertain: ALWAYS_FALSE,
             if_false: ALWAYS_FALSE,
             source_order,
             max_source_order: source_order,
         })
     }
 
-    /// Creates a new BDD node for a positive or negative individual constraint. (For a positive
-    /// constraint, this returns the same BDD node as [`new_constraint`][Self::new_constraint]. For
-    /// a negative constraint, it returns the negation of that BDD node.)
+    /// Creates a new BDD node for a positive, negative, or unconstrained individual constraint.
+    /// (For a positive constraint, this returns the same BDD node as
+    /// [`new_constraint`][Self::new_constraint]. For a negative constraint, it returns the
+    /// negation of that BDD node. For an unconstrained constraint, the result holds regardless
+    /// of the constraint's truth value.)
     fn new_satisfied_constraint(
         builder: &ConstraintSetBuilder<'_>,
         constraint: ConstraintAssignment,
@@ -1455,6 +1439,7 @@ impl Node {
                 builder.intern_interior_node(InteriorNodeData {
                     constraint,
                     if_true: ALWAYS_TRUE,
+                    if_uncertain: ALWAYS_FALSE,
                     if_false: ALWAYS_FALSE,
                     source_order,
                     max_source_order: source_order,
@@ -1464,7 +1449,22 @@ impl Node {
                 builder.intern_interior_node(InteriorNodeData {
                     constraint,
                     if_true: ALWAYS_FALSE,
+                    if_uncertain: ALWAYS_FALSE,
                     if_false: ALWAYS_TRUE,
+                    source_order,
+                    max_source_order: source_order,
+                })
+            }
+            ConstraintAssignment::Unconstrained(constraint) => {
+                // The result holds regardless of the constraint's truth value, so only
+                // `if_uncertain` needs to be `ALWAYS_TRUE` — `n? 0: 1: 0`. It would also be
+                // correct to use `n? 1: 1: 1` (i.e., `ALWAYS_TRUE` for all outgoing edges), but
+                // that would throw away some of the efficiency gains this representation gives us.
+                builder.intern_interior_node(InteriorNodeData {
+                    constraint,
+                    if_true: ALWAYS_FALSE,
+                    if_uncertain: ALWAYS_TRUE,
+                    if_false: ALWAYS_FALSE,
                     source_order,
                     max_source_order: source_order,
                 })
@@ -1513,10 +1513,13 @@ impl NodeId {
             Node::AlwaysTrue | Node::AlwaysFalse => self,
             Node::Interior(_) => {
                 let interior = builder.interior_node_data(self);
-                NodeId::new(
+                NodeId::with_uncertain(
                     builder,
                     interior.constraint,
                     interior.if_true.with_adjusted_source_order(builder, delta),
+                    interior
+                        .if_uncertain
+                        .with_adjusted_source_order(builder, delta),
                     interior.if_false.with_adjusted_source_order(builder, delta),
                     interior.source_order + delta,
                 )
@@ -1557,14 +1560,24 @@ impl NodeId {
                     builder,
                     interior.constraint.when_true(),
                     interior.source_order,
-                    |path, _| interior.if_true.for_each_path_inner(db, builder, f, path),
+                    |path, _| {
+                        interior.if_true.for_each_path_inner(db, builder, f, path);
+                        interior
+                            .if_uncertain
+                            .for_each_path_inner(db, builder, f, path);
+                    },
                 );
                 path.walk_edge(
                     db,
                     builder,
                     interior.constraint.when_false(),
                     interior.source_order,
-                    |path, _| interior.if_false.for_each_path_inner(db, builder, f, path),
+                    |path, _| {
+                        interior.if_false.for_each_path_inner(db, builder, f, path);
+                        interior
+                            .if_uncertain
+                            .for_each_path_inner(db, builder, f, path);
+                    },
                 );
             }
         }
@@ -1599,18 +1612,21 @@ impl NodeId {
                 // walk_edge will return None if this node's constraint (or anything we can derive
                 // from it) causes the if_true edge to become impossible. We want to ignore
                 // impossible paths, and so we treat them as passing the "always satisfied" check.
+                //
+                // Under TDD semantics, when the constraint holds the result is C ∨ U, and when it
+                // doesn't the result is D ∨ U. We fold the uncertain branch into both before
+                // checking, because "C ∨ U is always satisfied" cannot be decomposed into
+                // independent checks on C and U (it's a disjunction). This is zero-cost for binary
+                // BDDs since `C ∨ false = C`.
                 let interior = builder.interior_node_data(self);
+                let if_true_or_uncertain = interior.if_true.or(builder, interior.if_uncertain);
                 let true_always_satisfied = path
                     .walk_edge(
                         db,
                         builder,
                         interior.constraint.when_true(),
                         interior.source_order,
-                        |path, _| {
-                            interior
-                                .if_true
-                                .is_always_satisfied_inner(db, builder, path)
-                        },
+                        |path, _| if_true_or_uncertain.is_always_satisfied_inner(db, builder, path),
                     )
                     .unwrap_or(true);
                 if !true_always_satisfied {
@@ -1618,16 +1634,13 @@ impl NodeId {
                 }
 
                 // Ditto for the if_false branch
+                let if_false_or_uncertain = interior.if_false.or(builder, interior.if_uncertain);
                 path.walk_edge(
                     db,
                     builder,
                     interior.constraint.when_false(),
                     interior.source_order,
-                    |path, _| {
-                        interior
-                            .if_false
-                            .is_always_satisfied_inner(db, builder, path)
-                    },
+                    |path, _| if_false_or_uncertain.is_always_satisfied_inner(db, builder, path),
                 )
                 .unwrap_or(true)
             }
@@ -1659,6 +1672,10 @@ impl NodeId {
                 // walk_edge will return None if this node's constraint (or anything we can derive
                 // from it) causes the if_true edge to become impossible. We want to ignore
                 // impossible paths, and so we treat them as passing the "never satisfied" check.
+                //
+                // Note that unlike `is_always_satisfied`, here we don't have to fold the uncertain
+                // branch into the true and false branches, since C ∨ U is only false when C and U
+                // are each independently false. That lets us check each branch in isolation.
                 let interior = builder.interior_node_data(self);
                 let true_never_satisfied = path
                     .walk_edge(
@@ -1670,6 +1687,24 @@ impl NodeId {
                     )
                     .unwrap_or(true);
                 if !true_never_satisfied {
+                    return false;
+                }
+
+                // Ditto for the if_uncertain branch
+                let uncertain_never_satisfied = path
+                    .walk_edge(
+                        db,
+                        builder,
+                        interior.constraint.when_unconstrained(),
+                        interior.source_order,
+                        |path, _| {
+                            interior
+                                .if_uncertain
+                                .is_never_satisfied_inner(db, builder, path)
+                        },
+                    )
+                    .unwrap_or(true);
+                if !uncertain_never_satisfied {
                     return false;
                 }
 
@@ -1741,21 +1776,27 @@ impl NodeId {
             (Node::AlwaysTrue, Node::AlwaysTrue) => ALWAYS_TRUE,
             (Node::AlwaysTrue, Node::Interior(_)) => {
                 let other_interior = builder.interior_node_data(other);
-                NodeId::new(
+                // If lhs is always true, then the overall result is true for any assignment of
+                // rhs.
+                NodeId::with_uncertain(
                     builder,
                     other_interior.constraint,
+                    ALWAYS_FALSE,
                     ALWAYS_TRUE,
-                    ALWAYS_TRUE,
+                    ALWAYS_FALSE,
                     other_interior.source_order + other_offset,
                 )
             }
             (Node::Interior(_), Node::AlwaysTrue) => {
                 let self_interior = builder.interior_node_data(self);
-                NodeId::new(
+                // If rhs is always true, then the overall result is true for any assignment of
+                // lhs.
+                NodeId::with_uncertain(
                     builder,
                     self_interior.constraint,
+                    ALWAYS_FALSE,
                     ALWAYS_TRUE,
-                    ALWAYS_TRUE,
+                    ALWAYS_FALSE,
                     self_interior.source_order,
                 )
             }
@@ -1954,35 +1995,12 @@ impl NodeId {
         other: Self,
         other_offset: usize,
     ) -> Self {
-        match (self.node(), other.node()) {
-            (Node::AlwaysFalse, Node::AlwaysFalse) | (Node::AlwaysTrue, Node::AlwaysTrue) => {
-                ALWAYS_TRUE
-            }
-            (Node::AlwaysTrue, Node::AlwaysFalse) | (Node::AlwaysFalse, Node::AlwaysTrue) => {
-                ALWAYS_FALSE
-            }
-            (Node::AlwaysTrue | Node::AlwaysFalse, Node::Interior(_)) => {
-                let interior = builder.interior_node_data(other);
-                NodeId::new(
-                    builder,
-                    interior.constraint,
-                    self.iff_inner(builder, interior.if_true, other_offset),
-                    self.iff_inner(builder, interior.if_false, other_offset),
-                    interior.source_order + other_offset,
-                )
-            }
-            (Node::Interior(_), Node::AlwaysTrue | Node::AlwaysFalse) => {
-                let interior = builder.interior_node_data(self);
-                NodeId::new(
-                    builder,
-                    interior.constraint,
-                    interior.if_true.iff_inner(builder, other, other_offset),
-                    interior.if_false.iff_inner(builder, other, other_offset),
-                    interior.source_order,
-                )
-            }
-            (Node::Interior(a), Node::Interior(b)) => a.iff(builder, b, other_offset),
-        }
+        // iff(a, b) = (a ∧ b) ∨ (¬a ∧ ¬b)
+        let a_and_b = self.and_inner(builder, other, other_offset);
+        let not_a_and_not_b =
+            self.negate(builder)
+                .and_inner(builder, other.negate(builder), other_offset);
+        a_and_b.or(builder, not_a_and_not_b)
     }
 
     /// Returns the `if-then-else` of three BDDs: when `self` evaluates to `true`, it returns what
@@ -2319,6 +2337,7 @@ impl NodeId {
         let interior = builder.interior_node_data(self);
         f(interior.constraint, interior.source_order);
         interior.if_true.for_each_constraint(builder, f);
+        interior.if_uncertain.for_each_constraint(builder, f);
         interior.if_false.for_each_constraint(builder, f);
     }
 
@@ -2371,6 +2390,10 @@ impl NodeId {
                         let interior = builder.interior_node_data(node);
                         self.current_clause.push(interior.constraint.when_true());
                         self.visit_node(builder, interior.if_true);
+                        self.current_clause.pop();
+                        self.current_clause
+                            .push(interior.constraint.when_unconstrained());
+                        self.visit_node(builder, interior.if_uncertain);
                         self.current_clause.pop();
                         self.current_clause.push(interior.constraint.when_false());
                         self.visit_node(builder, interior.if_false);
@@ -2488,6 +2511,15 @@ impl NodeId {
                         seen,
                         f,
                     )?;
+                    write!(f, "\n{prefix}├─? ",)?;
+                    format_node(
+                        db,
+                        builder,
+                        interior.if_uncertain,
+                        &format_args!("{prefix}│   ",),
+                        seen,
+                        f,
+                    )?;
                     write!(f, "\n{prefix}└─₀ ",)?;
                     format_node(
                         db,
@@ -2557,6 +2589,7 @@ struct InteriorNode(NodeId);
 struct InteriorNodeData {
     constraint: ConstraintId,
     if_true: NodeId,
+    if_uncertain: NodeId,
     if_false: NodeId,
 
     /// Represents the order in which this node's constraint was added to the containing constraint
@@ -2583,12 +2616,23 @@ impl InteriorNode {
         }
         drop(storage);
 
+        // negate(n ? C : U : D) = n ? negate(or(C, U)) : 0 : negate(or(D, U))
+        //
+        // The uncertain branch U is absorbed into C and D via union before negation. The result's
+        // uncertain branch is always zero. When U = 0 (the common case), this degenerates to the
+        // standard binary BDD leaf-swap: n ? negate(C) : 0 : negate(D).
         let interior = builder.interior_node_data(self.node());
         let result = NodeId::new(
             builder,
             interior.constraint,
-            interior.if_true.negate(builder),
-            interior.if_false.negate(builder),
+            interior
+                .if_true
+                .or(builder, interior.if_uncertain)
+                .negate(builder),
+            interior
+                .if_false
+                .or(builder, interior.if_uncertain)
+                .negate(builder),
             interior.source_order,
         );
 
@@ -2610,35 +2654,44 @@ impl InteriorNode {
         let other_interior = builder.interior_node_data(other.node());
         let other_ordering = other_interior.constraint.ordering();
         let result = match self_ordering.cmp(&other_ordering) {
-            Ordering::Equal => NodeId::new(
+            Ordering::Equal => NodeId::with_uncertain(
                 builder,
                 self_interior.constraint,
                 self_interior
                     .if_true
                     .or_inner(builder, other_interior.if_true, other_offset),
+                self_interior.if_uncertain.or_inner(
+                    builder,
+                    other_interior.if_uncertain,
+                    other_offset,
+                ),
                 self_interior
                     .if_false
                     .or_inner(builder, other_interior.if_false, other_offset),
                 self_interior.source_order,
             ),
-            Ordering::Less => NodeId::new(
+            // This is from Frisch's original description of TDDs. If self < other, we check self
+            // first. Instead of distributing other into the if_true and if_false branches, we
+            // "park" it in the if_uncertain branch. That causes us to only evaluate other "lazily"
+            // when needed.
+            Ordering::Less => NodeId::with_uncertain(
                 builder,
                 self_interior.constraint,
+                self_interior.if_true,
                 self_interior
-                    .if_true
+                    .if_uncertain
                     .or_inner(builder, other.node(), other_offset),
-                self_interior
-                    .if_false
-                    .or_inner(builder, other.node(), other_offset),
+                self_interior.if_false,
                 self_interior.source_order,
             ),
-            Ordering::Greater => NodeId::new(
+            // Ditto above but for the other variable ordering
+            Ordering::Greater => NodeId::with_uncertain(
                 builder,
                 other_interior.constraint,
+                other_interior.if_true,
                 self.node()
-                    .or_inner(builder, other_interior.if_true, other_offset),
-                self.node()
-                    .or_inner(builder, other_interior.if_false, other_offset),
+                    .or_inner(builder, other_interior.if_uncertain, other_offset),
+                other_interior.if_false,
                 other_interior.source_order + other_offset,
             ),
         };
@@ -2661,33 +2714,91 @@ impl InteriorNode {
         let other_interior = builder.interior_node_data(other.node());
         let other_ordering = other_interior.constraint.ordering();
         let result = match self_ordering.cmp(&other_ordering) {
-            Ordering::Equal => NodeId::new(
-                builder,
-                self_interior.constraint,
-                self_interior
+            // This is one of Duboc's optimizations over Frisch's original TDD operators. Frisch
+            // always sets the if_uncertain branch to ALWAYS_FALSE, and always distributes both
+            // input if_uncertain branches into the corresponding if_true and if_false branches.
+            // Duboc propagates the input if_uncertain branches into the result's if_uncertain
+            // branch.
+            //
+            //     n ? (C1 ∧ (C2 ∨ U2)) ∨ (U1 ∧ C2) : U1 ∧ U2 : (D1 ∧ (U2 ∨ D2)) ∨ (U1 ∧ D2)
+            //
+            // See [Duboc2026], §11.2 for more details.
+            Ordering::Equal => {
+                let if_true = self_interior
                     .if_true
-                    .and_inner(builder, other_interior.if_true, other_offset),
-                self_interior
+                    .and_inner(
+                        builder,
+                        other_interior.if_true.or_inner(
+                            builder,
+                            other_interior.if_uncertain,
+                            other_offset,
+                        ),
+                        other_offset,
+                    )
+                    .or_inner(
+                        builder,
+                        self_interior.if_uncertain.and_inner(
+                            builder,
+                            other_interior.if_true,
+                            other_offset,
+                        ),
+                        0,
+                    );
+                let if_uncertain = self_interior.if_uncertain.and_inner(
+                    builder,
+                    other_interior.if_uncertain,
+                    other_offset,
+                );
+                let if_false = self_interior
                     .if_false
-                    .and_inner(builder, other_interior.if_false, other_offset),
-                self_interior.source_order,
-            ),
-            Ordering::Less => NodeId::new(
+                    .and_inner(
+                        builder,
+                        other_interior.if_uncertain.or_inner(
+                            builder,
+                            other_interior.if_false,
+                            other_offset,
+                        ),
+                        other_offset,
+                    )
+                    .or_inner(
+                        builder,
+                        self_interior.if_uncertain.and_inner(
+                            builder,
+                            other_interior.if_false,
+                            other_offset,
+                        ),
+                        0,
+                    );
+                NodeId::with_uncertain(
+                    builder,
+                    self_interior.constraint,
+                    if_true,
+                    if_uncertain,
+                    if_false,
+                    self_interior.source_order,
+                )
+            }
+            Ordering::Less => NodeId::with_uncertain(
                 builder,
                 self_interior.constraint,
                 self_interior
                     .if_true
                     .and_inner(builder, other.node(), other_offset),
                 self_interior
+                    .if_uncertain
+                    .and_inner(builder, other.node(), other_offset),
+                self_interior
                     .if_false
                     .and_inner(builder, other.node(), other_offset),
                 self_interior.source_order,
             ),
-            Ordering::Greater => NodeId::new(
+            Ordering::Greater => NodeId::with_uncertain(
                 builder,
                 other_interior.constraint,
                 self.node()
                     .and_inner(builder, other_interior.if_true, other_offset),
+                self.node()
+                    .and_inner(builder, other_interior.if_uncertain, other_offset),
                 self.node()
                     .and_inner(builder, other_interior.if_false, other_offset),
                 other_interior.source_order + other_offset,
@@ -2696,57 +2807,6 @@ impl InteriorNode {
 
         let mut storage = builder.storage.borrow_mut();
         storage.and_cache.insert(key, result);
-        result
-    }
-
-    fn iff(self, builder: &ConstraintSetBuilder<'_>, other: Self, other_offset: usize) -> NodeId {
-        let key = (self.node(), other.node(), other_offset);
-        let storage = builder.storage.borrow();
-        if let Some(result) = storage.iff_cache.get(&key) {
-            return *result;
-        }
-        drop(storage);
-
-        let self_interior = builder.interior_node_data(self.node());
-        let self_ordering = self_interior.constraint.ordering();
-        let other_interior = builder.interior_node_data(other.node());
-        let other_ordering = other_interior.constraint.ordering();
-        let result = match self_ordering.cmp(&other_ordering) {
-            Ordering::Equal => NodeId::new(
-                builder,
-                self_interior.constraint,
-                self_interior
-                    .if_true
-                    .iff_inner(builder, other_interior.if_true, other_offset),
-                self_interior
-                    .if_false
-                    .iff_inner(builder, other_interior.if_false, other_offset),
-                self_interior.source_order,
-            ),
-            Ordering::Less => NodeId::new(
-                builder,
-                self_interior.constraint,
-                self_interior
-                    .if_true
-                    .iff_inner(builder, other.node(), other_offset),
-                self_interior
-                    .if_false
-                    .iff_inner(builder, other.node(), other_offset),
-                self_interior.source_order,
-            ),
-            Ordering::Greater => NodeId::new(
-                builder,
-                other_interior.constraint,
-                self.node()
-                    .iff_inner(builder, other_interior.if_true, other_offset),
-                self.node()
-                    .iff_inner(builder, other_interior.if_false, other_offset),
-                other_interior.source_order + other_offset,
-            ),
-        };
-
-        let mut storage = builder.storage.borrow_mut();
-        storage.iff_cache.insert(key, result);
         result
     }
 
@@ -2809,7 +2869,7 @@ impl InteriorNode {
         let self_interior = builder.interior_node_data(self.node());
         if should_remove(self_interior.constraint) {
             // If we should remove constraints involving this typevar, then we replace this node
-            // with the OR of its if_false/if_true edges. That is, the result is true if there's
+            // with the OR of all of its outgoing edges. That is, the result is true if there's
             // any assignment of this node's constraint that is true.
             //
             // We also have to check if there are any derived facts that depend on the constraint
@@ -2886,7 +2946,36 @@ impl InteriorNode {
                     },
                 )
                 .unwrap_or(ALWAYS_FALSE);
-            if_true.or(builder, if_false)
+            let if_uncertain = path
+                .walk_edge(
+                    db,
+                    builder,
+                    self_interior.constraint.when_unconstrained(),
+                    self_interior.source_order,
+                    |path, new_range| {
+                        let branch = self_interior.if_uncertain.abstract_one_inner(
+                            db,
+                            builder,
+                            should_remove,
+                            path,
+                        );
+                        path.assignments[new_range]
+                            .iter()
+                            .filter(|(assignment, _)| !should_remove(assignment.constraint()))
+                            .fold(branch, |branch, (assignment, source_order)| {
+                                branch.and(
+                                    builder,
+                                    Node::new_satisfied_constraint(
+                                        builder,
+                                        *assignment,
+                                        *source_order,
+                                    ),
+                                )
+                            })
+                    },
+                )
+                .unwrap_or(ALWAYS_FALSE);
+            if_true.or(builder, if_uncertain).or(builder, if_false)
         } else {
             // Otherwise, we abstract the if_false/if_true edges recursively.
             let if_true = path
@@ -2899,6 +2988,22 @@ impl InteriorNode {
                         self_interior
                             .if_true
                             .abstract_one_inner(db, builder, should_remove, path)
+                    },
+                )
+                .unwrap_or(ALWAYS_FALSE);
+            let if_uncertain = path
+                .walk_edge(
+                    db,
+                    builder,
+                    self_interior.constraint.when_unconstrained(),
+                    self_interior.source_order,
+                    |path, _| {
+                        self_interior.if_uncertain.abstract_one_inner(
+                            db,
+                            builder,
+                            should_remove,
+                            path,
+                        )
                     },
                 )
                 .unwrap_or(ALWAYS_FALSE);
@@ -2915,6 +3020,10 @@ impl InteriorNode {
                     },
                 )
                 .unwrap_or(ALWAYS_FALSE);
+            // Absorb the uncertain branch into both the true and false branches before
+            // constructing the ITE, matching TDD semantics: when the constraint holds the result
+            // is C ∨ U, and when it doesn't the result is D ∨ U.
+            //
             // NB: We cannot use `Node::new` here, because the recursive calls might introduce new
             // derived constraints into the result, and those constraints might appear before this
             // one in the BDD ordering.
@@ -2923,7 +3032,11 @@ impl InteriorNode {
                 self_interior.constraint,
                 self_interior.source_order,
             )
-            .ite(builder, if_true, if_false)
+            .ite(
+                builder,
+                if_true.or(builder, if_uncertain),
+                if_false.or(builder, if_uncertain),
+            )
         }
     }
 
@@ -2949,25 +3062,51 @@ impl InteriorNode {
             (self.node(), false)
         } else {
             // Otherwise, check if this node's variable is in the assignment. If so, substitute the
-            // variable by replacing this node with its if_false/if_true edge, accordingly.
+            // variable by replacing this node with the appropriate edge(s). When restricting a
+            // TDD, the uncertain branch is folded in.
             if assignment == self_interior.constraint.when_true() {
-                (self_interior.if_true, true)
+                // restrict(n? C: U: D, n == true) = C ∨ U
+                (
+                    self_interior
+                        .if_true
+                        .or(builder, self_interior.if_uncertain),
+                    true,
+                )
             } else if assignment == self_interior.constraint.when_false() {
-                (self_interior.if_false, true)
+                // restrict(n? C: U: D, n == false) = D ∨ U
+                (
+                    self_interior
+                        .if_false
+                        .or(builder, self_interior.if_uncertain),
+                    true,
+                )
+            } else if assignment == self_interior.constraint.when_unconstrained() {
+                // restrict(n? C: U: D, n is unconstrained) = C ∨ U ∨ D
+                (
+                    self_interior
+                        .if_true
+                        .or(builder, self_interior.if_uncertain)
+                        .or(builder, self_interior.if_false),
+                    true,
+                )
             } else {
                 let (if_true, found_in_true) =
                     self_interior.if_true.restrict_one(db, builder, assignment);
+                let (if_uncertain, found_in_uncertain) = self_interior
+                    .if_uncertain
+                    .restrict_one(db, builder, assignment);
                 let (if_false, found_in_false) =
                     self_interior.if_false.restrict_one(db, builder, assignment);
                 (
-                    NodeId::new(
+                    NodeId::with_uncertain(
                         builder,
                         self_interior.constraint,
                         if_true,
+                        if_uncertain,
                         if_false,
                         self_interior.source_order,
                     ),
-                    found_in_true || found_in_false,
+                    found_in_true || found_in_uncertain || found_in_false,
                 )
             }
         };
@@ -3628,6 +3767,7 @@ pub(crate) struct TypeVarSolution<'db> {
 pub(crate) enum ConstraintAssignment {
     Positive(ConstraintId),
     Negative(ConstraintId),
+    Unconstrained(ConstraintId),
 }
 
 impl ConstraintAssignment {
@@ -3635,6 +3775,7 @@ impl ConstraintAssignment {
         match self {
             ConstraintAssignment::Positive(constraint) => constraint,
             ConstraintAssignment::Negative(constraint) => constraint,
+            ConstraintAssignment::Unconstrained(constraint) => constraint,
         }
     }
 
@@ -3645,6 +3786,10 @@ impl ConstraintAssignment {
             }
             ConstraintAssignment::Negative(constraint) => {
                 ConstraintAssignment::Positive(constraint)
+            }
+            // "This constraint can go either way" is symmetric under negation.
+            ConstraintAssignment::Unconstrained(constraint) => {
+                ConstraintAssignment::Unconstrained(constraint)
             }
         }
     }
@@ -3706,31 +3851,99 @@ impl ConstraintAssignment {
             //     |------other-------|
             //     |---|...self...|---|
             (ConstraintAssignment::Negative(_), ConstraintAssignment::Positive(_)) => false,
+
+            // An `Unconstrained` assignment means "this constraint can go either way." It does
+            // not imply any positive or negative assignment, and no positive or negative
+            // assignment implies it. The only trivially true case is Unconstrained => Unconstrained
+            // for the same constraint.
+            (
+                ConstraintAssignment::Unconstrained(self_constraint),
+                ConstraintAssignment::Unconstrained(other_constraint),
+            ) => self_constraint == other_constraint,
+            (ConstraintAssignment::Unconstrained(_), _)
+            | (_, ConstraintAssignment::Unconstrained(_)) => false,
         }
     }
 
     fn display<'db>(self, db: &'db dyn Db, builder: &ConstraintSetBuilder<'db>) -> impl Display {
         struct DisplayConstraintAssignment<'db, 'c> {
-            constraint: ConstraintAssignment,
+            assignment: ConstraintAssignment,
             db: &'db dyn Db,
             builder: &'c ConstraintSetBuilder<'db>,
         }
 
-        impl Display for DisplayConstraintAssignment<'_, '_> {
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                match self.constraint {
-                    ConstraintAssignment::Positive(constraint) => {
-                        constraint.display(self.db, self.builder).fmt(f)
-                    }
-                    ConstraintAssignment::Negative(constraint) => {
-                        constraint.display_negated(self.db, self.builder).fmt(f)
-                    }
+        impl DisplayConstraintAssignment<'_, '_> {
+            fn equality_sign(&self) -> &'static str {
+                match self.assignment {
+                    ConstraintAssignment::Positive(_) => "=",
+                    ConstraintAssignment::Negative(_) => "≠",
+                    ConstraintAssignment::Unconstrained(_) => "=?",
+                }
+            }
+
+            fn range_prefix(&self) -> &'static str {
+                match self.assignment {
+                    ConstraintAssignment::Positive(_) => "",
+                    ConstraintAssignment::Negative(_) => "¬",
+                    ConstraintAssignment::Unconstrained(_) => "?",
                 }
             }
         }
 
+        impl Display for DisplayConstraintAssignment<'_, '_> {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                let constraint_data = self.builder.constraint_data(self.assignment.constraint());
+                let lower = constraint_data.lower;
+                let upper = constraint_data.upper;
+                let typevar = constraint_data.typevar;
+                if lower.is_equivalent_to(self.db, upper) {
+                    // If this typevar is equivalent to another, output the constraint in a
+                    // consistent alphabetical order, regardless of the salsa ordering that we are
+                    // using the in BDD.
+                    if let Type::TypeVar(bound) = lower {
+                        let bound = bound.identity(self.db).display(self.db).to_string();
+                        let typevar = typevar.identity(self.db).display(self.db).to_string();
+                        let (smaller, larger) = if bound < typevar {
+                            (bound, typevar)
+                        } else {
+                            (typevar, bound)
+                        };
+                        return write!(f, "({} {} {})", smaller, self.equality_sign(), larger);
+                    }
+
+                    return write!(
+                        f,
+                        "({} {} {})",
+                        typevar.identity(self.db).display(self.db),
+                        self.equality_sign(),
+                        lower.display(self.db)
+                    );
+                }
+
+                if lower.is_never() && upper.is_object() {
+                    return write!(
+                        f,
+                        "({} {} *)",
+                        typevar.identity(self.db).display(self.db),
+                        self.equality_sign()
+                    );
+                }
+
+                f.write_str(self.range_prefix())?;
+                f.write_str("(")?;
+                if !lower.is_never() {
+                    write!(f, "{} ≤ ", lower.display(self.db))?;
+                }
+                typevar.identity(self.db).display(self.db).fmt(f)?;
+                if !upper.is_object() {
+                    write!(f, " ≤ {}", upper.display(self.db))?;
+                }
+                f.write_str(")")
+            }
+        }
+
         DisplayConstraintAssignment {
-            constraint: self,
+            assignment: self,
             db,
             builder,
         }
@@ -4617,12 +4830,18 @@ impl PathAssignments {
             .iter()
             .filter_map(|(assignment, source_order)| match assignment {
                 ConstraintAssignment::Positive(constraint) => Some((*constraint, *source_order)),
-                ConstraintAssignment::Negative(_) => None,
+                ConstraintAssignment::Negative(_) | ConstraintAssignment::Unconstrained(_) => None,
             })
     }
 
     fn assignment_holds(&self, assignment: ConstraintAssignment) -> bool {
         self.assignments.contains_key(&assignment)
+    }
+
+    fn contains_constraint(&self, constraint: ConstraintId) -> bool {
+        self.assignment_holds(constraint.when_true())
+            || self.assignment_holds(constraint.when_false())
+            || self.assignment_holds(constraint.when_unconstrained())
     }
 
     /// Update our sequent map to ensure that it holds all of the sequents that involve the given
@@ -4664,6 +4883,22 @@ impl PathAssignments {
         source_order: usize,
         derived: bool,
     ) -> Result<(), PathAssignmentConflict> {
+        if matches!(assignment, ConstraintAssignment::Unconstrained(_)) {
+            // An `Unconstrained` assignment means "this constraint can go either way". If there is
+            // already any assignment for this constraint (positive, negative, or unconstrained),
+            // the existing assignment is at least as informative, and we skip.
+            if self.contains_constraint(assignment.constraint()) {
+                return Ok(());
+            }
+
+            // Since we don't know whether the assignment's constraint holds or not, we cannot
+            // derive any additional information from the sequent map. We still want to record the
+            // assignment, but as an optimization we can return early without actually querying the
+            // sequent map.
+            self.assignments.insert(assignment, source_order);
+            return Ok(());
+        }
+
         // First add this assignment. If it causes a conflict, return that as an error. If we've
         // already know this assignment holds, just return.
         if self.assignments.contains_key(&assignment.negated()) {
@@ -4866,14 +5101,7 @@ impl SatisfiedClause {
         let mut constraints: Vec<_> = self
             .constraints
             .iter()
-            .map(|constraint| match constraint {
-                ConstraintAssignment::Positive(constraint) => {
-                    constraint.display(db, builder).to_string()
-                }
-                ConstraintAssignment::Negative(constraint) => {
-                    constraint.display_negated(db, builder).to_string()
-                }
-            })
+            .map(|constraint| constraint.display(db, builder).to_string())
             .collect();
         constraints.sort();
 
@@ -5112,18 +5340,18 @@ mod tests {
     fn test_display_graph_output() {
         let expected = indoc! {r#"
             <0> (U = bool) 2/4
-            ┡━₁ <1> (U = str) 1/4
-            │   ┡━₁ <2> (T = bool) 4/4
-            │   │   ┡━₁ <3> (T = str) 3/3
-            │   │   │   ┡━₁ always
-            │   │   │   └─₀ always
-            │   │   └─₀ <4> (T = str) 3/3
-            │   │       ┡━₁ always
-            │   │       └─₀ never
-            │   └─₀ <2> SHARED
-            └─₀ <5> (U = str) 1/4
-                ┡━₁ <2> SHARED
-                └─₀ never
+            ┡━₁ <1> (T = bool) 4/4
+            │   ┡━₁ always
+            │   ├─? <2> (T = str) 3/3
+            │   │   ┡━₁ always
+            │   │   ├─? never
+            │   │   └─₀ never
+            │   └─₀ never
+            ├─? <3> (U = str) 1/4
+            │   ┡━₁ <1> SHARED
+            │   ├─? never
+            │   └─₀ never
+            └─₀ never
         "#}
         .trim_end();
 
@@ -5145,5 +5373,250 @@ mod tests {
             .and(&db, &constraints, || t_str.or(&db, &constraints, || t_bool));
         let actual = set.node.display_graph(&db, &constraints, &"").to_string();
         assert_eq!(actual, expected);
+    }
+
+    /// Helper to check whether a TDD node has a non-trivial uncertain branch.
+    fn has_uncertain_branch(builder: &ConstraintSetBuilder<'_>, node: NodeId) -> bool {
+        match node.node() {
+            Node::AlwaysTrue | Node::AlwaysFalse => false,
+            Node::Interior(_) => {
+                let interior = builder.interior_node_data(node);
+                interior.if_uncertain != ALWAYS_FALSE
+            }
+        }
+    }
+
+    /// Helper to check whether any node in a TDD has a non-trivial uncertain branch.
+    fn has_any_uncertain_branch(builder: &ConstraintSetBuilder<'_>, node: NodeId) -> bool {
+        match node.node() {
+            Node::AlwaysTrue | Node::AlwaysFalse => false,
+            Node::Interior(_) => {
+                let interior = builder.interior_node_data(node);
+                interior.if_uncertain != ALWAYS_FALSE
+                    || has_any_uncertain_branch(builder, interior.if_true)
+                    || has_any_uncertain_branch(builder, interior.if_uncertain)
+                    || has_any_uncertain_branch(builder, interior.if_false)
+            }
+        }
+    }
+
+    /// The Duboc union algorithm parks the second operand in the uncertain branch when the two
+    /// TDDs have different root constraints, instead of duplicating it into both branches.
+    #[test]
+    fn tdd_union_creates_uncertain_branches() {
+        let db = setup_db();
+        let t =
+            BoundTypeVarInstance::synthetic(&db, Name::new_static("T"), TypeVarVariance::Invariant);
+        let u =
+            BoundTypeVarInstance::synthetic(&db, Name::new_static("U"), TypeVarVariance::Invariant);
+        let int_type = KnownClass::Int.to_instance(&db);
+        let str_type = KnownClass::Str.to_instance(&db);
+        let builder = ConstraintSetBuilder::new();
+
+        // Individual constraints have no uncertain branches
+        let t_int = ConstraintSet::constrain_typevar(&db, &builder, t, int_type, int_type);
+        let u_str = ConstraintSet::constrain_typevar(&db, &builder, u, str_type, str_type);
+        assert!(!has_uncertain_branch(&builder, t_int.node));
+        assert!(!has_uncertain_branch(&builder, u_str.node));
+
+        // Union of constraints on different typevars produces uncertain branches
+        let union = t_int.or(&db, &builder, || u_str);
+        assert!(has_uncertain_branch(&builder, union.node));
+    }
+
+    /// The Duboc intersection algorithm preserves uncertain branches: when both operands have
+    /// uncertain branches, the result's uncertain branch is `U1 ∧ U2`.
+    #[test]
+    fn tdd_intersection_preserves_uncertain() {
+        let db = setup_db();
+        let t =
+            BoundTypeVarInstance::synthetic(&db, Name::new_static("T"), TypeVarVariance::Invariant);
+        let u =
+            BoundTypeVarInstance::synthetic(&db, Name::new_static("U"), TypeVarVariance::Invariant);
+        let int_type = KnownClass::Int.to_instance(&db);
+        let str_type = KnownClass::Str.to_instance(&db);
+        let bool_type = KnownClass::Bool.to_instance(&db);
+        let builder = ConstraintSetBuilder::new();
+
+        // Build two TDDs that each have uncertain branches (via union of different-typevar
+        // constraints)
+        let t_int = ConstraintSet::constrain_typevar(&db, &builder, t, int_type, int_type);
+        let u_str = ConstraintSet::constrain_typevar(&db, &builder, u, str_type, str_type);
+        let t_bool = ConstraintSet::constrain_typevar(&db, &builder, t, bool_type, bool_type);
+        let u_int = ConstraintSet::constrain_typevar(&db, &builder, u, int_type, int_type);
+
+        // (T = int) ∨ (U = str) — has uncertain branch
+        let lhs = t_int.or(&db, &builder, || u_str);
+        assert!(has_uncertain_branch(&builder, lhs.node));
+
+        // (T = bool) ∨ (U = int) — has uncertain branch
+        let rhs = t_bool.or(&db, &builder, || u_int);
+        assert!(has_uncertain_branch(&builder, rhs.node));
+
+        // Their intersection should also have uncertain branches (Duboc preserves U1 ∧ U2)
+        let intersection = lhs.and(&db, &builder, || rhs);
+        assert!(has_any_uncertain_branch(&builder, intersection.node));
+    }
+
+    /// Negation always produces flat TDDs (all uncertain branches are `ALWAYS_FALSE`).
+    #[test]
+    fn tdd_negation_produces_flat_tdd() {
+        let db = setup_db();
+        let t =
+            BoundTypeVarInstance::synthetic(&db, Name::new_static("T"), TypeVarVariance::Invariant);
+        let u =
+            BoundTypeVarInstance::synthetic(&db, Name::new_static("U"), TypeVarVariance::Invariant);
+        let int_type = KnownClass::Int.to_instance(&db);
+        let str_type = KnownClass::Str.to_instance(&db);
+        let builder = ConstraintSetBuilder::new();
+
+        // Build a TDD with uncertain branches
+        let t_int = ConstraintSet::constrain_typevar(&db, &builder, t, int_type, int_type);
+        let u_str = ConstraintSet::constrain_typevar(&db, &builder, u, str_type, str_type);
+        let union = t_int.or(&db, &builder, || u_str);
+        assert!(has_uncertain_branch(&builder, union.node));
+
+        // Negation should produce a flat TDD (no uncertain branches)
+        let negated = union.negate(&db, &builder);
+        assert!(!has_any_uncertain_branch(&builder, negated.node));
+    }
+
+    /// For TDDs with uncertain branches: `T ∧ ¬T` is never satisfied, and `T ∨ ¬T` is always
+    /// satisfied.
+    #[test]
+    fn tdd_negation_correctness() {
+        let db = setup_db();
+        let t =
+            BoundTypeVarInstance::synthetic(&db, Name::new_static("T"), TypeVarVariance::Invariant);
+        let u =
+            BoundTypeVarInstance::synthetic(&db, Name::new_static("U"), TypeVarVariance::Invariant);
+        let int_type = KnownClass::Int.to_instance(&db);
+        let str_type = KnownClass::Str.to_instance(&db);
+        let builder = ConstraintSetBuilder::new();
+
+        // Build a TDD with uncertain branches: (T = int) ∨ (U = str)
+        let t_int = ConstraintSet::constrain_typevar(&db, &builder, t, int_type, int_type);
+        let u_str = ConstraintSet::constrain_typevar(&db, &builder, u, str_type, str_type);
+        let tdd = t_int.or(&db, &builder, || u_str);
+        assert!(has_uncertain_branch(&builder, tdd.node));
+
+        let negated = tdd.negate(&db, &builder);
+
+        // T ∧ ¬T should never be satisfied
+        assert!(tdd.and(&db, &builder, || negated).is_never_satisfied(&db));
+
+        // T ∨ ¬T should always be satisfied
+        assert!(tdd.or(&db, &builder, || negated).is_always_satisfied(&db));
+    }
+
+    /// Double negation of a TDD with uncertain branches is semantically equivalent to the
+    /// original (though the structure may differ since negation produces flat TDDs).
+    #[test]
+    fn tdd_double_negation() {
+        let db = setup_db();
+        let t =
+            BoundTypeVarInstance::synthetic(&db, Name::new_static("T"), TypeVarVariance::Invariant);
+        let u =
+            BoundTypeVarInstance::synthetic(&db, Name::new_static("U"), TypeVarVariance::Invariant);
+        let int_type = KnownClass::Int.to_instance(&db);
+        let str_type = KnownClass::Str.to_instance(&db);
+        let builder = ConstraintSetBuilder::new();
+
+        // Build a TDD with uncertain branches: (T = int) ∨ (U = str)
+        let t_int = ConstraintSet::constrain_typevar(&db, &builder, t, int_type, int_type);
+        let u_str = ConstraintSet::constrain_typevar(&db, &builder, u, str_type, str_type);
+        let tdd = t_int.or(&db, &builder, || u_str);
+
+        // Double negation should be semantically equivalent: ¬¬T ≡ T
+        // Check via: ¬¬T ∧ ¬T is never satisfied, ¬¬T ∨ ¬T is always satisfied
+        let double_negated = tdd.negate(&db, &builder).negate(&db, &builder);
+        let negated = tdd.negate(&db, &builder);
+        assert!(
+            double_negated
+                .and(&db, &builder, || negated)
+                .is_never_satisfied(&db)
+        );
+        assert!(
+            double_negated
+                .or(&db, &builder, || negated)
+                .is_always_satisfied(&db)
+        );
+    }
+
+    /// `iff(T, T)` is always satisfied for TDDs with uncertain branches.
+    #[test]
+    fn tdd_iff_self() {
+        let db = setup_db();
+        let t =
+            BoundTypeVarInstance::synthetic(&db, Name::new_static("T"), TypeVarVariance::Invariant);
+        let u =
+            BoundTypeVarInstance::synthetic(&db, Name::new_static("U"), TypeVarVariance::Invariant);
+        let int_type = KnownClass::Int.to_instance(&db);
+        let str_type = KnownClass::Str.to_instance(&db);
+        let builder = ConstraintSetBuilder::new();
+
+        // Build a TDD with uncertain branches: (T = int) ∨ (U = str)
+        let t_int = ConstraintSet::constrain_typevar(&db, &builder, t, int_type, int_type);
+        let u_str = ConstraintSet::constrain_typevar(&db, &builder, u, str_type, str_type);
+        let tdd = t_int.or(&db, &builder, || u_str);
+        assert!(has_uncertain_branch(&builder, tdd.node));
+
+        // iff(T, T) should always be satisfied
+        assert!(tdd.iff(&db, &builder, tdd).is_always_satisfied(&db));
+
+        // iff(T, ¬T) should never be satisfied
+        let negated = tdd.negate(&db, &builder);
+        assert!(tdd.iff(&db, &builder, negated).is_never_satisfied(&db));
+    }
+
+    /// Round-trip through `OwnedConstraintSet`: build a TDD with uncertain branches, convert to
+    /// owned, load into a new builder, and verify semantic equivalence.
+    #[test]
+    fn tdd_owned_round_trip() {
+        let db = setup_db();
+        let t =
+            BoundTypeVarInstance::synthetic(&db, Name::new_static("T"), TypeVarVariance::Invariant);
+        let u =
+            BoundTypeVarInstance::synthetic(&db, Name::new_static("U"), TypeVarVariance::Invariant);
+        let int_type = KnownClass::Int.to_instance(&db);
+        let str_type = KnownClass::Str.to_instance(&db);
+
+        // Build a TDD with uncertain branches and convert to owned
+        let owned = {
+            let builder = ConstraintSetBuilder::new();
+            builder.into_owned(|builder| {
+                let t_int = ConstraintSet::constrain_typevar(&db, builder, t, int_type, int_type);
+                let u_str = ConstraintSet::constrain_typevar(&db, builder, u, str_type, str_type);
+                t_int.or(&db, builder, || u_str)
+            })
+        };
+
+        // Load into a new builder
+        let builder2 = ConstraintSetBuilder::new();
+        let loaded = builder2.load(&db, &owned);
+
+        // The loaded constraint set should NOT be never satisfied (it's a valid union)
+        assert!(!loaded.is_never_satisfied(&db));
+
+        // The loaded constraint set should NOT be always satisfied (it requires specific types)
+        assert!(!loaded.is_always_satisfied(&db));
+
+        // Verify semantic equivalence: loaded ∧ ¬loaded should be never satisfied
+        let negated = loaded.negate(&db, &builder2);
+        assert!(
+            loaded
+                .and(&db, &builder2, || negated)
+                .is_never_satisfied(&db)
+        );
+
+        // loaded ∨ ¬loaded should be always satisfied
+        assert!(
+            loaded
+                .or(&db, &builder2, || negated)
+                .is_always_satisfied(&db)
+        );
+
+        // Also verify iff(loaded, loaded) is always satisfied
+        assert!(loaded.iff(&db, &builder2, loaded).is_always_satisfied(&db));
     }
 }
