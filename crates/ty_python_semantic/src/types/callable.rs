@@ -372,6 +372,20 @@ impl<'db> CallableType<'db> {
         )
     }
 
+    pub(crate) fn bind_self_with_receiver(
+        self,
+        db: &'db dyn Db,
+        receiver_ty: Option<Type<'db>>,
+        typing_self_ty: Option<Type<'db>>,
+    ) -> CallableType<'db> {
+        CallableType::new(
+            db,
+            self.signatures(db)
+                .bind_self_with_receiver(db, receiver_ty, typing_self_ty),
+            self.kind(db),
+        )
+    }
+
     pub(crate) fn apply_self(self, db: &'db dyn Db, self_type: Type<'db>) -> CallableType<'db> {
         CallableType::new(
             db,

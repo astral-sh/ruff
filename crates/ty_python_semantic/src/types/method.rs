@@ -7,8 +7,7 @@ use crate::{
         CallableType, KnownClass, LiteralValueType, LiteralValueTypeKind, Parameter, Parameters,
         PropertyInstanceType, Signature, StringLiteralType, Type, UnionType,
         callable::CallableTypeKind, constraints::ConstraintSet, function::FunctionType,
-        known_instance::InternedConstraintSet, relation::TypeRelationChecker,
-        signatures::CallableSignature, visitor,
+        known_instance::InternedConstraintSet, relation::TypeRelationChecker, visitor,
     },
 };
 
@@ -75,16 +74,9 @@ impl<'db> BoundMethodType<'db> {
 
         CallableType::new(
             db,
-            CallableSignature::from_overloads(
-                function
-                    .signature(db)
-                    .overloads
-                    .iter()
-                    // A bound method should only expose overloads whose first parameter can
-                    // actually accept the bound receiver type.
-                    .filter(|signature| signature.can_bind_self_to(db, receiver, self_instance))
-                    .map(|signature| signature.bind_self(db, Some(self_instance))),
-            ),
+            function
+                .signature(db)
+                .bind_self_with_receiver(db, Some(receiver), Some(self_instance)),
             CallableTypeKind::FunctionLike,
         )
     }

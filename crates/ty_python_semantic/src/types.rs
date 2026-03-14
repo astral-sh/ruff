@@ -2492,7 +2492,11 @@ impl<'db> Type<'db> {
                     });
 
                     Some((
-                        Type::Callable(callable.bind_self(db, Some(self_type))),
+                        Type::Callable(callable.bind_self_with_receiver(
+                            db,
+                            Some(self_type),
+                            Some(self_type),
+                        )),
                         AttributeKind::NormalOrNonDataDescriptor,
                     ))
                 };

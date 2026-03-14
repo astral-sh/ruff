@@ -271,6 +271,37 @@ impl<'db> CallableSignature<'db> {
     /// Binds the first (presumably `self`) parameter of this signature. If a `self_type` is
     /// provided, we will replace any occurrences of `typing.Self` in the parameter and return
     /// annotations with that type.
+    pub(crate) fn bind_self_with_receiver(
+        &self,
+        db: &'db dyn Db,
+        receiver_ty: Option<Type<'db>>,
+        typing_self_ty: Option<Type<'db>>,
+    ) -> Self {
+        match (receiver_ty, typing_self_ty) {
+            (Some(receiver_ty), Some(typing_self_ty)) => {
+                Self::from_overloads(self.overloads.iter().filter_map(|signature| {
+                    signature.bind_self_if_compatible(db, receiver_ty, typing_self_ty)
+                }))
+            }
+            (None, None) => Self::from_overloads(
+                self.overloads
+                    .iter()
+                    .map(|signature| signature.bind_self(db, None)),
+            ),
+            (Some(_), None) | (None, Some(_)) => {
+                debug_assert!(
+                    false,
+                    "receiver_ty and typing_self_ty should either both be present or both be absent"
+                );
+                Self::from_overloads(
+                    self.overloads
+                        .iter()
+                        .map(|signature| signature.bind_self(db, typing_self_ty)),
+                )
+            }
+        }
+    }
+
     pub(crate) fn bind_self(&self, db: &'db dyn Db, self_type: Option<Type<'db>>) -> Self {
         Self {
             overloads: self
@@ -662,18 +693,15 @@ impl<'db> Signature<'db> {
         self.definition
     }
 
-    pub(crate) fn can_bind_self_to(
+    fn expected_self_ty_for_bound_receiver(
         &self,
         db: &'db dyn Db,
-        receiver_ty: Type<'db>,
         typing_self_ty: Type<'db>,
-    ) -> bool {
-        let Some(first_parameter) = self.parameters.iter().next() else {
-            return true;
-        };
+    ) -> Option<(bool, Type<'db>)> {
+        let first_parameter = self.parameters.iter().next()?;
 
         if !first_parameter.is_positional() {
-            return true;
+            return None;
         }
 
         let binding_context = self.definition.map(BindingContext::Definition);
@@ -684,16 +712,28 @@ impl<'db> Signature<'db> {
             &self_mapping,
             TypeContext::default(),
         );
-        let constraints = ConstraintSetBuilder::new();
+        Some((first_parameter.inferred_annotation, expected_self_ty))
+    }
 
-        !receiver_ty
-            .when_assignable_to(
-                db,
-                expected_self_ty,
-                &constraints,
-                self.inferable_typevars(db),
-            )
-            .is_never_satisfied(db)
+    pub(crate) fn bind_self_if_compatible(
+        &self,
+        db: &'db dyn Db,
+        receiver_ty: Type<'db>,
+        typing_self_ty: Type<'db>,
+    ) -> Option<Self> {
+        let constraints = ConstraintSetBuilder::new();
+        self.expected_self_ty_for_bound_receiver(db, typing_self_ty)
+            .is_none_or(|(_, expected_self_ty)| {
+                !receiver_ty
+                    .when_assignable_to(
+                        db,
+                        expected_self_ty,
+                        &constraints,
+                        self.inferable_typevars(db),
+                    )
+                    .is_never_satisfied(db)
+            })
+            .then(|| self.bind_self(db, Some(typing_self_ty)))
     }
 
     pub(crate) fn bind_self(&self, db: &'db dyn Db, self_type: Option<Type<'db>>) -> Self {
@@ -866,6 +906,49 @@ impl<'db> VarianceInferable<'db> for &Signature<'db> {
 }
 
 impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
+    pub(super) fn bind_callable_signature_with_receiver(
+        &self,
+        db: &'db dyn Db,
+        signature: &CallableSignature<'db>,
+        receiver_ty: Type<'db>,
+        typing_self_ty: Type<'db>,
+    ) -> CallableSignature<'db> {
+        CallableSignature::from_overloads(signature.overloads.iter().filter_map(|overload| {
+            self.bind_signature_if_compatible(db, overload, receiver_ty, typing_self_ty)
+        }))
+    }
+
+    fn bind_signature_if_compatible(
+        &self,
+        db: &'db dyn Db,
+        signature: &Signature<'db>,
+        receiver_ty: Type<'db>,
+        typing_self_ty: Type<'db>,
+    ) -> Option<Signature<'db>> {
+        let Some((inferred_self_annotation, expected_self_ty)) =
+            signature.expected_self_ty_for_bound_receiver(db, typing_self_ty)
+        else {
+            return Some(signature.bind_self(db, Some(typing_self_ty)));
+        };
+
+        // Protocol methods synthesize an implicit receiver annotation from the protocol class
+        // itself. That annotation describes how the method is declared on the protocol, not an
+        // overload-level applicability restriction, so we must not filter on it here.
+        if inferred_self_annotation || expected_self_ty.contains_self(db) {
+            return Some(signature.bind_self(db, Some(typing_self_ty)));
+        }
+        let signature_inferable = signature.inferable_typevars(db);
+        let inferable = self.inferable.merge(&signature_inferable);
+        let checker = self
+            .with_inferable_typevars(inferable)
+            .with_relation(TypeRelation::Assignability);
+
+        (!checker
+            .check_type_pair(db, receiver_ty, expected_self_ty)
+            .is_never_satisfied(db))
+        .then(|| signature.bind_self(db, Some(typing_self_ty)))
+    }
+
     /// Fast path for unary callable assignability: compare overload sets by aggregating
     /// overlapping parameter domains and return types.
     ///
@@ -2153,8 +2236,8 @@ pub(crate) struct Parameter<'db> {
     /// Does the type of this parameter come from an explicit annotation, or was it inferred from
     /// the context, like `Unknown` for any normal un-annotated parameter, `Self` for the `self`
     /// parameter of instance method, or `type[Self]` for `cls` parameter of classmethods. This
-    /// field is only used to decide whether to display the annotated type; it has no effect on the
-    /// type semantics of the parameter.
+    /// field is used for display and to distinguish implicit protocol receiver annotations from
+    /// explicit receiver constraints during structural matching.
     pub(crate) inferred_annotation: bool,
 
     /// Variadic parameters can have starred annotations, e.g.
