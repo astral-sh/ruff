@@ -1,5 +1,6 @@
 use crate::diagnostic::{
     Diagnostic, DisplayDiagnosticConfig, Severity,
+    render::display_diagnostic_id,
     stylesheet::{DiagnosticStylesheet, fmt_styled, fmt_with_hyperlink},
 };
 
@@ -68,29 +69,18 @@ impl<'a> ConciseRenderer<'a> {
             }
 
             if self.config.hide_severity {
-                if let Some(code) = diag.secondary_code() {
-                    write!(
-                        f,
-                        "{code} ",
-                        code = fmt_styled(
-                            fmt_with_hyperlink(&code, diag.documentation_url(), &stylesheet),
-                            stylesheet.secondary_code
-                        )
-                    )?;
-                } else {
-                    write!(
-                        f,
-                        "{id}: ",
-                        id = fmt_styled(
-                            fmt_with_hyperlink(
-                                &diag.inner.id,
-                                diag.documentation_url(),
-                                &stylesheet
-                            ),
-                            stylesheet.secondary_code
-                        )
-                    )?;
-                }
+                write!(
+                    f,
+                    "{code} ",
+                    code = fmt_styled(
+                        fmt_with_hyperlink(
+                            display_diagnostic_id(diag, self.config),
+                            diag.documentation_url(),
+                            &stylesheet
+                        ),
+                        stylesheet.secondary_code
+                    )
+                )?;
             } else {
                 let (severity, severity_style) = match diag.severity() {
                     Severity::Info => ("info", stylesheet.info),
@@ -104,7 +94,7 @@ impl<'a> ConciseRenderer<'a> {
                     severity = fmt_styled(severity, severity_style),
                     id = fmt_styled(
                         fmt_with_hyperlink(
-                            &diag.secondary_code_or_id(),
+                            &diag.secondary_code_or_id(self.config.preview),
                             diag.documentation_url(),
                             &stylesheet
                         ),
@@ -171,10 +161,10 @@ mod tests {
         env.fix_applicability(Applicability::DisplayOnly);
         env.preview(true);
         insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @"
-        fib.py:1:8: F401 [*] `os` imported but unused
-        fib.py:6:5: F841 [*] Local variable `x` is assigned to but never used
-        undef.py:1:4: F821 Undefined name `a`
-        fib.py:12:16: F821 Undefined name `fibonaccii`
+        fib.py:1:8: unused-import: [*] `os` imported but unused
+        fib.py:6:5: unused-variable: [*] Local variable `x` is assigned to but never used
+        undef.py:1:4: undefined-name: Undefined name `a`
+        fib.py:12:16: undefined-name: Undefined name `fibonaccii`
         ");
     }
 

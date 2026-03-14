@@ -5,7 +5,8 @@ use quick_junit::{NonSuccessKind, Report, TestCase, TestCaseStatus, TestSuite, X
 
 use ruff_source_file::LineColumn;
 
-use crate::diagnostic::{Diagnostic, SecondaryCode, render::FileResolver};
+use crate::diagnostic::DisplayDiagnosticConfig;
+use crate::diagnostic::{Diagnostic, render::FileResolver};
 
 /// Print diagnostics as a JUnit-style XML report.
 ///
@@ -17,12 +18,12 @@ use crate::diagnostic::{Diagnostic, SecondaryCode, render::FileResolver};
 /// [`quick_junit`]: https://docs.rs/quick-junit/latest/quick_junit/
 pub(super) struct JunitRenderer<'a> {
     resolver: &'a dyn FileResolver,
-    program: &'a str,
+    config: &'a DisplayDiagnosticConfig,
 }
 
 impl<'a> JunitRenderer<'a> {
-    pub(super) fn new(resolver: &'a dyn FileResolver, program: &'a str) -> Self {
-        Self { resolver, program }
+    pub(super) fn new(resolver: &'a dyn FileResolver, config: &'a DisplayDiagnosticConfig) -> Self {
+        Self { resolver, config }
     }
 
     pub(super) fn render(
@@ -30,16 +31,16 @@ impl<'a> JunitRenderer<'a> {
         f: &mut std::fmt::Formatter,
         diagnostics: &[Diagnostic],
     ) -> std::fmt::Result {
-        let package = format!("org.{}", self.program);
-        let mut report = Report::new(self.program);
+        let package = format!("org.{}", self.config.program);
+        let mut report = Report::new(self.config.program);
 
         if diagnostics.is_empty() {
-            let mut test_suite = TestSuite::new(self.program);
+            let mut test_suite = TestSuite::new(self.config.program);
             test_suite
                 .extra
                 .insert(XmlString::new("package"), XmlString::new(&package));
             let mut case = TestCase::new("No errors found", TestCaseStatus::success());
-            case.set_classname(self.program);
+            case.set_classname(self.config.program);
             test_suite.add_test_case(case);
             report.add_test_suite(test_suite);
         } else {
@@ -58,9 +59,7 @@ impl<'a> JunitRenderer<'a> {
                         start_location: location,
                     } = diagnostic;
 
-                    let code = diagnostic
-                        .secondary_code()
-                        .map_or_else(|| diagnostic.name(), SecondaryCode::as_str);
+                    let code = diagnostic.secondary_code_or_id(self.config.preview);
                     let mut status = TestCaseStatus::non_success(NonSuccessKind::Failure);
                     status.set_message(diagnostic.concise_message().to_str());
 
@@ -76,7 +75,7 @@ impl<'a> JunitRenderer<'a> {
                     }
 
                     let mut case = TestCase::new(
-                        format!("org.{program}.{code}", program = self.program),
+                        format!("org.{program}.{code}", program = self.config.program),
                         status,
                     );
                     case.set_classname(classname.to_str().unwrap_or(filename));
