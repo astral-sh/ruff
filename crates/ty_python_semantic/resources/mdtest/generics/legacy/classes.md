@@ -509,6 +509,27 @@ reveal_type(D(1))  # revealed: D[int]
 # TODO: The revealed type in the error message should be `D[str]`.
 # error: [invalid-assignment] "Object of type `D[str | int]` is not assignable to `D[int]`"
 wrong_innards: D[int] = D("five")
+
+class E(Generic[T]):
+    def __new__(cls, x: object):
+        return object.__new__(cls)
+
+    def __init__(self, x: T) -> None: ...
+
+class F(Generic[T]):
+    def __new__(cls, x: object):
+        return object.__new__(cls)
+
+    def __init__(self, x: T) -> None: ...
+
+def union_ctor(flag: bool) -> None:
+    ctor: type[E[int]] | type[F[int]]
+    if flag:
+        ctor = E
+    else:
+        ctor = F
+
+    reveal_type(ctor(1))  # revealed: E[int] | F[int]
 ```
 
 ### Both present, `__new__` inherited from a generic base class

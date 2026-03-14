@@ -56,7 +56,7 @@ use crate::types::{
     TypeContext, TypeVarBoundOrConstraints, TypeVarVariance, UnionBuilder, UnionType,
     WrapperDescriptorKind, enums, list_members,
 };
-use crate::{DisplaySettings, Program};
+use crate::{DisplaySettings, FxOrderMap, Program};
 use ruff_db::diagnostic::{Annotation, Diagnostic, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_python_ast::{self as ast, ArgOrKeyword, PythonVersion};
 use ty_module_resolver::KnownModule;
@@ -83,7 +83,26 @@ struct BindingsElement<'db> {
     bindings: SmallVec<[CallableBinding<'db>; 1]>,
 }
 
+type ConstructorGroupBindings<'a, 'db> = SmallVec<[&'a CallableBinding<'db>; 1]>;
+type ConstructorGroupReturnTypes<'db> = SmallVec<[Type<'db>; 1]>;
+type ConstructorGroups<'a, 'db> = FxOrderMap<
+    Type<'db>,
+    (
+        ConstructorGroupBindings<'a, 'db>,
+        ConstructorGroupReturnTypes<'db>,
+    ),
+>;
+
 impl<'db> BindingsElement<'db> {
+    /// Returns the constructor instance type shared by all bindings in this element, if any.
+    fn constructor_instance_type(&self) -> Option<Type<'db>> {
+        let constructor_instance_type = self.bindings.first()?.constructor_instance_type?;
+        self.bindings
+            .iter()
+            .all(|binding| binding.constructor_instance_type == Some(constructor_instance_type))
+            .then_some(constructor_instance_type)
+    }
+
     /// Returns true if this element is an intersection of multiple callables.
     fn is_intersection(&self) -> bool {
         self.bindings.len() > 1
@@ -541,11 +560,16 @@ impl<'db> Bindings<'db> {
         self.callable_type
     }
 
-    // Constructor calls should combine `__new__`/`__init__` specializations instead of unioning.
-    fn constructor_return_type(&self, db: &'db dyn Db) -> Option<Type<'db>> {
-        let constructor_instance_type = self.constructor_instance_type?;
+    fn combine_constructor_return_type<'a>(
+        db: &'db dyn Db,
+        constructor_instance_type: Type<'db>,
+        bindings: impl IntoIterator<Item = &'a CallableBinding<'db>>,
+    ) -> Type<'db>
+    where
+        'db: 'a,
+    {
         let Some(class_specialization) = constructor_instance_type.class_specialization(db) else {
-            return Some(constructor_instance_type);
+            return constructor_instance_type;
         };
         let class_context = class_specialization.generic_context(db);
 
@@ -554,7 +578,7 @@ impl<'db> Bindings<'db> {
         // TODO this loops over all bindings, flattening union/intersection
         // shape. As we improve our constraint solver, there may be an
         // improvement needed here.
-        for binding in self.iter_flat() {
+        for binding in bindings {
             // For constructors, use the first matching overload (declaration order) to avoid
             // merging incompatible constructor specializations.
             let Some((_, overload)) = binding.matching_overloads().next() else {
@@ -576,7 +600,16 @@ impl<'db> Bindings<'db> {
         // specialization to avoid leaking inferable typevars in the constructed instance.
         let specialization =
             combined.unwrap_or_else(|| class_context.default_specialization(db, None));
-        Some(constructor_instance_type.apply_specialization(db, specialization))
+        constructor_instance_type.apply_specialization(db, specialization)
+    }
+
+    // Constructor calls should combine `__new__`/`__init__` specializations instead of unioning.
+    fn constructor_return_type(&self, db: &'db dyn Db) -> Option<Type<'db>> {
+        Some(Self::combine_constructor_return_type(
+            db,
+            self.constructor_instance_type?,
+            self.iter_flat(),
+        ))
     }
 
     /// Returns the return type of the call. For successful calls, this is the actual return type.
@@ -595,8 +628,14 @@ impl<'db> Bindings<'db> {
         // - Single binding: use that binding's return type
         // - Multiple bindings (intersection): for intersections, only include
         //   successful bindings (failed ones have been filtered out by retain_successful)
-        let element_return_types = self.elements.iter().map(|element| {
-            if let [single_binding] = &*element.bindings {
+        // Nested unions of constructor types flatten each class's `__new__` / `__init__`
+        // bindings into separate outer elements. Re-group them by constructed instance type so
+        // each constructor can merge its inferred specializations before we union the results.
+        let mut constructor_groups: ConstructorGroups<'_, 'db> = FxOrderMap::default();
+        let mut element_return_types = Vec::with_capacity(self.elements.len());
+
+        for element in &self.elements {
+            let element_return_type = if let [single_binding] = &*element.bindings {
                 single_binding.return_type()
             } else {
                 // For intersections, intersect the return types of remaining bindings
@@ -604,8 +643,31 @@ impl<'db> Bindings<'db> {
                     db,
                     element.bindings.iter().map(CallableBinding::return_type),
                 )
+            };
+
+            if let Some(constructor_instance_type) = element.constructor_instance_type() {
+                let (grouped_bindings, grouped_return_types) = constructor_groups
+                    .entry(constructor_instance_type)
+                    .or_default();
+                grouped_bindings.extend(element.bindings.iter());
+                grouped_return_types.push(element_return_type);
+                continue;
             }
-        });
+
+            element_return_types.push(element_return_type);
+        }
+
+        for (constructor_instance_type, (bindings, grouped_return_types)) in constructor_groups {
+            if grouped_return_types.len() > 1 {
+                element_return_types.push(Self::combine_constructor_return_type(
+                    db,
+                    constructor_instance_type,
+                    bindings,
+                ));
+            } else {
+                element_return_types.extend(grouped_return_types);
+            }
+        }
 
         // Union the return types of all elements
         UnionType::from_elements(db, element_return_types)
