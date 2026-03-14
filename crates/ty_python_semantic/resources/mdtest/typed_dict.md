@@ -368,6 +368,82 @@ def _(ATD: type[MyTD]):
     z = ATD(a="foo")
 ```
 
+Constructor validation should also work when the call target is a union or intersection of
+`type[...]` values:
+
+```py
+from typing import Union
+from ty_extensions import Intersection
+
+class CtorRequired(TypedDict):
+    a: int
+
+class CtorOptional(TypedDict, total=False):
+    a: int
+
+def _(ATD: Union[type[CtorRequired], type[CtorOptional]]):
+    ok = ATD(a=1)
+
+    # Both union variants reject the `str` argument for `a`.
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    bad = ATD(a="foo")
+
+    # 0-arg construction: valid for `CtorOptional` (all fields optional),
+    # but `CtorRequired` requires `a`.
+    # error: [no-matching-overload]
+    no_args = ATD()
+
+    # Dict-literal construction through a union.
+    ok_dict = ATD({"a": 1})
+
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    bad_dict = ATD({"a": "foo"})
+
+def _(ATD: Intersection[type[CtorRequired], type[CtorRequired]]):
+    ok = ATD(a=1)
+
+    # error: [invalid-argument-type]
+    bad = ATD(a="foo")
+
+def _(ATD: Intersection[type[CtorRequired], type[CtorOptional]]):
+    ok = ATD(a=1)
+
+    # Both intersection members check the argument independently.
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    bad = ATD(a="foo")
+
+    # Dict-literal construction through an intersection.
+    ok_dict = ATD({"a": 1})
+```
+
+TypedDict constructors also support the `dict(mapping, **kwargs)`-style merge form. Keyword
+arguments should override the positional mapping when validating the final shape:
+
+```py
+class BaseKwargs(TypedDict, total=False):
+    name: str
+
+class ChildKwargs(BaseKwargs, total=False):
+    count: int
+
+class OverrideCountKwargs(TypedDict, total=False):
+    count: str
+
+def _(base: BaseKwargs, override: OverrideCountKwargs):
+    ok = ChildKwargs(base, count=1)
+    overridden = ChildKwargs(override, count=1)
+    overridden_literal = ChildKwargs({"count": "wrong"}, count=1)
+
+    # error: [invalid-argument-type]
+    bad_value = ChildKwargs({"name": 1}, count=1)
+
+    # error: [invalid-argument-type]
+    bad_mapping = ChildKwargs(1, count=1)
+```
+
 All of these have an invalid type for the `name` field:
 
 ```py
@@ -1913,6 +1989,27 @@ def _(node: Node, person: Person):
     _: Node = person
 
 _: Node = Person(name="Alice", parent=Node(name="Bob", parent=Person(name="Charlie", parent=None)))
+```
+
+TypedDict constructor calls should also use field type context when inferring nested recursive
+values:
+
+```py
+from typing import Any, List, TypedDict, Union
+from typing_extensions import NotRequired
+
+class Comparison(TypedDict):
+    field: str
+    op: NotRequired[str]
+    value: Any
+
+class Logical(TypedDict):
+    op: NotRequired[str]
+    conditions: List["Filter"]
+
+Filter = Union[Comparison, Logical]
+
+logical = Logical(conditions=[Comparison(field="a", value="b")])
 ```
 
 ## Function/assignment syntax

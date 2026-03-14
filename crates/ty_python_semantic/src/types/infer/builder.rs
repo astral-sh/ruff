@@ -96,7 +96,10 @@ use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::subclass_of::SubclassOfInner;
 use crate::types::tuple::{Tuple, TupleLength, TupleSpecBuilder, TupleType};
 use crate::types::type_alias::{ManualPEP695TypeAliasType, PEP695TypeAliasType};
-use crate::types::typed_dict::{validate_typed_dict_constructor, validate_typed_dict_dict_literal};
+use crate::types::typed_dict::{
+    TypedDictConstructorCallKind, typed_dict_constructor_call_kind,
+    validate_typed_dict_constructor, validate_typed_dict_dict_literal,
+};
 use crate::types::typevar::{BoundTypeVarIdentity, TypeVarConstraints, TypeVarIdentity};
 use crate::types::{
     CallDunderError, CallableBinding, CallableType, ClassType, DynamicType, EvaluationMode,
@@ -7057,6 +7060,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .bindings(self.db())
             .match_parameters(self.db(), &call_arguments);
 
+        let typed_dict_constructor = class.and_then(|class| {
+            class
+                .class_literal(self.db())
+                .is_typed_dict(self.db())
+                .then_some(TypedDictType::new(class))
+        });
+
+        let typed_dict_constructor_call_kind = typed_dict_constructor
+            .map(|_| typed_dict_constructor_call_kind(arguments))
+            .unwrap_or(TypedDictConstructorCallKind::Unsupported);
+        let typed_dict_constructor_shape_supported =
+            typed_dict_constructor_call_kind != TypedDictConstructorCallKind::Unsupported;
+
         report_missing_implicit_constructor_call(
             &self.context,
             self.db(),
@@ -7074,12 +7090,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         );
 
         // Validate `TypedDict` constructor calls after argument type inference.
-        if let Some(class) = class
-            && class.class_literal(self.db()).is_typed_dict(self.db())
+        //
+        // Dict-literal positional args (e.g., `TD({"a": 1})`) are excluded here because the
+        // synthesized `__new__` mapping overload already handles them via normal callable checking.
+        if let Some(typed_dict) = typed_dict_constructor
+            && typed_dict_constructor_shape_supported
+            && typed_dict_constructor_call_kind
+                != TypedDictConstructorCallKind::PositionalDictLiteralOnly
         {
             validate_typed_dict_constructor(
                 &self.context,
-                TypedDictType::new(class),
+                typed_dict,
                 arguments,
                 func.as_ref().into(),
                 |expr| self.expression_type(expr),
@@ -7088,6 +7109,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let mut bindings = match bindings_result {
             Ok(()) => bindings,
+            // For TypedDict constructors with supported call shapes (keyword-only or single
+            // positional mapping), suppress binding errors from the synthesized `__new__` — the
+            // TypedDict-specific validator above produces more precise diagnostics.
+            Err(CallErrorKind::BindingError) if typed_dict_constructor_shape_supported => {
+                return bindings.return_type(self.db());
+            }
             Err(_) => {
                 bindings.report_diagnostics(&self.context, call_expression.into());
                 return bindings.return_type(self.db());

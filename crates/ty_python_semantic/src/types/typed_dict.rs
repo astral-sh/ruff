@@ -796,6 +796,33 @@ fn extract_typed_dict_keys<'db>(
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum TypedDictConstructorCallKind {
+    KeywordsOnly,
+    PositionalDictLiteralOnly,
+    PositionalMappingOnly,
+    PositionalDictLiteralAndKeywords,
+    PositionalMappingAndKeywords,
+    Unsupported,
+}
+
+pub(super) fn typed_dict_constructor_call_kind(
+    arguments: &Arguments,
+) -> TypedDictConstructorCallKind {
+    match (arguments.args.len(), arguments.keywords.is_empty()) {
+        (0, _) => TypedDictConstructorCallKind::KeywordsOnly,
+        (1, true) if arguments.args[0].is_dict_expr() => {
+            TypedDictConstructorCallKind::PositionalDictLiteralOnly
+        }
+        (1, true) => TypedDictConstructorCallKind::PositionalMappingOnly,
+        (1, false) if arguments.args[0].is_dict_expr() => {
+            TypedDictConstructorCallKind::PositionalDictLiteralAndKeywords
+        }
+        (1, false) => TypedDictConstructorCallKind::PositionalMappingAndKeywords,
+        _ => TypedDictConstructorCallKind::Unsupported,
+    }
+}
+
 pub(super) fn validate_typed_dict_constructor<'db, 'ast>(
     context: &InferContext<'db, 'ast>,
     typed_dict: TypedDictType<'db>,
@@ -803,52 +830,119 @@ pub(super) fn validate_typed_dict_constructor<'db, 'ast>(
     error_node: AnyNodeRef<'ast>,
     expression_type_fn: impl Fn(&ast::Expr) -> Type<'db>,
 ) {
-    let db = context.db();
+    match typed_dict_constructor_call_kind(arguments) {
+        TypedDictConstructorCallKind::PositionalDictLiteralOnly => {
+            let provided_keys = validate_from_dict_literal(
+                context,
+                typed_dict,
+                arguments,
+                error_node,
+                &expression_type_fn,
+                None,
+            );
+            validate_typed_dict_required_keys(context, typed_dict, &provided_keys, error_node);
+        }
+        TypedDictConstructorCallKind::PositionalMappingOnly => {
+            // Single positional argument: check if assignable to the target TypedDict.
+            // This handles TypedDict, intersections, unions, and type aliases correctly.
+            // Assignability already checks for required keys and type compatibility,
+            // so we don't need separate validation.
+            let arg = &arguments.args[0];
+            let arg_ty = expression_type_fn(arg);
+            let target_ty = Type::TypedDict(typed_dict);
 
-    // Check for a single positional argument that is a dict literal
-    let has_positional_dict_literal = arguments.args.len() == 1 && arguments.args[0].is_dict_expr();
-
-    // Check for a single positional argument (not a dict literal)
-    let is_single_positional_arg =
-        arguments.args.len() == 1 && arguments.keywords.is_empty() && !has_positional_dict_literal;
-
-    if has_positional_dict_literal {
-        let provided_keys = validate_from_dict_literal(
-            context,
-            typed_dict,
-            arguments,
-            error_node,
-            &expression_type_fn,
-        );
-        validate_typed_dict_required_keys(context, typed_dict, &provided_keys, error_node);
-    } else if is_single_positional_arg {
-        // Single positional argument: check if assignable to the target TypedDict.
-        // This handles TypedDict, intersections, unions, and type aliases correctly.
-        // Assignability already checks for required keys and type compatibility,
-        // so we don't need separate validation.
-        let arg = &arguments.args[0];
-        let arg_ty = expression_type_fn(arg);
-        let target_ty = Type::TypedDict(typed_dict);
-
-        if !arg_ty.is_assignable_to(db, target_ty) {
-            if let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, arg) {
+            if !arg_ty.is_assignable_to(context.db(), target_ty)
+                && let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, arg)
+            {
                 builder.into_diagnostic(format_args!(
                     "Argument of type `{}` is not assignable to `{}`",
-                    arg_ty.display(db),
-                    target_ty.display(db),
+                    arg_ty.display(context.db()),
+                    target_ty.display(context.db()),
                 ));
             }
         }
-    } else {
-        let provided_keys = validate_from_keywords(
+        TypedDictConstructorCallKind::PositionalDictLiteralAndKeywords
+        | TypedDictConstructorCallKind::PositionalMappingAndKeywords => {
+            let provided_keys = validate_from_mapping_and_keywords(
+                context,
+                typed_dict,
+                arguments,
+                error_node,
+                &expression_type_fn,
+            );
+            validate_typed_dict_required_keys(context, typed_dict, &provided_keys, error_node);
+        }
+        TypedDictConstructorCallKind::KeywordsOnly => {
+            let provided_keys = validate_from_keywords(
+                context,
+                typed_dict,
+                arguments,
+                error_node,
+                &expression_type_fn,
+            );
+            validate_typed_dict_required_keys(context, typed_dict, &provided_keys, error_node);
+        }
+        TypedDictConstructorCallKind::Unsupported => {}
+    }
+}
+
+fn validate_from_mapping_and_keywords<'db, 'ast>(
+    context: &InferContext<'db, 'ast>,
+    typed_dict: TypedDictType<'db>,
+    arguments: &'ast Arguments,
+    typed_dict_node: AnyNodeRef<'ast>,
+    expression_type_fn: &impl Fn(&ast::Expr) -> Type<'db>,
+) -> OrderSet<Name> {
+    let db = context.db();
+    let mapping_arg = &arguments.args[0];
+    let mut provided_keys = validate_from_keywords(
+        context,
+        typed_dict,
+        arguments,
+        typed_dict_node,
+        expression_type_fn,
+    );
+
+    if mapping_arg.is_dict_expr() {
+        let mapping_keys = validate_from_dict_literal(
             context,
             typed_dict,
             arguments,
-            error_node,
-            &expression_type_fn,
+            typed_dict_node,
+            expression_type_fn,
+            Some(&provided_keys),
         );
-        validate_typed_dict_required_keys(context, typed_dict, &provided_keys, error_node);
+        provided_keys.extend(mapping_keys);
+    } else {
+        let mapping_ty = expression_type_fn(mapping_arg);
+        let remaining_target_ty = Type::TypedDict(typed_dict_patch_without_keys(
+            db,
+            typed_dict,
+            &provided_keys,
+        ));
+
+        if !mapping_ty.is_assignable_to(db, remaining_target_ty)
+            && let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, mapping_arg)
+        {
+            builder.into_diagnostic(format_args!(
+                "Argument of type `{}` is not assignable to `{}`",
+                mapping_ty.display(db),
+                remaining_target_ty.display(db),
+            ));
+        }
+
+        if mapping_ty.is_never() || mapping_ty.is_dynamic() {
+            for (key_name, field) in typed_dict.items(db) {
+                if field.is_required() {
+                    provided_keys.insert(key_name.clone());
+                }
+            }
+        } else if let Some(mapping_keys) = extract_typed_dict_keys(db, mapping_ty) {
+            provided_keys.extend(mapping_keys.into_keys());
+        }
     }
+
+    provided_keys
 }
 
 /// Validates a `TypedDict` constructor call with a single positional dictionary argument
@@ -859,6 +953,7 @@ fn validate_from_dict_literal<'db, 'ast>(
     arguments: &'ast Arguments,
     typed_dict_node: AnyNodeRef<'ast>,
     expression_type_fn: &impl Fn(&ast::Expr) -> Type<'db>,
+    overridden_keys: Option<&OrderSet<Name>>,
 ) -> OrderSet<Name> {
     let mut provided_keys = OrderSet::new();
 
@@ -871,7 +966,12 @@ fn validate_from_dict_literal<'db, 'ast>(
                 }) = key_expr
             {
                 let key = key_value.to_str();
-                provided_keys.insert(Name::new(key));
+                let key_name = Name::new(key);
+                provided_keys.insert(key_name.clone());
+
+                if overridden_keys.is_some_and(|keys| keys.contains(&key_name)) {
+                    continue;
+                }
 
                 // Get the already-inferred argument type
                 let value_ty = expression_type_fn(&dict_item.value);
@@ -893,6 +993,21 @@ fn validate_from_dict_literal<'db, 'ast>(
     }
 
     provided_keys
+}
+
+fn typed_dict_patch_without_keys<'db>(
+    db: &'db dyn Db,
+    typed_dict: TypedDictType<'db>,
+    excluded_keys: &OrderSet<Name>,
+) -> TypedDictType<'db> {
+    let items: TypedDictSchema<'db> = typed_dict
+        .items(db)
+        .iter()
+        .filter(|(name, _)| !excluded_keys.contains(*name))
+        .map(|(name, field)| (name.clone(), field.clone().with_required(false)))
+        .collect();
+
+    TypedDictType::from_patch_items(db, items)
 }
 
 /// Validates a `TypedDict` constructor call with keywords

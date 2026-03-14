@@ -25,12 +25,12 @@ use crate::{
         use_def_map,
     },
     types::{
-        ApplyTypeMappingVisitor, BoundTypeVarInstance, CallArguments, CallableType, ClassBase,
-        ClassLiteral, ClassType, DATACLASS_FLAGS, DataclassFlags, DataclassParams, GenericAlias,
-        GenericContext, KnownClass, KnownInstanceType, MaterializationKind, MemberLookupPolicy,
-        MetaclassCandidate, MetaclassTransformInfo, Parameter, Parameters, PropertyInstanceType,
-        Signature, SpecialFormType, StaticMroError, SubclassOfType, Truthiness, Type, TypeContext,
-        TypeMapping, TypeVarVariance, UnionBuilder, UnionType,
+        ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallArguments, CallableType,
+        ClassBase, ClassLiteral, ClassType, DATACLASS_FLAGS, DataclassFlags, DataclassParams,
+        GenericAlias, GenericContext, KnownClass, KnownInstanceType, MaterializationKind,
+        MemberLookupPolicy, MetaclassCandidate, MetaclassTransformInfo, Parameter, Parameters,
+        PropertyInstanceType, Signature, SpecialFormType, StaticMroError, SubclassOfType,
+        Truthiness, Type, TypeContext, TypeMapping, TypeVarVariance, UnionBuilder, UnionType,
         call::{CallError, CallErrorKind},
         callable::CallableTypeKind,
         class::{
@@ -1542,6 +1542,71 @@ impl<'db> StaticClassLiteral<'db> {
                         let slots = fields.keys().map(|name| Type::string_literal(db, name));
                         Type::heterogeneous_tuple(db, slots)
                     })
+            }
+            (CodeGeneratorKind::TypedDict, "__new__") => {
+                let inherited_generic_context =
+                    inherited_generic_context.or_else(|| self.inherited_generic_context(db));
+
+                let self_typevar = BoundTypeVarInstance::synthetic_self(
+                    db,
+                    instance_ty,
+                    BindingContext::Synthetic,
+                );
+                let self_ty = Type::TypeVar(self_typevar);
+                let generic_context = GenericContext::from_typevar_instances(
+                    db,
+                    inherited_generic_context
+                        .iter()
+                        .flat_map(|ctx| ctx.variables(db))
+                        .chain(std::iter::once(self_typevar)),
+                );
+
+                let make_cls_parameter = || {
+                    Parameter::positional_or_keyword(Name::new_static("cls"))
+                        .with_annotated_type(SubclassOfType::from(db, self_typevar))
+                };
+
+                let fields = self.fields(db, specialization, field_policy);
+
+                let keyword_signature = Signature::new_generic(
+                    Some(generic_context),
+                    Parameters::new(
+                        db,
+                        std::iter::once(make_cls_parameter()).chain(fields.iter().map(
+                            |(field_name, field)| {
+                                let parameter = Parameter::keyword_only(field_name.clone())
+                                    .with_annotated_type(field.declared_ty);
+                                if field.is_required() {
+                                    parameter
+                                } else {
+                                    parameter.with_default_type(field.declared_ty)
+                                }
+                            },
+                        )),
+                    ),
+                    self_ty,
+                );
+
+                let positional_signature = Signature::new_generic(
+                    Some(generic_context),
+                    Parameters::new(
+                        db,
+                        [
+                            make_cls_parameter(),
+                            Parameter::positional_only(Some(Name::new_static("mapping")))
+                                .with_annotated_type(Type::typed_dict(
+                                    self.apply_optional_specialization(db, specialization),
+                                )),
+                        ],
+                    ),
+                    self_ty,
+                );
+
+                Some(Type::Callable(CallableType::new(
+                    db,
+                    CallableSignature::from_overloads([keyword_signature, positional_signature]),
+                    CallableTypeKind::FunctionLike,
+                )))
             }
             (CodeGeneratorKind::TypedDict, "__setitem__") => {
                 let fields = self.fields(db, specialization, field_policy);
