@@ -1,4 +1,5 @@
 use crate::Session;
+use crate::server::extension::Notifier;
 use crate::server::{Action, ConnectionSender, SendRequest};
 use crate::server::{Event, MainLoopSender};
 use lsp_server::{ErrorCode, Message, Notification, RequestId, ResponseError};
@@ -120,11 +121,18 @@ impl Client {
     /// This is useful for notifications that don't require any data.
     #[expect(dead_code)]
     pub(crate) fn send_notification_no_params(&self, method: &str) {
+        self.send_raw_notification(method, Value::Null);
+    }
+
+    /// Sends a raw notification with the given method and params.
+    ///
+    /// This is useful for extensions that need to send custom notifications.
+    pub(crate) fn send_raw_notification(&self, method: &str, params: Value) {
         if let Err(err) =
             self.client_sender
                 .send(lsp_server::Message::Notification(Notification::new(
                     method.to_string(),
-                    Value::Null,
+                    params,
                 )))
         {
             tracing::error!(
@@ -163,6 +171,16 @@ impl Client {
             error: Some(error),
         };
 
+        self.main_loop_sender
+            .send(Event::Action(Action::SendResponse(response)))
+            .unwrap();
+    }
+
+    /// Sends a pre-built response to the client.
+    ///
+    /// This is used by extension handlers that construct their own Response objects.
+    /// The response isn't sent immediately. Instead, it's queued up in the main loop.
+    pub(crate) fn send_response(&self, response: lsp_server::Response) {
         self.main_loop_sender
             .send(Event::Action(Action::SendResponse(response)))
             .unwrap();
@@ -235,6 +253,12 @@ impl Client {
                 );
             }
         }
+    }
+}
+
+impl Notifier for Client {
+    fn send_notification(&self, method: &str, params: serde_json::Value) {
+        self.send_raw_notification(method, params);
     }
 }
 

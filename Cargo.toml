@@ -42,6 +42,8 @@ ruff_source_file = { path = "crates/ruff_source_file" }
 ruff_text_size = { path = "crates/ruff_text_size" }
 ruff_workspace = { path = "crates/ruff_workspace" }
 
+tsp_types = { path = "crates/tsp_types" }
+tsp_ty_server = { path = "crates/tsp_ty_server" }
 ty = { path = "crates/ty" }
 ty_combine = { path = "crates/ty_combine" }
 ty_completion_bench = { path = "crates/ty_completion_bench" }
