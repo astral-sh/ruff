@@ -323,10 +323,9 @@ impl<'db> CallableSignature<'db> {
     ) -> ConstraintSet<'db, 'c> {
         let relation_visitor = HasRelationToVisitor::default(constraints);
         let disjointness_visitor = IsDisjointVisitor::default(constraints);
-        let checker = TypeRelationChecker::new(
+        let checker = TypeRelationChecker::constraint_set_assignability(
             constraints,
             inferable,
-            TypeRelation::ConstraintSetAssignability,
             &relation_visitor,
             &disjointness_visitor,
         );
@@ -786,10 +785,9 @@ impl<'db> Signature<'db> {
     ) -> ConstraintSet<'db, 'c> {
         let relation_visitor = HasRelationToVisitor::default(constraints);
         let disjointness_visitor = IsDisjointVisitor::default(constraints);
-        let checker = TypeRelationChecker::new(
+        let checker = TypeRelationChecker::constraint_set_assignability(
             constraints,
             inferable,
-            TypeRelation::ConstraintSetAssignability,
             &relation_visitor,
             &disjointness_visitor,
         );
