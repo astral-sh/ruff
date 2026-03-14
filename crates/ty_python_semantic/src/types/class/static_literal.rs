@@ -217,6 +217,8 @@ impl<'db> StaticClassLiteral<'db> {
                     }
                     // Dynamic namedtuples don't define their own ordering methods.
                     ClassLiteral::DynamicNamedTuple(_) => {}
+                    // Dynamic enums don't define their own ordering methods.
+                    ClassLiteral::DynamicEnum(_) => {}
                 }
             }
         }
@@ -667,7 +669,7 @@ impl<'db> StaticClassLiteral<'db> {
             .filter_map(ClassBase::into_class)
             .any(|base| match base.class_literal(db) {
                 ClassLiteral::DynamicNamedTuple(_) => true,
-                ClassLiteral::Dynamic(_) => false,
+                ClassLiteral::Dynamic(_) | ClassLiteral::DynamicEnum(_) => false,
                 ClassLiteral::Static(class) => class
                     .explicit_bases(db)
                     .contains(&Type::SpecialForm(SpecialFormType::NamedTuple)),

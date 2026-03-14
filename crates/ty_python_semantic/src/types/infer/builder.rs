@@ -115,6 +115,7 @@ use crate::{AnalysisSettings, Db, FxIndexSet, Program};
 mod annotation_expression;
 mod binary_expressions;
 mod class;
+mod enum_call;
 mod function;
 mod imports;
 mod named_tuple;
@@ -2837,6 +2838,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             Some(definition),
                             namedtuple_kind,
                         )
+                    } else if enum_call::enum_functional_call_base(self.db(), callable_type)
+                        .is_some()
+                    {
+                        self.infer_enum_call_expression(call_expr, Some(definition))
                     } else {
                         match callable_type
                             .as_class_literal()
@@ -6800,6 +6805,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Handle `typing.NamedTuple(typename, fields)` and `collections.namedtuple(typename, field_names)`.
         if let Some(namedtuple_kind) = NamedTupleKind::from_type(self.db(), callable_type) {
             return self.infer_namedtuple_call_expression(call_expression, None, namedtuple_kind);
+        }
+
+        if enum_call::enum_functional_call_base(self.db(), callable_type).is_some() {
+            return self.infer_enum_call_expression(call_expression, None);
         }
 
         // We don't call `Type::try_call`, because we want to perform type inference on the
