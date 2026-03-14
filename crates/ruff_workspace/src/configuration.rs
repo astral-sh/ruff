@@ -344,6 +344,7 @@ impl Configuration {
                 task_tags: lint
                     .task_tags
                     .unwrap_or_else(|| TASK_TAGS.iter().map(ToString::to_string).collect()),
+                logger_callables: lint.logger_callables.unwrap_or_default(),
                 logger_objects: lint.logger_objects.unwrap_or_default(),
                 typing_modules: lint.typing_modules.unwrap_or_default(),
                 // Plugins
@@ -683,6 +684,7 @@ pub struct LintConfiguration {
     pub dummy_variable_rgx: Option<Regex>,
     pub external: Option<Vec<String>>,
     pub ignore_init_module_imports: Option<bool>,
+    pub logger_callables: Option<Vec<String>>,
     pub logger_objects: Option<Vec<String>>,
     pub task_tags: Option<Vec<String>>,
     pub typing_modules: Option<Vec<String>>,
@@ -801,6 +803,7 @@ impl LintConfiguration {
                     .collect()
             }),
             task_tags: options.common.task_tags,
+            logger_callables: options.common.logger_callables,
             logger_objects: options.common.logger_objects,
             typing_modules: options.common.typing_modules,
             typing_extensions: options.typing_extensions,
@@ -1191,6 +1194,7 @@ impl LintConfiguration {
             ignore_init_module_imports: self
                 .ignore_init_module_imports
                 .or(config.ignore_init_module_imports),
+            logger_callables: self.logger_callables.or(config.logger_callables),
             logger_objects: self.logger_objects.or(config.logger_objects),
             per_file_ignores: self.per_file_ignores.or(config.per_file_ignores),
             explicit_preview_rules: self
@@ -1422,6 +1426,7 @@ fn warn_about_deprecated_top_level_lint_options(
         extend_safe_fixes,
         extend_unsafe_fixes,
         ignore_init_module_imports,
+        logger_callables,
         logger_objects,
         select,
         explicit_preview_rules,
@@ -1504,6 +1509,10 @@ fn warn_about_deprecated_top_level_lint_options(
 
     if ignore_init_module_imports.is_some() {
         used_options.push("ignore-init-module-imports");
+    }
+
+    if logger_callables.is_some() {
+        used_options.push("logger-callables");
     }
 
     if logger_objects.is_some() {
