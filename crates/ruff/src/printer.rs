@@ -81,7 +81,12 @@ impl Printer {
         }
     }
 
-    fn write_summary_text(&self, writer: &mut dyn Write, diagnostics: &Diagnostics) -> Result<()> {
+    fn write_summary_text(
+        &self,
+        writer: &mut dyn Write,
+        diagnostics: &Diagnostics,
+        preview: PreviewMode,
+    ) -> Result<()> {
         if self.log_level >= LogLevel::Default {
             let fixables = FixableStatistics::try_from(diagnostics, self.unsafe_fixes);
 
@@ -91,6 +96,12 @@ impl Printer {
                 .flat_map(FixTable::counts)
                 .sum::<usize>();
 
+            let reportable = if preview.is_enabled() {
+                "diagnostic"
+            } else {
+                "error"
+            };
+
             if self.flags.intersects(Flags::SHOW_VIOLATIONS) {
                 let remaining = diagnostics.inner.len();
                 let total = fixed + remaining;
@@ -98,11 +109,11 @@ impl Printer {
                     let s = if total == 1 { "" } else { "s" };
                     writeln!(
                         writer,
-                        "Found {total} error{s} ({fixed} fixed, {remaining} remaining)."
+                        "Found {total} {reportable}{s} ({fixed} fixed, {remaining} remaining)."
                     )?;
                 } else if remaining > 0 {
                     let s = if remaining == 1 { "" } else { "s" };
-                    writeln!(writer, "Found {remaining} error{s}.")?;
+                    writeln!(writer, "Found {remaining} {reportable}{s}.")?;
                 } else if remaining == 0 {
                     writeln!(writer, "All checks passed!")?;
                 }
@@ -169,12 +180,12 @@ impl Printer {
                         if self.fix_mode.is_apply() {
                             writeln!(
                                 writer,
-                                "Fixed {fixed} error{s} ({unapplied} additional fix{es} available with `--unsafe-fixes`)."
+                                "Fixed {fixed} {reportable}{s} ({unapplied} additional fix{es} available with `--unsafe-fixes`)."
                             )?;
                         } else {
                             writeln!(
                                 writer,
-                                "Would fix {fixed} error{s} ({unapplied} additional fix{es} available with `--unsafe-fixes`)."
+                                "Would fix {fixed} {reportable}{s} ({unapplied} additional fix{es} available with `--unsafe-fixes`)."
                             )?;
                         }
                     } else {
@@ -194,9 +205,9 @@ impl Printer {
                     if fixed > 0 {
                         let s = if fixed == 1 { "" } else { "s" };
                         if self.fix_mode.is_apply() {
-                            writeln!(writer, "Fixed {fixed} error{s}.")?;
+                            writeln!(writer, "Fixed {fixed} {reportable}{s}.")?;
                         } else {
-                            writeln!(writer, "Would fix {fixed} error{s}.")?;
+                            writeln!(writer, "Would fix {fixed} {reportable}{s}.")?;
                         }
                     }
                 }
@@ -227,7 +238,7 @@ impl Printer {
                         writeln!(writer)?;
                     }
                 }
-                self.write_summary_text(writer, diagnostics)?;
+                self.write_summary_text(writer, diagnostics, preview)?;
             }
             return Ok(());
         }
@@ -256,7 +267,7 @@ impl Printer {
                     writeln!(writer)?;
                 }
             }
-            self.write_summary_text(writer, diagnostics)?;
+            self.write_summary_text(writer, diagnostics, preview)?;
         }
 
         writer.flush()?;
@@ -268,6 +279,7 @@ impl Printer {
         &self,
         diagnostics: &Diagnostics,
         writer: &mut dyn Write,
+        preview: PreviewMode,
     ) -> Result<()> {
         let required_applicability = self.unsafe_fixes.required_applicability();
         let statistics: Vec<ExpandedStatistics> = diagnostics
@@ -360,7 +372,7 @@ impl Printer {
                     )?;
                 }
 
-                self.write_summary_text(writer, diagnostics)?;
+                self.write_summary_text(writer, diagnostics, preview)?;
                 return Ok(());
             }
             OutputFormat::Json => {
