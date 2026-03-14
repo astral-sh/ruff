@@ -793,11 +793,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
     fn can_register_narrowing_alias(value: &ast::Expr) -> bool {
         match value {
-            ast::Expr::Name(_)
-            | ast::Expr::Attribute(_)
-            | ast::Expr::Subscript(_)
-            | ast::Expr::Compare(_)
-            | ast::Expr::Call(_) => true,
+            // Bare names are handled above as chained aliases (`b = a` where `a` is already an alias).
+            // Other simple place expressions only add truthiness narrowing and are too common to
+            // scan as alias candidates on every assignment.
+            ast::Expr::Compare(_) | ast::Expr::Call(_) => true,
             ast::Expr::UnaryOp(unary) if unary.op == ast::UnaryOp::Not => {
                 Self::can_register_narrowing_alias(&unary.operand)
             }
