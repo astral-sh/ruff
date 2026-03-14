@@ -16,6 +16,7 @@ use notify::{RecursiveMode, Watcher, recommended_watcher};
 use args::{GlobalConfigArgs, ServerCommand};
 use ruff_db::diagnostic::{Diagnostic, Severity};
 use ruff_linter::logging::{LogLevel, set_up_logging};
+use ruff_linter::preview::is_warning_severity_enabled;
 use ruff_linter::settings::flags::FixMode;
 use ruff_linter::{fs, warn_user, warn_user_once};
 use ruff_workspace::Settings;
@@ -363,6 +364,21 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
     //   is resolved.
     let preview = pyproject_config.settings.linter.preview;
 
+    if !is_warning_severity_enabled(preview)
+        && pyproject_config
+            .settings
+            .linter
+            .rules
+            .iter_warn()
+            // TODO use `exact_size_is_empty` if that API stabilizes
+            .len()
+            .ne(&0)
+    {
+        warn_user_once!(
+            "Enabling rules with severity 'warning' requires preview mode, otherwise all rules are interpreted with severity 'error'."
+        );
+    }
+
     if cli.watch {
         // Configure the file watcher.
         let (tx, rx) = channel();
@@ -452,7 +468,7 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
             writer
         };
         if cli.statistics {
-            printer.write_statistics(&diagnostics, &mut summary_writer)?;
+            printer.write_statistics(&diagnostics, &mut summary_writer, preview)?;
         } else {
             printer.write_once(&diagnostics, &mut summary_writer, preview)?;
         }
@@ -495,17 +511,14 @@ https://github.com/astral-sh/ruff/issues/new?title=%5BLinter%20panic%5D
                     }
                 }
             } else {
-                // If we're running the linter (not just fixing), we want to exit non-zero if
-                // there are any violations, unless we're explicitly asked to exit zero on
-                // fix.
-                if cli.exit_non_zero_on_fix {
-                    if !diagnostics.fixed.is_empty() || !diagnostics.inner.is_empty() {
-                        return Ok(ExitStatus::Failure);
-                    }
-                } else {
-                    if !diagnostics.inner.is_empty() {
-                        return Ok(ExitStatus::Failure);
-                    }
+                // If we're running the linter (not just fixing), we want to
+                // exit non-zero if there are any (error level) violations,
+                // unless we're explicitly asked to exit zero on fix.
+                if max_severity >= Severity::Error
+                    || (!is_warning_severity_enabled(preview) && !diagnostics.inner.is_empty())
+                    || (cli.exit_non_zero_on_fix && !diagnostics.fixed.is_empty())
+                {
+                    return Ok(ExitStatus::Failure);
                 }
             }
         }
