@@ -1,7 +1,8 @@
 use crate::Db;
 use crate::semantic_index::expression::Expression;
 use crate::semantic_index::place::{
-    PlaceExpr, PlaceExprRef, PlaceTable, PlaceTableBuilder, ScopedPlaceId,
+    ParentPlaceIter, PlaceExpr, PlaceExprRef, PlaceKey, PlaceTable, PlaceTableBuilder,
+    ScopedPlaceId,
 };
 use crate::semantic_index::place_table;
 use crate::semantic_index::predicate::{
@@ -2200,20 +2201,65 @@ fn all_matching_tuple_elements_have_literal_types<'db>(
     })
 }
 
-pub(crate) trait PlaceIdLookup {
+pub(crate) trait PlaceLookup {
     fn place_id<'e>(&self, expression: impl Into<PlaceExprRef<'e>>) -> Option<ScopedPlaceId>;
+    fn place(&self, place_id: impl Into<ScopedPlaceId>) -> PlaceExprRef<'_>;
+    fn parents<'a>(&'a self, place_expr: impl Into<PlaceExprRef<'a>>) -> ParentPlaceIter<'a>;
 }
 
-impl PlaceIdLookup for PlaceTableBuilder {
+impl PlaceLookup for PlaceTableBuilder {
     fn place_id<'e>(&self, expression: impl Into<PlaceExprRef<'e>>) -> Option<ScopedPlaceId> {
         self.place_id(expression.into())
     }
+
+    fn place(&self, place_id: impl Into<ScopedPlaceId>) -> PlaceExprRef<'_> {
+        self.place(place_id)
+    }
+
+    fn parents<'a>(&'a self, place_expr: impl Into<PlaceExprRef<'a>>) -> ParentPlaceIter<'a> {
+        self.parents(place_expr)
+    }
 }
 
-impl PlaceIdLookup for PlaceTable {
+impl PlaceLookup for PlaceTable {
     fn place_id<'e>(&self, expression: impl Into<PlaceExprRef<'e>>) -> Option<ScopedPlaceId> {
         self.place_id(expression.into())
     }
+
+    fn place(&self, place_id: impl Into<ScopedPlaceId>) -> PlaceExprRef<'_> {
+        self.place(place_id)
+    }
+
+    fn parents<'a>(&'a self, place_expr: impl Into<PlaceExprRef<'a>>) -> ParentPlaceIter<'a> {
+        self.parents(place_expr)
+    }
+}
+
+/// Collect `PlaceKey`s for all narrowed places and their parents from a predicate expression.
+///
+/// Used to determine which place bindings would invalidate a narrowing alias.
+pub(crate) fn collect_narrowed_place_keys(
+    place_table: &impl PlaceLookup,
+    narrowed_places: &PossiblyNarrowedPlaces,
+) -> Vec<PlaceKey> {
+    let mut place_keys = Vec::new();
+
+    for &place_id in narrowed_places {
+        let place_expr = place_table.place(place_id);
+        let place_key = PlaceKey::from(place_expr);
+        if !place_keys.contains(&place_key) {
+            place_keys.push(place_key);
+        }
+
+        for parent_id in place_table.parents(place_expr) {
+            let parent_key = PlaceKey::from(place_table.place(parent_id));
+            if !place_keys.contains(&parent_key) {
+                place_keys.push(parent_key);
+            }
+        }
+    }
+
+    place_keys
 }
 
 /// Builder for computing the conservative set of places that could possibly be narrowed.
@@ -2227,7 +2273,7 @@ pub(crate) struct PossiblyNarrowedPlacesBuilder<'db, 'a, P = PlaceTableBuilder> 
 
 impl<'db, 'a, P> PossiblyNarrowedPlacesBuilder<'db, 'a, P>
 where
-    P: PlaceIdLookup,
+    P: PlaceLookup,
 {
     pub(crate) fn new(db: &'db dyn Db, places: &'a P) -> Self {
         Self { db, places }

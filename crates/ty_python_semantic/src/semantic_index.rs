@@ -31,7 +31,7 @@ use crate::semantic_index::scope::{
 use crate::semantic_index::symbol::ScopedSymbolId;
 use crate::semantic_index::use_def::{EnclosingSnapshotKey, ScopedEnclosingSnapshotId, UseDefMap};
 use crate::semantic_model::HasTrackedScope;
-use crate::types::PossiblyNarrowedPlacesBuilder;
+use crate::types::{PossiblyNarrowedPlacesBuilder, collect_narrowed_place_keys};
 
 pub mod ast_ids;
 mod builder;
@@ -382,23 +382,11 @@ impl AliasGuard {
         let place_table = index.place_table(self.guard_scope);
         let narrowed_places = PossiblyNarrowedPlacesBuilder::new(db, place_table)
             .expression(expression.node_ref(db, &module));
-        let mut guard_places = vec![PlaceKey::Symbol(self.alias_name.clone())];
-
-        for place_id in narrowed_places {
-            let place_expr = place_table.place(place_id);
-            let place_key = PlaceKey::from(place_expr);
-            if !guard_places.contains(&place_key) {
-                guard_places.push(place_key);
-            }
-
-            for parent_id in place_table.parents(place_expr) {
-                let parent_key = PlaceKey::from(place_table.place(parent_id));
-                if !guard_places.contains(&parent_key) {
-                    guard_places.push(parent_key);
-                }
-            }
+        let mut guard_places = collect_narrowed_place_keys(place_table, &narrowed_places);
+        let alias_key = PlaceKey::Symbol(self.alias_name.clone());
+        if !guard_places.contains(&alias_key) {
+            guard_places.push(alias_key);
         }
-
         guard_places
     }
 }
