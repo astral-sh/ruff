@@ -898,25 +898,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
     ) -> Option<NarrowingConstraints<'db>> {
         let target = PlaceExpr::try_from_expr(expr)?;
         let place = self.expect_place(&target);
-        self.simple_expr_constraints(place, is_positive)
-    }
 
-    fn evaluate_simple_expr_if_present(
-        &mut self,
-        expr: &ast::Expr,
-        is_positive: bool,
-    ) -> Option<NarrowingConstraints<'db>> {
-        let target = PlaceExpr::try_from_expr(expr)?;
-        let place = self.places().place_id(&target)?;
-        self.simple_expr_constraints(place, is_positive)
-    }
-
-    #[allow(clippy::unnecessary_wraps)]
-    fn simple_expr_constraints(
-        &self,
-        place: ScopedPlaceId,
-        is_positive: bool,
-    ) -> Option<NarrowingConstraints<'db>> {
         let ty = if is_positive {
             Type::AlwaysFalsy.negate(self.db)
         } else {
@@ -934,8 +916,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         expr_named: &ast::ExprNamed,
         is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
-        let target_constraints =
-            self.evaluate_simple_expr_if_present(&expr_named.target, is_positive);
+        let target_constraints = self.evaluate_simple_expr(&expr_named.target, is_positive);
         let value_constraints = self.evaluate_simple_expr(&expr_named.value, is_positive);
         match (target_constraints, value_constraints) {
             (Some(mut target), Some(value)) => {
