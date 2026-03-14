@@ -19,8 +19,8 @@ use crate::{
     types::{
         ApplyTypeMappingVisitor, BoundTypeVarInstance, CallableType, ClassBase, ClassType,
         FindLegacyTypeVarsVisitor, InstanceFallbackShadowsNonDataDescriptor, KnownFunction,
-        MemberLookupPolicy, PropertyInstanceType, Signature, StaticClassLiteral, Type, TypeMapping,
-        TypeQualifiers, TypeVarVariance, VarianceInferable,
+        MemberLookupPolicy, PropertyInstanceType, ProtocolInstanceType, Signature,
+        StaticClassLiteral, Type, TypeMapping, TypeQualifiers, TypeVarVariance, VarianceInferable,
         constraints::{ConstraintSet, IteratorConstraintsExtension, OptionConstraintsExtension},
         context::InferContext,
         diagnostic::report_undeclared_protocol_member,
@@ -965,4 +965,33 @@ fn protocol_bind_self<'db>(
         callable.signatures(db).bind_self(db, self_type),
         CallableTypeKind::Regular,
     )
+}
+
+/// Protocol compatibility can only succeed if every required member is present.
+///
+/// Check that necessary condition up front so we can avoid expensive per-member type
+/// comparisons and generic protocol solving when the actual type is plainly missing a member.
+pub(super) fn has_all_protocol_members_defined<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    protocol: ProtocolInstanceType<'db>,
+) -> bool {
+    let target_interface = protocol.interface(db);
+
+    match ty {
+        Type::ProtocolInstance(source_protocol) => target_interface.members(db).all(|member| {
+            source_protocol
+                .interface(db)
+                .includes_member(db, member.name())
+        }),
+        _ => target_interface.members(db).all(|member| {
+            matches!(
+                ty.member(db, member.name()).place,
+                Place::Defined(DefinedPlace {
+                    definedness: Definedness::AlwaysDefined,
+                    ..
+                })
+            )
+        }),
+    }
 }

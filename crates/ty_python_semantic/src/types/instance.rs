@@ -16,7 +16,9 @@ use crate::types::constraints::{
 };
 use crate::types::enums::is_single_member_enum;
 use crate::types::generics::{InferableTypeVars, walk_specialization};
-use crate::types::protocol_class::{ProtocolClass, walk_protocol_interface};
+use crate::types::protocol_class::{
+    ProtocolClass, has_all_protocol_members_defined, walk_protocol_interface,
+};
 use crate::types::relation::{
     DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker,
 };
@@ -474,6 +476,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             && proto_class.is_known(db, KnownClass::Generator)
             && Program::get(db).python_version(db) < PythonVersion::PY313
         {
+            return result;
+        }
+
+        if !has_all_protocol_members_defined(db, ty, protocol) {
             return result;
         }
 
