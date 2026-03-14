@@ -62,6 +62,59 @@ fn function_signature_expression_type<'db>(
     }
 }
 
+/// Zip two parameter slices while allowing one side to advance independently.
+struct ParametersZip<'a, 'db> {
+    current_source: Option<&'a Parameter<'db>>,
+    current_target: Option<&'a Parameter<'db>>,
+    source_iter: Iter<'a, Parameter<'db>>,
+    target_iter: Iter<'a, Parameter<'db>>,
+}
+
+impl<'a, 'db> ParametersZip<'a, 'db> {
+    /// Move to the next parameter in both iterators, or `None` if both are exhausted.
+    fn next(&mut self) -> Option<EitherOrBoth<&'a Parameter<'db>, &'a Parameter<'db>>> {
+        match (self.next_source(), self.next_target()) {
+            (Some(source_param), Some(target_param)) => {
+                Some(EitherOrBoth::Both(source_param, target_param))
+            }
+            (Some(source_param), None) => Some(EitherOrBoth::Left(source_param)),
+            (None, Some(target_param)) => Some(EitherOrBoth::Right(target_param)),
+            (None, None) => None,
+        }
+    }
+
+    /// Move to the next parameter in the source iterator, or `None` if exhausted.
+    fn next_source(&mut self) -> Option<&'a Parameter<'db>> {
+        self.current_source = self.source_iter.next();
+        self.current_source
+    }
+
+    /// Move to the next parameter in the target iterator, or `None` if exhausted.
+    fn next_target(&mut self) -> Option<&'a Parameter<'db>> {
+        self.current_target = self.target_iter.next();
+        self.current_target
+    }
+
+    /// Peek at the next target parameter without consuming it.
+    fn peek_target(&mut self) -> Option<&'a Parameter<'db>> {
+        self.target_iter.clone().next()
+    }
+
+    /// Return iterators over the remaining source and target parameters, including the current
+    /// parameters if present.
+    fn into_remaining(
+        self,
+    ) -> (
+        impl Iterator<Item = &'a Parameter<'db>>,
+        impl Iterator<Item = &'a Parameter<'db>>,
+    ) {
+        (
+            self.current_source.into_iter().chain(self.source_iter),
+            self.current_target.into_iter().chain(self.target_iter),
+        )
+    }
+}
+
 /// The signature of a single callable. If the callable is overloaded, there is a separate
 /// [`Signature`] for each overload.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
@@ -1122,73 +1175,220 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         )
     }
 
+    /// Cheap necessary-condition check for signature compatibility that only inspects parameter
+    /// shape, never parameter annotations or return types.
+    fn signature_parameter_shapes_could_match(
+        &self,
+        source: &Signature<'db>,
+        target: &Signature<'db>,
+    ) -> bool {
+        if target.parameters.is_top() {
+            return true;
+        }
+
+        if source.parameters.is_top() && !target.parameters.is_gradual() {
+            return false;
+        }
+
+        if source.parameters.is_gradual() || target.parameters.is_gradual() {
+            return match self.relation {
+                TypeRelation::Subtyping | TypeRelation::SubtypingAssuming => false,
+                TypeRelation::Redundancy { .. } => {
+                    source.parameters.is_gradual() && target.parameters.is_gradual()
+                }
+                TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability => true,
+            };
+        }
+
+        if source.parameters.as_paramspec().is_some() || target.parameters.as_paramspec().is_some()
+        {
+            return true;
+        }
+
+        let mut parameters = ParametersZip {
+            current_source: None,
+            current_target: None,
+            source_iter: source.parameters.iter(),
+            target_iter: target.parameters.iter(),
+        };
+
+        let mut target_keywords = Vec::new();
+
+        loop {
+            let Some(next_parameter) = parameters.next() else {
+                if target_keywords.is_empty() {
+                    return true;
+                }
+                break;
+            };
+
+            match next_parameter {
+                EitherOrBoth::Left(source_parameter) => match source_parameter.kind() {
+                    ParameterKind::KeywordOnly { .. } | ParameterKind::KeywordVariadic { .. }
+                        if !target_keywords.is_empty() =>
+                    {
+                        break;
+                    }
+                    ParameterKind::PositionalOnly { default_type, .. }
+                    | ParameterKind::PositionalOrKeyword { default_type, .. }
+                    | ParameterKind::KeywordOnly { default_type, .. } => {
+                        if default_type.is_none() {
+                            return false;
+                        }
+                    }
+                    ParameterKind::Variadic { .. } | ParameterKind::KeywordVariadic { .. } => {}
+                },
+                EitherOrBoth::Right(_) => return false,
+                EitherOrBoth::Both(source_param, target_param) => {
+                    match (source_param.kind(), target_param.kind()) {
+                        (
+                            ParameterKind::PositionalOnly {
+                                default_type: source_default,
+                                ..
+                            }
+                            | ParameterKind::PositionalOrKeyword {
+                                default_type: source_default,
+                                ..
+                            },
+                            ParameterKind::PositionalOnly {
+                                default_type: target_default,
+                                ..
+                            },
+                        ) => {
+                            if source_default.is_none() && target_default.is_some() {
+                                return false;
+                            }
+                        }
+                        (
+                            ParameterKind::PositionalOrKeyword {
+                                name: source_name,
+                                default_type: source_default,
+                            },
+                            ParameterKind::PositionalOrKeyword {
+                                name: target_name,
+                                default_type: target_default,
+                            },
+                        ) => {
+                            if source_name != target_name {
+                                return false;
+                            }
+                            if source_default.is_none() && target_default.is_some() {
+                                return false;
+                            }
+                        }
+                        (
+                            ParameterKind::Variadic { .. },
+                            ParameterKind::PositionalOnly { .. }
+                            | ParameterKind::PositionalOrKeyword { .. },
+                        ) => {
+                            if matches!(
+                                target_param.kind(),
+                                ParameterKind::PositionalOrKeyword { .. }
+                            ) {
+                                target_keywords.push(target_param);
+                            }
+
+                            loop {
+                                let Some(target_parameter) = parameters.peek_target() else {
+                                    break;
+                                };
+                                match target_parameter.kind() {
+                                    ParameterKind::PositionalOrKeyword { .. } => {
+                                        target_keywords.push(target_parameter);
+                                    }
+                                    ParameterKind::PositionalOnly { .. }
+                                    | ParameterKind::Variadic { .. } => {}
+                                    _ => break,
+                                }
+                                parameters.next_target();
+                            }
+                        }
+                        (ParameterKind::Variadic { .. }, ParameterKind::Variadic { .. }) => {}
+                        (
+                            _,
+                            ParameterKind::KeywordOnly { .. }
+                            | ParameterKind::KeywordVariadic { .. },
+                        ) => break,
+                        _ => return false,
+                    }
+                }
+            }
+        }
+
+        let (source_params, target_params) = parameters.into_remaining();
+        let mut source_keywords = FxHashMap::default();
+        let mut source_keyword_variadic = false;
+
+        for source_param in source_params {
+            match source_param.kind() {
+                ParameterKind::KeywordOnly { name, .. }
+                | ParameterKind::PositionalOrKeyword { name, .. } => {
+                    source_keywords.insert(name.as_str(), source_param);
+                }
+                ParameterKind::KeywordVariadic { .. } => {
+                    source_keyword_variadic = true;
+                }
+                ParameterKind::PositionalOnly { default_type, .. } => {
+                    if default_type.is_none() {
+                        return false;
+                    }
+                }
+                ParameterKind::Variadic { .. } => {}
+            }
+        }
+
+        for target_param in target_keywords.into_iter().chain(target_params) {
+            match target_param.kind() {
+                ParameterKind::KeywordOnly {
+                    name: target_name,
+                    default_type: target_default,
+                }
+                | ParameterKind::PositionalOrKeyword {
+                    name: target_name,
+                    default_type: target_default,
+                } => {
+                    if let Some(source_param) = source_keywords.remove(&**target_name) {
+                        match source_param.kind() {
+                            ParameterKind::PositionalOrKeyword {
+                                default_type: source_default,
+                                ..
+                            }
+                            | ParameterKind::KeywordOnly {
+                                default_type: source_default,
+                                ..
+                            } => {
+                                if source_default.is_none() && target_default.is_some() {
+                                    return false;
+                                }
+                            }
+                            _ => unreachable!(
+                                "`source_keywords` should only contain keyword-only or standard parameters"
+                            ),
+                        }
+                    } else if !source_keyword_variadic {
+                        return false;
+                    }
+                }
+                ParameterKind::KeywordVariadic { .. } => {
+                    if !source_keyword_variadic {
+                        return false;
+                    }
+                }
+                _ => return false,
+            }
+        }
+
+        source_keywords
+            .into_values()
+            .all(|source_param| source_param.default_type().is_some())
+    }
+
     fn check_signature_pair_inner(
         &self,
         db: &'db dyn Db,
         source: &Signature<'db>,
         target: &Signature<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        /// A helper struct to zip two slices of parameters together that provides control over the
-        /// two iterators individually. It also keeps track of the current parameter in each
-        /// iterator.
-        struct ParametersZip<'a, 'db> {
-            current_source: Option<&'a Parameter<'db>>,
-            current_target: Option<&'a Parameter<'db>>,
-            source_iter: Iter<'a, Parameter<'db>>,
-            target_iter: Iter<'a, Parameter<'db>>,
-        }
-
-        impl<'a, 'db> ParametersZip<'a, 'db> {
-            /// Move to the next parameter in both the `source` and `target` parameter iterators,
-            /// [`None`] if both iterators are exhausted.
-            fn next(&mut self) -> Option<EitherOrBoth<&'a Parameter<'db>, &'a Parameter<'db>>> {
-                match (self.next_source(), self.next_target()) {
-                    (Some(source_param), Some(target_param)) => {
-                        Some(EitherOrBoth::Both(source_param, target_param))
-                    }
-                    (Some(source_param), None) => Some(EitherOrBoth::Left(source_param)),
-                    (None, Some(target_param)) => Some(EitherOrBoth::Right(target_param)),
-                    (None, None) => None,
-                }
-            }
-
-            /// Move to the next parameter in the `source` parameter iterator, [`None`] if the
-            /// iterator is exhausted.
-            fn next_source(&mut self) -> Option<&'a Parameter<'db>> {
-                self.current_source = self.source_iter.next();
-                self.current_source
-            }
-
-            /// Move to the next parameter in the `target` parameter iterator, [`None`] if the
-            /// iterator is exhausted.
-            fn next_target(&mut self) -> Option<&'a Parameter<'db>> {
-                self.current_target = self.target_iter.next();
-                self.current_target
-            }
-
-            /// Peek at the next parameter in the `target` parameter iterator without consuming it.
-            fn peek_target(&mut self) -> Option<&'a Parameter<'db>> {
-                self.target_iter.clone().next()
-            }
-
-            /// Consumes the `ParametersZip` and returns a two-element tuple containing the
-            /// remaining parameters in the `source` and `target` iterators respectively.
-            ///
-            /// The returned iterators starts with the current parameter, if any, followed by the
-            /// remaining parameters in the respective iterators.
-            fn into_remaining(
-                self,
-            ) -> (
-                impl Iterator<Item = &'a Parameter<'db>>,
-                impl Iterator<Item = &'a Parameter<'db>>,
-            ) {
-                (
-                    self.current_source.into_iter().chain(self.source_iter),
-                    self.current_target.into_iter().chain(self.target_iter),
-                )
-            }
-        }
-
         let mut result = self.always();
 
         let mut check_types = |type1: Type<'db>, type2: Type<'db>| {
@@ -1218,6 +1418,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 .intersect(db, self.constraints, self.check_type_pair(db, type1, type2))
                 .is_never_satisfied(db)
         };
+
+        if !self.signature_parameter_shapes_could_match(source, target) {
+            return self.never();
+        }
 
         // Return types are covariant.
         if !check_types(source.return_ty, target.return_ty) {

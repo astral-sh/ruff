@@ -967,7 +967,49 @@ fn protocol_bind_self<'db>(
     )
 }
 
+fn protocol_member_kinds_could_match<'source, 'target, 'db>(
+    db: &'db dyn Db,
+    source_member: ProtocolMember<'source, 'db>,
+    target_member: ProtocolMember<'target, 'db>,
+) -> bool {
+    match (source_member.kind, target_member.kind) {
+        (ProtocolMemberKind::Method(_), ProtocolMemberKind::Other(_)) => false,
+        (ProtocolMemberKind::Property(property), ProtocolMemberKind::Other(_)) => {
+            property.getter(db).is_some() && property.setter(db).is_some()
+        }
+        (ProtocolMemberKind::Property(_), ProtocolMemberKind::Method(_)) => false,
+        (ProtocolMemberKind::Other(_), ProtocolMemberKind::Method(_)) => {
+            source_member.qualifiers.contains(TypeQualifiers::CLASS_VAR)
+        }
+        (
+            ProtocolMemberKind::Method(_)
+            | ProtocolMemberKind::Property(_)
+            | ProtocolMemberKind::Other(_),
+            ProtocolMemberKind::Method(_)
+            | ProtocolMemberKind::Property(_)
+            | ProtocolMemberKind::Other(_),
+        ) => true,
+    }
+}
+
+fn protocol_interface_member_shapes_could_match<'db>(
+    db: &'db dyn Db,
+    source: ProtocolInterface<'db>,
+    target: ProtocolInterface<'db>,
+) -> bool {
+    target.members(db).all(|target_member| {
+        source
+            .member_by_name(db, target_member.name())
+            .is_some_and(|source_member| {
+                protocol_member_kinds_could_match(db, source_member, target_member)
+            })
+    })
+}
+
 /// Protocol compatibility can only succeed if every required member is present.
+///
+/// For protocol sources, some member-kind mismatches are also immediate failures regardless of the
+/// member types, so we reject those up front too.
 ///
 /// Check that necessary condition up front so we can avoid expensive per-member type
 /// comparisons and generic protocol solving when the actual type is plainly missing a member.
@@ -979,11 +1021,11 @@ pub(super) fn has_all_protocol_members_defined<'db>(
     let target_interface = protocol.interface(db);
 
     match ty {
-        Type::ProtocolInstance(source_protocol) => target_interface.members(db).all(|member| {
-            source_protocol
-                .interface(db)
-                .includes_member(db, member.name())
-        }),
+        Type::ProtocolInstance(source_protocol) => protocol_interface_member_shapes_could_match(
+            db,
+            source_protocol.interface(db),
+            target_interface,
+        ),
         _ => target_interface.members(db).all(|member| {
             matches!(
                 ty.member(db, member.name()).place,
