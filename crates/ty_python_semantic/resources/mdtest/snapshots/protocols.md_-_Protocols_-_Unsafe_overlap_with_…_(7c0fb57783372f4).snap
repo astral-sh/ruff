@@ -16,87 +16,188 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/protocols.md
  1 | from typing import Protocol, runtime_checkable
  2 | 
  3 | @runtime_checkable
- 4 | class HasMethod(Protocol):
+ 4 | class MethodProto(Protocol):
  5 |     def method(self, x: int) -> int: ...
  6 | 
- 7 | class Compatible:
- 8 |     def method(self, x: int) -> int:
- 9 |         return x
+ 7 | @runtime_checkable
+ 8 | class AttributeProto(Protocol):
+ 9 |     method: int
 10 | 
-11 | class IncompatibleSignature:
-12 |     def method(self, x: str) -> None: ...
-13 | 
-14 | class IncompatibleAttribute:
-15 |     method: int
-16 | 
-17 | class NoOverlap:
-18 |     pass
-19 | 
-20 | def check_isinstance(
-21 |     compatible: Compatible,
-22 |     incompatible_sig: IncompatibleSignature,
-23 |     incompatible_attr: IncompatibleAttribute,
-24 |     no_overlap: NoOverlap,
-25 | ):
-26 |     isinstance(compatible, HasMethod)  # no error: `Compatible` is assignable to `HasMethod`
-27 | 
-28 |     isinstance(incompatible_sig, HasMethod)  # error: [unsafe-isinstance-narrowing]
-29 | 
-30 |     isinstance(incompatible_attr, HasMethod)  # error: [unsafe-isinstance-narrowing]
+11 | class MethodNominal:
+12 |     def method(self, x: str) -> None:
+13 |         pass
+14 | 
+15 | class AttributeNominal:
+16 |     method: int = 1
+17 | 
+18 | def check_isinstance(method_nominal: MethodNominal, attribute_nominal: AttributeNominal, obj: object):
+19 |     isinstance(method_nominal, MethodProto)  # error: [unsafe-isinstance-narrowing]
+20 |     isinstance(method_nominal, AttributeProto)  # error: [unsafe-isinstance-narrowing]
+21 |     isinstance(attribute_nominal, MethodProto)  # error: [unsafe-isinstance-narrowing]
+22 | 
+23 |     isinstance(attribute_nominal, AttributeProto)  # no error: `AttributeNominal <: AttributeProto`
+24 |     isinstance(obj, MethodNominal)  # no error: members from `MethodNominal` are missing as attributes
+25 |     isinstance(obj, AttributeProto)  # no error: members from `AttributeNominal` are missing as attributes
+26 | def check_issubclass():
+27 |     issubclass(MethodNominal, MethodProto)  # error: [unsafe-isinstance-narrowing]
+28 | @runtime_checkable
+29 | class NonDataProtocol(Protocol):
+30 |     def method(self) -> int: ...
 31 | 
-32 |     isinstance(no_overlap, HasMethod)  # no error: `NoOverlap` does not have all members of `HasMethod`
-33 | from typing import TypeVar
-34 | 
-35 | T = TypeVar("T")
-36 | 
-37 | @runtime_checkable
-38 | class GenericProto(Protocol[T]):
-39 |     def get(self) -> T: ...
-40 | 
-41 | def check_generic_no_overlap(x: GenericProto[int]):
-42 |     isinstance(x, GenericProto)  # no error: `GenericProto[int]` is assignable to `GenericProto`
-43 | class BadGenericOverlap:
-44 |     get: int  # has `get`, but it's an attribute, not a callable
-45 | 
-46 | def check_generic_overlap(x: BadGenericOverlap):
-47 |     isinstance(x, GenericProto)  # error: [unsafe-isinstance-narrowing]
+32 | def check_tuple(attribute_nominal: AttributeNominal):
+33 |     # error: [unsafe-isinstance-narrowing]
+34 |     # error: [unsafe-isinstance-narrowing]
+35 |     isinstance(attribute_nominal, (MethodProto, NonDataProtocol))
+36 | def check_union(nominal: MethodNominal | int):
+37 |     isinstance(nominal, MethodProto)  # error: [unsafe-isinstance-narrowing]
+38 | 
+39 | def check_union_no_overlap(str_or_int: str | int):
+40 |     isinstance(str_or_int, MethodProto)  # no error
+41 | from typing import TypeVar
+42 | 
+43 | T = TypeVar("T")
+44 | 
+45 | @runtime_checkable
+46 | class GenericProto(Protocol[T]):
+47 |     def get(self) -> T: ...
+48 | 
+49 | def check_generic_no_overlap(x: GenericProto[int]):
+50 |     isinstance(x, GenericProto)  # no error: `GenericProto[int]` is assignable to `GenericProto`
+51 | class BadGenericOverlap:
+52 |     get: int  # has `get`, but it's an attribute, not a callable
+53 | 
+54 | def check_generic_overlap(x: BadGenericOverlap):
+55 |     isinstance(x, GenericProto)  # error: [unsafe-isinstance-narrowing]
 ```
 
 # Diagnostics
 
 ```
-error[unsafe-isinstance-narrowing]: `IncompatibleSignature` unsafely overlaps with protocol `HasMethod`
-  --> src/mdtest_snippet.py:28:5
+error[unsafe-isinstance-narrowing]: `MethodNominal` unsafely overlaps with protocol `MethodProto`
+  --> src/mdtest_snippet.py:19:5
    |
-26 |     isinstance(compatible, HasMethod)  # no error: `Compatible` is assignable to `HasMethod`
-27 |
-28 |     isinstance(incompatible_sig, HasMethod)  # error: [unsafe-isinstance-narrowing]
-   |     ^^^^^^^^^^^----------------^^^^^^^^^^^^
+18 | def check_isinstance(method_nominal: MethodNominal, attribute_nominal: AttributeNominal, obj: object):
+19 |     isinstance(method_nominal, MethodProto)  # error: [unsafe-isinstance-narrowing]
+   |     ^^^^^^^^^^^--------------^^^^^^^^^^^^^^
    |                |
-   |                Has type `IncompatibleSignature`
-29 |
-30 |     isinstance(incompatible_attr, HasMethod)  # error: [unsafe-isinstance-narrowing]
+   |                Has type `MethodNominal`
+20 |     isinstance(method_nominal, AttributeProto)  # error: [unsafe-isinstance-narrowing]
+21 |     isinstance(attribute_nominal, MethodProto)  # error: [unsafe-isinstance-narrowing]
    |
-info: `IncompatibleSignature` has all the members of `HasMethod`, but with incompatible types
+info: `MethodNominal` has all the members of `MethodProto`, but with incompatible types
 info: Runtime `isinstance` checks against protocols only check for the presence of the required members, not their types
 info: rule `unsafe-isinstance-narrowing` is enabled by default
 
 ```
 
 ```
-error[unsafe-isinstance-narrowing]: `IncompatibleAttribute` unsafely overlaps with protocol `HasMethod`
-  --> src/mdtest_snippet.py:30:5
+error[unsafe-isinstance-narrowing]: `MethodNominal` unsafely overlaps with protocol `AttributeProto`
+  --> src/mdtest_snippet.py:20:5
    |
-28 |     isinstance(incompatible_sig, HasMethod)  # error: [unsafe-isinstance-narrowing]
-29 |
-30 |     isinstance(incompatible_attr, HasMethod)  # error: [unsafe-isinstance-narrowing]
-   |     ^^^^^^^^^^^-----------------^^^^^^^^^^^^
+18 | def check_isinstance(method_nominal: MethodNominal, attribute_nominal: AttributeNominal, obj: object):
+19 |     isinstance(method_nominal, MethodProto)  # error: [unsafe-isinstance-narrowing]
+20 |     isinstance(method_nominal, AttributeProto)  # error: [unsafe-isinstance-narrowing]
+   |     ^^^^^^^^^^^--------------^^^^^^^^^^^^^^^^^
    |                |
-   |                Has type `IncompatibleAttribute`
-31 |
-32 |     isinstance(no_overlap, HasMethod)  # no error: `NoOverlap` does not have all members of `HasMethod`
+   |                Has type `MethodNominal`
+21 |     isinstance(attribute_nominal, MethodProto)  # error: [unsafe-isinstance-narrowing]
    |
-info: `IncompatibleAttribute` has all the members of `HasMethod`, but with incompatible types
+info: `MethodNominal` has all the members of `AttributeProto`, but with incompatible types
+info: Runtime `isinstance` checks against protocols only check for the presence of the required members, not their types
+info: rule `unsafe-isinstance-narrowing` is enabled by default
+
+```
+
+```
+error[unsafe-isinstance-narrowing]: `AttributeNominal` unsafely overlaps with protocol `MethodProto`
+  --> src/mdtest_snippet.py:21:5
+   |
+19 |     isinstance(method_nominal, MethodProto)  # error: [unsafe-isinstance-narrowing]
+20 |     isinstance(method_nominal, AttributeProto)  # error: [unsafe-isinstance-narrowing]
+21 |     isinstance(attribute_nominal, MethodProto)  # error: [unsafe-isinstance-narrowing]
+   |     ^^^^^^^^^^^-----------------^^^^^^^^^^^^^^
+   |                |
+   |                Has type `AttributeNominal`
+22 |
+23 |     isinstance(attribute_nominal, AttributeProto)  # no error: `AttributeNominal <: AttributeProto`
+   |
+info: `AttributeNominal` has all the members of `MethodProto`, but with incompatible types
+info: Runtime `isinstance` checks against protocols only check for the presence of the required members, not their types
+info: rule `unsafe-isinstance-narrowing` is enabled by default
+
+```
+
+```
+error[unsafe-isinstance-narrowing]: `MethodNominal` unsafely overlaps with protocol `MethodProto`
+  --> src/mdtest_snippet.py:27:5
+   |
+25 |     isinstance(obj, AttributeProto)  # no error: members from `AttributeNominal` are missing as attributes
+26 | def check_issubclass():
+27 |     issubclass(MethodNominal, MethodProto)  # error: [unsafe-isinstance-narrowing]
+   |     ^^^^^^^^^^^-------------^^^^^^^^^^^^^^
+   |                |
+   |                Has type `MethodNominal`
+28 | @runtime_checkable
+29 | class NonDataProtocol(Protocol):
+   |
+info: `MethodNominal` has all the members of `MethodProto`, but with incompatible types
+info: Runtime `issubclass` checks against protocols only check for the presence of the required members, not their types
+info: rule `unsafe-isinstance-narrowing` is enabled by default
+
+```
+
+```
+error[unsafe-isinstance-narrowing]: `AttributeNominal` unsafely overlaps with protocol `MethodProto`
+  --> src/mdtest_snippet.py:35:5
+   |
+33 |     # error: [unsafe-isinstance-narrowing]
+34 |     # error: [unsafe-isinstance-narrowing]
+35 |     isinstance(attribute_nominal, (MethodProto, NonDataProtocol))
+   |     ^^^^^^^^^^^-----------------^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |                |
+   |                Has type `AttributeNominal`
+36 | def check_union(nominal: MethodNominal | int):
+37 |     isinstance(nominal, MethodProto)  # error: [unsafe-isinstance-narrowing]
+   |
+info: `AttributeNominal` has all the members of `MethodProto`, but with incompatible types
+info: Runtime `isinstance` checks against protocols only check for the presence of the required members, not their types
+info: rule `unsafe-isinstance-narrowing` is enabled by default
+
+```
+
+```
+error[unsafe-isinstance-narrowing]: `AttributeNominal` unsafely overlaps with protocol `NonDataProtocol`
+  --> src/mdtest_snippet.py:35:5
+   |
+33 |     # error: [unsafe-isinstance-narrowing]
+34 |     # error: [unsafe-isinstance-narrowing]
+35 |     isinstance(attribute_nominal, (MethodProto, NonDataProtocol))
+   |     ^^^^^^^^^^^-----------------^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |                |
+   |                Has type `AttributeNominal`
+36 | def check_union(nominal: MethodNominal | int):
+37 |     isinstance(nominal, MethodProto)  # error: [unsafe-isinstance-narrowing]
+   |
+info: `AttributeNominal` has all the members of `NonDataProtocol`, but with incompatible types
+info: Runtime `isinstance` checks against protocols only check for the presence of the required members, not their types
+info: rule `unsafe-isinstance-narrowing` is enabled by default
+
+```
+
+```
+error[unsafe-isinstance-narrowing]: `MethodNominal` unsafely overlaps with protocol `MethodProto`
+  --> src/mdtest_snippet.py:37:5
+   |
+35 |     isinstance(attribute_nominal, (MethodProto, NonDataProtocol))
+36 | def check_union(nominal: MethodNominal | int):
+37 |     isinstance(nominal, MethodProto)  # error: [unsafe-isinstance-narrowing]
+   |     ^^^^^^^^^^^-------^^^^^^^^^^^^^^
+   |                |
+   |                Has type `MethodNominal`
+38 |
+39 | def check_union_no_overlap(str_or_int: str | int):
+   |
+info: `MethodNominal` has all the members of `MethodProto`, but with incompatible types
 info: Runtime `isinstance` checks against protocols only check for the presence of the required members, not their types
 info: rule `unsafe-isinstance-narrowing` is enabled by default
 
@@ -104,10 +205,10 @@ info: rule `unsafe-isinstance-narrowing` is enabled by default
 
 ```
 error[unsafe-isinstance-narrowing]: `BadGenericOverlap` unsafely overlaps with protocol `GenericProto`
-  --> src/mdtest_snippet.py:47:5
+  --> src/mdtest_snippet.py:55:5
    |
-46 | def check_generic_overlap(x: BadGenericOverlap):
-47 |     isinstance(x, GenericProto)  # error: [unsafe-isinstance-narrowing]
+54 | def check_generic_overlap(x: BadGenericOverlap):
+55 |     isinstance(x, GenericProto)  # error: [unsafe-isinstance-narrowing]
    |     ^^^^^^^^^^^-^^^^^^^^^^^^^^^
    |                |
    |                Has type `BadGenericOverlap`
