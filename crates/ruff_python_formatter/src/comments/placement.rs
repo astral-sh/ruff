@@ -23,11 +23,39 @@ use crate::pattern::pattern_match_sequence::SequenceType;
 /// re-scanning the same source regions. When multiple comments share the
 /// same `preceding` node, subsequent scans only cover the gap since the
 /// last comment — reducing total work from O(N²) to O(N).
+///
+/// Callers must invoke [`PlacementState::update`] before each
+/// `place_comment` call so that every handler reads up-to-date results
+/// without needing `&mut` access to the state.
 #[derive(Default)]
 pub(super) struct PlacementState {
     preceding: PrecedingScanState,
     following: FollowingScanState,
     empty_lines: EmptyLinesScanState,
+}
+
+impl PlacementState {
+    /// Update caches for the current comment.
+    ///
+    /// Must be called before [`place_comment`] so that handlers can query
+    /// pre-computed scan results through shared (`&self`) references.
+    pub(super) fn update(&mut self, comment: &DecoratedComment<'_>, source: &str) {
+        if let Some(preceding) = comment.preceding_node() {
+            self.preceding
+                .scan(preceding.end(), comment.start(), source);
+        } else {
+            self.preceding = PrecedingScanState::default();
+        }
+        if let Some(following) = comment.following_node() {
+            self.following
+                .scan(comment.end(), following.start(), source);
+            self.empty_lines
+                .scan(comment.end(), following.start(), source);
+        } else {
+            self.following = FollowingScanState::default();
+            self.empty_lines = EmptyLinesScanState::default();
+        }
+    }
 }
 
 /// Cache for `preceding.end()..comment.start()` scans.
@@ -50,23 +78,19 @@ struct PrecedingScanState {
 }
 
 impl PrecedingScanState {
-    /// Returns whether an `LParen` token exists in `preceding_end..up_to`,
-    /// using cached results when possible.
-    fn has_lparen(&mut self, preceding_end: TextSize, up_to: TextSize, source: &str) -> bool {
-        self.ensure_scanned(preceding_end, up_to, source);
+    /// Returns whether an `LParen` was found in the last scanned range.
+    fn has_lparen(&self) -> bool {
         self.found_lparen
     }
 
-    /// Returns whether any non-trivia token exists in `preceding_end..up_to`,
-    /// using cached results when possible.
-    fn has_non_trivia(&mut self, preceding_end: TextSize, up_to: TextSize, source: &str) -> bool {
-        self.ensure_scanned(preceding_end, up_to, source);
+    /// Returns whether any non-trivia token was found in the last scanned range.
+    fn has_non_trivia(&self) -> bool {
         self.found_non_trivia
     }
 
-    /// Ensures the range `preceding_end..up_to` has been scanned, extending
-    /// incrementally from the last scanned position when possible.
-    fn ensure_scanned(&mut self, preceding_end: TextSize, up_to: TextSize, source: &str) {
+    /// Scans the range `preceding_end..up_to`, extending incrementally from
+    /// the last scanned position when possible.
+    fn scan(&mut self, preceding_end: TextSize, up_to: TextSize, source: &str) {
         if preceding_end != self.preceding_end {
             self.preceding_end = preceding_end;
             self.scanned_up_to = preceding_end;
@@ -132,14 +156,14 @@ struct FollowingScanState {
 }
 
 impl FollowingScanState {
-    /// Returns whether an `RParen` token exists in `comment_end..following_start`
+    /// Returns whether an `RParen` was found in the last scanned range.
+    fn has_rparen(&self) -> bool {
+        self.found_rparen
+    }
+
+    /// Scans `comment_end..following_start` for an `RParen` token
     /// (before any `as`/`def`/`class` keyword), using cached results when possible.
-    fn has_rparen(
-        &mut self,
-        comment_end: TextSize,
-        following_start: TextSize,
-        source: &str,
-    ) -> bool {
+    fn scan(&mut self, comment_end: TextSize, following_start: TextSize, source: &str) {
         if following_start != self.following_start {
             self.following_start = following_start;
             // Set scanned_from to following_start to force a scan on next check.
@@ -150,7 +174,7 @@ impl FollowingScanState {
         // If we've already scanned a superset of this range and found no RParen,
         // this subset can't contain one either.
         if comment_end >= self.scanned_from && !self.found_rparen {
-            return false;
+            return;
         }
 
         // Full scan required (first call, or previous scan found RParen which
@@ -176,8 +200,6 @@ impl FollowingScanState {
 
         self.scanned_from = comment_end;
         self.found_rparen = result;
-
-        result
     }
 }
 
@@ -192,49 +214,50 @@ struct EmptyLinesScanState {
     following_start: TextSize,
     /// The earliest `comment.end()` from which we have scanned.
     scanned_from: TextSize,
-    /// Whether any empty line was found in the most recent scan.
-    has_empty_line: bool,
+    /// The `max_empty_lines` count from the most recent scan.
+    cached_count: u32,
 }
 
 impl EmptyLinesScanState {
-    /// Returns the `max_empty_lines` count for `comment_end..following_start`,
+    /// Returns the `max_empty_lines` count from the last scan.
+    fn max_empty_lines(&self) -> u32 {
+        self.cached_count
+    }
+
+    /// Scans `comment_end..following_start` for empty lines,
     /// using cached results when possible.
-    fn max_empty_lines(
-        &mut self,
-        comment_end: TextSize,
-        following_start: TextSize,
-        source: &str,
-    ) -> u32 {
+    fn scan(&mut self, comment_end: TextSize, following_start: TextSize, source: &str) {
         if following_start != self.following_start {
             self.following_start = following_start;
             // Set scanned_from to following_start to force a scan on first check.
             self.scanned_from = following_start;
-            self.has_empty_line = false;
+            self.cached_count = 0;
         }
 
         // If we've already scanned a superset and found no empty lines,
         // this subset can't have any either.
-        if comment_end >= self.scanned_from && !self.has_empty_line {
-            return 0;
+        if comment_end >= self.scanned_from && self.cached_count == 0 {
+            return;
         }
 
         let result = max_empty_lines(&source[TextRange::new(comment_end, following_start)]);
 
         self.scanned_from = comment_end;
-        self.has_empty_line = result > 0;
-
-        result
+        self.cached_count = result;
     }
 }
 
 /// Manually attach comments to nodes that the default placement gets wrong.
+///
+/// The caller must invoke [`PlacementState::update`] before calling this
+/// function so that the scan caches are current for the given comment.
 pub(super) fn place_comment<'a>(
     comment: DecoratedComment<'a>,
     comment_ranges: &CommentRanges,
     source: &str,
-    state: &mut PlacementState,
+    state: &PlacementState,
 ) -> CommentPlacement<'a> {
-    handle_parenthesized_comment(comment, source, state)
+    handle_parenthesized_comment(comment, state)
         .or_else(|comment| handle_end_of_line_comment_around_body(comment, source))
         .or_else(|comment| handle_own_line_comment_around_body(comment, source, state))
         .or_else(|comment| handle_enclosed_comment(comment, comment_ranges, source))
@@ -280,8 +303,7 @@ pub(super) fn place_comment<'a>(
 /// comment is a leading comment of the following node.
 fn handle_parenthesized_comment<'a>(
     comment: DecoratedComment<'a>,
-    source: &str,
-    state: &mut PlacementState,
+    state: &PlacementState,
 ) -> CommentPlacement<'a> {
     // As a special-case, ignore comments within f-strings, like:
     // ```python
@@ -342,10 +364,7 @@ fn handle_parenthesized_comment<'a>(
     //     ),
     // ]
     // ```
-    if state
-        .preceding
-        .has_lparen(preceding.end(), comment.start(), source)
-    {
+    if state.preceding.has_lparen() {
         return CommentPlacement::leading(following, comment);
     }
 
@@ -358,10 +377,7 @@ fn handle_parenthesized_comment<'a>(
     //     y
     // ]
     // ```
-    if state
-        .following
-        .has_rparen(comment.end(), following.start(), source)
-    {
+    if state.following.has_rparen() {
         return CommentPlacement::trailing(preceding, comment);
     }
 
@@ -647,7 +663,7 @@ fn handle_end_of_line_comment_around_body<'a>(
 fn handle_own_line_comment_around_body<'a>(
     comment: DecoratedComment<'a>,
     source: &str,
-    state: &mut PlacementState,
+    state: &PlacementState,
 ) -> CommentPlacement<'a> {
     if comment.line_position().is_end_of_line() {
         return CommentPlacement::Default(comment);
@@ -669,10 +685,7 @@ fn handle_own_line_comment_around_body<'a>(
     //     # default placement comment
     //     def inline_after_else(): ...
     // ```
-    if state
-        .preceding
-        .has_non_trivia(preceding.end(), comment.start(), source)
-    {
+    if state.preceding.has_non_trivia() {
         return CommentPlacement::Default(comment);
     }
 
@@ -683,7 +696,7 @@ fn handle_own_line_comment_around_body<'a>(
             // recursively last statement in the preceding body with the matching indentation.
             handle_own_line_comment_after_branch(comment, preceding, source)
         })
-        .or_else(|comment| handle_own_line_comment_between_statements(comment, source, state))
+        .or_else(|comment| handle_own_line_comment_between_statements(comment, state))
 }
 
 /// Handles own-line comments between statements. If an own-line comment is between two statements,
@@ -708,8 +721,7 @@ fn handle_own_line_comment_around_body<'a>(
 /// ```
 fn handle_own_line_comment_between_statements<'a>(
     comment: DecoratedComment<'a>,
-    source: &str,
-    state: &mut PlacementState,
+    state: &PlacementState,
 ) -> CommentPlacement<'a> {
     let Some(preceding) = comment.preceding_node() else {
         return CommentPlacement::Default(comment);
@@ -749,11 +761,7 @@ fn handle_own_line_comment_between_statements<'a>(
     //
     // y = 2
     // ```
-    if state
-        .empty_lines
-        .max_empty_lines(comment.end(), following.start(), source)
-        == 0
-    {
+    if state.empty_lines.max_empty_lines() == 0 {
         CommentPlacement::leading(following, comment)
     } else {
         CommentPlacement::trailing(preceding, comment)
@@ -2651,19 +2659,23 @@ mod tests {
         let mut state = PrecedingScanState::default();
 
         // First comment at offset 9 — nothing between preceding_end and itself
-        assert!(!state.has_lparen(preceding_end, TextSize::new(9), source));
-        assert!(!state.has_non_trivia(preceding_end, TextSize::new(9), source));
+        state.scan(preceding_end, TextSize::new(9), source);
+        assert!(!state.has_lparen());
+        assert!(!state.has_non_trivia());
 
         // Second comment — should reuse cached result, not rescan from preceding_end
-        assert!(!state.has_lparen(preceding_end, TextSize::new(14), source));
-        assert!(!state.has_non_trivia(preceding_end, TextSize::new(14), source));
+        state.scan(preceding_end, TextSize::new(14), source);
+        assert!(!state.has_lparen());
+        assert!(!state.has_non_trivia());
 
         // Third comment
-        assert!(!state.has_lparen(preceding_end, TextSize::new(19), source));
+        state.scan(preceding_end, TextSize::new(19), source);
+        assert!(!state.has_lparen());
 
         // Different preceding_end resets the cache
         let new_preceding_end = TextSize::new(21);
-        assert!(!state.has_lparen(new_preceding_end, TextSize::new(25), source));
+        state.scan(new_preceding_end, TextSize::new(25), source);
+        assert!(!state.has_lparen());
     }
 
     #[test]
@@ -2674,9 +2686,11 @@ mod tests {
         let mut state = PrecedingScanState::default();
 
         // First comment: should find `(` between preceding and comment
-        assert!(state.has_lparen(preceding_end, TextSize::new(4), source));
+        state.scan(preceding_end, TextSize::new(4), source);
+        assert!(state.has_lparen());
         // Second comment: cached — still true
-        assert!(state.has_lparen(preceding_end, TextSize::new(9), source));
+        state.scan(preceding_end, TextSize::new(9), source);
+        assert!(state.has_lparen());
     }
 
     #[test]
@@ -2688,10 +2702,12 @@ mod tests {
         let mut state = PrecedingScanState::default();
 
         // First comment: should find `,` (non-trivia, not LParen)
-        assert!(state.has_non_trivia(preceding_end, TextSize::new(4), source));
-        assert!(!state.has_lparen(preceding_end, TextSize::new(4), source));
+        state.scan(preceding_end, TextSize::new(4), source);
+        assert!(state.has_non_trivia());
+        assert!(!state.has_lparen());
         // Second comment: cached — still true
-        assert!(state.has_non_trivia(preceding_end, TextSize::new(9), source));
+        state.scan(preceding_end, TextSize::new(9), source);
+        assert!(state.has_non_trivia());
     }
 
     #[test]
@@ -2705,9 +2721,11 @@ mod tests {
         // First comment: scan stops at `def` keyword — no LParen reported
         // (even though `(` and `)` appear after `def`, the scan stops before
         // reaching them because `def` is a stop token)
-        assert!(!state.has_lparen(preceding_end, TextSize::new(14), source));
+        state.scan(preceding_end, TextSize::new(14), source);
+        assert!(!state.has_lparen());
         // Second comment: keyword stop is cached — no rescan
-        assert!(!state.has_lparen(preceding_end, TextSize::new(19), source));
+        state.scan(preceding_end, TextSize::new(19), source);
+        assert!(!state.has_lparen());
     }
 
     #[test]
@@ -2720,10 +2738,13 @@ mod tests {
         let mut state = FollowingScanState::default();
 
         // First comment scans [4, 15), finds only trivia — no RParen
-        assert!(!state.has_rparen(TextSize::new(4), following_start, source));
+        state.scan(TextSize::new(4), following_start, source);
+        assert!(!state.has_rparen());
         // Subsequent comments hit cache
-        assert!(!state.has_rparen(TextSize::new(9), following_start, source));
-        assert!(!state.has_rparen(TextSize::new(14), following_start, source));
+        state.scan(TextSize::new(9), following_start, source);
+        assert!(!state.has_rparen());
+        state.scan(TextSize::new(14), following_start, source);
+        assert!(!state.has_rparen());
     }
 
     #[test]
@@ -2735,9 +2756,11 @@ mod tests {
         let mut state = FollowingScanState::default();
 
         // First comment: finds `)` in [4, 7)
-        assert!(state.has_rparen(TextSize::new(4), following_start, source));
+        state.scan(TextSize::new(4), following_start, source);
+        assert!(state.has_rparen());
         // Second comment starting after `)`: [6, 7) has no RParen
-        assert!(!state.has_rparen(TextSize::new(6), following_start, source));
+        state.scan(TextSize::new(6), following_start, source);
+        assert!(!state.has_rparen());
     }
 
     #[test]
@@ -2749,19 +2772,13 @@ mod tests {
         let mut state = EmptyLinesScanState::default();
 
         // First comment: scans [4, 15), no empty lines between comments
-        assert_eq!(
-            state.max_empty_lines(TextSize::new(4), following_start, source),
-            0
-        );
+        state.scan(TextSize::new(4), following_start, source);
+        assert_eq!(state.max_empty_lines(), 0);
         // Subsequent comments hit cache
-        assert_eq!(
-            state.max_empty_lines(TextSize::new(9), following_start, source),
-            0
-        );
-        assert_eq!(
-            state.max_empty_lines(TextSize::new(14), following_start, source),
-            0
-        );
+        state.scan(TextSize::new(9), following_start, source);
+        assert_eq!(state.max_empty_lines(), 0);
+        state.scan(TextSize::new(14), following_start, source);
+        assert_eq!(state.max_empty_lines(), 0);
     }
 
     #[test]
@@ -2773,11 +2790,10 @@ mod tests {
         let mut state = EmptyLinesScanState::default();
 
         // First comment [4, 11): includes blank line between c2 and apply
-        assert!(state.max_empty_lines(TextSize::new(4), following_start, source) > 0);
+        state.scan(TextSize::new(4), following_start, source);
+        assert!(state.max_empty_lines() > 0);
         // Comment starting at 10 [10, 11): just `\n`, no blank line
-        assert_eq!(
-            state.max_empty_lines(TextSize::new(10), following_start, source),
-            0
-        );
+        state.scan(TextSize::new(10), following_start, source);
+        assert_eq!(state.max_empty_lines(), 0);
     }
 }

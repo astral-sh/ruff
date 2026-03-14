@@ -541,11 +541,12 @@ pub(super) struct CommentsMapBuilder<'a> {
 
 impl<'a> PushComment<'a> for CommentsMapBuilder<'a> {
     fn push_comment(&mut self, placement: DecoratedComment<'a>) {
+        self.placement_state.update(&placement, self.source);
         let placement = place_comment(
             placement,
             self.comment_ranges,
             self.source,
-            &mut self.placement_state,
+            &self.placement_state,
         );
         match placement {
             CommentPlacement::Leading { node, comment } => {
