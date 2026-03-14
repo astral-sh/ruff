@@ -63,7 +63,7 @@ use crate::{Db, Program};
 mod except_handlers;
 mod loop_bindings_visitor;
 
-use crate::types::PossiblyNarrowedPlacesBuilder;
+use crate::types::{PossiblyNarrowedPlacesBuilder, collect_narrowed_place_keys};
 
 #[derive(Clone, Debug, Default)]
 struct Loop {
@@ -98,26 +98,8 @@ impl<'ast> ExprUseVisitor<'_, '_, 'ast> {
             return;
         };
 
-        if let Some(method_scope_id) = self.builder.is_method_or_eagerly_executed_in_method() {
-            if let PlaceExpr::Member(member) = &mut place_expr
-                && member.is_instance_attribute_candidate()
-            {
-                let accessed_object_refers_to_first_parameter = self
-                    .builder
-                    .current_first_parameter_name
-                    .is_some_and(|first| {
-                        member.symbol_name() == first
-                            && !self.builder.is_symbol_bound_in_intermediate_eager_scopes(
-                                first,
-                                method_scope_id,
-                            )
-                    });
-
-                if accessed_object_refers_to_first_parameter {
-                    member.mark_instance_attribute();
-                }
-            }
-        }
+        self.builder
+            .mark_instance_attribute_if_applicable(&mut place_expr);
 
         let place_id = self.builder.add_place(place_expr);
         if let ScopedPlaceId::Symbol(symbol_id) = place_id {
@@ -376,6 +358,21 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
 
         false
+    }
+
+    /// If `place_expr` is a member access on the first parameter of a method (e.g. `self.x`),
+    /// mark it as an instance attribute.
+    fn mark_instance_attribute_if_applicable(&self, place_expr: &mut PlaceExpr) {
+        if let Some(method_scope_id) = self.is_method_or_eagerly_executed_in_method()
+            && let PlaceExpr::Member(member) = place_expr
+            && member.is_instance_attribute_candidate()
+            && self.current_first_parameter_name.is_some_and(|first| {
+                member.symbol_name() == first
+                    && !self.is_symbol_bound_in_intermediate_eager_scopes(first, method_scope_id)
+            })
+        {
+            member.mark_instance_attribute();
+        }
     }
 
     /// Push a new loop, returning the outer loop, if any.
@@ -770,24 +767,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         let place_table = &self.place_tables[alias.scope];
         let narrowed_places =
             PossiblyNarrowedPlacesBuilder::new(self.db, place_table).expression(alias.expression);
-        let mut guard_places = Vec::new();
-
-        for place_id in narrowed_places {
-            let place_expr = place_table.place(place_id);
-            let place_key = PlaceKey::from(place_expr);
-            if !guard_places.contains(&place_key) {
-                guard_places.push(place_key);
-            }
-
-            for parent_id in place_table.parents(place_expr) {
-                let parent_key = PlaceKey::from(place_table.place(parent_id));
-                if !guard_places.contains(&parent_key) {
-                    guard_places.push(parent_key);
-                }
-            }
-        }
-
-        guard_places
+        collect_narrowed_place_keys(place_table, &narrowed_places)
     }
 
     fn can_register_narrowing_alias(value: &ast::Expr) -> bool {
@@ -3225,28 +3205,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
             | ast::Expr::Attribute(ast::ExprAttribute { ctx, .. })
             | ast::Expr::Subscript(ast::ExprSubscript { ctx, .. }) => {
                 if let Some(mut place_expr) = PlaceExpr::try_from_expr(expr) {
-                    if let Some(method_scope_id) = self.is_method_or_eagerly_executed_in_method() {
-                        if let PlaceExpr::Member(member) = &mut place_expr {
-                            if member.is_instance_attribute_candidate() {
-                                // We specifically mark attribute assignments to the first parameter of a method,
-                                // i.e. typically `self` or `cls`.
-                                // However, we must check that the symbol hasn't been shadowed by an intermediate
-                                // scope (e.g., a comprehension variable: `for self in [...]`).
-                                let accessed_object_refers_to_first_parameter =
-                                    self.current_first_parameter_name.is_some_and(|first| {
-                                        member.symbol_name() == first
-                                            && !self.is_symbol_bound_in_intermediate_eager_scopes(
-                                                first,
-                                                method_scope_id,
-                                            )
-                                    });
-
-                                if accessed_object_refers_to_first_parameter {
-                                    member.mark_instance_attribute();
-                                }
-                            }
-                        }
-                    }
+                    self.mark_instance_attribute_if_applicable(&mut place_expr);
 
                     let (is_use, is_definition) = match (ctx, self.current_assignment()) {
                         (ast::ExprContext::Store, Some(CurrentAssignment::AugAssign(_))) => {
