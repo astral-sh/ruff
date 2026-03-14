@@ -100,13 +100,12 @@ use crate::types::typed_dict::{validate_typed_dict_constructor, validate_typed_d
 use crate::types::typevar::{BoundTypeVarIdentity, TypeVarConstraints, TypeVarIdentity};
 use crate::types::{
     CallDunderError, CallableBinding, CallableType, ClassType, DynamicType, EvaluationMode,
-    InferenceFlags, InternedConstraintSet, InternedType, IntersectionBuilder, IntersectionType,
-    KnownClass, KnownInstanceType, KnownUnion, LiteralValueTypeKind, MemberLookupPolicy,
-    ParamSpecAttrKind, Parameter, ParameterForm, Parameters, Signature, SpecialFormType,
-    SubclassOfType, Truthiness, Type, TypeAliasType, TypeAndQualifiers, TypeContext,
-    TypeQualifiers, TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, TypedDictType,
-    UnionBuilder, UnionType, binding_type, definition_expression_type, infer_complete_scope_types,
-    infer_scope_types, todo_type,
+    InferenceFlags, InternedConstraintSet, InternedType, IntersectionBuilder, KnownClass,
+    KnownInstanceType, KnownUnion, LiteralValueTypeKind, MemberLookupPolicy, ParamSpecAttrKind,
+    Parameter, ParameterForm, Parameters, Signature, SpecialFormType, SubclassOfType, Truthiness,
+    Type, TypeAliasType, TypeAndQualifiers, TypeContext, TypeQualifiers, TypeVarBoundOrConstraints,
+    TypeVarKind, TypeVarVariance, TypedDictType, UnionBuilder, UnionType, binding_type,
+    definition_expression_type, infer_complete_scope_types, infer_scope_types, todo_type,
 };
 use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
 use crate::unpack::UnpackPosition;
@@ -4370,27 +4369,27 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     TypeContext::default(),
                 );
 
-                let [Some(value_ty)] = call_arguments.types() else {
-                    unreachable!();
-                };
-
                 match call {
                     Ok(outcome) => outcome.return_type(db),
                     Err(CallDunderError::MethodNotAvailable) => {
                         let value_ty = infer_value_ty(self, TypeContext::default());
                         binary_return_ty(self, value_ty)
                     }
-                    Err(CallDunderError::PossiblyUnbound(outcome)) => UnionType::from_two_elements(
-                        db,
-                        outcome.return_type(db),
-                        binary_return_ty(self, *value_ty),
-                    ),
+                    Err(CallDunderError::PossiblyUnbound(outcome)) => {
+                        let value_ty = outcome.type_for_argument(&call_arguments, 0);
+                        UnionType::from_two_elements(
+                            db,
+                            outcome.return_type(db),
+                            binary_return_ty(self, value_ty),
+                        )
+                    }
                     Err(CallDunderError::CallError(_, bindings)) => {
+                        let value_ty = bindings.type_for_argument(&call_arguments, 0);
                         report_unsupported_augmented_assignment(
                             &self.context,
                             assignment,
                             target_type,
-                            *value_ty,
+                            value_ty,
                         );
                         bindings.return_type(db)
                     }
@@ -4889,7 +4888,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ast_arguments.arguments_source_order()
         );
 
-        for ((_, argument_type), argument_form, ast_argument) in iter {
+        for ((_, argument_types), argument_form, ast_argument) in iter {
             let argument = match ast_argument {
                 // Splatted arguments are inferred before parameter matching to
                 // determine their length.
@@ -4901,7 +4900,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             };
 
             let ty = self.infer_argument_type(argument, argument_form, TypeContext::default());
-            *argument_type = Some(ty);
+            argument_types.insert(TypeContext::default(), ty);
         }
     }
 
@@ -5076,12 +5075,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// Note that this method may infer the type of a given argument expression multiple times with
     /// distinct type context. The provided `MultiInferenceState` can be used to dictate multi-inference
     /// behavior.
-    fn infer_all_argument_types(
+    fn infer_all_argument_types<'bindings>(
         &mut self,
         ast_arguments: ArgumentsIter<'_>,
         arguments_types: &mut CallArguments<'_, 'db>,
         infer_argument_ty: &mut dyn FnMut(&mut Self, ArgExpr<'db, '_>) -> Type<'db>,
-        bindings: &Bindings<'db>,
+        bindings: &'bindings Bindings<'db>,
         call_expression_tcx: TypeContext<'db>,
     ) {
         debug_assert_eq!(arguments_types.len(), bindings.argument_forms().len());
@@ -5118,14 +5117,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .flatten()
             .collect::<Vec<_>>();
 
-        // Each type is a valid independent inference of the given argument, and we may require
-        // different permutations of argument types to correctly perform argument expansion during
-        // overload evaluation, so we take the intersection of all the types we inferred for each
-        // argument.
-        let old_multi_inference_state =
-            self.set_multi_inference_state(MultiInferenceState::Intersect);
-
-        for (argument_index, (_, argument_type), argument_form, ast_argument) in iter {
+        for (argument_index, (_, argument_types), argument_form, ast_argument) in iter {
             let ast_argument = match ast_argument {
                 // Splatted arguments are inferred before parameter matching to
                 // determine their length.
@@ -5140,12 +5132,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // Type-form arguments are inferred without type context, so we can infer the argument type directly.
             if let Some(ParameterForm::Type) = argument_form {
-                *argument_type = Some(self.infer_type_expression(ast_argument));
+                argument_types.insert(
+                    TypeContext::default(),
+                    self.infer_type_expression(ast_argument),
+                );
+
                 continue;
             }
 
-            // Retrieve the parameter type for the current argument in a given overload and its binding.
-            let parameter_type = |overload: &Binding<'db>, binding: &CallableBinding<'db>| {
+            // Retrieve the parameter type context for the current argument in a given overload and its binding.
+            let parameter_tcx = |overload: &'bindings Binding<'db>,
+                                 binding: &CallableBinding<'db>| {
                 let argument_index = if binding.bound_type.is_some() {
                     argument_index + 1
                 } else {
@@ -5157,8 +5154,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     return None;
                 };
 
-                let mut parameter_type =
-                    overload.signature.parameters()[*parameter_index].annotated_type();
+                let parameter = &overload.signature.parameters()[*parameter_index];
+                let mut parameter_type = parameter.annotated_type();
 
                 // If the parameter is a single type variable with an upper bound, e.g., `typing.Self`,
                 // use the upper bound as type context.
@@ -5166,7 +5163,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     && let Some(TypeVarBoundOrConstraints::UpperBound(bound)) =
                         typevar.typevar(db).bound_or_constraints(db)
                 {
-                    return Some(bound);
+                    return Some((parameter, TypeContext::new(Some(bound))));
                 }
 
                 // If this is a generic call, attempt to specialize the parameter type using the
@@ -5203,67 +5200,63 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     parameter_type = parameter_type.apply_specialization(db, specialization);
                 }
 
-                Some(parameter_type)
+                Some((parameter, TypeContext::new(Some(parameter_type))))
             };
 
             // If there is only a single binding and overload, we can infer the argument directly with
             // the unique parameter type annotation.
             if let Ok((overload, binding)) = overloads_with_binding.iter().exactly_one() {
-                let tcx = TypeContext::new(parameter_type(overload, binding));
-                *argument_type = Some(infer_argument_ty(self, (argument_index, ast_argument, tcx)));
+                if let Some((parameter, parameter_tcx)) = parameter_tcx(overload, binding) {
+                    argument_types.insert(
+                        parameter.annotated_type(),
+                        infer_argument_ty(self, (argument_index, ast_argument, parameter_tcx)),
+                    );
+                } else {
+                    argument_types.insert(
+                        TypeContext::default(),
+                        infer_argument_ty(
+                            self,
+                            (argument_index, ast_argument, TypeContext::default()),
+                        ),
+                    );
+                }
             } else {
                 // We perform inference once without any type context, emitting any diagnostics that are unrelated
                 // to bidirectional type inference.
-                *argument_type = Some(infer_argument_ty(
-                    self,
-                    (argument_index, ast_argument, TypeContext::default()),
-                ));
+                argument_types.insert(
+                    TypeContext::default(),
+                    infer_argument_ty(self, (argument_index, ast_argument, TypeContext::default())),
+                );
 
                 // We then silence any diagnostics emitted during multi-inference, as the type context is only
                 // used as a hint to infer a more assignable argument type, and should not lead to diagnostics
                 // for non-matching overloads.
                 let was_in_multi_inference = self.context.set_multi_inference(true);
+                let prev_multi_inference_state =
+                    self.set_multi_inference_state(MultiInferenceState::Ignore);
 
                 // Infer the type of each argument once with each distinct parameter type as type context.
                 let parameter_types = overloads_with_binding
                     .iter()
-                    .filter_map(|(overload, binding)| parameter_type(overload, binding));
+                    .filter_map(|(overload, binding)| parameter_tcx(overload, binding));
 
                 let mut seen = FxHashSet::default();
 
-                for parameter_type in parameter_types {
-                    if !seen.insert(parameter_type) {
+                for (parameter, parameter_tcx) in parameter_types {
+                    if !seen.insert(parameter.annotated_type()) {
                         continue;
                     }
 
-                    let tcx = TypeContext::new(Some(parameter_type));
-                    let inferred_ty = infer_argument_ty(self, (argument_index, ast_argument, tcx));
-
-                    // Ensure the inferred type is assignable to the declared type.
-                    //
-                    // If not, we want to avoid storing the "failed" inference attempt.
-                    if !inferred_ty.is_assignable_to(db, parameter_type) {
-                        continue;
-                    }
-
-                    // TODO: Intersecting the inferred argument types is correct for unions of
-                    // callables, since the argument must satisfy each callable, but it's not clear
-                    // that it's correct for an intersection of callables, or for a case where
-                    // different overloads provide different type context; unioning may be more
-                    // correct in those cases.
-                    *argument_type = argument_type
-                        .map(|current| {
-                            IntersectionType::from_two_elements(db, inferred_ty, current)
-                        })
-                        .or(Some(inferred_ty));
+                    let inferred_ty =
+                        infer_argument_ty(self, (argument_index, ast_argument, parameter_tcx));
+                    argument_types.insert(parameter.annotated_type(), inferred_ty);
                 }
 
                 // Re-enable diagnostics.
                 self.context.set_multi_inference(was_in_multi_inference);
+                self.set_multi_inference_state(prev_multi_inference_state);
             }
         }
-
-        self.set_multi_inference_state(old_multi_inference_state);
     }
 
     fn infer_argument_type(
@@ -5422,29 +5415,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ty = Type::LiteralValue(literal.to_unpromotable());
         }
 
-        self.store_expression_type_impl(expression, ty, tcx);
+        self.store_expression_type(expression, ty);
 
         ty
     }
 
     #[track_caller]
     fn store_expression_type(&mut self, expression: &ast::Expr, ty: Type<'db>) {
-        self.store_expression_type_impl(expression, ty, TypeContext::default());
-    }
-
-    #[track_caller]
-    fn store_expression_type_impl(
-        &mut self,
-        expression: &ast::Expr,
-        ty: Type<'db>,
-        tcx: TypeContext<'db>,
-    ) {
         if self.inner_expression_inference_state.is_get() {
             // If `inner_expression_inference_state` is `Get`, the expression type has already been stored.
             return;
         }
-
-        let db = self.db();
 
         match self.multi_inference_state {
             MultiInferenceState::Ignore => {}
@@ -5452,22 +5433,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             MultiInferenceState::Panic => {
                 let previous = self.expressions.insert(expression.into(), ty);
                 assert_eq!(previous, None);
-            }
-
-            MultiInferenceState::Intersect => {
-                self.expressions
-                    .entry(expression.into())
-                    .and_modify(|current| {
-                        // Avoid storing "failed" multi-inference attempts, which can lead to
-                        // unnecessary union simplification overhead.
-                        if tcx
-                            .annotation
-                            .is_none_or(|tcx| ty.is_assignable_to(db, tcx))
-                        {
-                            *current = IntersectionType::from_two_elements(db, *current, ty);
-                        }
-                    })
-                    .or_insert(ty);
             }
         }
     }
@@ -5815,52 +5780,41 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     return ty;
                 }
             } else if let Type::Union(tcx) = tcx {
-                // Otherwise, disable diagnostics as we attempt to narrow to specific elements of the union.
+                // Otherwise, we have to narrow to specific elements of the union.
+                //
+                // Infer all expressions with diagnostics enabled before starting multi-inference.
+                for item in items {
+                    self.infer_optional_expression(item.key.as_ref(), TypeContext::default());
+                    self.infer_expression(&item.value, TypeContext::default());
+                }
+
+                // Disable diagnostics as we attempt to narrow to specific elements of the union.
                 let old_multi_inference = self.context.set_multi_inference(true);
                 let old_multi_inference_state =
                     self.set_multi_inference_state(MultiInferenceState::Ignore);
 
-                let mut narrowed_typed_dicts = Vec::new();
+                let mut narrowed_tys = Vec::new();
                 for element in tcx.elements(self.db()) {
                     let typed_dict = element
                         .as_typed_dict()
                         .expect("filtered out non-typed-dict types above");
 
-                    if self
-                        .infer_typed_dict_expression(dict, typed_dict, &mut item_types)
-                        .is_some()
+                    if let Some(inferred_ty) =
+                        self.infer_typed_dict_expression(dict, typed_dict, &mut item_types)
                     {
-                        narrowed_typed_dicts.push(typed_dict);
+                        narrowed_tys.push(inferred_ty);
                     }
 
                     item_types.clear();
                 }
 
-                if !narrowed_typed_dicts.is_empty() {
-                    // Now that we know which typed dict annotations are valid, re-infer with diagnostics enabled,
-                    self.context.set_multi_inference(old_multi_inference);
-
-                    // We may have to infer the same expression multiple times with distinct type context,
-                    // so we take the intersection of all valid inferences for a given expression.
-                    self.set_multi_inference_state(MultiInferenceState::Intersect);
-
-                    let mut narrowed_tys = Vec::new();
-                    for typed_dict in narrowed_typed_dicts {
-                        let mut item_types = FxHashMap::default();
-
-                        let ty = self
-                            .infer_typed_dict_expression(dict, typed_dict, &mut item_types)
-                            .expect("ensured the typed dict is valid above");
-
-                        narrowed_tys.push(ty);
-                    }
-
-                    self.set_multi_inference_state(old_multi_inference_state);
-                    return UnionType::from_elements(self.db(), narrowed_tys);
-                }
-
                 self.context.set_multi_inference(old_multi_inference);
                 self.set_multi_inference_state(old_multi_inference_state);
+
+                // Successfully narrowed to a subset of typed dicts.
+                if !narrowed_tys.is_empty() {
+                    return UnionType::from_elements(self.db(), narrowed_tys);
+                }
             }
         }
 
@@ -5880,9 +5834,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // dictionary literal as a `TypedDict`. This also allows us to infer using the
         // type context of the expected `TypedDict` field.
         let mut infer_elt_ty = |builder: &mut Self, (_, elt, tcx): ArgExpr<'db, '_>| {
-            item_types
-                .get(&elt.node_index().load())
-                .copied()
+            builder
+                .try_expression_type(elt)
                 .unwrap_or_else(|| builder.infer_expression(elt, tcx))
         };
 
@@ -9012,9 +8965,6 @@ enum MultiInferenceState {
 
     /// Ignore the newly inferred value.
     Ignore,
-
-    /// Store the intersection of all types inferred for the expression.
-    Intersect,
 }
 
 impl MultiInferenceState {
