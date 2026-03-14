@@ -2734,7 +2734,7 @@ fn nested_implicit_namespace_package() -> Result<()> {
     exit_code: 1
     ----- stdout -----
     foo/bar/baz/__init__.py:1:1: error[INP001] File `foo/bar/baz/__init__.py` declares a package, but is nested under an implicit namespace package. Add an `__init__.py` to `foo/bar`.
-    Found 1 error.
+    Found 1 diagnostic.
 
     ----- stderr -----
     "###);
@@ -3021,7 +3021,7 @@ d: Literal[None,] | Literal[None]
         .arg("--preview")
         .arg("--diff")
         .arg("-")
-        .pass_stdin(snippet), @"
+        .pass_stdin(snippet), @r###"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -3042,8 +3042,8 @@ d: Literal[None,] | Literal[None]
 
 
     ----- stderr -----
-    Would fix 4 errors.
-    ");
+    Would fix 4 diagnostics.
+    "###);
 }
 
 /// Test that private, old-style `TypeVar` generics
@@ -3075,7 +3075,7 @@ def func(t: _T) -> _T:
     return x
 "#
         ),
-        @"
+        @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -3089,8 +3089,8 @@ def func(t: _T) -> _T:
         return x
 
     ----- stderr -----
-    Found 7 errors (7 fixed, 0 remaining).
-    "
+    Found 7 diagnostics (7 fixed, 0 remaining).
+    "###
     );
 }
 
@@ -3124,7 +3124,7 @@ class Foo[_T, __T]:
 
     ----- stderr -----
     test.py:2:14: error[UP049] Generic class uses private type parameters
-    Found 2 errors (1 fixed, 1 remaining).
+    Found 2 diagnostics (1 fixed, 1 remaining).
     "###
     );
 }
@@ -3270,7 +3270,7 @@ class A(Generic[T]):
     exit_code: 1
     ----- stdout -----
     test.py:6:9: error[UP046] Generic class `A` uses `Generic` subclass instead of type parameters
-    Found 1 error.
+    Found 1 diagnostic.
     No fixes available (1 hidden fix can be enabled with the `--unsafe-fixes` option).
 
     ----- stderr -----
@@ -3412,7 +3412,7 @@ match 2:
     exit_code: 1
     ----- stdout -----
     test.py:2:1: error[invalid-syntax] Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)
-    Found 1 error.
+    Found 1 diagnostic.
 
     ----- stderr -----
     "###
@@ -3591,7 +3591,7 @@ fn semantic_syntax_errors() -> Result<()> {
     exit_code: 1
     ----- stdout -----
     -:1:3: error[invalid-syntax] assignment expression cannot rebind comprehension variable
-    Found 1 error.
+    Found 1 diagnostic.
 
     ----- stderr -----
     "###
@@ -3756,7 +3756,7 @@ fn show_fixes_in_full_output_with_preview_enabled() {
     help: Remove unused import: `math`
       - import math
 
-    Found 1 error.
+    Found 1 diagnostic.
     [*] 1 fixable with the `--fix` option.
 
     ----- stderr -----
@@ -3785,7 +3785,7 @@ fn rule_panic_mixed_results_concise() -> Result<()> {
     normal.py:1:1: error[RUF911] Hey this is a preview test rule.
     normal.py:1:1: error[RUF950] Hey this is a test rule that was redirected from another.
     panic.py: fatal[panic] Panicked at <location> when checking `[TMP]/panic.py`: `This is a fake panic for testing.`
-    Found 7 errors.
+    Found 7 diagnostics.
     [*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
 
     ----- stderr -----
@@ -3839,7 +3839,7 @@ fn rule_panic_mixed_results_full() -> Result<()> {
     info: If you could open an issue at https://github.com/astral-sh/ruff/issues/new?title=%5Bpanic%5D, we'd be very appreciative!
     info: run with `RUST_BACKTRACE=1` environment variable to show the full backtrace information
 
-    Found 7 errors.
+    Found 7 diagnostics.
     [*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
 
     ----- stderr -----
@@ -4006,7 +4006,7 @@ fn supported_file_extensions_preview_enabled() -> Result<()> {
     src/thing.py:1:8: error[F401] [*] `os` imported but unused
     src/thing.pyi:1:8: error[F401] [*] `os` imported but unused
     src/thing.pyw:1:8: error[F401] [*] `os` imported but unused
-    Found 4 errors.
+    Found 4 diagnostics.
     [*] 4 fixable with the `--fix` option.
 
     ----- stderr -----
@@ -4462,7 +4462,7 @@ warn = ["F401"]
     exit_code: 0
     ----- stdout -----
     try.py:1:8: warning[F401] [*] `os` imported but unused
-    Found 1 error.
+    Found 1 diagnostic.
     [*] 1 fixable with the `--fix` option.
 
     ----- stderr -----
@@ -4499,7 +4499,7 @@ warn = ["F401"]
     exit_code: 0
     ----- stdout -----
     try.py:1:8: warning[F401] [*] `os` imported but unused
-    Found 1 error.
+    Found 1 diagnostic.
     [*] 1 fixable with the `--fix` option.
 
     ----- stderr -----
@@ -4554,7 +4554,7 @@ warn = ["F401"]
     exit_code: 0
     ----- stdout -----
     try.py:1:8: warning[F401] [*] `os` imported but unused
-    Found 1 error.
+    Found 1 diagnostic.
     [*] 1 fixable with the `--fix` option.
 
     ----- stderr -----
@@ -4583,7 +4583,7 @@ select = ["F401"]
     exit_code: 1
     ----- stdout -----
     try.py:1:8: error[F401] [*] `os` imported but unused
-    Found 1 error.
+    Found 1 diagnostic.
     [*] 1 fixable with the `--fix` option.
 
     ----- stderr -----
@@ -4647,7 +4647,7 @@ warn = ["F401"]
     ----- stdout -----
     try.py:1:8: warning[F401] [*] `os` imported but unused
     try.py:1:22: error[F811] Redefinition of unused `foo` from line 1: `foo` redefined here
-    Found 2 errors.
+    Found 2 diagnostics.
     [*] 1 fixable with the `--fix` option.
 
     ----- stderr -----
@@ -4684,7 +4684,7 @@ select = ["F401"]
     ----- stdout -----
     try.py:1:8: error[F401] [*] `os` imported but unused
     try.py:1:22: warning[F811] Redefinition of unused `foo` from line 1: `foo` redefined here
-    Found 2 errors.
+    Found 2 diagnostics.
     [*] 1 fixable with the `--fix` option.
 
     ----- stderr -----
@@ -4754,7 +4754,7 @@ warn = ["F401"]
     exit_code: 0
     ----- stdout -----
     try.py:1:8: warning[F401] [*] `os` imported but unused
-    Found 1 error.
+    Found 1 diagnostic.
     [*] 1 fixable with the `--fix` option.
 
     ----- stderr -----
