@@ -439,7 +439,7 @@ In order to preserve the gradual guarantee, we intersect with the type of the se
 type of the second argument is a dynamic type:
 
 ```py
-from typing import Any
+from typing import Any, TypedDict
 from something_unresolvable import SomethingUnknown  # error: [unresolved-import]
 
 class Foo: ...
@@ -450,6 +450,13 @@ def f(a: Foo, b: Any):
 
     if isinstance(a, b):
         reveal_type(a)  # revealed: Foo & Any
+
+class Bar(TypedDict):
+    status: str
+
+def g(a: Bar | int):
+    if isinstance(a, SomethingUnknown):
+        reveal_type(a)  # revealed: (Bar & Unknown) | (int & Unknown)
 ```
 
 ## Narrowing if an object with an intersection/union/TypeVar type is used as the second argument
@@ -787,6 +794,20 @@ def narrow_dict_or_typeddict(x: dict[str, str] | A) -> None:
         reveal_type(x)  # revealed: dict[str, str] | A
     else:
         reveal_type(x)  # revealed: Never
+
+class Package:
+    ecosystem: str
+
+class Vulnerability:
+    package: Package
+    patched_versions: str | None
+
+def narrow_typeddict_or_class(value: A | Vulnerability) -> None:
+    if isinstance(value, dict):
+        pass
+    else:
+        reveal_type(value)  # revealed: Vulnerability & ~Top[dict[Unknown, Unknown]]
+        reveal_type(value.package.ecosystem)  # revealed: str
 ```
 
 `dict` methods should also remain callable on the narrowed value, even when the original type only
