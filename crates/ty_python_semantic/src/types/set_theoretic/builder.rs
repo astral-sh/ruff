@@ -950,7 +950,8 @@ impl<'db> IntersectionBuilder<'db> {
                 self
             }
             Type::NominalInstance(instance)
-                if enum_metadata(self.db, instance.class_literal(self.db)).is_some() =>
+                if enum_metadata(self.db, instance.class_literal(self.db))
+                    .is_some_and(|metadata| !metadata.is_flag_subclass) =>
             {
                 let mut contains_enum_literal_as_negative_element = false;
                 for intersection in &self.intersections {
@@ -1065,6 +1066,20 @@ impl<'db> IntersectionBuilder<'db> {
             }
             Type::LiteralValue(literal) => match literal.kind() {
                 LiteralValueTypeKind::Enum(enum_literal) => {
+                    let enum_class = enum_literal.enum_class(self.db);
+
+                    // Flag enums should not be treated as closed sets of their members; there
+                    // may be combinations that aren't expressible as individual literals. For
+                    // those classes, just fall back to the generic negative logic instead of
+                    // partitioning / expanding.
+                    if enum_metadata(self.db, enum_class)
+                        .is_some_and(|metadata| metadata.is_flag_subclass)
+                    {
+                        // For flag enums, do not restrict on negative literal values; any combination
+                        // of flags is still a valid member of the class.
+                        return self;
+                    }
+
                     let enum_instance = enum_literal.enum_class_instance(self.db);
 
                     // Partition intersections into those that contain the enum instance and those that don't.
