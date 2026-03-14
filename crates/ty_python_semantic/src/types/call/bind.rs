@@ -83,6 +83,16 @@ struct BindingsElement<'db> {
     bindings: SmallVec<[CallableBinding<'db>; 1]>,
 }
 
+type ConstructorGroupBindings<'a, 'db> = SmallVec<[&'a CallableBinding<'db>; 1]>;
+type ConstructorGroupReturnTypes<'db> = SmallVec<[Type<'db>; 1]>;
+type ConstructorGroups<'a, 'db> = FxOrderMap<
+    Type<'db>,
+    (
+        ConstructorGroupBindings<'a, 'db>,
+        ConstructorGroupReturnTypes<'db>,
+    ),
+>;
+
 impl<'db> BindingsElement<'db> {
     /// Returns the constructor instance type shared by all bindings in this element, if any.
     fn constructor_instance_type(&self) -> Option<Type<'db>> {
@@ -621,19 +631,10 @@ impl<'db> Bindings<'db> {
         // Nested unions of constructor types flatten each class's `__new__` / `__init__`
         // bindings into separate outer elements. Re-group them by constructed instance type so
         // each constructor can merge its inferred specializations before we union the results.
-        let mut constructor_groups: FxOrderMap<Type<'db>, SmallVec<[&CallableBinding<'db>; 1]>> =
-            FxOrderMap::default();
+        let mut constructor_groups: ConstructorGroups<'_, 'db> = FxOrderMap::default();
         let mut element_return_types = Vec::with_capacity(self.elements.len());
 
         for element in &self.elements {
-            if let Some(constructor_instance_type) = element.constructor_instance_type() {
-                constructor_groups
-                    .entry(constructor_instance_type)
-                    .or_default()
-                    .extend(element.bindings.iter());
-                continue;
-            }
-
             let element_return_type = if let [single_binding] = &*element.bindings {
                 single_binding.return_type()
             } else {
@@ -643,14 +644,30 @@ impl<'db> Bindings<'db> {
                     element.bindings.iter().map(CallableBinding::return_type),
                 )
             };
+
+            if let Some(constructor_instance_type) = element.constructor_instance_type() {
+                let (grouped_bindings, grouped_return_types) = constructor_groups
+                    .entry(constructor_instance_type)
+                    .or_default();
+                grouped_bindings.extend(element.bindings.iter());
+                grouped_return_types.push(element_return_type);
+                continue;
+            }
+
             element_return_types.push(element_return_type);
         }
 
-        element_return_types.extend(constructor_groups.into_iter().map(
-            |(constructor_instance_type, bindings)| {
-                Self::combine_constructor_return_type(db, constructor_instance_type, bindings)
-            },
-        ));
+        for (constructor_instance_type, (bindings, grouped_return_types)) in constructor_groups {
+            if grouped_return_types.len() > 1 {
+                element_return_types.push(Self::combine_constructor_return_type(
+                    db,
+                    constructor_instance_type,
+                    bindings,
+                ));
+            } else {
+                element_return_types.extend(grouped_return_types);
+            }
+        }
 
         // Union the return types of all elements
         UnionType::from_elements(db, element_return_types)
