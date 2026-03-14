@@ -150,13 +150,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         builder.typevar_binding_context,
                         builder.inference_flags,
                     )
-                    .unwrap_or_else(|error| {
-                        error.into_fallback_type(
-                            &builder.context,
-                            annotation,
-                            builder.is_reachable(annotation),
-                        )
-                    });
+                    .unwrap_or_else(|error| error.into_fallback_type(&builder.context, annotation));
                 let result_ty = builder.check_for_unbound_type_variable(annotation, result_ty);
                 TypeAndQualifiers::declared(result_ty)
             })

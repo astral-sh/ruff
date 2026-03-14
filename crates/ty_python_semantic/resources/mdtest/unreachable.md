@@ -331,20 +331,22 @@ def _(flag: bool):
             ExceptionGroup  # no error here
 ```
 
-The same works for ternary expressions:
+This does not currently extend into ternary-expression arms, because the surrounding assignment
+statement is still considered reachable:
 
 ```py
 class ExceptionGroupPolyfill: ...
 
-MyExceptionGroup1 = ExceptionGroup if sys.version_info >= (3, 11) else ExceptionGroupPolyfill
-MyExceptionGroup1 = ExceptionGroupPolyfill if sys.version_info < (3, 11) else ExceptionGroup
+MyExceptionGroup1 = ExceptionGroup if sys.version_info >= (3, 11) else ExceptionGroupPolyfill  # error: [unresolved-reference]
+MyExceptionGroup1 = ExceptionGroupPolyfill if sys.version_info < (3, 11) else ExceptionGroup  # error: [unresolved-reference]
 ```
 
-Due to short-circuiting, this also works for Boolean operators:
+Similarly, Boolean operators still report errors from unreachable operands if the enclosing
+statement itself is reachable:
 
 ```py
-sys.version_info >= (3, 11) and ExceptionGroup
-sys.version_info < (3, 11) or ExceptionGroup
+sys.version_info >= (3, 11) and ExceptionGroup  # error: [unresolved-reference]
+sys.version_info < (3, 11) or ExceptionGroup  # error: [unresolved-reference]
 ```
 
 And in `match` statements:
@@ -508,19 +510,19 @@ def _():
     class Sub(C): ...
 ```
 
-### Emit diagnostics for definitely wrong code
+### No diagnostics for unreachable statements
 
-Even though the expressions in the snippet below are unreachable, we still emit diagnostics for
-them:
+With statement-level reachability suppression, diagnostics are silenced uniformly for statements
+that are known to be unreachable, even if the expression itself is obviously wrong:
 
 ```py
 if False:
-    1 + "a"  # error: [unsupported-operator]
+    1 + "a"
 
 def f():
     return
 
-    1 / 0  # error: [division-by-zero]
+    1 / 0
 ```
 
 ### Conflicting type information

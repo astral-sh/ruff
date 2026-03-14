@@ -6518,24 +6518,17 @@ pub struct InvalidTypeExpressionError<'db> {
 }
 
 impl<'db> InvalidTypeExpressionError<'db> {
-    fn into_fallback_type(
-        self,
-        context: &InferContext,
-        node: &impl Ranged,
-        is_reachable: bool,
-    ) -> Type<'db> {
+    fn into_fallback_type(self, context: &InferContext, node: &impl Ranged) -> Type<'db> {
         let InvalidTypeExpressionError {
             fallback_type,
             invalid_expressions,
         } = self;
-        if is_reachable {
-            for error in invalid_expressions {
-                let Some(builder) = context.report_lint(&INVALID_TYPE_FORM, node) else {
-                    continue;
-                };
-                let diagnostic = builder.into_diagnostic(error.reason(context.db()));
-                error.add_subdiagnostics(context.db(), diagnostic, node);
-            }
+        for error in invalid_expressions {
+            let Some(builder) = context.report_lint(&INVALID_TYPE_FORM, node) else {
+                continue;
+            };
+            let diagnostic = builder.into_diagnostic(error.reason(context.db()));
+            error.add_subdiagnostics(context.db(), diagnostic, node);
         }
         fallback_type
     }

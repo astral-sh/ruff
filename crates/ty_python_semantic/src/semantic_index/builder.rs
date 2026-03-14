@@ -1615,6 +1615,49 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.semantic_checker = checker;
     }
 
+    fn record_statement_reachability(&mut self, stmt: &'ast ast::Stmt) {
+        let use_def = self.current_use_def_map_mut();
+        match stmt {
+            ast::Stmt::FunctionDef(node) => {
+                use_def.record_node_reachability(NodeKey::from_node(node))
+            }
+            ast::Stmt::ClassDef(node) => use_def.record_node_reachability(NodeKey::from_node(node)),
+            ast::Stmt::Return(node) => use_def.record_node_reachability(NodeKey::from_node(node)),
+            ast::Stmt::Delete(node) => use_def.record_node_reachability(NodeKey::from_node(node)),
+            ast::Stmt::TypeAlias(node) => {
+                use_def.record_node_reachability(NodeKey::from_node(node))
+            }
+            ast::Stmt::Assign(node) => use_def.record_node_reachability(NodeKey::from_node(node)),
+            ast::Stmt::AnnAssign(node) => {
+                use_def.record_node_reachability(NodeKey::from_node(node))
+            }
+            ast::Stmt::AugAssign(node) => {
+                use_def.record_node_reachability(NodeKey::from_node(node))
+            }
+            ast::Stmt::For(node) => use_def.record_node_reachability(NodeKey::from_node(node)),
+            ast::Stmt::While(node) => use_def.record_node_reachability(NodeKey::from_node(node)),
+            ast::Stmt::If(node) => use_def.record_node_reachability(NodeKey::from_node(node)),
+            ast::Stmt::With(node) => use_def.record_node_reachability(NodeKey::from_node(node)),
+            ast::Stmt::Match(node) => use_def.record_node_reachability(NodeKey::from_node(node)),
+            ast::Stmt::Raise(node) => use_def.record_node_reachability(NodeKey::from_node(node)),
+            ast::Stmt::Try(node) => use_def.record_node_reachability(NodeKey::from_node(node)),
+            ast::Stmt::Assert(node) => use_def.record_node_reachability(NodeKey::from_node(node)),
+            ast::Stmt::Import(node) => use_def.record_node_reachability(NodeKey::from_node(node)),
+            ast::Stmt::ImportFrom(node) => {
+                use_def.record_node_reachability(NodeKey::from_node(node))
+            }
+            ast::Stmt::Global(node) => use_def.record_node_reachability(NodeKey::from_node(node)),
+            ast::Stmt::Nonlocal(node) => use_def.record_node_reachability(NodeKey::from_node(node)),
+            ast::Stmt::Expr(node) => use_def.record_node_reachability(NodeKey::from_node(node)),
+            ast::Stmt::Pass(node) => use_def.record_node_reachability(NodeKey::from_node(node)),
+            ast::Stmt::Break(node) => use_def.record_node_reachability(NodeKey::from_node(node)),
+            ast::Stmt::Continue(node) => use_def.record_node_reachability(NodeKey::from_node(node)),
+            ast::Stmt::IpyEscapeCommand(node) => {
+                use_def.record_node_reachability(NodeKey::from_node(node))
+            }
+        }
+    }
+
     fn source_text(&self) -> &SourceText {
         self.source_text
             .get_or_init(|| source_text(self.db, self.file))
@@ -1624,6 +1667,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
     fn visit_stmt(&mut self, stmt: &'ast ast::Stmt) {
         self.with_semantic_checker(|semantic, context| semantic.visit_stmt(stmt, context));
+        self.record_statement_reachability(stmt);
 
         match stmt {
             ast::Stmt::FunctionDef(function_def) => {
