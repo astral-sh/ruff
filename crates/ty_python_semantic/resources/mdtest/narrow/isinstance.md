@@ -655,6 +655,37 @@ def _(x: Invariant[int] | Covariant[str]):
         reveal_type(x)  # revealed: Covariant[str] & ~Top[Invariant[Unknown]]
 ```
 
+For dict-like runtime checks, we only introduce the internal `TypedDictTop` fallback when the
+original value was already typed-dict-like. Plain `object` values should stay as ordinary
+`dict`/`Mapping`/`MutableMapping` instances:
+
+```py
+from collections.abc import Mapping, MutableMapping
+from typing import TypedDict
+
+class Movie(TypedDict):
+    title: str
+
+def _(x: object, y: Movie):
+    if isinstance(x, dict):
+        reveal_type(x)  # revealed: Top[dict[Unknown, Unknown]]
+
+    if isinstance(x, Mapping):
+        reveal_type(x)  # revealed: Top[Mapping[Unknown, object]]
+
+    if isinstance(x, MutableMapping):
+        reveal_type(x)  # revealed: Top[MutableMapping[Unknown, Unknown]]
+
+    if isinstance(y, dict):
+        reveal_type(y)  # revealed: Movie
+
+    if isinstance(y, Mapping):
+        reveal_type(y)  # revealed: Movie
+
+    if isinstance(y, MutableMapping):
+        reveal_type(y)  # revealed: Movie
+```
+
 The behavior of `issubclass()` is similar.
 
 ```py
