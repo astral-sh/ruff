@@ -268,6 +268,23 @@ def f(val: str | bytes) -> None:
 reveal_type(accepts_callable(f))  # revealed: str | bytes
 ```
 
+The same unary-overload aggregate path should also be able to reject immediately when none of the
+overload domains overlap the target callable.
+
+```py
+from typing import Callable, overload
+from ty_extensions import TypeOf, is_assignable_to, static_assert
+
+@overload
+def disjoint(val: str) -> None: ...
+@overload
+def disjoint(val: bytes) -> None: ...
+def disjoint(val: str | bytes) -> None:
+    pass
+
+static_assert(not is_assignable_to(TypeOf[disjoint], Callable[[int], None]))
+```
+
 When `T` is constrained to a union by other arguments, the overloaded callable must still be treated
 as a whole to satisfy `Callable[[T], T]`.
 

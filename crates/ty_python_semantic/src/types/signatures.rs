@@ -835,8 +835,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     /// Fast path for unary callable assignability: compare overload sets by aggregating
     /// overlapping parameter domains and return types.
     ///
-    /// This is intentionally accept-only. If the probe does not definitely succeed, it returns
-    /// `None` and callers should fall back to legacy per-overload relation checks.
+    /// If the probe can definitively prove success or failure, it returns the corresponding
+    /// constraint set. Otherwise it returns `None` and callers should fall back to legacy
+    /// per-overload relation checks.
     fn try_unary_overload_aggregate_relation(
         &self,
         db: &'db dyn Db,
@@ -905,7 +906,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         }
 
         if !has_overlapping_domain {
-            return None;
+            return Some(self.never());
         }
 
         // Function assignability here is parameter-contravariant and return-covariant.
