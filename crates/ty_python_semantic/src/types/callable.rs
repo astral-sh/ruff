@@ -205,6 +205,10 @@ impl<'db> Type<'db> {
             | Type::TypeGuard(_)
             | Type::TypedDict(_) => None,
 
+            Type::KnownInstance(KnownInstanceType::FunctoolsPartial(callable)) => {
+                Some(CallableTypes::one(callable))
+            }
+
             // TODO
             Type::DataclassDecorator(_)
             | Type::ModuleLiteral(_)

@@ -104,6 +104,10 @@ pub enum KnownInstanceType<'db> {
 
     /// The inferred spec for a functional `NamedTuple` class.
     NamedTupleSpec(NamedTupleSpec<'db>),
+
+    /// A `functools.partial(func, ...)` call result where we could determine
+    /// the remaining callable signature after binding some arguments.
+    FunctoolsPartial(CallableType<'db>),
 }
 
 pub(super) fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -154,6 +158,9 @@ pub(super) fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Size
             for field in spec.fields(db) {
                 visitor.visit_type(db, field.ty);
             }
+        }
+        KnownInstanceType::FunctoolsPartial(callable) => {
+            visitor.visit_callable_type(db, callable);
         }
     }
 }
@@ -217,6 +224,9 @@ impl<'db> KnownInstanceType<'db> {
             Self::NamedTupleSpec(spec) => spec
                 .recursive_type_normalized_impl(db, div, true)
                 .map(Self::NamedTupleSpec),
+            Self::FunctoolsPartial(callable) => callable
+                .recursive_type_normalized_impl(db, div, nested)
+                .map(Self::FunctoolsPartial),
         }
     }
 
@@ -244,6 +254,7 @@ impl<'db> KnownInstanceType<'db> {
             Self::LiteralStringAlias(_) => KnownClass::Str,
             Self::NewType(_) => KnownClass::NewType,
             Self::NamedTupleSpec(_) => KnownClass::Sequence,
+            Self::FunctoolsPartial(_) => KnownClass::FunctoolsPartial,
         }
     }
 
@@ -256,8 +267,14 @@ impl<'db> KnownInstanceType<'db> {
     /// For example, an alias created using the `type` statement is an instance of
     /// `typing.TypeAliasType`, so `KnownInstanceType::TypeAliasType(_).instance_fallback(db)`
     /// returns `Type::NominalInstance(NominalInstanceType { class: <typing.TypeAliasType> })`.
-    pub(super) fn instance_fallback(self, db: &dyn Db) -> Type<'_> {
-        self.class(db).to_instance(db)
+    pub(super) fn instance_fallback(self, db: &'db dyn Db) -> Type<'db> {
+        match self {
+            Self::FunctoolsPartial(callable) => {
+                let return_ty = callable.signatures(db).overload_return_type_or_unknown(db);
+                KnownClass::FunctoolsPartial.to_specialized_instance(db, &[return_ty])
+            }
+            _ => self.class(db).to_instance(db),
+        }
     }
 
     /// Return `true` if this symbol is an instance of `class`.
@@ -329,7 +346,8 @@ impl<'db> KnownInstanceType<'db> {
             | KnownInstanceType::Literal(_)
             | KnownInstanceType::LiteralStringAlias(_)
             | KnownInstanceType::NamedTupleSpec(_)
-            | KnownInstanceType::NewType(_) => {
+            | KnownInstanceType::NewType(_)
+            | KnownInstanceType::FunctoolsPartial(_) => {
                 // TODO: For some of these, we may need to apply the type mapping to inner types.
                 Type::KnownInstance(self)
             }

@@ -2036,6 +2036,9 @@ impl<'db> Type<'db> {
     /// Return true if this type is non-empty and all inhabitants of this type compare equal.
     pub(crate) fn is_single_valued(self, db: &'db dyn Db) -> bool {
         match self {
+            // Each `partial()` call creates a distinct object at runtime.
+            Type::KnownInstance(KnownInstanceType::FunctoolsPartial(_)) => false,
+
             Type::FunctionLiteral(..)
             | Type::BoundMethod(_)
             | Type::WrapperDescriptor(_)
@@ -3159,6 +3162,19 @@ impl<'db> Type<'db> {
                     .into()
             }
 
+            Type::KnownInstance(KnownInstanceType::FunctoolsPartial(callable))
+                if name_str == "__call__" =>
+            {
+                Place::bound(Type::Callable(callable)).into()
+            }
+
+            Type::KnownInstance(KnownInstanceType::FunctoolsPartial(callable)) => {
+                let known_instance = KnownInstanceType::FunctoolsPartial(callable);
+                known_instance
+                    .instance_fallback(db)
+                    .member_lookup_with_policy(db, name, policy)
+            }
+
             Type::NominalInstance(..)
             | Type::ProtocolInstance(..)
             | Type::NewTypeInstance(..)
@@ -3826,6 +3842,10 @@ impl<'db> Type<'db> {
             )
             .into(),
 
+            Type::KnownInstance(KnownInstanceType::FunctoolsPartial(callable)) => {
+                Type::Callable(callable).bindings(db)
+            }
+
             Type::KnownInstance(known_instance) => {
                 known_instance.instance_fallback(db).bindings(db)
             }
@@ -4141,6 +4161,47 @@ impl<'db> Type<'db> {
                 )
             }
 
+            KnownClass::FunctoolsPartial => {
+                // ```py
+                // class partial(Generic[_T]):
+                //     def __new__(cls, func: Callable[..., _T], /, *args: Any, **kwargs: Any) -> Self: ...
+                // ```
+                let return_ty = BoundTypeVarInstance::synthetic(
+                    db,
+                    Name::new_static("_T"),
+                    TypeVarVariance::Covariant,
+                );
+
+                Some(
+                    Binding::single(
+                        self,
+                        Signature::new_generic(
+                            Some(GenericContext::from_typevar_instances(db, [return_ty])),
+                            Parameters::new(
+                                db,
+                                [
+                                    Parameter::positional_only(Some(Name::new_static("func")))
+                                        .with_annotated_type(Type::single_callable(
+                                            db,
+                                            Signature::new(
+                                                Parameters::gradual_form(),
+                                                Type::TypeVar(return_ty),
+                                            ),
+                                        )),
+                                    Parameter::variadic(Name::new_static("args"))
+                                        .with_annotated_type(Type::any()),
+                                    Parameter::keyword_variadic(Name::new_static("kwargs"))
+                                        .with_annotated_type(Type::any()),
+                                ],
+                            ),
+                            KnownClass::FunctoolsPartial
+                                .to_specialized_instance(db, &[Type::TypeVar(return_ty)]),
+                        ),
+                    )
+                    .into(),
+                )
+            }
+
             KnownClass::Tuple => {
                 let element_ty = BoundTypeVarInstance::synthetic(
                     db,
@@ -4258,6 +4319,7 @@ impl<'db> Type<'db> {
                     | KnownClass::Str
                     | KnownClass::Type
                     | KnownClass::Object
+                    | KnownClass::FunctoolsPartial
                     | KnownClass::Property
                     | KnownClass::Super
                     | KnownClass::TypeAliasType
@@ -4969,6 +5031,12 @@ impl<'db> Type<'db> {
                 }
                 KnownInstanceType::Callable(callable) => Ok(Type::Callable(*callable)),
                 KnownInstanceType::LiteralStringAlias(ty) => Ok(ty.inner(db)),
+                KnownInstanceType::FunctoolsPartial(_) => Err(InvalidTypeExpressionError {
+                    invalid_expressions: smallvec_inline![InvalidTypeExpression::InvalidType(
+                        *self, scope_id
+                    )],
+                    fallback_type: Type::unknown(),
+                }),
             },
 
             Type::SpecialForm(special_form) => {
@@ -5638,7 +5706,8 @@ impl<'db> Type<'db> {
                 | KnownInstanceType::Literal(_)
                 | KnownInstanceType::LiteralStringAlias(_)
                 | KnownInstanceType::NamedTupleSpec(_)
-                | KnownInstanceType::NewType(_) => {
+                | KnownInstanceType::NewType(_)
+                | KnownInstanceType::FunctoolsPartial(_) => {
                     // TODO: For some of these, we may need to try to find legacy typevars in inner types.
                 }
             },
