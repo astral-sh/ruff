@@ -93,33 +93,25 @@ pub(crate) fn check_tokens(
                     fstring_nesting.pop();
                 }
                 TokenKind::Lbrace if !fstring_nesting.is_empty() => {
-                    *fstring_nesting.last_mut().unwrap() += 1;
+                    if let Some(depth) = fstring_nesting.last_mut() {
+                        *depth += 1;
+                    }
                 }
                 TokenKind::Rbrace if !fstring_nesting.is_empty() => {
-                    let depth = fstring_nesting.last_mut().unwrap();
-                    *depth = depth.saturating_sub(1);
+                    if let Some(depth) = fstring_nesting.last_mut() {
+                        *depth = depth.saturating_sub(1);
+                    }
                 }
                 _ => {}
             }
-            if matches!(
-                token.kind(),
-                TokenKind::String | TokenKind::FStringMiddle | TokenKind::TStringMiddle
-            ) {
-                // FStringMiddle/TStringMiddle tokens inside interpolation are format specs,
-                // where backslash escapes are valid in all Python versions.
-                let in_interpolation = fstring_nesting.last().is_some_and(|&depth| depth > 0)
-                    && !matches!(
-                        token.kind(),
-                        TokenKind::FStringMiddle | TokenKind::TStringMiddle
-                    );
-                let suppress_fix = in_interpolation && !target_version.supports_pep_701();
-                pylint::rules::invalid_string_characters(
-                    context,
-                    token,
-                    locator,
-                    suppress_fix,
-                );
-            }
+            let in_interpolation = fstring_nesting.last().is_some_and(|&depth| depth > 0);
+            pylint::rules::invalid_string_characters(
+                context,
+                token,
+                locator,
+                in_interpolation,
+                target_version,
+            );
         }
     }
 
