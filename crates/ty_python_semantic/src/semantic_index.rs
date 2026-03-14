@@ -925,6 +925,50 @@ mod tests {
             .collect()
     }
 
+    /// A function to test how the constant evaluator of `SemanticIndexBuilder` evaluates an expression
+    /// (the evaluation should match that of `TypeInferenceBuilder`).
+    /// For example, for the input `x = 1\nif cond: x = 2\nx`, if `cond` evaluates to `AlwaysTrue`, it returns `vec![2]`,
+    /// if it evaluates to `AlwaysFalse`, it returns `vec![1]`, ​​if it evaluates to `Ambiguous`, it returns `vec![1, 2]`.
+    fn reachable_bindings_for_terminal_use(content: &str) -> Vec<i64> {
+        let TestCase { db, file } = test_case(content);
+        let scope = global_scope(&db, file);
+        let module = parsed_module(&db, file).load(&db);
+        let ast = module.syntax();
+
+        let terminal_expr = ast
+            .body
+            .last()
+            .and_then(ast::Stmt::as_expr_stmt)
+            .map(|stmt| stmt.value.as_ref())
+            .expect("expected terminal expression statement");
+        let terminal_name = terminal_expr
+            .as_name_expr()
+            .expect("terminal expression should be a name");
+
+        let use_id = terminal_name.scoped_use_id(&db, scope);
+        let use_def = use_def_map(&db, scope);
+
+        use_def
+            .bindings_at_use(use_id)
+            .filter_map(|binding_with_constraints| {
+                let definition = binding_with_constraints.binding.definition()?;
+                let DefinitionKind::Assignment(assignment) = definition.kind(&db) else {
+                    return None;
+                };
+
+                let ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
+                    value: ast::Number::Int(value),
+                    ..
+                }) = assignment.value(&module)
+                else {
+                    return None;
+                };
+
+                value.as_i64()
+            })
+            .collect::<Vec<_>>()
+    }
+
     #[test]
     fn empty() {
         let TestCase { db, file } = test_case("");
@@ -1588,6 +1632,71 @@ class C[T]:
             panic!("should be a number literal")
         };
         assert_eq!(*num, 1);
+    }
+
+    #[test]
+    fn const_eval_lshift_overflow_is_ambiguous() {
+        let values = reachable_bindings_for_terminal_use(
+            "
+x = 1
+if 1 << 63:
+    x = 2
+x
+",
+        );
+        assert_eq!(values, vec![1, 2]);
+    }
+
+    #[test]
+    fn const_eval_lshift_zero_short_circuit() {
+        let values = reachable_bindings_for_terminal_use(
+            "
+x = 1
+if 0 << 4000000000000000000:
+    x = 2
+x
+",
+        );
+        assert_eq!(values, vec![1]);
+    }
+
+    #[test]
+    fn const_eval_rshift_large_positive() {
+        let values = reachable_bindings_for_terminal_use(
+            "
+x = 1
+if 1 >> 5000000000:
+    x = 2
+x
+",
+        );
+        assert_eq!(values, vec![1]);
+    }
+
+    #[test]
+    fn const_eval_rshift_large_negative_operand() {
+        let values = reachable_bindings_for_terminal_use(
+            "
+x = 1
+if (-1) >> 5000000000:
+    x = 2
+x
+",
+        );
+        assert_eq!(values, vec![2]);
+    }
+
+    #[test]
+    fn const_eval_negative_lshift_is_ambiguous() {
+        let values = reachable_bindings_for_terminal_use(
+            "
+x = 1
+if 42 << -3:
+    x = 2
+x
+",
+        );
+        assert_eq!(values, vec![1, 2]);
     }
 
     #[test]

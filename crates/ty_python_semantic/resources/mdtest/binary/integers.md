@@ -1,5 +1,11 @@
 # Binary operations on integers
 
+> Developer's note: This is mainly a test for the behavior of the type inferer. The constant
+> evaluator (`resolve_to_literal`) of `SemanticIndexBuilder` is implemented separately from the type
+> inferer, so if you modify the contents of this file or the type inferer, please also modify the
+> implementation of `resolve_to_literal` and the unit tests (semantic_index/tests/const_eval\_\*) at
+> the same time.
+
 ## Basic Arithmetic
 
 ```py
