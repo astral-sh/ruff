@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-E402 Module level import not at top of cell
+E402 [*] Module level import not at top of cell
   --> E402.ipynb:9:1
    |
  7 | os.path
@@ -11,8 +11,22 @@ E402 Module level import not at top of cell
 10 |
 11 | import a
    |
+help: Move module level imports to top of cell
+2  | 
+3  | sys.path
+4  | 
+5  + import pathlib
+6  | import os
+7  | 
+8  | os.path
+9  | 
+   - import pathlib
+10 | 
+11 | import a
+12 | 
+note: This is an unsafe fix and may change runtime behavior
 
-E402 Module level import not at top of cell
+E402 [*] Module level import not at top of cell
   --> E402.ipynb:22:1
    |
 20 | __some__magic = 1
@@ -21,8 +35,25 @@ E402 Module level import not at top of cell
    | ^^^^^^^^
 23 | import ok
    |
+help: Move module level imports to top of cell
+8  | 
+9  | import pathlib
+10 | 
+11 + import c
+12 | import a
+13 | 
+14 | try:
+--------------------------------------------------------------------------------
+20 | 
+21 | __some__magic = 1
+22 | 
+   - import c
+23 | import ok
+24 | 
+25 | 
+note: This is an unsafe fix and may change runtime behavior
 
-E402 Module level import not at top of cell
+E402 [*] Module level import not at top of cell
   --> E402.ipynb:30:1
    |
 30 | import no_ok
@@ -30,3 +61,20 @@ E402 Module level import not at top of cell
 31 |
 32 | %%time
    |
+help: Move module level imports to top of cell
+20 | __some__magic = 1
+21 | 
+22 | import c
+23 + import no_ok
+24 | import ok
+25 | 
+26 | 
+--------------------------------------------------------------------------------
+28 |     import e
+29 | 
+30 | 
+   - import no_ok
+31 | 
+32 | %%time
+33 | import pathlib
+note: This is an unsafe fix and may change runtime behavior
