@@ -56,7 +56,7 @@ use crate::types::{
     TypeContext, TypeVarBoundOrConstraints, TypeVarVariance, UnionBuilder, UnionType,
     WrapperDescriptorKind, enums, list_members,
 };
-use crate::{DisplaySettings, Program};
+use crate::{DisplaySettings, FxOrderMap, Program};
 use ruff_db::diagnostic::{Annotation, Diagnostic, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_python_ast::{self as ast, ArgOrKeyword, PythonVersion};
 use ty_module_resolver::KnownModule;
@@ -617,21 +617,16 @@ impl<'db> Bindings<'db> {
         // Nested unions of constructor types flatten each class's `__new__` / `__init__`
         // bindings into separate outer elements. Re-group them by constructed instance type so
         // each constructor can merge its inferred specializations before we union the results.
-        let mut constructor_groups: Vec<(Type<'db>, SmallVec<[&CallableBinding<'db>; 1]>)> =
-            Vec::with_capacity(self.elements.len());
+        let mut constructor_groups: FxOrderMap<Type<'db>, SmallVec<[&CallableBinding<'db>; 1]>> =
+            FxOrderMap::default();
         let mut element_return_types = Vec::with_capacity(self.elements.len());
 
         for element in &self.elements {
             if let Some(constructor_instance_type) = element.constructor_instance_type() {
-                if let Some((_, grouped_bindings)) = constructor_groups
-                    .iter_mut()
-                    .find(|(ty, _)| *ty == constructor_instance_type)
-                {
-                    grouped_bindings.extend(element.bindings.iter());
-                } else {
-                    constructor_groups
-                        .push((constructor_instance_type, element.bindings.iter().collect()));
-                }
+                constructor_groups
+                    .entry(constructor_instance_type)
+                    .or_default()
+                    .extend(element.bindings.iter());
                 continue;
             }
 
