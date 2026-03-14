@@ -662,6 +662,40 @@ impl<'db> Signature<'db> {
         self.definition
     }
 
+    pub(crate) fn can_bind_self_to(
+        &self,
+        db: &'db dyn Db,
+        receiver_ty: Type<'db>,
+        typing_self_ty: Type<'db>,
+    ) -> bool {
+        let Some(first_parameter) = self.parameters.iter().next() else {
+            return true;
+        };
+
+        if !first_parameter.is_positional() {
+            return true;
+        }
+
+        let binding_context = self.definition.map(BindingContext::Definition);
+        let self_mapping =
+            TypeMapping::BindSelf(SelfBinding::new(db, typing_self_ty, binding_context));
+        let expected_self_ty = first_parameter.annotated_type().apply_type_mapping(
+            db,
+            &self_mapping,
+            TypeContext::default(),
+        );
+        let constraints = ConstraintSetBuilder::new();
+
+        !receiver_ty
+            .when_assignable_to(
+                db,
+                expected_self_ty,
+                &constraints,
+                self.inferable_typevars(db),
+            )
+            .is_never_satisfied(db)
+    }
+
     pub(crate) fn bind_self(&self, db: &'db dyn Db, self_type: Option<Type<'db>>) -> Self {
         let mut parameters = self.parameters.iter().cloned().peekable();
 

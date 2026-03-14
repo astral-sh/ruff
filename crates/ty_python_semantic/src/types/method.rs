@@ -70,6 +70,7 @@ impl<'db> BoundMethodType<'db> {
     #[salsa::tracked(cycle_initial=into_callable_type_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> CallableType<'db> {
         let function = self.function(db);
+        let receiver = self.self_instance(db);
         let self_instance = self.typing_self_type(db);
 
         CallableType::new(
@@ -79,6 +80,9 @@ impl<'db> BoundMethodType<'db> {
                     .signature(db)
                     .overloads
                     .iter()
+                    // A bound method should only expose overloads whose first parameter can
+                    // actually accept the bound receiver type.
+                    .filter(|signature| signature.can_bind_self_to(db, receiver, self_instance))
                     .map(|signature| signature.bind_self(db, Some(self_instance))),
             ),
             CallableTypeKind::FunctionLike,
