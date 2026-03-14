@@ -1229,6 +1229,13 @@ impl<'db> Type<'db> {
         }
     }
 
+    pub(crate) const fn as_union_type_instance(self) -> Option<UnionTypeInstance<'db>> {
+        match self {
+            Type::KnownInstance(KnownInstanceType::UnionType(instance)) => Some(instance),
+            _ => None,
+        }
+    }
+
     #[track_caller]
     pub(crate) const fn expect_class_literal(self) -> ClassLiteral<'db> {
         self.as_class_literal()
@@ -4949,11 +4956,7 @@ impl<'db> Type<'db> {
                     invalid_expressions: smallvec_inline![InvalidTypeExpression::NamedTupleSpec],
                     fallback_type: Type::unknown(),
                 }),
-                KnownInstanceType::UnionType(instance) => {
-                    // Cloning here is cheap if the result is a `Type` (which is `Copy`). It's more
-                    // expensive if there are errors.
-                    instance.union_type(db).clone()
-                }
+                KnownInstanceType::UnionType(instance) => instance.union_type(db),
                 KnownInstanceType::Literal(ty) => Ok(ty.inner(db)),
                 KnownInstanceType::Annotated(ty) => Ok(ty.inner(db)),
                 KnownInstanceType::TypeGenericAlias(instance) => {

@@ -256,7 +256,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
 
                     return Type::KnownInstance(KnownInstanceType::UnionType(
-                        UnionTypeInstance::new(
+                        UnionTypeInstance::eager(
                             db,
                             None,
                             Ok(UnionType::from_two_elements(db, ty, Type::none(db))),
@@ -273,7 +273,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                         let is_empty = elements.peek().is_none();
                         let union_type = Type::KnownInstance(KnownInstanceType::UnionType(
-                            UnionTypeInstance::new(
+                            UnionTypeInstance::eager(
                                 db,
                                 None,
                                 Ok(UnionType::from_elements(db, elements)),

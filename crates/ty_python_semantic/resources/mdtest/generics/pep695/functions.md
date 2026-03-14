@@ -988,7 +988,6 @@ class Builder(Generic[TMsg]):
         # `Stream` is invariant, so `Stream[Msg]` is not a supertype of `Stream[TMsg]`;
         # therefore `_handler` is not compatible with `apply` here.
         # error: [invalid-argument-type]
-        # error: [invalid-assignment]
         stream = stream.apply(self._handler)
         return stream
 

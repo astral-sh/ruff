@@ -124,6 +124,15 @@ def _(x: int | list[int] | bytes):
     # error: [invalid-argument-type]
     elif isinstance(x, Any | NamedTuple | list[int]):
         reveal_type(x)  # revealed: int | list[int] | bytes
+    # error: [invalid-argument-type]
+    elif isinstance(x, (list[int] | bytes, int)):
+        reveal_type(x)  # revealed: int | list[int] | bytes
+    # error: [invalid-argument-type]
+    elif isinstance(x, (int, str | Literal[42])):
+        reveal_type(x)  # revealed: int | list[int] | bytes
+    # error: [invalid-argument-type]
+    elif isinstance(x, (int, (str, (bytes, memoryview | Literal[42])))):
+        reveal_type(x)  # revealed: int | list[int] | bytes
     else:
         reveal_type(x)  # revealed: int | list[int] | bytes
 ```
@@ -193,7 +202,7 @@ from typing import Union
 
 IntOrStr = Union[int, str]
 
-reveal_type(IntOrStr)  # revealed: <types.UnionType special-form 'int | str'>
+reveal_type(IntOrStr)  # revealed: <types.UnionType special-form 'IntOrStr'>
 
 def _(x: int | str | bytes | memoryview | range):
     if isinstance(x, IntOrStr):
@@ -329,11 +338,11 @@ def _(flag: bool):
 def _(flag: bool):
     x = 1 if flag else "a"
 
-    # error: [invalid-argument-type] "Argument to function `isinstance` is incorrect: Expected `type | UnionType | tuple[Divergent, ...]`, found `Literal["a"]"
+    # error: [invalid-argument-type] "Argument to function `isinstance` is incorrect: Expected `_ClassInfo`, found `Literal["a"]"
     if isinstance(x, "a"):
         reveal_type(x)  # revealed: Literal[1, "a"]
 
-    # error: [invalid-argument-type] "Argument to function `isinstance` is incorrect: Expected `type | UnionType | tuple[Divergent, ...]`, found `Literal["int"]"
+    # error: [invalid-argument-type] "Argument to function `isinstance` is incorrect: Expected `_ClassInfo`, found `Literal["int"]"
     if isinstance(x, "int"):
         reveal_type(x)  # revealed: Literal[1, "a"]
 ```

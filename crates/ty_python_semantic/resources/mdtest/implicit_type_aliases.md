@@ -30,6 +30,8 @@ g(None)
 
 ## Unions
 
+### Basics
+
 We also support unions in type aliases:
 
 ```py
@@ -77,40 +79,40 @@ IntOrTypeVar = int | T
 TypeVarOrNone = T | None
 NoneOrTypeVar = None | T
 
-reveal_type(IntOrStr)  # revealed: <types.UnionType special-form 'int | str'>
-reveal_type(IntOrStrOrBytes1)  # revealed: <types.UnionType special-form 'int | str | bytes'>
-reveal_type(IntOrStrOrBytes2)  # revealed: <types.UnionType special-form 'int | str | bytes'>
-reveal_type(IntOrStrOrBytes3)  # revealed: <types.UnionType special-form 'int | str | bytes'>
-reveal_type(IntOrStrOrBytes4)  # revealed: <types.UnionType special-form 'int | str | bytes'>
-reveal_type(IntOrStrOrBytes5)  # revealed: <types.UnionType special-form 'int | str | bytes'>
-reveal_type(IntOrStrOrBytes6)  # revealed: <types.UnionType special-form 'int | str | bytes'>
-reveal_type(BytesOrIntOrStr)  # revealed: <types.UnionType special-form 'bytes | int | str'>
-reveal_type(IntOrNone)  # revealed: <types.UnionType special-form 'int | None'>
-reveal_type(NoneOrInt)  # revealed: <types.UnionType special-form 'None | int'>
-reveal_type(IntOrStrOrNone)  # revealed: <types.UnionType special-form 'int | str | None'>
-reveal_type(NoneOrIntOrStr)  # revealed: <types.UnionType special-form 'None | int | str'>
-reveal_type(IntOrAny)  # revealed: <types.UnionType special-form 'int | Any'>
-reveal_type(AnyOrInt)  # revealed: <types.UnionType special-form 'Any | int'>
-reveal_type(NoneOrAny)  # revealed: <types.UnionType special-form 'None | Any'>
-reveal_type(AnyOrNone)  # revealed: <types.UnionType special-form 'Any | None'>
-reveal_type(NeverOrAny)  # revealed: <types.UnionType special-form 'Any'>
-reveal_type(AnyOrNever)  # revealed: <types.UnionType special-form 'Any'>
-reveal_type(UnknownOrInt)  # revealed: <types.UnionType special-form 'Unknown | int'>
-reveal_type(IntOrUnknown)  # revealed: <types.UnionType special-form 'int | Unknown'>
-reveal_type(StrOrZero)  # revealed: <types.UnionType special-form 'str | Literal[0]'>
-reveal_type(ZeroOrStr)  # revealed: <types.UnionType special-form 'Literal[0] | str'>
-reveal_type(IntOrLiteralString)  # revealed: <types.UnionType special-form 'int | LiteralString'>
-reveal_type(LiteralStringOrInt)  # revealed: <types.UnionType special-form 'LiteralString | int'>
-reveal_type(NoneOrTuple)  # revealed: <types.UnionType special-form 'None | tuple[int, str]'>
-reveal_type(TupleOrNone)  # revealed: <types.UnionType special-form 'tuple[int, str] | None'>
-reveal_type(IntOrAnnotated)  # revealed: <types.UnionType special-form 'int | str'>
-reveal_type(AnnotatedOrInt)  # revealed: <types.UnionType special-form 'str | int'>
-reveal_type(IntOrOptional)  # revealed: <types.UnionType special-form 'int | str | None'>
-reveal_type(OptionalOrInt)  # revealed: <types.UnionType special-form 'str | None | int'>
-reveal_type(IntOrTypeOfStr)  # revealed: <types.UnionType special-form 'int | type[str]'>
-reveal_type(TypeOfStrOrInt)  # revealed: <types.UnionType special-form 'type[str] | int'>
-reveal_type(IntOrCallable)  # revealed: <types.UnionType special-form 'int | ((str, /) -> bytes)'>
-reveal_type(CallableOrInt)  # revealed: <types.UnionType special-form '((str, /) -> bytes) | int'>
+reveal_type(IntOrStr)  # revealed: <types.UnionType special-form 'IntOrStr'>
+reveal_type(IntOrStrOrBytes1)  # revealed: <types.UnionType special-form 'IntOrStrOrBytes1'>
+reveal_type(IntOrStrOrBytes2)  # revealed: <types.UnionType special-form 'IntOrStrOrBytes2'>
+reveal_type(IntOrStrOrBytes3)  # revealed: <types.UnionType special-form 'IntOrStrOrBytes3'>
+reveal_type(IntOrStrOrBytes4)  # revealed: <types.UnionType special-form 'IntOrStrOrBytes4'>
+reveal_type(IntOrStrOrBytes5)  # revealed: <types.UnionType special-form 'IntOrStrOrBytes5'>
+reveal_type(IntOrStrOrBytes6)  # revealed: <types.UnionType special-form 'IntOrStrOrBytes6'>
+reveal_type(BytesOrIntOrStr)  # revealed: <types.UnionType special-form 'BytesOrIntOrStr'>
+reveal_type(IntOrNone)  # revealed: <types.UnionType special-form 'IntOrNone'>
+reveal_type(NoneOrInt)  # revealed: <types.UnionType special-form 'NoneOrInt'>
+reveal_type(IntOrStrOrNone)  # revealed: <types.UnionType special-form 'IntOrStrOrNone'>
+reveal_type(NoneOrIntOrStr)  # revealed: <types.UnionType special-form 'NoneOrIntOrStr'>
+reveal_type(IntOrAny)  # revealed: <types.UnionType special-form 'IntOrAny'>
+reveal_type(AnyOrInt)  # revealed: <types.UnionType special-form 'AnyOrInt'>
+reveal_type(NoneOrAny)  # revealed: <types.UnionType special-form 'NoneOrAny'>
+reveal_type(AnyOrNone)  # revealed: <types.UnionType special-form 'AnyOrNone'>
+reveal_type(NeverOrAny)  # revealed: <types.UnionType special-form 'NeverOrAny'>
+reveal_type(AnyOrNever)  # revealed: <types.UnionType special-form 'AnyOrNever'>
+reveal_type(UnknownOrInt)  # revealed: <types.UnionType special-form 'UnknownOrInt'>
+reveal_type(IntOrUnknown)  # revealed: <types.UnionType special-form 'IntOrUnknown'>
+reveal_type(StrOrZero)  # revealed: <types.UnionType special-form 'StrOrZero'>
+reveal_type(ZeroOrStr)  # revealed: <types.UnionType special-form 'ZeroOrStr'>
+reveal_type(IntOrLiteralString)  # revealed: <types.UnionType special-form 'IntOrLiteralString'>
+reveal_type(LiteralStringOrInt)  # revealed: <types.UnionType special-form 'LiteralStringOrInt'>
+reveal_type(NoneOrTuple)  # revealed: <types.UnionType special-form 'NoneOrTuple'>
+reveal_type(TupleOrNone)  # revealed: <types.UnionType special-form 'TupleOrNone'>
+reveal_type(IntOrAnnotated)  # revealed: <types.UnionType special-form 'IntOrAnnotated'>
+reveal_type(AnnotatedOrInt)  # revealed: <types.UnionType special-form 'AnnotatedOrInt'>
+reveal_type(IntOrOptional)  # revealed: <types.UnionType special-form 'IntOrOptional'>
+reveal_type(OptionalOrInt)  # revealed: <types.UnionType special-form 'OptionalOrInt'>
+reveal_type(IntOrTypeOfStr)  # revealed: <types.UnionType special-form 'IntOrTypeOfStr'>
+reveal_type(TypeOfStrOrInt)  # revealed: <types.UnionType special-form 'TypeOfStrOrInt'>
+reveal_type(IntOrCallable)  # revealed: <types.UnionType special-form 'IntOrCallable'>
+reveal_type(CallableOrInt)  # revealed: <types.UnionType special-form 'CallableOrInt'>
 reveal_type(TypeVarOrInt)  # revealed: <types.UnionType special-form 'T@TypeVarOrInt | int'>
 reveal_type(IntOrTypeVar)  # revealed: <types.UnionType special-form 'int | T@IntOrTypeVar'>
 reveal_type(TypeVarOrNone)  # revealed: <types.UnionType special-form 'T@TypeVarOrNone | None'>
@@ -243,6 +245,142 @@ def f(SomeUnionType: UnionType):
 f(int | str)
 ```
 
+### Recursive unions
+
+Assigned `types.UnionType` instances are named and lazily evaluated, allowing for recursive type
+structures.
+
+```py
+from typing import Union
+
+JsonValue = Union[int, float, bool, str, None, dict[str, "JsonValue"], list["JsonValue"]]
+
+reveal_type(JsonValue)  # revealed: <types.UnionType special-form 'JsonValue'>
+
+j1: JsonValue = 42
+reveal_type(j1)  # revealed: Literal[42]
+# TODO: better type using bidirectional inference
+j2: JsonValue = {"key": 123}
+reveal_type(
+    j2
+)  # revealed: dict[str, int | float | str | None | dict[str, int | float | str | None | dict[str, Any] | list[Any]] | list[int | float | str | None | dict[str, Any] | list[Any]]]
+# TODO: better type using bidirectional inference
+j3: JsonValue = [1, [2, [3]]]
+reveal_type(
+    j3
+)  # revealed: list[int | float | str | None | dict[str, int | float | str | None | dict[str, Any] | list[Any]] | list[int | float | str | None | dict[str, Any] | list[Any]]]
+# error: [invalid-assignment]
+j4: JsonValue = {1: "value"}
+# error: [invalid-assignment]
+j5: JsonValue = {"key": [{1: "value"}]}
+
+TreeNode = int | tuple["TreeNode", "TreeNode"]
+
+reveal_type(TreeNode)  # revealed: <types.UnionType special-form 'TreeNode'>
+
+t1: TreeNode = 5
+t2: TreeNode = (1, 2)
+t3: TreeNode = ((1, 2), (3, 4))
+t4: TreeNode = (((1, 2), 3), (4, (5, 6)))
+# error: [invalid-assignment]
+t5: TreeNode = "not a tree"
+# error: [invalid-assignment]
+t6: TreeNode = [1, 2]
+
+class Node:
+    Child = int | list["Child"]
+
+    def __init__(self, value: Child):
+        self.value = value
+
+n1 = Node(42)
+reveal_type(n1.value)  # revealed: Unknown | int | list[Child]
+n2 = Node([1, [2, [3]]])
+reveal_type(n2.value)  # revealed: Unknown | int | list[Child]
+# error: [invalid-argument-type]
+n3 = Node(["a"])
+reveal_type(n3.value)  # revealed: Unknown | int | list[Child]
+```
+
+The type of the second parameter of `isinstance/issubclass` is defined using an implicit (PEP-613)
+recursive union type alias on typeshed. This test ensures that it works correctly.
+
+```py
+from typing import Literal
+
+# `typeshed/stdlib/builtins.pyi`:
+# if sys.version_info >= (3, 10):
+#     _ClassInfo: TypeAlias = type | types.UnionType | tuple[_ClassInfo, ...]
+# else:
+#     _ClassInfo: TypeAlias = type | tuple[_ClassInfo, ...]
+# def isinstance(obj: object, class_or_tuple: _ClassInfo, /) -> bool: ...
+# def issubclass(cls: type, class_or_tuple: _ClassInfo, /) -> bool: ...
+
+def f(x: object):
+    # error: [invalid-argument-type]
+    if isinstance(x, 42):
+        reveal_type(x)  # revealed: object
+
+    # error: [invalid-argument-type]
+    if isinstance(x, (int, 42)):
+        reveal_type(x)  # revealed: object
+
+    # error: [invalid-argument-type]
+    if isinstance(x, (int, (str, (bytes, 42)))):
+        reveal_type(x)  # revealed: object
+
+def g(cls: type):
+    # error: [invalid-argument-type]
+    if issubclass(cls, 42):
+        reveal_type(cls)  # revealed: type
+
+    # error: [invalid-argument-type]
+    if issubclass(cls, (int, 42)):
+        reveal_type(cls)  # revealed: type
+
+    # error: [invalid-argument-type]
+    if issubclass(cls, (int, (str, (bytes, 42)))):
+        reveal_type(cls)  # revealed: type
+```
+
+Mutually recursive unions are also supported:
+
+```py
+A = int | tuple["B", ...]
+B = str | tuple["A", ...]
+
+a1: A = 42
+reveal_type(a1)  # revealed: Literal[42]
+a2: A = ("hello", (1,))
+reveal_type(a2)  # revealed: tuple[Literal["hello"], tuple[Literal[1]]]
+# error: [invalid-assignment]
+a3: A = ("hello", ("world",))
+reveal_type(a3)  # revealed: int | tuple[B, ...]
+
+b1: B = "test"
+reveal_type(b1)  # revealed: Literal["test"]
+b2: B = (1, ("hello", (3,)))
+reveal_type(b2)  # revealed: tuple[Literal[1], tuple[Literal["hello"], tuple[Literal[3]]]]
+# error: [invalid-assignment]
+b3: B = (1, (2, (3,)))
+reveal_type(b3)  # revealed: str | tuple[A, ...]
+```
+
+Generic recursive unions are not yet supported:
+
+```py
+from typing import TypeVar, Generic
+
+T = TypeVar("T")
+NestedDict = dict[str, T | "NestedDict[T]"]
+
+d1: NestedDict[int] = {"a": 1, "b": {"c": 2}}
+# TODO: should be `dict[str, int | dict[str, int]]` or something
+reveal_type(d1)  # revealed: dict[str, Divergent]
+# TODO: should be an invalid-assignment error
+d2: NestedDict[int] = {"a": 1, "b": {"c": "wrong"}}
+```
+
 ## `|` operator between class objects and non-class objects
 
 Using the `|` operator between a class object and a non-class object does not create a `UnionType`
@@ -295,7 +433,7 @@ X = Foo | Bar
 # In an ideal world, perhaps we would respect `Meta.__or__` here and reveal `str`?
 # But we still need to record what the elements are, since (according to the typing spec)
 # `X` is still a valid type alias
-reveal_type(X)  # revealed: <types.UnionType special-form 'Foo | Bar'>
+reveal_type(X)  # revealed: <types.UnionType special-form 'X'>
 
 def f(obj: X):
     reveal_type(obj)  # revealed: Foo | Bar
@@ -457,10 +595,10 @@ AnnotatedInt = AnnotatedType[int]
 SubclassOfInt = MyType[int]
 CallableIntToStr = MyCallable[[int], str]
 
-reveal_type(IntsOrNone)  # revealed: <types.UnionType special-form 'list[int] | None'>
-reveal_type(IntsOrStrs)  # revealed: <types.UnionType special-form 'tuple[int, int] | tuple[str, str]'>
+reveal_type(IntsOrNone)  # revealed: <types.UnionType special-form 'IntsOrNone'>
+reveal_type(IntsOrStrs)  # revealed: <types.UnionType special-form 'IntsOrStrs'>
 reveal_type(ListOfPairs)  # revealed: <class 'list[tuple[str, str]]'>
-reveal_type(ListOrTupleOfInts)  # revealed: <types.UnionType special-form 'list[int] | tuple[int, ...]'>
+reveal_type(ListOrTupleOfInts)  # revealed: <types.UnionType special-form 'ListOrTupleOfInts'>
 reveal_type(AnnotatedInt)  # revealed: <special-form 'typing.Annotated[int, <metadata>]'>
 reveal_type(SubclassOfInt)  # revealed: <special-form 'type[int]'>
 reveal_type(CallableIntToStr)  # revealed: <typing.Callable special-form '(int, /) -> str'>
@@ -731,7 +869,7 @@ def _(doubly_specialized: DictInt[int]):
 
 Union = list[str] | list[int]
 
-# error: [not-subscriptable] "Cannot subscript non-generic type `<types.UnionType special-form 'list[str] | list[int]'>`"
+# error: [not-subscriptable] "Cannot subscript non-generic type `<types.UnionType special-form 'Union'>`"
 def _(doubly_specialized: Union[int]):
     reveal_type(doubly_specialized)  # revealed: Unknown
 
@@ -1008,7 +1146,7 @@ from typing import Optional
 
 MyOptionalInt = Optional[int]
 
-reveal_type(MyOptionalInt)  # revealed: <types.UnionType special-form 'int | None'>
+reveal_type(MyOptionalInt)  # revealed: <types.UnionType special-form 'MyOptionalInt'>
 
 def _(optional_int: MyOptionalInt):
     reveal_type(optional_int)  # revealed: int | None
@@ -1096,8 +1234,8 @@ from typing import Union
 IntOrStr = Union[int, str]
 IntOrStrOrBytes = Union[int, Union[str, bytes]]
 
-reveal_type(IntOrStr)  # revealed: <types.UnionType special-form 'int | str'>
-reveal_type(IntOrStrOrBytes)  # revealed: <types.UnionType special-form 'int | str | bytes'>
+reveal_type(IntOrStr)  # revealed: <types.UnionType special-form 'IntOrStr'>
+reveal_type(IntOrStrOrBytes)  # revealed: <types.UnionType special-form 'IntOrStrOrBytes'>
 
 def _(
     int_or_str: IntOrStr,
@@ -1125,7 +1263,7 @@ An empty `typing.Union` leads to a `TypeError` at runtime, so we emit an error. 
 # error: [invalid-type-form] "`typing.Union` requires at least one type argument"
 EmptyUnion = Union[()]
 
-reveal_type(EmptyUnion)  # revealed: <types.UnionType special-form 'Never'>
+reveal_type(EmptyUnion)  # revealed: <types.UnionType special-form 'EmptyUnion'>
 
 def _(empty: EmptyUnion):
     reveal_type(empty)  # revealed: Never
@@ -1173,8 +1311,8 @@ SubclassOfP = type[P]
 reveal_type(SubclassOfA)  # revealed: <special-form 'type[A]'>
 reveal_type(SubclassOfAny)  # revealed: <special-form 'type[Any]'>
 reveal_type(SubclassOfAOrB1)  # revealed: <special-form 'type[A | B]'>
-reveal_type(SubclassOfAOrB2)  # revealed: <types.UnionType special-form 'type[A | B]'>
-reveal_type(SubclassOfAOrB3)  # revealed: <types.UnionType special-form 'type[A | B]'>
+reveal_type(SubclassOfAOrB2)  # revealed: <types.UnionType special-form 'SubclassOfAOrB2'>
+reveal_type(SubclassOfAOrB3)  # revealed: <types.UnionType special-form 'SubclassOfAOrB3'>
 reveal_type(SubclassOfG)  # revealed: <special-form 'type[G[Unknown]]'>
 reveal_type(SubclassOfGInt)  # revealed: <special-form 'type[G[int]]'>
 reveal_type(SubclassOfP)  # revealed: <special-form 'type[P]'>
@@ -1227,8 +1365,8 @@ UnionAlias2 = Union[C, D]
 SubclassOfUnionAlias1 = type[UnionAlias1]
 SubclassOfUnionAlias2 = type[UnionAlias2]
 
-reveal_type(SubclassOfUnionAlias1)  # revealed: <special-form 'type[C | D]'>
-reveal_type(SubclassOfUnionAlias2)  # revealed: <special-form 'type[C | D]'>
+reveal_type(SubclassOfUnionAlias1)  # revealed: <special-form 'type[UnionAlias1]'>
+reveal_type(SubclassOfUnionAlias2)  # revealed: <special-form 'type[UnionAlias2]'>
 
 def _(
     subclass_of_union_alias1: SubclassOfUnionAlias1,
@@ -1289,8 +1427,8 @@ SubclassOfP = Type[P]
 reveal_type(SubclassOfA)  # revealed: <special-form 'type[A]'>
 reveal_type(SubclassOfAny)  # revealed: <special-form 'type[Any]'>
 reveal_type(SubclassOfAOrB1)  # revealed: <special-form 'type[A | B]'>
-reveal_type(SubclassOfAOrB2)  # revealed: <types.UnionType special-form 'type[A | B]'>
-reveal_type(SubclassOfAOrB3)  # revealed: <types.UnionType special-form 'type[A | B]'>
+reveal_type(SubclassOfAOrB2)  # revealed: <types.UnionType special-form 'SubclassOfAOrB2'>
+reveal_type(SubclassOfAOrB3)  # revealed: <types.UnionType special-form 'SubclassOfAOrB3'>
 reveal_type(SubclassOfG)  # revealed: <special-form 'type[G[Unknown]]'>
 reveal_type(SubclassOfGInt)  # revealed: <special-form 'type[G[int]]'>
 reveal_type(SubclassOfP)  # revealed: <special-form 'type[P]'>
@@ -1408,25 +1546,25 @@ DefaultDictOrNone = DefaultDict[str, int] | None
 DequeOrNone = Deque[str] | None
 OrderedDictOrNone = OrderedDict[str, int] | None
 
-reveal_type(NoneOrList)  # revealed: <types.UnionType special-form 'None | list[str]'>
-reveal_type(NoneOrSet)  # revealed: <types.UnionType special-form 'None | set[str]'>
-reveal_type(NoneOrDict)  # revealed: <types.UnionType special-form 'None | dict[str, int]'>
-reveal_type(NoneOrFrozenSet)  # revealed: <types.UnionType special-form 'None | frozenset[str]'>
-reveal_type(NoneOrChainMap)  # revealed: <types.UnionType special-form 'None | ChainMap[str, int]'>
-reveal_type(NoneOrCounter)  # revealed: <types.UnionType special-form 'None | Counter[str]'>
-reveal_type(NoneOrDefaultDict)  # revealed: <types.UnionType special-form 'None | defaultdict[str, int]'>
-reveal_type(NoneOrDeque)  # revealed: <types.UnionType special-form 'None | deque[str]'>
-reveal_type(NoneOrOrderedDict)  # revealed: <types.UnionType special-form 'None | OrderedDict[str, int]'>
+reveal_type(NoneOrList)  # revealed: <types.UnionType special-form 'NoneOrList'>
+reveal_type(NoneOrSet)  # revealed: <types.UnionType special-form 'NoneOrSet'>
+reveal_type(NoneOrDict)  # revealed: <types.UnionType special-form 'NoneOrDict'>
+reveal_type(NoneOrFrozenSet)  # revealed: <types.UnionType special-form 'NoneOrFrozenSet'>
+reveal_type(NoneOrChainMap)  # revealed: <types.UnionType special-form 'NoneOrChainMap'>
+reveal_type(NoneOrCounter)  # revealed: <types.UnionType special-form 'NoneOrCounter'>
+reveal_type(NoneOrDefaultDict)  # revealed: <types.UnionType special-form 'NoneOrDefaultDict'>
+reveal_type(NoneOrDeque)  # revealed: <types.UnionType special-form 'NoneOrDeque'>
+reveal_type(NoneOrOrderedDict)  # revealed: <types.UnionType special-form 'NoneOrOrderedDict'>
 
-reveal_type(ListOrNone)  # revealed: <types.UnionType special-form 'list[int] | None'>
-reveal_type(SetOrNone)  # revealed: <types.UnionType special-form 'set[int] | None'>
-reveal_type(DictOrNone)  # revealed: <types.UnionType special-form 'dict[str, int] | None'>
-reveal_type(FrozenSetOrNone)  # revealed: <types.UnionType special-form 'frozenset[int] | None'>
-reveal_type(ChainMapOrNone)  # revealed: <types.UnionType special-form 'ChainMap[str, int] | None'>
-reveal_type(CounterOrNone)  # revealed: <types.UnionType special-form 'Counter[str] | None'>
-reveal_type(DefaultDictOrNone)  # revealed: <types.UnionType special-form 'defaultdict[str, int] | None'>
-reveal_type(DequeOrNone)  # revealed: <types.UnionType special-form 'deque[str] | None'>
-reveal_type(OrderedDictOrNone)  # revealed: <types.UnionType special-form 'OrderedDict[str, int] | None'>
+reveal_type(ListOrNone)  # revealed: <types.UnionType special-form 'ListOrNone'>
+reveal_type(SetOrNone)  # revealed: <types.UnionType special-form 'SetOrNone'>
+reveal_type(DictOrNone)  # revealed: <types.UnionType special-form 'DictOrNone'>
+reveal_type(FrozenSetOrNone)  # revealed: <types.UnionType special-form 'FrozenSetOrNone'>
+reveal_type(ChainMapOrNone)  # revealed: <types.UnionType special-form 'ChainMapOrNone'>
+reveal_type(CounterOrNone)  # revealed: <types.UnionType special-form 'CounterOrNone'>
+reveal_type(DefaultDictOrNone)  # revealed: <types.UnionType special-form 'DefaultDictOrNone'>
+reveal_type(DequeOrNone)  # revealed: <types.UnionType special-form 'DequeOrNone'>
+reveal_type(OrderedDictOrNone)  # revealed: <types.UnionType special-form 'OrderedDictOrNone'>
 
 def _(
     none_or_list: NoneOrList,

@@ -310,7 +310,7 @@ class B: ...
 
 EitherOr = A | B
 
-# error: [invalid-base] "Invalid class base with type `<types.UnionType special-form 'A | B'>`"
+# error: [invalid-base] "Invalid class base with type `<types.UnionType special-form 'EitherOr'>`"
 class Foo(EitherOr): ...
 ```
 
