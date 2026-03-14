@@ -413,6 +413,7 @@ class GenericShape[T]:
     @classmethod
     def baz[U](cls, u: U) -> "GenericShape[U]":
         reveal_type(cls)  # revealed: type[Self@baz]
+        # error: [invalid-return-type]
         return cls()
 
 class GenericCircle[T](GenericShape[T]): ...
@@ -820,7 +821,7 @@ class ExplicitGeneric[T]:
 
 ExplicitGeneric[int]().special()
 
-# TODO: this should be an `invalid-argument-type` error
+# error: [invalid-argument-type] "Argument to bound method `special` is incorrect: Expected `ExplicitGeneric[int]`, found `ExplicitGeneric[str]`"
 ExplicitGeneric[str]().special()
 ```
 
