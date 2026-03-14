@@ -765,6 +765,7 @@ fn extract_typed_dict_keys<'db>(
         }
         // TODO: handle unions by checking all TypedDict elements separately
         Type::Union(_) => None,
+        Type::TypedDictTop => None,
         Type::TypeAlias(alias) => extract_typed_dict_keys(db, alias.value_type(db)),
         // All other types cannot contain a TypedDict
         Type::Dynamic(_)

@@ -1,4 +1,5 @@
 use crate::Db;
+use crate::place::known_module_symbol;
 use crate::semantic_index::expression::Expression;
 use crate::semantic_index::place::{PlaceExpr, PlaceTable, PlaceTableBuilder, ScopedPlaceId};
 use crate::semantic_index::place_table;
@@ -31,6 +32,7 @@ use ruff_python_ast::{BoolOp, ExprBoolOp};
 use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::{SmallVec, smallvec, smallvec_inline};
 use std::collections::hash_map::Entry;
+use ty_module_resolver::KnownModule;
 
 /// A set of places that could possibly be narrowed by a predicate.
 ///
@@ -132,7 +134,7 @@ fn all_negative_narrowing_constraints_for_pattern<'db>(
 ///
 /// A "classinfo" argument is either a class or a tuple of classes, or a tuple of tuples of classes
 /// (etc. for arbitrary levels of recursion)
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 pub enum ClassInfoConstraintFunction {
     /// `builtins.isinstance`
     IsInstance,
@@ -140,31 +142,139 @@ pub enum ClassInfoConstraintFunction {
     IsSubclass,
 }
 
+#[derive(Hash, PartialEq, Debug, Eq, Clone, salsa::Update, get_size2::GetSize)]
+struct AnalyzedClassInfo<'db> {
+    constraint: Type<'db>,
+    typed_dict_runtime_match: TypedDictRuntimeMatch,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+enum TypedDictRuntimeMatch {
+    Always,
+    Never,
+}
+
+impl TypedDictRuntimeMatch {
+    fn from_class_literal<'db>(
+        db: &'db dyn Db,
+        function: ClassInfoConstraintFunction,
+        class: ClassLiteral<'db>,
+    ) -> Self {
+        if function == ClassInfoConstraintFunction::IsInstance
+            && class_literal_matches_typed_dict_runtime_supertype(db, class)
+        {
+            Self::Always
+        } else {
+            Self::Never
+        }
+    }
+
+    fn any(elements: &[AnalyzedClassInfo<'_>]) -> Self {
+        if elements
+            .iter()
+            .any(|element| element.typed_dict_runtime_match == Self::Always)
+        {
+            Self::Always
+        } else {
+            Self::Never
+        }
+    }
+
+    fn all(elements: &[AnalyzedClassInfo<'_>]) -> Self {
+        if elements
+            .iter()
+            .all(|element| element.typed_dict_runtime_match == Self::Always)
+        {
+            Self::Always
+        } else {
+            Self::Never
+        }
+    }
+}
+
+impl<'db> AnalyzedClassInfo<'db> {
+    fn from_constraint(constraint: Type<'db>) -> Self {
+        Self {
+            constraint,
+            typed_dict_runtime_match: TypedDictRuntimeMatch::Never,
+        }
+    }
+
+    fn from_class_literal(
+        db: &'db dyn Db,
+        function: ClassInfoConstraintFunction,
+        class: ClassLiteral<'db>,
+    ) -> Self {
+        let constraint = function.classinfo_constraint_for_class_literal(db, class);
+
+        Self {
+            constraint,
+            typed_dict_runtime_match: TypedDictRuntimeMatch::from_class_literal(
+                db, function, class,
+            ),
+        }
+    }
+
+    fn any(db: &'db dyn Db, elements: &[Self]) -> Self {
+        let constraint = elements
+            .iter()
+            .fold(UnionBuilder::new(db), |builder, element| {
+                builder.add(element.constraint)
+            })
+            .build();
+
+        Self {
+            constraint,
+            typed_dict_runtime_match: TypedDictRuntimeMatch::any(elements),
+        }
+    }
+
+    fn all(db: &'db dyn Db, elements: &[Self]) -> Self {
+        let mut builder = IntersectionBuilder::new(db);
+        for element in elements {
+            builder = builder.add_positive(element.constraint);
+        }
+
+        Self {
+            constraint: builder.build(),
+            typed_dict_runtime_match: TypedDictRuntimeMatch::all(elements),
+        }
+    }
+}
+
 impl ClassInfoConstraintFunction {
-    /// Generate a constraint from the type of a `classinfo` argument to `isinstance` or `issubclass`.
-    ///
-    /// The `classinfo` argument can be a class literal, a tuple of (tuples of) class literals. PEP 604
-    /// union types are not yet supported. Returns `None` if the `classinfo` argument has a wrong type.
-    fn generate_constraint<'db>(
+    fn classinfo_constraint_for_class_literal<'db>(
         self,
         db: &'db dyn Db,
-        classinfo: Type<'db>,
-        is_positive: bool,
-    ) -> Option<Type<'db>> {
-        let constraint_from_class_literal = |class: ClassLiteral<'db>| match self {
+        class: ClassLiteral<'db>,
+    ) -> Type<'db> {
+        match self {
             ClassInfoConstraintFunction::IsInstance => {
                 Type::instance(db, class.top_materialization(db))
             }
             ClassInfoConstraintFunction::IsSubclass => {
                 SubclassOfType::from(db, class.top_materialization(db))
             }
-        };
+        }
+    }
 
+    /// Generate a constraint from the type of a `classinfo` argument to `isinstance` or `issubclass`.
+    ///
+    /// The `classinfo` argument can be a class literal, a tuple of (tuples of) class literals. PEP 604
+    /// union types are not yet supported. Returns `None` if the `classinfo` argument has a wrong type.
+    fn analyze_classinfo<'db>(
+        self,
+        db: &'db dyn Db,
+        classinfo: Type<'db>,
+        is_positive: bool,
+    ) -> Option<AnalyzedClassInfo<'db>> {
         match classinfo {
-            Type::TypeAlias(alias) => {
-                self.generate_constraint(db, alias.value_type(db), is_positive)
-            }
-            Type::ClassLiteral(class_literal) => Some(constraint_from_class_literal(class_literal)),
+            Type::TypeAlias(alias) => self.analyze_classinfo(db, alias.value_type(db), is_positive),
+            Type::ClassLiteral(class_literal) => Some(AnalyzedClassInfo::from_class_literal(
+                db,
+                self,
+                class_literal,
+            )),
             Type::SubclassOf(subclass_of_ty) => {
                 // We can't narrow negatively from a `SubclassOf` type. `if !isinstance(x, y)`
                 // where `y: type[A]` doesn't ensure that `x` is not an instance of `A`, because
@@ -174,48 +284,52 @@ impl ClassInfoConstraintFunction {
                 }
 
                 match subclass_of_ty.subclass_of() {
-                    SubclassOfInner::Class(ClassType::NonGeneric(class_literal)) => {
-                        Some(constraint_from_class_literal(class_literal))
-                    }
+                    SubclassOfInner::Class(ClassType::NonGeneric(class_literal)) => Some(
+                        AnalyzedClassInfo::from_class_literal(db, self, class_literal),
+                    ),
                     // It's not valid to use a generic alias as the second argument to `isinstance()` or `issubclass()`,
                     // e.g. `isinstance(x, list[int])` fails at runtime.
                     SubclassOfInner::Class(ClassType::Generic(_)) => None,
-                    SubclassOfInner::Dynamic(dynamic) => Some(Type::Dynamic(dynamic)),
+                    SubclassOfInner::Dynamic(dynamic) => {
+                        Some(AnalyzedClassInfo::from_constraint(Type::Dynamic(dynamic)))
+                    }
                     SubclassOfInner::TypeVar(bound_typevar) => match self {
-                        ClassInfoConstraintFunction::IsSubclass => Some(classinfo),
-                        ClassInfoConstraintFunction::IsInstance => {
-                            Some(Type::TypeVar(bound_typevar))
+                        ClassInfoConstraintFunction::IsSubclass => {
+                            Some(AnalyzedClassInfo::from_constraint(classinfo))
                         }
+                        ClassInfoConstraintFunction::IsInstance => Some(
+                            AnalyzedClassInfo::from_constraint(Type::TypeVar(bound_typevar)),
+                        ),
                     },
                 }
             }
-            Type::Dynamic(_) => Some(classinfo),
+            Type::Dynamic(_) => Some(AnalyzedClassInfo::from_constraint(classinfo)),
             Type::Intersection(intersection) => {
                 if intersection.negative(db).is_empty() {
-                    let mut builder = IntersectionBuilder::new(db);
+                    let mut elements = Vec::with_capacity(intersection.positive(db).len());
                     for element in intersection.positive(db) {
-                        builder = builder.add_positive(self.generate_constraint(
-                            db,
-                            *element,
-                            is_positive,
-                        )?);
+                        elements.push(self.analyze_classinfo(db, *element, is_positive)?);
                     }
-                    Some(builder.build())
+                    Some(AnalyzedClassInfo::all(db, &elements))
                 } else {
                     // TODO: can we do better here?
                     None
                 }
             }
-            Type::Union(union) => union.try_map(db, |element| {
-                self.generate_constraint(db, *element, is_positive)
-            }),
+            Type::Union(union) => {
+                let mut elements = Vec::with_capacity(union.elements(db).len());
+                for element in union.elements(db) {
+                    elements.push(self.analyze_classinfo(db, *element, is_positive)?);
+                }
+                Some(AnalyzedClassInfo::any(db, &elements))
+            }
             Type::TypeVar(bound_typevar) => {
                 match bound_typevar.typevar(db).bound_or_constraints(db)? {
                     TypeVarBoundOrConstraints::UpperBound(bound) => {
-                        self.generate_constraint(db, bound, is_positive)
+                        self.analyze_classinfo(db, bound, is_positive)
                     }
                     TypeVarBoundOrConstraints::Constraints(constraints) => {
-                        self.generate_constraint(db, constraints.as_type(db), is_positive)
+                        self.analyze_classinfo(db, constraints.as_type(db), is_positive)
                     }
                 }
             }
@@ -225,54 +339,55 @@ impl ClassInfoConstraintFunction {
             Type::GenericAlias(_) => None,
 
             Type::NominalInstance(nominal) => nominal.tuple_spec(db).and_then(|tuple| {
-                UnionType::try_from_elements(
-                    db,
-                    tuple
-                        .iter_all_elements()
-                        .map(|element| self.generate_constraint(db, element, is_positive)),
-                )
+                let mut elements = Vec::new();
+                for element in tuple.iter_all_elements() {
+                    elements.push(self.analyze_classinfo(db, element, is_positive)?);
+                }
+                Some(AnalyzedClassInfo::any(db, &elements))
             }),
 
             Type::KnownInstance(KnownInstanceType::UnionType(instance)) => {
-                UnionType::try_from_elements(
-                    db,
-                    instance.value_expression_types(db).ok()?.map(|element| {
+                let mut elements = Vec::new();
+                for element in instance.value_expression_types(db).ok()? {
+                    let constraint = if element.is_none(db) {
                         // A special case is made for `None` at runtime
                         // (it's implicitly converted to `NoneType` in `int | None`)
                         // which means that `isinstance(x, int | None)` works even though
                         // `None` is not a class literal.
-                        if element.is_none(db) {
-                            self.generate_constraint(
-                                db,
-                                KnownClass::NoneType.to_class_literal(db),
-                                is_positive,
-                            )
-                        } else {
-                            self.generate_constraint(db, element, is_positive)
-                        }
-                    }),
-                )
+                        self.analyze_classinfo(
+                            db,
+                            KnownClass::NoneType.to_class_literal(db),
+                            is_positive,
+                        )
+                    } else {
+                        self.analyze_classinfo(db, element, is_positive)
+                    }?;
+                    elements.push(constraint);
+                }
+                Some(AnalyzedClassInfo::any(db, &elements))
             }
 
             Type::SpecialForm(form) => match form {
-                SpecialFormType::LegacyStdlibAlias(alias) => self.generate_constraint(
+                SpecialFormType::LegacyStdlibAlias(alias) => self.analyze_classinfo(
                     db,
                     alias.aliased_class().to_class_literal(db),
                     is_positive,
                 ),
-                SpecialFormType::Tuple => self.generate_constraint(
-                    db,
-                    KnownClass::Tuple.to_class_literal(db),
-                    is_positive,
-                ),
+                SpecialFormType::Tuple => {
+                    self.analyze_classinfo(db, KnownClass::Tuple.to_class_literal(db), is_positive)
+                }
                 SpecialFormType::Type => {
-                    self.generate_constraint(db, KnownClass::Type.to_class_literal(db), is_positive)
+                    self.analyze_classinfo(db, KnownClass::Type.to_class_literal(db), is_positive)
                 }
 
                 // We don't have a good meta-type for `Callable`s right now,
                 // so only apply `isinstance()` narrowing, not `issubclass()`
                 SpecialFormType::Callable => (self == ClassInfoConstraintFunction::IsInstance)
-                    .then(|| Type::Callable(CallableType::unknown(db)).top_materialization(db)),
+                    .then(|| {
+                        AnalyzedClassInfo::from_constraint(
+                            Type::Callable(CallableType::unknown(db)).top_materialization(db),
+                        )
+                    }),
 
                 _ => None,
             },
@@ -295,6 +410,7 @@ impl ClassInfoConstraintFunction {
             | Type::TypeGuard(_)
             | Type::WrapperDescriptor(_)
             | Type::DataclassTransformer(_)
+            | Type::TypedDictTop
             | Type::TypedDict(_)
             | Type::NewTypeInstance(_) => None,
         }
@@ -302,20 +418,53 @@ impl ClassInfoConstraintFunction {
 }
 
 #[derive(Hash, PartialEq, Debug, Eq, Clone, salsa::Update, get_size2::GetSize)]
+enum AtomicNarrowingConstraint<'db> {
+    Type(Type<'db>),
+    TypedDictRuntimeAdjustment {
+        constraint: Type<'db>,
+        is_positive: bool,
+    },
+}
+
+impl<'db> AtomicNarrowingConstraint<'db> {
+    fn apply(self, db: &'db dyn Db, base_ty: Type<'db>) -> Type<'db> {
+        match self {
+            AtomicNarrowingConstraint::Type(constraint) => IntersectionBuilder::new(db)
+                .add_positive(base_ty)
+                .add_positive(constraint)
+                .build(),
+            AtomicNarrowingConstraint::TypedDictRuntimeAdjustment {
+                constraint,
+                is_positive,
+            } => {
+                let static_narrowed = IntersectionBuilder::new(db)
+                    .add_positive(base_ty)
+                    .add_positive(constraint.negate_if(db, !is_positive))
+                    .build();
+
+                apply_typed_dict_runtime_adjustment(db, base_ty, static_narrowed, is_positive)
+            }
+        }
+    }
+}
+
+#[derive(Hash, PartialEq, Debug, Eq, Clone, salsa::Update, get_size2::GetSize)]
 struct Conjunctions<'db> {
-    conjuncts: SmallVec<[Type<'db>; 2]>,
+    conjuncts: SmallVec<[AtomicNarrowingConstraint<'db>; 2]>,
 }
 
 impl<'db> Conjunctions<'db> {
-    fn singleton(ty: Type<'db>) -> Self {
+    fn singleton(constraint: AtomicNarrowingConstraint<'db>) -> Self {
         Self {
-            conjuncts: smallvec![ty],
+            conjuncts: smallvec![constraint],
         }
     }
 
     fn and_with(mut self, other: Self) -> Self {
-        if self.conjuncts.iter().any(Type::is_never) || other.conjuncts.iter().any(Type::is_never) {
-            return Self::singleton(Type::Never);
+        let has_never = |constraint: &AtomicNarrowingConstraint<'db>| matches!(constraint, AtomicNarrowingConstraint::Type(ty) if ty.is_never());
+
+        if self.conjuncts.iter().any(has_never) || other.conjuncts.iter().any(has_never) {
+            return Self::singleton(AtomicNarrowingConstraint::Type(Type::Never));
         }
 
         for conjunct in other.conjuncts {
@@ -326,16 +475,24 @@ impl<'db> Conjunctions<'db> {
         self
     }
 
-    fn evaluate_constraint_type(self, db: &'db dyn Db) -> Type<'db> {
-        if self.conjuncts.len() == 1 {
-            return self.conjuncts[0];
+    fn evaluate_constraint_type(self, db: &'db dyn Db, base_ty: Type<'db>) -> Type<'db> {
+        if self
+            .conjuncts
+            .iter()
+            .all(|conjunct| matches!(conjunct, AtomicNarrowingConstraint::Type(_)))
+        {
+            let mut intersection = IntersectionBuilder::new(db).add_positive(base_ty);
+            for conjunct in self.conjuncts {
+                if let AtomicNarrowingConstraint::Type(ty) = conjunct {
+                    intersection = intersection.add_positive(ty);
+                }
+            }
+            return intersection.build();
         }
 
-        let mut intersection = IntersectionBuilder::new(db);
-        for conjunct in self.conjuncts {
-            intersection = intersection.add_positive(conjunct);
-        }
-        intersection.build()
+        self.conjuncts
+            .into_iter()
+            .fold(base_ty, |ty, conjunct| conjunct.apply(db, ty))
     }
 }
 
@@ -379,7 +536,9 @@ impl<'db> NarrowingConstraint<'db> {
     /// intersected with this constraint
     pub(crate) fn intersection(constraint: Type<'db>) -> Self {
         Self {
-            intersection_disjuncts: smallvec_inline![Conjunctions::singleton(constraint)],
+            intersection_disjuncts: smallvec_inline![Conjunctions::singleton(
+                AtomicNarrowingConstraint::Type(constraint),
+            )],
             replacement_disjuncts: smallvec![],
         }
     }
@@ -389,7 +548,29 @@ impl<'db> NarrowingConstraint<'db> {
     fn replacement(constraint: Type<'db>) -> Self {
         Self {
             intersection_disjuncts: smallvec![],
-            replacement_disjuncts: smallvec_inline![Conjunctions::singleton(constraint)],
+            replacement_disjuncts: smallvec_inline![Conjunctions::singleton(
+                AtomicNarrowingConstraint::Type(constraint),
+            )],
+        }
+    }
+
+    fn classinfo(db: &'db dyn Db, classinfo: &AnalyzedClassInfo<'db>, is_positive: bool) -> Self {
+        if classinfo.typed_dict_runtime_match == TypedDictRuntimeMatch::Never {
+            Self::intersection(classinfo.constraint.negate_if(db, !is_positive))
+        } else {
+            Self::typed_dict_runtime_adjustment(classinfo.constraint, is_positive)
+        }
+    }
+
+    fn typed_dict_runtime_adjustment(constraint: Type<'db>, is_positive: bool) -> Self {
+        Self {
+            intersection_disjuncts: smallvec_inline![Conjunctions::singleton(
+                AtomicNarrowingConstraint::TypedDictRuntimeAdjustment {
+                    constraint,
+                    is_positive,
+                },
+            )],
+            replacement_disjuncts: smallvec![],
         }
     }
 
@@ -446,17 +627,14 @@ impl<'db> NarrowingConstraint<'db> {
         }
     }
 
-    /// Evaluate the type this effectively constrains to
-    ///
-    /// Forgets whether each constraint originated from a `replacement` disjunct or not
-    pub(crate) fn evaluate_constraint_type(self, db: &'db dyn Db) -> Type<'db> {
+    /// Apply the constraint to a base type.
+    pub(crate) fn narrow_base_type(self, db: &'db dyn Db, base_ty: Type<'db>) -> Type<'db> {
         let mut union = UnionBuilder::new(db);
-        for conjunctions in self
-            .replacement_disjuncts
-            .into_iter()
-            .chain(self.intersection_disjuncts)
-        {
-            union = union.add(conjunctions.evaluate_constraint_type(db));
+        for conjunctions in self.replacement_disjuncts {
+            union = union.add(conjunctions.evaluate_constraint_type(db, Type::object()));
+        }
+        for conjunctions in self.intersection_disjuncts {
+            union = union.add(conjunctions.evaluate_constraint_type(db, base_ty));
         }
         union.build()
     }
@@ -1551,10 +1729,10 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 }
             }
             Type::FunctionLiteral(function_type) if expr_call.arguments.keywords.is_empty() => {
-                let [first_arg, second_arg] = &*expr_call.arguments.args else {
+                let [first_arg_node, second_arg] = &*expr_call.arguments.args else {
                     return None;
                 };
-                let first_arg = PlaceExpr::try_from_expr(first_arg)?;
+                let first_arg = PlaceExpr::try_from_expr(first_arg_node)?;
                 let function = function_type.known(self.db)?;
                 let place = self.expect_place(&first_arg);
 
@@ -1583,16 +1761,12 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
 
                 let function = function.into_classinfo_constraint_function()?;
 
-                let class_info_ty = inference.expression_type(second_arg);
-
                 function
-                    .generate_constraint(self.db, class_info_ty, is_positive)
-                    .map(|constraint| {
+                    .analyze_classinfo(self.db, inference.expression_type(second_arg), is_positive)
+                    .map(|classinfo| {
                         NarrowingConstraints::from_iter([(
                             place,
-                            NarrowingConstraint::intersection(
-                                constraint.negate_if(self.db, !is_positive),
-                            ),
+                            NarrowingConstraint::classinfo(self.db, &classinfo, is_positive),
                         )])
                     })
             }
@@ -1718,11 +1892,12 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         let place = self.expect_place(&subject);
 
         let mapping_type = ClassInfoConstraintFunction::IsInstance
-            .generate_constraint(
+            .analyze_classinfo(
                 self.db,
                 KnownClass::Mapping.to_class_literal(self.db),
                 is_positive,
             )?
+            .constraint
             .negate_if(self.db, !is_positive);
 
         Some(NarrowingConstraints::from_iter([(
@@ -2013,11 +2188,54 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
     }
 }
 
+fn apply_typed_dict_runtime_adjustment<'db>(
+    db: &'db dyn Db,
+    base_ty: Type<'db>,
+    static_narrowed: Type<'db>,
+    is_positive: bool,
+) -> Type<'db> {
+    if !is_or_contains_typed_dict_like(db, base_ty) {
+        return static_narrowed;
+    }
+
+    if !is_positive {
+        IntersectionBuilder::new(db)
+            .add_positive(static_narrowed)
+            .add_negative(Type::TypedDictTop)
+            .build()
+    } else {
+        UnionBuilder::new(db)
+            .add(static_narrowed)
+            .add(
+                IntersectionBuilder::new(db)
+                    .add_positive(base_ty)
+                    .add_positive(Type::TypedDictTop)
+                    .build(),
+            )
+            .build()
+    }
+}
+
+fn class_literal_matches_typed_dict_runtime_supertype<'db>(
+    db: &'db dyn Db,
+    class: ClassLiteral<'db>,
+) -> bool {
+    let mutable_mapping = known_module_symbol(db, KnownModule::Typing, "MutableMapping")
+        .place
+        .ignore_possibly_undefined()
+        .and_then(Type::as_class_literal);
+
+    class.is_known(db, KnownClass::Dict)
+        || class.is_known(db, KnownClass::Mapping)
+        || mutable_mapping == Some(class)
+}
+
 // Return true if the given type is a `TypedDict` or a union or intersection that includes at least
 // one `TypedDict` (even if other types are also present), or a type alias to such a type.
 fn is_or_contains_typeddict<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
     match ty {
         Type::TypedDict(_) => true,
+        Type::TypedDictTop => false,
         Type::Intersection(intersection) => intersection
             .positive(db)
             .iter()
@@ -2057,6 +2275,62 @@ fn is_or_contains_typeddict<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
     }
 }
 
+fn is_or_contains_typed_dict_like<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
+    match ty {
+        Type::TypedDict(_) | Type::TypedDictTop => true,
+        Type::Intersection(intersection) => {
+            intersection
+                .positive(db)
+                .iter()
+                .any(|intersection_element_ty| {
+                    is_or_contains_typed_dict_like(db, *intersection_element_ty)
+                })
+        }
+        Type::Union(union) => union
+            .elements(db)
+            .iter()
+            .any(|union_member_ty| is_or_contains_typed_dict_like(db, *union_member_ty)),
+        Type::TypeAlias(alias) => is_or_contains_typed_dict_like(db, alias.value_type(db)),
+        Type::TypeVar(bound_typevar) => bound_typevar
+            .typevar(db)
+            .bound_or_constraints(db)
+            .is_some_and(|bound_or_constraints| match bound_or_constraints {
+                TypeVarBoundOrConstraints::UpperBound(bound) => {
+                    is_or_contains_typed_dict_like(db, bound)
+                }
+                TypeVarBoundOrConstraints::Constraints(constraints) => {
+                    is_or_contains_typed_dict_like(db, constraints.as_type(db))
+                }
+            }),
+
+        Type::Dynamic(_)
+        | Type::Never
+        | Type::FunctionLiteral(_)
+        | Type::BoundMethod(_)
+        | Type::KnownBoundMethod(_)
+        | Type::WrapperDescriptor(_)
+        | Type::DataclassDecorator(_)
+        | Type::DataclassTransformer(_)
+        | Type::Callable(_)
+        | Type::ModuleLiteral(_)
+        | Type::ClassLiteral(_)
+        | Type::GenericAlias(_)
+        | Type::SubclassOf(_)
+        | Type::NominalInstance(_)
+        | Type::ProtocolInstance(_)
+        | Type::SpecialForm(_)
+        | Type::KnownInstance(_)
+        | Type::PropertyInstance(_)
+        | Type::AlwaysTruthy
+        | Type::AlwaysFalsy
+        | Type::LiteralValue(_)
+        | Type::BoundSuper(_)
+        | Type::TypeIs(_)
+        | Type::TypeGuard(_)
+        | Type::NewTypeInstance(_) => false,
+    }
+}
+
 fn is_supported_tag_literal(ty: Type) -> bool {
     matches!(
         ty.as_literal_value_kind(),
@@ -2089,6 +2363,7 @@ fn all_matching_typeddict_fields_have_literal_types<'db>(
 
     match ty {
         Type::TypedDict(td) => matching_field_is_literal(&td),
+        Type::TypedDictTop => false,
         Type::Union(union) => union.elements(db).iter().all(|union_member_ty| {
             !is_or_contains_typeddict(db, *union_member_ty)
                 || all_matching_typeddict_fields_have_literal_types(
