@@ -608,8 +608,12 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         if self.relation == TypeRelation::SubtypingAssuming
             && (source.is_type_var() || target.is_type_var())
         {
-            let given = self.relation_visitor.extra;
-            return given.implies_subtype_of(db, self.constraints, source, target);
+            return self.relation_visitor.extra.implies_subtype_of(
+                db,
+                self.constraints,
+                source,
+                target,
+            );
         }
 
         // Handle the constraint-set-based assignability relation next. Comparisons with a

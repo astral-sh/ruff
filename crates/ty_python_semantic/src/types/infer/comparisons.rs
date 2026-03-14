@@ -533,7 +533,7 @@ pub(super) fn infer_binary_type_comparison<'db>(
             let constraints = ConstraintSetBuilder::new();
             let left = constraints.load(db, left.constraints(db));
             let right = constraints.load(db, right.constraints(db));
-            let result = left.iff(db, &constraints, right);
+            let result = left.iff(db, &constraints, &right);
             let equivalent = result.is_always_satisfied(db);
             match op {
                 ast::CmpOp::Eq => Some(Ok(Type::bool_literal(equivalent))),

@@ -1190,7 +1190,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
         let mut result = self.always();
 
-        let mut check_types = |type1: Type<'db>, type2: Type<'db>| {
+        let check_types = |type1: Type<'db>, type2: Type<'db>, result: ConstraintSet<'db, 'c>| {
             match (type1, type2) {
                 // This is a special case where the _same_ components of two different `ParamSpec`
                 // type variables are assignable to each other when they're both in an inferable
@@ -1208,18 +1208,21 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             .without_paramspec_attr(db)
                             .is_inferable(db, self.inferable) =>
                 {
-                    return true;
+                    return self.always();
                 }
                 _ => {}
             }
 
-            !result
-                .intersect(db, self.constraints, self.check_type_pair(db, type1, type2))
-                .is_never_satisfied(db)
+            result.intersect(
+                db,
+                self.constraints,
+                &self.check_type_pair(db, type1, type2),
+            )
         };
 
         // Return types are covariant.
-        if !check_types(source.return_ty, target.return_ty) {
+        result = check_types(source.return_ty, target.return_ty, result);
+        if result.is_never_satisfied(db) {
             return result;
         }
 
@@ -1255,7 +1258,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 TypeRelation::Redundancy { .. } => result.intersect(
                     db,
                     self.constraints,
-                    ConstraintSet::from_bool(
+                    &ConstraintSet::from_bool(
                         self.constraints,
                         source.parameters.is_gradual() && target.parameters.is_gradual(),
                     ),
@@ -1279,7 +1282,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         Type::TypeVar(target_tvar),
                         Type::TypeVar(target_tvar),
                     );
-                    result.intersect(db, self.constraints, param_spec_matches);
+                    result = result.intersect(db, self.constraints, &param_spec_matches);
                     return result;
                 }
 
@@ -1300,7 +1303,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         Type::Never,
                         upper,
                     );
-                    result.intersect(db, self.constraints, param_spec_matches);
+                    result = result.intersect(db, self.constraints, &param_spec_matches);
                     return result;
                 }
 
@@ -1321,7 +1324,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         lower,
                         Type::object(),
                     );
-                    result.intersect(db, self.constraints, param_spec_matches);
+                    result = result.intersect(db, self.constraints, &param_spec_matches);
                     return result;
                 }
 
@@ -1404,10 +1407,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             if source_default.is_none() && target_default.is_some() {
                                 return self.never();
                             }
-                            if !check_types(
+                            result = check_types(
                                 target_param.annotated_type(),
                                 source_param.annotated_type(),
-                            ) {
+                                result,
+                            );
+                            if result.is_never_satisfied(db) {
                                 return result;
                             }
                         }
@@ -1429,10 +1434,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             if source_default.is_none() && target_default.is_some() {
                                 return self.never();
                             }
-                            if !check_types(
+                            result = check_types(
                                 target_param.annotated_type(),
                                 source_param.annotated_type(),
-                            ) {
+                                result,
+                            );
+                            if result.is_never_satisfied(db) {
                                 return result;
                             }
                         }
@@ -1442,10 +1449,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             ParameterKind::PositionalOnly { .. }
                             | ParameterKind::PositionalOrKeyword { .. },
                         ) => {
-                            if !check_types(
+                            result = check_types(
                                 target_param.annotated_type(),
                                 source_param.annotated_type(),
-                            ) {
+                                result,
+                            );
+                            if result.is_never_satisfied(db) {
                                 return result;
                             }
 
@@ -1482,10 +1491,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                         break;
                                     }
                                 }
-                                if !check_types(
+                                result = check_types(
                                     target_parameter.annotated_type(),
                                     source_param.annotated_type(),
-                                ) {
+                                    result,
+                                );
+                                if result.is_never_satisfied(db) {
                                     return result;
                                 }
                                 parameters.next_target();
@@ -1493,10 +1504,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         }
 
                         (ParameterKind::Variadic { .. }, ParameterKind::Variadic { .. }) => {
-                            if !check_types(
+                            result = check_types(
                                 target_param.annotated_type(),
                                 source_param.annotated_type(),
-                            ) {
+                                result,
+                            );
+                            if result.is_never_satisfied(db) {
                                 return result;
                             }
                         }
@@ -1576,10 +1589,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                 if source_default.is_none() && target_default.is_some() {
                                     return self.never();
                                 }
-                                if !check_types(
+                                result = check_types(
                                     target_param.annotated_type(),
                                     source_param.annotated_type(),
-                                ) {
+                                    result,
+                                );
+                                if result.is_never_satisfied(db) {
                                     return result;
                                 }
                             }
@@ -1588,7 +1603,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             ),
                         }
                     } else if let Some(source_keyword_variadic) = source_keyword_variadic {
-                        if !check_types(target_param.annotated_type(), source_keyword_variadic) {
+                        result = check_types(
+                            target_param.annotated_type(),
+                            source_keyword_variadic,
+                            result,
+                        );
+                        if result.is_never_satisfied(db) {
                             return result;
                         }
                     } else {
@@ -1601,7 +1621,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         // parameter, `source` must also have a keyword variadic parameter.
                         return self.never();
                     };
-                    if !check_types(target_param.annotated_type(), source_keyword_variadic) {
+                    result = check_types(
+                        target_param.annotated_type(),
+                        source_keyword_variadic,
+                        result,
+                    );
+                    if result.is_never_satisfied(db) {
                         return result;
                     }
                 }
