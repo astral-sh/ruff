@@ -476,11 +476,21 @@ fn check_class_declaration<'db>(
                 })
                 && type_contains_unknown(db, superclass_type);
 
+            let own_class_member_type = own_class_member.ignore_possibly_undefined();
+            let specialized_own_class_member_type = own_class_member_type.filter(|ty| {
+                ty.try_upcast_to_callable(db).is_some_and(|callables| {
+                    callables
+                        .iter()
+                        .any(|callable| callable.kind(db) == CallableTypeKind::FunctionLike)
+                })
+            });
+
             let superclass_type_as_type = if gradual_superclass_callable {
                 Type::Callable(CallableType::unknown(db))
             } else {
-                match declared_superclass_type
-                    .or_else(|| own_class_member.ignore_possibly_undefined())
+                match specialized_own_class_member_type
+                    .or(declared_superclass_type)
+                    .or(own_class_member_type)
                     .unwrap_or(superclass_type)
                     .method_override_base_type(
                         db,
@@ -642,9 +652,10 @@ impl<'db> Type<'db> {
                     .get(0)
                     .filter(|parameter| parameter.is_positional())
                     .is_none_or(|parameter| {
-                        !parameter
-                            .annotated_type()
-                            .is_disjoint_from(db, current_class_instance)
+                        let annotated_self = parameter.annotated_type();
+
+                        current_class_instance.is_assignable_to(db, annotated_self)
+                            || !annotated_self.is_disjoint_from(db, current_class_instance)
                     })
             })
             .cloned()
