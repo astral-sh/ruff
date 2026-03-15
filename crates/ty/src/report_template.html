@@ -395,16 +395,19 @@
       .tree-item .badge.q2 {
         background: rgba(246, 175, 188, 0.18);
       }
-      /* Quality row tints for summary table */
-      table.summary tbody tr.summary-quality-0 td {
-        background: rgba(var(--ty-precise-rgb), 0.12);
+      /* Quality pip in the file column of the summary table */
+      .summary-pip {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        border-radius: 2px;
+        margin-right: 6px;
+        vertical-align: middle;
+        flex-shrink: 0;
       }
-      table.summary tbody tr.summary-quality-1 td {
-        background: rgba(var(--ty-imprecise-rgb), 0.12);
-      }
-      table.summary tbody tr.summary-quality-2 td {
-        background: rgba(var(--ty-dynamic-rgb), 0.12);
-      }
+      .summary-pip.q0 { background: rgba(var(--ty-precise-rgb),  0.85); }
+      .summary-pip.q1 { background: rgba(var(--ty-imprecise-rgb), 0.85); }
+      .summary-pip.q2 { background: rgba(var(--ty-dynamic-rgb),  0.85); }
       .stat-badge {
         font-family: "IBM Plex Mono", monospace;
         font-size: 11px;
@@ -529,14 +532,6 @@
 
       function qualityClass(pct) {
         return pct < 5 ? "q0" : pct < 20 ? "q1" : "q2";
-      }
-
-      function summaryQualityClass(pct) {
-        return pct < 5
-          ? "summary-quality-0"
-          : pct < 20
-            ? "summary-quality-1"
-            : "summary-quality-2";
       }
 
       // Returns "N (X%)" — matches the ASCII table format from `fmt_count_pct` in lib.rs.
@@ -754,15 +749,12 @@
 
         files.forEach(function (f, idx) {
           const ls = lineStats(f);
-          const q = summaryQualityClass(ls.pct.combined);
+          const q = qualityClass(ls.pct.combined);
+          html += '<tr data-idx="' + idx + '" style="cursor:pointer">';
           html +=
-            '<tr class="' +
-            q +
-            '" data-idx="' +
-            idx +
-            '" style="cursor:pointer">';
-          html +=
-            '<td class="col-file"><a href="#file-' +
+            '<td class="col-file">' +
+            '<span class="summary-pip ' + q + '"></span>' +
+            '<a href="#file-' +
             idx +
             '" onclick="event.preventDefault()">' +
             escHtml(f.path) +

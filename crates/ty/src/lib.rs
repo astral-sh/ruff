@@ -289,8 +289,8 @@ fn run_coverage(args: CoverageCommand) -> anyhow::Result<ExitStatus> {
 
     // Sort by combined line-level imprecision descending, then by path for stable output.
     per_file.sort_by(|(path_a, _, details_a), (path_b, _, details_b)| {
-        let pct_a = details_a.stats.lines.combined_imprecision_pct();
-        let pct_b = details_b.stats.lines.combined_imprecision_pct();
+        let pct_a = details_a.stats.combined_imprecision_pct();
+        let pct_b = details_b.stats.combined_imprecision_pct();
         pct_b
             .partial_cmp(&pct_a)
             .unwrap_or(std::cmp::Ordering::Equal)
@@ -328,7 +328,7 @@ fn run_coverage(args: CoverageCommand) -> anyhow::Result<ExitStatus> {
         let mut tbl = AsciiTable::new(columns);
 
         for (path, _, d) in &per_file {
-            let ls = &d.stats.lines;
+            let ls = &d.stats;
             let n = ls.total();
             let mut row = vec![
                 display_path(path),
@@ -344,7 +344,7 @@ fn run_coverage(args: CoverageCommand) -> anyhow::Result<ExitStatus> {
             tbl.push_row(row);
         }
 
-        let tl = &total.lines;
+        let tl = &total;
         let tn = tl.total();
         let mut footer = vec![
             "Total".to_owned(),

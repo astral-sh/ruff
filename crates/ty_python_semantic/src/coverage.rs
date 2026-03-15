@@ -14,8 +14,9 @@ use ruff_python_ast::{
 use ruff_source_file::LineIndex;
 use ruff_text_size::{Ranged, TextRange};
 
+/// Per-line coverage counts for a file or a collection of files.
 #[derive(Debug, Default, Clone, Copy)]
-pub struct LineCoverageStats {
+pub struct CoverageStats {
     pub precise: u64,
     pub imprecise: u64,
     pub dynamic: u64,
@@ -23,7 +24,7 @@ pub struct LineCoverageStats {
     pub empty: u64,
 }
 
-impl LineCoverageStats {
+impl CoverageStats {
     pub fn total(&self) -> u64 {
         self.precise + self.imprecise + self.dynamic + self.todo + self.empty
     }
@@ -39,66 +40,13 @@ impl LineCoverageStats {
     }
 
     #[must_use]
-    pub fn merge(self, other: LineCoverageStats) -> LineCoverageStats {
-        LineCoverageStats {
+    pub fn merge(self, other: CoverageStats) -> CoverageStats {
+        CoverageStats {
             precise: self.precise + other.precise,
             imprecise: self.imprecise + other.imprecise,
             dynamic: self.dynamic + other.dynamic,
             todo: self.todo + other.todo,
             empty: self.empty + other.empty,
-        }
-    }
-}
-
-#[derive(Debug, Default, Clone, Copy)]
-pub struct CoverageStats {
-    pub total: u64,
-    pub dynamic: u64,
-    pub imprecise: u64,
-    pub todo: u64,
-    pub lines: LineCoverageStats,
-}
-
-impl CoverageStats {
-    #[must_use]
-    pub fn merge(self, other: CoverageStats) -> CoverageStats {
-        CoverageStats {
-            total: self.total + other.total,
-            dynamic: self.dynamic + other.dynamic,
-            imprecise: self.imprecise + other.imprecise,
-            todo: self.todo + other.todo,
-            lines: self.lines.merge(other.lines),
-        }
-    }
-
-    /// Returns the percentage of expressions that are directly or containedly dynamic
-    /// (combining `dynamic` + `imprecise` to match mypy's headline imprecision figure).
-    #[expect(clippy::cast_precision_loss)]
-    pub fn dynamic_percentage(&self) -> Option<f64> {
-        if self.total == 0 {
-            None
-        } else {
-            Some((self.dynamic + self.imprecise) as f64 / self.total as f64 * 100.0)
-        }
-    }
-
-    /// Returns the percentage of expressions whose type is *directly* dynamic
-    /// (top-level `Unknown`/`Any` only, not contained in a type argument).
-    #[expect(clippy::cast_precision_loss)]
-    pub fn pure_dynamic_percentage(&self) -> Option<f64> {
-        if self.total == 0 {
-            None
-        } else {
-            Some(self.dynamic as f64 / self.total as f64 * 100.0)
-        }
-    }
-
-    #[expect(clippy::cast_precision_loss)]
-    pub fn todo_percentage(&self) -> Option<f64> {
-        if self.total == 0 {
-            None
-        } else {
-            Some(self.todo as f64 / self.total as f64 * 100.0)
         }
     }
 }
@@ -144,20 +92,19 @@ pub fn coverage_details(db: &dyn Db, file: File) -> FileCoverageDetails {
     let ast = parsed_module(db, file).load(db);
     visitor.visit_body(ast.suite());
 
-    let mut lines = LineCoverageStats::default();
+    let mut stats = CoverageStats::default();
     for line in 1..=visitor.line_index.line_count() {
         match visitor.line_map.get(&line) {
-            None => lines.empty += 1,
-            Some(TypeCoverage::Precise) => lines.precise += 1,
-            Some(TypeCoverage::Imprecise) => lines.imprecise += 1,
-            Some(TypeCoverage::Dynamic) => lines.dynamic += 1,
-            Some(TypeCoverage::Todo) => lines.todo += 1,
+            None => stats.empty += 1,
+            Some(TypeCoverage::Precise) => stats.precise += 1,
+            Some(TypeCoverage::Imprecise) => stats.imprecise += 1,
+            Some(TypeCoverage::Dynamic) => stats.dynamic += 1,
+            Some(TypeCoverage::Todo) => stats.todo += 1,
         }
     }
-    visitor.stats.lines = lines;
 
     FileCoverageDetails {
-        stats: visitor.stats,
+        stats,
         line_map: visitor.line_map,
     }
 }
@@ -166,7 +113,6 @@ struct CoverageVisitor<'db> {
     db: &'db dyn Db,
     line_index: LineIndex,
     model: SemanticModel<'db>,
-    stats: CoverageStats,
     line_map: HashMap<usize, TypeCoverage>,
 }
 
@@ -176,7 +122,6 @@ impl<'db> CoverageVisitor<'db> {
             db,
             line_index: line_index(db, file),
             model: SemanticModel::new(db, file),
-            stats: CoverageStats::default(),
             line_map: HashMap::new(),
         }
     }
@@ -201,7 +146,6 @@ impl<'db> CoverageVisitor<'db> {
             return;
         };
 
-        self.stats.total += 1;
         let coverage = classify(self.db, ty);
 
         let start_line = self.line_index.line_index(range.start()).get();
@@ -221,13 +165,6 @@ impl<'db> CoverageVisitor<'db> {
         // claimed their lines, so a precise child won't be overwritten here.
         for line in (start_line + 1)..=end_line {
             self.line_map.entry(line).or_insert(coverage);
-        }
-
-        match coverage {
-            TypeCoverage::Todo => self.stats.todo += 1,
-            TypeCoverage::Dynamic => self.stats.dynamic += 1,
-            TypeCoverage::Imprecise => self.stats.imprecise += 1,
-            TypeCoverage::Precise => {}
         }
     }
 }
