@@ -12,7 +12,7 @@ use rustc_hash::FxHashSet;
 use crate::{
     Db,
     lint::LintId,
-    place::{DefinedPlace, Place},
+    place::{DefinedPlace, Place, place_from_declarations},
     semantic_index::{
         definition::{Definition, DefinitionKind},
         place::ScopedPlaceId,
@@ -129,6 +129,39 @@ fn check_class_declaration<'db>(
             .any(|definition| definition.kind(db).is_function_def())
     }
 
+    /// Salsa-tracked query to check whether all end-of-scope bindings of a symbol
+    /// are simple assignments.
+    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+    fn all_binding_definitions_are_assignments<'db>(
+        db: &'db dyn Db,
+        scope: ScopeId<'db>,
+        symbol: ScopedSymbolId,
+    ) -> bool {
+        let mut has_definition = false;
+
+        for binding in use_def_map(db, scope).end_of_scope_symbol_bindings(symbol) {
+            let Some(definition) = binding.binding.definition() else {
+                continue;
+            };
+
+            has_definition = true;
+
+            if !matches!(definition.kind(db), DefinitionKind::Assignment(_)) {
+                return false;
+            }
+        }
+
+        has_definition
+    }
+
+    fn type_contains_unknown<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
+        ty.is_unknown()
+            || matches!(
+                ty,
+                Type::Union(union) if union.elements(db).iter().any(Type::is_unknown)
+            )
+    }
+
     let db = context.db();
 
     let MemberWithDefinition {
@@ -138,13 +171,10 @@ fn check_class_declaration<'db>(
 
     let instance_of_class = Type::instance(db, class);
 
-    let Place::Defined(DefinedPlace {
-        ty: type_on_subclass_instance,
-        ..
-    }) = instance_of_class.member(db, &member.name).place
-    else {
-        return;
-    };
+    let type_on_subclass_instance = instance_of_class
+        .member(db, &member.name)
+        .place
+        .ignore_possibly_undefined();
 
     let Some((literal, specialization)) = class.static_class_literal(db) else {
         return;
@@ -395,6 +425,10 @@ fn check_class_declaration<'db>(
                 continue;
             };
 
+            let Some(type_on_subclass_instance) = type_on_subclass_instance else {
+                continue;
+            };
+
             // Constructor methods are not checked for Liskov compliance
             if matches!(
                 &*member.name,
@@ -410,21 +444,52 @@ fn check_class_declaration<'db>(
                 continue;
             }
 
+            let subclass_type_as_type = match class
+                .own_class_member(db, None, &member.name)
+                .ignore_possibly_undefined()
+                .unwrap_or(type_on_subclass_instance)
+                .method_override_base_type(db, instance_of_class, type_on_subclass_instance)
+            {
+                MethodOverrideBaseType::Skip => continue,
+                MethodOverrideBaseType::Type(subclass_type) => subclass_type,
+            };
+
             let Some(superclass_type_as_callable) = superclass_type.try_upcast_to_callable(db)
             else {
                 continue;
             };
 
-            let superclass_type_as_type = match own_class_member
-                .ignore_possibly_undefined()
-                .unwrap_or(superclass_type)
-                .method_override_base_type(
+            let declared_superclass_type = superclass_symbol_id.and_then(|id| {
+                place_from_declarations(
                     db,
-                    instance_of_class,
-                    superclass_type_as_callable.into_type(db),
-                ) {
-                MethodOverrideBaseType::Skip => continue,
-                MethodOverrideBaseType::Type(superclass_type) => superclass_type,
+                    use_def_map(db, superclass_scope).end_of_scope_symbol_declarations(id),
+                )
+                .ignore_conflicting_declarations()
+                .place
+                .ignore_possibly_undefined()
+                .map(|ty| ty.apply_optional_specialization(db, superclass_specialization))
+            });
+
+            let gradual_superclass_callable = declared_superclass_type.is_none()
+                && superclass_symbol_id.is_some_and(|id| {
+                    all_binding_definitions_are_assignments(db, superclass_scope, id)
+                })
+                && type_contains_unknown(db, superclass_type);
+
+            let superclass_type_as_type = if gradual_superclass_callable {
+                Type::Callable(CallableType::unknown(db))
+            } else {
+                match declared_superclass_type
+                    .or_else(|| own_class_member.ignore_possibly_undefined())
+                    .unwrap_or(superclass_type)
+                    .method_override_base_type(
+                        db,
+                        instance_of_class,
+                        superclass_type_as_callable.into_type(db),
+                    ) {
+                    MethodOverrideBaseType::Skip => continue,
+                    MethodOverrideBaseType::Type(superclass_type) => superclass_type,
+                }
             };
 
             // Record the first superclass that defines this method as the "immediate parent method"
@@ -432,7 +497,7 @@ fn check_class_declaration<'db>(
                 immediate_parent_method = Some((superclass, superclass_type_as_type));
             }
 
-            if type_on_subclass_instance.is_assignable_to(db, superclass_type_as_type) {
+            if subclass_type_as_type.is_assignable_to(db, superclass_type_as_type) {
                 continue;
             }
 
@@ -544,13 +609,17 @@ impl<'db> Type<'db> {
         fallback: Type<'db>,
     ) -> MethodOverrideBaseType<'db> {
         let callable = match self {
-            Type::FunctionLiteral(function) => function.into_callable_type(db),
-            Type::Callable(callable) => callable,
+            Self::FunctionLiteral(function) => function.into_callable_type(db),
+            Self::Callable(callable) => callable,
             _ => return MethodOverrideBaseType::Type(fallback),
         };
 
-        if callable.kind(db) != CallableTypeKind::FunctionLike {
-            return MethodOverrideBaseType::Type(fallback);
+        match callable.kind(db) {
+            CallableTypeKind::Regular => {
+                return MethodOverrideBaseType::Type(Self::Callable(callable));
+            }
+            CallableTypeKind::FunctionLike => {}
+            _ => return MethodOverrideBaseType::Type(fallback),
         }
 
         let overloads: Vec<_> = callable
@@ -581,7 +650,7 @@ impl<'db> Type<'db> {
         )
         .bind_self(db, Some(current_class_instance));
 
-        MethodOverrideBaseType::Type(Type::Callable(callable))
+        MethodOverrideBaseType::Type(Self::Callable(callable))
     }
 }
 

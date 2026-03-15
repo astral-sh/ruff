@@ -683,6 +683,42 @@ class Baz(Foo):
     def method(self) -> Iterator[Foo]: ...  # error: [invalid-method-override]
 ```
 
+## Gradual callable hooks
+
+If a base class stores a function in a class attribute typed as `Callable[..., T]`, subclasses
+should be checked against the declared callable contract, not the aliased function's original
+signature.
+
+```py
+from typing import Callable
+
+class Base:
+    def _initialize(self) -> None: ...
+    initialize = _initialize  # type: Callable[..., None]
+
+class Good(Base):
+    def initialize(self, x: int) -> None: ...
+```
+
+## Rebound methods
+
+Rebinding a method name on `self` inside another method should not affect override checks for
+subclasses that define the method in the class body.
+
+```py
+class Base:
+    def _handle_event(self, event: int) -> None: ...
+    def done(self, _: int) -> None: ...
+    def close(self) -> None:
+        self._handle_event = self.done  # error: [invalid-assignment]
+
+class Good(Base):
+    def _handle_event(self, event: int) -> None: ...
+
+class Bad(Base):
+    def _handle_event(self, event: str) -> None: ...  # error: [invalid-method-override]
+```
+
 ## Definitely bound members with no reachable definitions(!)
 
 We don't emit a Liskov-violation diagnostic here, but if you're writing code like this, you probably
