@@ -127,6 +127,43 @@ fn load_project(
     Ok((db, project_options_overrides, absolute_paths))
 }
 
+/// Returns the current working directory as a [`SystemPathBuf`].
+fn current_working_directory() -> anyhow::Result<SystemPathBuf> {
+    let cwd = std::env::current_dir().context("Failed to get the current working directory")?;
+    SystemPathBuf::from_path_buf(cwd).map_err(|path| {
+        anyhow!(
+            "The current working directory `{}` contains non-Unicode characters. ty only supports Unicode paths.",
+            path.display()
+        )
+    })
+}
+
+/// Creates the main loop, installs the Ctrl+C handler, and runs (or watches).
+fn run_main_loop(
+    db: &mut ProjectDatabase,
+    project_options_overrides: ProjectOptionsOverrides,
+    mode: MainLoopMode,
+    printer: Printer,
+    watch: bool,
+) -> anyhow::Result<ExitStatus> {
+    let (main_loop, main_loop_cancellation_token) =
+        MainLoop::new(mode, project_options_overrides, printer);
+
+    let main_loop_cancellation_token = Mutex::new(Some(main_loop_cancellation_token));
+    ctrlc::set_handler(move || {
+        let mut lock = main_loop_cancellation_token.lock().unwrap();
+        if let Some(token) = lock.take() {
+            token.stop();
+        }
+    })?;
+
+    if watch {
+        main_loop.watch(db)
+    } else {
+        main_loop.run(db)
+    }
+}
+
 fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     // Enabled ANSI colors on Windows 10.
     #[cfg(windows)]
@@ -141,16 +178,7 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
 
     tracing::debug!("Version: {}", version::version());
 
-    let cwd = {
-        let cwd = std::env::current_dir().context("Failed to get the current working directory")?;
-        SystemPathBuf::from_path_buf(cwd)
-            .map_err(|path| {
-                anyhow!(
-                    "The current working directory `{}` contains non-Unicode characters. ty only supports Unicode paths.",
-                    path.display()
-                )
-            })?
-    };
+    let cwd = current_working_directory()?;
 
     let mode = if args.add_ignore {
         MainLoopMode::AddIgnore
@@ -183,24 +211,7 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
 
     db.project().set_force_exclude(&mut db, force_exclude);
 
-    let (main_loop, main_loop_cancellation_token) =
-        MainLoop::new(mode, project_options_overrides, printer);
-
-    // Listen to Ctrl+C and abort the watch mode.
-    let main_loop_cancellation_token = Mutex::new(Some(main_loop_cancellation_token));
-    ctrlc::set_handler(move || {
-        let mut lock = main_loop_cancellation_token.lock().unwrap();
-
-        if let Some(token) = lock.take() {
-            token.stop();
-        }
-    })?;
-
-    let exit_status = if watch {
-        main_loop.watch(&mut db)?
-    } else {
-        main_loop.run(&mut db)?
-    };
+    let exit_status = run_main_loop(&mut db, project_options_overrides, mode, printer, watch)?;
 
     let mut stdout = printer.stream_for_requested_summary().lock();
     match std::env::var(EnvVars::TY_MEMORY_REPORT).as_deref() {
@@ -233,15 +244,7 @@ fn run_coverage(args: CoverageCommand) -> anyhow::Result<ExitStatus> {
     let verbosity = args.verbosity.level();
     let _guard = setup_tracing(verbosity, args.color.unwrap_or_default())?;
 
-    let cwd = {
-        let cwd = std::env::current_dir().context("Failed to get the current working directory")?;
-        SystemPathBuf::from_path_buf(cwd).map_err(|path| {
-            anyhow!(
-                "The current working directory `{}` contains non-Unicode characters. ty only supports Unicode paths.",
-                path.display()
-            )
-        })?
-    };
+    let cwd = current_working_directory()?;
 
     let system = OsSystem::new(&cwd);
     let config_file = args
@@ -251,6 +254,7 @@ fn run_coverage(args: CoverageCommand) -> anyhow::Result<ExitStatus> {
     // Extract paths and project before consuming args with into_options().
     let paths = args.paths.clone();
     let project = args.project.clone();
+    let no_progress = args.no_progress;
     let mode = MainLoopMode::Coverage {
         show_todo: args.todo,
         html_path: args.html.clone(),
@@ -275,20 +279,8 @@ fn run_coverage(args: CoverageCommand) -> anyhow::Result<ExitStatus> {
         }
     }
 
-    // Coverage never shows a progress bar.
-    let printer = Printer::new(verbosity, true);
-    let (main_loop, main_loop_cancellation_token) =
-        MainLoop::new(mode, project_options_overrides, printer);
-
-    let main_loop_cancellation_token = Mutex::new(Some(main_loop_cancellation_token));
-    ctrlc::set_handler(move || {
-        let mut lock = main_loop_cancellation_token.lock().unwrap();
-        if let Some(token) = lock.take() {
-            token.stop();
-        }
-    })?;
-
-    let exit_status = main_loop.run(&mut db)?;
+    let printer = Printer::new(verbosity, no_progress);
+    let exit_status = run_main_loop(&mut db, project_options_overrides, mode, printer, false)?;
 
     std::mem::forget(db);
 
@@ -546,16 +538,33 @@ impl MainLoop {
                     if matches!(self.mode, MainLoopMode::Coverage { .. }) {
                         // Coverage mode: compute per-file details in a background thread.
                         rayon::spawn(move || {
+                            let bar = indicatif::ProgressBar::hidden();
+                            let bar_for_cancel = bar.clone();
+
                             match salsa::Cancelled::catch(|| {
-                                db.project()
-                                    .files(&db)
+                                let files = db.project().files(&db);
+                                bar.set_length(files.len() as u64);
+                                bar.set_message("Coverage");
+                                bar.set_style(
+                                    indicatif::ProgressStyle::with_template(
+                                        "{msg:8.dim} {bar:60.green/dim} {pos}/{len} files",
+                                    )
+                                    .unwrap()
+                                    .progress_chars("--"),
+                                );
+                                bar.set_draw_target(self.printer.progress_target());
+
+                                let result = files
                                     .iter()
                                     .filter_map(|file| {
                                         let path = file.path(&db).as_system_path()?.to_path_buf();
                                         let details = compute_coverage_details(&db, *file);
+                                        bar.inc(1);
                                         Some((path, *file, details))
                                     })
-                                    .collect::<Vec<_>>()
+                                    .collect::<Vec<_>>();
+                                bar.finish_and_clear();
+                                result
                             }) {
                                 Ok(per_file) => {
                                     sender
@@ -566,6 +575,7 @@ impl MainLoop {
                                         .unwrap();
                                 }
                                 Err(cancelled) => {
+                                    bar_for_cancel.finish_and_clear();
                                     tracing::debug!(
                                         "Coverage computation cancelled: {cancelled:?}"
                                     );

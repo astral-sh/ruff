@@ -332,6 +332,12 @@ pub(crate) struct CoverageCommand {
         display_order = 1000
     )]
     pub(crate) color: Option<TerminalColor>,
+
+    /// Hide all progress outputs.
+    ///
+    /// For example, spinners or progress bars.
+    #[arg(global = true, long, value_parser = clap::builder::BoolishValueParser::new(), help_heading = "Global options")]
+    pub(crate) no_progress: bool,
 }
 
 impl CoverageCommand {
