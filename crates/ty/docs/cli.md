@@ -138,6 +138,8 @@ over all configuration files.</p>
 <p>May also be set with the <code>TY_CONFIG_FILE</code> environment variable.</p></dd><dt id="ty-coverage--extra-search-path"><a href="#ty-coverage--extra-search-path"><code>--extra-search-path</code></a> <i>path</i></dt><dd><p>Additional path to use as a module-resolution source (can be passed multiple times)</p>
 </dd><dt id="ty-coverage--help"><a href="#ty-coverage--help"><code>--help</code></a>, <code>-h</code></dt><dd><p>Print help (see a summary with '-h')</p>
 </dd><dt id="ty-coverage--html"><a href="#ty-coverage--html"><code>--html</code></a> <i>path</i></dt><dd><p>Write a self-contained HTML coverage report to PATH</p>
+</dd><dt id="ty-coverage--no-progress"><a href="#ty-coverage--no-progress"><code>--no-progress</code></a></dt><dd><p>Hide all progress outputs.</p>
+<p>For example, spinners or progress bars.</p>
 </dd><dt id="ty-coverage--project"><a href="#ty-coverage--project"><code>--project</code></a> <i>project</i></dt><dd><p>Run the command within the given project directory</p>
 </dd><dt id="ty-coverage--python"><a href="#ty-coverage--python"><code>--python</code></a>, <code>--venv</code> <i>path</i></dt><dd><p>Path to your project's Python environment or interpreter</p>
 </dd><dt id="ty-coverage--python-platform"><a href="#ty-coverage--python-platform"><code>--python-platform</code></a>, <code>--platform</code> <i>platform</i></dt><dd><p>Target platform to assume when resolving types</p>

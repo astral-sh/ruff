@@ -14,6 +14,8 @@ use serde::Serialize;
 use ty_project::{Db as _, ProjectDatabase};
 use ty_python_semantic::coverage::{FileCoverageDetails, TypeCoverage};
 
+const TEMPLATE: &str = include_str!("report_template.html");
+
 /// Root object embedded as `const COVERAGE_DATA = <json>;` in the HTML.
 #[derive(Serialize)]
 struct ReportData<'a> {
@@ -89,7 +91,6 @@ pub(crate) fn write_html_report(
     // Escape `</` so the browser's HTML parser won't see `</script>` inside JSON.
     let json = json.replace("</", "<\\/");
 
-    const TEMPLATE: &str = include_str!("report_template.html");
     let (before, after) = TEMPLATE
         .split_once("const COVERAGE_DATA = [];")
         .expect("report_template.html is missing the `const COVERAGE_DATA = [];` sentinel");
@@ -98,7 +99,7 @@ pub(crate) fn write_html_report(
     out.push_str(before);
     out.push_str("const COVERAGE_DATA = ");
     out.push_str(&json);
-    out.push_str(";");
+    out.push(';');
     out.push_str(after);
 
     let std_path = path.as_std_path();

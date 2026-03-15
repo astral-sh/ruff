@@ -314,6 +314,7 @@ fn render_coverage(
     // Sort by combined line-level imprecision descending, then by path for stable output.
     // When todo reporting is off, todo lines are folded into dynamic for display, so include
     // them in the sort key too so the table order matches the displayed percentages.
+    #[expect(clippy::cast_precision_loss)]
     let sort_key = |s: &CoverageStats| -> f64 {
         let dynamic = if show_todo {
             s.dynamic
@@ -598,7 +599,7 @@ impl MainLoop {
                                                 if let Some(path) = file
                                                     .path(&db)
                                                     .as_system_path()
-                                                    .map(|p| p.to_path_buf())
+                                                    .map(SystemPath::to_path_buf)
                                                 {
                                                     let details =
                                                         compute_coverage_details(&db, file);
