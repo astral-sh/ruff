@@ -6725,7 +6725,7 @@ impl<'db> InvalidTypeExpression<'db> {
         // casing for this function.
         } else if let InvalidTypeExpression::InvalidType(Type::FunctionLiteral(function), _) = self
             && function.name(db) == "callable"
-            && let function_body_scope = function.literal(db).last_definition(db).body_scope(db)
+            && let function_body_scope = function.literal(db).last_definition.body_scope(db)
             && function_body_scope
                 .scope(db)
                 .parent()
