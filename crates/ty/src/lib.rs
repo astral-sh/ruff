@@ -296,11 +296,24 @@ fn render_coverage(
     use std::io::Write as _;
 
     // Sort by combined line-level imprecision descending, then by path for stable output.
+    // When todo reporting is off, todo lines are folded into dynamic for display, so include
+    // them in the sort key too so the table order matches the displayed percentages.
+    let sort_key = |s: &CoverageStats| -> f64 {
+        let dynamic = if show_todo {
+            s.dynamic
+        } else {
+            s.dynamic + s.todo
+        };
+        let total = s.total();
+        if total == 0 {
+            0.0
+        } else {
+            (dynamic + s.imprecise) as f64 / total as f64 * 100.0
+        }
+    };
     per_file.sort_by(|(path_a, _, details_a), (path_b, _, details_b)| {
-        let pct_a = details_a.stats.combined_imprecision_pct();
-        let pct_b = details_b.stats.combined_imprecision_pct();
-        pct_b
-            .partial_cmp(&pct_a)
+        sort_key(&details_b.stats)
+            .partial_cmp(&sort_key(&details_a.stats))
             .unwrap_or(std::cmp::Ordering::Equal)
             .then_with(|| path_a.cmp(path_b))
     });
