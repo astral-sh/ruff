@@ -1,6 +1,7 @@
 use itertools::Itertools;
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHashSet;
+use std::borrow::Cow;
 
 use crate::place::{DefinedPlace, Place};
 use crate::types::constraints::{
@@ -324,8 +325,8 @@ impl<'db> Type<'db> {
             inferable,
             relation: TypeRelation::SubtypingAssuming,
             given: assuming,
-            relation_visitor: &HasRelationToVisitor::default(constraints),
-            disjointness_visitor: &IsDisjointVisitor::default(constraints),
+            relation_visitor: Cow::Owned(HasRelationToVisitor::default(constraints)),
+            disjointness_visitor: Cow::Owned(IsDisjointVisitor::default(constraints)),
         };
         checker.check_type_pair(db, self, target)
     }
@@ -418,14 +419,7 @@ impl<'db> Type<'db> {
         inferable: InferableTypeVars<'_, 'db>,
         relation: TypeRelation,
     ) -> ConstraintSet<'db, 'c> {
-        let checker = TypeRelationChecker {
-            constraints,
-            inferable,
-            relation,
-            given: ConstraintSet::from_bool(constraints, false),
-            relation_visitor: &HasRelationToVisitor::default(constraints),
-            disjointness_visitor: &IsDisjointVisitor::default(constraints),
-        };
+        let checker = TypeRelationChecker::new(constraints, inferable, relation);
         checker.check_type_pair(db, self, target)
     }
 
@@ -455,8 +449,8 @@ impl<'db> Type<'db> {
         let checker = EquivalenceChecker {
             constraints,
             given: ConstraintSet::from_bool(constraints, false),
-            relation_visitor: &HasRelationToVisitor::default(constraints),
-            disjointness_visitor: &IsDisjointVisitor::default(constraints),
+            relation_visitor: Cow::Owned(HasRelationToVisitor::default(constraints)),
+            disjointness_visitor: Cow::Owned(IsDisjointVisitor::default(constraints)),
         };
         checker.check_type_pair(db, self, other)
     }
@@ -489,13 +483,7 @@ impl<'db> Type<'db> {
         constraints: &'c ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'_, 'db>,
     ) -> ConstraintSet<'db, 'c> {
-        let checker = DisjointnessChecker {
-            constraints,
-            inferable,
-            given: ConstraintSet::from_bool(constraints, false),
-            disjointness_visitor: &IsDisjointVisitor::default(constraints),
-            relation_visitor: &HasRelationToVisitor::default(constraints),
-        };
+        let checker = DisjointnessChecker::new(constraints, inferable);
         checker.check_type_pair(db, self, other)
     }
 }
@@ -513,7 +501,7 @@ impl<'db, 'c> HasRelationToVisitor<'db, 'c> {
 /// A [`PairVisitor`] that is used in `is_disjoint_from` methods.
 pub(crate) type IsDisjointVisitor<'db, 'c> = PairVisitor<'db, IsDisjoint, ConstraintSet<'db, 'c>>;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct IsDisjoint;
 
 impl<'db, 'c> IsDisjointVisitor<'db, 'c> {
@@ -535,41 +523,42 @@ pub(super) struct TypeRelationChecker<'a, 'c, 'db> {
     // or `self.disjointness_visitor.visit()` from
     // `check_type_pair`, never from `check_typeddict_pair` or
     // any other more "low-level" method.
-    relation_visitor: &'a HasRelationToVisitor<'db, 'c>,
-    disjointness_visitor: &'a IsDisjointVisitor<'db, 'c>,
+    relation_visitor: Cow<'a, HasRelationToVisitor<'db, 'c>>,
+    disjointness_visitor: Cow<'a, IsDisjointVisitor<'db, 'c>>,
 }
 
 impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
-    pub(super) fn subtyping(
+    pub(super) fn new(
         constraints: &'c ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'a, 'db>,
-        relation_visitor: &'a HasRelationToVisitor<'db, 'c>,
-        disjointness_visitor: &'a IsDisjointVisitor<'db, 'c>,
+        relation: TypeRelation,
     ) -> Self {
         Self {
             constraints,
             inferable,
-            relation: TypeRelation::Subtyping,
+            relation,
             given: ConstraintSet::from_bool(constraints, false),
-            relation_visitor,
-            disjointness_visitor,
+            relation_visitor: Cow::Owned(HasRelationToVisitor::default(constraints)),
+            disjointness_visitor: Cow::Owned(IsDisjointVisitor::default(constraints)),
         }
+    }
+
+    pub(super) fn subtyping(
+        constraints: &'c ConstraintSetBuilder<'db>,
+        inferable: InferableTypeVars<'a, 'db>,
+    ) -> Self {
+        Self::new(constraints, inferable, TypeRelation::Subtyping)
     }
 
     pub(super) fn constraint_set_assignability(
         constraints: &'c ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'a, 'db>,
-        relation_visitor: &'a HasRelationToVisitor<'db, 'c>,
-        disjointness_visitor: &'a IsDisjointVisitor<'db, 'c>,
     ) -> Self {
-        Self {
+        Self::new(
             constraints,
             inferable,
-            relation: TypeRelation::ConstraintSetAssignability,
-            given: ConstraintSet::from_bool(constraints, false),
-            relation_visitor,
-            disjointness_visitor,
-        }
+            TypeRelation::ConstraintSetAssignability,
+        )
     }
 
     pub(super) fn with_inferable_typevars(&self, inferable: InferableTypeVars<'a, 'db>) -> Self {
@@ -1532,8 +1521,8 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         EquivalenceChecker {
             constraints: self.constraints,
             given: self.given,
-            relation_visitor: self.relation_visitor,
-            disjointness_visitor: self.disjointness_visitor,
+            relation_visitor: Cow::Borrowed(&self.relation_visitor),
+            disjointness_visitor: Cow::Borrowed(&self.disjointness_visitor),
         }
     }
 
@@ -1542,8 +1531,8 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             constraints: self.constraints,
             inferable: self.inferable,
             given: self.given,
-            relation_visitor: self.relation_visitor,
-            disjointness_visitor: self.disjointness_visitor,
+            relation_visitor: Cow::Borrowed(&self.relation_visitor),
+            disjointness_visitor: Cow::Borrowed(&self.disjointness_visitor),
         }
     }
 }
@@ -1558,8 +1547,8 @@ pub(super) struct EquivalenceChecker<'a, 'c, 'db> {
     // or `self.disjointness_visitor.visit()` from
     // `check_type_pair`, never from `check_typeddict_pair` or
     // any other more "low-level" method.
-    relation_visitor: &'a HasRelationToVisitor<'db, 'c>,
-    disjointness_visitor: &'a IsDisjointVisitor<'db, 'c>,
+    relation_visitor: Cow<'a, HasRelationToVisitor<'db, 'c>>,
+    disjointness_visitor: Cow<'a, IsDisjointVisitor<'db, 'c>>,
 }
 
 impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
@@ -1569,8 +1558,8 @@ impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
             constraints: self.constraints,
             given: self.given,
             inferable: InferableTypeVars::None,
-            relation_visitor: self.relation_visitor,
-            disjointness_visitor: self.disjointness_visitor,
+            relation_visitor: Cow::Borrowed(&self.relation_visitor),
+            disjointness_visitor: Cow::Borrowed(&self.disjointness_visitor),
         }
     }
 
@@ -1608,23 +1597,21 @@ pub(super) struct DisjointnessChecker<'a, 'c, 'db> {
     // or `self.disjointness_visitor.visit()` from
     // `check_type_pair`, never from `check_typeddict_pair` or
     // any other more "low-level" method.
-    disjointness_visitor: &'a IsDisjointVisitor<'db, 'c>,
-    relation_visitor: &'a HasRelationToVisitor<'db, 'c>,
+    disjointness_visitor: Cow<'a, IsDisjointVisitor<'db, 'c>>,
+    relation_visitor: Cow<'a, HasRelationToVisitor<'db, 'c>>,
 }
 
 impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
     pub(super) fn new(
         constraints: &'c ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'a, 'db>,
-        relation_visitor: &'a HasRelationToVisitor<'db, 'c>,
-        disjointness_visitor: &'a IsDisjointVisitor<'db, 'c>,
     ) -> Self {
         Self {
             constraints,
             inferable,
             given: ConstraintSet::from_bool(constraints, false),
-            disjointness_visitor,
-            relation_visitor,
+            disjointness_visitor: Cow::Owned(IsDisjointVisitor::default(constraints)),
+            relation_visitor: Cow::Owned(HasRelationToVisitor::default(constraints)),
         }
     }
 
@@ -1637,8 +1624,8 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             constraints: self.constraints,
             inferable: self.inferable,
             given: self.given,
-            relation_visitor: self.relation_visitor,
-            disjointness_visitor: self.disjointness_visitor,
+            relation_visitor: Cow::Borrowed(&self.relation_visitor),
+            disjointness_visitor: Cow::Borrowed(&self.disjointness_visitor),
         }
     }
 
@@ -1646,8 +1633,8 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
         EquivalenceChecker {
             constraints: self.constraints,
             given: self.given,
-            relation_visitor: self.relation_visitor,
-            disjointness_visitor: self.disjointness_visitor,
+            relation_visitor: Cow::Borrowed(&self.relation_visitor),
+            disjointness_visitor: Cow::Borrowed(&self.disjointness_visitor),
         }
     }
 

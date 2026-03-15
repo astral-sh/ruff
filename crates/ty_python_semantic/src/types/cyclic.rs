@@ -60,7 +60,7 @@ impl<Tag> Default for TypeTransformer<'_, Tag> {
 
 pub(crate) type PairVisitor<'db, Tag, C> = CycleDetector<Tag, (Type<'db>, Type<'db>), C>;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CycleDetector<Tag, T, R> {
     /// If the type we're visiting is present in `seen`, it indicates that we've hit a cycle (due
     /// to a recursive type); we need to immediately short circuit the whole operation and return
