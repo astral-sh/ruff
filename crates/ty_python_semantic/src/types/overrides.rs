@@ -25,6 +25,7 @@ use crate::{
         CallableType, ClassBase, ClassType, KnownClass, Parameter, Parameters, Signature,
         StaticClassLiteral, Type, TypeContext, TypeQualifiers,
         call::CallArguments,
+        callable::CallableTypeKind,
         class::{CodeGeneratorKind, FieldKind},
         constraints::ConstraintSetBuilder,
         context::InferContext,
@@ -37,6 +38,7 @@ use crate::{
         enums::{EnumMetadata, enum_metadata},
         function::{FunctionDecorators, FunctionType, KnownFunction},
         list_members::{Member, MemberWithDefinition, all_end_of_scope_members},
+        signatures::CallableSignature,
         tuple::Tuple,
     },
 };
@@ -321,17 +323,12 @@ fn check_class_declaration<'db>(
 
             subclass_overrides_superclass_declaration = true;
 
-            // Record the first superclass that defines this method as the "immediate parent method"
-            if immediate_parent_method.is_none() {
-                immediate_parent_method = Some((superclass, superclass_type));
-            }
+            let own_class_member = superclass.own_class_member(db, None, &member.name);
 
             if (configuration.check_final_method_overridden() && overridden_final_method.is_none())
                 || (configuration.check_final_variable_overridden()
                     && overridden_final_variable.is_none())
             {
-                let own_class_member = superclass.own_class_member(db, None, &member.name);
-
                 if configuration.check_final_method_overridden() {
                     overridden_final_method = overridden_final_method.or_else(|| {
                         let superclass_symbol_id = superclass_symbol_id?;
@@ -418,7 +415,22 @@ fn check_class_declaration<'db>(
                 continue;
             };
 
-            let superclass_type_as_type = superclass_type_as_callable.into_type(db);
+            let superclass_type_as_type = match own_class_member
+                .ignore_possibly_undefined()
+                .unwrap_or(superclass_type)
+                .method_override_base_type(
+                    db,
+                    instance_of_class,
+                    superclass_type_as_callable.into_type(db),
+                ) {
+                MethodOverrideBaseType::Skip => continue,
+                MethodOverrideBaseType::Type(superclass_type) => superclass_type,
+            };
+
+            // Record the first superclass that defines this method as the "immediate parent method"
+            if immediate_parent_method.is_none() {
+                immediate_parent_method = Some((superclass, superclass_type_as_type));
+            }
 
             if type_on_subclass_instance.is_assignable_to(db, superclass_type_as_type) {
                 continue;
@@ -517,6 +529,60 @@ pub(super) enum MethodKind<'db> {
     Synthesized(CodeGeneratorKind<'db>),
     #[default]
     NotSynthesized,
+}
+
+enum MethodOverrideBaseType<'db> {
+    Skip,
+    Type(Type<'db>),
+}
+
+impl<'db> Type<'db> {
+    fn method_override_base_type(
+        self,
+        db: &'db dyn Db,
+        current_class_instance: Type<'db>,
+        fallback: Type<'db>,
+    ) -> MethodOverrideBaseType<'db> {
+        let callable = match self {
+            Type::FunctionLiteral(function) => function.into_callable_type(db),
+            Type::Callable(callable) => callable,
+            _ => return MethodOverrideBaseType::Type(fallback),
+        };
+
+        if callable.kind(db) != CallableTypeKind::FunctionLike {
+            return MethodOverrideBaseType::Type(fallback);
+        }
+
+        let overloads: Vec<_> = callable
+            .signatures(db)
+            .iter()
+            .filter(|signature| {
+                signature
+                    .parameters()
+                    .get(0)
+                    .filter(|parameter| parameter.is_positional())
+                    .is_none_or(|parameter| {
+                        !parameter
+                            .annotated_type()
+                            .is_disjoint_from(db, current_class_instance)
+                    })
+            })
+            .cloned()
+            .collect();
+
+        if overloads.is_empty() {
+            return MethodOverrideBaseType::Skip;
+        }
+
+        let callable = CallableType::new(
+            db,
+            CallableSignature::from_overloads(overloads),
+            callable.kind(db),
+        )
+        .bind_self(db, Some(current_class_instance));
+
+        MethodOverrideBaseType::Type(Type::Callable(callable))
+    }
 }
 
 bitflags! {

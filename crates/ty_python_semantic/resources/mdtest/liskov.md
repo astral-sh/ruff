@@ -653,6 +653,36 @@ class BadChild(Base):
     def method(self, x: int, /, **kwargs: int) -> None: ...  # error: [invalid-method-override]
 ```
 
+## Overloads distinguished by `self`
+
+Overloads on a base method whose `self` parameter is disjoint from the current subclass should be
+ignored for override checks.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```pyi
+from collections.abc import Iterator
+from typing import overload
+
+class MyStr(str):
+    def __iter__(self) -> Iterator[str]: ...  # fine
+
+class Bar: ...
+
+class Foo:
+    @overload
+    def method(self: Bar) -> Iterator[Bar]: ...
+    @overload
+    def method(self: Foo) -> Iterator[Foo]: ...
+    def method(self) -> Iterator[Foo] | Iterator[Bar]: ...
+
+class Baz(Foo):
+    def method(self) -> Iterator[Foo]: ...  # error: [invalid-method-override]
+```
+
 ## Definitely bound members with no reachable definitions(!)
 
 We don't emit a Liskov-violation diagnostic here, but if you're writing code like this, you probably
