@@ -24,9 +24,7 @@ use crate::types::constraints::{
 };
 use crate::types::generics::{GenericContext, InferableTypeVars, walk_generic_context};
 use crate::types::infer::infer_deferred_types;
-use crate::types::relation::{
-    HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker,
-};
+use crate::types::relation::{TypeRelation, TypeRelationChecker};
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType,
     FindLegacyTypeVarsVisitor, KnownClass, MaterializationKind, ParamSpecAttrKind, SelfBinding,
@@ -321,14 +319,7 @@ impl<'db> CallableSignature<'db> {
         constraints: &'c ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'_, 'db>,
     ) -> ConstraintSet<'db, 'c> {
-        let relation_visitor = HasRelationToVisitor::default(constraints);
-        let disjointness_visitor = IsDisjointVisitor::default(constraints);
-        let checker = TypeRelationChecker::constraint_set_assignability(
-            constraints,
-            inferable,
-            &relation_visitor,
-            &disjointness_visitor,
-        );
+        let checker = TypeRelationChecker::constraint_set_assignability(constraints, inferable);
         checker.check_callable_signature_pair_inner(db, &self.overloads, &other.overloads)
     }
 }
@@ -783,14 +774,7 @@ impl<'db> Signature<'db> {
         constraints: &'c ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'_, 'db>,
     ) -> ConstraintSet<'db, 'c> {
-        let relation_visitor = HasRelationToVisitor::default(constraints);
-        let disjointness_visitor = IsDisjointVisitor::default(constraints);
-        let checker = TypeRelationChecker::constraint_set_assignability(
-            constraints,
-            inferable,
-            &relation_visitor,
-            &disjointness_visitor,
-        );
+        let checker = TypeRelationChecker::constraint_set_assignability(constraints, inferable);
         checker.check_signature_pair(db, self, other)
     }
 
