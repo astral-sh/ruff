@@ -550,7 +550,8 @@ impl MainLoop {
                             let bar_for_cancel = bar.clone();
 
                             match salsa::Cancelled::catch(|| {
-                                let files = db.project().files(&db);
+                                let indexed = db.project().files(&db);
+                                let files: Vec<File> = indexed.iter().copied().collect();
                                 bar.set_length(files.len() as u64);
                                 bar.set_message("Coverage");
                                 bar.set_style(
@@ -562,17 +563,41 @@ impl MainLoop {
                                 );
                                 bar.set_draw_target(self.printer.progress_target());
 
-                                let result = files
-                                    .iter()
-                                    .filter_map(|file| {
-                                        let path = file.path(&db).as_system_path()?.to_path_buf();
-                                        let details = compute_coverage_details(&db, *file);
-                                        bar.inc(1);
-                                        Some((path, *file, details))
-                                    })
-                                    .collect::<Vec<_>>();
+                                // Compute coverage in parallel, mirroring how `check` spawns
+                                // one task per file inside a rayon scope. Each task gets its
+                                // own db clone (lightweight: shares the underlying Arc storage).
+                                // The scope closure is `move` so it is `Send`; `collected` and
+                                // `bar` are captured as references since Mutex and ProgressBar
+                                // are Sync.
+                                let collected =
+                                    std::sync::Mutex::new(Vec::with_capacity(files.len()));
+                                {
+                                    let db = db.clone();
+                                    let collected = &collected;
+                                    let bar = &bar;
+                                    rayon::scope(move |scope| {
+                                        for &file in &files {
+                                            let db = db.clone();
+                                            scope.spawn(move |_| {
+                                                if let Some(path) = file
+                                                    .path(&db)
+                                                    .as_system_path()
+                                                    .map(|p| p.to_path_buf())
+                                                {
+                                                    let details =
+                                                        compute_coverage_details(&db, file);
+                                                    collected
+                                                        .lock()
+                                                        .unwrap()
+                                                        .push((path, file, details));
+                                                }
+                                                bar.inc(1);
+                                            });
+                                        }
+                                    });
+                                }
                                 bar.finish_and_clear();
-                                result
+                                collected.into_inner().unwrap()
                             }) {
                                 Ok(per_file) => {
                                     sender
