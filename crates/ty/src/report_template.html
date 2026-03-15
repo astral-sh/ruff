@@ -484,6 +484,9 @@
         font-family: "IBM Plex Mono", monospace;
         font-size: 12px;
       }
+      #project-bar {
+        display: none;
+      }
       td.col-file a {
         color: inherit;
         text-decoration: none;
@@ -518,6 +521,7 @@
       </div>
       <div class="main">
         <div class="tabs" id="tabs"></div>
+        <div id="project-bar" class="breadcrumb"></div>
         <div id="content-area"></div>
       </div>
     </div>
@@ -597,6 +601,7 @@
       }
 
       const TREE = buildCoverageTree(COVERAGE_DATA.files);
+
       let openTabs = []; // array of file indices
       let activeView = null; // 'summary' | number (file index)
       const expandedDirs = new Set();
@@ -720,6 +725,7 @@
         const files = COVERAGE_DATA.files;
         const showTodo = COVERAGE_DATA.show_todo;
 
+        // Compute aggregate totals once — reused for the project bar and tfoot.
         let totLines = 0,
           totPrecise = 0,
           totImprecise = 0,
@@ -735,6 +741,30 @@
           totTodo += ls.todo;
           totEmpty += ls.empty;
         });
+
+        // Populate and show the project header bar.
+        const bar = document.getElementById("project-bar");
+        function pct(n) {
+          return totLines ? ((n / totLines) * 100).toFixed(1) + "%" : "0.0%";
+        }
+        let barHtml =
+          '<span class="breadcrumb-path">📦 <span>' +
+          escHtml(COVERAGE_DATA.project_name) +
+          "</span></span>";
+        barHtml +=
+          '<span class="stat-badge sb-precise">' + pct(totPrecise) + " precise</span>";
+        barHtml +=
+          '<span class="stat-badge sb-imprecise">' + pct(totImprecise) + " imprecise</span>";
+        barHtml +=
+          '<span class="stat-badge sb-dynamic">' + pct(totDynamic) + " dynamic</span>";
+        if (showTodo) {
+          barHtml +=
+            '<span class="stat-badge sb-todo">' + pct(totTodo) + " todo</span>";
+        }
+        barHtml +=
+          '<span class="stat-badge sb-empty">' + pct(totEmpty) + " empty</span>";
+        bar.innerHTML = barHtml;
+        bar.style.display = "flex";
 
         let html =
           '<div class="summary-wrap"><table class="summary"><thead><tr>';
@@ -797,6 +827,7 @@
         if (!openTabs.includes(idx)) openTabs.push(idx);
         activeView = idx;
         document.getElementById("summary-btn").classList.remove("active");
+        document.getElementById("project-bar").style.display = "none";
         renderTabs();
         renderFileContent(idx);
 

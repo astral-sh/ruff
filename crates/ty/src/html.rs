@@ -12,7 +12,7 @@ use ruff_db::files::File;
 use ruff_db::source::source_text;
 use ruff_db::system::{SystemPath, SystemPathBuf};
 use serde::Serialize;
-use ty_project::ProjectDatabase;
+use ty_project::{Db as _, ProjectDatabase};
 use ty_python_semantic::coverage::{FileCoverageDetails, TypeCoverage};
 
 /// Root object embedded as `const COVERAGE_DATA = <json>;` in the HTML.
@@ -20,6 +20,8 @@ use ty_python_semantic::coverage::{FileCoverageDetails, TypeCoverage};
 struct ReportData<'a> {
     files: Vec<FileData<'a>>,
     show_todo: bool,
+    /// Project name retrieved from the project database.
+    project_name: &'a str,
 }
 
 /// Per-file record embedded in the HTML report JSON.
@@ -78,7 +80,12 @@ pub(crate) fn write_html_report(
         });
     }
 
-    let report = ReportData { files, show_todo };
+    let project_name = db.project().name(db);
+    let report = ReportData {
+        files,
+        show_todo,
+        project_name,
+    };
     let json = serde_json::to_string(&report)?;
     // Escape `</` so the browser's HTML parser won't see `</script>` inside JSON.
     let json = json.replace("</", "<\\/");
