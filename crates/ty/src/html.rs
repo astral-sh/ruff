@@ -60,7 +60,14 @@ pub(crate) fn write_html_report(
                 Some(TypeCoverage::Precise) => 1,
                 Some(TypeCoverage::Imprecise) => 2,
                 Some(TypeCoverage::Dynamic) => 3,
-                Some(TypeCoverage::Todo) => 4,
+                // When todo reporting is disabled, fold todo lines into dynamic.
+                Some(TypeCoverage::Todo) => {
+                    if show_todo {
+                        4
+                    } else {
+                        3
+                    }
+                }
             });
         }
 
