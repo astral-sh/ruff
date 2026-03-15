@@ -1,4 +1,5 @@
 """A Future class similar to the one in PEP 3148."""
+
 import sys
 from _asyncio import Future as Future
 from concurrent.futures._base import Future as _ConcurrentFuture
