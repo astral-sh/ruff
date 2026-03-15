@@ -300,7 +300,7 @@
         text-overflow: ellipsis;
         white-space: nowrap;
       }
-      .breadcrumb span {
+      .breadcrumb-path span {
         color: var(--accent);
       }
       /* ── Source table ── */
@@ -372,8 +372,7 @@
         border-right: 3px solid rgba(var(--ty-todo-rgb), var(--ty-pip-alpha));
       }
       tr.line-empty td.lineno {
-        border-right: 3px solid
-          rgba(var(--ty-empty-rgb), var(--ty-pip-alpha));
+        border-right: 3px solid rgba(var(--ty-empty-rgb), var(--ty-pip-alpha));
       }
       /* ── Quality colours (text + tinted backgrounds) ── */
       .q0 {
@@ -405,9 +404,15 @@
         vertical-align: middle;
         flex-shrink: 0;
       }
-      .summary-pip.q0 { background: rgba(var(--ty-precise-rgb),  0.85); }
-      .summary-pip.q1 { background: rgba(var(--ty-imprecise-rgb), 0.85); }
-      .summary-pip.q2 { background: rgba(var(--ty-dynamic-rgb),  0.85); }
+      .summary-pip.q0 {
+        background: rgba(var(--ty-precise-rgb), 0.85);
+      }
+      .summary-pip.q1 {
+        background: rgba(var(--ty-imprecise-rgb), 0.85);
+      }
+      .summary-pip.q2 {
+        background: rgba(var(--ty-dynamic-rgb), 0.85);
+      }
       .stat-badge {
         font-family: "IBM Plex Mono", monospace;
         font-size: 11px;
@@ -513,9 +518,9 @@
   <body>
     <div class="layout">
       <div class="sidebar">
-        <div class="sidebar-header">ty coverage</div>
+        <div class="sidebar-header">Coverage Report</div>
         <div class="summary-btn" id="summary-btn" onclick="showSummary()">
-          File Summary
+          Summary
         </div>
         <div class="tree" id="tree"></div>
       </div>
@@ -752,17 +757,25 @@
           escHtml(COVERAGE_DATA.project_name) +
           "</span></span>";
         barHtml +=
-          '<span class="stat-badge sb-precise">' + pct(totPrecise) + " precise</span>";
+          '<span class="stat-badge sb-precise">' +
+          pct(totPrecise) +
+          " precise</span>";
         barHtml +=
-          '<span class="stat-badge sb-imprecise">' + pct(totImprecise) + " imprecise</span>";
+          '<span class="stat-badge sb-imprecise">' +
+          pct(totImprecise) +
+          " imprecise</span>";
         barHtml +=
-          '<span class="stat-badge sb-dynamic">' + pct(totDynamic) + " dynamic</span>";
+          '<span class="stat-badge sb-dynamic">' +
+          pct(totDynamic) +
+          " dynamic</span>";
         if (showTodo) {
           barHtml +=
             '<span class="stat-badge sb-todo">' + pct(totTodo) + " todo</span>";
         }
         barHtml +=
-          '<span class="stat-badge sb-empty">' + pct(totEmpty) + " empty</span>";
+          '<span class="stat-badge sb-empty">' +
+          pct(totEmpty) +
+          " empty</span>";
         bar.innerHTML = barHtml;
         bar.style.display = "flex";
 
@@ -783,30 +796,51 @@
           html += '<tr data-idx="' + idx + '" style="cursor:pointer">';
           html +=
             '<td class="col-file">' +
-            '<span class="summary-pip ' + q + '"></span>' +
+            '<span class="summary-pip ' +
+            q +
+            '"></span>' +
             '<a href="#file-' +
             idx +
             '" onclick="event.preventDefault()">' +
             escHtml(f.path) +
             "</a></td>";
           html += '<td class="col-num">' + ls.total + "</td>";
-          html += '<td class="col-num">' + fmtCountPct(ls.precise, ls.total) + "</td>";
-          html += '<td class="col-num">' + fmtCountPct(ls.imprecise, ls.total) + "</td>";
-          html += '<td class="col-num">' + fmtCountPct(ls.dynamic, ls.total) + "</td>";
-          if (showTodo) html += '<td class="col-num">' + fmtCountPct(ls.todo, ls.total) + "</td>";
-          html += '<td class="col-num">' + fmtCountPct(ls.empty, ls.total) + "</td>";
+          html +=
+            '<td class="col-num">' +
+            fmtCountPct(ls.precise, ls.total) +
+            "</td>";
+          html +=
+            '<td class="col-num">' +
+            fmtCountPct(ls.imprecise, ls.total) +
+            "</td>";
+          html +=
+            '<td class="col-num">' +
+            fmtCountPct(ls.dynamic, ls.total) +
+            "</td>";
+          if (showTodo)
+            html +=
+              '<td class="col-num">' + fmtCountPct(ls.todo, ls.total) + "</td>";
+          html +=
+            '<td class="col-num">' + fmtCountPct(ls.empty, ls.total) + "</td>";
           html += "</tr>";
         });
 
         html += "</tbody><tfoot><tr>";
         html += '<td class="col-file"><strong>Total</strong></td>';
         html += '<td class="col-num">' + totLines + "</td>";
-        html += '<td class="col-num">' + fmtCountPct(totPrecise, totLines) + "</td>";
-        html += '<td class="col-num">' + fmtCountPct(totImprecise, totLines) + "</td>";
-        html += '<td class="col-num">' + fmtCountPct(totDynamic, totLines) + "</td>";
+        html +=
+          '<td class="col-num">' + fmtCountPct(totPrecise, totLines) + "</td>";
+        html +=
+          '<td class="col-num">' +
+          fmtCountPct(totImprecise, totLines) +
+          "</td>";
+        html +=
+          '<td class="col-num">' + fmtCountPct(totDynamic, totLines) + "</td>";
         if (showTodo)
-          html += '<td class="col-num">' + fmtCountPct(totTodo, totLines) + "</td>";
-        html += '<td class="col-num">' + fmtCountPct(totEmpty, totLines) + "</td>";
+          html +=
+            '<td class="col-num">' + fmtCountPct(totTodo, totLines) + "</td>";
+        html +=
+          '<td class="col-num">' + fmtCountPct(totEmpty, totLines) + "</td>";
         html += "</tr></tfoot></table></div>";
 
         const area = document.getElementById("content-area");
@@ -819,7 +853,7 @@
           });
         });
 
-        updateStatus("Coverage Summary", files.length + " files");
+        updateStatus("Summary", files.length + " files");
         history.replaceState(null, "", "#summary");
       }
 
