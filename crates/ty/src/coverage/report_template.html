@@ -610,6 +610,10 @@
       let openTabs = []; // array of file indices
       let activeView = null; // 'summary' | number (file index)
       const expandedDirs = new Set();
+      // Maps every tree path (file or directory) to its .tree-item element.
+      // Built during initial render so openFile can do O(1) lookups instead
+      // of walking the whole DOM on every click.
+      const treeItemMap = new Map();
 
       function renderTreeNode(obj, parentPath, depth) {
         const container = document.createDocumentFragment();
@@ -663,6 +667,7 @@
             item.append(chevron, icon, label, badge);
           }
 
+          treeItemMap.set(fullPath, item);
           node.appendChild(item);
 
           if (isDir) {
@@ -865,26 +870,29 @@
         renderTabs();
         renderFileContent(idx);
 
-        // Highlight active tree item.
         const f = COVERAGE_DATA.files[idx];
-        document.querySelectorAll(".tree-item").forEach(function (el) {
-          el.classList.toggle("active", el.dataset.path === f.path);
-        });
 
-        // Expand ancestor directories so the item is visible.
+        // Expand ancestor directories in-place.
         const parts = f.path.split("/");
         for (let i = 1; i < parts.length; i++) {
           const dirPath = parts.slice(0, i).join("/");
-          expandedDirs.add(dirPath);
+          if (!expandedDirs.has(dirPath)) {
+            expandedDirs.add(dirPath);
+            const dirItem = treeItemMap.get(dirPath);
+            if (dirItem) {
+              dirItem.nextElementSibling.classList.remove("collapsed");
+              dirItem.querySelector(".chevron").classList.add("open");
+              dirItem.querySelector(".icon").textContent = "📂";
+            }
+          }
         }
-        // Re-render tree to reflect expanded state.
-        const treeEl = document.getElementById("tree");
-        treeEl.innerHTML = "";
-        treeEl.appendChild(renderTreeNode(TREE, "", 0));
-        // Re-apply active class after re-render.
-        document.querySelectorAll(".tree-item").forEach(function (el) {
-          el.classList.toggle("active", el.dataset.path === f.path);
+
+        // Swap the active highlight in-place.
+        document.querySelectorAll(".tree-item.active").forEach(function (el) {
+          el.classList.remove("active");
         });
+        const activeItem = treeItemMap.get(f.path);
+        if (activeItem) activeItem.classList.add("active");
 
         updateStatus(f.path, "Python  ·  " + f.source.length + " lines");
         history.replaceState(null, "", "#file-" + idx);
