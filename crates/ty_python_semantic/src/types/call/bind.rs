@@ -83,10 +83,13 @@ struct BindingsElement<'db> {
     bindings: SmallVec<[CallableBinding<'db>; 1]>,
 }
 
+/// Temporary regrouping state for one constructor family while computing union return types.
 #[derive(Debug, Default)]
 struct ConstructorGroupState<'a, 'db> {
     bindings: SmallVec<[&'a CallableBinding<'db>; 1]>,
+    /// The original return type to preserve when the group never needs merging.
     preserved_return_type: Option<Type<'db>>,
+    /// Whether multiple outer union elements were collected for this constructor family.
     needs_merge: bool,
 }
 
