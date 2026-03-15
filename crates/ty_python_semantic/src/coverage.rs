@@ -1,4 +1,4 @@
-//! Tracks the percentage of expressions with a dynamic or `Todo` type,
+//! Tracks per-line type-coverage classifications (precise, imprecise, dynamic, todo, empty)
 //! as a measure of ty's type-inference coverage.
 
 use std::collections::HashMap;
@@ -9,7 +9,8 @@ use crate::{Db, HasType, SemanticModel};
 use ruff_db::source::line_index;
 use ruff_db::{files::File, parsed::parsed_module};
 use ruff_python_ast::{
-    self as ast, visitor::source_order, visitor::source_order::SourceOrderVisitor,
+    self as ast, helpers::is_docstring_stmt, visitor::source_order,
+    visitor::source_order::SourceOrderVisitor,
 };
 use ruff_source_file::LineIndex;
 use ruff_text_size::{Ranged, TextRange};
@@ -164,6 +165,9 @@ impl SourceOrderVisitor<'_> for CoverageVisitor<'_> {
             ast::Stmt::ClassDef(class) => {
                 self.record(class.inferred_type(&self.model), class.name.range());
             }
+            // Docstrings carry no type information worth measuring; leave their
+            // lines empty rather than counting them as precise.
+            stmt if is_docstring_stmt(stmt) => return,
             _ => {}
         }
         source_order::walk_stmt(self, stmt);

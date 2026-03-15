@@ -519,7 +519,7 @@ impl MainLoop {
     }
 
     fn main_loop(mut self, db: &mut ProjectDatabase) -> Result<ExitStatus> {
-        // Schedule the first check.
+        // Schedule the first workspace analysis (check or coverage).
         tracing::debug!("Starting main loop");
 
         let mut revision = 0u64;
