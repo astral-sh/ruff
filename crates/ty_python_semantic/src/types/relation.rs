@@ -510,7 +510,6 @@ impl<'db, 'c> IsDisjointVisitor<'db, 'c> {
     }
 }
 
-#[derive(Clone)]
 pub(super) struct TypeRelationChecker<'a, 'c, 'db> {
     pub(super) constraints: &'c ConstraintSetBuilder<'db>,
     pub(super) inferable: InferableTypeVars<'a, 'db>,
@@ -561,10 +560,17 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         )
     }
 
-    pub(super) fn with_inferable_typevars(&self, inferable: InferableTypeVars<'a, 'db>) -> Self {
-        Self {
+    pub(super) fn with_inferable_typevars<'b>(
+        &'b self,
+        inferable: InferableTypeVars<'b, 'db>,
+    ) -> TypeRelationChecker<'b, 'c, 'db> {
+        TypeRelationChecker {
+            constraints: self.constraints,
             inferable,
-            ..self.clone()
+            relation: self.relation,
+            given: self.given,
+            relation_visitor: Cow::Borrowed(&self.relation_visitor),
+            disjointness_visitor: Cow::Borrowed(&self.disjointness_visitor),
         }
     }
 
