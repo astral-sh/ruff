@@ -14,6 +14,7 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 use rustc_hash::FxHashSet;
 use ty_module_resolver::{KnownModule, Module, ModuleName};
 use ty_python_semantic::HasType;
+use ty_python_semantic::types::list_members::all_members;
 use ty_python_semantic::types::{SpecialFormType, UnionType};
 use ty_python_semantic::{
     Completion as SemanticCompletion, NameKind, SemanticModel,
@@ -76,10 +77,54 @@ pub fn completion<'db>(
                     );
                 }
             }
+            CompletionTargetAst::SubclassMethodDef(subclass_method_def) => {
+                add_base_class_methods_completions(
+                    db,
+                    &model,
+                    subclass_method_def.class_def,
+                    &mut completions,
+                );
+            }
         },
     }
 
     completions.into_completions()
+}
+
+/// Adds method completions from base classes when defining methods in a subclass
+fn add_base_class_methods_completions<'db>(
+    db: &'db dyn Db,
+    model: &SemanticModel<'db>,
+    class_def: &ast::StmtClassDef,
+    completions: &mut Completions<'db>,
+) {
+    if let Some(arguments) = &class_def.arguments {
+        for base_expr in &arguments.args {
+            if let Some(base_class_type) = base_expr.inferred_type(model) {
+                for member in all_members(db, base_class_type) {
+                    if matches!(member.ty, Type::FunctionLiteral(_)) {
+                        let semantic_completion = SemanticCompletion {
+                            name: member.name,
+                            ty: Some(member.ty),
+                            builtin: false,
+                        };
+
+                        let mut signature = member.ty.display(db).to_string();
+                        signature.push(':');
+                        let signature = signature.strip_prefix("def ").unwrap_or(&signature);
+
+                        completions.add(
+                            CompletionBuilder::from_semantic_completion(db, semantic_completion)
+                                .kind(CompletionKind::Method)
+                                .context_specific(true)
+                                .module_dependency_kind(ModuleDependencyKind::Current)
+                                .insert(signature),
+                        );
+                    }
+                }
+            }
+        }
+    }
 }
 
 /// A collection of completions built up from various sources.
@@ -746,7 +791,10 @@ impl<'m> ContextCursor<'m> {
 
     /// Whether the last token is in a place where we should not provide completions.
     fn is_in_no_completions_place(&self) -> bool {
-        self.is_in_comment() || self.is_in_string() || self.is_in_definition_place()
+        self.is_in_comment()
+            || self.is_in_string()
+            // We might autocomplete with methods from the base class
+            || (self.is_in_definition_place() && !self.is_in_subclass())
     }
 
     /// Whether the last token is within a comment or not.
@@ -802,6 +850,28 @@ impl<'m> ContextCursor<'m> {
         // Analyze the AST if token matching is insufficient
         // to determine if we're inside a name definition.
         self.is_in_variable_binding()
+    }
+
+    /// Returns true when the cursor is positioned within a class definition that inherits
+    /// from one or more base classes
+    fn is_in_subclass(&self) -> bool {
+        self.containing_class_def().is_some_and(|class_def| {
+            class_def
+                .arguments
+                .as_ref()
+                .is_some_and(|args| !args.args.is_empty())
+        })
+    }
+
+    /// Returns the class definition if the cursor is anywhere within its body
+    fn containing_class_def(&self) -> Option<&'m ast::StmtClassDef> {
+        self.covering_node.ancestors().find_map(|node| {
+            if let ast::AnyNodeRef::StmtClassDef(class_def) = node {
+                Some(class_def)
+            } else {
+                None
+            }
+        })
     }
 
     /// Returns true when the cursor sits on a binding statement.
@@ -1701,6 +1771,9 @@ enum CompletionTargetTokens<'t> {
         #[expect(dead_code)]
         attribute: Option<&'t Token>,
     },
+    /// The token under the cursor is a function/method name, more
+    /// precisely just after a 'def' token.
+    FunctionName,
     /// A token was found under the cursor, but it didn't
     /// match any of our anticipated token patterns.
     Generic { token: &'t Token },
@@ -1716,13 +1789,26 @@ impl<'t> CompletionTargetTokens<'t> {
         static OBJECT_DOT_NON_EMPTY: [TokenKind; 2] = [TokenKind::Dot, TokenKind::Name];
 
         let before = cursor.tokens_before;
+
+        let is_def_keyword = |token: &Token| token.kind() == TokenKind::Def;
+
         Some(
+            // We're looking if the cursor is just after a 'def' token,
+            // even if it's in the middle of the function name token.
+            // For example `def na<CURSOR>` or `def <CURSOR>`.
+            if match before {
+                [.., penultimate, _] if cursor.typed.is_some() => is_def_keyword(penultimate),
+                [.., last] if cursor.typed.is_none() => is_def_keyword(last),
+                _ => false,
+            } {
+                CompletionTargetTokens::FunctionName
+            }
             // Our strategy when it comes to `object.attribute` here is
             // to look for the `.` and then take the token immediately
             // preceding it. Later, we look for an `ExprAttribute` AST
             // node that overlaps (even partially) with this token. And
             // that's the object we try to complete attributes for.
-            if let Some([_dot]) = token_suffix_by_kinds(before, OBJECT_DOT_EMPTY) {
+            else if let Some([_dot]) = token_suffix_by_kinds(before, OBJECT_DOT_EMPTY) {
                 let object = before[..before.len() - 1].last()?;
                 CompletionTargetTokens::PossibleObjectDot {
                     object,
@@ -1767,6 +1853,16 @@ impl<'t> CompletionTargetTokens<'t> {
     /// If no plausible AST node could be found, then `None` is returned.
     fn ast(&self, cursor: &ContextCursor<'t>) -> Option<CompletionTargetAst<'t>> {
         match *self {
+            CompletionTargetTokens::FunctionName => {
+                if cursor.is_in_subclass()
+                    && let Some(class_def) = cursor.containing_class_def()
+                {
+                    return Some(CompletionTargetAst::SubclassMethodDef(SubclassMethodDef {
+                        class_def,
+                    }));
+                }
+                None
+            }
             CompletionTargetTokens::PossibleObjectDot { object, .. } => {
                 let covering_node = cursor
                     .covering_node(object.range())
@@ -1817,6 +1913,8 @@ enum CompletionTargetAst<'t> {
     /// A scoped scenario, where we want to list all items available in
     /// the most narrow scope containing the giving AST node.
     Scoped(ScopedTarget<'t>),
+    /// A subclass scenario, where we want to list base class methods
+    SubclassMethodDef(SubclassMethodDef<'t>),
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -1824,6 +1922,14 @@ struct ScopedTarget<'t> {
     /// The node with the smallest range that fully covers
     /// the token under the cursor.
     node: ast::AnyNodeRef<'t>,
+}
+
+/// Represents completion context when defining methods in a subclass.
+/// Used to provide base class method suggestions
+#[derive(Clone, Copy, Debug)]
+struct SubclassMethodDef<'t> {
+    /// The subclass definition that inherits from one or more base classes
+    class_def: &'t ast::StmtClassDef,
 }
 
 /// A representation of the completion context for a possibly incomplete import
@@ -4151,6 +4257,43 @@ class Quux:
         __str__
         __subclasshook__
         ");
+    }
+
+    #[test]
+    fn base_class_method() {
+        let builder = completion_test_builder(
+            "\
+class Foo:
+    def foo_bar(self, a: int) -> int:
+        return a
+
+class Bar(Foo):
+    def foo<CURSOR>
+",
+        );
+
+        assert_snapshot!(
+            builder.type_signatures().build().snapshot(), @"foo_bar(self, a: int) -> int: :: def foo_bar(self, a: int) -> int");
+    }
+
+    #[test]
+    fn base_class_abstract_method() {
+        let builder = completion_test_builder(
+            "\
+import abc
+
+class Foo(abc.ABC):
+    @abc.abstractmethod
+    def foo_bar(self) -> int:
+        return 1
+
+class Bar(Foo):
+    def foo<CURSOR>
+",
+        );
+
+        assert_snapshot!(
+            builder.type_signatures().build().snapshot(), @"foo_bar(self) -> int: :: def foo_bar(self) -> int");
     }
 
     #[test]
