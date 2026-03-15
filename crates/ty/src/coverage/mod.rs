@@ -1,2 +1,3 @@
 pub(crate) mod html;
-pub(crate) mod table;
+#[doc(hidden)]
+pub mod table;

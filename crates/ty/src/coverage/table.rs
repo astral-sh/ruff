@@ -6,6 +6,7 @@
 //! # Example
 //!
 //! ```
+//! use ty::coverage::table::{Align, AsciiTable, Column};
 //! let mut table = AsciiTable::new(vec![
 //!     Column::new("File", Align::Left),
 //!     Column::new("Total", Align::Right),
@@ -18,19 +19,19 @@
 use std::io;
 
 /// Column alignment.
-pub(crate) enum Align {
+pub enum Align {
     Left,
     Right,
 }
 
 /// A column definition: header text and alignment.
-pub(crate) struct Column {
+pub struct Column {
     header: &'static str,
     align: Align,
 }
 
 impl Column {
-    pub(crate) fn new(header: &'static str, align: Align) -> Self {
+    pub fn new(header: &'static str, align: Align) -> Self {
         Self { header, align }
     }
 }
@@ -39,14 +40,14 @@ impl Column {
 ///
 /// Column widths are computed automatically from the widest value in each column.
 /// Rows and the footer are separated from the header by dash separator lines.
-pub(crate) struct AsciiTable {
+pub struct AsciiTable {
     columns: Vec<Column>,
     rows: Vec<Vec<String>>,
     footer: Option<Vec<String>>,
 }
 
 impl AsciiTable {
-    pub(crate) fn new(columns: Vec<Column>) -> Self {
+    pub fn new(columns: Vec<Column>) -> Self {
         Self {
             columns,
             rows: Vec::new(),
@@ -54,16 +55,16 @@ impl AsciiTable {
         }
     }
 
-    pub(crate) fn push_row(&mut self, row: Vec<String>) {
+    pub fn push_row(&mut self, row: Vec<String>) {
         self.rows.push(row);
     }
 
-    pub(crate) fn set_footer(&mut self, footer: Vec<String>) {
+    pub fn set_footer(&mut self, footer: Vec<String>) {
         self.footer = Some(footer);
     }
 
     /// Render the table to `out`.
-    pub(crate) fn render(&self, out: &mut impl io::Write) -> io::Result<()> {
+    pub fn render(&self, out: &mut impl io::Write) -> io::Result<()> {
         let n = self.columns.len();
 
         // Compute column widths: max of header, all data rows, and footer.

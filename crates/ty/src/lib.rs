@@ -1,5 +1,6 @@
 mod args;
-mod coverage;
+#[doc(hidden)]
+pub mod coverage;
 mod logging;
 mod printer;
 mod python_version;
