@@ -381,10 +381,6 @@ fn render_coverage(
     Ok(())
 }
 
-fn coverage_exit_status() -> ExitStatus {
-    ExitStatus::Success
-}
-
 /// Formats a count with its percentage of a total as `"N (X%)"`.
 #[expect(clippy::cast_precision_loss)]
 fn fmt_count_pct(count: u64, total: u64) -> String {
@@ -711,7 +707,7 @@ impl MainLoop {
                         continue;
                     }
 
-                    return Ok(coverage_exit_status());
+                    return Ok(ExitStatus::Success);
                 }
 
                 MainLoopMessage::ApplyChanges(changes) => {
