@@ -1,9 +1,8 @@
 mod args;
-mod html;
+mod coverage;
 mod logging;
 mod printer;
 mod python_version;
-mod table;
 mod version;
 
 use std::fmt::Write;
@@ -321,7 +320,7 @@ fn render_coverage(
     let mut stdout = std::io::stdout().lock();
 
     {
-        use table::{Align, AsciiTable, Column};
+        use coverage::table::{Align, AsciiTable, Column};
 
         let mut columns = vec![
             Column::new("File", Align::Left),
@@ -374,7 +373,7 @@ fn render_coverage(
 
     if let Some(html_out) = html_path {
         let abs = SystemPath::absolute(html_out, cwd);
-        html::write_html_report(&abs, &per_file, &prefix, db, show_todo)?;
+        coverage::html::write_html_report(&abs, &per_file, &prefix, db, show_todo)?;
         writeln!(stdout, "HTML report written to {abs}")?;
     }
 

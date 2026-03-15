@@ -127,21 +127,6 @@ impl<'db> CoverageVisitor<'db> {
         }
     }
 
-    /// Visits an assignment target, skipping the tuple/list node itself so that
-    /// `a, b = ...` doesn't colour the whole line with the synthetic tuple type.
-    /// Only the individual leaf elements are recorded.
-    fn visit_target(&mut self, target: &ast::Expr) {
-        match target {
-            ast::Expr::List(ast::ExprList { elts, .. })
-            | ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => {
-                for element in elts {
-                    self.visit_target(element);
-                }
-            }
-            _ => self.visit_expr(target),
-        }
-    }
-
     fn record(&mut self, ty: Option<Type<'db>>, range: TextRange) {
         let Some(ty) = ty else {
             return;
@@ -179,41 +164,9 @@ impl SourceOrderVisitor<'_> for CoverageVisitor<'_> {
             ast::Stmt::ClassDef(class) => {
                 self.record(class.inferred_type(&self.model), class.name.range());
             }
-            ast::Stmt::Assign(assign) => {
-                for target in &assign.targets {
-                    self.visit_target(target);
-                }
-                self.visit_expr(&assign.value);
-                return;
-            }
-            ast::Stmt::For(for_stmt) => {
-                self.visit_target(&for_stmt.target);
-                self.visit_expr(&for_stmt.iter);
-                self.visit_body(&for_stmt.body);
-                self.visit_body(&for_stmt.orelse);
-                return;
-            }
-            ast::Stmt::With(with_stmt) => {
-                for item in &with_stmt.items {
-                    if let Some(target) = &item.optional_vars {
-                        self.visit_target(target);
-                    }
-                    self.visit_expr(&item.context_expr);
-                }
-                self.visit_body(&with_stmt.body);
-                return;
-            }
             _ => {}
         }
         source_order::walk_stmt(self, stmt);
-    }
-
-    fn visit_comprehension(&mut self, comprehension: &ast::Comprehension) {
-        self.visit_expr(&comprehension.iter);
-        self.visit_target(&comprehension.target);
-        for if_expr in &comprehension.ifs {
-            self.visit_expr(if_expr);
-        }
     }
 
     fn visit_expr(&mut self, expr: &ast::Expr) {
