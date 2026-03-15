@@ -1842,6 +1842,24 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source: ClassType<'db>,
         target: ClassType<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        // Fast path: check if the target's class literal is reachable from the source's
+        // unspecialized MRO. If it's not (and there are no dynamic bases that could match
+        // anything), we can return `never()` immediately, avoiding expensive specialization
+        // checks and constraint-set operations in the `when_any` below.
+        let target_literal = target.class_literal(db);
+        let target_reachable = source
+            .class_literal(db)
+            .iter_mro(db)
+            .any(|base| match base {
+                ClassBase::Class(class) => class.class_literal(db) == target_literal,
+                ClassBase::Dynamic(_) => true,
+                ClassBase::Protocol | ClassBase::Generic | ClassBase::TypedDict => false,
+            });
+
+        if !target_reachable {
+            return self.never();
+        }
+
         source.iter_mro(db).when_any(db, self.constraints, |base| {
             match base {
                 ClassBase::Dynamic(_) => match self.relation {
