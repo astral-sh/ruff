@@ -380,7 +380,7 @@ impl<'db> StaticClassLiteral<'db> {
     pub(crate) fn top_materialization(self, db: &'db dyn Db) -> ClassType<'db> {
         self.apply_specialization(db, |generic_context| {
             generic_context
-                .default_specialization(db, self.known(db))
+                .upper_bound_specialization(db, self.known(db))
                 .materialize_impl(
                     db,
                     MaterializationKind::Top,

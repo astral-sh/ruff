@@ -704,6 +704,24 @@ def _(x: object):
         reveal_type(x.y)  # revealed: tuple[A, object]
 ```
 
+When a type parameter has a bound, `isinstance` narrowing should use the bound as the upper limit
+for covariant type parameters. When a type parameter has a default, the default is not used; instead
+the upper bound (or `object` if unbounded) is used:
+
+```py
+from typing import Generic, TypeVar
+
+T_bounded = TypeVar("T_bounded", bound=int, covariant=True)
+T_defaulted = TypeVar("T_defaulted", default=None, covariant=True)
+
+class BoundedAndDefaulted(Generic[T_bounded, T_defaulted]):
+    pass
+
+def _(x: object):
+    if isinstance(x, BoundedAndDefaulted):
+        reveal_type(x)  # revealed: BoundedAndDefaulted[int, object]
+```
+
 ## Narrowing with TypedDict unions
 
 Narrowing unions of `int` and multiple TypedDicts using `isinstance(x, dict)` should not panic
