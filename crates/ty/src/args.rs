@@ -34,7 +34,6 @@ pub(crate) enum Command {
     Check(CheckCommand),
 
     /// Measure type-inference coverage for a project.
-    #[command(hide = true)]
     Coverage(CoverageCommand),
 
     /// Start the language server

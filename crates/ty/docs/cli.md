@@ -15,6 +15,7 @@ ty <COMMAND>
 <h3 class="cli-reference">Commands</h3>
 
 <dl class="cli-reference"><dt><a href="#ty-check"><code>ty check</code></a></dt><dd><p>Check a project for type errors</p></dd>
+<dt><a href="#ty-coverage"><code>ty coverage</code></a></dt><dd><p>Measure type-inference coverage for a project</p></dd>
 <dt><a href="#ty-server"><code>ty server</code></a></dt><dd><p>Start the language server</p></dd>
 <dt><a href="#ty-version"><code>ty version</code></a></dt><dd><p>Display ty's version</p></dd>
 <dt><a href="#ty-help"><code>ty help</code></a></dt><dd><p>Print this message or the help of the given subcommand(s)</p></dd>
@@ -103,6 +104,57 @@ over all configuration files.</p>
 </dd><dt id="ty-check--verbose"><a href="#ty-check--verbose"><code>--verbose</code></a>, <code>-v</code></dt><dd><p>Use verbose output (or <code>-vv</code> and <code>-vvv</code> for more verbose output)</p>
 </dd><dt id="ty-check--warn"><a href="#ty-check--warn"><code>--warn</code></a> <i>rule</i></dt><dd><p>Treat the given rule as having severity 'warn'. Can be specified multiple times. Use 'all' to apply to all rules.</p>
 </dd><dt id="ty-check--watch"><a href="#ty-check--watch"><code>--watch</code></a>, <code>-W</code></dt><dd><p>Watch files for changes and recheck files related to the changed files</p>
+</dd></dl>
+
+## ty coverage
+
+Measure type-inference coverage for a project
+
+<h3 class="cli-reference">Usage</h3>
+
+```
+ty coverage [OPTIONS] [PATH]...
+```
+
+<h3 class="cli-reference">Arguments</h3>
+
+<dl class="cli-reference"><dt id="ty-coverage--paths"><a href="#ty-coverage--paths"><code>PATHS</code></a></dt><dd><p>List of files or directories to measure [default: the project root]</p>
+</dd></dl>
+
+<h3 class="cli-reference">Options</h3>
+
+<dl class="cli-reference"><dt id="ty-coverage--color"><a href="#ty-coverage--color"><code>--color</code></a> <i>when</i></dt><dd><p>Control when colored output is used</p>
+<p>Possible values:</p>
+<ul>
+<li><code>auto</code>:  Display colors if the output goes to an interactive terminal</li>
+<li><code>always</code>:  Always display colors</li>
+<li><code>never</code>:  Never display colors</li>
+</ul></dd><dt id="ty-coverage--config"><a href="#ty-coverage--config"><code>--config</code></a>, <code>-c</code> <i>config-option</i></dt><dd><p>A TOML <code>&lt;KEY&gt; = &lt;VALUE&gt;</code> pair (such as you might find in a <code>ty.toml</code> configuration file)
+overriding a specific configuration option.</p>
+<p>Overrides of individual settings using this option always take precedence
+over all configuration files.</p>
+</dd><dt id="ty-coverage--config-file"><a href="#ty-coverage--config-file"><code>--config-file</code></a> <i>path</i></dt><dd><p>The path to a <code>ty.toml</code> file to use for configuration</p>
+<p>May also be set with the <code>TY_CONFIG_FILE</code> environment variable.</p></dd><dt id="ty-coverage--extra-search-path"><a href="#ty-coverage--extra-search-path"><code>--extra-search-path</code></a> <i>path</i></dt><dd><p>Additional path to use as a module-resolution source (can be passed multiple times)</p>
+</dd><dt id="ty-coverage--help"><a href="#ty-coverage--help"><code>--help</code></a>, <code>-h</code></dt><dd><p>Print help (see a summary with '-h')</p>
+</dd><dt id="ty-coverage--html"><a href="#ty-coverage--html"><code>--html</code></a> <i>path</i></dt><dd><p>Write a self-contained HTML coverage report to PATH</p>
+</dd><dt id="ty-coverage--project"><a href="#ty-coverage--project"><code>--project</code></a> <i>project</i></dt><dd><p>Run the command within the given project directory</p>
+</dd><dt id="ty-coverage--python"><a href="#ty-coverage--python"><code>--python</code></a>, <code>--venv</code> <i>path</i></dt><dd><p>Path to your project's Python environment or interpreter</p>
+</dd><dt id="ty-coverage--python-platform"><a href="#ty-coverage--python-platform"><code>--python-platform</code></a>, <code>--platform</code> <i>platform</i></dt><dd><p>Target platform to assume when resolving types</p>
+</dd><dt id="ty-coverage--python-version"><a href="#ty-coverage--python-version"><code>--python-version</code></a>, <code>--target-version</code> <i>version</i></dt><dd><p>Python version to assume when resolving types</p>
+<p>Possible values:</p>
+<ul>
+<li><code>3.7</code></li>
+<li><code>3.8</code></li>
+<li><code>3.9</code></li>
+<li><code>3.10</code></li>
+<li><code>3.11</code></li>
+<li><code>3.12</code></li>
+<li><code>3.13</code></li>
+<li><code>3.14</code></li>
+<li><code>3.15</code></li>
+</ul></dd><dt id="ty-coverage--quiet"><a href="#ty-coverage--quiet"><code>--quiet</code></a>, <code>-q</code></dt><dd><p>Use quiet output (or <code>-qq</code> for silent output)</p>
+</dd><dt id="ty-coverage--typeshed"><a href="#ty-coverage--typeshed"><code>--typeshed</code></a>, <code>--custom-typeshed-dir</code> <i>path</i></dt><dd><p>Custom directory to use for stdlib typeshed stubs</p>
+</dd><dt id="ty-coverage--verbose"><a href="#ty-coverage--verbose"><code>--verbose</code></a>, <code>-v</code></dt><dd><p>Use verbose output (or <code>-vv</code> and <code>-vvv</code> for more verbose output)</p>
 </dd></dl>
 
 ## ty server

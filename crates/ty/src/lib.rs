@@ -29,6 +29,9 @@ use ty_project::metadata::settings::TerminalSettings;
 use ty_project::watch::ProjectWatcher;
 use ty_project::{CollectReporter, Db, suppress_all_diagnostics, watch};
 use ty_project::{ProjectDatabase, ProjectMetadata};
+use ty_python_semantic::coverage::{
+    CoverageStats, FileCoverageDetails, coverage_details as compute_coverage_details,
+};
 use ty_server::run_server;
 use ty_static::EnvVars;
 
@@ -222,13 +225,9 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
 }
 
 fn run_coverage(args: CoverageCommand) -> anyhow::Result<ExitStatus> {
-    use std::io::Write as _;
-
     #[cfg(windows)]
     assert!(colored::control::set_virtual_terminal(true).is_ok());
 
-    let html_path = args.html.clone();
-    let show_todo = args.todo;
     set_colored_override(args.color);
 
     let verbosity = args.verbosity.level();
@@ -252,9 +251,14 @@ fn run_coverage(args: CoverageCommand) -> anyhow::Result<ExitStatus> {
     // Extract paths and project before consuming args with into_options().
     let paths = args.paths.clone();
     let project = args.project.clone();
+    let mode = MainLoopMode::Coverage {
+        show_todo: args.todo,
+        html_path: args.html.clone(),
+        cwd: cwd.clone(),
+    };
     let options = args.into_options();
 
-    let (db, _, resolved_paths) = load_project(
+    let (mut db, project_options_overrides, resolved_paths) = load_project(
         &cwd,
         &paths,
         project.as_ref(),
@@ -271,21 +275,34 @@ fn run_coverage(args: CoverageCommand) -> anyhow::Result<ExitStatus> {
         }
     }
 
-    let files = db.project().files(&db);
+    // Coverage never shows a progress bar.
+    let printer = Printer::new(verbosity, true);
+    let (main_loop, main_loop_cancellation_token) =
+        MainLoop::new(mode, project_options_overrides, printer);
 
-    // Collect per-file details (stats + per-line map) and file handles.
-    let mut per_file: Vec<(
-        SystemPathBuf,
-        ruff_db::files::File,
-        ty_python_semantic::coverage::FileCoverageDetails,
-    )> = files
-        .iter()
-        .filter_map(|file| {
-            let path = file.path(&db).as_system_path()?.to_path_buf();
-            let details = ty_python_semantic::coverage::coverage_details(&db, *file);
-            Some((path, *file, details))
-        })
-        .collect();
+    let main_loop_cancellation_token = Mutex::new(Some(main_loop_cancellation_token));
+    ctrlc::set_handler(move || {
+        let mut lock = main_loop_cancellation_token.lock().unwrap();
+        if let Some(token) = lock.take() {
+            token.stop();
+        }
+    })?;
+
+    let exit_status = main_loop.run(&mut db)?;
+
+    std::mem::forget(db);
+
+    Ok(exit_status)
+}
+
+fn render_coverage(
+    db: &ProjectDatabase,
+    mut per_file: Vec<(SystemPathBuf, File, FileCoverageDetails)>,
+    cwd: &SystemPath,
+    show_todo: bool,
+    html_path: Option<&SystemPath>,
+) -> anyhow::Result<()> {
+    use std::io::Write as _;
 
     // Sort by combined line-level imprecision descending, then by path for stable output.
     per_file.sort_by(|(path_a, _, details_a), (path_b, _, details_b)| {
@@ -297,10 +314,11 @@ fn run_coverage(args: CoverageCommand) -> anyhow::Result<ExitStatus> {
             .then_with(|| path_a.cmp(path_b))
     });
 
-    let total = per_file.iter().fold(
-        ty_python_semantic::coverage::CoverageStats::default(),
-        |acc, (_, _, d)| acc.merge(d.stats),
-    );
+    let total = per_file
+        .iter()
+        .fold(CoverageStats::default(), |acc, (_, _, d)| {
+            acc.merge(d.stats)
+        });
 
     // Compute common directory prefix to strip from displayed paths.
     let prefix = common_path_prefix(per_file.iter().map(|(p, _, _)| p.as_path()));
@@ -362,15 +380,17 @@ fn run_coverage(args: CoverageCommand) -> anyhow::Result<ExitStatus> {
         tbl.render(&mut stdout)?;
     }
 
-    if let Some(html_out) = &html_path {
-        let abs = ruff_db::system::SystemPath::absolute(html_out, &cwd);
-        html::write_html_report(&abs, &per_file, &prefix, &db, show_todo)?;
+    if let Some(html_out) = html_path {
+        let abs = SystemPath::absolute(html_out, cwd);
+        html::write_html_report(&abs, &per_file, &prefix, db, show_todo)?;
         writeln!(stdout, "HTML report written to {abs}")?;
     }
 
-    std::mem::forget(db);
+    Ok(())
+}
 
-    Ok(ExitStatus::Success)
+fn coverage_exit_status() -> ExitStatus {
+    ExitStatus::Success
 }
 
 /// Formats a count with its percentage of a total as `"N (X%)"`.
@@ -523,29 +543,58 @@ impl MainLoop {
                     let db = db.clone();
                     let sender = self.sender.clone();
 
-                    // Spawn a new task that checks the project. This needs to be done in a separate thread
-                    // to prevent blocking the main loop here.
-                    rayon::spawn(move || {
-                        let mut reporter = IndicatifReporter::from(self.printer);
-                        let bar = reporter.bar.clone();
+                    if matches!(self.mode, MainLoopMode::Coverage { .. }) {
+                        // Coverage mode: compute per-file details in a background thread.
+                        rayon::spawn(move || {
+                            match salsa::Cancelled::catch(|| {
+                                db.project()
+                                    .files(&db)
+                                    .iter()
+                                    .filter_map(|file| {
+                                        let path = file.path(&db).as_system_path()?.to_path_buf();
+                                        let details = compute_coverage_details(&db, *file);
+                                        Some((path, *file, details))
+                                    })
+                                    .collect::<Vec<_>>()
+                            }) {
+                                Ok(per_file) => {
+                                    sender
+                                        .send(MainLoopMessage::CoverageCompleted {
+                                            per_file,
+                                            revision,
+                                        })
+                                        .unwrap();
+                                }
+                                Err(cancelled) => {
+                                    tracing::debug!(
+                                        "Coverage computation cancelled: {cancelled:?}"
+                                    );
+                                }
+                            }
+                        });
+                    } else {
+                        // Check/AddIgnore mode: run diagnostics in a background thread.
+                        rayon::spawn(move || {
+                            let mut reporter = IndicatifReporter::from(self.printer);
+                            let bar = reporter.bar.clone();
 
-                        match salsa::Cancelled::catch(|| {
-                            db.check_with_reporter(&mut reporter);
-                            reporter.bar.finish_and_clear();
-                            reporter.collector.into_sorted(&db)
-                        }) {
-                            Ok(result) => {
-                                // Send the result back to the main loop for printing.
-                                sender
-                                    .send(MainLoopMessage::CheckCompleted { result, revision })
-                                    .unwrap();
+                            match salsa::Cancelled::catch(|| {
+                                db.check_with_reporter(&mut reporter);
+                                reporter.bar.finish_and_clear();
+                                reporter.collector.into_sorted(&db)
+                            }) {
+                                Ok(result) => {
+                                    sender
+                                        .send(MainLoopMessage::CheckCompleted { result, revision })
+                                        .unwrap();
+                                }
+                                Err(cancelled) => {
+                                    bar.finish_and_clear();
+                                    tracing::debug!("Check has been cancelled: {cancelled:?}");
+                                }
                             }
-                            Err(cancelled) => {
-                                bar.finish_and_clear();
-                                tracing::debug!("Check has been cancelled: {cancelled:?}");
-                            }
-                        }
-                    });
+                        });
+                    }
                 }
 
                 MainLoopMessage::CheckCompleted {
@@ -563,7 +612,7 @@ impl MainLoop {
                         tracing::warn!("No python files found under the given path(s)");
                     }
 
-                    let result = match self.mode {
+                    let result = match &self.mode {
                         MainLoopMode::Check => {
                             // TODO: We should have an official flag to silence workspace diagnostics.
                             if std::env::var("TY_MEMORY_REPORT").as_deref() == Ok("json") {
@@ -602,6 +651,8 @@ impl MainLoop {
                                 Err(Canceled)
                             }
                         }
+                        // Coverage mode never sends CheckCompleted; ignore stale messages.
+                        MainLoopMode::Coverage { .. } => continue,
                     };
 
                     let exit_status = match result.as_deref() {
@@ -624,6 +675,33 @@ impl MainLoop {
                     }
 
                     return Ok(exit_status);
+                }
+
+                MainLoopMessage::CoverageCompleted {
+                    per_file,
+                    revision: check_revision,
+                } => {
+                    if check_revision != revision {
+                        tracing::debug!(
+                            "Discarding coverage result for outdated revision: current: {revision}, result revision: {check_revision}"
+                        );
+                        continue;
+                    }
+
+                    if let MainLoopMode::Coverage {
+                        show_todo,
+                        html_path,
+                        cwd,
+                    } = &self.mode
+                    {
+                        render_coverage(db, per_file, cwd, *show_todo, html_path.as_deref())?;
+                    }
+
+                    if self.watcher.is_some() {
+                        continue;
+                    }
+
+                    return Ok(coverage_exit_status());
                 }
 
                 MainLoopMessage::ApplyChanges(changes) => {
@@ -703,10 +781,15 @@ impl MainLoop {
     }
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Clone, Debug)]
 enum MainLoopMode {
     Check,
     AddIgnore,
+    Coverage {
+        show_todo: bool,
+        html_path: Option<SystemPathBuf>,
+        cwd: SystemPathBuf,
+    },
 }
 
 fn exit_status_from_diagnostics(
@@ -813,6 +896,10 @@ enum MainLoopMessage {
     CheckCompleted {
         /// The diagnostics that were found during the check.
         result: Vec<Diagnostic>,
+        revision: u64,
+    },
+    CoverageCompleted {
+        per_file: Vec<(SystemPathBuf, File, FileCoverageDetails)>,
         revision: u64,
     },
     ApplyChanges(Vec<watch::ChangeEvent>),

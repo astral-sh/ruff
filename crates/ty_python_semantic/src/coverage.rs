@@ -64,6 +64,7 @@ pub enum TypeCoverage {
 }
 
 /// Aggregate stats plus per-line classification for a single file.
+#[derive(Debug)]
 pub struct FileCoverageDetails {
     pub stats: CoverageStats,
     /// Maps 1-based line numbers to their worst-case classification.
