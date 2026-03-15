@@ -675,7 +675,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // Pretend that instances of `dataclasses.Field` are assignable to their default type.
             // This allows field definitions like `name: str = field(default="")` in dataclasses
             // to pass the assignability check of the inferred type to the declared type.
-            (Type::KnownInstance(KnownInstanceType::Field(field)), right)
+            (Type::KnownInstance(KnownInstanceType::Field(field)), _)
                 if self.relation.is_assignability() =>
             {
                 field
