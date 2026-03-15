@@ -503,17 +503,28 @@ fn check_class_declaration<'db>(
 
             // If this superclass is not the immediate parent for this method,
             // check if the immediate parent itself already has an LSP violation with this ancestor.
-            // If so, don't report the same violation for the child class -- it would be a false positive
-            // since the child cannot fix the violation without contradicting its immediate parent's contract.
+            // For non-overloaded children, don't report the same violation again -- the child
+            // generally cannot fix it without contradicting the immediate parent. Overloaded
+            // children are different: they can add new call branches while remaining compatible
+            // with the immediate parent, so they still need to be checked against ancestors.
             // See: https://github.com/astral-sh/ty/issues/2000
             if let Some((immediate_parent, immediate_parent_type)) = immediate_parent_method {
                 if immediate_parent != superclass {
                     // The immediate parent already defines this method and is different from the
                     // current ancestor we're checking. Check if the immediate parent's method
                     // is also incompatible with this ancestor.
-                    if !immediate_parent_type.is_assignable_to(db, superclass_type_as_type) {
-                        // The immediate parent already has an LSP violation with this ancestor.
-                        // Don't report the same violation for the child.
+                    let inherited_violation =
+                        !immediate_parent_type.is_assignable_to(db, superclass_type_as_type);
+                    let child_is_overloaded = subclass_type_as_type
+                        .try_upcast_to_callable(db)
+                        .is_some_and(|callables| {
+                            callables.as_slice().len() > 1
+                                || callables
+                                    .iter()
+                                    .any(|callable| callable.signatures(db).iter().len() > 1)
+                        });
+
+                    if inherited_violation && !child_is_overloaded {
                         continue;
                     }
                 }

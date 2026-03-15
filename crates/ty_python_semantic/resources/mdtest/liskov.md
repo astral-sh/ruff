@@ -142,16 +142,19 @@ on its grandparent class. This is because type checkers will treat the child cla
 the grandparent class just as much as they treat it as a subtype of the parent class, so
 substitutability with respect to the grandparent class is just as important.
 
-However, if the parent class itself already has an LSP violation with an ancestor, we do not report
-the same violation for the child class. This is because the child class cannot fix the violation
-without introducing a new, worse violation against its immediate parent's contract.
+However, if the parent class itself already has an LSP violation with an ancestor, we usually do not
+report the same violation for the child class. This is because the child often cannot fix the
+violation without introducing a new, worse violation against its immediate parent's contract.
+Overloaded children are an exception: they can add new call branches while remaining compatible with
+their immediate parent, so those new overloads must still be checked against ancestors.
 
 <!-- snapshot-diagnostics -->
 
 `stub.pyi`:
 
 ```pyi
-from typing import Any
+from typing import Any, overload
+from typing_extensions import Self
 
 class Grandparent:
     def method(self, x: int) -> None: ...
@@ -184,6 +187,22 @@ class ChildWithReturnType(ParentWithReturnType):
     # Returns `int` again -- compatible with `GrandparentWithReturnType.method`,
     # but not with `ParentWithReturnType.method`. We report against the immediate parent.
     def method(self) -> int: ...  # error: [invalid-method-override]
+
+class GrandparentWithInheritedViolation:
+    def method(self, x: Any) -> Self: ...
+
+class ParentWithInheritedViolation(GrandparentWithInheritedViolation):
+    def method(self, x: int | Self) -> int: ...  # error: [invalid-method-override]
+
+class ChildWithExtraOverload(ParentWithInheritedViolation):
+    # `ParentWithInheritedViolation.method` already violates LSP with
+    # `GrandparentWithInheritedViolation.method`, but this child does not keep the same
+    # method type: it adds a new overload while remaining compatible with the immediate
+    # parent. We should therefore still report the violation on the child.
+    @overload
+    def method(self, x: int | Self) -> int: ...
+    @overload
+    def method(self, x: bytes) -> bytes: ...  # error: [invalid-method-override]
 
 class GradualParent(Grandparent):
     def method(self, x: Any) -> None: ...
