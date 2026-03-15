@@ -103,6 +103,9 @@ def f(
     # error: [unresolved-reference] "SomethingUndefined"
     # error: [unresolved-reference] "SomethingAlsoUndefined"
     i: SomethingUndefined | SomethingAlsoUndefined,
+    # error: [unsupported-operator]
+    # error: [unsupported-operator]
+    j: list["int" | None] | "bytes",
 ):
     reveal_type(a)  # revealed: int | Foo
     reveal_type(b)  # revealed: int | memoryview[int] | bytes
@@ -167,7 +170,12 @@ from __future__ import annotations
 def f(v: int | "Foo"):  # fine
     reveal_type(v)  # revealed: int | Foo
 
-class Foo: ...
+class Foo:
+    def __init__(self):
+        self.x: "int" | "str" = 42
+
+d = {}
+d[0]: "int" | "str" = 42
 
 # error: [unsupported-operator]
 X = list["int" | None]

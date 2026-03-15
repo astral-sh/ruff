@@ -49,38 +49,41 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/annotations/string.md
 34 |     # error: [unresolved-reference] "SomethingUndefined"
 35 |     # error: [unresolved-reference] "SomethingAlsoUndefined"
 36 |     i: SomethingUndefined | SomethingAlsoUndefined,
-37 | ):
-38 |     reveal_type(a)  # revealed: int | Foo
-39 |     reveal_type(b)  # revealed: int | memoryview[int] | bytes
-40 |     reveal_type(c)  # revealed: TD | None
-41 |     reveal_type(d)  # revealed: P | None
-42 |     reveal_type(e)  # revealed: T@f | Foo
-43 |     reveal_type(f)  # revealed: Foo | ((...) -> None)
-44 |     reveal_type(g)  # revealed: UsesMeta | Foo
-45 |     reveal_type(h)  # revealed: None
-46 |     reveal_type(i)  # revealed: Unknown
-47 | 
-48 | # fmt: on
-49 | 
-50 | class Foo: ...
-51 | 
-52 | # error: [unsupported-operator]
-53 | X = list["int" | None]
+37 |     # error: [unsupported-operator]
+38 |     # error: [unsupported-operator]
+39 |     j: list["int" | None] | "bytes",
+40 | ):
+41 |     reveal_type(a)  # revealed: int | Foo
+42 |     reveal_type(b)  # revealed: int | memoryview[int] | bytes
+43 |     reveal_type(c)  # revealed: TD | None
+44 |     reveal_type(d)  # revealed: P | None
+45 |     reveal_type(e)  # revealed: T@f | Foo
+46 |     reveal_type(f)  # revealed: Foo | ((...) -> None)
+47 |     reveal_type(g)  # revealed: UsesMeta | Foo
+48 |     reveal_type(h)  # revealed: None
+49 |     reveal_type(i)  # revealed: Unknown
+50 | 
+51 | # fmt: on
+52 | 
+53 | class Foo: ...
 54 | 
-55 | if TYPE_CHECKING:
-56 |     # TODO: ideally we would not error here, since `if TYPE_CHECKING`
-57 |     # blocks are not executed at runtime. Requires
-58 |     # https://github.com/astral-sh/ty/issues/1553.
-59 |     bar: "int" | "None"  # error: [unsupported-operator]
-60 | 
-61 |     # TODO: same as above
-62 |     # error: [unsupported-operator]
-63 |     def foo(x: "int" | "None"): ...
-64 | 
-65 |     class Bar:
-66 |         # no error because this annotation is resolved inside a scope
-67 |         # fully defined inside an `if TYPE_CHECKING` block
-68 |         def f(x: "int" | "None"): ...
+55 | # error: [unsupported-operator]
+56 | X = list["int" | None]
+57 | 
+58 | if TYPE_CHECKING:
+59 |     # TODO: ideally we would not error here, since `if TYPE_CHECKING`
+60 |     # blocks are not executed at runtime. Requires
+61 |     # https://github.com/astral-sh/ty/issues/1553.
+62 |     bar: "int" | "None"  # error: [unsupported-operator]
+63 | 
+64 |     # TODO: same as above
+65 |     # error: [unsupported-operator]
+66 |     def foo(x: "int" | "None"): ...
+67 | 
+68 |     class Bar:
+69 |         # no error because this annotation is resolved inside a scope
+70 |         # fully defined inside an `if TYPE_CHECKING` block
+71 |         def f(x: "int" | "None"): ...
 ```
 
 # Diagnostics
@@ -194,8 +197,8 @@ error[unresolved-reference]: Name `SomethingUndefined` used when not defined
 35 |     # error: [unresolved-reference] "SomethingAlsoUndefined"
 36 |     i: SomethingUndefined | SomethingAlsoUndefined,
    |        ^^^^^^^^^^^^^^^^^^
-37 | ):
-38 |     reveal_type(a)  # revealed: int | Foo
+37 |     # error: [unsupported-operator]
+38 |     # error: [unsupported-operator]
    |
 info: rule `unresolved-reference` is enabled by default
 
@@ -209,8 +212,8 @@ error[unresolved-reference]: Name `SomethingAlsoUndefined` used when not defined
 35 |     # error: [unresolved-reference] "SomethingAlsoUndefined"
 36 |     i: SomethingUndefined | SomethingAlsoUndefined,
    |                             ^^^^^^^^^^^^^^^^^^^^^^
-37 | ):
-38 |     reveal_type(a)  # revealed: int | Foo
+37 |     # error: [unsupported-operator]
+38 |     # error: [unsupported-operator]
    |
 info: rule `unresolved-reference` is enabled by default
 
@@ -218,16 +221,58 @@ info: rule `unresolved-reference` is enabled by default
 
 ```
 error[unsupported-operator]: Unsupported `|` operation
-  --> src/mdtest_snippet.py:53:10
+  --> src/mdtest_snippet.py:39:8
    |
-52 | # error: [unsupported-operator]
-53 | X = list["int" | None]
+37 |     # error: [unsupported-operator]
+38 |     # error: [unsupported-operator]
+39 |     j: list["int" | None] | "bytes",
+   |        ------------------^^^-------
+   |        |                    |
+   |        |                    Has type `Literal["bytes"]`
+   |        Has type `<class 'list[int | None]'>`
+40 | ):
+41 |     reveal_type(a)  # revealed: int | Foo
+   |
+info: All type expressions are evaluated at runtime by default on Python <3.14
+info: Python 3.13 was assumed when inferring types because it was specified on the command line
+help: Put quotes around the whole union rather than just certain elements
+info: rule `unsupported-operator` is enabled by default
+
+```
+
+```
+error[unsupported-operator]: Unsupported `|` operation
+  --> src/mdtest_snippet.py:39:13
+   |
+37 |     # error: [unsupported-operator]
+38 |     # error: [unsupported-operator]
+39 |     j: list["int" | None] | "bytes",
+   |             -----^^^----
+   |             |       |
+   |             |       Has type `None`
+   |             Has type `Literal["int"]`
+40 | ):
+41 |     reveal_type(a)  # revealed: int | Foo
+   |
+info: All type expressions are evaluated at runtime by default on Python <3.14
+info: Python 3.13 was assumed when inferring types because it was specified on the command line
+help: Put quotes around the whole union rather than just certain elements
+info: rule `unsupported-operator` is enabled by default
+
+```
+
+```
+error[unsupported-operator]: Unsupported `|` operation
+  --> src/mdtest_snippet.py:56:10
+   |
+55 | # error: [unsupported-operator]
+56 | X = list["int" | None]
    |          -----^^^----
    |          |       |
    |          |       Has type `None`
    |          Has type `Literal["int"]`
-54 |
-55 | if TYPE_CHECKING:
+57 |
+58 | if TYPE_CHECKING:
    |
 info: All type expressions are evaluated at runtime by default on Python <3.14
 info: Python 3.13 was assumed when inferring types because it was specified on the command line
@@ -238,17 +283,17 @@ info: rule `unsupported-operator` is enabled by default
 
 ```
 error[unsupported-operator]: Unsupported `|` operation
-  --> src/mdtest_snippet.py:59:10
+  --> src/mdtest_snippet.py:62:10
    |
-57 |     # blocks are not executed at runtime. Requires
-58 |     # https://github.com/astral-sh/ty/issues/1553.
-59 |     bar: "int" | "None"  # error: [unsupported-operator]
+60 |     # blocks are not executed at runtime. Requires
+61 |     # https://github.com/astral-sh/ty/issues/1553.
+62 |     bar: "int" | "None"  # error: [unsupported-operator]
    |          -----^^^------
    |          |       |
    |          |       Has type `Literal["None"]`
    |          Has type `Literal["int"]`
-60 |
-61 |     # TODO: same as above
+63 |
+64 |     # TODO: same as above
    |
 info: All type expressions are evaluated at runtime by default on Python <3.14
 info: Python 3.13 was assumed when inferring types because it was specified on the command line
@@ -259,17 +304,17 @@ info: rule `unsupported-operator` is enabled by default
 
 ```
 error[unsupported-operator]: Unsupported `|` operation
-  --> src/mdtest_snippet.py:63:16
+  --> src/mdtest_snippet.py:66:16
    |
-61 |     # TODO: same as above
-62 |     # error: [unsupported-operator]
-63 |     def foo(x: "int" | "None"): ...
+64 |     # TODO: same as above
+65 |     # error: [unsupported-operator]
+66 |     def foo(x: "int" | "None"): ...
    |                -----^^^------
    |                |       |
    |                |       Has type `Literal["None"]`
    |                Has type `Literal["int"]`
-64 |
-65 |     class Bar:
+67 |
+68 |     class Bar:
    |
 info: All type expressions are evaluated at runtime by default on Python <3.14
 info: Python 3.13 was assumed when inferring types because it was specified on the command line

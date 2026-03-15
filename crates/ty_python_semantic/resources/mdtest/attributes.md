@@ -2703,7 +2703,7 @@ class ManyCycles2:
 
     def f1(self: "ManyCycles2"):
         # TODO: should be Unknown | list[int] | list[Divergent]
-        reveal_type(self.x3)  # revealed: Unknown | list[int] | list[Unknown] | list[Divergent]
+        reveal_type(self.x3)  # revealed: Unknown | list[int] | list[Divergent] | list[Unknown]
 
         self.x1 = [self.x2] + [self.x3]
         self.x2 = [self.x1] + [self.x3]
@@ -2748,7 +2748,7 @@ class Toggle:
             self.y = True
 
 # Literal[True] or undefined
-reveal_type(Toggle().x)  # revealed: Literal[True] | Unknown
+reveal_type(Toggle().x)  # revealed: Unknown | Literal[True]
 reveal_type(Toggle().y)  # revealed: Unknown | Literal[True]
 ```
 
@@ -3055,9 +3055,9 @@ We give special diagnostics for this common case too:
 import foo
 import baz
 
-# error: [possibly-missing-attribute]
+# error: [possibly-missing-submodule]
 reveal_type(foo.bar)  # revealed: Unknown
-# error: [possibly-missing-attribute]
+# error: [possibly-missing-submodule]
 reveal_type(baz.bar)  # revealed: Unknown
 ```
 

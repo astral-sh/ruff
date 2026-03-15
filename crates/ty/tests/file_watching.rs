@@ -435,7 +435,7 @@ where
         }
     }
 
-    let mut db = ProjectDatabase::new(project, system)?;
+    let mut db = ProjectDatabase::fallible(project, system)?;
 
     if let Some(included_paths) = included_paths {
         db.project().set_included_paths(&mut db, included_paths);

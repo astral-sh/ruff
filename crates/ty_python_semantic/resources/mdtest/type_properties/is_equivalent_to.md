@@ -235,14 +235,18 @@ the parameter in one of the callable has a default value then the corresponding 
 other callable should also have a default value.
 
 ```py
-from ty_extensions import CallableTypeOf, is_equivalent_to, static_assert
+from ty_extensions import RegularCallableTypeOf, is_equivalent_to, static_assert
 from typing import Callable
 
 def f1(a: int = 1) -> None: ...
 def f2(a: int = 2) -> None: ...
 
-static_assert(is_equivalent_to(CallableTypeOf[f1], CallableTypeOf[f2]))
-static_assert(is_equivalent_to(CallableTypeOf[f1] | bool | CallableTypeOf[f2], CallableTypeOf[f2] | bool | CallableTypeOf[f1]))
+static_assert(is_equivalent_to(RegularCallableTypeOf[f1], RegularCallableTypeOf[f2]))
+static_assert(
+    is_equivalent_to(
+        RegularCallableTypeOf[f1] | bool | RegularCallableTypeOf[f2], RegularCallableTypeOf[f2] | bool | RegularCallableTypeOf[f1]
+    )
+)
 ```
 
 The names of the positional-only, variadic and keyword-variadic parameters does not need to be the
@@ -252,8 +256,12 @@ same.
 def f3(a1: int, /, *args1: int, **kwargs2: int) -> None: ...
 def f4(a2: int, /, *args2: int, **kwargs1: int) -> None: ...
 
-static_assert(is_equivalent_to(CallableTypeOf[f3], CallableTypeOf[f4]))
-static_assert(is_equivalent_to(CallableTypeOf[f3] | bool | CallableTypeOf[f4], CallableTypeOf[f4] | bool | CallableTypeOf[f3]))
+static_assert(is_equivalent_to(RegularCallableTypeOf[f3], RegularCallableTypeOf[f4]))
+static_assert(
+    is_equivalent_to(
+        RegularCallableTypeOf[f3] | bool | RegularCallableTypeOf[f4], RegularCallableTypeOf[f4] | bool | RegularCallableTypeOf[f3]
+    )
+)
 ```
 
 Putting it all together, the following two callables are equivalent:
@@ -262,8 +270,12 @@ Putting it all together, the following two callables are equivalent:
 def f5(a1: int, /, b: float, c: bool = False, *args1: int, d: int = 1, e: str, **kwargs1: float) -> None: ...
 def f6(a2: int, /, b: float, c: bool = True, *args2: int, d: int = 2, e: str, **kwargs2: float) -> None: ...
 
-static_assert(is_equivalent_to(CallableTypeOf[f5], CallableTypeOf[f6]))
-static_assert(is_equivalent_to(CallableTypeOf[f5] | bool | CallableTypeOf[f6], CallableTypeOf[f6] | bool | CallableTypeOf[f5]))
+static_assert(is_equivalent_to(RegularCallableTypeOf[f5], RegularCallableTypeOf[f6]))
+static_assert(
+    is_equivalent_to(
+        RegularCallableTypeOf[f5] | bool | RegularCallableTypeOf[f6], RegularCallableTypeOf[f6] | bool | RegularCallableTypeOf[f5]
+    )
+)
 ```
 
 ### Not equivalent
@@ -271,7 +283,7 @@ static_assert(is_equivalent_to(CallableTypeOf[f5] | bool | CallableTypeOf[f6], C
 There are multiple cases when two callable types are not equivalent which are enumerated below.
 
 ```py
-from ty_extensions import CallableTypeOf, is_equivalent_to, static_assert
+from ty_extensions import RegularCallableTypeOf, is_equivalent_to, static_assert
 from typing import Callable
 ```
 
@@ -281,7 +293,7 @@ When the number of parameters is different:
 def f1(a: int) -> None: ...
 def f2(a: int, b: int) -> None: ...
 
-static_assert(not is_equivalent_to(CallableTypeOf[f1], CallableTypeOf[f2]))
+static_assert(not is_equivalent_to(RegularCallableTypeOf[f1], RegularCallableTypeOf[f2]))
 ```
 
 When the return types are not equivalent in one or both of the callable types:
@@ -291,9 +303,9 @@ def f3(): ...
 def f4() -> None: ...
 
 static_assert(not is_equivalent_to(Callable[[], int], Callable[[], None]))
-static_assert(is_equivalent_to(CallableTypeOf[f3], CallableTypeOf[f3]))
-static_assert(not is_equivalent_to(CallableTypeOf[f3], CallableTypeOf[f4]))
-static_assert(not is_equivalent_to(CallableTypeOf[f4], CallableTypeOf[f3]))
+static_assert(is_equivalent_to(RegularCallableTypeOf[f3], RegularCallableTypeOf[f3]))
+static_assert(not is_equivalent_to(RegularCallableTypeOf[f3], RegularCallableTypeOf[f4]))
+static_assert(not is_equivalent_to(RegularCallableTypeOf[f4], RegularCallableTypeOf[f3]))
 ```
 
 When the parameter names are different:
@@ -302,13 +314,13 @@ When the parameter names are different:
 def f5(a: int) -> None: ...
 def f6(b: int) -> None: ...
 
-static_assert(not is_equivalent_to(CallableTypeOf[f5], CallableTypeOf[f6]))
+static_assert(not is_equivalent_to(RegularCallableTypeOf[f5], RegularCallableTypeOf[f6]))
 ```
 
 When only one of the callable types has parameter names:
 
 ```py
-static_assert(not is_equivalent_to(CallableTypeOf[f5], Callable[[int], None]))
+static_assert(not is_equivalent_to(RegularCallableTypeOf[f5], Callable[[int], None]))
 ```
 
 When the parameter kinds are different:
@@ -317,7 +329,7 @@ When the parameter kinds are different:
 def f7(a: int, /) -> None: ...
 def f8(a: int) -> None: ...
 
-static_assert(not is_equivalent_to(CallableTypeOf[f7], CallableTypeOf[f8]))
+static_assert(not is_equivalent_to(RegularCallableTypeOf[f7], RegularCallableTypeOf[f8]))
 ```
 
 When the annotated types of the parameters are not equivalent or absent in one or both of the
@@ -328,10 +340,10 @@ def f9(a: int) -> None: ...
 def f10(a: str) -> None: ...
 def f11(a) -> None: ...
 
-static_assert(not is_equivalent_to(CallableTypeOf[f9], CallableTypeOf[f10]))
-static_assert(not is_equivalent_to(CallableTypeOf[f10], CallableTypeOf[f11]))
-static_assert(not is_equivalent_to(CallableTypeOf[f11], CallableTypeOf[f10]))
-static_assert(is_equivalent_to(CallableTypeOf[f11], CallableTypeOf[f11]))
+static_assert(not is_equivalent_to(RegularCallableTypeOf[f9], RegularCallableTypeOf[f10]))
+static_assert(not is_equivalent_to(RegularCallableTypeOf[f10], RegularCallableTypeOf[f11]))
+static_assert(not is_equivalent_to(RegularCallableTypeOf[f11], RegularCallableTypeOf[f10]))
+static_assert(is_equivalent_to(RegularCallableTypeOf[f11], RegularCallableTypeOf[f11]))
 ```
 
 When the default value for a parameter is present only in one of the callable type:
@@ -340,8 +352,8 @@ When the default value for a parameter is present only in one of the callable ty
 def f12(a: int) -> None: ...
 def f13(a: int = 2) -> None: ...
 
-static_assert(not is_equivalent_to(CallableTypeOf[f12], CallableTypeOf[f13]))
-static_assert(not is_equivalent_to(CallableTypeOf[f13], CallableTypeOf[f12]))
+static_assert(not is_equivalent_to(RegularCallableTypeOf[f12], RegularCallableTypeOf[f13]))
+static_assert(not is_equivalent_to(RegularCallableTypeOf[f13], RegularCallableTypeOf[f12]))
 ```
 
 ### Unions containing `Callable`s
@@ -350,12 +362,12 @@ Two unions containing different `Callable` types are equivalent even if the unio
 ordered:
 
 ```py
-from ty_extensions import CallableTypeOf, Unknown, is_equivalent_to, static_assert
+from ty_extensions import RegularCallableTypeOf, Unknown, is_equivalent_to, static_assert
 
 def f(x): ...
 def g(x: Unknown): ...
 
-static_assert(is_equivalent_to(CallableTypeOf[f] | int | str, str | int | CallableTypeOf[g]))
+static_assert(is_equivalent_to(RegularCallableTypeOf[f] | int | str, str | int | RegularCallableTypeOf[g]))
 ```
 
 ### Unions containing `Callable`s containing unions
@@ -391,13 +403,13 @@ def overloaded(a: Grandparent) -> None: ...
 ```
 
 ```py
-from ty_extensions import CallableTypeOf, is_equivalent_to, static_assert
+from ty_extensions import RegularCallableTypeOf, is_equivalent_to, static_assert
 from overloaded import Grandparent, Parent, Child, overloaded
 
 def grandparent(a: Grandparent) -> None: ...
 
-static_assert(is_equivalent_to(CallableTypeOf[grandparent], CallableTypeOf[overloaded]))
-static_assert(is_equivalent_to(CallableTypeOf[overloaded], CallableTypeOf[grandparent]))
+static_assert(is_equivalent_to(RegularCallableTypeOf[grandparent], RegularCallableTypeOf[overloaded]))
+static_assert(is_equivalent_to(RegularCallableTypeOf[overloaded], RegularCallableTypeOf[grandparent]))
 ```
 
 #### Both overloads
@@ -424,11 +436,11 @@ def cpg(a: Grandparent) -> None: ...
 ```
 
 ```py
-from ty_extensions import CallableTypeOf, is_equivalent_to, static_assert
+from ty_extensions import RegularCallableTypeOf, is_equivalent_to, static_assert
 from overloaded import pg, cpg
 
-static_assert(is_equivalent_to(CallableTypeOf[pg], CallableTypeOf[cpg]))
-static_assert(is_equivalent_to(CallableTypeOf[cpg], CallableTypeOf[pg]))
+static_assert(is_equivalent_to(RegularCallableTypeOf[pg], RegularCallableTypeOf[cpg]))
+static_assert(is_equivalent_to(RegularCallableTypeOf[cpg], RegularCallableTypeOf[pg]))
 ```
 
 ### Function-literal types and bound-method types
@@ -463,7 +475,7 @@ gradual types. The cases with fully static types and using different combination
 are covered above.
 
 ```py
-from ty_extensions import Unknown, CallableTypeOf, TypeOf, is_equivalent_to, static_assert
+from ty_extensions import Unknown, CallableTypeOf, RegularCallableTypeOf, TypeOf, is_equivalent_to, static_assert
 from typing import Any, Callable
 
 static_assert(is_equivalent_to(Callable[..., int], Callable[..., int]))
@@ -485,7 +497,7 @@ def f1():
 def f1_equivalent() -> Any:
     return
 
-static_assert(is_equivalent_to(CallableTypeOf[f1], CallableTypeOf[f1_equivalent]))
+static_assert(is_equivalent_to(RegularCallableTypeOf[f1], RegularCallableTypeOf[f1_equivalent]))
 ```
 
 And, similarly for parameters with no annotations.
@@ -497,7 +509,7 @@ def f2(a, b, /) -> None:
 def f2_equivalent(a: Any, b: Any, /) -> None:
     return
 
-static_assert(is_equivalent_to(CallableTypeOf[f2], CallableTypeOf[f2_equivalent]))
+static_assert(is_equivalent_to(RegularCallableTypeOf[f2], RegularCallableTypeOf[f2_equivalent]))
 ```
 
 A function definition that includes both `*args` and `**kwargs` parameter that are annotated as
@@ -541,16 +553,16 @@ def variadic_kwargs(**kwargs):
     return
 
 def _(
-    signature_variadic_args: CallableTypeOf[variadic_args],
-    signature_variadic_kwargs: CallableTypeOf[variadic_kwargs],
+    signature_variadic_args: RegularCallableTypeOf[variadic_args],
+    signature_variadic_kwargs: RegularCallableTypeOf[variadic_kwargs],
 ) -> None:
     # revealed: (*args) -> Unknown
     reveal_type(signature_variadic_args)
     # revealed: (**kwargs) -> Unknown
     reveal_type(signature_variadic_kwargs)
 
-static_assert(not is_equivalent_to(CallableTypeOf[variadic_args], Callable[..., Any]))
-static_assert(not is_equivalent_to(CallableTypeOf[variadic_kwargs], Callable[..., Any]))
+static_assert(not is_equivalent_to(RegularCallableTypeOf[variadic_args], Callable[..., Any]))
+static_assert(not is_equivalent_to(RegularCallableTypeOf[variadic_kwargs], Callable[..., Any]))
 ```
 
 Parameter names, default values, and it's kind should also be considered when checking for gradual
@@ -560,19 +572,23 @@ equivalence.
 def f1(a): ...
 def f2(b): ...
 
-static_assert(not is_equivalent_to(CallableTypeOf[f1], CallableTypeOf[f2]))
+static_assert(not is_equivalent_to(RegularCallableTypeOf[f1], RegularCallableTypeOf[f2]))
 
 def f3(a=1): ...
 def f4(a=2): ...
 def f5(a): ...
 
-static_assert(is_equivalent_to(CallableTypeOf[f3], CallableTypeOf[f4]))
-static_assert(is_equivalent_to(CallableTypeOf[f3] | bool | CallableTypeOf[f4], CallableTypeOf[f4] | bool | CallableTypeOf[f3]))
-static_assert(not is_equivalent_to(CallableTypeOf[f3], CallableTypeOf[f5]))
+static_assert(is_equivalent_to(RegularCallableTypeOf[f3], RegularCallableTypeOf[f4]))
+static_assert(
+    is_equivalent_to(
+        RegularCallableTypeOf[f3] | bool | RegularCallableTypeOf[f4], RegularCallableTypeOf[f4] | bool | RegularCallableTypeOf[f3]
+    )
+)
+static_assert(not is_equivalent_to(RegularCallableTypeOf[f3], RegularCallableTypeOf[f5]))
 
 def f6(a, /): ...
 
-static_assert(not is_equivalent_to(CallableTypeOf[f1], CallableTypeOf[f6]))
+static_assert(not is_equivalent_to(RegularCallableTypeOf[f1], RegularCallableTypeOf[f6]))
 ```
 
 ## Module-literal types
@@ -627,7 +643,7 @@ import imported
 from module2 import imported as other_imported
 from ty_extensions import TypeOf, static_assert, is_equivalent_to
 
-# error: [possibly-missing-attribute]
+# error: [possibly-missing-submodule]
 reveal_type(imported.abc)  # revealed: Unknown
 
 reveal_type(other_imported.abc)  # revealed: <module 'imported.abc'>

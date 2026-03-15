@@ -3,7 +3,7 @@ use itertools::Itertools;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::token::parenthesized_range;
-use ruff_python_ast::{self as ast, Arguments, Expr};
+use ruff_python_ast::{self as ast, Arguments, Expr, PythonVersion};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
@@ -23,12 +23,15 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// quadratic complexity. The following methods are all linear in the number of
 /// lists:
 ///
+/// - `[*sublist for sublist in lists]` (Python 3.15+)
 /// - `functools.reduce(operator.iadd, lists, [])`
 /// - `list(itertools.chain.from_iterable(lists))`
 /// - `[item for sublist in lists for item in sublist]`
 ///
-/// When fixing relevant violations, Ruff defaults to the `functools.reduce`
-/// form, which outperforms the other methods in [microbenchmarks].
+/// When fixing relevant violations, Ruff uses the starred-list-comprehension
+/// form on Python 3.15 and later. On older Python versions, Ruff falls back to
+/// the `functools.reduce` form, which outperforms the other pre-3.15
+/// alternatives in [microbenchmarks].
 ///
 /// ## Example
 /// ```python
@@ -38,21 +41,18 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///
 /// Use instead:
 /// ```python
-/// import functools
-/// import operator
-///
-///
 /// lists = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
-/// functools.reduce(operator.iadd, lists, [])
+/// joined = [*sublist for sublist in lists]
 /// ```
 ///
 /// ## Fix safety
 ///
-/// This fix is always marked as unsafe because `sum` uses the `__add__` magic method while
-/// `operator.iadd` uses the `__iadd__` magic method, and these behave differently on lists.
-/// The former requires the right summand to be a list, whereas the latter allows for any iterable.
-/// Therefore, the fix could inadvertently cause code that previously raised an error to silently
-/// succeed. Moreover, the fix could remove comments from the original code.
+/// This fix is always marked as unsafe because the replacement may accept any
+/// iterable where `sum` previously required lists. On Python 3.15 and later,
+/// Ruff uses iterable unpacking within a list comprehension; on older Python
+/// versions, Ruff uses `operator.iadd`. In both cases, code that previously
+/// raised an error may silently succeed. Moreover, the fix could remove
+/// comments from the original code.
 ///
 /// ## References
 /// - [_How Not to Flatten a List of Lists in Python_](https://mathieularose.com/how-not-to-flatten-a-list-of-lists-in-python)
@@ -61,7 +61,25 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// [microbenchmarks]: https://github.com/astral-sh/ruff/issues/5073#issuecomment-1591836349
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.285")]
-pub(crate) struct QuadraticListSummation;
+pub(crate) struct QuadraticListSummation {
+    fix_style: QuadraticListSummationFixStyle,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum QuadraticListSummationFixStyle {
+    FunctoolsReduce,
+    StarredListComprehension,
+}
+
+impl QuadraticListSummationFixStyle {
+    fn from_target_version(target_version: PythonVersion) -> Self {
+        if target_version >= PythonVersion::PY315 {
+            Self::StarredListComprehension
+        } else {
+            Self::FunctoolsReduce
+        }
+    }
+}
 
 impl AlwaysFixableViolation for QuadraticListSummation {
     #[derive_message_formats]
@@ -70,7 +88,14 @@ impl AlwaysFixableViolation for QuadraticListSummation {
     }
 
     fn fix_title(&self) -> String {
-        "Replace with `functools.reduce`".to_string()
+        match self.fix_style {
+            QuadraticListSummationFixStyle::FunctoolsReduce => {
+                "Replace with `functools.reduce`".to_string()
+            }
+            QuadraticListSummationFixStyle::StarredListComprehension => {
+                "Replace with a starred list comprehension".to_string()
+            }
+        }
     }
 }
 
@@ -97,8 +122,41 @@ pub(crate) fn quadratic_list_summation(checker: &Checker, call: &ast::ExprCall) 
         return;
     }
 
-    let mut diagnostic = checker.report_diagnostic(QuadraticListSummation, *range);
-    diagnostic.try_set_fix(|| convert_to_reduce(iterable, call, checker));
+    let fix_style = QuadraticListSummationFixStyle::from_target_version(checker.target_version());
+    let mut diagnostic = checker.report_diagnostic(QuadraticListSummation { fix_style }, *range);
+    diagnostic.try_set_fix(|| convert_to_fix(iterable, call, checker, fix_style));
+}
+
+fn convert_to_fix(
+    iterable: &Expr,
+    call: &ast::ExprCall,
+    checker: &Checker,
+    fix_style: QuadraticListSummationFixStyle,
+) -> Result<Fix> {
+    match fix_style {
+        QuadraticListSummationFixStyle::FunctoolsReduce => {
+            convert_to_reduce(iterable, call, checker)
+        }
+        QuadraticListSummationFixStyle::StarredListComprehension => Ok(
+            convert_to_starred_list_comprehension(iterable, call, checker),
+        ),
+    }
+}
+
+fn convert_to_starred_list_comprehension(
+    iterable: &Expr,
+    call: &ast::ExprCall,
+    checker: &Checker,
+) -> Fix {
+    let iterable = checker.locator().slice(
+        parenthesized_range(iterable.into(), (&call.arguments).into(), checker.tokens())
+            .unwrap_or(iterable.range()),
+    );
+
+    Fix::unsafe_edit(Edit::range_replacement(
+        format!("[*sublist for sublist in {iterable}]"),
+        call.range(),
+    ))
 }
 
 /// Generate a [`Fix`] to convert a `sum()` call to a `functools.reduce()` call.

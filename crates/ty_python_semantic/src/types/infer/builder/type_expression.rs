@@ -5,7 +5,8 @@ use super::{DeferredExpressionState, TypeInferenceBuilder};
 use crate::semantic_index::scope::ScopeKind;
 use crate::types::diagnostic::{
     self, INVALID_TYPE_FORM, NOT_SUBSCRIPTABLE, UNBOUND_TYPE_VARIABLE, UNSUPPORTED_OPERATOR,
-    report_invalid_argument_number_to_special_form, report_invalid_arguments_to_callable,
+    note_py_version_too_old_for_pep_604, report_invalid_argument_number_to_special_form,
+    report_invalid_arguments_to_callable,
 };
 use crate::types::infer::InferenceFlags;
 use crate::types::infer::builder::{InnerExpressionInferenceState, MultiInferenceState};
@@ -162,7 +163,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         {
                             let previous_state =
                                 self.set_multi_inference_state(MultiInferenceState::Ignore);
-                            self.context.set_multi_inference(true);
+                            let was_in_multi_inference = self.context.set_multi_inference(true);
                             // If the left-hand side of the union is itself a PEP-604 union,
                             // we'll already have checked whether it can be used with `|` in a previous inference step
                             // and emitted a diagnostic if it was appropriate. We should skip inferring it here to
@@ -173,7 +174,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             let right_type_value =
                                 self.infer_expression(&binary.right, TypeContext::default());
                             self.multi_inference_state = previous_state;
-                            self.context.set_multi_inference(false);
+                            self.context.set_multi_inference(was_in_multi_inference);
 
                             let dunder_fails = Type::try_call_bin_op(
                                 self.db(),
@@ -185,18 +186,27 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
                             // As well as trying the normal dunder lookup,
                             // we also check for the case where one of the operands is a class-literal type
-                            // and the other is a string literal. The normal dunder lookup fails to catch
-                            // this error, since typeshed annotates `type.__(r)or__` as accepting `Any`.
-                            let should_emit_error = dunder_fails
-                                || matches!(
-                                    (left_type_value, right_type_value),
-                                    (
-                                        Type::ClassLiteral(class), Type::LiteralValue(literal))
-                                        | (Type::LiteralValue(literal), Type::ClassLiteral(class)
-                                    )
-                                    if class.metaclass(self.db()) == KnownClass::Type.to_class_literal(self.db())
-                                    && !literal.is_enum()
-                                );
+                            // or generic-alias type and the other is a string literal. The normal dunder lookup
+                            // fails to catch this error, since typeshed annotates `type.__(r)or__` as accepting `Any`.
+                            let should_emit_error = if dunder_fails {
+                                true
+                            } else {
+                                let literal = match (left_type_value, right_type_value) {
+                                    (Type::ClassLiteral(class), Type::LiteralValue(literal))
+                                    | (Type::LiteralValue(literal), Type::ClassLiteral(class))
+                                        if class.metaclass(self.db())
+                                            == KnownClass::Type.to_class_literal(self.db()) =>
+                                    {
+                                        Some(literal)
+                                    }
+                                    (Type::GenericAlias(_), Type::LiteralValue(literal))
+                                    | (Type::LiteralValue(literal), Type::GenericAlias(_)) => {
+                                        Some(literal)
+                                    }
+                                    _ => None,
+                                };
+                                literal.is_some_and(|literal| !literal.is_enum())
+                            };
 
                             if should_emit_error
                                 && let Some(builder) =
@@ -255,14 +265,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                             && !binary.left.is_string_literal_expr()
                                             && !binary.right.is_string_literal_expr()
                                         {
-                                            diagnostic.info(
-                                                "PEP 604 `|` unions are only available on \
-                                                Python 3.10+ unless they are quoted",
-                                            );
-                                            add_inferred_python_version_hint_to_diagnostic(
+                                            note_py_version_too_old_for_pep_604(
                                                 self.db(),
+                                                self.index,
                                                 &mut diagnostic,
-                                                "inferring types",
                                             );
                                         } else if python_version < PythonVersion::PY314 {
                                             diagnostic.info(
@@ -1743,7 +1749,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 type_of_type
             }
 
-            SpecialFormType::CallableTypeOf => {
+            SpecialFormType::CallableTypeOf | SpecialFormType::RegularCallableTypeOf => {
                 let arguments = if let ast::Expr::Tuple(tuple) = arguments_slice {
                     &*tuple.elts
                 } else {
@@ -1770,9 +1776,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
                 let argument_type = self.infer_expression(&arguments[0], TypeContext::default());
 
-                let Some(callable_type) = argument_type
-                    .try_upcast_to_callable(db)
-                    .map(|callables| callables.into_type(self.db()))
+                let Some(callable_type) =
+                    argument_type.try_upcast_to_callable(db).map(|callables| {
+                        if special_form == SpecialFormType::RegularCallableTypeOf {
+                            callables
+                                .map(|callable| callable.into_regular(db))
+                                .into_type(db)
+                        } else {
+                            callables.into_type(db)
+                        }
+                    })
                 else {
                     if let Some(builder) = self
                         .context
