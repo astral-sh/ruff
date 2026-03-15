@@ -22,22 +22,14 @@ struct ReportData<'a> {
     show_todo: bool,
 }
 
-/// Per-file record. Stats are flat for compact JSON.
+/// Per-file record embedded in the HTML report JSON.
 ///
-/// `line_classes`: 0=unanalyzed, 1=precise, 2=imprecise, 3=dynamic, 4=todo.
+/// `line_classes`: 0=empty, 1=precise, 2=imprecise, 3=dynamic, 4=todo.
 /// `source`: raw (unescaped) line strings; JS HTML-escapes on render.
+/// All stats are derived in JS from `line_classes` via `lineStats()`.
 #[derive(Serialize)]
 struct FileData<'a> {
     path: &'a str,
-    total: u64,
-    dynamic: u64,
-    imprecise: u64,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    todo: Option<u64>,
-    dyn_pct: f64,
-    imprecise_pct: f64,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    todo_pct: Option<f64>,
     line_classes: Vec<u8>,
     source: Vec<String>,
 }
@@ -56,7 +48,6 @@ pub(crate) fn write_html_report(
             .strip_prefix(prefix)
             .unwrap_or(fpath.as_path())
             .as_str();
-        let s = &details.stats;
 
         let src = source_text(db, *file);
         let source: Vec<String> = src.as_str().split('\n').map(str::to_owned).collect();
@@ -66,7 +57,7 @@ pub(crate) fn write_html_report(
         for lineno in 1..=line_count {
             line_classes.push(match details.line_map.get(&lineno) {
                 None => 0,
-                Some(TypeCoverage::Known) => 1,
+                Some(TypeCoverage::Precise) => 1,
                 Some(TypeCoverage::Imprecise) => 2,
                 Some(TypeCoverage::Dynamic) => 3,
                 Some(TypeCoverage::Todo) => 4,
@@ -75,13 +66,6 @@ pub(crate) fn write_html_report(
 
         files.push(FileData {
             path: rel,
-            total: s.total,
-            dynamic: s.dynamic,
-            imprecise: s.imprecise,
-            todo: show_todo.then_some(s.todo),
-            dyn_pct: s.pure_dynamic_percentage().unwrap_or(0.0),
-            imprecise_pct: s.dynamic_percentage().unwrap_or(0.0),
-            todo_pct: show_todo.then(|| s.todo_percentage().unwrap_or(0.0)),
             line_classes,
             source,
         });

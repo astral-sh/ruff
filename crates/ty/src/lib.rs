@@ -75,6 +75,55 @@ pub(crate) fn version(output_format: VersionFormat) -> Result<()> {
     Ok(())
 }
 
+fn load_project(
+    cwd: &SystemPath,
+    paths: &[SystemPathBuf],
+    project: Option<&SystemPathBuf>,
+    config_file: Option<SystemPathBuf>,
+    options: ty_project::metadata::options::Options,
+    system: OsSystem,
+    verbosity: VerbosityLevel,
+) -> anyhow::Result<(ProjectDatabase, ProjectOptionsOverrides, Vec<SystemPathBuf>)> {
+    let project_path = project
+        .map(|p| {
+            if p.as_std_path().is_dir() {
+                Ok(SystemPath::absolute(p, cwd))
+            } else {
+                Err(anyhow!("Provided project path `{p}` is not a directory"))
+            }
+        })
+        .transpose()?
+        .unwrap_or_else(|| cwd.to_path_buf());
+
+    let absolute_paths: Vec<_> = paths
+        .iter()
+        .map(|path| SystemPath::absolute(path, cwd))
+        .collect();
+
+    let mut project_metadata = match &config_file {
+        Some(config_file) => {
+            ProjectMetadata::from_config_file(config_file.clone(), &project_path, &system)?
+        }
+        None => ProjectMetadata::discover(&project_path, &system)?,
+    };
+
+    project_metadata.apply_configuration_files(&system)?;
+
+    let project_options_overrides = ProjectOptionsOverrides::new(config_file, options);
+    project_metadata.apply_overrides(&project_options_overrides);
+
+    let mut db = ProjectDatabase::new(project_metadata, system)?;
+    let project = db.project();
+
+    project.set_verbose(&mut db, verbosity >= VerbosityLevel::Verbose);
+
+    if !absolute_paths.is_empty() {
+        project.set_included_paths(&mut db, absolute_paths.clone());
+    }
+
+    Ok((db, project_options_overrides, absolute_paths))
+}
+
 fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     // Enabled ANSI colors on Windows 10.
     #[cfg(windows)]
@@ -172,62 +221,12 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     }
 }
 
-fn load_project(
-    cwd: &SystemPath,
-    paths: &[SystemPathBuf],
-    project: Option<&SystemPathBuf>,
-    config_file: Option<SystemPathBuf>,
-    options: ty_project::metadata::options::Options,
-    system: OsSystem,
-    verbosity: VerbosityLevel,
-) -> anyhow::Result<(ProjectDatabase, ProjectOptionsOverrides, Vec<SystemPathBuf>)> {
-    let project_path = project
-        .map(|p| {
-            if p.as_std_path().is_dir() {
-                Ok(SystemPath::absolute(p, cwd))
-            } else {
-                Err(anyhow!("Provided project path `{p}` is not a directory"))
-            }
-        })
-        .transpose()?
-        .unwrap_or_else(|| cwd.to_path_buf());
-
-    let absolute_paths: Vec<_> = paths
-        .iter()
-        .map(|path| SystemPath::absolute(path, cwd))
-        .collect();
-
-    let mut project_metadata = match &config_file {
-        Some(config_file) => {
-            ProjectMetadata::from_config_file(config_file.clone(), &project_path, &system)?
-        }
-        None => ProjectMetadata::discover(&project_path, &system)?,
-    };
-
-    project_metadata.apply_configuration_files(&system)?;
-
-    let project_options_overrides = ProjectOptionsOverrides::new(config_file, options);
-    project_metadata.apply_overrides(&project_options_overrides);
-
-    let mut db = ProjectDatabase::new(project_metadata, system)?;
-    let project = db.project();
-
-    project.set_verbose(&mut db, verbosity >= VerbosityLevel::Verbose);
-
-    if !absolute_paths.is_empty() {
-        project.set_included_paths(&mut db, absolute_paths.clone());
-    }
-
-    Ok((db, project_options_overrides, absolute_paths))
-}
-
 fn run_coverage(args: CoverageCommand) -> anyhow::Result<ExitStatus> {
     use std::io::Write as _;
 
     #[cfg(windows)]
     assert!(colored::control::set_virtual_terminal(true).is_ok());
 
-    let json = args.json;
     let html_path = args.html.clone();
     let show_todo = args.todo;
     set_colored_override(args.color);
@@ -288,10 +287,10 @@ fn run_coverage(args: CoverageCommand) -> anyhow::Result<ExitStatus> {
         })
         .collect();
 
-    // Sort by dynamic percentage descending, then by path for stable output.
+    // Sort by combined line-level imprecision descending, then by path for stable output.
     per_file.sort_by(|(path_a, _, details_a), (path_b, _, details_b)| {
-        let pct_a = details_a.stats.dynamic_percentage().unwrap_or(0.0);
-        let pct_b = details_b.stats.dynamic_percentage().unwrap_or(0.0);
+        let pct_a = details_a.stats.lines.combined_imprecision_pct();
+        let pct_b = details_b.stats.lines.combined_imprecision_pct();
         pct_b
             .partial_cmp(&pct_a)
             .unwrap_or(std::cmp::Ordering::Equal)
@@ -311,90 +310,53 @@ fn run_coverage(args: CoverageCommand) -> anyhow::Result<ExitStatus> {
 
     let mut stdout = std::io::stdout().lock();
 
-    if json {
-        let files_json: Vec<serde_json::Value> = per_file
-            .iter()
-            .map(|(path, _, d)| {
-                let s = &d.stats;
-                let mut obj = serde_json::json!({
-                    "path": display_path(path),
-                    "total": s.total,
-                    "dynamic": s.dynamic,
-                    "imprecise": s.imprecise,
-                });
-                if show_todo {
-                    obj["todo"] = serde_json::json!(s.todo);
-                }
-                obj
-            })
-            .collect();
-
-        let mut summary = serde_json::json!({
-            "total": total.total,
-            "dynamic": total.dynamic,
-            "imprecise": total.imprecise,
-            "lines": {
-                "precise": total.lines.precise,
-                "imprecise": total.lines.imprecise,
-                "dynamic": total.lines.dynamic,
-                "empty": total.lines.empty,
-            },
-        });
-        if show_todo {
-            summary["todo"] = serde_json::json!(total.todo);
-            summary["lines"]["todo"] = serde_json::json!(total.lines.todo);
-        }
-
-        let output = serde_json::json!({
-            "files": files_json,
-            "summary": summary,
-        });
-
-        writeln!(stdout, "{}", serde_json::to_string_pretty(&output)?)?;
-    } else {
+    {
         use table::{Align, AsciiTable, Column};
 
         let mut columns = vec![
             Column::new("File", Align::Left),
-            Column::new("Total", Align::Right),
-            Column::new("Dynamic", Align::Right),
+            Column::new("Lines", Align::Right),
+            Column::new("Precise", Align::Right),
             Column::new("Imprecise", Align::Right),
-            Column::new(if show_todo { "Dyn %" } else { "%" }, Align::Right),
+            Column::new("Dynamic", Align::Right),
         ];
         if show_todo {
             columns.push(Column::new("Todo", Align::Right));
-            columns.push(Column::new("Todo %", Align::Right));
         }
+        columns.push(Column::new("Empty", Align::Right));
 
         let mut tbl = AsciiTable::new(columns);
 
         for (path, _, d) in &per_file {
-            let s = &d.stats;
+            let ls = &d.stats.lines;
+            let n = ls.total();
             let mut row = vec![
                 display_path(path),
-                s.total.to_string(),
-                s.dynamic.to_string(),
-                s.imprecise.to_string(),
-                format!("{:.2}%", s.dynamic_percentage().unwrap_or(0.0)),
+                n.to_string(),
+                fmt_count_pct(ls.precise, n),
+                fmt_count_pct(ls.imprecise, n),
+                fmt_count_pct(ls.dynamic, n),
             ];
             if show_todo {
-                row.push(s.todo.to_string());
-                row.push(format!("{:.2}%", s.todo_percentage().unwrap_or(0.0)));
+                row.push(fmt_count_pct(ls.todo, n));
             }
+            row.push(fmt_count_pct(ls.empty, n));
             tbl.push_row(row);
         }
 
+        let tl = &total.lines;
+        let tn = tl.total();
         let mut footer = vec![
             "Total".to_owned(),
-            total.total.to_string(),
-            total.dynamic.to_string(),
-            total.imprecise.to_string(),
-            format!("{:.2}%", total.dynamic_percentage().unwrap_or(0.0)),
+            tn.to_string(),
+            fmt_count_pct(tl.precise, tn),
+            fmt_count_pct(tl.imprecise, tn),
+            fmt_count_pct(tl.dynamic, tn),
         ];
         if show_todo {
-            footer.push(total.todo.to_string());
-            footer.push(format!("{:.2}%", total.todo_percentage().unwrap_or(0.0)));
+            footer.push(fmt_count_pct(tl.todo, tn));
         }
+        footer.push(fmt_count_pct(tl.empty, tn));
         tbl.set_footer(footer);
 
         tbl.render(&mut stdout)?;
@@ -409,6 +371,16 @@ fn run_coverage(args: CoverageCommand) -> anyhow::Result<ExitStatus> {
     std::mem::forget(db);
 
     Ok(ExitStatus::Success)
+}
+
+/// Formats a count with its percentage of a total as `"N (X%)"`.
+#[expect(clippy::cast_precision_loss)]
+fn fmt_count_pct(count: u64, total: u64) -> String {
+    if total == 0 {
+        return format!("{count} (0%)");
+    }
+    let pct = (count as f64 / total as f64 * 100.0).round();
+    format!("{count} ({pct:.0}%)")
 }
 
 /// Returns the longest common directory prefix of the given paths.

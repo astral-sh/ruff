@@ -39,7 +39,7 @@
         --ty-imprecise-rgb: 255, 172, 47;
         --ty-dynamic-rgb: 222, 95, 233;
         --ty-todo-rgb: 95, 109, 233;
-        --ty-unanalyzed-rgb: 111, 93, 111;
+        --ty-empty-rgb: 111, 93, 111;
         --ty-line-fill-alpha: 0.3;
         --ty-pip-alpha: 0.85;
       }
@@ -354,8 +354,8 @@
       tr.line-todo td {
         background: rgba(var(--ty-todo-rgb), var(--ty-line-fill-alpha));
       }
-      tr.line-unanalyzed td {
-        background: rgba(var(--ty-unanalyzed-rgb), var(--ty-line-fill-alpha));
+      tr.line-empty td {
+        background: rgba(var(--ty-empty-rgb), var(--ty-line-fill-alpha));
       }
       /* Gutter pip: override the lineno right-border with a solid colour bar */
       tr.line-precise td.lineno {
@@ -371,9 +371,9 @@
       tr.line-todo td.lineno {
         border-right: 3px solid rgba(var(--ty-todo-rgb), var(--ty-pip-alpha));
       }
-      tr.line-unanalyzed td.lineno {
+      tr.line-empty td.lineno {
         border-right: 3px solid
-          rgba(var(--ty-unanalyzed-rgb), var(--ty-pip-alpha));
+          rgba(var(--ty-empty-rgb), var(--ty-pip-alpha));
       }
       /* ── Quality colours (text + tinted backgrounds) ── */
       .q0 {
@@ -429,8 +429,8 @@
         background: rgba(var(--ty-todo-rgb), var(--ty-line-fill-alpha));
         color: #ffffff;
       }
-      .sb-unanalyzed {
-        background: rgba(var(--ty-unanalyzed-rgb), var(--ty-line-fill-alpha));
+      .sb-empty {
+        background: rgba(var(--ty-empty-rgb), var(--ty-line-fill-alpha));
         color: #ffffff;
       }
       /* ── Summary table ── */
@@ -509,7 +509,7 @@
       <div class="sidebar">
         <div class="sidebar-header">ty coverage</div>
         <div class="summary-btn" id="summary-btn" onclick="showSummary()">
-          ⌂ Summary
+          File Summary
         </div>
         <div class="tree" id="tree"></div>
       </div>
@@ -539,9 +539,15 @@
             : "summary-quality-2";
       }
 
+      // Returns "N (X%)" — matches the ASCII table format from `fmt_count_pct` in lib.rs.
+      function fmtCountPct(count, total) {
+        if (total === 0) return count + " (0%)";
+        return count + " (" + Math.round((count / total) * 100) + "%)";
+      }
+
       // Returns per-category line counts and percentages for a file.
       function lineStats(f) {
-        const counts = [0, 0, 0, 0, 0]; // 0=unanalyzed 1=precise 2=imprecise 3=dynamic 4=todo
+        const counts = [0, 0, 0, 0, 0]; // 0=empty 1=precise 2=imprecise 3=dynamic 4=todo
         f.line_classes.forEach(function (c) {
           counts[c]++;
         });
@@ -551,7 +557,7 @@
         }
         return {
           total: total,
-          unanalyzed: counts[0],
+          empty: counts[0],
           precise: counts[1],
           imprecise: counts[2],
           dynamic: counts[3],
@@ -561,7 +567,7 @@
             imprecise: p(counts[2]),
             dynamic: p(counts[3]),
             todo: p(counts[4]),
-            unanalyzed: p(counts[0]),
+            empty: p(counts[0]),
             // Combined (imprecise + dynamic) — used for quality tier and sidebar badge.
             combined: p(counts[2] + counts[3]),
           },
@@ -724,7 +730,7 @@
           totImprecise = 0,
           totDynamic = 0,
           totTodo = 0,
-          totUnanalyzed = 0;
+          totEmpty = 0;
         files.forEach(function (f) {
           const ls = lineStats(f);
           totLines += ls.total;
@@ -732,26 +738,23 @@
           totImprecise += ls.imprecise;
           totDynamic += ls.dynamic;
           totTodo += ls.todo;
-          totUnanalyzed += ls.unanalyzed;
+          totEmpty += ls.empty;
         });
 
         let html =
           '<div class="summary-wrap"><table class="summary"><thead><tr>';
         html += '<th class="col-file">File</th>';
         html += '<th class="col-num">Lines</th>';
-        html += '<th class="col-num">Precise %</th>';
-        html += '<th class="col-num">Imprecise %</th>';
-        html += '<th class="col-num">Dynamic %</th>';
-        if (showTodo) html += '<th class="col-num">Todo %</th>';
-        html += '<th class="col-num">Unanalyzed %</th>';
+        html += '<th class="col-num">Precise</th>';
+        html += '<th class="col-num">Imprecise</th>';
+        html += '<th class="col-num">Dynamic</th>';
+        if (showTodo) html += '<th class="col-num">Todo</th>';
+        html += '<th class="col-num">Empty</th>';
         html += "</tr></thead><tbody>";
 
         files.forEach(function (f, idx) {
           const ls = lineStats(f);
           const q = summaryQualityClass(ls.pct.combined);
-          function lp(n) {
-            return ls.total ? ((n / ls.total) * 100).toFixed(1) + "%" : "0.0%";
-          }
           html +=
             '<tr class="' +
             q +
@@ -765,26 +768,23 @@
             escHtml(f.path) +
             "</a></td>";
           html += '<td class="col-num">' + ls.total + "</td>";
-          html += '<td class="col-num">' + lp(ls.precise) + "</td>";
-          html += '<td class="col-num">' + lp(ls.imprecise) + "</td>";
-          html += '<td class="col-num">' + lp(ls.dynamic) + "</td>";
-          if (showTodo) html += '<td class="col-num">' + lp(ls.todo) + "</td>";
-          html += '<td class="col-num">' + lp(ls.unanalyzed) + "</td>";
+          html += '<td class="col-num">' + fmtCountPct(ls.precise, ls.total) + "</td>";
+          html += '<td class="col-num">' + fmtCountPct(ls.imprecise, ls.total) + "</td>";
+          html += '<td class="col-num">' + fmtCountPct(ls.dynamic, ls.total) + "</td>";
+          if (showTodo) html += '<td class="col-num">' + fmtCountPct(ls.todo, ls.total) + "</td>";
+          html += '<td class="col-num">' + fmtCountPct(ls.empty, ls.total) + "</td>";
           html += "</tr>";
         });
 
-        function fp(n, t) {
-          return t ? ((n / t) * 100).toFixed(1) + "%" : "0.0%";
-        }
         html += "</tbody><tfoot><tr>";
         html += '<td class="col-file"><strong>Total</strong></td>';
         html += '<td class="col-num">' + totLines + "</td>";
-        html += '<td class="col-num">' + fp(totPrecise, totLines) + "</td>";
-        html += '<td class="col-num">' + fp(totImprecise, totLines) + "</td>";
-        html += '<td class="col-num">' + fp(totDynamic, totLines) + "</td>";
+        html += '<td class="col-num">' + fmtCountPct(totPrecise, totLines) + "</td>";
+        html += '<td class="col-num">' + fmtCountPct(totImprecise, totLines) + "</td>";
+        html += '<td class="col-num">' + fmtCountPct(totDynamic, totLines) + "</td>";
         if (showTodo)
-          html += '<td class="col-num">' + fp(totTodo, totLines) + "</td>";
-        html += '<td class="col-num">' + fp(totUnanalyzed, totLines) + "</td>";
+          html += '<td class="col-num">' + fmtCountPct(totTodo, totLines) + "</td>";
+        html += '<td class="col-num">' + fmtCountPct(totEmpty, totLines) + "</td>";
         html += "</tr></tfoot></table></div>";
 
         const area = document.getElementById("content-area");
@@ -867,9 +867,9 @@
             " todo</span>";
         }
         crumb +=
-          '<span class="stat-badge sb-unanalyzed">' +
-          linePct(ls.unanalyzed) +
-          " unanalyzed</span>";
+          '<span class="stat-badge sb-empty">' +
+          linePct(ls.empty) +
+          " empty</span>";
         crumb += "</div>";
 
         const LINE_CLASSES = [

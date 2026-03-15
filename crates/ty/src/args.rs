@@ -317,10 +317,6 @@ pub(crate) struct CoverageCommand {
     #[arg(long, env = EnvVars::TY_CONFIG_FILE, value_name = "PATH")]
     pub(crate) config_file: Option<SystemPathBuf>,
 
-    /// Output results as JSON.
-    #[arg(long)]
-    pub(crate) json: bool,
-
     /// Write a self-contained HTML coverage report to PATH.
     #[arg(long, value_name = "PATH")]
     pub(crate) html: Option<SystemPathBuf>,
