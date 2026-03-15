@@ -1392,9 +1392,14 @@ fn check_unsafe_overlap_with_protocol<'db>(
         }
 
         // Check if the subject type has all member names from the protocol.
-        let has_all_members = protocol_interface
-            .members(db)
-            .all(|member| !subject_type.member(db, member.name()).place.is_undefined());
+        let has_all_members = protocol_interface.members(db).all(|member| {
+            member.is_present_on_type(db, subject_type)
+                && !subject_type
+                    .member(db, member.name())
+                    .ignore_possibly_undefined()
+                    .and_then(Type::as_dynamic)
+                    .is_some_and(|dynamic| dynamic.is_todo())
+        });
 
         if has_all_members {
             report_unsafe_isinstance_narrowing(

@@ -579,6 +579,25 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
             ProtocolMemberKind::Other(ty) => *ty,
         }
     }
+
+    /// Naively check whether `self.name` is present as an attribute on `ty` in the ways
+    /// that would be required for `ty` to satisfy this protocol member, but *without*
+    /// considering the type of this protocol member.
+    pub(super) fn is_present_on_type(&self, db: &'db dyn Db, ty: Type<'db>) -> bool {
+        match &self.kind {
+            ProtocolMemberKind::Method(_) if self.name != "__call__" => !ty
+                .invoke_descriptor_protocol(
+                    db,
+                    self.name,
+                    Place::Undefined.into(),
+                    InstanceFallbackShadowsNonDataDescriptor::No,
+                    MemberLookupPolicy::default(),
+                )
+                .place
+                .is_undefined(),
+            _ => !ty.member(db, self.name).place.is_undefined(),
+        }
+    }
 }
 
 impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
