@@ -3,7 +3,6 @@
 //! All coverage data is serialized to JSON via serde and embedded as
 //! `const COVERAGE_DATA = <json>;` in the output file. JavaScript renders
 //! the file tree, summary table, and annotated source views on demand.
-//! The design follows the dark IDE theme from `example.html`.
 
 use std::io::Write as _;
 
