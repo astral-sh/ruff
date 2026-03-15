@@ -25,6 +25,7 @@ use ruff_linter::rules::isort::{ImportSection, ImportType};
 use ruff_linter::rules::pep8_naming::settings::IgnoreNames;
 use ruff_linter::rules::pydocstyle::settings::Convention;
 use ruff_linter::rules::pylint::settings::ConstantType;
+use ruff_linter::rules::ssort::settings::Order;
 use ruff_linter::rules::{
     flake8_copyright, flake8_errmsg, flake8_gettext, flake8_implicit_str_concat,
     flake8_import_conventions, flake8_pytest_style, flake8_quotes, flake8_self,
@@ -533,6 +534,10 @@ pub struct LintOptions {
     #[option_group]
     pub ruff: Option<RuffOptions>,
 
+    /// Options for the `ssort` plugin.
+    #[option_group]
+    pub ssort: Option<SSortOptions>,
+
     /// Whether to enable preview mode. When preview mode is enabled, Ruff will
     /// use unstable rules and fixes.
     #[option(
@@ -1004,10 +1009,6 @@ pub struct LintCommonOptions {
     /// Options for the `pyupgrade` plugin.
     #[option_group]
     pub pyupgrade: Option<PyUpgradeOptions>,
-
-    /// Options for the `ssort` plugin.
-    #[option_group]
-    pub ssort: Option<SSortOptions>,
 
     // WARNING: Don't add new options to this type. Add them to `LintOptions` instead.
 
@@ -3641,7 +3642,11 @@ pub struct SSortOptions {
 impl SSortOptions {
     pub fn into_settings(self) -> ssort::settings::Settings {
         ssort::settings::Settings {
-            narrative_order: self.narrative_order.unwrap_or_default(),
+            order: if self.narrative_order.unwrap_or_default() {
+                Order::Narrative
+            } else {
+                Order::Newspaper
+            },
         }
     }
 }
@@ -4207,13 +4212,13 @@ impl From<LintOptionsWire> for LintOptions {
                 pyflakes,
                 pylint,
                 pyupgrade,
-                ssort,
                 per_file_ignores,
                 extend_per_file_ignores,
             },
             exclude,
             pydoclint,
             ruff,
+            ssort,
             preview,
             typing_extensions,
             future_annotations,

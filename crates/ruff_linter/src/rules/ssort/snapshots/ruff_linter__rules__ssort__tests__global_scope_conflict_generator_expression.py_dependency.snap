@@ -19,3 +19,4 @@ help: Organize statements
 5 |     return (g for g in range(10))
   - def g():
   -     pass
+note: This is an unsafe fix and may change runtime behavior

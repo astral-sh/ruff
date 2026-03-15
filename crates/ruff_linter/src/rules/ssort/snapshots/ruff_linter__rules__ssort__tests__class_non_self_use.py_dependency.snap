@@ -22,3 +22,4 @@ help: Organize statements
   - 
   -     def inner_dependency():
   -         return 42
+note: This is an unsafe fix and may change runtime behavior

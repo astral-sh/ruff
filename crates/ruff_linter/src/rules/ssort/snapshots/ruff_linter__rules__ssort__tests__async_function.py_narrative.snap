@@ -26,3 +26,4 @@ help: Organize statements
   - 
   - async def async_function():
   -     return function()
+note: This is an unsafe fix and may change runtime behavior

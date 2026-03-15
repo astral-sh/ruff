@@ -25,3 +25,4 @@ help: Organize statements
 7 |         pass
 8 + 
 9 +     attr = method
+note: This is an unsafe fix and may change runtime behavior

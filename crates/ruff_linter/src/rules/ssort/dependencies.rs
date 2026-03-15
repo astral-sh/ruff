@@ -1,7 +1,8 @@
 use std::fmt;
 
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 
+use crate::rules::ssort::settings::Order;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{Expr, InterpolatedStringElement, Stmt};
@@ -13,7 +14,6 @@ pub(super) struct CycleError {
     pub(crate) cycle: Vec<usize>,
 }
 
-/// Allows `CycleError` to be treated as a standard error.
 impl std::error::Error for CycleError {}
 
 /// Allows `CycleError` to be formatted for display.
@@ -35,16 +35,20 @@ pub(super) struct Node<'a> {
 
     /// The statement in the AST.
     pub(crate) stmt: &'a Stmt,
+}
 
-    /// Whether this node can be moved during sorting.
-    pub(crate) movable: bool,
+impl Node<'_> {
+    /// Return `true` when this node can be reordered by the sorter.
+    fn is_movable(&self) -> bool {
+        self.name.is_some()
+    }
 }
 
 /// A visitor that collects all variable names referenced by a statement.
 #[derive(Default)]
 struct DependencyVisitor<'a> {
     /// The names referenced by the statement.
-    names: Vec<&'a Name>,
+    names: FxHashSet<&'a Name>,
 
     /// A mapping from names to their corresponding node indices.
     name_to_index: FxHashMap<&'a Name, usize>,
@@ -68,7 +72,7 @@ impl<'a> DependencyVisitor<'a> {
             .collect();
 
         Self {
-            names: Vec::new(),
+            names: FxHashSet::default(),
             name_to_index,
             function_depth: 0,
             class_depth: 0,
@@ -113,13 +117,13 @@ impl<'a> Visitor<'a> for DependencyVisitor<'a> {
         match expr {
             // Simple variable reference: `foo`
             Expr::Name(name) => {
-                self.names.push(&name.id);
+                self.names.insert(&name.id);
             }
 
             // Attribute access: `self.foo` or `obj.foo`
             Expr::Attribute(attr) if matches!(&*attr.value, Expr::Name(n) if n.id.as_str() == "self") =>
             {
-                self.names.push(&attr.attr.id);
+                self.names.insert(&attr.attr.id);
             }
 
             // Attribute access: `obj.foo`
@@ -216,10 +220,6 @@ fn collect_dependencies<'a>(node: &'a Node, visitor: &mut DependencyVisitor<'a>)
     // Visit the statement to collect referenced names
     visitor.visit_stmt(node.stmt);
 
-    // Deduplicate the collected names
-    visitor.names.sort_unstable();
-    visitor.names.dedup();
-
     // Map referenced names to node indices, skipping unknown names and self-references
     visitor
         .names
@@ -244,7 +244,7 @@ impl Dependencies {
     ///
     /// ## Returns
     /// A `Dependencies` instance containing the collected dependencies.
-    pub(super) fn from_nodes(nodes: &[Node]) -> Self {
+    pub(super) fn from_nodes(nodes: &[Node<'_>]) -> Self {
         let mut visitor = DependencyVisitor::new(nodes);
         Self {
             dependencies: nodes
@@ -262,7 +262,7 @@ impl Dependencies {
     ///
     /// ## Arguments
     /// * `nodes` - The list of all nodes in the AST.
-    /// * `narrative_order` - Whether to use a narrative-oriented order for the result.
+    /// * `order` - The desired order of the nodes.
     ///
     /// ## Returns
     /// A vector of node indices in dependency-respecting order, or a `CycleError` if a cycle is
@@ -270,7 +270,7 @@ impl Dependencies {
     pub(super) fn dependency_order(
         &self,
         nodes: &[Node],
-        narrative_order: bool,
+        order: Order,
     ) -> Result<Vec<usize>, CycleError> {
         fn emit_deps(
             idx: usize,
@@ -331,12 +331,12 @@ impl Dependencies {
                 &mut result,
             )?;
         }
-        if narrative_order {
+        if order == Order::Narrative {
             // Collect all movable nodes in reverse order
             let movable: Vec<usize> = result
                 .iter()
                 .copied()
-                .filter(|&idx| nodes[idx].movable)
+                .filter(|&idx| nodes[idx].is_movable())
                 .collect();
             let mut movable_iter = movable.into_iter().rev();
 
@@ -344,7 +344,7 @@ impl Dependencies {
             result = result
                 .into_iter()
                 .map(|idx| {
-                    if nodes[idx].movable {
+                    if nodes[idx].is_movable() {
                         movable_iter.next().unwrap()
                     } else {
                         idx
@@ -365,7 +365,7 @@ impl Dependencies {
 ///
 /// ## Returns
 /// A vector of nodes representing the statements in the suite.
-pub(super) fn nodes_from_suite(suite: &'_ [Stmt]) -> Vec<Node<'_>> {
+pub(super) fn nodes_from_suite(suite: &[Stmt]) -> Vec<Node<'_>> {
     suite
         .iter()
         .enumerate()
@@ -375,25 +375,52 @@ pub(super) fn nodes_from_suite(suite: &'_ [Stmt]) -> Vec<Node<'_>> {
                 Stmt::ClassDef(def) => Some(&def.name.id),
                 _ => None,
             };
-            Node {
-                index,
-                name,
-                stmt,
-                movable: name.is_some(),
-            }
+            Node { index, name, stmt }
         })
         .collect()
 }
 
 #[cfg(test)]
 mod tests {
+    use super::{
+        CycleError, Dependencies, DependencyVisitor, collect_dependencies, nodes_from_suite,
+    };
+    use crate::rules::ssort::settings::Order;
     use anyhow::Result;
     use ruff_python_ast::name::Name;
     use ruff_python_parser::parse_module;
 
-    use super::{
-        CycleError, Dependencies, DependencyVisitor, collect_dependencies, nodes_from_suite,
-    };
+    fn with_nodes<T>(
+        source: &str,
+        f: impl for<'a> FnOnce(&'a [super::Node<'a>]) -> T,
+    ) -> Result<T> {
+        let parsed = parse_module(source)?;
+        let nodes = nodes_from_suite(parsed.suite());
+        Ok(f(&nodes))
+    }
+
+    fn with_visitor<T>(
+        source: &str,
+        f: impl for<'a> FnOnce(&'a [super::Node<'a>], &mut DependencyVisitor<'a>) -> T,
+    ) -> Result<T> {
+        with_nodes(source, |nodes| {
+            let mut visitor = DependencyVisitor::new(nodes);
+            f(nodes, &mut visitor)
+        })
+    }
+
+    fn deps_for(source: &str, index: usize) -> Result<Vec<usize>> {
+        with_visitor(source, |nodes, visitor| {
+            collect_dependencies(&nodes[index], visitor)
+        })
+    }
+
+    fn order_for(source: &str, order: Order) -> Result<Vec<usize>> {
+        let parsed = parse_module(source)?;
+        let nodes = nodes_from_suite(parsed.suite());
+        let deps = Dependencies::from_nodes(&nodes);
+        Ok(deps.dependency_order(&nodes, order)?)
+    }
 
     /// Test that `CycleError` displays correctly.
     #[test]
@@ -426,12 +453,8 @@ def foo():
 def bar():
     return 2
 "#;
-        let parsed = parse_module(source)?;
-        let nodes = nodes_from_suite(parsed.suite());
-        let mut visitor = DependencyVisitor::new(&nodes);
-
-        assert_eq!(collect_dependencies(&nodes[0], &mut visitor).len(), 0);
-        assert_eq!(collect_dependencies(&nodes[1], &mut visitor).len(), 0);
+        assert_eq!(deps_for(source, 0)?.len(), 0);
+        assert_eq!(deps_for(source, 1)?.len(), 0);
         Ok(())
     }
 
@@ -445,10 +468,7 @@ def foo():
 def bar():
     return foo()
 "#;
-        let parsed = parse_module(source)?;
-        let nodes = nodes_from_suite(parsed.suite());
-        let mut visitor = DependencyVisitor::new(&nodes);
-        let deps = collect_dependencies(&nodes[1], &mut visitor);
+        let deps = deps_for(source, 1)?;
 
         assert_eq!(deps, vec![0]);
         Ok(())
@@ -467,10 +487,7 @@ def bar():
 def baz():
     return foo() + bar()
 "#;
-        let parsed = parse_module(source)?;
-        let nodes = nodes_from_suite(parsed.suite());
-        let mut visitor = DependencyVisitor::new(&nodes);
-        let deps = collect_dependencies(&nodes[2], &mut visitor);
+        let deps = deps_for(source, 2)?;
 
         assert_eq!(deps.len(), 2);
         assert!(deps.contains(&0));
@@ -485,10 +502,7 @@ def baz():
 def factorial(n):
     return n * factorial(n - 1)
 "#;
-        let parsed = parse_module(source)?;
-        let nodes = nodes_from_suite(parsed.suite());
-        let mut visitor = DependencyVisitor::new(&nodes);
-        let deps = collect_dependencies(&nodes[0], &mut visitor);
+        let deps = deps_for(source, 0)?;
 
         assert_eq!(deps.len(), 0);
         Ok(())
@@ -502,10 +516,7 @@ def foo():
     obj = SomeClass()
     return obj.method()
 "#;
-        let parsed = parse_module(source)?;
-        let nodes = nodes_from_suite(parsed.suite());
-        let mut visitor = DependencyVisitor::new(&nodes);
-        let deps = collect_dependencies(&nodes[0], &mut visitor);
+        let deps = deps_for(source, 0)?;
 
         assert_eq!(deps.len(), 0);
         Ok(())
@@ -521,10 +532,7 @@ class Base:
 class Derived:
     base = Base()
 "#;
-        let parsed = parse_module(source)?;
-        let nodes = nodes_from_suite(parsed.suite());
-        let mut visitor = DependencyVisitor::new(&nodes);
-        let deps = collect_dependencies(&nodes[1], &mut visitor);
+        let deps = deps_for(source, 1)?;
 
         assert_eq!(deps, vec![0]);
         Ok(())
@@ -543,12 +551,8 @@ def b():
 def c():
     return b()
 "#;
-        let parsed = parse_module(source)?;
-        let nodes = nodes_from_suite(parsed.suite());
-        let mut visitor = DependencyVisitor::new(&nodes);
-
-        assert_eq!(collect_dependencies(&nodes[1], &mut visitor), vec![0]);
-        assert_eq!(collect_dependencies(&nodes[2], &mut visitor), vec![1]);
+        assert_eq!(deps_for(source, 1)?, vec![0]);
+        assert_eq!(deps_for(source, 2)?, vec![1]);
         Ok(())
     }
 
@@ -562,10 +566,7 @@ def foo():
 def bar():
     return foo()[0] + len(foo())
 "#;
-        let parsed = parse_module(source)?;
-        let nodes = nodes_from_suite(parsed.suite());
-        let mut visitor = DependencyVisitor::new(&nodes);
-        let deps = collect_dependencies(&nodes[1], &mut visitor);
+        let deps = deps_for(source, 1)?;
 
         assert_eq!(deps, vec![0]);
         Ok(())
@@ -581,10 +582,7 @@ def foo():
 def bar():
     return f"Hello {foo()}"
 "#;
-        let parsed = parse_module(source)?;
-        let nodes = nodes_from_suite(parsed.suite());
-        let mut visitor = DependencyVisitor::new(&nodes);
-        let deps = collect_dependencies(&nodes[1], &mut visitor);
+        let deps = deps_for(source, 1)?;
 
         assert_eq!(deps, vec![0]);
         Ok(())
@@ -603,10 +601,7 @@ def bar():
 def baz():
     return f"{foo()} {bar()}"
 "#;
-        let parsed = parse_module(source)?;
-        let nodes = nodes_from_suite(parsed.suite());
-        let mut visitor = DependencyVisitor::new(&nodes);
-        let deps = collect_dependencies(&nodes[2], &mut visitor);
+        let deps = deps_for(source, 2)?;
 
         assert_eq!(deps.len(), 2);
         assert!(deps.contains(&0));
@@ -627,10 +622,7 @@ def bar():
 def baz():
     return foo() + bar()
 "#;
-        let parsed = parse_module(source)?;
-        let nodes = nodes_from_suite(parsed.suite());
-        let mut visitor = DependencyVisitor::new(&nodes);
-        let deps = collect_dependencies(&nodes[2], &mut visitor);
+        let deps = deps_for(source, 2)?;
 
         assert_eq!(deps.len(), 2);
         assert!(deps.contains(&0));
@@ -651,10 +643,7 @@ def bar():
 def baz():
     return foo() and bar()
 "#;
-        let parsed = parse_module(source)?;
-        let nodes = nodes_from_suite(parsed.suite());
-        let mut visitor = DependencyVisitor::new(&nodes);
-        let deps = collect_dependencies(&nodes[2], &mut visitor);
+        let deps = deps_for(source, 2)?;
 
         assert_eq!(deps.len(), 2);
         assert!(deps.contains(&0));
@@ -678,10 +667,7 @@ def baz():
 def qux():
     return bar() if foo() else baz()
 "#;
-        let parsed = parse_module(source)?;
-        let nodes = nodes_from_suite(parsed.suite());
-        let mut visitor = DependencyVisitor::new(&nodes);
-        let deps = collect_dependencies(&nodes[3], &mut visitor);
+        let deps = deps_for(source, 3)?;
 
         assert_eq!(deps.len(), 3);
         assert!(deps.contains(&0));
@@ -703,10 +689,7 @@ def bar():
 def baz():
     return [foo(), bar()]
 "#;
-        let parsed = parse_module(source)?;
-        let nodes = nodes_from_suite(parsed.suite());
-        let mut visitor = DependencyVisitor::new(&nodes);
-        let deps = collect_dependencies(&nodes[2], &mut visitor);
+        let deps = deps_for(source, 2)?;
 
         assert_eq!(deps.len(), 2);
         assert!(deps.contains(&0));
@@ -727,10 +710,7 @@ def bar():
 def baz():
     return (foo(), bar())
 "#;
-        let parsed = parse_module(source)?;
-        let nodes = nodes_from_suite(parsed.suite());
-        let mut visitor = DependencyVisitor::new(&nodes);
-        let deps = collect_dependencies(&nodes[2], &mut visitor);
+        let deps = deps_for(source, 2)?;
 
         assert_eq!(deps.len(), 2);
         assert!(deps.contains(&0));
@@ -751,10 +731,7 @@ def bar():
 def baz():
     return {foo(), bar()}
 "#;
-        let parsed = parse_module(source)?;
-        let nodes = nodes_from_suite(parsed.suite());
-        let mut visitor = DependencyVisitor::new(&nodes);
-        let deps = collect_dependencies(&nodes[2], &mut visitor);
+        let deps = deps_for(source, 2)?;
 
         assert_eq!(deps.len(), 2);
         assert!(deps.contains(&0));
@@ -775,10 +752,7 @@ def bar():
 def baz():
     return {foo(): bar()}
 "#;
-        let parsed = parse_module(source)?;
-        let nodes = nodes_from_suite(parsed.suite());
-        let mut visitor = DependencyVisitor::new(&nodes);
-        let deps = collect_dependencies(&nodes[2], &mut visitor);
+        let deps = deps_for(source, 2)?;
 
         assert_eq!(deps.len(), 2);
         assert!(deps.contains(&0));
@@ -796,10 +770,7 @@ def foo():
 def bar():
     return {"key": foo()}
 "#;
-        let parsed = parse_module(source)?;
-        let nodes = nodes_from_suite(parsed.suite());
-        let mut visitor = DependencyVisitor::new(&nodes);
-        let deps = collect_dependencies(&nodes[1], &mut visitor);
+        let deps = deps_for(source, 1)?;
 
         assert_eq!(deps, vec![0]);
         Ok(())
@@ -815,10 +786,7 @@ def foo():
 def bar():
     return (x * 2 for x in foo())
 "#;
-        let parsed = parse_module(source)?;
-        let nodes = nodes_from_suite(parsed.suite());
-        let mut visitor = DependencyVisitor::new(&nodes);
-        let deps = collect_dependencies(&nodes[1], &mut visitor);
+        let deps = deps_for(source, 1)?;
 
         assert_eq!(deps, vec![0]);
         Ok(())
@@ -837,10 +805,7 @@ def bar(x):
 def baz():
     return (x for x in foo() if bar(x))
 "#;
-        let parsed = parse_module(source)?;
-        let nodes = nodes_from_suite(parsed.suite());
-        let mut visitor = DependencyVisitor::new(&nodes);
-        let deps = collect_dependencies(&nodes[2], &mut visitor);
+        let deps = deps_for(source, 2)?;
 
         assert_eq!(deps.len(), 2);
         assert!(deps.contains(&0));
@@ -864,10 +829,7 @@ def baz():
 def qux():
     return [foo() if bar() else baz()]
 "#;
-        let parsed = parse_module(source)?;
-        let nodes = nodes_from_suite(parsed.suite());
-        let mut visitor = DependencyVisitor::new(&nodes);
-        let deps = collect_dependencies(&nodes[3], &mut visitor);
+        let deps = deps_for(source, 3)?;
 
         assert_eq!(deps.len(), 3);
         assert!(deps.contains(&0));
@@ -886,10 +848,7 @@ def foo():
 def bar():
     pass
 "#;
-        let parsed = parse_module(source)?;
-        let nodes = nodes_from_suite(parsed.suite());
-        let deps = Dependencies::from_nodes(&nodes);
-        let order = deps.dependency_order(&nodes, false)?;
+        let order = order_for(source, Order::Newspaper)?;
 
         assert_eq!(order, vec![0, 1]);
         Ok(())
@@ -905,10 +864,7 @@ def bar():
 def foo():
     return 1
 "#;
-        let parsed = parse_module(source)?;
-        let nodes = nodes_from_suite(parsed.suite());
-        let deps = Dependencies::from_nodes(&nodes);
-        let order = deps.dependency_order(&nodes, false)?;
+        let order = order_for(source, Order::Newspaper)?;
 
         assert_eq!(order, vec![1, 0]);
         Ok(())
@@ -927,10 +883,7 @@ def bar():
 def foo():
     return 1
 "#;
-        let parsed = parse_module(source)?;
-        let nodes = nodes_from_suite(parsed.suite());
-        let deps = Dependencies::from_nodes(&nodes);
-        let order = deps.dependency_order(&nodes, false)?;
+        let order = order_for(source, Order::Newspaper)?;
 
         assert_eq!(order, vec![2, 1, 0]);
         Ok(())
@@ -948,10 +901,7 @@ def foo():
 def bar():
     return foo()
 "#;
-        let parsed = parse_module(source)?;
-        let nodes = nodes_from_suite(parsed.suite());
-        let deps = Dependencies::from_nodes(&nodes);
-        let order = deps.dependency_order(&nodes, false)?;
+        let order = order_for(source, Order::Newspaper)?;
 
         assert_eq!(order, vec![0, 1, 2]);
         Ok(())
@@ -970,7 +920,7 @@ def bar():
         let parsed = parse_module(source)?;
         let nodes = nodes_from_suite(parsed.suite());
         let deps = Dependencies::from_nodes(&nodes);
-        let result = deps.dependency_order(&nodes, false);
+        let result = deps.dependency_order(&nodes, Order::Newspaper);
 
         assert!(result.is_err());
         let err = result.unwrap_err();
@@ -994,7 +944,7 @@ def c():
         let parsed = parse_module(source)?;
         let nodes = nodes_from_suite(parsed.suite());
         let deps = Dependencies::from_nodes(&nodes);
-        let result = deps.dependency_order(&nodes, false);
+        let result = deps.dependency_order(&nodes, Order::Newspaper);
 
         assert!(result.is_err());
         assert!(!result.unwrap_err().cycle.is_empty());
@@ -1014,10 +964,7 @@ def bar():
 def foo():
     return 1
 "#;
-        let parsed = parse_module(source)?;
-        let nodes = nodes_from_suite(parsed.suite());
-        let deps = Dependencies::from_nodes(&nodes);
-        let order = deps.dependency_order(&nodes, true)?;
+        let order = order_for(source, Order::Narrative)?;
 
         assert_eq!(order, vec![0, 1, 2]);
         Ok(())
@@ -1037,10 +984,7 @@ y = 2
 def bar():
     return foo()
 "#;
-        let parsed = parse_module(source)?;
-        let nodes = nodes_from_suite(parsed.suite());
-        let deps = Dependencies::from_nodes(&nodes);
-        let order = deps.dependency_order(&nodes, true)?;
+        let order = order_for(source, Order::Narrative)?;
 
         assert_eq!(order.len(), 4);
         assert_eq!(order[0], 0);
@@ -1066,10 +1010,7 @@ def b():
 def a():
     return 1
 "#;
-        let parsed = parse_module(source)?;
-        let nodes = nodes_from_suite(parsed.suite());
-        let deps = Dependencies::from_nodes(&nodes);
-        let order = deps.dependency_order(&nodes, false)?;
+        let order = order_for(source, Order::Newspaper)?;
 
         assert_eq!(order[0], 3);
         assert_eq!(order[3], 0);
@@ -1095,10 +1036,7 @@ def bar():
 
 z = 3
 "#;
-        let parsed = parse_module(source)?;
-        let nodes = nodes_from_suite(parsed.suite());
-        let deps = Dependencies::from_nodes(&nodes);
-        let order = deps.dependency_order(&nodes, false)?;
+        let order = order_for(source, Order::Newspaper)?;
 
         assert_eq!(order[0], 0);
         assert_eq!(order[2], 2);
@@ -1113,10 +1051,7 @@ z = 3
 def foo():
     pass
 "#;
-        let parsed = parse_module(source)?;
-        let nodes = nodes_from_suite(parsed.suite());
-        let deps = Dependencies::from_nodes(&nodes);
-        let order = deps.dependency_order(&nodes, false)?;
+        let order = order_for(source, Order::Newspaper)?;
 
         assert_eq!(order, vec![0]);
         Ok(())
@@ -1125,10 +1060,9 @@ def foo():
     /// Test that an empty source file produces no nodes.
     #[test]
     fn nodes_from_suite_empty() -> Result<()> {
-        let parsed = parse_module("")?;
-        let nodes = nodes_from_suite(parsed.suite());
-        assert_eq!(nodes.len(), 0);
-        Ok(())
+        with_nodes("", |nodes| {
+            assert_eq!(nodes.len(), 0);
+        })
     }
 
     /// Test that function definitions are correctly extracted as movable nodes.
@@ -1141,15 +1075,13 @@ def foo():
 def bar():
     pass
 "#;
-        let parsed = parse_module(source)?;
-        let nodes = nodes_from_suite(parsed.suite());
-
-        assert_eq!(nodes.len(), 2);
-        assert_eq!(nodes[0].name.map(Name::as_str), Some("foo"));
-        assert!(nodes[0].movable);
-        assert_eq!(nodes[1].name.map(Name::as_str), Some("bar"));
-        assert!(nodes[1].movable);
-        Ok(())
+        with_nodes(source, |nodes| {
+            assert_eq!(nodes.len(), 2);
+            assert_eq!(nodes[0].name.map(Name::as_str), Some("foo"));
+            assert!(nodes[0].is_movable());
+            assert_eq!(nodes[1].name.map(Name::as_str), Some("bar"));
+            assert!(nodes[1].is_movable());
+        })
     }
 
     /// Test that class definitions are correctly extracted as movable nodes.
@@ -1162,15 +1094,13 @@ class Foo:
 class Bar:
     pass
 "#;
-        let parsed = parse_module(source)?;
-        let nodes = nodes_from_suite(parsed.suite());
-
-        assert_eq!(nodes.len(), 2);
-        assert_eq!(nodes[0].name.map(Name::as_str), Some("Foo"));
-        assert!(nodes[0].movable);
-        assert_eq!(nodes[1].name.map(Name::as_str), Some("Bar"));
-        assert!(nodes[1].movable);
-        Ok(())
+        with_nodes(source, |nodes| {
+            assert_eq!(nodes.len(), 2);
+            assert_eq!(nodes[0].name.map(Name::as_str), Some("Foo"));
+            assert!(nodes[0].is_movable());
+            assert_eq!(nodes[1].name.map(Name::as_str), Some("Bar"));
+            assert!(nodes[1].is_movable());
+        })
     }
 
     /// Test that non-function/class statements are non-movable.
@@ -1183,17 +1113,15 @@ y = 2
 def foo():
     pass
 "#;
-        let parsed = parse_module(source)?;
-        let nodes = nodes_from_suite(parsed.suite());
-
-        assert_eq!(nodes.len(), 3);
-        assert_eq!(nodes[0].name, None);
-        assert!(!nodes[0].movable);
-        assert_eq!(nodes[1].name, None);
-        assert!(!nodes[1].movable);
-        assert_eq!(nodes[2].name.map(Name::as_str), Some("foo"));
-        assert!(nodes[2].movable);
-        Ok(())
+        with_nodes(source, |nodes| {
+            assert_eq!(nodes.len(), 3);
+            assert_eq!(nodes[0].name, None);
+            assert!(!nodes[0].is_movable());
+            assert_eq!(nodes[1].name, None);
+            assert!(!nodes[1].is_movable());
+            assert_eq!(nodes[2].name.map(Name::as_str), Some("foo"));
+            assert!(nodes[2].is_movable());
+        })
     }
 
     /// Test mixed classes and functions are all movable.
@@ -1209,14 +1137,12 @@ def bar():
 class Baz:
     pass
 "#;
-        let parsed = parse_module(source)?;
-        let nodes = nodes_from_suite(parsed.suite());
-
-        assert_eq!(nodes.len(), 3);
-        assert!(nodes.iter().all(|n| n.movable));
-        assert_eq!(nodes[0].name.map(Name::as_str), Some("Foo"));
-        assert_eq!(nodes[1].name.map(Name::as_str), Some("bar"));
-        assert_eq!(nodes[2].name.map(Name::as_str), Some("Baz"));
-        Ok(())
+        with_nodes(source, |nodes| {
+            assert_eq!(nodes.len(), 3);
+            assert!(nodes.iter().all(|node| node.is_movable()));
+            assert_eq!(nodes[0].name.map(Name::as_str), Some("Foo"));
+            assert_eq!(nodes[1].name.map(Name::as_str), Some("bar"));
+            assert_eq!(nodes[2].name.map(Name::as_str), Some("Baz"));
+        })
     }
 }

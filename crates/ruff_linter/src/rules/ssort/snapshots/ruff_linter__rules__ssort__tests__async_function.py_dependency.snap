@@ -26,3 +26,4 @@ help: Organize statements
 6 | 
 7 | async def async_function():
 8 |     return function()
+note: This is an unsafe fix and may change runtime behavior

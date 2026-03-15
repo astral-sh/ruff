@@ -28,3 +28,4 @@ help: Organize statements
   - 
   -     def _method(self):
   -         pass
+note: This is an unsafe fix and may change runtime behavior

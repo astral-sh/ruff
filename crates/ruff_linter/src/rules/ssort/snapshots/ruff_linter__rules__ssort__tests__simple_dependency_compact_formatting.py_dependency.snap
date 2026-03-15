@@ -25,4 +25,5 @@ help: Organize statements
   -     return c()
   - def c():
   -     return 42
-8 |
+8 | 
+note: This is an unsafe fix and may change runtime behavior

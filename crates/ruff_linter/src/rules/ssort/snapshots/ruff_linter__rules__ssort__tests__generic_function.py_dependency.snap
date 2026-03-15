@@ -14,3 +14,4 @@ help: Organize statements
 1 | def func[T](a: T) -> T:
 2 |     return a
 3 + func(4)
+note: This is an unsafe fix and may change runtime behavior

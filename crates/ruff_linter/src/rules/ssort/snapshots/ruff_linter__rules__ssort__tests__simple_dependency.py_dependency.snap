@@ -27,4 +27,5 @@ help: Organize statements
   -     return 42
 7 + def a():
 8 +     return b()
-9 |
+9 | 
+note: This is an unsafe fix and may change runtime behavior

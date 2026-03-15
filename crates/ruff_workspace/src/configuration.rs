@@ -837,7 +837,7 @@ impl LintConfiguration {
             pyflakes: options.common.pyflakes,
             pylint: options.common.pylint,
             pyupgrade: options.common.pyupgrade,
-            ssort: options.common.ssort,
+            ssort: options.ssort,
             ruff: options.ruff,
         })
     }
@@ -1459,7 +1459,6 @@ fn warn_about_deprecated_top_level_lint_options(
         pyflakes,
         pylint,
         pyupgrade,
-        ssort,
         per_file_ignores,
         extend_per_file_ignores,
     } = top_level_options;
@@ -1635,10 +1634,6 @@ fn warn_about_deprecated_top_level_lint_options(
 
     if pyupgrade.is_some() {
         used_options.push("pyupgrade");
-    }
-
-    if ssort.is_some() {
-        used_options.push("ssort");
     }
 
     if per_file_ignores.is_some() {

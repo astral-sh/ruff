@@ -31,4 +31,5 @@ help: Organize statements
    - def c():
    -     # depends on a()
    -     return a() + 1
-11 |
+11 | 
+note: This is an unsafe fix and may change runtime behavior

@@ -29,3 +29,4 @@ help: Organize statements
 7 | 
 8 | def c():
 9 |     # depends on a()
+note: This is an unsafe fix and may change runtime behavior

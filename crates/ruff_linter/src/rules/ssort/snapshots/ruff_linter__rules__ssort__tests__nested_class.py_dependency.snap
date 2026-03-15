@@ -32,3 +32,4 @@ help: Organize statements
    -             return 100
 9  +     def outer_function(self):
 10 +         return Inner().inner_function()
+note: This is an unsafe fix and may change runtime behavior

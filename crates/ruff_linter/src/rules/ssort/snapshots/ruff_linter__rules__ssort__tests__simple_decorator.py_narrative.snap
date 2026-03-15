@@ -28,3 +28,4 @@ help: Organize statements
 7 + 
 8 + def decorator(fn):
 9 +     return fn
+note: This is an unsafe fix and may change runtime behavior

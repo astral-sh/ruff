@@ -13,81 +13,88 @@ mod tests {
 
     use crate::assert_diagnostics;
     use crate::registry::Rule;
+    use crate::rules::ssort::settings::Order;
     use crate::settings::LinterSettings;
     use crate::test::test_path;
 
-    #[test_case(Path::new("async_function.py"), false)]
-    #[test_case(Path::new("async_function.py"), true)]
-    #[test_case(Path::new("attribute_assign_class.py"), false)]
-    #[test_case(Path::new("attribute_assign_class.py"), true)]
-    #[test_case(Path::new("class_non_self_use.py"), false)]
-    #[test_case(Path::new("class_non_self_use.py"), true)]
-    #[test_case(Path::new("comments_inside_dependency.py"), false)]
-    #[test_case(Path::new("comments_inside_dependency.py"), true)]
-    #[test_case(Path::new("concat.py"), false)]
-    #[test_case(Path::new("concat.py"), true)]
-    #[test_case(Path::new("dependency_order.py"), false)]
-    #[test_case(Path::new("dependency_order.py"), true)]
-    #[test_case(Path::new("empty.py"), false)]
-    #[test_case(Path::new("empty.py"), true)]
-    #[test_case(Path::new("format_string.py"), false)]
-    #[test_case(Path::new("format_string.py"), true)]
-    #[test_case(Path::new("generic_class_method_locals.py"), false)]
-    #[test_case(Path::new("generic_class_method_locals.py"), true)]
-    #[test_case(Path::new("generic_function.py"), false)]
-    #[test_case(Path::new("generic_function.py"), true)]
-    #[test_case(Path::new("generic_function_inner.py"), false)]
-    #[test_case(Path::new("generic_function_inner.py"), true)]
-    #[test_case(Path::new("global_scope_conflict_dict_comp.py"), false)]
-    #[test_case(Path::new("global_scope_conflict_dict_comp.py"), true)]
-    #[test_case(Path::new("global_scope_conflict_generator_expression.py"), false)]
-    #[test_case(Path::new("global_scope_conflict_generator_expression.py"), true)]
-    #[test_case(Path::new("global_scope_conflict_list_comp.py"), false)]
-    #[test_case(Path::new("global_scope_conflict_list_comp.py"), true)]
-    #[test_case(Path::new("global_scope_conflict_set_comp.py"), false)]
-    #[test_case(Path::new("global_scope_conflict_set_comp.py"), true)]
-    #[test_case(Path::new("inner_class.py"), false)]
-    #[test_case(Path::new("inner_class.py"), true)]
-    #[test_case(Path::new("iter_unpack_in_class.py"), false)]
-    #[test_case(Path::new("iter_unpack_in_class.py"), true)]
-    #[test_case(Path::new("mixed_runtime_initialisation.py"), false)]
-    #[test_case(Path::new("mixed_runtime_initialisation.py"), true)]
-    #[test_case(Path::new("nested_class.py"), false)]
-    #[test_case(Path::new("nested_class.py"), true)]
-    #[test_case(Path::new("pretend_dunder_properties.py"), false)]
-    #[test_case(Path::new("pretend_dunder_properties.py"), true)]
-    #[test_case(Path::new("simple_decorator.py"), false)]
-    #[test_case(Path::new("simple_decorator.py"), true)]
-    #[test_case(Path::new("simple_dependency.py"), false)]
-    #[test_case(Path::new("simple_dependency.py"), true)]
-    #[test_case(Path::new("simple_dependency_compact_formatting.py"), false)]
-    #[test_case(Path::new("simple_dependency_compact_formatting.py"), true)]
-    #[test_case(Path::new("single_comment.py"), false)]
-    #[test_case(Path::new("single_comment.py"), true)]
-    #[test_case(Path::new("single_line_dummy_class.py"), false)]
-    #[test_case(Path::new("single_line_dummy_class.py"), true)]
-    #[test_case(Path::new("single_line_dummy_function.py"), false)]
-    #[test_case(Path::new("single_line_dummy_function.py"), true)]
-    #[test_case(Path::new("slots.py"), false)]
-    #[test_case(Path::new("slots.py"), true)]
-    #[test_case(Path::new("template_string.py"), false)]
-    #[test_case(Path::new("template_string.py"), true)]
-    #[test_case(Path::new("top_level_statement.py"), false)]
-    #[test_case(Path::new("top_level_statement.py"), true)]
-    #[test_case(Path::new("type_alias.py"), false)]
-    #[test_case(Path::new("type_alias.py"), true)]
-    fn default(path: &Path, narrative_order: bool) -> Result<()> {
+    #[test_case(Path::new("async_function.py"), Order::Newspaper)]
+    #[test_case(Path::new("async_function.py"), Order::Narrative)]
+    #[test_case(Path::new("attribute_assign_class.py"), Order::Newspaper)]
+    #[test_case(Path::new("attribute_assign_class.py"), Order::Narrative)]
+    #[test_case(Path::new("class_non_self_use.py"), Order::Newspaper)]
+    #[test_case(Path::new("class_non_self_use.py"), Order::Narrative)]
+    #[test_case(Path::new("comments_inside_dependency.py"), Order::Newspaper)]
+    #[test_case(Path::new("comments_inside_dependency.py"), Order::Narrative)]
+    #[test_case(Path::new("concat.py"), Order::Newspaper)]
+    #[test_case(Path::new("concat.py"), Order::Narrative)]
+    #[test_case(Path::new("dependency_order.py"), Order::Newspaper)]
+    #[test_case(Path::new("dependency_order.py"), Order::Narrative)]
+    #[test_case(Path::new("empty.py"), Order::Newspaper)]
+    #[test_case(Path::new("empty.py"), Order::Narrative)]
+    #[test_case(Path::new("format_string.py"), Order::Newspaper)]
+    #[test_case(Path::new("format_string.py"), Order::Narrative)]
+    #[test_case(Path::new("generic_class_method_locals.py"), Order::Newspaper)]
+    #[test_case(Path::new("generic_class_method_locals.py"), Order::Narrative)]
+    #[test_case(Path::new("generic_function.py"), Order::Newspaper)]
+    #[test_case(Path::new("generic_function.py"), Order::Narrative)]
+    #[test_case(Path::new("generic_function_inner.py"), Order::Newspaper)]
+    #[test_case(Path::new("generic_function_inner.py"), Order::Narrative)]
+    #[test_case(Path::new("global_scope_conflict_dict_comp.py"), Order::Newspaper)]
+    #[test_case(Path::new("global_scope_conflict_dict_comp.py"), Order::Narrative)]
+    #[test_case(
+        Path::new("global_scope_conflict_generator_expression.py"),
+        Order::Newspaper
+    )]
+    #[test_case(
+        Path::new("global_scope_conflict_generator_expression.py"),
+        Order::Narrative
+    )]
+    #[test_case(Path::new("global_scope_conflict_list_comp.py"), Order::Newspaper)]
+    #[test_case(Path::new("global_scope_conflict_list_comp.py"), Order::Narrative)]
+    #[test_case(Path::new("global_scope_conflict_set_comp.py"), Order::Newspaper)]
+    #[test_case(Path::new("global_scope_conflict_set_comp.py"), Order::Narrative)]
+    #[test_case(Path::new("inner_class.py"), Order::Newspaper)]
+    #[test_case(Path::new("inner_class.py"), Order::Narrative)]
+    #[test_case(Path::new("iter_unpack_in_class.py"), Order::Newspaper)]
+    #[test_case(Path::new("iter_unpack_in_class.py"), Order::Narrative)]
+    #[test_case(Path::new("mixed_runtime_initialisation.py"), Order::Newspaper)]
+    #[test_case(Path::new("mixed_runtime_initialisation.py"), Order::Narrative)]
+    #[test_case(Path::new("nested_class.py"), Order::Newspaper)]
+    #[test_case(Path::new("nested_class.py"), Order::Narrative)]
+    #[test_case(Path::new("pretend_dunder_properties.py"), Order::Newspaper)]
+    #[test_case(Path::new("pretend_dunder_properties.py"), Order::Narrative)]
+    #[test_case(Path::new("simple_decorator.py"), Order::Newspaper)]
+    #[test_case(Path::new("simple_decorator.py"), Order::Narrative)]
+    #[test_case(Path::new("simple_dependency.py"), Order::Newspaper)]
+    #[test_case(Path::new("simple_dependency.py"), Order::Narrative)]
+    #[test_case(Path::new("simple_dependency_compact_formatting.py"), Order::Newspaper)]
+    #[test_case(Path::new("simple_dependency_compact_formatting.py"), Order::Narrative)]
+    #[test_case(Path::new("single_comment.py"), Order::Newspaper)]
+    #[test_case(Path::new("single_comment.py"), Order::Narrative)]
+    #[test_case(Path::new("single_line_dummy_class.py"), Order::Newspaper)]
+    #[test_case(Path::new("single_line_dummy_class.py"), Order::Narrative)]
+    #[test_case(Path::new("single_line_dummy_function.py"), Order::Newspaper)]
+    #[test_case(Path::new("single_line_dummy_function.py"), Order::Narrative)]
+    #[test_case(Path::new("slots.py"), Order::Newspaper)]
+    #[test_case(Path::new("slots.py"), Order::Narrative)]
+    #[test_case(Path::new("template_string.py"), Order::Newspaper)]
+    #[test_case(Path::new("template_string.py"), Order::Narrative)]
+    #[test_case(Path::new("top_level_statement.py"), Order::Newspaper)]
+    #[test_case(Path::new("top_level_statement.py"), Order::Narrative)]
+    #[test_case(Path::new("type_alias.py"), Order::Newspaper)]
+    #[test_case(Path::new("type_alias.py"), Order::Narrative)]
+    fn default(path: &Path, order: Order) -> Result<()> {
         let snapshot = format!(
             "{}_{}",
             path.to_string_lossy(),
-            if narrative_order {
+            if order == Order::Narrative {
                 "narrative"
             } else {
                 "dependency"
             }
         );
         let mut settings = LinterSettings::for_rule(Rule::UnsortedStatements);
-        settings.ssort.narrative_order = narrative_order;
+        settings.ssort.order = order;
         let diagnostics = test_path(Path::new("ssort").join(path).as_path(), &settings)?;
         assert_diagnostics!(snapshot, diagnostics);
         Ok(())
