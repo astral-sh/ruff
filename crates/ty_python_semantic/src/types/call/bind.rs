@@ -83,15 +83,28 @@ struct BindingsElement<'db> {
     bindings: SmallVec<[CallableBinding<'db>; 1]>,
 }
 
-type ConstructorGroupBindings<'a, 'db> = SmallVec<[&'a CallableBinding<'db>; 1]>;
-type ConstructorGroupReturnTypes<'db> = SmallVec<[Type<'db>; 1]>;
-type ConstructorGroups<'a, 'db> = FxOrderMap<
-    Type<'db>,
-    (
-        ConstructorGroupBindings<'a, 'db>,
-        ConstructorGroupReturnTypes<'db>,
-    ),
->;
+#[derive(Debug, Default)]
+struct ConstructorGroupState<'a, 'db> {
+    bindings: SmallVec<[&'a CallableBinding<'db>; 1]>,
+    preserved_return_type: Option<Type<'db>>,
+    needs_merge: bool,
+}
+
+impl<'a, 'db> ConstructorGroupState<'a, 'db> {
+    fn push(
+        &mut self,
+        bindings: impl IntoIterator<Item = &'a CallableBinding<'db>>,
+        return_ty: Type<'db>,
+    ) {
+        self.bindings.extend(bindings);
+
+        let had_preserved_return_type = self.preserved_return_type.is_some();
+        self.preserved_return_type.get_or_insert(return_ty);
+        self.needs_merge |= had_preserved_return_type;
+    }
+}
+
+type ConstructorGroups<'a, 'db> = FxOrderMap<Type<'db>, ConstructorGroupState<'a, 'db>>;
 
 impl<'db> BindingsElement<'db> {
     /// Returns the constructor instance type shared by all bindings in this element, if any.
@@ -646,26 +659,25 @@ impl<'db> Bindings<'db> {
             };
 
             if let Some(constructor_instance_type) = element.constructor_instance_type() {
-                let (grouped_bindings, grouped_return_types) = constructor_groups
+                constructor_groups
                     .entry(constructor_instance_type)
-                    .or_default();
-                grouped_bindings.extend(element.bindings.iter());
-                grouped_return_types.push(element_return_type);
+                    .or_default()
+                    .push(element.bindings.iter(), element_return_type);
                 continue;
             }
 
             element_return_types.push(element_return_type);
         }
 
-        for (constructor_instance_type, (bindings, grouped_return_types)) in constructor_groups {
-            if grouped_return_types.len() > 1 {
+        for (constructor_instance_type, group) in constructor_groups {
+            if group.needs_merge {
                 element_return_types.push(Self::combine_constructor_return_type(
                     db,
                     constructor_instance_type,
-                    bindings,
+                    group.bindings,
                 ));
-            } else {
-                element_return_types.extend(grouped_return_types);
+            } else if let Some(preserved_return_type) = group.preserved_return_type {
+                element_return_types.push(preserved_return_type);
             }
         }
 
