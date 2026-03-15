@@ -1,6 +1,6 @@
 //! Cycle detection for recursive types.
 //!
-//! The visitors here ([`TypeTransformer`] and [`PairVisitor`]) are used in methods that
+//! The visitors here ([`CycleDetector`] and [`TypeTransformer`]) are used in methods that
 //! recursively visit types to transform them (e.g. [`Type::apply_type_mapping`]) or to
 //! decide a relation between a pair of types (e.g. [`Type::has_relation_to`]).
 //!
@@ -57,8 +57,6 @@ impl<Tag> Default for TypeTransformer<'_, Tag> {
         CycleDetector::new(Type::any())
     }
 }
-
-pub(crate) type PairVisitor<'db, Tag, C> = CycleDetector<Tag, (Type<'db>, Type<'db>), C>;
 
 #[derive(Debug, Clone)]
 pub struct CycleDetector<Tag, T, R> {
