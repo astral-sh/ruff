@@ -4260,23 +4260,6 @@ class Quux:
     }
 
     #[test]
-    fn base_class_method() {
-        let builder = completion_test_builder(
-            "\
-class Foo:
-    def foo_bar(self, a: int) -> int:
-        return a
-
-class Bar(Foo):
-    def foo<CURSOR>
-",
-        );
-
-        assert_snapshot!(
-            builder.type_signatures().build().snapshot(), @"foo_bar(self, a: int) -> int: :: def foo_bar(self, a: int) -> int");
-    }
-
-    #[test]
     fn base_class_abstract_method() {
         let builder = completion_test_builder(
             "\
@@ -4294,6 +4277,296 @@ class Bar(Foo):
 
         assert_snapshot!(
             builder.type_signatures().build().snapshot(), @"foo_bar(self) -> int: :: def foo_bar(self) -> int");
+    }
+
+    #[test]
+    fn base_class_method_with_default_values() {
+        let builder = completion_test_builder(
+            "\
+class Foo:
+    def foo_bar(self, a: int = 5, b: str = 'hello') -> bool:
+        return True
+
+class Bar(Foo):
+    def foo<CURSOR>
+",
+        );
+
+        assert_snapshot!(
+        builder.type_signatures().build().snapshot(), @"foo_bar(self, a: int = 5, b: str = \"hello\") -> bool: :: def foo_bar(self, a: int = 5, b: str = \"hello\") -> bool");
+    }
+
+    #[test]
+    fn base_class_method_positional_only() {
+        let builder = completion_test_builder(
+            "\
+class Foo:
+    def foo_bar(self, a: int, b: str, /) -> None:
+        pass
+
+class Bar(Foo):
+    def foo<CURSOR>
+",
+        );
+
+        assert_snapshot!(
+            builder.type_signatures().build().snapshot(), @"foo_bar(self, a: int, b: str, /) -> None: :: def foo_bar(self, a: int, b: str, /) -> None");
+    }
+
+    #[test]
+    fn base_class_method_keyword_only() {
+        let builder = completion_test_builder(
+            "\
+class Foo:
+    def foo_bar(self, *, name: str, age: int = 25) -> dict[str, int]:
+        return {name: age}
+
+class Bar(Foo):
+    def foo<CURSOR>
+    ",
+        );
+
+        assert_snapshot!(
+            builder.type_signatures().build().snapshot(), @"foo_bar(self, *, name: str, age: int = 25) -> dict[str, int]: :: def foo_bar(self, *, name: str, age: int = 25) -> dict[str, int]");
+    }
+
+    #[test]
+    fn base_class_method_with_varargs() {
+        let builder = completion_test_builder(
+            "\
+class Foo:
+    def foo_bar(self, *args: int) -> tuple:
+        return args
+
+class Bar(Foo):
+    def foo<CURSOR>
+    ",
+        );
+
+        assert_snapshot!(
+            builder.type_signatures().build().snapshot(), @"foo_bar(self, *args: int) -> tuple[Unknown, ...]: :: def foo_bar(self, *args: int) -> tuple[Unknown, ...]");
+    }
+
+    #[test]
+    fn base_class_method_with_kwargs() {
+        let builder = completion_test_builder(
+            "\
+class Foo:
+    def foo_bar(self, **kwargs: str) -> None:
+        pass
+
+class Bar(Foo):
+    def foo<CURSOR>
+",
+        );
+
+        assert_snapshot!(
+        builder.type_signatures().build().snapshot(), @"foo_bar(self, **kwargs: str) -> None: :: def foo_bar(self, **kwargs: str) -> None");
+    }
+
+    #[test]
+    fn base_class_method_complex_signature() {
+        let builder = completion_test_builder(
+            "\
+class Foo:
+    def foo_bar(
+        self,
+        a: int,
+        b: str,
+        /,
+        c: float = 3.14,
+        *args: bool,
+        **kwargs: dict[str, str]
+    ) -> tuple[int, str]:
+        return (a, b)
+
+class Bar(Foo):
+    def foo<CURSOR>
+",
+        );
+
+        assert_snapshot!(
+        builder.type_signatures().build().snapshot(), @"foo_bar(self, a: int, b: str, /, c: int | float = ..., *args: bool, **kwargs: dict[str, str]) -> tuple[int, str]: :: def foo_bar(self, a: int, b: str, /, c: int | float = ..., *args: bool, **kwargs: dict[str, str]) -> tuple[int, str]");
+    }
+
+    #[test]
+    fn base_class_method_no_parameters() {
+        let builder = completion_test_builder(
+            "\
+class Foo:
+    def foo_bar(self) -> None:
+        pass
+
+class Bar(Foo):
+    def foo<CURSOR>
+",
+        );
+
+        assert_snapshot!(
+        builder.type_signatures().build().snapshot(), @"foo_bar(self) -> None: :: def foo_bar(self) -> None");
+    }
+
+    #[test]
+    fn base_class_method_no_return_annotation() {
+        let builder = completion_test_builder(
+            "\
+class Foo:
+    def foo_bar(self, x: int, y: str):
+        return x + len(y)
+
+class Bar(Foo):
+    def foo<CURSOR>
+",
+        );
+
+        assert_snapshot!(
+        builder.type_signatures().build().snapshot(), @"foo_bar(self, x: int, y: str) -> Unknown: :: def foo_bar(self, x: int, y: str) -> Unknown");
+    }
+
+    #[test]
+    fn base_class_method_no_type_annotations() {
+        let builder = completion_test_builder(
+            "\
+class Foo:
+    def foo_bar(self, x, y=10):
+        return x + y
+
+class Bar(Foo):
+    def foo<CURSOR>
+",
+        );
+
+        assert_snapshot!(
+        builder.type_signatures().build().snapshot(), @"foo_bar(self, x, y=10) -> Unknown: :: def foo_bar(self, x, y=10) -> Unknown");
+    }
+
+    #[test]
+    fn base_class_staticmethod() {
+        let builder = completion_test_builder(
+            "\
+class Foo:
+    @staticmethod
+    def foo_bar(x: int, y: int) -> int:
+        return x + y
+
+class Bar(Foo):
+    @staticmethod
+    def foo<CURSOR>
+",
+        );
+
+        assert_snapshot!(
+        builder.type_signatures().build().snapshot(), @"foo_bar(x: int, y: int) -> int: :: def foo_bar(x: int, y: int) -> int");
+    }
+
+    #[test]
+    fn base_class_method_union_types() {
+        let builder = completion_test_builder(
+        "\
+from typing import Union, Optional, List
+
+class Foo:
+    def foo_bar(self, data: Union[str, int], items: List[str], flag: Optional[bool] = None) -> Union[dict[str, str], list[str]]:
+        return {}
+
+class Bar(Foo):
+    def foo<CURSOR>
+",
+    );
+
+        assert_snapshot!(
+        builder.type_signatures().build().snapshot(), @"foo_bar(self, data: str | int, items: list[str], flag: bool | None = None) -> dict[str, str] | list[str]: :: def foo_bar(self, data: str | int, items: list[str], flag: bool | None = None) -> dict[str, str] | list[str]");
+    }
+
+    #[test]
+    fn multiple_inheritance_base_methods() {
+        let builder = completion_test_builder(
+            "\
+class Foo:
+    def foo_method(self, x: int) -> str:
+        return str(x)
+
+class Baz:
+    def foo_baz(self, y: float) -> bool:
+        return True
+
+class Bar(Foo, Baz):
+    def foo<CURSOR>
+",
+        );
+
+        assert_snapshot!(
+            builder.type_signatures().build().snapshot(),
+            @"
+            foo_baz(self, y: int | float) -> bool: :: def foo_baz(self, y: int | float) -> bool
+            foo_method(self, x: int) -> str: :: def foo_method(self, x: int) -> str
+            "
+        );
+    }
+
+    #[test]
+    fn base_class_method_generic() {
+        let builder = completion_test_builder(
+            "\
+from typing import TypeVar, Generic
+
+T = TypeVar('T')
+
+class Foo(Generic[T]):
+    def foo_bar(self, item: T) -> T:
+        return item
+
+class Bar(Foo[int]):
+    def foo<CURSOR>
+",
+        );
+
+        assert_snapshot!(
+        builder.type_signatures().build().snapshot(), @"foo_bar(self, item: int) -> int: :: def foo_bar(self, item: int) -> int");
+    }
+
+    #[test]
+    fn base_class_dunder_method() {
+        let builder = completion_test_builder(
+            "\
+class Foo:
+    def __str__(self) -> str:
+        return 'Foo'
+
+    def __len__(self) -> int:
+        return 42
+
+class Bar(Foo):
+    def __s<CURSOR>
+",
+        );
+
+        assert_snapshot!(
+        builder.type_signatures().build().snapshot(), @"
+        __getstate__(self) -> object: :: def __getstate__(self) -> object
+        __hash__(self) -> int: :: def __hash__(self) -> int
+        __setattr__(self, name: str, value: Any, /) -> None: :: def __setattr__(self, name: str, value: Any, /) -> None
+        __sizeof__(self) -> int: :: def __sizeof__(self) -> int
+        __str__(self) -> str: :: def __str__(self) -> str
+        ");
+    }
+
+    #[test]
+    fn nested_class_inheritance() {
+        let builder = completion_test_builder(
+            "\
+class Outer:
+    class Inner:
+        def inner_method(self, value: str) -> None:
+            pass
+
+class MyClass(Outer.Inner):
+    def inner<CURSOR>
+",
+        );
+
+        assert_snapshot!(
+        builder.type_signatures().build().snapshot(), @"inner_method(self, value: str) -> None: :: def inner_method(self, value: str) -> None");
     }
 
     #[test]
