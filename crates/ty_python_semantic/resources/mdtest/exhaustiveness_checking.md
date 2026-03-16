@@ -167,6 +167,18 @@ def match_exhaustive_no_assertion(x: Color) -> int:
         case Color.BLUE:
             return 3
 
+def match_exhaustive_through_instance(x: Color) -> int:
+    match x:
+        case x.RED:
+            reveal_type(x)  # revealed: Literal[Color.RED]
+            return 1
+        case x.GREEN:
+            reveal_type(x)  # revealed: Literal[Color.GREEN]
+            return 2
+        case x.BLUE:
+            reveal_type(x)  # revealed: Literal[Color.BLUE]
+            return 3
+
 def match_non_exhaustive(x: Color):
     match x:
         case Color.RED:
@@ -471,7 +483,6 @@ def i[T: (int, str)](x: T) -> T:
         case str():
             pass
         case _:
-            reveal_type(x)  # revealed: Never
             assert_never(x)
 
     return x

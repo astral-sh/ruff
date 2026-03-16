@@ -82,6 +82,16 @@
             "$ref": "#/definitions/string"
           }
         },
+        "replace-imports-with-any": {
+          "description": "A list of module glob patterns whose imports should be replaced with `typing.Any`.\n\nUnlike `allowed-unresolved-imports`, this setting replaces the module's type information\nwith `typing.Any` even if the module can be resolved. Import diagnostics are\nunconditionally suppressed for matching modules.\n\n- Prefix a pattern with `!` to exclude matching modules\n\nWhen multiple patterns match, later entries take precedence.\n\nGlob patterns can be used in combinations with each other. For example, to suppress errors for\nany module where the first component contains the substring `test`, use `*test*.**`.\n\nWhen multiple patterns match, later entries take precedence.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/definitions/string"
+          }
+        },
         "respect-type-ignore-comments": {
           "description": "Whether ty should respect `type: ignore` comments.\n\nWhen set to `false`, `type: ignore` comments are treated like any other normal\ncomment and can't be used to suppress ty errors (you have to use `ty: ignore` instead).\n\nSetting this option can be useful when using ty alongside other type checkers or when\nyou prefer using `ty: ignore` over `type: ignore`.\n\nDefaults to `true`.",
           "type": [
@@ -112,7 +122,7 @@
           }
         },
         "python": {
-          "description": "Path to your project's Python environment or interpreter.\n\nty uses the `site-packages` directory of your project's Python environment\nto resolve third-party (and, in some cases, first-party) imports in your code.\n\nIf you're using a project management tool such as uv, you should not generally need\nto specify this option, as commands such as `uv run` will set the `VIRTUAL_ENV`\nenvironment variable to point to your project's virtual environment. ty can also infer\nthe location of your environment from an activated Conda environment, and will look for\na `.venv` directory in the project root if none of the above apply.\n\nPassing a path to a Python executable is supported, but passing a path to a dynamic executable\n(such as a shim) is not currently supported.\n\nThis option can be used to point to virtual or system Python environments.",
+          "description": "Path to your project's Python environment or interpreter.\n\nty uses the `site-packages` directory of your project's Python environment\nto resolve third-party (and, in some cases, first-party) imports in your code.\n\nThis can be a path to:\n\n- A Python interpreter, e.g. `.venv/bin/python3`\n- A virtual environment directory, e.g. `.venv`\n- A system Python [`sys.prefix`] directory, e.g. `/usr`\n\nIf you're using a project management tool such as uv, you should not generally need to\nspecify this option, as commands such as `uv run` will set the `VIRTUAL_ENV` environment\nvariable to point to your project's virtual environment. ty can also infer the location of\nyour environment from an activated Conda environment, and will look for a `.venv` directory\nin the project root if none of the above apply. Failing that, ty will look for a `python3`\nor `python` binary available in `PATH`.\n\n[`sys.prefix`]: https://docs.python.org/3/library/sys.html#sys.prefix",
           "anyOf": [
             {
               "$ref": "#/definitions/RelativePathBuf"
@@ -145,7 +155,7 @@
           ]
         },
         "root": {
-          "description": "The root paths of the project, used for finding first-party modules.\n\nAccepts a list of directory paths searched in priority order (first has highest priority).\n\nIf left unspecified, ty will try to detect common project layouts and initialize `root` accordingly:\n\n* if a `./src` directory exists, include `.` and `./src` in the first party search path (src layout or flat)\n* if a `./<project-name>/<project-name>` directory exists, include `.` and `./<project-name>` in the first party search path\n* otherwise, default to `.` (flat layout)\n\nAdditionally, if a `./python` directory exists and is not a package (i.e. it does not contain an `__init__.py` or `__init__.pyi` file),\nit will also be included in the first party search path.",
+          "description": "The root paths of the project, used for finding first-party modules.\n\nAccepts a list of directory paths searched in priority order (first has highest priority).\n\nIf left unspecified, ty will try to detect common project layouts and initialize `root` accordingly.\nThe project root (`.`) is always included. Additionally, the following directories are included\nif they exist and are not packages (i.e. they do not contain `__init__.py` or `__init__.pyi` files):\n\n* `./src`\n* `./<project-name>` (if a `./<project-name>/<project-name>` directory exists)\n* `./python`",
           "type": [
             "array",
             "null"
@@ -212,6 +222,11 @@
           "description": "Print diagnostics in the format used by [GitHub Actions] workflow error annotations.\n\n[GitHub Actions]: https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands#setting-an-error-message",
           "type": "string",
           "const": "github"
+        },
+        {
+          "description": "Print diagnostics as a JUnit-style XML report.",
+          "type": "string",
+          "const": "junit"
         }
       ]
     },
@@ -360,6 +375,15 @@
             }
           ]
         },
+        "all": {
+          "title": "set the default severity level for all rules",
+          "description": "Configure a default severity level for all rules. Individual rule settings override this default.",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "ambiguous-protocol-member": {
           "title": "detects protocol classes with ambiguous interfaces",
           "description": "## What it does\nChecks for protocol classes with members that will lead to ambiguous interfaces.\n\n## Why is this bad?\nAssigning to an undeclared variable in a protocol class leads to an ambiguous\ninterface which may lead to the type checker inferring unexpected things. It's\nrecommended to ensure that all members of a protocol class are explicitly declared.\n\n## Examples\n\n```py\nfrom typing import Protocol\n\nclass BaseProto(Protocol):\n    a: int                               # fine (explicitly declared as `int`)\n    def method_member(self) -> int: ...  # fine: a method definition using `def` is considered a declaration\n    c = \"some variable\"                  # error: no explicit declaration, leading to ambiguity\n    b = method_member                    # error: no explicit declaration, leading to ambiguity\n\n    # error: this creates implicit assignments of `d` and `e` in the protocol class body.\n    # Were they really meant to be considered protocol members?\n    for d, e in enumerate(range(42)):\n        pass\n\nclass SubProto(BaseProto, Protocol):\n    a = 42  # fine (declared in superclass)\n```",
@@ -383,6 +407,16 @@
         "byte-string-type-annotation": {
           "title": "detects byte strings in type annotation positions",
           "description": "## What it does\nChecks for byte-strings in type annotation positions.\n\n## Why is this bad?\nStatic analysis tools like ty can't analyze type annotations that use byte-string notation.\n\n## Examples\n```python\ndef test(): -> b\"int\":\n    ...\n```\n\nUse instead:\n```python\ndef test(): -> \"int\":\n    ...\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "call-abstract-method": {
+          "title": "detects calls to abstract methods with trivial bodies on class objects",
+          "description": "## What it does\nChecks for calls to abstract `@classmethod`s or `@staticmethod`s\nwith \"trivial bodies\" when accessed on the class object itself.\n\n\"Trivial bodies\" are bodies that solely consist of `...`, `pass`,\na docstring, and/or `raise NotImplementedError`.\n\n## Why is this bad?\nAn abstract method with a trivial body has no concrete implementation\nto execute, so calling such a method directly on the class will probably\nnot have the desired effect.\n\nIt is also unsound to call these methods directly on the class. Unlike\nother methods, ty permits abstract methods with trivial bodies to have\nnon-`None` return types even though they always return `None` at runtime.\nThis is because it is expected that these methods will always be\noverridden rather than being called directly. As a result of this\nexception to the normal rule, ty may infer an incorrect type if one of\nthese methods is called directly, which may then mean that type errors\nelsewhere in your code go undetected by ty.\n\nCalling abstract classmethods or staticmethods via `type[X]` is allowed,\nsince the actual runtime type could be a concrete subclass with an implementation.\n\n## Example\n```python\nfrom abc import ABC, abstractmethod\n\nclass Foo(ABC):\n    @classmethod\n    @abstractmethod\n    def method(cls) -> int: ...\n\nFoo.method()  # Error: cannot call abstract classmethod\n```",
           "default": "error",
           "oneOf": [
             {
@@ -523,6 +557,16 @@
         "escape-character-in-forward-annotation": {
           "title": "detects forward type annotations with escape characters",
           "description": "## What it does\nChecks for forward annotations that contain escape characters.\n\n## Why is this bad?\nStatic analysis tools like ty can't analyze type annotations that contain escape characters.\n\n## Example\n\n```python\ndef foo() -> \"intt\\b\": ...\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "final-on-non-method": {
+          "title": "detects `@final` applied to non-method functions",
+          "description": "## What it does\nChecks for `@final` decorators applied to non-method functions.\n\n## Why is this bad?\nThe `@final` decorator is only meaningful on methods and classes.\nApplying it to a module-level function or a nested function has no\neffect and is likely a mistake.\n\n## Example\n\n```python\nfrom typing import final\n\n# Error: @final is not allowed on non-method functions\n@final\ndef my_function() -> int:\n    return 0\n```",
           "default": "error",
           "oneOf": [
             {
@@ -700,6 +744,16 @@
             }
           ]
         },
+        "invalid-enum-member-annotation": {
+          "title": "detects type annotations on enum members",
+          "description": "## What it does\nChecks for enum members that have explicit type annotations.\n\n## Why is this bad?\nThe [typing spec] states that type checkers should infer a literal type\nfor all enum members. An explicit type annotation on an enum member is\nmisleading because the annotated type will be incorrect — the actual\nruntime type is the enum class itself, not the annotated type.\n\nIn CPython's `enum` module, annotated assignments with values are still\ntreated as members at runtime, but the annotation will confuse readers of the code.\n\n## Examples\n```python\nfrom enum import Enum\n\nclass Pet(Enum):\n    CAT = 1       # OK\n    DOG: int = 2  # Error: enum members should not be annotated\n```\n\nUse instead:\n```python\nfrom enum import Enum\n\nclass Pet(Enum):\n    CAT = 1\n    DOG = 2\n```\n\n## References\n- [Typing spec: Enum members](https://typing.python.org/en/latest/spec/enums.html#enum-members)\n\n[typing spec]: https://typing.python.org/en/latest/spec/enums.html#enum-members",
+          "default": "warn",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "invalid-exception-caught": {
           "title": "detects exception handlers that catch classes that do not inherit from `BaseException`",
           "description": "## What it does\nChecks for exception handlers that catch non-exception classes.\n\n## Why is this bad?\nCatching classes that do not inherit from `BaseException` will raise a `TypeError` at runtime.\n\n## Example\n```python\ntry:\n    1 / 0\nexcept 1:\n    ...\n```\n\nUse instead:\n```python\ntry:\n    1 / 0\nexcept ZeroDivisionError:\n    ...\n```\n\n## References\n- [Python documentation: except clause](https://docs.python.org/3/reference/compound_stmts.html#except-clause)\n- [Python documentation: Built-in Exceptions](https://docs.python.org/3/library/exceptions.html#built-in-exceptions)\n\n## Ruff rule\n This rule corresponds to Ruff's [`except-with-non-exception-classes` (`B030`)](https://docs.astral.sh/ruff/rules/except-with-non-exception-classes)",
@@ -762,7 +816,7 @@
         },
         "invalid-key": {
           "title": "detects invalid subscript accesses or TypedDict literal keys",
-          "description": "## What it does\nChecks for subscript accesses with invalid keys and `TypedDict` construction with an\nunknown key.\n\n## Why is this bad?\nSubscripting with an invalid key will raise a `KeyError` at runtime.\n\nCreating a `TypedDict` with an unknown key is likely a mistake; if the `TypedDict` is\n`closed=true` it also violates the expectations of the type.\n\n## Examples\n```python\nfrom typing import TypedDict\n\nclass Person(TypedDict):\n    name: str\n    age: int\n\nalice = Person(name=\"Alice\", age=30)\nalice[\"height\"]  # KeyError: 'height'\n\nbob: Person = { \"name\": \"Bob\", \"age\": 30 }  # typo!\n\ncarol = Person(name=\"Carol\", age=25)  # typo!\n```",
+          "description": "## What it does\nChecks for subscript accesses with invalid keys and `TypedDict` construction with an\nunknown key.\n\n## Why is this bad?\nSubscripting with an invalid key will raise a `KeyError` at runtime.\n\nCreating a `TypedDict` with an unknown key is likely a mistake; if the `TypedDict` is\n`closed=true` it also violates the expectations of the type.\n\n## Examples\n```python\nfrom typing import TypedDict\n\nclass Person(TypedDict):\n    name: str\n    age: int\n\nalice = Person(name=\"Alice\", age=30)\nalice[\"height\"]  # KeyError: 'height'\n\nbob: Person = { \"namee\": \"Bob\", \"age\": 30 }  # typo!\n\ncarol = Person(name=\"Carol\", aeg=25)  # typo!\n```",
           "default": "error",
           "oneOf": [
             {
@@ -783,6 +837,16 @@
         "invalid-legacy-type-variable": {
           "title": "detects invalid legacy type variables",
           "description": "## What it does\nChecks for the creation of invalid legacy `TypeVar`s\n\n## Why is this bad?\nThere are several requirements that you must follow when creating a legacy `TypeVar`.\n\n## Examples\n```python\nfrom typing import TypeVar\n\nT = TypeVar(\"T\")  # okay\nQ = TypeVar(\"S\")  # error: TypeVar name must match the variable it's assigned to\nT = TypeVar(\"T\")  # error: TypeVars should not be redefined\n\n# error: TypeVar must be immediately assigned to a variable\ndef f(t: TypeVar(\"U\")): ...\n```\n\n## References\n- [Typing spec: Generics](https://typing.python.org/en/latest/spec/generics.html#introduction)",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "invalid-match-pattern": {
+          "title": "detect invalid match patterns",
+          "description": "## What it does\nChecks for invalid match patterns.\n\n## Why is this bad?\nMatching on invalid patterns will lead to a runtime error.\n\n## Examples\n```python\nNotAClass = 42\n\nmatch x:\n    case NotAClass():    # TypeError at runtime: must be a class\n        ...\n```",
           "default": "error",
           "oneOf": [
             {
@@ -1000,6 +1064,16 @@
             }
           ]
         },
+        "invalid-type-variable-default": {
+          "title": "detects invalid type variable defaults",
+          "description": "## What it does\nChecks for [type variables] whose default type is not compatible with\nthe type variable's bound or constraints.\n\n## Why is this bad?\nIf a type variable has a bound, the default must be assignable to that\nbound (see: [bound rules]). If a type variable has constraints, the default\nmust be one of the constraints (see: [constraint rules]).\n\n## Examples\n```python\nT = TypeVar(\"T\", bound=str, default=int)  # error: [invalid-type-variable-default]\nU = TypeVar(\"U\", int, str, default=bytes)  # error: [invalid-type-variable-default]\n```\n\n[type variables]: https://docs.python.org/3/library/typing.html#typing.TypeVar\n[bound rules]: https://typing.python.org/en/latest/spec/generics.html#bound-rules\n[constraint rules]: https://typing.python.org/en/latest/spec/generics.html#constraint-rules",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "invalid-typed-dict-header": {
           "title": "detects invalid statements in `TypedDict` class headers",
           "description": "## What it does\nDetects errors in `TypedDict` class headers, such as unexpected arguments\nor invalid base classes.\n\n## Why is this bad?\nThe typing spec states that `TypedDict`s are not permitted to have\ncustom metaclasses. Using `**` unpacking in a `TypedDict` header\nis also prohibited by ty, as it means that ty cannot statically determine\nwhether keys in the `TypedDict` are intended to be required or optional.\n\n## Example\n```python\nfrom typing import TypedDict\n\nclass Foo(TypedDict, metaclass=whatever):  # error: [invalid-typed-dict-header]\n    ...\n\ndef f(x: dict):\n    class Bar(TypedDict, **x):  # error: [invalid-typed-dict-header]\n        ...\n```",
@@ -1100,6 +1174,16 @@
             }
           ]
         },
+        "override-of-final-variable": {
+          "title": "detects overrides of Final class variables",
+          "description": "## What it does\nChecks for class variables on subclasses that override a superclass variable\nthat has been declared as `Final`.\n\n## Why is this bad?\nDeclaring a variable as `Final` indicates to the type checker that it should not be\noverridden on any subclass.\n\n## Example\n\n```python\nfrom typing import Final\n\nclass A:\n    X: Final[int] = 1\n\nclass B(A):\n    X = 2  # Error raised here\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "parameter-already-assigned": {
           "title": "detects multiple arguments for the same parameter",
           "description": "## What it does\nChecks for calls which provide more than one argument for a single parameter.\n\n## Why is this bad?\nProviding multiple values for a single parameter will raise a `TypeError` at runtime.\n\n## Examples\n\n```python\ndef f(x: int) -> int: ...\n\nf(1, x=2)  # Error raised here\n```",
@@ -1122,8 +1206,8 @@
         },
         "possibly-missing-attribute": {
           "title": "detects references to possibly missing attributes",
-          "description": "## What it does\nChecks for possibly missing attributes.\n\n## Why is this bad?\nAttempting to access a missing attribute will raise an `AttributeError` at runtime.\n\n## Examples\n```python\nclass A:\n    if b:\n        c = 0\n\nA.c  # AttributeError: type object 'A' has no attribute 'c'\n```",
-          "default": "warn",
+          "description": "## What it does\nChecks for possibly missing attributes.\n\n## Why is this bad?\nAttempting to access a missing attribute will raise an `AttributeError` at runtime.\n\n## Rule status\nThis rule is currently disabled by default because of the number of\nfalse positives it can produce.\n\n## Examples\n```python\nclass A:\n    if b:\n        c = 0\n\nA.c  # AttributeError: type object 'A' has no attribute 'c'\n```",
+          "default": "ignore",
           "oneOf": [
             {
               "$ref": "#/definitions/Level"
@@ -1144,6 +1228,16 @@
           "title": "detects possibly missing imports",
           "description": "## What it does\nChecks for imports of symbols that may be missing.\n\n## Why is this bad?\nImporting a missing module or name will raise a `ModuleNotFoundError`\nor `ImportError` at runtime.\n\n## Rule status\nThis rule is currently disabled by default because of the number of\nfalse positives it can produce.\n\n## Examples\n```python\n# module.py\nimport datetime\n\nif datetime.date.today().weekday() != 6:\n    a = 1\n\n# main.py\nfrom module import a  # ImportError: cannot import name 'a' from 'module'\n```",
           "default": "ignore",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "possibly-missing-submodule": {
+          "title": "detects accesses of submodules that may not be available as attributes on their parent module",
+          "description": "## What it does\nChecks for accesses of submodules that might not've been imported.\n\n## Why is this bad?\nWhen module `a` has a submodule `b`, `import a` isn't generally enough to let you access\n`a.b.` You either need to explicitly `import a.b`, or else you need the `__init__.py` file\nof `a` to include `from . import b`. Without one of those, `a.b` is an `AttributeError`.\n\n## Examples\n```python\nimport html\nhtml.parser  # AttributeError: module 'html' has no attribute 'parser'\n```",
+          "default": "warn",
           "oneOf": [
             {
               "$ref": "#/definitions/Level"
@@ -1174,6 +1268,26 @@
           "title": "detects redundant `cast` calls",
           "description": "## What it does\nDetects redundant `cast` calls where the value already has the target type.\n\n## Why is this bad?\nThese casts have no effect and can be removed.\n\n## Example\n```python\ndef f() -> int:\n    return 10\n\ncast(int, f())  # Redundant\n```",
           "default": "warn",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "redundant-final-classvar": {
+          "title": "detects redundant combinations of `ClassVar` and `Final`",
+          "description": "## What it does\nChecks for redundant combinations of the `ClassVar` and `Final` type qualifiers.\n\n## Why is this bad?\nAn attribute that is marked `Final` in a class body is implicitly a class variable.\nMarking it as `ClassVar` is therefore redundant.\n\nNote that this diagnostic is not emitted for dataclass fields, where\n`ClassVar[Final[int]]` has a distinct meaning from `Final[int]`.\n\n## Examples\n```python\nfrom typing import ClassVar, Final\n\nclass C:\n    x: ClassVar[Final[int]] = 1  # redundant\n    y: Final[ClassVar[int]] = 1  # redundant\n```",
+          "default": "warn",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "shadowed-type-variable": {
+          "title": "detects type variables that shadow type variables from outer scopes",
+          "description": "## What it does\nChecks for type variables in nested generic classes or functions that shadow type variables\nfrom an enclosing scope.\n\n## Why is this bad?\nShadowing type variables makes the code confusing and is disallowed by the typing spec.\n\n## Examples\n```python\nclass Outer[T]:\n    # Error: `T` is already used by `Outer`\n    class Inner[T]: ...\n\n    # Error: `T` is already used by `Outer`\n    def method[T](self, x: T) -> T: ...\n```\n\n## References\n- [Typing spec: Generics](https://typing.python.org/en/latest/spec/generics.html#introduction)",
+          "default": "error",
           "oneOf": [
             {
               "$ref": "#/definitions/Level"
@@ -1233,6 +1347,16 @@
         "unavailable-implicit-super-arguments": {
           "title": "detects invalid `super()` calls where implicit arguments are unavailable.",
           "description": "## What it does\nDetects invalid `super()` calls where implicit arguments like the enclosing class or first method argument are unavailable.\n\n## Why is this bad?\nWhen `super()` is used without arguments, Python tries to find two things:\nthe nearest enclosing class and the first argument of the immediately enclosing function (typically self or cls).\nIf either of these is missing, the call will fail at runtime with a `RuntimeError`.\n\n## Examples\n```python\nsuper()  # error: no enclosing class or function found\n\ndef func():\n    super()  # error: no enclosing class or first argument exists\n\nclass A:\n    f = super()  # error: no enclosing function to provide the first argument\n\n    def method(self):\n        def nested():\n            super()  # error: first argument does not exist in this nested function\n\n        lambda: super()  # error: first argument does not exist in this lambda\n\n        (super() for _ in range(10))  # error: argument is not available in generator expression\n\n        super()  # okay! both enclosing class and first argument are available\n```\n\n## References\n- [Python documentation: super()](https://docs.python.org/3/library/functions.html#super)",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "unbound-type-variable": {
+          "title": "detects type variables used outside of their bound scope",
+          "description": "## What it does\nChecks for type variables that are used in a scope where they are not bound\nto any enclosing generic context.\n\n## Why is this bad?\nUsing a type variable outside of a scope that binds it has no well-defined meaning.\n\n## Examples\n```python\nfrom typing import TypeVar, Generic\n\nT = TypeVar(\"T\")\nS = TypeVar(\"S\")\n\nx: T  # error: unbound type variable in module scope\n\nclass C(Generic[T]):\n    x: list[S] = []  # error: S is not in this class's generic context\n```\n\n## References\n- [Typing spec: Scoping rules for type variables](https://typing.python.org/en/latest/spec/generics.html#scoping-rules-for-type-variables)",
           "default": "error",
           "oneOf": [
             {
@@ -1322,7 +1446,7 @@
         },
         "unsupported-dynamic-base": {
           "title": "detects dynamic class bases that are unsupported as ty could not feasibly calculate the class's MRO",
-          "description": "## What it does\nChecks for dynamic class definitions (using `type()`) that have bases\nwhich are unsupported by ty.\n\nThis is equivalent to [`unsupported-base`] but applies to classes created\nvia `type()` rather than `class` statements.\n\n## Why is this bad?\nIf a dynamically created class has a base that is an unsupported type\nsuch as `type[T]`, ty will not be able to resolve the\n[method resolution order] (MRO) for the class. This may lead to an inferior\nunderstanding of your codebase and unpredictable type-checking behavior.\n\n## Default level\nThis rule is disabled by default because it will not cause a runtime error,\nand may be noisy on codebases that use `type()` in highly dynamic ways.\n\n## Examples\n```python\ndef factory(base: type[Base]) -> type:\n    # `base` has type `type[Base]`, not `type[Base]` itself\n    return type(\"Dynamic\", (base,), {})  # error: [unsupported-dynamic-base]\n```\n\n[method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order\n[`unsupported-base`]: https://docs.astral.sh/ty/rules/unsupported-base",
+          "description": "## What it does\nChecks for dynamic class definitions (using `type()`) that have bases\nwhich are unsupported by ty.\n\nThis is equivalent to `unsupported-base` but applies to classes created\nvia `type()` rather than `class` statements.\n\n## Why is this bad?\nIf a dynamically created class has a base that is an unsupported type\nsuch as `type[T]`, ty will not be able to resolve the\n[method resolution order] (MRO) for the class. This may lead to an inferior\nunderstanding of your codebase and unpredictable type-checking behavior.\n\n## Default level\nThis rule is disabled by default because it will not cause a runtime error,\nand may be noisy on codebases that use `type()` in highly dynamic ways.\n\n## Examples\n```python\ndef factory(base: type[Base]) -> type:\n    # `base` has type `type[Base]`, not `type[Base]` itself\n    return type(\"Dynamic\", (base,), {})  # error: [unsupported-dynamic-base]\n```\n\n[method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order",
           "default": "ignore",
           "oneOf": [
             {
@@ -1334,6 +1458,16 @@
           "title": "detects binary, unary, or comparison expressions where the operands don't support the operator",
           "description": "## What it does\nChecks for binary expressions, comparisons, and unary expressions where\nthe operands don't support the operator.\n\n## Why is this bad?\nAttempting to use an unsupported operator will raise a `TypeError` at\nruntime.\n\n## Examples\n```python\nclass A: ...\n\nA() + A()  # TypeError: unsupported operand type(s) for +: 'A' and 'A'\n```",
           "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "unused-awaitable": {
+          "title": "detects awaitable objects that are used as expression statements without being awaited",
+          "description": "## What it does\nChecks for awaitable objects (such as coroutines) used as expression\nstatements without being awaited.\n\n## Why is this bad?\nCalling an `async def` function returns a coroutine object. If the\ncoroutine is never awaited, the body of the async function will never\nexecute, which is almost always a bug. Python emits a\n`RuntimeWarning: coroutine was never awaited` at runtime in this case.\n\n## Examples\n```python\nasync def fetch_data() -> str:\n    return \"data\"\n\nasync def main() -> None:\n    fetch_data()  # Warning: coroutine is not awaited\n    await fetch_data()  # OK\n```",
+          "default": "warn",
           "oneOf": [
             {
               "$ref": "#/definitions/Level"
@@ -1418,7 +1552,7 @@
           ]
         },
         "root": {
-          "description": "The root of the project, used for finding first-party modules.\n\nIf left unspecified, ty will try to detect common project layouts and initialize `src.root` accordingly:\n\n* if a `./src` directory exists, include `.` and `./src` in the first party search path (src layout or flat)\n* if a `./<project-name>/<project-name>` directory exists, include `.` and `./<project-name>` in the first party search path\n* otherwise, default to `.` (flat layout)\n\nAdditionally, if a `./python` directory exists and is not a package (i.e. it does not contain an `__init__.py` file),\nit will also be included in the first party search path.",
+          "description": "The root of the project, used for finding first-party modules.\n\nIf left unspecified, ty will try to detect common project layouts and initialize `src.root` accordingly.\nThe project root (`.`) is always included. Additionally, the following directories are included\nif they exist and are not packages (i.e. they do not contain `__init__.py` or `__init__.pyi` files):\n\n* `./src`\n* `./<project-name>` (if a `./<project-name>/<project-name>` directory exists)\n* `./python`",
           "anyOf": [
             {
               "$ref": "#/definitions/RelativePathBuf"

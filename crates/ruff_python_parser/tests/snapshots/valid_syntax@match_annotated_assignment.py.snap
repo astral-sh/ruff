@@ -1,0 +1,120 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+---
+## AST
+
+```
+Module(
+    ModModule {
+        node_index: NodeIndex(None),
+        range: 0..36,
+        body: [
+            AnnAssign(
+                StmtAnnAssign {
+                    node_index: NodeIndex(None),
+                    range: 0..13,
+                    target: Subscript(
+                        ExprSubscript {
+                            node_index: NodeIndex(None),
+                            range: 0..8,
+                            value: Name(
+                                ExprName {
+                                    node_index: NodeIndex(None),
+                                    range: 0..5,
+                                    id: Name("match"),
+                                    ctx: Load,
+                                },
+                            ),
+                            slice: NumberLiteral(
+                                ExprNumberLiteral {
+                                    node_index: NodeIndex(None),
+                                    range: 6..7,
+                                    value: Int(
+                                        0,
+                                    ),
+                                },
+                            ),
+                            ctx: Store,
+                        },
+                    ),
+                    annotation: Name(
+                        ExprName {
+                            node_index: NodeIndex(None),
+                            range: 10..13,
+                            id: Name("int"),
+                            ctx: Load,
+                        },
+                    ),
+                    value: None,
+                    simple: false,
+                },
+            ),
+            AnnAssign(
+                StmtAnnAssign {
+                    node_index: NodeIndex(None),
+                    range: 14..35,
+                    target: Subscript(
+                        ExprSubscript {
+                            node_index: NodeIndex(None),
+                            range: 14..29,
+                            value: Name(
+                                ExprName {
+                                    node_index: NodeIndex(None),
+                                    range: 14..19,
+                                    id: Name("match"),
+                                    ctx: Load,
+                                },
+                            ),
+                            slice: Tuple(
+                                ExprTuple {
+                                    node_index: NodeIndex(None),
+                                    range: 21..28,
+                                    elts: [
+                                        Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 21..22,
+                                                id: Name("x"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 24..25,
+                                                id: Name("y"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 27..28,
+                                                id: Name("z"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ],
+                                    ctx: Load,
+                                    parenthesized: false,
+                                },
+                            ),
+                            ctx: Store,
+                        },
+                    ),
+                    annotation: Name(
+                        ExprName {
+                            node_index: NodeIndex(None),
+                            range: 31..35,
+                            id: Name("dict"),
+                            ctx: Load,
+                        },
+                    ),
+                    value: None,
+                    simple: false,
+                },
+            ),
+        ],
+    },
+)
+```

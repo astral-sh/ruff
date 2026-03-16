@@ -23,7 +23,7 @@ use super::special_form::SpecialFormType;
 use super::tuple::TupleSpec;
 use super::{
     DynamicType, IntersectionBuilder, IntersectionType, KnownInstanceType, Type, TypeAliasType,
-    UnionBuilder, UnionType, todo_type,
+    TypedDictType, UnionBuilder, UnionType, todo_type,
 };
 
 /// The kind of subscriptable type that had an out-of-bounds index.
@@ -120,6 +120,11 @@ pub(crate) enum SubscriptErrorKind<'db> {
         kind: CallErrorKind,
         bindings: Box<Bindings<'db>>,
     },
+    /// A `TypedDict` was subscripted with an invalid key.
+    InvalidTypedDictKey {
+        typed_dict: TypedDictType<'db>,
+        slice_ty: Type<'db>,
+    },
     /// The type does not support subscripting via the expected dunder.
     NotSubscriptable {
         value_ty: Type<'db>,
@@ -207,13 +212,17 @@ impl<'db> SubscriptErrorKind<'db> {
             }
             Self::NonGenericTypeAlias { alias } => {
                 if let Some(builder) = context.report_lint(&NOT_SUBSCRIPTABLE, subscript) {
+                    let mut diagnostic = builder.into_diagnostic(format_args!(
+                        "Cannot subscript non-generic type alias `{}`",
+                        alias.name(db)
+                    ));
                     let value_type = alias.raw_value_type(db);
-                    let mut diagnostic =
-                        builder.into_diagnostic("Cannot subscript non-generic type alias");
-                    if value_type.is_definition_generic(db) {
-                        diagnostic.set_primary_message(format_args!(
-                            "`{}` is already specialized",
-                            value_type.display(db)
+                    if value_type.is_specialized_generic(db) {
+                        diagnostic.annotate(context.secondary(&*subscript.value).message(
+                            format_args!(
+                                "Alias to `{}`, which is already specialized",
+                                value_type.display(db)
+                            ),
                         ));
                     }
                 }
@@ -276,6 +285,21 @@ impl<'db> SubscriptErrorKind<'db> {
                     }
                 }
             },
+            Self::InvalidTypedDictKey {
+                typed_dict,
+                slice_ty,
+            } => {
+                let typed_dict_ty = Type::TypedDict(*typed_dict);
+                report_invalid_key_on_typed_dict(
+                    context,
+                    value_node.into(),
+                    slice_node.into(),
+                    typed_dict_ty,
+                    None,
+                    *slice_ty,
+                    typed_dict.items(db),
+                );
+            }
             Self::NotSubscriptable { value_ty, method } => {
                 report_not_subscriptable(context, subscript, *value_ty, method.as_str());
             }
@@ -407,6 +431,45 @@ where
     ))
 }
 
+// `TypedDict` subscripts need custom handling because invalid keys should still
+// recover with `Unknown` while emitting `invalid-key`, which is not naturally
+// representable via synthesized `__getitem__` overloads alone.
+fn typed_dict_subscript<'db>(
+    db: &'db dyn Db,
+    typed_dict: TypedDictType<'db>,
+    slice_ty: Type<'db>,
+) -> Result<Type<'db>, SubscriptError<'db>> {
+    if slice_ty.is_dynamic() {
+        return Ok(Type::unknown());
+    }
+
+    let Some(key) = slice_ty
+        .as_string_literal()
+        .map(|literal| literal.value(db))
+    else {
+        return Err(SubscriptError::new(
+            Type::unknown(),
+            SubscriptErrorKind::InvalidTypedDictKey {
+                typed_dict,
+                slice_ty,
+            },
+        ));
+    };
+
+    typed_dict.items(db).get(key).map_or_else(
+        || {
+            Err(SubscriptError::new(
+                Type::unknown(),
+                SubscriptErrorKind::InvalidTypedDictKey {
+                    typed_dict,
+                    slice_ty,
+                },
+            ))
+        },
+        |field| Ok(field.declared_ty),
+    )
+}
+
 impl<'db> Type<'db> {
     pub(super) fn subscript(
         self,
@@ -447,8 +510,14 @@ impl<'db> Type<'db> {
                 }))
             }
 
+            // Ex) Given `person["name"]`, return `str`
+            (Type::TypedDict(typed_dict), _) if expr_context != ast::ExprContext::Store => {
+                Some(typed_dict_subscript(db, typed_dict, slice_ty))
+            }
+
             // Ex) Given `("a", "b", "c", "d")[1]`, return `"b"`
-            (Type::NominalInstance(nominal), Type::IntLiteral(i64_int)) => {
+            (Type::NominalInstance(nominal), Type::LiteralValue(literal)) if literal.is_int() => {
+                let i64_int = literal.as_int().unwrap();
                 nominal
                     .tuple_spec(db)
                     .and_then(|tuple| Some((tuple, i32::try_from(i64_int).ok()?)))
@@ -490,7 +559,9 @@ impl<'db> Type<'db> {
                 }),
 
             // Ex) Given `"value"[1]`, return `"a"`
-            (Type::StringLiteral(literal_ty), Type::IntLiteral(i64_int)) => {
+            (Type::LiteralValue(lhs_literal), Type::LiteralValue(rhs_literal)) if lhs_literal.is_string() && rhs_literal.is_int() => {
+                let literal_ty = lhs_literal.as_string().unwrap();
+                let i64_int = rhs_literal.as_int().unwrap();
                 i32::try_from(i64_int).ok().map(|i32_int| {
                     let literal_value = literal_ty.value(db);
                     match (&mut literal_value.chars()).py_index(db, i32_int) {
@@ -509,7 +580,9 @@ impl<'db> Type<'db> {
             }
 
             // Ex) Given `"value"[1:3]`, return `"al"`
-            (Type::StringLiteral(literal_ty), Type::NominalInstance(nominal)) => nominal
+            (Type::LiteralValue(literal), Type::NominalInstance(nominal)) if literal.is_string() => {
+                let literal_ty = literal.as_string().unwrap();
+                nominal
                 .slice_literal(db)
                 .map(|SliceLiteral { start, stop, step }| {
                     let literal_value = literal_ty.value(db);
@@ -525,24 +598,27 @@ impl<'db> Type<'db> {
                             SubscriptErrorKind::SliceStepSizeZero,
                         )),
                     }
-                }),
+                })
+            },
 
-            (Type::LiteralString, Type::IntLiteral(_) | Type::BooleanLiteral(_)) => {
-                Some(Ok(Type::LiteralString))
+            (Type::LiteralValue(lhs_literal), Type::LiteralValue(rhs_literal)) if lhs_literal.is_literal_string() && (rhs_literal.is_int() || rhs_literal.is_bool()) => {
+                Some(Ok(Type::literal_string()))
             }
 
-            (Type::LiteralString, Type::NominalInstance(nominal))
-                if nominal.slice_literal(db).is_some() =>
+            (Type::LiteralValue(literal), Type::NominalInstance(nominal))
+                if literal.is_literal_string() && nominal.slice_literal(db).is_some() =>
             {
-                Some(Ok(Type::LiteralString))
+                Some(Ok(Type::literal_string()))
             }
 
             // Ex) Given `b"value"[1]`, return `97` (i.e., `ord(b"a")`)
-            (Type::BytesLiteral(literal_ty), Type::IntLiteral(i64_int)) => {
+            (Type::LiteralValue(lhs_literal), Type::LiteralValue(rhs_literal)) if lhs_literal.is_bytes() && rhs_literal.is_int() => {
+                let literal_ty = lhs_literal.as_bytes().unwrap();
+                let i64_int = rhs_literal.as_int().unwrap();
                 i32::try_from(i64_int).ok().map(|i32_int| {
                     let literal_value = literal_ty.value(db);
                     match literal_value.py_index(db, i32_int) {
-                        Ok(byte) => Ok(Type::IntLiteral((*byte).into())),
+                        Ok(byte) => Ok(Type::int_literal((*byte).into())),
                         Err(_) => Err(SubscriptError::new(
                             Type::unknown(),
                             SubscriptErrorKind::IndexOutOfBounds {
@@ -557,7 +633,10 @@ impl<'db> Type<'db> {
             }
 
             // Ex) Given `b"value"[1:3]`, return `b"al"`
-            (Type::BytesLiteral(literal_ty), Type::NominalInstance(nominal)) => nominal
+            (Type::LiteralValue(literal), Type::NominalInstance(nominal)) if literal.is_bytes() =>
+            {
+                let literal_ty = literal.as_bytes().unwrap();
+                nominal
                 .slice_literal(db)
                 .map(|SliceLiteral { start, stop, step }| {
                     let literal_value = literal_ty.value(db);
@@ -572,17 +651,20 @@ impl<'db> Type<'db> {
                             SubscriptErrorKind::SliceStepSizeZero,
                         )),
                     }
-                }),
+                })
+            },
 
             // Ex) Given `"value"[True]`, return `"a"`
-            (Type::StringLiteral(_) | Type::BytesLiteral(_), Type::BooleanLiteral(bool)) => {
-                Some(value_ty.subscript(db, Type::IntLiteral(i64::from(bool)), expr_context))
+            (Type::LiteralValue(lhs_literal), Type::LiteralValue(rhs_literal)) if (lhs_literal.is_string() || lhs_literal.is_bytes()) && rhs_literal.is_bool() => {
+                let bool = rhs_literal.as_bool().unwrap();
+                Some(value_ty.subscript(db, Type::int_literal(i64::from(bool)), expr_context))
             }
 
-            (Type::NominalInstance(nominal), Type::BooleanLiteral(bool))
-                if nominal.tuple_spec(db).is_some() =>
+            (Type::NominalInstance(nominal), Type::LiteralValue(literal))
+                if literal.is_bool() && nominal.tuple_spec(db).is_some() =>
             {
-                Some(value_ty.subscript(db, Type::IntLiteral(i64::from(bool)), expr_context))
+                let bool = literal.as_bool().unwrap();
+                Some(value_ty.subscript(db, Type::int_literal(i64::from(bool)), expr_context))
             }
 
             (Type::KnownInstance(KnownInstanceType::SubscriptedProtocol(_)), _) => {
@@ -633,11 +715,8 @@ impl<'db> Type<'db> {
                 | Type::SubclassOf(_)
                 | Type::AlwaysFalsy
                 | Type::AlwaysTruthy
-                | Type::IntLiteral(_)
-                | Type::BooleanLiteral(_)
                 | Type::ProtocolInstance(_)
                 | Type::PropertyInstance(_)
-                | Type::EnumLiteral(_)
                 | Type::BoundSuper(_)
                 | Type::TypeIs(_)
                 | Type::TypeGuard(_)
@@ -646,9 +725,7 @@ impl<'db> Type<'db> {
                 | Type::NominalInstance(_)
                 | Type::SpecialForm(_)
                 | Type::KnownInstance(_)
-                | Type::StringLiteral(_)
-                | Type::BytesLiteral(_)
-                | Type::LiteralString
+                | Type::LiteralValue(_)
                 | Type::TypeVar(_)  // TODO: more complex logic required here!
                 | Type::KnownBoundMethod(_),
                 _,

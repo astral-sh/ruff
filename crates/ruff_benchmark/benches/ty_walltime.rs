@@ -51,7 +51,7 @@ impl<'a> Benchmark<'a> {
             ..Options::default()
         });
 
-        let mut db = ProjectDatabase::new(metadata, system).unwrap();
+        let mut db = ProjectDatabase::fallible(metadata, system).unwrap();
 
         db.project().set_included_paths(
             &mut db,
@@ -151,7 +151,7 @@ static FREQTRADE: Benchmark = Benchmark::new(
         max_dep_date: "2025-06-17",
         python_version: PythonVersion::PY312,
     },
-    600,
+    650,
 );
 
 static PANDAS: Benchmark = Benchmark::new(
@@ -171,7 +171,7 @@ static PANDAS: Benchmark = Benchmark::new(
         max_dep_date: "2025-06-17",
         python_version: PythonVersion::PY312,
     },
-    4500,
+    4600,
 );
 
 static PYDANTIC: Benchmark = Benchmark::new(
@@ -202,7 +202,7 @@ static SYMPY: Benchmark = Benchmark::new(
         max_dep_date: "2025-06-17",
         python_version: PythonVersion::PY312,
     },
-    13400,
+    13600,
 );
 
 static TANJUN: Benchmark = Benchmark::new(

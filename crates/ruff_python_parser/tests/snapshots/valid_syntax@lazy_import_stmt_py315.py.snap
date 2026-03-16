@@ -1,0 +1,196 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+---
+## AST
+
+```
+Module(
+    ModModule {
+        node_index: NodeIndex(None),
+        range: 0..185,
+        body: [
+            Import(
+                StmtImport {
+                    node_index: NodeIndex(None),
+                    range: 44..59,
+                    names: [
+                        Alias {
+                            range: 56..59,
+                            node_index: NodeIndex(None),
+                            name: Identifier {
+                                id: Name("foo"),
+                                range: 56..59,
+                                node_index: NodeIndex(None),
+                            },
+                            asname: None,
+                        },
+                    ],
+                    is_lazy: true,
+                },
+            ),
+            Import(
+                StmtImport {
+                    node_index: NodeIndex(None),
+                    range: 60..82,
+                    names: [
+                        Alias {
+                            range: 72..82,
+                            node_index: NodeIndex(None),
+                            name: Identifier {
+                                id: Name("foo"),
+                                range: 72..75,
+                                node_index: NodeIndex(None),
+                            },
+                            asname: Some(
+                                Identifier {
+                                    id: Name("bar"),
+                                    range: 79..82,
+                                    node_index: NodeIndex(None),
+                                },
+                            ),
+                        },
+                    ],
+                    is_lazy: true,
+                },
+            ),
+            ImportFrom(
+                StmtImportFrom {
+                    node_index: NodeIndex(None),
+                    range: 83..107,
+                    module: Some(
+                        Identifier {
+                            id: Name("bar"),
+                            range: 93..96,
+                            node_index: NodeIndex(None),
+                        },
+                    ),
+                    names: [
+                        Alias {
+                            range: 104..107,
+                            node_index: NodeIndex(None),
+                            name: Identifier {
+                                id: Name("baz"),
+                                range: 104..107,
+                                node_index: NodeIndex(None),
+                            },
+                            asname: None,
+                        },
+                    ],
+                    level: 0,
+                    is_lazy: true,
+                },
+            ),
+            ImportFrom(
+                StmtImportFrom {
+                    node_index: NodeIndex(None),
+                    range: 108..135,
+                    module: Some(
+                        Identifier {
+                            id: Name("sys"),
+                            range: 118..121,
+                            node_index: NodeIndex(None),
+                        },
+                    ),
+                    names: [
+                        Alias {
+                            range: 129..135,
+                            node_index: NodeIndex(None),
+                            name: Identifier {
+                                id: Name("x"),
+                                range: 129..130,
+                                node_index: NodeIndex(None),
+                            },
+                            asname: Some(
+                                Identifier {
+                                    id: Name("y"),
+                                    range: 134..135,
+                                    node_index: NodeIndex(None),
+                                },
+                            ),
+                        },
+                    ],
+                    level: 0,
+                    is_lazy: true,
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    node_index: NodeIndex(None),
+                    range: 136..144,
+                    targets: [
+                        Name(
+                            ExprName {
+                                node_index: NodeIndex(None),
+                                range: 136..140,
+                                id: Name("lazy"),
+                                ctx: Store,
+                            },
+                        ),
+                    ],
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            node_index: NodeIndex(None),
+                            range: 143..144,
+                            value: Int(
+                                1,
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Import(
+                StmtImport {
+                    node_index: NodeIndex(None),
+                    range: 145..163,
+                    names: [
+                        Alias {
+                            range: 152..163,
+                            node_index: NodeIndex(None),
+                            name: Identifier {
+                                id: Name("foo"),
+                                range: 152..155,
+                                node_index: NodeIndex(None),
+                            },
+                            asname: Some(
+                                Identifier {
+                                    id: Name("lazy"),
+                                    range: 159..163,
+                                    node_index: NodeIndex(None),
+                                },
+                            ),
+                        },
+                    ],
+                    is_lazy: false,
+                },
+            ),
+            ImportFrom(
+                StmtImportFrom {
+                    node_index: NodeIndex(None),
+                    range: 164..184,
+                    module: Some(
+                        Identifier {
+                            id: Name("lazy"),
+                            range: 169..173,
+                            node_index: NodeIndex(None),
+                        },
+                    ),
+                    names: [
+                        Alias {
+                            range: 181..184,
+                            node_index: NodeIndex(None),
+                            name: Identifier {
+                                id: Name("qux"),
+                                range: 181..184,
+                                node_index: NodeIndex(None),
+                            },
+                            asname: None,
+                        },
+                    ],
+                    level: 0,
+                    is_lazy: false,
+                },
+            ),
+        ],
+    },
+)
+```

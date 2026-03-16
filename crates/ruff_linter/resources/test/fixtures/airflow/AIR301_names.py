@@ -28,7 +28,6 @@ from airflow.utils.dates import (
     scale_time_units,
 )
 from airflow.utils.db import create_session
-from airflow.utils.decorators import apply_defaults
 from airflow.utils.file import mkdirs
 from airflow.utils.state import SHUTDOWN, terminating_states
 from airflow.utils.trigger_rule import TriggerRule
@@ -86,8 +85,6 @@ test_cycle
 # airflow.utils.db
 create_session
 
-# airflow.utils.decorators
-apply_defaults
 
 # airflow.utils.file
 mkdirs
@@ -99,7 +96,6 @@ terminating_states
 
 #  airflow.utils.trigger_rule
 TriggerRule.DUMMY
-TriggerRule.NONE_FAILED_OR_SKIPPED
 
 
 # airflow.www.auth

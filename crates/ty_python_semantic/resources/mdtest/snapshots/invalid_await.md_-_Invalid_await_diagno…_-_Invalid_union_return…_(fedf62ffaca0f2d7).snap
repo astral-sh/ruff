@@ -18,26 +18,25 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/invalid_awai
  3 | 
  4 | class UnawaitableUnion:
  5 |     if datetime.today().weekday() == 6:
- 6 | 
- 7 |         def __await__(self) -> typing.Generator[typing.Any, None, None]:
- 8 |             yield
+ 6 |         def __await__(self) -> typing.Generator[typing.Any, None, None]:
+ 7 |             yield
+ 8 | 
  9 |     else:
-10 | 
-11 |         def __await__(self) -> int:
-12 |             return 5
-13 | 
-14 | async def main() -> None:
-15 |     await UnawaitableUnion()  # error: [invalid-await]
+10 |         def __await__(self) -> int:
+11 |             return 5
+12 | 
+13 | async def main() -> None:
+14 |     await UnawaitableUnion()  # error: [invalid-await]
 ```
 
 # Diagnostics
 
 ```
 error[invalid-await]: `UnawaitableUnion` is not awaitable
-  --> src/mdtest_snippet.py:15:11
+  --> src/mdtest_snippet.py:14:11
    |
-14 | async def main() -> None:
-15 |     await UnawaitableUnion()  # error: [invalid-await]
+13 | async def main() -> None:
+14 |     await UnawaitableUnion()  # error: [invalid-await]
    |           ^^^^^^^^^^^^^^^^^^
    |
 info: `__await__` returns `Generator[Any, None, None] | int`, which is not a valid iterator

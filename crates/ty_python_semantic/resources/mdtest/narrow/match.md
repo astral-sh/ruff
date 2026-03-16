@@ -118,6 +118,39 @@ def f(x: Covariant[int]):
             assert_never(x)
 ```
 
+## Mapping patterns
+
+```py
+from collections.abc import Mapping
+
+def test_isinstance(x: dict | int) -> None:
+    if isinstance(x, Mapping):
+        reveal_type(x)  # revealed: dict[Unknown, Unknown] | (int & Top[Mapping[Unknown, object]])
+    else:
+        reveal_type(x)  # revealed: int & ~Top[Mapping[Unknown, object]]
+
+def test_match(x: dict | int) -> None:
+    match x:
+        case {}:
+            reveal_type(x)  # revealed: dict[Unknown, Unknown] | (int & Top[Mapping[Unknown, object]])
+        case _:
+            reveal_type(x)  # revealed: int & ~Top[Mapping[Unknown, object]]
+
+def test_match_double_star(x: dict | int) -> None:
+    match x:
+        case {**rest}:
+            reveal_type(x)  # revealed: dict[Unknown, Unknown] | (int & Top[Mapping[Unknown, object]])
+        case _:
+            reveal_type(x)  # revealed: int & ~Top[Mapping[Unknown, object]]
+
+def test_match_refutable(x: dict | int) -> None:
+    match x:
+        case {"k": _}:
+            reveal_type(x)  # revealed: dict[Unknown, Unknown] | (int & Top[Mapping[Unknown, object]])
+        case _:
+            reveal_type(x)  # revealed: dict[Unknown, Unknown] | int
+```
+
 ## Value patterns
 
 Value patterns are evaluated by equality, which is overridable. Therefore successfully matching on
@@ -228,12 +261,14 @@ def _(x: A | B | C):
         case _:
             reveal_type(x)  # revealed: Never
 
+def _(x: A | B | C):
     match x:
         case A() | B() | C():
             reveal_type(x)  # revealed: A | B | C
         case _:
             reveal_type(x)  # revealed: Never
 
+def _(x: A | B | C):
     match x:
         case A():
             reveal_type(x)  # revealed: A
@@ -252,7 +287,7 @@ def _(x: Literal["foo", b"bar"] | int):
             pass
         case b"bar" if reveal_type(x):  # revealed: Literal[b"bar"] | int
             pass
-        case _ if reveal_type(x):  # revealed: Literal["foo", b"bar"] | int
+        case _ if reveal_type(x):  # revealed: int | Literal["foo", b"bar"]
             pass
 ```
 
@@ -348,6 +383,45 @@ try:
     reveal_type(Answer.MAYBE.assert_yes())  # revealed: Literal[Answer.MAYBE]
 except ValueError:
     pass
+```
+
+## Narrowing is preserved when a terminal branch prevents a path from flowing through
+
+When one branch of a `match` statement is terminal (e.g. contains `raise`), narrowing from the
+non-terminal branches is preserved after the merge point.
+
+```py
+class A: ...
+class B: ...
+class C: ...
+
+def _(x: A | B | C):
+    match x:
+        case A():
+            pass
+        case B():
+            pass
+        case _:
+            raise ValueError()
+
+    reveal_type(x)  # revealed: B | (A & ~B)
+```
+
+Reassignment in non-terminal branches is also preserved when the default branch is terminal:
+
+```py
+def _(number_of_periods: int | None, interval: str):
+    match interval:
+        case "monthly":
+            if number_of_periods is None:
+                number_of_periods = 1
+        case "daily":
+            if number_of_periods is None:
+                number_of_periods = 30
+        case _:
+            raise ValueError("unsupported interval")
+
+    reveal_type(number_of_periods)  # revealed: int
 ```
 
 ## Narrowing tagged unions of tuples

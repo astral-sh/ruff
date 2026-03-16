@@ -438,6 +438,7 @@ if flag():
     def g(x: int) -> int: ...
     @overload
     def g(x: str) -> str: ...
+
 else:
     g: str
 

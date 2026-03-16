@@ -71,9 +71,9 @@ from compat import BASE_EXCEPTION_CLASS  # error: [unresolved-import] "Cannot re
 class Error(BASE_EXCEPTION_CLASS): ...
 
 try:
-    ...
+    pass
 except Error as err:
-    ...
+    pass
 ```
 
 ## Exception with no captured type
@@ -158,22 +158,22 @@ except int:
 try:
     raise AttributeError()  # fine
 except:
-    ...
+    pass
 
 try:
     raise FloatingPointError  # fine
 except:
-    ...
+    pass
 
 try:
     raise 1  # error: [invalid-raise]
 except:
-    ...
+    pass
 
 try:
     raise int  # error: [invalid-raise]
 except:
-    ...
+    pass
 
 def _(e: Exception | type[Exception]):
     raise e  # fine
@@ -189,31 +189,31 @@ def _():
     try:
         raise EOFError() from GeneratorExit  # fine
     except:
-        ...
+        pass
 
 def _():
     try:
         raise StopIteration from MemoryError()  # fine
     except:
-        ...
+        pass
 
 def _():
     try:
         raise BufferError() from None  # fine
     except:
-        ...
+        pass
 
 def _():
     try:
         raise ZeroDivisionError from False  # error: [invalid-raise]
     except:
-        ...
+        pass
 
 def _():
     try:
         raise SystemExit from bool()  # error: [invalid-raise]
     except:
-        ...
+        pass
 
 def _():
     try:

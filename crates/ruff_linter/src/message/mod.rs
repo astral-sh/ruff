@@ -8,8 +8,8 @@ use rustc_hash::FxHashMap;
 
 use ruff_db::diagnostic::{
     Annotation, Diagnostic, DiagnosticFormat, DiagnosticId, DisplayDiagnosticConfig,
-    DisplayDiagnostics, DisplayGithubDiagnostics, FileResolver, GithubRenderer, Input, LintName,
-    SecondaryCode, Severity, Span, SubDiagnostic, SubDiagnosticSeverity, UnifiedFile,
+    DisplayDiagnostics, FileResolver, Input, LintName, SecondaryCode, Severity, Span,
+    SubDiagnostic, SubDiagnosticSeverity, UnifiedFile,
 };
 use ruff_db::files::File;
 
@@ -206,11 +206,6 @@ pub fn render_diagnostics(
         Ok(format) => {
             let config = config.format(format);
             let value = DisplayDiagnostics::new(context, &config, diagnostics);
-            write!(writer, "{value}")?;
-        }
-        Err(RuffOutputFormat::Github) => {
-            let renderer = GithubRenderer::new(context, "Ruff");
-            let value = DisplayGithubDiagnostics::new(&renderer, diagnostics);
             write!(writer, "{value}")?;
         }
         Err(RuffOutputFormat::Grouped) => {

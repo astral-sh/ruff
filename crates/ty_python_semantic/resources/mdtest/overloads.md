@@ -176,6 +176,8 @@ python-version = "3.9"
 ```
 
 ```py
+from __future__ import annotations
+
 import sys
 from typing import overload
 
@@ -721,14 +723,12 @@ class Foo:
     def method1(self, x: int) -> int: ...
     @overload
     def method1(self, x: str) -> str: ...
-
     @overload
     def method2(self, x: int) -> int: ...
     @final
     @overload
     # error: [invalid-overload]
     def method2(self, x: str) -> str: ...
-
     @overload
     def method3(self, x: int) -> int: ...
     @final
@@ -813,4 +813,87 @@ class Sub2(Base):
     @override
     # error: [invalid-overload]
     def method(self, x: str) -> str: ...
+```
+
+### Regression: `def` statement shadows a non-`def` symbol with the same name
+
+We used to panic on snippets like these (see <https://github.com/astral-sh/ty/issues/1867>), because
+"iterating over the overloads" for the `def` statement would incorrectly list the overloads of the
+imported function.
+
+`module.pyi`:
+
+```pyi
+from typing import overload
+
+@overload
+def f() -> int: ...
+@overload
+def f(x) -> str: ...
+@overload
+def g() -> int: ...
+@overload
+def g(x) -> str: ...
+```
+
+`main.py`:
+
+```py
+import module
+
+foo = module.f
+
+# revealed: Overload[() -> int, (x) -> str]
+reveal_type(foo)
+
+def foo(): ...
+
+# revealed: def foo() -> Unknown
+reveal_type(foo)
+
+bar = module.g
+
+# revealed: Overload[() -> int, (x) -> str]
+reveal_type(bar)
+
+@staticmethod
+def bar(): ...
+
+# revealed: def bar() -> Unknown
+reveal_type(bar)
+```
+
+### Regression: `def` statement shadows a non-`def` symbol with the same name, defined in the same scope
+
+This is an even more pathological version of the above test. This version used to fail in the same
+way as the above snippet, but would only fail in a stub file, or in a `.py` file that had an
+overloaded function without an implementation. (Note that this is not always invalid even in `.py`
+files: we allow overloaded functions to omit the implementation function if they are decorated with
+`@abstractmethod` or they are defined in `if TYPE_CHECKING` blocks.)
+
+```pyi
+from typing import overload
+
+@overload
+def h() -> int: ...
+@overload
+def h(x) -> str: ...
+
+baz = h
+
+# revealed: Overload[() -> int, (x) -> str]
+reveal_type(baz)
+
+# This function is distinct from `h`, despite `h` originating
+# from the same scope and being aliased to the same name
+# in the same scope!
+@overload
+def baz(x, y) -> bytes: ...
+@overload
+def baz(x, y, z) -> list[str]: ...
+def baz(x, y, z=None) -> bytes | list[str]:
+    return b""
+
+# revealed: Overload[(x, y) -> bytes, (x, y, z) -> list[str]]
+reveal_type(baz)
 ```

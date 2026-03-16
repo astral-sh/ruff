@@ -9164,6 +9164,7 @@ pub struct StmtImport {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
     pub names: Vec<crate::Alias>,
+    pub is_lazy: bool,
 }
 
 /// See also [ImportFrom](https://docs.python.org/3/library/ast.html#ast.ImportFrom)
@@ -9175,6 +9176,7 @@ pub struct StmtImportFrom {
     pub module: Option<crate::Identifier>,
     pub names: Vec<crate::Alias>,
     pub level: u32,
+    pub is_lazy: bool,
 }
 
 /// See also [Global](https://docs.python.org/3/library/ast.html#ast.Global)
@@ -10126,6 +10128,7 @@ impl StmtImport {
     {
         let StmtImport {
             names,
+            is_lazy: _,
             range: _,
             node_index: _,
         } = self;
@@ -10145,6 +10148,7 @@ impl StmtImportFrom {
             module,
             names,
             level: _,
+            is_lazy: _,
             range: _,
             node_index: _,
         } = self;

@@ -335,6 +335,8 @@ pub enum KnownModule {
     Uuid,
     Warnings,
     Numbers,
+    #[strum(serialize = "struct", serialize = "_struct")]
+    Struct,
 }
 
 impl KnownModule {
@@ -364,6 +366,7 @@ impl KnownModule {
             Self::Uuid => "uuid",
             Self::Templatelib => "string.templatelib",
             Self::Numbers => "numbers",
+            Self::Struct => "struct",
         }
     }
 

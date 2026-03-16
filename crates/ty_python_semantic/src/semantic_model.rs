@@ -13,8 +13,10 @@ use ty_module_resolver::{
 use crate::Db;
 use crate::place::implicit_globals::all_implicit_module_globals;
 use crate::semantic_index::definition::Definition;
+use crate::semantic_index::place_table;
 use crate::semantic_index::scope::FileScopeId;
 use crate::semantic_index::semantic_index;
+use crate::semantic_index::symbol::Symbol;
 use crate::types::ide_support::{ImportAliasResolution, definition_for_name};
 use crate::types::list_members::{Member, all_members, all_reachable_members};
 use crate::types::{
@@ -263,6 +265,17 @@ impl<'db> SemanticModel<'db> {
         completions
     }
 
+    /// Returns `true` if the given class definition's name was previously
+    /// bound in the same scope (i.e., the class definition is a re-assignment).
+    pub fn is_class_name_reassigned(&self, class_def: &ast::StmtClassDef) -> bool {
+        let index = semantic_index(self.db, self.file);
+        let definition = index.expect_single_definition(class_def);
+        let scope = definition.scope(self.db);
+        let table = place_table(self.db, scope);
+        let place = table.place(definition.place(self.db));
+        place.as_symbol().is_some_and(Symbol::is_reassigned)
+    }
+
     /// Returns the scope in which `node` is defined (handles string annotations).
     pub fn scope(&self, node: ast::AnyNodeRef<'_>) -> Option<FileScopeId> {
         let index = semantic_index(self.db, self.file);
@@ -291,12 +304,11 @@ impl<'db> SemanticModel<'db> {
                     .scope(self.db)
                     .file_scope_id(self.db),
             ),
-            ast::AnyNodeRef::ExceptHandlerExceptHandler(handler) => Some(
-                handler
-                    .definition(self)
-                    .scope(self.db)
-                    .file_scope_id(self.db),
-            ),
+            ast::AnyNodeRef::ExceptHandlerExceptHandler(handler) => handler
+                .optional_definition(self)
+                .map(|definition| definition.scope(self.db).file_scope_id(self.db))
+                .or_else(|| index.try_expression_scope_id(handler.type_.as_deref()?))
+                .or(Some(FileScopeId::global())),
             ast::AnyNodeRef::TypeParamTypeVar(var) => {
                 Some(var.definition(self).scope(self.db).file_scope_id(self.db))
             }
@@ -504,6 +516,14 @@ pub trait HasDefinition {
     fn definition<'db>(&self, model: &SemanticModel<'db>) -> Definition<'db>;
 }
 
+pub trait HasOptionalDefinition {
+    /// Returns the definition of `self`, if it has one.
+    ///
+    /// ## Panics
+    /// May panic if `self` is from another file than `model`.
+    fn optional_definition<'db>(&self, model: &SemanticModel<'db>) -> Option<Definition<'db>>;
+}
+
 impl HasType for ast::ExprRef<'_> {
     fn inferred_type<'db>(&self, model: &SemanticModel<'db>) -> Option<Type<'db>> {
         let index = semantic_index(model.db, model.file);
@@ -628,7 +648,6 @@ impl_binding_has_ty_def!(ast::StmtFunctionDef);
 impl_binding_has_ty_def!(ast::StmtClassDef);
 impl_binding_has_ty_def!(ast::Parameter);
 impl_binding_has_ty_def!(ast::ParameterWithDefault);
-impl_binding_has_ty_def!(ast::ExceptHandlerExceptHandler);
 impl_binding_has_ty_def!(ast::TypeParamTypeVar);
 
 impl HasType for ast::Alias {
@@ -638,6 +657,21 @@ impl HasType for ast::Alias {
         }
         let index = semantic_index(model.db, model.file);
         Some(binding_type(model.db, index.expect_single_definition(self)))
+    }
+}
+
+impl HasOptionalDefinition for ast::ExceptHandlerExceptHandler {
+    fn optional_definition<'db>(&self, model: &SemanticModel<'db>) -> Option<Definition<'db>> {
+        self.name.as_ref()?;
+        let index = semantic_index(model.db, model.file);
+        Some(index.expect_single_definition(self))
+    }
+}
+
+impl HasType for ast::ExceptHandlerExceptHandler {
+    fn inferred_type<'db>(&self, model: &SemanticModel<'db>) -> Option<Type<'db>> {
+        let definition = self.optional_definition(model)?;
+        Some(binding_type(model.db, definition))
     }
 }
 

@@ -17,6 +17,7 @@ ty <COMMAND>
 <dl class="cli-reference"><dt><a href="#ty-check"><code>ty check</code></a></dt><dd><p>Check a project for type errors</p></dd>
 <dt><a href="#ty-server"><code>ty server</code></a></dt><dd><p>Start the language server</p></dd>
 <dt><a href="#ty-version"><code>ty version</code></a></dt><dd><p>Display ty's version</p></dd>
+<dt><a href="#ty-explain"><code>ty explain</code></a></dt><dd><p>Explain rules and other parts of ty</p></dd>
 <dt><a href="#ty-help"><code>ty help</code></a></dt><dd><p>Print this message or the help of the given subcommand(s)</p></dd>
 </dl>
 
@@ -63,19 +64,24 @@ over all configuration files.</p>
 </dd><dt id="ty-check--no-progress"><a href="#ty-check--no-progress"><code>--no-progress</code></a></dt><dd><p>Hide all progress outputs.</p>
 <p>For example, spinners or progress bars.</p>
 </dd><dt id="ty-check--output-format"><a href="#ty-check--output-format"><code>--output-format</code></a> <i>output-format</i></dt><dd><p>The format to use for printing diagnostic messages</p>
-<p>Possible values:</p>
+<p>May also be set with the <code>TY_OUTPUT_FORMAT</code> environment variable.</p><p>Possible values:</p>
 <ul>
 <li><code>full</code>:  Print diagnostics verbosely, with context and helpful hints (default)</li>
 <li><code>concise</code>:  Print diagnostics concisely, one per line</li>
 <li><code>gitlab</code>:  Print diagnostics in the JSON format expected by GitLab Code Quality reports</li>
 <li><code>github</code>:  Print diagnostics in the format used by GitHub Actions workflow error annotations</li>
+<li><code>junit</code>:  Print diagnostics as a JUnit-style XML report</li>
 </ul></dd><dt id="ty-check--project"><a href="#ty-check--project"><code>--project</code></a> <i>project</i></dt><dd><p>Run the command within the given project directory.</p>
 <p>All <code>pyproject.toml</code> files will be discovered by walking up the directory tree from the given project directory, as will the project's virtual environment (<code>.venv</code>) unless the <code>venv-path</code> option is set.</p>
 <p>Other command-line arguments (such as relative paths) will be resolved relative to the current working directory.</p>
 </dd><dt id="ty-check--python"><a href="#ty-check--python"><code>--python</code></a>, <code>--venv</code> <i>path</i></dt><dd><p>Path to your project's Python environment or interpreter.</p>
 <p>ty uses your Python environment to resolve third-party imports in your code.</p>
+<p>This can be a path to:</p>
+<ul>
+<li>A Python interpreter, e.g. <code>.venv/bin/python3</code> - A virtual environment directory, e.g. <code>.venv</code> - A system Python <a href="https://docs.python.org/3/library/sys.html#sys.prefix"><code>sys.prefix</code></a> directory, e.g. <code>/usr</code></li>
+</ul>
 <p>If you're using a project management tool such as uv or you have an activated Conda or virtual environment, you should not generally need to specify this option.</p>
-<p>This option can be used to point to virtual or system Python environments.</p>
+
 </dd><dt id="ty-check--python-platform"><a href="#ty-check--python-platform"><code>--python-platform</code></a>, <code>--platform</code> <i>platform</i></dt><dd><p>Target platform to assume when resolving types.</p>
 <p>This is used to specialize the type of <code>sys.platform</code> and will affect the visibility of platform-specific functions and attributes. If the value is set to <code>all</code>, no assumptions are made about the target platform. If unspecified, the current system's platform will be used.</p>
 </dd><dt id="ty-check--python-version"><a href="#ty-check--python-version"><code>--python-version</code></a>, <code>--target-version</code> <i>version</i></dt><dd><p>Python version to assume when resolving types.</p>
@@ -122,13 +128,18 @@ Display ty's version
 <h3 class="cli-reference">Usage</h3>
 
 ```
-ty version
+ty version [OPTIONS]
 ```
 
 <h3 class="cli-reference">Options</h3>
 
 <dl class="cli-reference"><dt id="ty-version--help"><a href="#ty-version--help"><code>--help</code></a>, <code>-h</code></dt><dd><p>Print help</p>
-</dd></dl>
+</dd><dt id="ty-version--output-format"><a href="#ty-version--output-format"><code>--output-format</code></a> <i>output-format</i></dt><dd><p>The format in which to display the version information</p>
+<p>[default: text]</p><p>Possible values:</p>
+<ul>
+<li><code>text</code></li>
+<li><code>json</code></li>
+</ul></dd></dl>
 
 ## ty generate-shell-completion
 
@@ -148,6 +159,58 @@ ty generate-shell-completion <SHELL>
 
 <dl class="cli-reference"><dt id="ty-generate-shell-completion--help"><a href="#ty-generate-shell-completion--help"><code>--help</code></a>, <code>-h</code></dt><dd><p>Print help</p>
 </dd></dl>
+
+## ty explain
+
+Explain rules and other parts of ty
+
+<h3 class="cli-reference">Usage</h3>
+
+```
+ty explain <COMMAND>
+```
+
+<h3 class="cli-reference">Commands</h3>
+
+<dl class="cli-reference"><dt><a href="#ty-explain-rule"><code>ty explain rule</code></a></dt><dd><p>Explain a rule (or all rules)</p></dd>
+<dt><a href="#ty-explain-help"><code>ty explain help</code></a></dt><dd><p>Print this message or the help of the given subcommand(s)</p></dd>
+</dl>
+
+### ty explain rule
+
+Explain a rule (or all rules)
+
+<h3 class="cli-reference">Usage</h3>
+
+```
+ty explain rule [OPTIONS] [RULE]
+```
+
+<h3 class="cli-reference">Arguments</h3>
+
+<dl class="cli-reference"><dt id="ty-explain-rule--rule"><a href="#ty-explain-rule--rule"><code>RULE</code></a></dt><dd><p>Rule to explain</p>
+<p>Defaults to all rules if omitted.</p>
+</dd></dl>
+
+<h3 class="cli-reference">Options</h3>
+
+<dl class="cli-reference"><dt id="ty-explain-rule--help"><a href="#ty-explain-rule--help"><code>--help</code></a>, <code>-h</code></dt><dd><p>Print help (see a summary with '-h')</p>
+</dd><dt id="ty-explain-rule--output-format"><a href="#ty-explain-rule--output-format"><code>--output-format</code></a> <i>output-format</i></dt><dd><p>Output format</p>
+<p>[default: text]</p><p>Possible values:</p>
+<ul>
+<li><code>text</code></li>
+<li><code>json</code></li>
+</ul></dd></dl>
+
+### ty explain help
+
+Print this message or the help of the given subcommand(s)
+
+<h3 class="cli-reference">Usage</h3>
+
+```
+ty explain help [COMMAND]
+```
 
 ## ty help
 

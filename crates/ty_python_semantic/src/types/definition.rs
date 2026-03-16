@@ -70,3 +70,18 @@ impl TypeDefinition<'_> {
         }
     }
 }
+
+impl<'db> TypeDefinition<'db> {
+    pub fn definition<'a>(&'a self) -> Option<&'a Definition<'db>> {
+        match self {
+            Self::Module(_) => None,
+            Self::StaticClass(definition)
+            | Self::DynamicClass(definition)
+            | Self::Function(definition)
+            | Self::TypeVar(definition)
+            | Self::TypeAlias(definition)
+            | Self::SpecialForm(definition)
+            | Self::NewType(definition) => Some(definition),
+        }
+    }
+}

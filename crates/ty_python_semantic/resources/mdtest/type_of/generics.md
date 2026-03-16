@@ -129,6 +129,23 @@ def narrow_a[B: A](a: A, b: B):
         reveal_type(type_of_a)  # revealed: type[B@narrow_a]
 ```
 
+Narrowing through `type[T]` or `Type[T]` should preserve the type variable identity, so the narrowed
+value remains assignable to `T`:
+
+```py
+from typing import Type, TypeVar
+
+LegacyT = TypeVar("LegacyT", int, str)
+
+def legacy_typevar_narrowing(x: int | str, t: Type[LegacyT]) -> LegacyT:
+    assert isinstance(x, t)
+    return x
+
+def pep695_typevar_narrowing[T: (int, str)](x: int | str, t: type[T]) -> T:
+    assert isinstance(x, t)
+    return x
+```
+
 ## `__class__`
 
 ```py
@@ -139,6 +156,23 @@ class A:
         reveal_type(self.__class__)  # revealed: type[Self@copy]
         reveal_type(self.__class__())  # revealed: Self@copy
         return self.__class__()
+```
+
+## Instantiating `type[Self]` is strict
+
+Constructor calls on `type[Self]` are checked against the current class's `__init__`/`__new__`
+signature. This is unsound (because Liskov is not enforced on `__init__` or `__new__`), but widely
+relied on.
+
+```py
+from typing import Self
+
+class B:
+    def __init__(self, x: int) -> None: ...
+    def clone(self: Self) -> Self:
+        # error: [invalid-argument-type] "Argument to bound method `__init__` is incorrect: Expected `int`, found `Literal["x"]`"
+        self.__class__("x")
+        return self.__class__(1)
 ```
 
 ## Subtyping
@@ -473,4 +507,109 @@ expects_type_c_default_of_int_str(C[int, str])
 expects_type_c_default(C[int])
 expects_type_c_default_of_int(C[str])
 expects_type_c_default_of_int_str(C[str, int])
+```
+
+## Upcasting a `type[]` type to a `Callable` type
+
+`type[T]` accepts the same parameters as `object.__init__` if `T` does not have an upper bound. If
+`T` is bound to a nominal-instance type, `type[T]` accepts the same parameters as the constructor of
+the class that the instance-type refers to.
+
+```py
+from ty_extensions import RegularCallableTypeOf
+
+class TakesStrInConstructor:
+    def __init__(self, x: int, y: str | None = None): ...
+
+class TakesIntInConstructor:
+    def __init__(self, x: int, y: int | None = None): ...
+
+def f[
+    T,
+    T1: object,
+    T2: int,
+    T3: TakesStrInConstructor | TakesIntInConstructor,
+    T4: (TakesStrInConstructor, TakesIntInConstructor),
+](
+    bare_type: type,
+    type_object: type[object],
+    type_int: type[int],
+    type_t_unbound: type[T],
+    type_t_object_bound: type[T1],
+    type_t_int_bound: type[T2],
+    type_t_union_bound: type[T3],
+    type_t_constrained: type[T4],
+):
+    # TODO: these are all `Any` because of typeshed's signature for `type.__call__`.
+    # We could consider overriding that.
+    reveal_type(bare_type())  # revealed: Any
+    reveal_type(type_object())  # revealed: Any
+
+    # TODO: we could consider emitting errors for these two, but don't currently,
+    # for the same reason
+    reveal_type(bare_type(""))  # revealed: Any
+    reveal_type(type_object(""))  # revealed: Any
+
+    reveal_type(type_t_unbound())  # revealed: T@f
+    # TODO: we could consider emitting an error here as well
+    reveal_type(type_t_unbound(""))  # revealed: T@f
+
+    reveal_type(type_t_object_bound())  # revealed: T1@f
+    # TODO: we could consider emitting an error here as well
+    reveal_type(type_t_object_bound(""))  # revealed: T1@f
+
+    reveal_type(type_int())  # revealed: int
+    reveal_type(type_int("1"))  # revealed: int
+    # error: [invalid-argument-type]
+    reveal_type(type_int([]))  # revealed: int
+
+    reveal_type(type_t_int_bound())  # revealed: T2@f
+    reveal_type(type_t_int_bound("1"))  # revealed: T2@f
+    # error: [invalid-argument-type]
+    reveal_type(type_t_int_bound([]))  # revealed: T2@f
+
+    reveal_type(type_t_union_bound(42))  # revealed: T3@f
+    # error: [invalid-argument-type]
+    reveal_type(type_t_union_bound(42, ""))  # revealed: T3@f
+    # error: [invalid-argument-type]
+    reveal_type(type_t_union_bound(42, 42))  # revealed: T3@f
+
+    reveal_type(type_t_constrained(42))  # revealed: T4@f
+    # error: [invalid-argument-type]
+    reveal_type(type_t_constrained(42, ""))  # revealed: T4@f
+    # error: [invalid-argument-type]
+    reveal_type(type_t_constrained(42, 42))  # revealed: T4@f
+
+    def g(
+        object_class_upcast: RegularCallableTypeOf[object],
+        bare_type_upcast: RegularCallableTypeOf[bare_type],
+        type_object_upcast: RegularCallableTypeOf[type_object],
+        type_t_unbound_upcast: RegularCallableTypeOf[type_t_unbound],
+        type_t_object_bound_upcast: RegularCallableTypeOf[type_t_object_bound],
+        type_int_upcast: RegularCallableTypeOf[type_int],
+        type_t_int_bound_upcast: RegularCallableTypeOf[type_t_int_bound],
+        type_t_union_bound_upcast: RegularCallableTypeOf[type_t_union_bound],
+        type_t_constrained_upcast: RegularCallableTypeOf[type_t_constrained],
+    ):
+        reveal_type(object_class_upcast)  # revealed: () -> object
+
+        # TODO: these two could arguably be `() -> object`,
+        # but have more dynamic signatures due to typeshed's `type.__call__` annotations.
+        # We could consider overriding those.
+        reveal_type(bare_type_upcast)  # revealed: (...) -> Any
+        reveal_type(type_object_upcast)  # revealed: (...) -> Any
+
+        # TODO: if we did decide to override typeshed's `type.__call__` annotations (see above),
+        # we should also turn these two into `() -> T@f` / `() -> T1@f`
+        reveal_type(type_t_unbound_upcast)  # revealed: (...) -> T@f
+        reveal_type(type_t_object_bound_upcast)  # revealed: (...) -> T1@f
+
+        # revealed: Overload[(x: str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = 0, /) -> int, (x: str | bytes | bytearray, /, base: SupportsIndex) -> int]
+        reveal_type(type_int_upcast)
+        # revealed: Overload[(x: str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = 0, /) -> T2@f, (x: str | bytes | bytearray, /, base: SupportsIndex) -> T2@f]
+        reveal_type(type_t_int_bound_upcast)
+        # revealed: ((x: int, y: str | None = None) -> T3@f) | ((x: int, y: int | None = None) -> T3@f)
+        reveal_type(type_t_union_bound_upcast)
+        # revealed: ((x: int, y: str | None = None) -> T4@f) | ((x: int, y: int | None = None) -> T4@f)
+        reveal_type(type_t_constrained_upcast)
 ```

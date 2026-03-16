@@ -156,3 +156,46 @@ def test_invalid_argvalues(param):
     ------------------------------------------------
     """
     ...
+
+
+# Regression tests for nested tuples that could cause syntax errors when unpacked.
+# See: https://github.com/astral-sh/ruff/issues/22441
+@pytest.mark.parametrize(
+    ["param"],
+    [
+        ((),),
+        ((1,),),
+    ],
+)
+def test_single_element_nested_empty_tuple(param):
+    ...
+
+
+@pytest.mark.parametrize(
+    ["param"],
+    [
+        ((1, 2),),
+        ((3, 4),),
+    ],
+)
+def test_single_element_nested_multi_tuple(param):
+    ...
+
+
+@pytest.mark.parametrize(
+    ["param"],
+    [
+        (((1,),),),
+    ],
+)
+def test_single_element_deeply_nested_tuple(param):
+    ...
+
+
+@pytest.mark.parametrize(
+    ["param"],
+    [
+        (((1,)),),
+    ],
+)
+def test_single_element_grouped_tuple(param): ...

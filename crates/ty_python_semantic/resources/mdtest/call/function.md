@@ -786,6 +786,53 @@ for tup in my_other_args:
     f4(*tup, e=None)
 ```
 
+Regression test for <https://github.com/astral-sh/ty/issues/2734>.
+
+```py
+def f5(x: int | None = None, y: str = "") -> None: ...
+def f6(flag: bool) -> None:
+    args = () if flag else (1,)
+    f5(*args)
+
+def f7(x: int | None = None, y: str = "") -> None: ...
+def f8(flag: bool) -> None:
+    args = () if flag else ("bad",)
+    f7(*args)  # error: [invalid-argument-type]
+
+def f11(*args: int) -> None: ...
+def f12(args: tuple[int] | int) -> None:
+    f11(*args)  # error: [not-iterable]
+
+def f13(a: int, b: int, c: str) -> None: ...
+def f14(a: int, b: int, c: str, d: list[float], e: list[float]) -> None: ...
+def f15(profile: bool, line: str) -> None:
+    matcher = f13
+    timings = []
+    if profile:
+        matcher = f14
+        timings = [[0.0], [1.0], [2.0], [3.0]]
+    matcher(1, 2, line, *timings[:2])
+
+def f9(x: int = 0, y: str = "") -> None: ...
+def f10(args: tuple[int, ...] | tuple[int, str]) -> None:
+    # The variable-length element `int` from `tuple[int, ...]` unions with `str`
+    # from `tuple[int, str]` at position 1, giving `int | str` for `y: str`.
+    f9(*args)  # error: [invalid-argument-type]
+
+def f18(x: int = 0, y: int = 0) -> None: ...
+def f19(args: tuple[int, ...] | tuple[int, int]) -> None:
+    f18(*args)
+
+# TODO: Union variadic unpacking should also work when the non-defaulted parameters
+# are covered by all union elements, even if not all remaining parameters are defaulted.
+# Currently we only apply per-element iteration when all remaining positional parameters
+# have defaults, so this falls back to `iterate()` which produces `tuple[int, ...]` and
+# greedily matches `c: str` with `int`.
+def f16(a: int, b: int = 0, c: str = "") -> None: ...
+def f17(x: tuple[int] | tuple[int, int]) -> None:
+    f16(*x)  # error: [invalid-argument-type]  # TODO: false positive
+```
+
 ### Mixed argument and parameter containing variadic
 
 ```toml
@@ -1292,7 +1339,11 @@ from collections.abc import Mapping
 def f(**kwargs: int) -> None: ...
 
 class DictSubclass(dict[int, int]): ...
-class MappingSubclass(Mapping[int, int]): ...
+
+class MappingSubclass(Mapping[int, int]):
+    def __iter__(self): ...
+    def __len__(self): ...
+    def __getitem__(self, key): ...
 
 class MappingProtocol:
     def keys(self) -> list[int]:
@@ -1344,7 +1395,12 @@ from collections.abc import Mapping
 def f(**kwargs: str) -> None: ...
 
 class DictSubclass(dict[str, int]): ...
-class MappingSubclass(Mapping[str, int]): ...
+
+class MappingSubclass(Mapping[str, int]):
+    def __iter__(self): ...
+    def __len__(self): ...
+    def __getitem__(self, key) -> int:
+        return 42
 
 class MappingProtocol:
     def keys(self) -> list[str]:
@@ -1502,4 +1558,41 @@ foo(*None)
 def _(arg: int):
     # error: [not-iterable] "Object of type `int` is not iterable"
     foo(*arg)
+```
+
+## Union variadic unpacking with explicit keyword arguments
+
+When a union type containing variable-length elements (like `Unknown`) is unpacked as `*args`, the
+variadic expansion should not greedily consume optional positional parameters that are also provided
+as explicit keyword arguments.
+
+```py
+from ty_extensions import Unknown
+
+def f(a: int = 0, b: int = 0, c: int = 0, fmt: str | None = None) -> None: ...
+def _(args: "Unknown | tuple[int, int, int]"):
+    f(*args, fmt="{key}")  # fine
+```
+
+## Variadic unpacking should stop at max known arity
+
+When unpacking (a union of) fixed-length tuples, variadic matching should stop once the known
+positions are exhausted. Otherwise, optional positional parameters can be incorrectly treated as
+already assigned, causing false positives for `**kwargs`.
+
+(This test uses `**kwargs` unpacking of a `TypedDict` instead of the simpler `c=1` keyword argument,
+because `c=1` is a known keyword argument and we always prevent unpacking `*args` over an
+explicitly-provided keyword argument. The case shown here, without the explicit keyword argument,
+requires instead that we use our knowledge of the tuple length to prevent over-unpacking.)
+
+```py
+from typing import TypedDict
+
+class CKwargs(TypedDict):
+    c: int
+
+def f(a: int = 0, b: int = 0, c: int = 0) -> None: ...
+def _(args_tuple: tuple[int, int], args_union: tuple[int] | tuple[int, int], kwargs: CKwargs) -> None:
+    f(*args_tuple, **kwargs)  # fine
+    f(*args_union, **kwargs)  # fine
 ```

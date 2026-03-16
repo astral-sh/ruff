@@ -72,7 +72,7 @@ class Sub8(Super):
     def method(self, x: int, *args, **kwargs): ...  # fine
 
 class Sub9(Super):
-    def method(self, x: int, extra_positional_arg=42, /): ... # fine
+    def method(self, x: int, extra_positional_arg=42, /): ...  # fine
 
 class Sub10(Super):
     def method(self, x: int, extra_pos_or_kw_arg=42): ...  # fine
@@ -215,6 +215,13 @@ class D(C):
     # compatible with `C.get` and `B.get`, but not with `A.get`.
     # Since `B.get` already violates LSP with `A.get`, we don't report for `D`.
     def get(self, my_default): ...
+```
+
+Unannotated overrides of overloaded dunder methods should remain accepted.
+
+```pyi
+class C(list[int]):
+    def __getitem__(self, key): ...
 ```
 
 ## Non-generic methods on generic classes work as expected
@@ -415,6 +422,7 @@ from dataclasses import dataclass, InitVar
 from typing_extensions import Self
 
 class Grandparent: ...
+
 class Parent(Grandparent):
     def __new__(cls, x: int) -> Self: ...
     def __init__(self, x: int) -> None: ...

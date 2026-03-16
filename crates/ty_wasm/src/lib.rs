@@ -8,7 +8,7 @@ use ruff_db::source::{SourceText, line_index, source_text};
 use ruff_db::system::walk_directory::WalkDirectoryBuilder;
 use ruff_db::system::{
     CaseSensitivity, DirectoryEntry, GlobError, MemoryFileSystem, Metadata, PatternError, System,
-    SystemPath, SystemPathBuf, SystemVirtualPath, WritableSystem,
+    SystemPath, SystemPathBuf, SystemVirtualPath, WhichError, WhichResult, WritableSystem,
 };
 use ruff_db::vendored::VendoredPath;
 use ruff_diagnostics::{Applicability, Edit};
@@ -26,7 +26,7 @@ use ty_project::metadata::value::ValueSource;
 use ty_project::watch::{ChangeEvent, ChangedKind, CreatedKind, DeletedKind};
 use ty_project::{CheckMode, ProjectMetadata};
 use ty_project::{Db, ProjectDatabase};
-use ty_python_semantic::{MisconfigurationMode, Program};
+use ty_python_semantic::{FallibleStrategy, Program};
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
@@ -131,11 +131,11 @@ impl Workspace {
             options,
             SystemPathBuf::from(root),
             None,
-            MisconfigurationMode::Fail,
+            &FallibleStrategy,
         )
         .map_err(into_error)?;
 
-        let mut db = ProjectDatabase::new(project, system.clone()).map_err(into_error)?;
+        let mut db = ProjectDatabase::fallible(project, system.clone()).map_err(into_error)?;
 
         // By default, it will check all files in the project but we only want to check the open
         // files in the playground.
@@ -160,12 +160,12 @@ impl Workspace {
             options,
             self.db.project().root(&self.db).to_path_buf(),
             None,
-            MisconfigurationMode::Fail,
+            &FallibleStrategy,
         )
         .map_err(into_error)?;
 
         let program_settings = project
-            .to_program_settings(&self.system, self.db.vendored())
+            .to_program_settings(&self.system, self.db.vendored(), &FallibleStrategy)
             .map_err(into_error)?;
         Program::get(&self.db).update_from_settings(&mut self.db, program_settings);
 
@@ -820,7 +820,7 @@ impl Diagnostic {
 
     #[wasm_bindgen]
     pub fn display(&self, workspace: &Workspace) -> JsString {
-        let config = DisplayDiagnosticConfig::default().color(false);
+        let config = DisplayDiagnosticConfig::new("ty").color(false);
         self.inner
             .display(&workspace.db, &config)
             .to_string()
@@ -1400,6 +1400,10 @@ impl System for WasmSystem {
 
     fn case_sensitivity(&self) -> CaseSensitivity {
         CaseSensitivity::CaseSensitive
+    }
+
+    fn which(&self, _name: &str) -> WhichResult {
+        Err(WhichError::CannotFindBinaryPath)
     }
 
     fn current_directory(&self) -> &SystemPath {

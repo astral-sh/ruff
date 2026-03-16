@@ -342,4 +342,29 @@ help: Convert to `X | Y`
 91 + def myfunc(param: "tuple[int | 'AClass' | None, str]"):
 92 |     print(param)
 93 | 
-94 |
+94 | 
+
+UP007 [*] Use `X | Y` for type annotations
+   --> UP007.py:151:31
+    |
+149 |       from typing import Literal, TypeAlias
+150 |
+151 |       LongLiterals: TypeAlias = Union[
+    |  _______________________________^
+152 | |         Literal["LongLiteralNumberOne"]
+153 | |         | Literal["LongLiteralNumberTwo"]
+154 | |         | Literal["LongLiteralNumberThree"]
+155 | |     ]
+    | |_____^
+    |
+help: Convert to `X | Y`
+148 | if TYPE_CHECKING:
+149 |     from typing import Literal, TypeAlias
+150 | 
+    -     LongLiterals: TypeAlias = Union[
+    -         Literal["LongLiteralNumberOne"]
+151 +     LongLiterals: TypeAlias = (Literal["LongLiteralNumberOne"]
+152 |         | Literal["LongLiteralNumberTwo"]
+    -         | Literal["LongLiteralNumberThree"]
+    -     ]
+153 +         | Literal["LongLiteralNumberThree"])

@@ -447,6 +447,7 @@ pub(crate) fn server_capabilities(
             ..Default::default()
         }),
         selection_range_provider: Some(SelectionRangeProviderCapability::Simple(true)),
+        folding_range_provider: Some(types::FoldingRangeProviderCapability::Simple(true)),
         document_symbol_provider: Some(OneOf::Left(true)),
         workspace_symbol_provider: Some(OneOf::Left(true)),
         notebook_document_sync: Some(OneOf::Left(lsp_types::NotebookDocumentSyncOptions {
@@ -468,6 +469,7 @@ pub(crate) fn server_capabilities(
             }),
             ..Default::default()
         }),
+        type_hierarchy_provider: Some(OneOf::Left(true)),
         ..Default::default()
     }
 }

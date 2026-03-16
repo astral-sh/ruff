@@ -1,0 +1,3 @@
+prefect
+pydantic
+scikit-build-core

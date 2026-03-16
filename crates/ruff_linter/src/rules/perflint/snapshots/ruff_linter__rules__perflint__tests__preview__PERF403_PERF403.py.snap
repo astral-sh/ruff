@@ -426,8 +426,8 @@ PERF403 [*] Use a dictionary comprehension instead of a for-loop
    --> PERF403.py:214:9
     |
 212 |     v = {}
-213 |     for o, (x,) in ["ox"]: 
-214 |         v[(x,)] = o 
+213 |     for o, (x,) in ["ox"]:
+214 |         v[(x,)] = o
     |         ^^^^^^^^^^^
 215 |     return v
     |
@@ -436,8 +436,59 @@ help: Replace for loop with dict comprehension
 210 | 
 211 | def issue_19153_3():
     -     v = {}
-    -     for o, (x,) in ["ox"]: 
-    -         v[(x,)] = o 
-212 +     v = {(x,): o for o, (x,) in ["ox"]} 
+    -     for o, (x,) in ["ox"]:
+    -         v[(x,)] = o
+212 +     v = {(x,): o for o, (x,) in ["ox"]}
 213 |     return v
+214 | 
+215 | def f():
+note: This is an unsafe fix and may change runtime behavior
+
+PERF403 [*] Use a dictionary comprehension instead of a for-loop
+   --> PERF403.py:225:13
+    |
+223 |             # comment
+224 |         ):
+225 |             result[k] = k
+    |             ^^^^^^^^^^^^^
+226 |
+227 | def f():
+    |
+help: Replace for loop with dict comprehension
+216 | 
+217 | def f():
+218 |     # comment duplication in if test (https://github.com/astral-sh/ruff/issues/18787)
+    -     result = {}
+    -     for k in ["a", "b", "c"]:
+    -         if (
+    -             k
+    -             # comment
+    -         ):
+    -             result[k] = k
+219 +     # comment
+220 +     result = {k: k for k in ["a", "b", "c"] if k}
+221 | 
+222 | def f():
+223 |     # comment duplication in target (https://github.com/astral-sh/ruff/issues/18787)
+note: This is an unsafe fix and may change runtime behavior
+
+PERF403 [*] Use a dictionary comprehension instead of a for-loop
+   --> PERF403.py:233:9
+    |
+231 |         k  # comment
+232 |     ) in ["a", "b", "c"]:
+233 |         result[k] = k
+    |         ^^^^^^^^^^^^^
+    |
+help: Replace for loop with dict comprehension
+226 | 
+227 | def f():
+228 |     # comment duplication in target (https://github.com/astral-sh/ruff/issues/18787)
+    -     result = {}
+    -     for (
+    -         k  # comment
+    -     ) in ["a", "b", "c"]:
+    -         result[k] = k
+229 +     # comment
+230 +     result = {k: k for k in ["a", "b", "c"]}
 note: This is an unsafe fix and may change runtime behavior

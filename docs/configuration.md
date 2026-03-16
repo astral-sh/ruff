@@ -47,8 +47,8 @@ If left unspecified, Ruff's default configuration is equivalent to:
     line-length = 88
     indent-width = 4
 
-    # Assume Python 3.9
-    target-version = "py39"
+    # Assume Python 3.10
+    target-version = "py310"
 
     [tool.ruff.lint]
     # Enable Pyflakes (`F`) and a subset of the pycodestyle (`E`) codes by default.
@@ -129,8 +129,8 @@ If left unspecified, Ruff's default configuration is equivalent to:
     line-length = 88
     indent-width = 4
 
-    # Assume Python 3.9
-    target-version = "py39"
+    # Assume Python 3.10
+    target-version = "py310"
 
     [lint]
     # Enable Pyflakes (`F`) and a subset of the pycodestyle (`E`) codes by default.
@@ -807,15 +807,43 @@ Ruff supports autocompletion for most shells. A shell-specific completion script
 by `ruff generate-shell-completion <SHELL>`, where `<SHELL>` is one of `bash`, `elvish`, `fig`, `fish`,
 `powershell`, or `zsh`.
 
-The exact steps required to enable autocompletion will vary by shell. For example instructions,
-see the [Poetry](https://python-poetry.org/docs/#enable-tab-completion-for-bash-fish-or-zsh) or
-[ripgrep](https://github.com/BurntSushi/ripgrep/blob/master/FAQ.md#complete) documentation.
+!!! tip
 
-As an example: to enable autocompletion for Zsh, run
-`ruff generate-shell-completion zsh > ~/.zfunc/_ruff`. Then add the following line to your
-`~/.zshrc` file, if they're not already present:
+    You can run `echo $SHELL` to help you determine your shell.
 
-```zsh
-fpath+=~/.zfunc
-autoload -Uz compinit && compinit
-```
+To enable shell autocompletion for Ruff, run one of the following:
+
+=== "Bash"
+
+    ```bash
+    echo 'eval "$(ruff generate-shell-completion bash)"' >> ~/.bashrc
+    ```
+
+=== "Zsh"
+
+    ```bash
+    echo 'eval "$(ruff generate-shell-completion zsh)"' >> ~/.zshrc
+    ```
+
+=== "fish"
+
+    ```bash
+    echo 'ruff generate-shell-completion fish | source' > ~/.config/fish/completions/ruff.fish
+    ```
+
+=== "Elvish"
+
+    ```bash
+    echo 'eval (ruff generate-shell-completion elvish | slurp)' >> ~/.elvish/rc.elv
+    ```
+
+=== "PowerShell / pwsh"
+
+    ```powershell
+    if (!(Test-Path -Path $PROFILE)) {
+      New-Item -ItemType File -Path $PROFILE -Force
+    }
+    Add-Content -Path $PROFILE -Value '(& ruff generate-shell-completion powershell) | Out-String | Invoke-Expression'
+    ```
+
+Then restart the shell or source the shell config file.

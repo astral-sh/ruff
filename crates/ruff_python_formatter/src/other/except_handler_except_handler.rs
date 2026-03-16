@@ -78,9 +78,30 @@ impl FormatNodeRule<ExceptHandlerExceptHandler> for FormatExceptHandlerExceptHan
                         // except BaseException, Exception:  # Ok
                         //     ...
                         // ```
+                        //
+                        // Unless any component of the tuple is starred. This case is actually valid
+                        // syntax on its own but is parsed as `except*`, not a tuple with a starred
+                        // element:
+                        //
+                        // ```py
+                        // try:
+                        //     ...
+                        // except *exceptions, BaseException:
+                        //     ...
+                        // ```
+                        //
+                        // And this case is an outright `SyntaxError`:
+                        //
+                        // ```py
+                        // try:
+                        //     ...
+                        // except BaseException, *exceptions:  # SyntaxError
+                        //     ...
+                        // ```
                         Some(Expr::Tuple(tuple))
                             if f.options().target_version() >= PythonVersion::PY314
-                                && name.is_none() =>
+                                && name.is_none()
+                                && !tuple.iter().any(Expr::is_starred_expr) =>
                         {
                             write!(
                                 f,

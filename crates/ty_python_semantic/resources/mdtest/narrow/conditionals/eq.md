@@ -168,6 +168,25 @@ def _(flag1: bool, flag2: bool):
         reveal_type(x)  # revealed: Literal[2]
 ```
 
+## `==` with PEP 695 alias to a union of literals
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Literal
+
+type Y = Literal[2, 3]
+
+def _(x: Literal[1, 2], y: Y):
+    if x == y:
+        reveal_type(x)  # revealed: Literal[2]
+    else:
+        reveal_type(x)  # revealed: Literal[1, 2]
+```
+
 ## `!=` for non-single-valued types
 
 Only single-valued types should narrow the type:
@@ -191,6 +210,24 @@ def _(flag1: bool, flag2: bool, a: int):
         reveal_type(x)  # revealed: Literal[1, 2]
     else:
         reveal_type(x)  # revealed: Literal[1, 2]
+```
+
+## `==` / `!=` with two narrowable operands
+
+Both operands should be narrowed when both are narrowable expressions.
+
+```py
+from typing import Literal
+
+def _(x: Literal[1], y: Literal[1, 2]):
+    if x == y:
+        reveal_type(y)  # revealed: Literal[1]
+    if y == x:
+        reveal_type(y)  # revealed: Literal[1]
+    if x != y:
+        reveal_type(y)  # revealed: Literal[2]
+    if y != x:
+        reveal_type(y)  # revealed: Literal[2]
 ```
 
 ## Assignment expressions
@@ -254,6 +291,10 @@ from typing_extensions import Literal, LiteralString, Any
 def _(s: LiteralString | None, t: LiteralString | Any):
     if s == "foo":
         reveal_type(s)  # revealed: Literal["foo"]
+    elif s == "bar":
+        reveal_type(s)  # revealed: Literal["bar"]
+    else:
+        reveal_type(s)  # revealed: (LiteralString & ~Literal["foo"] & ~Literal["bar"]) | None
 
     if s == 1:
         reveal_type(s)  # revealed: Never

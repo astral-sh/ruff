@@ -9,6 +9,7 @@ TC004 [*] Move import `builtins` out of type-checking block. Import is used for 
 5 | if TYPE_CHECKING: import builtins
   |                          ^^^^^^^^
 6 | builtins.print("!")
+  | -------- Used at runtime here
   |
 help: Move out of type-checking block
 1 | # Regression test for: https://github.com/astral-sh/ruff/issues/19175

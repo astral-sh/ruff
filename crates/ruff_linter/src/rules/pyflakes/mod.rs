@@ -132,6 +132,7 @@ mod tests {
     #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_30.py"))]
     #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_31.py"))]
     #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_32.py"))]
+    #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_33.pyi"))]
     #[test_case(Rule::UndefinedName, Path::new("F821_0.py"))]
     #[test_case(Rule::UndefinedName, Path::new("F821_1.py"))]
     #[test_case(Rule::UndefinedName, Path::new("F821_2.py"))]
@@ -168,6 +169,7 @@ mod tests {
     #[test_case(Rule::UndefinedName, Path::new("F821_31.py"))]
     #[test_case(Rule::UndefinedName, Path::new("F821_32.pyi"))]
     #[test_case(Rule::UndefinedName, Path::new("F821_33.py"))]
+    #[test_case(Rule::UndefinedName, Path::new("F821_34.pyi"))]
     #[test_case(Rule::UndefinedExport, Path::new("F822_0.py"))]
     #[test_case(Rule::UndefinedExport, Path::new("F822_0.pyi"))]
     #[test_case(Rule::UndefinedExport, Path::new("F822_1.py"))]
@@ -261,6 +263,15 @@ mod tests {
         __all__ = ['FOO']
         FOO = 42",
         "f401_preview_first_party_submodule_dunder_all"
+    )]
+    // Regression test for https://github.com/astral-sh/ruff/issues/22221
+    #[test_case(
+        r"
+        import submodule.bar
+        import submodule.baz
+        __all__ = ['submodule']
+        FOO = 42",
+        "f401_preview_dunder_all_multiple_bindings"
     )]
     fn f401_preview_first_party_submodule(contents: &str, snapshot: &str) {
         let diagnostics = test_contents(
@@ -693,6 +704,19 @@ mod tests {
             &LinterSettings {
                 typing_modules: vec!["foo.typical".to_string()],
                 ..LinterSettings::for_rule(Rule::UndefinedName)
+            },
+        )?;
+        assert_diagnostics!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn f811_typing_modules_overload() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pyflakes/F811_33.py"),
+            &LinterSettings {
+                typing_modules: vec!["std".to_string()],
+                ..LinterSettings::for_rule(Rule::RedefinedWhileUnused)
             },
         )?;
         assert_diagnostics!(diagnostics);
@@ -4034,6 +4058,13 @@ lambda: fu
         class B: pass
         ",
             &[],
+        );
+
+        flakes(
+            r"
+        lazy from __future__ import annotations
+        ",
+            &[Rule::UnusedImport],
         );
 
         flakes(
