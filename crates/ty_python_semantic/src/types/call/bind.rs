@@ -92,6 +92,7 @@ enum CallAlternative<'db> {
 #[derive(Debug, Clone)]
 struct ConstructorBinding<'db> {
     entry: CallableBinding<'db>,
+    constructed_instance_type: Type<'db>,
 }
 
 impl<'db> ConstructorBinding<'db> {
@@ -109,7 +110,21 @@ impl<'db> ConstructorBinding<'db> {
     ) -> ConstructorBinding<'db> {
         ConstructorBinding {
             entry: f(self.entry),
+            constructed_instance_type: self.constructed_instance_type,
         }
+    }
+
+    fn constructed_instance_type(&self) -> Type<'db> {
+        self.constructed_instance_type
+    }
+
+    fn return_type(&self, db: &'db dyn Db) -> Type<'db> {
+        Bindings::constructor_return_type_for_bindings(
+            db,
+            self.constructed_instance_type,
+            std::iter::once(&self.entry),
+        )
+        .unwrap_or_else(|| self.entry.return_type())
     }
 }
 
@@ -129,11 +144,17 @@ impl<'db> CallAlternative<'db> {
     }
 
     fn constructor_instance_type(&self) -> Option<Type<'db>> {
-        self.callable().constructor_instance_type
+        match self {
+            CallAlternative::Regular(binding) => binding.constructor_instance_type,
+            CallAlternative::Constructor(binding) => Some(binding.constructed_instance_type()),
+        }
     }
 
-    fn return_type(&self, _db: &'db dyn Db) -> Type<'db> {
-        self.callable().return_type()
+    fn return_type(&self, db: &'db dyn Db) -> Type<'db> {
+        match self {
+            CallAlternative::Regular(binding) => binding.return_type(),
+            CallAlternative::Constructor(binding) => binding.return_type(db),
+        }
     }
 
     fn check_types(
@@ -176,7 +197,14 @@ impl<'db> CallAlternative<'db> {
     fn into_constructor(self) -> CallAlternative<'db> {
         match self {
             CallAlternative::Regular(binding) => {
-                CallAlternative::Constructor(ConstructorBinding { entry: binding })
+                if let Some(constructed_instance_type) = binding.constructor_instance_type {
+                    CallAlternative::Constructor(ConstructorBinding {
+                        entry: binding,
+                        constructed_instance_type,
+                    })
+                } else {
+                    CallAlternative::Regular(binding)
+                }
             }
             constructor @ CallAlternative::Constructor(_) => constructor,
         }
