@@ -212,6 +212,7 @@ pub fn render_diagnostics(
             GroupedEmitter::default()
                 .with_show_fix_status(config.show_fix_status())
                 .with_applicability(config.fix_applicability())
+                .with_preview(config.is_preview())
                 .emit(writer, diagnostics, context)
                 .map_err(std::io::Error::other)?;
         }

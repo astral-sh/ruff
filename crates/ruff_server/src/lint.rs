@@ -253,13 +253,12 @@ fn to_lsp_diagnostic(
     let body = diagnostic.concise_message().to_string();
     let fix = diagnostic.fix();
     let suggestion = diagnostic.first_help_text();
-    let code = diagnostic.secondary_code();
+    let code = diagnostic.secondary_code_or_id(preview.is_enabled());
 
     let fix = fix.and_then(|fix| fix.applies(Applicability::Unsafe).then_some(fix));
 
     let data = (fix.is_some() || noqa_edit.is_some())
         .then(|| {
-            let code = code?.to_string();
             let edits = fix
                 .into_iter()
                 .flat_map(Fix::edits)
@@ -276,7 +275,7 @@ fn to_lsp_diagnostic(
                 title: suggestion.unwrap_or(name).to_string(),
                 noqa_edit,
                 edits,
-                code,
+                code: code.to_string(),
             })
             .ok()
         })
@@ -300,15 +299,12 @@ fn to_lsp_diagnostic(
     let (severity, code) = if let Some(code) = code {
         (severity(code), code.to_string())
     } else {
-        (
-            match diagnostic.severity() {
-                ruff_db::diagnostic::Severity::Info => lsp_types::DiagnosticSeverity::INFORMATION,
-                ruff_db::diagnostic::Severity::Warning => lsp_types::DiagnosticSeverity::WARNING,
-                ruff_db::diagnostic::Severity::Error => lsp_types::DiagnosticSeverity::ERROR,
-                ruff_db::diagnostic::Severity::Fatal => lsp_types::DiagnosticSeverity::ERROR,
-            },
-            diagnostic.secondary_code_or_id().to_string(),
-        )
+        match diagnostic.severity() {
+            ruff_db::diagnostic::Severity::Info => lsp_types::DiagnosticSeverity::INFORMATION,
+            ruff_db::diagnostic::Severity::Warning => lsp_types::DiagnosticSeverity::WARNING,
+            ruff_db::diagnostic::Severity::Error => lsp_types::DiagnosticSeverity::ERROR,
+            ruff_db::diagnostic::Severity::Fatal => lsp_types::DiagnosticSeverity::ERROR,
+        }
     };
 
     (
@@ -317,7 +313,7 @@ fn to_lsp_diagnostic(
             range,
             severity: Some(severity),
             tags: tags(diagnostic),
-            code: Some(lsp_types::NumberOrString::String(code)),
+            code: Some(lsp_types::NumberOrString::String(code.to_string())),
             code_description: diagnostic.documentation_url().and_then(|url| {
                 Some(lsp_types::CodeDescription {
                     href: lsp_types::Url::parse(url).ok()?,

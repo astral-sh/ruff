@@ -14,7 +14,7 @@ use ruff_linter::fs::relativize_path;
 use ruff_linter::logging::LogLevel;
 use ruff_linter::message::{EmitterContext, render_diagnostics};
 use ruff_linter::notify_user;
-use ruff_linter::preview::is_warning_severity_enabled;
+use ruff_linter::preview::{is_rule_name_output_enabled, is_warning_severity_enabled};
 use ruff_linter::settings::flags::{self};
 use ruff_linter::settings::types::{OutputFormat, PreviewMode, UnsafeFixes};
 
@@ -33,7 +33,7 @@ bitflags! {
 #[derive(Serialize)]
 struct ExpandedStatistics<'a> {
     code: Option<&'a SecondaryCode>,
-    name: &'static str,
+    name: &'a str,
     count: usize,
     #[serde(rename = "fixable")]
     all_fixable: bool,
@@ -48,7 +48,7 @@ impl ExpandedStatistics<'_> {
 
 /// Accumulator type for grouping diagnostics by code.
 /// Format: (`code`, `representative_diagnostic`, `total_count`, `fixable_count`)
-type DiagnosticGroup<'a> = (Option<&'a SecondaryCode>, &'a Diagnostic, usize, usize);
+type DiagnosticGroup<'a> = (&'a str, &'a Diagnostic, usize, usize);
 
 pub(crate) struct Printer {
     format: OutputFormat,
@@ -268,20 +268,21 @@ impl Printer {
         &self,
         diagnostics: &Diagnostics,
         writer: &mut dyn Write,
+        preview: PreviewMode,
     ) -> Result<()> {
         let required_applicability = self.unsafe_fixes.required_applicability();
         let statistics: Vec<ExpandedStatistics> = diagnostics
             .inner
             .iter()
-            .sorted_by_key(|diagnostic| diagnostic.secondary_code())
+            .sorted_by_key(|diagnostic| diagnostic.name())
             .fold(vec![], |mut acc: Vec<DiagnosticGroup>, diagnostic| {
                 let is_fixable = diagnostic
                     .fix()
                     .is_some_and(|fix| fix.applies(required_applicability));
-                let code = diagnostic.secondary_code();
+                let name = diagnostic.name();
 
-                if let Some((prev_code, _prev_message, count, fixable_count)) = acc.last_mut() {
-                    if *prev_code == code {
+                if let Some((prev_name, _prev_message, count, fixable_count)) = acc.last_mut() {
+                    if *prev_name == name {
                         *count += 1;
                         if is_fixable {
                             *fixable_count += 1;
@@ -289,14 +290,14 @@ impl Printer {
                         return acc;
                     }
                 }
-                acc.push((code, diagnostic, 1, usize::from(is_fixable)));
+                acc.push((name, diagnostic, 1, usize::from(is_fixable)));
                 acc
             })
             .iter()
             .map(
-                |&(code, message, count, fixable_count)| ExpandedStatistics {
-                    code,
-                    name: message.name(),
+                |&(name, message, count, fixable_count)| ExpandedStatistics {
+                    code: message.secondary_code(),
+                    name,
                     count,
                     // Backward compatibility: `fixable` is true only when all violations are fixable.
                     // See: https://github.com/astral-sh/ruff/pull/21513
@@ -335,29 +336,49 @@ impl Printer {
 
                 // By default, we mimic Flake8's `--statistics` format.
                 for statistic in &statistics {
-                    writeln!(
-                        writer,
-                        "{:>count_width$}\t{:<code_width$}\t{}{}",
-                        statistic.count.to_string().bold(),
-                        statistic
-                            .code
-                            .map(SecondaryCode::as_str)
-                            .unwrap_or_default()
-                            .red()
-                            .bold(),
-                        if any_fixable {
-                            if statistic.all_fixable {
-                                &all_fixable
-                            } else if statistic.any_fixable() {
-                                &partially_fixable
+                    if is_rule_name_output_enabled(preview) {
+                        writeln!(
+                            writer,
+                            "{:>count_width$}  {}{}",
+                            statistic.count.to_string().bold(),
+                            if any_fixable {
+                                if statistic.all_fixable {
+                                    &all_fixable
+                                } else if statistic.any_fixable() {
+                                    &partially_fixable
+                                } else {
+                                    unfixable
+                                }
                             } else {
-                                unfixable
-                            }
-                        } else {
-                            ""
-                        },
-                        statistic.name,
-                    )?;
+                                ""
+                            },
+                            statistic.name,
+                        )?;
+                    } else {
+                        writeln!(
+                            writer,
+                            "{:>count_width$}\t{:<code_width$}\t{}{}",
+                            statistic.count.to_string().bold(),
+                            statistic
+                                .code
+                                .map(SecondaryCode::as_str)
+                                .unwrap_or_default()
+                                .red()
+                                .bold(),
+                            if any_fixable {
+                                if statistic.all_fixable {
+                                    &all_fixable
+                                } else if statistic.any_fixable() {
+                                    &partially_fixable
+                                } else {
+                                    unfixable
+                                }
+                            } else {
+                                ""
+                            },
+                            statistic.name,
+                        )?;
+                    }
                 }
 
                 self.write_summary_text(writer, diagnostics)?;
