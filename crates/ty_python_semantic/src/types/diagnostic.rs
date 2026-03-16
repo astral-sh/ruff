@@ -801,9 +801,9 @@ declare_lint! {
     /// alice = Person(name="Alice", age=30)
     /// alice["height"]  # KeyError: 'height'
     ///
-    /// bob: Person = { "name": "Bob", "age": 30 }  # typo!
+    /// bob: Person = { "namee": "Bob", "age": 30 }  # typo!
     ///
-    /// carol = Person(name="Carol", age=25)  # typo!
+    /// carol = Person(name="Carol", aeg=25)  # typo!
     /// ```
     pub(crate) static INVALID_KEY = {
         summary: "detects invalid subscript accesses or TypedDict literal keys",
@@ -5170,7 +5170,7 @@ pub(super) fn report_invalid_method_override<'db>(
     let db = context.db();
 
     let signature_span =
-        |function: FunctionType<'db>| function.literal(db).last_definition(db).spans(db).signature;
+        |function: FunctionType<'db>| function.literal(db).last_definition.spans(db).signature;
 
     let subclass_definition_kind = subclass_definition.kind(db);
     let subclass_definition_signature_span = signature_span(subclass_function);
@@ -5412,7 +5412,7 @@ pub(super) fn report_overridden_final_method<'db>(
     } else {
         first_final_superclass_definition
             .literal(db)
-            .last_definition(db)
+            .last_definition
     };
 
     sub.annotate(

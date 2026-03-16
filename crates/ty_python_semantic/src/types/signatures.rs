@@ -323,10 +323,9 @@ impl<'db> CallableSignature<'db> {
     ) -> ConstraintSet<'db, 'c> {
         let relation_visitor = HasRelationToVisitor::default(constraints);
         let disjointness_visitor = IsDisjointVisitor::default(constraints);
-        let checker = TypeRelationChecker::new(
+        let checker = TypeRelationChecker::constraint_set_assignability(
             constraints,
             inferable,
-            TypeRelation::ConstraintSetAssignability,
             &relation_visitor,
             &disjointness_visitor,
         );
@@ -786,10 +785,9 @@ impl<'db> Signature<'db> {
     ) -> ConstraintSet<'db, 'c> {
         let relation_visitor = HasRelationToVisitor::default(constraints);
         let disjointness_visitor = IsDisjointVisitor::default(constraints);
-        let checker = TypeRelationChecker::new(
+        let checker = TypeRelationChecker::constraint_set_assignability(
             constraints,
             inferable,
-            TypeRelation::ConstraintSetAssignability,
             &relation_visitor,
             &disjointness_visitor,
         );
@@ -2555,7 +2553,7 @@ mod tests {
         db.write_dedented("/src/a.py", "def f(): ...").unwrap();
         let func = get_function_f(&db, "/src/a.py")
             .literal(&db)
-            .last_definition(&db);
+            .last_definition;
 
         let sig = func.signature(&db);
 
@@ -2580,7 +2578,7 @@ mod tests {
         .unwrap();
         let func = get_function_f(&db, "/src/a.py")
             .literal(&db)
-            .last_definition(&db);
+            .last_definition;
 
         let sig = func.signature(&db);
 
@@ -2632,7 +2630,7 @@ mod tests {
         .unwrap();
         let func = get_function_f(&db, "/src/a.py")
             .literal(&db)
-            .last_definition(&db);
+            .last_definition;
 
         let sig = func.signature(&db);
 
@@ -2670,7 +2668,7 @@ mod tests {
         .unwrap();
         let func = get_function_f(&db, "/src/a.pyi")
             .literal(&db)
-            .last_definition(&db);
+            .last_definition;
 
         let sig = func.signature(&db);
 
@@ -2708,7 +2706,7 @@ mod tests {
         .unwrap();
         let func = get_function_f(&db, "/src/a.py")
             .literal(&db)
-            .last_definition(&db);
+            .last_definition;
 
         let sig = func.signature(&db);
 
@@ -2752,7 +2750,7 @@ mod tests {
         .unwrap();
         let func = get_function_f(&db, "/src/a.pyi")
             .literal(&db)
-            .last_definition(&db);
+            .last_definition;
 
         let sig = func.signature(&db);
 
@@ -2790,7 +2788,7 @@ mod tests {
         .unwrap();
         let func = get_function_f(&db, "/src/a.py");
 
-        let overload = func.literal(&db).last_definition(&db);
+        let overload = func.literal(&db).last_definition;
         let expected_sig = overload.signature(&db);
 
         // With no decorators, internal and external signature are the same
