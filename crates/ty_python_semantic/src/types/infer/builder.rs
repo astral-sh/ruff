@@ -1349,8 +1349,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 node_index: _,
                 value,
             }) => {
-                // If this is a call expression, we would have added a `ReturnsNever` constraint,
-                // meaning this will be a standalone expression.
+                // If this is a call expression, we would have added an `IsNonTerminalCall`
+                // constraint, meaning this will be a standalone expression.
                 let ty = self.infer_maybe_standalone_expression(value, TypeContext::default());
 
                 if ty.is_awaitable(self.db()) && !self.is_known_function_call(value) {

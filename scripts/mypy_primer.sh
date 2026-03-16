@@ -5,7 +5,7 @@ echo "Enabling mypy primer specific configuration overloads (see .github/mypy-pr
 mkdir -p ~/.config/ty
 cp .github/mypy-primer-ty.toml ~/.config/ty/ty.toml
 
-PRIMER_SELECTOR="$(paste -s -d'|' "${PRIMER_SELECTOR}")"
+PRIMER_SELECTOR="$(uv run scripts/mypy_primer_selector.py "${PRIMER_SELECTOR}")"
 
 echo "new commit"
 git rev-list --format=%s --max-count=1 "${GITHUB_SHA}"
@@ -29,7 +29,7 @@ uvx \
   --cargo-profile profiling \
   --old base_commit \
   --new "${GITHUB_SHA}" \
-  --project-selector "/($PRIMER_SELECTOR)\$" \
+  --project-selector "${PRIMER_SELECTOR}" \
   --output concise \
   --debug > "${DIFF_FILE}" || [ $? -eq 1 ]
 
