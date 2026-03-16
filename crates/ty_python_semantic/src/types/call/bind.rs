@@ -98,6 +98,10 @@ struct ConstructorBinding<'db> {
 }
 
 impl<'db> ConstructorBinding<'db> {
+    fn entry_constructor_instance_type(&self) -> Option<Type<'db>> {
+        (!self.has_downstream_constructor()).then_some(self.constructed_instance_type)
+    }
+
     fn callable(&self) -> &CallableBinding<'db> {
         &self.entry
     }
@@ -144,9 +148,6 @@ impl<'db> ConstructorBinding<'db> {
         class_literal: ClassLiteral<'db>,
         bindings: Bindings<'db>,
     ) {
-        // Once constructor dispatch is deferred downstream, the upstream callable must preserve
-        // its own per-overload return types instead of forcing the constructed instance type.
-        self.entry.constructor_instance_type = None;
         self.downstream_constructor = Some(Box::new(DownstreamConstructor {
             class_literal,
             bindings,
@@ -159,16 +160,44 @@ impl<'db> ConstructorBinding<'db> {
         arguments: &CallArguments<'_, 'db>,
         argument_forms: &mut ArgumentForms,
     ) {
-        self.entry.match_parameters(db, arguments, argument_forms);
+        self.entry.match_parameters(
+            db,
+            arguments,
+            argument_forms,
+            self.entry_constructor_instance_type(),
+        );
+
+        let downstream_constructor_instance_type = self.constructed_instance_type;
 
         if let Some(downstream) = self.downstream_constructor.as_mut() {
             // `init_binding.match_parameters` handles its own bound-`self` insertion, so pass the
             // original call arguments here.
             let mut init_forms = ArgumentForms::new(arguments.len());
             for init_binding in downstream.bindings.iter_semantic_alternatives_mut() {
-                init_binding.match_parameters(db, arguments, &mut init_forms);
+                init_binding.match_parameters(
+                    db,
+                    arguments,
+                    &mut init_forms,
+                    Some(downstream_constructor_instance_type),
+                );
             }
         }
+    }
+
+    fn check_types(
+        &mut self,
+        db: &'db dyn Db,
+        constraints: &ConstraintSetBuilder<'db>,
+        argument_types: &CallArguments<'_, 'db>,
+        call_expression_tcx: TypeContext<'db>,
+    ) -> Option<ArgumentForms> {
+        self.entry.check_types(
+            db,
+            constraints,
+            argument_types,
+            self.entry_constructor_instance_type(),
+            call_expression_tcx,
+        )
     }
 
     fn check_downstream_constructor(
@@ -282,8 +311,14 @@ impl<'db> CallAlternative<'db> {
         argument_types: &CallArguments<'_, 'db>,
         call_expression_tcx: TypeContext<'db>,
     ) -> Option<ArgumentForms> {
-        self.callable_mut()
-            .check_types(db, constraints, argument_types, call_expression_tcx)
+        match self {
+            CallAlternative::Regular(binding) => {
+                binding.check_types(db, constraints, argument_types, None, call_expression_tcx)
+            }
+            CallAlternative::Constructor(binding) => {
+                binding.check_types(db, constraints, argument_types, call_expression_tcx)
+            }
+        }
     }
 
     fn match_parameters(
@@ -291,10 +326,11 @@ impl<'db> CallAlternative<'db> {
         db: &'db dyn Db,
         arguments: &CallArguments<'_, 'db>,
         argument_forms: &mut ArgumentForms,
+        constructor_instance_type: Option<Type<'db>>,
     ) {
         match self {
             CallAlternative::Regular(binding) => {
-                binding.match_parameters(db, arguments, argument_forms);
+                binding.match_parameters(db, arguments, argument_forms, constructor_instance_type);
             }
             CallAlternative::Constructor(binding) => {
                 binding.match_parameters(db, arguments, argument_forms);
@@ -328,6 +364,13 @@ impl<'db> CallAlternative<'db> {
             CallAlternative::Constructor(binding) => {
                 binding.checked_downstream_constructor_bindings(db)
             }
+        }
+    }
+
+    fn type_context_reverse_inference_return_ty(&self) -> Option<Type<'db>> {
+        match self {
+            CallAlternative::Regular(_) => None,
+            CallAlternative::Constructor(binding) => binding.entry_constructor_instance_type(),
         }
     }
 
@@ -731,14 +774,9 @@ impl<'db> Bindings<'db> {
         for element in &mut self.elements {
             for alternative in &mut element.alternatives {
                 match alternative {
-                    CallAlternative::Regular(binding) => {
-                        binding.constructor_instance_type = Some(constructor_instance_type);
-                    }
+                    CallAlternative::Regular(_) => {}
                     CallAlternative::Constructor(binding) => {
                         binding.constructed_instance_type = constructor_instance_type;
-                        binding.entry.constructor_instance_type = (!binding
-                            .has_downstream_constructor())
-                        .then_some(constructor_instance_type);
 
                         // Deferred downstream constructor bindings still need constructor instance
                         // context for generic specialization inference (including literal
@@ -964,21 +1002,32 @@ impl<'db> Bindings<'db> {
             .flat_map(BindingsElement::alternatives_mut)
     }
 
+    fn collect_type_context_callables<'a>(
+        &'a self,
+        db: &'db dyn Db,
+        out: &mut Vec<(&'a CallableBinding<'db>, Option<Type<'db>>)>,
+    ) {
+        for alternative in self.iter_semantic_alternatives() {
+            out.push((
+                alternative.callable(),
+                alternative.type_context_reverse_inference_return_ty(),
+            ));
+
+            if let Some(bindings) = alternative.checked_downstream_constructor_bindings(db) {
+                bindings.collect_type_context_callables(db, out);
+            }
+        }
+    }
+
     /// Returns the callables that should contribute argument type context, including deferred
     /// constructor callables whose checks are enabled by the matched upstream overload.
     pub(crate) fn iter_type_context_callables(
         &self,
         db: &'db dyn Db,
-    ) -> impl Iterator<Item = &CallableBinding<'db>> + '_ {
-        self.iter_semantic_alternatives()
-            .flat_map(move |alternative| {
-                std::iter::once(alternative.callable()).chain(
-                    alternative
-                        .checked_downstream_constructor_bindings(db)
-                        .into_iter()
-                        .flat_map(Bindings::iter_flat),
-                )
-            })
+    ) -> impl Iterator<Item = (&CallableBinding<'db>, Option<Type<'db>>)> + '_ {
+        let mut callables = Vec::new();
+        self.collect_type_context_callables(db, &mut callables);
+        callables.into_iter()
     }
 
     /// Maps each `CallableBinding` to a type and combines results while preserving
@@ -1045,7 +1094,7 @@ impl<'db> Bindings<'db> {
     ) -> Self {
         let mut argument_forms = ArgumentForms::new(arguments.len());
         for alternative in self.iter_semantic_alternatives_mut() {
-            alternative.match_parameters(db, arguments, &mut argument_forms);
+            alternative.match_parameters(db, arguments, &mut argument_forms, None);
         }
         argument_forms.shrink_to_fit();
         self.argument_forms = argument_forms;
@@ -2998,7 +3047,6 @@ impl<'db> From<Binding<'db>> for Bindings<'db> {
             signature_type,
             dunder_call_is_possibly_unbound: false,
             bound_type: None,
-            constructor_instance_type: None,
             overload_call_return_type: None,
             matching_overload_before_type_checking: None,
             overloads: smallvec_inline![from],
@@ -3042,9 +3090,6 @@ pub(crate) struct CallableBinding<'db> {
 
     /// The type of the bound `self` or `cls` parameter if this signature is for a bound method.
     pub(crate) bound_type: Option<Type<'db>>,
-
-    /// The type of the instance being constructed, if this signature is for a constructor.
-    pub(crate) constructor_instance_type: Option<Type<'db>>,
 
     /// The return type of this overloaded callable.
     ///
@@ -3094,7 +3139,6 @@ impl<'db> CallableBinding<'db> {
             signature_type,
             dunder_call_is_possibly_unbound: false,
             bound_type: None,
-            constructor_instance_type: None,
             overload_call_return_type: None,
             matching_overload_before_type_checking: None,
             overloads,
@@ -3107,7 +3151,6 @@ impl<'db> CallableBinding<'db> {
             signature_type,
             dunder_call_is_possibly_unbound: false,
             bound_type: None,
-            constructor_instance_type: None,
             overload_call_return_type: None,
             matching_overload_before_type_checking: None,
             overloads: smallvec![],
@@ -3142,11 +3185,11 @@ impl<'db> CallableBinding<'db> {
         db: &'db dyn Db,
         arguments: &CallArguments<'_, 'db>,
         argument_forms: &mut ArgumentForms,
+        constructor_instance_type: Option<Type<'db>>,
     ) {
         // If this callable is a bound method, prepend the self instance onto the arguments list
         // before checking.
         let bound_arguments = arguments.with_self(self.bound_type);
-        let constructor_instance_type = self.constructor_instance_type;
 
         for overload in &mut self.overloads {
             overload.match_parameters(
@@ -3163,12 +3206,12 @@ impl<'db> CallableBinding<'db> {
         db: &'db dyn Db,
         constraints: &ConstraintSetBuilder<'db>,
         argument_types: &CallArguments<'_, 'db>,
+        constructor_instance_type: Option<Type<'db>>,
         call_expression_tcx: TypeContext<'db>,
     ) -> Option<ArgumentForms> {
         // If this callable is a bound method, prepend the self instance onto the arguments list
         // before checking.
         let argument_types = argument_types.with_self(self.bound_type);
-        let constructor_instance_type = self.constructor_instance_type;
         let reverse_inference_return_ty = constructor_instance_type;
 
         let _span = tracing::trace_span!(

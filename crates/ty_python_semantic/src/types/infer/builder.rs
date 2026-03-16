@@ -5085,15 +5085,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         call_expression_tcx: TypeContext<'db>,
     ) {
         fn add_overloads_from_binding<'a, 'db>(
-            overloads_with_binding: &mut Vec<(&'a Binding<'db>, &'a CallableBinding<'db>)>,
+            overloads_with_binding: &mut Vec<(
+                &'a Binding<'db>,
+                &'a CallableBinding<'db>,
+                Option<Type<'db>>,
+            )>,
             binding: &'a CallableBinding<'db>,
+            reverse_inference_return_ty: Option<Type<'db>>,
         ) {
             match binding.matching_overload_index() {
                 MatchingOverloadIndex::Single(_) | MatchingOverloadIndex::Multiple(_) => {
                     overloads_with_binding.extend(
                         binding
                             .matching_overloads()
-                            .map(|(_, overload)| (overload, binding)),
+                            .map(|(_, overload)| (overload, binding, reverse_inference_return_ty)),
                     );
                 }
 
@@ -5101,7 +5106,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // types for better diagnostics.
                 MatchingOverloadIndex::None => {
                     if let [overload] = binding.overloads() {
-                        overloads_with_binding.push((overload, binding));
+                        overloads_with_binding.push((
+                            overload,
+                            binding,
+                            reverse_inference_return_ty,
+                        ));
                     }
                 }
             }
@@ -5118,10 +5127,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ast_arguments
         );
 
-        let mut overloads_with_binding: Vec<(&Binding<'db>, &CallableBinding<'db>)> = Vec::new();
+        let mut overloads_with_binding: Vec<(
+            &Binding<'db>,
+            &CallableBinding<'db>,
+            Option<Type<'db>>,
+        )> = Vec::new();
 
-        for binding in bindings.iter_type_context_callables(db) {
-            add_overloads_from_binding(&mut overloads_with_binding, binding);
+        for (binding, reverse_inference_return_ty) in bindings.iter_type_context_callables(db) {
+            add_overloads_from_binding(
+                &mut overloads_with_binding,
+                binding,
+                reverse_inference_return_ty,
+            );
         }
 
         // Each type is a valid independent inference of the given argument, and we may require
@@ -5151,71 +5168,78 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             // Retrieve the parameter type for the current argument in a given overload and its binding.
-            let parameter_type = |overload: &Binding<'db>, binding: &CallableBinding<'db>| {
-                let argument_index = if binding.bound_type.is_some() {
-                    argument_index + 1
-                } else {
-                    argument_index
-                };
+            let parameter_type =
+                |overload: &Binding<'db>,
+                 binding: &CallableBinding<'db>,
+                 reverse_inference_return_ty: Option<Type<'db>>| {
+                    let argument_index = if binding.bound_type.is_some() {
+                        argument_index + 1
+                    } else {
+                        argument_index
+                    };
 
-                let argument_matches = &overload.argument_matches()[argument_index];
-                let [parameter_index] = argument_matches.parameters.as_slice() else {
-                    return None;
-                };
+                    let argument_matches = &overload.argument_matches()[argument_index];
+                    let [parameter_index] = argument_matches.parameters.as_slice() else {
+                        return None;
+                    };
 
-                let mut parameter_type =
-                    overload.signature.parameters()[*parameter_index].annotated_type();
+                    let mut parameter_type =
+                        overload.signature.parameters()[*parameter_index].annotated_type();
 
-                // If the parameter is a single type variable with an upper bound, e.g., `typing.Self`,
-                // use the upper bound as type context.
-                if let Type::TypeVar(typevar) = parameter_type
-                    && let Some(TypeVarBoundOrConstraints::UpperBound(bound)) =
-                        typevar.typevar(db).bound_or_constraints(db)
-                {
-                    return Some(bound);
-                }
-
-                // If this is a generic call, attempt to specialize the parameter type using the
-                // declared type context, if provided.
-                if let Some(generic_context) = overload.signature.generic_context {
-                    let mut builder =
-                        SpecializationBuilder::new(db, generic_context.inferable_typevars(db));
-
-                    if let Some(declared_return_ty) = call_expression_tcx.annotation {
-                        let _ = builder.infer_reverse(
-                            &constraints,
-                            declared_return_ty,
-                            binding
-                                .constructor_instance_type
-                                .unwrap_or(overload.signature.return_ty),
-                        );
+                    // If the parameter is a single type variable with an upper bound, e.g., `typing.Self`,
+                    // use the upper bound as type context.
+                    if let Type::TypeVar(typevar) = parameter_type
+                        && let Some(TypeVarBoundOrConstraints::UpperBound(bound)) =
+                            typevar.typevar(db).bound_or_constraints(db)
+                    {
+                        return Some(bound);
                     }
 
-                    let specialization = builder
-                        // Default specialize any type variables to a marker type, which will be ignored
-                        // during argument inference, allowing the concrete subset of the parameter
-                        // type to still affect argument inference.
-                        //
-                        // TODO: Eventually, we want to "tie together" the typevars of the two calls
-                        // so that we can infer their specializations at the same time — or at least, for
-                        // the specialization of one to influence the specialization of the other. It's
-                        // not yet clear how we're going to do that. (We might have to start inferring
-                        // constraint sets for each expression, instead of simple types?)
-                        .with_default(generic_context, |_| {
-                            Type::Dynamic(DynamicType::UnspecializedTypeVar)
-                        })
-                        .build(generic_context);
+                    // If this is a generic call, attempt to specialize the parameter type using the
+                    // declared type context, if provided.
+                    if let Some(generic_context) = overload.signature.generic_context {
+                        let mut builder =
+                            SpecializationBuilder::new(db, generic_context.inferable_typevars(db));
 
-                    parameter_type = parameter_type.apply_specialization(db, specialization);
-                }
+                        if let Some(declared_return_ty) = call_expression_tcx.annotation {
+                            let _ = builder.infer_reverse(
+                                &constraints,
+                                declared_return_ty,
+                                reverse_inference_return_ty.unwrap_or(overload.signature.return_ty),
+                            );
+                        }
 
-                Some(parameter_type)
-            };
+                        let specialization = builder
+                            // Default specialize any type variables to a marker type, which will be ignored
+                            // during argument inference, allowing the concrete subset of the parameter
+                            // type to still affect argument inference.
+                            //
+                            // TODO: Eventually, we want to "tie together" the typevars of the two calls
+                            // so that we can infer their specializations at the same time — or at least, for
+                            // the specialization of one to influence the specialization of the other. It's
+                            // not yet clear how we're going to do that. (We might have to start inferring
+                            // constraint sets for each expression, instead of simple types?)
+                            .with_default(generic_context, |_| {
+                                Type::Dynamic(DynamicType::UnspecializedTypeVar)
+                            })
+                            .build(generic_context);
+
+                        parameter_type = parameter_type.apply_specialization(db, specialization);
+                    }
+
+                    Some(parameter_type)
+                };
 
             // If there is only a single binding and overload, we can infer the argument directly with
             // the unique parameter type annotation.
-            if let Ok((overload, binding)) = overloads_with_binding.iter().exactly_one() {
-                let tcx = TypeContext::new(parameter_type(overload, binding));
+            if let Ok((overload, binding, reverse_inference_return_ty)) =
+                overloads_with_binding.iter().exactly_one()
+            {
+                let tcx = TypeContext::new(parameter_type(
+                    overload,
+                    binding,
+                    *reverse_inference_return_ty,
+                ));
                 *argument_type = Some(infer_argument_ty(self, (argument_index, ast_argument, tcx)));
             } else {
                 // We perform inference once without any type context, emitting any diagnostics that are unrelated
@@ -5231,9 +5255,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let was_in_multi_inference = self.context.set_multi_inference(true);
 
                 // Infer the type of each argument once with each distinct parameter type as type context.
-                let parameter_types = overloads_with_binding
-                    .iter()
-                    .filter_map(|(overload, binding)| parameter_type(overload, binding));
+                let parameter_types = overloads_with_binding.iter().filter_map(
+                    |(overload, binding, reverse_inference_return_ty)| {
+                        parameter_type(overload, binding, *reverse_inference_return_ty)
+                    },
+                );
 
                 let mut seen = FxHashSet::default();
 
