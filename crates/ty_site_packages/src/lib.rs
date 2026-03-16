@@ -341,9 +341,6 @@ enum InstallationDir {
 }
 
 impl InstallationDir {
-    /// All known installation directory variants.
-    const ALL: &[Self] = &[Self::SitePackages, Self::DistPackages];
-
     const fn as_str(self) -> &'static str {
         match self {
             Self::SitePackages => "site-packages",
@@ -1254,7 +1251,7 @@ fn probe_package_dirs(
 /// for the given `suffixes` (typically `site-packages` and `dist-packages`).
 fn discover_package_dirs(
     prefix_dir: &SystemPath,
-    suffixes: &[InstallationDir],
+    suffixes: &(impl IntoIterator<Item = InstallationDir> + Clone),
     implementation: PythonImplementation,
     system: &dyn System,
     directories: &mut SitePackagesPaths,
@@ -1284,7 +1281,7 @@ fn discover_package_dirs(
         };
 
         if matches_implementation {
-            for suffix in suffixes {
+            for suffix in suffixes.clone() {
                 let candidate = path.join(suffix.as_str());
                 if system.is_directory(&candidate) {
                     directories.insert(candidate);
@@ -1399,7 +1396,7 @@ fn site_packages_directories_from_sys_prefix(
             let prefix = sys_prefix_path.join(lib_dir);
             discover_package_dirs(
                 &prefix,
-                InstallationDir::ALL,
+                &InstallationDir::iter(),
                 implementation,
                 system,
                 &mut directories,
