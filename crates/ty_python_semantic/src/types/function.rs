@@ -382,7 +382,7 @@ impl<'db> OverloadLiteral<'db> {
         };
 
         let previous_literal = previous_type.literal(db);
-        let previous_overload = previous_literal.last_definition(db);
+        let previous_overload = previous_literal.last_definition;
         if !previous_overload.is_overload(db) {
             return None;
         }
@@ -644,25 +644,21 @@ impl<'db> OverloadLiteral<'db> {
 /// Representation of a function definition in the AST, along with any previous overloads of the
 /// function. Each overload can be separately generic or not, and each generic overload uses
 /// distinct typevars.
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 pub struct FunctionLiteral<'db> {
     pub(crate) last_definition: OverloadLiteral<'db>,
 }
 
-// The Salsa heap is tracked separately.
-impl get_size2::GetSize for FunctionLiteral<'_> {}
-
-#[salsa::tracked]
 impl<'db> FunctionLiteral<'db> {
     fn name(self, db: &'db dyn Db) -> &'db ast::name::Name {
         // All of the overloads of a function literal should have the same name.
-        self.last_definition(db).name(db)
+        self.last_definition.name(db)
     }
 
     fn known(self, db: &'db dyn Db) -> Option<KnownFunction> {
         // Whether a function is known is based on its name (and its containing module's name), so
         // all overloads should be known (or not) equivalently.
-        self.last_definition(db).known(db)
+        self.last_definition.known(db)
     }
 
     fn has_known_decorator(self, db: &dyn Db, decorator: FunctionDecorators) -> bool {
@@ -679,15 +675,15 @@ impl<'db> FunctionLiteral<'db> {
     }
 
     fn definition(self, db: &'db dyn Db) -> Definition<'db> {
-        self.last_definition(db).definition(db)
+        self.last_definition.definition(db)
     }
 
     fn parameter_span(self, db: &'db dyn Db, parameter_index: Option<usize>) -> (Span, Span) {
-        self.last_definition(db).parameter_span(db, parameter_index)
+        self.last_definition.parameter_span(db, parameter_index)
     }
 
     fn spans(self, db: &'db dyn Db) -> FunctionSpans {
-        self.last_definition(db).spans(db)
+        self.last_definition.spans(db)
     }
 
     fn overloads_and_implementation(
@@ -701,14 +697,13 @@ impl<'db> FunctionLiteral<'db> {
         )]
         fn overloads_and_implementation_inner<'db>(
             db: &'db dyn Db,
-            function: FunctionLiteral<'db>,
+            self_overload: OverloadLiteral<'db>,
         ) -> (Box<[OverloadLiteral<'db>]>, Option<OverloadLiteral<'db>>) {
-            let self_overload = function.last_definition(db);
             let mut current = self_overload;
             let mut overloads = vec![];
 
             while let Some(previous) = current.previous_overload(db) {
-                let overload = previous.last_definition(db);
+                let overload = previous.last_definition;
                 overloads.push(overload);
                 current = overload;
             }
@@ -726,7 +721,8 @@ impl<'db> FunctionLiteral<'db> {
             (overloads.into_boxed_slice(), implementation)
         }
 
-        let (overloads, implementation) = overloads_and_implementation_inner(db, self);
+        let (overloads, implementation) =
+            overloads_and_implementation_inner(db, self.last_definition);
         (overloads.as_ref(), *implementation)
     }
 
@@ -771,7 +767,7 @@ impl<'db> FunctionLiteral<'db> {
     /// a cross-module dependency directly on the full AST which will lead to cache
     /// over-invalidation.
     fn last_definition_signature(self, db: &'db dyn Db) -> Signature<'db> {
-        self.last_definition(db).signature(db)
+        self.last_definition.signature(db)
     }
 
     /// Typed externally-visible "raw" signature of the last overload or implementation of this function.
@@ -783,7 +779,7 @@ impl<'db> FunctionLiteral<'db> {
     /// a cross-module dependency directly on the full AST which will lead to cache
     /// over-invalidation.
     fn last_definition_raw_signature(self, db: &'db dyn Db) -> Signature<'db> {
-        self.last_definition(db).raw_signature(db)
+        self.last_definition.raw_signature(db)
     }
 
     /// Return `Some()` if this function is an abstract method.
@@ -821,19 +817,26 @@ impl<'db> FunctionLiteral<'db> {
     ///
     /// For functions without an implementation (e.g., overloaded functions),
     /// returns [`FunctionBodyKind::Stub`].
-    #[salsa::tracked]
     fn body_kind(self, db: &'db dyn Db) -> FunctionBodyKind {
+        #[salsa::tracked]
+        fn implementation_body_kind<'db>(
+            db: &'db dyn Db,
+            implementation: OverloadLiteral<'db>,
+        ) -> FunctionBodyKind {
+            let definition = implementation.definition(db);
+            let file = definition.file(db);
+            let module = parsed_module(db, file).load(db);
+            let node = implementation.node(db, file, &module);
+            function_body_kind(db, node, |expr| {
+                definition_expression_type(db, definition, expr)
+            })
+        }
+
         let (_, implementation) = self.overloads_and_implementation(db);
         let Some(implementation) = implementation else {
             return FunctionBodyKind::Stub;
         };
-        let definition = self.definition(db);
-        let file = definition.file(db);
-        let module = parsed_module(db, file).load(db);
-        let node = implementation.node(db, file, &module);
-        function_body_kind(db, node, |expr| {
-            definition_expression_type(db, definition, expr)
-        })
+        implementation_body_kind(db, implementation)
     }
 
     /// Returns `true` if this function has a trivial body.
@@ -966,15 +969,15 @@ impl<'db> FunctionType<'db> {
         // previous overloads.
         let literal = self.literal(db);
         let last_definition = literal
-            .last_definition(db)
+            .last_definition
             .with_dataclass_transformer_params(db, params);
-        let literal = FunctionLiteral::new(db, last_definition);
+        let literal = FunctionLiteral { last_definition };
         Self::new(db, literal, None, None)
     }
 
     /// Returns the [`File`] in which this function is defined.
     pub(crate) fn file(self, db: &'db dyn Db) -> File {
-        self.literal(db).last_definition(db).file(db)
+        self.literal(db).last_definition.file(db)
     }
 
     /// Returns the AST node for this function.
@@ -984,7 +987,7 @@ impl<'db> FunctionType<'db> {
         file: File,
         module: &'ast ParsedModuleRef,
     ) -> &'ast ast::StmtFunctionDef {
-        self.literal(db).last_definition(db).node(db, file, module)
+        self.literal(db).last_definition.node(db, file, module)
     }
 
     pub(crate) fn name(self, db: &'db dyn Db) -> &'db ast::name::Name {

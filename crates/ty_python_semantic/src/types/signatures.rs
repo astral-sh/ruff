@@ -2553,7 +2553,7 @@ mod tests {
         db.write_dedented("/src/a.py", "def f(): ...").unwrap();
         let func = get_function_f(&db, "/src/a.py")
             .literal(&db)
-            .last_definition(&db);
+            .last_definition;
 
         let sig = func.signature(&db);
 
@@ -2578,7 +2578,7 @@ mod tests {
         .unwrap();
         let func = get_function_f(&db, "/src/a.py")
             .literal(&db)
-            .last_definition(&db);
+            .last_definition;
 
         let sig = func.signature(&db);
 
@@ -2630,7 +2630,7 @@ mod tests {
         .unwrap();
         let func = get_function_f(&db, "/src/a.py")
             .literal(&db)
-            .last_definition(&db);
+            .last_definition;
 
         let sig = func.signature(&db);
 
@@ -2668,7 +2668,7 @@ mod tests {
         .unwrap();
         let func = get_function_f(&db, "/src/a.pyi")
             .literal(&db)
-            .last_definition(&db);
+            .last_definition;
 
         let sig = func.signature(&db);
 
@@ -2706,7 +2706,7 @@ mod tests {
         .unwrap();
         let func = get_function_f(&db, "/src/a.py")
             .literal(&db)
-            .last_definition(&db);
+            .last_definition;
 
         let sig = func.signature(&db);
 
@@ -2750,7 +2750,7 @@ mod tests {
         .unwrap();
         let func = get_function_f(&db, "/src/a.pyi")
             .literal(&db)
-            .last_definition(&db);
+            .last_definition;
 
         let sig = func.signature(&db);
 
@@ -2788,7 +2788,7 @@ mod tests {
         .unwrap();
         let func = get_function_f(&db, "/src/a.py");
 
-        let overload = func.literal(&db).last_definition(&db);
+        let overload = func.literal(&db).last_definition;
         let expected_sig = overload.signature(&db);
 
         // With no decorators, internal and external signature are the same

@@ -611,7 +611,7 @@ fn check_explicit_overrides<'db>(
     let function_literal = if context.in_stub() {
         decorated_function.first_overload_or_implementation(db)
     } else {
-        decorated_function.literal(db).last_definition(db)
+        decorated_function.literal(db).last_definition
     };
 
     let Some(builder) = context.report_lint(
