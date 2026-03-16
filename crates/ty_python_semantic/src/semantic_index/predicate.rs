@@ -103,12 +103,21 @@ pub(crate) enum PredicateNode<'db> {
     Expression(Expression<'db>),
     /// These predicates are recorded for statements with call expressions. As part of
     /// reachability constraints, they are used to determine whether control flow can
-    /// continue past this statement or not. If it can be statically guaranteed that
-    /// such a call always returns `Never`/`NoReturn`, evaluation returns `AlwaysFalse`,
-    /// signaling that control flow terminates. In all other cases, the evaluation
-    /// returns `AlwaysTrue`. We do not return `Ambiguous`, even if the return type is
-    /// `Unknown`/`Any`, because that would result in too many false positives. Most
-    /// calls are not terminal.
+    /// continue past this statement or not.
+    ///
+    /// The predicate evaluates to
+    /// [`crate::types::Truthiness::AlwaysTrue`] in the common case where a call
+    /// is inferred as returning an inhabited type: in these situations, we will
+    /// infer control flow as flowing through the call expression without
+    /// terminating. If it can be statically guaranteed that a call always
+    /// returns `Never`/`NoReturn`, however, the predicate evaluates to
+    /// [`crate::types::Truthiness::AlwaysFalse`], signaling that control flow
+    /// ends as a result of the call: these call expressions are terminal.
+    ///
+    /// These predicates never evaluate to
+    /// [`crate::types::Truthiness::Ambiguous`], even if the return type of the
+    /// call is `Unknown`/`Any`, because that would result in too many false
+    /// positives.
     IsNonTerminalCall(Expression<'db>),
     Pattern(PatternPredicate<'db>),
     StarImportPlaceholder(StarImportPlaceholderPredicate<'db>),
