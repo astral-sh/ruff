@@ -980,7 +980,7 @@ def _(
     # `x()` returns `Foo` if `x` has type `type[Foo]`,
     # and `str` if `x` has type `Callable[[], str]()`.
     # The return type is the intersection of `Foo` and `str`.
-    reveal_type(x())  # revealed: str & Foo
+    reveal_type(x())  # revealed: Foo & str
 ```
 
 ### Partial success in intersection calls
@@ -1157,7 +1157,7 @@ from typing import Any
 class Foo: ...
 
 def _(x: Intersection[type[Foo], Any]) -> None:
-    reveal_type(x())  # revealed: Any & Foo
+    reveal_type(x())  # revealed: Foo & Any
 ```
 
 ### Element returning `Never`

@@ -56,7 +56,7 @@ use crate::types::{
     SpecialFormType, TypeAliasType, TypeContext, TypeVarBoundOrConstraints, TypeVarVariance,
     UnionBuilder, UnionType, WrapperDescriptorKind, enums, list_members,
 };
-use crate::{DisplaySettings, FxOrderMap, Program};
+use crate::{DisplaySettings, Program};
 use ruff_db::diagnostic::{Annotation, Diagnostic, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_python_ast::{self as ast, ArgOrKeyword, PythonVersion};
 use ty_module_resolver::KnownModule;
@@ -116,10 +116,6 @@ impl<'db> ConstructorBinding<'db> {
             constructor_kind: self.constructor_kind,
             downstream_constructor: self.downstream_constructor,
         }
-    }
-
-    fn constructed_instance_type(&self) -> Type<'db> {
-        self.constructed_instance_type
     }
 
     fn return_type(&self, db: &'db dyn Db) -> Type<'db> {
@@ -393,45 +389,21 @@ impl<'db> CallAlternative<'db> {
         }
     }
 
-    fn into_constructor(self) -> CallAlternative<'db> {
+    fn into_constructor(self, constructed_instance_type: Type<'db>) -> CallAlternative<'db> {
         match self {
-            CallAlternative::Regular(binding) => {
-                if let Some(constructed_instance_type) = binding.constructor_instance_type {
-                    CallAlternative::Constructor(ConstructorBinding {
-                        entry: binding,
-                        constructed_instance_type,
-                        constructor_kind: ConstructorCallableKind::Regular,
-                        downstream_constructor: None,
-                    })
-                } else {
-                    CallAlternative::Regular(binding)
-                }
+            CallAlternative::Regular(binding) => CallAlternative::Constructor(ConstructorBinding {
+                entry: binding,
+                constructed_instance_type,
+                constructor_kind: ConstructorCallableKind::Regular,
+                downstream_constructor: None,
+            }),
+            CallAlternative::Constructor(mut binding) => {
+                binding.constructed_instance_type = constructed_instance_type;
+                CallAlternative::Constructor(binding)
             }
-            constructor @ CallAlternative::Constructor(_) => constructor,
         }
     }
 }
-
-/// Temporary regrouping state for one constructor family while computing union return types.
-#[derive(Debug, Default)]
-struct ConstructorGroupState<'a, 'db> {
-    bindings: SmallVec<[&'a ConstructorBinding<'db>; 1]>,
-    /// The original return type to preserve if grouped constructor handling returns `None`.
-    preserved_return_type: Option<Type<'db>>,
-}
-
-impl<'a, 'db> ConstructorGroupState<'a, 'db> {
-    fn push(
-        &mut self,
-        bindings: impl IntoIterator<Item = &'a ConstructorBinding<'db>>,
-        return_ty: Type<'db>,
-    ) {
-        self.bindings.extend(bindings);
-        self.preserved_return_type.get_or_insert(return_ty);
-    }
-}
-
-type ConstructorGroups<'a, 'db> = FxOrderMap<Type<'db>, ConstructorGroupState<'a, 'db>>;
 
 impl<'db> BindingsElement<'db> {
     fn alternatives(&self) -> impl Iterator<Item = &CallAlternative<'db>> {
@@ -440,12 +412,6 @@ impl<'db> BindingsElement<'db> {
 
     fn alternatives_mut(&mut self) -> impl Iterator<Item = &mut CallAlternative<'db>> {
         self.alternatives.iter_mut()
-    }
-
-    fn constructor_bindings(&self) -> impl Iterator<Item = &ConstructorBinding<'db>> {
-        self.alternatives
-            .iter()
-            .filter_map(CallAlternative::as_constructor)
     }
 
     fn callables(&self) -> impl Iterator<Item = &CallableBinding<'db>> {
@@ -458,55 +424,17 @@ impl<'db> BindingsElement<'db> {
             .map(CallAlternative::callable_mut)
     }
 
-    /// Returns the constructor instance type shared by all bindings in this element, if any.
-    fn constructor_instance_type(&self) -> Option<Type<'db>> {
-        let constructor_instance_type = self
-            .alternatives
-            .first()?
-            .as_constructor()?
-            .constructed_instance_type();
-        self.alternatives
-            .iter()
-            .all(|alternative| {
-                alternative.as_constructor().is_some_and(|binding| {
-                    binding.constructed_instance_type() == constructor_instance_type
-                })
-            })
-            .then_some(constructor_instance_type)
-    }
-
     /// Returns true if this element is an intersection of multiple callables.
     fn is_intersection(&self) -> bool {
         self.alternatives.len() > 1
     }
 
     fn return_type(&self, db: &'db dyn Db) -> Type<'db> {
-        let mut constructor_groups: ConstructorGroups<'_, 'db> = FxOrderMap::default();
-        let mut binding_return_types = Vec::with_capacity(self.alternatives.len());
-
-        for alternative in &self.alternatives {
-            let binding_return_type = alternative.return_type(db);
-            if let Some(binding) = alternative.as_constructor() {
-                constructor_groups
-                    .entry(binding.constructed_instance_type())
-                    .or_default()
-                    .push(std::iter::once(binding), binding_return_type);
-                continue;
-            }
-            binding_return_types.push(binding_return_type);
-        }
-
-        for (constructor_instance_type, group) in constructor_groups {
-            if let Some(group_return_type) = Bindings::constructor_return_type_for_bindings(
-                db,
-                constructor_instance_type,
-                group.bindings.iter().copied(),
-            ) {
-                binding_return_types.push(group_return_type);
-            } else if let Some(preserved_return_type) = group.preserved_return_type {
-                binding_return_types.push(preserved_return_type);
-            }
-        }
+        let binding_return_types = self
+            .alternatives
+            .iter()
+            .map(|alternative| alternative.return_type(db))
+            .collect::<Vec<_>>();
 
         match binding_return_types.as_slice() {
             [single] => *single,
@@ -799,6 +727,46 @@ pub(crate) struct Bindings<'db> {
 }
 
 impl<'db> Bindings<'db> {
+    fn set_constructor_instance_type_in_place(&mut self, constructor_instance_type: Type<'db>) {
+        self.constructor_instance_type = Some(constructor_instance_type);
+
+        for element in &mut self.elements {
+            for alternative in &mut element.alternatives {
+                match alternative {
+                    CallAlternative::Regular(binding) => {
+                        binding.constructor_instance_type = Some(constructor_instance_type);
+                        for overload in &mut binding.overloads {
+                            overload.constructor_instance_type = Some(constructor_instance_type);
+                        }
+                    }
+                    CallAlternative::Constructor(binding) => {
+                        binding.constructed_instance_type = constructor_instance_type;
+                        binding.entry.constructor_instance_type = Some(constructor_instance_type);
+
+                        // For constructor bindings with deferred downstream checks, preserve
+                        // per-overload return behavior on the upstream callable while still
+                        // enabling constructor-level return-type synthesis on `Bindings`.
+                        if !binding.has_downstream_constructor() {
+                            for overload in &mut binding.entry.overloads {
+                                overload.constructor_instance_type =
+                                    Some(constructor_instance_type);
+                            }
+                        }
+
+                        // Deferred downstream constructor bindings still need constructor instance
+                        // context for generic specialization inference (including literal
+                        // promotion).
+                        if let Some(downstream) = binding.downstream_constructor_mut() {
+                            downstream
+                                .bindings
+                                .set_constructor_instance_type_in_place(constructor_instance_type);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     fn apply_generic_context_in_place(
         &mut self,
         db: &'db dyn Db,
@@ -909,66 +877,18 @@ impl<'db> Bindings<'db> {
         }
     }
 
-    pub(crate) fn with_constructor_instance_type(
+    pub(crate) fn into_constructor_bindings(
         mut self,
         constructor_instance_type: Type<'db>,
     ) -> Self {
-        self.constructor_instance_type = Some(constructor_instance_type);
-
-        for element in &mut self.elements {
-            for alternative in &mut element.alternatives {
-                match alternative {
-                    CallAlternative::Regular(binding) => {
-                        binding.constructor_instance_type = Some(constructor_instance_type);
-                        for overload in &mut binding.overloads {
-                            overload.constructor_instance_type = Some(constructor_instance_type);
-                        }
-                    }
-                    CallAlternative::Constructor(binding) => {
-                        binding.constructed_instance_type = constructor_instance_type;
-                        binding.entry.constructor_instance_type = Some(constructor_instance_type);
-
-                        // For constructor bindings with deferred downstream checks, preserve
-                        // per-overload return behavior on the upstream callable while still
-                        // enabling constructor-level return-type synthesis on `Bindings`.
-                        if !binding.has_downstream_constructor() {
-                            for overload in &mut binding.entry.overloads {
-                                overload.constructor_instance_type =
-                                    Some(constructor_instance_type);
-                            }
-                        }
-
-                        // Deferred downstream constructor bindings still need constructor instance
-                        // context for generic specialization inference (including literal
-                        // promotion).
-                        if let Some(downstream) = binding.downstream_constructor_mut() {
-                            downstream.bindings.constructor_instance_type =
-                                Some(constructor_instance_type);
-                            for init_binding in downstream.bindings.iter_flat_mut() {
-                                init_binding.constructor_instance_type =
-                                    Some(constructor_instance_type);
-                                for overload in &mut init_binding.overloads {
-                                    overload.constructor_instance_type =
-                                        Some(constructor_instance_type);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        self
-    }
-
-    pub(crate) fn into_constructor_alternatives(mut self) -> Self {
         for element in &mut self.elements {
             element.alternatives = std::mem::take(&mut element.alternatives)
                 .into_iter()
-                .map(CallAlternative::into_constructor)
+                .map(|alternative| alternative.into_constructor(constructor_instance_type))
                 .collect();
         }
 
+        self.set_constructor_instance_type_in_place(constructor_instance_type);
         self
     }
 
@@ -1693,43 +1613,10 @@ impl<'db> Bindings<'db> {
             return binding.return_type();
         }
 
-        // For each element (union variant), compute its return type:
-        // - Single binding: use that binding's return type
-        // - Multiple bindings (intersection): for intersections, only include
-        //   successful bindings (failed ones have been filtered out by retain_successful)
-        // Nested unions of constructor types flatten each class's `__new__` / `__init__`
-        // bindings into separate outer elements. Re-group them by constructed instance type so
-        // each constructor can merge its inferred specializations before we union the results.
-        let mut constructor_groups: ConstructorGroups<'_, 'db> = FxOrderMap::default();
-        let mut element_return_types = Vec::with_capacity(self.elements.len());
-
-        for element in &self.elements {
-            let element_return_type = element.return_type(db);
-            if let Some(constructor_instance_type) = element.constructor_instance_type() {
-                constructor_groups
-                    .entry(constructor_instance_type)
-                    .or_default()
-                    .push(element.constructor_bindings(), element_return_type);
-                continue;
-            }
-
-            element_return_types.push(element_return_type);
-        }
-
-        for (constructor_instance_type, group) in constructor_groups {
-            if let Some(group_return_type) = Self::constructor_return_type_for_bindings(
-                db,
-                constructor_instance_type,
-                group.bindings.iter().copied(),
-            ) {
-                element_return_types.push(group_return_type);
-            } else if let Some(preserved_return_type) = group.preserved_return_type {
-                element_return_types.push(preserved_return_type);
-            }
-        }
-
-        // Union the return types of all elements
-        UnionType::from_elements(db, element_return_types)
+        UnionType::from_elements(
+            db,
+            self.elements.iter().map(|element| element.return_type(db)),
+        )
     }
 
     /// Report diagnostics for all of the errors that occurred when trying to match actual
