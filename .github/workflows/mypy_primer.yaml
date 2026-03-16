@@ -4,29 +4,17 @@ permissions: {}
 
 on:
   pull_request:
-    paths:
-      - "crates/ty*/**"
-      - "!crates/ty_ide/**"
-      - "!crates/ty_server/**"
-      - "!crates/ty_test/**"
-      - "!crates/ty_completion_eval/**"
-      - "!crates/ty_wasm/**"
-      - "crates/ruff_db"
-      - "crates/ruff_python_ast"
-      - "crates/ruff_python_parser"
-      - ".github/workflows/mypy_primer.yaml"
-      - "scripts/mypy_primer.sh"
-      - "Cargo.lock"
-      - "!**.md"
-      - "!**.snap"
-      # It's tempting to skip all Python files in every directory,
-      # but changes to Python files in `ty_vendored` can affect the output of mypy_primer,
-      # so we apply a narrow exemption for all files in the corpus directory instead.
-      - "!crates/ty_python_semantic/resources/corpus/**"
+    # The default for `pull_request` is to trigger on `synchronize`, `opened` and `reopened`.
+    # We also add `labeled` here so that the workflow triggers when a label is initially added.
+    types:
+      - labeled
+      - synchronize
+      - opened
+      - reopened
 
 concurrency:
   group: mypy-primer-${{ github.ref_name }}-${{ github.event.pull_request.number || github.sha }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'mypy_primer') }}
 
 defaults:
   run:
@@ -44,6 +32,7 @@ jobs:
     name: Run mypy_primer
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-32' || 'ubuntu-latest' }}
     timeout-minutes: 20
+    if: contains(github.event.pull_request.labels.*.name, 'mypy_primer')
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -88,7 +77,7 @@ jobs:
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-32' || 'ubuntu-latest' }}
     timeout-minutes: 20
     # TODO: Enable once we fixed the non-deterministic diagnostics
-    if: false
+    if: false && contains(github.event.pull_request.labels.*.name, 'mypy_primer')
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
