@@ -5331,68 +5331,88 @@ mod tests {
     use crate::types::{BoundTypeVarInstance, KnownClass, TypeVarVariance};
     use ruff_python_ast::name::Name;
 
+    fn create_typevar<'db>(db: &'db dyn Db, name: &'static str) -> BoundTypeVarInstance<'db> {
+        BoundTypeVarInstance::synthetic(db, Name::new_static(name), TypeVarVariance::Invariant)
+    }
+
+    fn create_constraint<'db, 'c>(
+        db: &'db dyn Db,
+        builder: &'c ConstraintSetBuilder<'db>,
+        bound_typevar: BoundTypeVarInstance<'db>,
+        bound: KnownClass,
+    ) -> ConstraintSet<'db, 'c> {
+        let ty = bound.to_instance(db);
+        ConstraintSet::constrain_typevar(db, builder, bound_typevar, ty, ty)
+    }
+
+    #[track_caller]
+    fn check_display_graph<'db, 'c>(
+        db: &'db dyn Db,
+        builder: &'c ConstraintSetBuilder<'db>,
+        set: ConstraintSet<'db, 'c>,
+        expected: &str,
+    ) {
+        let expected = expected.trim_end();
+        let actual = set.node.display_graph(db, builder, &"").to_string();
+        assert_eq!(expected, actual);
+    }
+
     #[test]
     fn test_display_graph_output() {
-        let expected = indoc! {r#"
-            <0> (U = bool) 2/4
-            ┡━₁ <1> (T = bool) 4/4
-            │   ┡━₁ always
-            │   ├─? <2> (T = str) 3/3
-            │   │   ┡━₁ always
-            │   │   ├─? never
-            │   │   └─₀ never
-            │   └─₀ never
-            ├─? <3> (U = str) 1/4
-            │   ┡━₁ <1> SHARED
-            │   ├─? never
-            │   └─₀ never
-            └─₀ never
-        "#}
-        .trim_end();
-
         let db = setup_db();
-        let t =
-            BoundTypeVarInstance::synthetic(&db, Name::new_static("T"), TypeVarVariance::Invariant);
-        let u =
-            BoundTypeVarInstance::synthetic(&db, Name::new_static("U"), TypeVarVariance::Invariant);
-        let bool_type = KnownClass::Bool.to_instance(&db);
-        let str_type = KnownClass::Str.to_instance(&db);
+        let t = create_typevar(&db, "T");
+        let u = create_typevar(&db, "U");
         let constraints = ConstraintSetBuilder::new();
-        let t_str = ConstraintSet::constrain_typevar(&db, &constraints, t, str_type, str_type);
-        let t_bool = ConstraintSet::constrain_typevar(&db, &constraints, t, bool_type, bool_type);
-        let u_str = ConstraintSet::constrain_typevar(&db, &constraints, u, str_type, str_type);
-        let u_bool = ConstraintSet::constrain_typevar(&db, &constraints, u, bool_type, bool_type);
+        let t_str = create_constraint(&db, &constraints, t, KnownClass::Str);
+        let t_bool = create_constraint(&db, &constraints, t, KnownClass::Bool);
+        let u_str = create_constraint(&db, &constraints, u, KnownClass::Str);
+        let u_bool = create_constraint(&db, &constraints, u, KnownClass::Bool);
         // Construct this in a different order than above to make the source_orders more
         // interesting.
         let set = (u_str.or(&db, &constraints, || u_bool))
             .and(&db, &constraints, || t_str.or(&db, &constraints, || t_bool));
-        let actual = set.node.display_graph(&db, &constraints, &"").to_string();
-        assert_eq!(actual, expected);
+        check_display_graph(
+            &db,
+            &constraints,
+            set,
+            indoc! {r#"
+                <0> (U = bool) 2/4
+                ┡━₁ <1> (T = bool) 4/4
+                │   ┡━₁ always
+                │   ├─? <2> (T = str) 3/3
+                │   │   ┡━₁ always
+                │   │   ├─? never
+                │   │   └─₀ never
+                │   └─₀ never
+                ├─? <3> (U = str) 1/4
+                │   ┡━₁ <1> SHARED
+                │   ├─? never
+                │   └─₀ never
+                └─₀ never
+            "#},
+        );
     }
 
-    /// Helper to check whether a TDD node has a non-trivial uncertain branch.
-    fn has_uncertain_branch(builder: &ConstraintSetBuilder<'_>, node: NodeId) -> bool {
-        match node.node() {
-            Node::AlwaysTrue | Node::AlwaysFalse => false,
-            Node::Interior(_) => {
-                let interior = builder.interior_node_data(node);
-                interior.if_uncertain != ALWAYS_FALSE
-            }
-        }
-    }
+    // TODO: Many of the tests below should hold for _all_ constraint sets. They should really be
+    // promoted to full-fledged property tests.
 
-    /// Helper to check whether any node in a TDD has a non-trivial uncertain branch.
-    fn has_any_uncertain_branch(builder: &ConstraintSetBuilder<'_>, node: NodeId) -> bool {
-        match node.node() {
-            Node::AlwaysTrue | Node::AlwaysFalse => false,
-            Node::Interior(_) => {
-                let interior = builder.interior_node_data(node);
-                interior.if_uncertain != ALWAYS_FALSE
-                    || has_any_uncertain_branch(builder, interior.if_true)
-                    || has_any_uncertain_branch(builder, interior.if_uncertain)
-                    || has_any_uncertain_branch(builder, interior.if_false)
-            }
-        }
+    #[test]
+    fn tdd_bare_constraints_have_no_uncertain_branches() {
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let builder = ConstraintSetBuilder::new();
+        let t_int = create_constraint(&db, &builder, t, KnownClass::Int);
+        check_display_graph(
+            &db,
+            &builder,
+            t_int,
+            indoc! {r#"
+                <0> (T = int) 1/1
+                ┡━₁ always
+                ├─? never
+                └─₀ never
+            "#},
+        );
     }
 
     /// The Duboc union algorithm parks the second operand in the uncertain branch when the two
@@ -5400,23 +5420,30 @@ mod tests {
     #[test]
     fn tdd_union_creates_uncertain_branches() {
         let db = setup_db();
-        let t =
-            BoundTypeVarInstance::synthetic(&db, Name::new_static("T"), TypeVarVariance::Invariant);
-        let u =
-            BoundTypeVarInstance::synthetic(&db, Name::new_static("U"), TypeVarVariance::Invariant);
-        let int_type = KnownClass::Int.to_instance(&db);
-        let str_type = KnownClass::Str.to_instance(&db);
+        let t = create_typevar(&db, "T");
+        let u = create_typevar(&db, "U");
         let builder = ConstraintSetBuilder::new();
 
-        // Individual constraints have no uncertain branches
-        let t_int = ConstraintSet::constrain_typevar(&db, &builder, t, int_type, int_type);
-        let u_str = ConstraintSet::constrain_typevar(&db, &builder, u, str_type, str_type);
-        assert!(!has_uncertain_branch(&builder, t_int.node));
-        assert!(!has_uncertain_branch(&builder, u_str.node));
-
-        // Union of constraints on different typevars produces uncertain branches
+        // Neither lhs nor rhs have uncertain branches (checked above). The operand with the
+        // "lower" BDD variable (in this case, the lhs) is parked into a new uncertain branch in
+        // the union result.
+        let t_int = create_constraint(&db, &builder, t, KnownClass::Int);
+        let u_str = create_constraint(&db, &builder, u, KnownClass::Str);
         let union = t_int.or(&db, &builder, || u_str);
-        assert!(has_uncertain_branch(&builder, union.node));
+        check_display_graph(
+            &db,
+            &builder,
+            union,
+            indoc! {r#"
+                <0> (U = str) 2/2
+                ┡━₁ always
+                ├─? <1> (T = int) 1/1
+                │   ┡━₁ always
+                │   ├─? never
+                │   └─₀ never
+                └─₀ never
+            "#},
+        );
     }
 
     /// The Duboc intersection algorithm preserves uncertain branches: when both operands have
@@ -5424,83 +5451,84 @@ mod tests {
     #[test]
     fn tdd_intersection_preserves_uncertain() {
         let db = setup_db();
-        let t =
-            BoundTypeVarInstance::synthetic(&db, Name::new_static("T"), TypeVarVariance::Invariant);
-        let u =
-            BoundTypeVarInstance::synthetic(&db, Name::new_static("U"), TypeVarVariance::Invariant);
-        let int_type = KnownClass::Int.to_instance(&db);
-        let str_type = KnownClass::Str.to_instance(&db);
-        let bool_type = KnownClass::Bool.to_instance(&db);
+        let t = create_typevar(&db, "T");
+        let u = create_typevar(&db, "U");
         let builder = ConstraintSetBuilder::new();
+        let t_int = create_constraint(&db, &builder, t, KnownClass::Int);
+        let u_str = create_constraint(&db, &builder, u, KnownClass::Str);
+        let t_bool = create_constraint(&db, &builder, t, KnownClass::Bool);
+        let u_int = create_constraint(&db, &builder, u, KnownClass::Int);
 
-        // Build two TDDs that each have uncertain branches (via union of different-typevar
-        // constraints)
-        let t_int = ConstraintSet::constrain_typevar(&db, &builder, t, int_type, int_type);
-        let u_str = ConstraintSet::constrain_typevar(&db, &builder, u, str_type, str_type);
-        let t_bool = ConstraintSet::constrain_typevar(&db, &builder, t, bool_type, bool_type);
-        let u_int = ConstraintSet::constrain_typevar(&db, &builder, u, int_type, int_type);
-
-        // (T = int) ∨ (U = str) — has uncertain branch
+        // lhs and rhs both have uncertain branches (checked above). These uncertain branches are
+        // carried through to the intersection result.
         let lhs = t_int.or(&db, &builder, || u_str);
-        assert!(has_uncertain_branch(&builder, lhs.node));
-
-        // (T = bool) ∨ (U = int) — has uncertain branch
         let rhs = t_bool.or(&db, &builder, || u_int);
-        assert!(has_uncertain_branch(&builder, rhs.node));
-
-        // Their intersection should also have uncertain branches (Duboc preserves U1 ∧ U2)
         let intersection = lhs.and(&db, &builder, || rhs);
-        assert!(has_any_uncertain_branch(&builder, intersection.node));
+        check_display_graph(
+            &db,
+            &builder,
+            intersection,
+            indoc! {r#"
+                <0> (U = int) 4/4
+                ┡━₁ <1> (U = str) 2/2
+                │   ┡━₁ always
+                │   ├─? <2> (T = int) 1/1
+                │   │   ┡━₁ always
+                │   │   ├─? never
+                │   │   └─₀ never
+                │   └─₀ never
+                ├─? <3> (T = bool) 3/3
+                │   ┡━₁ <1> SHARED
+                │   ├─? never
+                │   └─₀ never
+                └─₀ never
+            "#},
+        );
     }
 
     /// Negation always produces flat TDDs (all uncertain branches are `ALWAYS_FALSE`).
     #[test]
     fn tdd_negation_produces_flat_tdd() {
         let db = setup_db();
-        let t =
-            BoundTypeVarInstance::synthetic(&db, Name::new_static("T"), TypeVarVariance::Invariant);
-        let u =
-            BoundTypeVarInstance::synthetic(&db, Name::new_static("U"), TypeVarVariance::Invariant);
-        let int_type = KnownClass::Int.to_instance(&db);
-        let str_type = KnownClass::Str.to_instance(&db);
+        let t = create_typevar(&db, "T");
+        let u = create_typevar(&db, "U");
         let builder = ConstraintSetBuilder::new();
-
-        // Build a TDD with uncertain branches
-        let t_int = ConstraintSet::constrain_typevar(&db, &builder, t, int_type, int_type);
-        let u_str = ConstraintSet::constrain_typevar(&db, &builder, u, str_type, str_type);
+        let t_int = create_constraint(&db, &builder, t, KnownClass::Int);
+        let u_str = create_constraint(&db, &builder, u, KnownClass::Str);
         let union = t_int.or(&db, &builder, || u_str);
-        assert!(has_uncertain_branch(&builder, union.node));
-
-        // Negation should produce a flat TDD (no uncertain branches)
         let negated = union.negate(&db, &builder);
-        assert!(!has_any_uncertain_branch(&builder, negated.node));
+        check_display_graph(
+            &db,
+            &builder,
+            negated,
+            indoc! {r#"
+                <0> (U = str) 2/2
+                ┡━₁ never
+                ├─? never
+                └─₀ <1> (T = int) 1/1
+                    ┡━₁ never
+                    ├─? never
+                    └─₀ always
+            "#},
+        );
     }
 
-    /// For TDDs with uncertain branches: `T ∧ ¬T` is never satisfied, and `T ∨ ¬T` is always
-    /// satisfied.
     #[test]
     fn tdd_negation_correctness() {
         let db = setup_db();
-        let t =
-            BoundTypeVarInstance::synthetic(&db, Name::new_static("T"), TypeVarVariance::Invariant);
-        let u =
-            BoundTypeVarInstance::synthetic(&db, Name::new_static("U"), TypeVarVariance::Invariant);
-        let int_type = KnownClass::Int.to_instance(&db);
-        let str_type = KnownClass::Str.to_instance(&db);
+        let t = create_typevar(&db, "T");
+        let u = create_typevar(&db, "U");
         let builder = ConstraintSetBuilder::new();
 
-        // Build a TDD with uncertain branches: (T = int) ∨ (U = str)
-        let t_int = ConstraintSet::constrain_typevar(&db, &builder, t, int_type, int_type);
-        let u_str = ConstraintSet::constrain_typevar(&db, &builder, u, str_type, str_type);
+        let t_int = create_constraint(&db, &builder, t, KnownClass::Int);
+        let u_str = create_constraint(&db, &builder, u, KnownClass::Str);
         let tdd = t_int.or(&db, &builder, || u_str);
-        assert!(has_uncertain_branch(&builder, tdd.node));
-
         let negated = tdd.negate(&db, &builder);
 
-        // T ∧ ¬T should never be satisfied
+        // T ∧ ¬T == false
         assert!(tdd.and(&db, &builder, || negated).is_never_satisfied(&db));
 
-        // T ∨ ¬T should always be satisfied
+        // T ∨ ¬T == true
         assert!(tdd.or(&db, &builder, || negated).is_always_satisfied(&db));
     }
 
@@ -5509,57 +5537,33 @@ mod tests {
     #[test]
     fn tdd_double_negation() {
         let db = setup_db();
-        let t =
-            BoundTypeVarInstance::synthetic(&db, Name::new_static("T"), TypeVarVariance::Invariant);
-        let u =
-            BoundTypeVarInstance::synthetic(&db, Name::new_static("U"), TypeVarVariance::Invariant);
-        let int_type = KnownClass::Int.to_instance(&db);
-        let str_type = KnownClass::Str.to_instance(&db);
+        let t = create_typevar(&db, "T");
+        let u = create_typevar(&db, "U");
         let builder = ConstraintSetBuilder::new();
-
-        // Build a TDD with uncertain branches: (T = int) ∨ (U = str)
-        let t_int = ConstraintSet::constrain_typevar(&db, &builder, t, int_type, int_type);
-        let u_str = ConstraintSet::constrain_typevar(&db, &builder, u, str_type, str_type);
+        let t_int = create_constraint(&db, &builder, t, KnownClass::Int);
+        let u_str = create_constraint(&db, &builder, u, KnownClass::Str);
         let tdd = t_int.or(&db, &builder, || u_str);
-
-        // Double negation should be semantically equivalent: ¬¬T ≡ T
-        // Check via: ¬¬T ∧ ¬T is never satisfied, ¬¬T ∨ ¬T is always satisfied
-        let double_negated = tdd.negate(&db, &builder).negate(&db, &builder);
         let negated = tdd.negate(&db, &builder);
-        assert!(
-            double_negated
-                .and(&db, &builder, || negated)
-                .is_never_satisfied(&db)
-        );
-        assert!(
-            double_negated
-                .or(&db, &builder, || negated)
-                .is_always_satisfied(&db)
-        );
+        let double_negated = negated.negate(&db, &builder);
+        let equivalent = tdd.iff(&db, &builder, double_negated);
+        assert!(equivalent.is_always_satisfied(&db));
     }
 
     /// `iff(T, T)` is always satisfied for TDDs with uncertain branches.
     #[test]
     fn tdd_iff_self() {
         let db = setup_db();
-        let t =
-            BoundTypeVarInstance::synthetic(&db, Name::new_static("T"), TypeVarVariance::Invariant);
-        let u =
-            BoundTypeVarInstance::synthetic(&db, Name::new_static("U"), TypeVarVariance::Invariant);
-        let int_type = KnownClass::Int.to_instance(&db);
-        let str_type = KnownClass::Str.to_instance(&db);
+        let t = create_typevar(&db, "T");
+        let u = create_typevar(&db, "U");
         let builder = ConstraintSetBuilder::new();
-
-        // Build a TDD with uncertain branches: (T = int) ∨ (U = str)
-        let t_int = ConstraintSet::constrain_typevar(&db, &builder, t, int_type, int_type);
-        let u_str = ConstraintSet::constrain_typevar(&db, &builder, u, str_type, str_type);
+        let t_int = create_constraint(&db, &builder, t, KnownClass::Int);
+        let u_str = create_constraint(&db, &builder, u, KnownClass::Str);
         let tdd = t_int.or(&db, &builder, || u_str);
-        assert!(has_uncertain_branch(&builder, tdd.node));
 
-        // iff(T, T) should always be satisfied
+        // iff(T, T) == true
         assert!(tdd.iff(&db, &builder, tdd).is_always_satisfied(&db));
 
-        // iff(T, ¬T) should never be satisfied
+        // iff(T, ¬T) == false
         let negated = tdd.negate(&db, &builder);
         assert!(tdd.iff(&db, &builder, negated).is_never_satisfied(&db));
     }
@@ -5569,49 +5573,51 @@ mod tests {
     #[test]
     fn tdd_owned_round_trip() {
         let db = setup_db();
-        let t =
-            BoundTypeVarInstance::synthetic(&db, Name::new_static("T"), TypeVarVariance::Invariant);
-        let u =
-            BoundTypeVarInstance::synthetic(&db, Name::new_static("U"), TypeVarVariance::Invariant);
-        let int_type = KnownClass::Int.to_instance(&db);
-        let str_type = KnownClass::Str.to_instance(&db);
+        let t = create_typevar(&db, "T");
+        let u = create_typevar(&db, "U");
 
         // Build a TDD with uncertain branches and convert to owned
-        let owned = {
-            let builder = ConstraintSetBuilder::new();
-            builder.into_owned(|builder| {
-                let t_int = ConstraintSet::constrain_typevar(&db, builder, t, int_type, int_type);
-                let u_str = ConstraintSet::constrain_typevar(&db, builder, u, str_type, str_type);
-                t_int.or(&db, builder, || u_str)
-            })
-        };
+        let builder = ConstraintSetBuilder::new();
+        let owned = builder.into_owned(|builder| {
+            let t_int = create_constraint(&db, &builder, t, KnownClass::Int);
+            let u_str = create_constraint(&db, &builder, u, KnownClass::Str);
+            let result = t_int.or(&db, builder, || u_str);
+            check_display_graph(
+                &db,
+                &builder,
+                result,
+                indoc! {r#"
+                    <0> (U = str) 2/2
+                    ┡━₁ always
+                    ├─? <1> (T = int) 1/1
+                    │   ┡━₁ always
+                    │   ├─? never
+                    │   └─₀ never
+                    └─₀ never
+                "#},
+            );
+            result
+        });
 
         // Load into a new builder
-        let builder2 = ConstraintSetBuilder::new();
-        let loaded = builder2.load(&db, &owned);
-
-        // The loaded constraint set should NOT be never satisfied (it's a valid union)
-        assert!(!loaded.is_never_satisfied(&db));
-
-        // The loaded constraint set should NOT be always satisfied (it requires specific types)
-        assert!(!loaded.is_always_satisfied(&db));
-
-        // Verify semantic equivalence: loaded ∧ ¬loaded should be never satisfied
-        let negated = loaded.negate(&db, &builder2);
-        assert!(
-            loaded
-                .and(&db, &builder2, || negated)
-                .is_never_satisfied(&db)
+        let builder = ConstraintSetBuilder::new();
+        let loaded = builder.load(&db, &owned);
+        check_display_graph(
+            &db,
+            &builder,
+            loaded,
+            indoc! {r#"
+                <0> (T = int) 1/1
+                ┡━₁ <1> (U = str) 1/1
+                │   ┡━₁ never
+                │   ├─? never
+                │   └─₀ always
+                ├─? <2> (U = str) 1/1
+                │   ┡━₁ always
+                │   ├─? never
+                │   └─₀ never
+                └─₀ never
+            "#},
         );
-
-        // loaded ∨ ¬loaded should be always satisfied
-        assert!(
-            loaded
-                .or(&db, &builder2, || negated)
-                .is_always_satisfied(&db)
-        );
-
-        // Also verify iff(loaded, loaded) is always satisfied
-        assert!(loaded.iff(&db, &builder2, loaded).is_always_satisfied(&db));
     }
 }
