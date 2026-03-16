@@ -1,0 +1,112 @@
+---
+source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+---
+--- Linter settings ---
+-linter.preview = disabled
++linter.preview = enabled
+
+--- Summary ---
+Removed: 3
+Added: 3
+
+--- Removed ---
+FA100 [*] Add `from __future__ import annotations` to simplify `typing.Union`
+ --> UP007_2.py:5:10
+  |
+5 | def f(x: Union[str, int, Union[float, bytes]]) -> None:
+  |          ^^^^^
+6 |     ...
+  |
+help: Add `from __future__ import annotations`
+1 + from __future__ import annotations
+2 | import typing
+3 | from typing import Union
+4 | 
+note: This is an unsafe fix and may change runtime behavior
+
+
+FA100 [*] Add `from __future__ import annotations` to simplify `typing.Union`
+ --> UP007_2.py:5:26
+  |
+5 | def f(x: Union[str, int, Union[float, bytes]]) -> None:
+  |                          ^^^^^
+6 |     ...
+  |
+help: Add `from __future__ import annotations`
+1 + from __future__ import annotations
+2 | import typing
+3 | from typing import Union
+4 | 
+note: This is an unsafe fix and may change runtime behavior
+
+
+FA100 [*] Add `from __future__ import annotations` to simplify `typing.Union`
+  --> UP007_2.py:9:10
+   |
+ 9 | def f(x: typing.Union[str, int]) -> None:
+   |          ^^^^^^^^^^^^
+10 |     ...
+   |
+help: Add `from __future__ import annotations`
+1 + from __future__ import annotations
+2 | import typing
+3 | from typing import Union
+4 | 
+note: This is an unsafe fix and may change runtime behavior
+
+
+
+--- Added ---
+UP007 [*] Use `X | Y` for type annotations
+ --> UP007_2.py:5:10
+  |
+5 | def f(x: Union[str, int, Union[float, bytes]]) -> None:
+  |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+6 |     ...
+  |
+help: Convert to `X | Y`
+2 | from typing import Union
+3 | 
+4 | 
+  - def f(x: Union[str, int, Union[float, bytes]]) -> None:
+5 + def f(x: str | int | Union[float, bytes]) -> None:
+6 |     ...
+7 | 
+8 | 
+note: This is an unsafe fix and may change runtime behavior
+
+
+UP007 [*] Use `X | Y` for type annotations
+ --> UP007_2.py:5:26
+  |
+5 | def f(x: Union[str, int, Union[float, bytes]]) -> None:
+  |                          ^^^^^^^^^^^^^^^^^^^
+6 |     ...
+  |
+help: Convert to `X | Y`
+2 | from typing import Union
+3 | 
+4 | 
+  - def f(x: Union[str, int, Union[float, bytes]]) -> None:
+5 + def f(x: Union[str, int, float | bytes]) -> None:
+6 |     ...
+7 | 
+8 | 
+note: This is an unsafe fix and may change runtime behavior
+
+
+UP007 [*] Use `X | Y` for type annotations
+  --> UP007_2.py:9:10
+   |
+ 9 | def f(x: typing.Union[str, int]) -> None:
+   |          ^^^^^^^^^^^^^^^^^^^^^^
+10 |     ...
+   |
+help: Convert to `X | Y`
+6  |     ...
+7  | 
+8  | 
+   - def f(x: typing.Union[str, int]) -> None:
+9  + def f(x: str | int) -> None:
+10 |     ...
+note: This is an unsafe fix and may change runtime behavior

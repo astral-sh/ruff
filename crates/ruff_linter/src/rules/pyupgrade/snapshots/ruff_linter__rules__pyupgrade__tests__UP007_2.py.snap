@@ -1,0 +1,55 @@
+---
+source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+---
+--- Linter settings ---
++	future-rewritable-type-annotation (FA100),
++	future-rewritable-type-annotation (FA100),
+
+--- Summary ---
+Removed: 0
+Added: 3
+
+--- Added ---
+FA100 [*] Add `from __future__ import annotations` to simplify `typing.Union`
+ --> UP007_2.py:5:10
+  |
+5 | def f(x: Union[str, int, Union[float, bytes]]) -> None:
+  |          ^^^^^
+6 |     ...
+  |
+help: Add `from __future__ import annotations`
+1 + from __future__ import annotations
+2 | import typing
+3 | from typing import Union
+4 | 
+note: This is an unsafe fix and may change runtime behavior
+
+
+FA100 [*] Add `from __future__ import annotations` to simplify `typing.Union`
+ --> UP007_2.py:5:26
+  |
+5 | def f(x: Union[str, int, Union[float, bytes]]) -> None:
+  |                          ^^^^^
+6 |     ...
+  |
+help: Add `from __future__ import annotations`
+1 + from __future__ import annotations
+2 | import typing
+3 | from typing import Union
+4 | 
+note: This is an unsafe fix and may change runtime behavior
+
+
+FA100 [*] Add `from __future__ import annotations` to simplify `typing.Union`
+  --> UP007_2.py:9:10
+   |
+ 9 | def f(x: typing.Union[str, int]) -> None:
+   |          ^^^^^^^^^^^^
+10 |     ...
+   |
+help: Add `from __future__ import annotations`
+1 + from __future__ import annotations
+2 | import typing
+3 | from typing import Union
+4 | 
+note: This is an unsafe fix and may change runtime behavior
