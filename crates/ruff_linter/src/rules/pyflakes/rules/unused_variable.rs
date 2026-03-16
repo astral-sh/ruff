@@ -41,7 +41,10 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ## Fix safety
 ///
 /// This rule's fix is marked as unsafe because removing an unused variable assignment may
-/// delete comments that are attached to the assignment.
+/// delete comments that are attached to the assignment. For `except` handler bindings (e.g.,
+/// `except ValueError as e`), the fix is also unsafe because Python 3 implicitly deletes the
+/// exception variable after the `except` block—removing `as e` can change program behavior
+/// when a same-name variable exists in an outer scope.
 ///
 /// ## See also
 ///

@@ -20,6 +20,7 @@ help: Remove assignment to unused variable `x`
 8  |         pass
 9  |     except ImportError as x:
 10 |         pass
+note: This is an unsafe fix and may change runtime behavior
 
 F841 [*] Local variable `x` is assigned to but never used
   --> <filename>:9:27
@@ -39,3 +40,4 @@ help: Remove assignment to unused variable `x`
 10 |         pass
 11 |
 12 |     # No error here, though it should arguably be an F821 error. `x` will
+note: This is an unsafe fix and may change runtime behavior
