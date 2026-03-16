@@ -296,8 +296,9 @@ impl<'db> ConstructorBinding<'db> {
         }
 
         // For constructor argument inference, keep deferred `__init__` context available for
-        // self-like `__new__(cls: type[T]) -> T` signatures even before specialization proves that
-        // the matched overload returns an instance of the constructed class.
+        // self-like `__new__(cls: type[T]) -> T` and `__new__(...) -> Self` signatures even
+        // before specialization proves that the matched overload returns an instance of the
+        // constructed class.
         if self.constructor_kind.is_metaclass_call() {
             return false;
         }
@@ -736,6 +737,10 @@ fn returns_cls_typevar<'db>(db: &'db dyn Db, overload: &Binding<'db>) -> bool {
     let Type::TypeVar(return_typevar) = overload.signature.return_ty.resolve_type_alias(db) else {
         return false;
     };
+
+    if return_typevar.typevar(db).is_self(db) {
+        return true;
+    }
 
     let Some(cls_parameter_ty) = overload
         .signature

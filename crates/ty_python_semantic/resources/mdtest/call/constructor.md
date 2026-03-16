@@ -489,6 +489,37 @@ class Tracer:
         Span("x", on_finish=[self._on_span_finish])
 ```
 
+#### `typing.Self` return should still provide `__init__` type context
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+from typing import Callable, Self, Any
+
+class SpanData:
+    def __new__(
+        cls,
+        name: str,
+        on_finish: Any | None = None,
+    ) -> Self:
+        return object.__new__(cls)
+
+class Span(SpanData):
+    def __init__(self, name: str, on_finish: list[Callable[[Span], None]] | None = None) -> None:
+        pass
+
+class Tracer:
+    def _on_span_finish(self, span: Span) -> None:
+        pass
+
+    def start(self) -> None:
+        Span("x", on_finish=[self._on_span_finish])
+```
+
 ### `__new__` returning a specific class affects subclasses
 
 When `__new__` returns a specific class (e.g., `-> Foo`), this is an instance type for `Foo` itself,
