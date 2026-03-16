@@ -323,7 +323,8 @@ impl<'db> Type<'db> {
             constraints,
             inferable,
             relation: TypeRelation::SubtypingAssuming,
-            relation_visitor: &HasRelationToVisitor::with_given(constraints, assuming),
+            given: assuming,
+            relation_visitor: &HasRelationToVisitor::default(constraints),
             disjointness_visitor: &IsDisjointVisitor::default(constraints),
         };
         checker.check_type_pair(db, self, target)
@@ -421,6 +422,7 @@ impl<'db> Type<'db> {
             constraints,
             inferable,
             relation,
+            given: ConstraintSet::from_bool(constraints, false),
             relation_visitor: &HasRelationToVisitor::default(constraints),
             disjointness_visitor: &IsDisjointVisitor::default(constraints),
         };
@@ -452,6 +454,7 @@ impl<'db> Type<'db> {
     ) -> ConstraintSet<'db, 'c> {
         let checker = EquivalenceChecker {
             constraints,
+            given: ConstraintSet::from_bool(constraints, false),
             relation_visitor: &HasRelationToVisitor::default(constraints),
             disjointness_visitor: &IsDisjointVisitor::default(constraints),
         };
@@ -489,6 +492,7 @@ impl<'db> Type<'db> {
         let checker = DisjointnessChecker {
             constraints,
             inferable,
+            given: ConstraintSet::from_bool(constraints, false),
             disjointness_visitor: &IsDisjointVisitor::default(constraints),
             relation_visitor: &HasRelationToVisitor::default(constraints),
         };
@@ -497,24 +501,12 @@ impl<'db> Type<'db> {
 }
 
 /// A [`PairVisitor`] that is used in `has_relation_to` methods.
-pub(crate) type HasRelationToVisitor<'db, 'c> = CycleDetector<
-    TypeRelation,
-    (Type<'db>, Type<'db>, TypeRelation),
-    ConstraintSet<'db, 'c>,
-    ConstraintSet<'db, 'c>,
->;
+pub(crate) type HasRelationToVisitor<'db, 'c> =
+    CycleDetector<TypeRelation, (Type<'db>, Type<'db>, TypeRelation), ConstraintSet<'db, 'c>>;
 
 impl<'db, 'c> HasRelationToVisitor<'db, 'c> {
     pub(crate) fn default(constraints: &'c ConstraintSetBuilder<'db>) -> Self {
-        HasRelationToVisitor::with_given(constraints, ConstraintSet::from_bool(constraints, false))
-    }
-
-    pub(crate) fn with_given(
-        constraints: &'c ConstraintSetBuilder<'db>,
-        given: ConstraintSet<'db, 'c>,
-    ) -> Self {
-        let fallback = ConstraintSet::from_bool(constraints, true);
-        HasRelationToVisitor::with_extra(fallback, given)
+        HasRelationToVisitor::new(ConstraintSet::from_bool(constraints, true))
     }
 }
 
@@ -535,6 +527,7 @@ pub(super) struct TypeRelationChecker<'a, 'c, 'db> {
     pub(super) constraints: &'c ConstraintSetBuilder<'db>,
     pub(super) inferable: InferableTypeVars<'a, 'db>,
     pub(super) relation: TypeRelation,
+    given: ConstraintSet<'db, 'c>,
 
     // N.B. these fields are private to reduce the risk of
     // "double-visiting" a given pair of types. You should
@@ -547,17 +540,33 @@ pub(super) struct TypeRelationChecker<'a, 'c, 'db> {
 }
 
 impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
-    pub(super) fn new(
+    pub(super) fn subtyping(
         constraints: &'c ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'a, 'db>,
-        relation: TypeRelation,
         relation_visitor: &'a HasRelationToVisitor<'db, 'c>,
         disjointness_visitor: &'a IsDisjointVisitor<'db, 'c>,
     ) -> Self {
         Self {
             constraints,
             inferable,
-            relation,
+            relation: TypeRelation::Subtyping,
+            given: ConstraintSet::from_bool(constraints, false),
+            relation_visitor,
+            disjointness_visitor,
+        }
+    }
+
+    pub(super) fn constraint_set_assignability(
+        constraints: &'c ConstraintSetBuilder<'db>,
+        inferable: InferableTypeVars<'a, 'db>,
+        relation_visitor: &'a HasRelationToVisitor<'db, 'c>,
+        disjointness_visitor: &'a IsDisjointVisitor<'db, 'c>,
+    ) -> Self {
+        Self {
+            constraints,
+            inferable,
+            relation: TypeRelation::ConstraintSetAssignability,
+            given: ConstraintSet::from_bool(constraints, false),
             relation_visitor,
             disjointness_visitor,
         }
@@ -608,8 +617,9 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         if self.relation == TypeRelation::SubtypingAssuming
             && (source.is_type_var() || target.is_type_var())
         {
-            let given = self.relation_visitor.extra;
-            return given.implies_subtype_of(db, self.constraints, source, target);
+            return self
+                .given
+                .implies_subtype_of(db, self.constraints, source, target);
         }
 
         // Handle the constraint-set-based assignability relation next. Comparisons with a
@@ -675,7 +685,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // Pretend that instances of `dataclasses.Field` are assignable to their default type.
             // This allows field definitions like `name: str = field(default="")` in dataclasses
             // to pass the assignability check of the inferred type to the declared type.
-            (Type::KnownInstance(KnownInstanceType::Field(field)), right)
+            (Type::KnownInstance(KnownInstanceType::Field(field)), _)
                 if self.relation.is_assignability() =>
             {
                 field
@@ -1521,6 +1531,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
     pub(super) fn as_equivalence_checker(&self) -> EquivalenceChecker<'_, 'c, 'db> {
         EquivalenceChecker {
             constraints: self.constraints,
+            given: self.given,
             relation_visitor: self.relation_visitor,
             disjointness_visitor: self.disjointness_visitor,
         }
@@ -1530,6 +1541,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         DisjointnessChecker {
             constraints: self.constraints,
             inferable: self.inferable,
+            given: self.given,
             relation_visitor: self.relation_visitor,
             disjointness_visitor: self.disjointness_visitor,
         }
@@ -1538,6 +1550,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
 pub(super) struct EquivalenceChecker<'a, 'c, 'db> {
     pub(super) constraints: &'c ConstraintSetBuilder<'db>,
+    given: ConstraintSet<'db, 'c>,
 
     // N.B. these fields are private to reduce the risk of
     // "double-visiting" a given pair of types. You should
@@ -1554,6 +1567,7 @@ impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
         TypeRelationChecker {
             relation: TypeRelation::Redundancy { pure: true },
             constraints: self.constraints,
+            given: self.given,
             inferable: InferableTypeVars::None,
             relation_visitor: self.relation_visitor,
             disjointness_visitor: self.disjointness_visitor,
@@ -1586,6 +1600,7 @@ impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
 pub(super) struct DisjointnessChecker<'a, 'c, 'db> {
     pub(super) constraints: &'c ConstraintSetBuilder<'db>,
     pub(super) inferable: InferableTypeVars<'a, 'db>,
+    given: ConstraintSet<'db, 'c>,
 
     // N.B. these fields are private to reduce the risk of
     // "double-visiting" a given pair of types. You should
@@ -1607,6 +1622,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
         Self {
             constraints,
             inferable,
+            given: ConstraintSet::from_bool(constraints, false),
             disjointness_visitor,
             relation_visitor,
         }
@@ -1620,6 +1636,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             relation,
             constraints: self.constraints,
             inferable: self.inferable,
+            given: self.given,
             relation_visitor: self.relation_visitor,
             disjointness_visitor: self.disjointness_visitor,
         }
@@ -1628,6 +1645,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
     pub(super) fn as_equivalence_checker(&self) -> EquivalenceChecker<'_, 'c, 'db> {
         EquivalenceChecker {
             constraints: self.constraints,
+            given: self.given,
             relation_visitor: self.relation_visitor,
             disjointness_visitor: self.disjointness_visitor,
         }

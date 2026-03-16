@@ -1050,10 +1050,9 @@ impl<'db> ClassType<'db> {
         let constraints = ConstraintSetBuilder::new();
         let relation_visitor = HasRelationToVisitor::default(&constraints);
         let disjointness_visitor = IsDisjointVisitor::default(&constraints);
-        let checker = TypeRelationChecker::new(
+        let checker = TypeRelationChecker::subtyping(
             &constraints,
             InferableTypeVars::None,
-            TypeRelation::Subtyping,
             &relation_visitor,
             &disjointness_visitor,
         );
