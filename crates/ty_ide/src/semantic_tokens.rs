@@ -2109,6 +2109,88 @@ q = Baz.prop        # prop should be property on the class as well
     }
 
     #[test]
+    fn attribute_on_union_3() {
+        // This is a test where the unions are not actually composed of the same elements,
+        // so the regular fallback logic should apply.
+        let test = SemanticTokenTest::new(
+            "
+from random import random
+
+class Baz:
+    if random():
+        CONSTANT = 42
+
+        def method(self) -> int:
+            return 42
+
+        @property
+        def prop(self) -> int:
+            return 42
+    else:
+        def CONSTANT(self):
+            return \"hello\"
+
+        @property
+        def method(self) -> str:
+            return \"hello\"
+
+        prop: str = \"hello\"
+
+baz = Baz()
+s = baz.method 
+t = baz.CONSTANT
+r = baz.prop
+q = Baz.prop
+",
+        );
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "random" @ 6..12: Namespace
+        "random" @ 20..26: Method
+        "Baz" @ 34..37: Class [definition]
+        "random" @ 46..52: Variable
+        "CONSTANT" @ 64..72: Variable [definition, readonly]
+        "42" @ 75..77: Number
+        "method" @ 91..97: Method [definition]
+        "self" @ 98..102: SelfParameter [definition]
+        "int" @ 107..110: Class
+        "42" @ 131..133: Number
+        "property" @ 144..152: Decorator
+        "prop" @ 165..169: Method [definition]
+        "self" @ 170..174: SelfParameter [definition]
+        "int" @ 179..182: Class
+        "42" @ 203..205: Number
+        "CONSTANT" @ 228..236: Method [definition]
+        "self" @ 237..241: SelfParameter [definition]
+        "\"hello\"" @ 263..270: String
+        "property" @ 281..289: Decorator
+        "method" @ 302..308: Method [definition]
+        "self" @ 309..313: SelfParameter [definition]
+        "str" @ 318..321: Class
+        "\"hello\"" @ 342..349: String
+        "prop" @ 359..363: Method [definition]
+        "str" @ 365..368: Class
+        "\"hello\"" @ 371..378: String
+        "baz" @ 380..383: Variable [definition]
+        "Baz" @ 386..389: Class
+        "s" @ 392..393: Variable [definition]
+        "baz" @ 396..399: Variable
+        "method" @ 400..406: Variable
+        "t" @ 408..409: Variable [definition]
+        "baz" @ 412..415: Variable
+        "CONSTANT" @ 416..424: Variable [readonly]
+        "r" @ 425..426: Variable [definition]
+        "baz" @ 429..432: Variable
+        "prop" @ 433..437: Variable
+        "q" @ 438..439: Variable [definition]
+        "Baz" @ 442..445: Class
+        "prop" @ 446..450: Variable
+        "#);
+    }
+
+    #[test]
     fn constant_name_detection() {
         let test = SemanticTokenTest::new(
             "
