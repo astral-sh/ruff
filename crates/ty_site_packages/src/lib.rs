@@ -329,6 +329,35 @@ impl PartialEq<UnixLibDir> for &str {
     }
 }
 
+/// The subdirectory name under a version-specific Python lib directory
+/// that contains installed packages.
+///
+/// For example, `site-packages` (the standard layout) or `dist-packages`
+/// (used by Debian/Ubuntu for system-managed packages).
+#[derive(Debug, Clone, Copy, Eq, PartialEq, strum_macros::EnumIter)]
+enum InstallationDir {
+    SitePackages,
+    DistPackages,
+}
+
+impl InstallationDir {
+    /// All known installation directory variants.
+    const ALL: &[Self] = &[Self::SitePackages, Self::DistPackages];
+
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::SitePackages => "site-packages",
+            Self::DistPackages => "dist-packages",
+        }
+    }
+}
+
+impl std::fmt::Display for InstallationDir {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
 /// The Python runtime that produced the venv.
 ///
 /// We only need to distinguish cases that change the on-disk layout.
@@ -1164,12 +1193,15 @@ when trying to resolve the `home` value to a directory on disk: {io_err}"
 /// If implementation is `Unknown`, probe CPython-style paths first, then PyPy-style paths.
 fn probe_package_dirs(
     prefix_dir: &SystemPath,
-    suffix: &str,
+    suffix: InstallationDir,
     python_version: PythonVersion,
     implementation: PythonImplementation,
     system: &dyn System,
     directories: &mut SitePackagesPaths,
 ) {
+    // Try to insert the CPython-style package path into `directories`.
+    // Returns `true` if a matching directory was found, so the caller can
+    // decide whether to fall back to probing other implementations.
     let probe_cpython_path = |directories: &mut SitePackagesPaths| {
         let path = prefix_dir.join(format!("python{python_version}/{suffix}"));
         if system.is_directory(&path) {
@@ -1189,6 +1221,8 @@ fn probe_package_dirs(
         }
     };
 
+    // Try to insert the PyPy-style package path into `directories`.
+    // Returns `true` if a matching directory was found.
     let probe_pypy_path = |directories: &mut SitePackagesPaths| {
         let path = prefix_dir.join(format!("pypy{python_version}/{suffix}"));
         if system.is_directory(&path) {
@@ -1214,10 +1248,13 @@ fn probe_package_dirs(
     }
 }
 
-/// Enumerate package directories under `prefix_dir` for an unknown Python version.
-fn enumerate_package_dirs(
+/// Discover package directories under `prefix_dir` when the Python version is unknown.
+///
+/// Scans `prefix_dir` for subdirectories matching `{python,pypy}3.X` and checks each
+/// for the given `suffixes` (typically `site-packages` and `dist-packages`).
+fn discover_package_dirs(
     prefix_dir: &SystemPath,
-    suffixes: &[&str],
+    suffixes: &[InstallationDir],
     implementation: PythonImplementation,
     system: &dyn System,
     directories: &mut SitePackagesPaths,
@@ -1248,7 +1285,7 @@ fn enumerate_package_dirs(
 
         if matches_implementation {
             for suffix in suffixes {
-                let candidate = path.join(suffix);
+                let candidate = path.join(suffix.as_str());
                 if system.is_directory(&candidate) {
                     directories.insert(candidate);
                 }
@@ -1326,7 +1363,7 @@ fn site_packages_directories_from_sys_prefix(
         if is_debian_system_prefix {
             probe_package_dirs(
                 SystemPath::new("/usr/local/lib"),
-                "dist-packages",
+                InstallationDir::DistPackages,
                 python_version,
                 implementation,
                 system,
@@ -1334,43 +1371,35 @@ fn site_packages_directories_from_sys_prefix(
             );
         }
 
-        // Standard paths: {sys_prefix}/{lib,lib64}/pythonX.Y/{site,dist}-packages
         for lib_dir in UnixLibDir::iter() {
             let prefix = sys_prefix_path.join(lib_dir);
-            probe_package_dirs(
-                &prefix,
-                "site-packages",
-                python_version,
-                implementation,
-                system,
-                &mut directories,
-            );
-            probe_package_dirs(
-                &prefix,
-                "dist-packages",
-                python_version,
-                implementation,
-                system,
-                &mut directories,
-            );
+            for suffix in InstallationDir::iter() {
+                probe_package_dirs(
+                    &prefix,
+                    suffix,
+                    python_version,
+                    implementation,
+                    system,
+                    &mut directories,
+                );
+            }
         }
     } else {
         if is_debian_system_prefix {
-            enumerate_package_dirs(
+            discover_package_dirs(
                 SystemPath::new("/usr/local/lib"),
-                &["dist-packages"],
+                &[InstallationDir::DistPackages],
                 implementation,
                 system,
                 &mut directories,
             );
         }
 
-        // Standard paths: enumerate each prefix once, checking both package suffixes.
         for lib_dir in UnixLibDir::iter() {
             let prefix = sys_prefix_path.join(lib_dir);
-            enumerate_package_dirs(
+            discover_package_dirs(
                 &prefix,
-                &["site-packages", "dist-packages"],
+                InstallationDir::ALL,
                 implementation,
                 system,
                 &mut directories,
