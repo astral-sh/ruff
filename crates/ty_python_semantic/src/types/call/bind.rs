@@ -126,6 +126,27 @@ impl<'db> ConstructorBinding<'db> {
         )
         .unwrap_or_else(|| self.entry.return_type())
     }
+
+    fn check_downstream_constructor(
+        &mut self,
+        db: &'db dyn Db,
+        constraints: &ConstraintSetBuilder<'db>,
+        argument_types: &CallArguments<'_, 'db>,
+        call_expression_tcx: TypeContext<'db>,
+        dataclass_field_specifiers: &[Type<'db>],
+    ) -> bool {
+        self.entry.check_downstream_constructor(
+            db,
+            constraints,
+            argument_types,
+            call_expression_tcx,
+            dataclass_field_specifiers,
+        )
+    }
+
+    fn checked_downstream_constructor_bindings(&self, db: &'db dyn Db) -> Option<&Bindings<'db>> {
+        self.entry.deferred_constructor_type_context_bindings(db)
+    }
 }
 
 impl<'db> CallAlternative<'db> {
@@ -166,6 +187,43 @@ impl<'db> CallAlternative<'db> {
     ) -> Option<ArgumentForms> {
         self.callable_mut()
             .check_types(db, constraints, argument_types, call_expression_tcx)
+    }
+
+    fn check_downstream_constructor(
+        &mut self,
+        db: &'db dyn Db,
+        constraints: &ConstraintSetBuilder<'db>,
+        argument_types: &CallArguments<'_, 'db>,
+        call_expression_tcx: TypeContext<'db>,
+        dataclass_field_specifiers: &[Type<'db>],
+    ) -> bool {
+        match self {
+            CallAlternative::Regular(binding) => binding.check_downstream_constructor(
+                db,
+                constraints,
+                argument_types,
+                call_expression_tcx,
+                dataclass_field_specifiers,
+            ),
+            CallAlternative::Constructor(binding) => binding.check_downstream_constructor(
+                db,
+                constraints,
+                argument_types,
+                call_expression_tcx,
+                dataclass_field_specifiers,
+            ),
+        }
+    }
+
+    fn checked_downstream_constructor_bindings(&self, db: &'db dyn Db) -> Option<&Bindings<'db>> {
+        match self {
+            CallAlternative::Regular(binding) => {
+                binding.deferred_constructor_type_context_bindings(db)
+            }
+            CallAlternative::Constructor(binding) => {
+                binding.checked_downstream_constructor_bindings(db)
+            }
+        }
     }
 
     fn as_result(&self) -> Result<(), CallErrorKind> {
@@ -233,6 +291,14 @@ impl<'a, 'db> ConstructorGroupState<'a, 'db> {
 type ConstructorGroups<'a, 'db> = FxOrderMap<Type<'db>, ConstructorGroupState<'a, 'db>>;
 
 impl<'db> BindingsElement<'db> {
+    fn alternatives(&self) -> impl Iterator<Item = &CallAlternative<'db>> {
+        self.alternatives.iter()
+    }
+
+    fn alternatives_mut(&mut self) -> impl Iterator<Item = &mut CallAlternative<'db>> {
+        self.alternatives.iter_mut()
+    }
+
     fn callables(&self) -> impl Iterator<Item = &CallableBinding<'db>> {
         self.alternatives.iter().map(CallAlternative::callable)
     }
@@ -791,6 +857,35 @@ impl<'db> Bindings<'db> {
             .flat_map(BindingsElement::callables_mut)
     }
 
+    fn iter_semantic_alternatives(&self) -> impl Iterator<Item = &CallAlternative<'db>> {
+        self.elements.iter().flat_map(BindingsElement::alternatives)
+    }
+
+    fn iter_semantic_alternatives_mut(
+        &mut self,
+    ) -> impl Iterator<Item = &mut CallAlternative<'db>> {
+        self.elements
+            .iter_mut()
+            .flat_map(BindingsElement::alternatives_mut)
+    }
+
+    /// Returns the callables that should contribute argument type context, including deferred
+    /// constructor callables whose checks are enabled by the matched upstream overload.
+    pub(crate) fn iter_type_context_callables(
+        &self,
+        db: &'db dyn Db,
+    ) -> impl Iterator<Item = &CallableBinding<'db>> + '_ {
+        self.iter_semantic_alternatives()
+            .flat_map(move |alternative| {
+                std::iter::once(alternative.callable()).chain(
+                    alternative
+                        .checked_downstream_constructor_bindings(db)
+                        .into_iter()
+                        .flat_map(|bindings| bindings.iter_flat()),
+                )
+            })
+    }
+
     /// Maps each `CallableBinding` to a type and combines results while preserving
     /// the union-of-intersections structure:
     ///
@@ -925,8 +1020,8 @@ impl<'db> Bindings<'db> {
         // For constructor bindings with deferred downstream checks: validate downstream bindings
         // if the matched overload is instance-returning.
         let mut init_error = false;
-        for binding in self.iter_flat_mut() {
-            if binding.check_downstream_constructor(
+        for alternative in self.iter_semantic_alternatives_mut() {
+            if alternative.check_downstream_constructor(
                 db,
                 constraints,
                 argument_types,
@@ -1482,16 +1577,16 @@ impl<'db> Bindings<'db> {
 
         // Report deferred constructor diagnostics when the matched overload is instance-returning.
         let mut reported_ctor_init_callables = FxHashSet::default();
-        for binding in self.iter_flat() {
-            let Some(downstream) = binding.downstream_constructor.as_ref() else {
+        for alternative in self.iter_semantic_alternatives() {
+            let Some(downstream_bindings) =
+                alternative.checked_downstream_constructor_bindings(context.db())
+            else {
                 continue;
             };
-            if binding.should_check_downstream_constructor(context.db()) {
-                if !reported_ctor_init_callables.insert(downstream.bindings.callable_type()) {
-                    continue;
-                }
-                downstream.bindings.report_diagnostics(context, node);
+            if !reported_ctor_init_callables.insert(downstream_bindings.callable_type()) {
+                continue;
             }
+            downstream_bindings.report_diagnostics(context, node);
         }
     }
 

@@ -5120,17 +5120,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let mut overloads_with_binding: Vec<(&Binding<'db>, &CallableBinding<'db>)> = Vec::new();
 
-        for binding in bindings.iter_flat() {
+        for binding in bindings.iter_type_context_callables(db) {
             add_overloads_from_binding(&mut overloads_with_binding, binding);
-
-            // Constructors may defer `__init__` validation under `__new__`/metaclass `__call__`.
-            // Include those deferred bindings for argument type context when they are relevant.
-            if let Some(deferred_bindings) = binding.deferred_constructor_type_context_bindings(db)
-            {
-                for deferred in deferred_bindings.iter_flat() {
-                    add_overloads_from_binding(&mut overloads_with_binding, deferred);
-                }
-            }
         }
 
         // Each type is a valid independent inference of the given argument, and we may require
