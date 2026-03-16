@@ -5,6 +5,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::preview::is_b018_subscript_enabled;
 
 use crate::rules::flake8_bugbear::helpers::at_last_top_level_expression_in_cell;
 
@@ -115,7 +116,7 @@ pub(crate) fn useless_expression(checker: &Checker, value: &Expr) {
         }
         // Flag subscripts as useless expressions, even if they're attached to calls or other
         // expressions.
-        if value.is_subscript_expr() {
+        if is_b018_subscript_enabled(checker.settings()) && value.is_subscript_expr() {
             checker.report_diagnostic(
                 UselessExpression {
                     kind: Kind::Subscript,

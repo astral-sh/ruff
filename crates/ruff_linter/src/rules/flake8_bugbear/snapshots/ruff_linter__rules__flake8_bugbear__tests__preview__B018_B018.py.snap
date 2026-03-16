@@ -281,3 +281,45 @@ B018 Found useless expression. Either assign it to a variable or remove it.
 65 |     "foo" + "bar"  # BinOp (raise)
    |     ^^^^^^^^^^^^^
    |
+
+B018 Found useless subscript access. Either assign it to a variable or remove it.
+  --> B018.py:69:5
+   |
+68 | def foo6():
+69 |     x["item"]  # Subscript (raise)
+   |     ^^^^^^^^^
+70 |     obj.attr["key"]  # Subscript (raise)
+71 |     get_dict()["key"]  # Subscript on call result (raise)
+   |
+
+B018 Found useless subscript access. Either assign it to a variable or remove it.
+  --> B018.py:70:5
+   |
+68 | def foo6():
+69 |     x["item"]  # Subscript (raise)
+70 |     obj.attr["key"]  # Subscript (raise)
+   |     ^^^^^^^^^^^^^^^
+71 |     get_dict()["key"]  # Subscript on call result (raise)
+72 |     x[0]  # Subscript with int key (raise)
+   |
+
+B018 Found useless subscript access. Either assign it to a variable or remove it.
+  --> B018.py:71:5
+   |
+69 |     x["item"]  # Subscript (raise)
+70 |     obj.attr["key"]  # Subscript (raise)
+71 |     get_dict()["key"]  # Subscript on call result (raise)
+   |     ^^^^^^^^^^^^^^^^^
+72 |     x[0]  # Subscript with int key (raise)
+73 |     _ = x["item"]  # OK: result intentionally ignored
+   |
+
+B018 Found useless subscript access. Either assign it to a variable or remove it.
+  --> B018.py:72:5
+   |
+70 |     obj.attr["key"]  # Subscript (raise)
+71 |     get_dict()["key"]  # Subscript on call result (raise)
+72 |     x[0]  # Subscript with int key (raise)
+   |     ^^^^
+73 |     _ = x["item"]  # OK: result intentionally ignored
+   |
