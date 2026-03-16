@@ -7355,7 +7355,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let class_name = class_literal.name(self.db());
             let mut diag =
                 builder.into_diagnostic(format_args!(r#"The class `{class_name}` is deprecated"#));
-            if let Some(message) = deprecated.message(self.db()) {
+            if let Some(message) = deprecated.message {
                 diag.set_primary_message(message.value(self.db()));
             }
             diag.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
@@ -7387,7 +7387,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let func_name = function.name(self.db());
         let mut diag =
             builder.into_diagnostic(format_args!(r#"The function `{func_name}` is deprecated"#));
-        if let Some(message) = deprecated.message(self.db()) {
+        if let Some(message) = deprecated.message {
             diag.set_primary_message(message.value(self.db()));
         }
         diag.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
