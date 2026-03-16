@@ -324,3 +324,7 @@ pub(crate) const fn is_up006_future_annotations_fix_enabled(settings: &LinterSet
 pub const fn is_warning_severity_enabled(preview: PreviewMode) -> bool {
     preview.is_enabled()
 }
+
+pub(crate) const fn is_pep604_future_annotations_fix_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
