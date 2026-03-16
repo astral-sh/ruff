@@ -1499,7 +1499,7 @@ impl<'db> PublicTypeBuilder<'db> {
             Type::FunctionLiteral(function) => {
                 if function
                     .literal(self.db)
-                    .last_definition(self.db)
+                    .last_definition
                     .is_overload(self.db)
                 {
                     self.queue = Some(element);

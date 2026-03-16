@@ -5338,9 +5338,23 @@ impl<'db> Type<'db> {
             }
 
             // TODO(jelle): Materialize should be handled differently, since TypeIs is invariant
-            Type::TypeIs(type_is) => type_is.with_type(db, type_is.return_type(db).apply_type_mapping(db, type_mapping, tcx)),
+            Type::TypeIs(type_is) => visitor.visit(self, || {
+                type_is.with_type(
+                    db,
+                    type_is
+                        .return_type(db)
+                        .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                )
+            }),
 
-            Type::TypeGuard(type_guard) => type_guard.with_type(db, type_guard.return_type(db).apply_type_mapping(db, type_mapping, tcx)),
+            Type::TypeGuard(type_guard) => visitor.visit(self, || {
+                type_guard.with_type(
+                    db,
+                    type_guard
+                        .return_type(db)
+                        .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                )
+            }),
 
             Type::TypeAlias(alias) => {
                 // For EagerExpansion, expand the raw value type. This path relies on Salsa's cycle
@@ -6725,7 +6739,7 @@ impl<'db> InvalidTypeExpression<'db> {
         // casing for this function.
         } else if let InvalidTypeExpression::InvalidType(Type::FunctionLiteral(function), _) = self
             && function.name(db) == "callable"
-            && let function_body_scope = function.literal(db).last_definition(db).body_scope(db)
+            && let function_body_scope = function.literal(db).last_definition.body_scope(db)
             && function_body_scope
                 .scope(db)
                 .parent()

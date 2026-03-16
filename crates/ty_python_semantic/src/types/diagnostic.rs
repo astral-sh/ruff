@@ -5170,7 +5170,7 @@ pub(super) fn report_invalid_method_override<'db>(
     let db = context.db();
 
     let signature_span =
-        |function: FunctionType<'db>| function.literal(db).last_definition(db).spans(db).signature;
+        |function: FunctionType<'db>| function.literal(db).last_definition.spans(db).signature;
 
     let subclass_definition_kind = subclass_definition.kind(db);
     let subclass_definition_signature_span = signature_span(subclass_function);
@@ -5412,7 +5412,7 @@ pub(super) fn report_overridden_final_method<'db>(
     } else {
         first_final_superclass_definition
             .literal(db)
-            .last_definition(db)
+            .last_definition
     };
 
     sub.annotate(

@@ -1720,7 +1720,9 @@ impl KnownClass {
                 };
 
                 overload.set_return_type(Type::KnownInstance(KnownInstanceType::Deprecated(
-                    DeprecatedInstance::new(db, message.as_string_literal()),
+                    DeprecatedInstance {
+                        message: message.as_string_literal(),
+                    },
                 )));
             }
 

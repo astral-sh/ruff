@@ -488,4 +488,17 @@ bad10: TypeAlias = InitVar  # error: [invalid-type-form]
 differently_bad: TypeAlias = Unpack[tuple[int, ...]]
 ```
 
+## Recursive `TypeIs` and `TypeGuard` aliases don't stack overflow
+
+```py
+from typing import TypeAlias
+from typing_extensions import TypeGuard, TypeIs
+
+RecursiveIs: TypeAlias = TypeIs["RecursiveIs"]
+RecursiveGuard: TypeAlias = TypeGuard["RecursiveGuard"]
+
+AliasIs: TypeAlias = RecursiveIs
+AliasGuard: TypeAlias = RecursiveGuard
+```
+
 [type expression]: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions

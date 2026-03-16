@@ -1349,8 +1349,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 node_index: _,
                 value,
             }) => {
-                // If this is a call expression, we would have added a `ReturnsNever` constraint,
-                // meaning this will be a standalone expression.
+                // If this is a call expression, we would have added an `IsNonTerminalCall`
+                // constraint, meaning this will be a standalone expression.
                 let ty = self.infer_maybe_standalone_expression(value, TypeContext::default());
 
                 if ty.is_awaitable(self.db()) && !self.is_known_function_call(value) {
@@ -7323,7 +7323,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let class_name = class_literal.name(self.db());
             let mut diag =
                 builder.into_diagnostic(format_args!(r#"The class `{class_name}` is deprecated"#));
-            if let Some(message) = deprecated.message(self.db()) {
+            if let Some(message) = deprecated.message {
                 diag.set_primary_message(message.value(self.db()));
             }
             diag.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
@@ -7355,7 +7355,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let func_name = function.name(self.db());
         let mut diag =
             builder.into_diagnostic(format_args!(r#"The function `{func_name}` is deprecated"#));
-        if let Some(message) = deprecated.message(self.db()) {
+        if let Some(message) = deprecated.message {
             diag.set_primary_message(message.value(self.db()));
         }
         diag.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);

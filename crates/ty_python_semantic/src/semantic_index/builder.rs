@@ -35,8 +35,8 @@ use crate::semantic_index::expression::{Expression, ExpressionKind};
 use crate::semantic_index::member::MemberExprBuilder;
 use crate::semantic_index::place::{PlaceExpr, PlaceTableBuilder, ScopedPlaceId};
 use crate::semantic_index::predicate::{
-    CallableAndCallExpr, ClassPatternKind, PatternPredicate, PatternPredicateKind, Predicate,
-    PredicateNode, PredicateOrLiteral, ScopedPredicateId, StarImportPlaceholderPredicate,
+    ClassPatternKind, PatternPredicate, PatternPredicateKind, Predicate, PredicateNode,
+    PredicateOrLiteral, ScopedPredicateId, StarImportPlaceholderPredicate,
 };
 use crate::semantic_index::re_exports::exported_names;
 use crate::semantic_index::reachability_constraints::{
@@ -1053,7 +1053,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         PossiblyNarrowedPlacesBuilder::new(self.db, place_table)
                             .pattern(pattern, module)
                     }
-                    PredicateNode::ReturnsNever(_) | PredicateNode::StarImportPlaceholder(_) => {
+                    PredicateNode::IsNonTerminalCall(_)
+                    | PredicateNode::StarImportPlaceholder(_) => {
                         // These predicates don't narrow any places
                         PossiblyNarrowedPlaces::default()
                     }
@@ -2784,44 +2785,29 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 // We also only add these inside function scopes, since considering module-level
                 // constraints can affect the type of imported symbols, leading to a lot more
                 // work in third-party code.
-                let call_info = match value.as_ref() {
-                    ast::Expr::Call(ast::ExprCall { func, .. }) => {
-                        Some((func.as_ref(), value.as_ref(), false))
-                    }
-                    ast::Expr::Await(ast::ExprAwait { value: inner, .. }) => match inner.as_ref() {
-                        ast::Expr::Call(ast::ExprCall { func, .. }) => {
-                            Some((func.as_ref(), value.as_ref(), true))
-                        }
-                        _ => None,
-                    },
-                    _ => None,
+                let is_call = match value.as_ref() {
+                    ast::Expr::Call(_) => true,
+                    ast::Expr::Await(ast::ExprAwait { value: inner, .. }) => inner.is_call_expr(),
+                    _ => false,
                 };
 
-                if let Some((func, expr, is_await)) = call_info {
-                    if !self.source_type.is_stub() && self.in_function_scope() {
-                        let callable = self.add_standalone_expression(func);
-                        let call_expr = self.add_standalone_expression(expr);
+                if is_call && !self.source_type.is_stub() && self.in_function_scope() {
+                    let call_expr = self.add_standalone_expression(value.as_ref());
 
-                        let predicate = Predicate {
-                            node: PredicateNode::ReturnsNever(CallableAndCallExpr {
-                                callable,
-                                call_expr,
-                                is_await,
-                            }),
-                            is_positive: false,
-                        };
-                        let constraint = self.record_reachability_constraint(
-                            PredicateOrLiteral::Predicate(predicate),
-                        );
+                    let predicate = Predicate {
+                        node: PredicateNode::IsNonTerminalCall(call_expr),
+                        is_positive: true,
+                    };
+                    let constraint = self
+                        .record_reachability_constraint(PredicateOrLiteral::Predicate(predicate));
 
-                        // Also gate narrowing by this constraint: if the call returns
-                        // `Never`, any narrowing in the current branch should be
-                        // invalidated (since this path is unreachable). This enables
-                        // narrowing to be preserved after if-statements where one branch
-                        // calls a `NoReturn` function like `sys.exit()`.
-                        self.current_use_def_map_mut()
-                            .record_narrowing_constraint_for_all_places(constraint);
-                    }
+                    // Also gate narrowing by this constraint: if the call returns
+                    // `Never`, any narrowing in the current branch should be
+                    // invalidated (since this path is unreachable). This enables
+                    // narrowing to be preserved after if-statements where one branch
+                    // calls a `NoReturn` function like `sys.exit()`.
+                    self.current_use_def_map_mut()
+                        .record_narrowing_constraint_for_all_places(constraint);
                 }
             }
             _ => {
