@@ -750,9 +750,6 @@ pub(crate) struct Bindings<'db> {
     /// The type that is (hopefully) callable.
     callable_type: Type<'db>,
 
-    /// The type of the instance being constructed, if this signature is for a constructor.
-    constructor_instance_type: Option<Type<'db>>,
-
     /// Whether implicit `__new__` calls may be missing in constructor bindings.
     implicit_dunder_new_is_possibly_unbound: bool,
 
@@ -769,8 +766,6 @@ pub(crate) struct Bindings<'db> {
 
 impl<'db> Bindings<'db> {
     fn set_constructor_instance_type_in_place(&mut self, constructor_instance_type: Type<'db>) {
-        self.constructor_instance_type = Some(constructor_instance_type);
-
         for element in &mut self.elements {
             for alternative in &mut element.alternatives {
                 match alternative {
@@ -853,7 +848,6 @@ impl<'db> Bindings<'db> {
             callable_type,
             elements,
             argument_forms: ArgumentForms::new(0),
-            constructor_instance_type: None,
             implicit_dunder_new_is_possibly_unbound,
             implicit_dunder_init_is_possibly_unbound,
         }
@@ -889,7 +883,6 @@ impl<'db> Bindings<'db> {
             implicit_dunder_init_is_possibly_unbound,
             elements,
             argument_forms: ArgumentForms::new(0),
-            constructor_instance_type: None,
         }
     }
 
@@ -1061,7 +1054,6 @@ impl<'db> Bindings<'db> {
         Self {
             callable_type: self.callable_type,
             argument_forms: self.argument_forms,
-            constructor_instance_type: self.constructor_instance_type,
             implicit_dunder_new_is_possibly_unbound: self.implicit_dunder_new_is_possibly_unbound,
             implicit_dunder_init_is_possibly_unbound: self.implicit_dunder_init_is_possibly_unbound,
             elements: self
@@ -1076,6 +1068,23 @@ impl<'db> Bindings<'db> {
                 })
                 .collect(),
         }
+    }
+
+    fn shared_constructor_instance_type(&self) -> Option<Type<'db>> {
+        let mut shared = None;
+
+        for alternative in self.iter_semantic_alternatives() {
+            let constructor = alternative.as_constructor()?;
+            if let Some(existing) = shared {
+                if existing != constructor.constructed_instance_type {
+                    return None;
+                }
+            } else {
+                shared = Some(constructor.constructed_instance_type);
+            }
+        }
+
+        shared
     }
 
     /// Match the arguments of a call site against the parameters of a collection of possibly
@@ -1400,7 +1409,7 @@ impl<'db> Bindings<'db> {
     fn constructor_return_type(&self, db: &'db dyn Db) -> Option<Type<'db>> {
         Self::constructor_return_type_for_bindings(
             db,
-            self.constructor_instance_type?,
+            self.shared_constructor_instance_type()?,
             self.iter_semantic_alternatives()
                 .filter_map(CallAlternative::as_constructor),
         )
@@ -3031,7 +3040,6 @@ impl<'db> From<CallableBinding<'db>> for Bindings<'db> {
                 alternatives: smallvec_inline![CallAlternative::Regular(from)],
             }],
             argument_forms: ArgumentForms::new(0),
-            constructor_instance_type: None,
             implicit_dunder_new_is_possibly_unbound: false,
             implicit_dunder_init_is_possibly_unbound: false,
         }
@@ -3057,7 +3065,6 @@ impl<'db> From<Binding<'db>> for Bindings<'db> {
                 alternatives: smallvec_inline![CallAlternative::Regular(callable_binding)],
             }],
             argument_forms: ArgumentForms::new(0),
-            constructor_instance_type: None,
             implicit_dunder_new_is_possibly_unbound: false,
             implicit_dunder_init_is_possibly_unbound: false,
         }
