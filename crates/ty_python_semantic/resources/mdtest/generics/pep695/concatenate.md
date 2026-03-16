@@ -253,7 +253,7 @@ def decorator[**P](func: Callable[Concatenate[int, P], bool]) -> Callable[P, boo
         return func(0, *args, **kwargs)
     return wrapper
 
-# TODO: Should error; `f0` has no `int` first parameter to match `Concatenate[int, P]`
+# error: [invalid-argument-type] "Argument to function `decorator` is incorrect: Expected `(int, /, *args: Unknown, **kwargs: Unknown) -> bool`, found `def f0() -> bool`"
 @decorator
 def f0() -> bool:
     return True
@@ -266,7 +266,7 @@ def f1(a: int) -> bool:
 def f2(a: int, b: str) -> bool:
     return True
 
-# TODO: Should error; first parameter is `str`, not `int`
+# error: [invalid-argument-type] "Argument to function `decorator` is incorrect: Expected `(int, /, *args: Unknown, **kwargs: Unknown) -> bool`, found `def f3(a: str, b: int) -> bool`"
 @decorator
 def f3(a: str, b: int) -> bool:
     return True
@@ -387,16 +387,14 @@ def variadic(x: int, *args: str, **kwargs: int) -> None: ...
 
 reveal_type(variadic)  # revealed: (*args: str, **kwargs: int) -> None
 
-# TODO: Should reveal `(*args: str, **kwargs: int) -> None`. The `*args: str` should be
-# able to absorb the `int` prefix from `Concatenate[int, P]` with `P` capturing the
-# remaining `(*args: str, **kwargs: int)` parameters.
+# error: [invalid-argument-type] "Argument to function `decorator` is incorrect: Expected `(int, /, *args: Unknown, **kwargs: Unknown) -> None`, found `def only_variadic(*args: str, **kwargs: int) -> None`"
 @decorator
 def only_variadic(*args: str, **kwargs: int) -> None: ...
 
 reveal_type(only_variadic)  # revealed: (...) -> None
 
-# TODO: Should reveal `(*args: str, **kwargs: int) -> None`. The unpacked tuple's first
-# element is `int`, which should match the `Concatenate[int, P]` prefix.
+# TODO: This should accept the callable and reveal `(*args: str, **kwargs: int) -> None`.
+# error: [invalid-argument-type]
 @decorator
 def unpack_variadic(*args: *tuple[int, *tuple[str, ...]], **kwargs: int) -> None: ...
 
@@ -413,17 +411,24 @@ from typing import Callable, Concatenate
 def foo[**P, R](func: Callable[Concatenate[int, P], R], *args: P.args, **kwargs: P.kwargs) -> R:
     return func(0, *args, **kwargs)
 
-def test(x: str, y: str) -> bool:
+def valid(x: int, y: str) -> bool:
     return True
 
-# TODO: These shouldn't be Unknown
-reveal_type(foo(test, "", ""))  # revealed: Unknown
-reveal_type(foo(test, y="", x=""))  # revealed: Unknown
+def invalid(x: str, y: str) -> bool:
+    return True
 
-# TODO: These calls should raise an error
-# TODO: These shouldn't be Unknown
-reveal_type(foo(test, 1, ""))  # revealed: Unknown
-reveal_type(foo(test, ""))  # revealed: Unknown
+reveal_type(foo(valid, ""))  # revealed: bool
+reveal_type(foo(valid, y=""))  # revealed: bool
+
+# error: [invalid-argument-type] "Argument to function `foo` is incorrect: Expected `str`, found `Literal[1]`"
+# error: [too-many-positional-arguments] "Too many positional arguments to function `foo`: expected 1, got 2"
+reveal_type(foo(valid, 1, ""))  # revealed: bool
+
+# TODO: These should reveal `bool`
+# error: [invalid-argument-type] "Argument to function `foo` is incorrect: Expected `(int, /, *args: Unknown, **kwargs: Unknown) -> Unknown`, found `def invalid(x: str, y: str) -> bool`"
+reveal_type(foo(invalid, ""))  # revealed: Unknown
+# error: [invalid-argument-type] "Argument to function `foo` is incorrect: Expected `(int, /, *args: Unknown, **kwargs: Unknown) -> Unknown`, found `def invalid(x: str, y: str) -> bool`"
+reveal_type(foo(invalid, 1, ""))  # revealed: Unknown
 ```
 
 ### Prepended type variable
@@ -436,21 +441,26 @@ def decorator[T, R, **P](func: Callable[Concatenate[T, P], R], *args: P.args, **
         return func(arg, *args, **kwargs)
     return wrapper
 
-# TODO: Remove this error
-# error: [missing-argument] "No argument provided for required parameter `y` of function `decorator`"
-@decorator
-def test1(x: str, y: str) -> bool:
+def test1(x: int, y: str) -> bool:
     return True
 
-reveal_type(test1)  # revealed: (str, /) -> bool
-reveal_type(test1(""))  # revealed: bool
-# error: [too-many-positional-arguments] "Too many positional arguments: expected 1, got 2"
-reveal_type(test1("", ""))  # revealed: bool
+# error: [missing-argument] "No argument provided for required parameter `y` of function `decorator`"
+reveal_type(decorator(test1))  # revealed: (int, /) -> bool
+reveal_type(decorator(test1, ""))  # revealed: (int, /) -> bool
 
-# error: [invalid-argument-type] "Argument to function `decorator` is incorrect: Expected `(int, /) -> bool`, found `def test2(*, x: int) -> bool`"
+decorated_test1 = decorator(test1, y="")
+
+reveal_type(decorated_test1(1))  # revealed: bool
+# error: [too-many-positional-arguments] "Too many positional arguments: expected 1, got 2"
+reveal_type(decorated_test1(1, ""))  # revealed: bool
+
+# error: [invalid-argument-type] "Argument to function `decorator` is incorrect: Expected `(Unknown, /, *args: Unknown, **kwargs: Unknown) -> Unknown`, found `def test2(*, x: int) -> bool`"
 @decorator
 def test2(*, x: int) -> bool:
     return True
+
+# TODO: This could reveal `(T, /, x: int) -> bool` using partial specialization
+reveal_type(test2)  # revealed: (Unknown, /) -> Unknown
 ```
 
 ## `Concatenate` with overloaded functions
@@ -564,17 +574,17 @@ As per the [spec](https://typing.python.org/en/latest/spec/generics.html#id5):
 ```py
 from typing import Callable, Concatenate
 
-def decorator[**P](func: Callable[P, None]) -> Callable[P, None]:
-    def wrapper(*args: P.args, **kwargs: P.kwargs) -> None:
+def decorator[**P1](func: Callable[P1, None]) -> Callable[P1, None]:
+    def wrapper(*args: P1.args, **kwargs: P1.kwargs) -> None:
         func(*args, **kwargs)
 
     return wrapper
 
 @decorator
-def f1[**P](fn: Callable[P, None], x: int, *args: P.args, **kwargs: P.kwargs) -> None:
+def f1[**P2](fn: Callable[P2, None], x: int, *args: P2.args, **kwargs: P2.kwargs) -> None:
     pass
 
-reveal_type(f1)  # revealed: [**P](fn: (**P) -> None, x: int, P@f1) -> None
+reveal_type(f1)  # revealed: [**P2](fn: (**P2) -> None, x: int, *args: P2.args, **kwargs: P2.kwargs) -> None
 
 def test(a: str) -> None: ...
 
@@ -601,7 +611,7 @@ def decorator[**P1](func: Callable[Concatenate[int, P1], None]) -> Callable[P1, 
     return wrapper
 
 def foo[**P2](f: Callable[P2, None]) -> None:
-    reveal_type(f)  # revealed: [**P2](**P2) -> None
+    reveal_type(f)  # revealed: (**P2@foo) -> None
     # TODO: This should raise an invalid-argument-type error
     reveal_type(decorator(f))  # revealed: (...) -> None
 ```
