@@ -1,6 +1,5 @@
 use crate::diagnostic::{
     Diagnostic, DisplayDiagnosticConfig, Severity,
-    render::display_diagnostic_id,
     stylesheet::{DiagnosticStylesheet, fmt_styled, fmt_with_hyperlink},
 };
 
@@ -74,7 +73,7 @@ impl<'a> ConciseRenderer<'a> {
                     "{code} ",
                     code = fmt_styled(
                         fmt_with_hyperlink(
-                            display_diagnostic_id(diag, self.config),
+                            diag.display_diagnostic_id(self.config.preview),
                             diag.documentation_url(),
                             &stylesheet
                         ),

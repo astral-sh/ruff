@@ -16,6 +16,7 @@ use crate::message::{Emitter, EmitterContext};
 pub struct GroupedEmitter {
     show_fix_status: bool,
     applicability: Applicability,
+    preview: bool,
 }
 
 impl Default for GroupedEmitter {
@@ -23,6 +24,7 @@ impl Default for GroupedEmitter {
         Self {
             show_fix_status: false,
             applicability: Applicability::Safe,
+            preview: false,
         }
     }
 }
@@ -37,6 +39,12 @@ impl GroupedEmitter {
     #[must_use]
     pub fn with_applicability(mut self, applicability: Applicability) -> Self {
         self.applicability = applicability;
+        self
+    }
+
+    #[must_use]
+    pub fn with_preview(mut self, preview: bool) -> Self {
+        self.preview = preview;
         self
     }
 }
@@ -78,6 +86,7 @@ impl Emitter for GroupedEmitter {
                         applicability: self.applicability,
                         row_length,
                         column_length,
+                        preview: self.preview,
                     }
                 )?;
             }
@@ -126,6 +135,7 @@ struct DisplayGroupedMessage<'a> {
     row_length: NonZeroUsize,
     column_length: NonZeroUsize,
     notebook_index: Option<&'a NotebookIndex>,
+    preview: bool,
 }
 
 impl Display for DisplayGroupedMessage<'_> {
@@ -170,7 +180,8 @@ impl Display for DisplayGroupedMessage<'_> {
             code_and_body = RuleCodeAndBody {
                 message,
                 show_fix_status: self.show_fix_status,
-                applicability: self.applicability
+                applicability: self.applicability,
+                preview: self.preview,
             },
         )?;
 
@@ -182,6 +193,7 @@ pub(super) struct RuleCodeAndBody<'a> {
     pub(crate) message: &'a Diagnostic,
     pub(crate) show_fix_status: bool,
     pub(crate) applicability: Applicability,
+    pub(crate) preview: bool,
 }
 
 impl Display for RuleCodeAndBody<'_> {
@@ -190,9 +202,8 @@ impl Display for RuleCodeAndBody<'_> {
             if let Some(fix) = self.message.fix() {
                 // Do not display an indicator for inapplicable fixes
                 if fix.applies(self.applicability) {
-                    if let Some(code) = self.message.secondary_code() {
-                        write!(f, "{} ", code.red().bold())?;
-                    }
+                    let name = self.message.secondary_code_or_id(self.preview);
+                    write!(f, "{} ", name.red().bold())?;
                     return write!(
                         f,
                         "{fix}{body}",
@@ -203,21 +214,16 @@ impl Display for RuleCodeAndBody<'_> {
             }
         }
 
-        if let Some(code) = self.message.secondary_code() {
-            write!(
-                f,
-                "{code} {body}",
-                code = code.red().bold(),
-                body = self.message.concise_message(),
-            )
-        } else {
-            write!(
-                f,
-                "{code}: {body}",
-                code = self.message.id().as_str().red().bold(),
-                body = self.message.concise_message(),
-            )
-        }
+        write!(
+            f,
+            "{code} {body}",
+            code = self
+                .message
+                .display_diagnostic_id(self.preview)
+                .red()
+                .bold(),
+            body = self.message.concise_message(),
+        )
     }
 }
 

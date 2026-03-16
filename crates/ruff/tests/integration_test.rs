@@ -1215,7 +1215,7 @@ fn show_statistics_syntax_errors() {
     success: false
     exit_code: 1
     ----- stdout -----
-    1		invalid-syntax
+    1  invalid-syntax
     Found 1 error.
 
     ----- stderr -----
@@ -1228,7 +1228,7 @@ fn show_statistics_syntax_errors() {
     success: false
     exit_code: 1
     ----- stdout -----
-    1		invalid-syntax
+    1  invalid-syntax
     Found 1 error.
 
     ----- stderr -----

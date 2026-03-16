@@ -424,7 +424,21 @@ impl Diagnostic {
             self.name()
         } else {
             self.secondary_code()
-                .map_or_else(|| self.inner.id.as_str(), SecondaryCode::as_str)
+                .map_or_else(|| self.name(), SecondaryCode::as_str)
+        }
+    }
+
+    /// Render the diagnostic id for display to the user.
+    /// When in preview mode, render the diagnostic name followed by a colon (eg, `rule-name:`).
+    /// Otherwise, render just the secondary code if available (eg, `F401`), or the rule id followed
+    /// by a colon (eg, `invalid-syntax:`).
+    pub fn display_diagnostic_id(&self, preview: bool) -> String {
+        if preview {
+            format!("{name}:", name = self.name())
+        } else if let Some(code) = self.secondary_code() {
+            code.to_string()
+        } else {
+            format!("{id}:", id = self.name())
         }
     }
 
@@ -1497,6 +1511,10 @@ impl DisplayDiagnosticConfig {
         self.cancellation_token
             .as_ref()
             .is_some_and(|token| token.is_cancelled())
+    }
+
+    pub fn is_preview(&self) -> bool {
+        self.preview
     }
 }
 
