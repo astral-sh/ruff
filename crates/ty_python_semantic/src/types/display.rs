@@ -28,7 +28,7 @@ use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::function::{FunctionType, OverloadLiteral};
 use crate::types::generics::{GenericContext, Specialization};
 use crate::types::signatures::{
-    CallableSignature, ConcatenateTail, Parameter, Parameters, ParametersKind, Signature,
+    CallableSignature, Parameter, Parameters, ParametersKind, Signature,
 };
 use crate::types::tuple::TupleSpec;
 use crate::types::typevar::BoundTypeVarIdentity;
@@ -2226,39 +2226,48 @@ impl<'db> FmtDetailed<'db> for DisplayParameters<'_, 'db> {
             ParametersKind::Standard => {
                 display_parameters(self, f, self.parameters.as_slice(), arg_separator)?;
             }
-            ParametersKind::Concatenate(concatenate_tail) => {
-                if let Some(prefix_parameters) = self
-                    .parameters
-                    .as_slice()
-                    // concatenate tail always has 2 parameters `*args` and `**kwargs`
-                    .get(..self.parameters.len().saturating_sub(2))
-                {
-                    display_parameters(self, f, prefix_parameters, arg_separator)?;
-                    if !prefix_parameters.is_empty() {
-                        f.write_str(arg_separator)?;
-                    }
-                    match concatenate_tail {
-                        ConcatenateTail::Gradual => f.write_str("...")?,
-                        ConcatenateTail::ParamSpec(bound_typevar) => {
-                            write!(
-                                f.with_type(Type::TypeVar(bound_typevar)),
-                                "**{}",
-                                bound_typevar.identity(self.db).display(self.db)
-                            )?;
-                        }
-                    }
-                } else {
-                    // This should never happen because `Concatenate` kind always ends with 2
-                    // parameters `*args` and `**kwargs`, but just in case, we can fallback to
-                    // displaying all parameters.
-                    display_parameters(self, f, self.parameters.as_slice(), arg_separator)?;
-                }
+            ParametersKind::Concatenate(_) => {
+                display_parameters(self, f, self.parameters.as_slice(), arg_separator)?;
+                // if let Some(prefix_parameters) = self
+                //     .parameters
+                //     .as_slice()
+                //     // concatenate tail always has 2 parameters `*args` and `**kwargs`
+                //     .get(..self.parameters.len().saturating_sub(2))
+                // {
+                //     display_parameters(self, f, prefix_parameters, arg_separator)?;
+                //     if !prefix_parameters.is_empty() {
+                //         f.write_str(arg_separator)?;
+                //     }
+                //     match concatenate_tail {
+                //         ConcatenateTail::Gradual => f.write_str("...")?,
+                //         ConcatenateTail::ParamSpec(bound_typevar) => {
+                //             write!(
+                //                 f.with_type(Type::TypeVar(bound_typevar)),
+                //                 "**{}",
+                //                 bound_typevar.identity(self.db).display(self.db)
+                //             )?;
+                //         }
+                //     }
+                // } else {
+                //     // This should never happen because `Concatenate` kind always ends with 2
+                //     // parameters `*args` and `**kwargs`, but just in case, we can fallback to
+                //     // displaying all parameters.
+                //     display_parameters(self, f, self.parameters.as_slice(), arg_separator)?;
+                // }
             }
-            ParametersKind::Gradual | ParametersKind::Top => {
-                // We represent gradual form as `...` in the signature, internally the parameters
-                // still contain `(*args, **kwargs)` parameters. (Top parameters are displayed the
-                // same as gradual parameters, we just wrap the entire signature in `Top[]`.)
+            ParametersKind::Top => {
+                // Top parameters are displayed the same as gradual parameters, we just wrap the
+                // entire signature in `Top[]`
                 f.write_str("...")?;
+            }
+            ParametersKind::Gradual if self.parameters.len() == 2 => {
+                // For gradual parameters with only `(*args, **kwargs)`, display as `...` for
+                // simplicity ...
+                f.write_str("...")?;
+            }
+            ParametersKind::Gradual => {
+                // ... but otherwise display all the parameters as normal.
+                display_parameters(self, f, self.parameters.as_slice(), arg_separator)?;
             }
             ParametersKind::ParamSpec(typevar) => {
                 write!(f, "**{}", typevar.name(self.db))?;
