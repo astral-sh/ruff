@@ -16,7 +16,10 @@ use ruff_db::vendored::VendoredFileSystem;
 use salsa::{Database, Event, Setter};
 use ty_module_resolver::SearchPaths;
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
-use ty_python_semantic::{AnalysisSettings, Db as SemanticDb, Program};
+use ty_python_semantic::{
+    AnalysisSettings, Db as SemanticDb, FallibleStrategy, MisconfigurationStrategy, Program,
+    UseDefaultStrategy,
+};
 
 mod changes;
 
@@ -45,7 +48,28 @@ pub struct ProjectDatabase {
 }
 
 impl ProjectDatabase {
-    pub fn new<S>(project_metadata: ProjectMetadata, system: S) -> anyhow::Result<Self>
+    /// Creates a new database, returning an error if the project metadata is misconfigured.
+    pub fn fallible<S>(project_metadata: ProjectMetadata, system: S) -> anyhow::Result<Self>
+    where
+        S: System + 'static + Send + Sync + RefUnwindSafe,
+    {
+        Self::new(project_metadata, system, &FallibleStrategy)
+    }
+
+    /// Creates a new database, substituting default values for any misconfigured settings.
+    pub fn use_defaults<S>(project_metadata: ProjectMetadata, system: S) -> Self
+    where
+        S: System + 'static + Send + Sync + RefUnwindSafe,
+    {
+        let Ok(db) = Self::new(project_metadata, system, &UseDefaultStrategy);
+        db
+    }
+
+    fn new<S, Strategy: MisconfigurationStrategy>(
+        project_metadata: ProjectMetadata,
+        system: S,
+        strategy: &Strategy,
+    ) -> Result<Self, Strategy::Error<anyhow::Error>>
     where
         S: System + 'static + Send + Sync + RefUnwindSafe,
     {
@@ -73,13 +97,17 @@ impl ProjectDatabase {
         //   we may want to have a dedicated method for this?
 
         // Initialize the `Program` singleton
-        let program_settings = project_metadata.to_program_settings(db.system(), db.vendored())?;
+        let program_settings = strategy.to_anyhow(project_metadata.to_program_settings(
+            db.system(),
+            db.vendored(),
+            strategy,
+        ))?;
         Program::from_settings(&db, program_settings);
 
-        db.project = Some(
-            Project::from_metadata(&db, project_metadata)
-                .map_err(|error| anyhow::anyhow!("{}", error.pretty(&db)))?,
-        );
+        db.project = Some(strategy.map_err(
+            Project::from_metadata(&db, project_metadata, strategy),
+            |error| anyhow::anyhow!("{}", error.pretty(&db)),
+        )?);
 
         Ok(db)
     }
@@ -546,7 +574,8 @@ pub(crate) mod tests {
     use ty_module_resolver::SearchPathSettings;
     use ty_python_semantic::lint::{LintRegistry, RuleSelection};
     use ty_python_semantic::{
-        AnalysisSettings, Program, ProgramSettings, PythonPlatform, PythonVersionWithSource,
+        AnalysisSettings, FallibleStrategy, Program, ProgramSettings, PythonPlatform,
+        PythonVersionWithSource,
     };
 
     use crate::db::Db;
@@ -583,7 +612,7 @@ pub(crate) mod tests {
                 project: None,
             };
 
-            let project = Project::from_metadata(&db, project).unwrap();
+            let project = Project::from_metadata(&db, project, &FallibleStrategy).unwrap();
             db.project = Some(project);
             db
         }
@@ -599,7 +628,7 @@ pub(crate) mod tests {
             let root = self.project().root(self);
 
             let search_paths = SearchPathSettings::new(vec![root.to_path_buf()])
-                .to_search_paths(self.system(), self.vendored())
+                .to_search_paths(self.system(), self.vendored(), &FallibleStrategy)
                 .expect("Valid search path settings");
 
             Program::from_settings(

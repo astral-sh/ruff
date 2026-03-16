@@ -436,7 +436,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8TidyImports, "251") => rules::flake8_tidy_imports::rules::BannedApi,
         (Flake8TidyImports, "252") => rules::flake8_tidy_imports::rules::RelativeImports,
         (Flake8TidyImports, "253") => rules::flake8_tidy_imports::rules::BannedModuleLevelImports,
-        (Flake8TidyImports, "254") => rules::flake8_tidy_imports::rules::BannedEagerImports,
+        (Flake8TidyImports, "254") => rules::flake8_tidy_imports::rules::LazyImportMismatch,
 
         // flake8-return
         (Flake8Return, "501") => rules::flake8_return::rules::UnnecessaryReturnNone,
@@ -1130,6 +1130,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         // airflow
         (Airflow, "001") => rules::airflow::rules::AirflowVariableNameTaskIdMismatch,
         (Airflow, "002") => rules::airflow::rules::AirflowDagNoScheduleArgument,
+        (Airflow, "003") => rules::airflow::rules::AirflowVariableGetOutsideTask,
         (Airflow, "301") => rules::airflow::rules::Airflow3Removal,
         (Airflow, "302") => rules::airflow::rules::Airflow3MovedToProvider,
         (Airflow, "303") => rules::airflow::rules::Airflow3IncompatibleFunctionSignature,

@@ -1293,11 +1293,20 @@ impl<'db> Bindings<'db> {
                             }
                         }
 
-                        Some(KnownFunction::IntoCallable) => {
+                        Some(
+                            into_callable @ (KnownFunction::IntoCallable
+                            | KnownFunction::IntoRegularCallable),
+                        ) => {
                             let [Some(ty)] = overload.parameter_types() else {
                                 continue;
                             };
-                            let Some(callables) = ty.try_upcast_to_callable(db) else {
+                            let Some(callables) = ty.try_upcast_to_callable(db).map(|callables| {
+                                if into_callable == KnownFunction::IntoRegularCallable {
+                                    callables.map(|callable| callable.into_regular(db))
+                                } else {
+                                    callables
+                                }
+                            }) else {
                                 continue;
                             };
                             overload.set_return_type(callables.into_type(db));

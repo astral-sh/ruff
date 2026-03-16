@@ -395,24 +395,29 @@ def _[T]():
     static_assert(not is_disjoint_from(type[InvSub[T]], type[Inv[Any]]))
 ```
 
-## `type[]` types in unions with `Callable` types
+## `type[]` types in unions with `Callable` types and callback protocols
 
 `type[Foo]` is assignable to `Callable[[], Foo]` here:
 
 ```py
-from typing import Callable
+from typing import Callable, Protocol
 from ty_extensions import is_assignable_to, is_subtype_of, static_assert, TypeOf, Top
 
 class Foo:
     def __init__(self): ...
 
+class CustomCallback(Protocol):
+    def __call__(self, /) -> Foo: ...
+
 static_assert(is_assignable_to(type[Foo], Callable[[], Foo]))
+static_assert(is_assignable_to(type[Foo], CustomCallback))
 ```
 
 but it is not a subtype of `Callable[[], Foo]` or redundant with `Callable[[], Foo]`:
 
 ```py
 static_assert(not is_subtype_of(type[Foo], Callable[[], Foo]))
+static_assert(not is_subtype_of(type[Foo], CustomCallback))
 ```
 
 and the reason for that is that constructor signatures are not checked for Liskov violations,
@@ -428,15 +433,17 @@ so if `type[Foo]` were considered a subtype of `Callable[[], Foo]`, then this un
 incorrectly simplified to `Callable[[], Foo]`:
 
 ```py
-def test(x: type[Foo] | Callable[[], Foo]):
-    # this remains unsimplified!
+def test(x: type[Foo] | Callable[[], Foo], y: type[Foo] | CustomCallback):
+    # these remain unsimplified!
     reveal_type(x)  # revealed: type[Foo] | (() -> Foo)
+    reveal_type(y)  # revealed: type[Foo] | CustomCallback
 ```
 
-which means that this assertion would fail:
+which means that these assertions would fail:
 
 ```py
 static_assert(is_subtype_of(type[Bar], type[Foo] | Callable[[], Foo]))
+static_assert(is_subtype_of(type[Bar], type[Foo] | CustomCallback))
 ```
 
 despite the fact that this would still pass!
@@ -466,17 +473,26 @@ constructor signatures:
 
 ```py
 static_assert(is_subtype_of(TypeOf[Foo], Callable[[], Foo]))
+static_assert(is_subtype_of(TypeOf[Foo], CustomCallback))
 static_assert(is_subtype_of(TypeOf[Bar], Callable[[int], Bar]))
 static_assert(not is_subtype_of(TypeOf[Bar], TypeOf[Foo]))
 static_assert(is_subtype_of(TypeOf[Foo], TypeOf[Foo] | Callable[[], Foo]))
+static_assert(is_subtype_of(TypeOf[Foo], TypeOf[Foo] | CustomCallback))
 static_assert(is_subtype_of(TypeOf[Bar], type[Foo] | Callable[[], Foo]))
+static_assert(is_subtype_of(TypeOf[Bar], type[Foo] | CustomCallback))
 static_assert(is_subtype_of(TypeOf[Bar], TypeOf[Bar] | Callable[[], Bar]))
 static_assert(is_subtype_of(TypeOf[Bar], type[Bar] | Callable[[], Bar]))
 static_assert(is_subtype_of(TypeOf[Bar], TypeOf[Bar] | Callable[[int], Bar]))
 static_assert(is_subtype_of(TypeOf[Bar], type[Bar] | Callable[[int], Bar]))
 
-def f(x: TypeOf[Foo] | Callable[[], Foo], y: TypeOf[Bar] | Callable[[int], Bar], z: TypeOf[Bar] | Callable[[], Bar]):
-    reveal_type(x)  # revealed: () -> Foo
-    reveal_type(y)  # revealed: (int, /) -> Bar
-    reveal_type(z)  # revealed: <class 'Bar'> | (() -> Bar)
+def f(
+    a: TypeOf[Foo] | Callable[[], Foo],
+    b: TypeOf[Bar] | Callable[[int], Bar],
+    c: TypeOf[Bar] | Callable[[], Bar],
+    d: TypeOf[Foo] | CustomCallback,
+):
+    reveal_type(a)  # revealed: () -> Foo
+    reveal_type(b)  # revealed: (int, /) -> Bar
+    reveal_type(c)  # revealed: <class 'Bar'> | (() -> Bar)
+    reveal_type(d)  # revealed: CustomCallback
 ```

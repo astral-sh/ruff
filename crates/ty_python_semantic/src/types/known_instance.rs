@@ -285,7 +285,7 @@ impl<'db> KnownInstanceType<'db> {
                 TypeMapping::ApplySpecialization(_)
                 | TypeMapping::ApplySpecializationWithMaterialization { .. }
                 | TypeMapping::UniqueSpecialization { .. }
-                | TypeMapping::Promote(_)
+                | TypeMapping::Promote(..)
                 | TypeMapping::BindSelf(..)
                 | TypeMapping::ReplaceSelf { .. }
                 | TypeMapping::Materialize(_)
@@ -338,14 +338,11 @@ impl<'db> KnownInstanceType<'db> {
 }
 
 /// Data regarding a `warnings.deprecated` or `typing_extensions.deprecated` decorator.
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
 pub struct DeprecatedInstance<'db> {
     /// The message for the deprecation
-    pub message: Option<StringLiteralType<'db>>,
+    pub(crate) message: Option<StringLiteralType<'db>>,
 }
-
-// The Salsa heap is tracked separately.
-impl get_size2::GetSize for DeprecatedInstance<'_> {}
 
 /// Contains information about instances of `dataclasses.Field`, typically created using
 /// `dataclasses.field()`.

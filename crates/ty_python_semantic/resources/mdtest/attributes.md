@@ -3055,9 +3055,9 @@ We give special diagnostics for this common case too:
 import foo
 import baz
 
-# error: [possibly-missing-attribute]
+# error: [possibly-missing-submodule]
 reveal_type(foo.bar)  # revealed: Unknown
-# error: [possibly-missing-attribute]
+# error: [possibly-missing-submodule]
 reveal_type(baz.bar)  # revealed: Unknown
 ```
 

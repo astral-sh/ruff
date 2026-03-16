@@ -421,6 +421,26 @@ def _(x: int):
 ```
 
 ```py
+def g[T](x: T, y: list[T | None]) -> T:
+    return x
+
+def _(flag: bool):
+    if flag:
+        x = 1
+
+    # error: [possibly-unresolved-reference]
+    x1: int | str = g(x, [1])
+    reveal_type(x1)  # revealed: int
+
+    if flag:
+        y = "1"
+
+    # error: [possibly-unresolved-reference]
+    x2: list[int | None] | list[str | None] = [y]
+    reveal_type(x2)  # revealed: list[str | None]
+```
+
+```py
 class Bar(TypedDict):
     bar: int
 

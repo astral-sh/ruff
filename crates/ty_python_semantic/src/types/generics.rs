@@ -18,7 +18,9 @@ use crate::types::class_base::ClassBase;
 use crate::types::constraints::{
     ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension, Solutions,
 };
-use crate::types::relation::{HasRelationToVisitor, IsDisjointVisitor, TypeRelation};
+use crate::types::relation::{
+    DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker,
+};
 use crate::types::signatures::{CallableSignature, Parameters};
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::type_alias::{walk_manual_pep_695_type_alias, walk_pep_695_type_alias};
@@ -1005,215 +1007,6 @@ pub(super) fn walk_specialization<'db, V: TypeVisitor<'db> + ?Sized>(
     }
 }
 
-#[expect(clippy::too_many_arguments)]
-fn is_subtype_in_invariant_position<'db, 'c>(
-    db: &'db dyn Db,
-    derived_type: &Type<'db>,
-    derived_materialization: MaterializationKind,
-    base_type: &Type<'db>,
-    base_materialization: MaterializationKind,
-    constraints: &'c ConstraintSetBuilder<'db>,
-    inferable: InferableTypeVars<'_, 'db>,
-    relation_visitor: &HasRelationToVisitor<'db, 'c>,
-    disjointness_visitor: &IsDisjointVisitor<'db, 'c>,
-) -> ConstraintSet<'db, 'c> {
-    let derived_top = derived_type.top_materialization(db);
-    let derived_bottom = derived_type.bottom_materialization(db);
-    let base_top = base_type.top_materialization(db);
-    let base_bottom = base_type.bottom_materialization(db);
-
-    let is_subtype_of = |derived: Type<'db>, base: Type<'db>| {
-        // TODO:
-        // This should be removed and properly handled in the respective
-        // `(Type::TypeVar(_), _) | (_, Type::TypeVar(_))` branch of
-        // `Type::has_relation_to_impl`. Right now, we cannot generally
-        // return `ConstraintSet::from_bool(constraints,true)` from that branch, as that
-        // leads to union simplification, which means that we lose track
-        // of type variables without recording the constraints under which
-        // the relation holds.
-        if matches!(base, Type::TypeVar(_)) || matches!(derived, Type::TypeVar(_)) {
-            return ConstraintSet::from_bool(constraints, true);
-        }
-
-        derived.has_relation_to_impl(
-            db,
-            base,
-            constraints,
-            inferable,
-            TypeRelation::Subtyping,
-            relation_visitor,
-            disjointness_visitor,
-        )
-    };
-    match (derived_materialization, base_materialization) {
-        // `Derived` is a subtype of `Base` if the range of materializations covered by `Derived`
-        // is a subset of the range covered by `Base`.
-        (MaterializationKind::Top, MaterializationKind::Top) => {
-            is_subtype_of(base_bottom, derived_bottom)
-                .and(db, constraints, || is_subtype_of(derived_top, base_top))
-        }
-        // One bottom is a subtype of another if it covers a strictly larger set of materializations.
-        (MaterializationKind::Bottom, MaterializationKind::Bottom) => {
-            is_subtype_of(derived_bottom, base_bottom)
-                .and(db, constraints, || is_subtype_of(base_top, derived_top))
-        }
-        // The bottom materialization of `Derived` is a subtype of the top materialization
-        // of `Base` if there is some type that is both within the
-        // range of types covered by derived and within the range covered by base, because if such a type
-        // exists, it's a subtype of `Top[base]` and a supertype of `Bottom[derived]`.
-        (MaterializationKind::Bottom, MaterializationKind::Top) => {
-            is_subtype_of(base_bottom, derived_bottom)
-                .and(db, constraints, || is_subtype_of(derived_bottom, base_top))
-                .or(db, constraints, || {
-                    is_subtype_of(base_bottom, derived_top)
-                        .and(db, constraints, || is_subtype_of(derived_top, base_top))
-                })
-                .or(db, constraints, || {
-                    is_subtype_of(base_top, derived_top)
-                        .and(db, constraints, || is_subtype_of(derived_bottom, base_top))
-                })
-        }
-        // A top materialization is a subtype of a bottom materialization only if both original
-        // un-materialized types are the same fully static type.
-        (MaterializationKind::Top, MaterializationKind::Bottom) => {
-            is_subtype_of(derived_top, base_bottom)
-                .and(db, constraints, || is_subtype_of(base_top, derived_bottom))
-        }
-    }
-}
-
-/// Whether two types encountered in an invariant position
-/// have a relation (subtyping or assignability), taking into account
-/// that the two types may come from a top or bottom materialization.
-#[expect(clippy::too_many_arguments)]
-fn has_relation_in_invariant_position<'db, 'c>(
-    db: &'db dyn Db,
-    derived_type: &Type<'db>,
-    derived_materialization: Option<MaterializationKind>,
-    base_type: &Type<'db>,
-    base_materialization: Option<MaterializationKind>,
-    constraints: &'c ConstraintSetBuilder<'db>,
-    inferable: InferableTypeVars<'_, 'db>,
-    relation: TypeRelation,
-    relation_visitor: &HasRelationToVisitor<'db, 'c>,
-    disjointness_visitor: &IsDisjointVisitor<'db, 'c>,
-) -> ConstraintSet<'db, 'c> {
-    match (derived_materialization, base_materialization, relation) {
-        // Top and bottom materializations are fully static types, so subtyping
-        // is the same as assignability.
-        (Some(derived_mat), Some(base_mat), _) => is_subtype_in_invariant_position(
-            db,
-            derived_type,
-            derived_mat,
-            base_type,
-            base_mat,
-            constraints,
-            inferable,
-            relation_visitor,
-            disjointness_visitor,
-        ),
-        // Subtyping between invariant type parameters without a top/bottom materialization necessitates
-        // checking the subtyping relation both ways: `A` must be a subtype of `B` *and* `B` must be a
-        // subtype of `A`. The same applies to assignability.
-        //
-        // For subtyping between fully static types, this is the same as equivalence. However, we cannot
-        // use `is_equivalent_to` (or `when_equivalent_to`) here, because we (correctly) understand
-        // `list[Any]` as being equivalent to `list[Any]`, but we don't want `list[Any]` to be
-        // considered a subtype of `list[Any]`. For assignability, we would have the opposite issue if
-        // we simply checked for equivalence here: `Foo[Any]` should be considered assignable to
-        // `Foo[list[Any]]` even if `Foo` is invariant, and even though `Any` is not equivalent to
-        // `list[Any]`, because `Any` is assignable to `list[Any]` and `list[Any]` is assignable to
-        // `Any`.
-        (None, None, relation) => derived_type
-            .has_relation_to_impl(
-                db,
-                *base_type,
-                constraints,
-                inferable,
-                relation,
-                relation_visitor,
-                disjointness_visitor,
-            )
-            .and(db, constraints, || {
-                base_type.has_relation_to_impl(
-                    db,
-                    *derived_type,
-                    constraints,
-                    inferable,
-                    relation,
-                    relation_visitor,
-                    disjointness_visitor,
-                )
-            }),
-        // For gradual types, A <: B (subtyping) is defined as Top[A] <: Bottom[B]
-        (
-            None,
-            Some(base_mat),
-            TypeRelation::Subtyping
-            | TypeRelation::Redundancy { .. }
-            | TypeRelation::SubtypingAssuming,
-        ) => is_subtype_in_invariant_position(
-            db,
-            derived_type,
-            MaterializationKind::Top,
-            base_type,
-            base_mat,
-            constraints,
-            inferable,
-            relation_visitor,
-            disjointness_visitor,
-        ),
-        (
-            Some(derived_mat),
-            None,
-            TypeRelation::Subtyping
-            | TypeRelation::Redundancy { .. }
-            | TypeRelation::SubtypingAssuming,
-        ) => is_subtype_in_invariant_position(
-            db,
-            derived_type,
-            derived_mat,
-            base_type,
-            MaterializationKind::Bottom,
-            constraints,
-            inferable,
-            relation_visitor,
-            disjointness_visitor,
-        ),
-        // And A <~ B (assignability) is Bottom[A] <: Top[B]
-        (
-            None,
-            Some(base_mat),
-            TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability,
-        ) => is_subtype_in_invariant_position(
-            db,
-            derived_type,
-            MaterializationKind::Bottom,
-            base_type,
-            base_mat,
-            constraints,
-            inferable,
-            relation_visitor,
-            disjointness_visitor,
-        ),
-        (
-            Some(derived_mat),
-            None,
-            TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability,
-        ) => is_subtype_in_invariant_position(
-            db,
-            derived_type,
-            derived_mat,
-            base_type,
-            MaterializationKind::Top,
-            constraints,
-            inferable,
-            relation_visitor,
-            disjointness_visitor,
-        ),
-    }
-}
-
 impl<'db> Specialization<'db> {
     /// Restricts this specialization to only include the typevars in a generic context. If the
     /// specialization does not include all of those typevars, returns `None`.
@@ -1489,87 +1282,6 @@ impl<'db> Specialization<'db> {
         )
     }
 
-    #[expect(clippy::too_many_arguments)]
-    pub(crate) fn has_relation_to_impl<'c>(
-        self,
-        db: &'db dyn Db,
-        other: Self,
-        constraints: &'c ConstraintSetBuilder<'db>,
-        inferable: InferableTypeVars<'_, 'db>,
-        relation: TypeRelation,
-        relation_visitor: &HasRelationToVisitor<'db, 'c>,
-        disjointness_visitor: &IsDisjointVisitor<'db, 'c>,
-    ) -> ConstraintSet<'db, 'c> {
-        let generic_context = self.generic_context(db);
-        if generic_context != other.generic_context(db) {
-            return ConstraintSet::from_bool(constraints, false);
-        }
-
-        if let (Some(self_tuple), Some(other_tuple)) = (self.tuple_inner(db), other.tuple_inner(db))
-        {
-            return self_tuple.has_relation_to_impl(
-                db,
-                other_tuple,
-                constraints,
-                inferable,
-                relation,
-                relation_visitor,
-                disjointness_visitor,
-            );
-        }
-
-        let self_materialization_kind = self.materialization_kind(db);
-        let other_materialization_kind = other.materialization_kind(db);
-
-        let types = itertools::izip!(
-            generic_context.variables(db),
-            self.types(db),
-            other.types(db)
-        );
-
-        types.when_all(db, constraints, |(bound_typevar, self_type, other_type)| {
-            // Subtyping/assignability of each type in the specialization depends on the variance
-            // of the corresponding typevar:
-            //   - covariant: verify that self_type <: other_type
-            //   - contravariant: verify that other_type <: self_type
-            //   - invariant: verify that self_type <: other_type AND other_type <: self_type
-            //   - bivariant: skip, can't make subtyping/assignability false
-            match bound_typevar.variance(db) {
-                TypeVarVariance::Invariant => has_relation_in_invariant_position(
-                    db,
-                    self_type,
-                    self_materialization_kind,
-                    other_type,
-                    other_materialization_kind,
-                    constraints,
-                    inferable,
-                    relation,
-                    relation_visitor,
-                    disjointness_visitor,
-                ),
-                TypeVarVariance::Covariant => self_type.has_relation_to_impl(
-                    db,
-                    *other_type,
-                    constraints,
-                    inferable,
-                    relation,
-                    relation_visitor,
-                    disjointness_visitor,
-                ),
-                TypeVarVariance::Contravariant => other_type.has_relation_to_impl(
-                    db,
-                    *self_type,
-                    constraints,
-                    inferable,
-                    relation,
-                    relation_visitor,
-                    disjointness_visitor,
-                ),
-                TypeVarVariance::Bivariant => ConstraintSet::from_bool(constraints, true),
-            }
-        })
-    }
-
     pub(crate) fn is_disjoint_from<'c>(
         self,
         db: &'db dyn Db,
@@ -1577,77 +1289,15 @@ impl<'db> Specialization<'db> {
         constraints: &'c ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'_, 'db>,
     ) -> ConstraintSet<'db, 'c> {
-        self.is_disjoint_from_impl(
-            db,
-            other,
+        let relation_visitor = HasRelationToVisitor::default(constraints);
+        let disjointness_visitor = IsDisjointVisitor::default(constraints);
+        let checker = DisjointnessChecker::new(
             constraints,
             inferable,
-            &IsDisjointVisitor::default(constraints),
-            &HasRelationToVisitor::default(constraints),
-        )
-    }
-
-    pub(crate) fn is_disjoint_from_impl<'c>(
-        self,
-        db: &'db dyn Db,
-        other: Self,
-        constraints: &'c ConstraintSetBuilder<'db>,
-        inferable: InferableTypeVars<'_, 'db>,
-        disjointness_visitor: &IsDisjointVisitor<'db, 'c>,
-        relation_visitor: &HasRelationToVisitor<'db, 'c>,
-    ) -> ConstraintSet<'db, 'c> {
-        let generic_context = self.generic_context(db);
-        if generic_context != other.generic_context(db) {
-            return ConstraintSet::from_bool(constraints, true);
-        }
-
-        if let (Some(self_tuple), Some(other_tuple)) = (self.tuple_inner(db), other.tuple_inner(db))
-        {
-            return self_tuple.is_disjoint_from_impl(
-                db,
-                other_tuple,
-                constraints,
-                inferable,
-                disjointness_visitor,
-                relation_visitor,
-            );
-        }
-
-        let types = itertools::izip!(
-            generic_context.variables(db),
-            self.types(db),
-            other.types(db)
+            &relation_visitor,
+            &disjointness_visitor,
         );
-
-        types.when_all(
-            db,
-            constraints,
-            |(bound_typevar, self_type, other_type)| match bound_typevar.variance(db) {
-                // TODO: This check can lead to false negatives.
-                //
-                // For example, `Foo[int]` and `Foo[bool]` are disjoint, even though `bool` is a subtype
-                // of `int`. However, given two non-inferable type variables `T` and `U`, `Foo[T]` and
-                // `Foo[U]` should not be considered disjoint, as `T` and `U` could be specialized to the
-                // same type. We don't currently have a good typing relationship to represent this.
-                TypeVarVariance::Invariant => self_type.is_disjoint_from_impl(
-                    db,
-                    *other_type,
-                    constraints,
-                    inferable,
-                    disjointness_visitor,
-                    relation_visitor,
-                ),
-
-                // If `Foo[T]` is covariant in `T`, `Foo[Never]` is a subtype of `Foo[A]` and `Foo[B]`
-                TypeVarVariance::Covariant => ConstraintSet::from_bool(constraints, false),
-
-                // If `Foo[T]` is contravariant in `T`, `Foo[A | B]` is a subtype of `Foo[A]` and `Foo[B]`
-                TypeVarVariance::Contravariant => ConstraintSet::from_bool(constraints, false),
-
-                // If `Foo[T]` is bivariant in `T`, `Foo[A]` and `Foo[B]` are mutual subtypes.
-                TypeVarVariance::Bivariant => ConstraintSet::from_bool(constraints, false),
-            },
-        )
+        checker.check_specialization_pair(db, self, other)
     }
 
     pub(crate) fn find_legacy_typevars_impl(
@@ -1662,6 +1312,279 @@ impl<'db> Specialization<'db> {
         }
         // A tuple's specialization will include all of its element types, so we don't need to also
         // look in `self.tuple`.
+    }
+}
+
+impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
+    pub(super) fn check_specialization_pair(
+        &self,
+        db: &'db dyn Db,
+        source: Specialization<'db>,
+        target: Specialization<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        let generic_context = source.generic_context(db);
+        if generic_context != target.generic_context(db) {
+            return self.never();
+        }
+
+        if let (Some(source_tuple), Some(target_tuple)) =
+            (source.tuple_inner(db), target.tuple_inner(db))
+        {
+            return self.check_tuple_type_pair(db, source_tuple, target_tuple);
+        }
+
+        let source_materialization_kind = source.materialization_kind(db);
+        let target_materialization_kind = target.materialization_kind(db);
+
+        let types = itertools::izip!(
+            generic_context.variables(db),
+            source.types(db),
+            target.types(db)
+        );
+
+        types.when_all(
+            db,
+            self.constraints,
+            |(bound_typevar, source_type, target_type)| {
+                // Subtyping/assignability of each type in the specialization depends on the variance
+                // of the corresponding typevar:
+                //   - covariant: verify that source_type <: target_type
+                //   - contravariant: verify that target_type <: source_type
+                //   - invariant: verify that source_type <: target_type AND target_type <: source_type
+                //   - bivariant: skip, can't make subtyping/assignability false
+                match bound_typevar.variance(db) {
+                    TypeVarVariance::Invariant => self.check_relation_in_invariant_position(
+                        db,
+                        *source_type,
+                        source_materialization_kind,
+                        *target_type,
+                        target_materialization_kind,
+                    ),
+                    TypeVarVariance::Covariant => {
+                        self.check_type_pair(db, *source_type, *target_type)
+                    }
+                    TypeVarVariance::Contravariant => {
+                        self.check_type_pair(db, *target_type, *source_type)
+                    }
+                    TypeVarVariance::Bivariant => self.always(),
+                }
+            },
+        )
+    }
+
+    /// Whether two types encountered in an invariant position
+    /// have a relation (subtyping or assignability), taking into account
+    /// that the two types may come from a top or bottom materialization.
+    fn check_relation_in_invariant_position(
+        &self,
+        db: &'db dyn Db,
+        source_type: Type<'db>,
+        source_materialization: Option<MaterializationKind>,
+        target_type: Type<'db>,
+        target_materialization: Option<MaterializationKind>,
+    ) -> ConstraintSet<'db, 'c> {
+        match (
+            source_materialization,
+            target_materialization,
+            self.relation,
+        ) {
+            // Top and bottom materializations are fully static types, so subtyping
+            // is the same as assignability.
+            (Some(source_mat), Some(target_mat), _) => self.check_subtyping_in_invariant_position(
+                db,
+                source_type,
+                source_mat,
+                target_type,
+                target_mat,
+            ),
+            // Subtyping between invariant type parameters without a top/bottom materialization necessitates
+            // checking the subtyping relation both ways: `A` must be a subtype of `B` *and* `B` must be a
+            // subtype of `A`. The same applies to assignability.
+            //
+            // For subtyping between fully static types, this is the same as equivalence. However, we cannot
+            // use `is_equivalent_to` (or `when_equivalent_to`) here, because we (correctly) understand
+            // `list[Any]` as being equivalent to `list[Any]`, but we don't want `list[Any]` to be
+            // considered a subtype of `list[Any]`. For assignability, we would have the opposite issue if
+            // we simply checked for equivalence here: `Foo[Any]` should be considered assignable to
+            // `Foo[list[Any]]` even if `Foo` is invariant, and even though `Any` is not equivalent to
+            // `list[Any]`, because `Any` is assignable to `list[Any]` and `list[Any]` is assignable to
+            // `Any`.
+            (None, None, _) => {
+                self.check_type_pair(db, target_type, source_type)
+                    .and(db, self.constraints, || {
+                        self.check_type_pair(db, source_type, target_type)
+                    })
+            }
+            // For gradual types, A <: B (subtyping) is defined as Top[A] <: Bottom[B]
+            (
+                None,
+                Some(target_mat),
+                TypeRelation::Subtyping
+                | TypeRelation::Redundancy { .. }
+                | TypeRelation::SubtypingAssuming,
+            ) => self.check_subtyping_in_invariant_position(
+                db,
+                source_type,
+                MaterializationKind::Top,
+                target_type,
+                target_mat,
+            ),
+            (
+                Some(source_mat),
+                None,
+                TypeRelation::Subtyping
+                | TypeRelation::Redundancy { .. }
+                | TypeRelation::SubtypingAssuming,
+            ) => self.check_subtyping_in_invariant_position(
+                db,
+                source_type,
+                source_mat,
+                target_type,
+                MaterializationKind::Bottom,
+            ),
+            // And A <~ B (assignability) is Bottom[A] <: Top[B]
+            (
+                None,
+                Some(target_mat),
+                TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability,
+            ) => self.check_subtyping_in_invariant_position(
+                db,
+                source_type,
+                MaterializationKind::Bottom,
+                target_type,
+                target_mat,
+            ),
+            (
+                Some(source_mat),
+                None,
+                TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability,
+            ) => self.check_subtyping_in_invariant_position(
+                db,
+                source_type,
+                source_mat,
+                target_type,
+                MaterializationKind::Top,
+            ),
+        }
+    }
+
+    fn check_subtyping_in_invariant_position(
+        &self,
+        db: &'db dyn Db,
+        source_type: Type<'db>,
+        source_materialization: MaterializationKind,
+        target_type: Type<'db>,
+        target_materialization: MaterializationKind,
+    ) -> ConstraintSet<'db, 'c> {
+        let source_top = source_type.top_materialization(db);
+        let source_bottom = source_type.bottom_materialization(db);
+        let target_top = target_type.top_materialization(db);
+        let target_bottom = target_type.bottom_materialization(db);
+
+        let is_subtype_of = |source: Type<'db>, target: Type<'db>| {
+            // TODO:
+            // This should be removed and properly handled in the respective
+            // `(Type::TypeVar(_), _) | (_, Type::TypeVar(_))` branch of
+            // `TypeRelationChecker::check_type_pair`. Right now, we cannot generally
+            // return `self.always()` from that branch, as that leads to union
+            // simplification, which means that we lose track of type variables
+            // without recording the constraints under which the relation holds.
+            if matches!(target, Type::TypeVar(_)) || matches!(source, Type::TypeVar(_)) {
+                return self.always();
+            }
+
+            self.check_type_pair(db, source, target)
+        };
+        match (source_materialization, target_materialization) {
+            // `source` is a subtype of `target` if the range of materializations covered by `source`
+            // is a subset of the range covered by `target`.
+            (MaterializationKind::Top, MaterializationKind::Top) => {
+                is_subtype_of(target_bottom, source_bottom).and(db, self.constraints, || {
+                    is_subtype_of(source_top, target_top)
+                })
+            }
+            // One bottom is a subtype of another if it covers a strictly larger set of materializations.
+            (MaterializationKind::Bottom, MaterializationKind::Bottom) => {
+                is_subtype_of(source_bottom, target_bottom).and(db, self.constraints, || {
+                    is_subtype_of(target_top, source_top)
+                })
+            }
+            // The bottom materialization of `source` is a subtype of the top materialization
+            // of `target` if there is some type that is both within the
+            // range of types covered by derived and within the range covered by base, because if such a type
+            // exists, it's a subtype of `Top[target]` and a supertype of `Bottom[source]`.
+            (MaterializationKind::Bottom, MaterializationKind::Top) => {
+                is_subtype_of(target_bottom, source_bottom)
+                    .and(db, self.constraints, || {
+                        is_subtype_of(source_bottom, target_top)
+                    })
+                    .or(db, self.constraints, || {
+                        is_subtype_of(target_bottom, source_top).and(db, self.constraints, || {
+                            is_subtype_of(source_top, target_top)
+                        })
+                    })
+                    .or(db, self.constraints, || {
+                        is_subtype_of(target_top, source_top).and(db, self.constraints, || {
+                            is_subtype_of(source_bottom, target_top)
+                        })
+                    })
+            }
+            // A top materialization is a subtype of a bottom materialization only if both original
+            // un-materialized types are the same fully static type.
+            (MaterializationKind::Top, MaterializationKind::Bottom) => {
+                is_subtype_of(source_top, target_bottom).and(db, self.constraints, || {
+                    is_subtype_of(target_top, source_bottom)
+                })
+            }
+        }
+    }
+}
+
+impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
+    pub(super) fn check_specialization_pair(
+        &self,
+        db: &'db dyn Db,
+        left: Specialization<'db>,
+        right: Specialization<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        let generic_context = left.generic_context(db);
+        if generic_context != right.generic_context(db) {
+            return self.always();
+        }
+
+        if let (Some(left_tuple), Some(right_tuple)) = (left.tuple_inner(db), right.tuple_inner(db))
+        {
+            return self.check_tuple_type_pair(db, left_tuple, right_tuple);
+        }
+
+        let types = itertools::izip!(
+            generic_context.variables(db),
+            left.types(db),
+            right.types(db)
+        );
+
+        types.when_all(
+            db,
+            self.constraints,
+            |(bound_typevar, left_type, right_type)| match bound_typevar.variance(db) {
+                // TODO: This check can lead to false negatives.
+                //
+                // For example, `Foo[int]` and `Foo[bool]` are disjoint, even though `bool` is a subtype
+                // of `int`. However, given two non-inferable type variables `T` and `U`, `Foo[T]` and
+                // `Foo[U]` should not be considered disjoint, as `T` and `U` could be specialized to the
+                // same type. We don't currently have a good typing relationship to represent this.
+                TypeVarVariance::Invariant => self.check_type_pair(db, *left_type, *right_type),
+
+                // If `Foo[T]` is covariant in `T`, `Foo[Never]` is a subtype of `Foo[A]` and `Foo[B]`
+                TypeVarVariance::Covariant => self.never(),
+
+                // If `Foo[T]` is contravariant in `T`, `Foo[A | B]` is a subtype of `Foo[A]` and `Foo[B]`
+                TypeVarVariance::Contravariant => self.never(),
+
+                // If `Foo[T]` is bivariant in `T`, `Foo[A]` and `Foo[B]` are mutual subtypes.
+                TypeVarVariance::Bivariant => self.never(),
+            },
+        )
     }
 }
 
@@ -1781,6 +1704,13 @@ impl<'db> SpecializationBuilder<'db> {
             db: self.db,
             inferable: self.inferable,
             types,
+        }
+    }
+
+    /// Apply a transformation to all accumulated type variable assignments.
+    pub(crate) fn map_types(&mut self, mut f: impl FnMut(Type<'db>) -> Type<'db>) {
+        for ty in self.types.values_mut() {
+            *ty = f(*ty);
         }
     }
 

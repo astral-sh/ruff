@@ -3,8 +3,7 @@ use crate::semantic_index::expression::Expression;
 use crate::semantic_index::place::{PlaceExpr, PlaceTable, PlaceTableBuilder, ScopedPlaceId};
 use crate::semantic_index::place_table;
 use crate::semantic_index::predicate::{
-    CallableAndCallExpr, ClassPatternKind, PatternPredicate, PatternPredicateKind, Predicate,
-    PredicateNode,
+    ClassPatternKind, PatternPredicate, PatternPredicateKind, Predicate, PredicateNode,
 };
 use crate::semantic_index::scope::ScopeId;
 use crate::subscript::PyIndex;
@@ -12,7 +11,7 @@ use crate::types::enums::{enum_member_literals, enum_metadata};
 use crate::types::function::KnownFunction;
 use crate::types::infer::{ExpressionInference, infer_same_file_expression_type};
 use crate::types::typed_dict::{
-    SynthesizedTypedDictType, TypedDictField, TypedDictFieldBuilder, TypedDictSchema, TypedDictType,
+    TypedDictField, TypedDictFieldBuilder, TypedDictSchema, TypedDictType,
 };
 use crate::types::{
     CallableType, ClassLiteral, ClassType, IntersectionBuilder, IntersectionType, KnownClass,
@@ -762,9 +761,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         match self.predicate {
             PredicateNode::Expression(expression) => expression.scope(self.db),
             PredicateNode::Pattern(pattern) => pattern.scope(self.db),
-            PredicateNode::ReturnsNever(CallableAndCallExpr { callable, .. }) => {
-                callable.scope(self.db)
-            }
+            PredicateNode::ReturnsNever(call_expr) => call_expr.scope(self.db),
             PredicateNode::StarImportPlaceholder(definition) => definition.scope(self.db),
         }
     }
@@ -1928,8 +1925,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             .read_only(true)
             .build();
         let schema = TypedDictSchema::from_iter([(field_name, field)]);
-        let synthesized_typeddict =
-            TypedDictType::Synthesized(SynthesizedTypedDictType::new(self.db, schema));
+        let synthesized_typeddict = TypedDictType::from_schema_items(self.db, schema);
         // As mentioned above, the synthesized `TypedDict` is always negated.
         let intersection = Type::TypedDict(synthesized_typeddict).negate(self.db);
         let place = self.expect_place(&subscript_place_expr);
