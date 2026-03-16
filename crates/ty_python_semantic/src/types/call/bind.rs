@@ -93,6 +93,8 @@ enum CallAlternative<'db> {
 struct ConstructorBinding<'db> {
     entry: CallableBinding<'db>,
     constructed_instance_type: Type<'db>,
+    constructor_kind: ConstructorCallableKind,
+    downstream_constructor: Option<Box<DownstreamConstructor<'db>>>,
 }
 
 impl<'db> ConstructorBinding<'db> {
@@ -111,6 +113,8 @@ impl<'db> ConstructorBinding<'db> {
         ConstructorBinding {
             entry: f(self.entry),
             constructed_instance_type: self.constructed_instance_type,
+            constructor_kind: self.constructor_kind,
+            downstream_constructor: self.downstream_constructor,
         }
     }
 
@@ -122,9 +126,55 @@ impl<'db> ConstructorBinding<'db> {
         Bindings::constructor_return_type_for_bindings(
             db,
             self.constructed_instance_type,
-            std::iter::once(&self.entry),
+            std::iter::once(self),
         )
         .unwrap_or_else(|| self.entry.return_type())
+    }
+
+    fn constructor_kind(&self) -> ConstructorCallableKind {
+        self.constructor_kind
+    }
+
+    fn set_constructor_kind(&mut self, constructor_kind: ConstructorCallableKind) {
+        self.constructor_kind = constructor_kind;
+    }
+
+    fn has_downstream_constructor(&self) -> bool {
+        self.downstream_constructor.is_some()
+    }
+
+    fn set_downstream_constructor(
+        &mut self,
+        class_literal: ClassLiteral<'db>,
+        bindings: Bindings<'db>,
+    ) {
+        // Once constructor dispatch is deferred downstream, the upstream callable must preserve
+        // its own per-overload return types instead of forcing the constructed instance type.
+        for overload in &mut self.entry.overloads {
+            overload.constructor_instance_type = None;
+        }
+        self.downstream_constructor = Some(Box::new(DownstreamConstructor {
+            class_literal,
+            bindings,
+        }));
+    }
+
+    fn match_parameters(
+        &mut self,
+        db: &'db dyn Db,
+        arguments: &CallArguments<'_, 'db>,
+        argument_forms: &mut ArgumentForms,
+    ) {
+        self.entry.match_parameters(db, arguments, argument_forms);
+
+        if let Some(downstream) = self.downstream_constructor.as_mut() {
+            // `init_binding.match_parameters` handles its own bound-`self` insertion, so pass the
+            // original call arguments here.
+            let mut init_forms = ArgumentForms::new(arguments.len());
+            for init_binding in downstream.bindings.iter_semantic_alternatives_mut() {
+                init_binding.match_parameters(db, arguments, &mut init_forms);
+            }
+        }
     }
 
     fn check_downstream_constructor(
@@ -135,17 +185,77 @@ impl<'db> ConstructorBinding<'db> {
         call_expression_tcx: TypeContext<'db>,
         dataclass_field_specifiers: &[Type<'db>],
     ) -> bool {
-        self.entry.check_downstream_constructor(
-            db,
-            constraints,
-            argument_types,
-            call_expression_tcx,
-            dataclass_field_specifiers,
-        )
+        if !self.should_check_downstream_constructor(db) {
+            return false;
+        }
+
+        let downstream = self.downstream_constructor.as_mut().expect("checked above");
+        let init_error = downstream
+            .bindings
+            .check_types_impl(
+                db,
+                constraints,
+                argument_types,
+                call_expression_tcx,
+                dataclass_field_specifiers,
+            )
+            .is_err();
+
+        // In layered mixed-constructor flows, the deferred bindings may themselves
+        // represent constructor logic (e.g. metaclass `__call__` -> `__new__`/`__init__`).
+        // If that downstream constructor resolves to a non-instance return, `__init__`
+        // should not be validated.
+        if let Some(downstream_return) = downstream.bindings.constructor_return_type(db)
+            && !downstream.return_is_instance_of_constructor_class(db, downstream_return)
+        {
+            return false;
+        }
+
+        init_error
     }
 
     fn checked_downstream_constructor_bindings(&self, db: &'db dyn Db) -> Option<&Bindings<'db>> {
-        self.entry.deferred_constructor_type_context_bindings(db)
+        let downstream = self.downstream_constructor.as_ref()?;
+        self.should_check_downstream_constructor(db)
+            .then_some(&downstream.bindings)
+    }
+
+    fn downstream_constructor(&self) -> Option<&DownstreamConstructor<'db>> {
+        self.downstream_constructor.as_deref()
+    }
+
+    fn downstream_constructor_mut(&mut self) -> Option<&mut DownstreamConstructor<'db>> {
+        self.downstream_constructor.as_deref_mut()
+    }
+
+    fn should_check_downstream_constructor(&self, db: &'db dyn Db) -> bool {
+        let Some(downstream) = self.downstream_constructor.as_ref() else {
+            return false;
+        };
+
+        if self.entry.matching_overloads().next().is_some() {
+            return downstream.all_matching_overloads_are_instance_returning(db, self);
+        }
+
+        // If metaclass `__call__` itself doesn't match, constructor dispatch stops there.
+        if self.constructor_kind.is_metaclass_call() {
+            return false;
+        }
+
+        // If no overload matched, only validate deferred `__init__` when all upstream overloads
+        // are potentially instance-returning. If any overload is definitely non-instance (mixed or
+        // all-non-instance constructor), we cannot assume `__init__` would run.
+        let mut saw_instance_like = false;
+        let mut saw_non_instance = false;
+        for overload in &self.entry.overloads {
+            match downstream.overload_return_outcome(db, overload).kind {
+                ConstructorReturnKind::NotInstance => saw_non_instance = true,
+                ConstructorReturnKind::Instance => {
+                    saw_instance_like = true;
+                }
+            }
+        }
+        saw_instance_like && !saw_non_instance
     }
 }
 
@@ -161,13 +271,6 @@ impl<'db> CallAlternative<'db> {
         match self {
             CallAlternative::Regular(binding) => binding,
             CallAlternative::Constructor(binding) => binding.callable_mut(),
-        }
-    }
-
-    fn constructor_instance_type(&self) -> Option<Type<'db>> {
-        match self {
-            CallAlternative::Regular(binding) => binding.constructor_instance_type,
-            CallAlternative::Constructor(binding) => Some(binding.constructed_instance_type()),
         }
     }
 
@@ -189,6 +292,22 @@ impl<'db> CallAlternative<'db> {
             .check_types(db, constraints, argument_types, call_expression_tcx)
     }
 
+    fn match_parameters(
+        &mut self,
+        db: &'db dyn Db,
+        arguments: &CallArguments<'_, 'db>,
+        argument_forms: &mut ArgumentForms,
+    ) {
+        match self {
+            CallAlternative::Regular(binding) => {
+                binding.match_parameters(db, arguments, argument_forms);
+            }
+            CallAlternative::Constructor(binding) => {
+                binding.match_parameters(db, arguments, argument_forms);
+            }
+        }
+    }
+
     fn check_downstream_constructor(
         &mut self,
         db: &'db dyn Db,
@@ -198,13 +317,7 @@ impl<'db> CallAlternative<'db> {
         dataclass_field_specifiers: &[Type<'db>],
     ) -> bool {
         match self {
-            CallAlternative::Regular(binding) => binding.check_downstream_constructor(
-                db,
-                constraints,
-                argument_types,
-                call_expression_tcx,
-                dataclass_field_specifiers,
-            ),
+            CallAlternative::Regular(_) => false,
             CallAlternative::Constructor(binding) => binding.check_downstream_constructor(
                 db,
                 constraints,
@@ -217,12 +330,40 @@ impl<'db> CallAlternative<'db> {
 
     fn checked_downstream_constructor_bindings(&self, db: &'db dyn Db) -> Option<&Bindings<'db>> {
         match self {
-            CallAlternative::Regular(binding) => {
-                binding.deferred_constructor_type_context_bindings(db)
-            }
+            CallAlternative::Regular(_) => None,
             CallAlternative::Constructor(binding) => {
                 binding.checked_downstream_constructor_bindings(db)
             }
+        }
+    }
+
+    fn as_constructor(&self) -> Option<&ConstructorBinding<'db>> {
+        match self {
+            CallAlternative::Regular(_) => None,
+            CallAlternative::Constructor(binding) => Some(binding),
+        }
+    }
+
+    fn as_constructor_mut(&mut self) -> Option<&mut ConstructorBinding<'db>> {
+        match self {
+            CallAlternative::Regular(_) => None,
+            CallAlternative::Constructor(binding) => Some(binding),
+        }
+    }
+
+    fn set_constructor_kind(&mut self, constructor_kind: ConstructorCallableKind) {
+        if let Some(binding) = self.as_constructor_mut() {
+            binding.set_constructor_kind(constructor_kind);
+        }
+    }
+
+    fn set_downstream_constructor(
+        &mut self,
+        class_literal: ClassLiteral<'db>,
+        bindings: &Bindings<'db>,
+    ) {
+        if let Some(binding) = self.as_constructor_mut() {
+            binding.set_downstream_constructor(class_literal, bindings.clone());
         }
     }
 
@@ -259,6 +400,8 @@ impl<'db> CallAlternative<'db> {
                     CallAlternative::Constructor(ConstructorBinding {
                         entry: binding,
                         constructed_instance_type,
+                        constructor_kind: ConstructorCallableKind::Regular,
+                        downstream_constructor: None,
                     })
                 } else {
                     CallAlternative::Regular(binding)
@@ -272,7 +415,7 @@ impl<'db> CallAlternative<'db> {
 /// Temporary regrouping state for one constructor family while computing union return types.
 #[derive(Debug, Default)]
 struct ConstructorGroupState<'a, 'db> {
-    bindings: SmallVec<[&'a CallableBinding<'db>; 1]>,
+    bindings: SmallVec<[&'a ConstructorBinding<'db>; 1]>,
     /// The original return type to preserve if grouped constructor handling returns `None`.
     preserved_return_type: Option<Type<'db>>,
 }
@@ -280,7 +423,7 @@ struct ConstructorGroupState<'a, 'db> {
 impl<'a, 'db> ConstructorGroupState<'a, 'db> {
     fn push(
         &mut self,
-        bindings: impl IntoIterator<Item = &'a CallableBinding<'db>>,
+        bindings: impl IntoIterator<Item = &'a ConstructorBinding<'db>>,
         return_ty: Type<'db>,
     ) {
         self.bindings.extend(bindings);
@@ -299,6 +442,12 @@ impl<'db> BindingsElement<'db> {
         self.alternatives.iter_mut()
     }
 
+    fn constructor_bindings(&self) -> impl Iterator<Item = &ConstructorBinding<'db>> {
+        self.alternatives
+            .iter()
+            .filter_map(CallAlternative::as_constructor)
+    }
+
     fn callables(&self) -> impl Iterator<Item = &CallableBinding<'db>> {
         self.alternatives.iter().map(CallAlternative::callable)
     }
@@ -311,11 +460,17 @@ impl<'db> BindingsElement<'db> {
 
     /// Returns the constructor instance type shared by all bindings in this element, if any.
     fn constructor_instance_type(&self) -> Option<Type<'db>> {
-        let constructor_instance_type = self.alternatives.first()?.constructor_instance_type()?;
+        let constructor_instance_type = self
+            .alternatives
+            .first()?
+            .as_constructor()?
+            .constructed_instance_type();
         self.alternatives
             .iter()
             .all(|alternative| {
-                alternative.constructor_instance_type() == Some(constructor_instance_type)
+                alternative.as_constructor().is_some_and(|binding| {
+                    binding.constructed_instance_type() == constructor_instance_type
+                })
             })
             .then_some(constructor_instance_type)
     }
@@ -331,11 +486,11 @@ impl<'db> BindingsElement<'db> {
 
         for alternative in &self.alternatives {
             let binding_return_type = alternative.return_type(db);
-            if let Some(constructor_instance_type) = alternative.constructor_instance_type() {
+            if let Some(binding) = alternative.as_constructor() {
                 constructor_groups
-                    .entry(constructor_instance_type)
+                    .entry(binding.constructed_instance_type())
                     .or_default()
-                    .push(std::iter::once(alternative.callable()), binding_return_type);
+                    .push(std::iter::once(binding), binding_return_type);
                 continue;
             }
             binding_return_types.push(binding_return_type);
@@ -585,10 +740,10 @@ impl<'db> DownstreamConstructor<'db> {
     fn all_matching_overloads_are_instance_returning(
         &self,
         db: &'db dyn Db,
-        binding: &CallableBinding<'db>,
+        binding: &ConstructorBinding<'db>,
     ) -> bool {
         let mut saw_match = false;
-        for (_, overload) in binding.matching_overloads() {
+        for (_, overload) in binding.callable().matching_overloads() {
             saw_match = true;
             if !self
                 .overload_return_outcome(db, overload)
@@ -644,6 +799,42 @@ pub(crate) struct Bindings<'db> {
 }
 
 impl<'db> Bindings<'db> {
+    fn apply_generic_context_in_place(
+        &mut self,
+        db: &'db dyn Db,
+        generic_context: GenericContext<'db>,
+    ) {
+        for element in &mut self.elements {
+            for alternative in &mut element.alternatives {
+                match alternative {
+                    CallAlternative::Regular(binding) => {
+                        for overload in &mut binding.overloads {
+                            overload.signature.generic_context = GenericContext::merge_optional(
+                                db,
+                                overload.signature.generic_context,
+                                Some(generic_context),
+                            );
+                        }
+                    }
+                    CallAlternative::Constructor(binding) => {
+                        for overload in &mut binding.entry.overloads {
+                            overload.signature.generic_context = GenericContext::merge_optional(
+                                db,
+                                overload.signature.generic_context,
+                                Some(generic_context),
+                            );
+                        }
+                        if let Some(downstream) = binding.downstream_constructor_mut() {
+                            downstream
+                                .bindings
+                                .apply_generic_context_in_place(db, generic_context);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     /// Creates a new `Bindings` from an iterator of [`Bindings`]s for a union type.
     /// Each input `Bindings` becomes a union element, preserving any intersection structure.
     /// Panics if the iterator is empty.
@@ -724,26 +915,44 @@ impl<'db> Bindings<'db> {
     ) -> Self {
         self.constructor_instance_type = Some(constructor_instance_type);
 
-        for binding in self.iter_flat_mut() {
-            binding.constructor_instance_type = Some(constructor_instance_type);
+        for element in &mut self.elements {
+            for alternative in &mut element.alternatives {
+                match alternative {
+                    CallAlternative::Regular(binding) => {
+                        binding.constructor_instance_type = Some(constructor_instance_type);
+                        for overload in &mut binding.overloads {
+                            overload.constructor_instance_type = Some(constructor_instance_type);
+                        }
+                    }
+                    CallAlternative::Constructor(binding) => {
+                        binding.constructed_instance_type = constructor_instance_type;
+                        binding.entry.constructor_instance_type = Some(constructor_instance_type);
 
-            // For constructor bindings with deferred downstream checks, preserve per-overload
-            // return behavior on the upstream callable while still enabling constructor-level
-            // return-type synthesis on `Bindings`.
-            if binding.downstream_constructor.is_none() {
-                for overload in &mut binding.overloads {
-                    overload.constructor_instance_type = Some(constructor_instance_type);
-                }
-            }
+                        // For constructor bindings with deferred downstream checks, preserve
+                        // per-overload return behavior on the upstream callable while still
+                        // enabling constructor-level return-type synthesis on `Bindings`.
+                        if !binding.has_downstream_constructor() {
+                            for overload in &mut binding.entry.overloads {
+                                overload.constructor_instance_type =
+                                    Some(constructor_instance_type);
+                            }
+                        }
 
-            // Deferred downstream constructor bindings still need constructor instance context for
-            // generic specialization inference (including literal promotion).
-            if let Some(downstream) = binding.downstream_constructor.as_mut() {
-                downstream.bindings.constructor_instance_type = Some(constructor_instance_type);
-                for init_binding in downstream.bindings.iter_flat_mut() {
-                    init_binding.constructor_instance_type = Some(constructor_instance_type);
-                    for overload in &mut init_binding.overloads {
-                        overload.constructor_instance_type = Some(constructor_instance_type);
+                        // Deferred downstream constructor bindings still need constructor instance
+                        // context for generic specialization inference (including literal
+                        // promotion).
+                        if let Some(downstream) = binding.downstream_constructor_mut() {
+                            downstream.bindings.constructor_instance_type =
+                                Some(constructor_instance_type);
+                            for init_binding in downstream.bindings.iter_flat_mut() {
+                                init_binding.constructor_instance_type =
+                                    Some(constructor_instance_type);
+                                for overload in &mut init_binding.overloads {
+                                    overload.constructor_instance_type =
+                                        Some(constructor_instance_type);
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -771,28 +980,7 @@ impl<'db> Bindings<'db> {
         let Some(generic_context) = generic_context else {
             return self;
         };
-        for binding in self.iter_flat_mut() {
-            for overload in &mut binding.overloads {
-                overload.signature.generic_context = GenericContext::merge_optional(
-                    db,
-                    overload.signature.generic_context,
-                    Some(generic_context),
-                );
-            }
-            if let Some(downstream) = binding.downstream_constructor.as_mut() {
-                for element in &mut downstream.bindings.elements {
-                    for init_binding in element.callables_mut() {
-                        for overload in &mut init_binding.overloads {
-                            overload.signature.generic_context = GenericContext::merge_optional(
-                                db,
-                                overload.signature.generic_context,
-                                Some(generic_context),
-                            );
-                        }
-                    }
-                }
-            }
-        }
+        self.apply_generic_context_in_place(db, generic_context);
         self
     }
 
@@ -801,14 +989,14 @@ impl<'db> Bindings<'db> {
         class_literal: ClassLiteral<'db>,
         bindings: &Bindings<'db>,
     ) {
-        for binding in self.iter_flat_mut() {
-            binding.set_downstream_constructor(class_literal, bindings.clone());
+        for alternative in self.iter_semantic_alternatives_mut() {
+            alternative.set_downstream_constructor(class_literal, bindings);
         }
     }
 
     pub(crate) fn set_constructor_kind(&mut self, constructor_kind: ConstructorCallableKind) {
-        for binding in self.iter_flat_mut() {
-            binding.constructor_kind = constructor_kind;
+        for alternative in self.iter_semantic_alternatives_mut() {
+            alternative.set_constructor_kind(constructor_kind);
         }
     }
 
@@ -881,7 +1069,7 @@ impl<'db> Bindings<'db> {
                     alternative
                         .checked_downstream_constructor_bindings(db)
                         .into_iter()
-                        .flat_map(|bindings| bindings.iter_flat()),
+                        .flat_map(Bindings::iter_flat),
                 )
             })
     }
@@ -949,8 +1137,8 @@ impl<'db> Bindings<'db> {
         arguments: &CallArguments<'_, 'db>,
     ) -> Self {
         let mut argument_forms = ArgumentForms::new(arguments.len());
-        for binding in self.iter_flat_mut() {
-            binding.match_parameters(db, arguments, &mut argument_forms);
+        for alternative in self.iter_semantic_alternatives_mut() {
+            alternative.match_parameters(db, arguments, &mut argument_forms);
         }
         argument_forms.shrink_to_fit();
         self.argument_forms = argument_forms;
@@ -1104,7 +1292,7 @@ impl<'db> Bindings<'db> {
     fn combine_constructor_return_type<'a>(
         db: &'db dyn Db,
         constructor_instance_type: Type<'db>,
-        bindings: impl IntoIterator<Item = &'a CallableBinding<'db>>,
+        bindings: impl IntoIterator<Item = &'a ConstructorBinding<'db>>,
     ) -> Type<'db>
     where
         'db: 'a,
@@ -1119,20 +1307,21 @@ impl<'db> Bindings<'db> {
         let class_context = class_specialization.generic_context(db);
         let bindings = bindings
             .into_iter()
-            .collect::<SmallVec<[&CallableBinding<'db>; 1]>>();
+            .collect::<SmallVec<[&ConstructorBinding<'db>; 1]>>();
 
         let mut combined: Option<Specialization<'db>> = None;
-        let mut combine_binding_specialization = |binding: &CallableBinding<'db>| {
+        let mut combine_binding_specialization = |binding: &ConstructorBinding<'db>| {
             // For constructors, prefer the first matching overload (declaration order) to avoid
             // merging incompatible constructor specializations. For deferred `__init__` paths, we
             // still want partial generic inference from a single unmatched overload (e.g. missing
             // required arguments) so constructor specialization can reflect inferred arguments.
-            let overload = binding
+            let callable = binding.callable();
+            let overload = callable
                 .matching_overloads()
                 .next()
                 .map(|(_, overload)| overload)
-                .or_else(|| match binding.overloads() {
-                    [overload] if binding.constructor_kind.is_init() => Some(overload),
+                .or_else(|| match callable.overloads() {
+                    [overload] if binding.constructor_kind().is_init() => Some(overload),
                     _ => None,
                 });
             let Some(overload) = overload else {
@@ -1218,13 +1407,17 @@ impl<'db> Bindings<'db> {
         // If all matched overloads are instance-returning, include inferred specializations from
         // those deferred bindings as well.
         for binding in bindings.iter().copied() {
-            let Some(downstream) = binding.downstream_constructor.as_ref() else {
+            let Some(downstream) = binding.downstream_constructor() else {
                 continue;
             };
             if !downstream.all_matching_overloads_are_instance_returning(db, binding) {
                 continue;
             }
-            for init_binding in downstream.bindings.iter_flat() {
+            for init_binding in downstream
+                .bindings
+                .iter_semantic_alternatives()
+                .filter_map(CallAlternative::as_constructor)
+            {
                 combine_binding_specialization(init_binding);
             }
         }
@@ -1252,25 +1445,26 @@ impl<'db> Bindings<'db> {
         Self::constructor_return_type_for_bindings(
             db,
             self.constructor_instance_type?,
-            self.iter_flat(),
+            self.iter_semantic_alternatives()
+                .filter_map(CallAlternative::as_constructor),
         )
     }
 
     fn constructor_return_type_for_bindings<'a>(
         db: &'db dyn Db,
         constructor_instance_type: Type<'db>,
-        bindings: impl IntoIterator<Item = &'a CallableBinding<'db>>,
+        bindings: impl IntoIterator<Item = &'a ConstructorBinding<'db>>,
     ) -> Option<Type<'db>>
     where
         'db: 'a,
     {
         let bindings = bindings
             .into_iter()
-            .collect::<SmallVec<[&CallableBinding<'db>; 1]>>();
+            .collect::<SmallVec<[&ConstructorBinding<'db>; 1]>>();
         let has_downstream_constructors = bindings
             .iter()
             .copied()
-            .any(|binding| binding.downstream_constructor.is_some());
+            .any(ConstructorBinding::has_downstream_constructor);
         let mut saw_matching_upstream_overload = false;
         let mut saw_unmatched_all_non_instance_overloaded_upstream = false;
         let mut saw_unmatched_instance_like_overloaded_upstream = false;
@@ -1300,22 +1494,23 @@ impl<'db> Bindings<'db> {
             let is_instance_of_constructor = |return_ty: Type<'db>| {
                 classify_constructor_return(db, constructor_class_literal, return_ty).is_instance()
             };
-            for binding in bindings.iter().copied() {
-                if has_downstream_constructors && binding.downstream_constructor.is_none() {
+            for binding in &bindings {
+                let callable = binding.callable();
+                if has_downstream_constructors && !binding.has_downstream_constructor() {
                     continue;
                 }
 
                 // `__init__` is a post-construction validator and does not determine the
                 // constructor return type.
-                if binding.constructor_kind.is_init() {
+                if binding.constructor_kind().is_init() {
                     continue;
                 }
 
-                let matching_overloads = binding.matching_overloads().collect::<Vec<_>>();
+                let matching_overloads = callable.matching_overloads().collect::<Vec<_>>();
                 let candidate_overloads = if matching_overloads.is_empty() {
-                    if binding.overloads().len() > 1 {
+                    if callable.overloads().len() > 1 {
                         let has_instance_like_overload =
-                            binding.overloads().iter().any(|overload| {
+                            callable.overloads().iter().any(|overload| {
                                 let outcome = constructor_return_outcome(
                                     db,
                                     constructor_class_literal,
@@ -1332,7 +1527,7 @@ impl<'db> Bindings<'db> {
                             saw_unmatched_all_non_instance_overloaded_upstream = true;
                         }
                     }
-                    match binding.overloads() {
+                    match callable.overloads() {
                         [overload] => vec![overload],
                         _ => Vec::new(),
                     }
@@ -1384,10 +1579,10 @@ impl<'db> Bindings<'db> {
                         continue;
                     };
                     if matches!(first_non_instance_return, Type::Dynamic(DynamicType::Any))
-                        && (binding.matching_overloads().next().is_none()
+                        && (callable.matching_overloads().next().is_none()
                             || constructor_is_subclass_of_any)
-                        && let Some(downstream) = binding.downstream_constructor.as_ref()
-                        && !binding.constructor_kind.is_metaclass_call()
+                        && let Some(downstream) = binding.downstream_constructor()
+                        && !binding.constructor_kind().is_metaclass_call()
                         && let Some(downstream_return) =
                             downstream.bindings.constructor_return_type(db)
                     {
@@ -1405,7 +1600,7 @@ impl<'db> Bindings<'db> {
                 // For layered mixed-constructor handling (metaclass `__call__` mixed with
                 // downstream constructor logic), if the downstream constructor resolves to a
                 // non-instance return, that becomes the effective constructor return.
-                if let Some(downstream) = binding.downstream_constructor.as_ref() {
+                if let Some(downstream) = binding.downstream_constructor() {
                     if !binding.should_check_downstream_constructor(db) {
                         continue;
                     }
@@ -1416,8 +1611,9 @@ impl<'db> Bindings<'db> {
                         }
                     } else if downstream
                         .bindings
-                        .iter_flat()
-                        .any(|downstream_binding| !downstream_binding.constructor_kind.is_init())
+                        .iter_semantic_alternatives()
+                        .filter_map(CallAlternative::as_constructor)
+                        .any(|downstream_binding| !downstream_binding.constructor_kind().is_init())
                     {
                         // Preserve `Unknown` from an invalid all-non-instance downstream
                         // constructor (for example, metaclass `__call__` forwarding into an
@@ -1444,18 +1640,19 @@ impl<'db> Bindings<'db> {
         // `__new__ -> D` where `D` is a subclass of `C`.
         if let Some(constructor_class) = constructor_class {
             let constructor_class_literal = constructor_class.class_literal(db);
-            for binding in bindings.iter().copied() {
-                if has_downstream_constructors && binding.downstream_constructor.is_none() {
+            for binding in &bindings {
+                let callable = binding.callable();
+                if has_downstream_constructors && !binding.has_downstream_constructor() {
                     continue;
                 }
-                let mut matching_overloads = binding.matching_overloads();
+                let mut matching_overloads = callable.matching_overloads();
                 let Some((_, overload)) = matching_overloads.next() else {
                     continue;
                 };
                 if matching_overloads.next().is_some() {
                     continue;
                 }
-                if binding.constructor_kind.is_init() {
+                if binding.constructor_kind().is_init() {
                     continue;
                 }
 
@@ -1512,7 +1709,7 @@ impl<'db> Bindings<'db> {
                 constructor_groups
                     .entry(constructor_instance_type)
                     .or_default()
-                    .push(element.callables(), element_return_type);
+                    .push(element.constructor_bindings(), element_return_type);
                 continue;
             }
 
@@ -2928,8 +3125,6 @@ impl<'db> From<Binding<'db>> for Bindings<'db> {
             dunder_call_is_possibly_unbound: false,
             bound_type: None,
             constructor_instance_type: None,
-            constructor_kind: ConstructorCallableKind::Regular,
-            downstream_constructor: None,
             overload_call_return_type: None,
             matching_overload_before_type_checking: None,
             overloads: smallvec_inline![from],
@@ -2976,12 +3171,6 @@ pub(crate) struct CallableBinding<'db> {
 
     /// The type of the instance being constructed, if this signature is for a constructor.
     pub(crate) constructor_instance_type: Option<Type<'db>>,
-
-    /// The callable's role within constructor dispatch.
-    constructor_kind: ConstructorCallableKind,
-
-    /// Deferred downstream constructor validation.
-    downstream_constructor: Option<Box<DownstreamConstructor<'db>>>,
 
     /// The return type of this overloaded callable.
     ///
@@ -3032,8 +3221,6 @@ impl<'db> CallableBinding<'db> {
             dunder_call_is_possibly_unbound: false,
             bound_type: None,
             constructor_instance_type: None,
-            constructor_kind: ConstructorCallableKind::Regular,
-            downstream_constructor: None,
             overload_call_return_type: None,
             matching_overload_before_type_checking: None,
             overloads,
@@ -3047,8 +3234,6 @@ impl<'db> CallableBinding<'db> {
             dunder_call_is_possibly_unbound: false,
             bound_type: None,
             constructor_instance_type: None,
-            constructor_kind: ConstructorCallableKind::Regular,
-            downstream_constructor: None,
             overload_call_return_type: None,
             matching_overload_before_type_checking: None,
             overloads: smallvec![],
@@ -3078,17 +3263,6 @@ impl<'db> CallableBinding<'db> {
         }
     }
 
-    fn set_downstream_constructor(
-        &mut self,
-        class_literal: ClassLiteral<'db>,
-        bindings: Bindings<'db>,
-    ) {
-        self.downstream_constructor = Some(Box::new(DownstreamConstructor {
-            class_literal,
-            bindings,
-        }));
-    }
-
     fn match_parameters(
         &mut self,
         db: &'db dyn Db,
@@ -3101,17 +3275,6 @@ impl<'db> CallableBinding<'db> {
 
         for overload in &mut self.overloads {
             overload.match_parameters(db, bound_arguments.as_ref(), argument_forms);
-        }
-
-        // Deferred `__init__` bindings participate in argument matching so they can be type-checked
-        // later if a matched overload returns a constructor instance.
-        if let Some(downstream) = self.downstream_constructor.as_mut() {
-            // `init_binding.match_parameters` handles its own bound-`self` insertion, so pass the
-            // original call arguments here.
-            let mut init_forms = ArgumentForms::new(arguments.len());
-            for init_binding in downstream.bindings.iter_flat_mut() {
-                init_binding.match_parameters(db, arguments, &mut init_forms);
-            }
         }
     }
 
@@ -3452,43 +3615,6 @@ impl<'db> CallableBinding<'db> {
         None
     }
 
-    fn check_downstream_constructor(
-        &mut self,
-        db: &'db dyn Db,
-        constraints: &ConstraintSetBuilder<'db>,
-        argument_types: &CallArguments<'_, 'db>,
-        call_expression_tcx: TypeContext<'db>,
-        dataclass_field_specifiers: &[Type<'db>],
-    ) -> bool {
-        if !self.should_check_downstream_constructor(db) {
-            return false;
-        }
-
-        let downstream = self.downstream_constructor.as_mut().expect("checked above");
-        let init_error = downstream
-            .bindings
-            .check_types_impl(
-                db,
-                constraints,
-                argument_types,
-                call_expression_tcx,
-                dataclass_field_specifiers,
-            )
-            .is_err();
-
-        // In layered mixed-constructor flows, the deferred bindings may themselves
-        // represent constructor logic (e.g. metaclass `__call__` -> `__new__`/`__init__`).
-        // If that downstream constructor resolves to a non-instance return, `__init__`
-        // should not be validated.
-        if let Some(downstream_return) = downstream.bindings.constructor_return_type(db)
-            && !downstream.return_is_instance_of_constructor_class(db, downstream_return)
-        {
-            return false;
-        }
-
-        init_error
-    }
-
     /// Filter overloads based on variadic argument to variadic parameter match.
     ///
     /// This is the step 4 of the [overload call evaluation algorithm][1].
@@ -3822,46 +3948,6 @@ impl<'db> CallableBinding<'db> {
             .iter()
             .enumerate()
             .filter(|(_, overload)| !overload.has_errors_affecting_overload_resolution())
-    }
-
-    fn should_check_downstream_constructor(&self, db: &'db dyn Db) -> bool {
-        let Some(downstream) = self.downstream_constructor.as_ref() else {
-            return false;
-        };
-
-        if self.matching_overloads().next().is_some() {
-            return downstream.all_matching_overloads_are_instance_returning(db, self);
-        }
-
-        // If metaclass `__call__` itself doesn't match, constructor dispatch stops there.
-        if self.constructor_kind.is_metaclass_call() {
-            return false;
-        }
-
-        // If no overload matched, only validate deferred `__init__` when all upstream overloads
-        // are potentially instance-returning. If any overload is definitely non-instance (mixed or
-        // all-non-instance constructor), we cannot assume `__init__` would run.
-        let mut saw_instance_like = false;
-        let mut saw_non_instance = false;
-        for overload in &self.overloads {
-            match downstream.overload_return_outcome(db, overload).kind {
-                ConstructorReturnKind::NotInstance => saw_non_instance = true,
-                ConstructorReturnKind::Instance => {
-                    saw_instance_like = true;
-                }
-            }
-        }
-        saw_instance_like && !saw_non_instance
-    }
-
-    /// Returns deferred constructor bindings that should contribute to argument type context.
-    pub(crate) fn deferred_constructor_type_context_bindings(
-        &self,
-        db: &'db dyn Db,
-    ) -> Option<&Bindings<'db>> {
-        let downstream = self.downstream_constructor.as_ref()?;
-        self.should_check_downstream_constructor(db)
-            .then_some(&downstream.bindings)
     }
 
     /// Returns an iterator over all the mutable overloads that matched for this call binding.
