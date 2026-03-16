@@ -1022,8 +1022,14 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             ([source_signature], [target_signature]) => {
                 // Base case: both callable types contain a single signature.
                 if self.relation.is_constraint_set_assignability()
-                    && (source_signature.parameters.as_paramspec().is_some()
-                        || target_signature.parameters.as_paramspec().is_some())
+                    && (source_signature
+                        .parameters
+                        .find_paramspec_from_args_kwargs(db)
+                        .is_some()
+                        || target_signature
+                            .parameters
+                            .find_paramspec_from_args_kwargs(db)
+                            .is_some())
                 {
                     self.check_signature_pair_inner(db, source_signature, target_signature)
                 } else {
@@ -1228,31 +1234,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             // early. We also need to compare the return types here so a return-type mismatch still
             // preserves the inferred ParamSpec binding.
             match (self_paramspec, other_paramspec) {
-                // self: `P` or `Concatenate[<prefix_params>, P]`
+                // self: `P`
                 // other: `P`
-                (
-                    Some((self_prefix_params, self_bound_typevar)),
-                    Some(([], other_bound_typevar)),
-                ) => {
-                    if !self_prefix_params.is_empty() {
-                        let upper = Type::Callable(CallableType::new(
-                            db,
-                            CallableSignature::single(Signature::new_generic(
-                                source.generic_context,
-                                Parameters::new(db, self_prefix_params.iter().cloned()),
-                                Type::unknown(),
-                            )),
-                            CallableTypeKind::ParamSpecValue,
-                        ));
-                        let param_spec_prefix_matches = ConstraintSet::constrain_typevar(
-                            db,
-                            self.constraints,
-                            self_bound_typevar,
-                            Type::Never,
-                            upper,
-                        );
-                        result.intersect(db, self.constraints, param_spec_prefix_matches);
-                    }
+                (Some(([], self_bound_typevar)), Some(([], other_bound_typevar))) => {
                     let param_spec_matches = ConstraintSet::constrain_typevar(
                         db,
                         self.constraints,
@@ -1264,15 +1248,64 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     return result;
                 }
 
+                // self: `Concatenate[<prefix_params>, P]`
+                // other: `P`
+                (
+                    Some((self_prefix_params, self_bound_typevar)),
+                    Some(([], other_bound_typevar)),
+                ) => {
+                    let lower = Type::Callable(CallableType::new(
+                        db,
+                        CallableSignature::single(Signature::new_generic(
+                            source.generic_context,
+                            Parameters::concatenate(
+                                db,
+                                self_prefix_params.to_vec(),
+                                ConcatenateTail::ParamSpec(self_bound_typevar),
+                            ),
+                            Type::unknown(),
+                        )),
+                        CallableTypeKind::ParamSpecValue,
+                    ));
+                    let param_spec_prefix_matches = ConstraintSet::constrain_typevar(
+                        db,
+                        self.constraints,
+                        other_bound_typevar,
+                        lower,
+                        Type::object(),
+                    );
+                    result.intersect(db, self.constraints, param_spec_prefix_matches);
+                    return result;
+                }
+
                 // self: `P`
                 // other: `Concatenate[<prefix_params>, P]`
                 (
-                    Some(([], _self_bound_typevar)),
-                    Some((_other_prefix_params, _other_bound_typevar)),
+                    Some(([], self_bound_typevar)),
+                    Some((other_prefix_params, other_bound_typevar)),
                 ) => {
-                    // This is always false because the `Concatenate` case requires at least one
-                    // required positional-only parameter.
-                    return self.never();
+                    let upper = Type::Callable(CallableType::new(
+                        db,
+                        CallableSignature::single(Signature::new_generic(
+                            target.generic_context,
+                            Parameters::concatenate(
+                                db,
+                                other_prefix_params.to_vec(),
+                                ConcatenateTail::ParamSpec(other_bound_typevar),
+                            ),
+                            Type::unknown(),
+                        )),
+                        CallableTypeKind::ParamSpecValue,
+                    ));
+                    let param_spec_matches = ConstraintSet::constrain_typevar(
+                        db,
+                        self.constraints,
+                        self_bound_typevar,
+                        Type::Never,
+                        upper,
+                    );
+                    result.intersect(db, self.constraints, param_spec_matches);
+                    return result;
                 }
 
                 // self: `Concatenate[<prefix_params>, P]`
@@ -1364,40 +1397,19 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
                     let (mut self_params, mut other_params) = parameters.into_remaining();
 
-                    // At this point, we should've exhausted at least one of the parameter lists.
-                    // debug_assert!(self_params.len() > 0 && other_params.len() > 0);
-
-                    // Any remaining parameters would be bound to the ParamSpec
+                    // At this point, we should've exhausted at least one of the parameter lists,
+                    // so only one side can have remaining prefix parameters.
                     if let Some(self_param) = self_params.next() {
-                        let upper = Type::Callable(CallableType::new(
-                            db,
-                            CallableSignature::single(Signature::new_generic(
-                                source.generic_context,
-                                Parameters::new(
-                                    db,
-                                    std::iter::once(self_param.clone()).chain(self_params.cloned()),
-                                ),
-                                Type::unknown(),
-                            )),
-                            CallableTypeKind::ParamSpecValue,
-                        ));
-                        let param_spec_prefix_matches = ConstraintSet::constrain_typevar(
-                            db,
-                            self.constraints,
-                            self_bound_typevar,
-                            Type::Never,
-                            upper,
-                        );
-                        result.intersect(db, self.constraints, param_spec_prefix_matches);
-                    } else if let Some(other_param) = other_params.next() {
                         let lower = Type::Callable(CallableType::new(
                             db,
                             CallableSignature::single(Signature::new_generic(
-                                target.generic_context,
-                                Parameters::new(
+                                source.generic_context,
+                                Parameters::concatenate(
                                     db,
-                                    std::iter::once(other_param.clone())
-                                        .chain(other_params.cloned()),
+                                    std::iter::once(self_param.clone())
+                                        .chain(self_params.cloned())
+                                        .collect(),
+                                    ConcatenateTail::ParamSpec(self_bound_typevar),
                                 ),
                                 Type::unknown(),
                             )),
@@ -1411,17 +1423,41 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             Type::object(),
                         );
                         result.intersect(db, self.constraints, param_spec_prefix_matches);
+                    } else if let Some(other_param) = other_params.next() {
+                        let upper = Type::Callable(CallableType::new(
+                            db,
+                            CallableSignature::single(Signature::new_generic(
+                                target.generic_context,
+                                Parameters::concatenate(
+                                    db,
+                                    std::iter::once(other_param.clone())
+                                        .chain(other_params.cloned())
+                                        .collect(),
+                                    ConcatenateTail::ParamSpec(other_bound_typevar),
+                                ),
+                                Type::unknown(),
+                            )),
+                            CallableTypeKind::ParamSpecValue,
+                        ));
+                        let param_spec_prefix_matches = ConstraintSet::constrain_typevar(
+                            db,
+                            self.constraints,
+                            self_bound_typevar,
+                            Type::Never,
+                            upper,
+                        );
+                        result.intersect(db, self.constraints, param_spec_prefix_matches);
+                    } else {
+                        // When the prefixes match exactly, we just relate the remaining tails.
+                        let param_spec_matches = ConstraintSet::constrain_typevar(
+                            db,
+                            self.constraints,
+                            self_bound_typevar,
+                            Type::TypeVar(other_bound_typevar),
+                            Type::TypeVar(other_bound_typevar),
+                        );
+                        result.intersect(db, self.constraints, param_spec_matches);
                     }
-
-                    // Bind the ParamSpec type variables to each other
-                    let param_spec_matches = ConstraintSet::constrain_typevar(
-                        db,
-                        self.constraints,
-                        self_bound_typevar,
-                        Type::TypeVar(other_bound_typevar),
-                        Type::TypeVar(other_bound_typevar),
-                    );
-                    result.intersect(db, self.constraints, param_spec_matches);
                     return result;
                 }
 
@@ -1550,45 +1586,34 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                             }
                                             parameters.next_target();
                                         }
+
+                                        break;
                                     }
 
-                                    _ => unreachable!(
-                                        "prefix parameters must be positional-only or positional-or-keyword"
-                                    ),
+                                    _ => return self.never(),
                                 }
                             }
                         }
                     }
 
-                    let (mut self_params, _) = parameters.into_remaining();
-
-                    // `other_params` should be consumed by now
-                    // debug_assert!(other_params.next().is_none());
-
-                    // Any remaining parameters in other_prefix_params would be bound to the
-                    // ParamSpec
-                    if let Some(self_param) = self_params.next() {
-                        let lower = Type::Callable(CallableType::new(
-                            db,
-                            CallableSignature::single(Signature::new_generic(
-                                source.generic_context,
-                                Parameters::new(
-                                    db,
-                                    std::iter::once(self_param.clone()).chain(self_params.cloned()),
-                                ),
-                                Type::unknown(),
-                            )),
-                            CallableTypeKind::ParamSpecValue,
-                        ));
-                        let param_spec_prefix_matches = ConstraintSet::constrain_typevar(
-                            db,
-                            self.constraints,
-                            other_bound_typevar,
-                            lower,
-                            Type::object(),
-                        );
-                        result.intersect(db, self.constraints, param_spec_prefix_matches);
-                    }
+                    let (self_params, _) = parameters.into_remaining();
+                    let lower = Type::Callable(CallableType::new(
+                        db,
+                        CallableSignature::single(Signature::new_generic(
+                            source.generic_context,
+                            Parameters::new(db, self_params.cloned()),
+                            Type::unknown(),
+                        )),
+                        CallableTypeKind::ParamSpecValue,
+                    ));
+                    let param_spec_prefix_matches = ConstraintSet::constrain_typevar(
+                        db,
+                        self.constraints,
+                        other_bound_typevar,
+                        lower,
+                        Type::object(),
+                    );
+                    result.intersect(db, self.constraints, param_spec_prefix_matches);
 
                     return result;
                 }
@@ -1700,31 +1725,24 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         }
                     }
 
-                    let (_, mut other_params) = parameters.into_remaining();
-
-                    if let Some(other_param) = other_params.next() {
-                        let upper = Type::Callable(CallableType::new(
-                            db,
-                            CallableSignature::single(Signature::new_generic(
-                                target.generic_context,
-                                Parameters::new(
-                                    db,
-                                    std::iter::once(other_param.clone())
-                                        .chain(other_params.cloned()),
-                                ),
-                                Type::unknown(),
-                            )),
-                            CallableTypeKind::ParamSpecValue,
-                        ));
-                        let param_spec_prefix_matches = ConstraintSet::constrain_typevar(
-                            db,
-                            self.constraints,
-                            self_bound_typevar,
-                            Type::Never,
-                            upper,
-                        );
-                        result.intersect(db, self.constraints, param_spec_prefix_matches);
-                    }
+                    let (_, other_params) = parameters.into_remaining();
+                    let upper = Type::Callable(CallableType::new(
+                        db,
+                        CallableSignature::single(Signature::new_generic(
+                            target.generic_context,
+                            Parameters::new(db, other_params.cloned()),
+                            Type::unknown(),
+                        )),
+                        CallableTypeKind::ParamSpecValue,
+                    ));
+                    let param_spec_prefix_matches = ConstraintSet::constrain_typevar(
+                        db,
+                        self.constraints,
+                        self_bound_typevar,
+                        Type::Never,
+                        upper,
+                    );
+                    result.intersect(db, self.constraints, param_spec_prefix_matches);
 
                     return result;
                 }
