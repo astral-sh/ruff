@@ -5185,7 +5185,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         let _ = builder.infer_reverse(
                             &constraints,
                             declared_return_ty,
-                            overload
+                            binding
                                 .constructor_instance_type
                                 .unwrap_or(overload.signature.return_ty),
                         );
