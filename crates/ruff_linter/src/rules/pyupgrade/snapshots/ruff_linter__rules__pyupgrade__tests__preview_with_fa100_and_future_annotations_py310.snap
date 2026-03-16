@@ -1,34 +1,34 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 ---
-UP006 [*] Use `list` instead of `typing.List` for type annotation
- --> UP006_4.py:5:10
+UP045 [*] Use `X | None` for type annotations
+ --> UP045_2.py:5:10
   |
-5 | def f(x: typing.List[str]) -> None:
-  |          ^^^^^^^^^^^
+5 | def f(x: Optional[str]) -> None:
+  |          ^^^^^^^^^^^^^
 6 |     ...
   |
-help: Replace with `list`
-2 | from typing import List
+help: Convert to `X | None`
+2 | from typing import Optional
 3 | 
 4 | 
-  - def f(x: typing.List[str]) -> None:
-5 + def f(x: list[str]) -> None:
+  - def f(x: Optional[str]) -> None:
+5 + def f(x: str | None) -> None:
 6 |     ...
 7 | 
 8 | 
 
-UP006 [*] Use `list` instead of `List` for type annotation
-  --> UP006_4.py:9:10
+UP045 [*] Use `X | None` for type annotations
+  --> UP045_2.py:9:10
    |
- 9 | def g(x: List[str]) -> None:
-   |          ^^^^
+ 9 | def f(x: typing.Optional[str]) -> None:
+   |          ^^^^^^^^^^^^^^^^^^^^
 10 |     ...
    |
-help: Replace with `list`
+help: Convert to `X | None`
 6  |     ...
 7  | 
 8  | 
-   - def g(x: List[str]) -> None:
-9  + def g(x: list[str]) -> None:
+   - def f(x: typing.Optional[str]) -> None:
+9  + def f(x: str | None) -> None:
 10 |     ...
