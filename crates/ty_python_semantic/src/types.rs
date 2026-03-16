@@ -3704,7 +3704,9 @@ impl<'db> Type<'db> {
                             )
                         }
                     };
-                    bindings.with_constructor_instance_type(Type::TypeVar(tvar))
+                    bindings
+                        .with_constructor_instance_type(Type::TypeVar(tvar))
+                        .into_constructor_alternatives()
                 }
             },
 
@@ -4424,6 +4426,7 @@ impl<'db> Type<'db> {
         bindings
             .with_generic_context(db, class_generic_context)
             .with_constructor_instance_type(constructor_instance_ty)
+            .into_constructor_alternatives()
     }
 
     /// Calls `self`. Returns a [`CallError`] if `self` is (always or possibly) not callable, or if
