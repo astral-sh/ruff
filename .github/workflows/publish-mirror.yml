@@ -21,7 +21,7 @@ jobs:
       VERSION: ${{ fromJson(inputs.plan).announcement_tag }}
     steps:
       - name: "Download GitHub Artifacts"
-        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3
+        uses: actions/download-artifact@484a0b528fb4d7bd804637ccb632e47a0e638317
         with:
           pattern: artifacts-*
           path: artifacts
