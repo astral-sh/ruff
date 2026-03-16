@@ -101,6 +101,14 @@ impl PredicateOrLiteral<'_> {
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub(crate) enum PredicateNode<'db> {
     Expression(Expression<'db>),
+    /// These predicates are recorded for statements with call expressions. As part of
+    /// reachability constraints, they are used to determine whether control flow can
+    /// continue past this statement or not. If it can be statically guaranteed that
+    /// such a call always returns `Never`/`NoReturn`, evaluation returns `AlwaysFalse`,
+    /// signaling that control flow terminates. In all other cases, the evaluation
+    /// returns `AlwaysTrue`. We do not return `Ambiguous`, even if the return type is
+    /// `Unknown`/`Any`, because that would result in too many false positives. Most
+    /// calls are not terminal.
     IsNonTerminalCall(Expression<'db>),
     Pattern(PatternPredicate<'db>),
     StarImportPlaceholder(StarImportPlaceholderPredicate<'db>),
