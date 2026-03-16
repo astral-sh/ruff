@@ -135,10 +135,6 @@ impl<'db> ConstructorBinding<'db> {
         self.constructor_kind
     }
 
-    fn set_constructor_kind(&mut self, constructor_kind: ConstructorCallableKind) {
-        self.constructor_kind = constructor_kind;
-    }
-
     fn has_downstream_constructor(&self) -> bool {
         self.downstream_constructor.is_some()
     }
@@ -388,12 +384,6 @@ impl<'db> CallableItem<'db> {
         }
     }
 
-    fn set_constructor_kind(&mut self, constructor_kind: ConstructorCallableKind) {
-        if let Some(binding) = self.as_constructor_mut() {
-            binding.set_constructor_kind(constructor_kind);
-        }
-    }
-
     fn set_downstream_constructor(
         &mut self,
         class_literal: ClassLiteral<'db>,
@@ -430,12 +420,16 @@ impl<'db> CallableItem<'db> {
         }
     }
 
-    fn into_constructor(self, constructed_instance_type: Type<'db>) -> CallableItem<'db> {
+    fn into_constructor(
+        self,
+        constructed_instance_type: Type<'db>,
+        constructor_kind: ConstructorCallableKind,
+    ) -> CallableItem<'db> {
         match self {
             CallableItem::Regular(binding) => CallableItem::Constructor(ConstructorBinding {
                 entry: binding,
                 constructed_instance_type,
-                constructor_kind: ConstructorCallableKind::Regular,
+                constructor_kind,
                 downstream_constructor: None,
             }),
             CallableItem::Constructor(mut binding) => {
@@ -572,10 +566,15 @@ struct DownstreamConstructor<'db> {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ConstructorCallableKind {
-    Regular,
-    New,
-    Init,
+    /// Bindings for constructing a `T` from a call to a `type[T]`, which may have any or all of
+    /// the below as downstream constructors (depending on the upper bound/constraints of `T`).
+    TypeVar,
+    /// A metaclass `__call__` method.
     MetaclassCall,
+    /// A `__new__` constructor.
+    New,
+    /// An `__init__` method.
+    Init,
 }
 
 impl ConstructorCallableKind {
@@ -895,11 +894,12 @@ impl<'db> Bindings<'db> {
     pub(crate) fn into_constructor_bindings(
         mut self,
         constructor_instance_type: Type<'db>,
+        constructor_kind: ConstructorCallableKind,
     ) -> Self {
         for element in &mut self.elements {
             element.items = std::mem::take(&mut element.items)
                 .into_iter()
-                .map(|item| item.into_constructor(constructor_instance_type))
+                .map(|item| item.into_constructor(constructor_instance_type, constructor_kind))
                 .collect();
         }
 
@@ -926,12 +926,6 @@ impl<'db> Bindings<'db> {
     ) {
         for item in self.iter_semantic_items_mut() {
             item.set_downstream_constructor(class_literal, bindings);
-        }
-    }
-
-    pub(crate) fn set_constructor_kind(&mut self, constructor_kind: ConstructorCallableKind) {
-        for item in self.iter_semantic_items_mut() {
-            item.set_constructor_kind(constructor_kind);
         }
     }
 

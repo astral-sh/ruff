@@ -3704,7 +3704,10 @@ impl<'db> Type<'db> {
                             )
                         }
                     };
-                    bindings.into_constructor_bindings(Type::TypeVar(tvar))
+                    bindings.into_constructor_bindings(
+                        Type::TypeVar(tvar),
+                        ConstructorCallableKind::TypeVar,
+                    )
                 }
             },
 
@@ -4321,8 +4324,10 @@ impl<'db> Type<'db> {
                 Some((new_callable, definedness)) => {
                     let mut bindings =
                         bind_constructor_new(db, new_callable.bindings(db), self_type)
-                            .into_constructor_bindings(constructor_instance_ty);
-                    bindings.set_constructor_kind(ConstructorCallableKind::New);
+                            .into_constructor_bindings(
+                                constructor_instance_ty,
+                                ConstructorCallableKind::New,
+                            );
                     if definedness == Definedness::PossiblyUndefined {
                         bindings.set_implicit_dunder_new_is_possibly_unbound();
                     }
@@ -4343,10 +4348,10 @@ impl<'db> Type<'db> {
                 }),
                 _,
             ) => {
-                let mut bindings = init_method
-                    .bindings(db)
-                    .into_constructor_bindings(constructor_instance_ty);
-                bindings.set_constructor_kind(ConstructorCallableKind::Init);
+                let mut bindings = init_method.bindings(db).into_constructor_bindings(
+                    constructor_instance_ty,
+                    ConstructorCallableKind::Init,
+                );
                 if *definedness == Definedness::PossiblyUndefined {
                     bindings.set_implicit_dunder_init_is_possibly_unbound();
                 }
@@ -4364,10 +4369,10 @@ impl<'db> Type<'db> {
                         definedness,
                         ..
                     }) => {
-                        let mut bindings = init_method
-                            .bindings(db)
-                            .into_constructor_bindings(constructor_instance_ty);
-                        bindings.set_constructor_kind(ConstructorCallableKind::Init);
+                        let mut bindings = init_method.bindings(db).into_constructor_bindings(
+                            constructor_instance_ty,
+                            ConstructorCallableKind::Init,
+                        );
                         if definedness == Definedness::PossiblyUndefined {
                             bindings.set_implicit_dunder_init_is_possibly_unbound();
                         }
@@ -4385,8 +4390,10 @@ impl<'db> Type<'db> {
                             Signature::new(Parameters::gradual_form(), constructor_instance_ty),
                         )
                         .into();
-                        bindings = bindings.into_constructor_bindings(constructor_instance_ty);
-                        bindings.set_constructor_kind(ConstructorCallableKind::Init);
+                        bindings = bindings.into_constructor_bindings(
+                            constructor_instance_ty,
+                            ConstructorCallableKind::Init,
+                        );
                         bindings.set_implicit_dunder_init_is_possibly_unbound();
                         Some(bindings)
                     }
@@ -4414,8 +4421,10 @@ impl<'db> Type<'db> {
         {
             let mut metaclass_bindings = metaclass_call_method
                 .bindings(db)
-                .into_constructor_bindings(constructor_instance_ty);
-            metaclass_bindings.set_constructor_kind(ConstructorCallableKind::MetaclassCall);
+                .into_constructor_bindings(
+                    constructor_instance_ty,
+                    ConstructorCallableKind::MetaclassCall,
+                );
             if let Some(downstream_bindings) = constructor_bindings.as_ref() {
                 // Preserve the full metaclass `__call__` signature and defer whether constructor
                 // downstream checks apply until the matched overload is known.
