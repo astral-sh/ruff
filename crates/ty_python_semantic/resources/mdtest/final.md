@@ -1325,7 +1325,6 @@ class Base(ABC):
     @abstractproperty  # error: [deprecated]
     def value(self) -> int:
         return 0
-
     @abstractclassmethod  # error: [deprecated]
     def make(cls) -> "Base":
         raise NotImplementedError
