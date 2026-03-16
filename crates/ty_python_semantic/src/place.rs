@@ -1181,7 +1181,6 @@ fn loop_header_reachability_impl<'db>(
     let loop_header = get_loop_header(db, loop_header_definition.loop_token());
     let place = loop_header_definition.place();
 
-    let mut has_defined_bindings = false;
     let mut deleted_reachability = Truthiness::AlwaysFalse;
     let mut reachable_bindings = FxIndexSet::default();
 
@@ -1202,7 +1201,6 @@ fn loop_header_reachability_impl<'db>(
                     def, definition,
                     "loop headers only include bindings from within the loop"
                 );
-                has_defined_bindings = true;
                 reachable_bindings.insert(ReachableLoopBinding {
                     definition: def,
                     narrowing_constraint: live_binding.narrowing_constraint,
@@ -1221,7 +1219,6 @@ fn loop_header_reachability_impl<'db>(
     }
 
     LoopHeaderReachability {
-        has_defined_bindings,
         deleted_reachability,
         reachable_bindings,
     }
@@ -1230,8 +1227,6 @@ fn loop_header_reachability_impl<'db>(
 /// Result of [`loop_header_reachability`]: pre-computed reachability info for loop-back bindings.
 #[derive(Debug, Clone, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub(crate) struct LoopHeaderReachability<'db> {
-    /// Whether any reachable loop-back binding is a defined binding.
-    pub(crate) has_defined_bindings: bool,
     pub(crate) deleted_reachability: Truthiness,
     /// Reachable loop-back bindings that are not `del`s.
     pub(crate) reachable_bindings: FxIndexSet<ReachableLoopBinding<'db>>,
@@ -1247,7 +1242,6 @@ impl<'db> LoopHeaderReachability<'db> {
         reachable_bindings.extend(self.reachable_bindings);
 
         LoopHeaderReachability {
-            has_defined_bindings: self.has_defined_bindings,
             deleted_reachability: self.deleted_reachability,
             reachable_bindings,
         }
@@ -1392,7 +1386,7 @@ fn place_from_bindings_impl<'db>(
                 // that none of them loop-back. In that case short-circuit, so that we don't
                 // produce an `Unknown` fallback type, and so that `Place::Undefined` is still a
                 // possibility below.
-                if !loop_header.has_defined_bindings {
+                if loop_header.reachable_bindings.is_empty() {
                     return None;
                 }
             } else {
