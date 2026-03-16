@@ -2798,6 +2798,19 @@ static_assert(not is_assignable_to(TypeOf[doesnt_satisfy_foo], Foo))
 static_assert(not is_subtype_of(TypeOf[doesnt_satisfy_foo], Foo))
 ```
 
+Protocols without a `__call__` member are not callable:
+
+```py
+from typing import Callable, Protocol
+from ty_extensions import is_subtype_of, is_assignable_to, static_assert
+
+class NotCallable(Protocol):
+    x: int
+
+static_assert(not is_subtype_of(NotCallable, Callable[..., object]))
+static_assert(not is_assignable_to(NotCallable, Callable[..., object]))
+```
+
 Class-literals and generic aliases can also be subtypes of callback protocols:
 
 ```py

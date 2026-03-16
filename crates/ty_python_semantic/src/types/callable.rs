@@ -11,6 +11,7 @@ use crate::{
         Signature, SubclassOfInner, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
         UnionType,
         constraints::{ConstraintSet, IteratorConstraintsExtension},
+        protocol_class::protocol_bind_self,
         relation::{TypeRelation, TypeRelationChecker},
         signatures::CallableSignature,
         visitor, walk_signature,
@@ -63,7 +64,16 @@ impl<'db> Type<'db> {
                 Some(CallableTypes::one(bound_method.into_callable_type(db)))
             }
 
-            Type::NominalInstance(_) | Type::ProtocolInstance(_) => {
+            Type::ProtocolInstance(protocol) => {
+                let call_method = protocol.interface(db).call_method(db)?;
+                Some(CallableTypes::one(protocol_bind_self(
+                    db,
+                    call_method,
+                    None,
+                )))
+            }
+
+            Type::NominalInstance(_) => {
                 let call_symbol = self
                     .member_lookup_with_policy(
                         db,

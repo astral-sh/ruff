@@ -955,7 +955,7 @@ fn proto_interface_cycle_initial<'db>(
 /// This additional upcasting is required in order for protocols with `__call__` method
 /// members to be considered assignable to `Callable` types, since the `Callable` supertype
 /// of the `__call__` method will be function-like but a `Callable` type is not.
-fn protocol_bind_self<'db>(
+pub(super) fn protocol_bind_self<'db>(
     db: &'db dyn Db,
     callable: CallableType<'db>,
     self_type: Option<Type<'db>>,
