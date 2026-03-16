@@ -1877,7 +1877,6 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             (
                 // note `LiteralString` is not single-valued, but we handle the special case above
                 left @ (Type::FunctionLiteral(..)
-                | Type::BoundMethod(..)
                 | Type::KnownBoundMethod(..)
                 | Type::WrapperDescriptor(..)
                 | Type::ModuleLiteral(..)
@@ -1885,7 +1884,6 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 | Type::SpecialForm(..)
                 | Type::KnownInstance(..)),
                 right @ (Type::FunctionLiteral(..)
-                | Type::BoundMethod(..)
                 | Type::KnownBoundMethod(..)
                 | Type::WrapperDescriptor(..)
                 | Type::ModuleLiteral(..)
@@ -2195,6 +2193,20 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 KnownClass::FunctionType
                     .when_subclass_of(db, instance.class(db), self.constraints)
                     .negate(db, self.constraints)
+            }
+
+            // A `BoundMethod` type includes instances of the same method bound to a
+            // subtype/subclass of the self type.
+            (Type::BoundMethod(a), Type::BoundMethod(b)) => {
+                if a.function(db).name(db) != b.function(db).name(db) {
+                    // Two `BoundMethod`s have to have the same method name to have any possibility
+                    // of overlap.
+                    self.always()
+                } else {
+                    // If the names match, then disjointness depends on whether the class types are
+                    // disjoint.
+                    self.check_type_pair(db, a.self_instance(db), b.self_instance(db))
+                }
             }
 
             (Type::BoundMethod(_), other) | (other, Type::BoundMethod(_)) => {

@@ -472,6 +472,40 @@ static_assert(not is_disjoint_from(TypeOf[f], FunctionType))
 static_assert(not is_disjoint_from(TypeOf[f], object))
 ```
 
+### Bound methods
+
+```py
+from typing import final
+from ty_extensions import TypeOf, is_disjoint_from, static_assert
+
+class A:
+    def foo(self) -> None: ...
+    def bar(self) -> None: ...
+
+class B:
+    def foo(self) -> None: ...
+
+# Bound methods with different names are disjoint.
+static_assert(is_disjoint_from(TypeOf[A().foo], TypeOf[A().bar]))
+
+# Bound methods with the same name but different self types are not disjoint, because a subclass
+# could inherit from both...
+static_assert(not is_disjoint_from(TypeOf[A().foo], TypeOf[B().foo]))
+
+@final
+class F1:
+    def foo(self) -> None: ...
+
+@final
+class F2:
+    def foo(self) -> None: ...
+
+# ...unless one or both of those classes are `@final`.
+static_assert(is_disjoint_from(TypeOf[A().foo], TypeOf[F2().foo]))
+static_assert(is_disjoint_from(TypeOf[B().foo], TypeOf[F2().foo]))
+static_assert(is_disjoint_from(TypeOf[F1().foo], TypeOf[F2().foo]))
+```
+
 ### `AlwaysTruthy` and `AlwaysFalsy`
 
 ```py

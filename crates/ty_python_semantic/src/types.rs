@@ -2076,7 +2076,6 @@ impl<'db> Type<'db> {
     pub(crate) fn is_single_valued(self, db: &'db dyn Db) -> bool {
         match self {
             Type::FunctionLiteral(..)
-            | Type::BoundMethod(_)
             | Type::WrapperDescriptor(_)
             | Type::KnownBoundMethod(_)
             | Type::ModuleLiteral(..)
@@ -2128,6 +2127,11 @@ impl<'db> Type<'db> {
 
             Type::BoundSuper(_) => {
                 // At runtime two super instances never compare equal, even if their arguments are identical.
+                false
+            }
+
+            Type::BoundMethod(_) => {
+                // Binding the same method to different instances yields different objects: `[].sort != [].sort`
                 false
             }
 
