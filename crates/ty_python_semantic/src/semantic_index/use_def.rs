@@ -1218,7 +1218,7 @@ impl<'db> UseDefMapBuilder<'db> {
 
     /// Records a narrowing constraint for all places in the current scope.
     ///
-    /// This is used to gate narrowing by `ReturnsNever` constraints: when a branch contains
+    /// This is used to gate narrowing by `CallSucceeds` constraints: when a branch contains
     /// a call to a `NoReturn` function, all narrowing in that branch should be conditional
     /// on the call actually returning `Never`.
     pub(super) fn record_narrowing_constraint_for_all_places(
