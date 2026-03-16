@@ -272,3 +272,8 @@ pub(crate) const fn is_mutable_default_in_dataclass_field_enabled(
 ) -> bool {
     settings.preview.is_enabled()
 }
+
+// https://github.com/astral-sh/ruff/pull/23197
+pub(crate) const fn is_tc010_future_annotations_fix_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}

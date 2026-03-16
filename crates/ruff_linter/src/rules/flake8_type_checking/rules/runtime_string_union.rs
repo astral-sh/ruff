@@ -6,6 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::preview::is_tc010_future_annotations_fix_enabled;
 use crate::{Fix, FixAvailability};
 
 /// ## What it does
@@ -87,7 +88,11 @@ pub(crate) fn runtime_string_union(checker: &Checker, expr: &Expr) {
 
     for string in &strings {
         let mut diagnostic = checker.report_diagnostic(RuntimeStringUnion, string.range());
-        if checker.settings().future_annotations && !checker.future_annotations_or_stub() {
+        if is_tc010_future_annotations_fix_enabled(checker.settings())
+            && checker.settings().future_annotations
+            && !checker.future_annotations_or_stub()
+            && !checker.semantic().in_runtime_evaluated_annotation()
+        {
             diagnostic.set_fix(Fix::unsafe_edit(checker.importer().add_future_import()));
         }
     }
