@@ -429,6 +429,66 @@ def _(c: C[str]):
     reveal_type(C(c))  # revealed: C[str]
 ```
 
+### Self-like `__new__` typevars should still provide `__init__` type context
+
+When `__new__` returns the constructed type via a `cls: type[T] -> T` annotation, we should still
+use `__init__` to provide argument type context for constructor arguments.
+
+#### `Any`-typed `__new__` parameter should not block `__init__` type context
+
+```py
+from __future__ import annotations
+from typing import Any, Callable, TypeVar
+
+T = TypeVar("T", bound="SpanData")
+
+class SpanData:
+    def __new__(
+        cls: type[T],
+        name: str,
+        on_finish: Any | None = None,
+    ) -> T:
+        return object.__new__(cls)
+
+class Span(SpanData):
+    def __init__(self, name: str, on_finish: list[Callable[[Span], None]] | None = None) -> None:
+        pass
+
+class Tracer:
+    def _on_span_finish(self, span: Span) -> None:
+        pass
+
+    def start(self) -> None:
+        Span("x", on_finish=[self._on_span_finish])
+```
+
+#### `object`-typed `__new__` parameter should not block `__init__` type context
+
+```py
+from typing import Callable, TypeVar
+
+T = TypeVar("T", bound="SpanData")
+
+class SpanData:
+    def __new__(
+        cls: type[T],
+        name: str,
+        on_finish: object | None = None,
+    ) -> T:
+        return object.__new__(cls)
+
+class Span(SpanData):
+    def __init__(self, name: str, on_finish: list[Callable[["Span"], None]] | None = None) -> None:
+        pass
+
+class Tracer:
+    def _on_span_finish(self, span: "Span") -> None:
+        pass
+
+    def start(self) -> None:
+        Span("x", on_finish=[self._on_span_finish])
+```
+
 ### `__new__` returning a specific class affects subclasses
 
 When `__new__` returns a specific class (e.g., `-> Foo`), this is an instance type for `Foo` itself,

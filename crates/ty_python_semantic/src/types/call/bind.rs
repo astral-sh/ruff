@@ -239,6 +239,15 @@ impl<'db> ConstructorBinding<'db> {
             .then_some(&downstream.bindings)
     }
 
+    fn type_context_downstream_constructor_bindings(
+        &self,
+        db: &'db dyn Db,
+    ) -> Option<&Bindings<'db>> {
+        let downstream = self.downstream_constructor.as_ref()?;
+        self.should_include_downstream_constructor_type_context(db)
+            .then_some(&downstream.bindings)
+    }
+
     fn downstream_constructor(&self) -> Option<&DownstreamConstructor<'db>> {
         self.downstream_constructor.as_deref()
     }
@@ -275,6 +284,34 @@ impl<'db> ConstructorBinding<'db> {
             }
         }
         saw_instance_like && !saw_non_instance
+    }
+
+    fn should_include_downstream_constructor_type_context(&self, db: &'db dyn Db) -> bool {
+        let Some(downstream) = self.downstream_constructor.as_ref() else {
+            return false;
+        };
+
+        if self.should_check_downstream_constructor(db) {
+            return true;
+        }
+
+        // For constructor argument inference, keep deferred `__init__` context available for
+        // self-like `__new__(cls: type[T]) -> T` signatures even before specialization proves that
+        // the matched overload returns an instance of the constructed class.
+        if self.constructor_kind.is_metaclass_call() {
+            return false;
+        }
+
+        if self.entry.matching_overloads().next().is_some() {
+            return self.entry.matching_overloads().any(|(_, overload)| {
+                downstream.overload_is_instance_like_for_type_context(db, overload)
+            });
+        }
+
+        match self.entry.overloads() {
+            [overload] => downstream.overload_is_instance_like_for_type_context(db, overload),
+            _ => false,
+        }
     }
 }
 
@@ -359,6 +396,18 @@ impl<'db> CallableItem<'db> {
             CallableItem::Regular(_) => None,
             CallableItem::Constructor(binding) => {
                 binding.checked_downstream_constructor_bindings(db)
+            }
+        }
+    }
+
+    fn type_context_downstream_constructor_bindings(
+        &self,
+        db: &'db dyn Db,
+    ) -> Option<&Bindings<'db>> {
+        match self {
+            CallableItem::Regular(_) => None,
+            CallableItem::Constructor(binding) => {
+                binding.type_context_downstream_constructor_bindings(db)
             }
         }
     }
@@ -683,6 +732,35 @@ fn constructor_return_outcome<'db>(
     }
 }
 
+fn returns_cls_typevar<'db>(db: &'db dyn Db, overload: &Binding<'db>) -> bool {
+    let Type::TypeVar(return_typevar) = overload.signature.return_ty.resolve_type_alias(db) else {
+        return false;
+    };
+
+    let Some(cls_parameter_ty) = overload
+        .signature
+        .parameters()
+        .get(0)
+        .map(Parameter::annotated_type)
+    else {
+        return false;
+    };
+    let cls_parameter_ty = overload
+        .specialization
+        .map(|specialization| cls_parameter_ty.apply_specialization(db, specialization))
+        .unwrap_or(cls_parameter_ty)
+        .resolve_type_alias(db);
+
+    let Type::SubclassOf(subclass_of) = cls_parameter_ty else {
+        return false;
+    };
+    let Some(cls_typevar) = subclass_of.into_type_var() else {
+        return false;
+    };
+
+    cls_typevar.typevar(db).identity(db) == return_typevar.typevar(db).identity(db)
+}
+
 impl<'db> DownstreamConstructor<'db> {
     fn return_kind(&self, db: &'db dyn Db, return_ty: Type<'db>) -> ConstructorReturnKind {
         classify_constructor_return(db, self.class_literal, return_ty)
@@ -694,6 +772,17 @@ impl<'db> DownstreamConstructor<'db> {
         overload: &Binding<'db>,
     ) -> ConstructorReturnOutcome<'db> {
         constructor_return_outcome(db, self.class_literal, overload)
+    }
+
+    fn overload_is_instance_like_for_type_context(
+        &self,
+        db: &'db dyn Db,
+        overload: &Binding<'db>,
+    ) -> bool {
+        let outcome = self.overload_return_outcome(db, overload);
+        outcome.kind.is_instance()
+            || outcome.resolved_return.is_unknown()
+            || returns_cls_typevar(db, overload)
     }
 
     /// Returns `true` if every matched overload is instance-returning (i.e., its return type
@@ -995,21 +1084,21 @@ impl<'db> Bindings<'db> {
                 item.type_context_reverse_inference_return_ty(),
             ));
 
-            if let Some(bindings) = item.checked_downstream_constructor_bindings(db) {
+            if let Some(bindings) = item.type_context_downstream_constructor_bindings(db) {
                 bindings.collect_type_context_callables(db, out);
             }
         }
     }
 
     /// Returns the callables that should contribute argument type context, including deferred
-    /// constructor callables whose checks are enabled by the matched upstream overload.
+    /// constructor callables that are relevant to the matched upstream constructor path.
     ///
-    /// The second element of the return tuple is the return type to use for reverse inference from
-    /// type context (so that in e.g. `x2: X[int | None] = X(1)` where `X` is generic over `T`, we
-    /// can take `int | None` as a constraint in solving for `T`). If `None` (for most callables),
-    /// we will use the annotated return type of matching overloads, but `__init__` constructors
-    /// require an override to use the constructed instance type, not the annotated (likely `None`)
-    /// return.
+    /// The second element of the return tuple is an optional override of the return type to use
+    /// for reverse inference from type context (so that in e.g. `x2: X[int | None] = X(1)` where
+    /// `X` is generic over `T`, we can take `int | None` as a constraint in solving for `T`). If
+    /// `None` (for most callables), we will use the annotated return type of matching overloads,
+    /// but `__init__` constructors require an override to use the constructed instance type,
+    /// rather than the annotated (likely `None`) return.
     pub(crate) fn iter_type_context_callables(
         &self,
         db: &'db dyn Db,
