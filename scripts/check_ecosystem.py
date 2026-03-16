@@ -26,7 +26,7 @@ from collections.abc import Awaitable
 from contextlib import asynccontextmanager, nullcontext
 from pathlib import Path
 from signal import SIGINT, SIGTERM
-from typing import TYPE_CHECKING, Any, NamedTuple, Self, TypeVar
+from typing import TYPE_CHECKING, NamedTuple, Self, TypeVar, cast
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Iterator, Sequence
@@ -244,7 +244,7 @@ async def compare(
     ruff2: Path,
     repo: Repository,
     checkouts: Path | None = None,
-) -> Diff | None:
+) -> Diff:
     """Check a specific repository against two versions of ruff."""
     removed, added = set(), set()
 
@@ -343,7 +343,7 @@ DIFF_LINE_RE = re.compile(
     r"^(?P<pre>[+-]) (?P<inner>(?P<path>[^:]+):(?P<lnum>\d+):\d+:) (?P<post>.*)$",
 )
 
-T = TypeVar("T", bound=Awaitable[Any])
+T = TypeVar("T")
 
 
 async def main(
@@ -365,7 +365,7 @@ async def main(
     # Otherwise doing 3k repositories can take >8GB RAM
     semaphore = asyncio.Semaphore(50)
 
-    async def limited_parallelism(coroutine: T) -> T:
+    async def limited_parallelism(coroutine: Awaitable[T]) -> T:
         async with semaphore:
             return await coroutine
 
@@ -424,7 +424,10 @@ async def main(
                 print()
 
                 repo = repositories[(org, repo)]
-                diff_lines = list(diff)
+                # TODO: ty otherwise considers this `list[set[str] | str]`,
+                # seemingly ignoring `Diff.__iter__`. Seems like maybe a bug, but
+                # pyright and mypy both do the same.
+                diff_lines = cast(list[str], list(diff))
 
                 print("<pre>")
                 for line in diff_lines:
