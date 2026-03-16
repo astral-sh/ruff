@@ -989,6 +989,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Numpy, "002") => rules::numpy::rules::NumpyLegacyRandom,
         (Numpy, "003") => rules::numpy::rules::NumpyDeprecatedFunction,
         (Numpy, "201") => rules::numpy::rules::Numpy2Deprecation,
+        (Numpy, "202") => rules::numpy::rules::NumpyArrayAPICompatibility,
 
         // fastapi
         (FastApi, "001") => rules::fastapi::rules::FastApiRedundantResponseModel,

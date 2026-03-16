@@ -20,6 +20,7 @@ mod tests {
     #[test_case(Rule::Numpy2Deprecation, Path::new("NPY201.py"))]
     #[test_case(Rule::Numpy2Deprecation, Path::new("NPY201_2.py"))]
     #[test_case(Rule::Numpy2Deprecation, Path::new("NPY201_3.py"))]
+    #[test_case(Rule::NumpyArrayAPICompatibility, Path::new("NPY202.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(

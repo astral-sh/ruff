@@ -1,0 +1,30 @@
+---
+source: crates/ruff_linter/src/rules/numpy/mod.rs
+---
+NPY202 [*] `transpose` is not compatible with the Array API. Use `permute_dims` instead.
+ --> NPY202.py:4:5
+  |
+2 |     import numpy as np
+3 |
+4 |     np.transpose(np.array([[0, 1], [2, 3]]), (1, 0))
+  |     ^^^^^^^^^^^^
+5 |
+6 |     np.array([[0, 1], [2, 3]]).T
+  |
+help: Replace with `numpy.permute_dims`
+1 | def func():
+2 |     import numpy as np
+3 | 
+  -     np.transpose(np.array([[0, 1], [2, 3]]), (1, 0))
+4 +     np.permute_dims(np.array([[0, 1], [2, 3]]), (1, 0))
+5 | 
+6 |     np.array([[0, 1], [2, 3]]).T
+
+NPY202 `T` is not compatible with the Array API. For (stacked) matrix transpose use `.mT` instead. For any other permutation of axes use `np.permute_dims(...)`
+ --> NPY202.py:6:5
+  |
+4 |     np.transpose(np.array([[0, 1], [2, 3]]), (1, 0))
+5 |
+6 |     np.array([[0, 1], [2, 3]]).T
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |

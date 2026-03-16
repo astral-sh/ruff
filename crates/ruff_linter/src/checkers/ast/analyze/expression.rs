@@ -248,6 +248,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                     if checker.is_rule_enabled(Rule::Numpy2Deprecation) {
                         numpy::rules::numpy_2_0_deprecation(checker, expr);
                     }
+                    if checker.is_rule_enabled(Rule::NumpyArrayAPICompatibility) {
+                        numpy::rules::numpy_array_api_compatibility(checker, expr);
+                    }
                     if checker.is_rule_enabled(Rule::CollectionsNamedTuple) {
                         flake8_pyi::rules::collections_named_tuple(checker, expr);
                     }
@@ -475,6 +478,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             }
             if checker.is_rule_enabled(Rule::Numpy2Deprecation) {
                 numpy::rules::numpy_2_0_deprecation(checker, expr);
+            }
+            if checker.is_rule_enabled(Rule::NumpyArrayAPICompatibility) {
+                numpy::rules::numpy_array_api_compatibility(checker, expr);
             }
             if checker.is_rule_enabled(Rule::DeprecatedMockImport) {
                 pyupgrade::rules::deprecated_mock_attribute(checker, attribute);
