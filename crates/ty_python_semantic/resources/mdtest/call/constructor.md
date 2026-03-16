@@ -798,6 +798,60 @@ def f(flag: bool) -> None:
     ctor("foo")
 ```
 
+### Union of generic constructor types with `__new__` should preserve specialization
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class E(Generic[T]):
+    def __new__(cls, x: object):
+        return object.__new__(cls)
+
+    def __init__(self, x: T) -> None: ...
+
+class F(Generic[T]):
+    def __new__(cls, x: object):
+        return object.__new__(cls)
+
+    def __init__(self, x: T) -> None: ...
+
+def f(flag: bool) -> None:
+    ctor: type[E[int]] | type[F[int]]
+    if flag:
+        ctor = E
+    else:
+        ctor = F
+
+    reveal_type(ctor(1))  # revealed: E[int] | F[int]
+```
+
+### Intersection of generic constructor types with `__new__` should preserve specialization
+
+```py
+from typing import Generic, TypeVar
+
+from ty_extensions import Intersection
+
+T = TypeVar("T")
+
+class E(Generic[T]):
+    def __new__(cls, x: object):
+        return object.__new__(cls)
+
+    def __init__(self, x: T) -> None: ...
+
+class F(Generic[T]):
+    def __new__(cls, x: object):
+        return object.__new__(cls)
+
+    def __init__(self, x: T) -> None: ...
+
+def f(ctor: Intersection[type[E[int]], type[F[int]]]) -> None:
+    reveal_type(ctor(1))  # revealed: E[int] & F[int]
+```
+
 ### `__new__` returning a strict subclass preserves that return type
 
 ```py

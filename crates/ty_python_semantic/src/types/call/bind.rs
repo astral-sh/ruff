@@ -56,7 +56,7 @@ use crate::types::{
     SpecialFormType, TypeAliasType, TypeContext, TypeVarBoundOrConstraints, TypeVarVariance,
     UnionBuilder, UnionType, WrapperDescriptorKind, enums, list_members,
 };
-use crate::{DisplaySettings, Program};
+use crate::{DisplaySettings, FxOrderMap, Program};
 use ruff_db::diagnostic::{Annotation, Diagnostic, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_python_ast::{self as ast, ArgOrKeyword, PythonVersion};
 use ty_module_resolver::KnownModule;
@@ -83,10 +83,74 @@ struct BindingsElement<'db> {
     bindings: SmallVec<[CallableBinding<'db>; 1]>,
 }
 
+/// Temporary regrouping state for one constructor family while computing union return types.
+#[derive(Debug, Default)]
+struct ConstructorGroupState<'a, 'db> {
+    bindings: SmallVec<[&'a CallableBinding<'db>; 1]>,
+    /// The original return type to preserve if grouped constructor handling returns `None`.
+    preserved_return_type: Option<Type<'db>>,
+}
+
+impl<'a, 'db> ConstructorGroupState<'a, 'db> {
+    fn push(
+        &mut self,
+        bindings: impl IntoIterator<Item = &'a CallableBinding<'db>>,
+        return_ty: Type<'db>,
+    ) {
+        self.bindings.extend(bindings);
+        self.preserved_return_type.get_or_insert(return_ty);
+    }
+}
+
+type ConstructorGroups<'a, 'db> = FxOrderMap<Type<'db>, ConstructorGroupState<'a, 'db>>;
+
 impl<'db> BindingsElement<'db> {
+    /// Returns the constructor instance type shared by all bindings in this element, if any.
+    fn constructor_instance_type(&self) -> Option<Type<'db>> {
+        let constructor_instance_type = self.bindings.first()?.constructor_instance_type?;
+        self.bindings
+            .iter()
+            .all(|binding| binding.constructor_instance_type == Some(constructor_instance_type))
+            .then_some(constructor_instance_type)
+    }
+
     /// Returns true if this element is an intersection of multiple callables.
     fn is_intersection(&self) -> bool {
         self.bindings.len() > 1
+    }
+
+    fn return_type(&self, db: &'db dyn Db) -> Type<'db> {
+        let mut constructor_groups: ConstructorGroups<'_, 'db> = FxOrderMap::default();
+        let mut binding_return_types = Vec::with_capacity(self.bindings.len());
+
+        for binding in &self.bindings {
+            let binding_return_type = binding.return_type();
+            if let Some(constructor_instance_type) = binding.constructor_instance_type {
+                constructor_groups
+                    .entry(constructor_instance_type)
+                    .or_default()
+                    .push(std::iter::once(binding), binding_return_type);
+                continue;
+            }
+            binding_return_types.push(binding_return_type);
+        }
+
+        for (constructor_instance_type, group) in constructor_groups {
+            if let Some(group_return_type) = Bindings::constructor_return_type_for_bindings(
+                db,
+                constructor_instance_type,
+                group.bindings.iter().copied(),
+            ) {
+                binding_return_types.push(group_return_type);
+            } else if let Some(preserved_return_type) = group.preserved_return_type {
+                binding_return_types.push(preserved_return_type);
+            }
+        }
+
+        match binding_return_types.as_slice() {
+            [single] => *single,
+            _ => IntersectionType::from_elements(db, binding_return_types),
+        }
     }
 
     /// Check types for all bindings in this element.
@@ -784,14 +848,175 @@ impl<'db> Bindings<'db> {
         self.callable_type
     }
 
-    fn constructor_return_type(&self, db: &'db dyn Db) -> Option<Type<'db>> {
-        let constructor_instance_type = self.constructor_instance_type?;
+    fn combine_constructor_return_type<'a>(
+        db: &'db dyn Db,
+        constructor_instance_type: Type<'db>,
+        bindings: impl IntoIterator<Item = &'a CallableBinding<'db>>,
+    ) -> Type<'db>
+    where
+        'db: 'a,
+    {
+        let Some(class_specialization) = constructor_instance_type.class_specialization(db) else {
+            return constructor_instance_type;
+        };
         let class_literal = constructor_instance_type
             .as_nominal_instance()
             .and_then(|inst| inst.class(db).static_class_literal(db))
             .map(|(lit, _)| lit);
-        let has_downstream_constructors = self
-            .iter_flat()
+        let class_context = class_specialization.generic_context(db);
+        let bindings = bindings
+            .into_iter()
+            .collect::<SmallVec<[&CallableBinding<'db>; 1]>>();
+
+        let mut combined: Option<Specialization<'db>> = None;
+        let mut combine_binding_specialization = |binding: &CallableBinding<'db>| {
+            // For constructors, prefer the first matching overload (declaration order) to avoid
+            // merging incompatible constructor specializations. For deferred `__init__` paths, we
+            // still want partial generic inference from a single unmatched overload (e.g. missing
+            // required arguments) so constructor specialization can reflect inferred arguments.
+            let overload = binding
+                .matching_overloads()
+                .next()
+                .map(|(_, overload)| overload)
+                .or_else(|| match binding.overloads() {
+                    [overload] if binding.constructor_kind.is_init() => Some(overload),
+                    _ => None,
+                });
+            let Some(overload) = overload else {
+                return;
+            };
+            let self_parameter_specialization = class_literal.and_then(|lit| {
+                let self_param_ty = overload.signature.parameters().get(0)?.annotated_type();
+                let resolved_self_param_ty = overload
+                    .specialization
+                    .map(|specialization| self_param_ty.apply_specialization(db, specialization))
+                    .unwrap_or(self_param_ty);
+                resolved_self_param_ty.specialization_of(db, lit)
+            });
+            let return_specialization = class_literal
+                // Fast path: use the already-resolved overload return type when possible.
+                .and_then(|lit| overload.return_ty.specialization_of(db, lit));
+            let return_specialization_is_informative =
+                return_specialization.is_some_and(|specialization| {
+                    class_context.variables(db).any(|class_typevar| {
+                        specialization
+                            .get(db, class_typevar)
+                            .is_some_and(|mapped_ty| {
+                                !mapped_ty.is_unknown() && mapped_ty != Type::TypeVar(class_typevar)
+                            })
+                    })
+                });
+            let refined_self_parameter_specialization =
+                self_parameter_specialization.map(|specialization| {
+                    let types: Box<[_]> = specialization
+                        .types(db)
+                        .iter()
+                        .copied()
+                        .map(|mapped_ty| {
+                            let without_unknown =
+                                mapped_ty.filter_union(db, |element| !element.is_unknown());
+                            let mapped_ty = if without_unknown.is_never() {
+                                mapped_ty
+                            } else {
+                                without_unknown
+                            };
+                            mapped_ty.promote(db)
+                        })
+                        .collect();
+                    Specialization::new(
+                        db,
+                        specialization.generic_context(db),
+                        types,
+                        specialization.materialization_kind(db),
+                        None,
+                    )
+                });
+            // Prefer extracting the class specialization from the resolved overload return type.
+            // Fall back to specialization inferred from annotated `self`, then to class-level
+            // type variable mappings from the overload specialization.
+            let specialization = if return_specialization_is_informative {
+                return_specialization
+            } else {
+                refined_self_parameter_specialization
+                    .or(return_specialization)
+                    .or_else(|| {
+                        overload
+                            .specialization
+                            .and_then(|s| s.restrict(db, class_context))
+                    })
+            };
+            let Some(specialization) = specialization else {
+                return;
+            };
+            combined = Some(match combined {
+                None => specialization,
+                Some(previous) => previous.combine(db, specialization),
+            });
+        };
+
+        // TODO this loops over all bindings, flattening union/intersection
+        // shape. As we improve our constraint solver, there may be an
+        // improvement needed here.
+        for binding in bindings.iter().copied() {
+            combine_binding_specialization(binding);
+        }
+
+        // Deferred downstream constructor bindings stay out-of-band for conditional validation.
+        // If all matched overloads are instance-returning, include inferred specializations from
+        // those deferred bindings as well.
+        for binding in bindings.iter().copied() {
+            let Some(downstream) = binding.downstream_constructor.as_ref() else {
+                continue;
+            };
+            if !downstream.all_matching_overloads_are_instance_returning(db, binding) {
+                continue;
+            }
+            for init_binding in downstream.bindings.iter_flat() {
+                combine_binding_specialization(init_binding);
+            }
+        }
+
+        // If constructor inference yields a specialization, rebuild the instance from the class's
+        // identity specialization so explicit aliases like `C[int]` can still be remapped by
+        // `__new__` return types (e.g. `C[list[T]]`).
+        if let Some(specialization) = combined {
+            let specialization =
+                specialization.apply_optional_specialization(db, Some(class_specialization));
+            if let Some(class_literal) = class_literal {
+                let remapped_class = class_literal.apply_specialization(db, |_| specialization);
+                return Type::instance(db, remapped_class);
+            }
+            return constructor_instance_type.apply_specialization(db, specialization);
+        }
+
+        // If constructor inference doesn't yield a specialization, fall back to the default
+        // specialization to avoid leaking inferable typevars in the constructed instance.
+        let specialization = class_context.default_specialization(db, None);
+        constructor_instance_type.apply_specialization(db, specialization)
+    }
+
+    fn constructor_return_type(&self, db: &'db dyn Db) -> Option<Type<'db>> {
+        Self::constructor_return_type_for_bindings(
+            db,
+            self.constructor_instance_type?,
+            self.iter_flat(),
+        )
+    }
+
+    fn constructor_return_type_for_bindings<'a>(
+        db: &'db dyn Db,
+        constructor_instance_type: Type<'db>,
+        bindings: impl IntoIterator<Item = &'a CallableBinding<'db>>,
+    ) -> Option<Type<'db>>
+    where
+        'db: 'a,
+    {
+        let bindings = bindings
+            .into_iter()
+            .collect::<SmallVec<[&CallableBinding<'db>; 1]>>();
+        let has_downstream_constructors = bindings
+            .iter()
+            .copied()
             .any(|binding| binding.downstream_constructor.is_some());
         let mut saw_matching_upstream_overload = false;
         let mut saw_unmatched_all_non_instance_overloaded_upstream = false;
@@ -822,7 +1047,7 @@ impl<'db> Bindings<'db> {
             let is_instance_of_constructor = |return_ty: Type<'db>| {
                 classify_constructor_return(db, constructor_class_literal, return_ty).is_instance()
             };
-            for binding in self.iter_flat() {
+            for binding in bindings.iter().copied() {
                 if has_downstream_constructors && binding.downstream_constructor.is_none() {
                     continue;
                 }
@@ -966,7 +1191,7 @@ impl<'db> Bindings<'db> {
         // `__new__ -> D` where `D` is a subclass of `C`.
         if let Some(constructor_class) = constructor_class {
             let constructor_class_literal = constructor_class.class_literal(db);
-            for binding in self.iter_flat() {
+            for binding in bindings.iter().copied() {
                 if has_downstream_constructors && binding.downstream_constructor.is_none() {
                     continue;
                 }
@@ -999,136 +1224,11 @@ impl<'db> Bindings<'db> {
             }
         }
 
-        let Some(class_specialization) = constructor_instance_type.class_specialization(db) else {
-            return Some(constructor_instance_type);
-        };
-        let class_context = class_specialization.generic_context(db);
-
-        let mut combined: Option<Specialization<'db>> = None;
-        let mut combine_binding_specialization = |binding: &CallableBinding<'db>| {
-            // For constructors, prefer the first matching overload (declaration order) to avoid
-            // merging incompatible constructor specializations. For deferred `__init__` paths, we
-            // still want partial generic inference from a single unmatched overload (e.g. missing
-            // required arguments) so constructor specialization can reflect inferred arguments.
-            let overload = binding
-                .matching_overloads()
-                .next()
-                .map(|(_, overload)| overload)
-                .or_else(|| match binding.overloads() {
-                    [overload] if binding.constructor_kind.is_init() => Some(overload),
-                    _ => None,
-                });
-            let Some(overload) = overload else {
-                return;
-            };
-            let self_parameter_specialization = class_literal.and_then(|lit| {
-                let self_param_ty = overload.signature.parameters().get(0)?.annotated_type();
-                let resolved_self_param_ty = overload
-                    .specialization
-                    .map(|specialization| self_param_ty.apply_specialization(db, specialization))
-                    .unwrap_or(self_param_ty);
-                resolved_self_param_ty.specialization_of(db, lit)
-            });
-            let return_specialization = class_literal
-                // Fast path: use the already-resolved overload return type when possible.
-                .and_then(|lit| overload.return_ty.specialization_of(db, lit));
-            let return_specialization_is_informative =
-                return_specialization.is_some_and(|specialization| {
-                    class_context.variables(db).any(|class_typevar| {
-                        specialization
-                            .get(db, class_typevar)
-                            .is_some_and(|mapped_ty| {
-                                !mapped_ty.is_unknown() && mapped_ty != Type::TypeVar(class_typevar)
-                            })
-                    })
-                });
-            let refined_self_parameter_specialization =
-                self_parameter_specialization.map(|specialization| {
-                    let types: Box<[_]> = specialization
-                        .types(db)
-                        .iter()
-                        .copied()
-                        .map(|mapped_ty| {
-                            let without_unknown =
-                                mapped_ty.filter_union(db, |element| !element.is_unknown());
-                            let mapped_ty = if without_unknown.is_never() {
-                                mapped_ty
-                            } else {
-                                without_unknown
-                            };
-                            mapped_ty.promote(db)
-                        })
-                        .collect();
-                    Specialization::new(
-                        db,
-                        specialization.generic_context(db),
-                        types,
-                        specialization.materialization_kind(db),
-                        None,
-                    )
-                });
-            // Prefer extracting the class specialization from the resolved overload return type.
-            // Fall back to specialization inferred from annotated `self`, then to class-level
-            // type variable mappings from the overload specialization.
-            let specialization = if return_specialization_is_informative {
-                return_specialization
-            } else {
-                refined_self_parameter_specialization
-                    .or(return_specialization)
-                    .or_else(|| {
-                        overload
-                            .specialization
-                            .and_then(|s| s.restrict(db, class_context))
-                    })
-            };
-            let Some(specialization) = specialization else {
-                return;
-            };
-            combined = Some(match combined {
-                None => specialization,
-                Some(previous) => previous.combine(db, specialization),
-            });
-        };
-
-        // TODO this loops over all bindings, flattening union/intersection
-        // shape. As we improve our constraint solver, there may be an
-        // improvement needed here.
-        for binding in self.iter_flat() {
-            combine_binding_specialization(binding);
-        }
-
-        // Deferred downstream constructor bindings stay out-of-band for conditional validation.
-        // If all matched overloads are instance-returning, include inferred specializations from
-        // those deferred bindings as well.
-        for binding in self.iter_flat() {
-            let Some(downstream) = binding.downstream_constructor.as_ref() else {
-                continue;
-            };
-            if !downstream.all_matching_overloads_are_instance_returning(db, binding) {
-                continue;
-            }
-            for init_binding in downstream.bindings.iter_flat() {
-                combine_binding_specialization(init_binding);
-            }
-        }
-
-        // If constructor inference yields a specialization, rebuild the instance from the class's
-        // identity specialization so explicit aliases like `C[int]` can still be remapped by
-        // `__new__` return types (e.g. `C[list[T]]`).
-        if let Some(specialization) = combined {
-            let specialization =
-                specialization.apply_optional_specialization(db, Some(class_specialization));
-            if let Some(class_literal) = class_literal {
-                let remapped_class = class_literal.apply_specialization(db, |_| specialization);
-                return Some(Type::instance(db, remapped_class));
-            }
-            return Some(constructor_instance_type.apply_specialization(db, specialization));
-        }
-
-        // If constructor inference doesn't yield a specialization, fall back to the default
-        // specialization to avoid leaking inferable typevars in the constructed instance.
-        let specialization = class_context.default_specialization(db, None);
-        Some(constructor_instance_type.apply_specialization(db, specialization))
+        Some(Self::combine_constructor_return_type(
+            db,
+            constructor_instance_type,
+            bindings.iter().copied(),
+        ))
     }
 
     /// Returns the return type of the call. For successful calls, this is the actual return type.
@@ -1147,17 +1247,36 @@ impl<'db> Bindings<'db> {
         // - Single binding: use that binding's return type
         // - Multiple bindings (intersection): for intersections, only include
         //   successful bindings (failed ones have been filtered out by retain_successful)
-        let element_return_types = self.elements.iter().map(|element| {
-            if let [single_binding] = &*element.bindings {
-                single_binding.return_type()
-            } else {
-                // For intersections, intersect the return types of remaining bindings
-                IntersectionType::from_elements(
-                    db,
-                    element.bindings.iter().map(CallableBinding::return_type),
-                )
+        // Nested unions of constructor types flatten each class's `__new__` / `__init__`
+        // bindings into separate outer elements. Re-group them by constructed instance type so
+        // each constructor can merge its inferred specializations before we union the results.
+        let mut constructor_groups: ConstructorGroups<'_, 'db> = FxOrderMap::default();
+        let mut element_return_types = Vec::with_capacity(self.elements.len());
+
+        for element in &self.elements {
+            let element_return_type = element.return_type(db);
+            if let Some(constructor_instance_type) = element.constructor_instance_type() {
+                constructor_groups
+                    .entry(constructor_instance_type)
+                    .or_default()
+                    .push(element.bindings.iter(), element_return_type);
+                continue;
             }
-        });
+
+            element_return_types.push(element_return_type);
+        }
+
+        for (constructor_instance_type, group) in constructor_groups {
+            if let Some(group_return_type) = Self::constructor_return_type_for_bindings(
+                db,
+                constructor_instance_type,
+                group.bindings.iter().copied(),
+            ) {
+                element_return_types.push(group_return_type);
+            } else if let Some(preserved_return_type) = group.preserved_return_type {
+                element_return_types.push(preserved_return_type);
+            }
+        }
 
         // Union the return types of all elements
         UnionType::from_elements(db, element_return_types)
