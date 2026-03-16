@@ -1,6 +1,9 @@
 #![allow(clippy::disallowed_names)]
 use ruff_benchmark::criterion;
-use ruff_benchmark::real_world_projects::{InstalledProject, RealWorldProject};
+use ruff_benchmark::real_world_projects::{
+    InstalledProject, RealWorldProject, copy_directory_recursive, get_project_cache_dir,
+    install_dependencies_to_cache,
+};
 
 use std::fmt::Write;
 use std::ops::Range;
@@ -219,8 +222,39 @@ fn assert_diagnostics(db: &dyn Db, diagnostics: &[Diagnostic], expected: &[KeyDi
 }
 
 fn setup_micro_case(code: &str) -> Case {
+    setup_micro_case_inner(code, None)
+}
+
+fn setup_micro_case_with_dependencies(name: &str, dependencies: &[&str], code: &str) -> Case {
+    setup_micro_case_inner(code, Some((name, dependencies)))
+}
+
+fn setup_micro_case_inner(code: &str, dependencies: Option<(&str, &[&str])>) -> Case {
     let system = TestSystem::default();
     let fs = system.memory_file_system().clone();
+
+    let python = dependencies.map(|(name, dependencies)| {
+        let cache_dir = get_project_cache_dir(name).expect("Failed to get cache directory");
+        std::fs::create_dir_all(&cache_dir).expect("Failed to create cache directory");
+
+        let venv_path = cache_dir.join(".venv");
+        install_dependencies_to_cache(
+            name,
+            dependencies,
+            &venv_path,
+            PythonVersion::PY312,
+            "2025-06-17",
+        )
+        .expect("Failed to install dependencies");
+
+        // Copy the on-disk venv into the in-memory filesystem.
+        // ProjectMetadata::discover walks up from /src and uses / as the project root,
+        // so the venv must be at /.venv for the `python = ".venv"` option to resolve correctly.
+        copy_directory_recursive(&fs, &venv_path, SystemPath::new("/.venv"))
+            .expect("Failed to copy venv to memory filesystem");
+
+        RelativePathBuf::cli(SystemPath::new(".venv"))
+    });
 
     let file_path = "src/test.py";
     fs.write_file_all(
@@ -234,6 +268,7 @@ fn setup_micro_case(code: &str) -> Case {
     metadata.apply_options(Options {
         environment: Some(EnvironmentOptions {
             python_version: Some(RangedValue::cli(PythonVersion::PY312)),
+            python,
             ..EnvironmentOptions::default()
         }),
         ..Options::default()
@@ -777,6 +812,39 @@ fn benchmark_large_isinstance_narrowing(criterion: &mut Criterion) {
     });
 }
 
+fn benchmark_pandas_tdd(criterion: &mut Criterion) {
+    setup_rayon();
+
+    // This example was reported in https://github.com/astral-sh/ty/issues/3039.
+    criterion.bench_function("ty_micro[pandas_tdd]", |b| {
+        b.iter_batched_ref(
+            || {
+                setup_micro_case_with_dependencies(
+                    "pandas_tdd",
+                    &["pandas-stubs"],
+                    r#"
+                    import pandas as pd
+
+                    df = pd.DataFrame({
+                        "a": [1, 2, 3],
+                        "b": [4, 5, 6],
+                        "c": [7, 8, 9],
+                    })
+                    df["d"] = df["a"] + df["b"] + df["c"] + 1 + (
+                        df["a"] ** 2 + df["b"] ** 2 + df["c"] ** 2)
+                    "#,
+                )
+            },
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 struct ProjectBenchmark<'a> {
     project: InstalledProject<'a>,
     fs: MemoryFileSystem,
@@ -941,6 +1009,7 @@ criterion_group!(
     benchmark_very_large_tuple,
     benchmark_large_union_narrowing,
     benchmark_large_isinstance_narrowing,
+    benchmark_pandas_tdd,
 );
 criterion_group!(project, anyio, attrs, hydra, datetype);
 criterion_main!(check_file, micro, project);
