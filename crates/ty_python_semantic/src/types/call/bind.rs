@@ -557,8 +557,8 @@ impl<'db> BindingsElement<'db> {
 ///
 /// Constructor call handling must defer downstream checks (`__new__`/`__init__`) until call-time
 /// overload resolution determines whether an upstream return type is an instance of the class
-/// being constructed. A `CallableBindings` for a metaclass `__call__` method might have a
-/// `__new__` or `__init__` as downstream constructor; a `CallableBindings` for a `__new__` might
+/// being constructed. A `ConstructorBinding` for a metaclass `__call__` method might have a
+/// `__new__` or `__init__` as downstream constructor; a `ConstructorBinding` for a `__new__` might
 /// have `__init__` as downstream constructor.
 #[derive(Debug, Clone)]
 struct DownstreamConstructor<'db> {
