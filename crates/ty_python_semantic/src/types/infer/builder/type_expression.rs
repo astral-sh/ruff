@@ -1,13 +1,15 @@
 use itertools::Either;
-use ruff_python_ast as ast;
+use ruff_python_ast::{self as ast, PythonVersion};
 
 use super::{DeferredExpressionState, TypeInferenceBuilder};
-use crate::FxOrderSet;
+use crate::semantic_index::scope::ScopeKind;
 use crate::types::diagnostic::{
-    self, INVALID_TYPE_FORM, NOT_SUBSCRIPTABLE, UNBOUND_TYPE_VARIABLE,
-    report_invalid_argument_number_to_special_form, report_invalid_arguments_to_callable,
+    self, INVALID_TYPE_FORM, NOT_SUBSCRIPTABLE, UNBOUND_TYPE_VARIABLE, UNSUPPORTED_OPERATOR,
+    note_py_version_too_old_for_pep_604, report_invalid_argument_number_to_special_form,
+    report_invalid_arguments_to_callable,
 };
-use crate::types::infer::builder::{InferenceFlags, InnerExpressionInferenceState};
+use crate::types::infer::InferenceFlags;
+use crate::types::infer::builder::{InnerExpressionInferenceState, MultiInferenceState};
 use crate::types::signatures::Signature;
 use crate::types::special_form::{AliasSpec, LegacyStdlibAlias};
 use crate::types::string_annotation::parse_string_annotation;
@@ -18,6 +20,7 @@ use crate::types::{
     SpecialFormType, SubclassOfType, Type, TypeAliasType, TypeContext, TypeGuardType, TypeIsType,
     TypeMapping, TypeVarKind, UnionBuilder, UnionType, any_over_type, todo_type,
 };
+use crate::{FxOrderSet, Program, add_inferred_python_version_hint_to_diagnostic};
 
 /// Type expressions
 impl<'db> TypeInferenceBuilder<'db, '_> {
@@ -153,6 +156,144 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     ast::Operator::BitOr => {
                         let left_ty = self.infer_type_expression(&binary.left);
                         let right_ty = self.infer_type_expression(&binary.right);
+
+                        // Detect runtime errors from e.g. `int | "bytes"` on Python <3.14 without `__future__` annotations.
+                        if !self.deferred_state.is_deferred()
+                            && !self.scope.scope(self.db()).in_type_checking_block()
+                        {
+                            let previous_state =
+                                self.set_multi_inference_state(MultiInferenceState::Ignore);
+                            let was_in_multi_inference = self.context.set_multi_inference(true);
+                            // If the left-hand side of the union is itself a PEP-604 union,
+                            // we'll already have checked whether it can be used with `|` in a previous inference step
+                            // and emitted a diagnostic if it was appropriate. We should skip inferring it here to
+                            // avoid duplicate diagnostics; just assume that the l.h.s. is a `UnionType` instance
+                            // in that case.
+                            let left_type_value =
+                                self.infer_expression(&binary.left, TypeContext::default());
+                            let right_type_value =
+                                self.infer_expression(&binary.right, TypeContext::default());
+                            self.multi_inference_state = previous_state;
+                            self.context.set_multi_inference(was_in_multi_inference);
+
+                            let dunder_fails = Type::try_call_bin_op(
+                                self.db(),
+                                left_type_value,
+                                ast::Operator::BitOr,
+                                right_type_value,
+                            )
+                            .is_err();
+
+                            // As well as trying the normal dunder lookup,
+                            // we also check for the case where one of the operands is a class-literal type
+                            // or generic-alias type and the other is a string literal. The normal dunder lookup
+                            // fails to catch this error, since typeshed annotates `type.__(r)or__` as accepting `Any`.
+                            let should_emit_error = if dunder_fails {
+                                true
+                            } else {
+                                let literal = match (left_type_value, right_type_value) {
+                                    (Type::ClassLiteral(class), Type::LiteralValue(literal))
+                                    | (Type::LiteralValue(literal), Type::ClassLiteral(class))
+                                        if class.metaclass(self.db())
+                                            == KnownClass::Type.to_class_literal(self.db()) =>
+                                    {
+                                        Some(literal)
+                                    }
+                                    (Type::GenericAlias(_), Type::LiteralValue(literal))
+                                    | (Type::LiteralValue(literal), Type::GenericAlias(_)) => {
+                                        Some(literal)
+                                    }
+                                    _ => None,
+                                };
+                                literal.is_some_and(|literal| !literal.is_enum())
+                            };
+
+                            if should_emit_error
+                                && let Some(builder) =
+                                    self.context.report_lint(&UNSUPPORTED_OPERATOR, binary)
+                            {
+                                let mut diagnostic =
+                                    builder.into_diagnostic("Unsupported `|` operation");
+
+                                if left_type_value.is_equivalent_to(self.db(), right_type_value) {
+                                    diagnostic.set_primary_message(format_args!(
+                                        "Both operands have type `{}`",
+                                        left_type_value.display(self.db())
+                                    ));
+                                    diagnostic.set_concise_message(format_args!(
+                                        "Operator `|` is unsupported between \
+                                        two objects of type `{}`",
+                                        left_type_value.display(self.db())
+                                    ));
+                                } else {
+                                    for (operand, ty) in [
+                                        (&*binary.left, left_type_value),
+                                        (&*binary.right, right_type_value),
+                                    ] {
+                                        diagnostic.annotate(
+                                            self.context.secondary(operand).message(format_args!(
+                                                "Has type `{}`",
+                                                ty.display(self.db())
+                                            )),
+                                        );
+                                    }
+                                    diagnostic.set_concise_message(format_args!(
+                                        "Operator `|` is unsupported between \
+                                        objects of type `{}` and `{}`",
+                                        left_type_value.display(self.db()),
+                                        right_type_value.display(self.db())
+                                    ));
+                                }
+
+                                match self.scope.scope(self.db()).kind() {
+                                    ScopeKind::TypeAlias => diagnostic.info(
+                                        "A type alias scope is lazy but will be \
+                                        executed at runtime if the `__value__` property is \
+                                        accessed",
+                                    ),
+                                    ScopeKind::TypeParams => diagnostic.info(
+                                        "Type parameter scopes are lazy but may be \
+                                        executed at runtime if the `__bound__`, `__value__`
+                                        or `__constraints__` property of a type parameter is \
+                                        accessed",
+                                    ),
+                                    _ => {
+                                        let python_version =
+                                            Program::get(self.db()).python_version(self.db());
+
+                                        if python_version < PythonVersion::PY310
+                                            && !binary.left.is_string_literal_expr()
+                                            && !binary.right.is_string_literal_expr()
+                                        {
+                                            note_py_version_too_old_for_pep_604(
+                                                self.db(),
+                                                self.index,
+                                                &mut diagnostic,
+                                            );
+                                        } else if python_version < PythonVersion::PY314 {
+                                            diagnostic.info(
+                                                "All type expressions are evaluated at \
+                                                runtime by default on Python <3.14",
+                                            );
+                                            add_inferred_python_version_hint_to_diagnostic(
+                                                self.db(),
+                                                &mut diagnostic,
+                                                "inferring types",
+                                            );
+                                            if binary.left.is_string_literal_expr()
+                                                || binary.right.is_string_literal_expr()
+                                            {
+                                                diagnostic.help(
+                                                    "Put quotes around the whole union \
+                                                    rather than just certain elements",
+                                                );
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
                         UnionType::from_elements_leave_aliases(self.db(), [left_ty, right_ty])
                     }
                     // anything else is an invalid annotation:
@@ -777,11 +918,26 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
     /// Given the slice of a `type[]` annotation, return the type that the annotation represents
     fn infer_subclass_of_type_expression(&mut self, slice: &ast::Expr) -> Type<'db> {
+        let invalid_type_argument = |builder: &Self, slice: &ast::Expr| {
+            builder.report_invalid_type_expression(
+                slice,
+                "The argument to `type[]` must be a class object type",
+            );
+            SubclassOfType::subclass_of_unknown()
+        };
+
+        let infer_type_argument = |builder: &mut Self, slice: &ast::Expr| {
+            let slice_ty = builder.infer_type_expression(slice);
+            SubclassOfType::try_from_instance(builder.db(), slice_ty).unwrap_or_else(|| {
+                match slice_ty {
+                    Type::Callable(_) => invalid_type_argument(builder, slice),
+                    _ => todo_type!("unsupported type[X] special form"),
+                }
+            })
+        };
+
         match slice {
-            ast::Expr::Name(_) | ast::Expr::Attribute(_) => {
-                SubclassOfType::try_from_instance(self.db(), self.infer_type_expression(slice))
-                    .unwrap_or(todo_type!("unsupported type[X] special form"))
-            }
+            ast::Expr::Name(_) | ast::Expr::Attribute(_) => infer_type_argument(self, slice),
             ast::Expr::BinOp(binary) if binary.op == ast::Operator::BitOr => {
                 let union_ty = UnionType::from_elements_leave_aliases(
                     self.db(),
@@ -865,6 +1021,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                 }
                             }
                         }
+                    }
+                    Type::SpecialForm(special_form @ SpecialFormType::Callable) => {
+                        self.infer_parameterized_special_form_type_expression(
+                            subscript,
+                            special_form,
+                        );
+                        invalid_type_argument(self, slice)
                     }
                     _ => {
                         self.infer_type_expression(parameters);
@@ -1586,7 +1749,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 type_of_type
             }
 
-            SpecialFormType::CallableTypeOf => {
+            SpecialFormType::CallableTypeOf | SpecialFormType::RegularCallableTypeOf => {
                 let arguments = if let ast::Expr::Tuple(tuple) = arguments_slice {
                     &*tuple.elts
                 } else {
@@ -1613,9 +1776,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
                 let argument_type = self.infer_expression(&arguments[0], TypeContext::default());
 
-                let Some(callable_type) = argument_type
-                    .try_upcast_to_callable(db)
-                    .map(|callables| callables.into_type(self.db()))
+                let Some(callable_type) =
+                    argument_type.try_upcast_to_callable(db).map(|callables| {
+                        if special_form == SpecialFormType::RegularCallableTypeOf {
+                            callables
+                                .map(|callable| callable.into_regular(db))
+                                .into_type(db)
+                        } else {
+                            callables.into_type(db)
+                        }
+                    })
                 else {
                     if let Some(builder) = self
                         .context

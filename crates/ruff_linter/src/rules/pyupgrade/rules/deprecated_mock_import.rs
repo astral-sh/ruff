@@ -285,6 +285,7 @@ pub(crate) fn deprecated_mock_import(checker: &Checker, stmt: &Stmt) {
     match stmt {
         Stmt::Import(ast::StmtImport {
             names,
+            is_lazy: _,
             range: _,
             node_index: _,
         }) => {

@@ -3053,18 +3053,11 @@ class dict(MutableMapping[_KT, _VT]):
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
         """See PEP 585"""
 
-    @overload
-    def __or__(self, value: dict[_KT, _VT], /) -> dict[_KT, _VT]:
+    def __or__(self, value: dict[_T1, _T2], /) -> dict[_KT | _T1, _VT | _T2]:
         """Return self|value."""
 
-    @overload
-    def __or__(self, value: dict[_T1, _T2], /) -> dict[_KT | _T1, _VT | _T2]: ...
-    @overload
-    def __ror__(self, value: dict[_KT, _VT], /) -> dict[_KT, _VT]:
+    def __ror__(self, value: dict[_T1, _T2], /) -> dict[_KT | _T1, _VT | _T2]:
         """Return value|self."""
-
-    @overload
-    def __ror__(self, value: dict[_T1, _T2], /) -> dict[_KT | _T1, _VT | _T2]: ...
     # dict.__ior__ should be kept roughly in line with MutableMapping.update()
     @overload  # type: ignore[misc]
     def __ior__(self, value: SupportsKeysAndGetItem[_KT, _VT], /) -> Self:
@@ -3090,32 +3083,32 @@ class set(MutableSet[_T]):
     def copy(self) -> set[_T]:
         """Return a shallow copy of a set."""
 
-    def difference(self, *s: Iterable[Any]) -> set[_T]:
+    def difference(self, *s: Iterable[object]) -> set[_T]:
         """Return a new set with elements in the set that are not in the others."""
 
-    def difference_update(self, *s: Iterable[Any]) -> None:
+    def difference_update(self, *s: Iterable[object]) -> None:
         """Update the set, removing elements found in others."""
 
-    def discard(self, element: _T, /) -> None:
+    def discard(self, element: object, /) -> None:
         """Remove an element from a set if it is a member.
 
         Unlike set.remove(), the discard() method does not raise
         an exception when an element is missing from the set.
         """
 
-    def intersection(self, *s: Iterable[Any]) -> set[_T]:
+    def intersection(self, *s: Iterable[object]) -> set[_T]:
         """Return a new set with elements common to the set and all others."""
 
-    def intersection_update(self, *s: Iterable[Any]) -> None:
+    def intersection_update(self, *s: Iterable[object]) -> None:
         """Update the set, keeping only elements found in it and all others."""
 
-    def isdisjoint(self, s: Iterable[Any], /) -> bool:
+    def isdisjoint(self, s: Iterable[object], /) -> bool:
         """Return True if two sets have a null intersection."""
 
-    def issubset(self, s: Iterable[Any], /) -> bool:
+    def issubset(self, s: Iterable[object], /) -> bool:
         """Report whether another set contains this set."""
 
-    def issuperset(self, s: Iterable[Any], /) -> bool:
+    def issuperset(self, s: Iterable[object], /) -> bool:
         """Report whether this set contains another set."""
 
     def remove(self, element: _T, /) -> None:
@@ -3124,7 +3117,7 @@ class set(MutableSet[_T]):
         If the element is not a member, raise a KeyError.
         """
 
-    def symmetric_difference(self, s: Iterable[_T], /) -> set[_T]:
+    def symmetric_difference(self, s: Iterable[_S], /) -> set[_T | _S]:
         """Return a new set with elements in either the set or other but not both."""
 
     def symmetric_difference_update(self, s: Iterable[_T], /) -> None:
@@ -3195,7 +3188,7 @@ class frozenset(AbstractSet[_T_co]):
     def intersection(self, *s: Iterable[object]) -> frozenset[_T_co]:
         """Return a new set with elements common to the set and all others."""
 
-    def isdisjoint(self, s: Iterable[_T_co], /) -> bool:
+    def isdisjoint(self, s: Iterable[object], /) -> bool:
         """Return True if two sets have a null intersection."""
 
     def issubset(self, s: Iterable[object], /) -> bool:
@@ -3204,7 +3197,7 @@ class frozenset(AbstractSet[_T_co]):
     def issuperset(self, s: Iterable[object], /) -> bool:
         """Report whether this set contains another set."""
 
-    def symmetric_difference(self, s: Iterable[_T_co], /) -> frozenset[_T_co]:
+    def symmetric_difference(self, s: Iterable[_S], /) -> frozenset[_T_co | _S]:
         """Return a new set with elements in either the set or other but not both."""
 
     def union(self, *s: Iterable[_S]) -> frozenset[_T_co | _S]:
@@ -3219,7 +3212,7 @@ class frozenset(AbstractSet[_T_co]):
     def __iter__(self) -> Iterator[_T_co]:
         """Implement iter(self)."""
 
-    def __and__(self, value: AbstractSet[_T_co], /) -> frozenset[_T_co]:
+    def __and__(self, value: AbstractSet[object], /) -> frozenset[_T_co]:
         """Return self&value."""
 
     def __or__(self, value: AbstractSet[_S], /) -> frozenset[_T_co | _S]:

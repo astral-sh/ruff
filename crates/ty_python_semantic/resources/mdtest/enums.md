@@ -916,7 +916,8 @@ class Answer(Enum):
 
     def is_yes(self) -> bool:
         return self == Answer.YES
-    constant: int = 1  # error: [invalid-enum-member-annotation]
+
+    constant: int
 
 reveal_type(Answer.YES.is_yes())  # revealed: bool
 reveal_type(Answer.YES.constant)  # revealed: int
@@ -930,6 +931,22 @@ class MyAnswer(MyEnum):
     NO = 2
 
 reveal_type(MyAnswer.YES.some_method())  # revealed: None
+```
+
+## Accessing enum members from enum members / instances
+
+```py
+from enum import Enum
+
+class Answer(Enum):
+    YES = 1
+    NO = 2
+
+reveal_type(Answer.YES.NO)  # revealed: Literal[Answer.NO]
+
+def _(answer: Answer) -> None:
+    reveal_type(answer.YES)  # revealed: Literal[Answer.YES]
+    reveal_type(answer.NO)  # revealed: Literal[Answer.NO]
 ```
 
 ## Accessing enum members from `type[…]`

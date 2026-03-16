@@ -969,7 +969,7 @@ fn cli_all_rules_warn() -> anyhow::Result<()> {
 
 /// The "all" keyword can be overridden by subsequent specific rule settings
 #[test]
-fn cli_all_rules_with_override() -> anyhow::Result<()> {
+fn cli_all_rules_precedence() -> anyhow::Result<()> {
     let case = CliTest::with_file(
         "test.py",
         r#"
@@ -1212,6 +1212,93 @@ fn overrides_all_rules_with_rule_sorting_before_all() -> anyhow::Result<()> {
     info: rule `abstract-method-in-final-class` was selected in the configuration file
 
     Found 1 diagnostic
+
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
+/// Tests the `all` selector in an `overrides` section
+#[test]
+fn all_overrides() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        (
+            "pyproject.toml",
+            r#"
+            [tool.ty.rules]
+            all = "error"
+
+            [[tool.ty.overrides]]
+            include = ["tests/**"]
+
+            [tool.ty.overrides.rules]
+            unresolved-reference = "warn"
+            "#,
+        ),
+        (
+            "main.py",
+            r#"
+            y = 4 / 0  # division-by-zero: error (global)
+            x = 1
+            prin(x)    # unresolved-reference: error (global)
+            "#,
+        ),
+        (
+            "tests/test_main.py",
+            r#"
+            y = 4 / 0  # division-by-zero: error (global)
+            x = 1
+            prin(x)    # unresolved-reference: warn (override)
+            "#,
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(case.command(), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
+     --> main.py:2:5
+      |
+    2 | y = 4 / 0  # division-by-zero: error (global)
+      |     ^^^^^
+    3 | x = 1
+    4 | prin(x)    # unresolved-reference: error (global)
+      |
+    info: rule `division-by-zero` was selected in the configuration file
+
+    error[unresolved-reference]: Name `prin` used when not defined
+     --> main.py:4:1
+      |
+    2 | y = 4 / 0  # division-by-zero: error (global)
+    3 | x = 1
+    4 | prin(x)    # unresolved-reference: error (global)
+      | ^^^^
+      |
+    info: rule `unresolved-reference` was selected in the configuration file
+
+    error[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
+     --> tests/test_main.py:2:5
+      |
+    2 | y = 4 / 0  # division-by-zero: error (global)
+      |     ^^^^^
+    3 | x = 1
+    4 | prin(x)    # unresolved-reference: warn (override)
+      |
+    info: rule `division-by-zero` was selected in the configuration file
+
+    warning[unresolved-reference]: Name `prin` used when not defined
+     --> tests/test_main.py:4:1
+      |
+    2 | y = 4 / 0  # division-by-zero: error (global)
+    3 | x = 1
+    4 | prin(x)    # unresolved-reference: warn (override)
+      | ^^^^
+      |
+    info: rule `unresolved-reference` was selected in the configuration file
+
+    Found 4 diagnostics
 
     ----- stderr -----
     ");

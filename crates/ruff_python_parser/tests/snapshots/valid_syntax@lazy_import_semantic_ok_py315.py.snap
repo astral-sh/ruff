@@ -1,0 +1,176 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+---
+## AST
+
+```
+Module(
+    ModModule {
+        node_index: NodeIndex(None),
+        range: 0..173,
+        body: [
+            Import(
+                StmtImport {
+                    node_index: NodeIndex(None),
+                    range: 44..61,
+                    names: [
+                        Alias {
+                            range: 51..61,
+                            node_index: NodeIndex(None),
+                            name: Identifier {
+                                id: Name("contextlib"),
+                                range: 51..61,
+                                node_index: NodeIndex(None),
+                            },
+                            asname: None,
+                        },
+                    ],
+                    is_lazy: false,
+                },
+            ),
+            With(
+                StmtWith {
+                    node_index: NodeIndex(None),
+                    range: 62..111,
+                    is_async: false,
+                    items: [
+                        WithItem {
+                            range: 67..91,
+                            node_index: NodeIndex(None),
+                            context_expr: Call(
+                                ExprCall {
+                                    node_index: NodeIndex(None),
+                                    range: 67..91,
+                                    func: Attribute(
+                                        ExprAttribute {
+                                            node_index: NodeIndex(None),
+                                            range: 67..89,
+                                            value: Name(
+                                                ExprName {
+                                                    node_index: NodeIndex(None),
+                                                    range: 67..77,
+                                                    id: Name("contextlib"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            attr: Identifier {
+                                                id: Name("nullcontext"),
+                                                range: 78..89,
+                                                node_index: NodeIndex(None),
+                                            },
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    arguments: Arguments {
+                                        range: 89..91,
+                                        node_index: NodeIndex(None),
+                                        args: [],
+                                        keywords: [],
+                                    },
+                                },
+                            ),
+                            optional_vars: None,
+                        },
+                    ],
+                    body: [
+                        Import(
+                            StmtImport {
+                                node_index: NodeIndex(None),
+                                range: 97..111,
+                                names: [
+                                    Alias {
+                                        range: 109..111,
+                                        node_index: NodeIndex(None),
+                                        name: Identifier {
+                                            id: Name("os"),
+                                            range: 109..111,
+                                            node_index: NodeIndex(None),
+                                        },
+                                        asname: None,
+                                    },
+                                ],
+                                is_lazy: true,
+                            },
+                        ),
+                    ],
+                },
+            ),
+            With(
+                StmtWith {
+                    node_index: NodeIndex(None),
+                    range: 112..172,
+                    is_async: false,
+                    items: [
+                        WithItem {
+                            range: 117..141,
+                            node_index: NodeIndex(None),
+                            context_expr: Call(
+                                ExprCall {
+                                    node_index: NodeIndex(None),
+                                    range: 117..141,
+                                    func: Attribute(
+                                        ExprAttribute {
+                                            node_index: NodeIndex(None),
+                                            range: 117..139,
+                                            value: Name(
+                                                ExprName {
+                                                    node_index: NodeIndex(None),
+                                                    range: 117..127,
+                                                    id: Name("contextlib"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            attr: Identifier {
+                                                id: Name("nullcontext"),
+                                                range: 128..139,
+                                                node_index: NodeIndex(None),
+                                            },
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    arguments: Arguments {
+                                        range: 139..141,
+                                        node_index: NodeIndex(None),
+                                        args: [],
+                                        keywords: [],
+                                    },
+                                },
+                            ),
+                            optional_vars: None,
+                        },
+                    ],
+                    body: [
+                        ImportFrom(
+                            StmtImportFrom {
+                                node_index: NodeIndex(None),
+                                range: 147..172,
+                                module: Some(
+                                    Identifier {
+                                        id: Name("sys"),
+                                        range: 157..160,
+                                        node_index: NodeIndex(None),
+                                    },
+                                ),
+                                names: [
+                                    Alias {
+                                        range: 168..172,
+                                        node_index: NodeIndex(None),
+                                        name: Identifier {
+                                            id: Name("path"),
+                                            range: 168..172,
+                                            node_index: NodeIndex(None),
+                                        },
+                                        asname: None,
+                                    },
+                                ],
+                                level: 0,
+                                is_lazy: true,
+                            },
+                        ),
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```

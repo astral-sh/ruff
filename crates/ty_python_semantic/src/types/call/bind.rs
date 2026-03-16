@@ -1056,7 +1056,7 @@ impl<'db> Bindings<'db> {
                             } else {
                                 without_unknown
                             };
-                            mapped_ty.promote_literals(db)
+                            mapped_ty.promote(db)
                         })
                         .collect();
                     Specialization::new(
@@ -1857,11 +1857,20 @@ impl<'db> Bindings<'db> {
                             }
                         }
 
-                        Some(KnownFunction::IntoCallable) => {
+                        Some(
+                            into_callable @ (KnownFunction::IntoCallable
+                            | KnownFunction::IntoRegularCallable),
+                        ) => {
                             let [Some(ty)] = overload.parameter_types() else {
                                 continue;
                             };
-                            let Some(callables) = ty.try_upcast_to_callable(db) else {
+                            let Some(callables) = ty.try_upcast_to_callable(db).map(|callables| {
+                                if into_callable == KnownFunction::IntoRegularCallable {
+                                    callables.map(|callable| callable.into_regular(db))
+                                } else {
+                                    callables
+                                }
+                            }) else {
                                 continue;
                             };
                             overload.set_return_type(callables.into_type(db));
@@ -4472,7 +4481,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
         self.errors.extend(specialization_errors);
 
-        // Attempt to promote any literal types assigned to the specialization.
+        // Attempt to promote any promotable types assigned to the specialization.
         let maybe_promote = |typevar: BoundTypeVarInstance<'db>, ty: Type<'db>| {
             let bound_or_constraints = typevar.typevar(self.db).bound_or_constraints(self.db);
 
@@ -4507,7 +4516,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 return ty;
             }
 
-            let promoted = ty.promote_literals(self.db);
+            let promoted = ty.promote(self.db);
 
             // If the TypeVar has an upper bound, only use the promoted type if it
             // still satisfies the bound.

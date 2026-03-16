@@ -51,7 +51,7 @@ impl<'a> Benchmark<'a> {
             ..Options::default()
         });
 
-        let mut db = ProjectDatabase::new(metadata, system).unwrap();
+        let mut db = ProjectDatabase::fallible(metadata, system).unwrap();
 
         db.project().set_included_paths(
             &mut db,
@@ -128,7 +128,7 @@ static COLOUR_SCIENCE: Benchmark = Benchmark::new(
         max_dep_date: "2025-06-17",
         python_version: PythonVersion::PY310,
     },
-    400,
+    350,
 );
 
 static FREQTRADE: Benchmark = Benchmark::new(
@@ -215,7 +215,7 @@ static TANJUN: Benchmark = Benchmark::new(
         max_dep_date: "2025-06-17",
         python_version: PythonVersion::PY312,
     },
-    150,
+    120,
 );
 
 static STATIC_FRAME: Benchmark = Benchmark::new(
