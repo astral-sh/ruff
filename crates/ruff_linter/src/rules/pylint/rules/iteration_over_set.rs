@@ -9,12 +9,12 @@ use crate::checkers::ast::Checker;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
-/// Checks for iteration over a `set` literal where each element in the set is
-/// itself a literal value.
+/// Checks for iteration over a `set` literal in which each element is a type literal.
 ///
 /// ## Why is this bad?
-/// Iterating over a `set` is less efficient than iterating over a sequence
-/// type, like `list` or `tuple`.
+/// Evaluating a `set` literal for each iteration is less efficient than evaluating a 
+/// `list` literal for each iteration, which is less efficient than the one-time 
+/// evaluation of a `tuple` literal at the initialization of the iteration.
 ///
 /// ## Example
 /// ```python
@@ -28,8 +28,17 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///     ...
 /// ```
 ///
+/// Or use instead:
+/// ```python
+/// set_number = {1, 2, 3}  # Not a `set` literal, but a `set` variable.
+/// for number in set_number:
+///     ...
+/// ```
+///
 /// ## References
 /// - [Python documentation: `set`](https://docs.python.org/3/library/stdtypes.html#set)
+/// - [Python documentation: `list` and `tuple`](https://docs.python.org/3/library/stdtypes.html#sequence-types-list-tuple-range)
+/// - [Python documentation: Literal expressions](https://docs.python.org/3/reference/expressions.html#literals)
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.271")]
 pub(crate) struct IterationOverSet;
