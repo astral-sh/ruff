@@ -198,6 +198,10 @@ mod tests {
     #[test_case(Rule::NonPEP604AnnotationUnion, Path::new("UP007_2.py"))]
     #[test_case(Rule::NonPEP604AnnotationOptional, Path::new("UP045_2.py"))]
     fn preview_with_fa100_and_future_annotations_py310(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "{}_preview_with_fa100_and_future_annotations_py310",
+            path.to_string_lossy()
+        );
         let diagnostics = test_path(
             Path::new("pyupgrade").join(path).as_path(),
             &settings::LinterSettings {
@@ -210,7 +214,7 @@ mod tests {
                 ])
             },
         )?;
-        assert_diagnostics!(diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
