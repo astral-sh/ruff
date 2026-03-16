@@ -246,6 +246,19 @@ mod tests {
     }
 
     #[test]
+    fn quadratic_list_summation_py315() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("ruff/RUF017_0.py"),
+            &settings::LinterSettings {
+                unresolved_target_version: PythonVersion::PY315.into(),
+                ..settings::LinterSettings::for_rule(Rule::QuadraticListSummation)
+            },
+        )?;
+        assert_diagnostics!("PY315_RUF017_RUF017_0.py", diagnostics);
+        Ok(())
+    }
+
+    #[test]
     fn access_annotations_from_class_dict_py310() -> Result<()> {
         let diagnostics = test_path(
             Path::new("ruff/RUF063.py"),
@@ -654,6 +667,7 @@ mod tests {
     #[test_case(Rule::ImplicitClassVarInDataclass, Path::new("RUF045.py"))]
     #[test_case(Rule::FloatEqualityComparison, Path::new("RUF069.py"))]
     #[test_case(Rule::UnnecessaryAssignBeforeYield, Path::new("RUF070.py"))]
+    #[test_case(Rule::OsPathCommonprefix, Path::new("RUF071.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",

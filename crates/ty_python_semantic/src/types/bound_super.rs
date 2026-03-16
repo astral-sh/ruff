@@ -11,10 +11,10 @@ use crate::{
         BoundTypeVarInstance, ClassBase, ClassType, DynamicType, IntersectionBuilder, KnownClass,
         MemberLookupPolicy, NominalInstanceType, SpecialFormType, SubclassOfInner, SubclassOfType,
         Type, TypeVarBoundOrConstraints, UnionBuilder,
-        constraints::{ConstraintSet, ConstraintSetBuilder},
+        constraints::ConstraintSet,
         context::InferContext,
         diagnostic::{INVALID_SUPER_ARGUMENT, UNAVAILABLE_IMPLICIT_SUPER_ARGUMENTS},
-        relation::{HasRelationToVisitor, IsDisjointVisitor},
+        relation::EquivalenceChecker,
         todo_type,
         typevar::{TypeVarConstraints, TypeVarInstance},
         visitor,
@@ -740,98 +740,74 @@ impl<'db> BoundSuperType<'db> {
                 .recursive_type_normalized_impl(db, div, nested)?,
         ))
     }
+}
 
+impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
     /// Check whether two `BoundSuperType`s are equivalent by recursing into
     /// their fields.
     ///
-    /// Despite the name, this is called from `Type::has_relation_to_impl`,
-    /// not from `Type::is_equivalent_to_impl`. `Type::has_relation_to_impl`
-    /// cannot simply delegate to `Type::is_equivalent_to_impl` for this
-    /// case, because `Type::is_equivalent_to_impl` itself delegates back to
-    /// `Type::has_relation_to_impl`, which would cause an infinite loop.
-    pub(crate) fn is_equivalent_to_impl<'c>(
-        self,
+    /// This method is necessary because [`super::relation::TypeRelationChecker::check_type_pair`]
+    /// should only return an always-satisfied constraint set for two
+    /// `Type::BoundSuper` types if the two types are exactly equivalent. But
+    /// `TypeRelationChecker::check_type_pair` cannot simply delegate to
+    /// [`EquivalenceChecker::check_type_pair`] for this case, because
+    /// `EquivalenceChecker::check_type_pair` itself delegates back to
+    /// `TypeRelationChecker::check_type_pair`, which would cause an infinite loop.
+    pub(super) fn check_bound_super_pair(
+        &self,
         db: &'db dyn Db,
-        other: Self,
-        constraints: &'c ConstraintSetBuilder<'db>,
-        relation_visitor: &HasRelationToVisitor<'db, 'c>,
-        disjointness_visitor: &IsDisjointVisitor<'db, 'c>,
+        left: BoundSuperType<'db>,
+        right: BoundSuperType<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        let mut class_equivalence = match (self.pivot_class(db), other.pivot_class(db)) {
-            (ClassBase::Class(left), ClassBase::Class(right)) => Type::from(left)
-                .when_equivalent_to_impl(
-                    db,
-                    Type::from(right),
-                    constraints,
-                    relation_visitor,
-                    disjointness_visitor,
-                ),
-            (ClassBase::Class(_), _) => ConstraintSet::from_bool(constraints, false),
+        let mut class_equivalence = match (left.pivot_class(db), right.pivot_class(db)) {
+            (ClassBase::Class(left), ClassBase::Class(right)) => {
+                self.check_type_pair(db, Type::from(left), Type::from(right))
+            }
+
+            (ClassBase::Class(_), _) => self.never(),
 
             // A `Divergent` type is only equivalent to itself
             (
                 ClassBase::Dynamic(DynamicType::Divergent(l)),
                 ClassBase::Dynamic(DynamicType::Divergent(r)),
-            ) => ConstraintSet::from_bool(constraints, l == r),
+            ) => ConstraintSet::from_bool(self.constraints, l == r),
             (ClassBase::Dynamic(DynamicType::Divergent(_)), _)
-            | (_, ClassBase::Dynamic(DynamicType::Divergent(_))) => {
-                ConstraintSet::from_bool(constraints, false)
-            }
-            (ClassBase::Dynamic(_), ClassBase::Dynamic(_)) => {
-                ConstraintSet::from_bool(constraints, true)
-            }
-            (ClassBase::Dynamic(_), _) => ConstraintSet::from_bool(constraints, false),
+            | (_, ClassBase::Dynamic(DynamicType::Divergent(_))) => self.never(),
+            (ClassBase::Dynamic(_), ClassBase::Dynamic(_)) => self.always(),
+            (ClassBase::Dynamic(_), _) => self.never(),
 
-            (ClassBase::Generic, ClassBase::Generic) => ConstraintSet::from_bool(constraints, true),
-            (ClassBase::Generic, _) => ConstraintSet::from_bool(constraints, false),
+            (ClassBase::Generic, ClassBase::Generic) => self.always(),
+            (ClassBase::Generic, _) => self.never(),
 
-            (ClassBase::Protocol, ClassBase::Protocol) => {
-                ConstraintSet::from_bool(constraints, true)
-            }
-            (ClassBase::Protocol, _) => ConstraintSet::from_bool(constraints, false),
+            (ClassBase::Protocol, ClassBase::Protocol) => self.always(),
+            (ClassBase::Protocol, _) => self.never(),
 
-            (ClassBase::TypedDict, ClassBase::TypedDict) => {
-                ConstraintSet::from_bool(constraints, true)
-            }
-            (ClassBase::TypedDict, _) => ConstraintSet::from_bool(constraints, false),
+            (ClassBase::TypedDict, ClassBase::TypedDict) => self.always(),
+            (ClassBase::TypedDict, _) => self.never(),
         };
         if class_equivalence.is_never_satisfied(db) {
-            return ConstraintSet::from_bool(constraints, false);
+            return self.never();
         }
-        let owner_equivalence = match (self.owner(db), other.owner(db)) {
-            (SuperOwnerKind::Class(left), SuperOwnerKind::Class(right)) => Type::from(left)
-                .when_equivalent_to_impl(
-                    db,
-                    Type::from(right),
-                    constraints,
-                    relation_visitor,
-                    disjointness_visitor,
-                ),
-            (SuperOwnerKind::Class(_), _) => ConstraintSet::from_bool(constraints, false),
+        let owner_equivalence = match (left.owner(db), right.owner(db)) {
+            (SuperOwnerKind::Class(left), SuperOwnerKind::Class(right)) => {
+                self.check_type_pair(db, Type::from(left), Type::from(right))
+            }
+            (SuperOwnerKind::Class(_), _) => self.never(),
 
-            (SuperOwnerKind::Instance(left), SuperOwnerKind::Instance(right)) => Type::from(left)
-                .when_equivalent_to_impl(
-                    db,
-                    Type::from(right),
-                    constraints,
-                    relation_visitor,
-                    disjointness_visitor,
-                ),
-            (SuperOwnerKind::Instance(_), _) => ConstraintSet::from_bool(constraints, false),
+            (SuperOwnerKind::Instance(left), SuperOwnerKind::Instance(right)) => {
+                self.check_type_pair(db, Type::from(left), Type::from(right))
+            }
+            (SuperOwnerKind::Instance(_), _) => self.never(),
 
             // A `Divergent` type is only equivalent to itself
             (
                 SuperOwnerKind::Dynamic(DynamicType::Divergent(l)),
                 SuperOwnerKind::Dynamic(DynamicType::Divergent(r)),
-            ) => ConstraintSet::from_bool(constraints, l == r),
+            ) => ConstraintSet::from_bool(self.constraints, l == r),
             (SuperOwnerKind::Dynamic(DynamicType::Divergent(_)), _)
-            | (_, SuperOwnerKind::Dynamic(DynamicType::Divergent(_))) => {
-                ConstraintSet::from_bool(constraints, false)
-            }
-            (SuperOwnerKind::Dynamic(_), SuperOwnerKind::Dynamic(_)) => {
-                ConstraintSet::from_bool(constraints, true)
-            }
-            (SuperOwnerKind::Dynamic(_), _) => ConstraintSet::from_bool(constraints, false),
+            | (_, SuperOwnerKind::Dynamic(DynamicType::Divergent(_))) => self.never(),
+            (SuperOwnerKind::Dynamic(_), SuperOwnerKind::Dynamic(_)) => self.always(),
+            (SuperOwnerKind::Dynamic(_), _) => self.never(),
 
             (
                 SuperOwnerKind::InstanceTypeVar(l_typevar, l_class),
@@ -840,27 +816,16 @@ impl<'db> BoundSuperType<'db> {
             | (
                 SuperOwnerKind::ClassTypeVar(l_typevar, l_class),
                 SuperOwnerKind::ClassTypeVar(r_typevar, r_class),
-            ) => Type::TypeVar(l_typevar)
-                .when_equivalent_to_impl(
-                    db,
-                    Type::TypeVar(r_typevar),
-                    constraints,
-                    relation_visitor,
-                    disjointness_visitor,
-                )
-                .and(db, constraints, || {
-                    Type::from(l_class).when_equivalent_to_impl(
-                        db,
-                        Type::from(r_class),
-                        constraints,
-                        relation_visitor,
-                        disjointness_visitor,
-                    )
+            ) => self
+                .check_type_pair(db, Type::TypeVar(l_typevar), Type::TypeVar(r_typevar))
+                .and(db, self.constraints, || {
+                    self.check_type_pair(db, Type::from(l_class), Type::from(r_class))
                 }),
+
             (SuperOwnerKind::InstanceTypeVar(..) | SuperOwnerKind::ClassTypeVar(..), _) => {
-                ConstraintSet::from_bool(constraints, false)
+                self.never()
             }
         };
-        class_equivalence.intersect(db, constraints, owner_equivalence)
+        class_equivalence.intersect(db, self.constraints, owner_equivalence)
     }
 }

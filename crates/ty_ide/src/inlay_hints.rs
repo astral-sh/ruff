@@ -2669,7 +2669,7 @@ mod tests {
         a[: list[int]] = [1, 2]
         b[: list[int | float]] = [1.0, 2.0]
         c[: list[bool]] = [True, False]
-        d[: list[None]] = [None, None]
+        d[: list[None | Unknown]] = [None, None]
         e[: list[str]] = ["hel", "lo"]
         f[: list[str]] = ['the', 're']
         g[: list[str]] = [f"{ft}", f"{ft}"]
@@ -2729,7 +2729,7 @@ mod tests {
         3 | b[: list[int | float]] = [1.0, 2.0]
           |     ^^^^
         4 | c[: list[bool]] = [True, False]
-        5 | d[: list[None]] = [None, None]
+        5 | d[: list[None | Unknown]] = [None, None]
           |
 
         info[inlay-hint-location]: Inlay Hint Target
@@ -2748,7 +2748,7 @@ mod tests {
         3 | b[: list[int | float]] = [1.0, 2.0]
           |          ^^^
         4 | c[: list[bool]] = [True, False]
-        5 | d[: list[None]] = [None, None]
+        5 | d[: list[None | Unknown]] = [None, None]
           |
 
         info[inlay-hint-location]: Inlay Hint Target
@@ -2766,7 +2766,7 @@ mod tests {
         3 | b[: list[int | float]] = [1.0, 2.0]
           |                ^^^^^
         4 | c[: list[bool]] = [True, False]
-        5 | d[: list[None]] = [None, None]
+        5 | d[: list[None | Unknown]] = [None, None]
           |
 
         info[inlay-hint-location]: Inlay Hint Target
@@ -2784,7 +2784,7 @@ mod tests {
         3 | b[: list[int | float]] = [1.0, 2.0]
         4 | c[: list[bool]] = [True, False]
           |     ^^^^
-        5 | d[: list[None]] = [None, None]
+        5 | d[: list[None | Unknown]] = [None, None]
         6 | e[: list[str]] = ["hel", "lo"]
           |
 
@@ -2804,7 +2804,7 @@ mod tests {
         3 | b[: list[int | float]] = [1.0, 2.0]
         4 | c[: list[bool]] = [True, False]
           |          ^^^^
-        5 | d[: list[None]] = [None, None]
+        5 | d[: list[None | Unknown]] = [None, None]
         6 | e[: list[str]] = ["hel", "lo"]
           |
 
@@ -2821,7 +2821,7 @@ mod tests {
           |
         3 | b[: list[int | float]] = [1.0, 2.0]
         4 | c[: list[bool]] = [True, False]
-        5 | d[: list[None]] = [None, None]
+        5 | d[: list[None | Unknown]] = [None, None]
           |     ^^^^
         6 | e[: list[str]] = ["hel", "lo"]
         7 | f[: list[str]] = ['the', 're']
@@ -2841,8 +2841,28 @@ mod tests {
           |
         3 | b[: list[int | float]] = [1.0, 2.0]
         4 | c[: list[bool]] = [True, False]
-        5 | d[: list[None]] = [None, None]
+        5 | d[: list[None | Unknown]] = [None, None]
           |          ^^^^
+        6 | e[: list[str]] = ["hel", "lo"]
+        7 | f[: list[str]] = ['the', 're']
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+          --> stdlib/ty_extensions.pyi:14:1
+           |
+        13 | # Types
+        14 | Unknown: _SpecialForm
+           | ^^^^^^^
+        15 | AlwaysTruthy: _SpecialForm
+        16 | AlwaysFalsy: _SpecialForm
+           |
+        info: Source
+         --> main2.py:5:17
+          |
+        3 | b[: list[int | float]] = [1.0, 2.0]
+        4 | c[: list[bool]] = [True, False]
+        5 | d[: list[None | Unknown]] = [None, None]
+          |                 ^^^^^^^
         6 | e[: list[str]] = ["hel", "lo"]
         7 | f[: list[str]] = ['the', 're']
           |
@@ -2859,7 +2879,7 @@ mod tests {
          --> main2.py:6:5
           |
         4 | c[: list[bool]] = [True, False]
-        5 | d[: list[None]] = [None, None]
+        5 | d[: list[None | Unknown]] = [None, None]
         6 | e[: list[str]] = ["hel", "lo"]
           |     ^^^^
         7 | f[: list[str]] = ['the', 're']
@@ -2879,7 +2899,7 @@ mod tests {
          --> main2.py:6:10
           |
         4 | c[: list[bool]] = [True, False]
-        5 | d[: list[None]] = [None, None]
+        5 | d[: list[None | Unknown]] = [None, None]
         6 | e[: list[str]] = ["hel", "lo"]
           |          ^^^
         7 | f[: list[str]] = ['the', 're']
@@ -2897,7 +2917,7 @@ mod tests {
         info: Source
          --> main2.py:7:5
           |
-        5 | d[: list[None]] = [None, None]
+        5 | d[: list[None | Unknown]] = [None, None]
         6 | e[: list[str]] = ["hel", "lo"]
         7 | f[: list[str]] = ['the', 're']
           |     ^^^^
@@ -2917,7 +2937,7 @@ mod tests {
         info: Source
          --> main2.py:7:10
           |
-        5 | d[: list[None]] = [None, None]
+        5 | d[: list[None | Unknown]] = [None, None]
         6 | e[: list[str]] = ["hel", "lo"]
         7 | f[: list[str]] = ['the', 're']
           |          ^^^
@@ -3151,12 +3171,13 @@ mod tests {
         ---------------------------------------------
         info[inlay-hint-edit]: File after edits
         info: Source
+        from ty_extensions import Unknown
         from string.templatelib import Template
 
         a: list[int] = [1, 2]
         b: list[int | float] = [1.0, 2.0]
         c: list[bool] = [True, False]
-        d: list[None] = [None, None]
+        d: list[None | Unknown] = [None, None]
         e: list[str] = ["hel", "lo"]
         f: list[str] = ['the', 're']
         g: list[str] = [f"{ft}", f"{ft}"]
@@ -7214,21 +7235,20 @@ mod tests {
         );
 
         assert_snapshot!(test.inlay_hints(), @r#"
-
         def f(xyxy: object):
             if isinstance(xyxy, list):
                 x[: Top[list[Unknown]]] = xyxy
 
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:24:1
+          --> stdlib/ty_extensions.pyi:44:1
            |
-        22 | CallableTypeOf: _SpecialForm
-        23 |
-        24 | Top: _SpecialForm
+        42 | """
+        43 |
+        44 | Top: _SpecialForm
            | ^^^
-        25 | """
-        26 | `Top[T]` represents the "top materialization" of `T`.
+        45 | """
+        46 | `Top[T]` represents the "top materialization" of `T`.
            |
         info: Source
          --> main2.py:4:13

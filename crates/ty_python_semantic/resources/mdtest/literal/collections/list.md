@@ -38,6 +38,55 @@ reveal_type(x[0].__name__)  # revealed: str
 reveal_type([1, (1, 2), (1, 2, 3)])
 ```
 
+## None promotion
+
+`None` is promoted to `None | Unknown` in list literals when it is the only element type, so that
+the inferred type does not overly restrict subsequent mutations of the list.
+
+```py
+from typing import Sequence
+
+reveal_type([None])  # revealed: list[None | Unknown]
+reveal_type([1, None])  # revealed: list[int | None]
+reveal_type([(None,)])  # revealed: list[tuple[None | Unknown]]
+reveal_type([[None], [None]])  # revealed: list[list[None | Unknown]]
+
+x: list[int | None] = [None]
+reveal_type(x)  # revealed: list[int | None]
+
+y: list[tuple[int | None, ...]] = [(None,)]
+reveal_type(y)  # revealed: list[tuple[int | None, ...]]
+
+z: list[Sequence[int | str | None]] = [(None,), [None], (None, None)]
+reveal_type(z)  # revealed: list[Sequence[int | str | None]]
+
+xx: list[None] = reveal_type([None])  # revealed: list[None]
+reveal_type(xx)  # revealed: list[None]
+
+yy = reveal_type([None])  # revealed: list[None | Unknown]
+reveal_type(yy)  # revealed: list[None | Unknown]
+
+# Bare `list` in a type expression is equivalent to `list[Unknown]`
+zz: list = [None]
+reveal_type(zz)  # revealed: list[Unknown]
+
+# Promotion only happens if we're in invariant contexts,
+# same as with `Literal` types:
+reveal_type((1, 2, None))  # revealed: tuple[Literal[1], Literal[2], None]
+reveal_type(((((None,),),),))  # revealed: tuple[tuple[tuple[tuple[None]]]]
+reveal_type((((([None],),),),))  # revealed: tuple[tuple[tuple[tuple[list[None | Unknown]]]]]
+
+class Foo:
+    def __init__(self):
+        self.mylist = [None, None, None]
+
+    def method(self):
+        self.mylist[0] = 42
+
+# TODO: could be `list[None | Unknown]`
+reveal_type(Foo().mylist)  # revealed: Unknown | list[None | Unknown]
+```
+
 ## List comprehensions
 
 ```py

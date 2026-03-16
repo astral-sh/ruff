@@ -32,7 +32,7 @@ pub(crate) fn check_function_definition<'db>(
         return;
     };
 
-    let last_definition = function_type.literal(db).last_definition(db);
+    let last_definition = function_type.literal(db).last_definition;
     let signature = last_definition.raw_signature(db);
 
     check_legacy_positional_only_convention(context, last_definition, &signature);

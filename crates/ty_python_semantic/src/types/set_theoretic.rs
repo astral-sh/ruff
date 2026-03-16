@@ -841,7 +841,7 @@ pub enum RecursivelyDefined {
 }
 
 impl RecursivelyDefined {
-    const fn is_yes(self) -> bool {
+    pub(crate) const fn is_yes(self) -> bool {
         matches!(self, RecursivelyDefined::Yes)
     }
 

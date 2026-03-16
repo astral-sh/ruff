@@ -4,41 +4,31 @@ This repository contains both Ruff (a Python linter and formatter) and ty (a Pyt
 
 ## Running Tests
 
-Run all tests (using `nextest` for faster execution):
+Run all tests (using `nextest` for faster execution, setting `CARGO_PROFILE_DEV_OPT_LEVEL=1` to enable optimizations while retaining debug info, and setting `INSTA_FORCE_PASS=1 INSTA_UPDATE=always` to ensure all snapshots are updated):
 
 ```sh
-cargo nextest run
-```
-
-For faster test execution, use the `fast-test` profile which enables optimizations while retaining debug info:
-
-```sh
-cargo nextest run --cargo-profile fast-test
+CARGO_PROFILE_DEV_OPT_LEVEL=1 INSTA_FORCE_PASS=1 INSTA_UPDATE=always cargo nextest run
 ```
 
 Run tests for a specific crate:
 
 ```sh
-cargo nextest run -p ty_python_semantic
+CARGO_PROFILE_DEV_OPT_LEVEL=1 INSTA_FORCE_PASS=1 INSTA_UPDATE=always cargo nextest run -p ty_python_semantic
 ```
 
-Run a single mdtest file:
+Run a single mdtest file. The path to the mdtest file should be relative to the `crates/ty_python_semantic/resources/mdtest` folder:
 
 ```sh
-cargo nextest run -p ty_python_semantic --test mdtest -- mdtest::<path/to/mdtest_file.md>
+CARGO_PROFILE_DEV_OPT_LEVEL=1 INSTA_FORCE_PASS=1 INSTA_UPDATE=always cargo nextest run -p ty_python_semantic -- mdtest::<path/to/mdtest_file.md>
 ```
 
 To run a specific mdtest within a file, use a substring of the Markdown header text as `MDTEST_TEST_FILTER`. Only use this if it's necessary to isolate a single test case:
 
 ```sh
-MDTEST_TEST_FILTER="<filter>" cargo nextest run -p ty_python_semantic --test mdtest -- mdtest::<path/to/mdtest_file.md>
+MDTEST_TEST_FILTER="<filter>" CARGO_PROFILE_DEV_OPT_LEVEL=1 INSTA_FORCE_PASS=1 INSTA_UPDATE=always cargo nextest run -p ty_python_semantic -- mdtest::<path/to/mdtest_file.md>
 ```
 
-Update snapshots after running tests:
-
-```sh
-cargo insta accept
-```
+After running the tests, always review the contents of any snapshots that have been added or updated.
 
 ## Running Clippy
 
@@ -62,7 +52,7 @@ Run ty:
 cargo run --bin ty -- check path/to/file.py
 ```
 
-## Reproducing ty ecosystem changes
+## Reproducing and minimizing ty ecosystem changes
 
 If asked to reproduce changes in the ty ecosystem, use this script to clone the project to some
 directory and install its dependencies into `.venv`:
@@ -70,6 +60,8 @@ directory and install its dependencies into `.venv`:
 ```sh
 uv run scripts/setup_primer_project.py <project-name> <some-temp-dir>
 ```
+
+If asked to *minimize* a change in the ty ecosystem, you should start off with the above command to ensure that the change reproduces. You should then attempt to minimize the Python code required to demonstrate a behaviour difference between ty on your feature branch and ty on the main branch. Your minimization process should consist of systematically removing files from the cloned ecosystem project, and stripping content from existing files, until the behaviour difference between your branch and `main` no longer reproduces.
 
 ## Pull Requests
 

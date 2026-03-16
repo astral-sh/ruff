@@ -2,7 +2,7 @@
 source: crates/ruff_db/src/diagnostic/render/full.rs
 expression: env.render(&diagnostic)
 ---
-error[unused-import][*]: `os` imported but unused
+error[F401][*]: `os` imported but unused
  --> notebook.ipynb:cell 1:2:8
   |
 1 | # cell 1
