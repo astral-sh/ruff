@@ -75,16 +75,16 @@ enum CallErrorPriority {
 
 /// A single element in a union of callables.
 /// This could be a single callable or an intersection of callables.
-/// If there are multiple alternatives, they form an intersection.
+/// If there are multiple items, they form an intersection.
 #[derive(Debug, Clone)]
 struct BindingsElement<'db> {
-    /// The semantic call alternatives for this element.
-    /// If there are multiple alternatives, they form an intersection.
-    alternatives: SmallVec<[CallAlternative<'db>; 1]>,
+    /// The semantic call items for this element.
+    /// If there are multiple items, they form an intersection.
+    items: SmallVec<[CallableItem<'db>; 1]>,
 }
 
 #[derive(Debug, Clone)]
-enum CallAlternative<'db> {
+enum CallableItem<'db> {
     Regular(CallableBinding<'db>),
     Constructor(ConstructorBinding<'db>),
 }
@@ -173,7 +173,7 @@ impl<'db> ConstructorBinding<'db> {
             // `init_binding.match_parameters` handles its own bound-`self` insertion, so pass the
             // original call arguments here.
             let mut init_forms = ArgumentForms::new(arguments.len());
-            for init_binding in downstream.bindings.iter_semantic_alternatives_mut() {
+            for init_binding in downstream.bindings.iter_semantic_items_mut() {
                 init_binding.match_parameters(
                     db,
                     arguments,
@@ -282,25 +282,25 @@ impl<'db> ConstructorBinding<'db> {
     }
 }
 
-impl<'db> CallAlternative<'db> {
+impl<'db> CallableItem<'db> {
     fn callable(&self) -> &CallableBinding<'db> {
         match self {
-            CallAlternative::Regular(binding) => binding,
-            CallAlternative::Constructor(binding) => binding.callable(),
+            CallableItem::Regular(binding) => binding,
+            CallableItem::Constructor(binding) => binding.callable(),
         }
     }
 
     fn callable_mut(&mut self) -> &mut CallableBinding<'db> {
         match self {
-            CallAlternative::Regular(binding) => binding,
-            CallAlternative::Constructor(binding) => binding.callable_mut(),
+            CallableItem::Regular(binding) => binding,
+            CallableItem::Constructor(binding) => binding.callable_mut(),
         }
     }
 
     fn return_type(&self, db: &'db dyn Db) -> Type<'db> {
         match self {
-            CallAlternative::Regular(binding) => binding.return_type(),
-            CallAlternative::Constructor(binding) => binding.return_type(db),
+            CallableItem::Regular(binding) => binding.return_type(),
+            CallableItem::Constructor(binding) => binding.return_type(db),
         }
     }
 
@@ -312,10 +312,10 @@ impl<'db> CallAlternative<'db> {
         call_expression_tcx: TypeContext<'db>,
     ) -> Option<ArgumentForms> {
         match self {
-            CallAlternative::Regular(binding) => {
+            CallableItem::Regular(binding) => {
                 binding.check_types(db, constraints, argument_types, None, call_expression_tcx)
             }
-            CallAlternative::Constructor(binding) => {
+            CallableItem::Constructor(binding) => {
                 binding.check_types(db, constraints, argument_types, call_expression_tcx)
             }
         }
@@ -329,10 +329,10 @@ impl<'db> CallAlternative<'db> {
         constructor_instance_type: Option<Type<'db>>,
     ) {
         match self {
-            CallAlternative::Regular(binding) => {
+            CallableItem::Regular(binding) => {
                 binding.match_parameters(db, arguments, argument_forms, constructor_instance_type);
             }
-            CallAlternative::Constructor(binding) => {
+            CallableItem::Constructor(binding) => {
                 binding.match_parameters(db, arguments, argument_forms);
             }
         }
@@ -347,8 +347,8 @@ impl<'db> CallAlternative<'db> {
         dataclass_field_specifiers: &[Type<'db>],
     ) -> bool {
         match self {
-            CallAlternative::Regular(_) => false,
-            CallAlternative::Constructor(binding) => binding.check_downstream_constructor(
+            CallableItem::Regular(_) => false,
+            CallableItem::Constructor(binding) => binding.check_downstream_constructor(
                 db,
                 constraints,
                 argument_types,
@@ -360,8 +360,8 @@ impl<'db> CallAlternative<'db> {
 
     fn checked_downstream_constructor_bindings(&self, db: &'db dyn Db) -> Option<&Bindings<'db>> {
         match self {
-            CallAlternative::Regular(_) => None,
-            CallAlternative::Constructor(binding) => {
+            CallableItem::Regular(_) => None,
+            CallableItem::Constructor(binding) => {
                 binding.checked_downstream_constructor_bindings(db)
             }
         }
@@ -369,22 +369,22 @@ impl<'db> CallAlternative<'db> {
 
     fn type_context_reverse_inference_return_ty(&self) -> Option<Type<'db>> {
         match self {
-            CallAlternative::Regular(_) => None,
-            CallAlternative::Constructor(binding) => binding.entry_constructor_instance_type(),
+            CallableItem::Regular(_) => None,
+            CallableItem::Constructor(binding) => binding.entry_constructor_instance_type(),
         }
     }
 
     fn as_constructor(&self) -> Option<&ConstructorBinding<'db>> {
         match self {
-            CallAlternative::Regular(_) => None,
-            CallAlternative::Constructor(binding) => Some(binding),
+            CallableItem::Regular(_) => None,
+            CallableItem::Constructor(binding) => Some(binding),
         }
     }
 
     fn as_constructor_mut(&mut self) -> Option<&mut ConstructorBinding<'db>> {
         match self {
-            CallAlternative::Regular(_) => None,
-            CallAlternative::Constructor(binding) => Some(binding),
+            CallableItem::Regular(_) => None,
+            CallableItem::Constructor(binding) => Some(binding),
         }
     }
 
@@ -423,58 +423,56 @@ impl<'db> CallAlternative<'db> {
     fn map(
         self,
         f: impl FnOnce(CallableBinding<'db>) -> CallableBinding<'db>,
-    ) -> CallAlternative<'db> {
+    ) -> CallableItem<'db> {
         match self {
-            CallAlternative::Regular(binding) => CallAlternative::Regular(f(binding)),
-            CallAlternative::Constructor(binding) => CallAlternative::Constructor(binding.map(f)),
+            CallableItem::Regular(binding) => CallableItem::Regular(f(binding)),
+            CallableItem::Constructor(binding) => CallableItem::Constructor(binding.map(f)),
         }
     }
 
-    fn into_constructor(self, constructed_instance_type: Type<'db>) -> CallAlternative<'db> {
+    fn into_constructor(self, constructed_instance_type: Type<'db>) -> CallableItem<'db> {
         match self {
-            CallAlternative::Regular(binding) => CallAlternative::Constructor(ConstructorBinding {
+            CallableItem::Regular(binding) => CallableItem::Constructor(ConstructorBinding {
                 entry: binding,
                 constructed_instance_type,
                 constructor_kind: ConstructorCallableKind::Regular,
                 downstream_constructor: None,
             }),
-            CallAlternative::Constructor(mut binding) => {
+            CallableItem::Constructor(mut binding) => {
                 binding.constructed_instance_type = constructed_instance_type;
-                CallAlternative::Constructor(binding)
+                CallableItem::Constructor(binding)
             }
         }
     }
 }
 
 impl<'db> BindingsElement<'db> {
-    fn alternatives(&self) -> impl Iterator<Item = &CallAlternative<'db>> {
-        self.alternatives.iter()
+    fn items(&self) -> impl Iterator<Item = &CallableItem<'db>> {
+        self.items.iter()
     }
 
-    fn alternatives_mut(&mut self) -> impl Iterator<Item = &mut CallAlternative<'db>> {
-        self.alternatives.iter_mut()
+    fn items_mut(&mut self) -> impl Iterator<Item = &mut CallableItem<'db>> {
+        self.items.iter_mut()
     }
 
     fn callables(&self) -> impl Iterator<Item = &CallableBinding<'db>> {
-        self.alternatives.iter().map(CallAlternative::callable)
+        self.items.iter().map(CallableItem::callable)
     }
 
     fn callables_mut(&mut self) -> impl Iterator<Item = &mut CallableBinding<'db>> {
-        self.alternatives
-            .iter_mut()
-            .map(CallAlternative::callable_mut)
+        self.items.iter_mut().map(CallableItem::callable_mut)
     }
 
     /// Returns true if this element is an intersection of multiple callables.
     fn is_intersection(&self) -> bool {
-        self.alternatives.len() > 1
+        self.items.len() > 1
     }
 
     fn return_type(&self, db: &'db dyn Db) -> Type<'db> {
         let binding_return_types = self
-            .alternatives
+            .items
             .iter()
-            .map(|alternative| alternative.return_type(db))
+            .map(|item| item.return_type(db))
             .collect::<Vec<_>>();
 
         match binding_return_types.as_slice() {
@@ -493,9 +491,9 @@ impl<'db> BindingsElement<'db> {
     ) -> Option<ArgumentForms> {
         let mut result = ArgumentForms::default();
         let mut any_forms = false;
-        for alternative in &mut self.alternatives {
+        for item in &mut self.items {
             if let Some(forms) =
-                alternative.check_types(db, constraints, argument_types, call_expression_tcx)
+                item.check_types(db, constraints, argument_types, call_expression_tcx)
             {
                 result.merge(&forms);
                 any_forms = true;
@@ -509,7 +507,7 @@ impl<'db> BindingsElement<'db> {
     /// When all bindings fail, returns the error from the highest-priority binding.
     fn as_result(&self) -> Result<(), CallErrorKind> {
         // If any binding succeeds, the element succeeds
-        if self.alternatives.iter().any(|b| b.as_result().is_ok()) {
+        if self.items.iter().any(|b| b.as_result().is_ok()) {
             return Ok(());
         }
 
@@ -518,7 +516,7 @@ impl<'db> BindingsElement<'db> {
 
         // Return the error from the first binding with the highest priority
         Err(self
-            .alternatives
+            .items
             .iter()
             .find(|b| b.error_priority() == max_priority)
             .map(|b| b.as_result().unwrap_err())
@@ -534,25 +532,24 @@ impl<'db> BindingsElement<'db> {
     /// there is a callable with the right parameters to match the call.)
     fn retain_successful(&mut self) {
         if self.is_intersection() && self.as_result().is_ok() {
-            self.alternatives.retain(|alternative| {
-                alternative.as_result().is_ok()
-                    || alternative.error_priority() == CallErrorPriority::TopCallable
+            self.items.retain(|item| {
+                item.as_result().is_ok() || item.error_priority() == CallErrorPriority::TopCallable
             });
         }
     }
 
     /// Returns the error priority for this element (used when all bindings failed).
     fn error_priority(&self) -> CallErrorPriority {
-        self.alternatives
+        self.items
             .iter()
-            .map(CallAlternative::error_priority)
+            .map(CallableItem::error_priority)
             .max()
             .unwrap_or(CallErrorPriority::NotCallable)
     }
 
     /// Returns true if any binding in this element is callable.
     fn is_callable(&self) -> bool {
-        self.alternatives.iter().any(CallAlternative::is_callable)
+        self.items.iter().any(CallableItem::is_callable)
     }
 }
 
@@ -767,10 +764,10 @@ pub(crate) struct Bindings<'db> {
 impl<'db> Bindings<'db> {
     fn set_constructor_instance_type_in_place(&mut self, constructor_instance_type: Type<'db>) {
         for element in &mut self.elements {
-            for alternative in &mut element.alternatives {
-                match alternative {
-                    CallAlternative::Regular(_) => {}
-                    CallAlternative::Constructor(binding) => {
+            for item in &mut element.items {
+                match item {
+                    CallableItem::Regular(_) => {}
+                    CallableItem::Constructor(binding) => {
                         binding.constructed_instance_type = constructor_instance_type;
 
                         // Deferred downstream constructor bindings still need constructor instance
@@ -793,9 +790,9 @@ impl<'db> Bindings<'db> {
         generic_context: GenericContext<'db>,
     ) {
         for element in &mut self.elements {
-            for alternative in &mut element.alternatives {
-                match alternative {
-                    CallAlternative::Regular(binding) => {
+            for item in &mut element.items {
+                match item {
+                    CallableItem::Regular(binding) => {
                         for overload in &mut binding.overloads {
                             overload.signature.generic_context = GenericContext::merge_optional(
                                 db,
@@ -804,7 +801,7 @@ impl<'db> Bindings<'db> {
                             );
                         }
                     }
-                    CallAlternative::Constructor(binding) => {
+                    CallableItem::Constructor(binding) => {
                         for overload in &mut binding.entry.overloads {
                             overload.signature.generic_context = GenericContext::merge_optional(
                                 db,
@@ -863,19 +860,19 @@ impl<'db> Bindings<'db> {
         // Flatten all input bindings into a single intersection element
         let mut implicit_dunder_new_is_possibly_unbound = true;
         let mut implicit_dunder_init_is_possibly_unbound = true;
-        let mut inner_alternatives_acc = SmallVec::new();
+        let mut inner_items_acc = SmallVec::new();
 
         for set in bindings_iter {
             implicit_dunder_new_is_possibly_unbound &= set.implicit_dunder_new_is_possibly_unbound;
             implicit_dunder_init_is_possibly_unbound &=
                 set.implicit_dunder_init_is_possibly_unbound;
             for element in set.elements {
-                inner_alternatives_acc.extend(element.alternatives);
+                inner_items_acc.extend(element.items);
             }
         }
-        assert!(!inner_alternatives_acc.is_empty());
+        assert!(!inner_items_acc.is_empty());
         let elements = smallvec![BindingsElement {
-            alternatives: inner_alternatives_acc,
+            items: inner_items_acc,
         }];
         Self {
             callable_type,
@@ -900,9 +897,9 @@ impl<'db> Bindings<'db> {
         constructor_instance_type: Type<'db>,
     ) -> Self {
         for element in &mut self.elements {
-            element.alternatives = std::mem::take(&mut element.alternatives)
+            element.items = std::mem::take(&mut element.items)
                 .into_iter()
-                .map(|alternative| alternative.into_constructor(constructor_instance_type))
+                .map(|item| item.into_constructor(constructor_instance_type))
                 .collect();
         }
 
@@ -927,14 +924,14 @@ impl<'db> Bindings<'db> {
         class_literal: ClassLiteral<'db>,
         bindings: &Bindings<'db>,
     ) {
-        for alternative in self.iter_semantic_alternatives_mut() {
-            alternative.set_downstream_constructor(class_literal, bindings);
+        for item in self.iter_semantic_items_mut() {
+            item.set_downstream_constructor(class_literal, bindings);
         }
     }
 
     pub(crate) fn set_constructor_kind(&mut self, constructor_kind: ConstructorCallableKind) {
-        for alternative in self.iter_semantic_alternatives_mut() {
-            alternative.set_constructor_kind(constructor_kind);
+        for item in self.iter_semantic_items_mut() {
+            item.set_constructor_kind(constructor_kind);
         }
     }
 
@@ -983,16 +980,14 @@ impl<'db> Bindings<'db> {
             .flat_map(BindingsElement::callables_mut)
     }
 
-    fn iter_semantic_alternatives(&self) -> impl Iterator<Item = &CallAlternative<'db>> {
-        self.elements.iter().flat_map(BindingsElement::alternatives)
+    fn iter_semantic_items(&self) -> impl Iterator<Item = &CallableItem<'db>> {
+        self.elements.iter().flat_map(BindingsElement::items)
     }
 
-    fn iter_semantic_alternatives_mut(
-        &mut self,
-    ) -> impl Iterator<Item = &mut CallAlternative<'db>> {
+    fn iter_semantic_items_mut(&mut self) -> impl Iterator<Item = &mut CallableItem<'db>> {
         self.elements
             .iter_mut()
-            .flat_map(BindingsElement::alternatives_mut)
+            .flat_map(BindingsElement::items_mut)
     }
 
     fn collect_type_context_callables<'a>(
@@ -1000,13 +995,13 @@ impl<'db> Bindings<'db> {
         db: &'db dyn Db,
         out: &mut Vec<(&'a CallableBinding<'db>, Option<Type<'db>>)>,
     ) {
-        for alternative in self.iter_semantic_alternatives() {
+        for item in self.iter_semantic_items() {
             out.push((
-                alternative.callable(),
-                alternative.type_context_reverse_inference_return_ty(),
+                item.callable(),
+                item.type_context_reverse_inference_return_ty(),
             ));
 
-            if let Some(bindings) = alternative.checked_downstream_constructor_bindings(db) {
+            if let Some(bindings) = item.checked_downstream_constructor_bindings(db) {
                 bindings.collect_type_context_callables(db, out);
             }
         }
@@ -1014,6 +1009,13 @@ impl<'db> Bindings<'db> {
 
     /// Returns the callables that should contribute argument type context, including deferred
     /// constructor callables whose checks are enabled by the matched upstream overload.
+    ///
+    /// The second element of the return tuple is the return type to use for reverse inference from
+    /// type context (so that in e.g. `x2: X[int | None] = X(1)` where `X` is generic over `T`, we
+    /// can take `int | None` as a constraint in solving for `T`). If `None` (for most callables),
+    /// we will use the annotated return type of matching overloads, but `__init__` constructors
+    /// require an override to use the constructed instance type, not the annotated (likely `None`)
+    /// return.
     pub(crate) fn iter_type_context_callables(
         &self,
         db: &'db dyn Db,
@@ -1060,11 +1062,7 @@ impl<'db> Bindings<'db> {
                 .elements
                 .into_iter()
                 .map(|elem| BindingsElement {
-                    alternatives: elem
-                        .alternatives
-                        .into_iter()
-                        .map(|alternative| alternative.map(&f))
-                        .collect(),
+                    items: elem.items.into_iter().map(|item| item.map(&f)).collect(),
                 })
                 .collect(),
         }
@@ -1073,8 +1071,8 @@ impl<'db> Bindings<'db> {
     fn shared_constructor_instance_type(&self) -> Option<Type<'db>> {
         let mut shared = None;
 
-        for alternative in self.iter_semantic_alternatives() {
-            let constructor = alternative.as_constructor()?;
+        for item in self.iter_semantic_items() {
+            let constructor = item.as_constructor()?;
             if let Some(existing) = shared {
                 if existing != constructor.constructed_instance_type {
                     return None;
@@ -1102,8 +1100,8 @@ impl<'db> Bindings<'db> {
         arguments: &CallArguments<'_, 'db>,
     ) -> Self {
         let mut argument_forms = ArgumentForms::new(arguments.len());
-        for alternative in self.iter_semantic_alternatives_mut() {
-            alternative.match_parameters(db, arguments, &mut argument_forms, None);
+        for item in self.iter_semantic_items_mut() {
+            item.match_parameters(db, arguments, &mut argument_forms, None);
         }
         argument_forms.shrink_to_fit();
         self.argument_forms = argument_forms;
@@ -1173,8 +1171,8 @@ impl<'db> Bindings<'db> {
         // For constructor bindings with deferred downstream checks: validate downstream bindings
         // if the matched overload is instance-returning.
         let mut init_error = false;
-        for alternative in self.iter_semantic_alternatives_mut() {
-            if alternative.check_downstream_constructor(
+        for item in self.iter_semantic_items_mut() {
+            if item.check_downstream_constructor(
                 db,
                 constraints,
                 argument_types,
@@ -1233,7 +1231,7 @@ impl<'db> Bindings<'db> {
     /// Returns true if this is a single callable (not a union or intersection).
     pub(crate) fn is_single(&self) -> bool {
         match &*self.elements {
-            [single] => single.alternatives.len() == 1,
+            [single] => single.items.len() == 1,
             _ => false,
         }
     }
@@ -1243,8 +1241,8 @@ impl<'db> Bindings<'db> {
         if self.is_single() {
             self.elements
                 .first()
-                .and_then(|e| e.alternatives.first())
-                .map(CallAlternative::callable)
+                .and_then(|e| e.items.first())
+                .map(CallableItem::callable)
         } else {
             None
         }
@@ -1380,8 +1378,8 @@ impl<'db> Bindings<'db> {
             }
             for init_binding in downstream
                 .bindings
-                .iter_semantic_alternatives()
-                .filter_map(CallAlternative::as_constructor)
+                .iter_semantic_items()
+                .filter_map(CallableItem::as_constructor)
             {
                 combine_binding_specialization(init_binding);
             }
@@ -1410,8 +1408,8 @@ impl<'db> Bindings<'db> {
         Self::constructor_return_type_for_bindings(
             db,
             self.shared_constructor_instance_type()?,
-            self.iter_semantic_alternatives()
-                .filter_map(CallAlternative::as_constructor),
+            self.iter_semantic_items()
+                .filter_map(CallableItem::as_constructor),
         )
     }
 
@@ -1576,8 +1574,8 @@ impl<'db> Bindings<'db> {
                         }
                     } else if downstream
                         .bindings
-                        .iter_semantic_alternatives()
-                        .filter_map(CallAlternative::as_constructor)
+                        .iter_semantic_items()
+                        .filter_map(CallableItem::as_constructor)
                         .any(|downstream_binding| !downstream_binding.constructor_kind().is_init())
                     {
                         // Preserve `Unknown` from an invalid all-non-instance downstream
@@ -1706,9 +1704,9 @@ impl<'db> Bindings<'db> {
 
         // Report deferred constructor diagnostics when the matched overload is instance-returning.
         let mut reported_ctor_init_callables = FxHashSet::default();
-        for alternative in self.iter_semantic_alternatives() {
+        for item in self.iter_semantic_items() {
             let Some(downstream_bindings) =
-                alternative.checked_downstream_constructor_bindings(context.db())
+                item.checked_downstream_constructor_bindings(context.db())
             else {
                 continue;
             };
@@ -1742,15 +1740,12 @@ impl<'db> Bindings<'db> {
             // Construct the intersection type from the bindings
             let intersection_type = IntersectionType::from_elements(
                 context.db(),
-                element
-                    .alternatives
-                    .iter()
-                    .map(CallAlternative::callable_type),
+                element.items.iter().map(CallableItem::callable_type),
             );
 
             // Only report errors from bindings with the highest priority
-            for alternative in &element.alternatives {
-                let binding = alternative.callable();
+            for item in &element.items {
+                let binding = item.callable();
                 if binding.error_priority() == max_priority {
                     if is_union {
                         // Use layered diagnostic for intersection inside a union
@@ -1772,7 +1767,7 @@ impl<'db> Bindings<'db> {
             }
         } else {
             // Single binding in this element - report as a union variant
-            if let Some(binding) = element.alternatives.first().map(CallAlternative::callable) {
+            if let Some(binding) = element.items.first().map(CallableItem::callable) {
                 if binding.as_result().is_ok() {
                     return;
                 }
@@ -3037,7 +3032,7 @@ impl<'db> From<CallableBinding<'db>> for Bindings<'db> {
         Bindings {
             callable_type: from.callable_type,
             elements: smallvec_inline![BindingsElement {
-                alternatives: smallvec_inline![CallAlternative::Regular(from)],
+                items: smallvec_inline![CallableItem::Regular(from)],
             }],
             argument_forms: ArgumentForms::new(0),
             implicit_dunder_new_is_possibly_unbound: false,
@@ -3062,7 +3057,7 @@ impl<'db> From<Binding<'db>> for Bindings<'db> {
         Bindings {
             callable_type,
             elements: smallvec_inline![BindingsElement {
-                alternatives: smallvec_inline![CallAlternative::Regular(callable_binding)],
+                items: smallvec_inline![CallableItem::Regular(callable_binding)],
             }],
             argument_forms: ArgumentForms::new(0),
             implicit_dunder_new_is_possibly_unbound: false,
