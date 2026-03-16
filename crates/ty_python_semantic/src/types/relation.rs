@@ -9,8 +9,8 @@ use crate::types::constraints::{
 use crate::types::enums::is_single_member_enum;
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::{
-    CallableType, ClassBase, ClassType, DynamicType, KnownBoundMethodType, KnownClass,
-    KnownInstanceType, LiteralValueTypeKind, MemberLookupPolicy, PropertyInstanceType,
+    CallableType, ClassBase, ClassType, CycleDetector, DynamicType, KnownBoundMethodType,
+    KnownClass, KnownInstanceType, LiteralValueTypeKind, MemberLookupPolicy, PropertyInstanceType,
     ProtocolInstanceType, SubclassOfInner, TypeVarBoundOrConstraints, UnionType, UpcastPolicy,
 };
 use crate::{
@@ -486,20 +486,29 @@ impl<'db> Type<'db> {
     }
 }
 
-// NOTE: we deliberately do not derive `Clone` for this struct.
-// In all cases, it is incorrect to clone a `RelationCycleDetector`,
-// because the cloned version of the detector would not share the same
-// cache as the original version of the detector.
+/// A wrapper around [`CycleDetector`] that allows us to use either an owned or shared cache.
+///
+/// N.B. It would be incorrect to derive `Clone` for this enum:
+/// when recursing into a pair of types, we almost always want to share the cache between
+/// the parent and child calls. Deriving `Clone` would make it easy to accidentally create a
+/// copy of the cache rather than sharing the cache.
 #[derive(Debug)]
-struct RelationCycleDetector<'a, 'db, 'c, Tag: Clone, T: Clone>(
-    std::borrow::Cow<'a, super::cyclic::CycleDetector<Tag, T, ConstraintSet<'db, 'c>>>,
-);
+enum RelationCycleDetector<'a, 'db, 'c, Tag, T> {
+    WithOwnedCache(CycleDetector<Tag, T, ConstraintSet<'db, 'c>>),
+    WithSharedCache(&'a CycleDetector<Tag, T, ConstraintSet<'db, 'c>>),
+}
 
-impl<'db, 'c, Tag: Clone, T: std::hash::Hash + Eq + Clone>
-    RelationCycleDetector<'_, 'db, 'c, Tag, T>
-{
-    fn borrowed<'s>(&'s self) -> RelationCycleDetector<'s, 'db, 'c, Tag, T> {
-        RelationCycleDetector(std::borrow::Cow::Borrowed(&self.0))
+impl<'db, 'c, Tag, T: Clone + Eq + std::hash::Hash> RelationCycleDetector<'_, 'db, 'c, Tag, T> {
+    /// Create a new `RelationCycleDetector` with a shared cache that borrows from `self`.
+    fn with_shared_cache<'s>(&'s self) -> RelationCycleDetector<'s, 'db, 'c, Tag, T> {
+        match self {
+            RelationCycleDetector::WithOwnedCache(detector) => {
+                RelationCycleDetector::WithSharedCache(detector)
+            }
+            RelationCycleDetector::WithSharedCache(detector) => {
+                RelationCycleDetector::WithSharedCache(*detector)
+            }
+        }
     }
 
     fn visit(
@@ -507,7 +516,10 @@ impl<'db, 'c, Tag: Clone, T: std::hash::Hash + Eq + Clone>
         key: T,
         work: impl FnOnce() -> ConstraintSet<'db, 'c>,
     ) -> ConstraintSet<'db, 'c> {
-        self.0.visit(key, work)
+        match self {
+            RelationCycleDetector::WithOwnedCache(detector) => detector.visit(key, work),
+            RelationCycleDetector::WithSharedCache(detector) => detector.visit(key, work),
+        }
     }
 }
 
@@ -517,24 +529,22 @@ type HasRelationToVisitor<'a, 'db, 'c> =
 
 impl<'db, 'c> HasRelationToVisitor<'_, 'db, 'c> {
     fn new(constraints: &'c ConstraintSetBuilder<'db>) -> Self {
-        Self(std::borrow::Cow::Owned(super::cyclic::CycleDetector::new(
-            ConstraintSet::from_bool(constraints, true),
-        )))
+        let fallback = ConstraintSet::from_bool(constraints, true);
+        Self::WithOwnedCache(CycleDetector::new(fallback))
     }
 }
 
 #[derive(Debug, Copy, Clone)]
 struct IsDisjoint;
 
-/// A cycle detector that is used in `is_disjoint_From` methods.
+/// A cycle detector that is used in `is_disjoint_from` methods.
 type IsDisjointVisitor<'a, 'db, 'c> =
     RelationCycleDetector<'a, 'db, 'c, IsDisjoint, (Type<'db>, Type<'db>)>;
 
 impl<'db, 'c> IsDisjointVisitor<'_, 'db, 'c> {
     fn new(constraints: &'c ConstraintSetBuilder<'db>) -> Self {
-        Self(std::borrow::Cow::Owned(super::cyclic::CycleDetector::new(
-            ConstraintSet::from_bool(constraints, false),
-        )))
+        let fallback = ConstraintSet::from_bool(constraints, false);
+        Self::WithOwnedCache(CycleDetector::new(fallback))
     }
 }
 
@@ -597,8 +607,8 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             relation: self.relation,
             given: self.given,
             constraints: self.constraints,
-            relation_visitor: self.relation_visitor.borrowed(),
-            disjointness_visitor: self.disjointness_visitor.borrowed(),
+            relation_visitor: self.relation_visitor.with_shared_cache(),
+            disjointness_visitor: self.disjointness_visitor.with_shared_cache(),
         }
     }
 
@@ -1555,8 +1565,8 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         EquivalenceChecker {
             constraints: self.constraints,
             given: self.given,
-            relation_visitor: self.relation_visitor.borrowed(),
-            disjointness_visitor: self.disjointness_visitor.borrowed(),
+            relation_visitor: self.relation_visitor.with_shared_cache(),
+            disjointness_visitor: self.disjointness_visitor.with_shared_cache(),
         }
     }
 
@@ -1565,8 +1575,8 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             constraints: self.constraints,
             inferable: self.inferable,
             given: self.given,
-            relation_visitor: self.relation_visitor.borrowed(),
-            disjointness_visitor: self.disjointness_visitor.borrowed(),
+            relation_visitor: self.relation_visitor.with_shared_cache(),
+            disjointness_visitor: self.disjointness_visitor.with_shared_cache(),
         }
     }
 }
@@ -1592,8 +1602,8 @@ impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
             constraints: self.constraints,
             given: self.given,
             inferable: InferableTypeVars::None,
-            relation_visitor: self.relation_visitor.borrowed(),
-            disjointness_visitor: self.disjointness_visitor.borrowed(),
+            relation_visitor: self.relation_visitor.with_shared_cache(),
+            disjointness_visitor: self.disjointness_visitor.with_shared_cache(),
         }
     }
 
@@ -1658,8 +1668,8 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             constraints: self.constraints,
             inferable: self.inferable,
             given: self.given,
-            relation_visitor: self.relation_visitor.borrowed(),
-            disjointness_visitor: self.disjointness_visitor.borrowed(),
+            relation_visitor: self.relation_visitor.with_shared_cache(),
+            disjointness_visitor: self.disjointness_visitor.with_shared_cache(),
         }
     }
 
@@ -1667,8 +1677,8 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
         EquivalenceChecker {
             constraints: self.constraints,
             given: self.given,
-            relation_visitor: self.relation_visitor.borrowed(),
-            disjointness_visitor: self.disjointness_visitor.borrowed(),
+            relation_visitor: self.relation_visitor.with_shared_cache(),
+            disjointness_visitor: self.disjointness_visitor.with_shared_cache(),
         }
     }
 

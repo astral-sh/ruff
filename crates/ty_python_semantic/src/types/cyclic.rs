@@ -58,7 +58,7 @@ impl<Tag> Default for TypeTransformer<'_, Tag> {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct CycleDetector<Tag, T, R> {
     /// If the type we're visiting is present in `seen`, it indicates that we've hit a cycle (due
     /// to a recursive type); we need to immediately short circuit the whole operation and return
