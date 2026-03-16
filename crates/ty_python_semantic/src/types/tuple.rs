@@ -311,10 +311,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         return self.never();
                     };
                     let element_constraints = self.check_type_pair(db, source_ty, target_ty);
-                    if result
-                        .intersect(db, self.constraints, element_constraints)
-                        .is_never_satisfied(db)
-                    {
+                    result.intersect(db, self.constraints, &element_constraints);
+                    if result.is_never_satisfied(db) {
                         return result;
                     }
                 }
@@ -323,10 +321,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         return self.never();
                     };
                     let element_constraints = self.check_type_pair(db, source_ty, target_ty);
-                    if result
-                        .intersect(db, self.constraints, element_constraints)
-                        .is_never_satisfied(db)
-                    {
+                    result.intersect(db, self.constraints, &element_constraints);
+                    if result.is_never_satisfied(db) {
                         return result;
                     }
                 }
@@ -374,10 +370,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         return self.never();
                     };
                     let element_constraints = self.check_type_pair(db, source_ty, target_ty);
-                    if result
-                        .intersect(db, self.constraints, element_constraints)
-                        .is_never_satisfied(db)
-                    {
+                    result.intersect(db, self.constraints, &element_constraints);
+                    if result.is_never_satisfied(db) {
                         return result;
                     }
                 }
@@ -387,10 +381,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         return self.never();
                     };
                     let element_constraints = self.check_type_pair(db, source_ty, target_ty);
-                    if result
-                        .intersect(db, self.constraints, element_constraints)
-                        .is_never_satisfied(db)
-                    {
+                    result.intersect(db, self.constraints, &element_constraints);
+                    if result.is_never_satisfied(db) {
                         return result;
                     }
                 }
@@ -439,10 +431,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             self.check_type_pair(db, source.variable(), other_ty)
                         }
                     };
-                    if result
-                        .intersect(db, self.constraints, pair_constraints)
-                        .is_never_satisfied(db)
-                    {
+                    result.intersect(db, self.constraints, &pair_constraints);
+                    if result.is_never_satisfied(db) {
                         return result;
                     }
                 }
@@ -477,10 +467,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             self.check_type_pair(db, source.variable(), target_ty)
                         }
                     };
-                    if result
-                        .intersect(db, self.constraints, pair_constraints)
-                        .is_never_satisfied(db)
-                    {
+                    result.intersect(db, self.constraints, &pair_constraints);
+                    if result.is_never_satisfied(db) {
                         return result;
                     }
                 }

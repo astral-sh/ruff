@@ -1531,7 +1531,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
     pub(super) fn as_equivalence_checker(&self) -> EquivalenceChecker<'_, 'c, 'db> {
         EquivalenceChecker {
             constraints: self.constraints,
-            given: self.given,
+            given: self.given.clone(),
             relation_visitor: self.relation_visitor,
             disjointness_visitor: self.disjointness_visitor,
         }
@@ -1541,7 +1541,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         DisjointnessChecker {
             constraints: self.constraints,
             inferable: self.inferable,
-            given: self.given,
+            given: self.given.clone(),
             relation_visitor: self.relation_visitor,
             disjointness_visitor: self.disjointness_visitor,
         }
@@ -1567,7 +1567,7 @@ impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
         TypeRelationChecker {
             relation: TypeRelation::Redundancy { pure: true },
             constraints: self.constraints,
-            given: self.given,
+            given: self.given.clone(),
             inferable: InferableTypeVars::None,
             relation_visitor: self.relation_visitor,
             disjointness_visitor: self.disjointness_visitor,
@@ -1636,7 +1636,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             relation,
             constraints: self.constraints,
             inferable: self.inferable,
-            given: self.given,
+            given: self.given.clone(),
             relation_visitor: self.relation_visitor,
             disjointness_visitor: self.disjointness_visitor,
         }
@@ -1645,7 +1645,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
     pub(super) fn as_equivalence_checker(&self) -> EquivalenceChecker<'_, 'c, 'db> {
         EquivalenceChecker {
             constraints: self.constraints,
-            given: self.given,
+            given: self.given.clone(),
             relation_visitor: self.relation_visitor,
             disjointness_visitor: self.disjointness_visitor,
         }

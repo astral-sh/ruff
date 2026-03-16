@@ -190,7 +190,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 result.intersect(
                     db,
                     self.constraints,
-                    self.check_type_pair(
+                    &self.check_type_pair(
                         db,
                         source_item_field.declared_ty,
                         target_item_field.declared_ty,
@@ -334,7 +334,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     }
                 }
             };
-            result.intersect(db, self.constraints, field_constraints);
+            result.intersect(db, self.constraints, &field_constraints);
             if result.is_never_satisfied(db) {
                 return result;
             }
