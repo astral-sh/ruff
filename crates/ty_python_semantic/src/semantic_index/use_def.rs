@@ -403,7 +403,7 @@ impl<'db> UseDefMap<'db> {
         )
     }
 
-    pub(crate) fn member_bindings_at_use(
+    pub(crate) fn multi_bindings_at_use(
         &self,
         use_id: ScopedUseId,
     ) -> impl Iterator<Item = BindingWithConstraintsIterator<'_, 'db>> {

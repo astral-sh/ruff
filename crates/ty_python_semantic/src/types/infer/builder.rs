@@ -6741,7 +6741,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Collect the types of each distinct key.
         let mut elements: Vec<(&str, Type<'db>)> = Vec::new();
 
-        for bindings in use_def.member_bindings_at_use(keyword.scoped_use_id(db, self.scope())) {
+        for bindings in use_def.multi_bindings_at_use(keyword.scoped_use_id(db, self.scope())) {
             let place = place_from_bindings(db, bindings.clone());
             let Some(key) = place.first_definition.and_then(definition_key) else {
                 continue;

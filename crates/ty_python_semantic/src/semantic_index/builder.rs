@@ -60,6 +60,8 @@ use crate::types::{EvaluationMode, PossiblyNarrowedPlaces};
 use crate::unpack::{Unpack, UnpackKind, UnpackPosition, UnpackValue};
 use crate::{Db, Program};
 
+use super::place::PlaceExprRef;
+
 mod except_handlers;
 mod loop_bindings_visitor;
 
@@ -2831,10 +2833,25 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     .place_id((&value_place_expr).into())
             })
             .map(|value_place_id| {
-                self.place_tables[current_scope]
+                let place_table = &self.place_tables[current_scope];
+                place_table
                     .associated_place_ids(value_place_id)
                     .iter()
-                    .map(|member_id| ScopedPlaceId::from(*member_id))
+                    .filter(move |key_member_id| {
+                        let key_member_expr = place_table.member(**key_member_id).expression();
+
+                        // Only include top-level keys.
+                        let Some(key_parent) = key_member_expr.as_ref().parent() else {
+                            return true;
+                        };
+                        match place_table.place(value_place_id) {
+                            PlaceExprRef::Symbol(_) => false,
+                            PlaceExprRef::Member(value_member) => {
+                                key_parent == value_member.expression()
+                            }
+                        }
+                    })
+                    .map(|key_member_id| ScopedPlaceId::from(*key_member_id))
             });
 
         let use_id = self.ast_ids[current_scope].record_use(keyword);
