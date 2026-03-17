@@ -37,6 +37,13 @@ exploration of new features, we will often close these pull requests immediately
 new feature to ruff creates a long-term maintenance burden and requires strong consensus from the ruff
 team before it is appropriate to begin work on an implementation.
 
+## Use of AI
+
+We **require all use of AI in contributions to follow our
+[AI Policy](https://github.com/astral-sh/.github/blob/main/AI_POLICY.md)**.
+
+If your contribution does not follow the policy, it will be closed.
+
 ## The Basics
 
 ### Prerequisites
