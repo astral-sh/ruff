@@ -150,7 +150,7 @@ def generator() -> Generator:
 from typing import Generator
 
 def invalid_generator() -> Generator[int, None, None]:
-    # error: [invalid-assignment]
+    # error: [invalid-return-type]
     yield "not an int"
 ```
 
