@@ -442,74 +442,85 @@ impl<'db> SemanticTokenVisitor<'db> {
         ty: Type,
         attr_name: &ast::Identifier,
     ) -> (SemanticTokenType, SemanticTokenModifier) {
+        enum UnifiedTokenType {
+            None,
+            /// All types have the same semantic token type
+            Uniform(SemanticTokenType),
+            /// The elements have different semantic token types
+            Fallback,
+        }
+
+        impl UnifiedTokenType {
+            fn add(&mut self, ty: SemanticTokenType) {
+                *self = match self {
+                    Self::None => Self::Uniform(ty),
+                    Self::Uniform(current) if *current == ty => Self::Uniform(ty),
+                    Self::Uniform(_) | Self::Fallback => Self::Fallback,
+                }
+            }
+
+            fn into_semantic_token_type(self) -> Option<SemanticTokenType> {
+                match self {
+                    UnifiedTokenType::None | UnifiedTokenType::Fallback => None,
+                    UnifiedTokenType::Uniform(ty) => Some(ty),
+                }
+            }
+        }
+
         let attr_name_str = attr_name.id.as_str();
         let mut modifiers = SemanticTokenModifier::empty();
 
         if let Some(classification) = self.classify_annotation_type_expr(ty) {
             return classification;
         }
-        // If we are dealing with a union type, classify all elements of the union and check if
-        // the classifications equal.
-        if let Type::Union(union) = ty
-            && let Ok(Some(classification)) = union
-                .elements(self.model.db())
-                .iter()
-                .map(|ty| self.classify_from_type_for_attribute(*ty, attr_name))
-                // Would be a lot cleaner with `try_reduce`, but that is still experimental
-                .try_fold(None, |prev, (class, mods)| {
-                    match prev {
-                        // First element gets special handling, because accumulator starts with None
-                        None => Ok(Some((class, mods))),
-                        // Later iterations have the comparison logic
-                        Some((class_prev, mods_prev)) => {
-                            if std::mem::discriminant(&class_prev) == std::mem::discriminant(&class)
-                            {
-                                Ok(Some((
-                                    class,
-                                    if mods_prev == mods {
-                                        mods
-                                    } else {
-                                        SemanticTokenModifier::empty()
-                                    },
-                                )))
-                            } else {
-                                Err(()) // Short-circuits when classes don't match
-                            }
-                        }
-                    }
-                })
-        {
-            return classification;
-        }
-        // Classify based on the inferred type of the attribute
-        match ty {
-            Type::ClassLiteral(_) => (SemanticTokenType::Class, modifiers),
-            Type::FunctionLiteral(_) => {
-                // This is a function accessed as an attribute, likely a method
-                (SemanticTokenType::Method, modifiers)
-            }
-            Type::BoundMethod(_) => {
-                // Method bound to an instance
-                (SemanticTokenType::Method, modifiers)
-            }
-            Type::ModuleLiteral(_) => {
-                // Module accessed as an attribute (e.g., from os import path)
-                (SemanticTokenType::Namespace, modifiers)
-            }
-            _ if ty.is_property_instance() => {
-                // Actual Python property
-                (SemanticTokenType::Property, modifiers)
-            }
-            _ => {
-                // Check for constant naming convention
-                if Self::is_constant_name(attr_name_str) {
-                    modifiers |= SemanticTokenModifier::READONLY;
-                }
 
-                // For other types (variables, constants, etc.), classify as variable
-                (SemanticTokenType::Variable, modifiers)
+        let elements = if let Some(union) = ty.as_union() {
+            union.elements(self.model.db())
+        } else {
+            std::slice::from_ref(&ty)
+        };
+
+        let mut token_type = UnifiedTokenType::None;
+
+        for element in elements {
+            // Classify based on the inferred type of the attribute
+            match element {
+                Type::ClassLiteral(_) => {
+                    token_type.add(SemanticTokenType::Class);
+                }
+                Type::FunctionLiteral(_) => {
+                    // This is a function accessed as an attribute, likely a method
+                    token_type.add(SemanticTokenType::Method);
+                }
+                Type::BoundMethod(_) | Type::KnownBoundMethod(_) => {
+                    // Method bound to an instance
+                    token_type.add(SemanticTokenType::Method);
+                }
+                Type::ModuleLiteral(_) => {
+                    // Module accessed as an attribute (e.g., from os import path)
+                    token_type.add(SemanticTokenType::Namespace);
+                }
+                ty if ty.is_property_instance() => {
+                    token_type.add(SemanticTokenType::Property);
+                }
+                _ => {
+                    token_type = UnifiedTokenType::Fallback;
+                }
             }
         }
+
+        if let Some(uniform) = token_type.into_semantic_token_type() {
+            return (uniform, modifiers);
+        }
+
+        // Check for constant naming convention
+        if Self::is_constant_name(attr_name_str) {
+            modifiers |= SemanticTokenModifier::READONLY;
+        }
+
+        // For other types (variables, constants, etc.), classify as variable
+        // Should this always be property?
+        (SemanticTokenType::Variable, modifiers)
     }
 
     fn classify_parameter(
