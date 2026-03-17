@@ -5,6 +5,7 @@ use rustc_hash::FxHashSet;
 use crate::place::{DefinedPlace, Place};
 use crate::types::constraints::{
     ConstraintSetBuilder, IteratorConstraintsExtension, OptionConstraintsExtension,
+    OwnedConstraintSet,
 };
 use crate::types::cyclic::PairVisitor;
 use crate::types::enums::is_single_member_enum;
@@ -403,6 +404,36 @@ impl<'db> Type<'db> {
             inferable,
             TypeRelation::Assignability,
         )
+    }
+
+    pub(super) fn when_constraint_set_assignable_to_owned(
+        self,
+        db: &'db dyn Db,
+        target: Type<'db>,
+    ) -> &'db OwnedConstraintSet<'db> {
+        #[salsa::tracked(
+            returns(ref),
+            cycle_initial=|_, _, _, _| OwnedConstraintSet::default(),
+            heap_size=ruff_memory_usage::heap_size,
+        )]
+        fn when_constraint_set_assignable_to_owned_impl<'db>(
+            db: &'db dyn Db,
+            source: Type<'db>,
+            target: Type<'db>,
+        ) -> OwnedConstraintSet<'db> {
+            let constraints = ConstraintSetBuilder::new();
+            constraints.into_owned(|constraints| {
+                source.has_relation_to(
+                    db,
+                    target,
+                    constraints,
+                    InferableTypeVars::None,
+                    TypeRelation::ConstraintSetAssignability,
+                )
+            })
+        }
+
+        when_constraint_set_assignable_to_owned_impl(db, self, target)
     }
 
     pub(super) fn when_constraint_set_assignable_to<'c>(
