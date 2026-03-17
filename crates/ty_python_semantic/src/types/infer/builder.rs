@@ -7340,44 +7340,42 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
         let return_type_span = enclosing_function.spans(self.db()).return_type;
 
-        let (inner_yield_ty, inner_is_iterable) = iterable_type
+        let inner_yield_ty = iterable_type
             .try_iterate(self.db())
-            .map(|tuple| (tuple.homogeneous_element_type(self.db()), true))
+            .map(|tuple| tuple.homogeneous_element_type(self.db()))
             .unwrap_or_else(|err| {
                 err.report_diagnostic(&self.context, iterable_type, value.as_ref().into());
-                (err.fallback_element_type(self.db()), false)
+                err.fallback_element_type(self.db())
             });
 
-        if inner_is_iterable {
-            if let Some(outer_yield_ty) = outer_expected.yielded
-                && !inner_yield_ty.is_assignable_to(self.db(), outer_yield_ty)
-            {
+        if let Some(outer_yield_ty) = outer_expected.yielded
+            && !inner_yield_ty.is_assignable_to(self.db(), outer_yield_ty)
+        {
+            report_invalid_generator_yield_type(
+                &self.context,
+                value.as_ref(),
+                return_type_span.clone(),
+                annotated_return_ty,
+                outer_yield_ty,
+                inner_yield_ty,
+                GeneratorMismatchKind::YieldType,
+            );
+        }
+
+        if let Some(outer_send_ty) = outer_expected.sent {
+            let inner_send_ty = iterable_type
+                .generator_send_type(self.db())
+                .unwrap_or_else(|| Type::none(self.db()));
+            if !outer_send_ty.is_assignable_to(self.db(), inner_send_ty) {
                 report_invalid_generator_yield_type(
                     &self.context,
                     value.as_ref(),
-                    return_type_span.clone(),
+                    return_type_span,
                     annotated_return_ty,
-                    outer_yield_ty,
-                    inner_yield_ty,
-                    GeneratorMismatchKind::YieldType,
+                    outer_send_ty,
+                    inner_send_ty,
+                    GeneratorMismatchKind::SendType,
                 );
-            }
-
-            if let Some(outer_send_ty) = outer_expected.sent {
-                let inner_send_ty = iterable_type
-                    .generator_send_type(self.db())
-                    .unwrap_or_else(|| Type::none(self.db()));
-                if !outer_send_ty.is_assignable_to(self.db(), inner_send_ty) {
-                    report_invalid_generator_yield_type(
-                        &self.context,
-                        value.as_ref(),
-                        return_type_span,
-                        annotated_return_ty,
-                        outer_send_ty,
-                        inner_send_ty,
-                        GeneratorMismatchKind::SendType,
-                    );
-                }
             }
         }
 
