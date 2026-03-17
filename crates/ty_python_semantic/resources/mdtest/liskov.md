@@ -224,6 +224,47 @@ class C(list[int]):
     def __getitem__(self, key): ...
 ```
 
+Non-overloaded overrides should also remain accepted when an inherited dunder method includes
+specialized `LiteralString` overloads.
+
+`mystr.py`:
+
+```py
+from __future__ import annotations
+
+from collections.abc import Iterator
+
+class MyStr(str):
+    def __iter__(self) -> Iterator[str]:
+        raise NotImplementedError
+```
+
+But overloads distinguished by `self` should still count if the current subclass could overlap with
+that `self` type.
+
+`baz.py`:
+
+```py
+from __future__ import annotations
+
+from collections.abc import Iterator
+from typing import overload
+
+class Foo:
+    @overload
+    def method(self: Bar) -> Iterator[Bar]: ...
+    @overload
+    def method(self: Foo) -> Iterator[Foo]: ...
+    def method(self) -> Iterator[Foo] | Iterator[Bar]:
+        raise NotImplementedError
+
+class Bar: ...
+
+class Baz(Foo):
+    def method(self) -> Iterator[Foo]:  # error: [invalid-method-override]
+        raise NotImplementedError
+```
+
 ## Non-generic methods on generic classes work as expected
 
 ```toml

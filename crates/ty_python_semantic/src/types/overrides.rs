@@ -23,7 +23,7 @@ use crate::{
     },
     types::{
         CallableType, ClassBase, ClassType, KnownClass, Parameter, Parameters, Signature,
-        StaticClassLiteral, Type, TypeContext, TypeQualifiers,
+        StaticClassLiteral, Type, TypeContext, TypeQualifiers, UnionType,
         call::CallArguments,
         class::{CodeGeneratorKind, FieldKind},
         constraints::ConstraintSetBuilder,
@@ -37,6 +37,7 @@ use crate::{
         enums::{EnumMetadata, enum_metadata},
         function::{FunctionDecorators, FunctionType, KnownFunction},
         list_members::{Member, MemberWithDefinition, all_end_of_scope_members},
+        signatures::CallableSignature,
         tuple::Tuple,
     },
 };
@@ -255,9 +256,10 @@ fn check_class_declaration<'db>(
     let mut overridden_final_variable: Option<(ClassType<'db>, Option<Definition<'db>>)> = None;
     let is_private_member = is_mangled_private(member.name.as_str());
 
-    // Track the first superclass that defines this method (the "immediate parent" for this method).
-    // We need this to check if parent itself already has an LSP violation with an ancestor.
-    // If so, we shouldn't report the same violation for the child class.
+    // Track the first superclass that defines this method (the "immediate parent" for this method),
+    // together with its unbound member type. We need this to check if parent itself already has an
+    // LSP violation with an ancestor. If so, we shouldn't report the same violation for the child
+    // class.
     let mut immediate_parent_method: Option<(ClassType<'db>, Type<'db>)> = None;
 
     if !is_private_member {
@@ -308,6 +310,12 @@ fn check_class_declaration<'db>(
                 .unwrap_or_default();
             }
 
+            let Some(superclass_member_ty) = superclass
+                .own_class_member(db, None, &member.name)
+                .ignore_possibly_undefined()
+            else {
+                continue;
+            };
             let Place::Defined(DefinedPlace {
                 ty: superclass_type,
                 ..
@@ -323,7 +331,7 @@ fn check_class_declaration<'db>(
 
             // Record the first superclass that defines this method as the "immediate parent method"
             if immediate_parent_method.is_none() {
-                immediate_parent_method = Some((superclass, superclass_type));
+                immediate_parent_method = Some((superclass, superclass_member_ty));
             }
 
             if (configuration.check_final_method_overridden() && overridden_final_method.is_none())
@@ -413,12 +421,11 @@ fn check_class_declaration<'db>(
                 continue;
             }
 
-            let Some(superclass_type_as_callable) = superclass_type.try_upcast_to_callable(db)
+            let Some(superclass_type_as_type) =
+                relevant_superclass_callable_type(db, superclass_member_ty, instance_of_class)
             else {
                 continue;
             };
-
-            let superclass_type_as_type = superclass_type_as_callable.into_type(db);
 
             if type_on_subclass_instance.is_assignable_to(db, superclass_type_as_type) {
                 continue;
@@ -429,12 +436,32 @@ fn check_class_declaration<'db>(
             // If so, don't report the same violation for the child class -- it would be a false positive
             // since the child cannot fix the violation without contradicting its immediate parent's contract.
             // See: https://github.com/astral-sh/ty/issues/2000
-            if let Some((immediate_parent, immediate_parent_type)) = immediate_parent_method {
+            if let Some((immediate_parent, immediate_parent_member_ty)) = immediate_parent_method {
                 if immediate_parent != superclass {
+                    let immediate_parent_instance = Type::instance(db, immediate_parent);
+                    let Some(immediate_parent_type_as_type) = relevant_superclass_callable_type(
+                        db,
+                        immediate_parent_member_ty,
+                        immediate_parent_instance,
+                    ) else {
+                        continue;
+                    };
+                    let Some(superclass_type_on_immediate_parent) =
+                        relevant_superclass_callable_type(
+                            db,
+                            superclass_member_ty,
+                            immediate_parent_instance,
+                        )
+                    else {
+                        continue;
+                    };
+
                     // The immediate parent already defines this method and is different from the
                     // current ancestor we're checking. Check if the immediate parent's method
                     // is also incompatible with this ancestor.
-                    if !immediate_parent_type.is_assignable_to(db, superclass_type_as_type) {
+                    if !immediate_parent_type_as_type
+                        .is_assignable_to(db, superclass_type_on_immediate_parent)
+                    {
                         // The immediate parent already has an LSP violation with this ancestor.
                         // Don't report the same violation for the child.
                         continue;
@@ -510,6 +537,86 @@ fn check_class_declaration<'db>(
             superclass_definition,
         );
     }
+}
+
+fn relevant_superclass_callable_type<'db>(
+    db: &'db dyn Db,
+    superclass_member_ty: Type<'db>,
+    receiver_ty: Type<'db>,
+) -> Option<Type<'db>> {
+    let superclass_callables = superclass_member_ty.try_upcast_to_callable(db)?;
+    let relevant_callables: Vec<_> = superclass_callables
+        .iter()
+        .filter_map(|callable| relevant_superclass_callable(db, *callable, receiver_ty))
+        .collect();
+
+    match relevant_callables.as_slice() {
+        [] => None,
+        [callable] => Some(Type::Callable(*callable)),
+        _ => Some(UnionType::from_elements(
+            db,
+            relevant_callables.into_iter().map(Type::Callable),
+        )),
+    }
+}
+
+fn relevant_superclass_callable<'db>(
+    db: &'db dyn Db,
+    callable: CallableType<'db>,
+    receiver_ty: Type<'db>,
+) -> Option<CallableType<'db>> {
+    let signatures = callable.signatures(db);
+    let relevant_signatures: Vec<_> = signatures
+        .iter()
+        .filter(|signature| !signature_has_disjoint_self_type(db, signature, receiver_ty))
+        .cloned()
+        .collect();
+
+    if relevant_signatures.is_empty() {
+        return None;
+    }
+
+    let callable = if relevant_signatures.len() == signatures.iter().len() {
+        callable
+    } else {
+        CallableType::new(
+            db,
+            CallableSignature::from_overloads(relevant_signatures),
+            callable.kind(db),
+        )
+    };
+
+    Some(
+        if callable.is_function_like(db) || callable.is_classmethod_like(db) {
+            callable.bind_self(db, Some(receiver_ty))
+        } else {
+            callable
+        },
+    )
+}
+
+fn signature_has_disjoint_self_type<'db>(
+    db: &'db dyn Db,
+    signature: &Signature<'db>,
+    receiver_ty: Type<'db>,
+) -> bool {
+    let Some(first_parameter) = signature.parameters().iter().next() else {
+        return false;
+    };
+
+    if !first_parameter.is_positional() {
+        return false;
+    }
+
+    let first_parameter_ty = first_parameter.annotated_type();
+    if first_parameter_ty.is_unknown()
+        || first_parameter_ty.has_dynamic(db)
+        || first_parameter_ty.has_typevar_or_typevar_instance(db)
+    {
+        return false;
+    }
+
+    receiver_ty.is_disjoint_from(db, first_parameter_ty)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]

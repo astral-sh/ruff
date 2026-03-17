@@ -86,6 +86,41 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/liskov.md
 2 |     def __getitem__(self, key): ...
 ```
 
+## mystr.py
+
+```
+1 | from __future__ import annotations
+2 | 
+3 | from collections.abc import Iterator
+4 | 
+5 | class MyStr(str):
+6 |     def __iter__(self) -> Iterator[str]:
+7 |         raise NotImplementedError
+```
+
+## baz.py
+
+```
+ 1 | from __future__ import annotations
+ 2 | 
+ 3 | from collections.abc import Iterator
+ 4 | from typing import overload
+ 5 | 
+ 6 | class Foo:
+ 7 |     @overload
+ 8 |     def method(self: Bar) -> Iterator[Bar]: ...
+ 9 |     @overload
+10 |     def method(self: Foo) -> Iterator[Foo]: ...
+11 |     def method(self) -> Iterator[Foo] | Iterator[Bar]:
+12 |         raise NotImplementedError
+13 | 
+14 | class Bar: ...
+15 | 
+16 | class Baz(Foo):
+17 |     def method(self) -> Iterator[Foo]:  # error: [invalid-method-override]
+18 |         raise NotImplementedError
+```
+
 # Diagnostics
 
 ```
@@ -231,6 +266,28 @@ error[invalid-method-override]: Invalid override of method `get`
 6 |
 7 | get = 56
   |
+info: This violates the Liskov Substitution Principle
+info: rule `invalid-method-override` is enabled by default
+
+```
+
+```
+error[invalid-method-override]: Invalid override of method `method`
+  --> src/baz.py:17:9
+   |
+16 | class Baz(Foo):
+17 |     def method(self) -> Iterator[Foo]:  # error: [invalid-method-override]
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Foo.method`
+18 |         raise NotImplementedError
+   |
+  ::: src/baz.py:11:9
+   |
+ 9 |     @overload
+10 |     def method(self: Foo) -> Iterator[Foo]: ...
+11 |     def method(self) -> Iterator[Foo] | Iterator[Bar]:
+   |         --------------------------------------------- `Foo.method` defined here
+12 |         raise NotImplementedError
+   |
 info: This violates the Liskov Substitution Principle
 info: rule `invalid-method-override` is enabled by default
 
