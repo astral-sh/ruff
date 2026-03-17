@@ -257,8 +257,9 @@ impl<'a> Comments<'a> {
             let map = if comment_ranges.is_empty() {
                 CommentsMap::new()
             } else {
-                let mut builder = CommentsMapBuilder::new(source_code.as_str(), comment_ranges);
-                CommentsVisitor::new(source_code, comment_ranges, &mut builder).visit(root);
+                let mut builder = CommentsMapBuilder::new(comment_ranges);
+                CommentsVisitor::<CommentsMapBuilder>::new(source_code, comment_ranges, &mut builder)
+                    .visit(root);
                 builder.finish()
             };
 

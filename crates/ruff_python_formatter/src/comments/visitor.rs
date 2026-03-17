@@ -12,7 +12,9 @@ use ruff_python_trivia::{CommentLinePosition, CommentRanges};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::comments::node_key::NodeRefEqualityKey;
-use crate::comments::placement::{PlacementState, place_comment};
+use crate::comments::placement::{
+    EmptyLinesScanState, FollowingScanState, PlaceComment, PrecedingScanState, place_comment,
+};
 use crate::comments::{CommentsMap, SourceComment};
 
 /// Collect the preceding, following and enclosing node for each comment without applying
@@ -23,24 +25,28 @@ pub(crate) fn collect_comments<'a>(
     comment_ranges: &'a CommentRanges,
 ) -> Vec<DecoratedComment<'a>> {
     let mut collector = CommentsVecBuilder::default();
-    CommentsVisitor::new(source_code, comment_ranges, &mut collector).visit(AnyNodeRef::from(root));
+    CommentsVisitor::<CommentsVecBuilder>::new(source_code, comment_ranges, &mut collector)
+        .visit(AnyNodeRef::from(root));
     collector.comments
 }
 
 /// Visitor extracting the comments from an AST.
-pub(super) struct CommentsVisitor<'a, 'builder> {
-    builder: &'builder mut (dyn PushComment<'a> + 'a),
+pub(super) struct CommentsVisitor<'a, 'builder, B: PushComment<'a>> {
+    builder: &'builder mut B,
     source_code: SourceCode<'a>,
     parents: Vec<AnyNodeRef<'a>>,
     preceding_node: Option<AnyNodeRef<'a>>,
     comment_ranges: Peekable<std::slice::Iter<'a, TextRange>>,
+    preceding_scan: PrecedingScanState,
+    following_scan: FollowingScanState,
+    empty_lines_scan: EmptyLinesScanState,
 }
 
-impl<'a, 'builder> CommentsVisitor<'a, 'builder> {
+impl<'a, 'builder, B: PushComment<'a>> CommentsVisitor<'a, 'builder, B> {
     pub(super) fn new(
         source_code: SourceCode<'a>,
         comment_ranges: &'a CommentRanges,
-        builder: &'builder mut (dyn PushComment<'a> + 'a),
+        builder: &'builder mut B,
     ) -> Self {
         Self {
             builder,
@@ -48,6 +54,9 @@ impl<'a, 'builder> CommentsVisitor<'a, 'builder> {
             parents: Vec::new(),
             preceding_node: None,
             comment_ranges: comment_ranges.iter().peekable(),
+            preceding_scan: PrecedingScanState::default(),
+            following_scan: FollowingScanState::default(),
+            empty_lines_scan: EmptyLinesScanState::default(),
         }
     }
 
@@ -67,9 +76,14 @@ impl<'a, 'builder> CommentsVisitor<'a, 'builder> {
             .peek()
             .is_none_or(|next_comment| next_comment.start() >= node_end)
     }
+
+    fn set_preceding_node(&mut self, node: Option<AnyNodeRef<'a>>) {
+        self.preceding_node = node;
+        self.preceding_scan.reset();
+    }
 }
 
-impl<'ast> SourceOrderVisitor<'ast> for CommentsVisitor<'ast, '_> {
+impl<'ast, B: PushComment<'ast>> SourceOrderVisitor<'ast> for CommentsVisitor<'ast, '_, B> {
     fn enter_node(&mut self, node: AnyNodeRef<'ast>) -> TraversalSignal {
         let node_range = node.range();
 
@@ -84,7 +98,7 @@ impl<'ast> SourceOrderVisitor<'ast> for CommentsVisitor<'ast, '_> {
                 break;
             }
 
-            let comment = DecoratedComment {
+            let decorated = DecoratedComment {
                 enclosing: enclosing_node,
                 preceding: self.preceding_node,
                 following: Some(node),
@@ -96,12 +110,19 @@ impl<'ast> SourceOrderVisitor<'ast> for CommentsVisitor<'ast, '_> {
                 slice: self.source_code.slice(*comment_range),
             };
 
-            self.builder.push_comment(comment);
+            let place = PlaceComment::new(
+                decorated,
+                self.source_code.as_str(),
+                &self.preceding_scan,
+                &self.following_scan,
+                &self.empty_lines_scan,
+            );
+            self.builder.push_comment(place);
             self.comment_ranges.next();
         }
 
         // From here on, we're inside of `node`, meaning, we're passed the preceding node.
-        self.preceding_node = None;
+        self.set_preceding_node(None);
         self.parents.push(node);
 
         if self.can_skip(node_range.end()) {
@@ -127,7 +148,7 @@ impl<'ast> SourceOrderVisitor<'ast> for CommentsVisitor<'ast, '_> {
                 break;
             }
 
-            let comment = DecoratedComment {
+            let decorated = DecoratedComment {
                 enclosing: node,
                 parent: self.parents.last().copied(),
                 preceding: self.preceding_node,
@@ -139,12 +160,19 @@ impl<'ast> SourceOrderVisitor<'ast> for CommentsVisitor<'ast, '_> {
                 slice: self.source_code.slice(*comment_range),
             };
 
-            self.builder.push_comment(comment);
+            let place = PlaceComment::new(
+                decorated,
+                self.source_code.as_str(),
+                &self.preceding_scan,
+                &self.following_scan,
+                &self.empty_lines_scan,
+            );
+            self.builder.push_comment(place);
 
             self.comment_ranges.next();
         }
 
-        self.preceding_node = Some(node);
+        self.set_preceding_node(Some(node));
     }
 
     fn visit_body(&mut self, body: &'ast [Stmt]) {
@@ -159,7 +187,7 @@ impl<'ast> SourceOrderVisitor<'ast> for CommentsVisitor<'ast, '_> {
                     // It is still necessary to visit the first statement to process all comments between
                     // the previous node and the first statement.
                     self.visit_stmt(first);
-                    self.preceding_node = Some(last.into());
+                    self.set_preceding_node(Some(last.into()));
                 } else {
                     walk_body(self, body);
                 }
@@ -513,7 +541,7 @@ impl<'a> CommentPlacement<'a> {
 }
 
 pub(super) trait PushComment<'a> {
-    fn push_comment(&mut self, placement: DecoratedComment<'a>);
+    fn push_comment<'state>(&mut self, comment: PlaceComment<'a, 'state>);
 }
 
 /// A storage for the [`CommentsVisitor`] that just pushes the decorated comments to a [`Vec`] for
@@ -524,8 +552,8 @@ struct CommentsVecBuilder<'a> {
 }
 
 impl<'a> PushComment<'a> for CommentsVecBuilder<'a> {
-    fn push_comment(&mut self, placement: DecoratedComment<'a>) {
-        self.comments.push(placement);
+    fn push_comment<'state>(&mut self, comment: PlaceComment<'a, 'state>) {
+        self.comments.push(comment.into_comment());
     }
 }
 
@@ -535,19 +563,11 @@ pub(super) struct CommentsMapBuilder<'a> {
     comments: CommentsMap<'a>,
     /// We need those for backwards lexing
     comment_ranges: &'a CommentRanges,
-    source: &'a str,
-    placement_state: PlacementState,
 }
 
 impl<'a> PushComment<'a> for CommentsMapBuilder<'a> {
-    fn push_comment(&mut self, placement: DecoratedComment<'a>) {
-        self.placement_state.update(&placement, self.source);
-        let placement = place_comment(
-            placement,
-            self.comment_ranges,
-            self.source,
-            &self.placement_state,
-        );
+    fn push_comment<'state>(&mut self, comment: PlaceComment<'a, 'state>) {
+        let placement = place_comment(comment, self.comment_ranges);
         match placement {
             CommentPlacement::Leading { node, comment } => {
                 self.push_leading_comment(node, comment);
@@ -609,12 +629,10 @@ impl<'a> PushComment<'a> for CommentsMapBuilder<'a> {
 }
 
 impl<'a> CommentsMapBuilder<'a> {
-    pub(crate) fn new(source: &'a str, comment_ranges: &'a CommentRanges) -> Self {
+    pub(crate) fn new(comment_ranges: &'a CommentRanges) -> Self {
         Self {
             comments: CommentsMap::default(),
             comment_ranges,
-            source,
-            placement_state: PlacementState::default(),
         }
     }
 

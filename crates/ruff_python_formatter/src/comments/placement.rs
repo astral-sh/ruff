@@ -1,17 +1,20 @@
+use std::cell::Cell;
+use std::cmp::Ordering;
+
 use ast::helpers::comment_indentation_after;
 use ruff_python_ast::whitespace::indentation;
 use ruff_python_ast::{
     self as ast, AnyNodeRef, Comprehension, Expr, ModModule, Parameter, Parameters, StringLike,
 };
 use ruff_python_trivia::{
-    BackwardsTokenizer, CommentRanges, SimpleToken, SimpleTokenKind, SimpleTokenizer,
-    find_only_token_in_range, first_non_trivia_token, indentation_at_offset,
+    BackwardsTokenizer, CommentLinePosition, CommentRanges, SimpleToken, SimpleTokenKind,
+    SimpleTokenizer, find_only_token_in_range, first_non_trivia_token, indentation_at_offset,
 };
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
-use std::cmp::Ordering;
 
 use crate::comments::visitor::{CommentPlacement, DecoratedComment};
+use crate::comments::SourceComment;
 use crate::expression::expr_slice::{ExprSliceCommentSection, assign_comment_in_slice};
 use crate::expression::parentheses::is_expression_parenthesized;
 use crate::other::parameters::{
@@ -19,55 +22,19 @@ use crate::other::parameters::{
 };
 use crate::pattern::pattern_match_sequence::SequenceType;
 
-/// State carried across consecutive `place_comment` calls to avoid
-/// re-scanning the same source regions. When multiple comments share the
-/// same `preceding` node, subsequent scans only cover the gap since the
-/// last comment — reducing total work from O(N²) to O(N).
-///
-/// Callers must invoke [`PlacementState::update`] before each
-/// `place_comment` call so that every handler reads up-to-date results
-/// without needing `&mut` access to the state.
-#[derive(Default)]
-pub(super) struct PlacementState {
-    preceding: PrecedingScanState,
-    following: FollowingScanState,
-    empty_lines: EmptyLinesScanState,
-}
-
-impl PlacementState {
-    /// Update caches for the current comment.
-    ///
-    /// Must be called before [`place_comment`] so that handlers can query
-    /// pre-computed scan results through shared (`&self`) references.
-    pub(super) fn update(&mut self, comment: &DecoratedComment<'_>, source: &str) {
-        if let Some(preceding) = comment.preceding_node() {
-            self.preceding
-                .scan(preceding.end(), comment.start(), source);
-        } else {
-            self.preceding = PrecedingScanState::default();
-        }
-        if let Some(following) = comment.following_node() {
-            self.following
-                .scan(comment.end(), following.start(), source);
-            self.empty_lines
-                .scan(comment.end(), following.start(), source);
-        } else {
-            self.following = FollowingScanState::default();
-            self.empty_lines = EmptyLinesScanState::default();
-        }
-    }
-}
-
 /// Cache for `preceding.end()..comment.start()` scans.
 ///
 /// Tracks how far we've scanned from a given `preceding_end` and what
 /// tokens were found, so that later comments with the same preceding node
 /// can skip already-scanned regions.
-#[derive(Default)]
-struct PrecedingScanState {
-    /// `preceding.end()` for which this cache is valid.
-    preceding_end: TextSize,
-    /// We have scanned `preceding_end..scanned_up_to`.
+///
+/// The visitor explicitly calls [`PrecedingScanState::reset`] when
+/// `preceding_node` changes, so no position-based invalidation is needed.
+pub(super) struct PrecedingScanState(Cell<PrecedingScanData>);
+
+#[derive(Default, Clone, Copy)]
+struct PrecedingScanData {
+    /// We have scanned up to this offset from `preceding_end`.
     scanned_up_to: TextSize,
     /// Whether any `LParen` was found in the scanned range.
     found_lparen: bool,
@@ -77,50 +44,63 @@ struct PrecedingScanState {
     stopped_at_keyword: bool,
 }
 
+impl Default for PrecedingScanState {
+    fn default() -> Self {
+        Self(Cell::new(PrecedingScanData::default()))
+    }
+}
+
 impl PrecedingScanState {
     /// Returns whether an `LParen` was found in the last scanned range.
     fn has_lparen(&self) -> bool {
-        self.found_lparen
+        self.0.get().found_lparen
     }
 
     /// Returns whether any non-trivia token was found in the last scanned range.
     fn has_non_trivia(&self) -> bool {
-        self.found_non_trivia
+        self.0.get().found_non_trivia
+    }
+
+    /// Reset the cache. Called by the visitor when `preceding_node` changes.
+    pub(super) fn reset(&self) {
+        self.0.set(PrecedingScanData::default());
     }
 
     /// Scans the range `preceding_end..up_to`, extending incrementally from
     /// the last scanned position when possible.
-    fn scan(&mut self, preceding_end: TextSize, up_to: TextSize, source: &str) {
-        if preceding_end != self.preceding_end {
-            self.preceding_end = preceding_end;
-            self.scanned_up_to = preceding_end;
-            self.found_lparen = false;
-            self.found_non_trivia = false;
-            self.stopped_at_keyword = false;
+    fn scan(&self, preceding_end: TextSize, up_to: TextSize, source: &str) {
+        let mut data = self.0.get();
+
+        // Ensure we never scan before the preceding node's end.
+        if data.scanned_up_to < preceding_end {
+            data.scanned_up_to = preceding_end;
         }
 
         // Already found lparen and non-trivia — nothing more to learn.
-        if self.found_lparen && self.found_non_trivia {
+        if data.found_lparen && data.found_non_trivia {
+            self.0.set(data);
             return;
         }
 
         // If we stopped at a keyword, no point scanning further.
-        if self.stopped_at_keyword {
+        if data.stopped_at_keyword {
+            self.0.set(data);
             return;
         }
 
-        if up_to <= self.scanned_up_to {
+        if up_to <= data.scanned_up_to {
+            self.0.set(data);
             return;
         }
 
-        let range = TextRange::new(self.scanned_up_to, up_to);
+        let range = TextRange::new(data.scanned_up_to, up_to);
         let tokenizer = SimpleTokenizer::new(source, range);
         for token in tokenizer.skip_trivia() {
             if matches!(
                 token.kind,
                 SimpleTokenKind::As | SimpleTokenKind::Def | SimpleTokenKind::Class
             ) {
-                self.stopped_at_keyword = true;
+                data.stopped_at_keyword = true;
                 break;
             }
             debug_assert!(
@@ -128,14 +108,15 @@ impl PrecedingScanState {
                 "Unexpected token between nodes: `{:?}`",
                 &source[range]
             );
-            self.found_non_trivia = true;
+            data.found_non_trivia = true;
             if token.kind == SimpleTokenKind::LParen {
-                self.found_lparen = true;
+                data.found_lparen = true;
                 // Both findings are complete — no more information to learn.
                 break;
             }
         }
-        self.scanned_up_to = up_to;
+        data.scanned_up_to = up_to;
+        self.0.set(data);
     }
 }
 
@@ -145,8 +126,10 @@ impl PrecedingScanState {
 /// processed in source order (earliest first). The first comment's range
 /// `[c1.end, following.start)` is a superset of all later comments' ranges.
 /// If no `RParen` is found in the full range, no subset can contain one either.
-#[derive(Default)]
-struct FollowingScanState {
+pub(super) struct FollowingScanState(Cell<FollowingScanData>);
+
+#[derive(Default, Clone, Copy)]
+struct FollowingScanData {
     /// `following.start()` for which this cache is valid.
     following_start: TextSize,
     /// The earliest `comment.end()` from which we have scanned.
@@ -155,25 +138,34 @@ struct FollowingScanState {
     found_rparen: bool,
 }
 
+impl Default for FollowingScanState {
+    fn default() -> Self {
+        Self(Cell::new(FollowingScanData::default()))
+    }
+}
+
 impl FollowingScanState {
     /// Returns whether an `RParen` was found in the last scanned range.
     fn has_rparen(&self) -> bool {
-        self.found_rparen
+        self.0.get().found_rparen
     }
 
     /// Scans `comment_end..following_start` for an `RParen` token
     /// (before any `as`/`def`/`class` keyword), using cached results when possible.
-    fn scan(&mut self, comment_end: TextSize, following_start: TextSize, source: &str) {
-        if following_start != self.following_start {
-            self.following_start = following_start;
+    fn scan(&self, comment_end: TextSize, following_start: TextSize, source: &str) {
+        let mut data = self.0.get();
+
+        if following_start != data.following_start {
+            data.following_start = following_start;
             // Set scanned_from to following_start to force a scan on next check.
-            self.scanned_from = following_start;
-            self.found_rparen = false;
+            data.scanned_from = following_start;
+            data.found_rparen = false;
         }
 
         // If we've already scanned a superset of this range and found no RParen,
         // this subset can't contain one either.
-        if comment_end >= self.scanned_from && !self.found_rparen {
+        if comment_end >= data.scanned_from && !data.found_rparen {
+            self.0.set(data);
             return;
         }
 
@@ -198,8 +190,9 @@ impl FollowingScanState {
                 token.kind == SimpleTokenKind::RParen
             });
 
-        self.scanned_from = comment_end;
-        self.found_rparen = result;
+        data.scanned_from = comment_end;
+        data.found_rparen = result;
+        self.0.set(data);
     }
 }
 
@@ -208,8 +201,10 @@ impl FollowingScanState {
 /// When multiple comments share the same `following` node and there are no
 /// empty lines in the full range (first comment to following), all shorter
 /// ranges also have no empty lines — avoiding O(N²) re-scanning.
-#[derive(Default)]
-struct EmptyLinesScanState {
+pub(super) struct EmptyLinesScanState(Cell<EmptyLinesScanData>);
+
+#[derive(Default, Clone, Copy)]
+struct EmptyLinesScanData {
     /// `following.start()` for which this cache is valid.
     following_start: TextSize,
     /// The earliest `comment.end()` from which we have scanned.
@@ -218,49 +213,282 @@ struct EmptyLinesScanState {
     cached_count: u32,
 }
 
+impl Default for EmptyLinesScanState {
+    fn default() -> Self {
+        Self(Cell::new(EmptyLinesScanData::default()))
+    }
+}
+
 impl EmptyLinesScanState {
     /// Returns the `max_empty_lines` count from the last scan.
     fn max_empty_lines(&self) -> u32 {
-        self.cached_count
+        self.0.get().cached_count
     }
 
     /// Scans `comment_end..following_start` for empty lines,
     /// using cached results when possible.
-    fn scan(&mut self, comment_end: TextSize, following_start: TextSize, source: &str) {
-        if following_start != self.following_start {
-            self.following_start = following_start;
+    fn scan(&self, comment_end: TextSize, following_start: TextSize, source: &str) {
+        let mut data = self.0.get();
+
+        if following_start != data.following_start {
+            data.following_start = following_start;
             // Set scanned_from to following_start to force a scan on first check.
-            self.scanned_from = following_start;
-            self.cached_count = 0;
+            data.scanned_from = following_start;
+            data.cached_count = 0;
         }
 
         // If we've already scanned a superset and found no empty lines,
         // this subset can't have any either.
-        if comment_end >= self.scanned_from && self.cached_count == 0 {
+        if comment_end >= data.scanned_from && data.cached_count == 0 {
+            self.0.set(data);
             return;
         }
 
         let result = max_empty_lines(&source[TextRange::new(comment_end, following_start)]);
 
-        self.scanned_from = comment_end;
-        self.cached_count = result;
+        data.scanned_from = comment_end;
+        data.cached_count = result;
+        self.0.set(data);
+    }
+}
+
+/// Wraps a [`DecoratedComment`] together with source text and scan state
+/// references. Provides lazy-scanning proxy methods via
+/// [`PlaceComment::preceding`] and [`PlaceComment::following`].
+pub(super) struct PlaceComment<'a, 'state> {
+    comment: DecoratedComment<'a>,
+    source: &'a str,
+    preceding_scan: &'state PrecedingScanState,
+    following_scan: &'state FollowingScanState,
+    empty_lines_scan: &'state EmptyLinesScanState,
+}
+
+impl<'a, 'state> PlaceComment<'a, 'state> {
+    pub(super) fn new(
+        comment: DecoratedComment<'a>,
+        source: &'a str,
+        preceding_scan: &'state PrecedingScanState,
+        following_scan: &'state FollowingScanState,
+        empty_lines_scan: &'state EmptyLinesScanState,
+    ) -> Self {
+        Self {
+            comment,
+            source,
+            preceding_scan,
+            following_scan,
+            empty_lines_scan,
+        }
+    }
+
+    pub(super) fn enclosing_node(&self) -> AnyNodeRef<'a> {
+        self.comment.enclosing_node()
+    }
+
+    pub(super) fn preceding_node(&self) -> Option<AnyNodeRef<'a>> {
+        self.comment.preceding_node()
+    }
+
+    pub(super) fn following_node(&self) -> Option<AnyNodeRef<'a>> {
+        self.comment.following_node()
+    }
+
+    pub(super) fn line_position(&self) -> CommentLinePosition {
+        self.comment.line_position()
+    }
+
+    pub(super) fn source(&self) -> &'a str {
+        self.source
+    }
+
+    /// Returns a proxy for lazily scanning the region between the preceding
+    /// node and this comment.
+    pub(super) fn preceding(&self) -> PrecedingContext<'_> {
+        PrecedingContext {
+            node_end: self.comment.preceding_node().map(|n| n.end()),
+            comment_start: self.comment.start(),
+            scan: self.preceding_scan,
+            source: self.source,
+        }
+    }
+
+    /// Returns a proxy for lazily scanning the region between this comment
+    /// and the following node.
+    pub(super) fn following(&self) -> FollowingContext<'_> {
+        FollowingContext {
+            following_start: self.comment.following_node().map(|n| n.start()),
+            comment_end: self.comment.end(),
+            rparen_scan: self.following_scan,
+            source: self.source,
+        }
+    }
+
+    pub(super) fn into_comment(self) -> DecoratedComment<'a> {
+        self.comment
+    }
+}
+
+impl Ranged for PlaceComment<'_, '_> {
+    fn range(&self) -> TextRange {
+        self.comment.range()
+    }
+}
+
+impl<'a> From<PlaceComment<'a, '_>> for SourceComment {
+    fn from(pc: PlaceComment<'a, '_>) -> Self {
+        pc.comment.into()
+    }
+}
+
+/// Proxy returned by [`PlaceComment::preceding`] that lazily scans the
+/// region between the preceding node and the comment on first access.
+pub(super) struct PrecedingContext<'a> {
+    node_end: Option<TextSize>,
+    comment_start: TextSize,
+    scan: &'a PrecedingScanState,
+    source: &'a str,
+}
+
+impl PrecedingContext<'_> {
+    fn has_lparen(&self) -> bool {
+        self.ensure_scanned();
+        self.scan.has_lparen()
+    }
+
+    fn has_non_trivia(&self) -> bool {
+        self.ensure_scanned();
+        self.scan.has_non_trivia()
+    }
+
+    fn ensure_scanned(&self) {
+        if let Some(end) = self.node_end {
+            self.scan.scan(end, self.comment_start, self.source);
+        }
+    }
+}
+
+/// Proxy returned by [`PlaceComment::following`] that lazily scans the
+/// region between the comment and the following node on first access.
+pub(super) struct FollowingContext<'a> {
+    following_start: Option<TextSize>,
+    comment_end: TextSize,
+    rparen_scan: &'a FollowingScanState,
+    source: &'a str,
+}
+
+impl FollowingContext<'_> {
+    fn has_rparen(&self) -> bool {
+        if let Some(start) = self.following_start {
+            self.rparen_scan.scan(self.comment_end, start, self.source);
+            self.rparen_scan.has_rparen()
+        } else {
+            false
+        }
+    }
+}
+
+/// Result type for the top-level comment placement chain.
+///
+/// Like [`CommentPlacement`] but carries [`PlaceComment`] in the `Default`
+/// variant so that scan state references can be threaded through `or_else`
+/// chains.
+enum PlaceResult<'a, 'state> {
+    Leading {
+        node: AnyNodeRef<'a>,
+        comment: SourceComment,
+    },
+    Trailing {
+        node: AnyNodeRef<'a>,
+        comment: SourceComment,
+    },
+    Dangling {
+        node: AnyNodeRef<'a>,
+        comment: SourceComment,
+    },
+    Default(PlaceComment<'a, 'state>),
+}
+
+impl<'a, 'state> PlaceResult<'a, 'state> {
+    fn leading(node: impl Into<AnyNodeRef<'a>>, comment: PlaceComment<'a, 'state>) -> Self {
+        Self::Leading {
+            node: node.into(),
+            comment: comment.into(),
+        }
+    }
+
+    fn trailing(node: impl Into<AnyNodeRef<'a>>, comment: PlaceComment<'a, 'state>) -> Self {
+        Self::Trailing {
+            node: node.into(),
+            comment: comment.into(),
+        }
+    }
+
+    fn dangling(node: impl Into<AnyNodeRef<'a>>, comment: PlaceComment<'a, 'state>) -> Self {
+        Self::Dangling {
+            node: node.into(),
+            comment: comment.into(),
+        }
+    }
+
+    fn or_else<F: FnOnce(PlaceComment<'a, 'state>) -> PlaceResult<'a, 'state>>(
+        self,
+        f: F,
+    ) -> Self {
+        match self {
+            Self::Default(pc) => f(pc),
+            _ => self,
+        }
+    }
+
+    /// Wrap a [`CommentPlacement`] (returned by sub-handlers) back into a
+    /// [`PlaceResult`], re-attaching scan state for the `Default` case.
+    fn from_placement(
+        placement: CommentPlacement<'a>,
+        source: &'a str,
+        preceding_scan: &'state PrecedingScanState,
+        following_scan: &'state FollowingScanState,
+        empty_lines_scan: &'state EmptyLinesScanState,
+    ) -> Self {
+        match placement {
+            CommentPlacement::Leading { node, comment } => PlaceResult::Leading { node, comment },
+            CommentPlacement::Trailing { node, comment } => {
+                PlaceResult::Trailing { node, comment }
+            }
+            CommentPlacement::Dangling { node, comment } => {
+                PlaceResult::Dangling { node, comment }
+            }
+            CommentPlacement::Default(decorated) => PlaceResult::Default(PlaceComment {
+                comment: decorated,
+                source,
+                preceding_scan,
+                following_scan,
+                empty_lines_scan,
+            }),
+        }
+    }
+
+    fn into_placement(self) -> CommentPlacement<'a> {
+        match self {
+            PlaceResult::Leading { node, comment } => CommentPlacement::Leading { node, comment },
+            PlaceResult::Trailing { node, comment } => CommentPlacement::Trailing { node, comment },
+            PlaceResult::Dangling { node, comment } => CommentPlacement::Dangling { node, comment },
+            PlaceResult::Default(pc) => CommentPlacement::Default(pc.comment),
+        }
     }
 }
 
 /// Manually attach comments to nodes that the default placement gets wrong.
 ///
-/// The caller must invoke [`PlacementState::update`] before calling this
-/// function so that the scan caches are current for the given comment.
+/// Scan caches are lazily populated through [`PlaceComment::preceding`]
+/// and [`PlaceComment::following`] — no eager `update()` call needed.
 pub(super) fn place_comment<'a>(
-    comment: DecoratedComment<'a>,
+    comment: PlaceComment<'a, '_>,
     comment_ranges: &CommentRanges,
-    source: &str,
-    state: &PlacementState,
 ) -> CommentPlacement<'a> {
-    handle_parenthesized_comment(comment, state)
-        .or_else(|comment| handle_end_of_line_comment_around_body(comment, source))
-        .or_else(|comment| handle_own_line_comment_around_body(comment, source, state))
-        .or_else(|comment| handle_enclosed_comment(comment, comment_ranges, source))
+    handle_parenthesized_comment(comment)
+        .or_else(handle_end_of_line_comment_around_body)
+        .or_else(handle_own_line_comment_around_body)
+        .or_else(|comment| handle_enclosed_comment(comment, comment_ranges))
+        .into_placement()
 }
 
 /// Handle parenthesized comments. A parenthesized comment is a comment that appears within a
@@ -301,10 +529,9 @@ pub(super) fn place_comment<'a>(
 /// the preceding node and the comment, then the comment is a trailing comment of the preceding
 /// node. If we find an opening parenthesis between the comment and the following node, then the
 /// comment is a leading comment of the following node.
-fn handle_parenthesized_comment<'a>(
-    comment: DecoratedComment<'a>,
-    state: &PlacementState,
-) -> CommentPlacement<'a> {
+fn handle_parenthesized_comment<'a, 'state>(
+    comment: PlaceComment<'a, 'state>,
+) -> PlaceResult<'a, 'state> {
     // As a special-case, ignore comments within f-strings, like:
     // ```python
     // (
@@ -316,15 +543,15 @@ fn handle_parenthesized_comment<'a>(
     // concatenation. But the expression ranges only include the `1` and `2` above, so we also
     // can't lex the contents between them.
     if comment.enclosing_node().is_expr_f_string() {
-        return CommentPlacement::Default(comment);
+        return PlaceResult::Default(comment);
     }
 
     let Some(preceding) = comment.preceding_node() else {
-        return CommentPlacement::Default(comment);
+        return PlaceResult::Default(comment);
     };
 
     let Some(following) = comment.following_node() else {
-        return CommentPlacement::Default(comment);
+        return PlaceResult::Default(comment);
     };
 
     // TODO(charlie): Assert that there are no bogus tokens in these ranges. There are a few cases
@@ -364,8 +591,8 @@ fn handle_parenthesized_comment<'a>(
     //     ),
     // ]
     // ```
-    if state.preceding.has_lparen() {
-        return CommentPlacement::leading(following, comment);
+    if comment.preceding().has_lparen() {
+        return PlaceResult::leading(following, comment);
     }
 
     // Search for comments that to the right of a parenthesized node, e.g.:
@@ -377,20 +604,27 @@ fn handle_parenthesized_comment<'a>(
     //     y
     // ]
     // ```
-    if state.following.has_rparen() {
-        return CommentPlacement::trailing(preceding, comment);
+    if comment.following().has_rparen() {
+        return PlaceResult::trailing(preceding, comment);
     }
 
-    CommentPlacement::Default(comment)
+    PlaceResult::Default(comment)
 }
 
 /// Handle a comment that is enclosed by a node.
-fn handle_enclosed_comment<'a>(
-    comment: DecoratedComment<'a>,
+fn handle_enclosed_comment<'a, 'state>(
+    comment: PlaceComment<'a, 'state>,
     comment_ranges: &CommentRanges,
-    source: &str,
-) -> CommentPlacement<'a> {
-    match comment.enclosing_node() {
+) -> PlaceResult<'a, 'state> {
+    let PlaceComment {
+        comment,
+        source,
+        preceding_scan,
+        following_scan,
+        empty_lines_scan,
+    } = comment;
+
+    let result = match comment.enclosing_node() {
         AnyNodeRef::Parameters(parameters) => {
             handle_parameters_separator_comment(comment, parameters, source).or_else(|comment| {
                 if are_parameters_parenthesized(parameters, source) {
@@ -441,45 +675,7 @@ fn handle_enclosed_comment<'a>(
             handle_trailing_expression_starred_star_end_of_line_comment(comment, starred, source)
         }
         AnyNodeRef::ExprSubscript(expr_subscript) => {
-            if let Expr::Slice(expr_slice) = expr_subscript.slice.as_ref() {
-                return handle_slice_comments(comment, expr_slice, comment_ranges, source);
-            }
-
-            // Handle non-slice subscript end-of-line comments coming after the `[`
-            // ```python
-            // repro(
-            //     "some long string that takes up some space"
-            //  )[  # some long comment also taking up space
-            //     0
-            // ]
-            // ```
-            if comment.line_position().is_end_of_line()
-                && expr_subscript.value.end() < comment.start()
-            {
-                // Ensure that there are no tokens between the open bracket and the comment.
-                let mut lexer = SimpleTokenizer::new(
-                    source,
-                    TextRange::new(expr_subscript.value.end(), comment.start()),
-                )
-                .skip_trivia();
-
-                // Skip to after the opening parenthesis (may skip some closing parentheses of value)
-                if !lexer
-                    .by_ref()
-                    .any(|token| token.kind() == SimpleTokenKind::LBracket)
-                {
-                    return CommentPlacement::Default(comment);
-                }
-
-                // If there are no additional tokens between the open parenthesis and the comment, then
-                // it should be attached as a dangling comment on the brackets, rather than a leading
-                // comment on the first argument.
-                if lexer.next().is_none() {
-                    return CommentPlacement::dangling(expr_subscript, comment);
-                }
-            }
-
-            CommentPlacement::Default(comment)
+            handle_subscript_comment(comment, expr_subscript, comment_ranges, source)
         }
         AnyNodeRef::ModModule(module) => {
             handle_trailing_module_comment(module, comment).or_else(|comment| {
@@ -521,23 +717,7 @@ fn handle_enclosed_comment<'a>(
         AnyNodeRef::FString(fstring) => CommentPlacement::dangling(fstring, comment),
         AnyNodeRef::TString(tstring) => CommentPlacement::dangling(tstring, comment),
         AnyNodeRef::InterpolatedElement(element) => {
-            if let Some(preceding) = comment.preceding_node() {
-                // Own line comment before format specifier
-                // ```py
-                // aaaaaaaaaaa = f"""asaaaaaaaaaaaaaaaa {
-                //    aaaaaaaaaaaa + bbbbbbbbbbbb + ccccccccccccccc + dddddddd
-                //    # comment
-                //    :.3f} cccccccccc"""
-                // ```
-                if comment.line_position().is_own_line()
-                    && element.format_spec.is_some()
-                    && comment.following_node().is_some()
-                {
-                    return CommentPlacement::trailing(preceding, comment);
-                }
-            }
-
-            handle_bracketed_end_of_line_comment(comment, source)
+            handle_interpolated_element_comment(comment, element, source)
         }
 
         AnyNodeRef::ExprList(_)
@@ -587,17 +767,20 @@ fn handle_enclosed_comment<'a>(
         }
 
         _ => CommentPlacement::Default(comment),
-    }
+    };
+
+    PlaceResult::from_placement(result, source, preceding_scan, following_scan, empty_lines_scan)
 }
 
 /// Handle an end-of-line comment around a body.
-fn handle_end_of_line_comment_around_body<'a>(
-    comment: DecoratedComment<'a>,
-    source: &str,
-) -> CommentPlacement<'a> {
+fn handle_end_of_line_comment_around_body<'a, 'state>(
+    comment: PlaceComment<'a, 'state>,
+) -> PlaceResult<'a, 'state> {
     if comment.line_position().is_own_line() {
-        return CommentPlacement::Default(comment);
+        return PlaceResult::Default(comment);
     }
+
+    let source = comment.source();
 
     // Handle comments before the first statement in a body
     // ```python
@@ -613,7 +796,7 @@ fn handle_end_of_line_comment_around_body<'a>(
                 .next()
                 .is_none()
         {
-            return CommentPlacement::dangling(comment.enclosing_node(), comment);
+            return PlaceResult::dangling(comment.enclosing_node(), comment);
         }
     }
 
@@ -634,11 +817,11 @@ fn handle_end_of_line_comment_around_body<'a>(
                 std::iter::successors(Some(last_child), AnyNodeRef::last_child_in_body)
                     .last()
                     .unwrap_or(last_child);
-            return CommentPlacement::trailing(innermost_child, comment);
+            return PlaceResult::trailing(innermost_child, comment);
         }
     }
 
-    CommentPlacement::Default(comment)
+    PlaceResult::Default(comment)
 }
 
 /// Handles own-line comments around a body (at the end of the body, at the end of the header
@@ -660,19 +843,17 @@ fn handle_end_of_line_comment_around_body<'a>(
 /// ):
 ///     pass
 /// ```
-fn handle_own_line_comment_around_body<'a>(
-    comment: DecoratedComment<'a>,
-    source: &str,
-    state: &PlacementState,
-) -> CommentPlacement<'a> {
+fn handle_own_line_comment_around_body<'a, 'state>(
+    comment: PlaceComment<'a, 'state>,
+) -> PlaceResult<'a, 'state> {
     if comment.line_position().is_end_of_line() {
-        return CommentPlacement::Default(comment);
+        return PlaceResult::Default(comment);
     }
 
     // If the following is the first child in an alternative body, this must be the last child in
     // the previous one
     let Some(preceding) = comment.preceding_node() else {
-        return CommentPlacement::Default(comment);
+        return PlaceResult::Default(comment);
     };
 
     // If there's any non-trivia token between the preceding node and the comment, then it means
@@ -685,18 +866,30 @@ fn handle_own_line_comment_around_body<'a>(
     //     # default placement comment
     //     def inline_after_else(): ...
     // ```
-    if state.preceding.has_non_trivia() {
-        return CommentPlacement::Default(comment);
+    if comment.preceding().has_non_trivia() {
+        return PlaceResult::Default(comment);
     }
 
+    let PlaceComment {
+        comment,
+        source,
+        preceding_scan,
+        following_scan,
+        empty_lines_scan,
+    } = comment;
+
     // Check if we're between bodies and should attach to the following body.
-    handle_own_line_comment_between_branches(comment, preceding, source)
+    let result = handle_own_line_comment_between_branches(comment, preceding, source)
         .or_else(|comment| {
             // Otherwise, there's no following branch or the indentation is too deep, so attach to the
             // recursively last statement in the preceding body with the matching indentation.
             handle_own_line_comment_after_branch(comment, preceding, source)
         })
-        .or_else(|comment| handle_own_line_comment_between_statements(comment, state))
+        .or_else(|comment| {
+            handle_own_line_comment_between_statements(comment, empty_lines_scan, source)
+        });
+
+    PlaceResult::from_placement(result, source, preceding_scan, following_scan, empty_lines_scan)
 }
 
 /// Handles own-line comments between statements. If an own-line comment is between two statements,
@@ -721,7 +914,8 @@ fn handle_own_line_comment_around_body<'a>(
 /// ```
 fn handle_own_line_comment_between_statements<'a>(
     comment: DecoratedComment<'a>,
-    state: &PlacementState,
+    empty_lines_scan: &EmptyLinesScanState,
+    source: &str,
 ) -> CommentPlacement<'a> {
     let Some(preceding) = comment.preceding_node() else {
         return CommentPlacement::Default(comment);
@@ -745,6 +939,9 @@ fn handle_own_line_comment_between_statements<'a>(
         return CommentPlacement::Default(comment);
     }
 
+    // Trigger the lazy scan for the range between comment and following.
+    empty_lines_scan.scan(comment.end(), following.start(), source);
+
     // If the comment is directly attached to the following statement; make it a leading
     // comment:
     // ```python
@@ -761,7 +958,7 @@ fn handle_own_line_comment_between_statements<'a>(
     //
     // y = 2
     // ```
-    if state.empty_lines.max_empty_lines() == 0 {
+    if empty_lines_scan.max_empty_lines() == 0 {
         CommentPlacement::leading(following, comment)
     } else {
         CommentPlacement::trailing(preceding, comment)
@@ -1323,6 +1520,84 @@ fn handle_module_level_own_line_comment_before_class_or_function_comment<'a>(
 ///     :2
 /// ]
 /// ```
+/// Handles comments enclosed by a subscript expression.
+///
+/// Delegates to [`handle_slice_comments`] when the subscript is a slice, and
+/// otherwise attaches end-of-line comments after the opening `[` as dangling.
+fn handle_subscript_comment<'a>(
+    comment: DecoratedComment<'a>,
+    expr_subscript: &'a ast::ExprSubscript,
+    comment_ranges: &CommentRanges,
+    source: &str,
+) -> CommentPlacement<'a> {
+    if let Expr::Slice(expr_slice) = expr_subscript.slice.as_ref() {
+        return handle_slice_comments(comment, expr_slice, comment_ranges, source);
+    }
+
+    // Handle non-slice subscript end-of-line comments coming after the `[`
+    // ```python
+    // repro(
+    //     "some long string that takes up some space"
+    //  )[  # some long comment also taking up space
+    //     0
+    // ]
+    // ```
+    if comment.line_position().is_end_of_line() && expr_subscript.value.end() < comment.start() {
+        // Ensure that there are no tokens between the open bracket and the comment.
+        let mut lexer = SimpleTokenizer::new(
+            source,
+            TextRange::new(expr_subscript.value.end(), comment.start()),
+        )
+        .skip_trivia();
+
+        // Skip to after the opening parenthesis (may skip some closing parentheses of value)
+        if !lexer
+            .by_ref()
+            .any(|token| token.kind() == SimpleTokenKind::LBracket)
+        {
+            return CommentPlacement::Default(comment);
+        }
+
+        // If there are no additional tokens between the open parenthesis and the comment, then
+        // it should be attached as a dangling comment on the brackets, rather than a leading
+        // comment on the first argument.
+        if lexer.next().is_none() {
+            return CommentPlacement::dangling(expr_subscript, comment);
+        }
+    }
+
+    CommentPlacement::Default(comment)
+}
+
+/// Handles comments enclosed by an interpolated element (f-string/t-string).
+///
+/// Own-line comments before the format specifier are attached as trailing on
+/// the preceding expression; other comments are handled by
+/// [`handle_bracketed_end_of_line_comment`].
+fn handle_interpolated_element_comment<'a>(
+    comment: DecoratedComment<'a>,
+    element: &'a ast::InterpolatedElement,
+    source: &str,
+) -> CommentPlacement<'a> {
+    if let Some(preceding) = comment.preceding_node() {
+        // Own line comment before format specifier
+        // ```py
+        // aaaaaaaaaaa = f"""asaaaaaaaaaaaaaaaa {
+        //    aaaaaaaaaaaa + bbbbbbbbbbbb + ccccccccccccccc + dddddddd
+        //    # comment
+        //    :.3f} cccccccccc"""
+        // ```
+        if comment.line_position().is_own_line()
+            && element.format_spec.is_some()
+            && comment.following_node().is_some()
+        {
+            return CommentPlacement::trailing(preceding, comment);
+        }
+    }
+
+    handle_bracketed_end_of_line_comment(comment, source)
+}
+
 fn handle_slice_comments<'a>(
     comment: DecoratedComment<'a>,
     expr_slice: &'a ast::ExprSlice,
@@ -2656,7 +2931,7 @@ mod tests {
         // Simulates: `apply(x)\n# c1\n# c2\n# c3\napply(x)`
         let source = "apply(x)\n# c1\n# c2\n# c3\napply(x)";
         let preceding_end = TextSize::new(9); // after first `apply(x)\n`
-        let mut state = PrecedingScanState::default();
+        let state = PrecedingScanState::default();
 
         // First comment at offset 9 — nothing between preceding_end and itself
         state.scan(preceding_end, TextSize::new(9), source);
@@ -2672,7 +2947,8 @@ mod tests {
         state.scan(preceding_end, TextSize::new(19), source);
         assert!(!state.has_lparen());
 
-        // Different preceding_end resets the cache
+        // Reset and scan from a new preceding_end
+        state.reset();
         let new_preceding_end = TextSize::new(21);
         state.scan(new_preceding_end, TextSize::new(25), source);
         assert!(!state.has_lparen());
@@ -2683,7 +2959,7 @@ mod tests {
         // `x\n(\n# c1\n# c2`
         let source = "x\n(\n# c1\n# c2";
         let preceding_end = TextSize::new(2); // after `x\n`
-        let mut state = PrecedingScanState::default();
+        let state = PrecedingScanState::default();
 
         // First comment: should find `(` between preceding and comment
         state.scan(preceding_end, TextSize::new(4), source);
@@ -2699,7 +2975,7 @@ mod tests {
         //  0  2  4
         let source = "x\n,\n# c1\n# c2";
         let preceding_end = TextSize::new(2); // after `x\n`
-        let mut state = PrecedingScanState::default();
+        let state = PrecedingScanState::default();
 
         // First comment: should find `,` (non-trivia, not LParen)
         state.scan(preceding_end, TextSize::new(4), source);
@@ -2716,7 +2992,7 @@ mod tests {
         //  0  2            14
         let source = "x\ndef foo():\n# c1\n# c2";
         let preceding_end = TextSize::new(2); // after `x\n`
-        let mut state = PrecedingScanState::default();
+        let state = PrecedingScanState::default();
 
         // First comment: scan stops at `def` keyword — no LParen reported
         // (even though `(` and `)` appear after `def`, the scan stops before
@@ -2735,7 +3011,7 @@ mod tests {
         let source = "# c1\n# c2\n# c3\napply(x)";
         // following_start = start of `apply(x)`, not end of source
         let following_start = TextSize::new(15);
-        let mut state = FollowingScanState::default();
+        let state = FollowingScanState::default();
 
         // First comment scans [4, 15), finds only trivia — no RParen
         state.scan(TextSize::new(4), following_start, source);
@@ -2753,7 +3029,7 @@ mod tests {
         //  0    5 7
         let source = "# c1\n)\nx";
         let following_start = TextSize::new(7); // start of `x`
-        let mut state = FollowingScanState::default();
+        let state = FollowingScanState::default();
 
         // First comment: finds `)` in [4, 7)
         state.scan(TextSize::new(4), following_start, source);
@@ -2769,7 +3045,7 @@ mod tests {
         //  0    5    10   15
         let source = "# c1\n# c2\n# c3\napply(x)";
         let following_start = TextSize::new(15);
-        let mut state = EmptyLinesScanState::default();
+        let state = EmptyLinesScanState::default();
 
         // First comment: scans [4, 15), no empty lines between comments
         state.scan(TextSize::new(4), following_start, source);
@@ -2787,7 +3063,7 @@ mod tests {
         //  0    5    10 12
         let source = "# c1\n# c2\n\napply(x)";
         let following_start = TextSize::new(11);
-        let mut state = EmptyLinesScanState::default();
+        let state = EmptyLinesScanState::default();
 
         // First comment [4, 11): includes blank line between c2 and apply
         state.scan(TextSize::new(4), following_start, source);
