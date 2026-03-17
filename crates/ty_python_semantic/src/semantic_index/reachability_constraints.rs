@@ -847,12 +847,12 @@ impl ReachabilityConstraints {
                 let node = self.get_interior_node(id);
                 let predicate = predicates[node.atom];
 
-                // `IsNonTerminalCall` predicates don't narrow any variable; they only
+                // `ReturnsNever` predicates don't narrow any variable; they only
                 // affect reachability. Evaluate the predicate to determine which
                 // path(s) are reachable, rather than walking both branches.
-                // `IsNonTerminalCall` always evaluates to `AlwaysTrue` or `AlwaysFalse`,
+                // `ReturnsNever` always evaluates to `AlwaysTrue` or `AlwaysFalse`,
                 // never `Ambiguous`.
-                if matches!(predicate.node, PredicateNode::IsNonTerminalCall(_)) {
+                if matches!(predicate.node, PredicateNode::ReturnsNever(_)) {
                     return match Self::analyze_single(db, &predicate) {
                         Truthiness::AlwaysTrue => self.narrow_by_constraint_inner(
                             db,
@@ -871,7 +871,7 @@ impl ReachabilityConstraints {
                             accumulated,
                         ),
                         Truthiness::Ambiguous => {
-                            unreachable!("`IsNonTerminalCall` predicates should never be Ambiguous")
+                            unreachable!("ReturnsNever predicates should never be Ambiguous")
                         }
                     };
                 }
@@ -1089,12 +1089,12 @@ impl ReachabilityConstraints {
                     .bool(db)
                     .negate_if(!predicate.is_positive)
             }
-            PredicateNode::IsNonTerminalCall(call_expr) => {
+            PredicateNode::ReturnsNever(call_expr) => {
                 let call_expr_ty = infer_expression_type(db, call_expr, TypeContext::default());
                 if call_expr_ty.is_equivalent_to(db, Type::Never) {
-                    Truthiness::AlwaysFalse
-                } else {
                     Truthiness::AlwaysTrue
+                } else {
+                    Truthiness::AlwaysFalse
                 }
                 .negate_if(!predicate.is_positive)
             }

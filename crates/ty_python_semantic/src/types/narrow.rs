@@ -74,7 +74,7 @@ pub(crate) fn infer_narrowing_constraint<'db>(
                 all_negative_narrowing_constraints_for_pattern(db, pattern)
             }
         }
-        PredicateNode::IsNonTerminalCall(_) => return None,
+        PredicateNode::ReturnsNever(_) => return None,
         PredicateNode::StarImportPlaceholder(_) => return None,
     };
 
@@ -601,7 +601,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             PredicateNode::Pattern(pattern) => {
                 self.evaluate_pattern_predicate(pattern, self.is_positive)
             }
-            PredicateNode::IsNonTerminalCall(_) => return None,
+            PredicateNode::ReturnsNever(_) => return None,
             PredicateNode::StarImportPlaceholder(_) => return None,
         };
 
@@ -761,7 +761,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         match self.predicate {
             PredicateNode::Expression(expression) => expression.scope(self.db),
             PredicateNode::Pattern(pattern) => pattern.scope(self.db),
-            PredicateNode::IsNonTerminalCall(call_expr) => call_expr.scope(self.db),
+            PredicateNode::ReturnsNever(call_expr) => call_expr.scope(self.db),
             PredicateNode::StarImportPlaceholder(definition) => definition.scope(self.db),
         }
     }

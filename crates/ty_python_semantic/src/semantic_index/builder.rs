@@ -1055,8 +1055,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         PossiblyNarrowedPlacesBuilder::new(self.db, place_table)
                             .pattern(pattern, module)
                     }
-                    PredicateNode::IsNonTerminalCall(_)
-                    | PredicateNode::StarImportPlaceholder(_) => {
+                    PredicateNode::ReturnsNever(_) | PredicateNode::StarImportPlaceholder(_) => {
                         // These predicates don't narrow any places
                         PossiblyNarrowedPlaces::default()
                     }
@@ -2797,8 +2796,8 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     let call_expr = self.add_standalone_expression(value.as_ref());
 
                     let predicate = Predicate {
-                        node: PredicateNode::IsNonTerminalCall(call_expr),
-                        is_positive: true,
+                        node: PredicateNode::ReturnsNever(call_expr),
+                        is_positive: false,
                     };
                     let constraint = self
                         .record_reachability_constraint(PredicateOrLiteral::Predicate(predicate));
