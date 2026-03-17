@@ -6,7 +6,6 @@ use crate::place::{DefinedPlace, Place};
 use crate::types::constraints::{
     ConstraintSetBuilder, IteratorConstraintsExtension, OptionConstraintsExtension,
 };
-use crate::types::cyclic::PairVisitor;
 use crate::types::enums::is_single_member_enum;
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::{
@@ -500,7 +499,7 @@ impl<'db> Type<'db> {
     }
 }
 
-/// A [`PairVisitor`] that is used in `has_relation_to` methods.
+/// A [`CycleDetector`] that is used in `has_relation_to` methods.
 pub(crate) type HasRelationToVisitor<'db, 'c> =
     CycleDetector<TypeRelation, (Type<'db>, Type<'db>, TypeRelation), ConstraintSet<'db, 'c>>;
 
@@ -510,8 +509,9 @@ impl<'db, 'c> HasRelationToVisitor<'db, 'c> {
     }
 }
 
-/// A [`PairVisitor`] that is used in `is_disjoint_from` methods.
-pub(crate) type IsDisjointVisitor<'db, 'c> = PairVisitor<'db, IsDisjoint, ConstraintSet<'db, 'c>>;
+/// A [`CycleDetector`] that is used in `is_disjoint_from` methods.
+pub(crate) type IsDisjointVisitor<'db, 'c> =
+    CycleDetector<IsDisjoint, (Type<'db>, Type<'db>), ConstraintSet<'db, 'c>>;
 
 #[derive(Debug)]
 pub(crate) struct IsDisjoint;
