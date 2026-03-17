@@ -563,6 +563,21 @@ reveal_type(Class8[int]())  # revealed: Class8[list[int]]
 reveal_type(Class8[str]())  # revealed: Class8[list[str]]
 ```
 
+### `__new__` returning `Self` preserves explicit specialization
+
+```py
+from typing import Generic, TypeVar
+from typing_extensions import Self
+
+T = TypeVar("T")
+
+class Class9(Generic[T]):
+    def __new__(cls, x: T) -> Self:
+        return super().__new__(cls)
+
+reveal_type(Class9[int](1))  # revealed: Class9[int]
+```
+
 ### `__new__` can fix generic specialization and still validate `__init__`
 
 ```toml

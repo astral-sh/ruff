@@ -762,6 +762,13 @@ fn constructor_return_outcome<'db>(
     }
 }
 
+fn returns_self<'db>(db: &'db dyn Db, overload: &Binding<'db>) -> bool {
+    matches!(
+        overload.signature.return_ty.resolve_type_alias(db),
+        Type::TypeVar(return_typevar) if return_typevar.typevar(db).is_self(db)
+    )
+}
+
 fn returns_cls_typevar<'db>(db: &'db dyn Db, overload: &Binding<'db>) -> bool {
     let Type::TypeVar(return_typevar) = overload.signature.return_ty.resolve_type_alias(db) else {
         return false;
@@ -5621,7 +5628,7 @@ impl<'db> Binding<'db> {
         constructor_context: Option<ConstructorContext<'db>>,
     ) {
         let return_ty = self
-            .constructor_instance_return_override(constructor_context)
+            .constructor_instance_return_override(db, constructor_context)
             .unwrap_or(self.signature.return_ty);
         let parameters = self.signature.parameters();
         let mut matcher =
@@ -5646,9 +5653,6 @@ impl<'db> Binding<'db> {
         for (keywords_index, keywords_type) in keywords_arguments {
             matcher.match_keyword_variadic(db, keywords_index, keywords_type);
         }
-        // `__init__` doesn't determine the constructor return type, and constructor methods with
-        // an `Unknown` return are treated as instance-returning. Other constructor methods keep
-        // their declared return type so generic information remains visible to inference.
         self.return_ty = return_ty;
         self.parameter_tys = vec![None; parameters.len()].into_boxed_slice();
         self.variadic_argument_matched_to_variadic_parameter =
@@ -5696,13 +5700,23 @@ impl<'db> Binding<'db> {
         self.return_ty = return_ty;
     }
 
+    /// For constructors, there are cases where we need to assume the return type is "an instance
+    /// of the type being constructed", rather than simply the annotated return type. The most
+    /// obvious case is when handling `__init__`, which is an initializer, not a constructor, and
+    /// always returns `None`. But even for other methods (e.g. `__new__`), we should assume that
+    /// an un-annotated return type is really "instance of the type being constructed" to allow for
+    /// proper inference of generic constructors. And we also need to apply this handling to
+    /// `Self`, since we need this substitution before we can do full generic inference on the
+    /// call.
     pub(crate) fn constructor_instance_return_override(
         &self,
+        db: &'db dyn Db,
         constructor_context: Option<ConstructorContext<'db>>,
     ) -> Option<Type<'db>> {
         let constructor_context = constructor_context?;
         match constructor_context.kind() {
             kind if kind.is_init() => Some(constructor_context.instance_type()),
+            _ if returns_self(db, self) => Some(constructor_context.instance_type()),
             _ if self.signature.return_ty.is_unknown() => Some(constructor_context.instance_type()),
             _ => None,
         }
@@ -5713,7 +5727,7 @@ impl<'db> Binding<'db> {
         db: &'db dyn Db,
         constructor_context: Option<ConstructorContext<'db>>,
     ) -> Option<Type<'db>> {
-        self.constructor_instance_return_override(constructor_context)
+        self.constructor_instance_return_override(db, constructor_context)
             .or_else(|| {
                 constructor_context
                     .filter(|_| returns_cls_typevar(db, self))
