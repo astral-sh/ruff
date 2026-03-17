@@ -5200,7 +5200,7 @@ impl<'db> Type<'db> {
         // Universal depth guard: protects against stack overflow from any source
         // (recursive aliases, ever-growing specializations, deeply nested generics, etc.)
         let Some(_depth) = visitor.enter_depth() else {
-            return Type::any();
+            return ApplyTypeMappingVisitor::FALLBACK;
         };
 
         // If we are binding `typing.Self`, and this type is what we are binding `Self` to, return
