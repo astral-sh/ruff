@@ -1775,12 +1775,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             if formal_is_single_paramspec {
                 let when = actual_callable
                     .signatures(self.db)
-                    .when_constraint_set_assignable_to(
-                        self.db,
-                        formal_signature,
-                        self.constraints,
-                        self.inferable,
-                    );
+                    .when_constraint_set_assignable_to(self.db, formal_signature, self.constraints);
                 self.add_type_mappings_from_constraint_set(formal, when, &mut *f)?;
             } else {
                 // An overloaded actual callable is compatible with the formal signature if at
@@ -1792,7 +1787,6 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                         self.db,
                         formal_signature,
                         self.constraints,
-                        self.inferable,
                     );
                     if self
                         .add_type_mappings_from_constraint_set(formal, when, &mut *f)
@@ -2244,7 +2238,6 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                             self.db,
                             formal,
                             self.constraints,
-                            self.inferable,
                         );
                         // For protocol inference via constraint sets, we currently treat
                         // unsatisfiable results as "no inference" instead of an immediate

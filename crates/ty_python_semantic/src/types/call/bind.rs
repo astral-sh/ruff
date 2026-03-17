@@ -3755,12 +3755,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 tcx.filter_union(self.db, |ty| ty.class_specialization(self.db).is_some())
                     .class_specialization(self.db)?;
 
-                let set = return_ty.when_constraint_set_assignable_to(
-                    self.db,
-                    tcx,
-                    constraints,
-                    self.inferable_typevars,
-                );
+                let set = return_ty.when_constraint_set_assignable_to(self.db, tcx, constraints);
 
                 // Use `solutions_with` to determine per-typevar variance from the raw
                 // lower/upper bounds on each BDD path.

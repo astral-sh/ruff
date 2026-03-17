@@ -1890,13 +1890,7 @@ impl<'db> Type<'db> {
             .annotation
             .and_then(|tcx| {
                 let alias_instance = Type::instance(db, class_literal.identity_specialization(db));
-                let inferable = generic_context.inferable_typevars(db);
-                let set = alias_instance.when_constraint_set_assignable_to(
-                    db,
-                    tcx,
-                    constraints,
-                    inferable,
-                );
+                let set = alias_instance.when_constraint_set_assignable_to(db, tcx, constraints);
                 match set.solutions(db, constraints) {
                     Solutions::Constrained(solutions) => {
                         let mut mappings = FxHashMap::default();

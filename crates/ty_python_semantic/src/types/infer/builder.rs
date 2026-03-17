@@ -5180,12 +5180,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         let return_ty = overload
                             .constructor_instance_type
                             .unwrap_or(overload.signature.return_ty);
-                        let inferable = generic_context.inferable_typevars(db);
                         let set = return_ty.when_constraint_set_assignable_to(
                             db,
                             declared_return_ty,
                             &constraints,
-                            inferable,
                         );
                         if let Solutions::Constrained(solutions) = set.solutions(db, &constraints) {
                             for solution in solutions.iter() {
@@ -6095,12 +6093,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let db = self.db();
                 let collection_instance = Type::instance(db, ClassType::Generic(collection_alias));
 
-                let set = collection_instance.when_constraint_set_assignable_to(
-                    db,
-                    tcx,
-                    &constraints,
-                    inferable,
-                );
+                let set =
+                    collection_instance.when_constraint_set_assignable_to(db, tcx, &constraints);
 
                 // Use `solutions_with_inferable` to capture per-typevar variance from the raw
                 // lower/upper bounds on each BDD path. We must use the inferable-aware variant so
