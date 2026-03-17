@@ -1,7 +1,5 @@
 //! When analyzing a call site, we create _bindings_, which match and type-check the actual
-//! arguments against the parameters of the callable. Like with
-//! [signatures][crate::types::signatures], we have to handle the fact that the callable might be a
-//! union of types, each of which might contain multiple overloads.
+//! arguments against the parameters of the callable.
 //!
 //! ### Tracing
 //!
@@ -509,16 +507,7 @@ impl<'db> BindingsElement<'db> {
     }
 
     fn return_type(&self, db: &'db dyn Db) -> Type<'db> {
-        let binding_return_types = self
-            .items
-            .iter()
-            .map(|item| item.return_type(db))
-            .collect::<Vec<_>>();
-
-        match binding_return_types.as_slice() {
-            [single] => *single,
-            _ => IntersectionType::from_elements(db, binding_return_types),
-        }
+        IntersectionType::from_elements(db, self.items.iter().map(|item| item.return_type(db)))
     }
 
     /// Check types for all bindings in this element.
@@ -1739,14 +1728,6 @@ impl<'db> Bindings<'db> {
     /// For calls with binding errors, this is a type that best approximates the return type. For
     /// types that are not callable, returns `Type::Unknown`.
     pub(crate) fn return_type(&self, db: &'db dyn Db) -> Type<'db> {
-        if let Some(return_ty) = self.constructor_return_type(db) {
-            return return_ty;
-        }
-        // If there's a single binding, return its type directly
-        if let Some(binding) = self.single_element() {
-            return binding.return_type();
-        }
-
         UnionType::from_elements(
             db,
             self.elements.iter().map(|element| element.return_type(db)),
