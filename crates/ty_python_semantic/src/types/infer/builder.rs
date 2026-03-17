@@ -4976,6 +4976,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         debug_assert_eq!(arguments_types.len(), bindings.argument_forms().len());
 
         let db = self.db();
+        let constraints = ConstraintSetBuilder::new();
         let iter = itertools::izip!(
             0..,
             arguments_types.iter_mut(),
@@ -5013,89 +5014,88 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             // Retrieve the parameter type context for the current argument in a given overload and its binding.
-            let parameter_tcx =
-                |overload: &'bindings Binding<'db>, binding: &CallableBinding<'db>| {
-                    let argument_index = if binding.bound_type.is_some() {
-                        argument_index + 1
-                    } else {
-                        argument_index
-                    };
+            let parameter_tcx = |overload: &'bindings Binding<'db>,
+                                 binding: &CallableBinding<'db>| {
+                let argument_index = if binding.bound_type.is_some() {
+                    argument_index + 1
+                } else {
+                    argument_index
+                };
 
-                    let argument_matches = &overload.argument_matches()[argument_index];
-                    let [parameter_index] = argument_matches.parameters.as_slice() else {
-                        return None;
-                    };
+                let argument_matches = &overload.argument_matches()[argument_index];
+                let [parameter_index] = argument_matches.parameters.as_slice() else {
+                    return None;
+                };
 
-                    let parameter = &overload.signature.parameters()[*parameter_index];
-                    let mut parameter_type = parameter.annotated_type();
+                let parameter = &overload.signature.parameters()[*parameter_index];
+                let mut parameter_type = parameter.annotated_type();
 
-                    // If the parameter is a single type variable with an upper bound, e.g., `typing.Self`,
-                    // use the upper bound as type context.
-                    if let Type::TypeVar(typevar) = parameter_type
-                        && let Some(TypeVarBoundOrConstraints::UpperBound(bound)) =
-                            typevar.typevar(db).bound_or_constraints(db)
-                    {
-                        return Some((parameter, TypeContext::new(Some(bound))));
-                    }
+                // If the parameter is a single type variable with an upper bound, e.g., `typing.Self`,
+                // use the upper bound as type context.
+                if let Type::TypeVar(typevar) = parameter_type
+                    && let Some(TypeVarBoundOrConstraints::UpperBound(bound)) =
+                        typevar.typevar(db).bound_or_constraints(db)
+                {
+                    return Some((parameter, TypeContext::new(Some(bound))));
+                }
 
-                    // If this is a generic call, attempt to specialize the parameter type using the
-                    // declared type context, if provided.
-                    if let Some(generic_context) = overload.signature.generic_context {
-                        // Use a forward assignability check to infer typevar specializations from the
-                        // declared type context. For example, if the return type is `list[T]` and the
-                        // declared type context is `list[int]`, the check produces `T = int`.
-                        let mut tcx_mappings = FxHashMap::default();
-                        if let Some(declared_return_ty) = call_expression_tcx.annotation {
-                            let return_ty = overload
-                                .normalized_constructor_return(db)
-                                .unwrap_or(overload.signature.return_ty);
-                            let set = return_ty
-                                .when_constraint_set_assignable_to_owned(db, declared_return_ty);
-                            let solutions =
-                                set.query(|constraints, set| set.solutions(db, constraints));
-                            if let Solutions::Constrained(solutions) = solutions {
-                                for solution in solutions {
-                                    for binding in solution {
-                                        tcx_mappings
-                                            .entry(binding.bound_typevar.identity(db))
-                                            .and_modify(|existing| {
-                                                *existing = UnionType::from_two_elements(
-                                                    db,
-                                                    *existing,
-                                                    binding.solution,
-                                                );
-                                            })
-                                            .or_insert(binding.solution);
-                                    }
+                // If this is a generic call, attempt to specialize the parameter type using the
+                // declared type context, if provided.
+                if let Some(generic_context) = overload.signature.generic_context {
+                    // Use a forward assignability check to infer typevar specializations from the
+                    // declared type context. For example, if the return type is `list[T]` and the
+                    // declared type context is `list[int]`, the check produces `T = int`.
+                    let mut tcx_mappings = FxHashMap::default();
+                    if let Some(declared_return_ty) = call_expression_tcx.annotation {
+                        let return_ty = overload
+                            .normalized_constructor_return(db)
+                            .unwrap_or(overload.signature.return_ty);
+                        let path_bounds = return_ty.assignable_solutions(db, declared_return_ty);
+                        let solutions = path_bounds.solve(db, &constraints);
+                        if let Solutions::Constrained(solutions) = solutions {
+                            for solution in solutions {
+                                for binding in solution {
+                                    tcx_mappings
+                                        .entry(binding.bound_typevar.identity(db))
+                                        .and_modify(|existing| {
+                                            *existing = UnionType::from_two_elements(
+                                                db,
+                                                *existing,
+                                                binding.solution,
+                                            );
+                                        })
+                                        .or_insert(binding.solution);
                                 }
                             }
                         }
-
-                        // Default specialize any type variables to a marker type, which will be ignored
-                        // during argument inference, allowing the concrete subset of the parameter
-                        // type to still affect argument inference.
-                        //
-                        // TODO: Eventually, we want to "tie together" the typevars of the two calls
-                        // so that we can infer their specializations at the same time — or at least, for
-                        // the specialization of one to influence the specialization of the other. It's
-                        // not yet clear how we're going to do that. (We might have to start inferring
-                        // constraint sets for each expression, instead of simple types?)
-                        let specialization = generic_context.specialize_recursive(
-                            db,
-                            generic_context.variables(db).map(|typevar| {
-                                Some(
-                                    tcx_mappings.get(&typevar.identity(db)).copied().unwrap_or(
-                                        Type::Dynamic(DynamicType::UnspecializedTypeVar),
-                                    ),
-                                )
-                            }),
-                        );
-
-                        parameter_type = parameter_type.apply_specialization(db, specialization);
                     }
 
-                    Some((parameter, TypeContext::new(Some(parameter_type))))
-                };
+                    // Default specialize any type variables to a marker type, which will be ignored
+                    // during argument inference, allowing the concrete subset of the parameter
+                    // type to still affect argument inference.
+                    //
+                    // TODO: Eventually, we want to "tie together" the typevars of the two calls
+                    // so that we can infer their specializations at the same time — or at least, for
+                    // the specialization of one to influence the specialization of the other. It's
+                    // not yet clear how we're going to do that. (We might have to start inferring
+                    // constraint sets for each expression, instead of simple types?)
+                    let specialization = generic_context.specialize_recursive(
+                        db,
+                        generic_context.variables(db).map(|typevar| {
+                            Some(
+                                tcx_mappings
+                                    .get(&typevar.identity(db))
+                                    .copied()
+                                    .unwrap_or(Type::Dynamic(DynamicType::UnspecializedTypeVar)),
+                            )
+                        }),
+                    );
+
+                    parameter_type = parameter_type.apply_specialization(db, specialization);
+                }
+
+                Some((parameter, TypeContext::new(Some(parameter_type))))
+            };
 
             // If there is only a single binding and overload, we can infer the argument directly with
             // the unique parameter type annotation.
@@ -5840,6 +5840,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return None;
         };
 
+        let constraints = ConstraintSetBuilder::new();
         let inferable = generic_context.inferable_typevars(self.db());
 
         // Remove any union elements of that are unrelated to the collection type.
@@ -5886,22 +5887,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let db = self.db();
                 let collection_instance = Type::instance(db, ClassType::Generic(collection_alias));
 
-                let set = collection_instance.when_constraint_set_assignable_to_owned(db, tcx);
-
-                let solutions = set.query(|constraints, set| {
-                    set.remove_noninferable(db, constraints, inferable)
-                        .solutions_with(db, constraints, |typevar, variance, lower, upper| {
-                            if !typevar.is_inferable(db, inferable) {
-                                return Ok(None);
-                            }
-
-                            let identity = typevar.identity(db);
-                            elt_tcx_variance
-                                .entry(identity)
-                                .and_modify(|current| *current = current.join(variance))
-                                .or_insert(variance);
-                            PathBounds::default_solve(db, constraints, typevar, lower, upper)
-                        })
+                let path_bounds =
+                    collection_instance.assignable_solutions_with_inferable(db, tcx, inferable);
+                let solutions = path_bounds.solve_with(|typevar, variance, lower, upper| {
+                    let identity = typevar.identity(db);
+                    elt_tcx_variance
+                        .entry(identity)
+                        .and_modify(|current| *current = current.join(variance))
+                        .or_insert(variance);
+                    PathBounds::default_solve(db, &constraints, typevar, lower, upper)
                 });
 
                 match solutions {
@@ -5961,7 +5955,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         // Create a set of constraints to infer a precise type for `T`.
-        let constraints = ConstraintSetBuilder::new();
         let mut builder = SpecializationBuilder::new(self.db(), &constraints, inferable);
 
         for elt_ty in elt_tys.clone() {
