@@ -13,8 +13,8 @@ use ruff_python_trivia::{
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
-use crate::comments::visitor::{CommentPlacement, DecoratedComment};
 use crate::comments::SourceComment;
+use crate::comments::visitor::{CommentPlacement, DecoratedComment};
 use crate::expression::expr_slice::{ExprSliceCommentSection, assign_comment_in_slice};
 use crate::expression::parentheses::is_expression_parenthesized;
 use crate::other::parameters::{
@@ -429,10 +429,7 @@ impl<'a, 'state> PlaceResult<'a, 'state> {
         }
     }
 
-    fn or_else<F: FnOnce(PlaceComment<'a, 'state>) -> PlaceResult<'a, 'state>>(
-        self,
-        f: F,
-    ) -> Self {
+    fn or_else<F: FnOnce(PlaceComment<'a, 'state>) -> PlaceResult<'a, 'state>>(self, f: F) -> Self {
         match self {
             Self::Default(pc) => f(pc),
             _ => self,
@@ -450,12 +447,8 @@ impl<'a, 'state> PlaceResult<'a, 'state> {
     ) -> Self {
         match placement {
             CommentPlacement::Leading { node, comment } => PlaceResult::Leading { node, comment },
-            CommentPlacement::Trailing { node, comment } => {
-                PlaceResult::Trailing { node, comment }
-            }
-            CommentPlacement::Dangling { node, comment } => {
-                PlaceResult::Dangling { node, comment }
-            }
+            CommentPlacement::Trailing { node, comment } => PlaceResult::Trailing { node, comment },
+            CommentPlacement::Dangling { node, comment } => PlaceResult::Dangling { node, comment },
             CommentPlacement::Default(decorated) => PlaceResult::Default(PlaceComment {
                 comment: decorated,
                 source,
@@ -769,7 +762,13 @@ fn handle_enclosed_comment<'a, 'state>(
         _ => CommentPlacement::Default(comment),
     };
 
-    PlaceResult::from_placement(result, source, preceding_scan, following_scan, empty_lines_scan)
+    PlaceResult::from_placement(
+        result,
+        source,
+        preceding_scan,
+        following_scan,
+        empty_lines_scan,
+    )
 }
 
 /// Handle an end-of-line comment around a body.
@@ -889,7 +888,13 @@ fn handle_own_line_comment_around_body<'a, 'state>(
             handle_own_line_comment_between_statements(comment, empty_lines_scan, source)
         });
 
-    PlaceResult::from_placement(result, source, preceding_scan, following_scan, empty_lines_scan)
+    PlaceResult::from_placement(
+        result,
+        source,
+        preceding_scan,
+        following_scan,
+        empty_lines_scan,
+    )
 }
 
 /// Handles own-line comments between statements. If an own-line comment is between two statements,

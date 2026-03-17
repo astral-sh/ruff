@@ -258,8 +258,12 @@ impl<'a> Comments<'a> {
                 CommentsMap::new()
             } else {
                 let mut builder = CommentsMapBuilder::new(comment_ranges);
-                CommentsVisitor::<CommentsMapBuilder>::new(source_code, comment_ranges, &mut builder)
-                    .visit(root);
+                CommentsVisitor::<CommentsMapBuilder>::new(
+                    source_code,
+                    comment_ranges,
+                    &mut builder,
+                )
+                .visit(root);
                 builder.finish()
             };
 
