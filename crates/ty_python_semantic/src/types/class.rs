@@ -1842,6 +1842,24 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source: ClassType<'db>,
         target: ClassType<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        // Fast path: if source and target are the same class (possibly with different
+        // specializations), we can compare them directly without walking the MRO.
+        match (source, target) {
+            (ClassType::NonGeneric(source), ClassType::NonGeneric(target)) if source == target => {
+                return self.always();
+            }
+            (ClassType::Generic(source_alias), ClassType::Generic(target_alias))
+                if source_alias.origin(db) == target_alias.origin(db) =>
+            {
+                return self.check_specialization_pair(
+                    db,
+                    source_alias.specialization(db),
+                    target_alias.specialization(db),
+                );
+            }
+            _ => {}
+        }
+
         source.iter_mro(db).when_any(db, self.constraints, |base| {
             match base {
                 ClassBase::Dynamic(_) => match self.relation {
