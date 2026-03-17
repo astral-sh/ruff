@@ -20,8 +20,8 @@ use smallvec::smallvec_inline;
 use ty_module_resolver::{KnownModule, Module, ModuleName, resolve_module};
 
 pub(crate) use self::callable::UpcastPolicy;
+pub(crate) use self::cyclic::ApplyTypeMappingVisitor;
 pub use self::cyclic::CycleDetector;
-pub(crate) use self::cyclic::TypeTransformer;
 pub(crate) use self::diagnostic::register_lints;
 pub use self::diagnostic::{TypeCheckDiagnostics, UNDEFINED_REVEAL, UNRESOLVED_REFERENCE};
 pub(crate) use self::infer::{
@@ -232,9 +232,6 @@ fn definition_expression_type<'db>(
         infer_complete_scope_types(db, scope).expression_type(expression)
     }
 }
-
-/// A [`TypeTransformer`] that is used in `apply_type_mapping` methods.
-pub(crate) type ApplyTypeMappingVisitor<'db> = TypeTransformer<'db, TypeMapping<'db, 'db>>;
 
 /// A [`CycleDetector`] that is used in `find_legacy_typevars` methods.
 pub(crate) type FindLegacyTypeVarsVisitor<'db> = CycleDetector<FindLegacyTypeVars, Type<'db>, ()>;
@@ -5200,6 +5197,12 @@ impl<'db> Type<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Type<'db> {
+        // Universal depth guard: protects against stack overflow from any source
+        // (recursive aliases, ever-growing specializations, deeply nested generics, etc.)
+        let Some(_depth) = visitor.enter_depth() else {
+            return Type::any();
+        };
+
         // If we are binding `typing.Self`, and this type is what we are binding `Self` to, return
         // early. This is not just an optimization, it also prevents us from infinitely expanding
         // the type, if it's something that can contain a `Self` reference.
@@ -5222,26 +5225,26 @@ impl<'db> Type<'db> {
             Type::TypeVar(bound_typevar) => bound_typevar.apply_type_mapping_impl(db, type_mapping, visitor),
             Type::KnownInstance(known_instance) => known_instance.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
 
-            Type::FunctionLiteral(function) => visitor.visit(self, || {
-                match type_mapping {
-                    // Promote the types within the signature before promoting the signature to its
-                    // callable form.
-                    TypeMapping::Promote(PromotionMode::On, _) => {
-                        Type::FunctionLiteral(function.apply_type_mapping_impl(
-                            db,
-                            type_mapping,
-                            tcx,
-                            visitor,
-                        ))
-                        .promote_impl(db)
-                    }
-                    _ => Type::FunctionLiteral(function.apply_type_mapping_impl(
+            // FunctionLiterals can self-reference via TypeOf (e.g. `def foo(x: TypeOf[foo])`),
+            // so they need cycle detection through `visit()`.
+            Type::FunctionLiteral(function) => visitor.visit(self, || match type_mapping {
+                // Promote the types within the signature before promoting the signature to its
+                // callable form.
+                TypeMapping::Promote(PromotionMode::On, _) => {
+                    Type::FunctionLiteral(function.apply_type_mapping_impl(
                         db,
                         type_mapping,
                         tcx,
                         visitor,
-                    )),
+                    ))
+                    .promote_impl(db)
                 }
+                _ => Type::FunctionLiteral(function.apply_type_mapping_impl(
+                    db,
+                    type_mapping,
+                    tcx,
+                    visitor,
+                )),
             }),
 
             Type::BoundMethod(method) => Type::BoundMethod(BoundMethodType::new(
@@ -5268,7 +5271,7 @@ impl<'db> Type<'db> {
 
             Type::NominalInstance(instance) => {
                 instance.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
-            },
+            }
 
             Type::NewTypeInstance(newtype) => visitor.visit(self, || {
                 Type::NewTypeInstance(newtype.map_base_class_type(db, |class_type| {
@@ -5351,23 +5354,19 @@ impl<'db> Type<'db> {
             }
 
             // TODO(jelle): Materialize should be handled differently, since TypeIs is invariant
-            Type::TypeIs(type_is) => visitor.visit(self, || {
-                type_is.with_type(
-                    db,
-                    type_is
-                        .return_type(db)
-                        .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-                )
-            }),
+            Type::TypeIs(type_is) => type_is.with_type(
+                db,
+                type_is
+                    .return_type(db)
+                    .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+            ),
 
-            Type::TypeGuard(type_guard) => visitor.visit(self, || {
-                type_guard.with_type(
-                    db,
-                    type_guard
-                        .return_type(db)
-                        .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-                )
-            }),
+            Type::TypeGuard(type_guard) => type_guard.with_type(
+                db,
+                type_guard
+                    .return_type(db)
+                    .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+            ),
 
             Type::TypeAlias(alias) => {
                 // For EagerExpansion, expand the raw value type. This path relies on Salsa's cycle
