@@ -503,9 +503,10 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         self,
         db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
-    ) -> Solutions<Ref<'c, Vec<Solution<'db>>>> {
-        self.verify_builder(builder);
-        self.node.solutions(db, builder)
+    ) -> Solutions<'db> {
+        self.solutions_with(db, builder, |bound_typevar, _variance, lower, upper| {
+            PathBounds::default_solve(db, builder, bound_typevar, lower, upper)
+        })
     }
 
     /// Computes solutions for each BDD path, using a caller-provided hook to select solutions.
@@ -527,7 +528,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
             Type<'db>,
             Type<'db>,
         ) -> Result<Option<Type<'db>>, ()>,
-    ) -> Solutions<Vec<Solution<'db>>> {
+    ) -> Solutions<'db> {
         self.verify_builder(builder);
         self.node.solutions_with(db, builder, choose)
     }
@@ -617,7 +618,6 @@ struct ConstraintSetStorage<'db> {
     exists_one_cache: FxHashMap<(NodeId, BoundTypeVarIdentity<'db>), NodeId>,
     retain_one_cache: FxHashMap<(NodeId, BoundTypeVarIdentity<'db>), NodeId>,
     restrict_one_cache: FxHashMap<(NodeId, ConstraintAssignment), (NodeId, bool)>,
-    solutions_cache: FxHashMap<NodeId, Vec<Solution<'db>>>,
     simplify_cache: FxHashMap<NodeId, NodeId>,
 
     single_sequent_cache: FxHashMap<ConstraintId, SequentMap>,
@@ -1760,18 +1760,6 @@ impl NodeId {
         }
     }
 
-    fn solutions<'db, 'c>(
-        self,
-        db: &'db dyn Db,
-        builder: &'c ConstraintSetBuilder<'db>,
-    ) -> Solutions<Ref<'c, Vec<Solution<'db>>>> {
-        match self.node() {
-            Node::AlwaysTrue => Solutions::Unconstrained,
-            Node::AlwaysFalse => Solutions::Unsatisfiable,
-            Node::Interior(interior) => interior.solutions(db, builder),
-        }
-    }
-
     fn solutions_with<'db>(
         self,
         db: &'db dyn Db,
@@ -1782,7 +1770,7 @@ impl NodeId {
             Type<'db>,
             Type<'db>,
         ) -> Result<Option<Type<'db>>, ()>,
-    ) -> Solutions<Vec<Solution<'db>>> {
+    ) -> Solutions<'db> {
         match self.node() {
             Node::AlwaysTrue => Solutions::Unconstrained,
             Node::AlwaysFalse => Solutions::Unsatisfiable,
@@ -2787,12 +2775,6 @@ impl<'db> PathBounds<'db> {
         Self(result)
     }
 
-    fn solve(&self, db: &'db dyn Db, builder: &ConstraintSetBuilder<'db>) -> Vec<Solution<'db>> {
-        self.solve_with(|bound_typevar, _variance, lower, upper| {
-            Self::default_solve(db, builder, bound_typevar, lower, upper)
-        })
-    }
-
     /// Solves each path by applying a per-typevar solver function, collecting valid solutions.
     ///
     /// The solver receives the typevar and its materialized lower/upper bounds, and returns:
@@ -3461,42 +3443,6 @@ impl InteriorNode {
         result
     }
 
-    fn solutions<'db, 'c>(
-        self,
-        db: &'db dyn Db,
-        builder: &'c ConstraintSetBuilder<'db>,
-    ) -> Solutions<Ref<'c, Vec<Solution<'db>>>> {
-        fn solutions_inner<'db, 'c>(
-            db: &'db dyn Db,
-            builder: &'c ConstraintSetBuilder<'db>,
-            interior: NodeId,
-        ) -> Ref<'c, Vec<Solution<'db>>> {
-            let key = interior;
-            let storage = builder.storage.borrow();
-            if let Ok(solutions) =
-                Ref::filter_map(storage, |storage| storage.solutions_cache.get(&key))
-            {
-                return solutions;
-            }
-
-            let path_bounds = PathBounds::compute(db, builder, interior);
-            let solutions = path_bounds.solve(db, builder);
-
-            let mut storage = builder.storage.borrow_mut();
-            storage.solutions_cache.insert(key, solutions);
-            drop(storage);
-
-            let storage = builder.storage.borrow();
-            Ref::map(storage, |storage| &storage.solutions_cache[&key])
-        }
-
-        let solutions = solutions_inner(db, builder, self.node());
-        if solutions.is_empty() {
-            return Solutions::Unsatisfiable;
-        }
-        Solutions::Constrained(solutions)
-    }
-
     fn solutions_with<'db>(
         self,
         db: &'db dyn Db,
@@ -3507,7 +3453,7 @@ impl InteriorNode {
             Type<'db>,
             Type<'db>,
         ) -> Result<Option<Type<'db>>, ()>,
-    ) -> Solutions<Vec<Solution<'db>>> {
+    ) -> Solutions<'db> {
         let path_bounds = PathBounds::compute(db, builder, self.node());
         let solutions = path_bounds.solve_with(choose);
         if solutions.is_empty() {
@@ -3965,10 +3911,10 @@ impl InteriorNode {
 /// hook-based solutions use `Vec<Solution<'db>>` (owned, since the hook makes
 /// caching inappropriate).
 #[derive(Debug)]
-pub(crate) enum Solutions<S> {
+pub(crate) enum Solutions<'db> {
     Unsatisfiable,
     Unconstrained,
-    Constrained(S),
+    Constrained(Vec<Solution<'db>>),
 }
 
 pub(crate) type Solution<'db> = Vec<TypeVarSolution<'db>>;

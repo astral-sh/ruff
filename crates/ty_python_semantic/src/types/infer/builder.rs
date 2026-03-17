@@ -4973,7 +4973,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             &constraints,
                         );
                         if let Solutions::Constrained(solutions) = set.solutions(db, &constraints) {
-                            for solution in solutions.iter() {
+                            for solution in solutions {
                                 for binding in solution {
                                     tcx_mappings
                                         .entry(binding.bound_typevar.identity(db))
