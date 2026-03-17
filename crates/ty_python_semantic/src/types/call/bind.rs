@@ -81,13 +81,15 @@ struct BindingsElement<'db> {
     items: SmallVec<[CallableItem<'db>; 1]>,
 }
 
+/// A single callable item within the union/intersection structure.
+/// Either a regular callable, or a constructor callable.
 #[derive(Debug, Clone)]
 enum CallableItem<'db> {
     Regular(CallableBinding<'db>),
     Constructor(ConstructorBinding<'db>),
 }
 
-/// Represents the full set of bindings for a constructor call as a singly-linked list.
+/// The full set of bindings for a constructor call, as a singly-linked list.
 ///
 /// The "outer" `ConstructorBinding` will be the first-called constructor
 /// method (could be a metaclass `__call__`, a `__new__`, or an `__init__`,
@@ -100,17 +102,20 @@ enum CallableItem<'db> {
 struct ConstructorBinding<'db> {
     /// The `CallableBinding` for this individual constructor method.
     entry: CallableBinding<'db>,
-    /// The instance type being constructed.
-    constructed_instance_type: Type<'db>,
-    /// The kind of constructor callable this is (typevar, metaclass `__call__`, `__new__`, or `__init__`).
-    constructor_kind: ConstructorCallableKind,
+    /// Context for the constructor callable: the instance type being constructed and the kind of
+    /// constructor method.
+    constructor_context: ConstructorContext<'db>,
     /// The next downstream constructor method, if any, to be (conditionally) checked after this one.
     downstream_constructor: Option<Box<DownstreamConstructor<'db>>>,
 }
 
 impl<'db> ConstructorBinding<'db> {
     fn context(&self) -> ConstructorContext<'db> {
-        ConstructorContext::new(self.constructed_instance_type, self.constructor_kind)
+        self.constructor_context
+    }
+
+    fn constructed_instance_type(&self) -> Type<'db> {
+        self.constructor_context.instance_type()
     }
 
     fn callable(&self) -> &CallableBinding<'db> {
@@ -127,8 +132,7 @@ impl<'db> ConstructorBinding<'db> {
     ) -> ConstructorBinding<'db> {
         ConstructorBinding {
             entry: f(self.entry),
-            constructed_instance_type: self.constructed_instance_type,
-            constructor_kind: self.constructor_kind,
+            constructor_context: self.constructor_context,
             downstream_constructor: self.downstream_constructor,
         }
     }
@@ -136,14 +140,18 @@ impl<'db> ConstructorBinding<'db> {
     fn return_type(&self, db: &'db dyn Db) -> Type<'db> {
         Bindings::constructor_return_type_for_bindings(
             db,
-            self.constructed_instance_type,
+            self.constructed_instance_type(),
             std::iter::once(self),
         )
         .unwrap_or_else(|| self.entry.return_type())
     }
 
     fn constructor_kind(&self) -> ConstructorCallableKind {
-        self.constructor_kind
+        self.constructor_context.kind()
+    }
+
+    fn set_constructed_instance_type(&mut self, instance_type: Type<'db>) {
+        self.constructor_context = self.constructor_context.with_instance_type(instance_type);
     }
 
     fn has_downstream_constructor(&self) -> bool {
@@ -260,7 +268,7 @@ impl<'db> ConstructorBinding<'db> {
         }
 
         // If metaclass `__call__` itself doesn't match, constructor dispatch stops there.
-        if self.constructor_kind.is_metaclass_call() {
+        if self.constructor_kind().is_metaclass_call() {
             return false;
         }
 
@@ -293,7 +301,7 @@ impl<'db> ConstructorBinding<'db> {
         // self-like `__new__(cls: type[T]) -> T` and `__new__(...) -> Self` signatures even
         // before specialization proves that the matched overload returns an instance of the
         // constructed class.
-        if self.constructor_kind.is_metaclass_call() {
+        if self.constructor_kind().is_metaclass_call() {
             return false;
         }
 
@@ -464,12 +472,14 @@ impl<'db> CallableItem<'db> {
         match self {
             CallableItem::Regular(binding) => CallableItem::Constructor(ConstructorBinding {
                 entry: binding,
-                constructed_instance_type,
-                constructor_kind,
+                constructor_context: ConstructorContext::new(
+                    constructed_instance_type,
+                    constructor_kind,
+                ),
                 downstream_constructor: None,
             }),
             CallableItem::Constructor(mut binding) => {
-                binding.constructed_instance_type = constructed_instance_type;
+                binding.set_constructed_instance_type(constructed_instance_type);
                 CallableItem::Constructor(binding)
             }
         }
@@ -611,6 +621,13 @@ impl<'db> ConstructorContext<'db> {
         Self {
             instance_type,
             kind,
+        }
+    }
+
+    fn with_instance_type(self, instance_type: Type<'db>) -> Self {
+        Self {
+            instance_type,
+            ..self
         }
     }
 
@@ -840,7 +857,7 @@ impl<'db> Bindings<'db> {
                 match item {
                     CallableItem::Regular(_) => {}
                     CallableItem::Constructor(binding) => {
-                        binding.constructed_instance_type = constructor_instance_type;
+                        binding.set_constructed_instance_type(constructor_instance_type);
                         let constructor_context = binding.context();
                         for overload in &mut binding.entry.overloads {
                             overload.set_constructor_context(db, constructor_context);
@@ -1148,11 +1165,11 @@ impl<'db> Bindings<'db> {
         for item in self.iter_semantic_items() {
             let constructor = item.as_constructor()?;
             if let Some(existing) = shared {
-                if existing != constructor.constructed_instance_type {
+                if existing != constructor.constructed_instance_type() {
                     return None;
                 }
             } else {
-                shared = Some(constructor.constructed_instance_type);
+                shared = Some(constructor.constructed_instance_type());
             }
         }
 
