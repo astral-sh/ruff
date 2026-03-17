@@ -6,28 +6,28 @@
 //!
 //! ## `CycleDetector` (for type relation checking)
 //!
-//! [`CycleDetector`] is used for methods like `has_relation_to` and `is_disjoint_from`, where the
-//! visited item (a type pair) uniquely determines the result. If we encounter the same pair during
-//! recursion, it's always a genuine cycle, so adding it to a `seen` set and caching the result is
-//! correct.
+//! [`CycleDetector`] is used for methods like [`Type::has_relation_to`] and
+//! [`Type::is_disjoint_from`], where the visited item (a type pair) uniquely determines the
+//! result. If we encounter the same pair during recursion, it's always a genuine cycle, so adding
+//! it to a `seen` set and caching the result is correct.
 //!
 //! ## `ApplyTypeMappingVisitor` (for `apply_type_mapping`)
 //!
 //! [`ApplyTypeMappingVisitor`] is a purpose-built recursion guard for [`Type::apply_type_mapping`].
-//! Unlike `CycleDetector`, it separates cycle detection from depth limiting, because
+//! Unlike [`CycleDetector`], it separates cycle detection from depth limiting, because
 //! `apply_type_mapping` has a property that type relation checking does not: the result of mapping
 //! a type depends on context (for example, which type aliases are currently being expanded).
 //!
 //! Cycles in `apply_type_mapping` arise from self-referential type definitions: recursive type
 //! aliases (e.g. `type Rec[T] = T | list[Rec[T]]`), self-referencing function literals (via
 //! `TypeOf`), and recursive newtypes. Other types like nominal instances merely *contain*
-//! recursive types but cannot introduce cycles themselves. Using a generic `CycleDetector` on
+//! recursive types but cannot introduce cycles themselves. Using a generic [`CycleDetector`] on
 //! such types would incorrectly flag them as cycles when they appear at different levels of a
 //! recursive expansion.
 //!
 //! `ApplyTypeMappingVisitor` provides:
-//! - [`ApplyTypeMappingVisitor::visit`]: Cycle detection (via a `seen` set) and result caching, used
-//!   *only* for types that can introduce cycles (type aliases, function literals, newtypes).
+//! - [`ApplyTypeMappingVisitor::visit`]: Cycle detection (via a `seen` set), used *only* for
+//!   types that can introduce cycles (type aliases, function literals, newtypes).
 //! - A depth counter incremented at every call to [`Type::apply_type_mapping_impl`] via
 //!   [`ApplyTypeMappingVisitor::enter_depth`], providing universal stack overflow protection.
 
@@ -137,11 +137,11 @@ impl<Tag, T, R: Default> Default for CycleDetector<Tag, T, R> {
 ///
 ///    Only type aliases, function literals (via `TypeOf`), and recursive newtypes can introduce
 ///    cycles during type mapping. The `visit` method tracks which types are being expanded and
-///    short-circuits with a fallback (`Any`) when a cycle is detected.
+///    short-circuits with a fallback when a cycle is detected.
 ///
 /// 2. Depth limiting for stack overflow prevention, via [`Self::enter_depth`].
 ///
-///    This is checked at every call to `Type::apply_type_mapping_impl`, providing universal
+///    This is checked at every call to [`Type::apply_type_mapping_impl`], providing universal
 ///    protection against unbounded recursion from any source (e.g. ever-growing generic
 ///    specializations).
 #[derive(Debug, Default)]
@@ -151,36 +151,28 @@ pub(crate) struct ApplyTypeMappingVisitor<'db> {
     /// the fallback.
     seen: RefCell<FxIndexSet<Type<'db>>>,
 
-    /// Cache of already-expanded results for cycle-introducing types. This is safe because
-    /// a self-referential type always expands to the same approximation: the inner recursive
-    /// reference always resolves to the fallback (currently always `Any`).
-    cache: RefCell<FxHashMap<Type<'db>, Type<'db>>>,
-
-    /// Global recursion depth, incremented at every call to `Type::apply_type_mapping_impl`.
+    /// Global recursion depth, incremented at every call to [`Type::apply_type_mapping_impl`].
     depth: Cell<u32>,
 }
 
 impl<'db> ApplyTypeMappingVisitor<'db> {
+    pub(crate) const FALLBACK: Type<'db> = Type::any();
+
     /// Track expansion of a cycle-introducing type (type alias, function literal, or newtype).
     ///
-    /// Returns the cached result if available, detects cycles via the `seen` set, and
-    /// caches the result after expansion. Does *not* check depth (that is handled by
-    /// [`Self::enter_depth`] at the top of [`Type::apply_type_mapping_impl`]).
+    /// Detects cycles via the `seen` set and returns [`Self::FALLBACK`] when a cycle is found.
+    /// Does *not* check depth (that is handled by [`Self::enter_depth`] at the top of
+    /// [`Type::apply_type_mapping_impl`]).
     pub(crate) fn visit(&self, ty: Type<'db>, func: impl FnOnce() -> Type<'db>) -> Type<'db> {
-        if let Some(val) = self.cache.borrow().get(&ty) {
-            return *val;
-        }
-
         // We hit a cycle
         if !self.seen.borrow_mut().insert(ty) {
             // TODO: proper recursive type handling
-            return Type::any();
+            return Self::FALLBACK;
         }
 
         let ret = func();
 
         self.seen.borrow_mut().pop();
-        self.cache.borrow_mut().insert(ty, ret);
 
         ret
     }
@@ -188,9 +180,10 @@ impl<'db> ApplyTypeMappingVisitor<'db> {
     /// Check the recursion depth limit and increment the counter.
     ///
     /// Returns `Some(DepthGuard)` if within limits (the guard decrements on drop).
-    /// Returns `None` if the depth limit has been exceeded (caller should return `Type::any()`).
+    /// Returns `None` if the depth limit has been exceeded (caller should return
+    /// [`Self::FALLBACK`]).
     ///
-    /// This should be called at the top of `Type::apply_type_mapping_impl` to provide
+    /// This should be called at the top of [`Type::apply_type_mapping_impl`] to provide
     /// universal stack overflow protection for all type variants.
     pub(crate) fn enter_depth(&self) -> Option<DepthGuard<'_>> {
         let previous = self.depth.get();
