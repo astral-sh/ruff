@@ -173,57 +173,26 @@ RUF069 Unreliable floating point equality comparison `i != 2.0`
 33 | {i for i in range(10) if i != 2.0}
    |                          ^^^^^^^^
 34 |
-35 | assert x / 2 == 1
-   |
-
-RUF069 Unreliable floating point equality comparison `x / 2 == 1`
-  --> RUF069.py:35:8
-   |
-33 | {i for i in range(10) if i != 2.0}
-34 |
-35 | assert x / 2 == 1
-   |        ^^^^^^^^^^
-36 | assert (x / 2) == (y / 3)
-   |
-
-RUF069 Unreliable floating point equality comparison `x / 2 == y / 3`
-  --> RUF069.py:36:9
-   |
-35 | assert x / 2 == 1
-36 | assert (x / 2) == (y / 3)
-   |         ^^^^^^^^^^^^^^^^
-37 |
-38 | # ok
+35 | # ok: division without a known float operand (see https://github.com/astral-sh/ruff/issues/23281)
    |
 
 RUF069 Unreliable floating point equality comparison `a == b * float("2")`
-  --> RUF069.py:42:12
+  --> RUF069.py:44:12
    |
-41 | def foo(a, b):
-42 |     return a == b * float("2")
+43 | def foo(a, b):
+44 |     return a == b * float("2")
    |            ^^^^^^^^^^^^^^^^^^^
-43 |
-44 | assert complex(0.3, 0.2) == complex(0.1 + 0.2, 0.1 + 0.1)
+45 |
+46 | assert complex(0.3, 0.2) == complex(0.1 + 0.2, 0.1 + 0.1)
    |
 
 RUF069 Unreliable floating point equality comparison `complex(0.3, 0.2) == complex(0.1 + 0.2, 0.1 + 0.1)`
-  --> RUF069.py:44:8
+  --> RUF069.py:46:8
    |
-42 |     return a == b * float("2")
-43 |
-44 | assert complex(0.3, 0.2) == complex(0.1 + 0.2, 0.1 + 0.1)
+44 |     return a == b * float("2")
+45 |
+46 | assert complex(0.3, 0.2) == complex(0.1 + 0.2, 0.1 + 0.1)
    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-45 |
-46 | assert (y := x / 2) == 1
-   |
-
-RUF069 Unreliable floating point equality comparison `y := x / 2 == 1`
-  --> RUF069.py:46:9
-   |
-44 | assert complex(0.3, 0.2) == complex(0.1 + 0.2, 0.1 + 0.1)
-45 |
-46 | assert (y := x / 2) == 1
-   |         ^^^^^^^^^^^^^^^^
 47 |
 48 | assert (0.3 if x > 0 else 1) == 0.1 + 0.2
    |
@@ -231,7 +200,7 @@ RUF069 Unreliable floating point equality comparison `y := x / 2 == 1`
 RUF069 Unreliable floating point equality comparison `0.3 if x > 0 else 1 == 0.1 + 0.2`
   --> RUF069.py:48:9
    |
-46 | assert (y := x / 2) == 1
+46 | assert complex(0.3, 0.2) == complex(0.1 + 0.2, 0.1 + 0.1)
 47 |
 48 | assert (0.3 if x > 0 else 1) == 0.1 + 0.2
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

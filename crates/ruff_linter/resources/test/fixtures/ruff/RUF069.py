@@ -32,8 +32,10 @@ assert (y := x + 1.0) == 2.0
 [i for i in range(10) if i == 1.0]
 {i for i in range(10) if i != 2.0}
 
+# ok: division without a known float operand (see https://github.com/astral-sh/ruff/issues/23281)
 assert x / 2 == 1
 assert (x / 2) == (y / 3)
+assert (y := x / 2) == 1
 
 # ok
 assert Path(__file__).parent / ".txt" == 1
@@ -42,8 +44,6 @@ def foo(a, b):
     return a == b * float("2")
 
 assert complex(0.3, 0.2) == complex(0.1 + 0.2, 0.1 + 0.1)
-
-assert (y := x / 2) == 1
 
 assert (0.3 if x > 0 else 1) == 0.1 + 0.2
 
