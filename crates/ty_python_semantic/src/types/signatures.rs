@@ -224,8 +224,7 @@ impl<'db> CallableSignature<'db> {
             type_mapping
         {
             Self::from_overloads(self.overloads.iter().flat_map(|signature| {
-                if let Some((prefix, paramspec)) =
-                    signature.parameters.find_paramspec_from_args_kwargs(db)
+                if let Some((prefix, paramspec)) = signature.parameters.as_paramspec_with_prefix()
                     && let Some(value) = specialization.get(db, paramspec)
                     && let Some(result) = try_apply_type_mapping_for_paramspec(
                         db,
@@ -1024,11 +1023,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 if self.relation.is_constraint_set_assignability()
                     && (source_signature
                         .parameters
-                        .find_paramspec_from_args_kwargs(db)
+                        .as_paramspec_with_prefix()
                         .is_some()
                         || target_signature
                             .parameters
-                            .find_paramspec_from_args_kwargs(db)
+                            .as_paramspec_with_prefix()
                             .is_some())
                 {
                     self.check_signature_pair_inner(db, source_signature, target_signature)
@@ -1226,8 +1225,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         let return_type_checks = check_types(source.return_ty, target.return_ty);
 
         if self.relation.is_constraint_set_assignability() {
-            let self_paramspec = source.parameters.find_paramspec_from_args_kwargs(db);
-            let other_paramspec = target.parameters.find_paramspec_from_args_kwargs(db);
+            let self_paramspec = source.parameters.as_paramspec_with_prefix();
+            let other_paramspec = target.parameters.as_paramspec_with_prefix();
 
             // If either signature is a ParamSpec, the constraint set should bind the ParamSpec to
             // the other signature before the return-type and gradual/top fast paths can return
@@ -2433,9 +2432,29 @@ impl<'db> Parameters<'db> {
         matches!(self.kind, ParametersKind::Top)
     }
 
+    /// Returns the bound `ParamSpec` type variable if the entire parameter list is exactly `P`.
+    ///
+    /// For either `P` or `Concatenate[<prefix-params>, P]`, use
+    /// [`Self::as_paramspec_with_prefix`].
     pub(crate) const fn as_paramspec(&self) -> Option<BoundTypeVarInstance<'db>> {
         match self.kind {
             ParametersKind::ParamSpec(bound_typevar) => Some(bound_typevar),
+            _ => None,
+        }
+    }
+
+    /// Returns the prefix parameters and bound `ParamSpec` if this parameter list is either `P` or
+    /// `Concatenate[<prefix-params>, P]`.
+    ///
+    /// For the narrower bare-`P` case, use [`Self::as_paramspec`].
+    pub(crate) fn as_paramspec_with_prefix<'a>(
+        &'a self,
+    ) -> Option<(&'a [Parameter<'db>], BoundTypeVarInstance<'db>)> {
+        match self.kind {
+            ParametersKind::ParamSpec(typevar) => Some((&[], typevar)),
+            ParametersKind::Concatenate(ConcatenateTail::ParamSpec(typevar)) => {
+                Some((&self.value[..self.value.len().saturating_sub(2)], typevar))
+            }
             _ => None,
         }
     }
@@ -2564,44 +2583,6 @@ impl<'db> Parameters<'db> {
             ],
             kind: ParametersKind::Top,
         }
-    }
-
-    /// Returns the bound `ParamSpec` type variable if the parameters contain a `ParamSpec`.
-    pub(crate) fn find_paramspec_from_args_kwargs<'a>(
-        &'a self,
-        db: &'db dyn Db,
-    ) -> Option<(&'a [Parameter<'db>], BoundTypeVarInstance<'db>)> {
-        let [prefix @ .., maybe_args, maybe_kwargs] = self.value.as_slice() else {
-            return None;
-        };
-
-        if !maybe_args.is_variadic() || !maybe_kwargs.is_keyword_variadic() {
-            return None;
-        }
-
-        let (Type::TypeVar(args_typevar), Type::TypeVar(kwargs_typevar)) =
-            (maybe_args.annotated_type(), maybe_kwargs.annotated_type())
-        else {
-            return None;
-        };
-
-        if matches!(
-            (
-                args_typevar.paramspec_attr(db),
-                kwargs_typevar.paramspec_attr(db)
-            ),
-            (
-                Some(ParamSpecAttrKind::Args),
-                Some(ParamSpecAttrKind::Kwargs)
-            )
-        ) {
-            let typevar = args_typevar.without_paramspec_attr(db);
-            if typevar.is_same_typevar_as(db, kwargs_typevar.without_paramspec_attr(db)) {
-                return Some((prefix, typevar));
-            }
-        }
-
-        None
     }
 
     fn from_parameters(
