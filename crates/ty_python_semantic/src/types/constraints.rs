@@ -5576,12 +5576,12 @@ mod tests {
         // Build a TDD with uncertain branches and convert to owned
         let builder = ConstraintSetBuilder::new();
         let owned = builder.into_owned(|builder| {
-            let t_int = create_constraint(&db, &builder, t, KnownClass::Int);
-            let u_str = create_constraint(&db, &builder, u, KnownClass::Str);
+            let t_int = create_constraint(&db, builder, t, KnownClass::Int);
+            let u_str = create_constraint(&db, builder, u, KnownClass::Str);
             let result = t_int.or(&db, builder, || u_str);
             check_display_graph(
                 &db,
-                &builder,
+                builder,
                 result,
                 indoc! {r#"
                     <0> (U = str) 2/2
