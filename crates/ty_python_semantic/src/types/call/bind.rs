@@ -750,7 +750,7 @@ fn constructor_return_outcome<'db>(
     class_literal: ClassLiteral<'db>,
     overload: &Binding<'db>,
 ) -> ConstructorReturnOutcome<'db> {
-    let declared_return = overload.signature.return_ty;
+    let declared_return = overload.return_ty;
     let resolved_return = overload
         .specialization
         .map(|specialization| declared_return.apply_specialization(db, specialization))
@@ -813,15 +813,9 @@ impl<'db> DownstreamConstructor<'db> {
         db: &'db dyn Db,
         overload: &Binding<'db>,
     ) -> bool {
-        let outcome = self.overload_return_outcome(db, overload);
-        outcome.kind.is_instance()
-            || outcome.resolved_return.is_unknown()
-            || overload
-                .signature
-                .return_ty
-                .resolve_type_alias(db)
-                .as_typevar()
-                .is_some_and(|typevar| returns_self_like(db, overload, typevar))
+        self.overload_return_outcome(db, overload)
+            .kind
+            .is_instance()
     }
 
     /// Returns `true` if every matched overload is instance-returning (i.e., its return type
