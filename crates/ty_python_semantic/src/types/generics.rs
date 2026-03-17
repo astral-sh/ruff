@@ -1737,10 +1737,10 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     /// argument, and the variance of those typevars in the corresponding parameter.
     ///
     /// TODO: This is a stopgap! Eventually, the builder will maintain a single constraint set for
-    /// the main specialization that we are building, and [`build`][Self::build] will build the
-    /// specialization directly from that constraint set. This method lets us migrate to that brave
-    /// new world incrementally, by using the new constraint set mechanism piecemeal for certain
-    /// type comparisons.
+    /// the main specialization that we are building, and [`build_with`][Self::build_with] will
+    /// build the specialization directly from that constraint set. This method lets us migrate to
+    /// that brave new world incrementally, by using the new constraint set mechanism piecemeal for
+    /// certain type comparisons.
     fn add_type_mappings_from_constraint_set(
         &mut self,
         formal: Type<'db>,
