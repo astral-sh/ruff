@@ -1565,7 +1565,7 @@ pub(super) struct EquivalenceChecker<'a, 'c, 'db> {
 impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
     fn as_relation_checker(&self) -> TypeRelationChecker<'_, 'c, 'db> {
         TypeRelationChecker {
-            relation: TypeRelation::Redundancy { pure: true },
+            relation: TypeRelation::Subtyping,
             constraints: self.constraints,
             given: self.given,
             inferable: InferableTypeVars::None,
@@ -1589,10 +1589,21 @@ impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
         right: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
         let relation_checker = self.as_relation_checker();
+        let left_top = left.top_materialization(db);
+        let right_top = right.top_materialization(db);
         relation_checker
-            .check_type_pair(db, left, right)
+            .check_type_pair(db, left_top, right_top)
             .and(db, self.constraints, || {
-                relation_checker.check_type_pair(db, right, left)
+                relation_checker.check_type_pair(db, right_top, left_top)
+            })
+            .and(db, self.constraints, || {
+                let left_bottom = left.bottom_materialization(db);
+                let right_bottom = right.bottom_materialization(db);
+                relation_checker
+                    .check_type_pair(db, left_bottom, right_bottom)
+                    .and(db, self.constraints, || {
+                        relation_checker.check_type_pair(db, right_bottom, left_bottom)
+                    })
             })
     }
 }
