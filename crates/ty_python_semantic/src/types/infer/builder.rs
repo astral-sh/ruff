@@ -4976,7 +4976,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             _ => &[],
         };
 
-        let mut try_narrow = |narrowed_ty| {
+        let mut try_narrow = |narrowed_ty: Type<'db>| {
+            // Short-circuit if there is no overload with a matching return type.
+            if !bindings.satisfies(|overload| {
+                let inferable = overload
+                    .signature
+                    .generic_context
+                    .map(|generic_context| generic_context.inferable_typevars(db))
+                    .unwrap_or(InferableTypeVars::None);
+
+                !overload
+                    .constructor_instance_type
+                    .unwrap_or(overload.signature.return_ty)
+                    .when_assignable_to(db, narrowed_ty, &constraints, inferable)
+                    .is_never_satisfied(db)
+            }) {
+                return None;
+            }
+
             let narrowed_tcx = TypeContext::new(Some(narrowed_ty));
 
             let mut speculative_bindings = bindings.clone();
@@ -5030,7 +5047,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ))
         };
 
-        // Prefer the declared type of generic classes.
+        // Prefer generic class instances when narrowing.
+        //
+        // Splitting up this loop is not necessary for correctness, but leads to a slight
+        // performance improvement.
         for narrowed_ty in narrow_targets
             .iter()
             .filter(|ty| ty.class_specialization(db).is_some())
@@ -5039,11 +5059,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 return result;
             }
         }
-
-        // Try the remaining elements of the union.
-        //
-        // TODO: We could also attempt an inference without type context, but this
-        // leads to similar performance issues.
         for narrowed_ty in narrow_targets
             .iter()
             .filter(|ty| ty.class_specialization(db).is_none())
@@ -5054,6 +5069,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         // Infer against the entire union as a fallback.
+        //
+        // TODO: We could also attempt an inference without type context, but this
+        // leads to similar performance issues.
         self.infer_all_argument_types(
             ast_arguments,
             argument_types,
