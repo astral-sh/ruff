@@ -564,9 +564,55 @@ class IncorrectArg(RequiresArg, not_arg="foo"):
     h = 8
     i = 9
     j = 10
+
+class NotCallableInitSubclass:
+    __init_subclass__ = None
+
+# TODO: this should be an error because `__init_subclass__` on the superclass is not callable
+class Bad(NotCallableInitSubclass):
+    a = 1
+    b = 2
+    c = 3
 ```
 
-#### Multiple inheritance
+The `metaclass` keyword is ignored, as it has special meaning and is not passed to
+`__init_subclass__` at runtime.
+
+```py
+class Base:
+    def __init_subclass__(cls, arg: int): ...
+
+class Valid(Base, arg=5, metaclass=object): ...
+
+# error: [invalid-argument-type]
+class Invalid(Base, metaclass=type, arg="foo"): ...
+```
+
+Overload matching is performed correctly:
+
+```py
+from typing import Literal, overload
+
+class Base:
+    @overload
+    def __init_subclass__(cls, mode: Literal["a"], arg: int) -> None: ...
+    @overload
+    def __init_subclass__(cls, mode: Literal["b"], arg: str) -> None: ...
+    def __init_subclass__(cls, mode: str, arg: int | str) -> None: ...
+
+class Valid(Base, mode="a", arg=5): ...
+class Valid(Base, mode="b", arg="foo"): ...
+
+# error: [no-matching-overload]
+class InvalidType(Base, mode="b", arg=5):
+    a = 1
+    b = 2
+    c = 3
+    d = 4
+    e = 5
+```
+
+#### More complex cases
 
 For multiple inheritance, the first resolved `__init_subclass__` method is used.
 
@@ -648,31 +694,6 @@ class Base(Generic[T]):
 
 class Valid(Base[int], arg=1): ...
 class InvalidType(Base[int], arg="x"): ...  # error: [invalid-argument-type]
-```
-
-So are overloads:
-
-```py
-class Base:
-    @overload
-    def __init_subclass__(cls, mode: Literal["a"], arg: int) -> None: ...
-    @overload
-    def __init_subclass__(cls, mode: Literal["b"], arg: str) -> None: ...
-    def __init_subclass__(cls, mode: str, arg: int | str) -> None: ...
-
-class Valid(Base, mode="a", arg=5): ...
-class Valid(Base, mode="b", arg="foo"): ...
-class InvalidType(Base, mode="b", arg=5): ...  # error: [no-matching-overload]
-```
-
-The `metaclass` keyword is ignored, as it has special meaning and is not passed to
-`__init_subclass__` at runtime.
-
-```py
-class Base:
-    def __init_subclass__(cls, arg: int): ...
-
-class Valid(Base, arg=5, metaclass=object): ...
 ```
 
 ## `@staticmethod`
