@@ -4795,7 +4795,7 @@ impl<'db> Type<'db> {
                 Some(GeneratorTypes {
                     yielded: Some(*yield_ty),
                     sent: Some(Type::none(db)),
-                    returned: Some(Type::none(db)),
+                    returned: Some(Type::unknown()),
                 })
             } else {
                 None

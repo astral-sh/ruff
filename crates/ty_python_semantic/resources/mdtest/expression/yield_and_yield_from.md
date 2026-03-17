@@ -111,10 +111,6 @@ def generator_send_str() -> Generator[int, str]:
     x = yield 1
     reveal_type(x)  # revealed: str
 
-def iterator_send_none() -> Iterator[int]:
-    x = yield 1
-    reveal_type(x)  # revealed: None
-
 async def async_generator_default() -> AsyncGenerator[int]:
     x = yield 1
     reveal_type(x)  # revealed: None
@@ -123,14 +119,26 @@ async def async_generator_send_str() -> AsyncGenerator[int, str]:
     x = yield 1
     reveal_type(x)  # revealed: str
 
-async def async_iterator_send_none() -> AsyncIterator[int]:
-    x = yield 1
-    reveal_type(x)  # revealed: None
-
 def mixing_generator_async_generator() -> Generator[int, int, None] | AsyncGenerator[int, str]:
     x = yield 1
     reveal_type(x)  # revealed: int | str
     return None
+```
+
+`Iterator` has no send type or return type, It is equivalent to using `Generator` with send set to
+`None` and return type to `Unknown`.
+
+```py
+def iterator_send_none() -> Iterator[int]:
+    x = yield 1
+    reveal_type(x)  # revealed: None
+
+async def async_iterator_send_none() -> AsyncIterator[int]:
+    x = yield 1
+    reveal_type(x)  # revealed: None
+
+def iterator_yield_from() -> Generator[int, None, int]:
+    yield from iterator_send_none()
 ```
 
 ## Error cases
