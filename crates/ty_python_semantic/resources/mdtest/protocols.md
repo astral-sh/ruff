@@ -2680,6 +2680,102 @@ def match_nested_non_runtime_checkable(arg: Wrapper):
             pass
 ```
 
+## Unsafe overlap with runtime-checkable protocols
+
+<!-- snapshot-diagnostics -->
+
+A type `X` unsafely overlaps with a protocol `P` if `X` is not assignable to `P`, but all members on
+`P` are present as attributes on `X` (with incompatible types). In this case, `isinstance()` would
+return `True` at runtime (since the runtime check only verifies the presence of members, not their
+types), but the type checker cannot safely narrow the type:
+
+```py
+from typing import Protocol, runtime_checkable
+
+@runtime_checkable
+class MethodProto(Protocol):
+    def method(self, x: int) -> int: ...
+
+@runtime_checkable
+class AttributeProto(Protocol):
+    method: int
+
+class MethodNominal:
+    def method(self, x: str) -> None:
+        pass
+
+class AttributeNominal:
+    method: int = 1
+
+def check_isinstance(method_nominal: MethodNominal, attribute_nominal: AttributeNominal, obj: object):
+    isinstance(method_nominal, MethodProto)  # error: [unsafe-isinstance-narrowing]
+    isinstance(method_nominal, AttributeProto)  # error: [unsafe-isinstance-narrowing]
+    isinstance(attribute_nominal, MethodProto)  # error: [unsafe-isinstance-narrowing]
+
+    isinstance(attribute_nominal, AttributeProto)  # no error: `AttributeNominal <: AttributeProto`
+    isinstance(obj, MethodNominal)  # no error: members from `MethodNominal` are missing as attributes
+    isinstance(obj, AttributeProto)  # no error: members from `AttributeNominal` are missing as attributes
+```
+
+The same check applies to `issubclass()`:
+
+```py
+def check_issubclass():
+    issubclass(MethodNominal, MethodProto)  # error: [unsafe-isinstance-narrowing]
+```
+
+Unsafe overlap is also detected when protocols appear in a tuple. An error is reported for each
+protocol in the tuple that has an unsafe overlap:
+
+```py
+@runtime_checkable
+class NonDataProtocol(Protocol):
+    def method(self) -> int: ...
+
+def check_tuple(attribute_nominal: AttributeNominal):
+    # error: [unsafe-isinstance-narrowing]
+    # error: [unsafe-isinstance-narrowing]
+    isinstance(attribute_nominal, (MethodProto, NonDataProtocol))
+```
+
+Unions in the first argument are checked element-by-element. If any element of the union unsafely
+overlaps with the protocol, an error is emitted:
+
+```py
+def check_union(nominal: MethodNominal | int):
+    isinstance(nominal, MethodProto)  # error: [unsafe-isinstance-narrowing]
+
+def check_union_no_overlap(str_or_int: str | int):
+    isinstance(str_or_int, MethodProto)  # no error
+```
+
+No false positive is emitted when the first argument is a specialization of a generic protocol that
+it is assignable to:
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+@runtime_checkable
+class GenericProto(Protocol[T]):
+    def get(self) -> T: ...
+
+def check_generic_no_overlap(x: GenericProto[int]):
+    isinstance(x, GenericProto)  # no error: `GenericProto[int]` is assignable to `GenericProto`
+```
+
+Unsafe overlaps with generic protocols are still detected when a class has all the required members
+but with incompatible types:
+
+```py
+class BadGenericOverlap:
+    get: int  # has `get`, but it's an attribute, not a callable
+
+def check_generic_overlap(x: BadGenericOverlap):
+    isinstance(x, GenericProto)  # error: [unsafe-isinstance-narrowing]
+```
+
 ## Truthiness of protocol instances
 
 An instance of a protocol type generally has ambiguous truthiness:
