@@ -50,7 +50,6 @@ use crate::semantic_index::symbol::{ScopedSymbolId, Symbol};
 use crate::semantic_index::{
     ApplicableConstraints, EnclosingSnapshotResult, SemanticIndex, place_table,
 };
-use crate::types::CallableTypes;
 use crate::types::call::bind::MatchingOverloadIndex;
 use crate::types::call::{Binding, Bindings, CallArguments, CallError, CallErrorKind};
 use crate::types::callable::CallableTypeKind;
@@ -100,13 +99,14 @@ use crate::types::type_alias::{ManualPEP695TypeAliasType, PEP695TypeAliasType};
 use crate::types::typed_dict::{validate_typed_dict_constructor, validate_typed_dict_dict_literal};
 use crate::types::typevar::{BoundTypeVarIdentity, TypeVarConstraints, TypeVarIdentity};
 use crate::types::{
-    CallDunderError, CallableBinding, CallableType, ClassType, DynamicType, EvaluationMode,
-    InferenceFlags, InternedConstraintSet, InternedType, IntersectionBuilder, KnownClass,
-    KnownInstanceType, KnownUnion, LiteralValueTypeKind, MemberLookupPolicy, ParamSpecAttrKind,
-    Parameter, ParameterForm, Parameters, Signature, SpecialFormType, SubclassOfType, Truthiness,
-    Type, TypeAliasType, TypeAndQualifiers, TypeContext, TypeQualifiers, TypeVarBoundOrConstraints,
-    TypeVarKind, TypeVarVariance, TypedDictType, UnionBuilder, UnionType, binding_type,
-    definition_expression_type, infer_complete_scope_types, infer_scope_types, todo_type,
+    CallDunderError, CallableBinding, CallableType, CallableTypes, ClassType, DynamicType,
+    EvaluationMode, InferenceFlags, InternedConstraintSet, InternedType, IntersectionBuilder,
+    IntersectionType, KnownClass, KnownInstanceType, KnownUnion, LiteralValueTypeKind,
+    MemberLookupPolicy, ParamSpecAttrKind, Parameter, ParameterForm, Parameters, Signature,
+    SpecialFormType, SubclassOfType, Truthiness, Type, TypeAliasType, TypeAndQualifiers,
+    TypeContext, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance,
+    TypedDictType, UnionBuilder, UnionType, binding_type, definition_expression_type,
+    infer_complete_scope_types, infer_scope_types, todo_type,
 };
 use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
 use crate::unpack::UnpackPosition;
@@ -5785,8 +5785,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 //
                 // Infer all expressions with diagnostics enabled before starting multi-inference.
                 for item in items {
-                    self.infer_optional_expression(item.key.as_ref(), TypeContext::default());
-                    self.infer_expression(&item.value, TypeContext::default());
+                    if let Some(key) = item.key.as_ref() {
+                        let key_ty = self.infer_expression(key, TypeContext::default());
+                        item_types.insert(key.node_index().load(), key_ty);
+                    }
+
+                    let value_ty = self.infer_expression(&item.value, TypeContext::default());
+                    item_types.insert(item.value.node_index().load(), value_ty);
                 }
 
                 // Disable diagnostics as we attempt to narrow to specific elements of the union.
@@ -5795,6 +5800,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     self.set_multi_inference_state(MultiInferenceState::Ignore);
 
                 let mut narrowed_tys = Vec::new();
+                let mut item_types = FxHashMap::default();
                 for element in tcx.elements(self.db()) {
                     let typed_dict = element
                         .as_typed_dict()
@@ -5835,8 +5841,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // dictionary literal as a `TypedDict`. This also allows us to infer using the
         // type context of the expected `TypedDict` field.
         let mut infer_elt_ty = |builder: &mut Self, (_, elt, tcx): ArgExpr<'db, '_>| {
-            builder
-                .try_expression_type(elt)
+            item_types
+                .get(&elt.node_index().load())
+                .copied()
                 .unwrap_or_else(|| builder.infer_expression(elt, tcx))
         };
 
