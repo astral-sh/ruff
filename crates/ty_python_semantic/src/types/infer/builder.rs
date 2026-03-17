@@ -5195,13 +5195,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             SpecializationBuilder::new(db, generic_context.inferable_typevars(db));
 
                         if let Some(declared_return_ty) = call_expression_tcx.annotation {
-                            let reverse_inference_return_ty = overload
-                                .constructor_type_context_return_override(db, constructor_context)
+                            let normalized_return_ty = overload
+                                .normalized_constructor_return(db, constructor_context)
                                 .unwrap_or(overload.signature.return_ty);
                             let _ = builder.infer_reverse(
                                 &constraints,
                                 declared_return_ty,
-                                reverse_inference_return_ty,
+                                normalized_return_ty,
                             );
                         }
 

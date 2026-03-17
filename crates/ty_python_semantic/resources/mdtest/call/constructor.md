@@ -489,6 +489,21 @@ class Tracer:
         Span("x", on_finish=[self._on_span_finish])
 ```
 
+#### `cls: type[T] -> T` should still allow literal promotion for invariant class type parameters
+
+```py
+from typing import Generic, TypeVar
+
+S = TypeVar("S")
+T = TypeVar("T", bound="Box")
+
+class Box(Generic[S]):
+    def __new__(cls: type[T], x: S) -> T:
+        return super().__new__(cls)
+
+reveal_type(Box(42))  # revealed: Box[int]
+```
+
 #### `typing.Self` return should still provide `__init__` type context
 
 ```toml

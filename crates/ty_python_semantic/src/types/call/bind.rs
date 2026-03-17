@@ -762,18 +762,11 @@ fn constructor_return_outcome<'db>(
     }
 }
 
-fn returns_self<'db>(db: &'db dyn Db, overload: &Binding<'db>) -> bool {
-    matches!(
-        overload.signature.return_ty.resolve_type_alias(db),
-        Type::TypeVar(return_typevar) if return_typevar.typevar(db).is_self(db)
-    )
-}
-
-fn returns_cls_typevar<'db>(db: &'db dyn Db, overload: &Binding<'db>) -> bool {
-    let Type::TypeVar(return_typevar) = overload.signature.return_ty.resolve_type_alias(db) else {
-        return false;
-    };
-
+fn returns_self_like<'db>(
+    db: &'db dyn Db,
+    overload: &Binding<'db>,
+    return_typevar: BoundTypeVarInstance<'db>,
+) -> bool {
     if return_typevar.typevar(db).is_self(db) {
         return true;
     }
@@ -823,7 +816,12 @@ impl<'db> DownstreamConstructor<'db> {
         let outcome = self.overload_return_outcome(db, overload);
         outcome.kind.is_instance()
             || outcome.resolved_return.is_unknown()
-            || returns_cls_typevar(db, overload)
+            || overload
+                .signature
+                .return_ty
+                .resolve_type_alias(db)
+                .as_typevar()
+                .is_some_and(|typevar| returns_self_like(db, overload, typevar))
     }
 
     /// Returns `true` if every matched overload is instance-returning (i.e., its return type
@@ -4821,7 +4819,6 @@ struct ArgumentTypeChecker<'a, 'db> {
     arguments: &'a CallArguments<'a, 'db>,
     argument_matches: &'a [MatchedArgument<'db>],
     parameter_tys: &'a mut [Option<Type<'db>>],
-    reverse_inference_return_ty: Option<Type<'db>>,
     call_expression_tcx: TypeContext<'db>,
     return_ty: Type<'db>,
     errors: &'a mut Vec<BindingError<'db>>,
@@ -4847,7 +4844,6 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         arguments: &'a CallArguments<'a, 'db>,
         argument_matches: &'a [MatchedArgument<'db>],
         parameter_tys: &'a mut [Option<Type<'db>>],
-        reverse_inference_return_ty: Option<Type<'db>>,
         call_expression_tcx: TypeContext<'db>,
         return_ty: Type<'db>,
         errors: &'a mut Vec<BindingError<'db>>,
@@ -4859,7 +4855,6 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             arguments,
             argument_matches,
             parameter_tys,
-            reverse_inference_return_ty,
             call_expression_tcx,
             return_ty,
             errors,
@@ -4901,10 +4896,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             return;
         };
 
-        let return_with_tcx = self
-            .reverse_inference_return_ty
-            .or(Some(self.return_ty))
-            .zip(self.call_expression_tcx.annotation);
+        let return_with_tcx = Some(self.return_ty).zip(self.call_expression_tcx.annotation);
 
         self.inferable_typevars = generic_context.inferable_typevars(self.db);
         let mut builder = SpecializationBuilder::new(self.db, self.inferable_typevars);
@@ -5004,8 +4996,6 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 return ty;
             }
 
-            let return_ty = self.return_ty;
-
             let mut variance_in_return = TypeVarVariance::Bivariant;
 
             // Find all occurrences of the type variable in the return type.
@@ -5017,7 +5007,8 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 variance_in_return = variance_in_return.join(variance);
             };
 
-            return_ty.visit_specialization(self.db, self.call_expression_tcx, visit_return_ty);
+            self.return_ty
+                .visit_specialization(self.db, self.call_expression_tcx, visit_return_ty);
 
             // Promotion is only useful if the type variable is in invariant or contravariant
             // position in the return type.
@@ -5624,7 +5615,7 @@ impl<'db> Binding<'db> {
         constructor_context: Option<ConstructorContext<'db>>,
     ) {
         let return_ty = self
-            .constructor_instance_return_override(db, constructor_context)
+            .normalized_constructor_return(db, constructor_context)
             .unwrap_or(self.signature.return_ty);
         let parameters = self.signature.parameters();
         let mut matcher =
@@ -5661,11 +5652,9 @@ impl<'db> Binding<'db> {
         db: &'db dyn Db,
         constraints: &ConstraintSetBuilder<'db>,
         arguments: &CallArguments<'_, 'db>,
-        constructor_context: Option<ConstructorContext<'db>>,
+        _constructor_context: Option<ConstructorContext<'db>>,
         call_expression_tcx: TypeContext<'db>,
     ) {
-        let reverse_inference_return_ty =
-            self.constructor_type_context_return_override(db, constructor_context);
         let mut checker = ArgumentTypeChecker::new(
             db,
             self.signature_type,
@@ -5673,7 +5662,6 @@ impl<'db> Binding<'db> {
             arguments,
             &self.argument_matches,
             &mut self.parameter_tys,
-            reverse_inference_return_ty,
             call_expression_tcx,
             self.return_ty,
             &mut self.errors,
@@ -5696,39 +5684,31 @@ impl<'db> Binding<'db> {
         self.return_ty = return_ty;
     }
 
-    /// For constructors, there are cases where we need to assume the return type is "an instance
-    /// of the type being constructed", rather than simply the annotated return type. The most
-    /// obvious case is when handling `__init__`, which is an initializer, not a constructor, and
-    /// always returns `None`. But even for other methods (e.g. `__new__`), we should assume that
-    /// an un-annotated return type is really "instance of the type being constructed" to allow for
-    /// proper inference of generic constructors. And we also need to apply this handling to
-    /// `Self`, since we need this substitution before we can do full generic inference on the
-    /// call.
-    pub(crate) fn constructor_instance_return_override(
+    /// Normalize constructor returns for downstream generic reasoning and the bound call return.
+    ///
+    /// This lets downstream logic operate on constructor semantics rather than spelling-specific
+    /// return annotations like `Self` or `T` in `cls: type[T] -> T`.
+    pub(crate) fn normalized_constructor_return(
         &self,
         db: &'db dyn Db,
         constructor_context: Option<ConstructorContext<'db>>,
     ) -> Option<Type<'db>> {
         let constructor_context = constructor_context?;
-        match constructor_context.kind() {
-            kind if kind.is_init() => Some(constructor_context.instance_type()),
-            _ if returns_self(db, self) => Some(constructor_context.instance_type()),
-            _ if self.signature.return_ty.is_unknown() => Some(constructor_context.instance_type()),
-            _ => None,
-        }
-    }
+        let instance_type = constructor_context.instance_type();
 
-    pub(crate) fn constructor_type_context_return_override(
-        &self,
-        db: &'db dyn Db,
-        constructor_context: Option<ConstructorContext<'db>>,
-    ) -> Option<Type<'db>> {
-        self.constructor_instance_return_override(db, constructor_context)
-            .or_else(|| {
-                constructor_context
-                    .filter(|_| returns_cls_typevar(db, self))
-                    .map(ConstructorContext::instance_type)
-            })
+        match (
+            constructor_context.kind(),
+            self.signature.return_ty.resolve_type_alias(db),
+        ) {
+            (ConstructorCallableKind::Init, _) => Some(instance_type),
+            (_, ty) if ty.is_unknown() => Some(instance_type),
+            (ConstructorCallableKind::New, Type::TypeVar(typevar))
+                if returns_self_like(db, self, typevar) =>
+            {
+                Some(instance_type)
+            }
+            _ => Some(self.signature.return_ty),
+        }
     }
 
     pub(crate) fn return_type(&self) -> Type<'db> {
