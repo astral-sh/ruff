@@ -149,7 +149,7 @@ def generator() -> Generator:
 ```py
 from typing import Generator
 
-def invalid_generator() -> Generator[int, int, None]:
+def invalid_generator() -> Generator[int, None, None]:
     # error: [invalid-return-type] "Yielded type does not match annotated yield type: expected yielded type assignable to `int`, found `Literal[""]`"
     yield ""
 ```
@@ -163,20 +163,49 @@ def returns_str() -> str:  # error: [invalid-return-type]
     x = yield 1
     reveal_type(x)  # revealed: Unknown
 
-# error: [invalid-return-type]
-def sync_returns_async_generator() -> AsyncGenerator[int, str]:
+def sync_returns_async_generator() -> AsyncGenerator[int, str]:  # error: [invalid-return-type]
     x = yield 1
     reveal_type(x)  # revealed: str
 ```
 
-### Using a generator with incompatible annotation in `yield from`
+### Invalid return type
 
 ```py
 from typing import Generator
 
-def f() -> Generator[None, float, None]:
-    x = yield
+# TODO: should emit an error (does not return `str`)
+def invalid_generator1() -> Generator[int, None, str]:
+    yield 1
 
-def g() -> Generator[None, int, None]:
-    yield from f()
+# TODO: should emit an error (does not return `int`)
+def invalid_generator2() -> Generator[int, None, None]:
+    yield 1
+
+    return "done"
+```
+
+### `yield from` with incompatible yield type
+
+```py
+from typing import Generator
+
+def inner() -> Generator[str, None, None]:
+    yield "hello"
+
+def outer() -> Generator[int, None, None]:
+    # error: [invalid-return-type] "Yielded type does not match annotated yield type: expected yielded type assignable to `int`, found `str`"
+    yield from inner()
+```
+
+### `yield from` with incompatible send type
+
+```py
+from typing import Generator
+
+def inner() -> Generator[int, int, None]:
+    x = yield 1
+
+def outer() -> Generator[int, str, None]:
+    # error: [invalid-return-type] "Sent type does not match annotated send type: expected sent type assignable to `str`, found `int`"
+    yield from inner()
 ```

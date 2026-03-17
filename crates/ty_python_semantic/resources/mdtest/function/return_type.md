@@ -528,11 +528,6 @@ def i2() -> typing.Generator:
 
 def j() -> str:  # error: [invalid-return-type]
     yield 42
-
-def invalid_return_type() -> typing.Generator[None, None, None]:
-    yield
-    # TODO: error: [invalid-return-type]
-    return ""
 ```
 
 ### Asynchronous
