@@ -5047,30 +5047,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ))
         };
 
-        // Prefer the declared type of generic classes.
-        for narrowed_ty in narrow_targets
-            .iter()
-            .filter(|ty| ty.class_specialization(db).is_some())
-        {
-            if let Some(result) = try_narrow(*narrowed_ty) {
-                return result;
-            }
-        }
-
-        // Try the remaining elements of the union.
-        //
-        // TODO: We could also attempt an inference without type context, but this
-        // leads to similar performance issues.
-        for narrowed_ty in narrow_targets
-            .iter()
-            .filter(|ty| ty.class_specialization(db).is_none())
-        {
+        // Attempt to narrow to each element of the union.
+        for narrowed_ty in narrow_targets {
             if let Some(result) = try_narrow(*narrowed_ty) {
                 return result;
             }
         }
 
         // Infer against the entire union as a fallback.
+        //
+        // TODO: We could also attempt an inference without type context, but this
+        // leads to similar performance issues.
         self.infer_all_argument_types(
             ast_arguments,
             argument_types,
