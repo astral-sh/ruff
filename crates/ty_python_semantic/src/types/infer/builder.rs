@@ -5047,8 +5047,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ))
         };
 
-        // Attempt to narrow to each element of the union.
-        for narrowed_ty in narrow_targets {
+        // Prefer generic class instances when narrowing.
+        //
+        // Splitting up this loop is not necessary for correctness, but leads to a slight
+        // performance improvement.
+        for narrowed_ty in narrow_targets
+            .iter()
+            .filter(|ty| ty.class_specialization(db).is_some())
+        {
+            if let Some(result) = try_narrow(*narrowed_ty) {
+                return result;
+            }
+        }
+        for narrowed_ty in narrow_targets
+            .iter()
+            .filter(|ty| ty.class_specialization(db).is_none())
+        {
             if let Some(result) = try_narrow(*narrowed_ty) {
                 return result;
             }
