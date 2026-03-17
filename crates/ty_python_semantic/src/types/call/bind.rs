@@ -78,8 +78,6 @@ enum CallErrorPriority {
 /// If there are multiple items, they form an intersection.
 #[derive(Debug, Clone)]
 struct BindingsElement<'db> {
-    /// The semantic call items for this element.
-    /// If there are multiple items, they form an intersection.
     items: SmallVec<[CallableItem<'db>; 1]>,
 }
 
@@ -89,11 +87,24 @@ enum CallableItem<'db> {
     Constructor(ConstructorBinding<'db>),
 }
 
+/// Represents the full set of bindings for a constructor call as a singly-linked list.
+///
+/// The "outer" `ConstructorBinding` will be the first-called constructor
+/// method (could be a metaclass `__call__`, a `__new__`, or an `__init__`,
+/// depending what is present on the constructed class). Its
+/// `downstream_constructor` may link to the next downstream constructor, if
+/// present (e.g. metaclass `__call__` could have `__new__` or `__init__` as
+/// downstream; `__new__` could have `__init__` as downstream; `__init__` cannot
+/// have a downstream).
 #[derive(Debug, Clone)]
 struct ConstructorBinding<'db> {
+    /// The `CallableBinding` for this individal constructor method.
     entry: CallableBinding<'db>,
+    /// The instance type being constructed.
     constructed_instance_type: Type<'db>,
+    /// The kind of constructor callable this is (typevar, metaclass `__call__`, `__new__`, or `__init__`).
     constructor_kind: ConstructorCallableKind,
+    /// The next downstream constructor method, if any, to be (conditionally) checked after this one.
     downstream_constructor: Option<Box<DownstreamConstructor<'db>>>,
 }
 
