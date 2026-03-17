@@ -224,9 +224,9 @@ impl<'db> ConstructorBinding<'db> {
         // represent constructor logic (e.g. metaclass `__call__` -> `__new__`/`__init__`).
         // If that downstream constructor resolves to a non-instance return, `__init__`
         // should not be validated.
-        if let Some(downstream_return) = downstream.bindings.constructor_return_type(db)
-            && !downstream.return_is_instance_of_constructor_class(db, downstream_return)
-        {
+        let downstream_return = downstream.bindings.return_type(db);
+
+        if !downstream.return_is_instance_of_constructor_class(db, downstream_return) {
             return false;
         }
 
@@ -1148,23 +1148,6 @@ impl<'db> Bindings<'db> {
         }
     }
 
-    fn shared_constructor_instance_type(&self) -> Option<Type<'db>> {
-        let mut shared = None;
-
-        for item in self.iter_semantic_items() {
-            let constructor = item.as_constructor()?;
-            if let Some(existing) = shared {
-                if existing != constructor.constructed_instance_type() {
-                    return None;
-                }
-            } else {
-                shared = Some(constructor.constructed_instance_type());
-            }
-        }
-
-        shared
-    }
-
     /// Match the arguments of a call site against the parameters of a collection of possibly
     /// unioned, possibly overloaded signatures.
     ///
@@ -1484,15 +1467,6 @@ impl<'db> Bindings<'db> {
         constructor_instance_type.apply_specialization(db, specialization)
     }
 
-    fn constructor_return_type(&self, db: &'db dyn Db) -> Option<Type<'db>> {
-        Self::constructor_return_type_for_bindings(
-            db,
-            self.shared_constructor_instance_type()?,
-            self.iter_semantic_items()
-                .filter_map(CallableItem::as_constructor),
-        )
-    }
-
     fn constructor_return_type_for_bindings<'a>(
         db: &'db dyn Db,
         constructor_instance_type: Type<'db>,
@@ -1626,10 +1600,8 @@ impl<'db> Bindings<'db> {
                             || constructor_is_subclass_of_any)
                         && let Some(downstream) = binding.downstream_constructor()
                         && !binding.constructor_kind().is_metaclass_call()
-                        && let Some(downstream_return) =
-                            downstream.bindings.constructor_return_type(db)
                     {
-                        return Some(downstream_return);
+                        return Some(downstream.bindings.return_type(db));
                     }
                     if non_instance_returns
                         .iter()
@@ -1647,26 +1619,9 @@ impl<'db> Bindings<'db> {
                     if !binding.should_check_downstream_constructor(db) {
                         continue;
                     }
-                    if let Some(downstream_return) = downstream.bindings.constructor_return_type(db)
-                    {
-                        if !is_instance_of_constructor(downstream_return) {
-                            return Some(downstream_return);
-                        }
-                    } else if downstream
-                        .bindings
-                        .iter_semantic_items()
-                        .filter_map(CallableItem::as_constructor)
-                        .any(|downstream_binding| !downstream_binding.constructor_kind().is_init())
-                    {
-                        // Preserve `Unknown` from an invalid all-non-instance downstream
-                        // constructor (for example, metaclass `__call__` forwarding into an
-                        // overloaded `__new__` where no overload matches). We intentionally do not
-                        // do this for deferred `__init__`-only paths, where constructor return
-                        // typing should still come from the constructed instance.
-                        let downstream_return = downstream.bindings.return_type(db);
-                        if downstream_return.is_unknown() {
-                            return Some(downstream_return);
-                        }
+                    let downstream_return = downstream.bindings.return_type(db);
+                    if !is_instance_of_constructor(downstream_return) {
+                        return Some(downstream_return);
                     }
                 }
             }
