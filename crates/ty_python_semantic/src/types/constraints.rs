@@ -236,19 +236,67 @@ where
 /// have to be overly worried about the efficiency of this type.
 ///
 /// Note that you cannot interrogate an owned constraint set in any useful way. Instead, you must
-/// [`load`][ConstraintSetBuilder::load] it into a new builder, and query the result.
+/// use [`query`][OwnedConstraintSet::query] or [`load`][ConstraintSetBuilder::load] to load it
+/// into a new builder, and query the result.
 #[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
 pub struct OwnedConstraintSet<'db> {
-    /// The BDD representing this constraint set
     node: NodeId,
-
-    /// The constraints arena for this BDD. This is extracted from the [`ConstraintSetBuilder`]
-    /// when an owned constraint set is constructed.
     constraints: IndexVec<ConstraintId, Constraint<'db>>,
-
-    /// The nodes arena for this BDD. This is extracted from the [`ConstraintSetBuilder`] when an
-    /// owned constraint set is constructed.
+    typevars: IndexVec<TypeVarId, BoundTypeVarIdentity<'db>>,
     nodes: IndexVec<NodeId, InteriorNodeData>,
+}
+
+impl Default for OwnedConstraintSet<'_> {
+    fn default() -> Self {
+        Self {
+            node: ALWAYS_FALSE,
+            constraints: IndexVec::default(),
+            typevars: IndexVec::default(),
+            nodes: IndexVec::default(),
+        }
+    }
+}
+
+impl<'db> OwnedConstraintSet<'db> {
+    /// Loads this constraint set into a new builder, invokes a callback with that builder, and
+    /// returns the result.
+    ///
+    /// This is more efficient than [`ConstraintSetBuilder::load`] when this is the only set you
+    /// need to load into the new builder.
+    pub(crate) fn query<F, R>(&self, f: F) -> R
+    where
+        F: for<'c> FnOnce(&'c ConstraintSetBuilder<'db>, ConstraintSet<'db, 'c>) -> R,
+    {
+        let constraint_cache = self
+            .constraints
+            .iter_enumerated()
+            .map(|(id, constraint)| (*constraint, id))
+            .collect();
+        let typevar_cache = self
+            .typevars
+            .iter_enumerated()
+            .map(|(id, bound_typevar)| (*bound_typevar, id))
+            .collect();
+        let node_cache = self
+            .nodes
+            .iter_enumerated()
+            .map(|(id, interior)| (*interior, id))
+            .collect();
+        let storage = ConstraintSetStorage {
+            constraints: self.constraints.clone(),
+            typevars: self.typevars.clone(),
+            nodes: self.nodes.clone(),
+            constraint_cache,
+            typevar_cache,
+            node_cache,
+            ..ConstraintSetStorage::default()
+        };
+        let builder = ConstraintSetBuilder {
+            storage: RefCell::new(storage),
+        };
+        let set = ConstraintSet::from_node(&builder, self.node);
+        f(&builder, set)
+    }
 }
 
 /// A set of constraints under which a type property holds.
@@ -647,6 +695,7 @@ impl<'db> ConstraintSetBuilder<'db> {
         OwnedConstraintSet {
             node,
             constraints: storage.constraints,
+            typevars: storage.typevars,
             nodes: storage.nodes,
         }
     }
@@ -2701,7 +2750,7 @@ impl<'db> Bounds<'db> {
 }
 
 /// Materialized lower and upper bounds for a single typevar on a single BDD path.
-struct TypeVarBounds<'db> {
+pub(crate) struct TypeVarBounds<'db> {
     bound_typevar: BoundTypeVarInstance<'db>,
     /// The union of all lower bounds on this path.
     lower: Type<'db>,
