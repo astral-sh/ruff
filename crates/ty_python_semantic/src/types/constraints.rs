@@ -2617,17 +2617,14 @@ impl InteriorNode {
         // uncertain branch is always zero. When U = 0 (the common case), this degenerates to the
         // standard binary BDD leaf-swap: n ? negate(C) : 0 : negate(D).
         let interior = builder.interior_node_data(self.node());
+        let not_true = interior.if_true.negate(builder);
+        let not_uncertain = interior.if_uncertain.negate(builder);
+        let not_false = interior.if_false.negate(builder);
         let result = NodeId::new(
             builder,
             interior.constraint,
-            interior
-                .if_true
-                .or(builder, interior.if_uncertain)
-                .negate(builder),
-            interior
-                .if_false
-                .or(builder, interior.if_uncertain)
-                .negate(builder),
+            not_true.and(builder, not_uncertain),
+            not_false.and(builder, not_uncertain),
             interior.source_order,
         );
 
