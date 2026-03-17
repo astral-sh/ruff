@@ -3718,6 +3718,7 @@ impl<'db> Type<'db> {
                         }
                     };
                     bindings.into_constructor_bindings(
+                        db,
                         Type::TypeVar(tvar),
                         ConstructorCallableKind::TypeVar,
                     )
@@ -4338,6 +4339,7 @@ impl<'db> Type<'db> {
                     let mut bindings =
                         bind_constructor_new(db, new_callable.bindings(db), self_type)
                             .into_constructor_bindings(
+                                db,
                                 constructor_instance_ty,
                                 ConstructorCallableKind::New,
                             );
@@ -4362,6 +4364,7 @@ impl<'db> Type<'db> {
                 _,
             ) => {
                 let mut bindings = init_method.bindings(db).into_constructor_bindings(
+                    db,
                     constructor_instance_ty,
                     ConstructorCallableKind::Init,
                 );
@@ -4383,6 +4386,7 @@ impl<'db> Type<'db> {
                         ..
                     }) => {
                         let mut bindings = init_method.bindings(db).into_constructor_bindings(
+                            db,
                             constructor_instance_ty,
                             ConstructorCallableKind::Init,
                         );
@@ -4404,6 +4408,7 @@ impl<'db> Type<'db> {
                         )
                         .into();
                         bindings = bindings.into_constructor_bindings(
+                            db,
                             constructor_instance_ty,
                             ConstructorCallableKind::Init,
                         );
@@ -4435,6 +4440,7 @@ impl<'db> Type<'db> {
             let mut metaclass_bindings = metaclass_call_method
                 .bindings(db)
                 .into_constructor_bindings(
+                    db,
                     constructor_instance_ty,
                     ConstructorCallableKind::MetaclassCall,
                 );
