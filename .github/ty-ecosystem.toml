@@ -1,5 +1,5 @@
 #:schema ../ty.schema.json
-# Configuration overrides for the mypy primer run
+# Configuration overrides for ty ecosystem analysis
 
 # Enable off-by-default rules.
 [rules]
