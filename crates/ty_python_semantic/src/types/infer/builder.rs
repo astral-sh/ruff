@@ -51,7 +51,7 @@ use crate::semantic_index::{
     ApplicableConstraints, EnclosingSnapshotResult, SemanticIndex, place_table,
 };
 use crate::types::CallableTypes;
-use crate::types::call::bind::MatchingOverloadIndex;
+use crate::types::call::bind::{ConstructorContext, MatchingOverloadIndex};
 use crate::types::call::{Binding, Bindings, CallArguments, CallError, CallErrorKind};
 use crate::types::callable::CallableTypeKind;
 use crate::types::class::{
@@ -5088,17 +5088,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             overloads_with_binding: &mut Vec<(
                 &'a Binding<'db>,
                 &'a CallableBinding<'db>,
-                Option<Type<'db>>,
+                Option<ConstructorContext<'db>>,
             )>,
             binding: &'a CallableBinding<'db>,
-            reverse_inference_return_ty: Option<Type<'db>>,
+            constructor_context: Option<ConstructorContext<'db>>,
         ) {
             match binding.matching_overload_index() {
                 MatchingOverloadIndex::Single(_) | MatchingOverloadIndex::Multiple(_) => {
                     overloads_with_binding.extend(
                         binding
                             .matching_overloads()
-                            .map(|(_, overload)| (overload, binding, reverse_inference_return_ty)),
+                            .map(|(_, overload)| (overload, binding, constructor_context)),
                     );
                 }
 
@@ -5106,11 +5106,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // types for better diagnostics.
                 MatchingOverloadIndex::None => {
                     if let [overload] = binding.overloads() {
-                        overloads_with_binding.push((
-                            overload,
-                            binding,
-                            reverse_inference_return_ty,
-                        ));
+                        overloads_with_binding.push((overload, binding, constructor_context));
                     }
                 }
             }
@@ -5130,15 +5126,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut overloads_with_binding: Vec<(
             &Binding<'db>,
             &CallableBinding<'db>,
-            Option<Type<'db>>,
+            Option<ConstructorContext<'db>>,
         )> = Vec::new();
 
-        for (binding, reverse_inference_return_ty) in bindings.iter_type_context_callables(db) {
-            add_overloads_from_binding(
-                &mut overloads_with_binding,
-                binding,
-                reverse_inference_return_ty,
-            );
+        for (binding, constructor_context) in bindings.iter_type_context_callables(db) {
+            add_overloads_from_binding(&mut overloads_with_binding, binding, constructor_context);
         }
 
         // Each type is a valid independent inference of the given argument, and we may require
@@ -5171,7 +5163,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let parameter_type =
                 |overload: &Binding<'db>,
                  binding: &CallableBinding<'db>,
-                 reverse_inference_return_ty: Option<Type<'db>>| {
+                 constructor_context: Option<ConstructorContext<'db>>| {
                     let argument_index = if binding.bound_type.is_some() {
                         argument_index + 1
                     } else {
@@ -5202,10 +5194,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             SpecializationBuilder::new(db, generic_context.inferable_typevars(db));
 
                         if let Some(declared_return_ty) = call_expression_tcx.annotation {
+                            let reverse_inference_return_ty = overload
+                                .constructor_type_context_return_override(db, constructor_context)
+                                .unwrap_or(overload.signature.return_ty);
                             let _ = builder.infer_reverse(
                                 &constraints,
                                 declared_return_ty,
-                                reverse_inference_return_ty.unwrap_or(overload.signature.return_ty),
+                                reverse_inference_return_ty,
                             );
                         }
 
@@ -5232,14 +5227,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // If there is only a single binding and overload, we can infer the argument directly with
             // the unique parameter type annotation.
-            if let Ok((overload, binding, reverse_inference_return_ty)) =
+            if let Ok((overload, binding, constructor_context)) =
                 overloads_with_binding.iter().exactly_one()
             {
-                let tcx = TypeContext::new(parameter_type(
-                    overload,
-                    binding,
-                    *reverse_inference_return_ty,
-                ));
+                let tcx = TypeContext::new(parameter_type(overload, binding, *constructor_context));
                 *argument_type = Some(infer_argument_ty(self, (argument_index, ast_argument, tcx)));
             } else {
                 // We perform inference once without any type context, emitting any diagnostics that are unrelated
@@ -5256,8 +5247,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 // Infer the type of each argument once with each distinct parameter type as type context.
                 let parameter_types = overloads_with_binding.iter().filter_map(
-                    |(overload, binding, reverse_inference_return_ty)| {
-                        parameter_type(overload, binding, *reverse_inference_return_ty)
+                    |(overload, binding, constructor_context)| {
+                        parameter_type(overload, binding, *constructor_context)
                     },
                 );
 

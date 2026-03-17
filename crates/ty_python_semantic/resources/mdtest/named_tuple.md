@@ -1094,11 +1094,11 @@ class LegacyProperty(NamedTuple, Generic[T]):
     name: str
     value: T
 
-reveal_type(LegacyProperty("height", 42))  # revealed: LegacyProperty[int]
+reveal_type(LegacyProperty("height", 42))  # revealed: LegacyProperty[Literal[42]]
 reveal_type(LegacyProperty.value)  # revealed: property
 reveal_type(LegacyProperty.value.fget)  # revealed: (self, /) -> Unknown
 reveal_type(LegacyProperty[str].value.fget)  # revealed: (self, /) -> str
-reveal_type(LegacyProperty("height", 3.4).value)  # revealed: int | float
+reveal_type(LegacyProperty("height", 3.4).value)  # revealed: float
 ```
 
 ### Functional syntax with generics
@@ -1728,5 +1728,5 @@ class GenericChild(GenericBase[T]):
         reveal_type(instance)  # revealed: @Todo(super in generic class)
         return instance
 
-reveal_type(GenericChild(x=3.14))  # revealed: GenericChild[int | float]
+reveal_type(GenericChild(x=3.14))  # revealed: GenericChild[float]
 ```
