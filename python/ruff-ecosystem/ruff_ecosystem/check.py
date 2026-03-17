@@ -45,8 +45,11 @@ CHECK_DIFF_LINE_RE = re.compile(
     r"^(?P<pre>[+-]) (?P<inner>(?P<path>[^:]+):(?P<lnum>\d+):\d+:) (?P<post>.*)$",
 )
 
+# A little permissive - it allows mismatched brackets around
+# the severity. But should be good enough while we support both
+# the old and new rendering with severities.
 CHECK_DIAGNOSTIC_LINE_RE = re.compile(
-    r"^(?P<diff>[+-])? ?(?P<location>.*): (?P<code>[A-Z]{1,4}[0-9]{3,4}|[a-z\-]+:)(?P<fixable> \[\*\])? (?P<message>.*)"
+    r"^(?P<diff>[+-])? ?(?P<location>.*): (?:(?P<severity>[a-z]+)\[)?(?P<code>[A-Z]{1,4}[0-9]{3,4}|[a-z\-]+:)\]?(?P<fixable> \[\*\])? (?P<message>.*)"
 )
 
 PANIC_DIAGNOSTIC_LINE_RE = re.compile(r"^[^:]+: panic: Panicked at ")

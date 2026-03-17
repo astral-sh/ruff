@@ -6,7 +6,9 @@ use ruff_notebook::NotebookIndex;
 use ruff_source_file::{LineColumn, OneIndexed};
 use ruff_text_size::Ranged;
 
-use crate::diagnostic::{ConciseMessage, Diagnostic, DiagnosticSource, DisplayDiagnosticConfig};
+use crate::diagnostic::{
+    ConciseMessage, Diagnostic, DiagnosticSource, DisplayDiagnosticConfig, Severity,
+};
 
 use super::FileResolver;
 
@@ -96,10 +98,12 @@ pub(super) fn diagnostic_to_json<'a>(
         },
     });
 
-    // In preview, the locations and filename can be optional.
+    // In preview, the locations and filename can be optional
+    // and the severity is displayed.
     if config.preview {
         JsonDiagnostic {
             code: diagnostic.secondary_code_or_id(),
+            severity: diagnostic.severity(),
             url: diagnostic.documentation_url(),
             message: diagnostic.concise_message(),
             fix,
@@ -112,6 +116,7 @@ pub(super) fn diagnostic_to_json<'a>(
     } else {
         JsonDiagnostic {
             code: diagnostic.secondary_code_or_id(),
+            severity: Severity::Error,
             url: diagnostic.documentation_url(),
             message: diagnostic.concise_message(),
             fix,
@@ -222,6 +227,7 @@ impl Serialize for ExpandedEdits<'_> {
 pub(crate) struct JsonDiagnostic<'a> {
     cell: Option<OneIndexed>,
     code: &'a str,
+    severity: Severity,
     end_location: Option<JsonLocation>,
     filename: Option<&'a str>,
     fix: Option<JsonFix<'a>>,
@@ -301,7 +307,7 @@ mod tests {
 
         insta::assert_snapshot!(
             env.render(&diag),
-            @r#"
+            @r###"
         [
           {
             "cell": null,
@@ -318,10 +324,11 @@ mod tests {
             },
             "message": "main diagnostic message",
             "noqa_row": null,
+            "severity": "error",
             "url": "https://docs.astral.sh/ruff/rules/test-diagnostic"
           }
         ]
-        "#,
+        "###,
         );
     }
 
@@ -338,7 +345,7 @@ mod tests {
 
         insta::assert_snapshot!(
             env.render(&diag),
-            @r#"
+            @r###"
         [
           {
             "cell": null,
@@ -349,10 +356,11 @@ mod tests {
             "location": null,
             "message": "main diagnostic message",
             "noqa_row": null,
+            "severity": "error",
             "url": "https://docs.astral.sh/ruff/rules/test-diagnostic"
           }
         ]
-        "#,
+        "###,
         );
     }
 }

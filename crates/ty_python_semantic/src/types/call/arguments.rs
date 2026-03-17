@@ -57,14 +57,14 @@ impl<'a, 'db> CallArguments<'a, 'db> {
     /// will remain uninitialized as `Unknown`.
     pub(crate) fn from_arguments(
         arguments: &'a ast::Arguments,
-        mut infer_argument_type: impl FnMut(Option<&ast::Expr>, &ast::Expr) -> Type<'db>,
+        mut infer_argument_type: impl FnMut(&ast::ArgOrKeyword, &ast::Expr) -> Type<'db>,
     ) -> Self {
         arguments
             .arguments_source_order()
             .map(|arg_or_keyword| match arg_or_keyword {
                 ast::ArgOrKeyword::Arg(arg) => match arg {
                     ast::Expr::Starred(ast::ExprStarred { value, .. }) => {
-                        let ty = infer_argument_type(Some(arg), value);
+                        let ty = infer_argument_type(&arg_or_keyword, value);
                         (Argument::Variadic, Some(ty))
                     }
                     _ => (Argument::Positional, None),
@@ -73,7 +73,7 @@ impl<'a, 'db> CallArguments<'a, 'db> {
                     if let Some(arg) = arg {
                         (Argument::Keyword(&arg.id), None)
                     } else {
-                        let ty = infer_argument_type(None, value);
+                        let ty = infer_argument_type(&arg_or_keyword, value);
                         (Argument::Keywords, Some(ty))
                     }
                 }

@@ -1,0 +1,38 @@
+# Extract class and instance types
+320a3c68aebf3dd13f3496efa7ecc21f04c4f34a
+# Rename Red Knot
+b51c4f82ea6b6e40dcf3622dd009d463bb7e2247
+# Move module resolver code into its own crate
+b4c2825afdd8c1010c3a5859521629d2d1e0a6df
+# split up types/infer.rs
+c6b92b918e4d350e4f8aed95a41985f80ca7dfc9
+# Extract relation module from types.rs
+24dd149e0351b6c27abf8ac9896b9634d1daeb95
+# Move subscript logic out of builder.rs
+c20cb8fc39878be34c3f56dc9b1982e13dbf52ac
+# Move binary expression logic out of builder.rs
+63b7ee8accd87e1e6b9bf04218d352fd59d255bd
+# move comparison logic out of builder.rs
+d3b9e6000423608a20c3ac563f0e7441decea030
+# Move UnionType and IntersectionType to a new types::set_theoretic submodule
+347452f41f5abe651362e936255551a32f45419d
+# move KnownInstanceType, and related types, to a new known_instance.rs submodule
+d98b514a1c592797035bf09a424cc72ee78fa5b6
+# Introduce types::bool, types::context_manager and types::iteration
+48cf24d48bbf59fb8b236087e0966291a07674b9
+# Move method-related types to a submodule
+7750704dec4865958912876cbe4e9b4445def7f6
+# move Type::subtyping_is_always_reflexive to types::relation
+9e69010d91cf171d2c6ad1ac0655fa9da62420fc
+# Move CallableType, and related methods/types, to a new types::callable submodule
+04023a2a65ebcde99a3bc2f4d0644092581a65ba
+# Move TypeVar-related code to a new types::typevar submodule
+a9b2876bd33264c826aaf38e462632f1f7bceb55
+# Move tests and type-alias-related code out of types.rs
+38c273aa235aca9a4b2d9e229c9d596f9eab2c65
+# Split deferred checks out of types/infer/builder.rs
+4926bd58204839cb75a8ed1397e824bbc8f644ca
+# Split out more submodules from types/infer/builder.rs
+53ad26f1e10b749e1ef4680603aa9156dd528dc5
+# Split up types/class.rs
+34cee06dfa6c558c4ab1460200033ea44b368ae4
