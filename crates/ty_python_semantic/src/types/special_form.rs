@@ -79,6 +79,8 @@ pub enum SpecialFormType {
     TypeOf,
     /// The symbol `ty_extensions.CallableTypeOf`
     CallableTypeOf,
+    /// The symbol `ty_extensions.RegularCallableTypeOf`
+    RegularCallableTypeOf,
     /// The symbol `ty_extensions.Top`
     Top,
     /// The symbol `ty_extensions.Bottom`
@@ -143,6 +145,10 @@ impl SpecialFormType {
             | Self::Bottom
             | Self::Intersection
             | Self::CallableTypeOf
+            | Self::RegularCallableTypeOf
+            | Self::Unknown
+            | Self::AlwaysTruthy
+            | Self::AlwaysFalsy
             | Self::TypeQualifier(_) => KnownClass::SpecialForm,
 
             // Typeshed says it's an instance of `_SpecialForm`,
@@ -153,8 +159,6 @@ impl SpecialFormType {
             Self::Generic | Self::Any => KnownClass::Type,
 
             Self::LegacyStdlibAlias(_) => KnownClass::StdlibAlias,
-
-            Self::Unknown | Self::AlwaysTruthy | Self::AlwaysFalsy => KnownClass::Object,
 
             Self::NamedTuple => KnownClass::FunctionType,
         }
@@ -212,6 +216,7 @@ impl SpecialFormType {
             Intersection,
             TypeOf,
             CallableTypeOf,
+            RegularCallableTypeOf,
             Top,
             Bottom,
             #[strum(serialize = "Self")]
@@ -252,6 +257,7 @@ impl SpecialFormType {
                     SpecialFormType::Annotated => Self::Annotated,
                     SpecialFormType::Callable => Self::Callable,
                     SpecialFormType::CallableTypeOf => Self::CallableTypeOf,
+                    SpecialFormType::RegularCallableTypeOf => Self::RegularCallableTypeOf,
                     SpecialFormType::Concatenate => Self::Concatenate,
                     SpecialFormType::Intersection => Self::Intersection,
                     SpecialFormType::Literal => Self::Literal,
@@ -307,6 +313,7 @@ impl SpecialFormType {
                 SpecialFormTypeBuilder::Annotated => Self::Annotated,
                 SpecialFormTypeBuilder::Callable => Self::Callable,
                 SpecialFormTypeBuilder::CallableTypeOf => Self::CallableTypeOf,
+                SpecialFormTypeBuilder::RegularCallableTypeOf => Self::RegularCallableTypeOf,
                 SpecialFormTypeBuilder::Concatenate => Self::Concatenate,
                 SpecialFormTypeBuilder::Intersection => Self::Intersection,
                 SpecialFormTypeBuilder::Literal => Self::Literal,
@@ -408,7 +415,8 @@ impl SpecialFormType {
             | Self::Bottom
             | Self::Intersection
             | Self::TypeOf
-            | Self::CallableTypeOf => module.is_ty_extensions(),
+            | Self::CallableTypeOf
+            | Self::RegularCallableTypeOf => module.is_ty_extensions(),
         }
     }
 
@@ -463,6 +471,7 @@ impl SpecialFormType {
             | Self::Intersection
             | Self::TypeOf
             | Self::CallableTypeOf
+            | Self::RegularCallableTypeOf
             | Self::Callable
             | Self::TypingSelf
             | Self::TypeQualifier(_)
@@ -493,6 +502,7 @@ impl SpecialFormType {
             | Self::Annotated
             | Self::Bottom
             | Self::CallableTypeOf
+            | Self::RegularCallableTypeOf
             | Self::TypeQualifier(_)
             | Self::Concatenate
             | Self::Intersection
@@ -559,6 +569,7 @@ impl SpecialFormType {
             SpecialFormType::Intersection => "Intersection",
             SpecialFormType::TypeOf => "TypeOf",
             SpecialFormType::CallableTypeOf => "CallableTypeOf",
+            SpecialFormType::RegularCallableTypeOf => "RegularCallableTypeOf",
             SpecialFormType::Top => "Top",
             SpecialFormType::Bottom => "Bottom",
             SpecialFormType::Protocol => "Protocol",
@@ -603,6 +614,7 @@ impl SpecialFormType {
             | SpecialFormType::Intersection
             | SpecialFormType::TypeOf
             | SpecialFormType::CallableTypeOf
+            | SpecialFormType::RegularCallableTypeOf
             | SpecialFormType::Top
             | SpecialFormType::Bottom => &[KnownModule::TyExtensions],
         }
@@ -708,7 +720,8 @@ impl SpecialFormType {
             | Self::TypeIs
             | Self::TypeGuard
             | Self::Unpack
-            | Self::CallableTypeOf => Err(InvalidTypeExpressionError {
+            | Self::CallableTypeOf
+            | Self::RegularCallableTypeOf => Err(InvalidTypeExpressionError {
                 invalid_expressions: smallvec::smallvec_inline![
                     InvalidTypeExpression::RequiresOneArgument(self)
                 ],

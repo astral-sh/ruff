@@ -150,6 +150,7 @@ pub(crate) static INCLUDE_PREVIEW: &[FilePattern] = &[
     FilePattern::Builtin("*.pyw"),
     FilePattern::Builtin("*.ipynb"),
     FilePattern::Builtin("**/pyproject.toml"),
+    FilePattern::Builtin("*.md"),
 ];
 
 impl FileResolverSettings {

@@ -129,7 +129,7 @@ The type of the expression being iterated over is immutable, and so should not b
 
 ```py
 # TODO: This should reveal `Literal["a", "b"]`
-# revealed: Unknown | str
+# revealed: str
 x = [reveal_type(string) for string in ["a", "b"]]
 ```
 
@@ -140,16 +140,16 @@ The type of the comprehension expression itself should reflect the inferred elem
 ```py
 from typing import TypedDict, Literal
 
-# revealed: list[Unknown | int]
+# revealed: list[int]
 reveal_type([x for x in range(10)])
 
-# revealed: set[Unknown | int]
+# revealed: set[int]
 reveal_type({x for x in range(10)})
 
-# revealed: dict[Unknown | int, Unknown | str]
+# revealed: dict[int, str]
 reveal_type({x: str(x) for x in range(10)})
 
-# revealed: list[Unknown | tuple[int, Unknown | str]]
+# revealed: list[tuple[int, str]]
 reveal_type([(x, y) for x in range(5) for y in ["a", "b", "c"]])
 
 squares: list[int | None] = [x**2 for x in range(10)]
@@ -162,18 +162,17 @@ Inference for comprehensions takes the type context into account:
 from typing import Sequence
 
 # Without type context:
-reveal_type([x for x in [1, 2, 3]])  # revealed: list[Unknown | int]
-reveal_type({x: "a" for x in [1, 2, 3]})  # revealed: dict[Unknown | int, Unknown | str]
-reveal_type({str(x): x for x in [1, 2, 3]})  # revealed: dict[Unknown | str, Unknown | int]
-reveal_type({x for x in [1, 2, 3]})  # revealed: set[Unknown | int]
+reveal_type([x for x in [1, 2, 3]])  # revealed: list[int]
+reveal_type({x: "a" for x in [1, 2, 3]})  # revealed: dict[int, str]
+reveal_type({str(x): x for x in [1, 2, 3]})  # revealed: dict[str, int]
+reveal_type({x for x in [1, 2, 3]})  # revealed: set[int]
 
 # With type context:
 x1: list[int] = [x for x in [1, 2, 3]]
 reveal_type(x1)  # revealed: list[int]
 
 x2: Sequence[int] = [x for x in [1, 2, 3]]
-# TODO: This should reveal `list[int]`.
-reveal_type(x2)  # revealed: list[Unknown | int]
+reveal_type(x2)  # revealed: list[int]
 
 x3: dict[int, str] = {x: str(x) for x in [1, 2, 3]}
 reveal_type(x3)  # revealed: dict[int, str]
@@ -186,7 +185,7 @@ This also works for nested comprehensions:
 
 ```py
 table = [[(x, y) for x in range(3)] for y in range(3)]
-reveal_type(table)  # revealed: list[Unknown | list[Unknown | tuple[int, int]]]
+reveal_type(table)  # revealed: list[list[tuple[int, int]]]
 
 table_with_content: list[list[tuple[int, int, str | None]]] = [[(x, y, None) for x in range(3)] for y in range(3)]
 reveal_type(table_with_content)  # revealed: list[list[tuple[int, int, str | None]]]
@@ -208,7 +207,7 @@ y3: list[Person] = [{"name": n} for n in ["Alice", "Bob"]]
 reveal_type(y3)  # revealed: list[Person]
 
 # error: [invalid-assignment]
-# error: [invalid-key] "Unknown key "misspelled" for TypedDict `Person`: Unknown key "misspelled""
+# error: [invalid-key] "Unknown key "misspelled" for TypedDict `Person`"
 # error: [missing-typed-dict-key] "Missing required key 'name' in TypedDict `Person` constructor"
 y4: list[Person] = [{"misspelled": n} for n in ["Alice", "Bob"]]
 ```
@@ -216,9 +215,9 @@ y4: list[Person] = [{"misspelled": n} for n in ["Alice", "Bob"]]
 We promote literals to avoid overly-precise types in invariant positions:
 
 ```py
-reveal_type([x for x in ("a", "b", "c")])  # revealed: list[Unknown | str]
-reveal_type({x for x in (1, 2, 3)})  # revealed: set[Unknown | int]
-reveal_type({k: 0 for k in ("a", "b", "c")})  # revealed: dict[Unknown | str, Unknown | int]
+reveal_type([x for x in ("a", "b", "c")])  # revealed: list[str]
+reveal_type({x for x in (1, 2, 3)})  # revealed: set[int]
+reveal_type({k: 0 for k in ("a", "b", "c")})  # revealed: dict[str, int]
 ```
 
 Type context can prevent this promotion from happening:

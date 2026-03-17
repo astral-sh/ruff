@@ -129,6 +129,23 @@ def narrow_a[B: A](a: A, b: B):
         reveal_type(type_of_a)  # revealed: type[B@narrow_a]
 ```
 
+Narrowing through `type[T]` or `Type[T]` should preserve the type variable identity, so the narrowed
+value remains assignable to `T`:
+
+```py
+from typing import Type, TypeVar
+
+LegacyT = TypeVar("LegacyT", int, str)
+
+def legacy_typevar_narrowing(x: int | str, t: Type[LegacyT]) -> LegacyT:
+    assert isinstance(x, t)
+    return x
+
+def pep695_typevar_narrowing[T: (int, str)](x: int | str, t: type[T]) -> T:
+    assert isinstance(x, t)
+    return x
+```
+
 ## `__class__`
 
 ```py
@@ -499,7 +516,7 @@ expects_type_c_default_of_int_str(C[str, int])
 the class that the instance-type refers to.
 
 ```py
-from ty_extensions import CallableTypeOf
+from ty_extensions import RegularCallableTypeOf
 
 class TakesStrInConstructor:
     def __init__(self, x: int, y: str | None = None): ...
@@ -564,15 +581,15 @@ def f[
     reveal_type(type_t_constrained(42, 42))  # revealed: T4@f
 
     def g(
-        object_class_upcast: CallableTypeOf[object],
-        bare_type_upcast: CallableTypeOf[bare_type],
-        type_object_upcast: CallableTypeOf[type_object],
-        type_t_unbound_upcast: CallableTypeOf[type_t_unbound],
-        type_t_object_bound_upcast: CallableTypeOf[type_t_object_bound],
-        type_int_upcast: CallableTypeOf[type_int],
-        type_t_int_bound_upcast: CallableTypeOf[type_t_int_bound],
-        type_t_union_bound_upcast: CallableTypeOf[type_t_union_bound],
-        type_t_constrained_upcast: CallableTypeOf[type_t_constrained],
+        object_class_upcast: RegularCallableTypeOf[object],
+        bare_type_upcast: RegularCallableTypeOf[bare_type],
+        type_object_upcast: RegularCallableTypeOf[type_object],
+        type_t_unbound_upcast: RegularCallableTypeOf[type_t_unbound],
+        type_t_object_bound_upcast: RegularCallableTypeOf[type_t_object_bound],
+        type_int_upcast: RegularCallableTypeOf[type_int],
+        type_t_int_bound_upcast: RegularCallableTypeOf[type_t_int_bound],
+        type_t_union_bound_upcast: RegularCallableTypeOf[type_t_union_bound],
+        type_t_constrained_upcast: RegularCallableTypeOf[type_t_constrained],
     ):
         reveal_type(object_class_upcast)  # revealed: () -> object
 

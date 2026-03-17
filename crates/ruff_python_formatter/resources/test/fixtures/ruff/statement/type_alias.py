@@ -150,3 +150,9 @@ type after_star[*Ts = *
 type bound_and_default[T:int=int] = int
 type long_bound_short_default[T: (aaaaaaaaaaaaaaaaaaaaaaaaaaaaa, bbbbbbbbbbbbbbb, ccccccccccc, ddddddddddddd, eeeeeee)=a]=int
 type short_bound_long_default[T:a= (aaaaaaaaaaaaaaaaaaaaaaaaaaaaa, bbbbbbbbbbbbbbb, ccccccccccc, ddddddddddddd, eeeeeee)]=int
+
+# Preserve parentheses around invalid type expressions.
+type NamedExprValue = (value := int)
+
+async def preserve_await_type_alias_value():
+    type AwaitValue = (await g())

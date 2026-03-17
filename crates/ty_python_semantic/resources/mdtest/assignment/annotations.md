@@ -69,7 +69,7 @@ reveal_type(d)  # revealed: tuple[tuple[str, str], tuple[int, int]]
 reveal_type(e)  # revealed: tuple[str, ...]
 
 reveal_type(f)  # revealed: tuple[str, *tuple[int, ...], bytes]
-reveal_type(g)  # revealed: tuple[@Todo(TypeVarTuple), ...]
+reveal_type(g)  # revealed: tuple[str, *tuple[int, ...], bytes]
 
 reveal_type(h)  # revealed: tuple[list[int], list[int]]
 reveal_type(i)  # revealed: tuple[str | int, str | int]
@@ -445,13 +445,21 @@ reveal_type(x8)  # revealed: Literal[True]
 x9: int | str = f2(True)
 reveal_type(x9)  # revealed: Literal[True]
 
-# TODO: We could choose a concrete type here.
 x10: list[int | str] | list[int | None] = [1, 2, 3]
-reveal_type(x10)  # revealed: list[Unknown | int]
+reveal_type(x10)  # revealed: list[int | str]
 
-# TODO: And here similarly.
 x11: Sequence[int | str] | Sequence[int | None] = [1, 2, 3]
-reveal_type(x11)  # revealed: list[Unknown | int]
+reveal_type(x11)  # revealed: list[int]
+
+x12: list[int] | list[int | None] | list[str | None] = ["1", "2"]
+reveal_type(x12)  # revealed: list[str | None]
+
+x13: dict[str, list[int | None]] | dict[str, list[str | None]] = {"a": ["b"]}
+reveal_type(x13)  # revealed: dict[str, list[str | None]]
+
+x14 = [{"a": [1], "b": 1}, {"a": [1]}]
+x14.append(reveal_type({"b": 1}))  # revealed: dict[str, list[int] | int]
+reveal_type(x14)  # revealed: list[dict[str, list[int] | int] | dict[str, list[int]]]
 ```
 
 ## Annotations influence generic call argument inference
@@ -480,12 +488,12 @@ reveal_type(x2)  # revealed: TD
 
 # error: [missing-typed-dict-key] "Missing required key 'x' in TypedDict `TD` constructor"
 # error: [invalid-key] "Unknown key "y" for TypedDict `TD`"
-# error: [invalid-assignment] "Object of type `TD | dict[Unknown | str, Unknown | int]` is not assignable to `TD`"
+# error: [invalid-assignment] "Object of type `TD | dict[str, int]` is not assignable to `TD`"
 x3: TD = first([{"y": 0}, {"x": 1}])
 
 # error: [missing-typed-dict-key] "Missing required key 'x' in TypedDict `TD` constructor"
 # error: [invalid-key] "Unknown key "y" for TypedDict `TD`"
-# error: [invalid-assignment] "Object of type `TD | None | dict[Unknown | str, Unknown | int]` is not assignable to `TD | None`"
+# error: [invalid-assignment] "Object of type `TD | None | dict[str, int]` is not assignable to `TD | None`"
 x4: TD | None = first([{"y": 0}, {"x": 1}])
 ```
 
@@ -708,19 +716,16 @@ x6: Iterable[list[Any]] = [[1, 2, 3]]
 reveal_type(x6)  # revealed: list[list[Any]]
 
 x7: Sequence[Any] = [i for i in [1, 2, 3]]
-# TODO: This should infer `list[int]`.
-reveal_type(x7)  # revealed: list[Unknown | int]
+reveal_type(x7)  # revealed: list[int]
 
 x8: MutableSequence[Any] = [i for i in [1, 2, 3]]
 reveal_type(x8)  # revealed: list[Any]
 
 x9: Iterable[Any] = [i for i in [1, 2, 3]]
-# TODO: This should infer `list[int]`.
-reveal_type(x9)  # revealed: list[Unknown | int]
+reveal_type(x9)  # revealed: list[int]
 
 x10: Iterable[Iterable[Any]] = [[i] for i in [1, 2, 3]]
-# TODO: This should infer `list[list[int]]`.
-reveal_type(x10)  # revealed: list[list[Unknown | int]]
+reveal_type(x10)  # revealed: list[list[int]]
 
 x11: list[Iterable[Any]] = [[i] for i in [1, 2, 3]]
 reveal_type(x11)  # revealed: list[Iterable[Any]]

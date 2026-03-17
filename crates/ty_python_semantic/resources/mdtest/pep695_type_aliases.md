@@ -131,6 +131,31 @@ def f(x: Foo[int]):
     reveal_type(x.foo())  # revealed: int
 ```
 
+## Stringified values
+
+<!-- snapshot-diagnostics -->
+
+Stringifying the right-hand side of a type alias is redundant, but allowed:
+
+```py
+type X = "int | str"
+
+def f(obj: X):
+    reveal_type(obj)  # revealed: int | str
+```
+
+The right-hand side of a PEP-695 type alias will not usually be executed, but can be if the user
+accesses the `.__value__` attribute. Normal runtime rules still therefore apply regarding partially
+stringified alias values:
+
+```py
+# error: [unsupported-operator]
+type Y = "int" | str
+
+def g(obj: Y):
+    reveal_type(obj)  # revealed: int | str
+```
+
 ## In unions and intersections
 
 We can "break apart" a type alias by e.g. adding it to a union:
@@ -276,7 +301,7 @@ in a tuple unpacking is not supported.
 from typing_extensions import TypeAliasType
 
 # error: [invalid-type-alias-type] "A `TypeAliasType` definition must be a simple variable assignment"
-TypeAliasType("IntOrStr", int | str)
+TypeAliasType("IntOrStr", "int | str")
 ```
 
 ### Mutually recursive `TypeAliasType` definitions
@@ -469,7 +494,7 @@ def f(x: A):
 #### With new-style union
 
 ```py
-type A = list["A" | str]
+type A = list[A | str]
 
 def f(x: A):
     reveal_type(x)  # revealed: list[A | str]
@@ -522,4 +547,16 @@ def foo(a: int, b: int) -> RecursiveT:
     some_intermediate_var = (a, b)
     # error: [invalid-return-type] "Return type does not match returned value: expected `RecursiveT`, found `list[int]`"
     return list(some_intermediate_var)
+```
+
+### Recursive `TypeIs` and `TypeGuard` aliases don't stack overflow
+
+```py
+from typing_extensions import TypeGuard, TypeIs
+
+type RecursiveIs = TypeIs[RecursiveIs]  # error: [cyclic-type-alias-definition]
+type RecursiveGuard = TypeGuard[RecursiveGuard]
+
+type AliasIs = RecursiveIs  # error: [cyclic-type-alias-definition]
+type AliasGuard = RecursiveGuard
 ```

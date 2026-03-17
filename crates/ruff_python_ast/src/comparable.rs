@@ -1532,6 +1532,7 @@ pub struct StmtAssert<'a> {
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct StmtImport<'a> {
     names: Vec<ComparableAlias<'a>>,
+    is_lazy: bool,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -1539,6 +1540,7 @@ pub struct StmtImportFrom<'a> {
     module: Option<&'a str>,
     names: Vec<ComparableAlias<'a>>,
     level: u32,
+    is_lazy: bool,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -1778,21 +1780,25 @@ impl<'a> From<&'a ast::Stmt> for ComparableStmt<'a> {
             }),
             ast::Stmt::Import(ast::StmtImport {
                 names,
+                is_lazy,
                 range: _,
                 node_index: _,
             }) => Self::Import(StmtImport {
                 names: names.iter().map(Into::into).collect(),
+                is_lazy: *is_lazy,
             }),
             ast::Stmt::ImportFrom(ast::StmtImportFrom {
                 module,
                 names,
                 level,
+                is_lazy,
                 range: _,
                 node_index: _,
             }) => Self::ImportFrom(StmtImportFrom {
                 module: module.as_deref(),
                 names: names.iter().map(Into::into).collect(),
                 level: *level,
+                is_lazy: *is_lazy,
             }),
             ast::Stmt::Global(ast::StmtGlobal {
                 names,

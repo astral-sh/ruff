@@ -373,14 +373,6 @@ def _(c: Callable[Concatenate[int, str, ...], int]):
     reveal_type(c)  # revealed: (...) -> int
 ```
 
-And, as one of the parameter types:
-
-```py
-def _(c: Callable[[Concatenate[int, str, ...], int], int]):
-    # TODO: Should reveal the correct signature
-    reveal_type(c)  # revealed: (...) -> int
-```
-
 Other type expressions can be nested inside `Concatenate`:
 
 ```py
@@ -524,7 +516,7 @@ def f_okay(c: Callable[[], None]):
 ### Subclasses should return themselves, not superclass
 
 ```py
-from ty_extensions import into_callable
+from ty_extensions import into_regular_callable
 
 class Base:
     def __init__(self) -> None:
@@ -534,7 +526,7 @@ class A(Base):
     pass
 
 # revealed: () -> A
-reveal_type(into_callable(A))
+reveal_type(into_regular_callable(A))
 ```
 
 [gradual form]: https://typing.python.org/en/latest/spec/glossary.html#term-gradual-form

@@ -301,7 +301,9 @@ impl<'a> Importer<'a> {
                 import
                     .stmt
                     .as_import_from_stmt()
-                    .is_some_and(|import_from| import_from.module.as_deref() == Some("__future__"))
+                    .is_some_and(|import_from| {
+                        !import_from.is_lazy && import_from.module.as_deref() == Some("__future__")
+                    })
             })
             .last()
     }
@@ -1457,6 +1459,25 @@ from __future__ import annotations
 
         typing.TypeVar
         "#);
+    }
+
+    #[test]
+    fn lazy_future_import_is_not_special() {
+        // Lazy `__future__` imports must not act like real future-import anchors for insertion.
+        let test = cursor_test(
+            "\
+lazy from __future__ import annotations
+
+<CURSOR>
+        ",
+        );
+        assert_snapshot!(
+            test.import("typing", "TypeVar"), @"
+        import typing
+        lazy from __future__ import annotations
+
+        typing.TypeVar
+        ");
     }
 
     #[test]

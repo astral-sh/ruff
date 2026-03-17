@@ -375,6 +375,15 @@
             }
           ]
         },
+        "all": {
+          "title": "set the default severity level for all rules",
+          "description": "Configure a default severity level for all rules. Individual rule settings override this default.",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "ambiguous-protocol-member": {
           "title": "detects protocol classes with ambiguous interfaces",
           "description": "## What it does\nChecks for protocol classes with members that will lead to ambiguous interfaces.\n\n## Why is this bad?\nAssigning to an undeclared variable in a protocol class leads to an ambiguous\ninterface which may lead to the type checker inferring unexpected things. It's\nrecommended to ensure that all members of a protocol class are explicitly declared.\n\n## Examples\n\n```py\nfrom typing import Protocol\n\nclass BaseProto(Protocol):\n    a: int                               # fine (explicitly declared as `int`)\n    def method_member(self) -> int: ...  # fine: a method definition using `def` is considered a declaration\n    c = \"some variable\"                  # error: no explicit declaration, leading to ambiguity\n    b = method_member                    # error: no explicit declaration, leading to ambiguity\n\n    # error: this creates implicit assignments of `d` and `e` in the protocol class body.\n    # Were they really meant to be considered protocol members?\n    for d, e in enumerate(range(42)):\n        pass\n\nclass SubProto(BaseProto, Protocol):\n    a = 42  # fine (declared in superclass)\n```",
@@ -735,6 +744,16 @@
             }
           ]
         },
+        "invalid-enum-member-annotation": {
+          "title": "detects type annotations on enum members",
+          "description": "## What it does\nChecks for enum members that have explicit type annotations.\n\n## Why is this bad?\nThe [typing spec] states that type checkers should infer a literal type\nfor all enum members. An explicit type annotation on an enum member is\nmisleading because the annotated type will be incorrect — the actual\nruntime type is the enum class itself, not the annotated type.\n\nIn CPython's `enum` module, annotated assignments with values are still\ntreated as members at runtime, but the annotation will confuse readers of the code.\n\n## Examples\n```python\nfrom enum import Enum\n\nclass Pet(Enum):\n    CAT = 1       # OK\n    DOG: int = 2  # Error: enum members should not be annotated\n```\n\nUse instead:\n```python\nfrom enum import Enum\n\nclass Pet(Enum):\n    CAT = 1\n    DOG = 2\n```\n\n## References\n- [Typing spec: Enum members](https://typing.python.org/en/latest/spec/enums.html#enum-members)\n\n[typing spec]: https://typing.python.org/en/latest/spec/enums.html#enum-members",
+          "default": "warn",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "invalid-exception-caught": {
           "title": "detects exception handlers that catch classes that do not inherit from `BaseException`",
           "description": "## What it does\nChecks for exception handlers that catch non-exception classes.\n\n## Why is this bad?\nCatching classes that do not inherit from `BaseException` will raise a `TypeError` at runtime.\n\n## Example\n```python\ntry:\n    1 / 0\nexcept 1:\n    ...\n```\n\nUse instead:\n```python\ntry:\n    1 / 0\nexcept ZeroDivisionError:\n    ...\n```\n\n## References\n- [Python documentation: except clause](https://docs.python.org/3/reference/compound_stmts.html#except-clause)\n- [Python documentation: Built-in Exceptions](https://docs.python.org/3/library/exceptions.html#built-in-exceptions)\n\n## Ruff rule\n This rule corresponds to Ruff's [`except-with-non-exception-classes` (`B030`)](https://docs.astral.sh/ruff/rules/except-with-non-exception-classes)",
@@ -797,7 +816,7 @@
         },
         "invalid-key": {
           "title": "detects invalid subscript accesses or TypedDict literal keys",
-          "description": "## What it does\nChecks for subscript accesses with invalid keys and `TypedDict` construction with an\nunknown key.\n\n## Why is this bad?\nSubscripting with an invalid key will raise a `KeyError` at runtime.\n\nCreating a `TypedDict` with an unknown key is likely a mistake; if the `TypedDict` is\n`closed=true` it also violates the expectations of the type.\n\n## Examples\n```python\nfrom typing import TypedDict\n\nclass Person(TypedDict):\n    name: str\n    age: int\n\nalice = Person(name=\"Alice\", age=30)\nalice[\"height\"]  # KeyError: 'height'\n\nbob: Person = { \"name\": \"Bob\", \"age\": 30 }  # typo!\n\ncarol = Person(name=\"Carol\", age=25)  # typo!\n```",
+          "description": "## What it does\nChecks for subscript accesses with invalid keys and `TypedDict` construction with an\nunknown key.\n\n## Why is this bad?\nSubscripting with an invalid key will raise a `KeyError` at runtime.\n\nCreating a `TypedDict` with an unknown key is likely a mistake; if the `TypedDict` is\n`closed=true` it also violates the expectations of the type.\n\n## Examples\n```python\nfrom typing import TypedDict\n\nclass Person(TypedDict):\n    name: str\n    age: int\n\nalice = Person(name=\"Alice\", age=30)\nalice[\"height\"]  # KeyError: 'height'\n\nbob: Person = { \"namee\": \"Bob\", \"age\": 30 }  # typo!\n\ncarol = Person(name=\"Carol\", aeg=25)  # typo!\n```",
           "default": "error",
           "oneOf": [
             {
@@ -1187,8 +1206,8 @@
         },
         "possibly-missing-attribute": {
           "title": "detects references to possibly missing attributes",
-          "description": "## What it does\nChecks for possibly missing attributes.\n\n## Why is this bad?\nAttempting to access a missing attribute will raise an `AttributeError` at runtime.\n\n## Examples\n```python\nclass A:\n    if b:\n        c = 0\n\nA.c  # AttributeError: type object 'A' has no attribute 'c'\n```",
-          "default": "warn",
+          "description": "## What it does\nChecks for possibly missing attributes.\n\n## Why is this bad?\nAttempting to access a missing attribute will raise an `AttributeError` at runtime.\n\n## Rule status\nThis rule is currently disabled by default because of the number of\nfalse positives it can produce.\n\n## Examples\n```python\nclass A:\n    if b:\n        c = 0\n\nA.c  # AttributeError: type object 'A' has no attribute 'c'\n```",
+          "default": "ignore",
           "oneOf": [
             {
               "$ref": "#/definitions/Level"
@@ -1209,6 +1228,16 @@
           "title": "detects possibly missing imports",
           "description": "## What it does\nChecks for imports of symbols that may be missing.\n\n## Why is this bad?\nImporting a missing module or name will raise a `ModuleNotFoundError`\nor `ImportError` at runtime.\n\n## Rule status\nThis rule is currently disabled by default because of the number of\nfalse positives it can produce.\n\n## Examples\n```python\n# module.py\nimport datetime\n\nif datetime.date.today().weekday() != 6:\n    a = 1\n\n# main.py\nfrom module import a  # ImportError: cannot import name 'a' from 'module'\n```",
           "default": "ignore",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "possibly-missing-submodule": {
+          "title": "detects accesses of submodules that may not be available as attributes on their parent module",
+          "description": "## What it does\nChecks for accesses of submodules that might not've been imported.\n\n## Why is this bad?\nWhen module `a` has a submodule `b`, `import a` isn't generally enough to let you access\n`a.b.` You either need to explicitly `import a.b`, or else you need the `__init__.py` file\nof `a` to include `from . import b`. Without one of those, `a.b` is an `AttributeError`.\n\n## Examples\n```python\nimport html\nhtml.parser  # AttributeError: module 'html' has no attribute 'parser'\n```",
+          "default": "warn",
           "oneOf": [
             {
               "$ref": "#/definitions/Level"
@@ -1325,6 +1354,16 @@
             }
           ]
         },
+        "unbound-type-variable": {
+          "title": "detects type variables used outside of their bound scope",
+          "description": "## What it does\nChecks for type variables that are used in a scope where they are not bound\nto any enclosing generic context.\n\n## Why is this bad?\nUsing a type variable outside of a scope that binds it has no well-defined meaning.\n\n## Examples\n```python\nfrom typing import TypeVar, Generic\n\nT = TypeVar(\"T\")\nS = TypeVar(\"S\")\n\nx: T  # error: unbound type variable in module scope\n\nclass C(Generic[T]):\n    x: list[S] = []  # error: S is not in this class's generic context\n```\n\n## References\n- [Typing spec: Scoping rules for type variables](https://typing.python.org/en/latest/spec/generics.html#scoping-rules-for-type-variables)",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "undefined-reveal": {
           "title": "detects usages of `reveal_type` without importing it",
           "description": "## What it does\nChecks for calls to `reveal_type` without importing it.\n\n## Why is this bad?\nUsing `reveal_type` without importing it will raise a `NameError` at runtime.\n\n## Examples\n```python\nreveal_type(1)  # NameError: name 'reveal_type' is not defined\n```",
@@ -1407,7 +1446,7 @@
         },
         "unsupported-dynamic-base": {
           "title": "detects dynamic class bases that are unsupported as ty could not feasibly calculate the class's MRO",
-          "description": "## What it does\nChecks for dynamic class definitions (using `type()`) that have bases\nwhich are unsupported by ty.\n\nThis is equivalent to [`unsupported-base`] but applies to classes created\nvia `type()` rather than `class` statements.\n\n## Why is this bad?\nIf a dynamically created class has a base that is an unsupported type\nsuch as `type[T]`, ty will not be able to resolve the\n[method resolution order] (MRO) for the class. This may lead to an inferior\nunderstanding of your codebase and unpredictable type-checking behavior.\n\n## Default level\nThis rule is disabled by default because it will not cause a runtime error,\nand may be noisy on codebases that use `type()` in highly dynamic ways.\n\n## Examples\n```python\ndef factory(base: type[Base]) -> type:\n    # `base` has type `type[Base]`, not `type[Base]` itself\n    return type(\"Dynamic\", (base,), {})  # error: [unsupported-dynamic-base]\n```\n\n[method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order\n[`unsupported-base`]: https://docs.astral.sh/ty/rules/unsupported-base",
+          "description": "## What it does\nChecks for dynamic class definitions (using `type()`) that have bases\nwhich are unsupported by ty.\n\nThis is equivalent to `unsupported-base` but applies to classes created\nvia `type()` rather than `class` statements.\n\n## Why is this bad?\nIf a dynamically created class has a base that is an unsupported type\nsuch as `type[T]`, ty will not be able to resolve the\n[method resolution order] (MRO) for the class. This may lead to an inferior\nunderstanding of your codebase and unpredictable type-checking behavior.\n\n## Default level\nThis rule is disabled by default because it will not cause a runtime error,\nand may be noisy on codebases that use `type()` in highly dynamic ways.\n\n## Examples\n```python\ndef factory(base: type[Base]) -> type:\n    # `base` has type `type[Base]`, not `type[Base]` itself\n    return type(\"Dynamic\", (base,), {})  # error: [unsupported-dynamic-base]\n```\n\n[method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order",
           "default": "ignore",
           "oneOf": [
             {
@@ -1419,6 +1458,16 @@
           "title": "detects binary, unary, or comparison expressions where the operands don't support the operator",
           "description": "## What it does\nChecks for binary expressions, comparisons, and unary expressions where\nthe operands don't support the operator.\n\n## Why is this bad?\nAttempting to use an unsupported operator will raise a `TypeError` at\nruntime.\n\n## Examples\n```python\nclass A: ...\n\nA() + A()  # TypeError: unsupported operand type(s) for +: 'A' and 'A'\n```",
           "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "unused-awaitable": {
+          "title": "detects awaitable objects that are used as expression statements without being awaited",
+          "description": "## What it does\nChecks for awaitable objects (such as coroutines) used as expression\nstatements without being awaited.\n\n## Why is this bad?\nCalling an `async def` function returns a coroutine object. If the\ncoroutine is never awaited, the body of the async function will never\nexecute, which is almost always a bug. Python emits a\n`RuntimeWarning: coroutine was never awaited` at runtime in this case.\n\n## Examples\n```python\nasync def fetch_data() -> str:\n    return \"data\"\n\nasync def main() -> None:\n    fetch_data()  # Warning: coroutine is not awaited\n    await fetch_data()  # OK\n```",
+          "default": "warn",
           "oneOf": [
             {
               "$ref": "#/definitions/Level"

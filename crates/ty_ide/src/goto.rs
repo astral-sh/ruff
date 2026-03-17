@@ -21,8 +21,8 @@ use ty_python_semantic::types::ide_support::{
     typed_dict_key_definition,
 };
 use ty_python_semantic::{
-    HasDefinition, HasType, ImportAliasResolution, SemanticModel, TypeQualifiers,
-    definitions_for_imported_symbol, definitions_for_name,
+    HasDefinition, HasOptionalDefinition, HasType, ImportAliasResolution, SemanticModel,
+    TypeQualifiers, definitions_for_imported_symbol, definitions_for_name,
 };
 
 #[derive(Clone, Debug)]
@@ -515,11 +515,9 @@ impl GotoTarget<'_> {
             )),
 
             // For exception variables, they are their own definitions (like parameters)
-            GotoTarget::ExceptVariable(except_handler) => {
-                Some(vec![ResolvedDefinition::Definition(
-                    except_handler.definition(model),
-                )])
-            }
+            GotoTarget::ExceptVariable(except_handler) => except_handler
+                .optional_definition(model)
+                .map(|definition| vec![ResolvedDefinition::Definition(definition)]),
 
             // Patterns are glorified assignments but we have to look them up by ident
             // because they're not expressions
@@ -949,9 +947,10 @@ impl GotoTarget<'_> {
 
                     None
                 }
-                Some(AnyNodeRef::ExceptHandlerExceptHandler(handler)) => {
-                    Some(GotoTarget::ExceptVariable(handler))
-                }
+                Some(AnyNodeRef::ExceptHandlerExceptHandler(handler)) => handler
+                    .name
+                    .is_some()
+                    .then_some(GotoTarget::ExceptVariable(handler)),
                 Some(AnyNodeRef::Keyword(keyword)) => {
                     // Find the containing call expression from the ancestor chain
                     let call_expression = covering_node
@@ -1139,7 +1138,10 @@ impl Ranged for GotoTarget<'_> {
             } => *component_range,
             GotoTarget::StringAnnotationSubexpr { subrange, .. } => *subrange,
             GotoTarget::ImportModuleAlias { asname, .. } => asname.range,
-            GotoTarget::ExceptVariable(except) => except.name.as_ref().unwrap().range,
+            GotoTarget::ExceptVariable(except) => except
+                .name
+                .as_ref()
+                .map_or(except.range(), |name| name.range),
             GotoTarget::KeywordArgument { keyword, .. } => keyword.arg.as_ref().unwrap().range,
             GotoTarget::PatternMatchRest(rest) => rest.rest.as_ref().unwrap().range,
             GotoTarget::PatternKeywordArgument(keyword) => keyword.attr.range,

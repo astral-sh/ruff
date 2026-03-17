@@ -110,10 +110,14 @@ impl Index {
             self.documents.insert(
                 DocumentKey::from_url(&opened_cell.uri),
                 Document::Text(
-                    TextDocument::new(opened_cell.uri, opened_cell.text, opened_cell.version)
-                        .with_language_id(&opened_cell.language_id)
-                        .with_notebook(notebook_path.clone())
-                        .into(),
+                    TextDocument::new(
+                        opened_cell.uri,
+                        opened_cell.text,
+                        opened_cell.version,
+                        &opened_cell.language_id,
+                    )
+                    .with_notebook(notebook_path.clone())
+                    .into(),
                 ),
             );
         }
@@ -231,7 +235,7 @@ impl Document {
 
     pub(crate) fn language_id(&self) -> Option<LanguageId> {
         match self {
-            Self::Text(document) => document.language_id(),
+            Self::Text(document) => Some(document.language_id()),
             Self::Notebook(_) => None,
         }
     }
