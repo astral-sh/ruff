@@ -25,12 +25,12 @@ use crate::{
         use_def_map,
     },
     types::{
-        ApplyTypeMappingVisitor, BoundTypeVarInstance, CallArguments, CallableType, ClassBase,
-        ClassLiteral, ClassType, DATACLASS_FLAGS, DataclassFlags, DataclassParams, GenericAlias,
-        GenericContext, KnownClass, KnownInstanceType, MaterializationKind, MemberLookupPolicy,
-        MetaclassCandidate, MetaclassTransformInfo, Parameter, Parameters, PropertyInstanceType,
-        Signature, SpecialFormType, StaticMroError, SubclassOfType, Truthiness, Type, TypeContext,
-        TypeMapping, TypeVarVariance, UnionBuilder, UnionType,
+        BoundTypeVarInstance, CallArguments, CallableType, ClassBase, ClassLiteral, ClassType,
+        DATACLASS_FLAGS, DataclassFlags, DataclassParams, GenericAlias, GenericContext, KnownClass,
+        KnownInstanceType, MemberLookupPolicy, MetaclassCandidate, MetaclassTransformInfo,
+        Parameter, Parameters, PropertyInstanceType, Signature, SpecialFormType, StaticMroError,
+        SubclassOfType, Truthiness, Type, TypeContext, TypeMapping, TypeVarVariance, UnionBuilder,
+        UnionType,
         call::{CallError, CallErrorKind},
         callable::CallableTypeKind,
         class::{
@@ -380,13 +380,7 @@ impl<'db> StaticClassLiteral<'db> {
 
     pub(crate) fn top_materialization(self, db: &'db dyn Db) -> ClassType<'db> {
         self.apply_specialization(db, |generic_context| {
-            generic_context
-                .default_specialization(db, self.known(db))
-                .materialize_impl(
-                    db,
-                    MaterializationKind::Top,
-                    &ApplyTypeMappingVisitor::default(),
-                )
+            generic_context.top_materialization_specialization(db, self.known(db))
         })
     }
 

@@ -776,6 +776,56 @@ impl<'db> GenericContext<'db> {
         }
     }
 
+    /// Returns a specialization where each covariant/bivariant typevar is mapped to its upper
+    /// bound (or `object` if unbounded), each contravariant typevar is mapped to `Never`, and
+    /// each invariant typevar is mapped to `Unknown`. For constrained typevars, the union of
+    /// constraints is used as the upper bound.
+    ///
+    /// This is used for top-materializing unparameterized generic classes, where we want the
+    /// widest possible type for each type parameter position, rather than the typevar's default.
+    pub(crate) fn top_materialization_specialization(
+        self,
+        db: &'db dyn Db,
+        known_class: Option<KnownClass>,
+    ) -> Specialization<'db> {
+        let mut has_dynamic_invariant_typevar = false;
+
+        let types: Box<[Type<'db>]> = self
+            .variables(db)
+            .map(|typevar| {
+                if typevar.is_paramspec(db) {
+                    return Type::paramspec_value_callable(db, Parameters::top());
+                }
+                match typevar.variance(db) {
+                    TypeVarVariance::Covariant | TypeVarVariance::Bivariant => {
+                        match typevar.typevar(db).require_bound_or_constraints(db) {
+                            TypeVarBoundOrConstraints::UpperBound(bound) => bound,
+                            TypeVarBoundOrConstraints::Constraints(constraints) => {
+                                constraints.as_type(db)
+                            }
+                        }
+                    }
+                    TypeVarVariance::Contravariant => Type::Never,
+                    TypeVarVariance::Invariant => {
+                        has_dynamic_invariant_typevar = true;
+                        Type::unknown()
+                    }
+                }
+            })
+            .collect();
+
+        let tuple_inner = if known_class == Some(KnownClass::Tuple) {
+            Some(TupleType::homogeneous(db, Type::object()))
+        } else {
+            None
+        };
+
+        let materialization_kind =
+            has_dynamic_invariant_typevar.then_some(MaterializationKind::Top);
+
+        Specialization::new(db, self, types, materialization_kind, tuple_inner)
+    }
+
     /// Returns a specialization of this generic context where each typevar is mapped to itself.
     pub(crate) fn identity_specialization(self, db: &'db dyn Db) -> Specialization<'db> {
         let types: Vec<Type> = self.variables(db).map(Type::TypeVar).collect();
@@ -1230,19 +1280,19 @@ impl<'db> Specialization<'db> {
         if self.materialization_kind(db).is_some() {
             return self;
         }
+
         let mut has_dynamic_invariant_typevar = false;
+
         let types: Box<[_]> = self
             .generic_context(db)
             .variables(db)
             .zip(self.types(db))
             .map(|(bound_typevar, vartype)| {
-                match bound_typevar.variance(db) {
-                    TypeVarVariance::Bivariant => {
-                        // With bivariance, all specializations are subtypes of each other,
-                        // so any materialization is acceptable.
-                        vartype.materialize(db, MaterializationKind::Top, visitor)
-                    }
-                    TypeVarVariance::Covariant => {
+                let variance = bound_typevar.variance(db);
+                let mut materialized = match variance {
+                    // With bivariance, all specializations are subtypes of each other,
+                    // so any materialization is acceptable.
+                    TypeVarVariance::Bivariant | TypeVarVariance::Covariant => {
                         vartype.materialize(db, materialization_kind, visitor)
                     }
                     TypeVarVariance::Contravariant => {
@@ -1256,9 +1306,32 @@ impl<'db> Specialization<'db> {
                         }
                         *vartype
                     }
+                };
+
+                if matches!(
+                    (materialization_kind, variance),
+                    (
+                        MaterializationKind::Top,
+                        TypeVarVariance::Covariant | TypeVarVariance::Bivariant
+                    ) | (MaterializationKind::Bottom, TypeVarVariance::Contravariant)
+                ) && let Some(bounds) = bound_typevar.typevar(db).bound_or_constraints(db)
+                {
+                    materialized = IntersectionType::from_two_elements(
+                        db,
+                        materialized,
+                        match bounds {
+                            TypeVarBoundOrConstraints::UpperBound(bound) => bound,
+                            TypeVarBoundOrConstraints::Constraints(constraints) => {
+                                constraints.as_type(db)
+                            }
+                        },
+                    );
                 }
+
+                materialized
             })
             .collect();
+
         let tuple_inner = self.tuple_inner(db).and_then(|tuple| {
             // Tuples are immutable, so tuple element types are always in covariant position.
             tuple.apply_type_mapping_impl(
@@ -1268,11 +1341,13 @@ impl<'db> Specialization<'db> {
                 visitor,
             )
         });
+
         let new_materialization_kind = if has_dynamic_invariant_typevar {
             Some(materialization_kind)
         } else {
             None
         };
+
         Specialization::new(
             db,
             self.generic_context(db),
