@@ -15,9 +15,8 @@ on:
       - "crates/ruff_python_ast"
       - "crates/ruff_python_parser"
       - ".github/workflows/ty-ecosystem-analyzer.yaml"
-      - ".github/workflows/mypy_primer.yaml"
-      - "scripts/mypy_primer.sh"
-      - "scripts/mypy_primer_selector.py"
+      - ".github/ty-ecosystem.toml"
+      - "crates/ty_python_semantic/resources/primer/**"
       - "Cargo.lock"
       - "!**.md"
       - "!**.snap"
@@ -69,9 +68,9 @@ jobs:
         run: |
           cd ruff
 
-          echo "Enabling configuration overloads (see .github/mypy-primer-ty.toml)"
+          echo "Enabling configuration overloads (see .github/ty-ecosystem.toml)"
           mkdir -p ~/.config/ty
-          cp .github/mypy-primer-ty.toml ~/.config/ty/ty.toml
+          cp .github/ty-ecosystem.toml ~/.config/ty/ty.toml
 
           echo "new commit"
           git checkout -b new_commit "$GITHUB_SHA"
@@ -87,7 +86,7 @@ jobs:
 
           cd ..
 
-          uv tool install "git+https://github.com/astral-sh/ecosystem-analyzer@3b27e0b28a5314240c218e939bde0c6c02a39652"
+          uv tool install "git+https://github.com/astral-sh/ecosystem-analyzer@2907323c61016ffd2cab9c25fb255f3dab8ec256"
 
           ecosystem-analyzer \
             --repository ruff \

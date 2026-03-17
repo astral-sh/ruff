@@ -1307,7 +1307,7 @@ impl<'db> Type<'db> {
         matches!(self, Type::Union(_))
     }
 
-    pub(crate) const fn as_union(self) -> Option<UnionType<'db>> {
+    pub const fn as_union(self) -> Option<UnionType<'db>> {
         match self {
             Type::Union(union_type) => Some(union_type),
             _ => None,
