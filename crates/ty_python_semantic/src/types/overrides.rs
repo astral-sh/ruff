@@ -256,10 +256,10 @@ fn check_class_declaration<'db>(
     let mut overridden_final_variable: Option<(ClassType<'db>, Option<Definition<'db>>)> = None;
     let is_private_member = is_mangled_private(member.name.as_str());
 
-    // Track the first superclass that defines this method (the "immediate parent" for this method),
-    // together with its unbound member type. We need this to check if parent itself already has an
-    // LSP violation with an ancestor. If so, we shouldn't report the same violation for the child
-    // class.
+    // Track the first superclass that defines this method as an actual method (the "immediate
+    // parent" for this method), together with its unbound member type. We need this to check if
+    // parent itself already has an LSP violation with an ancestor. If so, we shouldn't report the
+    // same violation for the child class.
     let mut immediate_parent_method: Option<(ClassType<'db>, Type<'db>)> = None;
 
     if !is_private_member {
@@ -316,6 +316,9 @@ fn check_class_declaration<'db>(
             else {
                 continue;
             };
+            let superclass_defines_method = matches!(method_kind, MethodKind::Synthesized(_))
+                || superclass_symbol_id
+                    .is_some_and(|id| is_function_definition(db, superclass_scope, id));
             let Place::Defined(DefinedPlace {
                 ty: superclass_type,
                 ..
@@ -329,8 +332,11 @@ fn check_class_declaration<'db>(
 
             subclass_overrides_superclass_declaration = true;
 
-            // Record the first superclass that defines this method as the "immediate parent method"
-            if immediate_parent_method.is_none() {
+            // Record the first superclass that defines this method as the "immediate parent
+            // method" for Liskov checks. Callable-valued placeholders such as
+            // `RequestHandler.get = _unimplemented_method` are not method definitions and should
+            // not participate here.
+            if superclass_defines_method && immediate_parent_method.is_none() {
                 immediate_parent_method = Some((superclass, superclass_member_ty));
             }
 
@@ -418,6 +424,14 @@ fn check_class_declaration<'db>(
             if &member.name == "__replace__"
                 && matches!(class_kind, Some(CodeGeneratorKind::DataclassLike(_)))
             {
+                continue;
+            }
+
+            // Callable-valued class attributes can still be overridden as attributes, but they do
+            // not yet participate in method-specific Liskov checks. In particular, framework hook
+            // placeholders like `initialize = _initialize  # type: Callable[..., None]` are meant
+            // to permit subclasses to pick their own signatures.
+            if !superclass_defines_method {
                 continue;
             }
 

@@ -513,7 +513,7 @@ class C:
     x = foo.x
 
 class D(C):
-    def x(self, y: int): ...  # error: [invalid-method-override]
+    def x(self, y: int): ...
 ```
 
 ## Bad override of `__eq__`
@@ -666,6 +666,43 @@ class GoodChild2(Parent):
     def class_method(cls, x: object) -> bool: ...
     @staticmethod
     def static_method(x: object) -> bool: ...
+```
+
+## Callable-valued superclass hook placeholders
+
+Some frameworks define subclass hooks by assigning a broad callable-typed placeholder in the class
+body, then expect subclasses to provide more specific signatures. These should still count as
+overrides for `@override`, but they should not be treated as superclass method contracts for Liskov
+checks.
+
+```pyi
+from collections.abc import Awaitable, Callable
+from typing import Optional
+
+class Configurable:
+    def _initialize(self) -> None: ...
+    initialize = _initialize  # type: Callable[..., None]
+
+class HTTPServer(Configurable):
+    def initialize(self, request_callback: object, xheaders: bool = False) -> None: ...
+
+class RequestHandler:
+    def _initialize(self) -> None: ...
+    initialize = _initialize  # type: Callable[..., None]
+
+    def _unimplemented_method(self, *args: str, **kwargs: str) -> None: ...
+    get = _unimplemented_method  # type: Callable[..., Optional[Awaitable[None]]]
+
+class ProfileHandler(RequestHandler):
+    def initialize(self, database: object) -> None: ...
+    def get(self, username: str) -> None: ...
+
+class WebSocketHandler(RequestHandler):
+    def _open(self, *args: str, **kwargs: str) -> Optional[Awaitable[None]]: ...
+    open = _open  # type: Callable[..., Optional[Awaitable[None]]]
+
+class EchoWebSocket(WebSocketHandler):
+    def open(self, room: str) -> None: ...
 ```
 
 ## Overloaded methods with positional-only parameters with defaults
