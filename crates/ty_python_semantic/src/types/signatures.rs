@@ -942,12 +942,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             let target_is_single_paramspec =
                 CallableSignature::signatures_is_single_paramspec(target_overloads);
 
-            // TODO: Adding proper support for overloads with ParamSpec with likely require some
+            // TODO: Adding proper support for overloads with ParamSpec will likely require some
             // changes here.
 
-            // Only handle ParamSpec here when we still need the whole overload set. Once both
-            // sides are down to single signatures, let `Signature::has_relation_to_inner` handle
-            // the ParamSpec binding instead.
+            // Only handle ParamSpec here when we still need the whole overload set. Once we're
+            // down to a single signature on both sides, let
+            // `TypeRelationChecker::check_signature_pair_inner` handle the ParamSpec binding
+            // instead.
             match (source_is_single_paramspec, target_is_single_paramspec) {
                 (Some((source_tvar, source_return)), None) if target_overloads.len() > 1 => {
                     let upper = Type::Callable(CallableType::new(
@@ -1213,7 +1214,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 .is_never_satisfied(db)
         };
 
-        // Avoid returning early after checking the return types to let the `ParamSpec`
+        // Avoid returning early after checking the return types in case there is a `ParamSpec` type
+        // variable in either signature to ensure that the `ParamSpec` binding is still applied even
+        // if the return types are incompatible.
         let return_type_checks = check_types(source.return_ty, target.return_ty);
 
         if self.relation.is_constraint_set_assignability() {
