@@ -22,9 +22,10 @@ use crate::{
         use_def_map,
     },
     types::{
-        CallableType, CallableTypeKind, ClassBase, ClassType, KnownClass, Parameter, Parameters,
-        Signature, StaticClassLiteral, SubclassOfType, Type, TypeContext, TypeQualifiers,
+        CallableType, ClassBase, ClassType, KnownClass, Parameter, Parameters, Signature,
+        StaticClassLiteral, SubclassOfType, Type, TypeContext, TypeQualifiers,
         call::CallArguments,
+        callable::CallableTypeKind,
         class::{CodeGeneratorKind, FieldKind},
         constraints::ConstraintSetBuilder,
         context::InferContext,
