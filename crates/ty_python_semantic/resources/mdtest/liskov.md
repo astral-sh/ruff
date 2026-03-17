@@ -824,11 +824,9 @@ class Sub3(Base3):
         raise NotImplementedError
 ```
 
-The same filtering should apply to generic classes. When a base class has an overload with a
+The same filtering should also apply to generic classes. When a base class has an overload with a
 specialized self type (e.g., `self: Base[int]`), subclasses that specialize to a different type
-parameter should ideally ignore that overload. However, the self-type annotation currently resolves
-to a union containing a `Todo` placeholder, which prevents the disjointness check from filtering the
-overload:
+parameter should ignore that overload:
 
 ```toml
 [environment]
@@ -839,22 +837,21 @@ python-version = "3.12"
 from collections.abc import Iterator
 from typing import overload
 
-class Base[T]:
+class GenericBase[T]:
+    value: T
+
     @overload
-    def method(self: "Base[int]") -> Iterator[int]: ...
+    def method(self: "GenericBase[int]") -> Iterator[int]: ...
     @overload
     def method(self) -> Iterator[str]: ...
     def method(self) -> Iterator[str] | Iterator[int]:
         raise NotImplementedError
 
-class Sub(Base[str]):
-    # TODO: this should not be an error, since `Base[int]` is disjoint from `Sub`
-    # (which inherits from `Base[str]`). Currently, the self-type annotation `Base[int]`
-    # resolves with a `Todo` placeholder that prevents disjointness detection.
-    def method(self) -> Iterator[str]:  # error: [invalid-method-override]
+class GenericSub(GenericBase[str]):
+    def method(self) -> Iterator[str]:
         raise NotImplementedError
 
-class SubInt(Base[int]):
+class GenericSubInt(GenericBase[int]):
     # error: [invalid-method-override]
     def method(self) -> Iterator[str]:
         raise NotImplementedError

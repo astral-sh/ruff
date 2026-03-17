@@ -1150,6 +1150,40 @@ impl<'db> ClassType<'db> {
             return false;
         }
 
+        // Two classes cannot coexist in an MRO if they, or any of their ancestors, specialize the
+        // same generic origin with disjoint type arguments. For example, `Base[int]` cannot coexist
+        // with a subclass of `Base[str]` because any shared MRO would need to contain incompatible
+        // specializations of `Base`.
+        if self
+            .iter_mro(db)
+            .filter_map(ClassBase::into_class)
+            .any(|self_ancestor| {
+                other
+                    .iter_mro(db)
+                    .filter_map(ClassBase::into_class)
+                    .any(|other_ancestor| {
+                        let (ClassType::Generic(self_alias), ClassType::Generic(other_alias)) =
+                            (self_ancestor, other_ancestor)
+                        else {
+                            return false;
+                        };
+
+                        self_alias.origin(db) == other_alias.origin(db)
+                            && self_alias
+                                .specialization(db)
+                                .is_disjoint_from(
+                                    db,
+                                    other_alias.specialization(db),
+                                    constraints,
+                                    InferableTypeVars::None,
+                                )
+                                .is_always_satisfied(db)
+                    })
+            })
+        {
+            return false;
+        }
+
         // Check to see whether the metaclasses of `self` and `other` are disjoint.
         // Avoid this check if the metaclass of either `self` or `other` is `type`,
         // however, since we end up with infinite recursion in that case due to the fact
