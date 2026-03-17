@@ -351,6 +351,18 @@ impl<'db> Bindings<'db> {
         self.elements.iter_mut().flat_map(|e| e.bindings.iter_mut())
     }
 
+    /// Returns `true` if every element of the union contains an intersection element with a matching
+    /// overload that satisfies the provided closure, or `false` otherwise.
+    pub(crate) fn satisfies(&self, f: impl Fn(&Binding<'db>) -> bool) -> bool {
+        self.elements.iter().all(|element| {
+            element
+                .bindings
+                .iter()
+                .flat_map(CallableBinding::matching_overloads)
+                .any(|(_, overload)| f(overload))
+        })
+    }
+
     /// Maps each `CallableBinding` to a type and combines results while preserving
     /// the union-of-intersections structure:
     ///

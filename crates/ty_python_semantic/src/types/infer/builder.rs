@@ -4976,7 +4976,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             _ => &[],
         };
 
-        let mut try_narrow = |narrowed_ty| {
+        let mut try_narrow = |narrowed_ty: Type<'db>| {
+            // Short-circuit if there is no overload with a matching return type.
+            if !bindings.satisfies(|overload| {
+                let inferable = overload
+                    .signature
+                    .generic_context
+                    .map(|generic_context| generic_context.inferable_typevars(db))
+                    .unwrap_or(InferableTypeVars::None);
+
+                !overload
+                    .constructor_instance_type
+                    .unwrap_or(overload.signature.return_ty)
+                    .when_assignable_to(db, narrowed_ty, &constraints, inferable)
+                    .is_never_satisfied(db)
+            }) {
+                return None;
+            }
+
             let narrowed_tcx = TypeContext::new(Some(narrowed_ty));
 
             let mut speculative_bindings = bindings.clone();
