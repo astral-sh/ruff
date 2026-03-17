@@ -1650,23 +1650,6 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         }
     }
 
-    /// Apply a transformation to all accumulated type variable assignments.
-    pub(crate) fn map_types(&mut self, mut f: impl FnMut(Type<'db>) -> Type<'db>) {
-        for ty in self.types.values_mut() {
-            *ty = f(*ty);
-        }
-    }
-
-    pub(crate) fn build(&mut self, generic_context: GenericContext<'db>) -> Specialization<'db> {
-        let types = generic_context
-            .variables_inner(self.db)
-            .iter()
-            .map(|(identity, _)| self.types.get(identity).copied());
-
-        // TODO Infer the tuple spec for a tuple type
-        generic_context.specialize_recursive(self.db, types)
-    }
-
     /// Build a specialization, using a caller-provided hook to select the solution for each
     /// typevar.
     ///

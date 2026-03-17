@@ -6300,15 +6300,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
-        // Promote singleton types to `T | Unknown` in inferred type parameters,
-        // so that e.g. `[None]` is inferred as `list[None | Unknown]`.
-        if elt_tcx_constraints.is_empty() {
-            builder.map_types(|ty| ty.promote_singletons(self.db()));
-        }
-
         let class_type = collection_alias
             .origin(self.db())
-            .apply_specialization(self.db(), |_| builder.build(generic_context));
+            .apply_specialization(self.db(), |_| {
+                builder.build_with(generic_context, |_, lower, _| {
+                    // Promote singleton types to `T | Unknown` in inferred type parameters,
+                    // so that e.g. `[None]` is inferred as `list[None | Unknown]`.
+                    if elt_tcx_constraints.is_empty() {
+                        return Some(lower.promote_singletons(self.db()));
+                    }
+                    None
+                })
+            });
 
         Type::from(class_type).to_instance(self.db())
     }
