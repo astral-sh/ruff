@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+assertion_line: 74
 ---
 E501 Line too long (89 > 88)
   --> E501_3.py:11:89
