@@ -762,39 +762,6 @@ fn constructor_return_outcome<'db>(
     }
 }
 
-fn returns_self_like<'db>(
-    db: &'db dyn Db,
-    overload: &Binding<'db>,
-    return_typevar: BoundTypeVarInstance<'db>,
-) -> bool {
-    if return_typevar.typevar(db).is_self(db) {
-        return true;
-    }
-
-    let Some(cls_parameter_ty) = overload
-        .signature
-        .parameters()
-        .get(0)
-        .map(Parameter::annotated_type)
-    else {
-        return false;
-    };
-    let cls_parameter_ty = overload
-        .specialization
-        .map(|specialization| cls_parameter_ty.apply_specialization(db, specialization))
-        .unwrap_or(cls_parameter_ty)
-        .resolve_type_alias(db);
-
-    let Type::SubclassOf(subclass_of) = cls_parameter_ty else {
-        return false;
-    };
-    let Some(cls_typevar) = subclass_of.into_type_var() else {
-        return false;
-    };
-
-    cls_typevar.typevar(db).identity(db) == return_typevar.typevar(db).identity(db)
-}
-
 impl<'db> DownstreamConstructor<'db> {
     fn return_kind(&self, db: &'db dyn Db, return_ty: Type<'db>) -> ConstructorReturnKind {
         classify_constructor_return(db, self.class_literal, return_ty)
@@ -5678,15 +5645,56 @@ impl<'db> Binding<'db> {
         self.return_ty = return_ty;
     }
 
-    /// Normalize constructor returns for downstream generic reasoning and the bound call return.
+    /// Normalize constructor return type. There are a few special cases we have to handle for
+    /// constructors:
     ///
-    /// This lets downstream logic operate on constructor semantics rather than spelling-specific
-    /// return annotations like `Self` or `T` in `cls: type[T] -> T`.
+    ///   * `__init__` methods always return `None`, but for the purposes of type inference we want
+    ///     to treat them as returning the constructed instance type.
+    ///
+    ///   * If a `__new__` method (or metaclass `__call__`) has no annotated return type (or is
+    ///     annotated with an unknown return type), treat it as returning the constructed instance
+    ///     type.
+    ///
+    ///   * If a `__new__` method returns `typing.Self` or `T` where the first parameter to
+    ///     `__new__` is annotated as `type[T]`, replace it with the instance type. Although
+    ///     these cases should be resolved correctly later by the specialization machinery, we need
+    ///     to unwrap these early in case the constructed instance type is generic. Literal
+    ///     promotion and reverse inference from type context need to be able to see into the
+    ///     generic instance type.
+    ///
+    /// Return `None` if this is not a constructor call.
     pub(crate) fn normalized_constructor_return(
         &self,
         db: &'db dyn Db,
         constructor_context: Option<ConstructorContext<'db>>,
     ) -> Option<Type<'db>> {
+        // Determine whether a typevar returned by a `__new__` method is "self-like", meaning it is
+        // either `typing.Self`, or it is `T`, where the first parameter of the method is annotated
+        // `type[T]`.
+        let is_self_like = |return_typevar: BoundTypeVarInstance<'db>| {
+            if return_typevar.typevar(db).is_self(db) {
+                return true;
+            }
+
+            let Some(cls_parameter_ty) = self
+                .signature
+                .parameters()
+                .get(0)
+                .map(Parameter::annotated_type)
+            else {
+                return false;
+            };
+
+            let Type::SubclassOf(subclass_of) = cls_parameter_ty else {
+                return false;
+            };
+            let Some(cls_typevar) = subclass_of.into_type_var() else {
+                return false;
+            };
+
+            cls_typevar.typevar(db).identity(db) == return_typevar.typevar(db).identity(db)
+        };
+
         let constructor_context = constructor_context?;
         let instance_type = constructor_context.instance_type();
 
@@ -5696,9 +5704,7 @@ impl<'db> Binding<'db> {
         ) {
             (ConstructorCallableKind::Init, _) => Some(instance_type),
             (_, ty) if ty.is_unknown() => Some(instance_type),
-            (ConstructorCallableKind::New, Type::TypeVar(typevar))
-                if returns_self_like(db, self, typevar) =>
-            {
+            (ConstructorCallableKind::New, Type::TypeVar(typevar)) if is_self_like(typevar) => {
                 Some(instance_type)
             }
             _ => Some(self.signature.return_ty),
