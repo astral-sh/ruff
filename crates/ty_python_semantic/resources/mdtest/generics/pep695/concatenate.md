@@ -628,3 +628,28 @@ def foo[**P2](f: Callable[P2, None]) -> None:
     # TODO: This should raise an invalid-argument-type error
     reveal_type(decorator(f))  # revealed: (...) -> None
 ```
+
+### Concatenate `ParamSpec` to concatenate `...`
+
+```py
+from typing import Callable, Concatenate
+
+def gradual_generic[T](func: Callable[..., T]) -> T:
+    return func()
+
+def concat_paramspec[**P, T](fn: Callable[Concatenate[int, P], T]):
+    reveal_type(gradual_generic(fn))  # revealed: T@concat_paramspec
+```
+
+### Concatenate `...` to concatenate `ParamSpec`
+
+```py
+from typing import Callable, Concatenate
+
+def concat_paramspec[**P, T](fn: Callable[Concatenate[int, P], T]) -> Callable[Concatenate[int, P], T]:
+    return fn
+
+def gradual_generic[T](func: Callable[..., T]):
+    # revealed: (int, /, *args: Any, **kwargs: Any) -> T@gradual_generic
+    reveal_type(concat_paramspec(func))
+```

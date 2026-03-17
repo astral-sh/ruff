@@ -1225,23 +1225,23 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         let return_type_checks = check_types(source.return_ty, target.return_ty);
 
         if self.relation.is_constraint_set_assignability() {
-            let self_paramspec = source.parameters.as_paramspec_with_prefix();
-            let other_paramspec = target.parameters.as_paramspec_with_prefix();
+            let source_paramspec = source.parameters.as_paramspec_with_prefix();
+            let target_paramspec = target.parameters.as_paramspec_with_prefix();
 
             // If either signature is a ParamSpec, the constraint set should bind the ParamSpec to
             // the other signature before the return-type and gradual/top fast paths can return
             // early. We also need to compare the return types here so a return-type mismatch still
             // preserves the inferred ParamSpec binding.
-            match (self_paramspec, other_paramspec) {
+            match (source_paramspec, target_paramspec) {
                 // self: `P`
                 // other: `P`
-                (Some(([], self_bound_typevar)), Some(([], other_bound_typevar))) => {
+                (Some(([], source_bound_typevar)), Some(([], target_bound_typevar))) => {
                     let param_spec_matches = ConstraintSet::constrain_typevar(
                         db,
                         self.constraints,
-                        self_bound_typevar,
-                        Type::TypeVar(other_bound_typevar),
-                        Type::TypeVar(other_bound_typevar),
+                        source_bound_typevar,
+                        Type::TypeVar(target_bound_typevar),
+                        Type::TypeVar(target_bound_typevar),
                     );
                     result.intersect(db, self.constraints, param_spec_matches);
                     return result;
@@ -1250,8 +1250,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 // self: `Concatenate[<prefix_params>, P]`
                 // other: `P`
                 (
-                    Some((self_prefix_params, self_bound_typevar)),
-                    Some(([], other_bound_typevar)),
+                    Some((source_prefix_params, source_bound_typevar)),
+                    Some(([], target_bound_typevar)),
                 ) => {
                     let lower = Type::Callable(CallableType::new(
                         db,
@@ -1259,8 +1259,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             source.generic_context,
                             Parameters::concatenate(
                                 db,
-                                self_prefix_params.to_vec(),
-                                ConcatenateTail::ParamSpec(self_bound_typevar),
+                                source_prefix_params.to_vec(),
+                                ConcatenateTail::ParamSpec(source_bound_typevar),
                             ),
                             Type::unknown(),
                         )),
@@ -1269,7 +1269,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     let param_spec_prefix_matches = ConstraintSet::constrain_typevar(
                         db,
                         self.constraints,
-                        other_bound_typevar,
+                        target_bound_typevar,
                         lower,
                         Type::object(),
                     );
@@ -1280,8 +1280,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 // self: `P`
                 // other: `Concatenate[<prefix_params>, P]`
                 (
-                    Some(([], self_bound_typevar)),
-                    Some((other_prefix_params, other_bound_typevar)),
+                    Some(([], source_bound_typevar)),
+                    Some((target_prefix_params, target_bound_typevar)),
                 ) => {
                     let upper = Type::Callable(CallableType::new(
                         db,
@@ -1289,8 +1289,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             target.generic_context,
                             Parameters::concatenate(
                                 db,
-                                other_prefix_params.to_vec(),
-                                ConcatenateTail::ParamSpec(other_bound_typevar),
+                                target_prefix_params.to_vec(),
+                                ConcatenateTail::ParamSpec(target_bound_typevar),
                             ),
                             Type::unknown(),
                         )),
@@ -1299,7 +1299,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     let param_spec_matches = ConstraintSet::constrain_typevar(
                         db,
                         self.constraints,
-                        self_bound_typevar,
+                        source_bound_typevar,
                         Type::Never,
                         upper,
                     );
@@ -1310,14 +1310,14 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 // self: `Concatenate[<prefix_params>, P]`
                 // other: `Concatenate[<prefix_params>, P]`
                 (
-                    Some((self_prefix_params, self_bound_typevar)),
-                    Some((other_prefix_params, other_bound_typevar)),
+                    Some((source_prefix_params, source_bound_typevar)),
+                    Some((target_prefix_params, target_bound_typevar)),
                 ) => {
                     let mut parameters = ParametersZip {
                         current_source: None,
                         current_target: None,
-                        source_iter: self_prefix_params.iter(),
-                        target_iter: other_prefix_params.iter(),
+                        source_iter: source_prefix_params.iter(),
+                        target_iter: target_prefix_params.iter(),
                     };
 
                     // Note that in the following loop, the `Concatenate` case could come from a
@@ -1331,20 +1331,20 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     // positional-or-keyword parameter.
 
                     loop {
-                        let Some(EitherOrBoth::Both(self_param, other_param)) = parameters.next()
+                        let Some(EitherOrBoth::Both(source_param, target_param)) =
+                            parameters.next()
                         else {
                             break;
                         };
 
-                        // TODO: Avoid the duplication here
-                        match (self_param.kind(), other_param.kind()) {
+                        match (source_param.kind(), target_param.kind()) {
                             (
                                 ParameterKind::PositionalOnly {
-                                    default_type: self_default,
+                                    default_type: source_default,
                                     ..
                                 }
                                 | ParameterKind::PositionalOrKeyword {
-                                    default_type: self_default,
+                                    default_type: source_default,
                                     ..
                                 },
                                 ParameterKind::PositionalOnly {
@@ -1352,12 +1352,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                     ..
                                 },
                             ) => {
-                                if self_default.is_none() && other_default.is_some() {
+                                if source_default.is_none() && other_default.is_some() {
                                     return self.never();
                                 }
                                 if !check_types(
-                                    other_param.annotated_type(),
-                                    self_param.annotated_type(),
+                                    target_param.annotated_type(),
+                                    source_param.annotated_type(),
                                 ) {
                                     return result;
                                 }
@@ -1366,7 +1366,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             (
                                 ParameterKind::PositionalOrKeyword {
                                     name: self_name,
-                                    default_type: self_default,
+                                    default_type: source_default,
                                 },
                                 ParameterKind::PositionalOrKeyword {
                                     name: other_name,
@@ -1377,38 +1377,36 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                     return self.never();
                                 }
                                 // The following checks are the same as positional-only parameters.
-                                if self_default.is_none() && other_default.is_some() {
+                                if source_default.is_none() && other_default.is_some() {
                                     return self.never();
                                 }
                                 if !check_types(
-                                    other_param.annotated_type(),
-                                    self_param.annotated_type(),
+                                    target_param.annotated_type(),
+                                    source_param.annotated_type(),
                                 ) {
                                     return result;
                                 }
                             }
 
-                            _ => unreachable!(
-                                "prefix parameters must be positional-only or positional-or-keyword"
-                            ),
+                            _ => return self.never(),
                         }
                     }
 
-                    let (mut self_params, mut other_params) = parameters.into_remaining();
+                    let (mut source_params, mut target_params) = parameters.into_remaining();
 
                     // At this point, we should've exhausted at least one of the parameter lists,
                     // so only one side can have remaining prefix parameters.
-                    if let Some(self_param) = self_params.next() {
+                    if let Some(source_param) = source_params.next() {
                         let lower = Type::Callable(CallableType::new(
                             db,
                             CallableSignature::single(Signature::new_generic(
                                 source.generic_context,
                                 Parameters::concatenate(
                                     db,
-                                    std::iter::once(self_param.clone())
-                                        .chain(self_params.cloned())
+                                    std::iter::once(source_param.clone())
+                                        .chain(source_params.cloned())
                                         .collect(),
-                                    ConcatenateTail::ParamSpec(self_bound_typevar),
+                                    ConcatenateTail::ParamSpec(source_bound_typevar),
                                 ),
                                 Type::unknown(),
                             )),
@@ -1417,22 +1415,22 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         let param_spec_prefix_matches = ConstraintSet::constrain_typevar(
                             db,
                             self.constraints,
-                            other_bound_typevar,
+                            target_bound_typevar,
                             lower,
                             Type::object(),
                         );
                         result.intersect(db, self.constraints, param_spec_prefix_matches);
-                    } else if let Some(other_param) = other_params.next() {
+                    } else if let Some(target_param) = target_params.next() {
                         let upper = Type::Callable(CallableType::new(
                             db,
                             CallableSignature::single(Signature::new_generic(
                                 target.generic_context,
                                 Parameters::concatenate(
                                     db,
-                                    std::iter::once(other_param.clone())
-                                        .chain(other_params.cloned())
+                                    std::iter::once(target_param.clone())
+                                        .chain(target_params.cloned())
                                         .collect(),
-                                    ConcatenateTail::ParamSpec(other_bound_typevar),
+                                    ConcatenateTail::ParamSpec(target_bound_typevar),
                                 ),
                                 Type::unknown(),
                             )),
@@ -1441,7 +1439,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         let param_spec_prefix_matches = ConstraintSet::constrain_typevar(
                             db,
                             self.constraints,
-                            self_bound_typevar,
+                            source_bound_typevar,
                             Type::Never,
                             upper,
                         );
@@ -1451,9 +1449,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         let param_spec_matches = ConstraintSet::constrain_typevar(
                             db,
                             self.constraints,
-                            self_bound_typevar,
-                            Type::TypeVar(other_bound_typevar),
-                            Type::TypeVar(other_bound_typevar),
+                            source_bound_typevar,
+                            Type::TypeVar(target_bound_typevar),
+                            Type::TypeVar(target_bound_typevar),
                         );
                         result.intersect(db, self.constraints, param_spec_matches);
                     }
@@ -1462,7 +1460,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
                 // self: callable without ParamSpec
                 // other: `P`
-                (None, Some(([], other_bound_typevar))) => {
+                (None, Some(([], target_bound_typevar))) => {
                     let lower = Type::Callable(CallableType::new(
                         db,
                         CallableSignature::single(Signature::new_generic(
@@ -1475,7 +1473,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     let param_spec_matches = ConstraintSet::constrain_typevar(
                         db,
                         self.constraints,
-                        other_bound_typevar,
+                        target_bound_typevar,
                         lower,
                         Type::object(),
                     );
@@ -1485,14 +1483,14 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
                 // self: callable without ParamSpec
                 // other: `Concatenate[<prefix_params>, P]`
-                (None, Some((other_prefix_params, other_bound_typevar))) => {
-                    // Loop over self parameters and other_prefix_params in a similar manner to the
+                (None, Some((target_prefix_params, target_bound_typevar))) => {
+                    // Loop over self parameters and target_prefix_params in a similar manner to the
                     // above loop
                     let mut parameters = ParametersZip {
                         current_source: None,
                         current_target: None,
                         source_iter: source.parameters.iter(),
-                        target_iter: other_prefix_params.iter(),
+                        target_iter: target_prefix_params.iter(),
                     };
 
                     loop {
@@ -1509,28 +1507,28 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             EitherOrBoth::Right(_) => {
                                 return self.never();
                             }
-                            EitherOrBoth::Both(self_param, other_param) => {
-                                match (self_param.kind(), other_param.kind()) {
+                            EitherOrBoth::Both(source_param, target_param) => {
+                                match (source_param.kind(), target_param.kind()) {
                                     (
                                         ParameterKind::PositionalOnly {
-                                            default_type: self_default,
+                                            default_type: source_default,
                                             ..
                                         }
                                         | ParameterKind::PositionalOrKeyword {
-                                            default_type: self_default,
+                                            default_type: source_default,
                                             ..
                                         },
                                         ParameterKind::PositionalOnly {
-                                            default_type: other_default,
+                                            default_type: target_default,
                                             ..
                                         },
                                     ) => {
-                                        if self_default.is_none() && other_default.is_some() {
+                                        if source_default.is_none() && target_default.is_some() {
                                             return self.never();
                                         }
                                         if !check_types(
-                                            other_param.annotated_type(),
-                                            self_param.annotated_type(),
+                                            target_param.annotated_type(),
+                                            source_param.annotated_type(),
                                         ) {
                                             return result;
                                         }
@@ -1538,24 +1536,24 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
                                     (
                                         ParameterKind::PositionalOrKeyword {
-                                            name: self_name,
-                                            default_type: self_default,
+                                            name: source_name,
+                                            default_type: source_default,
                                         },
                                         ParameterKind::PositionalOrKeyword {
-                                            name: other_name,
-                                            default_type: other_default,
+                                            name: target_name,
+                                            default_type: target_default,
                                         },
                                     ) => {
-                                        if self_name != other_name {
+                                        if source_name != target_name {
                                             return self.never();
                                         }
                                         // The following checks are the same as positional-only parameters.
-                                        if self_default.is_none() && other_default.is_some() {
+                                        if source_default.is_none() && target_default.is_some() {
                                             return self.never();
                                         }
                                         if !check_types(
-                                            other_param.annotated_type(),
-                                            self_param.annotated_type(),
+                                            target_param.annotated_type(),
+                                            source_param.annotated_type(),
                                         ) {
                                             return result;
                                         }
@@ -1567,19 +1565,20 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                         | ParameterKind::PositionalOrKeyword { .. },
                                     ) => {
                                         if !check_types(
-                                            other_param.annotated_type(),
-                                            self_param.annotated_type(),
+                                            target_param.annotated_type(),
+                                            source_param.annotated_type(),
                                         ) {
                                             return result;
                                         }
 
                                         loop {
-                                            let Some(other_param) = parameters.peek_target() else {
+                                            let Some(target_param) = parameters.peek_target()
+                                            else {
                                                 break;
                                             };
                                             if !check_types(
-                                                other_param.annotated_type(),
-                                                self_param.annotated_type(),
+                                                target_param.annotated_type(),
+                                                source_param.annotated_type(),
                                             ) {
                                                 return result;
                                             }
@@ -1595,12 +1594,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         }
                     }
 
-                    let (self_params, _) = parameters.into_remaining();
+                    let (source_params, _) = parameters.into_remaining();
                     let lower = Type::Callable(CallableType::new(
                         db,
                         CallableSignature::single(Signature::new_generic(
                             source.generic_context,
-                            Parameters::new(db, self_params.cloned()),
+                            Parameters::new(db, source_params.cloned()),
                             Type::unknown(),
                         )),
                         CallableTypeKind::ParamSpecValue,
@@ -1608,7 +1607,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     let param_spec_prefix_matches = ConstraintSet::constrain_typevar(
                         db,
                         self.constraints,
-                        other_bound_typevar,
+                        target_bound_typevar,
                         lower,
                         Type::object(),
                     );
@@ -1619,7 +1618,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
                 // self: `P`
                 // other: callable without ParamSpec
-                (Some(([], self_bound_typevar)), None) => {
+                (Some(([], source_bound_typevar)), None) => {
                     let upper = Type::Callable(CallableType::new(
                         db,
                         CallableSignature::single(Signature::new_generic(
@@ -1632,7 +1631,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     let param_spec_matches = ConstraintSet::constrain_typevar(
                         db,
                         self.constraints,
-                        self_bound_typevar,
+                        source_bound_typevar,
                         Type::Never,
                         upper,
                     );
@@ -1642,94 +1641,96 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
                 // self: `Concatenate[<prefix_params>, P]`
                 // other: callable without ParamSpec
-                (Some((self_prefix_params, self_bound_typevar)), None) => {
+                (Some((source_prefix_params, source_bound_typevar)), None) => {
                     let mut parameters = ParametersZip {
                         current_source: None,
                         current_target: None,
-                        source_iter: self_prefix_params.iter(),
+                        source_iter: source_prefix_params.iter(),
                         target_iter: target.parameters.iter(),
                     };
 
-                    loop {
-                        let Some(next_parameter) = parameters.next() else {
-                            break;
-                        };
-
-                        match next_parameter {
-                            EitherOrBoth::Left(_) => {
-                                return self.never();
-                            }
-                            EitherOrBoth::Right(_) => {
-                                // If the non-Concatenate callable has remaining parameters, they
-                                // should be bound to the `ParamSpec` in self.
+                    if target.parameters.kind() != ParametersKind::Gradual {
+                        loop {
+                            let Some(next_parameter) = parameters.next() else {
                                 break;
-                            }
-                            EitherOrBoth::Both(self_param, other_param) => {
-                                match (self_param.kind(), other_param.kind()) {
-                                    (
-                                        ParameterKind::PositionalOnly {
-                                            default_type: self_default,
-                                            ..
-                                        }
-                                        | ParameterKind::PositionalOrKeyword {
-                                            default_type: self_default,
-                                            ..
-                                        },
-                                        ParameterKind::PositionalOnly {
-                                            default_type: other_default,
-                                            ..
-                                        },
-                                    ) => {
-                                        if self_default.is_none() && other_default.is_some() {
-                                            return self.never();
-                                        }
-                                        if !check_types(
-                                            other_param.annotated_type(),
-                                            self_param.annotated_type(),
-                                        ) {
-                                            return result;
-                                        }
-                                    }
+                            };
 
-                                    (
-                                        ParameterKind::PositionalOrKeyword {
-                                            name: self_name,
-                                            default_type: self_default,
-                                        },
-                                        ParameterKind::PositionalOrKeyword {
-                                            name: other_name,
-                                            default_type: other_default,
-                                        },
-                                    ) => {
-                                        if self_name != other_name {
-                                            return self.never();
+                            match next_parameter {
+                                EitherOrBoth::Left(_) => {
+                                    return self.never();
+                                }
+                                EitherOrBoth::Right(_) => {
+                                    // If the non-Concatenate callable has remaining parameters, they
+                                    // should be bound to the `ParamSpec` in self.
+                                    break;
+                                }
+                                EitherOrBoth::Both(source_param, target_param) => {
+                                    match (source_param.kind(), target_param.kind()) {
+                                        (
+                                            ParameterKind::PositionalOnly {
+                                                default_type: source_default,
+                                                ..
+                                            }
+                                            | ParameterKind::PositionalOrKeyword {
+                                                default_type: source_default,
+                                                ..
+                                            },
+                                            ParameterKind::PositionalOnly {
+                                                default_type: target_default,
+                                                ..
+                                            },
+                                        ) => {
+                                            if source_default.is_none() && target_default.is_some()
+                                            {
+                                                return self.never();
+                                            }
+                                            if !check_types(
+                                                target_param.annotated_type(),
+                                                source_param.annotated_type(),
+                                            ) {
+                                                return result;
+                                            }
                                         }
-                                        // The following checks are the same as positional-only parameters.
-                                        if self_default.is_none() && other_default.is_some() {
-                                            return self.never();
-                                        }
-                                        if !check_types(
-                                            other_param.annotated_type(),
-                                            self_param.annotated_type(),
-                                        ) {
-                                            return result;
-                                        }
-                                    }
 
-                                    _ => unreachable!(
-                                        "prefix parameters must be positional-only or positional-or-keyword"
-                                    ),
+                                        (
+                                            ParameterKind::PositionalOrKeyword {
+                                                name: source_name,
+                                                default_type: source_default,
+                                            },
+                                            ParameterKind::PositionalOrKeyword {
+                                                name: target_name,
+                                                default_type: target_default,
+                                            },
+                                        ) => {
+                                            if source_name != target_name {
+                                                return self.never();
+                                            }
+                                            // The following checks are the same as positional-only parameters.
+                                            if source_default.is_none() && target_default.is_some()
+                                            {
+                                                return self.never();
+                                            }
+                                            if !check_types(
+                                                target_param.annotated_type(),
+                                                source_param.annotated_type(),
+                                            ) {
+                                                return result;
+                                            }
+                                        }
+
+                                        _ => return self.never(),
+                                    }
                                 }
                             }
                         }
                     }
 
-                    let (_, other_params) = parameters.into_remaining();
+                    let (_, target_params) = parameters.into_remaining();
                     let upper = Type::Callable(CallableType::new(
                         db,
                         CallableSignature::single(Signature::new_generic(
                             target.generic_context,
-                            Parameters::new(db, other_params.cloned()),
+                            Parameters::new(db, target_params.cloned()),
                             Type::unknown(),
                         )),
                         CallableTypeKind::ParamSpecValue,
@@ -1737,7 +1738,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     let param_spec_prefix_matches = ConstraintSet::constrain_typevar(
                         db,
                         self.constraints,
-                        self_bound_typevar,
+                        source_bound_typevar,
                         Type::Never,
                         upper,
                     );
@@ -1789,15 +1790,18 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     ParametersKind::Concatenate(ConcatenateTail::Gradual),
                     ParametersKind::Concatenate(ConcatenateTail::Gradual),
                 ) => {
-                    let self_prefix_params =
+                    let source_prefix_params =
                         &source.parameters.value[..source.parameters.len().saturating_sub(2)];
-                    let other_prefix_params =
+                    let target_prefix_params =
                         &target.parameters.value[..target.parameters.len().saturating_sub(2)];
 
-                    for (self_param, other_param) in
-                        self_prefix_params.iter().zip(other_prefix_params.iter())
+                    for (source_param, target_param) in
+                        source_prefix_params.iter().zip(target_prefix_params.iter())
                     {
-                        if !check_types(other_param.annotated_type(), self_param.annotated_type()) {
+                        if !check_types(
+                            target_param.annotated_type(),
+                            source_param.annotated_type(),
+                        ) {
                             return result;
                         }
                     }
@@ -1809,10 +1813,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     ParametersKind::Concatenate(ConcatenateTail::Gradual),
                     ParametersKind::Standard,
                 ) => {
-                    let self_prefix_params =
+                    let source_prefix_params =
                         &source.parameters.value[..source.parameters.len().saturating_sub(2)];
 
-                    for param in self_prefix_params
+                    for param in source_prefix_params
                         .iter()
                         .zip_longest(target.parameters.iter())
                     {
@@ -1828,23 +1832,23 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                 // `Concatenate`.
                                 break;
                             }
-                            EitherOrBoth::Both(self_param, other_param) => {
+                            EitherOrBoth::Both(source_param, target_param) => {
                                 if let (
                                     ParameterKind::PositionalOnly { .. },
                                     ParameterKind::PositionalOnly {
-                                        default_type: other_default,
+                                        default_type: target_default,
                                         ..
                                     },
-                                ) = (self_param.kind(), other_param.kind())
+                                ) = (source_param.kind(), target_param.kind())
                                 {
                                     // `self`'s default is always going to be `None` because it comes
                                     // from the `Concatenate` form which cannot have default value.
-                                    if other_default.is_some() {
+                                    if target_default.is_some() {
                                         return self.never();
                                     }
                                     if !check_types(
-                                        other_param.annotated_type(),
-                                        self_param.annotated_type(),
+                                        target_param.annotated_type(),
+                                        source_param.annotated_type(),
                                     ) {
                                         return result;
                                     }
@@ -1862,14 +1866,14 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     ParametersKind::Standard,
                     ParametersKind::Concatenate(ConcatenateTail::Gradual),
                 ) => {
-                    let other_prefix_params =
+                    let target_prefix_params =
                         &target.parameters.value[..target.parameters.len().saturating_sub(2)];
 
                     let mut parameters = ParametersZip {
                         current_source: None,
                         current_target: None,
                         source_iter: source.parameters.iter(),
-                        target_iter: other_prefix_params.iter(),
+                        target_iter: target_prefix_params.iter(),
                     };
 
                     loop {
@@ -1889,43 +1893,44 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                 // self does not.
                                 return self.never();
                             }
-                            EitherOrBoth::Both(self_param, other_param) => {
-                                match self_param.kind() {
+                            EitherOrBoth::Both(source_param, target_param) => {
+                                match source_param.kind() {
                                     ParameterKind::PositionalOnly {
-                                        default_type: self_default,
+                                        default_type: source_default,
                                         ..
                                     }
                                     | ParameterKind::PositionalOrKeyword {
-                                        default_type: self_default,
+                                        default_type: source_default,
                                         ..
                                     } => {
-                                        if self_default.is_none()
-                                            && other_param.default_type().is_some()
+                                        if source_default.is_none()
+                                            && target_param.default_type().is_some()
                                         {
                                             return self.never();
                                         }
                                         if !check_types(
-                                            other_param.annotated_type(),
-                                            self_param.annotated_type(),
+                                            target_param.annotated_type(),
+                                            source_param.annotated_type(),
                                         ) {
                                             return result;
                                         }
                                     }
                                     ParameterKind::Variadic { .. } => {
                                         if !check_types(
-                                            other_param.annotated_type(),
-                                            self_param.annotated_type(),
+                                            target_param.annotated_type(),
+                                            source_param.annotated_type(),
                                         ) {
                                             return result;
                                         }
 
                                         loop {
-                                            let Some(other_param) = parameters.peek_target() else {
+                                            let Some(target_param) = parameters.peek_target()
+                                            else {
                                                 break;
                                             };
                                             if !check_types(
-                                                other_param.annotated_type(),
-                                                self_param.annotated_type(),
+                                                target_param.annotated_type(),
+                                                source_param.annotated_type(),
                                             ) {
                                                 return result;
                                             }
