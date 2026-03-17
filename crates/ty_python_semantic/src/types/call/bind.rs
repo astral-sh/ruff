@@ -3635,7 +3635,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         // For ParamSpec parameters, both *args and **kwargs are required since we don't know
         // what arguments the underlying callable expects. For all other callables, variadic
         // and keyword_variadic parameters are optional.
-        let paramspec_parameters = self.parameters.as_paramspec().is_some();
+        let paramspec = self.parameters.as_paramspec();
 
         let mut missing = vec![];
         for (
@@ -3651,7 +3651,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
                     continue;
                 }
                 let param = &self.parameters[index];
-                if !paramspec_parameters && (param.is_variadic() || param.is_keyword_variadic())
+                if paramspec.is_none() && (param.is_variadic() || param.is_keyword_variadic())
                     || param.default_type().is_some()
                 {
                     // variadic/keywords and defaulted arguments are not required
@@ -3664,7 +3664,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         if !missing.is_empty() {
             self.errors.push(BindingError::MissingArguments {
                 parameters: ParameterContexts(missing),
-                paramspec: self.parameters.as_paramspec(),
+                paramspec,
             });
         }
 
@@ -4016,10 +4016,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
     }
 
     fn check_argument_types(&mut self, constraints: &ConstraintSetBuilder<'db>) {
-        let paramspec = self
-            .signature
-            .parameters()
-            .find_paramspec_from_args_kwargs(self.db);
+        let paramspec = self.signature.parameters().as_paramspec_with_prefix();
 
         for (argument_index, adjusted_argument_index, argument, argument_types) in
             self.enumerate_argument_types()

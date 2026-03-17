@@ -53,6 +53,19 @@ def _(c: Callable[Concatenate[int, Callable[Concatenate[str, ...], None], ...], 
     reveal_type(c)  # revealed: (int, (str, /, *args: Any, **kwargs: Any) -> None, /, *args: Any, **kwargs: Any) -> None
 ```
 
+### Both `*args` and `**kwargs` are required
+
+```py
+from typing import Callable, Concatenate
+
+def decorator[**P](func: Callable[Concatenate[int, P], None]) -> Callable[P, None]:
+    def wrapper(*args: P.args, **kwargs: P.kwargs) -> None:
+        func(1)  # TODO: error: [missing-argument]
+        func(1, *args)  # TODO: error: [missing-argument]
+        func(1, **kwargs)  # TODO: error: [missing-argument]
+    return wrapper
+```
+
 ## Decorator patterns
 
 ### Adding a parameter
