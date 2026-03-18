@@ -2826,12 +2826,9 @@ impl InteriorNode {
             db,
             builder,
             // Remove any node that constrains `bound_typevar`, or that has a lower/upper bound
-            // that mentions `bound_typevar`.
-            // TODO: This will currently remove constraints that mention a typevar, but the sequent
-            // map is not yet propagating all derived facts about those constraints. For instance,
-            // removing `T` from `T ≤ int ∧ U ≤ Sequence[T]` should produce `U ≤ Sequence[int]`.
-            // But that requires `T ≤ int ∧ U ≤ Sequence[T] → U ≤ Sequence[int]` to exist in the
-            // sequent map. It doesn't, and so we currently produce `U ≤ Unknown` in this case.
+            // that mentions `bound_typevar`. The sequent map ensures that derived facts are
+            // propagated for nested typevar references, using the variance of the typevar's
+            // position to determine the correct substitution.
             &mut |constraint| {
                 let constraint = builder.constraint_data(constraint);
                 if constraint.typevar.identity(db) == bound_typevar {
