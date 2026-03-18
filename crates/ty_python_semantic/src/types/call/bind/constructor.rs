@@ -162,7 +162,10 @@ impl<'db> ConstructorBinding<'db> {
         // If all matched overloads are instance-returning, include inferred specializations from
         // those deferred bindings as well.
         if let Some(downstream) = self.downstream_constructor()
-            && downstream.all_matching_overloads_are_instance_returning(db, self)
+            && self
+                .callable()
+                .matching_overloads()
+                .all(|(_, overload)| downstream.overload_returns_instance(db, overload))
         {
             for init_binding in downstream
                 .bindings
@@ -317,9 +320,7 @@ impl<'db> ConstructorBinding<'db> {
                     // For layered mixed-constructor handling (metaclass `__call__` mixed with
                     // downstream constructor logic), if the downstream constructor resolves to a
                     // non-instance return, that becomes the effective constructor return.
-                    if let Some(downstream) = self.downstream_constructor()
-                        && self.should_check_downstream_constructor(db)
-                    {
+                    if let Some(downstream) = self.checkable_downstream_constructor(db) {
                         let downstream_return = downstream.bindings.return_type(db);
                         if !is_instance_of_constructor(downstream_return) {
                             return downstream_return;
@@ -424,42 +425,27 @@ impl<'db> ConstructorBinding<'db> {
         call_expression_tcx: TypeContext<'db>,
         dataclass_field_specifiers: &[Type<'db>],
     ) -> bool {
-        if !self.should_check_downstream_constructor(db) {
-            return false;
-        }
-
-        let downstream = self.downstream_constructor.as_mut().expect("checked above");
-        let init_error = downstream
-            .bindings
-            .check_types_impl(
-                db,
-                constraints,
-                argument_types,
-                call_expression_tcx,
-                dataclass_field_specifiers,
-            )
-            .is_err();
-
-        // In layered mixed-constructor flows, the deferred bindings may themselves
-        // represent constructor logic (e.g. metaclass `__call__` -> `__new__`/`__init__`).
-        // If that downstream constructor resolves to a non-instance return, `__init__`
-        // should not be validated.
-        let downstream_return = downstream.bindings.return_type(db);
-
-        if !downstream.return_is_instance_of_constructor_class(db, downstream_return) {
-            return false;
-        }
-
-        init_error
+        self.checkable_downstream_constructor_mut(db)
+            .is_some_and(|downstream| {
+                downstream
+                    .bindings
+                    .check_types_impl(
+                        db,
+                        constraints,
+                        argument_types,
+                        call_expression_tcx,
+                        dataclass_field_specifiers,
+                    )
+                    .is_err()
+            })
     }
 
     pub(super) fn checked_downstream_constructor_bindings(
         &self,
         db: &'db dyn Db,
     ) -> Option<&Bindings<'db>> {
-        let downstream = self.downstream_constructor.as_ref()?;
-        self.should_check_downstream_constructor(db)
-            .then_some(&downstream.bindings)
+        self.checkable_downstream_constructor(db)
+            .map(|downstream| &downstream.bindings)
     }
 
     pub(super) fn type_context_downstream_constructor_bindings(
@@ -479,22 +465,43 @@ impl<'db> ConstructorBinding<'db> {
         self.downstream_constructor.as_deref_mut()
     }
 
+    fn checkable_downstream_constructor(
+        &self,
+        db: &'db dyn Db,
+    ) -> Option<&DownstreamConstructor<'db>> {
+        self.should_check_downstream_constructor(db)
+            .then_some(self.downstream_constructor()?)
+    }
+
+    fn checkable_downstream_constructor_mut(
+        &mut self,
+        db: &'db dyn Db,
+    ) -> Option<&mut DownstreamConstructor<'db>> {
+        self.should_check_downstream_constructor(db)
+            .then_some(self.downstream_constructor_mut()?)
+    }
+
     fn should_check_downstream_constructor(&self, db: &'db dyn Db) -> bool {
-        let Some(downstream) = self.downstream_constructor.as_ref() else {
+        let Some(downstream) = self.downstream_constructor() else {
             return false;
         };
 
-        if self.entry.matching_overloads().next().is_some() {
-            return downstream.all_matching_overloads_are_instance_returning(db, self);
+        let mut matching = self.entry.matching_overloads();
+
+        if matching
+            .next()
+            .is_some_and(|(_, overload)| downstream.overload_returns_instance(db, overload))
+            && matching.all(|(_, overload)| downstream.overload_returns_instance(db, overload))
+        {
+            return true;
         }
 
-        // If metaclass `__call__` itself doesn't match, constructor dispatch stops there.
+        // If metaclass `__call__` doesn't match, don't check `__new__` or `__init__`. But if
+        // `__new__` doesn't match (but is instance-returning), we also check `__init__`.
         if self.constructor_kind().is_metaclass_call() {
             return false;
         }
 
-        // If no overload matched, only validate deferred `__init__` when all upstream overloads
-        // are potentially instance-returning.
         self.entry
             .overloads
             .iter()
@@ -502,13 +509,9 @@ impl<'db> ConstructorBinding<'db> {
     }
 
     fn should_include_downstream_constructor_type_context(&self, db: &'db dyn Db) -> bool {
-        let Some(downstream) = self.downstream_constructor.as_ref() else {
+        let Some(downstream) = self.checkable_downstream_constructor(db) else {
             return false;
         };
-
-        if self.should_check_downstream_constructor(db) {
-            return true;
-        }
 
         // For constructor argument inference, keep deferred `__init__` context available for
         // self-like `__new__(cls: type[T]) -> T` and `__new__(...) -> Self` signatures even
@@ -697,10 +700,6 @@ fn constructor_return_outcome<'db>(
 }
 
 impl<'db> DownstreamConstructor<'db> {
-    fn return_kind(&self, db: &'db dyn Db, return_ty: Type<'db>) -> ConstructorReturnKind {
-        classify_constructor_return(db, self.class_literal, return_ty)
-    }
-
     fn overload_return_outcome(
         &self,
         db: &'db dyn Db,
@@ -713,31 +712,6 @@ impl<'db> DownstreamConstructor<'db> {
         self.overload_return_outcome(db, overload)
             .kind
             .is_instance()
-    }
-
-    /// Returns `true` if every matched overload is instance-returning (i.e., its return type
-    /// is an instance of the constructor class). We have to check across all overloads, and not
-    /// just resolve to a single return type and check that, because of the possibility that
-    /// multiple overloads match due to a gradual argument, which would fall back to `Unknown`
-    /// return type (which we would consider instance-returning), but we still want to skip
-    /// validating `__init__` in case some of the matched overloads are not instance-returning.
-    fn all_matching_overloads_are_instance_returning(
-        &self,
-        db: &'db dyn Db,
-        binding: &ConstructorBinding<'db>,
-    ) -> bool {
-        binding
-            .callable()
-            .matching_overloads()
-            .all(|(_, overload)| self.overload_returns_instance(db, overload))
-    }
-
-    fn return_is_instance_of_constructor_class(
-        &self,
-        db: &'db dyn Db,
-        return_ty: Type<'db>,
-    ) -> bool {
-        self.return_kind(db, return_ty).is_instance()
     }
 }
 
