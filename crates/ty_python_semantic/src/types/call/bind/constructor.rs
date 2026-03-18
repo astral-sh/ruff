@@ -169,7 +169,7 @@ impl<'db> ConstructorBinding<'db> {
         {
             for init_binding in downstream
                 .bindings
-                .iter_semantic_items()
+                .iter_callable_items()
                 .filter_map(CallableItem::as_constructor)
             {
                 combine_binding_specialization(init_binding);
@@ -400,7 +400,7 @@ impl<'db> ConstructorBinding<'db> {
             // `init_binding.match_parameters` handles its own bound-`self` insertion, so pass the
             // original call arguments here.
             let mut init_forms = ArgumentForms::new(arguments.len());
-            for init_binding in downstream.bindings.iter_semantic_items_mut() {
+            for init_binding in downstream.bindings.iter_callable_items_mut() {
                 init_binding.match_parameters(db, arguments, &mut init_forms);
             }
         }

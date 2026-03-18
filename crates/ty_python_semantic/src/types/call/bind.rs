@@ -562,7 +562,7 @@ impl<'db> Bindings<'db> {
         class_literal: ClassLiteral<'db>,
         bindings: &Bindings<'db>,
     ) {
-        for item in self.iter_semantic_items_mut() {
+        for item in self.iter_callable_items_mut() {
             item.set_downstream_constructor(class_literal, bindings);
         }
     }
@@ -612,11 +612,11 @@ impl<'db> Bindings<'db> {
             .flat_map(BindingsElement::callables_mut)
     }
 
-    fn iter_semantic_items(&self) -> impl Iterator<Item = &CallableItem<'db>> {
+    fn iter_callable_items(&self) -> impl Iterator<Item = &CallableItem<'db>> {
         self.elements.iter().flat_map(BindingsElement::items)
     }
 
-    fn iter_semantic_items_mut(&mut self) -> impl Iterator<Item = &mut CallableItem<'db>> {
+    fn iter_callable_items_mut(&mut self) -> impl Iterator<Item = &mut CallableItem<'db>> {
         self.elements
             .iter_mut()
             .flat_map(BindingsElement::items_mut)
@@ -627,7 +627,7 @@ impl<'db> Bindings<'db> {
         db: &'db dyn Db,
         out: &mut Vec<&'a CallableBinding<'db>>,
     ) {
-        for item in self.iter_semantic_items() {
+        for item in self.iter_callable_items() {
             out.push(item.callable());
 
             if let Some(bindings) = item.type_context_downstream_constructor_bindings(db) {
@@ -716,7 +716,7 @@ impl<'db> Bindings<'db> {
         arguments: &CallArguments<'_, 'db>,
     ) -> Self {
         let mut argument_forms = ArgumentForms::new(arguments.len());
-        for item in self.iter_semantic_items_mut() {
+        for item in self.iter_callable_items_mut() {
             item.match_parameters(db, arguments, &mut argument_forms);
         }
         argument_forms.shrink_to_fit();
@@ -787,7 +787,7 @@ impl<'db> Bindings<'db> {
         // For constructor bindings with deferred downstream checks: validate downstream bindings
         // if the matched overload is instance-returning.
         let mut init_error = false;
-        for item in self.iter_semantic_items_mut() {
+        for item in self.iter_callable_items_mut() {
             if item.check_downstream_constructor(
                 db,
                 constraints,
@@ -942,7 +942,7 @@ impl<'db> Bindings<'db> {
 
         // Report deferred constructor diagnostics when the matched overload is instance-returning.
         let mut reported_ctor_init_callables = FxHashSet::default();
-        for item in self.iter_semantic_items() {
+        for item in self.iter_callable_items() {
             let Some(downstream_bindings) =
                 item.checked_downstream_constructor_bindings(context.db())
             else {
