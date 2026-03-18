@@ -726,11 +726,10 @@ impl<'db> DownstreamConstructor<'db> {
         db: &'db dyn Db,
         binding: &ConstructorBinding<'db>,
     ) -> bool {
-        let callable = binding.callable();
-        callable.has_matching_overload()
-            && callable
-                .matching_overloads()
-                .all(|(_, overload)| self.overload_returns_instance(db, overload))
+        binding
+            .callable()
+            .matching_overloads()
+            .all(|(_, overload)| self.overload_returns_instance(db, overload))
     }
 
     fn return_is_instance_of_constructor_class(
