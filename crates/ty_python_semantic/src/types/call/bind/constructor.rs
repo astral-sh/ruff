@@ -494,17 +494,11 @@ impl<'db> ConstructorBinding<'db> {
         }
 
         // If no overload matched, only validate deferred `__init__` when all upstream overloads
-        // are potentially instance-returning. If any overload is definitely non-instance (mixed or
-        // all-non-instance constructor), we cannot assume `__init__` would run.
-        let mut saw_instance_like = false;
-        let mut saw_non_instance = false;
-        for overload in &self.entry.overloads {
-            match downstream.overload_return_outcome(db, overload).kind {
-                ConstructorReturnKind::NotInstance => saw_non_instance = true,
-                ConstructorReturnKind::Instance => saw_instance_like = true,
-            }
-        }
-        saw_instance_like && !saw_non_instance
+        // are potentially instance-returning.
+        self.entry
+            .overloads
+            .iter()
+            .all(|overload| downstream.overload_returns_instance(db, overload))
     }
 
     fn should_include_downstream_constructor_type_context(&self, db: &'db dyn Db) -> bool {
@@ -525,13 +519,14 @@ impl<'db> ConstructorBinding<'db> {
         }
 
         if self.entry.matching_overloads().next().is_some() {
-            return self.entry.matching_overloads().any(|(_, overload)| {
-                downstream.overload_is_instance_like_for_type_context(db, overload)
-            });
+            return self
+                .entry
+                .matching_overloads()
+                .any(|(_, overload)| downstream.overload_returns_instance(db, overload));
         }
 
         match self.entry.overloads() {
-            [overload] => downstream.overload_is_instance_like_for_type_context(db, overload),
+            [overload] => downstream.overload_returns_instance(db, overload),
             _ => false,
         }
     }
@@ -714,11 +709,7 @@ impl<'db> DownstreamConstructor<'db> {
         constructor_return_outcome(db, self.class_literal, overload)
     }
 
-    fn overload_is_instance_like_for_type_context(
-        &self,
-        db: &'db dyn Db,
-        overload: &Binding<'db>,
-    ) -> bool {
+    fn overload_returns_instance(&self, db: &'db dyn Db, overload: &Binding<'db>) -> bool {
         self.overload_return_outcome(db, overload)
             .kind
             .is_instance()
@@ -735,18 +726,11 @@ impl<'db> DownstreamConstructor<'db> {
         db: &'db dyn Db,
         binding: &ConstructorBinding<'db>,
     ) -> bool {
-        let mut saw_match = false;
-        for (_, overload) in binding.callable().matching_overloads() {
-            saw_match = true;
-            if !self
-                .overload_return_outcome(db, overload)
-                .kind
-                .is_instance()
-            {
-                return false;
-            }
-        }
-        saw_match
+        let callable = binding.callable();
+        callable.has_matching_overload()
+            && callable
+                .matching_overloads()
+                .all(|(_, overload)| self.overload_returns_instance(db, overload))
     }
 
     fn return_is_instance_of_constructor_class(

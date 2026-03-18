@@ -3111,6 +3111,10 @@ impl<'db> CallableBinding<'db> {
         }
     }
 
+    pub(crate) fn has_matching_overload(&self) -> bool {
+        !matches!(self.matching_overload_index(), MatchingOverloadIndex::None)
+    }
+
     /// Returns all overloads for this call binding, including overloads that did not match.
     pub(crate) fn overloads(&self) -> &[Binding<'db>] {
         self.overloads.as_slice()
