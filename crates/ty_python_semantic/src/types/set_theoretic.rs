@@ -45,12 +45,20 @@ impl<'db> UnionType<'db> {
         I: IntoIterator<Item = T>,
         T: Into<Type<'db>>,
     {
-        elements
-            .into_iter()
-            .fold(UnionBuilder::new(db), |builder, element| {
-                builder.add(element.into())
-            })
-            .build()
+        let mut iter_elements = elements.into_iter();
+
+        if let Some(first) = iter_elements.next() {
+            if let Some(second) = iter_elements.next() {
+                let builder = UnionBuilder::new(db).add(first.into()).add(second.into());
+                iter_elements
+                    .fold(builder, |builder, element| builder.add(element.into()))
+                    .build()
+            } else {
+                first.into()
+            }
+        } else {
+            Type::Never
+        }
     }
 
     /// Create a union type `A | B` from two elements `A` and `B`.
@@ -632,9 +640,23 @@ impl<'db> IntersectionType<'db> {
         I: IntoIterator<Item = T>,
         T: Into<Type<'db>>,
     {
-        IntersectionBuilder::new(db)
-            .positive_elements(elements)
-            .build()
+        let mut elements_iter = elements.into_iter();
+
+        if let Some(first) = elements_iter.next() {
+            if let Some(second) = elements_iter.next() {
+                let builder =
+                    IntersectionBuilder::new(db).positive_elements([first.into(), second.into()]);
+                elements_iter
+                    .fold(builder, |builder, element| {
+                        builder.add_positive(element.into())
+                    })
+                    .build()
+            } else {
+                first.into()
+            }
+        } else {
+            Type::object()
+        }
     }
 
     /// Create an intersection type `A & B` from two elements `A` and `B`.
