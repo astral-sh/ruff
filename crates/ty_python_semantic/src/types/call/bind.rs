@@ -188,10 +188,10 @@ impl<'db> CallableItem<'db> {
         self.callable().callable_type
     }
 
-    fn map(
-        self,
-        f: impl FnOnce(CallableBinding<'db>) -> CallableBinding<'db>,
-    ) -> CallableItem<'db> {
+    fn map<F>(self, f: &F) -> CallableItem<'db>
+    where
+        F: Fn(CallableBinding<'db>) -> CallableBinding<'db>,
+    {
         match self {
             CallableItem::Regular(binding) => CallableItem::Regular(f(binding)),
             CallableItem::Constructor(binding) => CallableItem::Constructor(binding.map(f)),
@@ -703,7 +703,10 @@ impl<'db> Bindings<'db> {
         UnionType::from_elements(db, element_types)
     }
 
-    pub(crate) fn map(self, f: impl Fn(CallableBinding<'db>) -> CallableBinding<'db>) -> Self {
+    fn map_with<F>(self, f: &F) -> Self
+    where
+        F: Fn(CallableBinding<'db>) -> CallableBinding<'db>,
+    {
         Self {
             callable_type: self.callable_type,
             argument_forms: self.argument_forms,
@@ -713,10 +716,14 @@ impl<'db> Bindings<'db> {
                 .elements
                 .into_iter()
                 .map(|elem| BindingsElement {
-                    items: elem.items.into_iter().map(|item| item.map(&f)).collect(),
+                    items: elem.items.into_iter().map(|item| item.map(f)).collect(),
                 })
                 .collect(),
         }
+    }
+
+    pub(crate) fn map(self, f: impl Fn(CallableBinding<'db>) -> CallableBinding<'db>) -> Self {
+        self.map_with(&f)
     }
 
     /// Match the arguments of a call site against the parameters of a collection of possibly

@@ -47,14 +47,19 @@ impl<'db> ConstructorBinding<'db> {
         &mut self.entry
     }
 
-    pub(super) fn map(
-        self,
-        f: impl FnOnce(CallableBinding<'db>) -> CallableBinding<'db>,
-    ) -> ConstructorBinding<'db> {
+    pub(super) fn map<F>(self, f: &F) -> ConstructorBinding<'db>
+    where
+        F: Fn(CallableBinding<'db>) -> CallableBinding<'db>,
+    {
         ConstructorBinding {
             entry: f(self.entry),
             constructor_context: self.constructor_context,
-            downstream_constructor: self.downstream_constructor,
+            downstream_constructor: self.downstream_constructor.map(|downstream| {
+                Box::new(DownstreamConstructor {
+                    class_literal: downstream.class_literal,
+                    bindings: downstream.bindings.map_with(f),
+                })
+            }),
         }
     }
 
