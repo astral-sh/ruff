@@ -4493,7 +4493,8 @@ impl SequentMap {
                 // Note: if `Bivariant` is ever removed from the `TypeVarVariance` enum, we would
                 // need an alternative representation for "typevar not present"
                 // (e.g., `Option<TypeVarVariance>`).
-                let upper_post = match constrained_data.upper.variance_of(db, bound_typevar) {
+                let upper_replacement = match constrained_data.upper.variance_of(db, bound_typevar)
+                {
                     TypeVarVariance::Bivariant => None,
                     // Skip bare typevars — those are handled by
                     // `add_mutual_sequents_for_different_typevars`.
@@ -4501,73 +4502,96 @@ impl SequentMap {
                     // Covariance preserves direction: upper bound on T substitutes into upper
                     // bound. A ≤ B → G[A] ≤ G[B], so (T ≤ u_B) gives G[T] ≤ G[u_B].
                     TypeVarVariance::Covariant if !bound_data.upper.is_object() => {
-                        let new_upper = constrained_data.upper.apply_type_mapping(
-                            db,
-                            &TypeMapping::ApplySpecialization(ApplySpecialization::Single(
-                                bound_typevar,
-                                bound_data.upper,
-                            )),
-                            TypeContext::default(),
-                        );
-                        (new_upper != constrained_data.upper).then(|| {
-                            ConstraintId::new(
-                                db,
-                                builder,
-                                constrained_typevar,
-                                constrained_data.lower,
-                                new_upper,
-                            )
-                        })
+                        Some(bound_data.upper)
                     }
-                    // TODO: Contravariant and Invariant cases will be added in Phase 3.
+                    // Contravariance flips direction: lower bound on T substitutes into upper
+                    // bound. A ≤ B → G[B] ≤ G[A], so (l_B ≤ T) gives G[T] ≤ G[l_B].
+                    TypeVarVariance::Contravariant if !bound_data.lower.is_never() => {
+                        Some(bound_data.lower)
+                    }
+                    // Invariance requires equality: only substitute if l_B = u_B.
+                    TypeVarVariance::Invariant
+                        if bound_data.lower == bound_data.upper && !bound_data.lower.is_never() =>
+                    {
+                        Some(bound_data.lower)
+                    }
                     _ => None,
                 };
-                if let Some(post) = upper_post {
-                    self.add_pair_implication(
+                if let Some(replacement) = upper_replacement {
+                    let new_upper = constrained_data.upper.apply_type_mapping(
                         db,
-                        builder,
-                        bound_constraint,
-                        constrained_constraint,
-                        post,
+                        &TypeMapping::ApplySpecialization(ApplySpecialization::Single(
+                            bound_typevar,
+                            replacement,
+                        )),
+                        TypeContext::default(),
                     );
+                    if new_upper != constrained_data.upper {
+                        let post = ConstraintId::new(
+                            db,
+                            builder,
+                            constrained_typevar,
+                            constrained_data.lower,
+                            new_upper,
+                        );
+                        self.add_pair_implication(
+                            db,
+                            builder,
+                            bound_constraint,
+                            constrained_constraint,
+                            post,
+                        );
+                    }
                 }
 
                 // Check the lower bound of the constrained constraint for nested occurrences.
-                let lower_post = match constrained_data.lower.variance_of(db, bound_typevar) {
+                let lower_replacement = match constrained_data.lower.variance_of(db, bound_typevar)
+                {
                     TypeVarVariance::Bivariant => None,
                     _ if constrained_data.lower.is_type_var() => None,
                     // Covariance preserves direction: lower bound on T substitutes into lower
                     // bound. A ≤ B → G[A] ≤ G[B], so (l_B ≤ T) gives G[l_B] ≤ G[T].
                     TypeVarVariance::Covariant if !bound_data.lower.is_never() => {
-                        let new_lower = constrained_data.lower.apply_type_mapping(
-                            db,
-                            &TypeMapping::ApplySpecialization(ApplySpecialization::Single(
-                                bound_typevar,
-                                bound_data.lower,
-                            )),
-                            TypeContext::default(),
-                        );
-                        (new_lower != constrained_data.lower).then(|| {
-                            ConstraintId::new(
-                                db,
-                                builder,
-                                constrained_typevar,
-                                new_lower,
-                                constrained_data.upper,
-                            )
-                        })
+                        Some(bound_data.lower)
                     }
-                    // TODO: Contravariant and Invariant cases will be added in Phase 3.
+                    // Contravariance flips direction: upper bound on T substitutes into lower
+                    // bound. A ≤ B → G[B] ≤ G[A], so (T ≤ u_B) gives G[u_B] ≤ G[T].
+                    TypeVarVariance::Contravariant if !bound_data.upper.is_object() => {
+                        Some(bound_data.upper)
+                    }
+                    // Invariance requires equality: only substitute if l_B = u_B.
+                    TypeVarVariance::Invariant
+                        if bound_data.lower == bound_data.upper && !bound_data.lower.is_never() =>
+                    {
+                        Some(bound_data.lower)
+                    }
                     _ => None,
                 };
-                if let Some(post) = lower_post {
-                    self.add_pair_implication(
+                if let Some(replacement) = lower_replacement {
+                    let new_lower = constrained_data.lower.apply_type_mapping(
                         db,
-                        builder,
-                        bound_constraint,
-                        constrained_constraint,
-                        post,
+                        &TypeMapping::ApplySpecialization(ApplySpecialization::Single(
+                            bound_typevar,
+                            replacement,
+                        )),
+                        TypeContext::default(),
                     );
+                    if new_lower != constrained_data.lower {
+                        let post = ConstraintId::new(
+                            db,
+                            builder,
+                            constrained_typevar,
+                            new_lower,
+                            constrained_data.upper,
+                        );
+                        self.add_pair_implication(
+                            db,
+                            builder,
+                            bound_constraint,
+                            constrained_constraint,
+                            post,
+                        );
+                    }
                 }
             };
 

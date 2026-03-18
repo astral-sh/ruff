@@ -171,7 +171,7 @@ Once covariance is working end-to-end, extend the logic to handle the remaining
 variance cases. These should be fairly straightforward modifications to the
 covariance logic.
 
-#### Step 3.1 ⬜ — Add mdtest cases for contravariant and invariant propagation (red)
+#### Step 3.1 ✅ — Add mdtest cases for contravariant and invariant propagation (red)
 
 Add tests following the same pattern as Step 2.2, using the `Contravariant[T]`
 and `Invariant[T]` classes already defined in the "Compound types" section.
@@ -198,7 +198,7 @@ Composed variance test cases:
 
 Run these tests first to verify they fail (red phase).
 
-#### Step 3.2 ⬜ — Add contravariant propagation
+#### Step 3.2 ✅ — Add contravariant propagation
 
 Extend the nested typevar sequent generation:
 
@@ -212,14 +212,14 @@ Extend the nested typevar sequent generation:
 - Emit `(l_B ≤ B ≤ u_B) ∧ (l_C ≤ C ≤ u_C) → (l_C[B := u_B] ≤ C)`
     (The *upper* bound on `B` substitutes into the lower bound of `C` — flipped.)
 
-#### Step 3.3 ⬜ — Add invariant propagation
+#### Step 3.3 ✅ — Add invariant propagation
 
 Extend the nested typevar sequent generation:
 
 - Only emit a derived constraint if `l_B = u_B` (equality constraint on `B`).
 - If so, substitute that single type into either bound of `C`.
 
-#### Step 3.4 ⬜ — Run the full test suite
+#### Step 3.4 ✅ — Run the full test suite
 
 Run the full test suite again to check for regressions.
 

@@ -620,4 +620,142 @@ def lower_bound[U, T]():
     static_assert(not constraints.implies_subtype_of(Covariant[str], U))
 ```
 
+### Transitivity can propagate through nested contravariant typevars
+
+The previous section also works for contravariant generic types, though one of the antecedent
+constraints is flipped.
+
+```py
+from typing import Never
+from ty_extensions import ConstraintSet, static_assert
+
+class Contravariant[T]:
+    def set(self, value: T):
+        pass
+
+def upper_bound[T, U]():
+    # If (int ≤ T ∧ U ≤ Contravariant[T]), then by contravariance,
+    # Contravariant[T] ≤ Contravariant[int], and by transitivity, U ≤ Contravariant[int].
+    # Note: we need the *lower* bound on T (not the upper) because contravariance flips.
+    # Since bool ≤ int, Contravariant[int] ≤ Contravariant[bool], so U ≤ Contravariant[bool]
+    # also holds.
+    constraints = ConstraintSet.range(int, T, object) & ConstraintSet.range(Never, U, Contravariant[T])
+    static_assert(constraints.implies_subtype_of(U, Contravariant[int]))
+    static_assert(constraints.implies_subtype_of(U, Contravariant[bool]))
+    static_assert(not constraints.implies_subtype_of(U, Contravariant[str]))
+
+def lower_bound[T, U]():
+    # If (T ≤ int ∧ Contravariant[T] ≤ U), then by contravariance,
+    # Contravariant[int] ≤ Contravariant[T], and by transitivity, Contravariant[int] ≤ U.
+    # Contravariant[bool] is a supertype of Contravariant[int] (since bool ≤ int), so
+    # Contravariant[bool] ≤ U does NOT hold.
+    constraints = ConstraintSet.range(Never, T, int) & ConstraintSet.range(Contravariant[T], U, object)
+    static_assert(constraints.implies_subtype_of(Contravariant[int], U))
+    static_assert(not constraints.implies_subtype_of(Contravariant[bool], U))
+    static_assert(not constraints.implies_subtype_of(Contravariant[str], U))
+
+# Repeat with reversed typevar ordering to verify BDD-ordering independence.
+def upper_bound[U, T]():
+    constraints = ConstraintSet.range(int, T, object) & ConstraintSet.range(Never, U, Contravariant[T])
+    static_assert(constraints.implies_subtype_of(U, Contravariant[int]))
+    static_assert(constraints.implies_subtype_of(U, Contravariant[bool]))
+    static_assert(not constraints.implies_subtype_of(U, Contravariant[str]))
+
+def lower_bound[U, T]():
+    constraints = ConstraintSet.range(Never, T, int) & ConstraintSet.range(Contravariant[T], U, object)
+    static_assert(constraints.implies_subtype_of(Contravariant[int], U))
+    static_assert(not constraints.implies_subtype_of(Contravariant[bool], U))
+    static_assert(not constraints.implies_subtype_of(Contravariant[str], U))
+```
+
+### Transitivity can propagate through nested invariant typevars
+
+For invariant type parameters, only an equality constraint on the typevar allows propagation. A
+one-sided bound (upper or lower only) is not sufficient.
+
+```py
+from typing import Never
+from ty_extensions import ConstraintSet, static_assert
+
+class Invariant[T]:
+    def get(self) -> T:
+        raise ValueError
+
+    def set(self, value: T):
+        pass
+
+def equality_constraint[T, U]():
+    # (T = int ∧ U ≤ Invariant[T]) should imply U ≤ Invariant[int].
+    constraints = ConstraintSet.range(int, T, int) & ConstraintSet.range(Never, U, Invariant[T])
+    static_assert(constraints.implies_subtype_of(U, Invariant[int]))
+    static_assert(not constraints.implies_subtype_of(U, Invariant[bool]))
+    static_assert(not constraints.implies_subtype_of(U, Invariant[str]))
+
+def upper_bound_only[T, U]():
+    # (T ≤ int ∧ U ≤ Invariant[T]) should NOT imply U ≤ Invariant[int], because T is invariant
+    # and we only have an upper bound, not equality.
+    constraints = ConstraintSet.range(Never, T, int) & ConstraintSet.range(Never, U, Invariant[T])
+    static_assert(not constraints.implies_subtype_of(U, Invariant[int]))
+    static_assert(not constraints.implies_subtype_of(U, Invariant[bool]))
+    static_assert(not constraints.implies_subtype_of(U, Invariant[str]))
+
+def lower_bound_only[T, U]():
+    # (int ≤ T ∧ Invariant[T] ≤ U) should NOT imply Invariant[int] ≤ U, because T is invariant
+    # and we only have a lower bound, not equality.
+    constraints = ConstraintSet.range(int, T, object) & ConstraintSet.range(Invariant[T], U, object)
+    static_assert(not constraints.implies_subtype_of(Invariant[int], U))
+    static_assert(not constraints.implies_subtype_of(Invariant[bool], U))
+    static_assert(not constraints.implies_subtype_of(Invariant[str], U))
+
+# Repeat with reversed typevar ordering.
+def equality_constraint[U, T]():
+    constraints = ConstraintSet.range(int, T, int) & ConstraintSet.range(Never, U, Invariant[T])
+    static_assert(constraints.implies_subtype_of(U, Invariant[int]))
+    static_assert(not constraints.implies_subtype_of(U, Invariant[bool]))
+    static_assert(not constraints.implies_subtype_of(U, Invariant[str]))
+```
+
+### Transitivity propagates through composed variance
+
+When a typevar is nested inside multiple layers of generics, variances compose. For instance, a
+covariant type inside a contravariant type yields contravariant overall.
+
+```py
+from typing import Never
+from ty_extensions import ConstraintSet, static_assert
+
+class Covariant[T]:
+    def get(self) -> T:
+        raise ValueError
+
+class Contravariant[T]:
+    def set(self, value: T):
+        pass
+
+def covariant_of_contravariant[T, U]():
+    # Covariant[Contravariant[T]]: T is contravariant overall (covariant × contravariant).
+    # So a lower bound on T should propagate (flipped).
+    constraints = ConstraintSet.range(int, T, object) & ConstraintSet.range(Never, U, Covariant[Contravariant[T]])
+    static_assert(constraints.implies_subtype_of(U, Covariant[Contravariant[int]]))
+    static_assert(not constraints.implies_subtype_of(U, Covariant[Contravariant[str]]))
+
+def contravariant_of_covariant[T, U]():
+    # Contravariant[Covariant[T]]: T is contravariant overall (contravariant × covariant).
+    # So a lower bound on T should propagate (flipped).
+    constraints = ConstraintSet.range(int, T, object) & ConstraintSet.range(Never, U, Contravariant[Covariant[T]])
+    static_assert(constraints.implies_subtype_of(U, Contravariant[Covariant[int]]))
+    static_assert(not constraints.implies_subtype_of(U, Contravariant[Covariant[str]]))
+
+# Repeat with reversed typevar ordering.
+def covariant_of_contravariant[U, T]():
+    constraints = ConstraintSet.range(int, T, object) & ConstraintSet.range(Never, U, Covariant[Contravariant[T]])
+    static_assert(constraints.implies_subtype_of(U, Covariant[Contravariant[int]]))
+    static_assert(not constraints.implies_subtype_of(U, Covariant[Contravariant[str]]))
+
+def contravariant_of_covariant[U, T]():
+    constraints = ConstraintSet.range(int, T, object) & ConstraintSet.range(Never, U, Contravariant[Covariant[T]])
+    static_assert(constraints.implies_subtype_of(U, Contravariant[Covariant[int]]))
+    static_assert(not constraints.implies_subtype_of(U, Contravariant[Covariant[str]]))
+```
+
 [subtyping]: https://typing.python.org/en/latest/spec/concepts.html#subtype-supertype-and-type-equivalence
