@@ -153,13 +153,9 @@ impl<'db> CallableItem<'db> {
         }
     }
 
-    fn set_downstream_constructor(
-        &mut self,
-        class_literal: ClassLiteral<'db>,
-        bindings: &Bindings<'db>,
-    ) {
+    fn set_downstream_constructor(&mut self, bindings: &Bindings<'db>) {
         if let Some(binding) = self.as_constructor_mut() {
-            binding.set_downstream_constructor(class_literal, bindings.clone());
+            binding.set_downstream_constructor(bindings.clone());
         }
     }
 
@@ -563,13 +559,9 @@ impl<'db> Bindings<'db> {
         self
     }
 
-    pub(crate) fn set_downstream_constructor(
-        &mut self,
-        class_literal: ClassLiteral<'db>,
-        bindings: &Bindings<'db>,
-    ) {
+    pub(crate) fn set_downstream_constructor(&mut self, bindings: &Bindings<'db>) {
         for item in self.iter_callable_items_mut() {
-            item.set_downstream_constructor(class_literal, bindings);
+            item.set_downstream_constructor(bindings);
         }
     }
 

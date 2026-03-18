@@ -4420,12 +4420,11 @@ impl<'db> Type<'db> {
             (Place::Undefined, true) => None,
         };
 
-        let constructor_class_literal = class.class_literal(db);
         let constructor_bindings = if let Some(mut new_bindings) = new_bindings {
             // Preserve the full `__new__` signature and defer `__init__` validation until we know
             // which `__new__` overload matched at call time.
             if let Some(init_bindings) = init_bindings.as_ref() {
-                new_bindings.set_downstream_constructor(constructor_class_literal, init_bindings);
+                new_bindings.set_downstream_constructor(init_bindings);
             }
             Some(new_bindings)
         } else {
@@ -4447,8 +4446,7 @@ impl<'db> Type<'db> {
             if let Some(downstream_bindings) = constructor_bindings.as_ref() {
                 // Preserve the full metaclass `__call__` signature and defer whether constructor
                 // downstream checks apply until the matched overload is known.
-                metaclass_bindings
-                    .set_downstream_constructor(constructor_class_literal, downstream_bindings);
+                metaclass_bindings.set_downstream_constructor(downstream_bindings);
             }
             metaclass_bindings
         } else if let Some(constructor_bindings) = constructor_bindings {

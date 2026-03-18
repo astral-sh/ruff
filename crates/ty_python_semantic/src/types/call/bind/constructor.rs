@@ -39,6 +39,12 @@ impl<'db> ConstructorBinding<'db> {
         self.constructor_context.instance_type()
     }
 
+    fn constructed_class_literal(&self, db: &'db dyn Db) -> Option<ClassLiteral<'db>> {
+        self.constructed_instance_type()
+            .as_nominal_instance()
+            .map(|instance| instance.class(db).class_literal(db))
+    }
+
     pub(super) fn callable(&self) -> &CallableBinding<'db> {
         &self.entry
     }
@@ -56,7 +62,6 @@ impl<'db> ConstructorBinding<'db> {
             constructor_context: self.constructor_context,
             downstream_constructor: self.downstream_constructor.map(|downstream| {
                 Box::new(DownstreamConstructor {
-                    class_literal: downstream.class_literal,
                     bindings: downstream.bindings.map_with(f),
                 })
             }),
@@ -167,10 +172,10 @@ impl<'db> ConstructorBinding<'db> {
         // If all matched overloads are instance-returning, include inferred specializations from
         // those deferred bindings as well.
         if let Some(downstream) = self.downstream_constructor()
-            && self
-                .callable()
-                .matching_overloads()
-                .all(|(_, overload)| downstream.overload_returns_instance(db, overload))
+            && let Some(constructor_class_literal) = self.constructed_class_literal(db)
+            && self.callable().matching_overloads().all(|(_, overload)| {
+                overload_returns_instance(db, constructor_class_literal, overload)
+            })
         {
             for init_binding in downstream
                 .bindings
@@ -382,15 +387,8 @@ impl<'db> ConstructorBinding<'db> {
         self.constructor_context = self.constructor_context.with_instance_type(instance_type);
     }
 
-    pub(super) fn set_downstream_constructor(
-        &mut self,
-        class_literal: ClassLiteral<'db>,
-        bindings: Bindings<'db>,
-    ) {
-        self.downstream_constructor = Some(Box::new(DownstreamConstructor {
-            class_literal,
-            bindings,
-        }));
+    pub(super) fn set_downstream_constructor(&mut self, bindings: Bindings<'db>) {
+        self.downstream_constructor = Some(Box::new(DownstreamConstructor { bindings }));
     }
 
     pub(super) fn match_parameters(
@@ -478,16 +476,19 @@ impl<'db> ConstructorBinding<'db> {
     }
 
     fn should_check_downstream_constructor(&self, db: &'db dyn Db) -> bool {
-        let Some(downstream) = self.downstream_constructor() else {
+        if self.downstream_constructor().is_none() {
+            return false;
+        }
+        let Some(constructor_class_literal) = self.constructed_class_literal(db) else {
             return false;
         };
 
         let mut matching = self.entry.matching_overloads();
 
-        if matching
-            .next()
-            .is_some_and(|(_, overload)| downstream.overload_returns_instance(db, overload))
-            && matching.all(|(_, overload)| downstream.overload_returns_instance(db, overload))
+        if matching.next().is_some_and(|(_, overload)| {
+            overload_returns_instance(db, constructor_class_literal, overload)
+        }) && matching
+            .all(|(_, overload)| overload_returns_instance(db, constructor_class_literal, overload))
         {
             return true;
         }
@@ -501,7 +502,7 @@ impl<'db> ConstructorBinding<'db> {
         self.entry
             .overloads
             .iter()
-            .all(|overload| downstream.overload_returns_instance(db, overload))
+            .all(|overload| overload_returns_instance(db, constructor_class_literal, overload))
     }
 }
 
@@ -514,10 +515,6 @@ impl<'db> ConstructorBinding<'db> {
 /// have `__init__` as downstream constructor.
 #[derive(Debug, Clone)]
 pub(super) struct DownstreamConstructor<'db> {
-    /// The class literal of the class being constructed, used to determine whether
-    /// the matched overload is instance-returning by checking if its return type is an
-    /// instance of this class (or a subclass thereof).
-    class_literal: ClassLiteral<'db>,
     /// Downstream constructor bindings to validate conditionally.
     pub(super) bindings: Bindings<'db>,
 }
@@ -669,20 +666,14 @@ fn constructor_return_outcome<'db>(
     }
 }
 
-impl<'db> DownstreamConstructor<'db> {
-    fn overload_return_outcome(
-        &self,
-        db: &'db dyn Db,
-        overload: &Binding<'db>,
-    ) -> ConstructorReturnOutcome<'db> {
-        constructor_return_outcome(db, self.class_literal, overload)
-    }
-
-    fn overload_returns_instance(&self, db: &'db dyn Db, overload: &Binding<'db>) -> bool {
-        self.overload_return_outcome(db, overload)
-            .kind
-            .is_instance()
-    }
+fn overload_returns_instance<'db>(
+    db: &'db dyn Db,
+    class_literal: ClassLiteral<'db>,
+    overload: &Binding<'db>,
+) -> bool {
+    constructor_return_outcome(db, class_literal, overload)
+        .kind
+        .is_instance()
 }
 
 impl<'db> Binding<'db> {
