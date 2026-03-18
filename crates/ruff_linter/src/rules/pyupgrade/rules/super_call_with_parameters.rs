@@ -2,7 +2,7 @@ use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::visitor::{Visitor, walk_expr, walk_stmt};
 use ruff_python_ast::{self as ast, Expr, Stmt};
-use ruff_python_semantic::SemanticModel;
+use ruff_python_semantic::{SemanticModel, ScopeKind};
 use ruff_text_size::{Ranged, TextSize};
 
 use crate::checkers::ast::Checker;
@@ -142,6 +142,35 @@ pub(crate) fn super_call_with_parameters(checker: &Checker, call: &ast::ExprCall
                 && !checker.semantic().current_scope().has(id))
             {
                 return;
+            }
+            // Check that the name resolves to the enclosing class definition.
+            // For `super(ClassName, self)` where ClassName refers to an outer scope class
+            // (like in `class Outer: class Inner(Inner):`), changing to `super()` would
+            // change semantics, so we should not flag it.
+            if *id != "__class__" {
+                // Look up the symbol to see if it resolves to a class definition
+                if let Some(binding_id) = checker.semantic().lookup_symbol(id) {
+                    let binding = checker.semantic().binding(binding_id);
+                    if let ruff_python_semantic::BindingKind::ClassDefinition(binding_scope_id) =
+                        binding.kind
+                    {
+                        // Walk up from function scope through all class scopes to find
+                        // a class with the same name as the first argument
+                        let mut current_scope_id = checker.semantic().current_scope_ids().last();
+                        while let Some(scope_id) = current_scope_id {
+                            let current_scope = &checker.semantic().scopes[scope_id];
+                            if let ScopeKind::Class(class_def) = current_scope.kind {
+                                // If there's a class with the same name but different scope,
+                                // it means the name refers to that outer class, not the one being defined
+                                // So don't flag it (this is the #24001 fix)
+                                if class_def.name.as_str() == *id && scope_id != binding_scope_id {
+                                    return;
+                                }
+                            }
+                            current_scope_id = checker.semantic().parent_scope_id(scope_id);
+                        }
+                    }
+                }
             }
         }
         Expr::Attribute(_) => {

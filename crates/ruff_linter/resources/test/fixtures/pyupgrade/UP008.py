@@ -343,3 +343,25 @@ class Outer3:
         def __init__(self, foo):
             super(Wrong.Inner, self).__init__(foo)  # Should NOT trigger UP008
 
+
+# See: https://github.com/astral-sh/ruff/issues/24001
+# UP008 false positive in nested class when the first `super` arg is not a full class path
+class Outer24001:
+    class Inner(Inner):
+        def __init__(self, foo):
+            super(Inner, self).__init__(foo)  # Should NOT trigger UP008
+
+
+# Deeper nesting false positive
+class Outer2:
+    class Middle:
+        class Inner2(Inner2):
+            def __init__(self, foo):
+                super(Inner2, self).__init__(foo)  # Should NOT trigger UP008
+
+
+# This should still trigger - full chain matches
+class Outer3:
+    class Inner3:
+        def __init__(self, foo):
+            super(Outer3.Inner3, self).__init__(foo)  # Should trigger UP008
