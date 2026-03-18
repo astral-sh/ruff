@@ -5,7 +5,7 @@ resolver = "2"
 [workspace.package]
 # Please update rustfmt.toml when bumping the Rust edition
 edition = "2024"
-rust-version = "1.90"
+rust-version = "1.91"
 homepage = "https://docs.astral.sh/ruff"
 documentation = "https://docs.astral.sh/ruff"
 repository = "https://github.com/astral-sh/ruff"
@@ -23,6 +23,7 @@ ruff_graph = { path = "crates/ruff_graph" }
 ruff_index = { path = "crates/ruff_index" }
 ruff_linter = { path = "crates/ruff_linter" }
 ruff_macros = { path = "crates/ruff_macros" }
+ruff_markdown = { path = "crates/ruff_markdown" }
 ruff_memory_usage = { path = "crates/ruff_memory_usage" }
 ruff_notebook = { path = "crates/ruff_notebook" }
 ruff_options_metadata = { path = "crates/ruff_options_metadata" }
@@ -43,6 +44,7 @@ ruff_workspace = { path = "crates/ruff_workspace" }
 
 ty = { path = "crates/ty" }
 ty_combine = { path = "crates/ty_combine" }
+ty_completion_bench = { path = "crates/ty_completion_bench" }
 ty_completion_eval = { path = "crates/ty_completion_eval" }
 ty_ide = { path = "crates/ty_ide" }
 ty_module_resolver = { path = "crates/ty_module_resolver" }
@@ -55,11 +57,11 @@ ty_test = { path = "crates/ty_test" }
 ty_vendored = { path = "crates/ty_vendored" }
 
 aho-corasick = { version = "1.1.3" }
-anstream = { version = "0.6.18" }
+anstream = { version = "1.0.0" }
 anstyle = { version = "1.0.10" }
 anyhow = { version = "1.0.80" }
 arc-swap = { version = "1.7.1" }
-argfile = { version = "0.2.0" }
+argfile = { version = "1.0.0" }
 assert_fs = { version = "1.1.0" }
 bincode = { version = "2.0.0" }
 bitflags = { version = "2.5.0" }
@@ -96,7 +98,7 @@ get-size2 = { version = "0.7.3", features = [
     "compact-str",
     "ordermap"
 ] }
-getrandom = { version = "0.3.1" }
+getrandom = { version = "0.4.1" }
 glob = { version = "0.3.1" }
 globset = { version = "0.4.14" }
 globwalk = { version = "0.9.1" }
@@ -115,7 +117,6 @@ indoc = { version = "2.0.4" }
 insta = { version = "1.35.1" }
 insta-cmd = { version = "0.6.0" }
 is-macro = { version = "0.3.5" }
-is-wsl = { version = "0.4.0" }
 itertools = { version = "0.14.0" }
 jiff = { version = "0.2.0" }
 jod-thread = { version = "1.0.0" }
@@ -124,7 +125,7 @@ libc = { version = "0.2.153" }
 libcst = { version = "1.8.4", default-features = false }
 log = { version = "0.4.17" }
 lsp-server = { version = "0.7.6" }
-lsp-types = { git = "https://github.com/astral-sh/lsp-types.git", rev = "3512a9f", features = [
+lsp-types = { git = "https://github.com/astral-sh/lsp-types.git", rev = "e15db0593f0ecbbd80599c3f5880e4bf5da1ca0c", features = [
     "proposed",
 ] }
 matchit = { version = "0.9.0" }
@@ -144,14 +145,15 @@ quick-junit = { version = "0.5.0" }
 quickcheck = { version = "1.0.3", default-features = false }
 quickcheck_macros = { version = "1.0.0" }
 quote = { version = "1.0.23" }
-rand = { version = "0.9.0" }
+rand = { version = "0.10.0" }
 rayon = { version = "1.10.0" }
 regex = { version = "1.10.2" }
 regex-automata = { version = "0.4.9" }
+regex-syntax = { version = "0.8.8" }
 rustc-hash = { version = "2.0.0" }
 rustc-stable-hash = { version = "0.1.2" }
 # When updating salsa, make sure to also update the revision in `fuzz/Cargo.toml`
-salsa = { git = "https://github.com/salsa-rs/salsa.git", rev = "9860ff6ca0f1f8f3a8d6b832020002790b501254", default-features = false, features = [
+salsa = { git = "https://github.com/salsa-rs/salsa.git", rev = "53421c2fff87426fa0bb51cab06632b87646de13", default-features = false, features = [
     "compact_str",
     "macros",
     "salsa_unstable",
@@ -169,22 +171,22 @@ serde_with = { version = "3.6.0", default-features = false, features = [
 shellexpand = { version = "3.0.0" }
 similar = { version = "2.4.0", features = ["inline"] }
 smallvec = { version = "1.13.2", features = ["union", "const_generics", "const_new"] }
-snapbox = { version = "0.6.0", features = [
+snapbox = { version = "1.0.0", features = [
     "diff",
     "term-svg",
     "cmd",
     "examples",
 ] }
 static_assertions = "1.1.0"
-strum = { version = "0.27.0", features = ["strum_macros"] }
-strum_macros = { version = "0.27.0" }
+strum = { version = "0.28.0", features = ["strum_macros"] }
+strum_macros = { version = "0.28.0" }
 supports-hyperlinks = { version = "3.1.0" }
 syn = { version = "2.0.55" }
 tempfile = { version = "3.9.0" }
 test-case = { version = "3.3.1" }
 thiserror = { version = "2.0.0" }
 tikv-jemallocator = { version = "0.6.0" }
-toml = { version = "0.9.0" }
+toml = { version = "1.0.0" }
 tracing = { version = "0.1.40" }
 tracing-flame = { version = "0.2.0" }
 tracing-indicatif = { version = "0.3.11" }
@@ -195,7 +197,7 @@ tracing-subscriber = { version = "0.3.18", default-features = false, features = 
     "ansi",
     "smallvec",
 ] }
-tryfn = { version = "0.2.1" }
+tryfn = { version = "1.0.0" }
 typed-arena = { version = "2.0.2" }
 unic-ucd-category = { version = "0.9" }
 unicode-ident = { version = "1.0.12" }
@@ -207,6 +209,7 @@ uuid = { version = "1.6.1", features = ["v4", "fast-rng", "macro-diagnostics"] }
 walkdir = { version = "2.3.2" }
 wasm-bindgen = { version = "0.2.92" }
 wasm-bindgen-test = { version = "0.3.42" }
+which = { version = "8.0.0" }
 wild = { version = "2" }
 zip = { version = "0.6.6", default-features = false }
 
@@ -216,6 +219,7 @@ ignored = [
     "ruff_options_metadata",
     "uuid",
     "get-size2",
+    "ty_completion_bench",
     "ty_completion_eval",
 ]
 

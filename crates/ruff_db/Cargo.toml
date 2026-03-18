@@ -46,6 +46,7 @@ supports-hyperlinks = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true, optional = true }
+which = { workspace = true, optional = true }
 zip = { workspace = true }
 
 [target.'cfg(not(target_arch="wasm32"))'.dependencies]
@@ -61,7 +62,7 @@ tempfile = { workspace = true }
 [features]
 cache = ["ruff_cache"]
 junit = ["dep:quick-junit"]
-os = ["ignore", "dep:etcetera"]
+os = ["ignore", "dep:etcetera", "dep:which"]
 serde = [
     "camino/serde1",
     "dep:serde",

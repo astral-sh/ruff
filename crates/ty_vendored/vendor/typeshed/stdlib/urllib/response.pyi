@@ -12,6 +12,7 @@ from collections.abc import Callable, Iterable
 from email.message import Message
 from types import TracebackType
 from typing import IO, Any
+from typing_extensions import deprecated
 
 __all__ = ["addbase", "addclosehook", "addinfo", "addinfourl"]
 
@@ -48,9 +49,13 @@ class addinfourl(addinfo):
     """class to add info() and geturl() methods to an open file."""
 
     url: str
-    code: int | None
+    code: int | None  # Deprecated since Python 3.9. Use `addinfourl.status` attribute instead.
     @property
     def status(self) -> int | None: ...
     def __init__(self, fp: IO[bytes], headers: Message, url: str, code: int | None = None) -> None: ...
+    @deprecated("Deprecated since Python 3.9. Use `addinfourl.url` attribute instead.")
     def geturl(self) -> str: ...
+    @deprecated("Deprecated since Python 3.9. Use `addinfourl.headers` attribute instead.")
+    def info(self) -> Message: ...
+    @deprecated("Deprecated since Python 3.9. Use `addinfourl.status` attribute instead.")
     def getcode(self) -> int | None: ...

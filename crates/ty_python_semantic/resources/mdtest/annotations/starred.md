@@ -18,5 +18,11 @@ def append_int(*args: *Ts) -> tuple[*Ts, int]:
     return (*args, 1)
 
 # TODO should be tuple[Literal[True], Literal["a"], int]
-reveal_type(append_int(True, "a"))  # revealed: tuple[@Todo(PEP 646), ...]
+reveal_type(append_int(True, "a"))  # revealed: tuple[@Todo(TypeVarTuple), ...]
+
+def first_arg_int(*args: *tuple[int, *tuple[str, ...]]): ...
+
+first_arg_int(42, "42", "42")  # fine
+first_arg_int("not an int", "42", "42")  # TODO: should error
+first_arg_int(56, "42", 56)  # TODO: should error
 ```

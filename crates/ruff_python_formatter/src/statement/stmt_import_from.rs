@@ -16,9 +16,14 @@ impl FormatNodeRule<StmtImportFrom> for FormatStmtImportFrom {
             module,
             names,
             level,
+            is_lazy,
             range: _,
             node_index: _,
         } = item;
+
+        if *is_lazy {
+            write!(f, [token("lazy"), space()])?;
+        }
 
         write!(
             f,

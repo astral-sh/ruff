@@ -16,7 +16,6 @@ use crate::{
 
 /// A cross-module identifier of a scope that can be used as a salsa query parameter.
 #[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
-#[derive(PartialOrd, Ord)]
 pub struct ScopeId<'db> {
     pub file: File,
 
@@ -33,6 +32,16 @@ impl<'db> ScopeId<'db> {
 
     pub(crate) fn node(self, db: &dyn Db) -> &NodeWithScopeKind {
         self.scope(db).node()
+    }
+
+    /// Returns `true` if this scope may require type context from its parent scope.
+    pub(crate) fn accepts_type_context(self, db: &dyn Db) -> bool {
+        matches!(
+            self.node(db),
+            NodeWithScopeKind::ListComprehension(_)
+                | NodeWithScopeKind::SetComprehension(_)
+                | NodeWithScopeKind::DictComprehension(_)
+        )
     }
 
     pub(crate) fn scope(self, db: &dyn Db) -> &Scope {

@@ -134,6 +134,11 @@ pub(crate) fn unused_loop_control_variable(checker: &Checker, stmt_for: &ast::St
             },
             expr.range(),
         );
+
+        if certainty == Certainty::Certain {
+            diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Unnecessary);
+        }
+
         if let Some(rename) = rename {
             if certainty == Certainty::Certain {
                 // Avoid fixing if the variable, or any future bindings to the variable, are

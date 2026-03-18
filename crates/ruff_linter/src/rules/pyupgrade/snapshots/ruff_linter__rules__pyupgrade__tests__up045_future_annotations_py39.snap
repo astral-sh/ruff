@@ -1,0 +1,82 @@
+---
+source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+---
+UP045 [*] Use `X | None` for type annotations
+  --> UP045_py39.py:10:4
+   |
+10 | x: Optional[str]             # UP045
+   |    ^^^^^^^^^^^^^
+11 | x: "Optional[str]"           # UP045
+12 | cast("Optional[str]", None)  # UP045
+   |
+help: Convert to `X | None`
+7  | from typing import Optional, cast, TypeAlias
+8  | 
+9  | 
+   - x: Optional[str]             # UP045
+10 + x: str | None             # UP045
+11 | x: "Optional[str]"           # UP045
+12 | cast("Optional[str]", None)  # UP045
+13 | cast(Optional[str], None)    # okay, str | None is a runtime error
+note: This is an unsafe fix and may change runtime behavior
+
+UP045 [*] Use `X | None` for type annotations
+  --> UP045_py39.py:11:5
+   |
+10 | x: Optional[str]             # UP045
+11 | x: "Optional[str]"           # UP045
+   |     ^^^^^^^^^^^^^
+12 | cast("Optional[str]", None)  # UP045
+13 | cast(Optional[str], None)    # okay, str | None is a runtime error
+   |
+help: Convert to `X | None`
+8  | 
+9  | 
+10 | x: Optional[str]             # UP045
+   - x: "Optional[str]"           # UP045
+11 + x: "str | None"           # UP045
+12 | cast("Optional[str]", None)  # UP045
+13 | cast(Optional[str], None)    # okay, str | None is a runtime error
+14 | x: TypeAlias = "Optional[str]"  # UP045
+note: This is an unsafe fix and may change runtime behavior
+
+UP045 [*] Use `X | None` for type annotations
+  --> UP045_py39.py:12:7
+   |
+10 | x: Optional[str]             # UP045
+11 | x: "Optional[str]"           # UP045
+12 | cast("Optional[str]", None)  # UP045
+   |       ^^^^^^^^^^^^^
+13 | cast(Optional[str], None)    # okay, str | None is a runtime error
+14 | x: TypeAlias = "Optional[str]"  # UP045
+   |
+help: Convert to `X | None`
+9  | 
+10 | x: Optional[str]             # UP045
+11 | x: "Optional[str]"           # UP045
+   - cast("Optional[str]", None)  # UP045
+12 + cast("str | None", None)  # UP045
+13 | cast(Optional[str], None)    # okay, str | None is a runtime error
+14 | x: TypeAlias = "Optional[str]"  # UP045
+15 | x: TypeAlias = Optional[str]  # okay
+note: This is an unsafe fix and may change runtime behavior
+
+UP045 [*] Use `X | None` for type annotations
+  --> UP045_py39.py:14:17
+   |
+12 | cast("Optional[str]", None)  # UP045
+13 | cast(Optional[str], None)    # okay, str | None is a runtime error
+14 | x: TypeAlias = "Optional[str]"  # UP045
+   |                 ^^^^^^^^^^^^^
+15 | x: TypeAlias = Optional[str]  # okay
+   |
+help: Convert to `X | None`
+11 | x: "Optional[str]"           # UP045
+12 | cast("Optional[str]", None)  # UP045
+13 | cast(Optional[str], None)    # okay, str | None is a runtime error
+   - x: TypeAlias = "Optional[str]"  # UP045
+14 + x: TypeAlias = "str | None"  # UP045
+15 | x: TypeAlias = Optional[str]  # okay
+16 | 
+17 | # complex (implicitly concatenated) annotations
+note: This is an unsafe fix and may change runtime behavior

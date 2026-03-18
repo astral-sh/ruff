@@ -28,6 +28,13 @@ pub(crate) fn as_non_finite_float_string_literal(expr: &ast::Expr) -> Option<&'s
     )
 }
 
+pub(crate) fn is_infinity_string_literal(expr: &ast::Expr) -> Option<&'static str> {
+    find_any_ignore_ascii_case(
+        expr,
+        &["inf", "+inf", "-inf", "infinity", "+infinity", "-infinity"],
+    )
+}
+
 fn find_any_ignore_ascii_case(expr: &ast::Expr, patterns: &[&'static str]) -> Option<&'static str> {
     let value = &expr.as_string_literal_expr()?.value;
 

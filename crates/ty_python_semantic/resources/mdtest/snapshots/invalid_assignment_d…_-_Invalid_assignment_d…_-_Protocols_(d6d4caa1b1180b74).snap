@@ -1,0 +1,63 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: invalid_assignment_details.md - Invalid assignment diagnostics - Protocols
+mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/invalid_assignment_details.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from typing import Protocol
+ 2 | 
+ 3 | class SupportsCheck(Protocol):
+ 4 |     def check(self, x: int, y: str) -> bool: ...
+ 5 | 
+ 6 | class DoesNotHaveCheck: ...
+ 7 | 
+ 8 | def _(source: DoesNotHaveCheck):
+ 9 |     target: SupportsCheck = source  # error: [invalid-assignment]
+10 | class CheckWithWrongSignature:
+11 |     def check(self, x: int, y: bytes) -> bool:
+12 |         return False
+13 | 
+14 | def _(source: CheckWithWrongSignature):
+15 |     target: SupportsCheck = source  # error: [invalid-assignment]
+```
+
+# Diagnostics
+
+```
+error[invalid-assignment]: Object of type `DoesNotHaveCheck` is not assignable to `SupportsCheck`
+  --> src/mdtest_snippet.py:9:13
+   |
+ 8 | def _(source: DoesNotHaveCheck):
+ 9 |     target: SupportsCheck = source  # error: [invalid-assignment]
+   |             -------------   ^^^^^^ Incompatible value of type `DoesNotHaveCheck`
+   |             |
+   |             Declared type
+10 | class CheckWithWrongSignature:
+11 |     def check(self, x: int, y: bytes) -> bool:
+   |
+info: rule `invalid-assignment` is enabled by default
+
+```
+
+```
+error[invalid-assignment]: Object of type `CheckWithWrongSignature` is not assignable to `SupportsCheck`
+  --> src/mdtest_snippet.py:15:13
+   |
+14 | def _(source: CheckWithWrongSignature):
+15 |     target: SupportsCheck = source  # error: [invalid-assignment]
+   |             -------------   ^^^^^^ Incompatible value of type `CheckWithWrongSignature`
+   |             |
+   |             Declared type
+   |
+info: rule `invalid-assignment` is enabled by default
+
+```

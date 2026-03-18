@@ -1,6 +1,6 @@
 [project]
 name = "scripts"
-version = "0.14.13"
+version = "0.15.6"
 description = ""
 authors = ["Charles Marsh <charlie.r.marsh@gmail.com>"]
 
@@ -23,4 +23,3 @@ linter = [
     "pylint",
     "isort",
 ]
-

@@ -804,3 +804,38 @@ transform = lambda left, right: ibis.timestamp("2017-04-01").cast(dt.date).betwe
         x
     )
 )
+
+lambda x: (
+    x := 1
+)
+
+(
+    lambda  # dangling header comment
+    : (x := 1)
+)
+
+
+# Regression tests for https://github.com/astral-sh/ruff/issues/23851
+foo = lambda x: 'hello this is a really long string that then get concatenated ' 'with another string that prints {x!r}'
+
+foo = lambda x: 'hello this is a really long string that then get concatenated ' 'with another string that prints {x!r}'.format(x=x)
+
+foo = lambda x: 'hello this is a really long string that then get concatenated ' 'with another string that prints {x!r}'[x]
+
+foo = lambda x: ('hello this is a really long string that then get concatenated ' and 'with another string that prints {x!r}').foo()
+
+foo = lambda: (result := some_really_long_callable_expression)(extra_argument_one, extra_argument_two)
+
+foo = lambda: (result := some_really_long_subscriptable_expression)[extra_long_index_expression]
+
+foo = lambda: (await some_coroutine)(extra_argument_one, extra_argument_two, extra_argument_three)
+
+foo = lambda: call()(extra_argument_one, extra_argument_two, extra_argument_threeeeeeeee)
+
+foo = lambda: call()(extra_argument_one, extra_argument_twooooooooooooooooooo, extra_argument_threeeeeeeee)
+
+foo = lambda: call(argument_one,)(extra_argument_one, extra_argument_twooooooooooooooooooo, extra_argument_threeeeeeeee)
+
+foo = lambda: call(argument_one, argument_two, argument_threeeeeeeeeeeeeeeeeeeeeeeeeeee)(extra_argument_one, extra_argument_twooooooooooooooooooo, extra_argument_threeeeeeeee)
+
+foo = lambda: callllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllll(argument_one, argument_two, argument_threeeeeeeeeeeeeeeeeeeeeeeeeeee)(extra_argument_one, extra_argument_twooooooooooooooooooo, extra_argument_threeeeeeeee)

@@ -53,6 +53,22 @@ def _(x: A | B, y: A | C):
         reveal_type(y)  # revealed: A | C
 ```
 
+## `type(x) is C` in chained comparisons
+
+```py
+from typing import Literal
+
+class A: ...
+class B: ...
+
+def _(x: A | B, y: Literal[1, 2]):
+    if type(x) is A is not None:
+        reveal_type(x)  # revealed: A
+
+    if y is 1 is not type(x):
+        reveal_type(y)  # revealed: Literal[1]
+```
+
 ## `type(x) is not C`
 
 ```py

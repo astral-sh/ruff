@@ -7,8 +7,7 @@ use crate::docstrings::Docstring;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
-/// Checks for docstrings that use `'''triple single quotes'''` instead of
-/// `"""triple double quotes"""`.
+/// Checks for docstrings that don't use `"""triple double quotes"""`.
 ///
 /// ## Why is this bad?
 /// [PEP 257](https://peps.python.org/pep-0257/#what-is-a-docstring) recommends
@@ -19,12 +18,18 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ```python
 /// def kos_root():
 ///     '''Return the pathname of the KOS root directory.'''
+///
+/// def kos_branch():
+///     'Return the branch name.'
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// def kos_root():
 ///     """Return the pathname of the KOS root directory."""
+///
+/// def kos_branch():
+///     """Return the branch name."""
 /// ```
 ///
 /// ## Formatter compatibility

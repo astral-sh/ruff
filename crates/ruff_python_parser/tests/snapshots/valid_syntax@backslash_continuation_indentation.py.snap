@@ -1,0 +1,84 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+---
+## AST
+
+```
+Module(
+    ModModule {
+        node_index: NodeIndex(None),
+        range: 0..46,
+        body: [
+            If(
+                StmtIf {
+                    node_index: NodeIndex(None),
+                    range: 0..45,
+                    test: BooleanLiteral(
+                        ExprBooleanLiteral {
+                            node_index: NodeIndex(None),
+                            range: 3..7,
+                            value: true,
+                        },
+                    ),
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                node_index: NodeIndex(None),
+                                range: 23..24,
+                                value: NumberLiteral(
+                                    ExprNumberLiteral {
+                                        node_index: NodeIndex(None),
+                                        range: 23..24,
+                                        value: Int(
+                                            1,
+                                        ),
+                                    },
+                                ),
+                            },
+                        ),
+                        Expr(
+                            StmtExpr {
+                                node_index: NodeIndex(None),
+                                range: 31..32,
+                                value: NumberLiteral(
+                                    ExprNumberLiteral {
+                                        node_index: NodeIndex(None),
+                                        range: 31..32,
+                                        value: Int(
+                                            2,
+                                        ),
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                    elif_else_clauses: [
+                        ElifElseClause {
+                            range: 33..45,
+                            node_index: NodeIndex(None),
+                            test: None,
+                            body: [
+                                Expr(
+                                    StmtExpr {
+                                        node_index: NodeIndex(None),
+                                        range: 44..45,
+                                        value: NumberLiteral(
+                                            ExprNumberLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 44..45,
+                                                value: Int(
+                                                    3,
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```

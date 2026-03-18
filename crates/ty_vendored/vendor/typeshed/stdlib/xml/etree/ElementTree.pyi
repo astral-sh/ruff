@@ -185,7 +185,7 @@ class Element(Generic[_Tag]):
         """Return self[key]."""
 
     @overload
-    def __getitem__(self, key: slice, /) -> list[Element]: ...
+    def __getitem__(self, key: slice[SupportsIndex | None], /) -> list[Element]: ...
     def __len__(self) -> int:
         """Return len(self)."""
     # Doesn't actually exist at runtime, but instance of the class are indeed iterable due to __getitem__.
@@ -195,7 +195,7 @@ class Element(Generic[_Tag]):
         """Set self[key] to value."""
 
     @overload
-    def __setitem__(self, key: slice, value: Iterable[Element[Any]], /) -> None: ...
+    def __setitem__(self, key: slice[SupportsIndex | None], value: Iterable[Element[Any]], /) -> None: ...
 
     # Doesn't really exist in earlier versions, where __len__ is called implicitly instead
     @deprecated("Testing an element's truth value is deprecated.")

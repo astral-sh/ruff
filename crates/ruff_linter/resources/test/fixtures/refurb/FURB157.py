@@ -91,3 +91,11 @@ Decimal("000_000")
 Decimal("_-1")      # Should flag as verbose
 Decimal("_+1")      # Should flag as verbose
 Decimal("_-1_000")  # Should flag as verbose
+
+
+Decimal(
+    float(
+        # text
+        "Infinity"
+    )
+)

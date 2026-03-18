@@ -50,6 +50,21 @@ pub(super) fn is_allowed_func_call(name: &str) -> bool {
     )
 }
 
+/// Returns `true` if a call is semantically allowed to use a boolean trap.
+pub(super) fn is_semantically_allowed_func_call(
+    call: &ast::ExprCall,
+    semantic: &SemanticModel,
+) -> bool {
+    semantic
+        .resolve_qualified_name(call.func.as_ref())
+        .is_some_and(|qualified_name| {
+            ["multiprocessing.Value"]
+                .iter()
+                .map(|target| QualifiedName::from_dotted_name(target))
+                .any(|target| qualified_name == target)
+        })
+}
+
 /// Returns `true` if a call is allowed by the user to use a boolean trap.
 pub(super) fn is_user_allowed_func_call(
     call: &ast::ExprCall,
@@ -184,6 +199,11 @@ pub(super) fn allow_boolean_trap(call: &ast::ExprCall, checker: &Checker) -> boo
         {
             return true;
         }
+    }
+
+    // If the function is explicitly allowed, then the boolean trap is allowed.
+    if is_semantically_allowed_func_call(call, checker.semantic()) {
+        return true;
     }
 
     // If the call is explicitly allowed by the user, then the boolean trap is allowed.

@@ -84,11 +84,11 @@ reveal_type(Baz.__supertype__)  # revealed: type | NewType
 ```py
 from collections.abc import Callable
 from typing_extensions import NewType
-from ty_extensions import CallableTypeOf
+from ty_extensions import RegularCallableTypeOf
 
 Foo = NewType("Foo", int)
 
-def _(obj: CallableTypeOf[Foo]):
+def _(obj: RegularCallableTypeOf[Foo]):
     reveal_type(obj)  # revealed: (int, /) -> Foo
 
 def f(_: Callable[[int], Foo]): ...
@@ -105,15 +105,15 @@ g(Foo)  # error: [invalid-argument-type]
 
 ```py
 from typing import NewType, Callable, Any
-from ty_extensions import CallableTypeOf
+from ty_extensions import RegularCallableTypeOf
 
 N = NewType("N", int)
 i = N(42)
 
 y: Callable[..., Any] = i  # error: [invalid-assignment] "Object of type `N` is not assignable to `(...) -> Any`"
 
-# error: [invalid-type-form] "Expected the first argument to `ty_extensions.CallableTypeOf` to be a callable object, but got an object of type `N`"
-def f(x: CallableTypeOf[i]):
+# error: [invalid-type-form] "Expected the first argument to `ty_extensions.RegularCallableTypeOf` to be a callable object, but got an object of type `N`"
+def f(x: RegularCallableTypeOf[i]):
     reveal_type(x)  # revealed: Unknown
 
 class SomethingCallable:
@@ -125,7 +125,7 @@ j = N2(SomethingCallable())
 
 z: Callable[[str], bytes] = j  # fine
 
-def g(x: CallableTypeOf[j]):
+def g(x: RegularCallableTypeOf[j]):
     reveal_type(x)  # revealed: (a: str) -> bytes
 ```
 
@@ -263,6 +263,20 @@ static_assert(is_assignable_to(Bar, int | float | complex | None))
 static_assert(is_assignable_to(Bar, Bar | None))
 ```
 
+`NewType`s can be arbitrarily deeply nested. Check the same properties on a doubly nested example:
+
+```py
+FooFoo = NewType("FooFoo", Foo)
+reveal_type(FooFoo(Foo(3.14)).__class__)  # revealed: type[int | float]
+reveal_type(FooFoo(Foo(42)).__class__)  # revealed: type[int | float]
+static_assert(is_assignable_to(FooFoo, float))
+static_assert(is_assignable_to(FooFoo, Foo))
+static_assert(is_assignable_to(FooFoo, int | float))
+static_assert(is_assignable_to(FooFoo, int | float | None))
+static_assert(is_assignable_to(FooFoo, FooFoo | None))
+static_assert(is_assignable_to(FooFoo, Foo | None))
+```
+
 We don't currently try to distinguish between an implicit union (e.g. `float`) and the equivalent
 explicit union (e.g. `int | float`), so these two explicit unions are also allowed. But again, most
 unions are not allowed:
@@ -299,6 +313,10 @@ reveal_type(Foo(3.14) < Foo(42))  # revealed: bool
 reveal_type(Foo(3.14) == Foo(42))  # revealed: bool
 reveal_type(Foo(3.14) + Foo(42))  # revealed: int | float
 reveal_type(Foo(3.14) / Foo(42))  # revealed: int | float
+reveal_type(FooFoo(Foo(3.14)) < FooFoo(Foo(42)))  # revealed: bool
+reveal_type(FooFoo(Foo(3.14)) == FooFoo(Foo(42)))  # revealed: bool
+reveal_type(FooFoo(Foo(3.14)) + FooFoo(Foo(42)))  # revealed: int | float
+reveal_type(FooFoo(Foo(3.14)) / FooFoo(Foo(42)))  # revealed: int | float
 ```
 
 But again as above, we can't _always_ lower `Foo` to `int | float`, because there are also binary
@@ -332,6 +350,68 @@ Bing() + 3.14  # error: [unsupported-operator]
 3.14 < Bing()  # error: [unsupported-operator]
 Bing() < 3.14  # error: [unsupported-operator]
 3.14 in Bing()  # error: [unsupported-operator]
+```
+
+`Unknown` should still propagate through these operations.
+
+```py
+from typing import NewType
+from doesnotexist import unknown  # error: [unresolved-import]
+
+MyFloat = NewType("MyFloat", float)
+
+reveal_type(unknown)  # revealed: Unknown
+reveal_type(1.0 * unknown)  # revealed: Unknown
+reveal_type(MyFloat(1.0) * unknown)  # revealed: Unknown
+reveal_type(unknown * MyFloat(1.0))  # revealed: Unknown
+```
+
+Unary operations take a different codepath and need their own test cases:
+
+```py
+reveal_type(-Foo(3.14))  # revealed: int | float
+reveal_type(+Foo(3.14))  # revealed: int | float
+~Foo(3.14)  # error: [unsupported-operator]
+reveal_type(not Foo(3.14))  # revealed: bool
+reveal_type(-Bar(1 + 2j))  # revealed: int | float | complex
+reveal_type(+Bar(1 + 2j))  # revealed: int | float | complex
+~Bar(1 + 2j)  # error: [unsupported-operator]
+reveal_type(not Bar(1 + 2j))  # revealed: bool
+reveal_type(-FooFoo(Foo(3.14)))  # revealed: int | float
+reveal_type(+FooFoo(Foo(3.14)))  # revealed: int | float
+~FooFoo(Foo(3.14))  # error: [unsupported-operator]
+reveal_type(not FooFoo(Foo(3.14)))  # revealed: bool
+
+class Unary:
+    # __pos__ is deliberately left out, giving an error below.
+    def __neg__(self) -> str:
+        return "negated"
+
+    def __invert__(self) -> list[int]:
+        return [1, 2, 3]
+
+UnaryNT = NewType("UnaryNT", Unary)
+
+reveal_type(-UnaryNT(Unary()))  # revealed: str
++UnaryNT(Unary())  # error: [unsupported-operator]
+reveal_type(~UnaryNT(Unary()))  # revealed: list[int]
+reveal_type(not UnaryNT(Unary()))  # revealed: bool
+```
+
+Make sure we handle the case where a `NewType` of `float` or `complex` participates in a larger
+union:
+
+```py
+def _(x: Foo | float, y: Bar | complex):
+    reveal_type(-x)  # revealed: int | float
+    reveal_type(+x)  # revealed: int | float
+    ~x  # error: [unsupported-operator]
+    reveal_type(not x)  # revealed: bool
+
+    reveal_type(-y)  # revealed: int | float | complex
+    reveal_type(+y)  # revealed: int | float | complex
+    ~y  # error: [unsupported-operator]
+    reveal_type(not y)  # revealed: bool
 ```
 
 ## A `NewType` definition must be a simple variable assignment
@@ -544,7 +624,7 @@ Bar = NewType("Bar", Foo)  # error: [invalid-newtype]
 ## A `NewType` cannot be generic
 
 ```py
-from typing import Any, NewType, TypeVar
+from typing import Any, NewType, TypeVar, Generic
 
 # All of these are allowed.
 A = NewType("A", list)
@@ -557,6 +637,9 @@ C = NewType("C", list[T])  # error: [invalid-newtype]
 
 D = dict[str, T]
 E = NewType("E", D[T])  # error: [invalid-newtype]
+
+class Foo(Generic[T]):
+    N = NewType("N", list[T])  # error: [invalid-newtype]
 
 # this is fine: omitting the type argument means that this is equivalent
 # to `F = NewType("F", dict[str, Any])
@@ -592,4 +675,19 @@ f(n)  # fine
 class Invalid: ...
 
 bad = N(Invalid())  # error: [invalid-argument-type]
+```
+
+## `typing.Self` respects `NewType` subtypes
+
+```py
+from typing_extensions import NewType, Self
+
+class C:
+    def copy(self) -> Self:
+        return self
+
+NT = NewType("NT", C)
+
+x = NT(C())
+reveal_type(x.copy())  # revealed: NT
 ```

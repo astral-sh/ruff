@@ -229,9 +229,23 @@ def _(a: object, b: SupportsStr, c: Falsy, d: AlwaysFalsy, e: None, f: Foo | Non
     b.__str__()
     c.__str__()
     d.__str__()
-    # TODO: these should not error
-    e.__str__()  # error: [missing-argument]
-    f.__str__()  # error: [missing-argument]
+    e.__str__()
+    f.__str__()
+```
+
+## Method calls on subclasses of `Any`
+
+```py
+from typing_extensions import assert_type, Any
+
+class SubclassOfAny(Any):
+    def method(self) -> int:
+        return 1
+
+a = SubclassOfAny()
+assert_type(a.method(), int)
+
+assert_type(a.non_existing_method(), Any)
 ```
 
 ## Error cases: Calling `__get__` for methods
@@ -693,6 +707,32 @@ reveal_type(Derived.f(1))  # revealed: str
 reveal_type(Derived().f(1))  # revealed: str
 ```
 
+### Staticmethod assigned in class body
+
+Assigning a `staticmethod(...)` object directly in the class body should preserve the callable
+behavior of the wrapped function when accessed on both classes and instances.
+
+```py
+def foo(*args, **kwargs) -> None:
+    print("foo", args, kwargs)
+
+class A:
+    __call__ = staticmethod(foo)
+    bar = staticmethod(foo)
+
+a = A()
+a()
+a.bar()
+a(5)
+a.bar(5)
+a(x=10)
+a.bar(x=10)
+
+A.bar()
+A.bar(5)
+A.bar(x=10)
+```
+
 ### Accessing the staticmethod as a static member
 
 ```py
@@ -808,7 +848,7 @@ properties are understood correctly for these functions and methods.
 ```py
 import types
 from typing import Callable
-from ty_extensions import static_assert, CallableTypeOf, is_assignable_to, TypeOf
+from ty_extensions import static_assert, RegularCallableTypeOf, is_assignable_to, TypeOf
 
 def f(obj: type) -> None: ...
 
@@ -872,18 +912,18 @@ reveal_type("foo".startswith)
 static_assert(is_assignable_to(TypeOf["foo".startswith], Callable))
 
 def _(
-    a: CallableTypeOf[types.FunctionType.__get__],
-    b: CallableTypeOf[f],
-    c: CallableTypeOf[f.__get__],
-    d: CallableTypeOf[types.FunctionType.__call__],
-    e: CallableTypeOf[f.__call__],
-    f: CallableTypeOf[property],
-    g: CallableTypeOf[property.__get__],
-    h: CallableTypeOf[MyClass.my_property.__get__],
-    i: CallableTypeOf[property.__set__],
-    j: CallableTypeOf[MyClass.my_property.__set__],
-    k: CallableTypeOf[str.startswith],
-    l: CallableTypeOf["foo".startswith],
+    a: RegularCallableTypeOf[types.FunctionType.__get__],
+    b: RegularCallableTypeOf[f],
+    c: RegularCallableTypeOf[f.__get__],
+    d: RegularCallableTypeOf[types.FunctionType.__call__],
+    e: RegularCallableTypeOf[f.__call__],
+    f: RegularCallableTypeOf[property],
+    g: RegularCallableTypeOf[property.__get__],
+    h: RegularCallableTypeOf[MyClass.my_property.__get__],
+    i: RegularCallableTypeOf[property.__set__],
+    j: RegularCallableTypeOf[MyClass.my_property.__set__],
+    k: RegularCallableTypeOf[str.startswith],
+    l: RegularCallableTypeOf["foo".startswith],
 ):
     # revealed: Overload[(self: FunctionType, instance: None, owner: type, /) -> Unknown, (self: FunctionType, instance: object, owner: type | None = None, /) -> Unknown]
     reveal_type(a)

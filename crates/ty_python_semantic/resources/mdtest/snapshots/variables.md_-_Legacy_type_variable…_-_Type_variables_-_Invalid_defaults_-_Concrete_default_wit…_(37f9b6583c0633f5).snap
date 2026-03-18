@@ -1,0 +1,40 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: variables.md - Legacy type variables - Type variables - Invalid defaults - Concrete default with a bound
+mdtest path: crates/ty_python_semantic/resources/mdtest/generics/legacy/variables.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | from typing import TypeVar
+2 | 
+3 | # error: [invalid-type-variable-default] "TypeVar default is not assignable to the TypeVar's upper bound"
+4 | T = TypeVar("T", bound=str, default=int)
+5 | 
+6 | S = TypeVar("S", bound=float, default=int)
+```
+
+# Diagnostics
+
+```
+error[invalid-type-variable-default]: TypeVar default is not assignable to the TypeVar's upper bound
+ --> src/mdtest_snippet.py:4:24
+  |
+3 | # error: [invalid-type-variable-default] "TypeVar default is not assignable to the TypeVar's upper bound"
+4 | T = TypeVar("T", bound=str, default=int)
+  |                        ---          ^^^ Default of `T`
+  |                        |
+  |                        Upper bound of `T`
+5 |
+6 | S = TypeVar("S", bound=float, default=int)
+  |
+info: rule `invalid-type-variable-default` is enabled by default
+
+```

@@ -1,0 +1,102 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+--- Linter settings ---
+-linter.unresolved_target_version = 3.12
++linter.unresolved_target_version = 3.11
+
+--- Summary ---
+Removed: 4
+Added: 0
+
+--- Removed ---
+RUF027 [*] Possible f-string without an `f` prefix
+  --> RUF027_0.py:41:22
+   |
+39 |       single_line = """ {a} """  # RUF027
+40 |       # RUF027
+41 |       multi_line = a = """b { # comment
+   |  ______________________^
+42 | |     c}  d
+43 | |     """
+   | |_______^
+   |
+help: Add `f` prefix
+38 |     c = a
+39 |     single_line = """ {a} """  # RUF027
+40 |     # RUF027
+   -     multi_line = a = """b { # comment
+41 +     multi_line = a = f"""b { # comment
+42 |     c}  d
+43 |     """
+44 | 
+note: This is an unsafe fix and may change runtime behavior
+
+
+RUF027 [*] Possible f-string without an `f` prefix
+  --> RUF027_0.py:49:9
+   |
+47 |       a = 4
+48 |       # RUF027
+49 |       b = " {\
+   |  _________^
+50 | |     a} \
+51 | |     "
+   | |_____^
+   |
+help: Add `f` prefix
+46 | def single_quoted_multi_line():
+47 |     a = 4
+48 |     # RUF027
+   -     b = " {\
+49 +     b = f" {\
+50 |     a} \
+51 |     "
+52 | 
+note: This is an unsafe fix and may change runtime behavior
+
+
+RUF027 [*] Possible f-string without an `f` prefix
+  --> RUF027_0.py:92:11
+   |
+90 | def backslash_test():
+91 |     x = "test"
+92 |     print("Hello {'\\n'}{x}")  # Should not trigger RUF027 for Python < 3.12
+   |           ^^^^^^^^^^^^^^^^^^
+93 |
+94 | # Test case for comment handling in f-string interpolations
+   |
+help: Add `f` prefix
+89 | # Should not trigger RUF027 for Python < 3.12 due to backslashes in interpolations
+90 | def backslash_test():
+91 |     x = "test"
+   -     print("Hello {'\\n'}{x}")  # Should not trigger RUF027 for Python < 3.12
+92 +     print(f"Hello {'\\n'}{x}")  # Should not trigger RUF027 for Python < 3.12
+93 | 
+94 | # Test case for comment handling in f-string interpolations
+95 | # Should not trigger RUF027 for Python < 3.12 due to comments in interpolations
+note: This is an unsafe fix and may change runtime behavior
+
+
+RUF027 [*] Possible f-string without an `f` prefix
+   --> RUF027_0.py:98:11
+    |
+ 96 |   def comment_test():
+ 97 |       x = "!"
+ 98 |       print("""{x  # }
+    |  ___________^
+ 99 | | }""")
+    | |____^
+100 |
+101 |   # Test case for `#` inside a nested string literal in interpolation
+    |
+help: Add `f` prefix
+95  | # Should not trigger RUF027 for Python < 3.12 due to comments in interpolations
+96  | def comment_test():
+97  |     x = "!"
+    -     print("""{x  # }
+98  +     print(f"""{x  # }
+99  | }""")
+100 | 
+101 | # Test case for `#` inside a nested string literal in interpolation
+note: This is an unsafe fix and may change runtime behavior

@@ -4,13 +4,12 @@ use ruff_text_size::Ranged;
 
 use crate::builders::parenthesize_if_expands;
 use crate::comments::{SourceComment, dangling_comments, leading_comments, trailing_comments};
+use crate::expression::has_own_parentheses;
 use crate::expression::parentheses::{
     NeedsParentheses, OptionalParentheses, Parentheses, is_expression_parenthesized,
 };
-use crate::expression::{CallChainLayout, has_own_parentheses};
 use crate::other::parameters::ParametersParentheses;
 use crate::prelude::*;
-use crate::preview::is_parenthesize_lambda_bodies_enabled;
 
 #[derive(Default)]
 pub struct FormatExprLambda {
@@ -31,7 +30,6 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
 
         let comments = f.context().comments().clone();
         let dangling = comments.dangling(item);
-        let preview = is_parenthesize_lambda_bodies_enabled(f.context());
 
         write!(f, [token("lambda")])?;
 
@@ -108,7 +106,7 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
             }
 
             // Try to keep the parameters on a single line, unless there are intervening comments.
-            if preview && !comments.contains_comments(parameters.into()) {
+            if !comments.contains_comments(parameters.into()) {
                 let mut buffer = RemoveSoftLinesBuffer::new(f);
                 write!(
                     buffer,
@@ -134,17 +132,12 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
 
         if dangling_header_comments.is_empty() {
             write!(f, [space()])?;
-        } else if !preview {
-            write!(f, [dangling_comments(dangling_header_comments)])?;
-        }
-
-        if !preview {
-            return body.format().fmt(f);
         }
 
         let fmt_body = FormatBody {
             body,
             dangling_header_comments,
+            needs_parentheses: body.needs_parentheses(item.into(), f.context()),
         };
 
         match self.layout {
@@ -262,13 +255,16 @@ struct FormatBody<'a> {
     /// )
     /// ```
     dangling_header_comments: &'a [SourceComment],
+    needs_parentheses: OptionalParentheses,
 }
 
 impl Format<PyFormatContext<'_>> for FormatBody<'_> {
+    #[expect(clippy::if_same_then_else)]
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
         let FormatBody {
             dangling_header_comments,
             body,
+            needs_parentheses,
         } = self;
 
         let body = *body;
@@ -363,6 +359,24 @@ impl Format<PyFormatContext<'_>> for FormatBody<'_> {
         else if body_comments.has_leading() || body_comments.has_trailing_own_line() {
             body.format().with_options(Parentheses::Always).fmt(f)
         }
+        // Include parentheses for cases that always require them, such as named expressions:
+        //
+        // ```py
+        // lambda x: (y := x + 1)
+        // ```
+        else if matches!(needs_parentheses, OptionalParentheses::Always) {
+            body.format().with_options(Parentheses::Always).fmt(f)
+        }
+        // Use `parenthesize_if_expands` for cases that require parentheses when broken over
+        // multiple lines, including some calls and subscripts:
+        //
+        // ```py
+        // lambda x: "implicitly" "concatenated {x}".format(x)
+        // lambda x: "implicitly" "concatenated {x}"[x]
+        // ```
+        else if matches!(needs_parentheses, OptionalParentheses::Multiline) {
+            parenthesize_if_expands(&body.format().with_options(Parentheses::Never)).fmt(f)
+        }
         // Calls and subscripts require special formatting because they have their own
         // parentheses, but they can also have an arbitrary amount of text before the
         // opening parenthesis. We want to avoid cases where we keep a long callable on the
@@ -392,31 +406,20 @@ impl Format<PyFormatContext<'_>> for FormatBody<'_> {
         // )
         // ```
         else if matches!(body, Expr::Call(_) | Expr::Subscript(_)) {
-            let unparenthesized = body.format().with_options(Parentheses::Never);
-            if CallChainLayout::from_expression(
-                body.into(),
-                comments.ranges(),
-                f.context().source(),
-            )
-            .is_fluent()
-            {
-                parenthesize_if_expands(&unparenthesized).fmt(f)
-            } else {
-                let unparenthesized = unparenthesized.memoized();
-                if unparenthesized.inspect(f)?.will_break() {
-                    expand_parent().fmt(f)?;
-                }
-
-                best_fitting![
-                    // body all flat
-                    unparenthesized,
-                    // body expanded
-                    group(&unparenthesized).should_expand(true),
-                    // parenthesized
-                    format_args![token("("), block_indent(&unparenthesized), token(")")]
-                ]
-                .fmt(f)
+            let unparenthesized = body.format().with_options(Parentheses::Never).memoized();
+            if unparenthesized.inspect(f)?.will_break() {
+                expand_parent().fmt(f)?;
             }
+
+            best_fitting![
+                // body all flat
+                unparenthesized,
+                // body expanded
+                group(&unparenthesized).should_expand(true),
+                // parenthesized
+                format_args![token("("), block_indent(&unparenthesized), token(")")]
+            ]
+            .fmt(f)
         }
         // For other cases with their own parentheses, such as lists, sets, dicts, tuples,
         // etc., we can just format the body directly. Their own formatting results in the

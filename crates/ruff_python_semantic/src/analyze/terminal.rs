@@ -1,4 +1,7 @@
+use ruff_python_ast::helpers::map_callable;
 use ruff_python_ast::{self as ast, ExceptHandler, Stmt};
+
+use crate::model::SemanticModel;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Terminal {
@@ -8,6 +11,8 @@ pub enum Terminal {
     Implicit,
     /// Every path through the function ends with a `raise` statement.
     Raise,
+    /// Every path through the function ends with a `raise NotImplementedError` statement.
+    RaiseNotImplemented,
     /// No path through the function ends with a `return` statement.
     Return,
     /// Every path through the function ends with a `return` or `raise` statement.
@@ -18,8 +23,8 @@ pub enum Terminal {
 
 impl Terminal {
     /// Returns the [`Terminal`] behavior of the function, if it can be determined.
-    pub fn from_function(function: &ast::StmtFunctionDef) -> Terminal {
-        Self::from_body(&function.body)
+    pub fn from_function(function: &ast::StmtFunctionDef, semantic: &SemanticModel) -> Terminal {
+        Self::from_body(&function.body, semantic)
     }
 
     /// Returns `true` if the [`Terminal`] behavior includes at least one `return` path.
@@ -35,8 +40,13 @@ impl Terminal {
         matches!(self, Self::None | Self::Implicit | Self::ConditionalReturn)
     }
 
+    /// Returns `true` if the [`Terminal`] behavior is `Raise` or `RaiseNotImplemented`.
+    pub fn is_always_raise(self) -> bool {
+        matches!(self, Self::Raise | Self::RaiseNotImplemented)
+    }
+
     /// Returns the [`Terminal`] behavior of the body, if it can be determined.
-    fn from_body(stmts: &[Stmt]) -> Terminal {
+    fn from_body(stmts: &[Stmt], semantic: &SemanticModel) -> Terminal {
         let mut terminal = Terminal::None;
 
         for stmt in stmts {
@@ -47,10 +57,10 @@ impl Terminal {
                         continue;
                     }
 
-                    terminal = terminal.and_then(Self::from_body(body));
+                    terminal = terminal.and_then(Self::from_body(body, semantic));
 
-                    if !sometimes_breaks(body) {
-                        terminal = terminal.and_then(Self::from_body(orelse));
+                    if !sometimes_breaks(body, semantic) {
+                        terminal = terminal.and_then(Self::from_body(orelse, semantic));
                     }
                 }
                 Stmt::If(ast::StmtIf {
@@ -59,10 +69,10 @@ impl Terminal {
                     ..
                 }) => {
                     let branch_terminal = Terminal::branches(
-                        std::iter::once(Self::from_body(body)).chain(
+                        std::iter::once(Self::from_body(body, semantic)).chain(
                             elif_else_clauses
                                 .iter()
-                                .map(|clause| Self::from_body(&clause.body)),
+                                .map(|clause| Self::from_body(&clause.body, semantic)),
                         ),
                     );
 
@@ -79,7 +89,9 @@ impl Terminal {
                 }
                 Stmt::Match(ast::StmtMatch { cases, .. }) => {
                     let branch_terminal = terminal.and_then(Terminal::branches(
-                        cases.iter().map(|case| Self::from_body(&case.body)),
+                        cases
+                            .iter()
+                            .map(|case| Self::from_body(&case.body, semantic)),
                     ));
 
                     // If the `match` is known to be exhaustive (by way of including a wildcard
@@ -106,21 +118,21 @@ impl Terminal {
                     // that _any_ statement in the body could raise an exception, so we don't
                     // consider the body to be exhaustive. In other words, we assume the exception
                     // handlers exist for a reason.
-                    let body_terminal = Self::from_body(body);
+                    let body_terminal = Self::from_body(body, semantic);
                     if body_terminal.has_any_return() {
                         terminal = terminal.and_then(Terminal::ConditionalReturn);
                     }
 
                     // If the `finally` block returns, the `try` block must also return. (Similarly,
                     // if the `finally` block raises, the `try` block must also raise.)
-                    terminal = terminal.and_then(Self::from_body(finalbody));
+                    terminal = terminal.and_then(Self::from_body(finalbody, semantic));
 
                     let branch_terminal = Terminal::branches(handlers.iter().map(|handler| {
                         let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
                             body,
                             ..
                         }) = handler;
-                        Self::from_body(body)
+                        Self::from_body(body, semantic)
                     }));
 
                     if orelse.is_empty() {
@@ -132,18 +144,29 @@ impl Terminal {
                     } else {
                         // If there's an `else`, we won't fall through. If all the handlers and
                         // the `else` block return,, the `try` block also returns.
-                        terminal =
-                            terminal.and_then(branch_terminal.branch(Terminal::from_body(orelse)));
+                        terminal = terminal.and_then(
+                            branch_terminal.branch(Terminal::from_body(orelse, semantic)),
+                        );
                     }
                 }
                 Stmt::With(ast::StmtWith { body, .. }) => {
-                    terminal = terminal.and_then(Self::from_body(body));
+                    terminal = terminal.and_then(Self::from_body(body, semantic));
                 }
                 Stmt::Return(_) => {
                     terminal = terminal.and_then(Terminal::RaiseOrReturn);
                 }
-                Stmt::Raise(_) => {
-                    terminal = terminal.and_then(Terminal::Raise);
+                Stmt::Raise(raise) => {
+                    // Check if this raise is NotImplementedError
+                    let is_not_implemented = raise.exc.as_ref().is_some_and(|exc| {
+                        let exc = map_callable(exc);
+                        semantic.match_builtin_expr(exc, "NotImplementedError")
+                    });
+
+                    if is_not_implemented {
+                        terminal = terminal.and_then(Terminal::RaiseNotImplemented);
+                    } else {
+                        terminal = terminal.and_then(Terminal::Raise);
+                    }
                 }
                 _ => {}
             }
@@ -169,10 +192,14 @@ impl Terminal {
             // If both operators are conditional returns, the result is a conditional return.
             (Self::ConditionalReturn, Self::ConditionalReturn) => Self::ConditionalReturn,
 
-            // If one of the operators is `Raise`, then the function ends with an explicit `raise`
-            // or `return` statement.
-            (Self::Raise, Self::ConditionalReturn) => Self::RaiseOrReturn,
-            (Self::ConditionalReturn, Self::Raise) => Self::RaiseOrReturn,
+            // If one of the operators is `Raise` or `RaiseNotImplemented`, then the function ends
+            // with an explicit `raise` or `return` statement.
+            (Self::Raise | Self::RaiseNotImplemented, Self::ConditionalReturn) => {
+                Self::RaiseOrReturn
+            }
+            (Self::ConditionalReturn, Self::Raise | Self::RaiseNotImplemented) => {
+                Self::RaiseOrReturn
+            }
 
             // If one of the operators is `Return`, then the function returns.
             (Self::Return, Self::ConditionalReturn) => Self::Return,
@@ -180,15 +207,21 @@ impl Terminal {
 
             // All paths through the function end with a `raise` statement.
             (Self::Raise, Self::Raise) => Self::Raise,
+            // All paths through the function end with a `raise NotImplementedError` statement.
+            (Self::RaiseNotImplemented, Self::RaiseNotImplemented) => Self::RaiseNotImplemented,
+            // Mixed raises: if one is NotImplementedError and one is regular Raise, result is Raise
+            (Self::RaiseNotImplemented, Self::Raise) | (Self::Raise, Self::RaiseNotImplemented) => {
+                Self::Raise
+            }
 
             // All paths through the function end with a `return` statement.
             (Self::Return, Self::Return) => Self::Return,
 
             // All paths through the function end with a `return` or `raise` statement.
-            (Self::Raise, Self::Return) => Self::RaiseOrReturn,
+            (Self::Raise | Self::RaiseNotImplemented, Self::Return) => Self::RaiseOrReturn,
 
             // All paths through the function end with a `return` or `raise` statement.
-            (Self::Return, Self::Raise) => Self::RaiseOrReturn,
+            (Self::Return, Self::Raise | Self::RaiseNotImplemented) => Self::RaiseOrReturn,
 
             // All paths through the function end with a `return` or `raise` statement.
             (Self::RaiseOrReturn, _) => Self::RaiseOrReturn,
@@ -205,8 +238,8 @@ impl Terminal {
 
             // If one of the operators is `Implicit`, the other operator should be downgraded.
             (Self::Implicit, Self::Implicit) => Self::Implicit,
-            (Self::Implicit, Self::Raise) => Self::Implicit,
-            (Self::Raise, Self::Implicit) => Self::Implicit,
+            (Self::Implicit, Self::Raise | Self::RaiseNotImplemented) => Self::Implicit,
+            (Self::Raise | Self::RaiseNotImplemented, Self::Implicit) => Self::Implicit,
             (Self::Implicit, Self::Return) => Self::ConditionalReturn,
             (Self::Return, Self::Implicit) => Self::ConditionalReturn,
             (Self::Implicit, Self::RaiseOrReturn) => Self::ConditionalReturn,
@@ -217,20 +250,30 @@ impl Terminal {
             // If both operators are conditional returns, the result is a conditional return.
             (Self::ConditionalReturn, Self::ConditionalReturn) => Self::ConditionalReturn,
 
-            (Self::Raise, Self::ConditionalReturn) => Self::RaiseOrReturn,
-            (Self::ConditionalReturn, Self::Raise) => Self::RaiseOrReturn,
+            (Self::Raise | Self::RaiseNotImplemented, Self::ConditionalReturn) => {
+                Self::RaiseOrReturn
+            }
+            (Self::ConditionalReturn, Self::Raise | Self::RaiseNotImplemented) => {
+                Self::RaiseOrReturn
+            }
 
             (Self::Return, Self::ConditionalReturn) => Self::Return,
             (Self::ConditionalReturn, Self::Return) => Self::Return,
 
             // All paths through the function end with a `raise` statement.
             (Self::Raise, Self::Raise) => Self::Raise,
+            // All paths through the function end with a `raise NotImplementedError` statement.
+            (Self::RaiseNotImplemented, Self::RaiseNotImplemented) => Self::RaiseNotImplemented,
+            // Mixed raises: if one is NotImplementedError and one is regular Raise, result is Raise
+            (Self::RaiseNotImplemented, Self::Raise) | (Self::Raise, Self::RaiseNotImplemented) => {
+                Self::Raise
+            }
             // All paths through the function end with a `return` statement.
             (Self::Return, Self::Return) => Self::Return,
             // All paths through the function end with a `return` or `raise` statement.
-            (Self::Raise, Self::Return) => Self::RaiseOrReturn,
+            (Self::Raise | Self::RaiseNotImplemented, Self::Return) => Self::RaiseOrReturn,
             // All paths through the function end with a `return` or `raise` statement.
-            (Self::Return, Self::Raise) => Self::RaiseOrReturn,
+            (Self::Return, Self::Raise | Self::RaiseNotImplemented) => Self::RaiseOrReturn,
             // All paths through the function end with a `return` or `raise` statement.
             (Self::RaiseOrReturn, _) => Self::RaiseOrReturn,
             (_, Self::RaiseOrReturn) => Self::RaiseOrReturn,
@@ -244,22 +287,22 @@ impl Terminal {
 }
 
 /// Returns `true` if the body may break via a `break` statement.
-fn sometimes_breaks(stmts: &[Stmt]) -> bool {
+fn sometimes_breaks(stmts: &[Stmt], semantic: &SemanticModel) -> bool {
     for stmt in stmts {
         match stmt {
             Stmt::For(ast::StmtFor { body, orelse, .. }) => {
-                if Terminal::from_body(body).has_any_return() {
+                if Terminal::from_body(body, semantic).has_any_return() {
                     return false;
                 }
-                if sometimes_breaks(orelse) {
+                if sometimes_breaks(orelse, semantic) {
                     return true;
                 }
             }
             Stmt::While(ast::StmtWhile { body, orelse, .. }) => {
-                if Terminal::from_body(body).has_any_return() {
+                if Terminal::from_body(body, semantic).has_any_return() {
                     return false;
                 }
-                if sometimes_breaks(orelse) {
+                if sometimes_breaks(orelse, semantic) {
                     return true;
                 }
             }
@@ -270,13 +313,16 @@ fn sometimes_breaks(stmts: &[Stmt]) -> bool {
             }) => {
                 if std::iter::once(body)
                     .chain(elif_else_clauses.iter().map(|clause| &clause.body))
-                    .any(|body| sometimes_breaks(body))
+                    .any(|body| sometimes_breaks(body, semantic))
                 {
                     return true;
                 }
             }
             Stmt::Match(ast::StmtMatch { cases, .. }) => {
-                if cases.iter().any(|case| sometimes_breaks(&case.body)) {
+                if cases
+                    .iter()
+                    .any(|case| sometimes_breaks(&case.body, semantic))
+                {
                     return true;
                 }
             }
@@ -287,22 +333,22 @@ fn sometimes_breaks(stmts: &[Stmt]) -> bool {
                 finalbody,
                 ..
             }) => {
-                if sometimes_breaks(body)
+                if sometimes_breaks(body, semantic)
                     || handlers.iter().any(|handler| {
                         let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
                             body,
                             ..
                         }) = handler;
-                        sometimes_breaks(body)
+                        sometimes_breaks(body, semantic)
                     })
-                    || sometimes_breaks(orelse)
-                    || sometimes_breaks(finalbody)
+                    || sometimes_breaks(orelse, semantic)
+                    || sometimes_breaks(finalbody, semantic)
                 {
                     return true;
                 }
             }
             Stmt::With(ast::StmtWith { body, .. }) => {
-                if sometimes_breaks(body) {
+                if sometimes_breaks(body, semantic) {
                     return true;
                 }
             }

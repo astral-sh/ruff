@@ -383,3 +383,50 @@ fn cell_to_lsp_cell(
         lsp_types::TextDocumentItem::new(cell_uri, "python".to_string(), 1, contents),
     ))
 }
+
+/// Test that notebook documents opened via `notebookDocument/didOpen` are recognized
+/// as notebooks regardless of file extension.
+///
+/// See: <https://github.com/astral-sh/ruff/issues/22809>
+#[test]
+fn notebook_without_ipynb_extension() {
+    let file_path =
+        std::fs::canonicalize(PathBuf::from_str(SUPER_RESOLUTION_OVERVIEW_PATH).unwrap()).unwrap();
+
+    // Use a .py URL instead of .ipynb to simulate a non-ipynb notebook (like marimo)
+    let workspace_dir = file_path.parent().unwrap();
+    let py_url = lsp_types::Url::from_file_path(workspace_dir.join("notebook.py")).unwrap();
+
+    let notebook = create_notebook(&file_path).unwrap();
+
+    let (main_loop_sender, _main_loop_receiver) = crossbeam::channel::unbounded();
+    let (client_sender, _client_receiver) = crossbeam::channel::unbounded();
+
+    let client = Client::new(main_loop_sender, client_sender);
+
+    let options = GlobalOptions::default();
+    let global = options.into_settings(client.clone());
+
+    let mut session = ruff_server::Session::new(
+        &ClientCapabilities::default(),
+        ruff_server::PositionEncoding::UTF16,
+        global,
+        &Workspaces::new(vec![
+            Workspace::new(lsp_types::Url::from_file_path(workspace_dir).unwrap())
+                .with_options(ClientOptions::default()),
+        ]),
+        &client,
+    )
+    .unwrap();
+
+    // Simulate notebookDocument/didOpen
+    session.open_notebook_document(py_url.clone(), notebook);
+
+    // key_from_url should return Notebook, not Text, because the document
+    // was opened as a notebook via notebookDocument/didOpen
+    let key = session.key_from_url(py_url);
+    assert!(
+        matches!(key, ruff_server::DocumentKey::Notebook(_)),
+        "Expected DocumentKey::Notebook for .py file opened as notebook, got {key:?}"
+    );
+}

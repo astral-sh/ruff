@@ -1,0 +1,258 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: function.md - Call expression - PEP-484 convention for positional-only parameters
+mdtest path: crates/ty_python_semantic/resources/mdtest/call/function.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | def f(__x: int): ...
+ 2 | 
+ 3 | f(1)
+ 4 | # error: [positional-only-parameter-as-kwarg]
+ 5 | f(__x=1)
+ 6 | from typing import overload
+ 7 | 
+ 8 | # error: [invalid-legacy-positional-parameter]
+ 9 | def g(x: int, __y: str): ...
+10 | 
+11 | g(x=1, __y="foo")
+12 | 
+13 | # The earlier `g` definition is shadowed here,
+14 | # but we still emit a diagnostic on the earlier definition
+15 | def g(): ...
+16 | import tkinter
+17 | from typing import Callable, TypeVar, Any
+18 | 
+19 | @overload
+20 | def g2(x: int, __y: str): ...  # error: [invalid-legacy-positional-parameter]
+21 | @overload
+22 | def g2(x: str, __y: int): ...  # error: [invalid-legacy-positional-parameter]
+23 | def g2(x: str | int, __y: int | str): ...  # error: [invalid-legacy-positional-parameter]
+24 | 
+25 | T = TypeVar("T")
+26 | 
+27 | def copy_type(f: T) -> Callable[[Any], T]:
+28 |     return lambda x: x
+29 | 
+30 | # Naively iterating over the overloads using `.iter_overloads_and_implementation()` and/or
+31 | # using `.signature()` would cause us to panic on this function, because the overloads
+32 | # of this function's public signature are defined in `stdlib/tkinter/__init__.pyi` due to
+33 | # the decorator.
+34 | @copy_type(tkinter.Text.__init__)
+35 | def g3(x, *args: Any, **kwargs: Any) -> None: ...
+36 | def new_signature(): ...
+37 | 
+38 | # The check is able to "see through" the decorators and examines the original function's
+39 | # signature:
+40 | @copy_type(new_signature)
+41 | def g4(a, __b): ...  # error: [invalid-legacy-positional-parameter]
+42 | def h(__x__: str): ...
+43 | 
+44 | h(__x__="foo")
+45 | def i(x: str, /, __y: int): ...
+46 | 
+47 | i("foo", __y=42)  # fine
+48 | class C:
+49 |     def method(self, __x: int): ...
+50 |     @classmethod
+51 |     def class_method(cls, __x: str): ...
+52 |     # (the name of the first parameter is irrelevant;
+53 |     # a staticmethod works the same as a free function in the global scope)
+54 |     @staticmethod
+55 |     def static_method(self, __x: int): ...  # error: [invalid-legacy-positional-parameter]
+56 |     # `__new__` is a staticmethod, but the `cls` parameter works in the same way as the `cls`
+57 |     # parameter in a classmethod, and is always passed positionally at runtime,
+58 |     # We therefore understand both `cls` and `__x` here as positional-only; we do not
+59 |     # emit `[invalid-legacy-positional-parameter]` on the method.
+60 |     def __new__(cls, __x: int): ...
+61 | 
+62 | # error: [positional-only-parameter-as-kwarg]
+63 | C(42).method(__x=1)
+64 | # error: [positional-only-parameter-as-kwarg]
+65 | C.class_method(__x="1")
+66 | C.static_method("x", __x=42)  # fine
+```
+
+# Diagnostics
+
+```
+error[positional-only-parameter-as-kwarg]: Positional-only parameter 1 (`__x`) passed as keyword argument of function `f`
+ --> src/mdtest_snippet.py:5:3
+  |
+3 | f(1)
+4 | # error: [positional-only-parameter-as-kwarg]
+5 | f(__x=1)
+  |   ^^^^^
+6 | from typing import overload
+  |
+info: Function signature here
+ --> src/mdtest_snippet.py:1:5
+  |
+1 | def f(__x: int): ...
+  |     ^^^^^^^^^^^
+2 |
+3 | f(1)
+  |
+info: rule `positional-only-parameter-as-kwarg` is enabled by default
+
+```
+
+```
+warning[invalid-legacy-positional-parameter]: Invalid use of the legacy convention for positional-only parameters
+  --> src/mdtest_snippet.py:9:7
+   |
+ 8 | # error: [invalid-legacy-positional-parameter]
+ 9 | def g(x: int, __y: str): ...
+   |       -       ^^^ Parameter name begins with `__` but will not be treated as positional-only
+   |       |
+   |       Prior parameter here was positional-or-keyword
+10 |
+11 | g(x=1, __y="foo")
+   |
+info: A parameter can only be positional-only if it precedes all positional-or-keyword parameters
+info: rule `invalid-legacy-positional-parameter` is enabled by default
+
+```
+
+```
+warning[invalid-legacy-positional-parameter]: Invalid use of the legacy convention for positional-only parameters
+  --> src/mdtest_snippet.py:20:8
+   |
+19 | @overload
+20 | def g2(x: int, __y: str): ...  # error: [invalid-legacy-positional-parameter]
+   |        -       ^^^ Parameter name begins with `__` but will not be treated as positional-only
+   |        |
+   |        Prior parameter here was positional-or-keyword
+21 | @overload
+22 | def g2(x: str, __y: int): ...  # error: [invalid-legacy-positional-parameter]
+   |
+info: A parameter can only be positional-only if it precedes all positional-or-keyword parameters
+info: rule `invalid-legacy-positional-parameter` is enabled by default
+
+```
+
+```
+warning[invalid-legacy-positional-parameter]: Invalid use of the legacy convention for positional-only parameters
+  --> src/mdtest_snippet.py:22:8
+   |
+20 | def g2(x: int, __y: str): ...  # error: [invalid-legacy-positional-parameter]
+21 | @overload
+22 | def g2(x: str, __y: int): ...  # error: [invalid-legacy-positional-parameter]
+   |        -       ^^^ Parameter name begins with `__` but will not be treated as positional-only
+   |        |
+   |        Prior parameter here was positional-or-keyword
+23 | def g2(x: str | int, __y: int | str): ...  # error: [invalid-legacy-positional-parameter]
+   |
+info: A parameter can only be positional-only if it precedes all positional-or-keyword parameters
+info: rule `invalid-legacy-positional-parameter` is enabled by default
+
+```
+
+```
+warning[invalid-legacy-positional-parameter]: Invalid use of the legacy convention for positional-only parameters
+  --> src/mdtest_snippet.py:23:8
+   |
+21 | @overload
+22 | def g2(x: str, __y: int): ...  # error: [invalid-legacy-positional-parameter]
+23 | def g2(x: str | int, __y: int | str): ...  # error: [invalid-legacy-positional-parameter]
+   |        -             ^^^ Parameter name begins with `__` but will not be treated as positional-only
+   |        |
+   |        Prior parameter here was positional-or-keyword
+24 |
+25 | T = TypeVar("T")
+   |
+info: A parameter can only be positional-only if it precedes all positional-or-keyword parameters
+info: rule `invalid-legacy-positional-parameter` is enabled by default
+
+```
+
+```
+warning[invalid-legacy-positional-parameter]: Invalid use of the legacy convention for positional-only parameters
+  --> src/mdtest_snippet.py:41:8
+   |
+39 | # signature:
+40 | @copy_type(new_signature)
+41 | def g4(a, __b): ...  # error: [invalid-legacy-positional-parameter]
+   |        -  ^^^ Parameter name begins with `__` but will not be treated as positional-only
+   |        |
+   |        Prior parameter here was positional-or-keyword
+42 | def h(__x__: str): ...
+   |
+info: A parameter can only be positional-only if it precedes all positional-or-keyword parameters
+info: rule `invalid-legacy-positional-parameter` is enabled by default
+
+```
+
+```
+warning[invalid-legacy-positional-parameter]: Invalid use of the legacy convention for positional-only parameters
+  --> src/mdtest_snippet.py:55:23
+   |
+53 |     # a staticmethod works the same as a free function in the global scope)
+54 |     @staticmethod
+55 |     def static_method(self, __x: int): ...  # error: [invalid-legacy-positional-parameter]
+   |                       ----  ^^^ Parameter name begins with `__` but will not be treated as positional-only
+   |                       |
+   |                       Prior parameter here was positional-or-keyword
+56 |     # `__new__` is a staticmethod, but the `cls` parameter works in the same way as the `cls`
+57 |     # parameter in a classmethod, and is always passed positionally at runtime,
+   |
+info: A parameter can only be positional-only if it precedes all positional-or-keyword parameters
+info: rule `invalid-legacy-positional-parameter` is enabled by default
+
+```
+
+```
+error[positional-only-parameter-as-kwarg]: Positional-only parameter 2 (`__x`) passed as keyword argument of bound method `method`
+  --> src/mdtest_snippet.py:63:14
+   |
+62 | # error: [positional-only-parameter-as-kwarg]
+63 | C(42).method(__x=1)
+   |              ^^^^^
+64 | # error: [positional-only-parameter-as-kwarg]
+65 | C.class_method(__x="1")
+   |
+info: Method signature here
+  --> src/mdtest_snippet.py:49:9
+   |
+47 | i("foo", __y=42)  # fine
+48 | class C:
+49 |     def method(self, __x: int): ...
+   |         ^^^^^^^^^^^^^^^^^^^^^^
+50 |     @classmethod
+51 |     def class_method(cls, __x: str): ...
+   |
+info: rule `positional-only-parameter-as-kwarg` is enabled by default
+
+```
+
+```
+error[positional-only-parameter-as-kwarg]: Positional-only parameter 2 (`__x`) passed as keyword argument of bound method `class_method`
+  --> src/mdtest_snippet.py:65:16
+   |
+63 | C(42).method(__x=1)
+64 | # error: [positional-only-parameter-as-kwarg]
+65 | C.class_method(__x="1")
+   |                ^^^^^^^
+66 | C.static_method("x", __x=42)  # fine
+   |
+info: Method signature here
+  --> src/mdtest_snippet.py:51:9
+   |
+49 |     def method(self, __x: int): ...
+50 |     @classmethod
+51 |     def class_method(cls, __x: str): ...
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+52 |     # (the name of the first parameter is irrelevant;
+53 |     # a staticmethod works the same as a free function in the global scope)
+   |
+info: rule `positional-only-parameter-as-kwarg` is enabled by default
+
+```

@@ -879,3 +879,71 @@ help: Add return type annotation: `Union[str, int]`
 301 |         case [1, 2, 3]:
 302 |             return 1
 note: This is an unsafe fix and may change runtime behavior
+
+ANN201 Missing return type annotation for public function `func`
+   --> auto_return_type.py:308:5
+    |
+307 | # Test cases for NotImplementedError - should not get NoReturn auto-fix
+308 | def func():
+    |     ^^^^
+309 |     raise NotImplementedError
+    |
+help: Add return type annotation
+
+ANN205 Missing return type annotation for staticmethod `func`
+   --> auto_return_type.py:314:9
+    |
+312 | class Class:
+313 |     @staticmethod
+314 |     def func():
+    |         ^^^^
+315 |         raise NotImplementedError
+    |
+help: Add return type annotation
+
+ANN206 Missing return type annotation for classmethod `method`
+   --> auto_return_type.py:318:9
+    |
+317 |     @classmethod
+318 |     def method(cls):
+    |         ^^^^^^
+319 |         raise NotImplementedError
+    |
+help: Add return type annotation
+
+ANN201 Missing return type annotation for public function `instance_method`
+   --> auto_return_type.py:321:9
+    |
+319 |         raise NotImplementedError
+320 |
+321 |     def instance_method(self):
+    |         ^^^^^^^^^^^^^^^
+322 |         raise NotImplementedError
+    |
+help: Add return type annotation
+
+ANN201 [*] Missing return type annotation for public function `func`
+   --> auto_return_type.py:326:5
+    |
+325 | # Test case: function that raises other exceptions should still get NoReturn
+326 | def func():
+    |     ^^^^
+327 |     raise ValueError
+    |
+help: Add return type annotation: `NoReturn`
+214 |         return 1
+215 | 
+216 | 
+    - from typing import overload
+217 + from typing import overload, NoReturn
+218 | 
+219 | 
+220 | @overload
+--------------------------------------------------------------------------------
+323 | 
+324 | 
+325 | # Test case: function that raises other exceptions should still get NoReturn
+    - def func():
+326 + def func() -> NoReturn:
+327 |     raise ValueError
+note: This is an unsafe fix and may change runtime behavior

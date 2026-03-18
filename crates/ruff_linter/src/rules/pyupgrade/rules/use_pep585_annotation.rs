@@ -1,14 +1,15 @@
 use ruff_python_ast::Expr;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::PythonVersion;
 use ruff_python_ast::name::UnqualifiedName;
 use ruff_python_semantic::analyze::typing::ModuleMember;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
+use crate::preview::is_up006_future_annotations_fix_enabled;
 use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
-use ruff_python_ast::PythonVersion;
 
 /// ## What it does
 /// Checks for the use of generics that can be replaced with standard library
@@ -49,11 +50,17 @@ use ruff_python_ast::PythonVersion;
 /// alongside libraries that rely on runtime type annotations, like Pydantic,
 /// on Python versions prior to Python 3.9.
 ///
+/// In [preview], this rule can also add its own `__future__` import on Python
+/// 3.9 and earlier, if the [`lint.future-annotations`] setting is enabled. This
+/// also makes the fix unsafe.
+///
 /// ## Options
 /// - `target-version`
 /// - `lint.pyupgrade.keep-runtime-typing`
+/// - `lint.future-annotations`
 ///
 /// [PEP 585]: https://peps.python.org/pep-0585/
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.155")]
 pub(crate) struct NonPEP585Annotation {
@@ -89,6 +96,25 @@ pub(crate) fn use_pep585_annotation(checker: &Checker, expr: &Expr, replacement:
         expr.range(),
     );
     if !checker.semantic().in_complex_string_type_definition() {
+        let future_import = if checker.target_version() < PythonVersion::PY310
+            && is_up006_future_annotations_fix_enabled(checker.settings())
+            && checker.settings().future_annotations
+            && !checker.semantic().future_annotations_or_stub()
+        {
+            Some(checker.importer().add_future_import())
+        } else {
+            None
+        };
+
+        // Adding `from __future__ import annotations` changes runtime behavior for all
+        // annotations in the file, so those fixes are always unsafe. Without a future
+        // import, the original applicability applies: safe only on Python 3.10+.
+        let applicability =
+            if future_import.is_none() && checker.target_version() >= PythonVersion::PY310 {
+                Applicability::Safe
+            } else {
+                Applicability::Unsafe
+            };
         match replacement {
             ModuleMember::BuiltIn(name) => {
                 // Built-in type, like `list`.
@@ -99,14 +125,9 @@ pub(crate) fn use_pep585_annotation(checker: &Checker, expr: &Expr, replacement:
                         checker.semantic(),
                     )?;
                     let binding_edit = Edit::range_replacement(binding, expr.range());
-                    let applicability = if checker.target_version() >= PythonVersion::PY310 {
-                        Applicability::Safe
-                    } else {
-                        Applicability::Unsafe
-                    };
                     Ok(Fix::applicable_edits(
                         binding_edit,
-                        import_edit,
+                        import_edit.into_iter().chain(future_import),
                         applicability,
                     ))
                 });
@@ -121,13 +142,9 @@ pub(crate) fn use_pep585_annotation(checker: &Checker, expr: &Expr, replacement:
                     )?;
                     let reference_edit = Edit::range_replacement(binding, expr.range());
                     Ok(Fix::applicable_edits(
-                        import_edit,
-                        [reference_edit],
-                        if checker.target_version() >= PythonVersion::PY310 {
-                            Applicability::Safe
-                        } else {
-                            Applicability::Unsafe
-                        },
+                        reference_edit,
+                        std::iter::once(import_edit).chain(future_import),
+                        applicability,
                     ))
                 });
             }

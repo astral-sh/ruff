@@ -23,6 +23,9 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/type_qualifiers/final.md
  8 | from _stat import ST_INO
  9 | 
 10 | ST_INO = 1  # error: [invalid-assignment]
+11 | from typing import Final
+12 | 
+13 | UNINITIALIZED: Final[int]  # error: [final-without-value]
 ```
 
 # Diagnostics
@@ -54,7 +57,21 @@ error[invalid-assignment]: Reassignment of `Final` symbol `ST_INO` is not allowe
  9 |
 10 | ST_INO = 1  # error: [invalid-assignment]
    | ^^^^^^^^^^ Reassignment of `Final` symbol
+11 | from typing import Final
    |
 info: rule `invalid-assignment` is enabled by default
+
+```
+
+```
+error[final-without-value]: `Final` symbol `UNINITIALIZED` is not assigned a value
+  --> src/mdtest_snippet.py:13:1
+   |
+11 | from typing import Final
+12 |
+13 | UNINITIALIZED: Final[int]  # error: [final-without-value]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+info: rule `final-without-value` is enabled by default
 
 ```

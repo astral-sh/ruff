@@ -46,6 +46,36 @@ except MyExc as e:
     reveal_type(e)  # revealed: Exception
 ```
 
+## Can be (partially) stringified
+
+```py
+from typing import TypeAlias, Optional, TypeVar, Generic
+
+class A: ...
+
+OptionalA1: TypeAlias = Optional[A]
+OptionalA2: TypeAlias = Optional["A"]
+OptionalA3: TypeAlias = "Optional[A]"
+
+def _(a: OptionalA1, b: OptionalA2, c: OptionalA3) -> None:
+    reveal_type(a)  # revealed: A | None
+    reveal_type(b)  # revealed: A | None
+    reveal_type(c)  # revealed: A | None
+
+T = TypeVar("T")
+
+class MyGenericClass(Generic[T]): ...
+
+MyGenericAlias1: TypeAlias = MyGenericClass[A]
+MyGenericAlias2: TypeAlias = MyGenericClass["A"]
+MyGenericAlias3: TypeAlias = "MyGenericClass[A]"
+
+def _(a: MyGenericAlias1, b: MyGenericAlias2, c: MyGenericAlias3) -> None:
+    reveal_type(a)  # revealed: MyGenericClass[A]
+    reveal_type(b)  # revealed: MyGenericClass[A]
+    reveal_type(c)  # revealed: MyGenericClass[A]
+```
+
 ## Can inherit from an alias
 
 ```py
@@ -280,13 +310,13 @@ def _(x: IntOrStr):
 from typing import TypeAlias, TypeVar, Union
 from types import UnionType
 
-RecursiveTuple: TypeAlias = tuple[int | "RecursiveTuple", str]
+RecursiveTuple: TypeAlias = tuple["int | RecursiveTuple", str]
 
 def _(rec: RecursiveTuple):
     # TODO should be `tuple[int | RecursiveTuple, str]`
     reveal_type(rec)  # revealed: tuple[Divergent, str]
 
-RecursiveHomogeneousTuple: TypeAlias = tuple[int | "RecursiveHomogeneousTuple", ...]
+RecursiveHomogeneousTuple: TypeAlias = tuple["int | RecursiveHomogeneousTuple", ...]
 
 def _(rec: RecursiveHomogeneousTuple):
     # TODO should be `tuple[int | RecursiveHomogeneousTuple, ...]`
@@ -430,3 +460,45 @@ BadTypeAlias14: TypeAlias = Literal[-3.14]  # error: [invalid-type-form]
 # error: [invalid-type-form]
 BadTypeAlias14: TypeAlias = Literal[3.14]
 ```
+
+## No type qualifiers
+
+The right-hand side of a type alias definition is a [type expression], not an annotation expression.
+Type qualifiers like `ClassVar` and `Final` are only valid in annotation expressions, so they cannot
+appear in type alias definitions:
+
+```py
+from typing_extensions import ClassVar, Final, Required, NotRequired, ReadOnly, TypeAlias, Unpack
+from dataclasses import InitVar
+
+bad1: TypeAlias = ClassVar[str]  # error: [invalid-type-form]
+bad2: TypeAlias = ClassVar  # error: [invalid-type-form]
+bad3: TypeAlias = Final[int]  # error: [invalid-type-form]
+bad4: TypeAlias = Final  # error: [invalid-type-form]
+bad5: TypeAlias = Required[int]  # error: [invalid-type-form]
+bad6: TypeAlias = NotRequired[int]  # error: [invalid-type-form]
+bad7: TypeAlias = ReadOnly[int]  # error: [invalid-type-form]
+bad9: TypeAlias = InitVar[int]  # error: [invalid-type-form]
+bad10: TypeAlias = InitVar  # error: [invalid-type-form]
+
+# TODO: this should cause us to emit an error (`Unpack` is not valid at the
+# top level in this context), but for different reasons to the above cases:
+# `Unpack` is not a type qualifier, and so the error message in our diagnostic
+# shouldn't say that it is.
+differently_bad: TypeAlias = Unpack[tuple[int, ...]]
+```
+
+## Recursive `TypeIs` and `TypeGuard` aliases don't stack overflow
+
+```py
+from typing import TypeAlias
+from typing_extensions import TypeGuard, TypeIs
+
+RecursiveIs: TypeAlias = TypeIs["RecursiveIs"]
+RecursiveGuard: TypeAlias = TypeGuard["RecursiveGuard"]
+
+AliasIs: TypeAlias = RecursiveIs
+AliasGuard: TypeAlias = RecursiveGuard
+```
+
+[type expression]: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions

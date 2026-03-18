@@ -60,6 +60,7 @@ def _(flag: bool):
         if flag:
             def __iadd__(self, other: int) -> str:
                 return "Hello, world!"
+
         else:
             def __iadd__(self, other: int) -> int:
                 return 42

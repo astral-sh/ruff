@@ -24,7 +24,7 @@ use crate::{FixAvailability, Violation};
 ///
 /// ## Example
 /// ```python
-/// with open(filename) as f:
+/// with open("file.txt") as f:
 ///     contents = f.read()
 /// ```
 ///
@@ -32,7 +32,7 @@ use crate::{FixAvailability, Violation};
 /// ```python
 /// from pathlib import Path
 ///
-/// contents = Path(filename).read_text()
+/// contents = Path("file.txt").read_text()
 /// ```
 /// ## Fix Safety
 /// This rule's fix is marked as unsafe if the replacement would remove comments attached to the original expression.
