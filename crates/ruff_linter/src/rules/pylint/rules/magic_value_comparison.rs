@@ -67,20 +67,22 @@ impl Violation for MagicValueComparison {
     }
 }
 
-/// If an [`Expr`] is a literal (or unary operation on a literal), return the [`LiteralExpressionRef`].
-fn as_literal(expr: &Expr) -> Option<LiteralExpressionRef<'_>> {
+/// If an [`Expr`] is a literal (or unary operation on a literal), return the [`LiteralExpressionRef`]
+/// and the unary operand, if any.
+fn as_literal(expr: &Expr) -> Option<(LiteralExpressionRef<'_>, Option<&UnaryOp>)> {
     match expr {
-        Expr::UnaryOp(ast::ExprUnaryOp {
-            op: UnaryOp::UAdd | UnaryOp::USub | UnaryOp::Invert,
-            operand,
-            ..
-        }) => operand.as_literal_expr(),
-        _ => expr.as_literal_expr(),
+        Expr::UnaryOp(ast::ExprUnaryOp { op, operand, .. })
+            if matches!(op, UnaryOp::UAdd | UnaryOp::USub | UnaryOp::Invert) =>
+        {
+            operand.as_literal_expr().map(|literal| (literal, Some(op)))
+        }
+        _ => expr.as_literal_expr().map(|literal| (literal, None)),
     }
 }
 
 fn is_magic_value(
     literal_expr: LiteralExpressionRef,
+    unary_op: Option<&UnaryOp>,
     allowed_types: &[ConstantType],
     allowed_values: &[AllowedValue],
 ) -> bool {
@@ -94,7 +96,7 @@ fn is_magic_value(
     // Check if the literal value is in the allowed values list
     if allowed_values
         .iter()
-        .any(|value| value.matches_literal(literal_expr))
+        .any(|value| value.matches_value(literal_expr, unary_op))
     {
         return false;
     }
@@ -139,8 +141,8 @@ pub(crate) fn magic_value_comparison(checker: &Checker, left: &Expr, comparators
     let mut previous = None;
     let mut operands = std::iter::once(left).chain(comparators).peekable();
     while let Some(comparison_expr) = operands.next() {
-        if let Some(value) = as_literal(comparison_expr)
-            && is_magic_value(value, allowed_types, allowed_values)
+        if let Some((value, unary_op)) = as_literal(comparison_expr)
+            && is_magic_value(value, unary_op, allowed_types, allowed_values)
             && !previous.is_some_and(|expr| is_sys_version_comparand(expr, checker.semantic()))
             && !operands
                 .peek()
