@@ -76,14 +76,6 @@ enum CallErrorPriority {
     BindingError = 2,
 }
 
-/// A single element in a union of callables.
-/// This could be a single callable or an intersection of callables.
-/// If there are multiple items, they form an intersection.
-#[derive(Debug, Clone)]
-struct BindingsElement<'db> {
-    items: SmallVec<[CallableItem<'db>; 1]>,
-}
-
 /// A single callable item within the union/intersection structure.
 /// Either a regular callable, or a constructor callable.
 #[derive(Debug, Clone)]
@@ -171,12 +163,21 @@ impl<'db> CallableItem<'db> {
         }
     }
 
-    fn as_result(&self) -> Result<(), CallErrorKind> {
-        self.callable().as_result()
+    fn as_result(&self, db: &'db dyn Db) -> Result<(), CallErrorKind> {
+        self.callable().as_result()?;
+
+        self.as_constructor()
+            .and_then(|binding| binding.checked_downstream_constructor_bindings(db))
+            .map_or(Ok(()), |bindings| bindings.as_result(db))
     }
 
-    fn error_priority(&self) -> CallErrorPriority {
-        self.callable().error_priority()
+    fn error_priority(&self, db: &'db dyn Db) -> CallErrorPriority {
+        let priority = self.callable().error_priority();
+        self.as_constructor()
+            .and_then(|binding| binding.checked_downstream_constructor_bindings(db))
+            .map_or(priority, |bindings| {
+                priority.max(bindings.error_priority(db))
+            })
     }
 
     fn is_callable(&self) -> bool {
@@ -217,6 +218,14 @@ impl<'db> CallableItem<'db> {
             }
         }
     }
+}
+
+/// A single element in a union of callables.
+/// This could be a single callable or an intersection of callables.
+/// If there are multiple items, they form an intersection.
+#[derive(Debug, Clone)]
+struct BindingsElement<'db> {
+    items: SmallVec<[CallableItem<'db>; 1]>,
 }
 
 impl<'db> BindingsElement<'db> {
@@ -269,21 +278,21 @@ impl<'db> BindingsElement<'db> {
     /// Returns the result of calling this element.
     /// For intersections, if any binding succeeds, the element succeeds.
     /// When all bindings fail, returns the error from the highest-priority binding.
-    fn as_result(&self) -> Result<(), CallErrorKind> {
+    fn as_result(&self, db: &'db dyn Db) -> Result<(), CallErrorKind> {
         // If any binding succeeds, the element succeeds
-        if self.items.iter().any(|b| b.as_result().is_ok()) {
+        if self.items.iter().any(|b| b.as_result(db).is_ok()) {
             return Ok(());
         }
 
         // All bindings failed - find highest priority and return that error kind
-        let max_priority = self.error_priority();
+        let max_priority = self.error_priority(db);
 
         // Return the error from the first binding with the highest priority
         Err(self
             .items
             .iter()
-            .find(|b| b.error_priority() == max_priority)
-            .map(|b| b.as_result().unwrap_err())
+            .find(|b| b.error_priority(db) == max_priority)
+            .map(|b| b.as_result(db).unwrap_err())
             .unwrap_or(CallErrorKind::NotCallable))
     }
 
@@ -294,19 +303,20 @@ impl<'db> BindingsElement<'db> {
     /// `f: KnownCallable & Top[Callable[..., Awaitable[object]]]`, even though the top-callable
     /// call itself is unsafe. (We know that somewhere in the infinite-union of the top callable,
     /// there is a callable with the right parameters to match the call.)
-    fn retain_successful(&mut self) {
-        if self.is_intersection() && self.as_result().is_ok() {
+    fn retain_successful(&mut self, db: &'db dyn Db) {
+        if self.is_intersection() && self.as_result(db).is_ok() {
             self.items.retain(|item| {
-                item.as_result().is_ok() || item.error_priority() == CallErrorPriority::TopCallable
+                item.as_result(db).is_ok()
+                    || item.error_priority(db) == CallErrorPriority::TopCallable
             });
         }
     }
 
     /// Returns the error priority for this element (used when all bindings failed).
-    fn error_priority(&self) -> CallErrorPriority {
+    fn error_priority(&self, db: &'db dyn Db) -> CallErrorPriority {
         self.items
             .iter()
-            .map(CallableItem::error_priority)
+            .map(|item| item.error_priority(db))
             .max()
             .unwrap_or(CallErrorPriority::NotCallable)
     }
@@ -348,6 +358,43 @@ pub(crate) struct Bindings<'db> {
 }
 
 impl<'db> Bindings<'db> {
+    fn as_result(&self, db: &'db dyn Db) -> Result<(), CallErrorKind> {
+        let mut all_ok = true;
+        let mut any_binding_error = false;
+        let mut all_not_callable = true;
+
+        if self.argument_forms.conflicting.contains(&true) {
+            all_ok = false;
+            any_binding_error = true;
+            all_not_callable = false;
+        }
+
+        for element in &self.elements {
+            let result = element.as_result(db);
+            all_ok &= result.is_ok();
+            any_binding_error |= matches!(result, Err(CallErrorKind::BindingError));
+            all_not_callable &= matches!(result, Err(CallErrorKind::NotCallable));
+        }
+
+        if all_ok {
+            Ok(())
+        } else if any_binding_error {
+            Err(CallErrorKind::BindingError)
+        } else if all_not_callable {
+            Err(CallErrorKind::NotCallable)
+        } else {
+            Err(CallErrorKind::PossiblyNotCallable)
+        }
+    }
+
+    fn error_priority(&self, db: &'db dyn Db) -> CallErrorPriority {
+        self.elements
+            .iter()
+            .map(|element| element.error_priority(db))
+            .max()
+            .unwrap_or(CallErrorPriority::NotCallable)
+    }
+
     fn set_constructor_instance_type_in_place(
         &mut self,
         db: &'db dyn Db,
@@ -749,70 +796,25 @@ impl<'db> Bindings<'db> {
 
         self.evaluate_known_cases(db, call_arguments, dataclass_field_specifiers);
 
-        // For intersection elements with at least one successful binding,
-        // filter out the failing bindings.
-        for element in &mut self.elements {
-            element.retain_successful();
-        }
-
         // For constructor bindings with deferred downstream checks: validate downstream bindings
         // if the matched overload is instance-returning.
-        let mut init_error = false;
         for constructor in self.iter_constructor_items_mut() {
-            if constructor.check_downstream_constructor(
+            constructor.check_downstream_constructor(
                 db,
                 constraints,
                 call_arguments,
                 call_expression_tcx,
                 dataclass_field_specifiers,
-            ) {
-                init_error = true;
-            }
+            );
         }
 
-        // In order of precedence:
-        //
-        // - If every union element is Ok, then the union is too.
-        // - If any element has a BindingError, the union has a BindingError.
-        // - If every element is NotCallable, then the union is also NotCallable.
-        // - Otherwise, the elements are some mixture of Ok, NotCallable, and PossiblyNotCallable.
-        //   The union as a whole is PossiblyNotCallable.
-        //
-        // For example, the union type `Callable[[int], int] | None` may not be callable at all,
-        // because the `None` element in this union has no `__call__` method.
-        //
-        // On the other hand, the union type `Callable[[int], int] | Callable[[str], str]` is
-        // always *callable*, but it would produce a `BindingError` if an inhabitant of this type
-        // was called with a single `int` argument passed in. That's because the second element in
-        // the union doesn't accept an `int` when it's called: it only accepts a `str`.
-        let mut all_ok = true;
-        let mut any_binding_error = false;
-        let mut all_not_callable = true;
-        if self.argument_forms.conflicting.contains(&true) {
-            all_ok = false;
-            any_binding_error = true;
-            all_not_callable = false;
-        }
-        for element in &self.elements {
-            let result = element.as_result();
-            all_ok &= result.is_ok();
-            any_binding_error |= matches!(result, Err(CallErrorKind::BindingError));
-            all_not_callable &= matches!(result, Err(CallErrorKind::NotCallable));
-        }
-        if init_error {
-            any_binding_error = true;
-            all_ok = false;
+        // For intersection elements with at least one successful binding,
+        // filter out the failing bindings after deferred constructor checks.
+        for element in &mut self.elements {
+            element.retain_successful(db);
         }
 
-        if all_ok {
-            Ok(())
-        } else if any_binding_error {
-            Err(CallErrorKind::BindingError)
-        } else if all_not_callable {
-            Err(CallErrorKind::NotCallable)
-        } else {
-            Err(CallErrorKind::PossiblyNotCallable)
-        }
+        self.as_result(db)
     }
 
     /// Returns true if this is a single callable (not a union or intersection).
@@ -935,7 +937,7 @@ impl<'db> Bindings<'db> {
         element: &BindingsElement<'db>,
     ) {
         // If this element succeeded, no diagnostics to report
-        if element.as_result().is_ok() {
+        if element.as_result(context.db()).is_ok() {
             return;
         }
 
@@ -944,7 +946,7 @@ impl<'db> Bindings<'db> {
         // For intersection elements, use priority hierarchy
         if element.is_intersection() {
             // Find the highest priority error among bindings in this element
-            let max_priority = element.error_priority();
+            let max_priority = element.error_priority(context.db());
 
             // Construct the intersection type from the bindings
             let intersection_type = IntersectionType::from_elements(
@@ -955,7 +957,7 @@ impl<'db> Bindings<'db> {
             // Only report errors from bindings with the highest priority
             for item in &element.items {
                 let binding = item.callable();
-                if binding.error_priority() == max_priority {
+                if item.error_priority(context.db()) == max_priority {
                     if is_union {
                         // Use layered diagnostic for intersection inside a union
                         let layered_diag = LayeredDiagnostic {
@@ -977,7 +979,7 @@ impl<'db> Bindings<'db> {
         } else {
             // Single binding in this element - report as a union variant
             if let Some(binding) = element.items.first().map(CallableItem::callable) {
-                if binding.as_result().is_ok() {
+                if element.as_result(context.db()).is_ok() {
                     return;
                 }
                 let union_diag = UnionDiagnostic {

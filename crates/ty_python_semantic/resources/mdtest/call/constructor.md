@@ -919,6 +919,32 @@ def f(flag: bool) -> None:
     ctor("foo")
 ```
 
+### Intersection of mixed constructors should discard failing deferred `__init__` checks
+
+```py
+from typing import overload
+
+from ty_extensions import Intersection
+from typing_extensions import Self
+
+class C:
+    @overload
+    def __new__(cls, x: int) -> int: ...
+    @overload
+    def __new__(cls, x: str) -> Self: ...
+    def __new__(cls, x: int | str) -> object: ...
+    def __init__(self, x: str, y: str) -> None: ...
+
+class D:
+    def __init__(self, x: str) -> None: ...
+
+def f(ctor: Intersection[type[C], type[D]]) -> None:
+    # `C.__new__` selects `str -> Self`, but `C.__init__` still rejects the call
+    # because `y` is missing. `D` accepts the call, so the intersection should
+    # succeed using only the `D` branch.
+    reveal_type(ctor("foo"))  # revealed: D
+```
+
 ### Union of generic constructor types with `__new__` should preserve specialization
 
 ```py
