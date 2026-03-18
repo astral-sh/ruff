@@ -1,0 +1,11 @@
+version = 1
+revision = 3
+requires-python = ">=3.11"
+
+[manifest]
+requirements = [{ name = "mypy-primer", git = "https://github.com/hauntsaninja/mypy_primer" }]
+
+[[package]]
+name = "mypy-primer"
+version = "0.1.0"
+source = { git = "https://github.com/hauntsaninja/mypy_primer#05f73ec3d85bb4f55676f3c57f2c3e5136228977" }

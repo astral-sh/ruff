@@ -29,10 +29,9 @@ mod os;
 mod path;
 mod test;
 pub mod walk_directory;
-#[cfg(not(target_family = "wasm"))]
-mod which;
 
 pub type Result<T> = std::io::Result<T>;
+pub type WhichResult = std::result::Result<SystemPathBuf, WhichError>;
 
 /// The system on which Ruff runs.
 ///
@@ -97,6 +96,9 @@ pub trait System: Debug + Sync + Send {
         None
     }
 
+    /// Find an executable binary's path by name.
+    fn which(&self, binary_name: &str) -> WhichResult;
+
     /// Reads the content of the file at `path` into a [`String`].
     fn read_to_string(&self, path: &SystemPath) -> Result<String>;
 
@@ -146,9 +148,6 @@ pub trait System: Debug + Sync + Send {
         self.path_metadata(path)
             .is_ok_and(|metadata| metadata.file_type.is_file())
     }
-
-    /// Returns `true` if `path` exists and is marked as executable.
-    fn is_executable(&self, path: &SystemPath) -> bool;
 
     /// Returns the current working directory
     fn current_directory(&self) -> &SystemPath;
@@ -477,4 +476,35 @@ pub fn file_time_now() -> FileTime {
 
             FileTime::from_unix_time(-(until_epoch.as_secs() as i64) + sec_offset, nanos)
         })
+}
+
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+pub enum WhichError {
+    /// An executable binary with that name was not found
+    CannotFindBinaryPath,
+
+    /// There was nowhere to search and the provided name wasn't an absolute path
+    CannotGetCurrentDirAndPathListEmpty,
+
+    /// Failed to canonicalize the path found
+    CannotCanonicalize,
+
+    /// The executable exists but its path contains non UTF8 characters.
+    NonUtf8Path,
+}
+
+impl Error for WhichError {}
+
+impl fmt::Display for WhichError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            WhichError::CannotFindBinaryPath => write!(f, "cannot find binary path"),
+            WhichError::CannotGetCurrentDirAndPathListEmpty => write!(
+                f,
+                "no path to search and provided name is not an absolute path"
+            ),
+            WhichError::CannotCanonicalize => write!(f, "cannot canonicalize path"),
+            WhichError::NonUtf8Path => write!(f, "non UTF-8 path"),
+        }
+    }
 }

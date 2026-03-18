@@ -61,6 +61,7 @@ pub(super) use comparisons::UnsupportedComparisonError;
 
 mod builder;
 mod comparisons;
+mod deferred;
 #[cfg(test)]
 mod tests;
 
@@ -425,6 +426,12 @@ impl<'db> TypeContext<'db> {
     pub(crate) fn is_typealias(&self) -> bool {
         self.annotation
             .is_some_and(|ty| ty.is_typealias_special_form())
+    }
+}
+
+impl<'db> From<Type<'db>> for TypeContext<'db> {
+    fn from(annotation: Type<'db>) -> Self {
+        Self::new(Some(annotation))
     }
 }
 
@@ -880,5 +887,31 @@ impl<'db> ExpressionInference<'db> {
 
     fn fallback_type(&self) -> Option<Type<'db>> {
         self.extra.as_ref().and_then(|extra| extra.cycle_recovery)
+    }
+}
+
+bitflags::bitflags! {
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub(crate) struct InferenceFlags: u8 {
+        /// Whether to allow `ParamSpec` in type expressions.
+        ///
+        /// In most contexts inside type expressions, bare `ParamSpec`s are not allowed.
+        /// They are specifically allowed as the first argument to `Callable`,
+        /// the second argument to `Concatenate`, and certain other special cases.
+        const ALLOW_PARAMSPEC_TYPE_EXPR = 1 << 0;
+
+        /// Whether to check for unbound type variables in type expressions.
+        /// This flag is set when processing annotation expressions, where unbound type variables
+        /// are an error. It is unset in other contexts (e.g., `TypeVar` defaults, explicit class
+        /// specialization) where unbound type variables are expected.
+        const CHECK_UNBOUND_TYPEVARS = 1 << 1;
+    }
+}
+
+impl InferenceFlags {
+    fn replace(&mut self, other: Self, set_to: bool) -> bool {
+        let previously_contained_flag = self.contains(other);
+        self.set(other, set_to);
+        previously_contained_flag
     }
 }

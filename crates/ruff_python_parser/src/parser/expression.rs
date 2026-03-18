@@ -1989,10 +1989,19 @@ impl<'src> Parser<'src> {
             TokenKind::Async | TokenKind::For => {
                 // Parenthesized starred expression isn't allowed either but that is
                 // handled by the `parse_parenthesized_expression` method.
+
+                // test_ok starred_list_comp_py315
+                // # parse_options: {"target-version": "3.15"}
+                // [*x for x in y]
+                // [*factor.dims for factor in bases]
+
+                // test_err starred_list_comp_py314
+                // # parse_options: {"target-version": "3.14"}
+                // [*x for x in y]
                 if first_element.is_unparenthesized_starred_expr() {
-                    self.add_error(
-                        ParseErrorType::IterableUnpackingInComprehension,
-                        &first_element,
+                    self.add_unsupported_syntax_error(
+                        UnsupportedSyntaxErrorKind::IterableUnpackingInListComprehension,
+                        first_element.range(),
                     );
                 }
 

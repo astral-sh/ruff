@@ -67,25 +67,62 @@ def foo[**P = int]() -> None:
 
 `ParamSpec` is only valid as the first element to `Callable` or the final element to `Concatenate`.
 
+<!-- snapshot-diagnostics -->
+
 ```py
-from typing import ParamSpec, Callable, Concatenate
+from typing import Any, Final, ParamSpec, Callable, Concatenate, Union, Optional, Annotated
 
 def valid[**P](
     a1: Callable[P, int],
     a2: Callable[Concatenate[int, P], int],
+    a3: Callable["P", int],
+    a4: Callable[Concatenate[int, "P"], int],
 ) -> None: ...
 def invalid[**P](
-    # TODO: error
+    # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
     a1: P,
-    # TODO: error
-    a2: list[P],
-    # TODO: error
+    # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
     a3: Callable[[P], int],
-    # TODO: error
+    # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
     a4: Callable[..., P],
-    # TODO: error
+    # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
     a5: Callable[Concatenate[P, ...], int],
+    # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
+    a6: P | int,
+    # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
+    a7: Union[P, int],
+    # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
+    a8: Optional[P],
+    # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
+    a9: Annotated[P, "metadata"],
 ) -> None: ...
+
+# error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
+def invalid_return[**P]() -> P:
+    raise NotImplementedError
+
+# error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
+type Alias[**P] = P
+
+def invalid_variable_annotation[**P](y: Any) -> None:
+    # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
+    x: P = y
+
+def invalid_with_qualifier[**P](y: Any) -> None:
+    # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
+    x: Final[P] = y
+
+# error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
+def invalid_stringified_return[**P]() -> "P":
+    raise NotImplementedError
+
+def invalid_stringified_annotation[**P](
+    # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
+    a: "P",
+) -> None: ...
+def invalid_stringified_variable_annotation[**P](y: Any) -> None:
+    # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
+    x: "P" = y
 ```
 
 ## Validating `P.args` and `P.kwargs` usage
@@ -337,6 +374,44 @@ both mypy and Pyright allow this and there are usages of this in the wild e.g.,
 
 ```py
 reveal_type(TypeVarAndParamSpec[int, Any]().attr)  # revealed: (...) -> int
+```
+
+## `ParamSpec` cannot specialize a `TypeVar`, and vice versa
+
+<!-- snapshot-diagnostics -->
+
+A `ParamSpec` is not a valid type argument for a regular `TypeVar`, and vice versa.
+
+```py
+from typing import Callable
+
+class OnlyTypeVar[T]:
+    attr: T
+
+class TypeVarAndParamSpec[T, **P]:
+    attr: Callable[P, T]
+
+def f[**P, T]():
+    # error: [invalid-type-arguments] "ParamSpec `P` cannot be used to specialize type variable `T`"
+    a: OnlyTypeVar[P]
+
+    # error: [invalid-type-arguments] "ParamSpec `P` cannot be used to specialize type variable `T`"
+    b: TypeVarAndParamSpec[P, [int]]
+
+class OnlyParamSpec[**P]:
+    attr: Callable[P, None]
+
+# This is fine due to the special case whereby `OnlyParamSpec[T]` is interpreted the same as
+# `OnlyParamSpec[[T]]`, due to the fact that `OnlyParamSpec` is only generic over a single
+# `ParamSpec` and no other type variables.
+def func2[T](c: OnlyParamSpec[T], other: T):
+    reveal_type(c.attr)  # revealed: (T@func2, /) -> None
+
+class ParamSpecAndTypeVar[**P, T]:
+    attr: Callable[P, T]
+
+# error: [invalid-type-arguments] "Type argument for `ParamSpec` must be either a list of types, `ParamSpec`, `Concatenate`, or `...`"
+def func3[T](c: ParamSpecAndTypeVar[T, int], other: T): ...
 ```
 
 ## Specialization when defaults are involved
@@ -958,7 +1033,7 @@ reveal_type(generic_context(c.generic_method))
 
 reveal_type(c.generic_method)  # revealed: [T](value: T) -> T
 reveal_type(c.generic_method(100))  # revealed: Literal[100]
-reveal_type(c.generic_method([1, 2, 3]))  # revealed: list[Unknown | int]
+reveal_type(c.generic_method([1, 2, 3]))  # revealed: list[int]
 ```
 
 ## Callable protocols with `ParamSpec` and class constructors

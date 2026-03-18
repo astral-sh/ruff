@@ -2518,7 +2518,9 @@ class Grid:
         ipady: float | str = ...,
         padx: float | str | tuple[float | str, float | str] = ...,
         pady: float | str | tuple[float | str, float | str] = ...,
-        sticky: str = ...,  # consists of letters 'n', 's', 'w', 'e', may contain repeats, may be empty
+        sticky: (
+            str | list[str] | tuple[str, ...]
+        ) = ...,  # consists of letters 'n', 's', 'w', 'e', may contain repeats, may be empty
         in_: Misc = ...,
         **kw: Any,  # allow keyword argument named 'in', see #4836
     ) -> None:

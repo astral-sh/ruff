@@ -22,6 +22,7 @@ use ruff_python_ast::PythonVersion;
 use rustc_hash::FxHasher;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
+use std::cmp::Ordering;
 use std::fmt::{self, Debug, Display};
 use std::hash::BuildHasherDefault;
 use std::ops::Deref;
@@ -33,7 +34,7 @@ use ty_module_resolver::{
 };
 use ty_python_semantic::lint::{Level, LintSource, RuleSelection};
 use ty_python_semantic::{
-    AnalysisSettings, MisconfigurationMode, ProgramSettings, PythonEnvironment, PythonPlatform,
+    AnalysisSettings, MisconfigurationStrategy, ProgramSettings, PythonEnvironment, PythonPlatform,
     PythonVersionFileSource, PythonVersionSource, PythonVersionWithSource, SitePackagesPaths,
     SysPrefixPathOrigin,
 };
@@ -107,8 +108,40 @@ pub struct Options {
 impl Options {
     pub fn from_toml_str(content: &str, source: ValueSource) -> Result<Self, TyTomlError> {
         let _guard = ValueSourceGuard::new(source, true);
-        let options = toml::from_str(content)?;
+        let mut options: Self = toml::from_str(content)?;
+        options.prioritize_all_selectors();
         Ok(options)
+    }
+
+    /// Ensures that the `all` selector is applied before per-rule selectors
+    /// in all rule tables (top-level and overrides).
+    ///
+    /// This must be called after deserializing from TOML and before any
+    /// [`Combine::combine`] calls, because TOML tables are unordered and the
+    /// `toml` crate sorts keys lexicographically.
+    pub(crate) fn prioritize_all_selectors(&mut self) {
+        // Stable sort that moves all `all` selectors before non-`all` selectors
+        // while preserving relative order among non-`all` entries.
+        let sort = |rules: &mut Rules| {
+            rules.inner.sort_by(
+                |key_a, _, key_b, _| match (**key_a == "all", **key_b == "all") {
+                    (true, false) => Ordering::Less,
+                    (false, true) => Ordering::Greater,
+                    _ => Ordering::Equal,
+                },
+            );
+        };
+
+        if let Some(rules) = &mut self.rules {
+            sort(rules);
+        }
+        if let Some(overrides) = &mut self.overrides {
+            for override_option in &mut overrides.0 {
+                if let Some(rules) = &mut override_option.rules {
+                    sort(rules);
+                }
+            }
+        }
     }
 
     pub fn deserialize_with<'de, D>(source: ValueSource, deserializer: D) -> Result<Self, D::Error>
@@ -119,14 +152,14 @@ impl Options {
         Self::deserialize(deserializer)
     }
 
-    pub(crate) fn to_program_settings(
+    pub(crate) fn to_program_settings<Strategy: MisconfigurationStrategy>(
         &self,
         project_root: &SystemPath,
         project_name: &str,
         system: &dyn System,
         vendored: &VendoredFileSystem,
-        misconfiguration_mode: MisconfigurationMode,
-    ) -> anyhow::Result<ProgramSettings> {
+        strategy: &Strategy,
+    ) -> Result<ProgramSettings, Strategy::Error<anyhow::Error>> {
         let environment = self.environment.or_default();
 
         let options_python_version =
@@ -172,17 +205,11 @@ impl Options {
         };
 
         // If in safe-mode, fallback to None if this fails instead of erroring.
-        let python_environment = match python_environment {
-            Ok(python_environment) => python_environment,
-            Err(err) => {
-                if misconfiguration_mode == MisconfigurationMode::UseDefault {
-                    tracing::debug!("Default settings failed to discover local Python environment");
-                    None
-                } else {
-                    return Err(err);
-                }
-            }
-        };
+        let python_environment = strategy
+            .fallback_opt(python_environment, |_| {
+                tracing::debug!("Default settings failed to discover local Python environment");
+            })?
+            .flatten();
 
         let self_environment = self_environment_search_paths(
             python_environment
@@ -196,19 +223,10 @@ impl Options {
             let site_packages_paths = python_environment
                 .site_packages_paths(system)
                 .context("Failed to discover the site-packages directory");
-            let site_packages_paths = match site_packages_paths {
-                Ok(paths) => paths,
-                Err(err) => {
-                    if misconfiguration_mode == MisconfigurationMode::UseDefault {
-                        tracing::debug!(
-                            "Default settings failed to discover site-packages directory"
-                        );
-                        SitePackagesPaths::default()
-                    } else {
-                        return Err(err);
-                    }
-                }
-            };
+            let site_packages_paths = strategy.fallback(site_packages_paths, |_| {
+                tracing::debug!("Default settings failed to discover site-packages directory");
+                SitePackagesPaths::default()
+            })?;
             match self_environment {
                 // When ty is installed in a virtual environment (e.g., `uvx --with ...`),
                 // the self-environment takes priority over the discovered environment.
@@ -242,15 +260,15 @@ impl Options {
             .unwrap_or_default();
 
         // Safe mode is handled inside this function, so we just assume this can't fail
-        let search_paths = self.to_search_paths(
+        let search_paths = strategy.to_anyhow(self.to_search_paths(
             project_root,
             project_name,
             site_packages_paths,
             real_stdlib_path,
             system,
             vendored,
-            misconfiguration_mode,
-        )?;
+            strategy,
+        ))?;
 
         tracing::info!(
             "Python version: Python {python_version}, platform: {python_platform}",
@@ -265,7 +283,7 @@ impl Options {
     }
 
     #[expect(clippy::too_many_arguments)]
-    fn to_search_paths(
+    fn to_search_paths<Strategy: MisconfigurationStrategy>(
         &self,
         project_root: &SystemPath,
         project_name: &str,
@@ -273,8 +291,8 @@ impl Options {
         real_stdlib_path: Option<SystemPathBuf>,
         system: &dyn System,
         vendored: &VendoredFileSystem,
-        misconfiguration_mode: MisconfigurationMode,
-    ) -> Result<SearchPaths, SearchPathSettingsError> {
+        strategy: &Strategy,
+    ) -> Result<SearchPaths, Strategy::Error<SearchPathSettingsError>> {
         let environment = self.environment.or_default();
         let src = self.src.or_default();
 
@@ -386,17 +404,17 @@ impl Options {
                 .map(|path| path.absolute(project_root, system)),
             site_packages_paths: site_packages_paths.into_vec(),
             real_stdlib_path,
-            misconfiguration_mode,
         };
 
-        settings.to_search_paths(system, vendored)
+        settings.to_search_paths(system, vendored, strategy)
     }
 
-    pub(crate) fn to_settings(
+    pub(crate) fn to_settings<Strategy: MisconfigurationStrategy>(
         &self,
         db: &dyn Db,
         project_root: &SystemPath,
-    ) -> Result<(Settings, Vec<OptionDiagnostic>), ToSettingsError> {
+        strategy: &Strategy,
+    ) -> Result<(Settings, Vec<OptionDiagnostic>), Strategy::Error<ToSettingsError>> {
         let mut diagnostics = Vec::new();
         let rules = self.to_rule_selection(db, &mut diagnostics);
 
@@ -446,7 +464,8 @@ impl Options {
                 diagnostic: err,
                 output_format: terminal.output_format,
                 color: colored::control::SHOULD_COLORIZE.should_colorize(),
-            })?;
+            });
+        let src = strategy.fallback(src, |_| SrcSettings::default())?;
 
         let mut analysis_diagnostics = Vec::new();
         let analysis = self
@@ -454,13 +473,17 @@ impl Options {
             .or_default()
             .to_settings(db, &mut analysis_diagnostics);
 
-        if let Some(diagnostic) = analysis_diagnostics.into_iter().next() {
-            return Err(ToSettingsError {
-                diagnostic: Box::new(diagnostic),
-                output_format: terminal.output_format,
-                color: colored::control::SHOULD_COLORIZE.should_colorize(),
-            });
-        }
+        let analysis_result: Result<_, ToSettingsError> =
+            if let Some(diagnostic) = analysis_diagnostics.into_iter().next() {
+                Err(ToSettingsError {
+                    diagnostic: Box::new(diagnostic),
+                    output_format: terminal.output_format,
+                    color: colored::control::SHOULD_COLORIZE.should_colorize(),
+                })
+            } else {
+                Ok(analysis)
+            };
+        let analysis = strategy.fallback(analysis_result, |_| AnalysisSettings::default())?;
 
         let overrides = self
             .to_overrides_settings(db, project_root, &mut diagnostics)
@@ -468,7 +491,8 @@ impl Options {
                 diagnostic: err,
                 output_format: terminal.output_format,
                 color: colored::control::SHOULD_COLORIZE.should_colorize(),
-            })?;
+            });
+        let overrides = strategy.fallback(overrides, |_| Vec::new())?;
 
         let settings = Settings {
             rules: Arc::new(rules),
@@ -885,6 +909,10 @@ impl SrcOptions {
 )]
 #[serde(rename_all = "kebab-case", transparent)]
 pub struct Rules {
+    /// The rules with their severity. Entries coming later in the map take precedence over
+    /// earlier entries (e.g. a `all` selector earlier in the hash map will be overridden
+    /// by a specific rule selector coming after it but if `all` is the last selector, then it
+    /// overrides even specific rule codes).
     inner: OrderMap<RangedValue<String>, RangedValue<Level>, BuildHasherDefault<FxHasher>>,
 }
 
@@ -927,7 +955,7 @@ impl Rules {
             };
 
             // Handle "all" as a special case - apply the level to all rules
-            if rule_name.eq_ignore_ascii_case("all") {
+            if rule_name.as_str() == "all" {
                 for lint in registry.lints() {
                     set_lint_level(*lint);
                 }
@@ -970,7 +998,7 @@ impl Rules {
 }
 
 /// Default exclude patterns for src options.
-const DEFAULT_SRC_EXCLUDES: &[&str] = &[
+pub(crate) const DEFAULT_SRC_EXCLUDES: &[&str] = &[
     "**/.bzr/",
     "**/.direnv/",
     "**/.eggs/",
@@ -1828,7 +1856,7 @@ mod schema {
             let registry = ty_python_semantic::default_lint_registry();
             let level_schema = generator.subschema_for::<super::Level>();
 
-            let properties: Map<String, Value> = registry
+            let mut properties: Map<String, Value> = registry
                 .lints()
                 .iter()
                 .map(|lint| {
@@ -1857,6 +1885,26 @@ mod schema {
                     (lint.name().to_string(), schema.into())
                 })
                 .collect();
+
+            let mut all_schema = schemars::Schema::default();
+            let all = all_schema.ensure_object();
+            all.insert(
+                "title".to_string(),
+                Value::String("set the default severity level for all rules".to_string()),
+            );
+            all.insert(
+                "description".to_string(),
+                Value::String(
+                    "Configure a default severity level for all rules. Individual rule settings override this default."
+                        .to_string(),
+                ),
+            );
+            all.insert(
+                "oneOf".to_string(),
+                Value::Array(vec![level_schema.clone().into()]),
+            );
+
+            properties.insert("all".to_string(), all_schema.into());
 
             let mut schema = schemars::json_schema!({ "type": "object" });
             let object = schema.ensure_object();

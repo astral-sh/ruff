@@ -164,3 +164,9 @@ class Foo:
 class Class:
     def __init__(self):
         print(f"{self.attr=}")
+
+
+# Regression test for: https://github.com/astral-sh/ruff/issues/14695
+# A quoted annotation containing a nested string with an escape sequence
+# should not cause a stack overflow.
+def quoted_escape(x: "'in\x74'"): pass

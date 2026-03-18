@@ -282,6 +282,9 @@ class WithDefault(Generic[T, WithDefaultU]): ...
 
 reveal_type(WithDefault[str, str]())  # revealed: WithDefault[str, str]
 reveal_type(WithDefault[str]())  # revealed: WithDefault[str, int]
+
+# error: [invalid-type-arguments] "Too many type arguments to class `WithDefault`: expected between 1 and 2, got 3"
+reveal_type(WithDefault[str, str, str]())  # revealed: WithDefault[Unknown, Unknown]
 ```
 
 Type variable defaults can reference earlier type variables, but not later ones:
@@ -399,7 +402,7 @@ consistent with each other.
 
 ```py
 from typing_extensions import Generic, TypeVar
-from ty_extensions import generic_context, into_callable
+from ty_extensions import generic_context, into_regular_callable
 
 T = TypeVar("T")
 
@@ -410,7 +413,7 @@ class C(Generic[T]):
 # revealed: ty_extensions.GenericContext[T@C]
 reveal_type(generic_context(C))
 # revealed: ty_extensions.GenericContext[T@C]
-reveal_type(generic_context(into_callable(C)))
+reveal_type(generic_context(into_regular_callable(C)))
 
 reveal_type(C(1))  # revealed: C[int]
 
@@ -422,7 +425,7 @@ wrong_innards: C[int] = C("five")
 
 ```py
 from typing_extensions import Generic, TypeVar
-from ty_extensions import generic_context, into_callable
+from ty_extensions import generic_context, into_regular_callable
 
 T = TypeVar("T")
 
@@ -432,7 +435,7 @@ class C(Generic[T]):
 # revealed: ty_extensions.GenericContext[T@C]
 reveal_type(generic_context(C))
 # revealed: ty_extensions.GenericContext[T@C]
-reveal_type(generic_context(into_callable(C)))
+reveal_type(generic_context(into_regular_callable(C)))
 
 reveal_type(C(1))  # revealed: C[int]
 
@@ -444,7 +447,7 @@ wrong_innards: C[int] = C("five")
 
 ```py
 from typing_extensions import Generic, TypeVar
-from ty_extensions import generic_context, into_callable
+from ty_extensions import generic_context, into_regular_callable
 
 T = TypeVar("T")
 
@@ -457,7 +460,7 @@ class C(Generic[T]):
 # revealed: ty_extensions.GenericContext[T@C]
 reveal_type(generic_context(C))
 # revealed: ty_extensions.GenericContext[T@C]
-reveal_type(generic_context(into_callable(C)))
+reveal_type(generic_context(into_regular_callable(C)))
 
 reveal_type(C(1))  # revealed: C[int]
 
@@ -469,7 +472,7 @@ wrong_innards: C[int] = C("five")
 
 ```py
 from typing_extensions import Generic, TypeVar
-from ty_extensions import generic_context, into_callable
+from ty_extensions import generic_context, into_regular_callable
 
 T = TypeVar("T")
 
@@ -482,7 +485,7 @@ class C(Generic[T]):
 # revealed: ty_extensions.GenericContext[T@C]
 reveal_type(generic_context(C))
 # revealed: ty_extensions.GenericContext[T@C]
-reveal_type(generic_context(into_callable(C)))
+reveal_type(generic_context(into_regular_callable(C)))
 
 reveal_type(C(1))  # revealed: C[int]
 
@@ -499,7 +502,7 @@ class D(Generic[T]):
 # revealed: ty_extensions.GenericContext[T@D]
 reveal_type(generic_context(D))
 # revealed: ty_extensions.GenericContext[T@D]
-reveal_type(generic_context(into_callable(D)))
+reveal_type(generic_context(into_regular_callable(D)))
 
 reveal_type(D(1))  # revealed: D[int]
 
@@ -515,7 +518,7 @@ to specialize the class.
 
 ```py
 from typing_extensions import Generic, TypeVar
-from ty_extensions import generic_context, into_callable
+from ty_extensions import generic_context, into_regular_callable
 
 T = TypeVar("T")
 U = TypeVar("U")
@@ -531,7 +534,7 @@ class D(C[V, int]):
 # revealed: ty_extensions.GenericContext[V@D]
 reveal_type(generic_context(D))
 # revealed: ty_extensions.GenericContext[V@D]
-reveal_type(generic_context(into_callable(D)))
+reveal_type(generic_context(into_regular_callable(D)))
 
 reveal_type(D(1))  # revealed: D[int]
 ```
@@ -540,7 +543,7 @@ reveal_type(D(1))  # revealed: D[int]
 
 ```py
 from typing_extensions import Generic, TypeVar
-from ty_extensions import generic_context, into_callable
+from ty_extensions import generic_context, into_regular_callable
 
 T = TypeVar("T")
 U = TypeVar("U")
@@ -554,7 +557,7 @@ class D(C[T, U]):
 # revealed: ty_extensions.GenericContext[T@D, U@D]
 reveal_type(generic_context(D))
 # revealed: ty_extensions.GenericContext[T@D, U@D]
-reveal_type(generic_context(into_callable(D)))
+reveal_type(generic_context(into_regular_callable(D)))
 
 reveal_type(C(1, "str"))  # revealed: C[int, str]
 reveal_type(D(1, "str"))  # revealed: D[int, str]
@@ -566,7 +569,7 @@ This is a specific example of the above, since it was reported specifically by a
 
 ```py
 from typing_extensions import Generic, TypeVar
-from ty_extensions import generic_context, into_callable
+from ty_extensions import generic_context, into_regular_callable
 
 T = TypeVar("T")
 U = TypeVar("U")
@@ -577,7 +580,7 @@ class D(dict[T, U]):
 # revealed: ty_extensions.GenericContext[T@D, U@D]
 reveal_type(generic_context(D))
 # revealed: ty_extensions.GenericContext[T@D, U@D]
-reveal_type(generic_context(into_callable(D)))
+reveal_type(generic_context(into_regular_callable(D)))
 
 reveal_type(D(key=1))  # revealed: D[str, int]
 ```
@@ -590,7 +593,7 @@ context. But from the user's point of view, this is another example of the above
 
 ```py
 from typing_extensions import Generic, TypeVar
-from ty_extensions import generic_context, into_callable
+from ty_extensions import generic_context, into_regular_callable
 
 T = TypeVar("T")
 U = TypeVar("U")
@@ -600,7 +603,7 @@ class C(tuple[T, U]): ...
 # revealed: ty_extensions.GenericContext[T@C, U@C]
 reveal_type(generic_context(C))
 # revealed: ty_extensions.GenericContext[T@C, U@C]
-reveal_type(generic_context(into_callable(C)))
+reveal_type(generic_context(into_regular_callable(C)))
 
 reveal_type(C((1, 2)))  # revealed: C[int, int]
 ```
@@ -633,7 +636,7 @@ def func8(t1: tuple[complex, list[int]], t2: tuple[int, *tuple[str, ...]], t3: t
 
 ```py
 from typing_extensions import Generic, TypeVar
-from ty_extensions import generic_context, into_callable
+from ty_extensions import generic_context, into_regular_callable
 
 S = TypeVar("S")
 T = TypeVar("T")
@@ -644,7 +647,7 @@ class C(Generic[T]):
 # revealed: ty_extensions.GenericContext[T@C]
 reveal_type(generic_context(C))
 # revealed: ty_extensions.GenericContext[T@C, S@__init__]
-reveal_type(generic_context(into_callable(C)))
+reveal_type(generic_context(into_regular_callable(C)))
 
 reveal_type(C(1, 1))  # revealed: C[int]
 reveal_type(C(1, "string"))  # revealed: C[int]
@@ -658,7 +661,7 @@ wrong_innards: C[int] = C("five", 1)
 
 ```py
 from typing_extensions import overload, Generic, TypeVar
-from ty_extensions import generic_context, into_callable
+from ty_extensions import generic_context, into_regular_callable
 
 T = TypeVar("T")
 U = TypeVar("U", covariant=True)
@@ -677,7 +680,7 @@ class C(Generic[T]):
 # revealed: ty_extensions.GenericContext[T@C]
 reveal_type(generic_context(C))
 # revealed: ty_extensions.GenericContext[T@C]
-reveal_type(generic_context(into_callable(C)))
+reveal_type(generic_context(into_regular_callable(C)))
 
 reveal_type(C("string"))  # revealed: C[str]
 reveal_type(C(b"bytes"))  # revealed: C[bytes]
@@ -709,7 +712,7 @@ class D(Generic[T, U]):
 # revealed: ty_extensions.GenericContext[T@D, U@D]
 reveal_type(generic_context(D))
 # revealed: ty_extensions.GenericContext[T@D, U@D]
-reveal_type(generic_context(into_callable(D)))
+reveal_type(generic_context(into_regular_callable(D)))
 
 reveal_type(D("string"))  # revealed: D[str, Literal["string"]]
 reveal_type(D(1))  # revealed: D[str, Literal[1]]
@@ -721,7 +724,7 @@ reveal_type(D(1, "string"))  # revealed: D[int, Literal["string"]]
 ```py
 from dataclasses import dataclass
 from typing_extensions import Generic, TypeVar
-from ty_extensions import generic_context, into_callable
+from ty_extensions import generic_context, into_regular_callable
 
 T = TypeVar("T")
 
@@ -732,7 +735,7 @@ class A(Generic[T]):
 # revealed: ty_extensions.GenericContext[T@A]
 reveal_type(generic_context(A))
 # revealed: ty_extensions.GenericContext[T@A]
-reveal_type(generic_context(into_callable(A)))
+reveal_type(generic_context(into_regular_callable(A)))
 
 reveal_type(A(x=1))  # revealed: A[int]
 ```
@@ -741,7 +744,7 @@ reveal_type(A(x=1))  # revealed: A[int]
 
 ```py
 from typing_extensions import Generic, TypeVar
-from ty_extensions import generic_context, into_callable
+from ty_extensions import generic_context, into_regular_callable
 
 T = TypeVar("T")
 U = TypeVar("U", default=T)
@@ -751,7 +754,7 @@ class C(Generic[T, U]): ...
 # revealed: ty_extensions.GenericContext[T@C, U@C]
 reveal_type(generic_context(C))
 # revealed: ty_extensions.GenericContext[T@C, U@C]
-reveal_type(generic_context(into_callable(C)))
+reveal_type(generic_context(into_regular_callable(C)))
 
 reveal_type(C())  # revealed: C[Unknown, Unknown]
 
@@ -761,7 +764,7 @@ class D(Generic[T, U]):
 # revealed: ty_extensions.GenericContext[T@D, U@D]
 reveal_type(generic_context(D))
 # revealed: ty_extensions.GenericContext[T@D, U@D]
-reveal_type(generic_context(into_callable(D)))
+reveal_type(generic_context(into_regular_callable(D)))
 
 reveal_type(D())  # revealed: D[Unknown, Unknown]
 ```
@@ -1058,6 +1061,58 @@ class D(C[G]): ...
 def func(x: D): ...
 
 func(G())  # error: [invalid-argument-type]
+```
+
+## Default type parameter after `TypeVarTuple`
+
+A type parameter with a default cannot follow a `TypeVarTuple` in a legacy `Generic[...]` or
+`Protocol[...]` subscription. This is prohibited by the typing spec because a `TypeVarTuple`
+consumes all remaining positional type arguments, making any subsequent defaults meaningless.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import ParamSpec, TypeVar, TypeVarTuple, Unpack, Generic, Protocol
+
+T = TypeVar("T", default=int)
+T2 = TypeVar("T2", default=str)
+U = TypeVar("U")
+Ts = TypeVarTuple("Ts")
+Ts2 = TypeVarTuple("Ts2", default=Unpack[tuple[int, str]])
+Us = TypeVarTuple("Us")
+P = ParamSpec("P", default=[int, str])
+
+# TODO: should emit [invalid-type-variable-default]
+class Foo(Generic[*Ts, T]): ...
+
+# TODO: should emit [invalid-type-variable-default]
+class Bar(Generic[U, *Ts, T]): ...
+
+# TODO: should emit [invalid-type-variable-default]
+class Baz(Protocol[*Ts, T]): ...
+
+# TODO: should emit [invalid-type-variable-default]
+class Qux(Generic[*Ts, T, T2]): ...
+
+# TODO: should emit [invalid-type-variable-default]
+class Quux(Generic[Unpack[Ts], T]): ...
+
+# Note: the spec says this is fine,
+# but it raises `TypeError` at runtime
+# (<https://github.com/python/typing/issues/2211>)
+#
+# TODO: should emit [invalid-type-variable-default]
+class Corge(Generic[Unpack[Us], P]): ...
+
+# TODO: should emit [invalid-type-variable-default]
+class Grault(Generic[Unpack[Us], Unpack[Ts2]]): ...
+
+# These are fine:
+class Ok1(Generic[U, *Ts]): ...
+class Ok2(Generic[U, Unpack[Ts]]): ...
 ```
 
 [crtp]: https://en.wikipedia.org/wiki/Curiously_recurring_template_pattern

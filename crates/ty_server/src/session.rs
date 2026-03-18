@@ -27,13 +27,13 @@ use ty_project::watch::{ChangeEvent, CreatedKind};
 use ty_project::{ChangeResult, Db as _, ProjectDatabase, ProjectMetadata};
 
 use index::DocumentError;
-use ty_python_semantic::MisconfigurationMode;
+use ty_python_semantic::UseDefaultStrategy;
 
 pub(crate) use self::options::InitializationOptions;
 pub use self::options::{ClientOptions, DiagnosticMode, GlobalOptions, WorkspaceOptions};
 pub(crate) use self::settings::{GlobalSettings, WorkspaceSettings};
 use crate::capabilities::{ResolvedClientCapabilities, server_diagnostic_options};
-use crate::document::{DocumentKey, DocumentVersion, NotebookDocument};
+use crate::document::{DocumentKey, DocumentVersion, LanguageId, NotebookDocument};
 use crate::server::{Action, publish_settings_diagnostics};
 use crate::session::client::Client;
 use crate::session::index::Document;
@@ -611,7 +611,7 @@ impl Session {
                     metadata.apply_overrides(overrides);
                 }
 
-                ProjectDatabase::new(metadata, system.clone())
+                ProjectDatabase::fallible(metadata, system.clone())
             });
 
         let (root, db) = match project {
@@ -627,15 +627,13 @@ impl Session {
                     self.client_name.log_guidance(),
                 ));
 
-                let db_with_default_settings = ProjectMetadata::from_options(
+                let Ok(metadata) = ProjectMetadata::from_options(
                     Options::default(),
                     root,
                     None,
-                    MisconfigurationMode::UseDefault,
-                )
-                .context("Failed to convert default options to metadata")
-                .and_then(|metadata| ProjectDatabase::new(metadata, system))
-                .expect("Default configuration to be valid");
+                    &UseDefaultStrategy,
+                );
+                let db_with_default_settings = ProjectDatabase::use_defaults(metadata, system);
                 let default_root = db_with_default_settings
                     .project()
                     .root(&db_with_default_settings)
@@ -1166,7 +1164,7 @@ impl Session {
     /// Returns a handle to the opened document.
     pub(crate) fn open_notebook_document(&mut self, document: NotebookDocument) -> DocumentHandle {
         let handle = self.index_mut().open_notebook_document(document);
-        self.open_document_in_db(&handle);
+        self.open_document_in_db(&handle, None);
         handle
     }
 
@@ -1175,12 +1173,13 @@ impl Session {
     ///
     /// Returns a handle to the opened document.
     pub(crate) fn open_text_document(&mut self, document: TextDocument) -> DocumentHandle {
+        let language_id = document.language_id();
         let handle = self.index_mut().open_text_document(document);
-        self.open_document_in_db(&handle);
+        self.open_document_in_db(&handle, Some(language_id));
         handle
     }
 
-    fn open_document_in_db(&mut self, document: &DocumentHandle) {
+    fn open_document_in_db(&mut self, document: &DocumentHandle, language_id: Option<LanguageId>) {
         let path = document.notebook_or_file_path();
 
         // This is a "maybe" because the `File` might've not been interned yet i.e., the
@@ -1193,6 +1192,11 @@ impl Session {
                 .is_none_or(|file| !file.exists(db))
         });
 
+        // When we know the document isn't a Python source file
+        // then we'll avoid adding it to the project. (But we
+        // still track it as part of the index.)
+        let is_not_python = matches!(language_id, Some(LanguageId::Other));
+
         match path {
             AnySystemPath::System(system_path) => {
                 let event = if is_maybe_new_system_file {
@@ -1204,6 +1208,10 @@ impl Session {
                     ChangeEvent::Opened(system_path.clone())
                 };
                 self.apply_changes(path, vec![event]);
+
+                if is_not_python {
+                    return;
+                }
 
                 let db = self.project_db_mut(path);
                 match system_path_to_file(db, system_path) {
@@ -1220,6 +1228,10 @@ impl Session {
                 }
             }
             AnySystemPath::SystemVirtual(virtual_path) => {
+                if is_not_python {
+                    return;
+                }
+
                 let db = self.project_db_mut(path);
                 let virtual_file = db.files().virtual_file(db, virtual_path);
                 db.project().open_file(db, virtual_file.file());

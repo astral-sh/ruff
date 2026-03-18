@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
-input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/statement/function.py
 ---
 ## Input
 ```python
@@ -569,6 +568,19 @@ def args_with_type_annotations_no_after_colon_comment(
     int # trailing type
     # after type
     ): pass
+
+
+# Preserve parentheses around invalid type expressions in parameter annotations.
+def preserve_named_param_annotation(x: (value := int)):
+    pass
+
+
+def preserve_yield_param_annotation(x: (yield 1)):
+    pass
+
+
+async def preserve_await_param_annotation(x: (await g())):
+    pass
 ```
 
 ## Output
@@ -1317,6 +1329,19 @@ def args_with_type_annotations_no_after_colon_comment(
     int,  # trailing type
     # after type
 ):
+    pass
+
+
+# Preserve parentheses around invalid type expressions in parameter annotations.
+def preserve_named_param_annotation(x: (value := int)):
+    pass
+
+
+def preserve_yield_param_annotation(x: (yield 1)):
+    pass
+
+
+async def preserve_await_param_annotation(x: (await g())):
     pass
 ```
 

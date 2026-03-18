@@ -853,12 +853,12 @@ Type inference accounts for parameter type annotations across all signatures in 
 ```py
 from typing import TypedDict, overload
 
-class T(TypedDict):
+class TD(TypedDict):
     x: int
 
 def _(flag: bool):
     if flag:
-        def f(x: T) -> int:
+        def f(x: TD) -> int:
             return 1
 
     else:
@@ -867,7 +867,7 @@ def _(flag: bool):
     x = f({"x": 1})
     reveal_type(x)  # revealed: int
 
-    # error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `T`, found `dict[str, int] & dict[Unknown | str, Unknown | int]`"
+    # error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `TD`, found `dict[str, int]`"
     f({"y": 1})
 ```
 

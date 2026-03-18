@@ -5,12 +5,13 @@ use crate::{
     semantic_index::{definition::Definition, scope::ScopeId},
     types::{
         ApplyTypeMappingVisitor, BoundTypeVarInstance, CallableType, ClassType, GenericContext,
-        InvalidTypeExpressionError, KnownClass, StringLiteralType, Type, TypeAliasType,
-        TypeContext, TypeMapping, TypeVarInstance, TypeVarVariance, UnionBuilder,
+        InferenceFlags, InvalidTypeExpressionError, KnownClass, StringLiteralType, Type,
+        TypeAliasType, TypeContext, TypeMapping, TypeVarVariance, UnionBuilder,
         class::NamedTupleSpec,
         constraints::OwnedConstraintSet,
         generics::{Specialization, walk_generic_context},
         newtype::NewType,
+        typevar::TypeVarInstance,
         variance::VarianceInferable,
         visitor,
     },
@@ -282,8 +283,9 @@ impl<'db> KnownInstanceType<'db> {
                     BoundTypeVarInstance::new(db, typevar, *binding_context, None),
                 ),
                 TypeMapping::ApplySpecialization(_)
+                | TypeMapping::ApplySpecializationWithMaterialization { .. }
                 | TypeMapping::UniqueSpecialization { .. }
-                | TypeMapping::PromoteLiterals(_)
+                | TypeMapping::Promote(..)
                 | TypeMapping::BindSelf(..)
                 | TypeMapping::ReplaceSelf { .. }
                 | TypeMapping::Materialize(_)
@@ -336,14 +338,11 @@ impl<'db> KnownInstanceType<'db> {
 }
 
 /// Data regarding a `warnings.deprecated` or `typing_extensions.deprecated` decorator.
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
 pub struct DeprecatedInstance<'db> {
     /// The message for the deprecation
-    pub message: Option<StringLiteralType<'db>>,
+    pub(crate) message: Option<StringLiteralType<'db>>,
 }
-
-// The Salsa heap is tracked separately.
-impl get_size2::GetSize for DeprecatedInstance<'_> {}
 
 /// Contains information about instances of `dataclasses.Field`, typically created using
 /// `dataclasses.field()`.
@@ -425,10 +424,11 @@ impl<'db> UnionTypeInstance<'db> {
         value_expr_types: [Type<'db>; 2],
         scope_id: ScopeId<'db>,
         typevar_binding_context: Option<Definition<'db>>,
+        inference_flags: InferenceFlags,
     ) -> Type<'db> {
         let mut builder = UnionBuilder::new(db);
         for ty in &value_expr_types {
-            match ty.in_type_expression(db, scope_id, typevar_binding_context) {
+            match ty.in_type_expression(db, scope_id, typevar_binding_context, inference_flags) {
                 Ok(ty) => builder.add_in_place(ty),
                 Err(error) => {
                     return Type::KnownInstance(KnownInstanceType::UnionType(

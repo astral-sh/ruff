@@ -310,13 +310,13 @@ def _(x: IntOrStr):
 from typing import TypeAlias, TypeVar, Union
 from types import UnionType
 
-RecursiveTuple: TypeAlias = tuple[int | "RecursiveTuple", str]
+RecursiveTuple: TypeAlias = tuple["int | RecursiveTuple", str]
 
 def _(rec: RecursiveTuple):
     # TODO should be `tuple[int | RecursiveTuple, str]`
     reveal_type(rec)  # revealed: tuple[Divergent, str]
 
-RecursiveHomogeneousTuple: TypeAlias = tuple[int | "RecursiveHomogeneousTuple", ...]
+RecursiveHomogeneousTuple: TypeAlias = tuple["int | RecursiveHomogeneousTuple", ...]
 
 def _(rec: RecursiveHomogeneousTuple):
     # TODO should be `tuple[int | RecursiveHomogeneousTuple, ...]`
@@ -486,6 +486,19 @@ bad10: TypeAlias = InitVar  # error: [invalid-type-form]
 # `Unpack` is not a type qualifier, and so the error message in our diagnostic
 # shouldn't say that it is.
 differently_bad: TypeAlias = Unpack[tuple[int, ...]]
+```
+
+## Recursive `TypeIs` and `TypeGuard` aliases don't stack overflow
+
+```py
+from typing import TypeAlias
+from typing_extensions import TypeGuard, TypeIs
+
+RecursiveIs: TypeAlias = TypeIs["RecursiveIs"]
+RecursiveGuard: TypeAlias = TypeGuard["RecursiveGuard"]
+
+AliasIs: TypeAlias = RecursiveIs
+AliasGuard: TypeAlias = RecursiveGuard
 ```
 
 [type expression]: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions

@@ -8,6 +8,7 @@ use ruff_python_ast::PythonVersion;
 
 use crate::db::tests::TestDb;
 use crate::settings::SearchPathSettings;
+use crate::strategy::FallibleStrategy;
 
 /// A test case for the module resolver.
 ///
@@ -253,7 +254,7 @@ impl TestCaseBuilder<MockedTypeshed> {
             site_packages_paths: vec![site_packages.clone()],
             ..SearchPathSettings::empty()
         }
-        .to_search_paths(db.system(), db.vendored())
+        .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
         .expect("Valid search path settings");
 
         db = db.with_search_paths(search_paths);
@@ -327,7 +328,7 @@ impl TestCaseBuilder<VendoredTypeshed> {
             site_packages_paths: vec![site_packages.clone()],
             ..SearchPathSettings::empty()
         }
-        .to_search_paths(db.system(), db.vendored())
+        .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
         .expect("Valid search path settings");
 
         db = db.with_search_paths(search_paths);

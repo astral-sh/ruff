@@ -136,6 +136,36 @@ c.my_property = 2
 c.my_property = "a"
 ```
 
+## Conditional redefinition in class body
+
+Distinct property definitions in statically unknown class-body branches should remain distinct, the
+same way methods do:
+
+```py
+from random import random
+
+class Baz:
+    if random():
+        def method(self) -> int:
+            return 42
+
+        @property
+        def prop(self) -> int:
+            return 42
+
+    else:
+        def method(self) -> str:
+            return "hello"
+
+        @property
+        def prop(self) -> str:
+            return "hello"
+
+baz = Baz()
+reveal_type(baz.prop)  # revealed: int | str
+reveal_type(baz.method())  # revealed: int | str
+```
+
 ## Failure cases
 
 ### Attempting to write to a read-only property
@@ -350,4 +380,157 @@ static_assert(not is_subtype_of(TypeOf[attr_property.__get__], types.WrapperDesc
 static_assert(not is_subtype_of(TypeOf[attr_property.__set__], types.WrapperDescriptorType))
 static_assert(not is_subtype_of(TypeOf[attr_property.__get__], types.BuiltinMethodType))
 static_assert(not is_subtype_of(TypeOf[attr_property.__set__], types.BuiltinMethodType))
+```
+
+## Property type relations
+
+Property equivalence and disjointness are structural over the getter and setter types. We use
+standalone property objects here so `TypeOf[...]` sees the raw property type rather than the
+`Unknown | ...` that can arise from class-attribute lookup. For the subtype cases, we construct
+properties through helper functions with `Callable`-typed parameters so the slot types are
+structural rather than exact function literals:
+
+```py
+from typing import Callable
+from ty_extensions import (
+    CallableTypeOf,
+    TypeOf,
+    is_assignable_to,
+    is_disjoint_from,
+    is_equivalent_to,
+    is_subtype_of,
+    static_assert,
+)
+
+def get_int(self) -> int:
+    return 1
+
+def get_str(self) -> str:
+    return "a"
+
+def set_int(self, value: int) -> None:
+    pass
+
+def set_object(self, value: object) -> None:
+    pass
+
+def set_str(self, value: str) -> None:
+    pass
+
+def get_equiv_a(self, /) -> int:
+    return 1
+
+def get_equiv_b(other, /) -> int:
+    return 1
+
+GetterReturnsInt = Callable[[object], int]
+GetterReturnsObject = Callable[[object], object]
+SetterAcceptsInt = Callable[[object, int], None]
+SetterAcceptsObject = Callable[[object, object], None]
+
+# Use `CallableTypeOf[...]` here rather than plain `Callable[...]` so these getters remain
+# equivalent as types while still carrying distinct callable metadata and distinct Salsa IDs.
+def assert_equivalent_properties(
+    getter_a: CallableTypeOf[get_equiv_a],
+    getter_b: CallableTypeOf[get_equiv_b],
+):
+    getter_only_equivalent_a = property(getter_a)
+    getter_only_equivalent_b = property(getter_b)
+
+    static_assert(is_equivalent_to(TypeOf[getter_only_equivalent_a], TypeOf[getter_only_equivalent_b]))
+    static_assert(not is_disjoint_from(TypeOf[getter_only_equivalent_a], TypeOf[getter_only_equivalent_b]))
+
+def assert_structural_property_relations(
+    getter_sub: GetterReturnsInt,
+    getter_super: GetterReturnsObject,
+    setter_sub: SetterAcceptsObject,
+    setter_super: SetterAcceptsInt,
+):
+    getter_covariant_sub = property(getter_sub)
+    getter_covariant_super = property(getter_super)
+
+    setter_contravariant_sub = property(fset=setter_sub)
+    setter_contravariant_super = property(fset=setter_super)
+
+    both_structural_sub = property(getter_sub, setter_sub)
+    both_structural_super = property(getter_super, setter_super)
+
+    static_assert(not is_equivalent_to(TypeOf[getter_covariant_sub], TypeOf[getter_covariant_super]))
+    static_assert(not is_equivalent_to(TypeOf[setter_contravariant_sub], TypeOf[setter_contravariant_super]))
+    static_assert(not is_equivalent_to(TypeOf[both_structural_sub], TypeOf[both_structural_super]))
+
+    static_assert(is_subtype_of(TypeOf[getter_covariant_sub], TypeOf[getter_covariant_super]))
+    static_assert(not is_subtype_of(TypeOf[getter_covariant_super], TypeOf[getter_covariant_sub]))
+    static_assert(is_assignable_to(TypeOf[getter_covariant_sub], TypeOf[getter_covariant_super]))
+    static_assert(not is_assignable_to(TypeOf[getter_covariant_super], TypeOf[getter_covariant_sub]))
+
+    static_assert(is_subtype_of(TypeOf[setter_contravariant_sub], TypeOf[setter_contravariant_super]))
+    static_assert(not is_subtype_of(TypeOf[setter_contravariant_super], TypeOf[setter_contravariant_sub]))
+    static_assert(is_assignable_to(TypeOf[setter_contravariant_sub], TypeOf[setter_contravariant_super]))
+    static_assert(not is_assignable_to(TypeOf[setter_contravariant_super], TypeOf[setter_contravariant_sub]))
+
+    static_assert(is_subtype_of(TypeOf[both_structural_sub], TypeOf[both_structural_super]))
+    static_assert(not is_subtype_of(TypeOf[both_structural_super], TypeOf[both_structural_sub]))
+    static_assert(is_assignable_to(TypeOf[both_structural_sub], TypeOf[both_structural_super]))
+    static_assert(not is_assignable_to(TypeOf[both_structural_super], TypeOf[both_structural_sub]))
+
+    static_assert(is_subtype_of(TypeOf[both_structural_sub.__get__], TypeOf[both_structural_super.__get__]))
+    static_assert(not is_subtype_of(TypeOf[both_structural_super.__get__], TypeOf[both_structural_sub.__get__]))
+    static_assert(is_subtype_of(TypeOf[both_structural_sub.__set__], TypeOf[both_structural_super.__set__]))
+    static_assert(not is_subtype_of(TypeOf[both_structural_super.__set__], TypeOf[both_structural_sub.__set__]))
+
+    static_assert(not is_disjoint_from(TypeOf[getter_covariant_sub], TypeOf[getter_covariant_super]))
+    static_assert(not is_disjoint_from(TypeOf[setter_contravariant_sub], TypeOf[setter_contravariant_super]))
+    static_assert(not is_disjoint_from(TypeOf[both_structural_sub], TypeOf[both_structural_super]))
+    static_assert(not is_disjoint_from(TypeOf[both_structural_sub.__get__], TypeOf[both_structural_super.__get__]))
+    static_assert(not is_disjoint_from(TypeOf[both_structural_sub.__set__], TypeOf[both_structural_super.__set__]))
+
+empty_a = property()
+empty_b = property()
+
+getter_only_a = property(get_int)
+getter_only_b = property(get_int)
+getter_only_c = property(get_str)
+
+setter_only_a = property(fset=set_int)
+setter_only_b = property(fset=set_int)
+setter_only_c = property(fset=set_str)
+
+both_a = property(get_int, set_int)
+both_b = property(get_int, set_int)
+both_c = property(get_int, set_str)
+both_d = property(get_str, set_int)
+
+static_assert(is_equivalent_to(TypeOf[empty_a], TypeOf[empty_b]))
+static_assert(is_equivalent_to(TypeOf[getter_only_a], TypeOf[getter_only_b]))
+static_assert(is_equivalent_to(TypeOf[setter_only_a], TypeOf[setter_only_b]))
+static_assert(is_equivalent_to(TypeOf[both_a], TypeOf[both_b]))
+
+static_assert(not is_equivalent_to(TypeOf[empty_a], TypeOf[getter_only_a]))
+static_assert(not is_equivalent_to(TypeOf[empty_a], TypeOf[setter_only_a]))
+static_assert(not is_equivalent_to(TypeOf[getter_only_a], TypeOf[getter_only_c]))
+static_assert(not is_equivalent_to(TypeOf[getter_only_a], TypeOf[setter_only_a]))
+static_assert(not is_equivalent_to(TypeOf[getter_only_a], TypeOf[both_a]))
+static_assert(not is_equivalent_to(TypeOf[setter_only_a], TypeOf[setter_only_c]))
+static_assert(not is_equivalent_to(TypeOf[setter_only_a], TypeOf[both_a]))
+static_assert(not is_equivalent_to(TypeOf[both_a], TypeOf[both_c]))
+static_assert(not is_equivalent_to(TypeOf[both_a], TypeOf[both_d]))
+
+static_assert(not is_disjoint_from(TypeOf[empty_a], TypeOf[empty_b]))
+static_assert(not is_disjoint_from(TypeOf[getter_only_a], TypeOf[getter_only_b]))
+static_assert(not is_disjoint_from(TypeOf[setter_only_a], TypeOf[setter_only_b]))
+static_assert(not is_disjoint_from(TypeOf[both_a], TypeOf[both_b]))
+
+static_assert(is_disjoint_from(TypeOf[empty_a], TypeOf[getter_only_a]))
+static_assert(is_disjoint_from(TypeOf[empty_a], TypeOf[setter_only_a]))
+static_assert(is_disjoint_from(TypeOf[getter_only_a], TypeOf[getter_only_c]))
+static_assert(is_disjoint_from(TypeOf[getter_only_a], TypeOf[setter_only_a]))
+static_assert(is_disjoint_from(TypeOf[getter_only_a], TypeOf[both_a]))
+static_assert(is_disjoint_from(TypeOf[setter_only_a], TypeOf[setter_only_c]))
+static_assert(is_disjoint_from(TypeOf[setter_only_a], TypeOf[both_a]))
+static_assert(is_disjoint_from(TypeOf[both_a], TypeOf[both_c]))
+static_assert(is_disjoint_from(TypeOf[both_a], TypeOf[both_d]))
+
+assert_equivalent_properties(get_equiv_a, get_equiv_b)
+assert_structural_property_relations(get_int, get_int, set_object, set_object)
 ```

@@ -393,6 +393,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Bugbear, "034") => rules::flake8_bugbear::rules::ReSubPositionalArgs,
         (Flake8Bugbear, "035") => rules::flake8_bugbear::rules::StaticKeyDictComprehension,
         (Flake8Bugbear, "039") => rules::flake8_bugbear::rules::MutableContextvarDefault,
+        (Flake8Bugbear, "043") => rules::flake8_bugbear::rules::DelAttrWithConstant,
         (Flake8Bugbear, "901") => rules::flake8_bugbear::rules::ReturnInGenerator,
         (Flake8Bugbear, "903") => rules::flake8_bugbear::rules::ClassAsDataStructure,
         (Flake8Bugbear, "904") => rules::flake8_bugbear::rules::RaiseWithoutFromInsideExcept,
@@ -435,6 +436,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8TidyImports, "251") => rules::flake8_tidy_imports::rules::BannedApi,
         (Flake8TidyImports, "252") => rules::flake8_tidy_imports::rules::RelativeImports,
         (Flake8TidyImports, "253") => rules::flake8_tidy_imports::rules::BannedModuleLevelImports,
+        (Flake8TidyImports, "254") => rules::flake8_tidy_imports::rules::LazyImportMismatch,
 
         // flake8-return
         (Flake8Return, "501") => rules::flake8_return::rules::UnnecessaryReturnNone,
@@ -1066,6 +1068,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "068") => rules::ruff::rules::DuplicateEntryInDunderAll,
         (Ruff, "069") => rules::ruff::rules::FloatEqualityComparison,
         (Ruff, "070") => rules::ruff::rules::UnnecessaryAssignBeforeYield,
+        (Ruff, "071") => rules::ruff::rules::OsPathCommonprefix,
 
         (Ruff, "100") => rules::ruff::rules::UnusedNOQA,
         (Ruff, "101") => rules::ruff::rules::RedirectedNOQA,
@@ -1127,9 +1130,11 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         // airflow
         (Airflow, "001") => rules::airflow::rules::AirflowVariableNameTaskIdMismatch,
         (Airflow, "002") => rules::airflow::rules::AirflowDagNoScheduleArgument,
+        (Airflow, "003") => rules::airflow::rules::AirflowVariableGetOutsideTask,
         (Airflow, "301") => rules::airflow::rules::Airflow3Removal,
         (Airflow, "302") => rules::airflow::rules::Airflow3MovedToProvider,
         (Airflow, "303") => rules::airflow::rules::Airflow3IncompatibleFunctionSignature,
+        (Airflow, "304") => rules::airflow::rules::Airflow3DagDynamicValue,
         (Airflow, "311") => rules::airflow::rules::Airflow3SuggestedUpdate,
         (Airflow, "312") => rules::airflow::rules::Airflow3SuggestedToMoveToProvider,
         (Airflow, "321") => rules::airflow::rules::Airflow31Moved,
