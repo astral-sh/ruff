@@ -100,13 +100,15 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
 
 use crate::types::class::GenericAlias;
-use crate::types::generics::InferableTypeVars;
+use crate::types::generics::{ApplySpecialization, InferableTypeVars};
 use crate::types::typevar::{BoundTypeVarIdentity, walk_bound_type_var_type};
+use crate::types::variance::VarianceInferable;
 use crate::types::visitor::{
     TypeCollector, TypeVisitor, any_over_type, walk_type_with_recursion_guard,
 };
 use crate::types::{
-    BoundTypeVarInstance, IntersectionType, Type, TypeVarBoundOrConstraints, UnionType,
+    BoundTypeVarInstance, IntersectionType, Type, TypeContext, TypeMapping,
+    TypeVarBoundOrConstraints, TypeVarVariance, UnionType,
 };
 use crate::{Db, FxIndexMap, FxIndexSet};
 
@@ -4287,6 +4289,7 @@ impl SequentMap {
                 left_constraint,
                 right_constraint,
             );
+            self.add_nested_typevar_sequents(db, builder, left_constraint, right_constraint);
         } else if left_constraint_data.lower.is_type_var()
             || left_constraint_data.upper.is_type_var()
             || right_constraint_data.lower.is_type_var()
@@ -4456,6 +4459,121 @@ impl SequentMap {
                 post_constraint,
             );
         }
+    }
+
+    /// Adds sequents for the case where one constraint's lower or upper bound contains another
+    /// constraint's typevar nested inside a parameterized type (e.g., `U ≤ Covariant[T]`).
+    ///
+    /// This is distinct from `add_mutual_sequents_for_different_typevars`, which handles the case
+    /// where a typevar appears _directly_ as a top-level lower/upper bound (e.g., `U ≤ T`). A
+    /// bare `Type::TypeVar` is technically a special case of covariant nesting (since the variance
+    /// of `T` in `T` itself is covariant), but the existing direct-typevar logic handles it
+    /// separately because it requires careful canonical ordering of typevar-to-typevar constraints
+    /// that the generic nested-typevar logic here does not need to worry about.
+    fn add_nested_typevar_sequents<'db>(
+        &mut self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        left_constraint: ConstraintId,
+        right_constraint: ConstraintId,
+    ) {
+        let mut try_one_direction =
+            |bound_constraint: ConstraintId, constrained_constraint: ConstraintId| {
+                let bound_data = builder.constraint_data(bound_constraint);
+                let bound_typevar = bound_data.typevar;
+                let constrained_data = builder.constraint_data(constrained_constraint);
+                let constrained_typevar = constrained_data.typevar;
+
+                // Check the upper bound of the constrained constraint for nested occurrences of
+                // the bound typevar. We use `variance_of` as our combined presence + variance
+                // check: `Bivariant` means the typevar doesn't appear in the type (or is genuinely
+                // bivariant, which is semantically equivalent — no implication is needed in either
+                // case).
+                //
+                // Note: if `Bivariant` is ever removed from the `TypeVarVariance` enum, we would
+                // need an alternative representation for "typevar not present"
+                // (e.g., `Option<TypeVarVariance>`).
+                let upper_post = match constrained_data.upper.variance_of(db, bound_typevar) {
+                    TypeVarVariance::Bivariant => None,
+                    // Skip bare typevars — those are handled by
+                    // `add_mutual_sequents_for_different_typevars`.
+                    _ if constrained_data.upper.is_type_var() => None,
+                    // Covariance preserves direction: upper bound on T substitutes into upper
+                    // bound. A ≤ B → G[A] ≤ G[B], so (T ≤ u_B) gives G[T] ≤ G[u_B].
+                    TypeVarVariance::Covariant if !bound_data.upper.is_object() => {
+                        let new_upper = constrained_data.upper.apply_type_mapping(
+                            db,
+                            &TypeMapping::ApplySpecialization(ApplySpecialization::Single(
+                                bound_typevar,
+                                bound_data.upper,
+                            )),
+                            TypeContext::default(),
+                        );
+                        (new_upper != constrained_data.upper).then(|| {
+                            ConstraintId::new(
+                                db,
+                                builder,
+                                constrained_typevar,
+                                constrained_data.lower,
+                                new_upper,
+                            )
+                        })
+                    }
+                    // TODO: Contravariant and Invariant cases will be added in Phase 3.
+                    _ => None,
+                };
+                if let Some(post) = upper_post {
+                    self.add_pair_implication(
+                        db,
+                        builder,
+                        bound_constraint,
+                        constrained_constraint,
+                        post,
+                    );
+                }
+
+                // Check the lower bound of the constrained constraint for nested occurrences.
+                let lower_post = match constrained_data.lower.variance_of(db, bound_typevar) {
+                    TypeVarVariance::Bivariant => None,
+                    _ if constrained_data.lower.is_type_var() => None,
+                    // Covariance preserves direction: lower bound on T substitutes into lower
+                    // bound. A ≤ B → G[A] ≤ G[B], so (l_B ≤ T) gives G[l_B] ≤ G[T].
+                    TypeVarVariance::Covariant if !bound_data.lower.is_never() => {
+                        let new_lower = constrained_data.lower.apply_type_mapping(
+                            db,
+                            &TypeMapping::ApplySpecialization(ApplySpecialization::Single(
+                                bound_typevar,
+                                bound_data.lower,
+                            )),
+                            TypeContext::default(),
+                        );
+                        (new_lower != constrained_data.lower).then(|| {
+                            ConstraintId::new(
+                                db,
+                                builder,
+                                constrained_typevar,
+                                new_lower,
+                                constrained_data.upper,
+                            )
+                        })
+                    }
+                    // TODO: Contravariant and Invariant cases will be added in Phase 3.
+                    _ => None,
+                };
+                if let Some(post) = lower_post {
+                    self.add_pair_implication(
+                        db,
+                        builder,
+                        bound_constraint,
+                        constrained_constraint,
+                        post,
+                    );
+                }
+            };
+
+        // Try both directions: left's typevar might be nested in right's bounds, or vice versa.
+        try_one_direction(left_constraint, right_constraint);
+        try_one_direction(right_constraint, left_constraint);
     }
 
     fn add_mutual_sequents_for_same_typevars<'db>(

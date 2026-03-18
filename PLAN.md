@@ -44,7 +44,7 @@ contravariance and invariance as modifications to that working foundation.
 
 ### Phase 1: Helpers
 
-#### Step 1.1 ⬜ — Confirm that `variance_of` serves as our detection mechanism
+#### Step 1.1 ✅ — Confirm that `variance_of` serves as our detection mechanism
 
 No new helper is needed. The existing `VarianceInferable` trait provides
 `ty.variance_of(db, typevar)`, which returns:
@@ -65,7 +65,7 @@ needed in either case)." Note that if `Bivariant` is ever removed from the
 `TypeVarVariance` enum, we would need an alternative representation for
 "typevar not present" (e.g., returning `Option<TypeVarVariance>`).
 
-#### Step 1.2 ⬜ — Add a `Single` variant to `ApplySpecialization`
+#### Step 1.2 ✅ — Add a `Single` variant to `ApplySpecialization`
 
 Add a new variant to `ApplySpecialization` in `generics.rs`:
 
@@ -89,7 +89,7 @@ This phase implements the covariant case fully, including sequent generation,
 testing, and validation. Contravariance and invariance will follow as
 modifications to this working foundation.
 
-#### Step 2.1 ⬜ — Add mdtest cases for covariant propagation (red)
+#### Step 2.1 ✅ — Add mdtest cases for covariant propagation (red)
 
 Add tests to the "Transitivity" section of
 `crates/ty_python_semantic/resources/mdtest/type_properties/implies_subtype_of.md`.
@@ -115,7 +115,7 @@ Key test cases for covariant lower bound propagation:
 Run these tests first to verify they fail with the current logic (red phase of
 TDD). Then proceed to Step 2.2 to make them pass.
 
-#### Step 2.2 ⬜ — Add sequent generation for covariant nested typevars (green)
+#### Step 2.2 ✅ — Add sequent generation for covariant nested typevars (green)
 
 Currently, `add_sequents_for_pair` dispatches to
 `add_mutual_sequents_for_different_typevars` when the two constraints are on
@@ -160,7 +160,7 @@ check for nested references when the bound is *not* a bare `Type::TypeVar`.
 Add a comment in the code explaining this relationship — it's a subtle point
 that would be easy to miss.
 
-#### Step 2.3 ⬜ — Run the full test suite
+#### Step 2.3 ✅ — Run the full test suite
 
 Run the full constraint set and ty_python_semantic test suite to check for
 regressions. Fix any issues before proceeding.

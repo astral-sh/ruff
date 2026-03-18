@@ -576,4 +576,48 @@ def concrete_pivot[T, U]():
     static_assert(not constraints.implies_subtype_of(T, U))
 ```
 
+### Transitivity can propagate through nested covariant typevars
+
+When a typevar appears nested inside a covariant generic type in another constraint's bound, we can
+propagate the bound "into" the generic type.
+
+```py
+from typing import Never
+from ty_extensions import ConstraintSet, static_assert
+
+class Covariant[T]:
+    def get(self) -> T:
+        raise ValueError
+
+def upper_bound[T, U]():
+    # If (T ≤ int) ∧ (U ≤ Covariant[T]), then by covariance, Covariant[T] ≤ Covariant[int],
+    # and by transitivity, U ≤ Covariant[int].
+    constraints = ConstraintSet.range(Never, T, int) & ConstraintSet.range(Never, U, Covariant[T])
+    static_assert(constraints.implies_subtype_of(U, Covariant[int]))
+    static_assert(not constraints.implies_subtype_of(U, Covariant[bool]))
+    static_assert(not constraints.implies_subtype_of(U, Covariant[str]))
+
+def lower_bound[T, U]():
+    # If (int ≤ T ∧ Covariant[T] ≤ U), then by covariance, Covariant[int] ≤ Covariant[T],
+    # and by transitivity, Covariant[int] ≤ U. Since bool ≤ int, Covariant[bool] ≤ U also holds.
+    constraints = ConstraintSet.range(int, T, object) & ConstraintSet.range(Covariant[T], U, object)
+    static_assert(constraints.implies_subtype_of(Covariant[int], U))
+    static_assert(constraints.implies_subtype_of(Covariant[bool], U))
+    static_assert(not constraints.implies_subtype_of(Covariant[str], U))
+
+# Repeat with reversed typevar ordering to verify BDD-ordering independence.
+def upper_bound[U, T]():
+    constraints = ConstraintSet.range(Never, T, int) & ConstraintSet.range(Never, U, Covariant[T])
+    static_assert(constraints.implies_subtype_of(U, Covariant[int]))
+    static_assert(not constraints.implies_subtype_of(U, Covariant[bool]))
+    static_assert(not constraints.implies_subtype_of(U, Covariant[str]))
+
+def lower_bound[U, T]():
+    # Since bool ≤ int, Covariant[bool] ≤ U also holds.
+    constraints = ConstraintSet.range(int, T, object) & ConstraintSet.range(Covariant[T], U, object)
+    static_assert(constraints.implies_subtype_of(Covariant[int], U))
+    static_assert(constraints.implies_subtype_of(Covariant[bool], U))
+    static_assert(not constraints.implies_subtype_of(Covariant[str], U))
+```
+
 [subtyping]: https://typing.python.org/en/latest/spec/concepts.html#subtype-supertype-and-type-equivalence

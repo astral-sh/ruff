@@ -1603,6 +1603,9 @@ pub enum ApplySpecialization<'a, 'db> {
         skip: Option<usize>,
     },
     ReturnCallables(&'a FxIndexMap<BoundTypeVarInstance<'db>, BoundTypeVarInstance<'db>>),
+    /// Maps a single typevar to a concrete type. Used by the constraint set's sequent map to
+    /// substitute a typevar nested inside another constraint's bound.
+    Single(BoundTypeVarInstance<'db>, Type<'db>),
 }
 
 impl<'db> ApplySpecialization<'_, 'db> {
@@ -1632,6 +1635,13 @@ impl<'db> ApplySpecialization<'_, 'db> {
             }
             ApplySpecialization::ReturnCallables(replacements) => {
                 replacements.get(&bound_typevar).copied().map(Type::TypeVar)
+            }
+            ApplySpecialization::Single(typevar, ty) => {
+                if bound_typevar.is_same_typevar_as(db, *typevar) {
+                    Some(*ty)
+                } else {
+                    None
+                }
             }
         }
     }
