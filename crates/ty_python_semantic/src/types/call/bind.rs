@@ -147,35 +147,6 @@ impl<'db> CallableItem<'db> {
         }
     }
 
-    fn check_downstream_constructor(
-        &mut self,
-        db: &'db dyn Db,
-        constraints: &ConstraintSetBuilder<'db>,
-        argument_types: &CallArguments<'_, 'db>,
-        call_expression_tcx: TypeContext<'db>,
-        dataclass_field_specifiers: &[Type<'db>],
-    ) -> bool {
-        match self {
-            CallableItem::Regular(_) => false,
-            CallableItem::Constructor(binding) => binding.check_downstream_constructor(
-                db,
-                constraints,
-                argument_types,
-                call_expression_tcx,
-                dataclass_field_specifiers,
-            ),
-        }
-    }
-
-    fn checked_downstream_constructor_bindings(&self, db: &'db dyn Db) -> Option<&Bindings<'db>> {
-        match self {
-            CallableItem::Regular(_) => None,
-            CallableItem::Constructor(binding) => {
-                binding.checked_downstream_constructor_bindings(db)
-            }
-        }
-    }
-
     fn as_constructor(&self) -> Option<&ConstructorBinding<'db>> {
         match self {
             CallableItem::Regular(_) => None,
@@ -610,6 +581,16 @@ impl<'db> Bindings<'db> {
             .flat_map(BindingsElement::items_mut)
     }
 
+    fn iter_constructor_items(&self) -> impl Iterator<Item = &ConstructorBinding<'db>> {
+        self.iter_callable_items()
+            .filter_map(CallableItem::as_constructor)
+    }
+
+    fn iter_constructor_items_mut(&mut self) -> impl Iterator<Item = &mut ConstructorBinding<'db>> {
+        self.iter_callable_items_mut()
+            .filter_map(CallableItem::as_constructor_mut)
+    }
+
     fn collect_type_context_callables<'a>(
         &'a self,
         db: &'db dyn Db,
@@ -618,7 +599,9 @@ impl<'db> Bindings<'db> {
         for item in self.iter_callable_items() {
             out.push(item.callable());
 
-            if let Some(bindings) = item.checked_downstream_constructor_bindings(db) {
+            if let Some(constructor) = item.as_constructor()
+                && let Some(bindings) = constructor.checked_downstream_constructor_bindings(db)
+            {
                 bindings.collect_type_context_callables(db, out);
             }
         }
@@ -775,8 +758,8 @@ impl<'db> Bindings<'db> {
         // For constructor bindings with deferred downstream checks: validate downstream bindings
         // if the matched overload is instance-returning.
         let mut init_error = false;
-        for item in self.iter_callable_items_mut() {
-            if item.check_downstream_constructor(
+        for constructor in self.iter_constructor_items_mut() {
+            if constructor.check_downstream_constructor(
                 db,
                 constraints,
                 call_arguments,
@@ -930,9 +913,9 @@ impl<'db> Bindings<'db> {
 
         // Report deferred constructor diagnostics when the matched overload is instance-returning.
         let mut reported_ctor_init_callables = FxHashSet::default();
-        for item in self.iter_callable_items() {
+        for constructor in self.iter_constructor_items() {
             let Some(downstream_bindings) =
-                item.checked_downstream_constructor_bindings(context.db())
+                constructor.checked_downstream_constructor_bindings(context.db())
             else {
                 continue;
             };
