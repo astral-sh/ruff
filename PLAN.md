@@ -223,9 +223,202 @@ Extend the nested typevar sequent generation:
 
 Run the full test suite again to check for regressions.
 
-### Phase 4: Handle the same-typevar case with nested references
+### Phase 4: Reverse direction — decomposing matching generic bounds
 
-#### Step 4.1 ⬜ — Extend `add_sequents_for_pair` for same-typevar with nested references
+Phases 1–3 implemented the *forward* direction: given a concrete bound on a
+typevar `T`, substitute it into a nested occurrence of `T` in another typevar's
+bound. This is a cross-typevar (different-typevar) pair sequent.
+
+The *reverse* direction handles the case where a single constraint on a typevar
+has lower and upper bounds that are both parameterizations of the same generic
+type. By decomposing the generic type using variance, we can extract bounds on
+the nested typevar.
+
+Example: the constraint `(Sequence[int] ≤ A ≤ Sequence[T])` implies
+`(int ≤ T)`, because `Sequence` is covariant, so `Sequence[int] ≤ Sequence[T]`
+implies `int ≤ T`.
+
+This combined constraint arises from two separate constraints `(Sequence[int] ≤ A)`
+and `(A ≤ Sequence[T])` being combined — the existing `add_concrete_sequents`
+logic should already produce this combined constraint as a pair implication.
+
+This is *part* of what's needed to make patterns like
+`invoke(head_sequence, x)` work:
+
+```python
+def invoke[A, B](c: Callable[[A], B], a: A) -> B: ...
+def head_sequence[T](s: Sequence[T]) -> T: ...
+def _(x: Sequence[int]):
+    reveal_type(invoke(head_sequence, x))  # should be int
+```
+
+The matching would produce constraints that combine into:
+
+- `Sequence[int] ≤ A ≤ Sequence[T]` (from argument + callable parameter)
+- `T ≤ B` (from callable return matching)
+
+To derive `int ≤ T`, we need to decompose `Sequence[int] ≤ A ≤ Sequence[T]`
+by recognizing that `Sequence[int] ≤ Sequence[T]` must hold, and applying
+covariance.
+
+Note: this example will also require conjoining constraint sets across
+multiple arguments (which is not yet implemented — tracked by the TODO in
+`add_type_mappings_from_constraint_set`). The reverse decomposition is
+necessary but not sufficient on its own.
+
+#### Where this fits
+
+This is a single-constraint decomposition: given a constraint
+`(L ≤ A ≤ U)`, we check whether `L ≤ U` produces useful derived constraints
+on the typevars mentioned in `L` and `U`. This logic belongs in
+`add_sequents_for_single` (or is triggered when the combined constraint is
+first created).
+
+#### Variance rules (same as forward, applied in reverse)
+
+Given a constraint `(G[l'] ≤ A ≤ G[T])` where both bounds share the same
+generic base `G`:
+
+| Variance of T in G | Derived constraint                               |
+| ------------------ | ------------------------------------------------ |
+| Covariant          | `l' ≤ T`                                         |
+| Contravariant      | `T ≤ l'`                                         |
+| Invariant          | `T = l'` (only if both sides match structurally) |
+| Bivariant          | skip                                             |
+
+And symmetrically for `(G[T] ≤ A ≤ G[u'])`:
+
+| Variance of T in G | Derived constraint                      |
+| ------------------ | --------------------------------------- |
+| Covariant          | `T ≤ u'`                                |
+| Contravariant      | `u' ≤ T`                                |
+| Invariant          | `T = u'` (only with matching structure) |
+| Bivariant          | skip                                    |
+
+#### Approach: single implication via assignability check
+
+Rather than building bespoke generic-base-matching logic, we can reuse the
+existing constraint set assignability machinery. Given a constraint
+`(L ≤ A ≤ U)`, the constraint is only satisfiable if `L ≤ U`. If `L` and/or
+`U` mention typevars, then `L ≤ U` produces a constraint set on those typevars.
+
+This could be triggered from `add_sequents_for_single` — for every constraint
+`(L ≤ A ≤ U)`, compute `L.when_constraint_set_assignable_to(U)` and derive
+implications from the result. No need for an upfront check on whether the
+bounds mention typevars — just do the CSA check unconditionally and see if the
+result is a non-trivial constraint set. Deeply scanning for typevars would not
+be significantly cheaper than just doing the check.
+
+This should subsume the existing `single_implications` logic in
+`add_sequents_for_single`. The current code manually propagates typevar-to-
+typevar bounds (e.g., `(S ≤ T ≤ U) → (S ≤ U)`), but a CSA check on `S ≤ U`
+will produce that same constraint with the correct typevar ordering
+automatically. The bare-typevar case does not need special treatment — CSA
+handles canonical ordering naturally.
+
+Note that the existing pair sequent logic should already combine two
+same-typevar constraints like `(Sequence[int] ≤ A)` and `(A ≤ Sequence[T])`
+into a single combined constraint `(Sequence[int] ≤ A ≤ Sequence[T])` via
+`add_concrete_sequents`. So the decomposition logic lives at the single-
+constraint level.
+
+The result of the assignability check is a full constraint set (an arbitrary
+boolean formula, not just a conjunction). The sequent map currently only
+supports implications where the consequent is a single constraint. As a
+pragmatic starting point, we handle only the case where the resulting
+constraint set is a single conjunction — i.e., a single path from root to the
+`always` terminal in the BDD.
+
+To detect this, we can take advantage of BDD reduction. Our BDDs are only
+quasi-reduced, but redundant nodes where both outgoing edges lead to `never`
+are still collapsed. This means if we ever encounter an interior node where
+both outgoing edges (if_true and if_false) point to something other than
+`never`, that node *must* have at least two paths to the `always` terminal,
+and the constraint set is not a simple conjunction. So a single structural
+walk of the tree suffices to check — no PathAssignments/SequentMap needed.
+
+If the constraint set is simple (single root→always path), walk it a second
+time to collect the constraints along that path:
+
+- For each positive constraint (interior node where we take the if_true
+    branch): record a `single_implication` from the original constraint to the
+    derived constraint.
+- For each negative constraint (interior node where we take the if_false
+    branch): record a `pair_impossibility` between the original constraint and
+    the derived constraint.
+
+For common cases (covariant/contravariant generics with a single type
+parameter), the result should always be a simple conjunction, so this approach
+should suffice.
+
+A future, more sophisticated solution could handle arbitrary constraint set
+results by viewing the BDD as a DNF (disjunction of paths from root to the
+`always` terminal, where each path is a conjunction). Each DNF clause could be
+integrated into `PathAssignments` by recursing with resets for each path — a
+pattern similar to what `walk_edge` already does for true/false/uncertain
+branches. But this is significantly more complex and can be deferred.
+
+Circular dependency concern: we'd be invoking constraint set assignability
+*from within* sequent map construction. We need to verify this doesn't create
+cycles. A possible mitigation is to use the assignability check without
+consulting the sequent map (i.e., a "raw" check that doesn't itself rely on
+derived facts).
+
+#### Steps
+
+##### Step 4.1 ⬜ — Add mdtest cases for reverse decomposition (red)
+
+Add tests to the Transitivity section of `implies_subtype_of.md`. The tests
+should construct the combined constraint directly using `ConstraintSet.range`
+(e.g., `ConstraintSet.range(Covariant[int], A, Covariant[T])`) and verify
+that the derived implications hold.
+
+Test cases:
+
+- Covariant: `(Covariant[int] ≤ A ≤ Covariant[T])` should imply `int ≤ T`
+- Contravariant: `(Contravariant[int] ≤ A ≤ Contravariant[T])` should imply
+    `T ≤ int` (flipped)
+- Invariant: `(Invariant[int] ≤ A ≤ Invariant[T])` should imply `T = int`
+- Bare typevar (existing behavior, should still pass):
+    `(S ≤ A ≤ T)` should imply `S ≤ T`
+- Test both typevar orderings for BDD-ordering independence
+
+##### Step 4.2 ⬜ — Implement reverse decomposition via CSA in `add_sequents_for_single`
+
+Replace (or extend) the existing single-constraint implication logic in
+`add_sequents_for_single` with a CSA-based approach:
+
+1. For each constraint `(L ≤ A ≤ U)`, compute
+    `L.when_constraint_set_assignable_to(U)` to get a constraint set `C`.
+1. Check if `C` is a simple conjunction (single root→always path in the BDD).
+    Use the structural criterion: if any interior node has both outgoing edges
+    pointing to something other than `never`, the result is not simple — bail
+    out.
+1. If simple, walk the single path and record sequents:
+    - For each positive constraint (if_true branch taken): add a
+        `single_implication` from the original constraint to the derived one.
+    - For each negative constraint (if_false branch taken): add a
+        `pair_impossibility` between the original and derived constraints.
+
+This should subsume the existing `single_implications` logic in
+`add_sequents_for_single`, including bare typevar-to-typevar propagation.
+Variance is handled automatically by the CSA check — no need for explicit
+variance matching or special-casing bare typevars.
+
+##### Step 4.3 ⬜ — Verify bare typevar propagation still works
+
+Confirm that the existing tests for typevar-to-typevar transitivity
+(e.g., `(S ≤ T ≤ U) → (S ≤ U)`) still pass with the new CSA-based logic.
+If the new logic fully subsumes the old `single_implications` code, consider
+removing the old code.
+
+##### Step 4.4 ⬜ — Run the full test suite
+
+Run the full test suite to check for regressions.
+
+### Phase 5: Handle the same-typevar case with recursive nested references
+
+#### Step 5.1 ⬜ — Extend `add_sequents_for_pair` for same-typevar with recursive nesting
 
 The dispatch in `add_sequents_for_pair` currently falls through to
 `add_concrete_sequents` when both constraints are on the same typevar and
@@ -236,14 +429,14 @@ so, whether it needs special handling.
 
 This is lower priority and may not need to be addressed initially.
 
-### Phase 5: Clean up
+### Phase 6: Clean up
 
-#### Step 5.1 ⬜ — Remove or update the TODO comment
+#### Step 6.1 ✅ — Remove or update the TODO comment
 
 Remove the TODO comment at line 2828 of `constraints.rs` once the feature is
 working. Update any related comments.
 
-#### Step 5.2 ⬜ — Run `/home/dcreager/bin/jpk`
+#### Step 6.2 ✅ — Run `/home/dcreager/bin/jpk`
 
 Final pre-commit checks. We are in a jj worktree, so use `jpk` (with no
 arguments) as a standin for `prek`.
@@ -265,3 +458,20 @@ arguments) as a standin for `prek`.
 
 1. **Recursive bounds**: Can a constraint like `T ≤ Sequence[T]` arise? If so,
     does it require special handling to avoid infinite loops during substitution?
+
+1. **Circular dependencies in reverse decomposition**: The reverse direction
+    invokes constraint set assignability from within sequent map construction.
+    Need to verify this doesn't create cycles. May need a "raw" assignability
+    check that doesn't consult the sequent map.
+
+1. **DNF expansion for complex constraint set results**: When the assignability
+    check produces a non-simple constraint set (e.g., a disjunction), we could
+    view the BDD as a DNF and integrate each path's conjunction into
+    `PathAssignments` by recursing with resets. Deferred for now.
+
+1. **No natural Python example exercises forward direction today**: The forward
+    direction (Phases 1–3) is correct and tested via mdtests, but currently no
+    Python code path conjoins argument-level concrete bounds with callable-
+    matching cross-typevar constraints into a single constraint set. This will
+    be exercised once the specialization builder migrates to maintaining a single
+    constraint set (tracked by the TODO in `add_type_mappings_from_constraint_set`).
