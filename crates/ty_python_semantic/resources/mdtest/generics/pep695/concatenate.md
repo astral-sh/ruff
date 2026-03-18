@@ -663,7 +663,6 @@ from typing import Concatenate
 type ConsumerType[**P1] = Callable[Concatenate[Callable[P1, None], P1], None]
 
 def consumer[**P2](x: Callable[P2, None], /, *args: P2.args, **kwargs: P2.kwargs) -> None: ...
-
 def assign[**P3](x: Callable[P3, None], /, *args: P3.args, **kwargs: P3.kwargs) -> None:
     # TODO: This shouldn't be an error
     # error: [invalid-assignment] "Object of type `def consumer[**P2](x: (**P2) -> None, /, *args: P2.args, **kwargs: P2.kwargs) -> None` is not assignable to `ConsumerType[P3@assign]`"
