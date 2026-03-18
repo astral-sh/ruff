@@ -26,8 +26,7 @@ fn display_default_settings() -> anyhow::Result<()> {
         ("test.py", r#"print("Hello")"#),
     ])?;
 
-    assert_cmd_snapshot!(test.command()
-        .args(["check", "--show-settings", "test.py"]));
+    assert_cmd_snapshot!(test.command().args(["check", "--show-settings", "test.py"]));
 
     Ok(())
 }
@@ -58,8 +57,10 @@ fn display_settings_from_nested_directory() -> anyhow::Result<()> {
         ("subdir/test.py", r#"import os"#),
     ])?;
 
-    assert_cmd_snapshot!(test.command()
-        .args(["check", "--show-settings", "subdir/test.py"]));
+    assert_cmd_snapshot!(
+        test.command()
+            .args(["check", "--show-settings", "subdir/test.py"])
+    );
 
     Ok(())
 }
