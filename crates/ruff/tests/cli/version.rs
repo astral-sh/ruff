@@ -2,11 +2,6 @@ use insta_cmd::assert_cmd_snapshot;
 
 use crate::CliTest;
 
-const VERSION_FILTER: (&str, &str) = (
-    r"\d+\.\d+\.\d+(\+\d+)?( \(\w{9} \d\d\d\d-\d\d-\d\d\))?",
-    "[VERSION]",
-);
-
 fn version_test() -> anyhow::Result<VersionTest> {
     VersionTest::new()
 }
@@ -109,7 +104,10 @@ impl VersionTest {
     fn new() -> anyhow::Result<Self> {
         Ok(Self {
             cli_test: CliTest::with_settings(|_, mut settings| {
-                settings.add_filter(VERSION_FILTER.0, VERSION_FILTER.1);
+                settings.add_filter(
+                    r"\d+\.\d+\.\d+(\+\d+)?( \(\w{9} \d\d\d\d-\d\d-\d\d\))?",
+                    "[VERSION]",
+                );
                 settings
             })?,
         })
