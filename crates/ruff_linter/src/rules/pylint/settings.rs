@@ -7,7 +7,7 @@ use std::fmt;
 use crate::display_settings;
 use ruff_cache::{CacheKey, CacheKeyHasher};
 use ruff_macros::CacheKey;
-use ruff_python_ast::{ExprNumberLiteral, LiteralExpressionRef, Number};
+use ruff_python_ast::{ExprNumberLiteral, LiteralExpressionRef, Number, UnaryOp};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, CacheKey)]
 #[serde(untagged)]
@@ -19,29 +19,66 @@ pub enum AllowedValue {
 }
 
 impl AllowedValue {
-    pub fn matches_literal(&self, literal_expr: LiteralExpressionRef<'_>) -> bool {
+    pub fn matches_value(
+        &self,
+        literal_expr: LiteralExpressionRef<'_>,
+        unary_op: Option<&UnaryOp>,
+    ) -> bool {
         match (self, literal_expr) {
             (
                 AllowedValue::String(allowed),
                 LiteralExpressionRef::StringLiteral(string_literal),
-            ) => allowed.as_str() == string_literal.value.to_str(),
-            (AllowedValue::Int(allowed), LiteralExpressionRef::NumberLiteral(number_literal)) => {
+            ) => unary_op.is_none() && allowed.as_str() == string_literal.value.to_str(),
+            (AllowedValue::Int(allowed), LiteralExpressionRef::NumberLiteral(number_literal)) =>
+            {
                 #[expect(clippy::cast_possible_truncation)]
                 match &number_literal.value {
-                    Number::Int(i) => i.as_i32() == Some(*allowed), // allowed int vs found int
-                    Number::Float(f) => f.fract() == 0.0 && *f as i32 == *allowed, // allowed int vs found float
+                    Number::Int(i) => {
+                        i.as_i32()
+                            .and_then(|value| apply_unary_int(value, unary_op))
+                            == Some(*allowed)
+                    }
+                    Number::Float(f) => {
+                        if f.fract() == 0.0 {
+                            apply_unary_int(*f as i32, unary_op) == Some(*allowed)
+                        } else {
+                            false
+                        }
+                    }
                     Number::Complex { .. } => false,
                 }
             }
             (AllowedValue::Float(allowed), LiteralExpressionRef::NumberLiteral(number_literal)) => {
                 match &number_literal.value {
-                    Number::Float(f) => *allowed == AllowedFloatValue::new(*f), //allowed float vs found float
-                    Number::Int(i) => i.as_i32().map(f64::from) == Some(allowed.value()), //allowed float vs found int
+                    Number::Float(f) => apply_unary_float(*f, unary_op)
+                        .is_some_and(|value| *allowed == AllowedFloatValue::new(value)),
+                    Number::Int(i) => {
+                        i.as_i32()
+                            .map(f64::from)
+                            .and_then(|value| apply_unary_float(value, unary_op))
+                            == Some(allowed.value())
+                    }
                     Number::Complex { .. } => false,
                 }
             }
             _ => false,
         }
+    }
+}
+
+fn apply_unary_int(value: i32, unary_op: Option<&UnaryOp>) -> Option<i32> {
+    match unary_op {
+        None | Some(UnaryOp::UAdd) => Some(value),
+        Some(UnaryOp::USub) => value.checked_neg(),
+        Some(UnaryOp::Invert | UnaryOp::Not) => None,
+    }
+}
+
+fn apply_unary_float(value: f64, unary_op: Option<&UnaryOp>) -> Option<f64> {
+    match unary_op {
+        None | Some(UnaryOp::UAdd) => Some(value),
+        Some(UnaryOp::USub) => Some(-value),
+        Some(UnaryOp::Invert | UnaryOp::Not) => None,
     }
 }
 
