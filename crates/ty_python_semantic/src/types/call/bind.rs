@@ -92,15 +92,6 @@ enum CallableItem<'db> {
     Constructor(ConstructorBinding<'db>),
 }
 
-/// The full set of bindings for a constructor call, as a singly-linked list.
-///
-/// The "outer" `ConstructorBinding` will be the first-called constructor
-/// method (could be a metaclass `__call__`, a `__new__`, or an `__init__`,
-/// depending what is present on the constructed class). Its
-/// `downstream_constructor` may link to the next downstream constructor, if
-/// present (e.g. metaclass `__call__` could have `__new__` or `__init__` as
-/// downstream; `__new__` could have `__init__` as downstream; `__init__` cannot
-/// have a downstream).
 impl<'db> CallableItem<'db> {
     fn callable(&self) -> &CallableBinding<'db> {
         match self {
