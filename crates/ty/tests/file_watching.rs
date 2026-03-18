@@ -456,10 +456,24 @@ where
         root_dir: root_path,
     };
 
-    // Sometimes the file watcher reports changes for events that happened before the watcher was started.
-    // Do a best effort at dropping these events.
-    let _ =
-        test_case.try_take_watch_changes(|_event: &ChangeEvent| true, Duration::from_millis(100));
+    // Write a sentinel file to confirm the watcher is live and delivering events.
+    // This
+    // 1. ensures the watcher is working well, and not e.g. backed up with events unrelated to the current test
+    // 2. flushes events that are unrelated to the current test
+    let sentinel_path = project_path.join(".watcher_ready");
+    std::fs::write(sentinel_path.as_std_path(), "ready")?;
+
+    test_case
+        .try_take_watch_changes(event_for_file(".watcher_ready"), Duration::from_secs(30))
+        .expect(
+            "Watcher failed to deliver sentinel event within 30s \
+             — file watching may not be operational",
+        );
+
+    // Clean up the sentinel file and drain its deletion event.
+    let _ = std::fs::remove_file(sentinel_path.as_std_path());
+    let _ = test_case
+        .try_take_watch_changes(event_for_file(".watcher_ready"), Duration::from_millis(500));
 
     Ok(test_case)
 }
