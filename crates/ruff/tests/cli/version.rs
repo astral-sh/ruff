@@ -120,10 +120,6 @@ impl VersionTest {
         test.write_file(path, content)?;
         Ok(test)
     }
-
-    fn command(&self) -> std::process::Command {
-        self.cli_test.command()
-    }
 }
 
 impl std::ops::Deref for VersionTest {
