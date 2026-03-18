@@ -35,6 +35,23 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// os.path.commonpath(["/usr/lib", "/usr/local/lib"])
 /// ```
 ///
+/// ## When to ignore this rule
+///
+/// This rule may produce false positives when using `os.path.commonprefix` with
+/// non-path strings. Unlike `os.path.commonpath`, `commonprefix` works with any
+/// list of strings:
+///
+/// ```python
+/// # Returns "12" - valid for non-path strings
+/// os.path.commonprefix(["123", "124"])
+///
+/// # Raises ValueError: os.path.commonpath() argument must contain at least one path
+/// os.path.commonpath(["123", "124"])
+/// ```
+///
+/// In such cases, you can suppress the rule with a `# noqa: RUF071` comment
+/// or add `RUF071` to the `extend-unsafe-fixes` or `extend-safe-fixes` setting.
+///
 /// ## References
 /// - [Python documentation: `os.path.commonprefix`](https://docs.python.org/3/library/os.path.html#os.path.commonprefix)
 /// - [Python documentation: `os.path.commonpath`](https://docs.python.org/3/library/os.path.html#os.path.commonpath)
