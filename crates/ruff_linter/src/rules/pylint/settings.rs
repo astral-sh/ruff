@@ -29,40 +29,35 @@ impl AllowedValue {
                 AllowedValue::String(allowed),
                 LiteralExpressionRef::StringLiteral(string_literal),
             ) => unary_op.is_none() && allowed.as_str() == string_literal.value.to_str(),
-            (AllowedValue::Int(allowed), LiteralExpressionRef::NumberLiteral(number_literal)) =>
-            {
-                #[expect(clippy::cast_possible_truncation)]
-                match &number_literal.value {
-                    Number::Int(i) => {
-                        i.as_i32()
-                            .and_then(|value| apply_unary_int(value, unary_op))
-                            == Some(*allowed)
-                    }
-                    Number::Float(f) => {
-                        if f.fract() == 0.0 {
-                            apply_unary_int(*f as i32, unary_op) == Some(*allowed)
-                        } else {
-                            false
-                        }
-                    }
-                    Number::Complex { .. } => false,
-                }
+            (AllowedValue::Int(allowed), LiteralExpressionRef::NumberLiteral(number_literal)) => {
+                number_to_i32(&number_literal.value)
+                    .and_then(|value| apply_unary_int(value, unary_op))
+                    == Some(*allowed)
             }
             (AllowedValue::Float(allowed), LiteralExpressionRef::NumberLiteral(number_literal)) => {
-                match &number_literal.value {
-                    Number::Float(f) => apply_unary_float(*f, unary_op)
-                        .is_some_and(|value| *allowed == AllowedFloatValue::new(value)),
-                    Number::Int(i) => {
-                        i.as_i32()
-                            .map(f64::from)
-                            .and_then(|value| apply_unary_float(value, unary_op))
-                            == Some(allowed.value())
-                    }
-                    Number::Complex { .. } => false,
-                }
+                number_to_f64(&number_literal.value)
+                    .and_then(|value| apply_unary_float(value, unary_op))
+                    == Some(allowed.value())
             }
             _ => false,
         }
+    }
+}
+
+fn number_to_i32(number: &Number) -> Option<i32> {
+    match number {
+        Number::Int(i) => i.as_i32(),
+        #[expect(clippy::cast_possible_truncation)]
+        Number::Float(f) if f.fract() == 0.0 => Some(*f as i32),
+        Number::Float(_) | Number::Complex { .. } => None,
+    }
+}
+
+fn number_to_f64(number: &Number) -> Option<f64> {
+    match number {
+        Number::Int(i) => i.as_i32().map(f64::from),
+        Number::Float(f) => Some(*f),
+        Number::Complex { .. } => None,
     }
 }
 
