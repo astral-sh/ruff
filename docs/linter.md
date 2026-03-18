@@ -294,6 +294,55 @@ comments, and range suppressions.
 
 #### Line-level
 
+Ruff supports a `noqa` system similar to [Flake8](https://flake8.pycqa.org/en/3.1.1/user/ignoring-errors.html).
+To ignore an individual violation, add `# noqa: {code}` to the end of the line, like so:
+
+```python
+# Ignore F841.
+x = 1  # noqa: F841
+
+# Ignore E741 and F841.
+i = 1  # noqa: E741, F841
+
+# Ignore _all_ violations.
+x = 1  # noqa
+```
+
+For multi-line strings (like docstrings), the `noqa` directive should come at the end of the string
+(after the closing triple quote), and will apply to the entire string, like so:
+
+```python
+"""Lorem ipsum dolor sit amet.
+
+Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor.
+"""  # noqa: E501
+```
+
+For import sorting, the `noqa` should come at the end of the first line in the import block, and
+will apply to all imports in the block, like so:
+
+```python
+import os  # noqa: I001
+import abc
+```
+
+The full inline comment specification is as follows:
+
+- An inline blanket `noqa` comment is given by a case-insensitive match for
+  `#noqa` with optional whitespace after the `#` symbol, followed by either: the
+  end of the comment, the beginning of a new comment (`#`), or whitespace
+  followed by any character other than `:`.
+- An inline `noqa` suppression is given by first finding a case-insensitive match
+  for `#noqa` with optional whitespace after the `#` symbol, optional whitespace
+  after `noqa`, and followed by the symbol `:`. After this we are expected to
+  have a list of rule codes which is given by sequences of uppercase ASCII
+  characters followed by ASCII digits, separated by whitespace or commas. The
+  list ends at the last valid code. We will attempt to interpret rules with a
+  missing delimiter (e.g. `F401F841`), though a warning will be emitted in this
+  case.
+
+*The following is currently only available in [preview mode](`preview.md`).*
+
 To ignore one or more violations within a single "logical" line (a statement or
 block header), an "ignore" comment can be placed either above or at the end of
 the logical line, like so:
@@ -358,52 +407,6 @@ The full line-level suppression comment specification is as follows:
   before or after each code, and may be followed by an optional trailing comma
   after the last code.
 
-Ruff also supports a `noqa` system similar to [Flake8](https://flake8.pycqa.org/en/3.1.1/user/ignoring-errors.html).
-To ignore an individual violation, add `# noqa: {code}` to the end of the line, like so:
-
-```python
-# Ignore F841.
-x = 1  # noqa: F841
-
-# Ignore E741 and F841.
-i = 1  # noqa: E741, F841
-
-# Ignore _all_ violations.
-x = 1  # noqa
-```
-
-For multi-line strings (like docstrings), the `noqa` directive should come at the end of the string
-(after the closing triple quote), and will apply to the entire string, like so:
-
-```python
-"""Lorem ipsum dolor sit amet.
-
-Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor.
-"""  # noqa: E501
-```
-
-For import sorting, the `noqa` should come at the end of the first line in the import block, and
-will apply to all imports in the block, like so:
-
-```python
-import os  # noqa: I001
-import abc
-```
-
-The full inline comment specification is as follows:
-
-- An inline blanket `noqa` comment is given by a case-insensitive match for
-  `#noqa` with optional whitespace after the `#` symbol, followed by either: the
-  end of the comment, the beginning of a new comment (`#`), or whitespace
-  followed by any character other than `:`.
-- An inline `noqa` suppression is given by first finding a case-insensitive match
-  for `#noqa` with optional whitespace after the `#` symbol, optional whitespace
-  after `noqa`, and followed by the symbol `:`. After this we are expected to
-  have a list of rule codes which is given by sequences of uppercase ASCII
-  characters followed by ASCII digits, separated by whitespace or commas. The
-  list ends at the last valid code. We will attempt to interpret rules with a
-  missing delimiter (e.g. `F401F841`), though a warning will be emitted in this
-  case.
 
 #### Block-level
 
