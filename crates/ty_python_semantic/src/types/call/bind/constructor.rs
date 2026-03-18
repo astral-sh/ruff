@@ -9,15 +9,16 @@ use crate::types::{
     TypeContext,
 };
 
-/// The full set of bindings for a constructor call, as a singly-linked list.
+/// Bindings for a constructor call.
 ///
-/// The "outer" `ConstructorBinding` will be the first-called constructor
-/// method (could be a metaclass `__call__`, a `__new__`, or an `__init__`,
-/// depending what is present on the constructed class). Its
-/// `downstream_constructor` may link to the next downstream constructor, if
-/// present (e.g. metaclass `__call__` could have `__new__` or `__init__` as
-/// downstream; `__new__` could have `__init__` as downstream; `__init__` cannot
-/// have a downstream).
+/// The `entry` is the first-called constructor method (could be a metaclass `__call__`, a
+/// `__new__`, or an `__init__`, depending what is present on the constructed class). Its
+/// `downstream_constructor` may link to the next downstream constructor, if present (e.g.
+/// metaclass `__call__` could have `__new__` or `__init__` as downstream; `__new__` could have
+/// `__init__` as downstream; `__init__` cannot have a downstream). The downstream constructor is
+/// only checked if the upstream returns an instance of the class being constructed. (A downstream
+/// constructor may itself have a downstream constructor, in the case where metaclass `__call__`,
+/// `__new__`, and `__init__` are all present.)
 #[derive(Debug, Clone)]
 pub(super) struct ConstructorBinding<'db> {
     /// The `CallableBinding` for this individual constructor method.
@@ -69,14 +70,13 @@ impl<'db> ConstructorBinding<'db> {
     }
 
     fn combine_constructor_return_type(&self, db: &'db dyn Db) -> Type<'db> {
-        let constructor_instance_type = self.constructed_instance_type();
-        let Some(class_specialization) = constructor_instance_type.class_specialization(db) else {
-            return constructor_instance_type;
+        let constructed_instance_type = self.constructed_instance_type();
+        let Some(class_specialization) = constructed_instance_type.class_specialization(db) else {
+            return constructed_instance_type;
         };
-        let class_literal = constructor_instance_type
-            .as_nominal_instance()
-            .and_then(|inst| inst.class(db).static_class_literal(db))
-            .map(|(lit, _)| lit);
+        let static_class_literal = self
+            .constructed_class_literal(db)
+            .and_then(ClassLiteral::as_static);
         let class_context = class_specialization.generic_context(db);
 
         let mut combined: Option<Specialization<'db>> = None;
@@ -97,7 +97,7 @@ impl<'db> ConstructorBinding<'db> {
             let Some(overload) = overload else {
                 return;
             };
-            let self_parameter_specialization = class_literal.and_then(|lit| {
+            let self_parameter_specialization = static_class_literal.and_then(|lit| {
                 let self_param_ty = overload.signature.parameters().get(0)?.annotated_type();
                 let resolved_self_param_ty = overload
                     .specialization
@@ -105,7 +105,7 @@ impl<'db> ConstructorBinding<'db> {
                     .unwrap_or(self_param_ty);
                 resolved_self_param_ty.specialization_of(db, lit)
             });
-            let return_specialization = class_literal
+            let return_specialization = static_class_literal
                 // Fast path: use the already-resolved overload return type when possible.
                 .and_then(|lit| overload.return_ty.specialization_of(db, lit));
             let return_specialization_is_informative =
@@ -192,21 +192,22 @@ impl<'db> ConstructorBinding<'db> {
         if let Some(specialization) = combined {
             let specialization =
                 specialization.apply_optional_specialization(db, Some(class_specialization));
-            if let Some(class_literal) = class_literal {
-                let remapped_class = class_literal.apply_specialization(db, |_| specialization);
+            if let Some(static_class_literal) = static_class_literal {
+                let remapped_class =
+                    static_class_literal.apply_specialization(db, |_| specialization);
                 return Type::instance(db, remapped_class);
             }
-            return constructor_instance_type.apply_specialization(db, specialization);
+            return constructed_instance_type.apply_specialization(db, specialization);
         }
 
         // If constructor inference doesn't yield a specialization, fall back to the default
         // specialization to avoid leaking inferable typevars in the constructed instance.
         let specialization = class_context.default_specialization(db, None);
-        constructor_instance_type.apply_specialization(db, specialization)
+        constructed_instance_type.apply_specialization(db, specialization)
     }
 
     pub(super) fn return_type(&self, db: &'db dyn Db) -> Type<'db> {
-        let constructor_instance_type = self.constructed_instance_type();
+        let constructed_instance_type = self.constructed_instance_type();
         let mut saw_matching_upstream_overload = false;
         let mut saw_unmatched_all_non_instance_overloaded_upstream = false;
         let mut saw_unmatched_instance_like_overloaded_upstream = false;
@@ -215,7 +216,7 @@ impl<'db> ConstructorBinding<'db> {
         // specialization, is a non-instance type (e.g. `__new__[S] -> S` with `S` inferred as
         // `str`), use that resolved type directly. This handles arbitrary `__new__` return
         // types like `S`, `list[S]`, etc.
-        let constructor_class = constructor_instance_type
+        let constructor_class = constructed_instance_type
             .as_nominal_instance()
             .map(|inst| inst.class(db));
         let constructor_class_literal =
