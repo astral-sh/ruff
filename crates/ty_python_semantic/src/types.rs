@@ -1044,18 +1044,25 @@ impl<'db> Type<'db> {
         self.specialization_of_optional(db, None)
     }
 
+    /// If this type is a class instance, returns its class.
+    pub(crate) fn nominal_class(self, db: &'db dyn Db) -> Option<ClassType<'db>> {
+        match self {
+            Type::NominalInstance(instance) => Some(instance.class(db)),
+            Type::ProtocolInstance(instance) => instance.to_nominal_instance().map(|i| i.class(db)),
+            Type::TypeAlias(alias) => alias
+                .value_type(db)
+                .as_nominal_instance()
+                .map(|i| i.class(db)),
+            _ => None,
+        }
+    }
+
     fn specialization_of_optional(
         self,
         db: &'db dyn Db,
         expected_class: Option<StaticClassLiteral<'_>>,
     ) -> Option<Specialization<'db>> {
-        let class_type = match self {
-            Type::NominalInstance(instance) => instance,
-            Type::ProtocolInstance(instance) => instance.to_nominal_instance()?,
-            Type::TypeAlias(alias) => alias.value_type(db).as_nominal_instance()?,
-            _ => return None,
-        }
-        .class(db);
+        let class_type = self.nominal_class(db)?;
 
         let (class_literal, specialization) = class_type.static_class_literal(db)?;
         if expected_class.is_some_and(|expected_class| expected_class != class_literal) {
