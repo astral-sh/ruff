@@ -2223,44 +2223,17 @@ impl<'db> FmtDetailed<'db> for DisplayParameters<'_, 'db> {
         let arg_separator = if multiline { ",\n    " } else { ", " };
 
         match self.parameters.kind() {
-            ParametersKind::Standard => {
+            ParametersKind::Standard | ParametersKind::Concatenate(_) => {
                 display_parameters(self, f, self.parameters.as_slice(), arg_separator)?;
-            }
-            ParametersKind::Concatenate(_) => {
-                display_parameters(self, f, self.parameters.as_slice(), arg_separator)?;
-                // if let Some(prefix_parameters) = self
-                //     .parameters
-                //     .as_slice()
-                //     // concatenate tail always has 2 parameters `*args` and `**kwargs`
-                //     .get(..self.parameters.len().saturating_sub(2))
-                // {
-                //     display_parameters(self, f, prefix_parameters, arg_separator)?;
-                //     if !prefix_parameters.is_empty() {
-                //         f.write_str(arg_separator)?;
-                //     }
-                //     match concatenate_tail {
-                //         ConcatenateTail::Gradual => f.write_str("...")?,
-                //         ConcatenateTail::ParamSpec(bound_typevar) => {
-                //             write!(
-                //                 f.with_type(Type::TypeVar(bound_typevar)),
-                //                 "**{}",
-                //                 bound_typevar.identity(self.db).display(self.db)
-                //             )?;
-                //         }
-                //     }
-                // } else {
-                //     // This should never happen because `Concatenate` kind always ends with 2
-                //     // parameters `*args` and `**kwargs`, but just in case, we can fallback to
-                //     // displaying all parameters.
-                //     display_parameters(self, f, self.parameters.as_slice(), arg_separator)?;
-                // }
             }
             ParametersKind::Top => {
+                // TODO: Remove `...`, always display all the parameters
                 // Top parameters are displayed the same as gradual parameters, we just wrap the
                 // entire signature in `Top[]`
                 f.write_str("...")?;
             }
             ParametersKind::Gradual if self.parameters.len() == 2 => {
+                // TODO: Remove `...`, always display all the parameters
                 // For gradual parameters with only `(*args, **kwargs)`, display as `...` for
                 // simplicity ...
                 f.write_str("...")?;
