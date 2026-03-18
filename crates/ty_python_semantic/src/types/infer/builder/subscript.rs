@@ -1417,10 +1417,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     return true;
                 };
 
-                let [Some(slice_ty), Some(rhs_value_ty)] = call_arguments.types() else {
-                    unreachable!();
-                };
-
                 match call_dunder_err {
                     CallDunderError::PossiblyUnbound { .. } => {
                         if emit_diagnostic
@@ -1437,6 +1433,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         false
                     }
                     CallDunderError::CallError(call_error_kind, bindings) => {
+                        let slice_ty = bindings.type_for_argument(&call_arguments, 0);
+                        let rhs_value_ty = bindings.type_for_argument(&call_arguments, 1);
+
                         match call_error_kind {
                             CallErrorKind::NotCallable => {
                                 if emit_diagnostic
@@ -1461,7 +1460,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                             typed_dict,
                                             full_object_ty,
                                             key,
-                                            value_ty: *rhs_value_ty,
+                                            value_ty: rhs_value_ty,
                                             typed_dict_node: target.value.as_ref().into(),
                                             key_node: target.slice.as_ref().into(),
                                             value_node: rhs_value_node.into(),
