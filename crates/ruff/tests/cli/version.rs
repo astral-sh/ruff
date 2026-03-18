@@ -2,13 +2,9 @@ use insta_cmd::assert_cmd_snapshot;
 
 use crate::CliTest;
 
-fn version_test() -> anyhow::Result<VersionTest> {
-    VersionTest::new()
-}
-
 #[test]
 fn version_basics() -> anyhow::Result<()> {
-    let test = version_test()?;
+    let test = VersionTest::new()?;
     assert_cmd_snapshot!(
         test.command().arg("version"), @"
     success: true
@@ -49,7 +45,7 @@ fn config_option_allowed_but_ignored() -> anyhow::Result<()> {
 
 #[test]
 fn config_option_ignored_but_validated() -> anyhow::Result<()> {
-    let test = version_test()?;
+    let test = VersionTest::new()?;
     assert_cmd_snapshot!(
         test.command()
             .arg("version")
@@ -82,7 +78,7 @@ fn config_option_ignored_but_validated() -> anyhow::Result<()> {
 /// `--isolated` is also a global option,
 #[test]
 fn isolated_option_allowed() -> anyhow::Result<()> {
-    let test = version_test()?;
+    let test = VersionTest::new()?;
     assert_cmd_snapshot!(
         test.command().arg("version").arg("--isolated"), @"
     success: true
