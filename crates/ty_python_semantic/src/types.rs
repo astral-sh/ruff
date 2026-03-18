@@ -4848,7 +4848,10 @@ impl<'db> Type<'db> {
                     (!types.is_empty()).then(|| {
                         types
                             .into_iter()
-                            .fold(IntersectionBuilder::new(db), |b, t| b.add_positive(t))
+                            .fold(
+                                IntersectionBuilder::new(db),
+                                IntersectionBuilder::add_positive,
+                            )
                             .build()
                     })
                 };
