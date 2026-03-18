@@ -176,18 +176,6 @@ impl<'db> CallableItem<'db> {
         }
     }
 
-    fn type_context_downstream_constructor_bindings(
-        &self,
-        db: &'db dyn Db,
-    ) -> Option<&Bindings<'db>> {
-        match self {
-            CallableItem::Regular(_) => None,
-            CallableItem::Constructor(binding) => {
-                binding.type_context_downstream_constructor_bindings(db)
-            }
-        }
-    }
-
     fn as_constructor(&self) -> Option<&ConstructorBinding<'db>> {
         match self {
             CallableItem::Regular(_) => None,
@@ -630,7 +618,7 @@ impl<'db> Bindings<'db> {
         for item in self.iter_callable_items() {
             out.push(item.callable());
 
-            if let Some(bindings) = item.type_context_downstream_constructor_bindings(db) {
+            if let Some(bindings) = item.checked_downstream_constructor_bindings(db) {
                 bindings.collect_type_context_callables(db, out);
             }
         }

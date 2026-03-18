@@ -448,15 +448,6 @@ impl<'db> ConstructorBinding<'db> {
             .map(|downstream| &downstream.bindings)
     }
 
-    pub(super) fn type_context_downstream_constructor_bindings(
-        &self,
-        db: &'db dyn Db,
-    ) -> Option<&Bindings<'db>> {
-        let downstream = self.downstream_constructor.as_ref()?;
-        self.should_include_downstream_constructor_type_context(db)
-            .then_some(&downstream.bindings)
-    }
-
     fn downstream_constructor(&self) -> Option<&DownstreamConstructor<'db>> {
         self.downstream_constructor.as_deref()
     }
@@ -506,32 +497,6 @@ impl<'db> ConstructorBinding<'db> {
             .overloads
             .iter()
             .all(|overload| downstream.overload_returns_instance(db, overload))
-    }
-
-    fn should_include_downstream_constructor_type_context(&self, db: &'db dyn Db) -> bool {
-        let Some(downstream) = self.checkable_downstream_constructor(db) else {
-            return false;
-        };
-
-        // For constructor argument inference, keep deferred `__init__` context available for
-        // self-like `__new__(cls: type[T]) -> T` and `__new__(...) -> Self` signatures even
-        // before specialization proves that the matched overload returns an instance of the
-        // constructed class.
-        if self.constructor_kind().is_metaclass_call() {
-            return false;
-        }
-
-        if self.entry.matching_overloads().next().is_some() {
-            return self
-                .entry
-                .matching_overloads()
-                .any(|(_, overload)| downstream.overload_returns_instance(db, overload));
-        }
-
-        match self.entry.overloads() {
-            [overload] => downstream.overload_returns_instance(db, overload),
-            _ => false,
-        }
     }
 }
 
