@@ -593,7 +593,7 @@ python-version = "3.13"
 ```
 
 ```py
-from typing import Any, Generic, TypeVar, Never
+from typing_extensions import Any, Generic, TypeVar, Never, ParamSpec, Callable
 from ty_extensions import Bottom, Top, static_assert, is_equivalent_to
 
 T_bounded_co = TypeVar("T_bounded_co", bound=int, covariant=True)
@@ -632,23 +632,35 @@ def g(x: Top[BoundedAndDefaulted[Any, Any, Any]]):
 T_bounded_invariant = TypeVar("T_bounded_invariant", bound=int)
 T_defaulted_invariant = TypeVar("T_defaulted_invariant", default=None)
 T_bounded_and_defaulted_invariant = TypeVar("T_bounded_and_defaulted_invariant", default=None, bound=int | None)
+P = ParamSpec("P")
+P_defaulted = ParamSpec("P_defaulted", default=[int, str])
 
-class BoundedAndDefaultedInvariant(Generic[T_bounded_invariant, T_defaulted_invariant, T_bounded_and_defaulted_invariant]):
+class BoundedAndDefaultedInvariant(
+    Generic[T_bounded_invariant, P, T_defaulted_invariant, T_bounded_and_defaulted_invariant, P_defaulted]
+):
     t_bounded: T_bounded_invariant
     t_defaulted: T_defaulted_invariant
     t_bounded_and_defaulted: T_bounded_and_defaulted_invariant
+    callable_attr: Callable[P, None]
+    callable_attr_defaulted: Callable[P_defaulted, None]
 
 def h(x: Top[BoundedAndDefaultedInvariant]):
-    reveal_type(x)  # revealed: Top[BoundedAndDefaultedInvariant[Unknown & int, None, None]]
+    # revealed: Top[BoundedAndDefaultedInvariant[Unknown & int, Top[(...)], None, None, (int, str, /)]]
+    reveal_type(x)
     reveal_type(x.t_bounded)  # revealed: int
     reveal_type(x.t_defaulted)  # revealed: None
     reveal_type(x.t_bounded_and_defaulted)  # revealed: None
+    reveal_type(x.callable_attr)  # revealed: Top[(...) -> None]
+    reveal_type(x.callable_attr_defaulted)  # revealed: (int, str, /) -> None
 
-def i(x: Top[BoundedAndDefaultedInvariant[Any, Any, Any]]):
-    reveal_type(x)  # revealed: Top[BoundedAndDefaultedInvariant[Any & int, Any, (Any & int) | (Any & None)]]
+def i(x: Top[BoundedAndDefaultedInvariant[Any, ..., Any, Any, ...]]):
+    # revealed: Top[BoundedAndDefaultedInvariant[Any & int, Top[(...)], Any, (Any & int) | (Any & None), Top[(...)]]]
+    reveal_type(x)
     reveal_type(x.t_bounded)  # revealed: int
     reveal_type(x.t_defaulted)  # revealed: object
     reveal_type(x.t_bounded_and_defaulted)  # revealed: int | None
+    reveal_type(x.callable_attr)  # revealed: Top[(...) -> None]
+    reveal_type(x.callable_attr_defaulted)  # revealed: Top[(...) -> None]
 
 T_bounded_contra = TypeVar("T_bounded_contra", bound=int, contravariant=True)
 T_defaulted_contra = TypeVar("T_defaulted_contra", default=None, contravariant=True)
