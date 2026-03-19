@@ -1283,18 +1283,7 @@ impl<'db> Specialization<'db> {
                     ) | (MaterializationKind::Bottom, TypeVarVariance::Contravariant)
                 ) && let Some(bounds) = bound_typevar.typevar(db).bound_or_constraints(db)
                 {
-                    materialized = match bounds {
-                        TypeVarBoundOrConstraints::UpperBound(bound) => {
-                            IntersectionType::from_two_elements(db, materialized, bound)
-                        }
-                        TypeVarBoundOrConstraints::Constraints(constraints) => {
-                            let elements = constraints.elements(db).iter();
-                            let mapped = elements.map(|&constraint| {
-                                IntersectionType::from_two_elements(db, materialized, constraint)
-                            });
-                            UnionType::from_elements(db, mapped)
-                        }
-                    };
+                    materialized = bounds.intersect_with(db, materialized);
                 }
 
                 materialized
@@ -1471,18 +1460,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             ) => {
                 let effective_source_type = tvar
                     .bound_or_constraints(db)
-                    .map(|bound_or_constraints| match bound_or_constraints {
-                        TypeVarBoundOrConstraints::UpperBound(bound) => {
-                            IntersectionType::from_two_elements(db, bound, source_type)
-                        }
-                        TypeVarBoundOrConstraints::Constraints(constraints) => {
-                            UnionType::from_elements(
-                                db,
-                                constraints.elements(db).iter().map(|&constraint| {
-                                    IntersectionType::from_two_elements(db, source_type, constraint)
-                                }),
-                            )
-                        }
+                    .map(|bound_or_constraints| {
+                        bound_or_constraints.intersect_with(db, source_type)
                     })
                     .unwrap_or(source_type);
 

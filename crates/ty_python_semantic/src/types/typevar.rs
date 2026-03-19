@@ -12,11 +12,11 @@ use crate::{
         semantic_index,
     },
     types::{
-        ApplySpecialization, ApplyTypeMappingVisitor, CycleDetector, DynamicType, KnownClass,
-        KnownInstanceType, MaterializationKind, Parameter, Parameters, Type, TypeAliasType,
-        TypeContext, TypeMapping, TypeVarVariance, UnionBuilder, UnionType, any_over_type,
-        binding_type, definition_expression_type, tuple::Tuple, variance::VarianceInferable,
-        visitor,
+        ApplySpecialization, ApplyTypeMappingVisitor, CycleDetector, DynamicType, IntersectionType,
+        KnownClass, KnownInstanceType, MaterializationKind, Parameter, Parameters, Type,
+        TypeAliasType, TypeContext, TypeMapping, TypeVarVariance, UnionBuilder, UnionType,
+        any_over_type, binding_type, definition_expression_type, tuple::Tuple,
+        variance::VarianceInferable, visitor,
     },
 };
 
@@ -1382,6 +1382,25 @@ impl<'db> TypeVarBoundOrConstraints<'db> {
                     visitor,
                 ))
             }
+        }
+    }
+
+    /// If `self` represents an upper bound, returns the intersection of the upper bound and `other`.
+    /// If `self` represents a set of constraints, returns the intersection of `<union of constraints> & other`.
+    pub(super) fn intersect_with(self, db: &'db dyn Db, other: Type<'db>) -> Type<'db> {
+        match self {
+            TypeVarBoundOrConstraints::UpperBound(bound) => {
+                IntersectionType::from_two_elements(db, other, bound)
+            }
+            // Conceptually the same as `IntersectionType::from_two_elements(db, constraints.as_type(db), other)`,
+            // but this gets us there a more direct way in the `UnionBuilder`
+            TypeVarBoundOrConstraints::Constraints(constraints) => UnionType::from_elements(
+                db,
+                constraints
+                    .elements(db)
+                    .iter()
+                    .map(|&constraint| IntersectionType::from_two_elements(db, other, constraint)),
+            ),
         }
     }
 }
