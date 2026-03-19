@@ -2,7 +2,8 @@ use std::cmp::Reverse;
 
 use ruff_python_ast::helpers::{map_callable, map_subscript};
 use ruff_python_ast::name::QualifiedName;
-use ruff_python_ast::str::Quote;
+use ruff_python_ast::StringFlags;
+use ruff_python_ast::str::{Quote, TripleQuotes};
 use ruff_python_ast::visitor::transformer::{Transformer, walk_expr};
 use ruff_python_ast::{self as ast, Decorator, Expr, StringLiteralFlags};
 use ruff_python_codegen::{Generator, Stylist};
@@ -320,7 +321,7 @@ pub(crate) fn quote_annotation(
     stylist: &Stylist,
     locator: &Locator,
     flags: StringLiteralFlags,
-) -> Edit {
+) -> QuoteEdit {
     let expr = semantic.expression(node_id).expect("Expression not found");
     if let Some(parent_id) = semantic.parent_expression_id(node_id) {
         match semantic.expression(parent_id) {
@@ -377,11 +378,24 @@ pub(crate) fn quote_type_expression(
     stylist: &Stylist,
     locator: &Locator,
     flags: StringLiteralFlags,
-) -> Edit {
+) -> QuoteEdit {
     // Quote the entire expression.
     let quote_annotator = QuoteAnnotator::new(semantic, stylist, locator, flags);
+    let annotation = quote_annotator.into_annotation(expr);
+    let has_unresolvable_escapes = annotation.contains('\\');
+    QuoteEdit {
+        edit: Edit::range_replacement(annotation, expr.range()),
+        has_unresolvable_escapes,
+    }
+}
 
-    Edit::range_replacement(quote_annotator.into_annotation(expr), expr.range())
+/// Result of quoting a type expression.
+pub(crate) struct QuoteEdit {
+    /// The edit to apply.
+    pub edit: Edit,
+    /// Whether the quoted annotation still contains escape sequences that
+    /// could not be avoided by switching quote styles.
+    pub has_unresolvable_escapes: bool,
 }
 
 /// Filter out any [`Edit`]s that are completely contained by any other [`Edit`].
@@ -402,6 +416,52 @@ pub(crate) fn filter_contained(edits: Vec<Edit>) -> Vec<Edit> {
         }
     }
     filtered
+}
+
+/// Choose string literal flags that avoid producing escape sequences in the quoted annotation.
+///
+/// When the annotation text contains the preferred quote character, we switch to triple-quoted
+/// strings to avoid escape sequences. If that also fails, we try the opposite quote style.
+fn flags_avoiding_escape_sequences(
+    annotation: &str,
+    preferred: StringLiteralFlags,
+) -> StringLiteralFlags {
+    let quote = preferred.quote_style();
+    let quote_char = quote.as_char();
+
+    if !annotation.contains(quote_char) {
+        return preferred;
+    }
+
+    // The annotation contains the preferred quote char; try triple-quoted string.
+    let triple_quote_str = match quote {
+        Quote::Double => r#"""""#,
+        Quote::Single => "'''",
+    };
+    if !annotation.contains(triple_quote_str) {
+        return preferred.with_triple_quotes(TripleQuotes::Yes);
+    }
+
+    // Try the opposite quote style.
+    let opposite = quote.opposite();
+    let opposite_char = opposite.as_char();
+    if !annotation.contains(opposite_char) {
+        return preferred.with_quote_style(opposite);
+    }
+
+    // Try opposite triple-quoted.
+    let opposite_triple = match opposite {
+        Quote::Double => r#"""""#,
+        Quote::Single => "'''",
+    };
+    if !annotation.contains(opposite_triple) {
+        return preferred
+            .with_quote_style(opposite)
+            .with_triple_quotes(TripleQuotes::Yes);
+    }
+
+    // All options exhausted; the output will contain escapes, but this is an extreme edge case.
+    preferred
 }
 
 pub(crate) struct QuoteAnnotator<'a> {
@@ -429,17 +489,19 @@ impl<'a> QuoteAnnotator<'a> {
     fn into_annotation(self, expr: &Expr) -> String {
         let mut expr_without_forward_references = expr.clone();
         self.visit_expr(&mut expr_without_forward_references);
-        let generator = Generator::from(self.stylist);
-        // we first generate the annotation with the inverse quote, so we can
-        // generate the string literal with the preferred quote
+        // Generate the annotation body with the inverse quote so inner strings
+        // use the opposite quote style from the outer wrapper.
         let subgenerator = Generator::new(self.stylist.indentation(), self.stylist.line_ending());
         let annotation = subgenerator.expr(&expr_without_forward_references);
-        generator.expr(&Expr::from(ast::StringLiteral {
-            range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-            value: annotation.into_boxed_str(),
-            flags: self.flags,
-        }))
+        // Pick flags that avoid escape sequences (e.g. triple quotes when the
+        // annotation contains the preferred quote character).
+        let flags = flags_avoiding_escape_sequences(&annotation, self.flags);
+        // Build the quoted string directly instead of going through the
+        // generator's `StringLiteral` path, because its `UnicodeEscape` logic
+        // does not account for triple-quoted strings and would still escape
+        // individual quote characters inside `"""..."""`.
+        let quote_str = flags.quote_str();
+        format!("{quote_str}{annotation}{quote_str}")
     }
 
     fn visit_annotated_slice(&self, slice: &mut Expr) {

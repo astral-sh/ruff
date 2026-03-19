@@ -97,3 +97,16 @@ def f():
 
     cast(typ=int, val=3.0)  # TC006
     cast(val=3.0, typ=int)  # TC006
+
+
+def f():
+    # Regression test for #22131: escape sequences in quoted type expressions
+    from typing import cast, Literal
+
+    cast(Literal["'"], "'")  # TC006
+
+
+def f():
+    from typing import cast, Literal
+
+    cast(Literal['"'], '"')  # TC006

@@ -575,7 +575,7 @@ fn fix_imports(checker: &Checker, node_id: NodeId, imports: &[ImportBinding]) ->
                                 checker.stylist(),
                                 checker.locator(),
                                 checker.default_string_flags(),
-                            ))
+                            ).edit)
                         } else {
                             None
                         }

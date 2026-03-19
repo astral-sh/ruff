@@ -8,7 +8,7 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
-use crate::rules::flake8_type_checking::helpers::quote_type_expression;
+use crate::rules::flake8_type_checking::helpers::{QuoteEdit, quote_type_expression};
 use crate::{AlwaysFixableViolation, Edit, Fix, FixAvailability, Violation};
 use ruff_python_ast::PythonVersion;
 use ruff_python_ast::token::parenthesized_range;
@@ -178,7 +178,7 @@ pub(crate) fn unquoted_type_alias(checker: &Checker, binding: &Binding) {
     // Eventually we may try to be more clever and come up with the
     // minimal set of subexpressions that need to be quoted.
     let parent = expr.range().start();
-    let edit = quote_type_expression(
+    let QuoteEdit { edit, .. } = quote_type_expression(
         expr,
         checker.semantic(),
         checker.stylist(),
