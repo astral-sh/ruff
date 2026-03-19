@@ -56,7 +56,7 @@ jobs:
 
           cd ..
 
-          uv tool install "git+https://github.com/astral-sh/ecosystem-analyzer@2907323c61016ffd2cab9c25fb255f3dab8ec256"
+          uv tool install "git+https://github.com/astral-sh/ecosystem-analyzer@cc6b94ac6d40d7c1cbf891ce48245d6b69e5631b"
 
           ecosystem-analyzer \
             --verbose \
