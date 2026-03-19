@@ -863,7 +863,7 @@ impl DefinitionKind<'_> {
         matches!(self, DefinitionKind::Function(_))
     }
 
-    pub(crate) const fn is_parameter_definition(&self) -> bool {
+    pub(crate) const fn is_parameter_def(&self) -> bool {
         matches!(
             self,
             DefinitionKind::VariadicPositionalParameter(_)

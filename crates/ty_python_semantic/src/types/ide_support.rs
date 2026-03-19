@@ -1163,7 +1163,7 @@ pub fn unused_bindings(db: &dyn Db, file: ruff_db::files::File) -> Vec<UnusedBin
                 continue;
             }
 
-            let is_parameter = kind.is_parameter_definition();
+            let is_parameter = kind.is_parameter_def();
             if is_parameter && (skip_unused_parameters_for_override || method_has_stub_body) {
                 continue;
             }
