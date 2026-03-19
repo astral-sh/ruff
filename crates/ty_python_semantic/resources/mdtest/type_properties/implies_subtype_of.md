@@ -758,6 +758,50 @@ def contravariant_of_covariant[U, T]():
     static_assert(not constraints.implies_subtype_of(U, Contravariant[Covariant[str]]))
 ```
 
+### Concrete bound substitution into nested generic types
+
+When a constraint on C has a concrete type nested in a generic bound, and that concrete type matches
+another typevar B's bound, we can substitute B (the typevar) for the concrete type, creating a
+cross-typevar relationship. This is a weakening (the derived constraint is less restrictive), but it
+introduces a useful link between the two typevars.
+
+For example, `(Covariant[int] ≤ C) ∧ (B ≤ int)` should derive `Covariant[B] ≤ C`, because `B ≤ int`
+and covariance give `Covariant[B] ≤ Covariant[int] ≤ C`.
+
+```py
+from typing import Never
+from ty_extensions import ConstraintSet, static_assert
+
+class Covariant[T]:
+    def get(self) -> T:
+        raise ValueError
+
+def upper_bound_into_lower[B, C]():
+    # (Covariant[int] ≤ C) ∧ (B ≤ int) → (Covariant[B] ≤ C)
+    # B ≤ int, so Covariant[B] ≤ Covariant[int] ≤ C.
+    constraints = ConstraintSet.range(Covariant[int], C, object) & ConstraintSet.range(Never, B, int)
+    # TODO: not yet implemented
+    # static_assert(constraints.implies_subtype_of(Covariant[B], C))
+
+def lower_bound_into_upper[B, C]():
+    # (C ≤ Covariant[int]) ∧ (int ≤ B) → (C ≤ Covariant[B])
+    # int ≤ B, so Covariant[int] ≤ Covariant[B], and C ≤ Covariant[int] ≤ Covariant[B].
+    constraints = ConstraintSet.range(Never, C, Covariant[int]) & ConstraintSet.range(int, B, object)
+    # TODO: not yet implemented
+    # static_assert(constraints.implies_subtype_of(C, Covariant[B]))
+
+# Repeat with reversed typevar ordering.
+def upper_bound_into_lower[C, B]():
+    constraints = ConstraintSet.range(Covariant[int], C, object) & ConstraintSet.range(Never, B, int)
+    # TODO: not yet implemented
+    # static_assert(constraints.implies_subtype_of(Covariant[B], C))
+
+def lower_bound_into_upper[C, B]():
+    constraints = ConstraintSet.range(Never, C, Covariant[int]) & ConstraintSet.range(int, B, object)
+    # TODO: not yet implemented
+    # static_assert(constraints.implies_subtype_of(C, Covariant[B]))
+```
+
 ### Reverse decomposition: bounds on a typevar can be decomposed via variance
 
 When a constraint has lower and upper bounds that are parameterizations of the same generic type, we

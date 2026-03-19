@@ -432,16 +432,32 @@ Run the full test suite to check for regressions.
 
 ### Phase 5: Handle the same-typevar case with recursive nested references
 
-#### Step 5.1 ⬜ — Extend `add_sequents_for_pair` for same-typevar with recursive nesting
+#### Step 5.1 ✅ — Investigate same-typevar recursive nesting and concrete bound substitution
 
-The dispatch in `add_sequents_for_pair` currently falls through to
-`add_concrete_sequents` when both constraints are on the same typevar and
-neither has a typevar as a direct bound. But a constraint like `T ≤ Sequence[T]`
-(recursive bound) would have `T` nested in its upper bound while also directly
-constraining `T`. Check whether this case actually arises in practice, and if
-so, whether it needs special handling.
+**Recursive nesting** (`T ≤ Covariant[T]`): Investigated and confirmed that
+trivial cases (lower = Never) are handled correctly. Non-trivial cases
+(`Covariant[int] ≤ T ≤ Covariant[T]`) are a pre-existing limitation — the
+CSA decomposition derives `int ≤ T` but the pair intersection between the
+original and derived constraints is flagged as disjoint, which is actually
+mathematically correct (the combined constraint is unsatisfiable for most
+user-defined classes). Does not arise in practice.
 
-This is lower priority and may not need to be addressed initially.
+**Concrete bound substitution** (newly identified gap): The forward direction
+(Phase 2/3) substitutes B's concrete bounds into C's bounds that contain B.
+The reverse direction — substituting B (the typevar) into C's bounds that
+contain B's concrete bound — is not yet implemented. This is analogous to the
+existing "pivot" cases in `add_mutual_sequents_for_different_typevars` but
+generalized to work inside generic types.
+
+Examples (covariant case):
+
+- `(Covariant[BU] ≤ C) ∧ (B ≤ BU) → (Covariant[B] ≤ C)`
+- `(C ≤ Covariant[BL]) ∧ (BL ≤ B) → (C ≤ Covariant[B])`
+
+These create cross-typevar links that are weaker than the originals but useful
+for downstream inference (e.g., after `exists_one`). Test cases are written
+in the mdtest file with TODO markers. Implementation deferred to a future
+phase.
 
 ### Phase 6: Clean up
 
@@ -454,6 +470,167 @@ working. Update any related comments.
 
 Final pre-commit checks. We are in a jj worktree, so use `jpk` (with no
 arguments) as a standin for `prek`.
+
+### Phase 7: Typevar bound substitution into nested generic types
+
+Phases 2–3 implemented the *forward* direction of nested typevar propagation:
+when B (a typevar) appears nested inside C's bound, substitute B's concrete
+bounds for B. This phase implements a restricted *reverse* direction: when one
+of B's bounds is a *bare typevar* that appears nested inside C's bound,
+substitute B (the typevar) for that bound.
+
+This generalizes the existing top-level "pivot" cases in
+`add_mutual_sequents_for_different_typevars` to work inside generic types.
+The pivot cases handle:
+
+```text
+(CL ≤ C ≤ pivot) ∧ (pivot ≤ B ≤ BU) → (CL ≤ C ≤ B)
+```
+
+The new cases handle the same logic when the pivot appears inside a generic:
+
+```text
+(CL ≤ C ≤ G[pivot]) ∧ (pivot ≤ B ≤ BU) → (CL ≤ C ≤ G[B])
+```
+
+The derived constraint is *weaker* than the original (since `B ≤ BU` means
+`G[B] ≤ G[BU]` in a covariant position, so we're relaxing C's bound). But it
+introduces a cross-typevar link between B and C that is useful for downstream
+inference, especially after `exists_one` removes one of the typevars.
+
+#### Scope restriction: bare typevar bounds only
+
+The fully general version of this feature would handle arbitrary concrete
+types nested in C's bounds — e.g., `Covariant[int]` where `int` matches B's
+upper bound. However, detecting an arbitrary concrete type inside a nested
+position requires different machinery (pattern matching on generic alias
+structure, or a CSA-based approach).
+
+When B's bound is a bare typevar, we can reuse `variance_of` for detection,
+since `variance_of` already finds typevars nested inside types. This makes
+the implementation a natural extension of `add_nested_typevar_sequents`.
+
+For example, given `(G[S] ≤ C) ∧ (S ≤ B)` where S is a typevar:
+
+- `variance_of(G[S], S)` finds S in the covariant position
+- We know `S ≤ B`, so `G[S] ≤ G[B]` (covariance)
+- Therefore `G[S] ≤ C` implies `G[B] ≤ C` (weakening the lower bound)
+- Emit pair implication: `(G[S] ≤ C) ∧ (S ≤ B) → (G[B] ≤ C)`
+
+A TODO comment should be added noting that a future extension could handle
+the case where B's bound is an arbitrary type (not just a bare typevar).
+
+#### Where this fits
+
+The existing `add_nested_typevar_sequents` handles the case where `B` (the
+constraint's typevar) appears in C's bound — it substitutes B's concrete
+bounds for B. This new logic handles the complementary case: a *different*
+typevar (one of B's bounds) appears in C's bound — we substitute B for that
+typevar, creating a weaker but useful cross-typevar constraint.
+
+Both are called from `add_sequents_for_pair` for different-typevar pairs.
+The new logic can live in `add_nested_typevar_sequents` itself, or in a new
+method called alongside it.
+
+#### Variance rules
+
+The rules mirror `add_nested_typevar_sequents` but in the *weakening*
+direction rather than the *tightening* direction. We substitute B for the
+found typevar only when the result weakens (relaxes) the bound.
+
+Given constraints `(l_C ≤ C ≤ u_C)` and `(l_B ≤ B ≤ u_B)`, and a typevar S
+that is one of B's bounds:
+
+**S = u_B (B's upper bound is a bare typevar S) and S appears in u_C:**
+
+We know `B ≤ S`. By variance:
+
+- Covariant: `G[B] ≤ G[S]`, so `u_C[B] ≤ u_C[S]` — substituting B *weakens*
+    the upper bound → emit `C ≤ u_C[S := B]`
+- Contravariant: `G[S] ≤ G[B]`, so `u_C[B] ≥ u_C[S]` — substituting B
+    *tightens* → no useful derivation
+- Invariant: only if `l_B = u_B` (equality on B), then `B = S` and the
+    substitution is exact
+
+**S = l_B (B's lower bound is a bare typevar S) and S appears in l_C:**
+
+We know `S ≤ B`. By variance:
+
+- Covariant: `G[S] ≤ G[B]`, so `l_C[B] ≥ l_C[S]` — substituting B *weakens*
+    the lower bound → emit `l_C[S := B] ≤ C`
+- Contravariant: `G[B] ≤ G[S]`, so `l_C[B] ≤ l_C[S]` — substituting B
+    *tightens* → no useful derivation
+- Invariant: only if `l_B = u_B` (equality on B)
+
+**S = l_B and S appears in u_C:**
+
+We know `S ≤ B`. By variance:
+
+- Contravariant: `G[B] ≤ G[S]`, so `u_C[B] ≤ u_C[S]` — substituting B
+    *weakens* the upper bound → emit `C ≤ u_C[S := B]`
+- Covariant: tightens → no useful derivation
+- Invariant: only if `l_B = u_B`
+
+**S = u_B and S appears in l_C:**
+
+We know `B ≤ S`. By variance:
+
+- Contravariant: `G[S] ≤ G[B]`, so `l_C[B] ≥ l_C[S]` — substituting B
+    *weakens* the lower bound → emit `l_C[S := B] ≤ C`
+- Covariant: tightens → no useful derivation
+- Invariant: only if `l_B = u_B`
+
+#### Steps
+
+##### Step 7.1 ⬜ — Add tests for bare typevar bound substitution (red)
+
+Update the tests in the "Concrete bound substitution" section to use bare
+typevar bounds. The existing test structure uses concrete types like `int`;
+change them so B's bound is a typevar S that also appears in C's bound.
+
+For example:
+
+- `(Covariant[S] ≤ C) ∧ (S ≤ B)` should imply `Covariant[B] ≤ C`
+- `(C ≤ Covariant[S]) ∧ (S ≤ B)` should imply `C ≤ Covariant[B]`
+- Contravariant and invariant variants
+
+Keep the existing concrete-bound tests (with `int`) as TODO-commented
+assertions documenting the future extension.
+
+Verify the tests fail before proceeding.
+
+##### Step 7.2 ⬜ — Add the typevar bound substitution logic
+
+Extend `add_nested_typevar_sequents` (or add a companion method called
+alongside it). For each pair of constraints (C, B) on different typevars,
+and for each of B's bounds that is a bare typevar S:
+
+1. Use `variance_of(u_C, S)` / `variance_of(l_C, S)` to check if S appears
+    in C's upper/lower bound and determine the variance.
+1. Based on the variance and which bound of B is S, decide whether the
+    substitution weakens (valid) or tightens (skip). See the variance rules
+    above.
+1. If valid, use `apply_type_mapping` with `ApplySpecialization::Single(S, B)`
+    to construct the new bound, and emit a pair implication.
+
+Skip if S is the same typevar as C (handled elsewhere) or if S equals B
+(no-op substitution).
+
+##### Step 7.3 ⬜ — Run the tests (green)
+
+Run the test suite and verify the new tests pass.
+
+##### Step 7.4 ⬜ — Add TODO for arbitrary-type extension
+
+Add a TODO comment in the code noting that the current implementation only
+handles the case where B's bound is a bare typevar. A future extension could
+handle arbitrary types by pattern-matching on generic alias structure (checking
+each type argument against B's bounds using `is_constraint_set_assignable_to`).
+
+##### Step 7.5 ⬜ — Run the full test suite and jpk
+
+Run the full `ty_python_semantic` test suite to check for regressions, then
+run `/home/dcreager/bin/jpk` for pre-commit checks.
 
 ## Open questions
 
