@@ -936,7 +936,7 @@ impl KnownClass {
             }
 
             class_literal
-                .apply_specialization(db, |_| generic_context.specialize(db, specialization))
+                .apply_specialization(db, |_| generic_context.specialize(db, specialization, None))
         }
 
         let class_literal = self.to_class_literal(db).as_class_literal()?.as_static()?;

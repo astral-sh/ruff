@@ -776,84 +776,28 @@ impl<'db> GenericContext<'db> {
         }
     }
 
-    /// Returns a specialization where each covariant/bivariant typevar is mapped to its upper
-    /// bound (or `object` if unbounded), each contravariant typevar is mapped to `Never`, and
-    /// each invariant typevar is mapped to `Unknown`. For constrained typevars, the union of
-    /// constraints is used as the upper bound.
-    ///
-    /// This is used for top-materializing unparameterized generic classes, where we want the
-    /// widest possible type for each type parameter position, rather than the typevar's default.
-    pub(crate) fn top_materialization_specialization(
+    /// Returns a specialization of this generic context where each typevar is mapped to itself.
+    pub(crate) fn identity_specialization(self, db: &'db dyn Db) -> Specialization<'db> {
+        let types: Vec<Type> = self.variables(db).map(Type::TypeVar).collect();
+        self.specialize(db, types, None)
+    }
+
+    pub(crate) fn unknown_specialization(
         self,
         db: &'db dyn Db,
         known_class: Option<KnownClass>,
     ) -> Specialization<'db> {
-        let mut has_dynamic_invariant_typevar = false;
-
-        let types: Box<[Type<'db>]> = self
-            .variables(db)
-            .map(|typevar| {
-                if typevar.is_paramspec(db) {
-                    return Type::paramspec_value_callable(db, Parameters::top());
-                }
-                match typevar.variance(db) {
-                    TypeVarVariance::Covariant | TypeVarVariance::Bivariant => {
-                        match typevar.typevar(db).require_bound_or_constraints(db) {
-                            TypeVarBoundOrConstraints::UpperBound(bound) => bound,
-                            TypeVarBoundOrConstraints::Constraints(constraints) => {
-                                constraints.as_type(db)
-                            }
-                        }
-                    }
-                    TypeVarVariance::Contravariant => Type::Never,
-                    TypeVarVariance::Invariant => {
-                        has_dynamic_invariant_typevar = true;
-                        match typevar.typevar(db).bound_or_constraints(db) {
-                            Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                                IntersectionType::from_two_elements(db, bound, Type::unknown())
-                            }
-                            Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                                let constraints = constraints.elements(db).iter();
-                                let mapped_constraints = constraints.map(|constraint| {
-                                    IntersectionType::from_two_elements(
-                                        db,
-                                        *constraint,
-                                        Type::unknown(),
-                                    )
-                                });
-                                UnionType::from_elements(db, mapped_constraints)
-                            }
-                            None => Type::unknown(),
-                        }
-                    }
-                }
-            })
-            .collect();
-
-        let tuple_inner = if known_class == Some(KnownClass::Tuple) {
-            Some(TupleType::homogeneous(db, Type::object()))
+        let tuple = if known_class == Some(KnownClass::Tuple) {
+            Some(TupleType::homogeneous(db, Type::unknown()))
         } else {
             None
         };
 
-        let materialization_kind =
-            has_dynamic_invariant_typevar.then_some(MaterializationKind::Top);
-
-        Specialization::new(db, self, types, materialization_kind, tuple_inner)
-    }
-
-    /// Returns a specialization of this generic context where each typevar is mapped to itself.
-    pub(crate) fn identity_specialization(self, db: &'db dyn Db) -> Specialization<'db> {
-        let types: Vec<Type> = self.variables(db).map(Type::TypeVar).collect();
-        self.specialize(db, types)
-    }
-
-    pub(crate) fn unknown_specialization(self, db: &'db dyn Db) -> Specialization<'db> {
         match self.len(db) {
-            0 => self.specialize(db, &[]),
-            1 => self.specialize(db, &[Type::unknown(); 1]),
-            2 => self.specialize(db, &[Type::unknown(); 2]),
-            len => self.specialize(db, vec![Type::unknown(); len]),
+            0 => self.specialize(db, &[], tuple),
+            1 => self.specialize(db, &[Type::unknown(); 1], tuple),
+            2 => self.specialize(db, &[Type::unknown(); 2], tuple),
+            len => self.specialize(db, vec![Type::unknown(); len], tuple),
         }
     }
 
@@ -893,7 +837,12 @@ impl<'db> GenericContext<'db> {
     /// otherwise, you will be left with a partial specialization. (Use
     /// [`specialize_recursive`](Self::specialize_recursive) if your types might mention typevars
     /// in this generic context.)
-    pub(crate) fn specialize<'t, T>(self, db: &'db dyn Db, types: T) -> Specialization<'db>
+    pub(crate) fn specialize<'t, T>(
+        self,
+        db: &'db dyn Db,
+        types: T,
+        tuple: Option<TupleType<'db>>,
+    ) -> Specialization<'db>
     where
         T: Into<Cow<'t, [Type<'db>]>>,
         'db: 't,
@@ -901,7 +850,7 @@ impl<'db> GenericContext<'db> {
         let types = types.into();
 
         assert_eq!(self.len(db), types.len());
-        Specialization::new(db, self, types, None, None)
+        Specialization::new(db, self, types, None, tuple)
     }
 
     /// Creates a specialization of this generic context. Panics if the length of `types` does not

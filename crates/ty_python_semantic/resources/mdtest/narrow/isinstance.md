@@ -614,7 +614,7 @@ class InvariantWithAny[T: int]:
 
 def _(x: object):
     if isinstance(x, InvariantWithAny):
-        reveal_type(x)  # revealed: Top[InvariantWithAny[int & Unknown]]
+        reveal_type(x)  # revealed: Top[InvariantWithAny[Unknown & int]]
         reveal_type(x.a)  # revealed: int
         reveal_type(x.b)  # revealed: Any
 ```
@@ -815,7 +815,7 @@ class Invariant(Generic[T, T_bound, T_constrained, T_defaulted, T_defaulted_and_
 
 def test_invariant_narrowing(x: object):
     if isinstance(x, Invariant):
-        # revealed: Top[Invariant[Unknown, UpperBound & Unknown, (Constraint1 & Unknown) | (Constraint2 & Unknown), Unknown, (UnionBoundElement1 & Unknown) | (UnionBoundElement2 & Unknown), (Constraint1 & Unknown) | (Constraint2 & Unknown)]]
+        # revealed: Top[Invariant[Unknown, Unknown & UpperBound, (Unknown & Constraint1) | (Unknown & Constraint2), Unknown, (Unknown & UnionBoundElement1) | (Unknown & UnionBoundElement2), (Unknown & Constraint1) | (Unknown & Constraint2)]]
         reveal_type(x)
         reveal_type(x.t)  # revealed: object
         reveal_type(x.t_bound)  # revealed: UpperBound

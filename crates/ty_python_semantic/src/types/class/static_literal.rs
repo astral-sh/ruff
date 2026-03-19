@@ -25,12 +25,12 @@ use crate::{
         use_def_map,
     },
     types::{
-        BoundTypeVarInstance, CallArguments, CallableType, ClassBase, ClassLiteral, ClassType,
-        DATACLASS_FLAGS, DataclassFlags, DataclassParams, GenericAlias, GenericContext, KnownClass,
-        KnownInstanceType, MemberLookupPolicy, MetaclassCandidate, MetaclassTransformInfo,
-        Parameter, Parameters, PropertyInstanceType, Signature, SpecialFormType, StaticMroError,
-        SubclassOfType, Truthiness, Type, TypeContext, TypeMapping, TypeVarVariance, UnionBuilder,
-        UnionType,
+        ApplyTypeMappingVisitor, BoundTypeVarInstance, CallArguments, CallableType, ClassBase,
+        ClassLiteral, ClassType, DATACLASS_FLAGS, DataclassFlags, DataclassParams, GenericAlias,
+        GenericContext, KnownClass, KnownInstanceType, MaterializationKind, MemberLookupPolicy,
+        MetaclassCandidate, MetaclassTransformInfo, Parameter, Parameters, PropertyInstanceType,
+        Signature, SpecialFormType, StaticMroError, SubclassOfType, Truthiness, Type, TypeContext,
+        TypeMapping, TypeVarVariance, UnionBuilder, UnionType,
         call::{CallError, CallErrorKind},
         callable::CallableTypeKind,
         class::{
@@ -379,9 +379,12 @@ impl<'db> StaticClassLiteral<'db> {
     }
 
     pub(crate) fn top_materialization(self, db: &'db dyn Db) -> ClassType<'db> {
-        self.apply_specialization(db, |generic_context| {
-            generic_context.top_materialization_specialization(db, self.known(db))
-        })
+        self.unknown_specialization(db).apply_type_mapping_impl(
+            db,
+            &TypeMapping::Materialize(MaterializationKind::Top),
+            TypeContext::default(),
+            &ApplyTypeMappingVisitor::default(),
+        )
     }
 
     /// Returns the default specialization of this class. For non-generic classes, the class is
@@ -398,7 +401,7 @@ impl<'db> StaticClassLiteral<'db> {
     /// maps each of the class's typevars to `Unknown`.
     pub(crate) fn unknown_specialization(self, db: &'db dyn Db) -> ClassType<'db> {
         self.apply_specialization(db, |generic_context| {
-            generic_context.unknown_specialization(db)
+            generic_context.unknown_specialization(db, self.known(db))
         })
     }
 
