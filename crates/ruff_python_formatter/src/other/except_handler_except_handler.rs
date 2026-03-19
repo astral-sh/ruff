@@ -103,11 +103,13 @@ impl FormatNodeRule<ExceptHandlerExceptHandler> for FormatExceptHandlerExceptHan
                                 && name.is_none()
                                 && !tuple.iter().any(Expr::is_starred_expr) =>
                         {
+                            // In Python 3.14+, parentheses around exception tuples are optional.
+                            // Use Preserve to keep existing parentheses if present, otherwise omit them.
                             write!(
                                 f,
                                 [
                                     space(),
-                                    tuple.format().with_options(TupleParentheses::NeverPreserve)
+                                    tuple.format().with_options(TupleParentheses::Preserve)
                                 ]
                             )?;
                         }
