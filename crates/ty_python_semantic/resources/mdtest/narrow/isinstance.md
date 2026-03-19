@@ -774,16 +774,11 @@ def test_contravariant_narrowing(x: object):
         # revealed: bound method Contravariant[Never, Never, Never, Never, Never, Never].method(t_contra: Never, t_contra_bound: Never, t_contra_constrained: Never, t_contra_defaulted: Never, t_contra_defaulted_and_bound: Never, t_contra_defaulted_and_constrained: Never) -> Unknown
         reveal_type(x.method)
 
-class Covariant(
-    Generic[T_co, T_co_bound, T_co_constrained, T_co_defaulted, T_co_defaulted_and_bound, T_co_defaulted_and_constrained]
-):
+class Covariant1(Generic[T_co, T_co_bound, T_co_defaulted, T_co_defaulted_and_bound]):
     def t_co(self) -> T_co:
         raise NotImplementedError
 
     def t_co_bound(self) -> T_co_bound:
-        raise NotImplementedError
-
-    def t_co_constrained(self) -> T_co_constrained:
         raise NotImplementedError
 
     def t_co_defaulted(self) -> T_co_defaulted:
@@ -792,36 +787,71 @@ class Covariant(
     def t_co_defaulted_and_bound(self) -> T_co_defaulted_and_bound:
         raise NotImplementedError
 
+class Covariant2(Generic[T_co_constrained, T_co_defaulted_and_constrained]):
+    def t_co_constrained(self) -> T_co_constrained:
+        raise NotImplementedError
+
     def t_co_defaulted_and_constrained(self) -> T_co_defaulted_and_constrained:
         raise NotImplementedError
 
 def test_covariant_narrowing(x: object):
-    if isinstance(x, Covariant):
-        # revealed: Covariant[object, UpperBound, Constraint1 | Constraint2, object, UnionBoundElement1 | UnionBoundElement2, Constraint1 | Constraint2]
-        reveal_type(x)
+    if isinstance(x, Covariant1):
+        reveal_type(x)  # revealed: Covariant1[object, UpperBound, object, UnionBoundElement1 | UnionBoundElement2]
         reveal_type(x.t_co_bound())  # revealed: UpperBound
-        reveal_type(x.t_co_constrained())  # revealed: Constraint1 | Constraint2
         reveal_type(x.t_co_defaulted())  # revealed: object
         reveal_type(x.t_co_defaulted_and_bound())  # revealed: UnionBoundElement1 | UnionBoundElement2
+
+    if isinstance(x, Covariant2):
+        # TODO: solving a constrained TypeVar to anything except `Unknown` or one of its constraints is invalid.
+        # A more accurate revealed type here might be something like
+        #
+        # Top[
+        #     Covariant2[Constraint1, Constraint1]
+        #     | Covariant2[Constraint1, Constraint2]
+        #     | Covariant2[Constraint2, Constraint1]
+        #     | Covariant2[Constraint2, Constraint2]
+        # ]
+        #
+        # revealed: Covariant2[Constraint1 | Constraint2, Constraint1 | Constraint2]
+        reveal_type(x)
+
+        reveal_type(x.t_co_constrained())  # revealed: Constraint1 | Constraint2
         reveal_type(x.t_co_defaulted_and_constrained())  # revealed: Constraint1 | Constraint2
 
-class Invariant(Generic[T, T_bound, T_constrained, T_defaulted, T_defaulted_and_bound, T_defaulted_and_constrained]):
+class Invariant1(Generic[T, T_bound, T_defaulted, T_defaulted_and_bound]):
     t: T
     t_bound: T_bound
-    t_constrained: T_constrained
     t_defaulted: T_defaulted
     t_defaulted_and_bound: T_defaulted_and_bound
+
+class Invariant2(Generic[T_constrained, T_defaulted_and_constrained]):
+    t_constrained: T_constrained
     t_defaulted_and_constrained: T_defaulted_and_constrained
 
 def test_invariant_narrowing(x: object):
-    if isinstance(x, Invariant):
-        # revealed: Top[Invariant[Unknown, Unknown & UpperBound, (Unknown & Constraint1) | (Unknown & Constraint2), Unknown, (Unknown & UnionBoundElement1) | (Unknown & UnionBoundElement2), (Unknown & Constraint1) | (Unknown & Constraint2)]]
+    if isinstance(x, Invariant1):
+        # revealed: Top[Invariant1[Unknown, Unknown & UpperBound, Unknown, (Unknown & UnionBoundElement1) | (Unknown & UnionBoundElement2)]]
         reveal_type(x)
         reveal_type(x.t)  # revealed: object
         reveal_type(x.t_bound)  # revealed: UpperBound
-        reveal_type(x.t_constrained)  # revealed: Constraint1 | Constraint2
         reveal_type(x.t_defaulted)  # revealed: object
         reveal_type(x.t_defaulted_and_bound)  # revealed: UnionBoundElement1 | UnionBoundElement2
+
+    if isinstance(x, Invariant2):
+        # TODO: solving a constrained TypeVar to anything except `Unknown` or one of its constraints is invalid.
+        # A more accurate revealed type here might be something like
+        #
+        # Top[
+        #     (Invariant2[Constraint1, Constraint1] & Unknown)
+        #     | (Invariant2[Constraint1, Constraint2] & Unknown)
+        #     | (Invariant2[Constraint2, Constraint1] & Unknown)
+        #     | (Invariant2[Constraint2, Constraint2] & Unknown)
+        # ]
+        #
+        # revealed: Top[Invariant2[(Unknown & Constraint1) | (Unknown & Constraint2), (Unknown & Constraint1) | (Unknown & Constraint2)]]
+        reveal_type(x)
+
+        reveal_type(x.t_constrained)  # revealed: Constraint1 | Constraint2
         reveal_type(x.t_defaulted_and_constrained)  # revealed: Constraint1 | Constraint2
 ```
 
