@@ -379,12 +379,15 @@ impl<'db> StaticClassLiteral<'db> {
     }
 
     pub(crate) fn top_materialization(self, db: &'db dyn Db) -> ClassType<'db> {
-        self.unknown_specialization(db).apply_type_mapping_impl(
-            db,
-            &TypeMapping::Materialize(MaterializationKind::Top),
-            TypeContext::default(),
-            &ApplyTypeMappingVisitor::default(),
-        )
+        self.apply_specialization(db, |generic_context| {
+            generic_context
+                .unknown_specialization(db, self.known(db))
+                .materialize_impl(
+                    db,
+                    MaterializationKind::Top,
+                    &ApplyTypeMappingVisitor::default(),
+                )
+        })
     }
 
     /// Returns the default specialization of this class. For non-generic classes, the class is
