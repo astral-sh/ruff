@@ -14,3 +14,6 @@ from typing import Annotated
 foo: Annotated[Telnet, telnetlib.Telnet()]
 
 def _() -> Telnet: ...
+
+# Non-function members should not be flagged
+port = telnetlib.TELNET_PORT

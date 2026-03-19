@@ -948,7 +948,7 @@ pub(crate) struct SuspiciousFTPLibUsage;
 impl Violation for SuspiciousFTPLibUsage {
     #[derive_message_formats]
     fn message(&self) -> String {
-        "FTP-related functions are being called. FTP is considered insecure. Use SSH/SFTP/SCP or some other encrypted protocol.".to_string()
+        "Use of FTP-related functions. FTP is considered insecure. Use SSH/SFTP/SCP or some other encrypted protocol.".to_string()
     }
 }
 
@@ -1314,10 +1314,14 @@ fn suspicious_function(
         ] => checker.report_diagnostic_if_enabled(SuspiciousXMLETreeUsage, range),
 
         // Telnet
-        ["telnetlib", ..] => checker.report_diagnostic_if_enabled(SuspiciousTelnetUsage, range),
+        ["telnetlib", "Telnet"] => {
+            checker.report_diagnostic_if_enabled(SuspiciousTelnetUsage, range)
+        }
 
         // FTPLib
-        ["ftplib", ..] => checker.report_diagnostic_if_enabled(SuspiciousFTPLibUsage, range),
+        ["ftplib", "FTP" | "FTP_TLS"] => {
+            checker.report_diagnostic_if_enabled(SuspiciousFTPLibUsage, range)
+        }
 
         _ => return,
     };

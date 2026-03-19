@@ -1,0 +1,52 @@
+---
+source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
+---
+--- Linter settings ---
+-linter.preview = disabled
++linter.preview = enabled
+
+--- Summary ---
+Removed: 0
+Added: 4
+
+--- Added ---
+S321 Use of FTP-related functions. FTP is considered insecure. Use SSH/SFTP/SCP or some other encrypted protocol.
+  --> S321.py:11:5
+   |
+10 | # References in callback positions
+11 | map(ftplib.FTP, [])
+   |     ^^^^^^^^^^
+12 | foo = ftplib.FTP
+   |
+
+
+S321 Use of FTP-related functions. FTP is considered insecure. Use SSH/SFTP/SCP or some other encrypted protocol.
+  --> S321.py:12:7
+   |
+10 | # References in callback positions
+11 | map(ftplib.FTP, [])
+12 | foo = ftplib.FTP
+   |       ^^^^^^^^^^
+13 |
+14 | from ftplib import FTP
+   |
+
+
+S321 Use of FTP-related functions. FTP is considered insecure. Use SSH/SFTP/SCP or some other encrypted protocol.
+  --> S321.py:18:5
+   |
+16 | FTP()
+17 |
+18 | map(FTP, [])
+   |     ^^^
+19 | foo = FTP
+   |
+
+
+S321 Use of FTP-related functions. FTP is considered insecure. Use SSH/SFTP/SCP or some other encrypted protocol.
+  --> S321.py:19:7
+   |
+18 | map(FTP, [])
+19 | foo = FTP
+   |       ^^^
+   |

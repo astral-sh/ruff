@@ -1,0 +1,33 @@
+---
+source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
+---
+S321 Use of FTP-related functions. FTP is considered insecure. Use SSH/SFTP/SCP or some other encrypted protocol.
+ --> S321.py:3:1
+  |
+1 | import ftplib
+2 |
+3 | ftplib.FTP()
+  | ^^^^^^^^^^^^
+4 | ftplib.FTP_TLS()
+  |
+
+S321 Use of FTP-related functions. FTP is considered insecure. Use SSH/SFTP/SCP or some other encrypted protocol.
+ --> S321.py:4:1
+  |
+3 | ftplib.FTP()
+4 | ftplib.FTP_TLS()
+  | ^^^^^^^^^^^^^^^^
+5 |
+6 | # Non-function members should not be flagged (https://github.com/astral-sh/ruff/issues/16673)
+  |
+
+S321 Use of FTP-related functions. FTP is considered insecure. Use SSH/SFTP/SCP or some other encrypted protocol.
+  --> S321.py:16:1
+   |
+14 | from ftplib import FTP
+15 |
+16 | FTP()
+   | ^^^^^
+17 |
+18 | map(FTP, [])
+   |
