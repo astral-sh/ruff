@@ -1605,13 +1605,7 @@ pub(super) fn function_body_kind<'db>(
     infer_type: impl Fn(&ast::Expr) -> Type<'db>,
 ) -> FunctionBodyKind {
     // Allow docstrings, but only as the first statement.
-    let suite = if let Some(ast::Stmt::Expr(ast::StmtExpr { value, .. })) = node.body.first()
-        && value.is_string_literal_expr()
-    {
-        &node.body[1..]
-    } else {
-        &node.body[..]
-    };
+    let suite = ast::helpers::body_without_leading_docstring(&node.body);
 
     if suite.iter().all(|stmt| match stmt {
         ast::Stmt::Pass(_) => true,

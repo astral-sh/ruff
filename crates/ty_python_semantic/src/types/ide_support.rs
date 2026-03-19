@@ -4,7 +4,7 @@ use crate::FxIndexSet;
 use crate::place::builtins_module_scope;
 use crate::semantic_index::definition::{Definition, DefinitionKind, DefinitionState};
 use crate::semantic_index::place::ScopedPlaceId;
-use crate::semantic_index::scope::ScopeKind;
+use crate::semantic_index::scope::{FileScopeId, ScopeKind};
 use crate::semantic_index::{attribute_scopes, global_scope, semantic_index, use_def_map};
 use crate::types::call::{CallArguments, CallError, MatchedArgument};
 use crate::types::class::{DynamicClassAnchor, DynamicNamedTupleAnchor};
@@ -1022,15 +1022,8 @@ fn find_parameter_range(parameters: &ast::Parameters, parameter_name: &str) -> O
         .map(|param| param.parameter.name.range())
 }
 
-/// Collects unused local bindings for IDE-facing diagnostics.
-///
-/// This intentionally reports only function-, lambda-, and comprehension-scope bindings.
-/// Module and class bindings can be observed indirectly (e.g., imports, attribute access), so
-/// reporting them here risks false positives without cross-file/reference analysis.
-fn should_mark_unused(name: &str) -> bool {
-    !name.starts_with('_') && !matches!(name, "self" | "cls")
-}
-
+/// Returns `true` for definition kinds that create user-facing bindings we consider for
+/// unused-binding diagnostics.
 fn should_consider_definition(kind: &DefinitionKind<'_>) -> bool {
     matches!(
         kind,
@@ -1048,16 +1041,84 @@ fn should_consider_definition(kind: &DefinitionKind<'_>) -> bool {
     )
 }
 
+fn function_has_stub_body(function: &ast::StmtFunctionDef) -> bool {
+    let suite = ruff_python_ast::helpers::body_without_leading_docstring(&function.body);
+
+    suite.iter().all(|stmt| match stmt {
+        ast::Stmt::Pass(_) => true,
+        ast::Stmt::Expr(ast::StmtExpr { value, .. }) => value.is_ellipsis_literal_expr(),
+        _ => false,
+    })
+}
+
+fn class_defines_member_named(db: &dyn Db, class: ClassType<'_>, member_name: &str) -> bool {
+    let Some((class_literal, specialization)) = class.static_class_literal(db) else {
+        // If we cannot inspect class members precisely, be conservative and avoid false positives.
+        return true;
+    };
+
+    let class_scope = class_literal.body_scope(db);
+    let class_place_table = crate::semantic_index::place_table(db, class_scope);
+
+    class_place_table
+        .symbol_id(member_name)
+        .is_some_and(|symbol_id| {
+            let symbol = class_place_table.symbol(symbol_id);
+            symbol.is_bound() || symbol.is_declared()
+        })
+        || class_literal
+            .own_synthesized_member(db, specialization, None, member_name)
+            .is_some()
+}
+
+// Returns true if a superclass in the method's MRO defines the same method name.
+// Used to suppress unused-parameter diagnostics for likely overrides.
+fn method_name_exists_in_superclass(
+    db: &dyn Db,
+    index: &crate::semantic_index::SemanticIndex<'_>,
+    parsed: &ruff_db::parsed::ParsedModuleRef,
+    file_scope_id: FileScopeId,
+) -> bool {
+    let scope = index.scope(file_scope_id);
+    let Some(function) = scope.node().as_function() else {
+        return false;
+    };
+
+    let Some(class_definition) = index.class_definition_of_method(file_scope_id) else {
+        return false;
+    };
+
+    let method_name = function.node(parsed).name.as_str();
+    let Some(class_type) = crate::types::binding_type(db, class_definition).to_class_type(db)
+    else {
+        return false;
+    };
+
+    class_type
+        .iter_mro(db)
+        .skip(1)
+        .any(|class_base| match class_base {
+            ClassBase::Protocol | ClassBase::Generic | ClassBase::TypedDict => false,
+            ClassBase::Dynamic(_) => true,
+            ClassBase::Class(superclass) => class_defines_member_named(db, superclass, method_name),
+        })
+}
+
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct UnusedBinding {
     pub range: TextRange,
     pub name: Name,
 }
 
+/// Collects unused local bindings for IDE-facing diagnostics.
+///
+/// This intentionally reports only function-, lambda-, and comprehension-scope bindings.
+/// Module and class bindings can be observed indirectly (e.g., imports, attribute access), so
+/// reporting them here risks false positives without cross-file/reference analysis.
 #[salsa::tracked(returns(ref))]
 pub fn unused_bindings(db: &dyn Db, file: ruff_db::files::File) -> Vec<UnusedBinding> {
     let parsed = parsed_module(db, file).load(db);
-    if !parsed.errors().is_empty() || !parsed.unsupported_syntax_errors().is_empty() {
+    if !parsed.errors().is_empty() {
         return Vec::new();
     }
 
@@ -1069,15 +1130,21 @@ pub fn unused_bindings(db: &dyn Db, file: ruff_db::files::File) -> Vec<UnusedBin
         let scope = index.scope(file_scope_id);
         let scope_kind = scope.kind();
 
-        // Restrict to local scopes to avoid false positives for bindings that may be
-        // observed indirectly from module/class contexts (for example via imports or
-        // attribute access) without cross-file analysis.
         if !matches!(
             scope_kind,
             ScopeKind::Function | ScopeKind::Lambda | ScopeKind::Comprehension
         ) {
             continue;
         }
+
+        let is_method_scope = index.class_definition_of_method(file_scope_id).is_some();
+        let method_has_stub_body = is_method_scope
+            && scope
+                .node()
+                .as_function()
+                .is_some_and(|function| function_has_stub_body(function.node(&parsed)));
+        let skip_unused_parameters_for_override =
+            method_name_exists_in_superclass(db, index, &parsed, file_scope_id);
 
         let place_table = index.place_table(file_scope_id);
         let use_def_map = index.use_def_map(file_scope_id);
@@ -1096,6 +1163,11 @@ pub fn unused_bindings(db: &dyn Db, file: ruff_db::files::File) -> Vec<UnusedBin
                 continue;
             }
 
+            let is_parameter = kind.is_parameter_definition();
+            if is_parameter && (skip_unused_parameters_for_override || method_has_stub_body) {
+                continue;
+            }
+
             let ScopedPlaceId::Symbol(symbol_id) = definition.place(db) else {
                 continue;
             };
@@ -1103,7 +1175,12 @@ pub fn unused_bindings(db: &dyn Db, file: ruff_db::files::File) -> Vec<UnusedBin
             let symbol = place_table.symbol(symbol_id);
             let name = symbol.name().as_str();
 
-            if !should_mark_unused(name) {
+            // Skip conventional method receiver parameters
+            if is_parameter && is_method_scope && matches!(name, "self" | "cls") {
+                continue;
+            }
+
+            if name.starts_with('_') {
                 continue;
             }
 
@@ -1275,6 +1352,128 @@ mod unused_bindings_tests {
     }
 
     #[test]
+    fn skips_unused_parameter_for_overriding_method() -> anyhow::Result<()> {
+        let source = dedent(
+            "
+            class Test:
+                def a(self, bar):
+                    print(bar)
+
+            class Test2(Test):
+                def a(self, bar):
+                    ...
+            ",
+        );
+
+        let names = collect_unused_names(&source)?;
+        assert_eq!(names, Vec::<String>::new());
+        Ok(())
+    }
+
+    #[test]
+    fn skips_unused_parameter_for_indirect_override() -> anyhow::Result<()> {
+        let source = dedent(
+            "
+            class A:
+                def a(self, bar):
+                    print(bar)
+
+            class B(A):
+                pass
+
+            class C(B):
+                def a(self, bar):
+                    ...
+            ",
+        );
+
+        let names = collect_unused_names(&source)?;
+        assert_eq!(names, Vec::<String>::new());
+        Ok(())
+    }
+
+    #[test]
+    fn reports_unused_parameter_for_non_overriding_method() -> anyhow::Result<()> {
+        let source = dedent(
+            "
+            class Base:
+                def keep(self):
+                    return 0
+
+            class Child(Base):
+                def new_method(self, dead):
+                    return 1
+            ",
+        );
+
+        let names = collect_unused_names(&source)?;
+        assert_eq!(names, vec!["dead"]);
+        Ok(())
+    }
+
+    #[test]
+    fn overriding_method_reports_unused_local_bindings() -> anyhow::Result<()> {
+        let source = dedent(
+            "
+            class Base:
+                def a(self, bar):
+                    print(bar)
+
+            class Child(Base):
+                def a(self, bar):
+                    local_dead = 1
+                    return 0
+            ",
+        );
+
+        let names = collect_unused_names(&source)?;
+        assert_eq!(names, vec!["local_dead"]);
+        Ok(())
+    }
+
+    #[test]
+    fn skips_unused_parameter_for_method_with_stub_body() -> anyhow::Result<()> {
+        let source = dedent(
+            "
+            class Test:
+                def a(self, bar):
+                    ...
+
+                def b(self, baz):
+                    pass
+            ",
+        );
+
+        let names = collect_unused_names(&source)?;
+        assert_eq!(names, Vec::<String>::new());
+        Ok(())
+    }
+
+    #[test]
+    fn skips_unused_parameter_for_overload_stub_declarations() -> anyhow::Result<()> {
+        let source = dedent(
+            "
+            import typing
+
+            class Test:
+                @typing.overload
+                def a(self, bar: str): ...
+
+                @typing.overload
+                def a(self, bar: int) -> None:
+                    ...
+
+                def a(self, bar: str | int) -> None:
+                    print(bar)
+            ",
+        );
+
+        let names = collect_unused_names(&source)?;
+        assert_eq!(names, Vec::<String>::new());
+        Ok(())
+    }
+
+    #[test]
     fn captures_unused_function_and_lambda_parameters() -> anyhow::Result<()> {
         let source = dedent(
             "
@@ -1290,6 +1489,22 @@ mod unused_bindings_tests {
 
         let names = collect_unused_names(&source)?;
         assert_eq!(names, vec!["b", "c", "dead", "y"]);
+        Ok(())
+    }
+
+    #[test]
+    fn reports_non_parameter_self_and_cls_bindings() -> anyhow::Result<()> {
+        let source = dedent(
+            "
+            def f(xs):
+                self = 1
+                [0 for cls in xs]
+                return 0
+            ",
+        );
+
+        let names = collect_unused_names(&source)?;
+        assert_eq!(names, vec!["cls", "self"]);
         Ok(())
     }
 

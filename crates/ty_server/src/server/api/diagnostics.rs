@@ -101,6 +101,27 @@ impl Diagnostics {
                     .push(lsp_diagnostic);
             }
 
+            for binding in &self.unused_bindings {
+                let Some((url, lsp_diagnostic)) = unused_binding_to_lsp_diagnostic(
+                    db,
+                    self.file_or_notebook,
+                    self.encoding,
+                    binding,
+                ) else {
+                    continue;
+                };
+
+                let Some(url) = url else {
+                    tracing::warn!("Unable to find notebook cell");
+                    continue;
+                };
+
+                cell_diagnostics
+                    .entry(url)
+                    .or_default()
+                    .push(lsp_diagnostic);
+            }
+
             LspDiagnostics::NotebookDocument(cell_diagnostics)
         } else {
             let mut diagnostics = self
@@ -349,7 +370,7 @@ pub(super) fn compute_diagnostics(
 }
 
 pub(super) fn collect_unused_bindings(db: &ProjectDatabase, file: File) -> Vec<UnusedBinding> {
-    if db.notebook_document(file).is_some() || !db.project().should_check_file(db, file) {
+    if !db.project().should_check_file(db, file) {
         return Vec::new();
     }
     unused_bindings(db, file).clone()
@@ -363,12 +384,24 @@ pub(super) fn unused_bindings_to_lsp_diagnostics(
 ) -> Vec<Diagnostic> {
     unused_bindings
         .iter()
-        .map(|binding| Diagnostic {
-            range: binding
-                .range
-                .to_lsp_range(db, file, encoding)
-                .map(|range| range.local_range())
-                .unwrap_or_default(),
+        .filter_map(|binding| unused_binding_to_lsp_diagnostic(db, file, encoding, binding))
+        .map(|(_, diagnostic)| diagnostic)
+        .collect()
+}
+
+fn unused_binding_to_lsp_diagnostic(
+    db: &ProjectDatabase,
+    file: File,
+    encoding: PositionEncoding,
+    binding: &UnusedBinding,
+) -> Option<(Option<Url>, Diagnostic)> {
+    let range = binding.range.to_lsp_range(db, file, encoding)?;
+    let url = range.to_location().map(|location| location.uri);
+
+    Some((
+        url,
+        Diagnostic {
+            range: range.local_range(),
             severity: Some(DiagnosticSeverity::HINT),
             code: Some(NumberOrString::String(UNUSED_BINDING_CODE.to_owned())),
             code_description: None,
@@ -377,8 +410,8 @@ pub(super) fn unused_bindings_to_lsp_diagnostics(
             related_information: None,
             tags: Some(vec![DiagnosticTag::UNNECESSARY]),
             data: None,
-        })
-        .collect()
+        },
+    ))
 }
 
 /// Converts the tool specific [`Diagnostic`][ruff_db::diagnostic::Diagnostic] to an LSP

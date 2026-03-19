@@ -204,6 +204,24 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.current_scope_info().file_scope_id
     }
 
+    /// Returns an iterator over ancestors of `scope` that are visible for name resolution,
+    /// starting with `scope` itself. This follows Python's lexical scoping rules where
+    /// class scopes are skipped during name resolution (except for the starting scope
+    /// if it happens to be a class scope).
+    ///
+    /// For example, in this code:
+    /// ```python
+    /// x = 1
+    /// class A:
+    ///     x = 2
+    ///     def method(self):
+    ///         print(x)  # Refers to global x=1, not class x=2
+    /// ```
+    /// The `method` function can see the global scope but not the class scope.
+    fn visible_ancestor_scopes(&self, scope: FileScopeId) -> VisibleAncestorsIter<'_> {
+        VisibleAncestorsIter::new(&self.scopes, scope)
+    }
+
     /// Returns the scope ID of the current scope if the current scope
     /// is a method inside a class body or an eagerly executed scope inside a method.
     /// Returns `None` otherwise, e.g. if the current scope is a function body outside of a class, or if the current scope is not a
@@ -499,9 +517,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     .symbol(enclosing_symbol)
                     .name();
                 let is_reassignment_of_snapshotted_symbol = || {
-                    for (ancestor, _) in
-                        VisibleAncestorsIter::new(&self.scopes, key.enclosing_scope)
-                    {
+                    for (ancestor, _) in self.visible_ancestor_scopes(key.enclosing_scope) {
                         if ancestor == current_scope {
                             return true;
                         }
@@ -557,12 +573,13 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         });
     }
 
+    /// Finds the nearest visible ancestor scope that actually owns a local binding for `name`.
     fn resolve_nested_reference_scope(
         &self,
         nested_scope: FileScopeId,
         name: &str,
     ) -> Option<FileScopeId> {
-        VisibleAncestorsIter::new(&self.scopes, nested_scope)
+        self.visible_ancestor_scopes(nested_scope)
             .skip(1)
             .find_map(|(scope_id, _)| {
                 let place_table = &self.place_tables[scope_id];

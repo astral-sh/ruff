@@ -863,6 +863,15 @@ impl DefinitionKind<'_> {
         matches!(self, DefinitionKind::Function(_))
     }
 
+    pub(crate) const fn is_parameter_definition(&self) -> bool {
+        matches!(
+            self,
+            DefinitionKind::VariadicPositionalParameter(_)
+                | DefinitionKind::VariadicKeywordParameter(_)
+                | DefinitionKind::Parameter(_)
+        )
+    }
+
     pub(crate) const fn is_loop_header(&self) -> bool {
         matches!(self, DefinitionKind::LoopHeader(_))
     }
