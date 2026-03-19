@@ -72,7 +72,56 @@ impl<'a> Resolver<'a> {
                     .chain(std::iter::once(source_file))
                     .flatten()
             }
+            CollectedImport::StringImport(import, min_dots) => {
+                // Try the full name first, then progressively shorter prefixes.
+                // This handles cases like `"a.b.c.MyClass"` where `MyClass` is an
+                // attribute of module `a.b.c`, not a submodule.
+                let (resolved, resolved_name) =
+                    self.resolve_with_parent_fallback(&import, min_dots);
+
+                let source_file = resolved
+                    .is_some_and(|file| file.extension() == Some("pyi"))
+                    .then(|| {
+                        resolved_name
+                            .as_ref()
+                            .and_then(|name| self.resolve_real_module(name))
+                    })
+                    .flatten();
+
+                std::iter::once(resolved)
+                    .chain(std::iter::once(source_file))
+                    .flatten()
+            }
         }
+    }
+
+    /// Try to resolve a module name, falling back to progressively shorter parent prefixes.
+    ///
+    /// The fallback will not produce candidates with fewer dots than `min_dots`
+    /// (e.g. with `min_dots = 2`, `"a.b"` is the shortest name attempted).
+    ///
+    /// Returns the resolved file path (if any) and the module name that resolved.
+    fn resolve_with_parent_fallback(
+        &self,
+        module_name: &ModuleName,
+        min_dots: usize,
+    ) -> (Option<&'a FilePath>, Option<ModuleName>) {
+        if let Some(file) = self.resolve_module(module_name) {
+            return (Some(file), Some(module_name.clone()));
+        }
+        // `min_dots` N requires at least N+1 components (N dots).
+        let min_components = min_dots + 1;
+        let mut current = module_name.parent();
+        while let Some(name) = current {
+            if name.components().count() < min_components {
+                break;
+            }
+            if let Some(file) = self.resolve_module(&name) {
+                return (Some(file), Some(name));
+            }
+            current = name.parent();
+        }
+        (None, None)
     }
 
     /// Resolves a module name to a module.
