@@ -383,13 +383,27 @@ Test cases:
     `(S ≤ A ≤ T)` should imply `S ≤ T`
 - Test both typevar orderings for BDD-ordering independence
 
-##### Step 4.2 ⬜ — Implement reverse decomposition via CSA in `add_sequents_for_single`
+##### Step 4.2 ✅ — Fix the disjointness check in `intersect`
 
-Replace (or extend) the existing single-constraint implication logic in
-`add_sequents_for_single` with a CSA-based approach:
+The current `ConstraintId::intersect` method uses
+`lower.is_constraint_set_assignable_to(db, upper)` (a universal/always check)
+to determine if the intersection `(L ≤ A ≤ U)` is disjoint. When `U` contains
+typevars (e.g., `Covariant[T]`), this returns false even if there exist
+assignments of `T` that make `L ≤ U` hold — causing the combined constraint to
+be pruned as unsatisfiable.
 
-1. For each constraint `(L ≤ A ≤ U)`, compute
-    `L.when_constraint_set_assignable_to(U)` to get a constraint set `C`.
+Fix: change the check to an existential one — "is `L ≤ U` *ever* true?" rather
+than "is `L ≤ U` *always* true?". This is
+`!when_constraint_set_assignable_to(L, U).is_never_satisfied()`. If there
+exists some assignment where the intersection is satisfiable, the combined
+constraint should survive.
+
+##### Step 4.3 ✅ — Add CSA-based decomposition in `add_sequents_for_single`
+
+For each constraint `(L ≤ A ≤ U)`, compute
+`L.when_constraint_set_assignable_to(U)` to get a constraint set `C` that
+describes the conditions under which `L ≤ U` holds. Then:
+
 1. Check if `C` is a simple conjunction (single root→always path in the BDD).
     Use the structural criterion: if any interior node has both outgoing edges
     pointing to something other than `never`, the result is not simple — bail
@@ -405,14 +419,14 @@ This should subsume the existing `single_implications` logic in
 Variance is handled automatically by the CSA check — no need for explicit
 variance matching or special-casing bare typevars.
 
-##### Step 4.3 ⬜ — Verify bare typevar propagation still works
+##### Step 4.4 ✅ — Verify bare typevar propagation still works
 
 Confirm that the existing tests for typevar-to-typevar transitivity
 (e.g., `(S ≤ T ≤ U) → (S ≤ U)`) still pass with the new CSA-based logic.
 If the new logic fully subsumes the old `single_implications` code, consider
 removing the old code.
 
-##### Step 4.4 ⬜ — Run the full test suite
+##### Step 4.5 ✅ — Run the full test suite
 
 Run the full test suite to check for regressions.
 

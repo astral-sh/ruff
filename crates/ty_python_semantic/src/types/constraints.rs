@@ -1069,9 +1069,15 @@ impl<'db> Constraint<'db> {
             _ => {}
         }
 
-        // If `lower ≰ upper`, then the constraint cannot be satisfied, since there is no type that
-        // is both greater than `lower`, and less than `upper`.
-        if !lower.is_constraint_set_assignable_to(db, upper) {
+        // If `lower ≰ upper` for every possible assignment of typevars, then the constraint cannot
+        // be satisfied, since there is no type that is both greater than `lower`, and less than
+        // `upper`. We use an existential check here ("is there *some* assignment where
+        // `lower ≤ upper`?") rather than a universal check, because the bounds may mention
+        // typevars — e.g., `Sequence[int] ≤ A ≤ Sequence[T]` is satisfiable when `int ≤ T`.
+        if lower
+            .when_constraint_set_assignable_to(db, upper, builder, InferableTypeVars::None)
+            .is_never_satisfied(db)
+        {
             return ALWAYS_FALSE;
         }
 
@@ -1264,9 +1270,16 @@ impl ConstraintId {
         let upper =
             IntersectionType::from_two_elements(db, self_constraint.upper, other_constraint.upper);
 
-        // If `lower ≰ upper`, then the intersection is empty, since there is no type that is both
-        // greater than `lower`, and less than `upper`.
-        if !lower.is_constraint_set_assignable_to(db, upper) {
+        // If `lower ≰ upper` for every possible assignment of typevars, then the intersection is
+        // empty, since there is no type that is both greater than `lower`, and less than `upper`.
+        // We use an existential check here ("is there *some* assignment where `lower ≤ upper`?")
+        // rather than a universal check ("is `lower ≤ upper` for *all* assignments?"), because the
+        // bounds may mention typevars — e.g., `Sequence[int] ≤ A ≤ Sequence[T]` is satisfiable
+        // when `int ≤ T`, even though it's not universally true for all `T`.
+        if lower
+            .when_constraint_set_assignable_to(db, upper, builder, InferableTypeVars::None)
+            .is_never_satisfied(db)
+        {
             return IntersectionResult::Disjoint;
         }
 
@@ -1520,6 +1533,50 @@ impl NodeId {
                     interior.if_false.with_adjusted_source_order(builder, delta),
                     interior.source_order + delta,
                 )
+            }
+        }
+    }
+
+    /// Checks whether this BDD represents a single conjunction (of an arbitrary number of
+    /// positive or negative constraints).
+    fn is_single_conjunction(self, builder: &ConstraintSetBuilder<'_>) -> bool {
+        // A BDD can be viewed as an encoding of the formula's DNF representation (OR of ANDs).
+        // Each path from the root node to the `always` terminals represents one of the disjoints.
+        // The constraints that we encounter on the path represent the conjoints. That means that a
+        // BDD can only represent a single conjunction if there is precisely one path from the root
+        // node to the `always` terminal.
+        //
+        // We can take advantage of quasi-reduction. We never create an interior node with both
+        // outgoing edges leading to `never`; those are collapsed to `never`. That means that if we
+        // ever encounter a node with both outgoing edges pointing to something other than `never`,
+        // that node must have at least two paths to the `always` terminal.
+        let mut current = self.node();
+        loop {
+            match current {
+                Node::AlwaysTrue => return true,
+                Node::AlwaysFalse => return false,
+                Node::Interior(interior) => {
+                    let data = builder.interior_node_data(interior.node());
+
+                    // If both if_true and if_false point to non-never, there are multiple paths to
+                    // `always`, so this cannot be a simple conjunction.
+                    if data.if_true != ALWAYS_FALSE && data.if_false != ALWAYS_FALSE {
+                        return false;
+                    }
+
+                    // The uncertain branch must also be never for a simple conjunction, since it
+                    // contributes to all paths.
+                    if data.if_uncertain != ALWAYS_FALSE {
+                        return false;
+                    }
+
+                    // Follow the non-never branch.
+                    current = if data.if_true != ALWAYS_FALSE {
+                        data.if_true.node()
+                    } else {
+                        data.if_false.node()
+                    };
+                }
             }
         }
     }
@@ -4193,58 +4250,112 @@ impl SequentMap {
             return;
         }
 
-        // If the lower or upper bound of this constraint is a typevar, we can propagate the
-        // constraint:
+        // Given a constraint `L ≤ T ≤ U`, `L ≤ U` must also hold. If those bounds contain other
+        // typevars, we can infer additional constraints. This is easiest to see when the bounds
+        // _are_ typevars:
         //
         //   1. `(S ≤ T ≤ U) → (S ≤ U)`
         //   2. `(S ≤ T ≤ τ) → (S ≤ τ)`
         //   3. `(τ ≤ T ≤ U) → (τ ≤ U)`
         //
-        // Technically, (1) also allows `(S = T) → (S = S)`, but the rhs of that is vacuously true,
-        // so we don't add a sequent for that case.
+        // but it also holds when the bounds _contain_ typevars:
+        //
+        //   4. `(Covariant[S] ≤ T ≤ Covariant[U]) → (S ≤ U)`
+        //      `(Covariant[S] ≤ T ≤ Covariant[τ]) → (S ≤ τ)`
+        //      `(Covariant[τ] ≤ T ≤ Covariant[U]) → (τ ≤ U)`
+        //
+        //   5. `(Contravariant[S] ≤ T ≤ Contravariant[U]) → (U ≤ S)`
+        //      `(Contravariant[S] ≤ T ≤ Contravariant[τ]) → (τ ≤ S)`
+        //      `(Contravariant[τ] ≤ T ≤ Contravariant[U]) → (U ≤ τ)`
+        //
+        //   6. `(Invariant[S] ≤ T ≤ Invariant[U]) → (S = U)`
+        //      `(Invariant[S] ≤ T ≤ Invariant[τ]) → (S = τ)`
+        //      `(Invariant[τ] ≤ T ≤ Invariant[U]) → (τ = U)`
+        //
+        // and whenever the bounds are assignable, even if they don't mention exactly the same
+        // types:
+        //
+        //   class Sub(Covariant[int]): ...
+        //
+        //   7. `(Covariant[S] ≤ T ≤ Sub) → (S ≤ int)`
+        //      `(Sub ≤ T ≤ Covariant[U]) → (int ≤ U)`
+        //
+        // To handle all of these cases, we perform a constraint set assignability check to see
+        // when `L ≤ U`. This gives us a constraint set, which should be the rhs of the sequent
+        // implication. (That is, this check directly encodes `(L ≤ T ≤ U) → (L ≤ U)` as an
+        // implication.)
 
-        let post_constraint = match (lower, upper) {
-            // Case 1
-            (Type::TypeVar(lower_typevar), Type::TypeVar(upper_typevar)) => {
-                if lower_typevar.is_same_typevar_as(db, upper_typevar) {
-                    return;
+        // Skip trivial cases where the assignability check won't produce useful results.
+        if lower.is_never() || upper.is_object() {
+            return;
+        }
+
+        let when =
+            lower.when_constraint_set_assignable_to(db, upper, builder, InferableTypeVars::None);
+
+        // If L is _never_ assignable to U, this constraint would violate transitivity, and should
+        // never have been added.
+        debug_assert!(!when.is_never_satisfied(db));
+
+        // Fast path: If L is trivially always assignable to U, there are no derived constraints
+        // that we can infer. (This would be handled correctly by the logic below, but this is a
+        // useful early return.)
+        if when.node == ALWAYS_TRUE {
+            return;
+        }
+
+        // Technically, we've just calculated a _constraint set_ as the rhs of this implication.
+        // Unfortunately, our sequent map can currently only store implications where the rhs is a
+        // single constraint.
+        //
+        // If the constraint set that we get represents a single conjunction, we can still shoehorn
+        // it into this shape, since we can "break apart" a conjunction on the rhs of an
+        // implication:
+        //
+        //   a → b ∧ c ∧ d
+        //
+        // becomes
+        //
+        //   a → b
+        //   a → c
+        //   a → d
+        //
+        // That takes care of breaking apart the rhs conjunction: we can add each positive
+        // constraint as a separate single_implication.
+        //
+        // We can also handle _negative_ constraints, because those turn into impossibilities:
+        //
+        //   a → ¬b
+        //
+        // becomes
+        //
+        //   a ∧ b → false
+        //
+        // TODO: This should handle the most common cases. In the future, we could handle arbitrary
+        // rhs constraint sets by moving this logic into PathAssignments::walk_path, and performing
+        // it once for _every_ root→always path in the BDD. (That would require resetting the
+        // PathAssignments state for each of those paths, which is why the logic would have to
+        // move.)
+        let mut node = when.node;
+        if !node.is_single_conjunction(builder) {
+            return;
+        }
+
+        loop {
+            match node.node() {
+                Node::AlwaysTrue | Node::AlwaysFalse => break,
+                Node::Interior(interior) => {
+                    let interior = builder.interior_node_data(interior.node());
+                    if interior.if_true != ALWAYS_FALSE {
+                        self.add_single_implication(db, builder, constraint, interior.constraint);
+                        node = interior.if_true;
+                    } else {
+                        self.add_pair_impossibility(db, builder, constraint, interior.constraint);
+                        node = interior.if_false;
+                    }
                 }
-
-                // We always want to propagate `lower ≤ upper`, but we must do so using a
-                // canonical top-level typevar ordering.
-                //
-                // Example: if we learn `(A ≤ [T] ≤ B)`, this single-constraint propagation step
-                // should infer `A ≤ B`. Depending on ordering, we might need to encode that as
-                // either `(Never ≤ [A] ≤ B)` or `(A ≤ [B] ≤ object)`. Both render as `A ≤ B`,
-                // but they constrain different typevars and must be created in the orientation
-                // allowed by `can_be_bound_for`.
-                if upper_typevar.can_be_bound_for(db, builder, lower_typevar) {
-                    ConstraintId::new(db, builder, lower_typevar, Type::Never, upper)
-                } else {
-                    ConstraintId::new(
-                        db,
-                        builder,
-                        upper_typevar,
-                        Type::TypeVar(lower_typevar),
-                        Type::object(),
-                    )
-                }
             }
-
-            // Case 2
-            (Type::TypeVar(lower_typevar), _) => {
-                ConstraintId::new(db, builder, lower_typevar, Type::Never, upper)
-            }
-
-            // Case 3
-            (_, Type::TypeVar(upper_typevar)) => {
-                ConstraintId::new(db, builder, upper_typevar, lower, Type::object())
-            }
-
-            _ => return,
-        };
-
-        self.add_single_implication(db, builder, constraint, post_constraint);
+        }
     }
 
     fn add_sequents_for_pair<'db>(

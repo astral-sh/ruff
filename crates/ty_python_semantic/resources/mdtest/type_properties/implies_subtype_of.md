@@ -758,4 +758,89 @@ def contravariant_of_covariant[U, T]():
     static_assert(not constraints.implies_subtype_of(U, Contravariant[Covariant[str]]))
 ```
 
+### Reverse decomposition: bounds on a typevar can be decomposed via variance
+
+When a constraint has lower and upper bounds that are parameterizations of the same generic type, we
+can decompose the bounds to extract constraints on the nested typevar. For instance, the constraint
+`Covariant[int] ≤ A ≤ Covariant[T]` implies `int ≤ T`, because `Covariant` is covariant and
+`Covariant[int] ≤ Covariant[T]` requires `int ≤ T`.
+
+```py
+from typing import Never
+from ty_extensions import ConstraintSet, static_assert
+
+class Covariant[T]:
+    def get(self) -> T:
+        raise ValueError
+
+class Contravariant[T]:
+    def set(self, value: T):
+        pass
+
+class Invariant[T]:
+    def get(self) -> T:
+        raise ValueError
+
+    def set(self, value: T):
+        pass
+
+def covariant_decomposition[A, T]():
+    # Covariant[int] ≤ A ≤ Covariant[T] implies int ≤ T.
+    constraints = ConstraintSet.range(Covariant[int], A, Covariant[T])
+    static_assert(constraints.implies_subtype_of(int, T))
+    static_assert(not constraints.implies_subtype_of(str, T))
+
+def contravariant_decomposition[A, T]():
+    # Contravariant[int] ≤ A ≤ Contravariant[T] implies T ≤ int (flipped).
+    # Because contravariance reverses: Contravariant[int] ≤ Contravariant[T] means T ≤ int.
+    constraints = ConstraintSet.range(Contravariant[int], A, Contravariant[T])
+    static_assert(constraints.implies_subtype_of(T, int))
+    static_assert(not constraints.implies_subtype_of(T, str))
+
+def invariant_decomposition[A, T]():
+    # Invariant[int] ≤ A ≤ Invariant[T] implies T = int.
+    constraints = ConstraintSet.range(Invariant[int], A, Invariant[T])
+    static_assert(constraints.implies_subtype_of(T, int))
+    static_assert(constraints.implies_subtype_of(int, T))
+    static_assert(not constraints.implies_subtype_of(T, str))
+
+def bare_typevar_decomposition[A, S, T]():
+    # S ≤ A ≤ T implies S ≤ T. This is existing behavior (bare typevar transitivity)
+    # that should continue to work.
+    constraints = ConstraintSet.range(S, A, T)
+    static_assert(constraints.implies_subtype_of(S, T))
+
+# Repeat with reversed typevar ordering.
+def covariant_decomposition[T, A]():
+    constraints = ConstraintSet.range(Covariant[int], A, Covariant[T])
+    static_assert(constraints.implies_subtype_of(int, T))
+    static_assert(not constraints.implies_subtype_of(str, T))
+
+def contravariant_decomposition[T, A]():
+    constraints = ConstraintSet.range(Contravariant[int], A, Contravariant[T])
+    static_assert(constraints.implies_subtype_of(T, int))
+    static_assert(not constraints.implies_subtype_of(T, str))
+
+def invariant_decomposition[T, A]():
+    constraints = ConstraintSet.range(Invariant[int], A, Invariant[T])
+    static_assert(constraints.implies_subtype_of(T, int))
+    static_assert(constraints.implies_subtype_of(int, T))
+    static_assert(not constraints.implies_subtype_of(T, str))
+
+# The lower and upper bounds don't need to be parameterizations of the same type — our inference
+# logic handles subtyping naturally.
+class Sub(Covariant[int]): ...
+
+def subclass_lower_bound[A, T]():
+    # Sub ≤ Covariant[int], so Sub ≤ A ≤ Covariant[T] implies int ≤ T.
+    constraints = ConstraintSet.range(Sub, A, Covariant[T])
+    static_assert(constraints.implies_subtype_of(int, T))
+    static_assert(not constraints.implies_subtype_of(str, T))
+
+def subclass_lower_bound[T, A]():
+    constraints = ConstraintSet.range(Sub, A, Covariant[T])
+    static_assert(constraints.implies_subtype_of(int, T))
+    static_assert(not constraints.implies_subtype_of(str, T))
+```
+
 [subtyping]: https://typing.python.org/en/latest/spec/concepts.html#subtype-supertype-and-type-equivalence
