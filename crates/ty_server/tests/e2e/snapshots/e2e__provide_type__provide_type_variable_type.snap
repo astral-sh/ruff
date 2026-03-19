@@ -1,12 +1,10 @@
 ---
 source: crates/ty_server/tests/e2e/provide_type.rs
-assertion_line: 231
-expression: provide_type_response
+assertion_line: 24
+expression: "&provide_type_response"
 ---
-Some(
-    ProvideTypeResponse {
-        tys: [
-            "T1@foo.A | T2@foo.A.f",
-        ],
-    },
-)
+{
+  "tys": [
+    "T1@A | T2@f"
+  ]
+}
