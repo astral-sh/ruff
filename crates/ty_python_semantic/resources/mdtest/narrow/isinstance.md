@@ -614,8 +614,8 @@ class InvariantWithAny[T: int]:
 
 def _(x: object):
     if isinstance(x, InvariantWithAny):
-        reveal_type(x)  # revealed: Top[InvariantWithAny[Unknown]]
-        reveal_type(x.a)  # revealed: object
+        reveal_type(x)  # revealed: Top[InvariantWithAny[int & Unknown]]
+        reveal_type(x.a)  # revealed: int
         reveal_type(x.b)  # revealed: Any
 ```
 
@@ -711,15 +711,118 @@ the upper bound (or `object` if unbounded) is used:
 ```py
 from typing import Generic, TypeVar
 
-T_bounded = TypeVar("T_bounded", bound=int, covariant=True)
-T_defaulted = TypeVar("T_defaulted", default=None, covariant=True)
+class UpperBound: ...
+class Constraint1: ...
+class Constraint2: ...
+class UnionBoundElement1: ...
+class UnionBoundElement2: ...
 
-class BoundedAndDefaulted(Generic[T_bounded, T_defaulted]):
-    pass
+T = TypeVar("T")
+T_bound = TypeVar("T_bound", bound=UpperBound)
+T_constrained = TypeVar("T_constrained", Constraint1, Constraint2)
+T_defaulted = TypeVar("T_defaulted", default=None)
+T_defaulted_and_bound = TypeVar(
+    "T_defaulted_and_bound", default=UnionBoundElement1, bound=UnionBoundElement1 | UnionBoundElement2
+)
+T_defaulted_and_constrained = TypeVar("T_defaulted_and_constrained", Constraint1, Constraint2, default=Constraint1)
 
-def _(x: object):
-    if isinstance(x, BoundedAndDefaulted):
-        reveal_type(x)  # revealed: BoundedAndDefaulted[int, object]
+T_co = TypeVar("T_co", covariant=True)
+T_co_bound = TypeVar("T_co_bound", bound=UpperBound, covariant=True)
+T_co_constrained = TypeVar("T_co_constrained", Constraint1, Constraint2, covariant=True)
+T_co_defaulted = TypeVar("T_co_defaulted", default=None, covariant=True)
+T_co_defaulted_and_bound = TypeVar(
+    "T_co_defaulted_and_bound", default=UnionBoundElement1, bound=UnionBoundElement1 | UnionBoundElement2, covariant=True
+)
+T_co_defaulted_and_constrained = TypeVar(
+    "T_co_defaulted_and_constrained", Constraint1, Constraint2, default=Constraint1, covariant=True
+)
+
+T_contra = TypeVar("T_contra", contravariant=True)
+T_contra_bound = TypeVar("T_contra_bound", bound=UpperBound, contravariant=True)
+T_contra_constrained = TypeVar("T_contra_constrained", Constraint1, Constraint2, contravariant=True)
+T_contra_defaulted = TypeVar("T_contra_defaulted", default=None, contravariant=True)
+T_contra_defaulted_and_bound = TypeVar(
+    "T_contra_defaulted_and_bound", default=UnionBoundElement1, bound=UnionBoundElement1 | UnionBoundElement2, contravariant=True
+)
+T_contra_defaulted_and_constrained = TypeVar(
+    "T_contra_defaulted_and_constrained", Constraint1, Constraint2, default=Constraint1, contravariant=True
+)
+
+class Contravariant(
+    Generic[
+        T_contra,
+        T_contra_bound,
+        T_contra_constrained,
+        T_contra_defaulted,
+        T_contra_defaulted_and_bound,
+        T_contra_defaulted_and_constrained,
+    ]
+):
+    def method(
+        self,
+        t_contra: T_contra,
+        t_contra_bound: T_contra_bound,
+        t_contra_constrained: T_contra_constrained,
+        t_contra_defaulted: T_contra_defaulted,
+        t_contra_defaulted_and_bound: T_contra_defaulted_and_bound,
+        t_contra_defaulted_and_constrained: T_contra_defaulted_and_constrained,
+    ): ...
+
+def test_contravariant_narrowing(x: object):
+    if isinstance(x, Contravariant):
+        reveal_type(x)  # revealed: Contravariant[Never, Never, Never, Never, Never, Never]
+        # revealed: bound method Contravariant[Never, Never, Never, Never, Never, Never].method(t_contra: Never, t_contra_bound: Never, t_contra_constrained: Never, t_contra_defaulted: Never, t_contra_defaulted_and_bound: Never, t_contra_defaulted_and_constrained: Never) -> Unknown
+        reveal_type(x.method)
+
+class Covariant(
+    Generic[T_co, T_co_bound, T_co_constrained, T_co_defaulted, T_co_defaulted_and_bound, T_co_defaulted_and_constrained]
+):
+    def t_co(self) -> T_co:
+        raise NotImplementedError
+
+    def t_co_bound(self) -> T_co_bound:
+        raise NotImplementedError
+
+    def t_co_constrained(self) -> T_co_constrained:
+        raise NotImplementedError
+
+    def t_co_defaulted(self) -> T_co_defaulted:
+        raise NotImplementedError
+
+    def t_co_defaulted_and_bound(self) -> T_co_defaulted_and_bound:
+        raise NotImplementedError
+
+    def t_co_defaulted_and_constrained(self) -> T_co_defaulted_and_constrained:
+        raise NotImplementedError
+
+def test_covariant_narrowing(x: object):
+    if isinstance(x, Covariant):
+        # revealed: Covariant[object, UpperBound, Constraint1 | Constraint2, object, UnionBoundElement1 | UnionBoundElement2, Constraint1 | Constraint2]
+        reveal_type(x)
+        reveal_type(x.t_co_bound())  # revealed: UpperBound
+        reveal_type(x.t_co_constrained())  # revealed: Constraint1 | Constraint2
+        reveal_type(x.t_co_defaulted())  # revealed: object
+        reveal_type(x.t_co_defaulted_and_bound())  # revealed: UnionBoundElement1 | UnionBoundElement2
+        reveal_type(x.t_co_defaulted_and_constrained())  # revealed: Constraint1 | Constraint2
+
+class Invariant(Generic[T, T_bound, T_constrained, T_defaulted, T_defaulted_and_bound, T_defaulted_and_constrained]):
+    t: T
+    t_bound: T_bound
+    t_constrained: T_constrained
+    t_defaulted: T_defaulted
+    t_defaulted_and_bound: T_defaulted_and_bound
+    t_defaulted_and_constrained: T_defaulted_and_constrained
+
+def test_invariant_narrowing(x: object):
+    if isinstance(x, Invariant):
+        # revealed: Top[Invariant[Unknown, UpperBound & Unknown, (Constraint1 & Unknown) | (Constraint2 & Unknown), Unknown, (UnionBoundElement1 & Unknown) | (UnionBoundElement2 & Unknown), (Constraint1 & Unknown) | (Constraint2 & Unknown)]]
+        reveal_type(x)
+        reveal_type(x.t)  # revealed: object
+        reveal_type(x.t_bound)  # revealed: UpperBound
+        reveal_type(x.t_constrained)  # revealed: Constraint1 | Constraint2
+        reveal_type(x.t_defaulted)  # revealed: object
+        reveal_type(x.t_defaulted_and_bound)  # revealed: UnionBoundElement1 | UnionBoundElement2
+        reveal_type(x.t_defaulted_and_constrained)  # revealed: Constraint1 | Constraint2
 ```
 
 ## Narrowing with TypedDict unions

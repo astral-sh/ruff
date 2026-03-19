@@ -808,7 +808,23 @@ impl<'db> GenericContext<'db> {
                     TypeVarVariance::Contravariant => Type::Never,
                     TypeVarVariance::Invariant => {
                         has_dynamic_invariant_typevar = true;
-                        Type::unknown()
+                        match typevar.typevar(db).bound_or_constraints(db) {
+                            Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                                IntersectionType::from_two_elements(db, bound, Type::unknown())
+                            }
+                            Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                                let constraints = constraints.elements(db).iter();
+                                let mapped_constraints = constraints.map(|constraint| {
+                                    IntersectionType::from_two_elements(
+                                        db,
+                                        *constraint,
+                                        Type::unknown(),
+                                    )
+                                });
+                                UnionType::from_elements(db, mapped_constraints)
+                            }
+                            None => Type::unknown(),
+                        }
                     }
                 }
             })
@@ -1312,20 +1328,24 @@ impl<'db> Specialization<'db> {
                     (materialization_kind, variance),
                     (
                         MaterializationKind::Top,
-                        TypeVarVariance::Covariant | TypeVarVariance::Bivariant
+                        TypeVarVariance::Covariant
+                            | TypeVarVariance::Bivariant
+                            | TypeVarVariance::Invariant
                     ) | (MaterializationKind::Bottom, TypeVarVariance::Contravariant)
                 ) && let Some(bounds) = bound_typevar.typevar(db).bound_or_constraints(db)
                 {
-                    materialized = IntersectionType::from_two_elements(
-                        db,
-                        materialized,
-                        match bounds {
-                            TypeVarBoundOrConstraints::UpperBound(bound) => bound,
-                            TypeVarBoundOrConstraints::Constraints(constraints) => {
-                                constraints.as_type(db)
-                            }
-                        },
-                    );
+                    materialized = match bounds {
+                        TypeVarBoundOrConstraints::UpperBound(bound) => {
+                            IntersectionType::from_two_elements(db, materialized, bound)
+                        }
+                        TypeVarBoundOrConstraints::Constraints(constraints) => {
+                            let elements = constraints.elements(db).iter();
+                            let mapped = elements.map(|&constraint| {
+                                IntersectionType::from_two_elements(db, materialized, constraint)
+                            });
+                            UnionType::from_elements(db, mapped)
+                        }
+                    };
                 }
 
                 materialized
@@ -1434,6 +1454,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         source_materialization_kind,
                         *target_type,
                         target_materialization_kind,
+                        bound_typevar.typevar(db),
                     ),
                     TypeVarVariance::Covariant => {
                         self.check_type_pair(db, *source_type, *target_type)
@@ -1457,6 +1478,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source_materialization: Option<MaterializationKind>,
         target_type: Type<'db>,
         target_materialization: Option<MaterializationKind>,
+        tvar: TypeVarInstance<'db>,
     ) -> ConstraintSet<'db, 'c> {
         match (
             source_materialization,
@@ -1497,13 +1519,32 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 TypeRelation::Subtyping
                 | TypeRelation::Redundancy { .. }
                 | TypeRelation::SubtypingAssuming,
-            ) => self.check_subtyping_in_invariant_position(
-                db,
-                source_type,
-                MaterializationKind::Top,
-                target_type,
-                target_mat,
-            ),
+            ) => {
+                let effective_source_type = tvar
+                    .bound_or_constraints(db)
+                    .map(|bound_or_constraints| match bound_or_constraints {
+                        TypeVarBoundOrConstraints::UpperBound(bound) => {
+                            IntersectionType::from_two_elements(db, bound, source_type)
+                        }
+                        TypeVarBoundOrConstraints::Constraints(constraints) => {
+                            UnionType::from_elements(
+                                db,
+                                constraints.elements(db).iter().map(|&constraint| {
+                                    IntersectionType::from_two_elements(db, source_type, constraint)
+                                }),
+                            )
+                        }
+                    })
+                    .unwrap_or(source_type);
+
+                self.check_subtyping_in_invariant_position(
+                    db,
+                    effective_source_type,
+                    MaterializationKind::Top,
+                    target_type,
+                    target_mat,
+                )
+            }
             (
                 Some(source_mat),
                 None,

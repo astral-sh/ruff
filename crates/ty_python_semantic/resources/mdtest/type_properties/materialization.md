@@ -598,14 +598,79 @@ from ty_extensions import Bottom, Top, static_assert, is_equivalent_to
 
 T_bounded_co = TypeVar("T_bounded_co", bound=int, covariant=True)
 T_default_co = TypeVar("T_default_co", default=None, covariant=True)
+T_bounded_and_defaulted_co = TypeVar("T_bounded_and_defaulted_co", default=None, bound=int | None, covariant=True)
 
-class BoundedAndDefaulted(Generic[T_bounded_co, T_default_co]):
-    pass
+class BoundedAndDefaulted(Generic[T_bounded_co, T_default_co, T_bounded_and_defaulted_co]):
+    def get_bounded(self) -> T_bounded_co:
+        raise NotImplementedError
 
-# T_bounded_co should resolve to its bound `int`, not `object`.
-# T_default_co keeps its default `None` since `Top[Foo]` means `Top[Foo[Unknown, None]]`.
+    def get_defaulted(self) -> T_default_co:
+        raise NotImplementedError
+
+    def get_bounded_and_defaulted(self) -> T_bounded_and_defaulted_co:
+        raise NotImplementedError
+
+# `Top[BoundedAndDefaulted]` translates to "the top materialization of the default specialization of the `BoundedAndDefaulted` type".
+# I.e. `Top[BoundedAndDefaulted]` -> `Top[BoundedAndDefaulted[Unknown, None]]` -> `BoundedAndDefaulted[int, None]`.
+#
+# This is consistent with how an unparameterized class always means "the class with the default specialization applied"
+# in type expressions, but note that it means that `Top[BoundedAndDefaulted]` here is therefore a different type
+# to the "true top materialization" of `BoundedAndDefaulted` that we would intersect a type with for `isinstance()`
+# narrowing. That "true top materialization" is tested elsewhere, in `isinstance.md`.
 def f(x: Top[BoundedAndDefaulted]):
-    reveal_type(x)  # revealed: BoundedAndDefaulted[int, None]
+    reveal_type(x)  # revealed: BoundedAndDefaulted[int, None, None]
+    reveal_type(x.get_bounded())  # revealed: int
+    reveal_type(x.get_defaulted())  # revealed: None
+    reveal_type(x.get_bounded_and_defaulted())  # revealed: None
+
+def g(x: Top[BoundedAndDefaulted[Any, Any, Any]]):
+    reveal_type(x)  # revealed: BoundedAndDefaulted[int, object, int | None]
+    reveal_type(x.get_bounded())  # revealed: int
+    reveal_type(x.get_defaulted())  # revealed: object
+    reveal_type(x.get_bounded_and_defaulted())  # revealed: int | None
+
+T_bounded_invariant = TypeVar("T_bounded_invariant", bound=int)
+T_defaulted_invariant = TypeVar("T_defaulted_invariant", default=None)
+T_bounded_and_defaulted_invariant = TypeVar("T_bounded_and_defaulted_invariant", default=None, bound=int | None)
+
+class BoundedAndDefaultedInvariant(Generic[T_bounded_invariant, T_defaulted_invariant, T_bounded_and_defaulted_invariant]):
+    t_bounded: T_bounded_invariant
+    t_defaulted: T_defaulted_invariant
+    t_bounded_and_defaulted: T_bounded_and_defaulted_invariant
+
+def h(x: Top[BoundedAndDefaultedInvariant]):
+    reveal_type(x)  # revealed: Top[BoundedAndDefaultedInvariant[Unknown & int, None, None]]
+    reveal_type(x.t_bounded)  # revealed: int
+    reveal_type(x.t_defaulted)  # revealed: None
+    reveal_type(x.t_bounded_and_defaulted)  # revealed: None
+
+def i(x: Top[BoundedAndDefaultedInvariant[Any, Any, Any]]):
+    reveal_type(x)  # revealed: Top[BoundedAndDefaultedInvariant[Any & int, Any, (Any & int) | (Any & None)]]
+    reveal_type(x.t_bounded)  # revealed: int
+    reveal_type(x.t_defaulted)  # revealed: object
+    reveal_type(x.t_bounded_and_defaulted)  # revealed: int | None
+
+T_bounded_contra = TypeVar("T_bounded_contra", bound=int, contravariant=True)
+T_defaulted_contra = TypeVar("T_defaulted_contra", default=None, contravariant=True)
+T_bounded_and_defaulted_contra = TypeVar("T_bounded_and_defaulted_contra", default=None, bound=int | None, contravariant=True)
+
+class BoundedAndDefaultedContra(Generic[T_bounded_contra, T_defaulted_contra, T_bounded_and_defaulted_contra]):
+    def method(
+        self,
+        t_bounded: T_bounded_contra,
+        t_defaulted: T_defaulted_contra,
+        t_bounded_and_defaulted: T_bounded_and_defaulted_contra,
+    ): ...
+
+def i(x: Top[BoundedAndDefaultedContra]):
+    reveal_type(x)  # revealed: BoundedAndDefaultedContra[Never, None, None]
+    # revealed: bound method BoundedAndDefaultedContra[Never, None, None].method(t_bounded: Never, t_defaulted: None, t_bounded_and_defaulted: None) -> Unknown
+    reveal_type(x.method)
+
+def i(x: Top[BoundedAndDefaultedContra[Any, Any, Any]]):
+    reveal_type(x)  # revealed: BoundedAndDefaultedContra[Never, Never, Never]
+    # revealed: bound method BoundedAndDefaultedContra[Never, Never, Never].method(t_bounded: Never, t_defaulted: Never, t_bounded_and_defaulted: Never) -> Unknown
+    reveal_type(x.method)
 ```
 
 ## Invalid use
