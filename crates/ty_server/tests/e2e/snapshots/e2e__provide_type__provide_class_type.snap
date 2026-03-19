@@ -1,12 +1,10 @@
 ---
 source: crates/ty_server/tests/e2e/provide_type.rs
-assertion_line: 262
-expression: provide_type_response
+assertion_line: 24
+expression: "&provide_type_response"
 ---
-Some(
-    ProvideTypeResponse {
-        tys: [
-            "builtins.type[foo.A]",
-        ],
-    },
-)
+{
+  "tys": [
+    "builtins.type[foo.A]"
+  ]
+}
