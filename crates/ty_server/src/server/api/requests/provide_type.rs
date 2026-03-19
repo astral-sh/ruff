@@ -4,17 +4,16 @@ use crate::document::RangeExt;
 use crate::server::api::traits::{
     BackgroundDocumentRequestHandler, RequestHandler, RetriableRequestHandler,
 };
-use crate::session::DocumentSnapshot;
 use crate::session::client::Client;
+use crate::session::DocumentSnapshot;
 use lsp_types::request::Request;
 use lsp_types::{Range, TextDocumentIdentifier, Url};
 use ruff_db::parsed::parsed_module;
 use ruff_db::source::{line_index, source_text};
-use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::find_node::covering_node;
+use ruff_python_ast::AnyNodeRef;
 use serde::{Deserialize, Serialize};
 use ty_project::ProjectDatabase;
-use ty_python_semantic::types::Type;
 use ty_python_semantic::{DisplaySettings, HasType, SemanticModel};
 
 pub(crate) struct ProvideTypeRequestHandler;
@@ -42,7 +41,7 @@ pub struct ProvideTypeParams {
 #[serde(rename_all = "camelCase")]
 pub struct ProvideTypeResponse {
     /// Fully qualified names of the types, one per input range
-    pub tys: Vec<String>, // TODO: type parameters
+    pub tys: Vec<Option<String>>,
 }
 
 impl RequestHandler for ProvideTypeRequestHandler {
@@ -71,7 +70,7 @@ impl BackgroundDocumentRequestHandler for ProvideTypeRequestHandler {
 
         let model = SemanticModel::new(db, file);
 
-        let tys: Vec<String> = params
+        let tys: Vec<Option<String>> = params
             .ranges
             .iter()
             .map(|range| {
@@ -80,13 +79,13 @@ impl BackgroundDocumentRequestHandler for ProvideTypeRequestHandler {
                 {
                     range_offset
                 } else {
-                    return String::new();
+                    return None;
                 };
 
                 let covering_node = covering_node(parsed.syntax().into(), range_offset);
                 let node = match covering_node.find_first(|node| node.is_expression()) {
                     Ok(found) => found.node(),
-                    Err(_) => return String::new(),
+                    Err(_) => return None,
                 };
 
                 let ty = match node {
@@ -123,15 +122,13 @@ impl BackgroundDocumentRequestHandler for ProvideTypeRequestHandler {
                     AnyNodeRef::ExprTuple(expr) => expr.inferred_type(&model),
                     AnyNodeRef::ExprSlice(expr) => expr.inferred_type(&model),
                     AnyNodeRef::ExprIpyEscapeCommand(expr) => expr.inferred_type(&model),
-                    _ => return String::new(),
+                    _ => return None,
                 };
 
-                match ty {
-                    Some(ty) => ty
-                        .display_with(db, DisplaySettings::default().fully_qualified())
-                        .to_string(),
-                    None => String::new(),
-                }
+                ty.map(|ty| {
+                    ty.display_with(db, DisplaySettings::default().fully_qualified())
+                        .to_string()
+                })
             })
             .collect();
 
