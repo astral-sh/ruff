@@ -21,7 +21,7 @@ fn assert_provide_type_snapshot(
     server.open_text_document(foo, foo_content, 1);
     let provide_type_response = server.provide_type_request(foo, request_range);
 
-    insta::assert_debug_snapshot!(snapshot_name, provide_type_response);
+    insta::assert_json_snapshot!(snapshot_name, &provide_type_response);
 
     Ok(())
 }
@@ -142,7 +142,6 @@ def a():
 }
 
 #[test]
-#[ignore = "TODO: provide scope for generics"]
 fn provide_type_variable_type() -> anyhow::Result<()> {
     assert_provide_type_snapshot(
         "provide_type_variable_type",
