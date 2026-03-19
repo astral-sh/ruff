@@ -7,7 +7,7 @@ Released on 2026-03-19.
 ### Preview features
 
 - Display output severity in preview ([#23845](https://github.com/astral-sh/ruff/pull/23845))
-- Don't show noqa hover for non-Python documents ([#24040](https://github.com/astral-sh/ruff/pull/24040))
+- Don't show `noqa` hover for non-Python documents ([#24040](https://github.com/astral-sh/ruff/pull/24040))
 
 ### Rule changes
 
@@ -20,14 +20,12 @@ Released on 2026-03-19.
 ### Documentation
 
 - Add company AI policy to contributing guide ([#24021](https://github.com/astral-sh/ruff/pull/24021))
-- Document editor features for markdown code formatting ([#23924](https://github.com/astral-sh/ruff/pull/23924))
+- Document editor features for Markdown code formatting ([#23924](https://github.com/astral-sh/ruff/pull/23924))
 - \[`pylint`\] Improve phrasing (`PLC0208`) ([#24033](https://github.com/astral-sh/ruff/pull/24033))
 
 ### Other changes
 
-- PEP 639 license information ([#19661](https://github.com/astral-sh/ruff/pull/19661))
-- Update Rust crate toml to v1.0.6 ([#23984](https://github.com/astral-sh/ruff/pull/23984))
-- Update taiki-e/install-action action to v2.68.25 ([#23986](https://github.com/astral-sh/ruff/pull/23986))
+- Use PEP 639 license information ([#19661](https://github.com/astral-sh/ruff/pull/19661))
 
 ### Contributors
 
