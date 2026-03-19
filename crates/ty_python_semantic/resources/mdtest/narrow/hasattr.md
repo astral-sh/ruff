@@ -98,3 +98,14 @@ def f(x: object):
         # error: [unresolved-attribute] "Object of type `<Protocol with members '__qualname__'>` has no attribute `foo`"
         reveal_type(x.foo)  # revealed: Unknown
 ```
+
+When the narrowed attribute itself is defined on `object`, we intersect the synthesized protocol's
+`object`-typed member with the real attribute type from `object`:
+
+```py
+def f(x: object):
+    if hasattr(x, "__dict__"):
+        reveal_type(x)  # revealed: <Protocol with members '__dict__'>
+        reveal_type(x.__dict__)  # revealed: dict[str, Any]
+        del x.__dict__["f"]
+```

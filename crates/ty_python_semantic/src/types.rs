@@ -39,8 +39,8 @@ pub(crate) use self::signatures::Signature;
 pub(crate) use self::subclass_of::{SubclassOfInner, SubclassOfType};
 pub use crate::diagnostic::add_inferred_python_version_hint_to_diagnostic;
 use crate::place::{
-    DefinedPlace, Definedness, Place, PlaceAndQualifiers, TypeOrigin, builtins_module_scope,
-    imported_symbol, known_module_symbol,
+    DefinedPlace, Definedness, Place, PlaceAndQualifiers, TypeOrigin, Widening,
+    builtins_module_scope, imported_symbol, known_module_symbol,
 };
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::place::ScopedPlaceId;
@@ -3062,6 +3062,51 @@ impl<'db> Type<'db> {
             }
 
             Type::ModuleLiteral(module) => module.static_member(db, name_str),
+
+            Type::ProtocolInstance(ProtocolInstanceType {
+                inner: Protocol::Synthesized(protocol),
+                ..
+            }) if protocol.interface().includes_member(db, name_str) => {
+                let protocol_fallback = protocol
+                    .interface()
+                    .own_instance_member(db, name_str)
+                    .expect("synthesized protocols include the matched member");
+                let protocol_member = self.invoke_descriptor_protocol(
+                    db,
+                    name_str,
+                    protocol_fallback,
+                    InstanceFallbackShadowsNonDataDescriptor::No,
+                    policy,
+                );
+                let protocol_member = self
+                    .fallback_to_getattr(db, &name, protocol_member, policy)
+                    .map_type(|ty| ty.bind_self_typevars(db, self));
+                let object_member =
+                    Type::object().member_lookup_with_policy(db, name.clone(), policy);
+
+                match (protocol_member.place, object_member.place) {
+                    (Place::Defined(protocol_place), Place::Defined(object_place)) => {
+                        Place::Defined(DefinedPlace {
+                            ty: IntersectionType::from_two_elements(
+                                db,
+                                protocol_place.ty,
+                                object_place.ty,
+                            ),
+                            origin: protocol_place.origin.merge(object_place.origin),
+                            definedness: protocol_place.definedness.max(object_place.definedness),
+                            widening: match (protocol_place.widening, object_place.widening) {
+                                (Widening::WithUnknown, _) | (_, Widening::WithUnknown) => {
+                                    Widening::WithUnknown
+                                }
+                                (Widening::None, Widening::None) => Widening::None,
+                            },
+                        })
+                        .with_qualifiers(protocol_member.qualifiers | object_member.qualifiers)
+                    }
+                    (_, Place::Undefined) => protocol_member,
+                    (Place::Undefined, _) => object_member,
+                }
+            }
 
             // If a protocol does not include a member and the policy disables falling back to
             // `object`, we return `Place::Undefined` here. This short-circuits attribute lookup
