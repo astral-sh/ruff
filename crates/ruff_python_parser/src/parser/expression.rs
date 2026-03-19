@@ -2792,7 +2792,6 @@ impl<'src> Parser<'src> {
     /// # Panics
     ///
     /// If the parser isn't positioned at a `IpyEscapeCommand` token.
-    /// If the escape command kind is not `%` or `!`.
     fn parse_ipython_escape_command_expression(&mut self) -> ast::ExprIpyEscapeCommand {
         let start = self.node_start();
 
@@ -2802,13 +2801,19 @@ impl<'src> Parser<'src> {
             unreachable!()
         };
 
+        let range = self.node_range(start);
+
         if !matches!(kind, IpyEscapeKind::Magic | IpyEscapeKind::Shell) {
-            // This should never occur as the lexer won't allow it.
-            unreachable!("IPython escape command expression is only allowed for % and !");
+            self.add_error(
+                ParseErrorType::OtherError(
+                    "IPython escape command expression is only allowed for % and !".to_string(),
+                ),
+                range,
+            );
         }
 
         let command = ast::ExprIpyEscapeCommand {
-            range: self.node_range(start),
+            range,
             node_index: AtomicNodeIndex::NONE,
             kind,
             value,

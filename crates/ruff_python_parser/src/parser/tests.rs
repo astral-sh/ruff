@@ -1,4 +1,6 @@
-use crate::{Mode, ParseOptions, parse, parse_expression, parse_module};
+use crate::{
+    Mode, ParseErrorType, ParseOptions, parse, parse_expression, parse_module, parse_unchecked,
+};
 
 #[test]
 fn test_modes() {
@@ -135,6 +137,20 @@ foo.bar[0].baz[2].egg??
     )
     .unwrap();
     insta::assert_debug_snapshot!(parsed.syntax());
+}
+
+#[test]
+fn test_ipython_quote_escape_command_as_expression() {
+    let parsed = parse_unchecked("{]\n,", ParseOptions::from(Mode::Ipython));
+
+    assert!(parsed.has_invalid_syntax());
+    assert!(parsed.errors().iter().any(|error| {
+        matches!(
+            &error.error,
+            ParseErrorType::OtherError(message)
+                if message == "IPython escape command expression is only allowed for % and !"
+        )
+    }));
 }
 
 #[test]
