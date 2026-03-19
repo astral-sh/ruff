@@ -2858,6 +2858,32 @@ impl<'db> Type<'db> {
         self.member_lookup_with_policy(db, name.into(), MemberLookupPolicy::default())
     }
 
+    fn lookup_instance_member_with_fallback(
+        self,
+        db: &'db dyn Db,
+        name: &Name,
+        fallback: PlaceAndQualifiers<'db>,
+        policy: MemberLookupPolicy,
+    ) -> PlaceAndQualifiers<'db> {
+        let result = self.invoke_descriptor_protocol(
+            db,
+            name.as_str(),
+            fallback,
+            InstanceFallbackShadowsNonDataDescriptor::No,
+            policy,
+        );
+
+        if result.is_class_var() && self.is_typed_dict() {
+            // `ClassVar`s on `TypedDictFallback` cannot be accessed on inhabitants of `SomeTypedDict`.
+            // They can only be accessed on `SomeTypedDict` directly.
+            return Place::Undefined.into();
+        }
+
+        let result = self.fallback_to_getattr(db, name, result, policy);
+
+        result.map_type(|ty| ty.bind_self_typevars(db, self))
+    }
+
     /// Similar to [`Type::member`], but allows the caller to specify what policy should be used
     /// when looking up attributes. See [`MemberLookupPolicy`] for more information.
     #[salsa::tracked(
@@ -3066,21 +3092,18 @@ impl<'db> Type<'db> {
             Type::ProtocolInstance(ProtocolInstanceType {
                 inner: Protocol::Synthesized(protocol),
                 ..
-            }) if protocol.interface().includes_member(db, name_str) => {
-                let protocol_fallback = protocol
-                    .interface()
-                    .own_instance_member(db, name_str)
-                    .expect("synthesized protocols include the matched member");
-                let protocol_member = self.invoke_descriptor_protocol(
+            }) if !policy.no_instance_fallback()
+                && protocol.interface().includes_member(db, name_str) =>
+            {
+                let protocol_member = self.lookup_instance_member_with_fallback(
                     db,
-                    name_str,
-                    protocol_fallback,
-                    InstanceFallbackShadowsNonDataDescriptor::No,
+                    &name,
+                    protocol
+                        .interface()
+                        .own_instance_member(db, name_str)
+                        .expect("synthesized protocols include the matched member"),
                     policy,
                 );
-                let protocol_member = self
-                    .fallback_to_getattr(db, &name, protocol_member, policy)
-                    .map_type(|ty| ty.bind_self_typevars(db, self));
                 let object_member =
                     Type::object().member_lookup_with_policy(db, name.clone(), policy);
 
@@ -3240,25 +3263,12 @@ impl<'db> Type<'db> {
                     .into();
                 }
 
-                let fallback = self.instance_member(db, name_str);
-
-                let result = self.invoke_descriptor_protocol(
+                self.lookup_instance_member_with_fallback(
                     db,
-                    name_str,
-                    fallback,
-                    InstanceFallbackShadowsNonDataDescriptor::No,
+                    &name,
+                    self.instance_member(db, name_str),
                     policy,
-                );
-
-                if result.is_class_var() && self.is_typed_dict() {
-                    // `ClassVar`s on `TypedDictFallback` cannot be accessed on inhabitants of `SomeTypedDict`.
-                    // They can only be accessed on `SomeTypedDict` directly.
-                    return Place::Undefined.into();
-                }
-
-                let result = self.fallback_to_getattr(db, &name, result, policy);
-
-                result.map_type(|ty| ty.bind_self_typevars(db, self))
+                )
             }
 
             Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..) => {

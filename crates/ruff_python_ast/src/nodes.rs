@@ -3401,21 +3401,21 @@ pub enum ArgOrKeyword<'a> {
 }
 
 impl<'a> ArgOrKeyword<'a> {
-    pub const fn value(self) -> &'a Expr {
+    pub const fn value(&self) -> &'a Expr {
         match self {
             ArgOrKeyword::Arg(argument) => argument,
             ArgOrKeyword::Keyword(keyword) => &keyword.value,
         }
     }
 
-    pub const fn is_variadic(self) -> bool {
+    pub const fn is_variadic(&self) -> bool {
         match self {
             ArgOrKeyword::Arg(expr) => expr.is_starred_expr(),
             ArgOrKeyword::Keyword(keyword) => keyword.arg.is_none(),
         }
     }
 
-    pub const fn as_variadic(self) -> Option<&'a Keyword> {
+    pub const fn as_variadic(&self) -> Option<&'a Keyword> {
         match self {
             ArgOrKeyword::Keyword(keyword) if keyword.arg.is_none() => Some(keyword),
             _ => None,
@@ -3475,7 +3475,8 @@ impl Arguments {
     /// argument exists. Used to retrieve argument values that can be provided _either_ as keyword or
     /// positional arguments.
     pub fn find_argument_value(&self, name: &str, position: usize) -> Option<&Expr> {
-        self.find_argument(name, position).map(ArgOrKeyword::value)
+        self.find_argument(name, position)
+            .map(|argument| argument.value())
     }
 
     /// Return the argument with the given name or at the given position, or `None` if no such
