@@ -935,8 +935,11 @@ from typing_extensions import Never, Any
 
 static_assert(is_assignable_to(Any, Never))
 static_assert(is_assignable_to(Unknown, Never))
+static_assert(is_assignable_to(Any | Unknown, Never))
 static_assert(is_assignable_to(Intersection[Any, int], Never))
 static_assert(is_assignable_to(Intersection[Unknown, int], Never))
+static_assert(not is_assignable_to(Any | int, Never))
+static_assert(not is_assignable_to(Unknown | int, Never))
 ```
 
 ## Callable
