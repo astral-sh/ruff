@@ -745,9 +745,9 @@ impl<'db> ConstraintSetBuilder<'db> {
         // `OwnedConstraintSet` is only used in mdtests, and not in type inference of user code.
 
         fn rebuild_node<'db>(
-            db: &'db dyn Db,
             builder: &ConstraintSetBuilder<'db>,
             other: &OwnedConstraintSet<'db>,
+            constraints: &IndexVec<ConstraintId, NodeId>,
             cache: &mut FxHashMap<NodeId, NodeId>,
             old_node: NodeId,
         ) -> NodeId {
@@ -758,36 +758,52 @@ impl<'db> ConstraintSetBuilder<'db> {
                 return *remapped;
             }
 
-            let old_interior = other.nodes[old_node];
-            let old_constraint = other.constraints[old_interior.constraint];
-            let condition = Constraint::new_node(
-                db,
-                builder,
-                old_constraint.typevar,
-                old_constraint.lower,
-                old_constraint.upper,
-            );
-
             // Absorb the uncertain branch into both true and false branches. This collapses
             // the TDD back to a binary structure, which is correct but loses the TDD laziness for
             // unions. This is acceptable since `load` is only used for `OwnedConstraintSet` in
             // mdtests.
             // TODO: A 4-arg `ite_uncertain` could preserve TDD structure if `load` ever becomes
             // performance-sensitive.
-            let if_true = rebuild_node(db, builder, other, cache, old_interior.if_true);
-            let if_uncertain = rebuild_node(db, builder, other, cache, old_interior.if_uncertain);
-            let if_false = rebuild_node(db, builder, other, cache, old_interior.if_false);
+            let old_interior = other.nodes[old_node];
+            let if_true = rebuild_node(builder, other, constraints, cache, old_interior.if_true);
+            let if_uncertain = rebuild_node(
+                builder,
+                other,
+                constraints,
+                cache,
+                old_interior.if_uncertain,
+            );
+            let if_false = rebuild_node(builder, other, constraints, cache, old_interior.if_false);
             let if_true_merged = if_true.or(builder, if_uncertain);
             let if_false_merged = if_false.or(builder, if_uncertain);
+            let condition = constraints[old_interior.constraint];
             let remapped = condition.ite(builder, if_true_merged, if_false_merged);
 
             cache.insert(old_node, remapped);
             remapped
         }
 
+        // Load all of the constraints into the this builder first, to maximize the chance that the
+        // constraints and typevars will appear in the same order. (This is important because many
+        // of our mdtests try to force a particular ordering, to test that our algorithms are all
+        // order-independent.)
+        let constraints = other
+            .constraints
+            .iter()
+            .map(|old_constraint| {
+                Constraint::new_node(
+                    db,
+                    self,
+                    old_constraint.typevar,
+                    old_constraint.lower,
+                    old_constraint.upper,
+                )
+            })
+            .collect();
+
         // Maps NodeIds in the OwnedConstraintSet to the corresponding NodeIds in this builder.
         let mut cache = FxHashMap::default();
-        let node = rebuild_node(db, self, other, &mut cache, other.node);
+        let node = rebuild_node(self, other, &constraints, &mut cache, other.node);
         ConstraintSet::from_node(self, node)
     }
 
@@ -5854,16 +5870,16 @@ mod tests {
             &builder,
             loaded,
             indoc! {r#"
-                <0> (T = int) 1/1
-                ┡━₁ <1> (U = str) 1/1
+                <0> (U = str) 1/1
+                ┡━₁ <1> (T = int) 1/1
                 │   ┡━₁ never
-                │   ├─? never
-                │   └─₀ always
-                ├─? <2> (U = str) 1/1
-                │   ┡━₁ always
-                │   ├─? never
+                │   ├─? always
                 │   └─₀ never
-                └─₀ never
+                ├─? never
+                └─₀ <2> (T = int) 1/1
+                    ┡━₁ always
+                    ├─? never
+                    └─₀ never
             "#},
         );
     }
