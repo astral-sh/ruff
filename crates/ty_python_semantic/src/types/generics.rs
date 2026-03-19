@@ -1458,6 +1458,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 | TypeRelation::Redundancy { .. }
                 | TypeRelation::SubtypingAssuming,
             ) => {
+                // Ensure that all possible specializations of a class are considered
+                // subtypes of the top-materialization specialization of that class
+                // by intersecting `source_type` with the bounds/constraints of the
+                // type variable, if they exist.
                 let effective_source_type = tvar
                     .bound_or_constraints(db)
                     .map(|bound_or_constraints| {
