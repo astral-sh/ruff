@@ -758,15 +758,83 @@ def contravariant_of_covariant[U, T]():
     static_assert(not constraints.implies_subtype_of(U, Contravariant[Covariant[str]]))
 ```
 
-### Concrete bound substitution into nested generic types
+### Typevar bound substitution into nested generic types
 
-When a constraint on C has a concrete type nested in a generic bound, and that concrete type matches
-another typevar B's bound, we can substitute B (the typevar) for the concrete type, creating a
-cross-typevar relationship. This is a weakening (the derived constraint is less restrictive), but it
-introduces a useful link between the two typevars.
+When a typevar B has a bare typevar S as one of its bounds, and S appears nested inside another
+constraint's bound, we can substitute B for S to create a cross-typevar link. The derived constraint
+is weaker (less restrictive), but introduces a useful relationship between the typevars.
 
-For example, `(Covariant[int] ≤ C) ∧ (B ≤ int)` should derive `Covariant[B] ≤ C`, because `B ≤ int`
-and covariance give `Covariant[B] ≤ Covariant[int] ≤ C`.
+For example, `(Covariant[S] ≤ C) ∧ (S ≤ B)` should imply `Covariant[B] ≤ C`: we are given that
+`S ≤ B`, covariance tells us that `Covariant[S] ≤ Covariant[B]`, and transitivity gives
+`Covariant[B] ≤ C`. (We can infer similar weakened constraints for contravariant and invariant
+typevars.)
+
+```py
+from typing import Never
+from ty_extensions import ConstraintSet, static_assert
+
+class Covariant[T]:
+    def get(self) -> T:
+        raise ValueError
+
+class Contravariant[T]:
+    def set(self, value: T):
+        pass
+
+class Invariant[T]:
+    def get(self) -> T:
+        raise ValueError
+
+    def set(self, value: T):
+        pass
+
+def covariant_upper_bound_into_lower[S, B, C]():
+    # (Covariant[S] ≤ C) ∧ (B ≤ S) → (Covariant[B] ≤ C)
+    # B ≤ S, so Covariant[B] ≤ Covariant[S], and Covariant[S] ≤ C gives Covariant[B] ≤ C.
+    constraints = ConstraintSet.range(Covariant[S], C, object) & ConstraintSet.range(Never, B, S)
+    static_assert(constraints.implies_subtype_of(Covariant[B], C))
+
+def covariant_lower_bound_into_upper[S, B, C]():
+    # (C ≤ Covariant[S]) ∧ (S ≤ B) → (C ≤ Covariant[B])
+    # S ≤ B, so Covariant[S] ≤ Covariant[B], and C ≤ Covariant[S] ≤ Covariant[B].
+    constraints = ConstraintSet.range(Never, C, Covariant[S]) & ConstraintSet.range(S, B, object)
+    static_assert(constraints.implies_subtype_of(C, Covariant[B]))
+
+def contravariant_upper_bound_into_lower[S, B, C]():
+    # (Contravariant[S] ≤ C) ∧ (S ≤ B) → (Contravariant[B] ≤ C)
+    # S ≤ B gives Contravariant[B] ≤ Contravariant[S], so Contravariant[B] ≤ Contravariant[S] ≤ C.
+    constraints = ConstraintSet.range(Contravariant[S], C, object) & ConstraintSet.range(S, B, object)
+    static_assert(constraints.implies_subtype_of(Contravariant[B], C))
+
+def contravariant_lower_bound_into_upper[S, B, C]():
+    # (C ≤ Contravariant[S]) ∧ (B ≤ S) → (C ≤ Contravariant[B])
+    # B ≤ S gives Contravariant[S] ≤ Contravariant[B], so C ≤ Contravariant[S] ≤ Contravariant[B].
+    constraints = ConstraintSet.range(Never, C, Contravariant[S]) & ConstraintSet.range(Never, B, S)
+    static_assert(constraints.implies_subtype_of(C, Contravariant[B]))
+
+# Repeat with reversed typevar ordering.
+def covariant_upper_bound_into_lower[C, B, S]():
+    constraints = ConstraintSet.range(Covariant[S], C, object) & ConstraintSet.range(Never, B, S)
+    static_assert(constraints.implies_subtype_of(Covariant[B], C))
+
+def covariant_lower_bound_into_upper[C, B, S]():
+    constraints = ConstraintSet.range(Never, C, Covariant[S]) & ConstraintSet.range(S, B, object)
+    static_assert(constraints.implies_subtype_of(C, Covariant[B]))
+
+def contravariant_upper_bound_into_lower[C, B, S]():
+    constraints = ConstraintSet.range(Contravariant[S], C, object) & ConstraintSet.range(S, B, object)
+    static_assert(constraints.implies_subtype_of(Contravariant[B], C))
+
+def contravariant_lower_bound_into_upper[C, B, S]():
+    constraints = ConstraintSet.range(Never, C, Contravariant[S]) & ConstraintSet.range(Never, B, S)
+    static_assert(constraints.implies_subtype_of(C, Contravariant[B]))
+```
+
+### Concrete bound substitution into nested generic types (future extension)
+
+When B's bound _contains_ a typevar (but is not a bare typevar), the same logic as above applies.
+
+TODO: This is not implemented yet, since it requires different detection machinery.
 
 ```py
 from typing import Never
@@ -778,28 +846,17 @@ class Covariant[T]:
 
 def upper_bound_into_lower[B, C]():
     # (Covariant[int] ≤ C) ∧ (B ≤ int) → (Covariant[B] ≤ C)
-    # B ≤ int, so Covariant[B] ≤ Covariant[int] ≤ C.
     constraints = ConstraintSet.range(Covariant[int], C, object) & ConstraintSet.range(Never, B, int)
-    # TODO: not yet implemented
-    # static_assert(constraints.implies_subtype_of(Covariant[B], C))
+    # TODO: no error
+    # error: [static-assert-error]
+    static_assert(constraints.implies_subtype_of(Covariant[B], C))
 
 def lower_bound_into_upper[B, C]():
     # (C ≤ Covariant[int]) ∧ (int ≤ B) → (C ≤ Covariant[B])
-    # int ≤ B, so Covariant[int] ≤ Covariant[B], and C ≤ Covariant[int] ≤ Covariant[B].
     constraints = ConstraintSet.range(Never, C, Covariant[int]) & ConstraintSet.range(int, B, object)
-    # TODO: not yet implemented
-    # static_assert(constraints.implies_subtype_of(C, Covariant[B]))
-
-# Repeat with reversed typevar ordering.
-def upper_bound_into_lower[C, B]():
-    constraints = ConstraintSet.range(Covariant[int], C, object) & ConstraintSet.range(Never, B, int)
-    # TODO: not yet implemented
-    # static_assert(constraints.implies_subtype_of(Covariant[B], C))
-
-def lower_bound_into_upper[C, B]():
-    constraints = ConstraintSet.range(Never, C, Covariant[int]) & ConstraintSet.range(int, B, object)
-    # TODO: not yet implemented
-    # static_assert(constraints.implies_subtype_of(C, Covariant[B]))
+    # TODO: no error
+    # error: [static-assert-error]
+    static_assert(constraints.implies_subtype_of(C, Covariant[B]))
 ```
 
 ### Reverse decomposition: bounds on a typevar can be decomposed via variance

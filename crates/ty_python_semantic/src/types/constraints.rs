@@ -4601,7 +4601,7 @@ impl SequentMap {
         left_constraint: ConstraintId,
         right_constraint: ConstraintId,
     ) {
-        let mut try_one_direction =
+        let mut try_tightening =
             |bound_constraint: ConstraintId, constrained_constraint: ConstraintId| {
                 let bound_data = builder.constraint_data(bound_constraint);
                 let bound_typevar = bound_data.typevar;
@@ -4719,9 +4719,144 @@ impl SequentMap {
                 }
             };
 
-        // Try both directions: left's typevar might be nested in right's bounds, or vice versa.
-        try_one_direction(left_constraint, right_constraint);
-        try_one_direction(right_constraint, left_constraint);
+        try_tightening(left_constraint, right_constraint);
+        try_tightening(right_constraint, left_constraint);
+
+        // Additionally, check if one constraint's bare typevar *bound* appears nested in the other
+        // constraint's bounds. This handles the "dual" direction: instead of substituting a
+        // typevar's concrete bounds into another constraint (tightening), we substitute the
+        // typevar itself for one of its bare typevar bounds (weakening), creating a cross-typevar
+        // link.
+        //
+        // For example, given `(Covariant[S] ≤ C) ∧ (Never ≤ B ≤ S)`, S is B's upper bound and
+        // appears covariantly in C's lower bound. Since `B ≤ S`, covariance tells us that
+        // `Covariant[B] ≤ Covariant[S]`. Transitivity then lets us derive `Covariant[B] ≤ C`.
+        //
+        // The derived constraint is weaker than the original, but it introduces a relationship
+        // between B and C that we need to remember and propagate if we ever existentially quantify
+        // away S.
+        //
+        // TODO: This only handles the case where the bound (in this case, S) is a bare typevar. A
+        // future extension could handle arbitrary types by pattern-matching on generic alias
+        // structure.
+        //
+        // This is defined as a separate closure because it iterates over the bound constraint's
+        // bare typevar bounds, which is a different axis than `try_tightening`'s check on the
+        // bound constraint's typevar.
+        let mut try_weakening =
+            |bound_constraint: ConstraintId, constrained_constraint: ConstraintId| {
+                let bound_data = builder.constraint_data(bound_constraint);
+                let bound_typevar = bound_data.typevar;
+                let constrained_data = builder.constraint_data(constrained_constraint);
+                let constrained_typevar = constrained_data.typevar;
+
+                let mut try_one_bound = |bound: Type<'db>, is_upper_bound: bool| {
+                    let Some(nested_typevar) = bound.as_typevar() else {
+                        return;
+                    };
+
+                    // Skip if the nested typevar is the same as the constrained typevar — that
+                    // case is handled by `add_mutual_sequents_for_different_typevars`.
+                    if nested_typevar.is_same_typevar_as(db, constrained_typevar)
+                        || nested_typevar.is_same_typevar_as(db, bound_typevar)
+                    {
+                        return;
+                    }
+
+                    let replacement = Type::TypeVar(bound_typevar);
+
+                    // Check the constrained constraint's upper bound for nested occurrences of
+                    // nested_typevar (S). We want to *weaken* (relax) the upper bound by making it
+                    // larger:
+                    //   - Covariant + S is B's lower bound (S ≤ B): G[S] ≤ G[B] → weaker. Emit.
+                    //   - Contravariant + S is B's upper bound (B ≤ S): G[S] ≤ G[B] → weaker. Emit.
+                    //   - Other combinations tighten rather than weaken. Skip.
+                    let should_weaken_upper =
+                        match constrained_data.upper.variance_of(db, nested_typevar) {
+                            TypeVarVariance::Bivariant => false,
+                            _ if constrained_data.upper.is_type_var() => false,
+                            TypeVarVariance::Covariant => !is_upper_bound,
+                            TypeVarVariance::Contravariant => is_upper_bound,
+                            TypeVarVariance::Invariant => {
+                                bound_data.lower == bound_data.upper && !bound_data.lower.is_never()
+                            }
+                        };
+                    if should_weaken_upper {
+                        let new_upper = constrained_data.upper.apply_type_mapping(
+                            db,
+                            &TypeMapping::ApplySpecialization(ApplySpecialization::Single(
+                                nested_typevar,
+                                replacement,
+                            )),
+                            TypeContext::default(),
+                        );
+                        if new_upper != constrained_data.upper {
+                            let post = ConstraintId::new(
+                                db,
+                                builder,
+                                constrained_typevar,
+                                constrained_data.lower,
+                                new_upper,
+                            );
+                            self.add_pair_implication(
+                                db,
+                                builder,
+                                bound_constraint,
+                                constrained_constraint,
+                                post,
+                            );
+                        }
+                    }
+
+                    // Ditto for the lower bound.
+                    let should_weaken_lower =
+                        match constrained_data.lower.variance_of(db, nested_typevar) {
+                            TypeVarVariance::Bivariant => false,
+                            _ if constrained_data.lower.is_type_var() => false,
+                            TypeVarVariance::Covariant => is_upper_bound,
+                            TypeVarVariance::Contravariant => !is_upper_bound,
+                            TypeVarVariance::Invariant => {
+                                bound_data.lower == bound_data.upper && !bound_data.lower.is_never()
+                            }
+                        };
+                    if should_weaken_lower {
+                        let new_lower = constrained_data.lower.apply_type_mapping(
+                            db,
+                            &TypeMapping::ApplySpecialization(ApplySpecialization::Single(
+                                nested_typevar,
+                                replacement,
+                            )),
+                            TypeContext::default(),
+                        );
+                        if new_lower != constrained_data.lower {
+                            let post = ConstraintId::new(
+                                db,
+                                builder,
+                                constrained_typevar,
+                                new_lower,
+                                constrained_data.upper,
+                            );
+                            self.add_pair_implication(
+                                db,
+                                builder,
+                                bound_constraint,
+                                constrained_constraint,
+                                post,
+                            );
+                        }
+                    }
+                };
+
+                // For each bare typevar bound S of the bound constraint, check if S appears
+                // nested in the constrained constraint's bounds. If so, we can substitute B
+                // (the bound constraint's typevar) for S, producing a weaker but useful
+                // constraint.
+                try_one_bound(bound_data.upper, true);
+                try_one_bound(bound_data.lower, false);
+            };
+
+        try_weakening(left_constraint, right_constraint);
+        try_weakening(right_constraint, left_constraint);
     }
 
     fn add_mutual_sequents_for_same_typevars<'db>(
