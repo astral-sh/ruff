@@ -214,12 +214,14 @@ TC006 [*] Add quotes to type expression in `typing.cast()`
 99 |     cast(val=3.0, typ=int)  # TC006
    |
 help: Add quotes
-95 |     # Keyword arguments
-96 |     from typing import cast
-97 | 
-   -     cast(typ=int, val=3.0)  # TC006
-98 +     cast(typ="int", val=3.0)  # TC006
-99 |     cast(val=3.0, typ=int)  # TC006
+95  |     # Keyword arguments
+96  |     from typing import cast
+97  | 
+    -     cast(typ=int, val=3.0)  # TC006
+98  +     cast(typ="int", val=3.0)  # TC006
+99  |     cast(val=3.0, typ=int)  # TC006
+100 | 
+101 | 
 
 TC006 [*] Add quotes to type expression in `typing.cast()`
   --> TC006.py:99:23
@@ -229,8 +231,44 @@ TC006 [*] Add quotes to type expression in `typing.cast()`
    |                       ^^^
    |
 help: Add quotes
-96 |     from typing import cast
-97 | 
-98 |     cast(typ=int, val=3.0)  # TC006
-   -     cast(val=3.0, typ=int)  # TC006
-99 +     cast(val=3.0, typ="int")  # TC006
+96  |     from typing import cast
+97  | 
+98  |     cast(typ=int, val=3.0)  # TC006
+    -     cast(val=3.0, typ=int)  # TC006
+99  +     cast(val=3.0, typ="int")  # TC006
+100 | 
+101 | 
+102 | def f():
+
+TC006 [*] Add quotes to type expression in `typing.cast()`
+   --> TC006.py:106:10
+    |
+104 |     from typing import cast, Literal
+105 |
+106 |     cast(Literal["'"], "'")  # TC006
+    |          ^^^^^^^^^^^^
+    |
+help: Add quotes
+103 |     # Regression test for #22131: escape sequences in quoted type expressions
+104 |     from typing import cast, Literal
+105 | 
+    -     cast(Literal["'"], "'")  # TC006
+106 +     cast("""Literal["'"]""", "'")  # TC006
+107 | 
+108 | 
+109 | def f():
+
+TC006 [*] Add quotes to type expression in `typing.cast()`
+   --> TC006.py:112:10
+    |
+110 |     from typing import cast, Literal
+111 |
+112 |     cast(Literal['"'], '"')  # TC006
+    |          ^^^^^^^^^^^^
+    |
+help: Add quotes
+109 | def f():
+110 |     from typing import cast, Literal
+111 | 
+    -     cast(Literal['"'], '"')  # TC006
+112 +     cast("""Literal['"']""", '"')  # TC006

@@ -11,7 +11,7 @@ use ruff_python_parser::typing::parse_type_annotation;
 use ruff_python_semantic::{
     Binding, BindingKind, Modules, NodeId, ScopeKind, SemanticModel, analyze,
 };
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::Ranged;
 
 use crate::Edit;
 use crate::Locator;
