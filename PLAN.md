@@ -628,11 +628,32 @@ behavior. Full test suite (513 tests) passes. jpk passes.
 
 ## Open questions
 
-1. **Performance**: The `variance_of` computation walks the type tree
-    recursively. Calling it inside `add_sequents_for_pair` for every pair of
-    constraints could be expensive. We should check if caching or early-exit
-    (e.g., skip if neither bound contains any typevar via `any_over_type`) is
-    needed.
+1. **Performance (diagnosed on 2026-03-20)**: The scipy ecosystem timeout is
+    not from `variance_of` itself; it is from the *upper-bound tightening*
+    implications in `add_nested_typevar_sequents`.
+
+    Repro/minimization:
+
+    - Full scipy on this branch timed out (`scipy: null`), while `main` was ~5.9s.
+    - Narrowed to `scipy/interpolate/tests/test_polyint.py`:
+        - feature branch: >20s timeout, ~1.2GB RSS
+        - main: ~0.59s, ~108MB RSS
+    - Disabling all nested-typevar sequents restores ~0.6s.
+    - Re-enabling only `try_weakening` stays fast.
+    - Re-enabling `try_tightening` regresses again.
+    - Within `try_tightening`, lower-bound substitutions are fine; the blowup is
+      upper-bound substitutions that emit pair implications.
+
+    Candidate mitigation tested in scratch:
+
+    - In the upper-replacement filter, skip replacements that are bare typevars
+      (`!replacement.is_type_var()`).
+    - This restores scipy to ~6.2s via `eco` and ~0.59s for `test_polyint.py`.
+    - `cargo nextest run -p ty_python_semantic` passes with this change.
+    - But this is likely too aggressive: it drops valid implications such as
+      `(B ≤ S) ∧ (U ≤ Covariant[B]) -> (U ≤ Covariant[S])`.
+      A temporary mdtest confirmed that implication fails under this filter.
+      So this is useful as a diagnostic, not a final fix.
 
 1. **Multiple typevar occurrences**: A single bound like `dict[T, T]` mentions
     `T` twice. The `variance_of` implementation already handles this by joining
