@@ -106,7 +106,7 @@ impl ProjectWatcher {
             if let Err(error) = watcher_paths.add(&path) {
                 // TODO: Log a user-facing warning.
                 tracing::warn!(
-                    "Failed to setup watcher for path `{path}`: {error}. You have to restart Ruff after making changes to files under this path or you might see stale results."
+                    "Failed to setup watcher for path `{path}`: {error}. You have to restart ty after making changes to files under this path or you might see stale results."
                 );
                 self.has_errored_paths = true;
             } else {
@@ -116,7 +116,7 @@ impl ProjectWatcher {
 
         if let Err(error) = watcher_paths.commit() {
             tracing::warn!(
-                "Failed to apply file watcher updates: {error}. You have to restart Ruff after making changes to watched files or you might see stale results."
+                "Failed to apply file watcher updates: {error}. You have to restart ty after making changes to watched files or you might see stale results."
             );
             self.has_errored_paths = true;
         }
