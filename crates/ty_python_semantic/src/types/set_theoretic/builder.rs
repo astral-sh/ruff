@@ -1516,7 +1516,11 @@ impl<'db> InnerIntersectionBuilder<'db> {
         // to their upper bound and all constrained type variables to the union of their constraints.
         // If that speculative intersection simplifies to `Never`, this intersection must also simplify
         // to `Never`.
-        if self.positive.iter().any(|ty| ty.is_type_var()) {
+        if self
+            .positive
+            .iter()
+            .any(|ty| matches!(ty, Type::TypeVar(_) | Type::NewTypeInstance(_)))
+        {
             let mut speculative = IntersectionBuilder::new(db);
             for pos in &self.positive {
                 match pos {
@@ -1532,6 +1536,9 @@ impl<'db> InnerIntersectionBuilder<'db> {
                             // upper bound, and it is always a no-op to add `object` to an intersection.
                             None => {}
                         }
+                    }
+                    Type::NewTypeInstance(newtype) => {
+                        speculative = speculative.add_positive(newtype.concrete_base_type(db));
                     }
                     _ => speculative = speculative.add_positive(*pos),
                 }

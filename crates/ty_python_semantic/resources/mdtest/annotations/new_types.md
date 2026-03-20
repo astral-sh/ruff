@@ -414,6 +414,17 @@ def _(x: Foo | float, y: Bar | complex):
     reveal_type(not y)  # revealed: bool
 ```
 
+Intersections with `NewType`s solve to `Never` if the intersection with the `NewType`'s concrete
+base type would also solve to `Never`:
+
+```py
+TFloat = NewType("TFloat", float)
+
+def f(x: TFloat) -> None:
+    if not isinstance(x, float | int):
+        reveal_type(x)  # revealed: Never
+```
+
 ## A `NewType` definition must be a simple variable assignment
 
 ```py
