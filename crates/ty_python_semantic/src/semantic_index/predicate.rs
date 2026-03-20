@@ -118,7 +118,7 @@ pub(crate) enum PredicateNode<'db> {
     /// [`crate::types::Truthiness::Ambiguous`], even if the return type of the
     /// call is `Unknown`/`Any`, because that would result in too many false
     /// positives.
-    IsNonTerminalCall(Expression<'db>),
+    IsNonTerminalCall(NonTerminalCallPredicate<'db>),
     Pattern(PatternPredicate<'db>),
     StarImportPlaceholder(StarImportPlaceholderPredicate<'db>),
 }
@@ -250,3 +250,18 @@ impl<'db> From<StarImportPlaceholderPredicate<'db>> for PredicateOrLiteral<'db> 
         })
     }
 }
+
+#[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
+pub(crate) struct NonTerminalCallPredicate<'db> {
+    pub(crate) call_expr: Expression<'db>,
+    pub(crate) called_function: Option<Expression<'db>>,
+}
+
+impl<'db> NonTerminalCallPredicate<'db> {
+    pub(crate) fn scope(self, db: &'db dyn Db) -> ScopeId<'db> {
+        self.call_expr(db).scope(db)
+    }
+}
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for NonTerminalCallPredicate<'_> {}

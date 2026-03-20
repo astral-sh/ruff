@@ -208,8 +208,8 @@ use crate::semantic_index::predicate::{
     PatternPredicate, PatternPredicateKind, Predicate, PredicateNode, Predicates, ScopedPredicateId,
 };
 use crate::types::{
-    IntersectionBuilder, KnownClass, NarrowingConstraint, Truthiness, Type, TypeContext,
-    UnionBuilder, UnionType, infer_expression_type, infer_narrowing_constraint,
+    IntersectionBuilder, KnownClass, KnownFunction, NarrowingConstraint, Truthiness, Type,
+    TypeContext, UnionBuilder, UnionType, infer_expression_type, infer_narrowing_constraint,
 };
 
 /// A ternary formula that defines under what conditions a binding is visible. (A ternary formula
@@ -1089,10 +1089,30 @@ impl ReachabilityConstraints {
                     .bool(db)
                     .negate_if(!predicate.is_positive)
             }
-            PredicateNode::IsNonTerminalCall(call_expr) => {
+            PredicateNode::IsNonTerminalCall(non_terminal_prediate) => {
+                let call_expr = non_terminal_prediate.call_expr(db);
                 let call_expr_ty = infer_expression_type(db, call_expr, TypeContext::default());
                 if call_expr_ty.is_equivalent_to(db, Type::Never) {
-                    Truthiness::AlwaysFalse
+                    // Special-case `assert_never` and `reveal_type` calls:
+                    // it's never really desirable for these to create reachability constraints
+                    // that would lead to us inferring unreachable code later on.
+                    let called_function = non_terminal_prediate.called_function(db);
+                    if let Some(function) = called_function
+                        && let Type::FunctionLiteral(function) =
+                            infer_expression_type(db, function, TypeContext::default())
+                        && matches!(
+                            function.known(db),
+                            Some(
+                                KnownFunction::AssertNever
+                                    | KnownFunction::AssertType
+                                    | KnownFunction::RevealType
+                            )
+                        )
+                    {
+                        Truthiness::AlwaysTrue
+                    } else {
+                        Truthiness::AlwaysFalse
+                    }
                 } else {
                     Truthiness::AlwaysTrue
                 }

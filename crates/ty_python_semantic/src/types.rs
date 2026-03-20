@@ -24,6 +24,7 @@ pub use self::cyclic::CycleDetector;
 pub(crate) use self::cyclic::TypeTransformer;
 pub(crate) use self::diagnostic::register_lints;
 pub use self::diagnostic::{TypeCheckDiagnostics, UNDEFINED_REVEAL, UNRESOLVED_REFERENCE};
+pub(crate) use self::function::KnownFunction;
 pub(crate) use self::infer::{
     TypeContext, infer_complete_scope_types, infer_deferred_types, infer_definition_types,
     infer_expression_type, infer_expression_types, infer_scope_types,
@@ -58,7 +59,7 @@ pub use crate::types::display::{DisplaySettings, TypeDetail, TypeDisplayDetails}
 use crate::types::enums::enum_metadata;
 use crate::types::function::{
     DataclassTransformerFlags, DataclassTransformerParams, FunctionDecorators, FunctionSpans,
-    FunctionType, KnownFunction,
+    FunctionType,
 };
 use crate::types::generics::{
     ApplySpecialization, InferableTypeVars, Specialization, bind_typevar,

@@ -824,7 +824,7 @@ def diff_format(
     *,
     greater_is_better: bool = True,
     neutral: bool = False,
-) -> str:
+) -> str:  # ty: ignore[invalid-return-type]  # see comment above `assert_never()` call
     if diff == 0:
         return ""
 
