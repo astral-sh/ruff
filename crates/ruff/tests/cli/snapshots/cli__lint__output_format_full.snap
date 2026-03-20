@@ -25,6 +25,10 @@ F401 [*] `os` imported but unused
 3 | match 42:  # invalid-syntax
   |
 help: Remove unused import: `os`
+  - import os  # F401
+1 | x = y      # F821
+2 | match 42:  # invalid-syntax
+3 |     case _: ...
 
 F821 Undefined name `y`
  --> input.py:2:5
