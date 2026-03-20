@@ -2664,44 +2664,44 @@ impl<'db> CallableBinding<'db> {
         arguments: &CallArguments<'_, 'db>,
         matching_overload_indexes: &[usize],
     ) {
-        // The maximum number of parameters across all the overloads that are being considered
-        // for filtering.
-        let max_parameter_count = matching_overload_indexes
+        let overload_slots = matching_overload_indexes
             .iter()
-            .map(|&index| self.overloads[index].signature.parameters().len())
+            .map(|&index| {
+                (
+                    index,
+                    self.overloads[index]
+                        .step_5_filtering_slots(db, arguments)
+                        .collect::<Vec<_>>(),
+                )
+            })
+            .collect::<Vec<_>>();
+
+        let max_slot_count = overload_slots
+            .iter()
+            .map(|(_, slots)| slots.len())
             .max()
             .unwrap_or(0);
 
-        // These are the parameter indexes that matches the arguments that participate in the
-        // filtering process.
-        //
-        // The parameter types at these indexes have at least one overload where the type isn't
-        // gradual equivalent to the parameter types at the same index for other overloads.
-        let mut participating_parameter_indexes = HashSet::new();
-
-        // The parameter types at each index for the first overload containing a parameter at
-        // that index.
-        let mut first_parameter_types: Vec<Option<Type<'db>>> = vec![None; max_parameter_count];
-
-        for argument_index in 0..arguments.len() {
-            for overload_index in matching_overload_indexes {
-                let overload = &self.overloads[*overload_index];
-                for &parameter_index in &overload.argument_matches[argument_index].parameters {
-                    // TODO: For an unannotated `self` / `cls` parameter, the type should be
-                    // `typing.Self` / `type[typing.Self]`
-                    let current_parameter_type =
-                        overload.signature.parameters()[parameter_index].annotated_type();
-                    let first_parameter_type = &mut first_parameter_types[parameter_index];
-                    if let Some(first_parameter_type) = first_parameter_type {
+        let mut participating_slot_indexes = HashSet::new();
+        for slot_index in 0..max_slot_count {
+            let mut first_parameter_type: Option<Type<'db>> = None;
+            for (_, slots) in &overload_slots {
+                let current_parameter_type = slots.get(slot_index).map(|slot| slot.parameter_type);
+                match (first_parameter_type, current_parameter_type) {
+                    (Some(first_parameter_type), Some(current_parameter_type))
                         if !first_parameter_type
                             .when_equivalent_to(db, current_parameter_type, constraints)
-                            .is_always_satisfied(db)
-                        {
-                            participating_parameter_indexes.insert(parameter_index);
-                        }
-                    } else {
-                        *first_parameter_type = Some(current_parameter_type);
+                            .is_always_satisfied(db) =>
+                    {
+                        participating_slot_indexes.insert(slot_index);
                     }
+                    (Some(_), None) => {
+                        participating_slot_indexes.insert(slot_index);
+                    }
+                    (None, Some(current_parameter_type)) => {
+                        first_parameter_type = Some(current_parameter_type);
+                    }
+                    (Some(_), Some(_)) | (None, None) => {}
                 }
             }
         }
@@ -2717,70 +2717,25 @@ impl<'db> CallableBinding<'db> {
             }
 
             let mut union_argument_type_builders = std::iter::repeat_with(|| UnionBuilder::new(db))
-                .take(max_parameter_count)
+                .take(max_slot_count)
                 .collect::<Vec<_>>();
-
-            // The following loop is trying to construct a tuple of argument types that correspond to
-            // the participating parameter indexes. Considering the following example:
-            //
-            // ```python
-            // @overload
-            // def f(x: Literal[1], y: Literal[2]) -> tuple[int, int]: ...
-            // @overload
-            // def f(*args: Any) -> tuple[Any, ...]: ...
-            //
-            // f(1, 2)
-            // ```
-            //
-            // Here, only the first parameter participates in the filtering process because only one
-            // overload has the second parameter. So, while going through the argument types, the
-            // second argument needs to be skipped but for the second overload both arguments map to
-            // the first parameter and that parameter is considered for the filtering process. This
-            // flag is to handle that special case of many-to-one mapping from arguments to parameters.
-            let mut variadic_parameter_handled = false;
-
-            for (argument_index, argument_types) in arguments.types().iter().enumerate() {
-                if variadic_parameter_handled {
-                    continue;
-                }
-
-                // Get the argument type as inferred against the target overload.
-                let current_overload = &self.overloads[*current_index];
-                let argument_type =
-                    match *current_overload.argument_matches[argument_index].parameters {
-                        [parameter_index] => {
-                            let declared_type = current_overload.signature.parameters()
-                                [parameter_index]
-                                .annotated_type();
-                            argument_types.get_for_declared_type(declared_type)
-                        }
-                        // Splatted arguments are inferred without type context.
-                        _ => argument_types.get_default().unwrap_or(Type::unknown()),
-                    };
-
-                for overload_index in matching_overload_indexes {
-                    let overload = &self.overloads[*overload_index];
-                    for (parameter_index, variadic_argument_type) in
-                        overload.argument_matches[argument_index].iter()
-                    {
-                        let parameter = &overload.signature.parameters()[parameter_index];
-                        if parameter.is_variadic() {
-                            variadic_parameter_handled = true;
-                        }
-                        if !participating_parameter_indexes.contains(&parameter_index) {
-                            continue;
-                        }
-                        union_argument_type_builders[parameter_index].add_in_place(
-                            variadic_argument_type
-                                .unwrap_or(argument_type)
-                                .top_materialization(db),
-                        );
+            let current_slots = &overload_slots[upto].1;
+            for (_, slots) in &overload_slots {
+                for (slot_index, slot) in slots.iter().enumerate() {
+                    if participating_slot_indexes.contains(&slot_index) {
+                        let argument_type = if slot.has_precise_argument_type {
+                            slot.argument_type
+                        } else {
+                            current_slots
+                                .get(slot_index)
+                                .map_or(Type::unknown(), |slot| slot.argument_type)
+                        };
+                        union_argument_type_builders[slot_index]
+                            .add_in_place(argument_type.top_materialization(db));
                     }
                 }
             }
 
-            // These only contain the top materialized argument types for the corresponding
-            // participating parameter indexes.
             let top_materialized_argument_type = Type::heterogeneous_tuple(
                 db,
                 union_argument_type_builders
@@ -2795,32 +2750,12 @@ impl<'db> CallableBinding<'db> {
             );
 
             let mut union_parameter_types = std::iter::repeat_with(|| UnionBuilder::new(db))
-                .take(max_parameter_count)
+                .take(max_slot_count)
                 .collect::<Vec<_>>();
-
-            // The number of parameters that have been skipped because they don't participate in
-            // the filtering process. This is used to make sure the types are added to the
-            // corresponding parameter index in `union_parameter_types`.
-            let mut skipped_parameters = 0;
-
-            for argument_index in 0..arguments.len() {
-                for overload_index in &matching_overload_indexes[..=upto] {
-                    let overload = &self.overloads[*overload_index];
-                    for parameter_index in &overload.argument_matches[argument_index].parameters {
-                        if !participating_parameter_indexes.contains(parameter_index) {
-                            skipped_parameters += 1;
-                            continue;
-                        }
-                        // TODO: For an unannotated `self` / `cls` parameter, the type should be
-                        // `typing.Self` / `type[typing.Self]`
-                        let mut parameter_type =
-                            overload.signature.parameters()[*parameter_index].annotated_type();
-                        if let Some(specialization) = overload.specialization {
-                            parameter_type =
-                                parameter_type.apply_specialization(db, specialization);
-                        }
-                        union_parameter_types[parameter_index.saturating_sub(skipped_parameters)]
-                            .add_in_place(parameter_type);
+            for (_, slots) in &overload_slots[..=upto] {
+                for (slot_index, slot) in slots.iter().enumerate() {
+                    if participating_slot_indexes.contains(&slot_index) {
+                        union_parameter_types[slot_index].add_in_place(slot.parameter_type);
                     }
                 }
             }
@@ -3196,6 +3131,13 @@ impl<'db> CallableBinding<'db> {
             }
         }
     }
+}
+
+#[derive(Clone, Copy)]
+struct Step5FilteringSlot<'db> {
+    parameter_type: Type<'db>,
+    argument_type: Type<'db>,
+    has_precise_argument_type: bool,
 }
 
 impl<'a, 'db> IntoIterator for &'a CallableBinding<'db> {
@@ -4857,6 +4799,44 @@ impl<'db> Binding<'db> {
     /// Mark this overload binding as an unmatched overload.
     fn mark_as_unmatched_overload(&mut self) {
         self.errors.push(BindingError::UnmatchedOverload);
+    }
+
+    fn step_5_filtering_slots<'a>(
+        &'a self,
+        db: &'db dyn Db,
+        arguments: &'a CallArguments<'_, 'db>,
+    ) -> impl Iterator<Item = Step5FilteringSlot<'db>> + 'a {
+        self.argument_matches
+            .iter()
+            .zip(arguments.types())
+            .flat_map(move |(matched_argument, argument_types)| {
+                matched_argument
+                    .iter()
+                    .map(move |(parameter_index, variadic_argument_type)| {
+                        // TODO: For an unannotated `self` / `cls` parameter, the type should be
+                        // `typing.Self` / `type[typing.Self]`
+                        let mut parameter_type =
+                            self.signature.parameters()[parameter_index].annotated_type();
+                        if let Some(specialization) = self.specialization {
+                            parameter_type =
+                                parameter_type.apply_specialization(db, specialization);
+                        }
+
+                        let argument_type = variadic_argument_type.unwrap_or_else(|| {
+                            if matched_argument.parameters.as_slice() == [parameter_index] {
+                                argument_types.get_for_declared_type(parameter_type)
+                            } else {
+                                argument_types.get_default().unwrap_or(Type::unknown())
+                            }
+                        });
+
+                        Step5FilteringSlot {
+                            parameter_type,
+                            argument_type,
+                            has_precise_argument_type: variadic_argument_type.is_some(),
+                        }
+                    })
+            })
     }
 
     fn report_diagnostics(
