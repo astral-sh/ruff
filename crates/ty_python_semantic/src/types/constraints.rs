@@ -100,15 +100,15 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
 
 use crate::types::class::GenericAlias;
-use crate::types::generics::{ApplySpecialization, InferableTypeVars};
+use crate::types::generics::InferableTypeVars;
 use crate::types::typevar::{BoundTypeVarIdentity, walk_bound_type_var_type};
 use crate::types::variance::VarianceInferable;
 use crate::types::visitor::{
     TypeCollector, TypeVisitor, any_over_type, walk_type_with_recursion_guard,
 };
 use crate::types::{
-    BoundTypeVarInstance, IntersectionType, Type, TypeContext, TypeMapping,
-    TypeVarBoundOrConstraints, TypeVarVariance, UnionType,
+    BoundTypeVarInstance, IntersectionType, Type, TypeVarBoundOrConstraints, TypeVarVariance,
+    UnionType,
 };
 use crate::{Db, FxIndexMap, FxIndexSet};
 
@@ -4642,13 +4642,10 @@ impl SequentMap {
                     _ => None,
                 };
                 if let Some(replacement) = upper_replacement {
-                    let new_upper = constrained_data.upper.apply_type_mapping(
+                    let new_upper = constrained_data.upper.substitute_one_typevar(
                         db,
-                        &TypeMapping::ApplySpecialization(ApplySpecialization::Single(
-                            bound_typevar,
-                            replacement,
-                        )),
-                        TypeContext::default(),
+                        bound_typevar,
+                        replacement,
                     );
                     if new_upper != constrained_data.upper {
                         let post = ConstraintId::new(
@@ -4692,13 +4689,10 @@ impl SequentMap {
                     _ => None,
                 };
                 if let Some(replacement) = lower_replacement {
-                    let new_lower = constrained_data.lower.apply_type_mapping(
+                    let new_lower = constrained_data.lower.substitute_one_typevar(
                         db,
-                        &TypeMapping::ApplySpecialization(ApplySpecialization::Single(
-                            bound_typevar,
-                            replacement,
-                        )),
-                        TypeContext::default(),
+                        bound_typevar,
+                        replacement,
                     );
                     if new_lower != constrained_data.lower {
                         let post = ConstraintId::new(
@@ -4782,13 +4776,10 @@ impl SequentMap {
                             }
                         };
                     if should_weaken_upper {
-                        let new_upper = constrained_data.upper.apply_type_mapping(
+                        let new_upper = constrained_data.upper.substitute_one_typevar(
                             db,
-                            &TypeMapping::ApplySpecialization(ApplySpecialization::Single(
-                                nested_typevar,
-                                replacement,
-                            )),
-                            TypeContext::default(),
+                            nested_typevar,
+                            replacement,
                         );
                         if new_upper != constrained_data.upper {
                             let post = ConstraintId::new(
@@ -4820,13 +4811,10 @@ impl SequentMap {
                             }
                         };
                     if should_weaken_lower {
-                        let new_lower = constrained_data.lower.apply_type_mapping(
+                        let new_lower = constrained_data.lower.substitute_one_typevar(
                             db,
-                            &TypeMapping::ApplySpecialization(ApplySpecialization::Single(
-                                nested_typevar,
-                                replacement,
-                            )),
-                            TypeContext::default(),
+                            nested_typevar,
+                            replacement,
                         );
                         if new_lower != constrained_data.lower {
                             let post = ConstraintId::new(

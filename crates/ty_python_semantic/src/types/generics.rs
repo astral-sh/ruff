@@ -1647,6 +1647,24 @@ impl<'db> ApplySpecialization<'_, 'db> {
     }
 }
 
+impl<'db> Type<'db> {
+    pub(crate) fn substitute_one_typevar(
+        self,
+        db: &'db dyn Db,
+        bound_typevar: BoundTypeVarInstance<'db>,
+        replacement: Type<'db>,
+    ) -> Type<'db> {
+        self.apply_type_mapping(
+            db,
+            &TypeMapping::ApplySpecialization(ApplySpecialization::Single(
+                bound_typevar,
+                replacement,
+            )),
+            TypeContext::default(),
+        )
+    }
+}
+
 /// Performs type inference between parameter annotations and argument types, producing a
 /// specialization of a generic function.
 pub(crate) struct SpecializationBuilder<'db> {
