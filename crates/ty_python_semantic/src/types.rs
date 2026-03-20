@@ -4815,58 +4815,74 @@ impl<'db> Type<'db> {
                 }
             }
             Type::Union(union) => {
-                let member_types: Vec<GeneratorTypes<'db>> = union
-                    .elements(db)
-                    .iter()
-                    .map(|ty| ty.generator_types(db))
-                    .collect::<Option<_>>()?;
+                let mut yield_builder = Some(UnionBuilder::new(db));
+                let mut send_builder = Some(UnionBuilder::new(db));
+                let mut return_builder = Some(UnionBuilder::new(db));
 
-                let yielded: Option<Vec<_>> = member_types.iter().map(|gt| gt.yield_ty).collect();
-                let sent: Option<Vec<_>> = member_types.iter().map(|gt| gt.send_ty).collect();
-                let returned: Option<Vec<_>> = member_types.iter().map(|gt| gt.return_ty).collect();
+                for ty in union.elements(db) {
+                    let gt = ty.generator_types(db)?;
+                    match gt.yield_ty {
+                        Some(ty) => yield_builder = yield_builder.map(|b| b.add(ty)),
+                        None => yield_builder = None,
+                    }
+                    match gt.send_ty {
+                        Some(ty) => send_builder = send_builder.map(|b| b.add(ty)),
+                        None => send_builder = None,
+                    }
+                    match gt.return_ty {
+                        Some(ty) => return_builder = return_builder.map(|b| b.add(ty)),
+                        None => return_builder = None,
+                    }
+                }
 
                 Some(GeneratorTypes {
-                    yield_ty: yielded.map(|ts| UnionType::from_elements(db, ts)),
-                    send_ty: sent.map(|ts| UnionType::from_elements(db, ts)),
-                    return_ty: returned.map(|ts| UnionType::from_elements(db, ts)),
+                    yield_ty: yield_builder.map(UnionBuilder::build),
+                    send_ty: send_builder.map(UnionBuilder::build),
+                    return_ty: return_builder.map(UnionBuilder::build),
                 })
             }
             Type::Intersection(intersection) => {
                 // Using `positive()` rather than `positive_elements_or_object()` is safe
                 // here because `object` is not a generator, so falling back to it would
                 // still return `None`.
-                let member_types: Vec<GeneratorTypes<'db>> = intersection
-                    .positive(db)
-                    .iter()
-                    .filter_map(|ty| ty.generator_types(db))
-                    .collect();
+                let mut yield_builder = Some(IntersectionBuilder::new(db));
+                let mut send_builder = Some(IntersectionBuilder::new(db));
+                let mut return_builder = Some(IntersectionBuilder::new(db));
+                let mut any_success = false;
 
-                if member_types.is_empty() {
+                for ty in intersection.positive(db) {
+                    let Some(gt) = ty.generator_types(db) else {
+                        continue;
+                    };
+                    any_success = true;
+                    match gt.yield_ty {
+                        Some(ty) => {
+                            yield_builder = yield_builder.map(|b| b.add_positive(ty));
+                        }
+                        None => yield_builder = None,
+                    }
+                    match gt.send_ty {
+                        Some(ty) => {
+                            send_builder = send_builder.map(|b| b.add_positive(ty));
+                        }
+                        None => send_builder = None,
+                    }
+                    match gt.return_ty {
+                        Some(ty) => {
+                            return_builder = return_builder.map(|b| b.add_positive(ty));
+                        }
+                        None => return_builder = None,
+                    }
+                }
+
+                if !any_success {
                     return None;
                 }
 
-                let build_intersection = |types: Vec<Type<'db>>| -> Option<Type<'db>> {
-                    (!types.is_empty()).then(|| {
-                        types
-                            .into_iter()
-                            .fold(
-                                IntersectionBuilder::new(db),
-                                IntersectionBuilder::add_positive,
-                            )
-                            .build()
-                    })
-                };
-
                 Some(GeneratorTypes {
-                    yield_ty: build_intersection(
-                        member_types.iter().filter_map(|gt| gt.yield_ty).collect(),
-                    ),
-                    send_ty: build_intersection(
-                        member_types.iter().filter_map(|gt| gt.send_ty).collect(),
-                    ),
-                    return_ty: build_intersection(
-                        member_types.iter().filter_map(|gt| gt.return_ty).collect(),
-                    ),
+                    yield_ty: yield_builder.map(IntersectionBuilder::build),
+                    send_ty: send_builder.map(IntersectionBuilder::build),
+                    return_ty: return_builder.map(IntersectionBuilder::build),
                 })
             }
             ty @ (Type::Dynamic(_) | Type::Never) => Some(GeneratorTypes {
@@ -4880,12 +4896,12 @@ impl<'db> Type<'db> {
 
     fn generator_return_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
         self.generator_types(db)
-            .and_then(|expected_types| expected_types.return_ty)
+            .and_then(|generator_types| generator_types.return_ty)
     }
 
     fn generator_send_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
         self.generator_types(db)
-            .and_then(|expected_types| expected_types.send_ty)
+            .and_then(|generator_types| generator_types.send_ty)
     }
 
     #[must_use]
