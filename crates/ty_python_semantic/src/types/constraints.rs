@@ -4641,6 +4641,16 @@ impl SequentMap {
                     }
                     _ => None,
                 };
+                // If the replacement contains the bound typevar itself (e.g., the bound
+                // constraint is `_V ≤ G[_V]`), or the constrained typevar (e.g., the bound
+                // constraint is `_T ≤ G[_V]` and we're about to substitute into `_V ≤ G[_T]`),
+                // substituting would create a deeper nesting of the same recursive pattern
+                // that triggers the same substitution again ad infinitum. Skip in both cases.
+                let upper_replacement = upper_replacement.filter(|replacement| {
+                    replacement.variance_of(db, bound_typevar) == TypeVarVariance::Bivariant
+                        && replacement.variance_of(db, constrained_typevar)
+                            == TypeVarVariance::Bivariant
+                });
                 if let Some(replacement) = upper_replacement {
                     let new_upper = constrained_data.upper.substitute_one_typevar(
                         db,
@@ -4688,6 +4698,12 @@ impl SequentMap {
                     }
                     _ => None,
                 };
+                // Same recursive-type guard as above for the upper bound case.
+                let lower_replacement = lower_replacement.filter(|replacement| {
+                    replacement.variance_of(db, bound_typevar) == TypeVarVariance::Bivariant
+                        && replacement.variance_of(db, constrained_typevar)
+                            == TypeVarVariance::Bivariant
+                });
                 if let Some(replacement) = lower_replacement {
                     let new_lower = constrained_data.lower.substitute_one_typevar(
                         db,
