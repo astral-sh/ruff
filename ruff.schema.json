@@ -1790,13 +1790,6 @@
             "type": "string"
           }
         },
-        "force-alphabetical-sort": {
-          "description": "Sort all imports as a single alphabetical block, ignoring sections and\nimport style. Sets [`force-single-line`](#lint_isort_force-single-line),\n[`force-sort-within-sections`](#lint_isort_force-sort-within-sections),\n[`no-sections`](#lint_isort_no-sections) to `true` and\n[`order-by-type`](#lint_isort_order-by-type) to `false`.",
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
         "force-single-line": {
           "description": "Forces all from imports to appear on their own line.",
           "type": [
@@ -1944,7 +1937,7 @@
           }
         },
         "no-sections": {
-          "description": "Put all imports into the same section bucket.\n\nFor example, rather than separating standard library and third-party imports, as in:\n```python\nimport os\nimport sys\n\nimport numpy\nimport pandas\n```\n\nSetting `no-sections = true` will instead group all imports into a single section:\n```python\nimport numpy\nimport os\nimport pandas\nimport sys\n```",
+          "description": "Put all imports into the same section bucket.\n\nFor example, rather than separating standard library and third-party imports, as in:\n```python\nimport os\nimport sys\n\nimport numpy\nimport pandas\n```\n\nSetting `no-sections = true` will instead group all imports into a single section:\n```python\nimport numpy\nimport os\nimport pandas\nimport sys\n```\n\nTo replicate isort's `force_alphabetical_sort` option, use:\n```toml\n[tool.ruff.lint.isort]\nforce-single-line = true\nforce-sort-within-sections = true\nno-sections = true\norder-by-type = false\n```",
           "type": [
             "boolean",
             "null"

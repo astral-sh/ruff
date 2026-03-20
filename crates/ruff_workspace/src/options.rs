@@ -2751,6 +2751,15 @@ pub struct IsortOptions {
     /// import pandas
     /// import sys
     /// ```
+    ///
+    /// To replicate isort's `force_alphabetical_sort` option, use:
+    /// ```toml
+    /// [tool.ruff.lint.isort]
+    /// force-single-line = true
+    /// force-sort-within-sections = true
+    /// no-sections = true
+    /// order-by-type = false
+    /// ```
     #[option(
         default = r#"false"#,
         value_type = "bool",
@@ -2759,20 +2768,6 @@ pub struct IsortOptions {
         "#
     )]
     pub no_sections: Option<bool>,
-
-    /// Sort all imports as a single alphabetical block, ignoring sections and
-    /// import style. Sets [`force-single-line`](#lint_isort_force-single-line),
-    /// [`force-sort-within-sections`](#lint_isort_force-sort-within-sections),
-    /// [`no-sections`](#lint_isort_no-sections) to `true` and
-    /// [`order-by-type`](#lint_isort_order-by-type) to `false`.
-    #[option(
-        default = r#"false"#,
-        value_type = "bool",
-        example = r#"
-            force-alphabetical-sort = true
-        "#
-    )]
-    pub force_alphabetical_sort: Option<bool>,
 
     /// Whether to automatically mark imports from within the same package as first-party.
     /// For example, when `detect-same-package = true`, then when analyzing files within the
@@ -2899,13 +2894,8 @@ impl IsortOptions {
     pub fn try_into_settings(
         self,
     ) -> Result<isort::settings::Settings, isort::settings::SettingsError> {
-        // `force_alphabetical_sort` is a shortcut for setting `force_single_line`,
-        // `force_sort_within_sections`, `no_sections` to `true` and `order_by_type` to `false`.
-        // Explicit settings take precedence.
-        let force_alphabetical_sort = self.force_alphabetical_sort.unwrap_or_default();
-
         // Verify that if `no_sections` is set, then `section_order` is empty.
-        let no_sections = self.no_sections.unwrap_or(force_alphabetical_sort);
+        let no_sections = self.no_sections.unwrap_or_default();
         if no_sections && self.section_order.is_some() {
             warn_user_once!("`section-order` is ignored when `no-sections` is set to `true`");
         }
@@ -2917,9 +2907,7 @@ impl IsortOptions {
         }
 
         // Verify that if `force_sort_within_sections` is `True`, then `lines_between_types` is set to `0`.
-        let force_sort_within_sections = self
-            .force_sort_within_sections
-            .unwrap_or(force_alphabetical_sort);
+        let force_sort_within_sections = self.force_sort_within_sections.unwrap_or_default();
         let lines_between_types = self.lines_between_types.unwrap_or_default();
         if force_sort_within_sections && lines_between_types != 0 {
             warn_user_once!(
@@ -3065,7 +3053,7 @@ impl IsortOptions {
                 .flat_map(NameImports::into_imports)
                 .collect(),
             combine_as_imports: self.combine_as_imports.unwrap_or(false),
-            force_single_line: self.force_single_line.unwrap_or(force_alphabetical_sort),
+            force_single_line: self.force_single_line.unwrap_or(false),
             force_sort_within_sections,
             case_sensitive: self.case_sensitive.unwrap_or(false),
             force_wrap_aliases: self.force_wrap_aliases.unwrap_or(false),
@@ -3078,7 +3066,7 @@ impl IsortOptions {
                 extra_standard_library,
                 sections,
             ),
-            order_by_type: self.order_by_type.unwrap_or(!force_alphabetical_sort),
+            order_by_type: self.order_by_type.unwrap_or(true),
             relative_imports_order: self.relative_imports_order.unwrap_or_default(),
             single_line_exclusions: FxHashSet::from_iter(
                 self.single_line_exclusions.unwrap_or_default(),

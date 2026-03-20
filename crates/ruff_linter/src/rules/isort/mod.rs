@@ -808,27 +808,6 @@ mod tests {
         Ok(())
     }
 
-    #[test_case(Path::new("force_alphabetical_sort.py"))]
-    fn force_alphabetical_sort(path: &Path) -> Result<()> {
-        let snapshot = format!("force_alphabetical_sort_{}", path.to_string_lossy());
-        let diagnostics = test_path(
-            Path::new("isort").join(path).as_path(),
-            &LinterSettings {
-                isort: super::settings::Settings {
-                    force_single_line: true,
-                    force_sort_within_sections: true,
-                    no_sections: true,
-                    order_by_type: false,
-                    ..super::settings::Settings::default()
-                },
-                src: vec![test_resource_path("fixtures/isort")],
-                ..LinterSettings::for_rule(Rule::UnsortedImports)
-            },
-        )?;
-        assert_diagnostics!(snapshot, diagnostics);
-        Ok(())
-    }
-
     #[test_case(Path::new("comment.py"))]
     #[test_case(Path::new("comments_and_newlines.py"))]
     #[test_case(Path::new("docstring.py"))]
