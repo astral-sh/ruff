@@ -97,30 +97,23 @@ impl<'a> Insertion<'a> {
         // lines after comments so we can preserve them between comments and
         // the first statement.
         let mut seen_comment = false;
-        let mut blank_lines_end = None;
         for line in
             UniversalNewlineIterator::with_offset(&contents[location.to_usize()..], location)
         {
             let trimmed_line = line.trim_whitespace_start();
             if trimmed_line.is_empty() {
                 if seen_comment {
-                    blank_lines_end = Some(line.full_end());
+                    location = line.full_end();
                 }
                 continue;
             }
+
             if trimmed_line.starts_with('#') {
                 location = line.full_end();
                 seen_comment = true;
-                blank_lines_end = None;
             } else {
                 break;
             }
-        }
-
-        // If there were blank lines between the last comment and the first
-        // statement, advance past them so the insertion preserves the gap.
-        if let Some(end) = blank_lines_end {
-            location = end;
         }
 
         Insertion::own_line("", location, stylist.line_ending().as_str())
