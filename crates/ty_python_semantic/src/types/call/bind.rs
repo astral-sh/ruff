@@ -32,7 +32,7 @@ use crate::types::diagnostic::{
     CALL_NON_CALLABLE, CALL_TOP_CALLABLE, CONFLICTING_ARGUMENT_FORMS, INVALID_ARGUMENT_TYPE,
     INVALID_DATACLASS, MISSING_ARGUMENT, NO_MATCHING_OVERLOAD, PARAMETER_ALREADY_ASSIGNED,
     POSITIONAL_ONLY_PARAMETER_AS_KWARG, TOO_MANY_POSITIONAL_ARGUMENTS, UNKNOWN_ARGUMENT,
-    note_numbers_module_not_supported,
+    add_invariant_generic_hints, note_numbers_module_not_supported,
 };
 use crate::types::enums::is_enum_class;
 use crate::types::function::{
@@ -5273,6 +5273,8 @@ impl<'db> BindingError<'db> {
                         *provided_ty,
                     );
                 }
+
+                add_invariant_generic_hints(context.db(), &mut diag, *expected_ty, *provided_ty);
             }
 
             Self::InvalidKeyType {
