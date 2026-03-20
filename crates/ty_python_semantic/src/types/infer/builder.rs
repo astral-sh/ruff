@@ -84,7 +84,7 @@ use crate::types::diagnostic::{
     report_unsupported_comparison,
 };
 use crate::types::enums::{enum_ignored_names, is_enum_class_by_inheritance};
-use crate::types::function::{FunctionType, KnownFunction};
+use crate::types::function::{FunctionType, KnownFunction, report_revealed_type};
 use crate::types::generics::{InferableTypeVars, SpecializationBuilder, bind_typevar};
 use crate::types::infer::builder::named_tuple::NamedTupleKind;
 use crate::types::infer::builder::paramspec_validation::validate_paramspec_components;
@@ -7197,6 +7197,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 overload,
                                 call_expression,
                             );
+                        }
+                    }
+                    Type::Never => {
+                        // In unreachable sections of code, we infer `Never` for symbols that were
+                        // define outside the unreachable part. We still want to emit revealed-type
+                        // diagnostics in these sections, so check on the name of the callable here
+                        // and assume that it's actually `typing.reveal_type`.
+                        if let ast::Expr::Name(name) = func.as_ref()
+                            && name.id == "reveal_type"
+                            && let Some(first_arg) = arguments.args.first()
+                        {
+                            let revealed_ty = self.expression_type(first_arg);
+                            report_revealed_type(&self.context, revealed_ty, first_arg);
                         }
                     }
                     _ => {}
