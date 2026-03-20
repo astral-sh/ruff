@@ -126,14 +126,6 @@ repos:
     hooks:
       - id: ruff-format
         name: mdtest format
-        args:
-          [
-            "--preview",
-            "--line-length",
-            "130",
-            "--extension",
-            "py:pyi,python:pyi",
-          ]
         types_or: [markdown]
         files: '^crates/.*/resources/mdtest/.*\.md$'
         pass_filenames: true
