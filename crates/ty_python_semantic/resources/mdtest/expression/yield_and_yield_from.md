@@ -185,11 +185,13 @@ def generator() -> Generator:
 
 ### Invalid `yield` type
 
+<!-- snapshot-diagnostics -->
+
 ```py
 from typing import Generator
 
 def invalid_generator() -> Generator[int, None, None]:
-    # error: [invalid-yield] "Yielded type does not match annotated yield type: expected yielded type assignable to `int`, found `Literal[""]`"
+    # error: [invalid-yield] "Yield type `Literal[""]` does not match annotated yield type `int`"
     yield ""
 ```
 
@@ -232,11 +234,13 @@ def inner() -> Generator[str, None, None]:
     yield "hello"
 
 def outer() -> Generator[int, None, None]:
-    # error: [invalid-yield] "Yielded type does not match annotated yield type: expected yielded type assignable to `int`, found `str`"
+    # error: [invalid-yield] "Yield type `str` does not match annotated yield type `int`"
     yield from inner()
 ```
 
 ### `yield from` with incompatible send type
+
+<!-- snapshot-diagnostics -->
 
 ```py
 from typing import Generator
@@ -245,6 +249,6 @@ def inner() -> Generator[int, int, None]:
     x = yield 1
 
 def outer() -> Generator[int, str, None]:
-    # error: [invalid-yield] "Send type does not match annotated send type: expected send type assignable to `str`, found `int`"
+    # error: [invalid-yield] "Send type `int` does not match annotated send type `str`"
     yield from inner()
 ```
