@@ -1049,10 +1049,7 @@ impl<'db> Type<'db> {
         match self {
             Type::NominalInstance(instance) => Some(instance.class(db)),
             Type::ProtocolInstance(instance) => instance.to_nominal_instance().map(|i| i.class(db)),
-            Type::TypeAlias(alias) => alias
-                .value_type(db)
-                .as_nominal_instance()
-                .map(|i| i.class(db)),
+            Type::TypeAlias(alias) => alias.value_type(db).nominal_class(db),
             _ => None,
         }
     }

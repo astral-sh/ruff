@@ -3470,18 +3470,7 @@ fn covariant_supertype_hint<'db>(
         ) => Some(
             "Consider using the supertype `collections.abc.Mapping`, which is covariant in its value type",
         ),
-        _ => match (class.name(db).as_str(), mismatched_invariant_parameters) {
-            ("MutableSequence", [0]) => {
-                Some("Consider using the covariant supertype `collections.abc.Sequence`")
-            }
-            ("MutableSet", [0]) => {
-                Some("Consider using the covariant supertype `collections.abc.Set`")
-            }
-            ("MutableMapping", [1]) => Some(
-                "Consider using the supertype `collections.abc.Mapping`, which is covariant in its value type",
-            ),
-            _ => None,
-        },
+        _ => None,
     }
 }
 
@@ -3548,12 +3537,6 @@ pub(super) fn add_invariant_generic_hints<'db>(
         (_, [2]) => format!("`{class_name}` is invariant in its third type parameter"),
         (2, [0, 1]) => {
             format!("`{class_name}` is invariant in its first and second type parameters")
-        }
-        (_, [index]) => {
-            format!(
-                "`{class_name}` is invariant in its {}th type parameter",
-                index + 1
-            )
         }
         _ => format!("`{class_name}` is invariant in (one of) its type parameters"),
     };

@@ -303,15 +303,6 @@ def _(source: Counter[bool]):
 
 def _(source: MutableSequence[bool]):
     target: MutableSequence[int] = source  # error: [invalid-assignment]
-
-def _(source: MutableSet[bool]):
-    target: MutableSet[int] = source  # error: [invalid-assignment]
-
-def _(source: MutableMapping[str, bool]):
-    target: MutableMapping[str, int] = source  # error: [invalid-assignment]
-
-def _(source: MutableMapping[bool, str]):
-    target: MutableMapping[int, str] = source  # error: [invalid-assignment]
 ```
 
 We also show this hint for custom invariant generic classes:
