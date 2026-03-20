@@ -1835,17 +1835,7 @@ impl KnownFunction {
                     .arguments_for_parameter(call_arguments, 0)
                     .fold(UnionBuilder::new(db), |builder, (_, ty)| builder.add(ty))
                     .build();
-                if let Some(builder) =
-                    context.report_diagnostic(DiagnosticId::RevealedType, Severity::Info)
-                {
-                    let mut diag = builder.into_diagnostic("Revealed type");
-                    let span = context.span(&call_expression.arguments.args[0]);
-                    diag.annotate(Annotation::primary(span).message(format_args!(
-                        "`{}`",
-                        revealed_type
-                            .display_with(db, DisplaySettings::default().preserve_long_unions())
-                    )));
-                }
+                report_revealed_type(context, revealed_type, &call_expression.arguments.args[0]);
             }
 
             KnownFunction::HasMember => {
@@ -2232,6 +2222,26 @@ impl KnownFunction {
 
     pub(crate) fn name(self) -> &'static str {
         self.into()
+    }
+}
+
+/// Emit a `revealed-type` diagnostic for a `reveal_type(...)` call.
+pub(super) fn report_revealed_type<'db>(
+    context: &InferContext<'db, '_>,
+    revealed_type: Type<'db>,
+    argument_node: &ast::Expr,
+) {
+    if let Some(builder) = context.report_diagnostic(DiagnosticId::RevealedType, Severity::Info) {
+        let mut diag = builder.into_diagnostic("Revealed type");
+        diag.annotate(
+            Annotation::primary(context.span(argument_node)).message(format_args!(
+                "`{}`",
+                revealed_type.display_with(
+                    context.db(),
+                    DisplaySettings::default().preserve_long_unions()
+                )
+            )),
+        );
     }
 }
 
