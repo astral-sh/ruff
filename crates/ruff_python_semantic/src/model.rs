@@ -552,15 +552,6 @@ impl<'a> SemanticModel<'a> {
                         return ReadResult::UnboundLocal(binding_id);
                     }
 
-                    BindingKind::ConditionalDeletion(binding_id) => {
-                        self.unresolved_references.push(
-                            name.range,
-                            self.exceptions(),
-                            UnresolvedReferenceFlags::empty(),
-                        );
-                        return ReadResult::UnboundLocal(binding_id);
-                    }
-
                     // If we hit an unbound exception that shadowed a bound name, resole to the
                     // bound name. For example, given:
                     //
@@ -712,7 +703,6 @@ impl<'a> SemanticModel<'a> {
                 match self.bindings[binding_id].kind {
                     BindingKind::Annotation => continue,
                     BindingKind::Deletion | BindingKind::UnboundException(None) => return None,
-                    BindingKind::ConditionalDeletion(binding_id) => return Some(binding_id),
                     BindingKind::UnboundException(Some(binding_id)) => return Some(binding_id),
                     _ => return Some(binding_id),
                 }
@@ -845,8 +835,7 @@ impl<'a> SemanticModel<'a> {
                         }
                         if let BindingKind::Annotation
                         | BindingKind::Deletion
-                        | BindingKind::UnboundException(..)
-                        | BindingKind::ConditionalDeletion(..) = binding.kind
+                        | BindingKind::UnboundException(..) = binding.kind
                         {
                             continue;
                         }
@@ -870,7 +859,6 @@ impl<'a> SemanticModel<'a> {
                     let candidate_id = match self.bindings[binding_id].kind {
                         BindingKind::Annotation => continue,
                         BindingKind::Deletion | BindingKind::UnboundException(None) => return None,
-                        BindingKind::ConditionalDeletion(binding_id) => binding_id,
                         BindingKind::UnboundException(Some(binding_id)) => binding_id,
                         _ => binding_id,
                     };
