@@ -104,7 +104,7 @@ def persons() -> Iterator[Person]:
     yield {"name": "Alice"}
     yield {"name": "Bob"}
 
-    # error: [invalid-return-type]
+    # error: [invalid-yield]
     # error: [invalid-argument-type]
     yield {"name": 42}
 ```
@@ -116,7 +116,7 @@ generator's yield type as type context:
 def persons() -> Iterator[Person]:
     yield from [{"name": "Alice"}, {"name": "Bob"}]
 
-    # error: [invalid-return-type]
+    # error: [invalid-yield]
     # error: [invalid-argument-type]
     yield from [{"name": 42}]
 ```
@@ -189,7 +189,7 @@ def generator() -> Generator:
 from typing import Generator
 
 def invalid_generator() -> Generator[int, None, None]:
-    # error: [invalid-return-type] "Yielded type does not match annotated yield type: expected yielded type assignable to `int`, found `Literal[""]`"
+    # error: [invalid-yield] "Yielded type does not match annotated yield type: expected yielded type assignable to `int`, found `Literal[""]`"
     yield ""
 ```
 
@@ -232,7 +232,7 @@ def inner() -> Generator[str, None, None]:
     yield "hello"
 
 def outer() -> Generator[int, None, None]:
-    # error: [invalid-return-type] "Yielded type does not match annotated yield type: expected yielded type assignable to `int`, found `str`"
+    # error: [invalid-yield] "Yielded type does not match annotated yield type: expected yielded type assignable to `int`, found `str`"
     yield from inner()
 ```
 
@@ -245,6 +245,6 @@ def inner() -> Generator[int, int, None]:
     x = yield 1
 
 def outer() -> Generator[int, str, None]:
-    # error: [invalid-return-type] "Send type does not match annotated send type: expected send type assignable to `str`, found `int`"
+    # error: [invalid-yield] "Send type does not match annotated send type: expected send type assignable to `str`, found `int`"
     yield from inner()
 ```

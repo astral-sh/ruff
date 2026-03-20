@@ -78,6 +78,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&ISINSTANCE_AGAINST_TYPED_DICT);
     registry.register_lint(&INVALID_ARGUMENT_TYPE);
     registry.register_lint(&INVALID_RETURN_TYPE);
+    registry.register_lint(&INVALID_YIELD);
     registry.register_lint(&INVALID_ASSIGNMENT);
     registry.register_lint(&INVALID_AWAIT);
     registry.register_lint(&INVALID_BASE);
@@ -936,6 +937,31 @@ declare_lint! {
     pub(crate) static INVALID_RETURN_TYPE = {
         summary: "detects returned values that can't be assigned to the function's annotated return type",
         status: LintStatus::stable("0.0.1-alpha.1"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Detects `yield` and `yield from` expressions where the "yield" or "send" type
+    /// is incompatible with the generator function's annotated return type.
+    ///
+    /// ## Why is this bad?
+    /// Yielding a value of a type that doesn't match the generator's declared yield type,
+    /// or using `yield from` with a sub-iterator whose yield or send type is incompatible,
+    /// is a type error that may cause downstream consumers of the generator to receive
+    /// values of an unexpected type.
+    ///
+    /// ## Examples
+    /// ```python
+    /// from typing import Iterator
+    ///
+    /// def gen() -> Iterator[int]:
+    ///     yield "not an int"  # error: [invalid-yield]
+    /// ```
+    pub(crate) static INVALID_YIELD = {
+        summary: "detects yield expressions where the \"yield\" or \"send\" type is incompatible with the annotated return type",
+        status: LintStatus::stable("0.0.25"),
         default_level: Level::Error,
     }
 }
@@ -3779,7 +3805,7 @@ pub(super) fn report_invalid_generator_yield_type(
     actual_ty: Type,
     kind: GeneratorMismatchKind,
 ) {
-    let Some(builder) = context.report_lint(&INVALID_RETURN_TYPE, object_range) else {
+    let Some(builder) = context.report_lint(&INVALID_YIELD, object_range) else {
         return;
     };
 

@@ -1094,6 +1094,16 @@
             }
           ]
         },
+        "invalid-yield": {
+          "title": "detects yield expressions where the \"yield\" or \"send\" type is incompatible with the annotated return type",
+          "description": "## What it does\nDetects `yield` and `yield from` expressions where the \"yield\" or \"send\" type\nis incompatible with the generator function's annotated return type.\n\n## Why is this bad?\nYielding a value of a type that doesn't match the generator's declared yield type,\nor using `yield from` with a sub-iterator whose yield or send type is incompatible,\nis a type error that may cause downstream consumers of the generator to receive\nvalues of an unexpected type.\n\n## Examples\n```python\nfrom typing import Iterator\n\ndef gen() -> Iterator[int]:\n    yield \"not an int\"  # error: [invalid-yield]\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "isinstance-against-protocol": {
           "title": "reports invalid runtime checks against protocol classes",
           "description": "## What it does\nReports invalid runtime checks against `Protocol` classes.\nThis includes explicit calls `isinstance()`/`issubclass()` against\nnon-runtime-checkable protocols, `issubclass()` calls against protocols\nthat have non-method members, and implicit `isinstance()` checks against\nnon-runtime-checkable protocols via pattern matching.\n\n## Why is this bad?\nThese calls (implicit or explicit) raise `TypeError` at runtime.\n\n## Examples\n```python\nfrom typing_extensions import Protocol, runtime_checkable\n\nclass HasX(Protocol):\n    x: int\n\n@runtime_checkable\nclass HasY(Protocol):\n    y: int\n\ndef f(arg: object, arg2: type):\n    isinstance(arg, HasX)  # error: [isinstance-against-protocol] (not runtime-checkable)\n    issubclass(arg2, HasX)  # error: [isinstance-against-protocol] (not runtime-checkable)\n\ndef g(arg: object):\n    match arg:\n        case HasX():  # error: [isinstance-against-protocol] (not runtime-checkable)\n            pass\n\ndef h(arg2: type):\n    isinstance(arg2, HasY)  # fine (runtime-checkable)\n\n    # `HasY` is runtime-checkable, but has non-method members,\n    # so it still can't be used in `issubclass` checks)\n    issubclass(arg2, HasY)  # error: [isinstance-against-protocol]\n```\n\n## References\n- [Typing documentation: `@runtime_checkable`](https://docs.python.org/3/library/typing.html#typing.runtime_checkable)",
