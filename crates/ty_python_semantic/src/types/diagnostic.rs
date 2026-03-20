@@ -3801,10 +3801,10 @@ pub(super) fn report_invalid_generator_yield_type(
             ),
         ),
         GeneratorMismatchKind::SendType => (
-            "Sent type does not match annotated send type",
-            format!("expected sent type assignable to `{expected_ty}`, found `{actual_ty}`"),
+            "Send type does not match annotated send type",
+            format!("expected send type assignable to `{expected_ty}`, found `{actual_ty}`"),
             format!(
-                "Expected sent type assignable to `{expected_ty}` because return type is \
+                "Expected send type assignable to `{expected_ty}` because return type is \
                  `{annotated_return_ty}`"
             ),
         ),

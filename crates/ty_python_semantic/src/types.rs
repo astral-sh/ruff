@@ -759,10 +759,11 @@ fn recursive_type_normalize_type_guard_like<'db, T: TypeGuardLike<'db>>(
 }
 
 #[derive(Debug, Clone, Copy)]
+#[expect(clippy::struct_field_names)]
 struct GeneratorTypes<'db> {
-    yielded: Option<Type<'db>>,
-    sent: Option<Type<'db>>,
-    returned: Option<Type<'db>>,
+    yield_ty: Option<Type<'db>>,
+    send_ty: Option<Type<'db>>,
+    return_ty: Option<Type<'db>>,
 }
 
 #[salsa::tracked]
@@ -4776,26 +4777,26 @@ impl<'db> Type<'db> {
                 && let [yield_ty, send_ty, return_ty] = specialization.types(db)
             {
                 Some(GeneratorTypes {
-                    yielded: Some(*yield_ty),
-                    sent: Some(*send_ty),
-                    returned: Some(*return_ty),
+                    yield_ty: Some(*yield_ty),
+                    send_ty: Some(*send_ty),
+                    return_ty: Some(*return_ty),
                 })
             } else if class.is_known(db, KnownClass::AsyncGenerator)
                 && let [yield_ty, send_ty] = specialization.types(db)
             {
                 Some(GeneratorTypes {
-                    yielded: Some(*yield_ty),
-                    sent: Some(*send_ty),
-                    returned: None,
+                    yield_ty: Some(*yield_ty),
+                    send_ty: Some(*send_ty),
+                    return_ty: None,
                 })
             } else if (class.is_known(db, KnownClass::Iterator)
                 || class.is_known(db, KnownClass::AsyncIterator))
                 && let [yield_ty] = specialization.types(db)
             {
                 Some(GeneratorTypes {
-                    yielded: Some(*yield_ty),
-                    sent: Some(Type::none(db)),
-                    returned: Some(Type::unknown()),
+                    yield_ty: Some(*yield_ty),
+                    send_ty: Some(Type::none(db)),
+                    return_ty: Some(Type::unknown()),
                 })
             } else {
                 None
@@ -4820,14 +4821,14 @@ impl<'db> Type<'db> {
                     .map(|ty| ty.generator_types(db))
                     .collect::<Option<_>>()?;
 
-                let yielded: Option<Vec<_>> = member_types.iter().map(|gt| gt.yielded).collect();
-                let sent: Option<Vec<_>> = member_types.iter().map(|gt| gt.sent).collect();
-                let returned: Option<Vec<_>> = member_types.iter().map(|gt| gt.returned).collect();
+                let yielded: Option<Vec<_>> = member_types.iter().map(|gt| gt.yield_ty).collect();
+                let sent: Option<Vec<_>> = member_types.iter().map(|gt| gt.send_ty).collect();
+                let returned: Option<Vec<_>> = member_types.iter().map(|gt| gt.return_ty).collect();
 
                 Some(GeneratorTypes {
-                    yielded: yielded.map(|ts| UnionType::from_elements(db, ts)),
-                    sent: sent.map(|ts| UnionType::from_elements(db, ts)),
-                    returned: returned.map(|ts| UnionType::from_elements(db, ts)),
+                    yield_ty: yielded.map(|ts| UnionType::from_elements(db, ts)),
+                    send_ty: sent.map(|ts| UnionType::from_elements(db, ts)),
+                    return_ty: returned.map(|ts| UnionType::from_elements(db, ts)),
                 })
             }
             Type::Intersection(intersection) => {
@@ -4857,21 +4858,21 @@ impl<'db> Type<'db> {
                 };
 
                 Some(GeneratorTypes {
-                    yielded: build_intersection(
-                        member_types.iter().filter_map(|gt| gt.yielded).collect(),
+                    yield_ty: build_intersection(
+                        member_types.iter().filter_map(|gt| gt.yield_ty).collect(),
                     ),
-                    sent: build_intersection(
-                        member_types.iter().filter_map(|gt| gt.sent).collect(),
+                    send_ty: build_intersection(
+                        member_types.iter().filter_map(|gt| gt.send_ty).collect(),
                     ),
-                    returned: build_intersection(
-                        member_types.iter().filter_map(|gt| gt.returned).collect(),
+                    return_ty: build_intersection(
+                        member_types.iter().filter_map(|gt| gt.return_ty).collect(),
                     ),
                 })
             }
             ty @ (Type::Dynamic(_) | Type::Never) => Some(GeneratorTypes {
-                yielded: Some(ty),
-                sent: Some(ty),
-                returned: Some(ty),
+                yield_ty: Some(ty),
+                send_ty: Some(ty),
+                return_ty: Some(ty),
             }),
             _ => None,
         }
@@ -4879,12 +4880,12 @@ impl<'db> Type<'db> {
 
     fn generator_return_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
         self.generator_types(db)
-            .and_then(|expected_types| expected_types.returned)
+            .and_then(|expected_types| expected_types.return_ty)
     }
 
     fn generator_send_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
         self.generator_types(db)
-            .and_then(|expected_types| expected_types.sent)
+            .and_then(|expected_types| expected_types.send_ty)
     }
 
     #[must_use]

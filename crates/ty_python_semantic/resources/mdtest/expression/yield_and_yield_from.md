@@ -90,6 +90,37 @@ def outer_generator():
     reveal_type(result)  # revealed: str
 ```
 
+## Infering with type context
+
+A dict literal that is structurally compatible with a `TypedDict` should be accepted.
+
+```py
+from typing import Iterator, TypedDict
+
+class Person(TypedDict):
+    name: str
+
+def persons() -> Iterator[Person]:
+    yield {"name": "Alice"}
+    yield {"name": "Bob"}
+
+    # error: [invalid-return-type]
+    # error: [invalid-argument-type]
+    yield {"name": 42}
+```
+
+This also works with `yield from`, where the iterable expression is inferred with the outer
+generator's yield type as type context:
+
+```py
+def persons() -> Iterator[Person]:
+    yield from [{"name": "Alice"}, {"name": "Bob"}]
+
+    # error: [invalid-return-type]
+    # error: [invalid-argument-type]
+    yield from [{"name": 42}]
+```
+
 ## `yield` expression send type inference
 
 ```py
@@ -214,6 +245,6 @@ def inner() -> Generator[int, int, None]:
     x = yield 1
 
 def outer() -> Generator[int, str, None]:
-    # error: [invalid-return-type] "Sent type does not match annotated send type: expected sent type assignable to `str`, found `int`"
+    # error: [invalid-return-type] "Send type does not match annotated send type: expected send type assignable to `str`, found `int`"
     yield from inner()
 ```

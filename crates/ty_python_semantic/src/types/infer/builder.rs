@@ -7277,13 +7277,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             node_index: _,
             value,
         } = yield_expression;
-        let yielded_ty = self
-            .infer_optional_expression(value.as_deref(), TypeContext::default())
-            .unwrap_or_else(|| Type::none(self.db()));
-
         let Some(enclosing_function) =
             nearest_enclosing_function(self.db(), self.index, self.scope())
         else {
+            let _ = self.infer_optional_expression(value.as_deref(), TypeContext::default());
             return Type::unknown();
         };
         let declared_return_ty = enclosing_function
@@ -7292,10 +7289,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let return_type_span = enclosing_function.spans(self.db()).return_type;
 
         let Some(generator_type_params) = declared_return_ty.generator_types(self.db()) else {
+            let _ = self.infer_optional_expression(value.as_deref(), TypeContext::default());
             return Type::unknown();
         };
 
-        let expected_yield_ty = generator_type_params.yielded;
+        let expected_yield_ty = generator_type_params.yield_ty;
+        let tcx = TypeContext::new(expected_yield_ty);
+        let yielded_ty = self
+            .infer_optional_expression(value.as_deref(), tcx)
+            .unwrap_or_else(|| Type::none(self.db()));
         let diagnostic_node: AnyNodeRef = value
             .as_deref()
             .map_or_else(|| yield_expression.into(), AnyNodeRef::from);
@@ -7314,7 +7316,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             );
         }
 
-        generator_type_params.sent.unwrap_or_else(Type::unknown)
+        generator_type_params.send_ty.unwrap_or_else(Type::unknown)
     }
 
     fn infer_yield_from_expression(&mut self, yield_from: &ast::ExprYieldFrom) -> Type<'db> {
@@ -7324,11 +7326,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             value,
         } = yield_from;
 
-        let iterable_type = self.infer_expression(value, TypeContext::default());
-
         let Some(enclosing_function) =
             nearest_enclosing_function(self.db(), self.index, self.scope())
         else {
+            let _ = self.infer_expression(value, TypeContext::default());
             return Type::unknown();
         };
         let annotated_return_ty = enclosing_function
@@ -7336,9 +7337,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .return_ty;
 
         let Some(outer_expected) = annotated_return_ty.generator_types(self.db()) else {
+            let _ = self.infer_expression(value, TypeContext::default());
             return Type::unknown();
         };
         let return_type_span = enclosing_function.spans(self.db()).return_type;
+
+        let tcx = TypeContext::new(outer_expected.yield_ty.map(|yielded_ty| {
+            KnownClass::Iterable.to_specialized_instance(self.db(), &[yielded_ty])
+        }));
+        let iterable_type = self.infer_expression(value, tcx);
 
         let inner_yield_ty = iterable_type
             .try_iterate(self.db())
@@ -7348,7 +7355,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 err.fallback_element_type(self.db())
             });
 
-        if let Some(outer_yield_ty) = outer_expected.yielded
+        if let Some(outer_yield_ty) = outer_expected.yield_ty
             && !inner_yield_ty.is_assignable_to(self.db(), outer_yield_ty)
         {
             report_invalid_generator_yield_type(
@@ -7362,7 +7369,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             );
         }
 
-        if let Some(outer_send_ty) = outer_expected.sent {
+        if let Some(outer_send_ty) = outer_expected.send_ty {
             let inner_send_ty = iterable_type
                 .generator_send_type(self.db())
                 .unwrap_or_else(|| Type::none(self.db()));
