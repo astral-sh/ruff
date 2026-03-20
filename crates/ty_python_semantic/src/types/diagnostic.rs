@@ -29,8 +29,8 @@ use crate::types::typed_dict::TypedDictSchema;
 use crate::types::typevar::TypeVarInstance;
 use crate::types::{
     BoundTypeVarInstance, ClassType, DynamicType, LintDiagnosticGuard, Protocol,
-    ProtocolInstanceType, SpecialFormType, SubclassOfInner, Type, TypeContext, binding_type,
-    protocol_class::ProtocolClass,
+    ProtocolInstanceType, SpecialFormType, SubclassOfInner, Type, TypeContext, TypeVarVariance,
+    binding_type, protocol_class::ProtocolClass,
 };
 use crate::types::{KnownInstanceType, MemberLookupPolicy, UnionType};
 use crate::{Db, DisplaySettings, FxIndexMap, Program, declare_lint};
@@ -3447,6 +3447,109 @@ pub(super) fn note_numbers_module_not_supported<'db>(
     }
 }
 
+fn covariant_supertype_hint<'db>(
+    class: ClassType<'db>,
+    db: &'db dyn Db,
+    mismatched_invariant_parameters: &[usize],
+) -> Option<&'static str> {
+    match (class.known(db), mismatched_invariant_parameters) {
+        (Some(KnownClass::List | KnownClass::Deque), [0]) => {
+            Some("Consider using the covariant supertype `collections.abc.Sequence`")
+        }
+        (Some(KnownClass::Set), [0]) => {
+            Some("Consider using the covariant supertype `collections.abc.Set`")
+        }
+        (
+            Some(
+                KnownClass::Dict
+                | KnownClass::DefaultDict
+                | KnownClass::OrderedDict
+                | KnownClass::ChainMap,
+            ),
+            [1],
+        ) => Some(
+            "Consider using the supertype `collections.abc.Mapping`, which is covariant in its value type",
+        ),
+        _ => None,
+    }
+}
+
+/// Add a diagnostic hint for cases like an invalid `list[bool]` to `list[int]` assignment,
+/// that fails due to invariance.
+pub(super) fn add_invariant_generic_hints<'db>(
+    db: &'db dyn Db,
+    diag: &mut Diagnostic,
+    expected_ty: Type<'db>,
+    provided_ty: Type<'db>,
+) {
+    let Some(expected_class) = expected_ty.nominal_class(db) else {
+        return;
+    };
+    let Some(provided_class) = provided_ty.nominal_class(db) else {
+        return;
+    };
+    let Some(expected_specialization) = expected_ty.class_specialization(db) else {
+        return;
+    };
+    let Some(provided_specialization) = provided_ty.class_specialization(db) else {
+        return;
+    };
+
+    if expected_class.class_literal(db) != provided_class.class_literal(db) {
+        return;
+    }
+
+    let generic_context = expected_specialization.generic_context(db);
+    if generic_context != provided_specialization.generic_context(db) {
+        return;
+    }
+
+    let mismatched_invariant_arguments = generic_context
+        .variables(db)
+        .zip(expected_specialization.types(db))
+        .zip(provided_specialization.types(db))
+        .enumerate()
+        .filter_map(|(index, ((bound_typevar, expected_arg), provided_arg))| {
+            (bound_typevar.variance(db) == TypeVarVariance::Invariant
+                && !expected_arg.is_equivalent_to(db, *provided_arg))
+            .then_some((index, expected_arg, provided_arg))
+        });
+
+    let mut mismatch_indices = Vec::new();
+    for (index, expected_arg, provided_arg) in mismatched_invariant_arguments {
+        if !provided_arg.is_assignable_to(db, *expected_arg) {
+            return;
+        }
+        mismatch_indices.push(index);
+    }
+
+    if mismatch_indices.is_empty() {
+        return;
+    }
+
+    let class_name = expected_class.name(db);
+    let message = match (generic_context.len(db), mismatch_indices.as_slice()) {
+        (1, _) => {
+            format!("`{class_name}` is invariant in its type parameter")
+        }
+        (_, [0]) => format!("`{class_name}` is invariant in its first type parameter"),
+        (_, [1]) => format!("`{class_name}` is invariant in its second type parameter"),
+        (_, [2]) => format!("`{class_name}` is invariant in its third type parameter"),
+        (2, [0, 1]) => {
+            format!("`{class_name}` is invariant in its first and second type parameters")
+        }
+        _ => format!("`{class_name}` is invariant in (one of) its type parameters"),
+    };
+    diag.info(message);
+
+    if let Some(note) = covariant_supertype_hint(expected_class, db, &mismatch_indices) {
+        diag.info(note);
+    }
+    diag.info(
+        "For more information, see https://docs.astral.sh/ty/reference/typing-faq/#invariant-generics",
+    );
+}
+
 pub(super) fn report_invalid_assignment<'db>(
     context: &InferContext<'db, '_>,
     target_node: AnyNodeRef,
@@ -3531,6 +3634,7 @@ pub(super) fn report_invalid_assignment<'db>(
 
     // special case message
     note_numbers_module_not_supported(context.db(), &mut diag, target_ty, value_ty);
+    add_invariant_generic_hints(context.db(), &mut diag, target_ty, value_ty);
 }
 
 pub(super) fn report_invalid_attribute_assignment(
