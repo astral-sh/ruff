@@ -9,10 +9,11 @@ RUF013 [*] PEP 484 prohibits implicit `Optional`
    |
 help: Convert to `T | None`
 1  | # https://github.com/astral-sh/ruff/issues/13833
-2  + from __future__ import annotations
-3  | 
+2  | 
+3  + from __future__ import annotations
 4  | from typing import Optional
 5  | 
+6  | 
 --------------------------------------------------------------------------------
 13 | def multiple_1(arg1: Optional, arg2: Optional = None): ...
 14 | 

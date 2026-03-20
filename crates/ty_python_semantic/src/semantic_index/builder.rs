@@ -857,14 +857,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 continue;
             };
 
-            // Recurse into nested dictionaries.
-            self.add_dict_key_assignment_definitions_impl(
-                &member_expr,
-                (&item.value).into(),
-                assignment,
-            );
-
-            if let Some(place_expr) = PlaceExpr::try_from_member_expr(member_expr) {
+            if let Some(place_expr) = PlaceExpr::try_from_member_expr(member_expr.clone()) {
                 let place_id = self.add_place(place_expr);
 
                 self.add_definition(
@@ -874,6 +867,16 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         assignment,
                         value: &item.value,
                     },
+                );
+
+                // Recurse into nested dictionaries.
+                //
+                // Note that we must do this _after_ adding the outer place in order to track
+                // sub-member places correctly.
+                self.add_dict_key_assignment_definitions_impl(
+                    &member_expr,
+                    (&item.value).into(),
+                    assignment,
                 );
             }
         }

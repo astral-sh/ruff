@@ -897,9 +897,6 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 self.never()
             }
 
-            // `Never` is the bottom type, the empty set.
-            (_, Type::Never) => self.never(),
-
             (Type::NewTypeInstance(source_newtype), Type::NewTypeInstance(target_newtype)) => {
                 self.check_newtype_pair(db, source_newtype, target_newtype)
             }
@@ -1026,6 +1023,9 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     |elem_ty| self.check_type_pair(db, elem_ty, target),
                 )
             }
+
+            // `Never` is the bottom type, the empty set.
+            (_, Type::Never) => self.never(),
 
             // Other than the special cases checked above, no other types are a subtype of a
             // typevar, since there's no guarantee what type the typevar will be specialized to.
