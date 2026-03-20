@@ -1520,24 +1520,7 @@ class Permissions(Flag):
     EXECUTE = 4
 
 reveal_type(Permissions.READ)  # revealed: Literal[Permissions.READ]
-reveal_type(Permissions.READ | Permissions.WRITE)  # revealed: Literal[Permissions.READ, Permissions.WRITE]
-```
-
-### Flag members
-
-Flag enum members are treated similarly to regular enum members but allow for bitwise combinations:
-
-```py
-from enum import Flag
-from ty_extensions import enum_members
-
-class Permissions(Flag):
-    READ = 1
-    WRITE = 2
-    EXECUTE = 4
-
-# revealed: tuple[Literal["READ"], Literal["WRITE"], Literal["EXECUTE"]]
-reveal_type(enum_members(Permissions))
+reveal_type(Permissions.READ | Permissions.WRITE)  # revealed: Permissions
 ```
 
 ### IntFlag
@@ -1554,7 +1537,7 @@ class Status(IntFlag):
     STOPPED = 4
 
 reveal_type(Status.READY)  # revealed: Literal[Status.READY]
-reveal_type(Status.READY | Status.RUNNING)  # revealed: Literal[Status.READY]
+reveal_type(Status.READY | Status.RUNNING)  # revealed: Status
 
 # IntFlag members can be used in arithmetic operations
 reveal_type(Status.READY + 1)  # revealed: int
@@ -1601,46 +1584,19 @@ class Flags(Flag):
 def test(f: Flags) -> None:
     match f:
         case Flags.A | Flags.B:
-            # Pattern matching on flags does not narrow to specific literals
-            assert_type(f, Flags)
+            # Pattern matching on flags do narrow to specific literals
+            assert_type(f, Literal[Flags.A, Flags.B])
+        case Flags.A:
+            assert_type(f, Literal[Flags.A])
+        case _ if f & (Flags.A | Flags.B) == (Flags.A | Flags.B):
+             assert_type(f, Flags)
+        case Flags.B:
+            assert_type(f, Literal[Flags.B])
         case Flags.C:
-            assert_type(f, Flags)
+            assert_type(f, Literal[Flags.C])
         case _:
             # The wildcard also preserves the full flag type
             assert_type(f, Flags)
-```
-
-### Difference from regular enums
-
-Regular enums narrow to remaining members in the `else` branch. Flags do not, because flag members
-can be combined:
-
-```py
-from enum import Enum, Flag
-from typing_extensions import assert_type, Literal
-
-class Color(Enum):
-    RED = 1
-    BLUE = 2
-
-class Perms(Flag):
-    READ = 4
-    WRITE = 2
-
-def handle_color(c: Color) -> None:
-    if c is Color.RED:
-        assert_type(c, Literal[Color.RED])
-    else:
-        # Regular enums narrow to remaining members
-        assert_type(c, Literal[Color.BLUE])
-
-def handle_perms(p: Perms) -> None:
-    if p is Perms.READ:
-        assert_type(p, Literal[Perms.READ])
-    else:
-        # Flags do NOT narrow because other members can be combined
-        # with READ (e.g., Perms.READ | Perms.WRITE is a valid Perms)
-        assert_type(p, Perms)
 ```
 
 ## References

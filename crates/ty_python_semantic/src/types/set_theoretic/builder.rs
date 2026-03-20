@@ -157,6 +157,8 @@ impl<'db> Type<'db> {
                 (LiteralValueTypeKind::Int(_), LiteralKind::Int) => true,
                 (LiteralValueTypeKind::Enum(enum_literal), LiteralKind::Enum { enum_class }) => {
                     enum_literal.enum_class(db) == enum_class
+                        && enum_metadata(db, enum_class)
+                            .is_some_and(|metadata| !metadata.is_flag_subclass)
                 }
                 _ => false,
             },
@@ -1052,21 +1054,34 @@ impl<'db> IntersectionBuilder<'db> {
             }
             Type::LiteralValue(literal) => match literal.kind() {
                 LiteralValueTypeKind::Enum(enum_literal) => {
-                    let enum_class = enum_literal.enum_class(self.db);
+                    let enum_instance = enum_literal.enum_class_instance(self.db);
 
-                    // Flag enums should not be treated as closed sets of their members; there
-                    // may be combinations that aren't expressible as individual literals. For
-                    // those classes, just fall back to the generic negative logic instead of
-                    // partitioning / expanding.
-                    if enum_metadata(self.db, enum_class)
+                    // For flag enums, excluding a single member does not constrain the type
+                    // to the remaining members, because flag combinations can exist that aren't
+                    // named. In that case, treat the negative constraint as a no-op for the
+                    // intersections that already contain the enum instance.
+                    if enum_metadata(self.db, enum_literal.enum_class(self.db))
                         .is_some_and(|metadata| metadata.is_flag_subclass)
                     {
-                        // For flag enums, do not restrict on negative literal values; any combination
-                        // of flags is still a valid member of the class.
-                        return self;
-                    }
+                        // Partition intersections into those that contain the enum instance and those that don't.
+                        // For intersections containing the enum, we do nothing.
+                        // For others, add the negative as normal.
+                        let (enum_intersections, other_intersections): (Vec<_>, Vec<_>) = self
+                            .intersections
+                            .into_iter()
+                            .partition(|inner| inner.positive.contains(&enum_instance));
 
-                    let enum_instance = enum_literal.enum_class_instance(self.db);
+                        let mut other_builder = IntersectionBuilder {
+                            db: self.db,
+                            intersections: other_intersections,
+                        };
+                        for inner in &mut other_builder.intersections {
+                            inner.add_negative(self.db, ty);
+                        }
+
+                        other_builder.intersections.extend(enum_intersections);
+                        return other_builder;
+                    }
 
                     // Partition intersections into those that contain the enum instance and those that don't.
                     // For intersections containing the enum, we need to expand to remaining members.
