@@ -4781,10 +4781,12 @@ impl SequentMap {
                     //   - Covariant + S is B's lower bound (S ≤ B): G[S] ≤ G[B] → weaker. Emit.
                     //   - Contravariant + S is B's upper bound (B ≤ S): G[S] ≤ G[B] → weaker. Emit.
                     //   - Other combinations tighten rather than weaken. Skip.
-                    let should_weaken_upper =
-                        match constrained_data.upper.variance_of(db, nested_typevar) {
+                    let should_weaken_upper = !constrained_data.upper.is_type_var()
+                        && !constrained_data.upper.is_never()
+                        && !constrained_data.upper.is_object()
+                        && !constrained_data.upper.is_dynamic()
+                        && match constrained_data.upper.variance_of(db, nested_typevar) {
                             TypeVarVariance::Bivariant => false,
-                            _ if constrained_data.upper.is_type_var() => false,
                             TypeVarVariance::Covariant => !is_upper_bound,
                             TypeVarVariance::Contravariant => is_upper_bound,
                             TypeVarVariance::Invariant => {
@@ -4816,10 +4818,12 @@ impl SequentMap {
                     }
 
                     // Ditto for the lower bound.
-                    let should_weaken_lower =
-                        match constrained_data.lower.variance_of(db, nested_typevar) {
+                    let should_weaken_lower = !constrained_data.lower.is_type_var()
+                        && !constrained_data.lower.is_never()
+                        && !constrained_data.lower.is_object()
+                        && !constrained_data.lower.is_dynamic()
+                        && match constrained_data.lower.variance_of(db, nested_typevar) {
                             TypeVarVariance::Bivariant => false,
-                            _ if constrained_data.lower.is_type_var() => false,
                             TypeVarVariance::Covariant => is_upper_bound,
                             TypeVarVariance::Contravariant => !is_upper_bound,
                             TypeVarVariance::Invariant => {
