@@ -489,3 +489,24 @@ def test() -> None:
     # error: [invalid-key] "Unknown key "nonexistent" for TypedDict `Person`"
     print(p["nonexistent"])
 ```
+
+## Truthiness narrowing of `NewType`s
+
+```py
+from typing import NewType
+
+FloatNewType = NewType("FloatNewType", float)
+ComplexNewType = NewType("ComplexNewType", complex)
+
+def expects_float(x: float): ...
+def expects_complex(x: complex): ...
+def f(floaty: FloatNewType, complexy: ComplexNewType):
+    if floaty:
+        reveal_type(floaty)  # revealed:FloatNewType & ~AlwaysFalsy
+        expects_float(floaty)  # fine
+
+    if complexy:
+        reveal_type(complexy)  # revealed: ComplexNewType & ~AlwaysFalsy
+        expects_complex(complexy)  # fine
+        expects_float(complexy)  # error: [invalid-argument-type]
+```
