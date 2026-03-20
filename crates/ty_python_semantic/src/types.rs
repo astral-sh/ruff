@@ -1188,6 +1188,13 @@ impl<'db> Type<'db> {
         }
     }
 
+    pub(crate) const fn as_new_type(self) -> Option<NewType<'db>> {
+        match self {
+            Type::NewTypeInstance(new_type) => Some(new_type),
+            _ => None,
+        }
+    }
+
     /// If this type is a `Type::TypeAlias`, recursively resolves it to its
     /// underlying value type. Otherwise, returns `self` unchanged.
     pub(crate) fn resolve_type_alias(self, db: &'db dyn Db) -> Type<'db> {

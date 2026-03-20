@@ -20,7 +20,7 @@ type (i.e. not an alias).
 
 ```py
 from typing_extensions import NewType
-from ty_extensions import static_assert, is_subtype_of, is_equivalent_to
+from ty_extensions import static_assert, is_subtype_of, is_equivalent_to, Not, Intersection, AlwaysFalsy, is_assignable_to
 
 Foo = NewType("Foo", int)
 Bar = NewType("Bar", Foo)
@@ -53,6 +53,21 @@ g(Bar(Foo(42)))
 h(42)  # error: [invalid-argument-type] "Argument to function `h` is incorrect: Expected `Bar`, found `Literal[42]`"
 h(Foo(42))  # error: [invalid-argument-type] "Argument to function `h` is incorrect: Expected `Bar`, found `Foo`"
 h(Bar(Foo(42)))
+
+FloatNewType = NewType("FloatNewType", float)
+
+static_assert(is_subtype_of(FloatNewType, float))
+static_assert(is_subtype_of(Intersection[FloatNewType, AlwaysFalsy], float))
+static_assert(is_subtype_of(Intersection[FloatNewType, Not[AlwaysFalsy]], float))
+
+ComplexNewType = NewType("ComplexNewType", complex)
+
+static_assert(is_subtype_of(ComplexNewType, complex))
+static_assert(is_subtype_of(Intersection[ComplexNewType, AlwaysFalsy], complex))
+static_assert(is_subtype_of(Intersection[ComplexNewType, Not[AlwaysFalsy]], complex))
+static_assert(not is_assignable_to(ComplexNewType, float))
+static_assert(not is_assignable_to(Intersection[ComplexNewType, AlwaysFalsy], float))
+static_assert(not is_assignable_to(Intersection[ComplexNewType, Not[AlwaysFalsy]], float))
 ```
 
 ## Member and method lookup work
