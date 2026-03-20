@@ -1,4 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::helpers::is_dunder;
 use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_python_semantic::analyze::typing::is_type_checking_block;
 use ruff_text_size::Ranged;
@@ -56,7 +57,8 @@ use crate::{Violation, checkers::ast::Checker};
 /// In non-strict mode, this rule allows several common patterns in `__init__.py` files:
 ///
 /// - Imports
-/// - Assignments to `__all__`, `__path__`, `__version__`, and `__author__`
+/// - Assignments to dunder names (identifiers starting and ending with `__`, such as `__all__` or
+///   `__submodules__`)
 /// - Module-level and attribute docstrings
 /// - `if TYPE_CHECKING` blocks
 /// - [PEP-562] module-level `__getattr__` and `__dir__` functions
@@ -128,33 +130,10 @@ pub(crate) fn non_empty_init_module(checker: &Checker, stmt: &Stmt) {
         }
 
         if let Some(assignment) = Assignment::from_stmt(stmt) {
-            // Allow assignments to `__all__`.
-            //
-            // TODO(brent) should we allow additional cases here? Beyond simple assignments, you could
-            // also append or extend `__all__`.
-            //
-            // This is actually going slightly beyond the upstream rule already, which only checks for
-            // `Stmt::Assign`.
-            if assignment.is_assignment_to("__all__") {
-                return;
-            }
-
-            // Allow legacy namespace packages with assignments like:
-            //
-            // ```py
-            // __path__ = __import__('pkgutil').extend_path(__path__, __name__)
-            // ```
-            if assignment.is_assignment_to("__path__") && assignment.is_pkgutil_extend_path() {
-                return;
-            }
-
-            // Allow assignments to `__version__`.
-            if assignment.is_assignment_to("__version__") {
-                return;
-            }
-
-            // Allow assignments to `__author__`.
-            if assignment.is_assignment_to("__author__") {
+            // Allow assignments to any dunder-named target (e.g. `__all__`, `__path__`, or
+            // tool-specific names like `__submodules__`). Chained assignments require every target
+            // to be a dunder.
+            if assignment.all_targets_are_dunder() {
                 return;
             }
         }
@@ -172,88 +151,28 @@ pub(crate) fn non_empty_init_module(checker: &Checker, stmt: &Stmt) {
 /// assignments.
 struct Assignment<'a> {
     targets: &'a [Expr],
-    value: Option<&'a Expr>,
 }
 
 impl<'a> Assignment<'a> {
     fn from_stmt(stmt: &'a Stmt) -> Option<Self> {
-        let (targets, value) = match stmt {
-            Stmt::Assign(ast::StmtAssign { targets, value, .. }) => {
-                (targets.as_slice(), Some(&**value))
-            }
-            Stmt::AnnAssign(ast::StmtAnnAssign { target, value, .. }) => {
-                (std::slice::from_ref(&**target), value.as_deref())
-            }
-            Stmt::AugAssign(ast::StmtAugAssign { target, value, .. }) => {
-                (std::slice::from_ref(&**target), Some(&**value))
-            }
+        let targets = match stmt {
+            Stmt::Assign(ast::StmtAssign { targets, .. }) => targets.as_slice(),
+            Stmt::AnnAssign(ast::StmtAnnAssign { target, .. }) => std::slice::from_ref(&**target),
+            Stmt::AugAssign(ast::StmtAugAssign { target, .. }) => std::slice::from_ref(&**target),
             _ => return None,
         };
 
-        Some(Self { targets, value })
+        Some(Self { targets })
     }
 
-    /// Returns whether all of the assignment targets match `name`.
-    ///
-    /// For example, both of the following would be allowed for a `name` of `__all__`:
-    ///
-    /// ```py
-    /// __all__ = ["foo"]
-    /// __all__ = __all__ = ["foo"]
-    /// ```
-    ///
-    /// but not:
-    ///
-    /// ```py
-    /// __all__ = another_list = ["foo"]
-    /// ```
-    fn is_assignment_to(&self, name: &str) -> bool {
-        self.targets
-            .iter()
-            .all(|target| target.as_name_expr().is_some_and(|expr| expr.id == name))
-    }
-
-    /// Returns `true` if the value being assigned is a call to `pkgutil.extend_path`.
-    ///
-    /// For example, both of the following would return true:
-    ///
-    /// ```py
-    /// __path__ = __import__('pkgutil').extend_path(__path__, __name__)
-    /// __path__ = other.extend_path(__path__, __name__)
-    /// ```
-    ///
-    /// We're intentionally a bit less strict here, not requiring that the receiver of the
-    /// `extend_path` call is the typical `__import__('pkgutil')` or `pkgutil`.
-    fn is_pkgutil_extend_path(&self) -> bool {
-        let Some(Expr::Call(ast::ExprCall {
-            func: extend_func,
-            arguments: extend_arguments,
-            ..
-        })) = self.value
-        else {
-            return false;
-        };
-
-        let Expr::Attribute(ast::ExprAttribute {
-            attr: maybe_extend_path,
-            ..
-        }) = &**extend_func
-        else {
-            return false;
-        };
-
-        // Test that this is an `extend_path(__path__, __name__)` call
-        if maybe_extend_path != "extend_path" {
-            return false;
-        }
-
-        let Some(Expr::Name(path)) = extend_arguments.find_argument_value("path", 0) else {
-            return false;
-        };
-        let Some(Expr::Name(name)) = extend_arguments.find_argument_value("name", 1) else {
-            return false;
-        };
-
-        path.id() == "__path__" && name.id() == "__name__"
+    /// Returns `true` when every assignment target is a simple name and each name is a dunder
+    /// (`__` prefix and suffix), matching [`is_dunder`].
+    fn all_targets_are_dunder(&self) -> bool {
+        !self.targets.is_empty()
+            && self.targets.iter().all(|target| {
+                target
+                    .as_name_expr()
+                    .is_some_and(|name| is_dunder(name.id.as_str()))
+            })
     }
 }
