@@ -46,7 +46,8 @@ use std::ops::Deref;
 use ty_python_semantic::semantic_index::definition::Definition;
 use ty_python_semantic::types::TypeVarKind;
 use ty_python_semantic::{
-    HasType, SemanticModel, semantic_index::definition::DefinitionKind, types::Type,
+    HasType, SemanticModel, definitions_for_attribute,
+    semantic_index::definition::DefinitionKind, types::Type,
     types::ide_support::definition_for_name,
 };
 
@@ -523,6 +524,28 @@ impl<'db> SemanticTokenVisitor<'db> {
         (SemanticTokenType::Variable, modifiers)
     }
 
+    /// Check if an attribute access refers to a property by examining the attribute's
+    /// definition. This is needed because instance-level property access (e.g., `obj.prop`)
+    /// resolves through the descriptor protocol, so the inferred type is the property's
+    /// return type rather than a `PropertyInstance`.
+    fn is_property_from_definition(&self, attr: &ast::ExprAttribute) -> bool {
+        let db = self.model.db();
+        let definitions = definitions_for_attribute(self.model, attr);
+        definitions.iter().any(|resolved| {
+            let Some(definition) = resolved.definition() else {
+                return false;
+            };
+            if let DefinitionKind::Function(func_ref) = definition.kind(db) {
+                let def_model = SemanticModel::new(db, definition.file(db));
+                let parsed = parsed_module(db, definition.file(db)).load(db);
+                let func_node = func_ref.node(&parsed);
+                matches!(func_node.inferred_type(&def_model), Some(ty) if ty.is_property_instance())
+            } else {
+                false
+            }
+        })
+    }
+
     fn classify_parameter(
         &self,
         _param: &ast::Parameter,
@@ -896,7 +919,13 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
 
                 // Then add token for the attribute name (e.g., 'path' in 'os.path')
                 let ty = expr.inferred_type(self.model).unwrap_or(Type::unknown());
-                let (token_type, modifiers) = self.classify_from_type_for_attribute(ty, &attr.attr);
+                let (token_type, modifiers) = if !ty.is_property_instance()
+                    && self.is_property_from_definition(attr)
+                {
+                    (SemanticTokenType::Property, SemanticTokenModifier::empty())
+                } else {
+                    self.classify_from_type_for_attribute(ty, &attr.attr)
+                };
                 self.add_token(&attr.attr, token_type, modifiers);
             }
             ast::Expr::NumberLiteral(_) => {
@@ -1899,7 +1928,7 @@ t = MyClass.prop          # prop should be property on the class itself
         "CONSTANT" @ 413..421: Variable [readonly]
         "w" @ 483..484: Variable [definition]
         "obj" @ 487..490: Variable
-        "prop" @ 491..495: Variable
+        "prop" @ 491..495: Property
         "v" @ 534..535: Variable [definition]
         "MyClass" @ 538..545: Class
         "method" @ 546..552: Method
@@ -1909,6 +1938,41 @@ t = MyClass.prop          # prop should be property on the class itself
         "t" @ 651..652: Variable [definition]
         "MyClass" @ 655..662: Class
         "prop" @ 663..667: Property
+        "#);
+    }
+
+    #[test]
+    fn property_with_return_annotation() {
+        let test = SemanticTokenTest::new(
+            "
+class Foo:
+    @property
+    def prop(self) -> int:
+        return 4
+
+foo = Foo()
+w = foo.prop
+x = Foo.prop
+",
+        );
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "Foo" @ 7..10: Class [definition]
+        "property" @ 17..25: Decorator
+        "prop" @ 34..38: Method [definition]
+        "self" @ 39..43: SelfParameter [definition]
+        "int" @ 48..51: Class
+        "4" @ 68..69: Number
+        "foo" @ 71..74: Variable [definition]
+        "Foo" @ 77..80: Class
+        "w" @ 83..84: Variable [definition]
+        "foo" @ 87..90: Variable
+        "prop" @ 91..95: Property
+        "x" @ 96..97: Variable [definition]
+        "Foo" @ 100..103: Class
+        "prop" @ 104..108: Property
         "#);
     }
 
@@ -2024,7 +2088,7 @@ x = foobar_cls.prop                              # prop should be property
         "CONSTANT" @ 470..478: Variable [readonly]
         "w" @ 561..562: Variable [definition]
         "foobar" @ 565..571: Variable
-        "prop" @ 572..576: Variable
+        "prop" @ 572..576: Property
         "foobar_cls" @ 636..646: Variable [definition]
         "Foo" @ 649..652: Class
         "random" @ 656..662: Variable
@@ -2112,7 +2176,7 @@ q = Baz.prop        # prop should be property on the class as well
         "CONSTANT" @ 502..510: Variable [readonly]
         "r" @ 558..559: Variable [definition]
         "baz" @ 562..565: Variable
-        "prop" @ 566..570: Variable
+        "prop" @ 566..570: Property
         "q" @ 604..605: Variable [definition]
         "Baz" @ 608..611: Class
         "prop" @ 612..616: Property
@@ -2194,10 +2258,10 @@ q = Baz.prop
         "CONSTANT" @ 416..424: Variable [readonly]
         "r" @ 425..426: Variable [definition]
         "baz" @ 429..432: Variable
-        "prop" @ 433..437: Variable
+        "prop" @ 433..437: Property
         "q" @ 438..439: Variable [definition]
         "Baz" @ 442..445: Class
-        "prop" @ 446..450: Variable
+        "prop" @ 446..450: Property
         "#);
     }
 
@@ -3050,10 +3114,10 @@ class BoundedContainer[T: int, U = str]:
         "wrapper" @ 339..346: Function [definition]
         "args" @ 348..352: Parameter [definition]
         "P" @ 354..355: Variable
-        "args" @ 356..360: Variable
+        "args" @ 356..360: Property
         "kwargs" @ 364..370: Parameter [definition]
         "P" @ 372..373: Variable
-        "kwargs" @ 374..380: Variable
+        "kwargs" @ 374..380: Property
         "str" @ 385..388: Class
         "str" @ 405..408: Class
         "func" @ 409..413: Parameter
