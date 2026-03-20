@@ -487,3 +487,26 @@ def i[T: (int, str)](x: T) -> T:
 
     return x
 ```
+
+In this example, no `invalid-return-type` is emitted, despite the fact there is no `else` clause.
+Note that this example deliberately also does *not* have any `assert_never` or `assert_type` calls,
+since these call expressions can create their own `IsNonTerminalCall` predicates in our reachability
+infrastructure!
+
+```py
+class A: ...
+class B: ...
+
+def f[T: A | B](x: T) -> bool:
+    if isinstance(x, A):
+        return True
+    elif isinstance(x, B):
+        return False
+
+def g[T: A | B](x: T) -> bool:
+    match x:
+        case A():
+            return True
+        case B():
+            return False
+```

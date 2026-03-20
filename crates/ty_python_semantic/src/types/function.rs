@@ -87,10 +87,10 @@ use crate::types::signatures::{CallableSignature, Signature};
 use crate::types::visitor::any_over_type;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundMethodType, BoundTypeVarInstance, CallableType, ClassBase,
-    ClassLiteral, ClassType, DynamicType, FindLegacyTypeVarsVisitor, KnownClass, KnownInstanceType,
-    SpecialFormType, SubclassOfInner, SubclassOfType, Truthiness, Type, TypeContext, TypeMapping,
-    TypeVarBoundOrConstraints, UnionBuilder, UnionType, binding_type, definition_expression_type,
-    infer_definition_types, walk_signature,
+    ClassLiteral, ClassType, DynamicType, FindLegacyTypeVarsVisitor, IntersectionBuilder,
+    KnownClass, KnownInstanceType, SpecialFormType, SubclassOfInner, SubclassOfType, Truthiness,
+    Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints, UnionBuilder, UnionType,
+    binding_type, definition_expression_type, infer_definition_types, walk_signature,
 };
 use crate::{Db, FxOrderSet};
 
@@ -1467,12 +1467,45 @@ fn is_instance_truthiness<'db>(
             // have been simplified to `A` anyway
             Truthiness::Ambiguous
         }
-        Type::Intersection(intersection) => always_true_if(
-            intersection
-                .positive(db)
-                .iter()
-                .any(|element| is_instance_truthiness(db, *element, class).is_always_true()),
-        ),
+
+        // Create a new intersection that maps type variables to their upper bounds,
+        // and evaluate the truthiness of the `isinstance()` check with that type.
+        // Along the way, short-circuit to `AlwaysTrue` if we find any positive element
+        // that is always true.
+        Type::Intersection(intersection) => {
+            let mut effective = IntersectionBuilder::new(db);
+            let mut found_positive_tvars = false;
+
+            for &positive in intersection.positive(db) {
+                if is_instance_truthiness(db, positive, class).is_always_true() {
+                    return Truthiness::AlwaysTrue;
+                } else if let Type::TypeVar(tvar) = positive
+                    && let Some(TypeVarBoundOrConstraints::UpperBound(bound)) =
+                        tvar.typevar(db).bound_or_constraints(db)
+                {
+                    effective = effective.add_positive(bound);
+                    found_positive_tvars = true;
+                } else {
+                    effective = effective.add_positive(positive);
+                }
+            }
+
+            if !found_positive_tvars {
+                return Truthiness::Ambiguous;
+            }
+
+            for &negative in intersection.negative(db) {
+                effective = effective.add_negative(negative);
+            }
+
+            let effective = effective.build();
+
+            if effective == ty {
+                Truthiness::Ambiguous
+            } else {
+                is_instance_truthiness(db, effective, class)
+            }
+        }
 
         Type::NominalInstance(..) => always_true_if(is_instance(&ty)),
 
