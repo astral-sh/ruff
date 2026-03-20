@@ -2866,7 +2866,9 @@ impl<'a> Checker<'a> {
 
         self.semantic.resolve_del(id, expr.range());
 
-        if helpers::on_conditional_branch(&mut self.semantic.current_statements()) {
+        if helpers::on_conditional_branch(&mut self.semantic.current_statements())
+            || self.semantic.in_exception_handler()
+        {
             return;
         }
 
