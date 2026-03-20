@@ -8011,7 +8011,9 @@ def no_type_check_decorator():
                 c.name == "no_type_check_decorator"
                     && c.module_name.map(ModuleName::as_str) == Some("thirdparty")
             })
-            .expect("expected non-deprecated `no_type_check_decorator` completion from `thirdparty`");
+            .expect(
+                "expected non-deprecated `no_type_check_decorator` completion from `thirdparty`",
+            );
         let typing_idx = test
             .completions()
             .iter()
