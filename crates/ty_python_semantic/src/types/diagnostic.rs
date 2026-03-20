@@ -78,6 +78,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&ISINSTANCE_AGAINST_TYPED_DICT);
     registry.register_lint(&INVALID_ARGUMENT_TYPE);
     registry.register_lint(&INVALID_RETURN_TYPE);
+    registry.register_lint(&INVALID_YIELD);
     registry.register_lint(&INVALID_ASSIGNMENT);
     registry.register_lint(&INVALID_AWAIT);
     registry.register_lint(&INVALID_BASE);
@@ -936,6 +937,31 @@ declare_lint! {
     pub(crate) static INVALID_RETURN_TYPE = {
         summary: "detects returned values that can't be assigned to the function's annotated return type",
         status: LintStatus::stable("0.0.1-alpha.1"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Detects `yield` and `yield from` expressions where the "yield" or "send" type
+    /// is incompatible with the generator function's annotated return type.
+    ///
+    /// ## Why is this bad?
+    /// Yielding a value of a type that doesn't match the generator's declared yield type,
+    /// or using `yield from` with a sub-iterator whose yield or send type is incompatible,
+    /// is a type error that may cause downstream consumers of the generator to receive
+    /// values of an unexpected type.
+    ///
+    /// ## Examples
+    /// ```python
+    /// from typing import Iterator
+    ///
+    /// def gen() -> Iterator[int]:
+    ///     yield "not an int"  # error: [invalid-yield]
+    /// ```
+    pub(crate) static INVALID_YIELD = {
+        summary: "detects yield expressions where the \"yield\" or \"send\" type is incompatible with the annotated return type",
+        status: LintStatus::stable("0.0.25"),
         default_level: Level::Error,
     }
 }
@@ -3762,6 +3788,61 @@ pub(super) fn report_invalid_generator_function_return_type(
         "Function is inferred as returning `{inferred_ty}` because it is {description}"
     ));
     diag.info(format_args!("See {link} for more details"));
+}
+
+#[derive(Copy, Clone)]
+pub(super) enum GeneratorMismatchKind {
+    YieldType,
+    SendType,
+}
+
+pub(super) fn report_invalid_generator_yield_type(
+    context: &InferContext,
+    object_range: impl Ranged,
+    return_type_span: Option<Span>,
+    expected_ty: Type,
+    actual_ty: Type,
+    kind: GeneratorMismatchKind,
+) {
+    let Some(builder) = context.report_lint(&INVALID_YIELD, object_range) else {
+        return;
+    };
+
+    let settings =
+        DisplaySettings::from_possibly_ambiguous_types(context.db(), [expected_ty, actual_ty]);
+    let expected_ty = expected_ty.display_with(context.db(), settings.clone());
+    let actual_ty = actual_ty.display_with(context.db(), settings);
+
+    let (kind_name, title, concise) = match kind {
+        GeneratorMismatchKind::YieldType => (
+            "yield",
+            "Yield expression type does not match annotation",
+            format!("Yield type `{actual_ty}` does not match annotated yield type `{expected_ty}`"),
+        ),
+        GeneratorMismatchKind::SendType => (
+            "send",
+            "Send type does not match annotation",
+            format!("Send type `{actual_ty}` does not match annotated send type `{expected_ty}`"),
+        ),
+    };
+
+    let mut diag = builder.into_diagnostic(title);
+    diag.set_concise_message(concise);
+    let primary = match kind {
+        GeneratorMismatchKind::YieldType => {
+            format!("expression of type `{actual_ty}`, expected `{expected_ty}`")
+        }
+        GeneratorMismatchKind::SendType => {
+            format!("generator with send type `{actual_ty}`, expected `{expected_ty}`")
+        }
+    };
+    diag.set_primary_message(primary);
+
+    if let Some(return_type_span) = return_type_span {
+        diag.annotate(Annotation::secondary(return_type_span).message(format!(
+            "Function annotated with {kind_name} type `{expected_ty}` here"
+        )));
+    }
 }
 
 pub(super) fn report_implicit_return_type(
