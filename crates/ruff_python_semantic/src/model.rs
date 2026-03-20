@@ -2033,6 +2033,11 @@ impl<'a> SemanticModel<'a> {
         self.flags.intersects(SemanticModelFlags::EXCEPTION_HANDLER)
     }
 
+    /// Return `true` if the model is in an exception handler.
+    pub const fn in_orelse(&self) -> bool {
+        self.flags.intersects(SemanticModelFlags::ORELSE)
+    }
+
     /// Return `true` if the model is in an `assert` statement.
     pub const fn in_assert_statement(&self) -> bool {
         self.flags.intersects(SemanticModelFlags::ASSERT_STATEMENT)
@@ -2699,6 +2704,19 @@ bitflags! {
         /// t'{x}'
         /// ```
         const T_STRING = 1 << 29;
+
+        /// The model is in the body of an `else` clause.
+        ///
+        /// For example, the model could be visiting `x` in:
+        /// ```python
+        /// try:
+        ///     ...
+        /// except Exception:
+        ///     ...
+        /// else:
+        ///     print(x)
+        /// ```
+        const ORELSE = 1 << 30;
 
 
         /// The context is in any type annotation.
