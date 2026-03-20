@@ -7201,13 +7201,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                     Type::Never => {
                         // In unreachable sections of code, we infer `Never` for symbols that were
-                        // define outside the unreachable part. We still want to emit revealed-type
+                        // defined outside the unreachable part. We still want to emit revealed-type
                         // diagnostics in these sections, so check on the name of the callable here
                         // and assume that it's actually `typing.reveal_type`.
-                        if let ast::Expr::Name(name) = func.as_ref()
-                            && name.id == "reveal_type"
-                            && let Some(first_arg) = arguments.args.first()
-                        {
+                        let is_reveal_type = match func.as_ref() {
+                            ast::Expr::Name(name) => name.id == "reveal_type",
+                            ast::Expr::Attribute(attr) => attr.attr.id == "reveal_type",
+                            _ => false,
+                        };
+                        if is_reveal_type && let Some(first_arg) = arguments.args.first() {
                             let revealed_ty = self.expression_type(first_arg);
                             report_revealed_type(&self.context, revealed_ty, first_arg);
                         }

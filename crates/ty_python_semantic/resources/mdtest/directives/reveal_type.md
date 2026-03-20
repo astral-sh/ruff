@@ -11,6 +11,14 @@ from typing_extensions import reveal_type
 reveal_type(1)  # revealed: Literal[1]
 ```
 
+This also works with the fully qualified name:
+
+```py
+import typing_extensions
+
+typing_extensions.reveal_type(1)  # revealed: Literal[1]
+```
+
 The return type of `reveal_type` is the type of the argument:
 
 ```py
@@ -38,12 +46,15 @@ Make sure that `reveal_type` works even in unreachable code.
 
 ```py
 from typing_extensions import reveal_type
+import typing_extensions
 
 if False:
     reveal_type(1)  # revealed: Literal[1]
+    typing_extensions.reveal_type(1)  # revealed: Literal[1]
 
 if 1 + 1 != 2:
     reveal_type(1)  # revealed: Literal[1]
+    typing_extensions.reveal_type(1)  # revealed: Literal[1]
 ```
 
 ### Without importing it
