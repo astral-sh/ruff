@@ -1790,6 +1790,13 @@
             "type": "string"
           }
         },
+        "force-alphabetical-sort": {
+          "description": "Sort all imports as a single alphabetical block, ignoring sections and\nimport style. Sets [`force-single-line`](#lint_isort_force-single-line),\n[`force-sort-within-sections`](#lint_isort_force-sort-within-sections),\n[`no-sections`](#lint_isort_no-sections) to `true` and\n[`order-by-type`](#lint_isort_order-by-type) to `false`.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
         "force-single-line": {
           "description": "Forces all from imports to appear on their own line.",
           "type": [

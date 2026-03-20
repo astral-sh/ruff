@@ -1,0 +1,30 @@
+---
+source: crates/ruff_linter/src/rules/isort/mod.rs
+---
+I001 [*] Import block is un-sorted or un-formatted
+ --> force_alphabetical_sort.py:1:1
+  |
+1 | / import sys
+2 | | from collections import OrderedDict
+3 | | import os
+4 | | from os import path
+5 | | import abc
+6 | | from datetime import datetime
+7 | | import json
+8 | | from itertools import chain
+  | |___________________________^
+  |
+help: Organize imports
+  - import sys
+1 + import abc
+2 | from collections import OrderedDict
+3 + from datetime import datetime
+4 + from itertools import chain
+5 + import json
+6 | import os
+7 | from os import path
+  - import abc
+  - from datetime import datetime
+  - import json
+  - from itertools import chain
+8 + import sys
