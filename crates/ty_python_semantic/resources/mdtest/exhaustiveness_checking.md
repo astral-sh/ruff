@@ -487,3 +487,92 @@ def i[T: (int, str)](x: T) -> T:
 
     return x
 ```
+
+In this example, no `invalid-return-type` is emitted, despite the fact there is no `else` clause.
+Note that this example deliberately also does *not* have any `assert_never` or `assert_type` calls,
+since these call expressions can create their own `IsNonTerminalCall` predicates in our reachability
+infrastructure!
+
+```py
+class A: ...
+class B: ...
+
+def j[T: A | B](x: T) -> bool:
+    if isinstance(x, A):
+        return True
+    elif isinstance(x, B):
+        return False
+
+def k[T: (A, B)](x: T) -> bool:
+    if isinstance(x, A):
+        return True
+    elif isinstance(x, B):
+        return False
+
+def l[T](x: T) -> bool:
+    if isinstance(x, int):
+        return True
+    elif not isinstance(x, int):
+        return False
+
+def m[T: A | B](x: T) -> bool:
+    match x:
+        case A():
+            return True
+        case B():
+            return False
+
+def n[T: (A, B)](x: T) -> bool:
+    match x:
+        case A():
+            return True
+        case B():
+            return False
+```
+
+## Exhaustiveness checking for `NewType`s of `float` and `complex`
+
+```py
+from typing_extensions import NewType, assert_never
+
+FloatN = NewType("FloatN", float)
+ComplexN = NewType("ComplexN", complex)
+
+def f(x: FloatN) -> bool:
+    if isinstance(x, int):
+        return True
+    elif isinstance(x, float):
+        return False
+    else:
+        assert_never(x)
+
+def g(x: ComplexN) -> bool:
+    if isinstance(x, int):
+        return True
+    elif isinstance(x, float):
+        return True
+    elif isinstance(x, complex):
+        return False
+    else:
+        assert_never(x)
+
+# the same version of the above tests, but isolated
+# from the fact that `assert_never` creates its own
+# reachability constraint:
+
+# no `invalid-return-type` diagnostic
+def h(x: FloatN) -> bool:
+    if isinstance(x, int):
+        return True
+    elif isinstance(x, float):
+        return False
+
+# no `invalid-return-type` diagnostic
+def i(x: ComplexN) -> bool:
+    if isinstance(x, int):
+        return True
+    elif isinstance(x, float):
+        return True
+    elif isinstance(x, complex):
+        return False
+```
