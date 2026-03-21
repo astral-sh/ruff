@@ -49,6 +49,17 @@ Methods that are available on `dict`s are also available on `TypedDict`s:
 
 ```py
 bob.update(age=26)
+bob.update({"age": 27})
+
+# error: [invalid-argument-type]
+bob.update(age="bad")
+
+# error: [no-matching-overload]
+bob.update(other=1)
+
+# error: [invalid-argument-type]
+# error: [invalid-argument-type]
+bob.update({"age": "bad"})
 ```
 
 PEP 584-style immutable updates preserve the `TypedDict` type when the other operand is compatible:

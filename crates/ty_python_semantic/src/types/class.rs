@@ -2004,6 +2004,51 @@ impl<'db> VarianceInferable<'db> for ClassLiteral<'db> {
     }
 }
 
+pub(super) fn synthesize_typed_dict_update_member<'db, I>(
+    db: &'db dyn Db,
+    instance_ty: Type<'db>,
+    fields: I,
+) -> Type<'db>
+where
+    I: IntoIterator<Item = (Name, Type<'db>)>,
+{
+    let partial_ty = if let Type::TypedDict(typed_dict) = instance_ty {
+        Type::TypedDict(typed_dict.to_partial(db))
+    } else {
+        instance_ty
+    };
+
+    let positional_update = Signature::new(
+        Parameters::new(
+            db,
+            [
+                Parameter::positional_only(Some(Name::new_static("self")))
+                    .with_annotated_type(instance_ty),
+                Parameter::positional_only(Some(Name::new_static("value")))
+                    .with_annotated_type(partial_ty),
+            ],
+        ),
+        Type::none(db),
+    );
+
+    let keyword_parameters = std::iter::once(
+        Parameter::positional_only(Some(Name::new_static("self"))).with_annotated_type(instance_ty),
+    )
+    .chain(fields.into_iter().map(|(field_name, field_ty)| {
+        Parameter::keyword_only(field_name)
+            .with_annotated_type(field_ty)
+            .with_default_type(field_ty)
+    }));
+
+    let keyword_update = Signature::new(Parameters::new(db, keyword_parameters), Type::none(db));
+
+    Type::Callable(CallableType::new(
+        db,
+        CallableSignature::from_overloads([positional_update, keyword_update]),
+        CallableTypeKind::FunctionLike,
+    ))
+}
+
 /// Performs member lookups over an MRO (Method Resolution Order).
 ///
 /// This struct encapsulates the shared logic for looking up class and instance

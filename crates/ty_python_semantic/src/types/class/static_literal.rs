@@ -37,6 +37,7 @@ use crate::{
             ClassMemberResult, CodeGeneratorKind, DisjointBase, Field, FieldKind,
             InstanceMemberResult, MetaclassError, MetaclassErrorKind, MethodDecorator, MroLookup,
             NamedTupleField, SlotsKind, synthesize_namedtuple_class_member,
+            synthesize_typed_dict_update_member,
         },
         context::InferContext,
         declaration_type, definition_expression_type, determine_upper_bound,
@@ -1976,23 +1977,13 @@ impl<'db> StaticClassLiteral<'db> {
                     CallableTypeKind::FunctionLike,
                 )))
             }
-            (CodeGeneratorKind::TypedDict, "update") => {
-                // TODO: synthesize a set of overloads with precise types
-                let signature = Signature::new(
-                    Parameters::new(
-                        db,
-                        [
-                            Parameter::positional_only(Some(Name::new_static("self")))
-                                .with_annotated_type(instance_ty),
-                            Parameter::variadic(Name::new_static("args")),
-                            Parameter::keyword_variadic(Name::new_static("kwargs")),
-                        ],
-                    ),
-                    Type::none(db),
-                );
-
-                Some(Type::function_like_callable(db, signature))
-            }
+            (CodeGeneratorKind::TypedDict, "update") => Some(synthesize_typed_dict_update_member(
+                db,
+                instance_ty,
+                self.fields(db, specialization, field_policy)
+                    .iter()
+                    .map(|(name, field)| (name.clone(), field.declared_ty)),
+            )),
             _ => None,
         }
     }
