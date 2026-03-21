@@ -501,7 +501,7 @@ impl<'db> SemanticTokenVisitor<'db> {
                     // Module accessed as an attribute (e.g., from os import path)
                     token_type.add(SemanticTokenType::Namespace);
                 }
-                ty if ty.is_property_instance() => {
+                Type::PropertyInstance(_) => {
                     token_type.add(SemanticTokenType::Property);
                 }
                 _ => {
@@ -919,9 +919,7 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
 
                 // Then add token for the attribute name (e.g., 'path' in 'os.path')
                 let ty = expr.inferred_type(self.model).unwrap_or(Type::unknown());
-                let (token_type, modifiers) = if !ty.is_property_instance()
-                    && self.is_property_from_definition(attr)
-                {
+                let (token_type, modifiers) = if self.is_property_from_definition(attr) {
                     (SemanticTokenType::Property, SemanticTokenModifier::empty())
                 } else {
                     self.classify_from_type_for_attribute(ty, &attr.attr)
