@@ -650,10 +650,19 @@ behavior. Full test suite (513 tests) passes. jpk passes.
       (`!replacement.is_type_var()`).
     - This restores scipy to ~6.2s via `eco` and ~0.59s for `test_polyint.py`.
     - `cargo nextest run -p ty_python_semantic` passes with this change.
-    - But this is likely too aggressive: it drops valid implications such as
+    - But this is too aggressive: it drops valid implications such as
       `(B ≤ S) ∧ (U ≤ Covariant[B]) -> (U ≤ Covariant[S])`.
-      A temporary mdtest confirmed that implication fails under this filter.
-      So this is useful as a diagnostic, not a final fix.
+
+    Implemented mitigation:
+
+    - Keep bare-typevar replacement support, but skip the pathological
+      typevar→typevar replacement shape in compound bounds:
+        - upper bounds: skip when constrained upper bound is a union
+        - lower bounds (dual): skip when constrained lower bound is an intersection
+    - Also add a fast-path in the recursion guard for bare typevars so we avoid
+      tracked `variance_of` calls in that case.
+    - This keeps the new regression mdtests for bare typevar replacement green,
+      and restores scipy performance (`eco scipy` ~5.74s instead of timeout).
 
 1. **Multiple typevar occurrences**: A single bound like `dict[T, T]` mentions
     `T` twice. The `variance_of` implementation already handles this by joining

@@ -4608,6 +4608,21 @@ impl SequentMap {
                 let constrained_data = builder.constraint_data(constrained_constraint);
                 let constrained_typevar = constrained_data.typevar;
 
+                // If the replacement contains the bound typevar itself (e.g., the bound
+                // constraint is `_V ≤ G[_V]`), or the constrained typevar (e.g., the bound
+                // constraint is `_T ≤ G[_V]` and we're about to substitute into `_V ≤ G[_T]`),
+                // substituting would create a deeper nesting of the same recursive pattern
+                // that triggers the same substitution again ad infinitum. Skip in both cases.
+                //
+                // Fast-path bare typevar replacements (`Type::TypeVar`) using equality checks
+                // instead of calling `variance_of` on them. This avoids a large number of tiny
+                // tracked `variance_of` queries in hot paths.
+                let replacement_mentions_bound_or_constrained = |replacement: Type<'db>| {
+                    replacement.variance_of(db, bound_typevar) != TypeVarVariance::Bivariant
+                        || replacement.variance_of(db, constrained_typevar)
+                            != TypeVarVariance::Bivariant
+                };
+
                 // Check the upper bound of the constrained constraint for nested occurrences of
                 // the bound typevar. We use `variance_of` as our combined presence + variance
                 // check: `Bivariant` means the typevar doesn't appear in the type (or is genuinely
@@ -4641,15 +4656,15 @@ impl SequentMap {
                     }
                     _ => None,
                 };
-                // If the replacement contains the bound typevar itself (e.g., the bound
-                // constraint is `_V ≤ G[_V]`), or the constrained typevar (e.g., the bound
-                // constraint is `_T ≤ G[_V]` and we're about to substitute into `_V ≤ G[_T]`),
-                // substituting would create a deeper nesting of the same recursive pattern
-                // that triggers the same substitution again ad infinitum. Skip in both cases.
                 let upper_replacement = upper_replacement.filter(|replacement| {
-                    replacement.variance_of(db, bound_typevar) == TypeVarVariance::Bivariant
-                        && replacement.variance_of(db, constrained_typevar)
-                            == TypeVarVariance::Bivariant
+                    // Substituting one typevar for another into large unions can generate many
+                    // very-weak derived constraints and cause severe performance regressions.
+                    // Keep the common/non-union case enabled; skip union upper bounds for this
+                    // specific typevar-to-typevar replacement shape.
+                    if replacement.is_type_var() && constrained_data.upper.is_union() {
+                        return false;
+                    }
+                    !replacement_mentions_bound_or_constrained(*replacement)
                 });
                 if let Some(replacement) = upper_replacement {
                     let new_upper = constrained_data.upper.substitute_one_typevar(
@@ -4698,11 +4713,15 @@ impl SequentMap {
                     }
                     _ => None,
                 };
-                // Same recursive-type guard as above for the upper bound case.
                 let lower_replacement = lower_replacement.filter(|replacement| {
-                    replacement.variance_of(db, bound_typevar) == TypeVarVariance::Bivariant
-                        && replacement.variance_of(db, constrained_typevar)
-                            == TypeVarVariance::Bivariant
+                    // Substituting one typevar for another into large intersections can generate
+                    // many very-weak derived constraints and cause severe performance regressions.
+                    // Keep the common/non-intersection case enabled; skip intersection lower
+                    // bounds for this specific typevar-to-typevar replacement shape.
+                    if replacement.is_type_var() && constrained_data.lower.is_intersection() {
+                        return false;
+                    }
+                    !replacement_mentions_bound_or_constrained(*replacement)
                 });
                 if let Some(replacement) = lower_replacement {
                     let new_lower = constrained_data.lower.substitute_one_typevar(
