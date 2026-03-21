@@ -33,7 +33,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/function/return_type.md
 18 | 
 19 | async def j() -> typing.AsyncGenerator:
 20 |     yield 42
-21 |     return 2 # error: [invalid-syntax] "`return` with value in async generator"
+21 |     return 2  # error: [invalid-syntax] "`return` with value in async generator"
 ```
 
 # Diagnostics
@@ -60,7 +60,7 @@ error[invalid-syntax]: `return` with value in async generator
    |
 19 | async def j() -> typing.AsyncGenerator:
 20 |     yield 42
-21 |     return 2 # error: [invalid-syntax] "`return` with value in async generator"
+21 |     return 2  # error: [invalid-syntax] "`return` with value in async generator"
    |     ^^^^^^^^
    |
 

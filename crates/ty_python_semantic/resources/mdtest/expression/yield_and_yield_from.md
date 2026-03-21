@@ -170,6 +170,7 @@ async def async_iterator_send_none() -> AsyncIterator[int]:
 
 def iterator_yield_from() -> Generator[int, None, int]:
     yield from iterator_send_none()
+    return 1
 ```
 
 ## Error cases
@@ -214,14 +215,14 @@ def sync_returns_async_generator() -> AsyncGenerator[int, str]:  # error: [inval
 ```py
 from typing import Generator
 
-# TODO: should emit an error (does not return `str`)
+# error: [invalid-return-type]
 def invalid_generator1() -> Generator[int, None, str]:
     yield 1
 
-# TODO: should emit an error (does not return `int`)
 def invalid_generator2() -> Generator[int, None, None]:
     yield 1
 
+    # error: [invalid-return-type]
     return "done"
 ```
 
