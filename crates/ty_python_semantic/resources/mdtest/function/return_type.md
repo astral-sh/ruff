@@ -534,7 +534,8 @@ def invalid_return_type() -> typing.Generator[None, None, None]:
     return ""  # error: [invalid-return-type]
 ```
 
-When a function is annotated the return type must match the return type:
+The return value of the function must be assignable to the return type of the `Generator`. This is
+specified in the third type parameter.
 
 ```py
 def wrong_return() -> typing.Generator[int, int, int]:
@@ -542,13 +543,11 @@ def wrong_return() -> typing.Generator[int, int, int]:
     return ""  # error: [invalid-return-type]
 ```
 
-Also bare returns are checked the function is assumed to return nothing and it's type checked
-againts the declarated return type.
+If the function has no return and it's implicitly returning it is still type checked.
 
 ```py
 def bare_return_ok() -> typing.Generator[int, int, None]:
     yield 1
-    return
 
 def missing_return() -> typing.Generator[int, int, int]:  # error: [invalid-return-type]
     yield 1

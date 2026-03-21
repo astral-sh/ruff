@@ -42,10 +42,9 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/function/return_type.md
 27 |     return ""  # error: [invalid-return-type]
 28 | def bare_return_ok() -> typing.Generator[int, int, None]:
 29 |     yield 1
-30 |     return
-31 | 
-32 | def missing_return() -> typing.Generator[int, int, int]:  # error: [invalid-return-type]
-33 |     yield 1
+30 | 
+31 | def missing_return() -> typing.Generator[int, int, int]:  # error: [invalid-return-type]
+32 |     yield 1
 ```
 
 # Diagnostics
@@ -104,13 +103,13 @@ info: rule `invalid-return-type` is enabled by default
 
 ```
 error[invalid-return-type]: Function always implicitly returns `None`, which is not assignable to return type `int`
-  --> src/mdtest_snippet.py:32:25
+  --> src/mdtest_snippet.py:31:25
    |
-30 |     return
-31 |
-32 | def missing_return() -> typing.Generator[int, int, int]:  # error: [invalid-return-type]
+29 |     yield 1
+30 |
+31 | def missing_return() -> typing.Generator[int, int, int]:  # error: [invalid-return-type]
    |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-33 |     yield 1
+32 |     yield 1
    |
 info: Consider changing the return annotation to `-> None` or adding a `return` statement
 info: rule `invalid-return-type` is enabled by default
