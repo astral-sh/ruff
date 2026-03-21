@@ -177,18 +177,13 @@ impl<'db> ConstructorBinding<'db> {
         // Deferred downstream constructor bindings stay out-of-band for conditional validation.
         // If all matched overloads are instance-returning, include inferred specializations from
         // those deferred bindings as well.
-        if let Some(downstream) = self.downstream_constructor()
-            && let Some(constructor_class_literal) = self.constructed_class_literal(db)
-            && self.callable().matching_overloads().all(|(_, overload)| {
-                overload_returns_instance(db, constructor_class_literal, overload)
-            })
-        {
-            for init_binding in downstream
+        if let Some(downstream) = self.checkable_downstream_constructor(db) {
+            for downstream_binding in downstream
                 .bindings
                 .iter_callable_items()
                 .filter_map(CallableItem::as_constructor)
             {
-                combine_binding_specialization(init_binding);
+                combine_binding_specialization(downstream_binding);
             }
         }
 
