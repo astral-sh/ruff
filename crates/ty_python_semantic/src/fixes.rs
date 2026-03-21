@@ -1,4 +1,4 @@
-use crate::{is_unused_ignore_comment_lint, suppress_all};
+use crate::{SuppressFix, is_unused_ignore_comment_lint, suppress_all};
 use ruff_db::cancellation::{Canceled, CancellationToken};
 use ruff_db::diagnostic::{DisplayDiagnosticConfig, DisplayDiagnostics};
 use ruff_db::parsed::parsed_module;
@@ -18,13 +18,13 @@ use thiserror::Error;
 
 use crate::Db;
 
-pub struct SuppressAllResult {
-    /// The non-lint diagnostics that can't be suppressed or the diagnostics of files
-    /// that couldn't be suppressed (because ty failed to write the result back to disk,
-    /// or the file contains syntax errors).
+pub struct FixAllResults {
+    /// The non-lint diagnostics that can't be fixed or the diagnostics of files
+    /// that couldn't be fixed because ty failed to write the result back to disk,
+    /// or the file contains a syntax errors after fixing.
     pub diagnostics: Vec<Diagnostic>,
 
-    /// The number of diagnostics that were suppressed.
+    /// The number of diagnostics that were fixed across all files.
     pub count: usize,
 }
 
@@ -36,29 +36,45 @@ pub struct SuppressAllResult {
 /// If the `db`'s system isn't [writable](WritableSystem).
 pub fn suppress_all_diagnostics(
     db: &mut dyn Db,
+    diagnostics: Vec<Diagnostic>,
+    cancellation_token: &CancellationToken,
+) -> Result<FixAllResults, Canceled> {
+    fix_all(db, diagnostics, cancellation_token, FixMode::Suppress)
+}
+
+/// Applies the safe fixes for all diagnostics and writes the changed files back to disk.
+///
+/// Returns how many diagnostics were fixed along the remaining, non-fixed diagnostics.
+///
+/// ## Panics
+/// If the `db`'s system isn't [writable](WritableSystem).
+pub fn fix_all_diagnostics(
+    db: &mut dyn Db,
+    diagnostics: Vec<Diagnostic>,
+    cancellation_token: &CancellationToken,
+) -> Result<FixAllResults, Canceled> {
+    fix_all(db, diagnostics, cancellation_token, FixMode::ApplyFixes)
+}
+
+fn fix_all(
+    db: &mut dyn Db,
     mut diagnostics: Vec<Diagnostic>,
     cancellation_token: &CancellationToken,
-) -> Result<SuppressAllResult, Canceled> {
+    fix_mode: FixMode,
+) -> Result<FixAllResults, Canceled> {
     let system = WritableSystem::dyn_clone(
         db.system()
             .as_writable()
             .expect("System should be writable"),
     );
 
-    let has_fixable = diagnostics.iter().any(|diagnostic| {
-        diagnostic
-            .primary_span()
-            .and_then(|span| span.range())
-            .is_some()
-            && diagnostic
-                .id()
-                .as_lint()
-                .is_some_and(|name| !is_unused_ignore_comment_lint(name))
-    });
+    let has_fixable = diagnostics
+        .iter()
+        .any(|diagnostic| fix_mode.is_fixable(diagnostic));
 
     // Early return if there are no diagnostics that can be suppressed to avoid all the heavy work below.
     if !has_fixable {
-        return Ok(SuppressAllResult {
+        return Ok(FixAllResults {
             diagnostics,
             count: 0,
         });
@@ -101,39 +117,17 @@ pub fn suppress_all_diagnostics(
             continue;
         }
 
-        let fixable_diagnostics: Vec<_> = file_diagnostics
-            .iter()
-            .filter_map(|diagnostic| {
-                let lint_id = diagnostic.id().as_lint()?;
+        let fixes = fix_mode.fixes(db, file, file_diagnostics);
 
-                // Don't suppress unused ignore comments.
-                if is_unused_ignore_comment_lint(lint_id) {
-                    return None;
-                }
-
-                // We can't suppress diagnostics without a corresponding file or range.
-                let span = diagnostic.primary_span()?;
-                let range = span.range()?;
-
-                Some((lint_id, range))
-            })
-            .collect();
-
-        if fixable_diagnostics.is_empty() {
-            tracing::debug!(
-                "Skipping file `{path}` because it contains no suppressable diagnostics"
-            );
+        if fixes.is_empty() {
+            tracing::debug!("Skipping file `{path}` because it has no fixable diagnostics");
             continue;
         }
 
-        tracing::debug!(
-            "Suppressing {} diagnostics in `{path}`.",
-            fixable_diagnostics.len()
-        );
+        tracing::debug!("Applying {} fixes in `{path}`.", fixes.len());
 
         // Required to work around borrow checker issues.
         let path = path.to_path_buf();
-        let fixes = suppress_all(db, file, &fixable_diagnostics);
         let source = source_text(db, file);
 
         // TODO: Handle overlapping fixes when adding support for `--fix` by iterating until all fixes
@@ -142,6 +136,7 @@ pub fn suppress_all_diagnostics(
         let FixedCode {
             source: new_source,
             source_map,
+            applied_fixes,
         } = apply_fixes(&source, fixes).unwrap_or_else(|fixed| fixed);
 
         let new_source = source.with_text(new_source, &source_map);
@@ -157,9 +152,7 @@ pub fn suppress_all_diagnostics(
             let mut diag = Diagnostic::new(
                 DiagnosticId::InternalError,
                 Severity::Fatal,
-                format_args!(
-                    "Adding suppressions introduced a syntax error. Reverting all changes."
-                ),
+                format_args!("Applying fixes introduced a syntax error. Reverting all changes."),
             );
 
             let mut file_annotation = Annotation::primary(Span::from(file));
@@ -209,7 +202,7 @@ pub fn suppress_all_diagnostics(
         // If we got here then we've been successful. Re-check to get the diagnostics with the
         // update source, update the fix count.
 
-        if fixable_diagnostics.len() == file_diagnostics.len() {
+        if applied_fixes == file_diagnostics.len() {
             file_diagnostics.clear();
         } else {
             // If there are any other file level diagnostics, call `check_file` to re-compute them
@@ -217,7 +210,7 @@ pub fn suppress_all_diagnostics(
             *file_diagnostics = db.check_file(file);
         }
 
-        fixed_count += fixable_diagnostics.len();
+        fixed_count += applied_fixes;
         // Don't restore the source text or we risk a panic when rendering the diagnostics
         // if reading any of the fixed files fails (for whatever reason).
         // The override will get removed on the next `File::sync_path` call.
@@ -231,10 +224,100 @@ pub fn suppress_all_diagnostics(
             .cmp(&right.rendering_sort_key(db))
     });
 
-    Ok(SuppressAllResult {
+    Ok(FixAllResults {
         diagnostics,
         count: fixed_count,
     })
+}
+
+#[derive(Copy, Clone, Debug)]
+enum FixMode {
+    /// Adds suppression comments for every suppressable diagnostic.
+    Suppress,
+    /// Applies the diagnostic's safe fixes.
+    ApplyFixes,
+}
+
+impl FixMode {
+    fn is_fixable(self, diagnostic: &Diagnostic) -> bool {
+        let Some(primary_span) = diagnostic.primary_span() else {
+            return false;
+        };
+
+        match self {
+            FixMode::Suppress => {
+                primary_span.range().is_some()
+                    && diagnostic
+                        .id()
+                        .as_lint()
+                        .is_some_and(|name| !is_unused_ignore_comment_lint(name))
+            }
+            FixMode::ApplyFixes => {
+                diagnostic.has_applicable_fix(ruff_diagnostics::Applicability::Safe)
+            }
+        }
+    }
+
+    fn fixes(self, db: &dyn Db, file: File, file_diagnostics: &[Diagnostic]) -> Vec<ApplicableFix> {
+        match self {
+            FixMode::Suppress => {
+                let suppressable_diagnostics: Vec<_> = file_diagnostics
+                    .iter()
+                    .filter_map(|diagnostic| {
+                        let lint_id = diagnostic.id().as_lint()?;
+
+                        // Don't suppress unused ignore comments.
+                        if is_unused_ignore_comment_lint(lint_id) {
+                            return None;
+                        }
+
+                        // We can't suppress diagnostics without a corresponding file or range.
+                        let span = diagnostic.primary_span()?;
+                        let range = span.range()?;
+
+                        Some((lint_id, range))
+                    })
+                    .collect();
+
+                suppress_all(db, file, &suppressable_diagnostics)
+                    .into_iter()
+                    .map(
+                        |SuppressFix {
+                             fix,
+                             suppressed_diagnostics,
+                         }| ApplicableFix {
+                            fix,
+                            fixed_diagnostics: suppressed_diagnostics,
+                        },
+                    )
+                    .collect()
+            }
+            FixMode::ApplyFixes => file_diagnostics
+                .iter()
+                .filter(|diagnostic| {
+                    diagnostic.has_applicable_fix(ruff_diagnostics::Applicability::Safe)
+                })
+                .filter_map(|diagnostic| {
+                    diagnostic.fix().cloned().map(|fix| ApplicableFix {
+                        fix,
+                        fixed_diagnostics: 1,
+                    })
+                })
+                .collect(),
+        }
+    }
+}
+
+struct ApplicableFix {
+    fix: Fix,
+
+    /// The number of diagnostics this fix resolves.
+    ///
+    /// This is always 1 for `--fix`, but there are instances where `--add-ignore` groups
+    /// multiple suppressions into a single fix. We need to track the count here to know
+    /// how many diagnostics were fixed in the precense of overlapping fixes (which `--add-ignore` should
+    /// never generate but better be safe than sorry).
+    fixed_diagnostics: usize,
 }
 
 fn write_changes(
@@ -267,7 +350,7 @@ enum WriteChangesError {
 /// Apply a series of fixes to `File` and returns the updated source code along with the source map.
 ///
 /// Returns an error if not all fixes were applied because some fixes are overlapping.
-fn apply_fixes(source: &str, mut fixes: Vec<Fix>) -> Result<FixedCode, FixedCode> {
+fn apply_fixes(source: &str, mut fixes: Vec<ApplicableFix>) -> Result<FixedCode, FixedCode> {
     let mut output = String::with_capacity(source.len());
     let mut last_pos: Option<TextSize> = None;
     let mut has_overlapping_fixes = false;
@@ -275,9 +358,14 @@ fn apply_fixes(source: &str, mut fixes: Vec<Fix>) -> Result<FixedCode, FixedCode
 
     let mut source_map = SourceMap::default();
 
-    fixes.sort_unstable_by_key(Fix::min_start);
+    fixes.sort_unstable_by_key(|fix| fix.fix.min_start());
+    let mut applied = 0usize;
 
     for fix in fixes {
+        let ApplicableFix {
+            fix,
+            fixed_diagnostics,
+        } = fix;
         let mut edits = fix.edits().iter().peekable();
 
         // If the fix contains at least one new edit, enforce isolation and positional requirements.
@@ -298,7 +386,6 @@ fn apply_fixes(source: &str, mut fixes: Vec<Fix>) -> Result<FixedCode, FixedCode
             }
         }
 
-        let mut applied_edits = Vec::with_capacity(fix.edits().len());
         for edit in edits {
             // Add all contents from `last_pos` to `fix.location`.
             let slice = &source[TextRange::new(last_pos.unwrap_or_default(), edit.start())];
@@ -315,8 +402,9 @@ fn apply_fixes(source: &str, mut fixes: Vec<Fix>) -> Result<FixedCode, FixedCode
 
             // Track that the edit was applied.
             last_pos = Some(edit.end());
-            applied_edits.push(edit);
         }
+
+        applied += fixed_diagnostics;
     }
 
     // Add the remaining content.
@@ -326,6 +414,7 @@ fn apply_fixes(source: &str, mut fixes: Vec<Fix>) -> Result<FixedCode, FixedCode
     let fixed = FixedCode {
         source: output,
         source_map,
+        applied_fixes: applied,
     };
 
     if has_overlapping_fixes {
@@ -342,6 +431,8 @@ struct FixedCode {
 
     /// The fixed source code
     source: String,
+
+    applied_fixes: usize,
 }
 
 /// Guard that sets [`File::set_source_text_override`] and guarantees to restore the original source
@@ -405,7 +496,7 @@ mod tests {
     use ruff_db::system::SystemPath;
     use rustc_hash::FxHashMap;
 
-    use super::suppress_all_diagnostics;
+    use super::{FixAllResults, FixMode, fix_all_diagnostics, suppress_all_diagnostics};
     use crate::Db as _;
     use crate::db::tests::TestDbBuilder;
 
@@ -696,6 +787,16 @@ class B(A):
 
     #[track_caller]
     fn suppress_all_in(source: &str) -> String {
+        apply_all_in(source, FixMode::Suppress)
+    }
+
+    #[track_caller]
+    fn fix_all_in(source: &str) -> String {
+        apply_all_in(source, FixMode::ApplyFixes)
+    }
+
+    #[track_caller]
+    fn apply_all_in(source: &str, fix_mode: FixMode) -> String {
         use std::fmt::Write as _;
 
         let mut db = TestDbBuilder::new()
@@ -714,9 +815,15 @@ class B(A):
         let diagnostics = db.check_file(file);
         let total_diagnostics = diagnostics.len();
         let cancellation_token_source = CancellationTokenSource::new();
-        let fixes =
-            suppress_all_diagnostics(&mut db, diagnostics, &cancellation_token_source.token())
-                .expect("operation never gets cancelled");
+        let fixes = match fix_mode {
+            FixMode::Suppress => {
+                suppress_all_diagnostics(&mut db, diagnostics, &cancellation_token_source.token())
+            }
+            FixMode::ApplyFixes => {
+                fix_all_diagnostics(&mut db, diagnostics, &cancellation_token_source.token())
+            }
+        }
+        .expect("operation never gets cancelled");
 
         assert_eq!(fixes.count, total_diagnostics - fixes.diagnostics.len());
 
@@ -733,8 +840,8 @@ class B(A):
 
         writeln!(
             output,
-            "Added {} suppressions\n\n## Fixed source\n\n```py\n{}\n```\n",
-            fixes.count,
+            "{}\n\n## Fixed source\n\n```py\n{}\n```\n",
+            summary_line(&fixes, fix_mode),
             fixed.as_str()
         )
         .unwrap();
@@ -774,6 +881,13 @@ class B(A):
         }
 
         output
+    }
+
+    fn summary_line(results: &FixAllResults, fix_mode: FixMode) -> String {
+        match fix_mode {
+            FixMode::Suppress => format!("Added {} suppressions", results.count),
+            FixMode::ApplyFixes => format!("Applied {} fixes", results.count),
+        }
     }
 
     fn diff_diagnostics<'a>(before: &'a [Diagnostic], after: &'a [Diagnostic]) -> Vec<Diagnostic> {

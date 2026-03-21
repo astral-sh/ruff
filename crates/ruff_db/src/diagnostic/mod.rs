@@ -370,9 +370,8 @@ impl Diagnostic {
 
     /// Returns `true` if the diagnostic is [`fixable`](Diagnostic::fixable) and applies at the
     /// configured applicability level.
-    pub fn has_applicable_fix(&self, config: &DisplayDiagnosticConfig) -> bool {
-        self.fix()
-            .is_some_and(|fix| fix.applies(config.fix_applicability))
+    pub fn has_applicable_fix(&self, fix_applicability: Applicability) -> bool {
+        self.fix().is_some_and(|fix| fix.applies(fix_applicability))
     }
 
     pub fn documentation_url(&self) -> Option<&str> {

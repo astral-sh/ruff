@@ -68,8 +68,12 @@ pub(crate) struct CheckCommand {
     )]
     pub paths: Vec<SystemPathBuf>,
 
-    /// Adds `ty: ignore` comments to suppress all rule diagnostics.
+    /// Apply fixes to resolve errors..
     #[arg(long)]
+    pub(crate) fix: bool,
+
+    /// Adds `ty: ignore` comments to suppress all rule diagnostics.
+    #[arg(long, conflicts_with("fix"))]
     pub(crate) add_ignore: bool,
 
     /// Run the command within the given project directory.

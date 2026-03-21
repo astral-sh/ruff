@@ -28,7 +28,7 @@ use ty_project::metadata::settings::TerminalSettings;
 use ty_project::watch::ProjectWatcher;
 use ty_project::{CollectReporter, Db, watch};
 use ty_project::{ProjectDatabase, ProjectMetadata};
-use ty_python_semantic::suppress_all_diagnostics;
+use ty_python_semantic::{fix_all_diagnostics, suppress_all_diagnostics};
 use ty_server::run_server;
 use ty_static::EnvVars;
 
@@ -134,8 +134,10 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         .map(|path| SystemPath::absolute(path, &cwd))
         .collect();
 
-    let mode = if args.add_ignore {
-        MainLoopMode::AddIgnore
+    let mode = if args.fix {
+        MainLoopMode::Fix(FixMode::ApplyFixes)
+    } else if args.add_ignore {
+        MainLoopMode::Fix(FixMode::AddIgnore)
     } else {
         MainLoopMode::Check
     };
@@ -381,10 +383,17 @@ impl MainLoop {
                                 Ok(result)
                             }
                         }
-                        MainLoopMode::AddIgnore => {
-                            if let Ok(result) =
-                                suppress_all_diagnostics(db, result, &self.cancellation_token)
-                            {
+                        MainLoopMode::Fix(mode) => {
+                            let result = match mode {
+                                FixMode::AddIgnore => {
+                                    suppress_all_diagnostics(db, result, &self.cancellation_token)
+                                }
+                                FixMode::ApplyFixes => {
+                                    fix_all_diagnostics(db, result, &self.cancellation_token)
+                                }
+                            };
+
+                            if let Ok(result) = result {
                                 self.write_diagnostics(db, &result.diagnostics)?;
 
                                 let terminal_settings = db.project().settings(db).terminal();
@@ -509,7 +518,13 @@ impl MainLoop {
 #[derive(Copy, Clone, Debug)]
 enum MainLoopMode {
     Check,
+    Fix(FixMode),
+}
+
+#[derive(Copy, Clone, Debug)]
+enum FixMode {
     AddIgnore,
+    ApplyFixes,
 }
 
 fn exit_status_from_diagnostics(
