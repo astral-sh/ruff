@@ -74,6 +74,37 @@ bob.update({"other": 1})
 bob.update({"age": "bad"})
 ```
 
+`update()` treats the patch operand as partial even when the target `TypedDict` uses `Required` and
+`NotRequired`:
+
+```py
+from typing_extensions import NotRequired, Required
+
+class Movie(TypedDict, total=False):
+    title: Required[str]
+    year: int
+    director: NotRequired[str]
+
+class MissingRequiredTitle(TypedDict, total=False):
+    year: int
+
+movie: Movie = {"title": "Alien"}
+missing_required_title: MissingRequiredTitle = {"year": 1986}
+
+movie.update(year=1986)
+movie.update(director="Cameron")
+movie.update({"title": "Aliens"})
+movie.update({"director": "Cameron"})
+movie.update(missing_required_title)
+
+# error: [invalid-argument-type]
+movie.update(title=1986)
+
+# error: [invalid-argument-type]
+# error: [invalid-argument-type]
+movie.update({"director": 1986})
+```
+
 PEP 584-style immutable updates preserve the `TypedDict` type when the other operand is compatible:
 
 ```py
