@@ -78,24 +78,17 @@ fn build_fstring(joiner: &str, joinees: &[Expr], flags: FStringFlags) -> Option<
         let mut flags: Option<ast::StringLiteralFlags> = None;
         let mut any_raw = false;
 
-        for expr in joinees {
-            if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = expr {
-                let curr_flags = value.first_literal_flags();
-                let is_raw = curr_flags.prefix().is_raw();
-
-                if flags.is_none() {
-                    flags = Some(curr_flags);
-                    any_raw = is_raw;
-                } else if is_raw {
-                    any_raw = true;
-                }
-            }
-        }
-
         let content = joinees
             .iter()
             .filter_map(|expr| {
                 if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = expr {
+                    let curr_flags = value.first_literal_flags();
+                    if flags.is_none() {
+                        flags = Some(curr_flags);
+                        any_raw = curr_flags.prefix().is_raw();
+                    } else if curr_flags.prefix().is_raw() {
+                        any_raw = true;
+                    }
                     Some(value.to_str())
                 } else {
                     None
@@ -112,11 +105,18 @@ fn build_fstring(joiner: &str, joinees: &[Expr], flags: FStringFlags) -> Option<
             let needs_non_raw = content.contains(['\r', '\0']) || {
                 // Check if content contains characters that would break raw string syntax
                 let quote_char = flags.quote_str();
-                // A raw string cannot end with a single backslash if it's immediately
+                // A raw string cannot end with an odd number of backslashes if it's immediately
                 // followed by the quote delimiter, as that would be invalid syntax.
-                let ends_with_backslash = content.ends_with('\\')
-                    && (content.len() == 1 || content.chars().nth_back(1) != Some('\\'));
-                content.contains(quote_char) || ends_with_backslash
+                let mut trailing_backslashes = 0;
+                for char in content.chars().rev() {
+                    if char == '\\' {
+                        trailing_backslashes += 1;
+                    } else {
+                        break;
+                    }
+                }
+                let ends_with_odd_backslashes = trailing_backslashes % 2 != 0;
+                content.contains(quote_char) || ends_with_odd_backslashes
             };
 
             if needs_non_raw {

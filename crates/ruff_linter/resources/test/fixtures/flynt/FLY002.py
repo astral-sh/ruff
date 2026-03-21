@@ -32,11 +32,14 @@ nok13 = "".join([foo, "'", '"'])
 
 # Regression test for: https://github.com/astral-sh/ruff/issues/21082
 # Mixing raw and non-raw strings can cause syntax errors or behavior changes
-nok14 = "".join((r"", '"'))  # First is raw, second is not - would break syntax
-nok15 = "".join((r"", "\\"))  # First is raw, second has backslash - would break syntax
-nok16 = "".join((r"", "\0"))  # First is raw, second has null byte - would introduce null bytes
-nok17 = "".join((r"", "\r"))  # First is raw, second has carriage return - would change behavior
-nok18 = "".join((r"", "\\r"))  # First is raw, second has backslash followed by literal r - OK (no special handling needed)
+# if not handled carefully.
+nok14 = "".join((r"", '"'))  # Mixed raw/non-raw; result contains quote character
+nok15 = "".join((r"", "\\"))  # Mixed raw/non-raw; result ends with odd number of backslashes
+nok16 = "".join((r"", "\0"))  # Mixed raw/non-raw; result contains null byte
+nok17 = "".join((r"", "\r"))  # Mixed raw/non-raw; result contains carriage return
+nok18 = "".join((r"", "\\r"))  # Mixed raw/non-raw; result contains backslash followed by literal r
+nok19 = "".join((r"", "\\\\"))  # Mixed raw/non-raw; result ends with even number of backslashes (safe)
+nok20 = "".join((r"", "\\\\\\"))  # Mixed raw/non-raw; result ends with odd number of backslashes (unsafe)
 
 # Test that all-raw strings still work (should be OK)
 ok7 = "".join((r"", r"something"))  # Both are raw - OK
