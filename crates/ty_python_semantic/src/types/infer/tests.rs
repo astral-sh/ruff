@@ -222,14 +222,14 @@ fn pep695_type_params() {
         );
     };
 
-    check_typevar("T", "typing.TypeVar", None, None, None);
-    check_typevar("U", "typing.TypeVar", Some("A"), None, None);
-    check_typevar("V", "typing.TypeVar", None, Some(&["A", "B"]), None);
-    check_typevar("W", "typing.TypeVar", None, None, Some("A"));
-    check_typevar("X", "typing.TypeVar", Some("A"), None, Some("A1"));
+    check_typevar("T", "TypeVar", None, None, None);
+    check_typevar("U", "TypeVar", Some("A"), None, None);
+    check_typevar("V", "TypeVar", None, Some(&["A", "B"]), None);
+    check_typevar("W", "TypeVar", None, None, Some("A"));
+    check_typevar("X", "TypeVar", Some("A"), None, Some("A1"));
 
     // a typevar with less than two constraints is treated as unconstrained
-    check_typevar("Y", "typing.TypeVar", None, None, None);
+    check_typevar("Y", "TypeVar", None, None, None);
 }
 
 /// Test that a symbol known to be unbound in a scope does not still trigger cycle-causing

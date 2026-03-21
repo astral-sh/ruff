@@ -52,7 +52,7 @@ impl AzureRenderer<'_> {
                 f,
                 "code={code};]{body}",
                 code = diag.secondary_code_or_id(),
-                body = diag.body(),
+                body = diag.concise_message(),
             )?;
         }
 

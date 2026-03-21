@@ -2,6 +2,7 @@
 source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
+
 ---
 mdtest name: protocols.md - Protocols - Invalid calls to `get_protocol_members()`
 mdtest path: crates/ty_python_semantic/resources/mdtest/protocols.md

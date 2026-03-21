@@ -43,6 +43,10 @@ use crate::{Fix, FixAvailability, Violation};
 ///
 /// ## Fix safety
 /// The fix is always marked as unsafe, as it changes runtime behavior.
+///
+/// ## Options
+///
+/// - `lint.logger-objects`
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "0.12.0")]
 pub(crate) struct ExcInfoOutsideExceptHandler;
@@ -111,7 +115,6 @@ pub(crate) fn exc_info_outside_except_handler(checker: &Checker, call: &ExprCall
     }
 
     let arguments = &call.arguments;
-    let source = checker.source();
 
     let mut diagnostic = checker.report_diagnostic(ExcInfoOutsideExceptHandler, exc_info.range);
 
@@ -120,8 +123,8 @@ pub(crate) fn exc_info_outside_except_handler(checker: &Checker, call: &ExprCall
             exc_info,
             arguments,
             Parentheses::Preserve,
-            source,
-            checker.comment_ranges(),
+            checker.source(),
+            checker.tokens(),
         )?;
         Ok(Fix::unsafe_edit(edit))
     });

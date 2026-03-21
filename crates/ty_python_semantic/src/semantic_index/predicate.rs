@@ -33,11 +33,6 @@ impl ScopedPredicateId {
     fn is_terminal(self) -> bool {
         self >= Self::SMALLEST_TERMINAL
     }
-
-    #[cfg(test)]
-    pub(crate) fn as_u32(self) -> u32 {
-        self.0
-    }
 }
 
 impl Idx for ScopedPredicateId {
@@ -104,15 +99,26 @@ impl PredicateOrLiteral<'_> {
 }
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
-pub(crate) struct CallableAndCallExpr<'db> {
-    pub(crate) callable: Expression<'db>,
-    pub(crate) call_expr: Expression<'db>,
-}
-
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub(crate) enum PredicateNode<'db> {
     Expression(Expression<'db>),
-    ReturnsNever(CallableAndCallExpr<'db>),
+    /// These predicates are recorded for statements with call expressions. As part of
+    /// reachability constraints, they are used to determine whether control flow can
+    /// continue past this statement or not.
+    ///
+    /// The predicate evaluates to
+    /// [`crate::types::Truthiness::AlwaysTrue`] in the common case where a call
+    /// is inferred as returning an inhabited type: in these situations, we will
+    /// infer control flow as flowing through the call expression without
+    /// terminating. If it can be statically guaranteed that a call always
+    /// returns `Never`/`NoReturn`, however, the predicate evaluates to
+    /// [`crate::types::Truthiness::AlwaysFalse`], signaling that control flow
+    /// ends as a result of the call: these call expressions are terminal.
+    ///
+    /// These predicates never evaluate to
+    /// [`crate::types::Truthiness::Ambiguous`], even if the return type of the
+    /// call is `Unknown`/`Any`, because that would result in too many false
+    /// positives.
+    IsNonTerminalCall(Expression<'db>),
     Pattern(PatternPredicate<'db>),
     StarImportPlaceholder(StarImportPlaceholderPredicate<'db>),
 }
@@ -136,6 +142,7 @@ pub(crate) enum PatternPredicateKind<'db> {
     Value(Expression<'db>),
     Or(Vec<PatternPredicateKind<'db>>),
     Class(Expression<'db>, ClassPatternKind),
+    Mapping(ClassPatternKind),
     As(Option<Box<PatternPredicateKind<'db>>>, Option<Name>),
     Unsupported,
 }
@@ -166,10 +173,10 @@ impl<'db> PatternPredicate<'db> {
     }
 }
 
-/// A "placeholder predicate" that is used to model the fact that the boundness of a
-/// (possible) definition or declaration caused by a `*` import cannot be fully determined
-/// until type-inference time. This is essentially the same as a standard reachability constraint,
-/// so we reuse the [`Predicate`] infrastructure to model it.
+/// A "placeholder predicate" that is used to model the fact that the boundness of a (possible)
+/// definition or declaration caused by a `*` import cannot be fully determined until type-
+/// inference time. This is essentially the same as a standard reachability constraint, so we reuse
+/// the [`Predicate`] infrastructure to model it.
 ///
 /// To illustrate, say we have a module `exporter.py` like so:
 ///
@@ -183,14 +190,14 @@ impl<'db> PatternPredicate<'db> {
 /// ```py
 /// A = 1
 ///
-/// from importer import *
+/// from exporter import *
 /// ```
 ///
-/// Since we cannot know whether or not <condition> is true at semantic-index time,
-/// we record a definition for `A` in `b.py` as a result of the `from a import *`
-/// statement, but place a predicate on it to record the fact that we don't yet
-/// know whether this definition will be visible from all control-flow paths or not.
-/// Essentially, we model `b.py` as something similar to this:
+/// Since we cannot know whether or not <condition> is true at semantic-index time, we record
+/// a definition for `A` in `importer.py` as a result of the `from exporter import *` statement,
+/// but place a predicate on it to record the fact that we don't yet know whether this definition
+/// will be visible from all control-flow paths or not. Essentially, we model `importer.py` as
+/// something similar to this:
 ///
 /// ```py
 /// A = 1
@@ -199,8 +206,8 @@ impl<'db> PatternPredicate<'db> {
 ///     from a import A
 /// ```
 ///
-/// At type-check time, the placeholder predicate for the `A` definition is evaluated by
-/// attempting to resolve the `A` symbol in `a.py`'s global namespace:
+/// At type-check time, the placeholder predicate for the `A` definition is evaluated by attempting
+/// to resolve the `A` symbol in `exporter.py`'s global namespace:
 /// - If it resolves to a definitely bound symbol, then the predicate resolves to [`Truthiness::AlwaysTrue`]
 /// - If it resolves to an unbound symbol, then the predicate resolves to [`Truthiness::AlwaysFalse`]
 /// - If it resolves to a possibly bound symbol, then the predicate resolves to [`Truthiness::Ambiguous`]

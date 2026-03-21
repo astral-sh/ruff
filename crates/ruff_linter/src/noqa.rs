@@ -10,6 +10,7 @@ use itertools::Itertools;
 use log::warn;
 
 use ruff_db::diagnostic::{Diagnostic, SecondaryCode};
+use ruff_python_trivia::PythonWhitespace;
 use ruff_python_trivia::{CommentRanges, Cursor, indentation_at_offset};
 use ruff_source_file::{LineEnding, LineRanges};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
@@ -20,12 +21,14 @@ use crate::Locator;
 use crate::fs::relativize_path;
 use crate::registry::Rule;
 use crate::rule_redirects::get_redirect_target;
+use crate::suppression::Suppressions;
 
 /// Generates an array of edits that matches the length of `messages`.
 /// Each potential edit in the array is paired, in order, with the associated diagnostic.
 /// Each edit will add a `noqa` comment to the appropriate line in the source to hide
 /// the diagnostic. These edits may conflict with each other and should not be applied
 /// simultaneously.
+#[expect(clippy::too_many_arguments)]
 pub fn generate_noqa_edits(
     path: &Path,
     diagnostics: &[Diagnostic],
@@ -34,12 +37,20 @@ pub fn generate_noqa_edits(
     external: &[String],
     noqa_line_for: &NoqaMapping,
     line_ending: LineEnding,
+    suppressions: &Suppressions,
 ) -> Vec<Option<Edit>> {
     let file_directives = FileNoqaDirectives::extract(locator, comment_ranges, external, path);
     let exemption = FileExemption::from(&file_directives);
-    let directives = NoqaDirectives::from_commented_ranges(comment_ranges, external, path, locator);
-    let comments = find_noqa_comments(diagnostics, locator, &exemption, &directives, noqa_line_for);
-    build_noqa_edits_by_diagnostic(comments, locator, line_ending)
+    let directives = NoqaDirectives::from_commented_ranges(comment_ranges, path, locator);
+    let comments = find_noqa_comments(
+        diagnostics,
+        locator,
+        &exemption,
+        &directives,
+        noqa_line_for,
+        suppressions,
+    );
+    build_noqa_edits_by_diagnostic(comments, locator, line_ending, None)
 }
 
 /// A directive to ignore a set of rules either for a given line of Python source code or an entire file (e.g.,
@@ -267,24 +278,18 @@ impl<'a> FileNoqaDirectives<'a> {
                             vec![]
                         }
                         Directive::Codes(codes) => {
-                            codes.iter().filter_map(|code| {
-                                let code = code.as_str();
-                                // Ignore externally-defined rules.
-                                if external.iter().any(|external| code.starts_with(external)) {
-                                    return None;
-                                }
+                            codes
+                                .iter()
+                                .filter_map(|code| {
+                                    let code = code.as_str();
+                                    // Ignore externally-defined rules.
+                                    if external.iter().any(|external| code.starts_with(external)) {
+                                        return None;
+                                    }
 
-                                if let Ok(rule) = Rule::from_code(get_redirect_target(code).unwrap_or(code))
-                                {
-                                    Some(rule)
-                                } else {
-                                    #[expect(deprecated)]
-                                    let line = locator.compute_line_index(range.start());
-                                    let path_display = relativize_path(path);
-                                    warn!("Invalid rule code provided to `# ruff: noqa` at {path_display}:{line}: {code}");
-                                    None
-                                }
-                            }).collect()
+                                    Rule::from_code(get_redirect_target(code).unwrap_or(code)).ok()
+                                })
+                                .collect()
                         }
                     };
 
@@ -715,6 +720,7 @@ impl Display for LexicalError {
 impl Error for LexicalError {}
 
 /// Adds noqa comments to suppress all messages of a file.
+#[expect(clippy::too_many_arguments)]
 pub(crate) fn add_noqa(
     path: &Path,
     diagnostics: &[Diagnostic],
@@ -723,6 +729,8 @@ pub(crate) fn add_noqa(
     external: &[String],
     noqa_line_for: &NoqaMapping,
     line_ending: LineEnding,
+    reason: Option<&str>,
+    suppressions: &Suppressions,
 ) -> Result<usize> {
     let (count, output) = add_noqa_inner(
         path,
@@ -732,12 +740,15 @@ pub(crate) fn add_noqa(
         external,
         noqa_line_for,
         line_ending,
+        reason,
+        suppressions,
     );
 
     fs::write(path, output)?;
     Ok(count)
 }
 
+#[expect(clippy::too_many_arguments)]
 fn add_noqa_inner(
     path: &Path,
     diagnostics: &[Diagnostic],
@@ -746,6 +757,8 @@ fn add_noqa_inner(
     external: &[String],
     noqa_line_for: &NoqaMapping,
     line_ending: LineEnding,
+    reason: Option<&str>,
+    suppressions: &Suppressions,
 ) -> (usize, String) {
     let mut count = 0;
 
@@ -753,11 +766,18 @@ fn add_noqa_inner(
     let directives = FileNoqaDirectives::extract(locator, comment_ranges, external, path);
     let exemption = FileExemption::from(&directives);
 
-    let directives = NoqaDirectives::from_commented_ranges(comment_ranges, external, path, locator);
+    let directives = NoqaDirectives::from_commented_ranges(comment_ranges, path, locator);
 
-    let comments = find_noqa_comments(diagnostics, locator, &exemption, &directives, noqa_line_for);
+    let comments = find_noqa_comments(
+        diagnostics,
+        locator,
+        &exemption,
+        &directives,
+        noqa_line_for,
+        suppressions,
+    );
 
-    let edits = build_noqa_edits_by_line(comments, locator, line_ending);
+    let edits = build_noqa_edits_by_line(comments, locator, line_ending, reason);
 
     let contents = locator.contents();
 
@@ -783,6 +803,7 @@ fn build_noqa_edits_by_diagnostic(
     comments: Vec<Option<NoqaComment>>,
     locator: &Locator,
     line_ending: LineEnding,
+    reason: Option<&str>,
 ) -> Vec<Option<Edit>> {
     let mut edits = Vec::default();
     for comment in comments {
@@ -794,6 +815,7 @@ fn build_noqa_edits_by_diagnostic(
                     FxHashSet::from_iter([comment.code]),
                     locator,
                     line_ending,
+                    reason,
                 ) {
                     edits.push(Some(noqa_edit.into_edit()));
                 }
@@ -808,6 +830,7 @@ fn build_noqa_edits_by_line<'a>(
     comments: Vec<Option<NoqaComment<'a>>>,
     locator: &Locator,
     line_ending: LineEnding,
+    reason: Option<&'a str>,
 ) -> BTreeMap<TextSize, NoqaEdit<'a>> {
     let mut comments_by_line = BTreeMap::default();
     for comment in comments.into_iter().flatten() {
@@ -831,6 +854,7 @@ fn build_noqa_edits_by_line<'a>(
                 .collect(),
             locator,
             line_ending,
+            reason,
         ) {
             edits.insert(offset, edit);
         }
@@ -850,6 +874,7 @@ fn find_noqa_comments<'a>(
     exemption: &'a FileExemption,
     directives: &'a NoqaDirectives,
     noqa_line_for: &NoqaMapping,
+    suppressions: &'a Suppressions,
 ) -> Vec<Option<NoqaComment<'a>>> {
     // List of noqa comments, ordered to match up with `messages`
     let mut comments_by_line: Vec<Option<NoqaComment<'a>>> = vec![];
@@ -862,6 +887,12 @@ fn find_noqa_comments<'a>(
         };
 
         if exemption.contains_secondary_code(code) {
+            comments_by_line.push(None);
+            continue;
+        }
+
+        // Apply ranged suppressions next
+        if suppressions.check_diagnostic(message) {
             comments_by_line.push(None);
             continue;
         }
@@ -927,6 +958,8 @@ struct NoqaEdit<'a> {
     noqa_codes: FxHashSet<&'a SecondaryCode>,
     codes: Option<&'a Codes<'a>>,
     line_ending: LineEnding,
+    reason: Option<&'a str>,
+    blank_line: bool,
 }
 
 impl NoqaEdit<'_> {
@@ -938,7 +971,10 @@ impl NoqaEdit<'_> {
     }
 
     fn write(&self, writer: &mut impl std::fmt::Write) {
-        write!(writer, "  # noqa: ").unwrap();
+        if !self.blank_line {
+            write!(writer, "  ").unwrap();
+        }
+        write!(writer, "# noqa: ").unwrap();
         match self.codes {
             Some(codes) => {
                 push_codes(
@@ -953,6 +989,9 @@ impl NoqaEdit<'_> {
             None => {
                 push_codes(writer, self.noqa_codes.iter().sorted_unstable());
             }
+        }
+        if let Some(reason) = self.reason {
+            write!(writer, " {reason}").unwrap();
         }
         write!(writer, "{}", self.line_ending.as_str()).unwrap();
     }
@@ -970,16 +1009,19 @@ fn generate_noqa_edit<'a>(
     noqa_codes: FxHashSet<&'a SecondaryCode>,
     locator: &Locator,
     line_ending: LineEnding,
+    reason: Option<&'a str>,
 ) -> Option<NoqaEdit<'a>> {
     let line_range = locator.full_line_range(offset);
 
     let edit_range;
     let codes;
+    let blank_line;
 
     // Add codes.
     match directive {
         None => {
             let trimmed_line = locator.slice(line_range).trim_end();
+            blank_line = trimmed_line.trim_whitespace_start().is_empty();
             edit_range = TextRange::new(TextSize::of(trimmed_line), line_range.len()) + offset;
             codes = None;
         }
@@ -988,6 +1030,7 @@ fn generate_noqa_edit<'a>(
             let trimmed_line = locator
                 .slice(TextRange::new(line_range.start(), existing_codes.start()))
                 .trim_end();
+            blank_line = false;
             edit_range = TextRange::new(TextSize::of(trimmed_line), line_range.len()) + offset;
             codes = Some(existing_codes);
         }
@@ -999,6 +1042,8 @@ fn generate_noqa_edit<'a>(
         noqa_codes,
         codes,
         line_ending,
+        reason,
+        blank_line,
     })
 }
 
@@ -1040,7 +1085,6 @@ pub(crate) struct NoqaDirectives<'a> {
 impl<'a> NoqaDirectives<'a> {
     pub(crate) fn from_commented_ranges(
         comment_ranges: &CommentRanges,
-        external: &[String],
         path: &Path,
         locator: &'a Locator<'a>,
     ) -> Self {
@@ -1062,29 +1106,6 @@ impl<'a> NoqaDirectives<'a> {
                             warn!(
                                 "Missing or joined rule code(s) at {path_display}:{line}: {warning}"
                             );
-                        }
-                    }
-                    if let Directive::Codes(codes) = &directive {
-                        // Warn on invalid rule codes.
-                        for code in &codes.codes {
-                            // Ignore externally-defined rules.
-                            if !external
-                                .iter()
-                                .any(|external| code.as_str().starts_with(external))
-                            {
-                                if Rule::from_code(
-                                    get_redirect_target(code.as_str()).unwrap_or(code.as_str()),
-                                )
-                                .is_err()
-                                {
-                                    #[expect(deprecated)]
-                                    let line = locator.compute_line_index(range.start());
-                                    let path_display = relativize_path(path);
-                                    warn!(
-                                        "Invalid rule code provided to `# noqa` at {path_display}:{line}: {code}"
-                                    );
-                                }
-                            }
                         }
                     }
                     // noqa comments are guaranteed to be single line.
@@ -1238,6 +1259,7 @@ mod tests {
     use crate::rules::pycodestyle::rules::{AmbiguousVariableName, UselessSemicolon};
     use crate::rules::pyflakes::rules::UnusedVariable;
     use crate::rules::pyupgrade::rules::PrintfStringFormatting;
+    use crate::suppression::Suppressions;
     use crate::{Edit, Violation};
     use crate::{Locator, generate_noqa_edits};
 
@@ -1283,7 +1305,7 @@ mod tests {
     fn noqa_all() {
         let source = "# noqa";
         let directive = lex_inline_noqa(TextRange::up_to(source.text_len()), source);
-        assert_debug_snapshot!(directive, @r"
+        assert_debug_snapshot!(directive, @"
         Ok(
             Some(
                 NoqaLexerOutput {
@@ -1304,7 +1326,7 @@ mod tests {
     fn noqa_no_code() {
         let source = "# noqa:";
         let directive = lex_inline_noqa(TextRange::up_to(source.text_len()), source);
-        assert_debug_snapshot!(directive, @r"
+        assert_debug_snapshot!(directive, @"
         Err(
             MissingCodes,
         )
@@ -1316,7 +1338,7 @@ mod tests {
     fn noqa_no_code_invalid_suffix() {
         let source = "# noqa: foo";
         let directive = lex_inline_noqa(TextRange::up_to(source.text_len()), source);
-        assert_debug_snapshot!(directive, @r"
+        assert_debug_snapshot!(directive, @"
         Err(
             MissingCodes,
         )
@@ -1328,7 +1350,7 @@ mod tests {
     fn noqa_no_code_trailing_content() {
         let source = "# noqa:  # Foo";
         let directive = lex_inline_noqa(TextRange::up_to(source.text_len()), source);
-        assert_debug_snapshot!(directive, @r"
+        assert_debug_snapshot!(directive, @"
         Err(
             MissingCodes,
         )
@@ -1340,7 +1362,7 @@ mod tests {
     fn malformed_code_1() {
         let source = "# noqa: F";
         let directive = lex_inline_noqa(TextRange::up_to(source.text_len()), source);
-        assert_debug_snapshot!(directive, @r"
+        assert_debug_snapshot!(directive, @"
         Err(
             MissingCodes,
         )
@@ -1379,7 +1401,7 @@ mod tests {
     fn malformed_code_3() {
         let source = "# noqa: RUF001F";
         let directive = lex_inline_noqa(TextRange::up_to(source.text_len()), source);
-        assert_debug_snapshot!(directive, @r"
+        assert_debug_snapshot!(directive, @"
         Err(
             InvalidCodeSuffix,
         )
@@ -1449,7 +1471,7 @@ mod tests {
     fn noqa_all_case_insensitive() {
         let source = "# NOQA";
         let directive = lex_inline_noqa(TextRange::up_to(source.text_len()), source);
-        assert_debug_snapshot!(directive, @r"
+        assert_debug_snapshot!(directive, @"
         Ok(
             Some(
                 NoqaLexerOutput {
@@ -1582,7 +1604,7 @@ mod tests {
     fn noqa_all_no_space() {
         let source = "#noqa";
         let directive = lex_inline_noqa(TextRange::up_to(source.text_len()), source);
-        assert_debug_snapshot!(directive, @r"
+        assert_debug_snapshot!(directive, @"
         Ok(
             Some(
                 NoqaLexerOutput {
@@ -1661,7 +1683,7 @@ mod tests {
     fn noqa_all_multi_space() {
         let source = "#  noqa";
         let directive = lex_inline_noqa(TextRange::up_to(source.text_len()), source);
-        assert_debug_snapshot!(directive, @r"
+        assert_debug_snapshot!(directive, @"
         Ok(
             Some(
                 NoqaLexerOutput {
@@ -1794,7 +1816,7 @@ mod tests {
     fn noqa_all_leading_comment() {
         let source = "# Some comment describing the noqa # noqa";
         let directive = lex_inline_noqa(TextRange::up_to(source.text_len()), source);
-        assert_debug_snapshot!(directive, @r"
+        assert_debug_snapshot!(directive, @"
         Ok(
             Some(
                 NoqaLexerOutput {
@@ -1873,7 +1895,7 @@ mod tests {
     fn noqa_all_trailing_comment() {
         let source = "# noqa # Some comment describing the noqa";
         let directive = lex_inline_noqa(TextRange::up_to(source.text_len()), source);
-        assert_debug_snapshot!(directive, @r"
+        assert_debug_snapshot!(directive, @"
         Ok(
             Some(
                 NoqaLexerOutput {
@@ -1952,7 +1974,7 @@ mod tests {
     fn noqa_invalid_codes() {
         let source = "# noqa: unused-import, F401, some other code";
         let directive = lex_inline_noqa(TextRange::up_to(source.text_len()), source);
-        assert_debug_snapshot!(directive, @r"
+        assert_debug_snapshot!(directive, @"
         Err(
             MissingCodes,
         )
@@ -2096,7 +2118,7 @@ mod tests {
     fn noqa_code_invalid_code_suffix() {
         let source = "# noqa: F401abc";
         let directive = lex_inline_noqa(TextRange::up_to(source.text_len()), source);
-        assert_debug_snapshot!(directive, @r"
+        assert_debug_snapshot!(directive, @"
         Err(
             InvalidCodeSuffix,
         )
@@ -2108,7 +2130,7 @@ mod tests {
     fn noqa_invalid_suffix() {
         let source = "# noqa[F401]";
         let directive = lex_inline_noqa(TextRange::up_to(source.text_len()), source);
-        assert_debug_snapshot!(directive, @r"
+        assert_debug_snapshot!(directive, @"
         Err(
             InvalidSuffix,
         )
@@ -2120,7 +2142,7 @@ mod tests {
     fn flake8_exemption_all() {
         let source = "# flake8: noqa";
         let exemption = lex_file_exemption(TextRange::up_to(source.text_len()), source);
-        assert_debug_snapshot!(exemption, @r"
+        assert_debug_snapshot!(exemption, @"
         Ok(
             Some(
                 NoqaLexerOutput {
@@ -2141,7 +2163,7 @@ mod tests {
     fn flake8_noqa_no_code() {
         let source = "# flake8: noqa:";
         let exemption = lex_file_exemption(TextRange::up_to(source.text_len()), source);
-        assert_debug_snapshot!(exemption, @r"
+        assert_debug_snapshot!(exemption, @"
         Err(
             MissingCodes,
         )
@@ -2153,7 +2175,7 @@ mod tests {
     fn flake8_noqa_no_code_invalid_suffix() {
         let source = "# flake8: noqa: foo";
         let exemption = lex_file_exemption(TextRange::up_to(source.text_len()), source);
-        assert_debug_snapshot!(exemption, @r"
+        assert_debug_snapshot!(exemption, @"
         Err(
             MissingCodes,
         )
@@ -2165,7 +2187,7 @@ mod tests {
     fn flake8_noqa_no_code_trailing_content() {
         let source = "# flake8: noqa:  # Foo";
         let exemption = lex_file_exemption(TextRange::up_to(source.text_len()), source);
-        assert_debug_snapshot!(exemption, @r"
+        assert_debug_snapshot!(exemption, @"
         Err(
             MissingCodes,
         )
@@ -2177,7 +2199,7 @@ mod tests {
     fn flake8_malformed_code_1() {
         let source = "# flake8: noqa: F";
         let directive = lex_file_exemption(TextRange::up_to(source.text_len()), source);
-        assert_debug_snapshot!(directive, @r"
+        assert_debug_snapshot!(directive, @"
         Err(
             MissingCodes,
         )
@@ -2216,7 +2238,7 @@ mod tests {
     fn flake8_malformed_code_3() {
         let source = "# flake8: noqa: RUF001F";
         let directive = lex_file_exemption(TextRange::up_to(source.text_len()), source);
-        assert_debug_snapshot!(directive, @r"
+        assert_debug_snapshot!(directive, @"
         Err(
             InvalidCodeSuffix,
         )
@@ -2228,7 +2250,7 @@ mod tests {
     fn ruff_exemption_all() {
         let source = "# ruff: noqa";
         let exemption = lex_file_exemption(TextRange::up_to(source.text_len()), source);
-        assert_debug_snapshot!(exemption, @r"
+        assert_debug_snapshot!(exemption, @"
         Ok(
             Some(
                 NoqaLexerOutput {
@@ -2249,7 +2271,7 @@ mod tests {
     fn ruff_noqa_no_code() {
         let source = "# ruff: noqa:";
         let exemption = lex_file_exemption(TextRange::up_to(source.text_len()), source);
-        assert_debug_snapshot!(exemption, @r"
+        assert_debug_snapshot!(exemption, @"
         Err(
             MissingCodes,
         )
@@ -2261,7 +2283,7 @@ mod tests {
     fn ruff_noqa_no_code_invalid_suffix() {
         let source = "# ruff: noqa: foo";
         let exemption = lex_file_exemption(TextRange::up_to(source.text_len()), source);
-        assert_debug_snapshot!(exemption, @r"
+        assert_debug_snapshot!(exemption, @"
         Err(
             MissingCodes,
         )
@@ -2273,7 +2295,7 @@ mod tests {
     fn ruff_noqa_no_code_trailing_content() {
         let source = "# ruff: noqa:  # Foo";
         let exemption = lex_file_exemption(TextRange::up_to(source.text_len()), source);
-        assert_debug_snapshot!(exemption, @r"
+        assert_debug_snapshot!(exemption, @"
         Err(
             MissingCodes,
         )
@@ -2285,7 +2307,7 @@ mod tests {
     fn ruff_malformed_code_1() {
         let source = "# ruff: noqa: F";
         let directive = lex_file_exemption(TextRange::up_to(source.text_len()), source);
-        assert_debug_snapshot!(directive, @r"
+        assert_debug_snapshot!(directive, @"
         Err(
             MissingCodes,
         )
@@ -2324,7 +2346,7 @@ mod tests {
     fn ruff_malformed_code_3() {
         let source = "# ruff: noqa: RUF001F";
         let directive = lex_file_exemption(TextRange::up_to(source.text_len()), source);
-        assert_debug_snapshot!(directive, @r"
+        assert_debug_snapshot!(directive, @"
         Err(
             InvalidCodeSuffix,
         )
@@ -2336,7 +2358,7 @@ mod tests {
     fn flake8_exemption_all_no_space() {
         let source = "#flake8:noqa";
         let exemption = lex_file_exemption(TextRange::up_to(source.text_len()), source);
-        assert_debug_snapshot!(exemption, @r"
+        assert_debug_snapshot!(exemption, @"
         Ok(
             Some(
                 NoqaLexerOutput {
@@ -2357,7 +2379,7 @@ mod tests {
     fn ruff_exemption_all_no_space() {
         let source = "#ruff:noqa";
         let exemption = lex_file_exemption(TextRange::up_to(source.text_len()), source);
-        assert_debug_snapshot!(exemption, @r"
+        assert_debug_snapshot!(exemption, @"
         Ok(
             Some(
                 NoqaLexerOutput {
@@ -2576,7 +2598,7 @@ mod tests {
     fn ruff_exemption_invalid_code_suffix() {
         let source = "# ruff: noqa: F401abc";
         let exemption = lex_file_exemption(TextRange::up_to(source.text_len()), source);
-        assert_debug_snapshot!(exemption, @r"
+        assert_debug_snapshot!(exemption, @"
         Err(
             InvalidCodeSuffix,
         )
@@ -2642,7 +2664,7 @@ mod tests {
     fn ruff_exemption_all_leading_comment() {
         let source = "# Leading comment # ruff: noqa";
         let exemption = lex_file_exemption(TextRange::up_to(source.text_len()), source);
-        assert_debug_snapshot!(exemption, @r"
+        assert_debug_snapshot!(exemption, @"
         Ok(
             Some(
                 NoqaLexerOutput {
@@ -2663,7 +2685,7 @@ mod tests {
     fn ruff_exemption_all_trailing_comment() {
         let source = "# ruff: noqa # Trailing comment";
         let exemption = lex_file_exemption(TextRange::up_to(source.text_len()), source);
-        assert_debug_snapshot!(exemption, @r"
+        assert_debug_snapshot!(exemption, @"
         Ok(
             Some(
                 NoqaLexerOutput {
@@ -2711,7 +2733,7 @@ mod tests {
     fn ruff_exemption_all_trailing_comment_no_space() {
         let source = "# ruff: noqa# Trailing comment";
         let exemption = lex_file_exemption(TextRange::up_to(source.text_len()), source);
-        assert_debug_snapshot!(exemption, @r"
+        assert_debug_snapshot!(exemption, @"
         Ok(
             Some(
                 NoqaLexerOutput {
@@ -2732,7 +2754,7 @@ mod tests {
     fn ruff_exemption_all_trailing_comment_no_hash() {
         let source = "# ruff: noqa Trailing comment";
         let exemption = lex_file_exemption(TextRange::up_to(source.text_len()), source);
-        assert_debug_snapshot!(exemption, @r"
+        assert_debug_snapshot!(exemption, @"
         Ok(
             Some(
                 NoqaLexerOutput {
@@ -2780,7 +2802,7 @@ mod tests {
     fn flake8_exemption_all_case_insensitive() {
         let source = "# flake8: NoQa";
         let exemption = lex_file_exemption(TextRange::up_to(source.text_len()), source);
-        assert_debug_snapshot!(exemption, @r"
+        assert_debug_snapshot!(exemption, @"
         Ok(
             Some(
                 NoqaLexerOutput {
@@ -2801,7 +2823,7 @@ mod tests {
     fn ruff_exemption_all_case_insensitive() {
         let source = "# ruff: NoQa";
         let exemption = lex_file_exemption(TextRange::up_to(source.text_len()), source);
-        assert_debug_snapshot!(exemption, @r"
+        assert_debug_snapshot!(exemption, @"
         Ok(
             Some(
                 NoqaLexerOutput {
@@ -2832,6 +2854,8 @@ mod tests {
             &[],
             &noqa_line_for,
             LineEnding::Lf,
+            None,
+            &Suppressions::default(),
         );
         assert_eq!(count, 0);
         assert_eq!(output, format!("{contents}"));
@@ -2855,6 +2879,8 @@ mod tests {
             &[],
             &noqa_line_for,
             LineEnding::Lf,
+            None,
+            &Suppressions::default(),
         );
         assert_eq!(count, 1);
         assert_eq!(output, "x = 1  # noqa: F841\n");
@@ -2885,6 +2911,8 @@ mod tests {
             &[],
             &noqa_line_for,
             LineEnding::Lf,
+            None,
+            &Suppressions::default(),
         );
         assert_eq!(count, 1);
         assert_eq!(output, "x = 1  # noqa: E741, F841\n");
@@ -2915,6 +2943,8 @@ mod tests {
             &[],
             &noqa_line_for,
             LineEnding::Lf,
+            None,
+            &Suppressions::default(),
         );
         assert_eq!(count, 0);
         assert_eq!(output, "x = 1  # noqa");
@@ -2937,6 +2967,7 @@ print(
         let messages = [PrintfStringFormatting
             .into_diagnostic(TextRange::new(12.into(), 79.into()), &source_file)];
         let comment_ranges = CommentRanges::default();
+        let suppressions = Suppressions::default();
         let edits = generate_noqa_edits(
             path,
             &messages,
@@ -2945,6 +2976,7 @@ print(
             &[],
             &noqa_line_for,
             LineEnding::Lf,
+            &suppressions,
         );
         assert_eq!(
             edits,
@@ -2968,6 +3000,7 @@ bar =
             [UselessSemicolon.into_diagnostic(TextRange::new(4.into(), 5.into()), &source_file)];
         let noqa_line_for = NoqaMapping::default();
         let comment_ranges = CommentRanges::default();
+        let suppressions = Suppressions::default();
         let edits = generate_noqa_edits(
             path,
             &messages,
@@ -2976,6 +3009,7 @@ bar =
             &[],
             &noqa_line_for,
             LineEnding::Lf,
+            &suppressions,
         );
         assert_eq!(
             edits,

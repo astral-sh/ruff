@@ -1,0 +1,50 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: final.md - `typing.Final` - Overriding in subclasses - Superclass with same name as subclass
+mdtest path: crates/ty_python_semantic/resources/mdtest/type_qualifiers/final.md
+---
+
+# Python source files
+
+## module_a.py
+
+```
+1 | from typing import Final
+2 | 
+3 | class Foo:
+4 |     X: Final[int] = 1
+```
+
+## module_b.py
+
+```
+1 | from module_a import Foo as BaseFoo
+2 | 
+3 | class Foo(BaseFoo):
+4 |     X = 2  # error: [override-of-final-variable]
+```
+
+# Diagnostics
+
+```
+error[override-of-final-variable]: Cannot override `module_a.Foo.X`
+ --> src/module_b.py:4:5
+  |
+3 | class Foo(BaseFoo):
+4 |     X = 2  # error: [override-of-final-variable]
+  |     ^ Overrides a final variable from superclass `module_a.Foo`
+  |
+info: `module_a.Foo.X` is declared as `Final`, forbidding overrides
+ --> src/module_a.py:4:5
+  |
+3 | class Foo:
+4 |     X: Final[int] = 1
+  |     - `module_a.Foo.X` defined here
+  |
+info: rule `override-of-final-variable` is enabled by default
+
+```

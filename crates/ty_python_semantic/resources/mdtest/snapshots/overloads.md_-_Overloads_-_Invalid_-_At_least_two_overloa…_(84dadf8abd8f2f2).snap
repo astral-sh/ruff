@@ -2,6 +2,7 @@
 source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
+
 ---
 mdtest name: overloads.md - Overloads - Invalid - At least two overloads
 mdtest path: crates/ty_python_semantic/resources/mdtest/overloads.md
@@ -15,11 +16,10 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/overloads.md
 1 | from typing import overload
 2 | 
 3 | @overload
-4 | def func(x: int) -> int: ...
-5 | 
-6 | # error: [invalid-overload]
-7 | def func(x: int | str) -> int | str:
-8 |     return x
+4 | # error: [invalid-overload]
+5 | def func(x: int) -> int: ...
+6 | def func(x: int | str) -> int | str:
+7 |     return x
 ```
 
 ## mdtest_snippet.pyi
@@ -36,16 +36,14 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/overloads.md
 
 ```
 error[invalid-overload]: Overloaded function `func` requires at least two overloads
- --> src/mdtest_snippet.py:4:5
+ --> src/mdtest_snippet.py:5:5
   |
 3 | @overload
-4 | def func(x: int) -> int: ...
-  |     ---- Only one overload defined here
-5 |
-6 | # error: [invalid-overload]
-7 | def func(x: int | str) -> int | str:
-  |     ^^^^
-8 |     return x
+4 | # error: [invalid-overload]
+5 | def func(x: int) -> int: ...
+  |     ^^^^ Only one overload defined here
+6 | def func(x: int | str) -> int | str:
+7 |     return x
   |
 info: rule `invalid-overload` is enabled by default
 
@@ -58,9 +56,7 @@ error[invalid-overload]: Overloaded function `func` requires at least two overlo
 3 | @overload
 4 | # error: [invalid-overload]
 5 | def func(x: int) -> int: ...
-  |     ----
-  |     |
-  |     Only one overload defined here
+  |     ^^^^ Only one overload defined here
   |
 info: rule `invalid-overload` is enabled by default
 

@@ -67,5 +67,5 @@ Module(
 
   |
 1 | def foo(*, **kwargs): ...
-  |            ^^^^^^^^ Syntax Error: Expected one or more keyword parameter after '*' separator
+  |            ^^^^^^^^ Syntax Error: Expected one or more keyword parameter after `*` separator
   |

@@ -1,3 +1,4 @@
+use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::ExprCall;
 
@@ -76,6 +77,6 @@ pub(crate) fn os_path_getctime(checker: &Checker, call: &ExprCall, segments: &[&
         "filename",
         is_fix_os_path_getctime_enabled(checker.settings()),
         OsPathGetctime,
-        None,
+        Applicability::Safe,
     );
 }

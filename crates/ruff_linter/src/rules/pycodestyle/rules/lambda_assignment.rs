@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::parenthesize::parenthesized_range;
+use ruff_python_ast::token::parenthesized_range;
 use ruff_python_ast::{
     self as ast, Expr, ExprEllipsisLiteral, ExprLambda, Identifier, Parameter,
     ParameterWithDefault, Parameters, Stmt,
@@ -265,29 +265,19 @@ fn replace_trailing_ellipsis_with_original_expr(
     stmt: &Stmt,
     checker: &Checker,
 ) -> String {
-    let original_expr_range = parenthesized_range(
-        (&lambda.body).into(),
-        lambda.into(),
-        checker.comment_ranges(),
-        checker.source(),
-    )
-    .unwrap_or(lambda.body.range());
+    let original_expr_range =
+        parenthesized_range((&lambda.body).into(), lambda.into(), checker.tokens())
+            .unwrap_or(lambda.body.range());
 
     // This prevents the autofix of introducing a syntax error if the lambda's body is an
     // expression spanned across multiple lines. To avoid the syntax error we preserve
     // the parenthesis around the body.
-    let original_expr_in_source = if parenthesized_range(
-        lambda.into(),
-        stmt.into(),
-        checker.comment_ranges(),
-        checker.source(),
-    )
-    .is_some()
-    {
-        format!("({})", checker.locator().slice(original_expr_range))
-    } else {
-        checker.locator().slice(original_expr_range).to_string()
-    };
+    let original_expr_in_source =
+        if parenthesized_range(lambda.into(), stmt.into(), checker.tokens()).is_some() {
+            format!("({})", checker.locator().slice(original_expr_range))
+        } else {
+            checker.locator().slice(original_expr_range).to_string()
+        };
 
     let placeholder_ellipsis_start = generated.rfind("...").unwrap();
     let placeholder_ellipsis_end = placeholder_ellipsis_start + "...".len();

@@ -1,0 +1,39 @@
+---
+source: crates/ty_server/tests/e2e/signature_help.rs
+expression: signature_help
+---
+{
+  "signatures": [
+    {
+      "label": "(pattern: str | Pattern[str], string: str, flags: int = 0) -> Match[str] | None",
+      "documentation": "Try to apply the pattern at the start of the string, returning/na Match object, or None if no match was found.\n",
+      "parameters": [
+        {
+          "label": "pattern: str | Pattern[str]"
+        },
+        {
+          "label": "string: str"
+        },
+        {
+          "label": "flags: int = 0"
+        }
+      ]
+    },
+    {
+      "label": "(pattern: bytes | Pattern[bytes], string: Buffer, flags: int = 0) -> Match[bytes] | None",
+      "parameters": [
+        {
+          "label": "pattern: bytes | Pattern[bytes]"
+        },
+        {
+          "label": "string: Buffer"
+        },
+        {
+          "label": "flags: int = 0"
+        }
+      ]
+    }
+  ],
+  "activeSignature": 0,
+  "activeParameter": 0
+}

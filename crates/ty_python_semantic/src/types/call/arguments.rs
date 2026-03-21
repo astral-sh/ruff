@@ -1,14 +1,30 @@
 use std::borrow::Cow;
+use std::fmt::Display;
 
 use itertools::{Either, Itertools};
 use ruff_python_ast as ast;
+use rustc_hash::FxHashMap;
 
 use crate::Db;
-use crate::types::KnownClass;
 use crate::types::enums::{enum_member_literals, enum_metadata};
-use crate::types::tuple::{Tuple, TupleType};
+use crate::types::tuple::Tuple;
+use crate::types::{KnownClass, Type, TypeContext};
 
-use super::Type;
+/// Maximum number of expanded types that can be generated from a single tuple's
+/// Cartesian product in [`expand_type`].
+///
+/// See: [pyright's `maxSingleOverloadArgTypeExpansionCount`][pyright]
+///
+/// [pyright]: https://github.com/microsoft/pyright/blob/5a325e4874e775436671eed65ad696787a1ef74b/packages/pyright-internal/src/analyzer/typeEvaluator.ts#L570
+const MAX_TUPLE_EXPANSION: usize = 64;
+
+/// Maximum total number of expanded argument type combinations across all arguments
+/// in [`CallArguments::expand`].
+///
+/// See: [pyright's `maxTotalOverloadArgTypeExpansionCount`][pyright]
+///
+/// [pyright]: https://github.com/microsoft/pyright/blob/5a325e4874e775436671eed65ad696787a1ef74b/packages/pyright-internal/src/analyzer/typeEvaluator.ts#L566
+const MAX_TOTAL_EXPANSION: usize = 256;
 
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum Argument<'a> {
@@ -28,11 +44,72 @@ pub(crate) enum Argument<'a> {
 #[derive(Clone, Debug, Default)]
 pub(crate) struct CallArguments<'a, 'db> {
     arguments: Vec<Argument<'a>>,
-    types: Vec<Option<Type<'db>>>,
+    types: Vec<CallArgumentTypes<'db>>,
+}
+
+/// Inferred types for a given argument.
+///
+/// Note that a single argument may produce multiple distinct inferred types when inferred
+/// with type context across multiple bindings.
+#[derive(Clone, Debug, Default)]
+pub(crate) struct CallArgumentTypes<'db> {
+    fallback_type: Option<Type<'db>>,
+    types: FxHashMap<Type<'db>, Type<'db>>,
+}
+
+impl<'db> CallArgumentTypes<'db> {
+    pub(crate) fn new(fallback_ty: Option<Type<'db>>) -> Self {
+        Self {
+            fallback_type: fallback_ty,
+            types: FxHashMap::default(),
+        }
+    }
+
+    /// Returns the most appropriate type of this argument when there is no specific declared type.
+    pub(crate) fn get_default(&self) -> Option<Type<'db>> {
+        // If this type was inferred against exactly one declared type, or was inferred against
+        // multiple, but resulted in a single inferred type, we have an exact type to return.
+        if let Ok(exact_ty) = self
+            .types
+            .values()
+            .exactly_one()
+            .or(self.types.values().all_equal_value())
+        {
+            return Some(*exact_ty);
+        }
+
+        self.fallback_type
+    }
+
+    /// Returns the type of this argument when inferred against the provided declared type.
+    pub(crate) fn get_for_declared_type(&self, tcx: Type<'db>) -> Type<'db> {
+        self.types
+            .get(&tcx)
+            .copied()
+            .or(self.get_default())
+            .unwrap_or(Type::unknown())
+    }
+
+    /// Insert the type of this argument when inferred with the provided type context.
+    pub(crate) fn insert(&mut self, tcx: impl Into<TypeContext<'db>>, ty: Type<'db>) {
+        match tcx.into().annotation {
+            None => self.fallback_type = Some(ty),
+            Some(tcx) => {
+                self.types.insert(tcx, ty);
+            }
+        }
+    }
+
+    pub(crate) fn iter(&self) -> impl Iterator<Item = (TypeContext<'db>, Type<'db>)> {
+        self.types
+            .iter()
+            .map(|(tcx, ty)| (TypeContext::new(Some(*tcx)), *ty))
+            .chain(self.fallback_type.map(|ty| (TypeContext::default(), ty)))
+    }
 }
 
 impl<'a, 'db> CallArguments<'a, 'db> {
-    fn new(arguments: Vec<Argument<'a>>, types: Vec<Option<Type<'db>>>) -> Self {
+    fn new(arguments: Vec<Argument<'a>>, types: Vec<CallArgumentTypes<'db>>) -> Self {
         debug_assert!(arguments.len() == types.len());
         Self { arguments, types }
     }
@@ -42,14 +119,14 @@ impl<'a, 'db> CallArguments<'a, 'db> {
     /// will remain uninitialized as `Unknown`.
     pub(crate) fn from_arguments(
         arguments: &'a ast::Arguments,
-        mut infer_argument_type: impl FnMut(Option<&ast::Expr>, &ast::Expr) -> Type<'db>,
+        mut infer_argument_type: impl FnMut(&ast::ArgOrKeyword, &ast::Expr) -> Type<'db>,
     ) -> Self {
         arguments
             .arguments_source_order()
             .map(|arg_or_keyword| match arg_or_keyword {
                 ast::ArgOrKeyword::Arg(arg) => match arg {
                     ast::Expr::Starred(ast::ExprStarred { value, .. }) => {
-                        let ty = infer_argument_type(Some(arg), value);
+                        let ty = infer_argument_type(&arg_or_keyword, value);
                         (Argument::Variadic, Some(ty))
                     }
                     _ => (Argument::Positional, None),
@@ -58,7 +135,40 @@ impl<'a, 'db> CallArguments<'a, 'db> {
                     if let Some(arg) = arg {
                         (Argument::Keyword(&arg.id), None)
                     } else {
-                        let ty = infer_argument_type(None, value);
+                        let ty = infer_argument_type(&arg_or_keyword, value);
+                        (Argument::Keywords, Some(ty))
+                    }
+                }
+            })
+            .collect()
+    }
+
+    /// Like [`Self::from_arguments`] but fills as much typing info in as possible.
+    ///
+    /// This currently only exists for the LSP usecase, and shouldn't be used in normal
+    /// typechecking.
+    pub(crate) fn from_arguments_typed(
+        arguments: &'a ast::Arguments,
+        mut infer_argument_type: impl FnMut(&ast::Expr) -> Type<'db>,
+    ) -> Self {
+        arguments
+            .arguments_source_order()
+            .map(|arg_or_keyword| match arg_or_keyword {
+                ast::ArgOrKeyword::Arg(arg) => match arg {
+                    ast::Expr::Starred(ast::ExprStarred { value, .. }) => {
+                        let ty = infer_argument_type(value);
+                        (Argument::Variadic, Some(ty))
+                    }
+                    _ => {
+                        let ty = infer_argument_type(arg);
+                        (Argument::Positional, Some(ty))
+                    }
+                },
+                ast::ArgOrKeyword::Keyword(ast::Keyword { arg, value, .. }) => {
+                    let ty = infer_argument_type(value);
+                    if let Some(arg) = arg {
+                        (Argument::Keyword(&arg.id), Some(ty))
+                    } else {
                         (Argument::Keywords, Some(ty))
                     }
                 }
@@ -73,7 +183,11 @@ impl<'a, 'db> CallArguments<'a, 'db> {
 
     /// Create a [`CallArguments`] from an iterator over non-variadic positional argument types.
     pub(crate) fn positional(positional_tys: impl IntoIterator<Item = Type<'db>>) -> Self {
-        let types: Vec<_> = positional_tys.into_iter().map(Some).collect();
+        let types: Vec<_> = positional_tys
+            .into_iter()
+            .map(Some)
+            .map(CallArgumentTypes::new)
+            .collect();
         let arguments = vec![Argument::Positional; types.len()];
         Self { arguments, types }
     }
@@ -82,12 +196,8 @@ impl<'a, 'db> CallArguments<'a, 'db> {
         self.arguments.len()
     }
 
-    pub(crate) fn types(&self) -> &[Option<Type<'db>>] {
+    pub(crate) fn types(&self) -> &[CallArgumentTypes<'db>] {
         &self.types
-    }
-
-    pub(crate) fn iter_types(&self) -> impl Iterator<Item = Type<'db>> {
-        self.types.iter().map(|ty| ty.unwrap_or_else(Type::unknown))
     }
 
     /// Prepend an optional extra synthetic argument (for a `self` or `cls` parameter) to the front
@@ -98,8 +208,8 @@ impl<'a, 'db> CallArguments<'a, 'db> {
             let arguments = std::iter::once(Argument::Synthetic)
                 .chain(self.arguments.iter().copied())
                 .collect();
-            let types = std::iter::once(bound_self)
-                .chain(self.types.iter().copied())
+            let types = std::iter::once(CallArgumentTypes::new(bound_self))
+                .chain(self.types.iter().cloned())
                 .collect();
             Cow::Owned(CallArguments { arguments, types })
         } else {
@@ -107,14 +217,24 @@ impl<'a, 'db> CallArguments<'a, 'db> {
         }
     }
 
-    pub(crate) fn iter(&self) -> impl Iterator<Item = (Argument<'a>, Option<Type<'db>>)> + '_ {
-        (self.arguments.iter().copied()).zip(self.types.iter().copied())
+    pub(crate) fn iter(
+        &self,
+    ) -> impl Iterator<Item = (Argument<'a>, &CallArgumentTypes<'db>)> + '_ {
+        (self.arguments.iter().copied()).zip(self.types.iter())
     }
 
     pub(crate) fn iter_mut(
         &mut self,
-    ) -> impl Iterator<Item = (Argument<'a>, &mut Option<Type<'db>>)> + '_ {
+    ) -> impl Iterator<Item = (Argument<'a>, &mut CallArgumentTypes<'db>)> + '_ {
         (self.arguments.iter().copied()).zip(self.types.iter_mut())
+    }
+
+    /// Create a new [`CallArguments`] starting from the specified index.
+    pub(super) fn start_from(&self, index: usize) -> Self {
+        Self {
+            arguments: self.arguments[index..].to_vec(),
+            types: self.types[index..].to_vec(),
+        }
     }
 
     /// Returns an iterator on performing [argument type expansion].
@@ -124,9 +244,6 @@ impl<'a, 'db> CallArguments<'a, 'db> {
     ///
     /// [argument type expansion]: https://typing.python.org/en/latest/spec/overload.html#argument-type-expansion
     pub(super) fn expand(&self, db: &'db dyn Db) -> impl Iterator<Item = Expansion<'a, 'db>> + '_ {
-        /// Maximum number of argument lists that can be generated in a single expansion step.
-        static MAX_EXPANSIONS: usize = 512;
-
         /// Represents the state of the expansion process.
         enum State<'a, 'b, 'db> {
             LimitReached(usize),
@@ -138,7 +255,7 @@ impl<'a, 'db> CallArguments<'a, 'db> {
         /// This is useful to avoid cloning the initial types vector if none of the types can be
         /// expanded.
         enum ExpandingState<'a, 'b, 'db> {
-            Initial(&'b Vec<Option<Type<'db>>>),
+            Initial(&'b Vec<CallArgumentTypes<'db>>),
             Expanded(Vec<CallArguments<'a, 'db>>),
         }
 
@@ -150,7 +267,7 @@ impl<'a, 'db> CallArguments<'a, 'db> {
                 }
             }
 
-            fn iter(&self) -> impl Iterator<Item = &[Option<Type<'db>>]> + '_ {
+            fn iter(&self) -> impl Iterator<Item = &[CallArgumentTypes<'db>]> + '_ {
                 match self {
                     ExpandingState::Initial(types) => {
                         Either::Left(std::iter::once(types.as_slice()))
@@ -175,19 +292,26 @@ impl<'a, 'db> CallArguments<'a, 'db> {
                 // Find the next type that can be expanded.
                 let expanded_types = loop {
                     let arg_type = self.types.get(index)?;
-                    if let Some(arg_type) = arg_type {
-                        if let Some(expanded_types) = expand_type(db, *arg_type) {
-                            break expanded_types;
-                        }
+                    // TODO: For types inferred multiple times with distinct type context, we currently only
+                    // expand the default inference. Note that direct expansion of a type inferred against a
+                    // given declared type would not likely be assignable to other declared types without
+                    // re-inference, and so a more complete implementation would likely have to re-infer the
+                    // argument type against the union a given subset of type contexts before expansion. However,
+                    // this only shows up in very convoluted instances of generic call inference across multiple
+                    // overloads, and is unlikely to happen in practice.
+                    if let Some(arg_type) = arg_type.get_default()
+                        && let Some(expanded_types) = expand_type(db, arg_type)
+                    {
+                        break expanded_types;
                     }
                     index += 1;
                 };
 
                 let expansion_size = expanded_types.len() * state.len();
-                if expansion_size > MAX_EXPANSIONS {
+                if expansion_size > MAX_TOTAL_EXPANSION {
                     tracing::debug!(
                         "Skipping argument type expansion as it would exceed the \
-                    maximum number of expansions ({MAX_EXPANSIONS})"
+                            maximum number of expansions ({MAX_TOTAL_EXPANSION})"
                     );
                     return Some(State::LimitReached(index));
                 }
@@ -197,7 +321,7 @@ impl<'a, 'db> CallArguments<'a, 'db> {
                 for pre_expanded_types in state.iter() {
                     for subtype in &expanded_types {
                         let mut new_expanded_types = pre_expanded_types.to_vec();
-                        new_expanded_types[index] = Some(*subtype);
+                        new_expanded_types[index] = CallArgumentTypes::new(Some(*subtype));
                         expanded_arguments.push(CallArguments::new(
                             self.arguments.clone(),
                             new_expanded_types,
@@ -222,6 +346,72 @@ impl<'a, 'db> CallArguments<'a, 'db> {
             State::Expanding(ExpandingState::Expanded(expanded)) => Expansion::Expanded(expanded),
         })
     }
+
+    pub(super) fn display(&self, db: &'db dyn Db) -> impl Display {
+        struct DisplayCallArgumentTypes<'a, 'db> {
+            types: &'a CallArgumentTypes<'db>,
+            db: &'db dyn Db,
+        }
+
+        impl std::fmt::Display for DisplayCallArgumentTypes<'_, '_> {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                f.debug_map()
+                    .entries(self.types.iter().map(|(tcx, ty)| {
+                        (
+                            tcx.annotation.as_ref().map(|ty| ty.display(self.db)),
+                            ty.display(self.db),
+                        )
+                    }))
+                    .finish()
+            }
+        }
+
+        struct DisplayCallArguments<'a, 'db> {
+            call_arguments: &'a CallArguments<'a, 'db>,
+            db: &'db dyn Db,
+        }
+
+        impl std::fmt::Display for DisplayCallArguments<'_, '_> {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                f.write_str("(")?;
+                for (index, (argument, types)) in self.call_arguments.iter().enumerate() {
+                    if index > 0 {
+                        write!(f, ", ")?;
+                    }
+                    match argument {
+                        Argument::Synthetic => {
+                            write!(
+                                f,
+                                "self: {}",
+                                DisplayCallArgumentTypes { types, db: self.db }
+                            )?;
+                        }
+                        Argument::Positional => {
+                            write!(f, "{}", DisplayCallArgumentTypes { types, db: self.db })?;
+                        }
+                        Argument::Variadic => {
+                            write!(f, "*{}", DisplayCallArgumentTypes { types, db: self.db })?;
+                        }
+                        Argument::Keyword(name) => write!(
+                            f,
+                            "{}={}",
+                            name,
+                            DisplayCallArgumentTypes { types, db: self.db }
+                        )?,
+                        Argument::Keywords => {
+                            write!(f, "**{}", DisplayCallArgumentTypes { types, db: self.db })?;
+                        }
+                    }
+                }
+                f.write_str(")")
+            }
+        }
+
+        DisplayCallArguments {
+            call_arguments: self,
+            db,
+        }
+    }
 }
 
 /// Represents a single element of the expansion process for argument types for [`expand`].
@@ -245,7 +435,10 @@ impl<'a, 'db> FromIterator<(Argument<'a>, Option<Type<'db>>)> for CallArguments<
     where
         T: IntoIterator<Item = (Argument<'a>, Option<Type<'db>>)>,
     {
-        let (arguments, types) = iter.into_iter().unzip();
+        let (arguments, types) = iter
+            .into_iter()
+            .map(|(arg, ty)| (arg, CallArgumentTypes::new(ty)))
+            .unzip();
         Self { arguments, types }
     }
 }
@@ -260,13 +453,14 @@ pub(crate) fn is_expandable_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
             class.is_known(db, KnownClass::Bool)
                 || instance.tuple_spec(db).is_some_and(|spec| match &*spec {
                     Tuple::Fixed(fixed_length_tuple) => fixed_length_tuple
-                        .all_elements()
-                        .any(|element| is_expandable_type(db, *element)),
+                        .iter_all_elements()
+                        .any(|element| is_expandable_type(db, element)),
                     Tuple::Variable(_) => false,
                 })
-                || enum_metadata(db, class.class_literal(db).0).is_some()
+                || enum_metadata(db, class.class_literal(db)).is_some()
         }
         Type::Union(_) => true,
+        Type::TypeAlias(alias) => is_expandable_type(db, alias.value_type(db)),
         _ => false,
     }
 }
@@ -281,33 +475,37 @@ fn expand_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Vec<Type<'db>>> {
             let class = instance.class(db);
 
             if class.is_known(db, KnownClass::Bool) {
-                return Some(vec![
-                    Type::BooleanLiteral(true),
-                    Type::BooleanLiteral(false),
-                ]);
+                return Some(vec![Type::bool_literal(true), Type::bool_literal(false)]);
             }
 
             // If the class is a fixed-length tuple subtype, we expand it to its elements.
             if let Some(spec) = instance.tuple_spec(db) {
                 return match &*spec {
                     Tuple::Fixed(fixed_length_tuple) => {
-                        let expanded = fixed_length_tuple
-                            .all_elements()
+                        // Pre-expand each element and compute the total Cartesian product size.
+                        // Bail out early if the product would exceed `MAX_TUPLE_EXPANSION` to
+                        // avoid exponential blowup (e.g. a 37-element tuple with 2-element
+                        // unions would produce 2^37 types).
+                        let per_element: Vec<_> = fixed_length_tuple
+                            .iter_all_elements()
                             .map(|element| {
-                                if let Some(expanded) = expand_type(db, *element) {
-                                    Either::Left(expanded.into_iter())
-                                } else {
-                                    Either::Right(std::iter::once(*element))
-                                }
+                                expand_type(db, element).unwrap_or_else(|| vec![element])
                             })
-                            .multi_cartesian_product()
-                            .map(|types| Type::tuple(TupleType::heterogeneous(db, types)))
-                            .collect::<Vec<_>>();
+                            .collect();
 
-                        if expanded.len() == 1 {
-                            // There are no elements in the tuple type that can be expanded.
+                        let product_size: usize = per_element
+                            .iter()
+                            .try_fold(1usize, |acc, v| acc.checked_mul(v.len()))
+                            .unwrap_or(usize::MAX);
+
+                        if product_size <= 1 || product_size > MAX_TUPLE_EXPANSION {
                             None
                         } else {
+                            let expanded = per_element
+                                .into_iter()
+                                .multi_cartesian_product()
+                                .map(|types| Type::heterogeneous_tuple(db, types))
+                                .collect::<Vec<_>>();
                             Some(expanded)
                         }
                     }
@@ -315,13 +513,15 @@ fn expand_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Vec<Type<'db>>> {
                 };
             }
 
-            if let Some(enum_members) = enum_member_literals(db, class.class_literal(db).0, None) {
+            if let Some(enum_members) = enum_member_literals(db, class.class_literal(db), None) {
                 return Some(enum_members.collect());
             }
 
             None
         }
         Type::Union(union) => Some(union.elements(db).to_vec()),
+        // For type aliases, expand the underlying value type.
+        Type::TypeAlias(alias) => expand_type(db, alias.value_type(db)),
         // We don't handle `type[A | B]` here because it's already stored in the expanded form
         // i.e., `type[A] | type[B]` which is handled by the `Type::Union` case.
         _ => None,
@@ -355,7 +555,7 @@ mod tests {
         let db = setup_db();
         let bool_instance = KnownClass::Bool.to_instance(&db);
         let expanded = expand_type(&db, bool_instance).unwrap();
-        let expected_types = [Type::BooleanLiteral(true), Type::BooleanLiteral(false)];
+        let expected_types = [Type::bool_literal(true), Type::bool_literal(false)];
         assert_eq!(expanded.len(), expected_types.len());
         assert_eq!(expanded, expected_types);
     }
@@ -368,8 +568,8 @@ mod tests {
         let str_ty = KnownClass::Str.to_instance(&db);
         let bytes_ty = KnownClass::Bytes.to_instance(&db);
         let bool_ty = KnownClass::Bool.to_instance(&db);
-        let true_ty = Type::BooleanLiteral(true);
-        let false_ty = Type::BooleanLiteral(false);
+        let true_ty = Type::bool_literal(true);
+        let false_ty = Type::bool_literal(false);
 
         // Empty tuple
         let empty_tuple = Type::empty_tuple(&db);

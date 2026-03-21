@@ -288,7 +288,7 @@ Module(
 2 | type X[T: yield x] = int
 3 | type X[T: yield from x] = int
 4 | type X[T: x := int] = int
-  |             ^^ Syntax Error: Expected ',', found ':='
+  |             ^^ Syntax Error: Expected `,`, found `:=`
   |
 
 

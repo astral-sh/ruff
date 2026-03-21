@@ -1,0 +1,224 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: paramspec_subcall_error_location.md - `ParamSpec` error locations - Functions
+mdtest path: crates/ty_python_semantic/resources/mdtest/paramspec_subcall_error_location.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from typing import Callable
+ 2 | 
+ 3 | def foo[**P, T](fn: Callable[P, T], *args: P.args, **kwargs: P.kwargs): ...
+ 4 | def fn1(a: int, b: int, c: int) -> None: ...
+ 5 | 
+ 6 | # error: [invalid-argument-type]
+ 7 | # error: [invalid-argument-type]
+ 8 | # error: [unknown-argument]
+ 9 | foo(fn1, "a", 2, c="c", unknown=1)
+10 | 
+11 | def fn2(a: int) -> None: ...
+12 | 
+13 | # error: [too-many-positional-arguments]
+14 | foo(fn2, 1, 2, 3)
+15 | 
+16 | def fn3(a: int, /) -> None: ...
+17 | 
+18 | # error: [positional-only-parameter-as-kwarg]
+19 | foo(fn3, a=1)
+20 | 
+21 | def fn4(a: int, b: int) -> None: ...
+22 | 
+23 | # error: [parameter-already-assigned]
+24 | # error: [missing-argument]
+25 | foo(fn4, 1, a=2)
+26 | 
+27 | # error: [missing-argument]
+28 | foo(fn4)
+```
+
+# Diagnostics
+
+```
+error[invalid-argument-type]: Argument to function `foo` is incorrect
+  --> src/mdtest_snippet.py:9:10
+   |
+ 7 | # error: [invalid-argument-type]
+ 8 | # error: [unknown-argument]
+ 9 | foo(fn1, "a", 2, c="c", unknown=1)
+   |          ^^^ Expected `int`, found `Literal["a"]`
+10 |
+11 | def fn2(a: int) -> None: ...
+   |
+info: Function defined here
+ --> src/mdtest_snippet.py:3:5
+  |
+1 | from typing import Callable
+2 |
+3 | def foo[**P, T](fn: Callable[P, T], *args: P.args, **kwargs: P.kwargs): ...
+  |     ^^^         ------------------ Parameter declared here
+4 | def fn1(a: int, b: int, c: int) -> None: ...
+  |
+info: rule `invalid-argument-type` is enabled by default
+
+```
+
+```
+error[invalid-argument-type]: Argument to function `foo` is incorrect
+  --> src/mdtest_snippet.py:9:18
+   |
+ 7 | # error: [invalid-argument-type]
+ 8 | # error: [unknown-argument]
+ 9 | foo(fn1, "a", 2, c="c", unknown=1)
+   |                  ^^^^^ Expected `int`, found `Literal["c"]`
+10 |
+11 | def fn2(a: int) -> None: ...
+   |
+info: Function defined here
+ --> src/mdtest_snippet.py:3:5
+  |
+1 | from typing import Callable
+2 |
+3 | def foo[**P, T](fn: Callable[P, T], *args: P.args, **kwargs: P.kwargs): ...
+  |     ^^^                                            ------------------ Parameter declared here
+4 | def fn1(a: int, b: int, c: int) -> None: ...
+  |
+info: rule `invalid-argument-type` is enabled by default
+
+```
+
+```
+error[unknown-argument]: Argument `unknown` does not match any known parameter of function `foo`
+  --> src/mdtest_snippet.py:9:25
+   |
+ 7 | # error: [invalid-argument-type]
+ 8 | # error: [unknown-argument]
+ 9 | foo(fn1, "a", 2, c="c", unknown=1)
+   |                         ^^^^^^^^^
+10 |
+11 | def fn2(a: int) -> None: ...
+   |
+info: Function signature here
+ --> src/mdtest_snippet.py:3:5
+  |
+1 | from typing import Callable
+2 |
+3 | def foo[**P, T](fn: Callable[P, T], *args: P.args, **kwargs: P.kwargs): ...
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+4 | def fn1(a: int, b: int, c: int) -> None: ...
+  |
+info: rule `unknown-argument` is enabled by default
+
+```
+
+```
+error[too-many-positional-arguments]: Too many positional arguments to function `foo`: expected 1, got 3
+  --> src/mdtest_snippet.py:14:13
+   |
+13 | # error: [too-many-positional-arguments]
+14 | foo(fn2, 1, 2, 3)
+   |             ^
+15 |
+16 | def fn3(a: int, /) -> None: ...
+   |
+info: Function signature here
+ --> src/mdtest_snippet.py:3:5
+  |
+1 | from typing import Callable
+2 |
+3 | def foo[**P, T](fn: Callable[P, T], *args: P.args, **kwargs: P.kwargs): ...
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+4 | def fn1(a: int, b: int, c: int) -> None: ...
+  |
+info: rule `too-many-positional-arguments` is enabled by default
+
+```
+
+```
+error[positional-only-parameter-as-kwarg]: Positional-only parameter 1 (`a`) passed as keyword argument of function `foo`
+  --> src/mdtest_snippet.py:19:10
+   |
+18 | # error: [positional-only-parameter-as-kwarg]
+19 | foo(fn3, a=1)
+   |          ^^^
+20 |
+21 | def fn4(a: int, b: int) -> None: ...
+   |
+info: Function signature here
+ --> src/mdtest_snippet.py:3:5
+  |
+1 | from typing import Callable
+2 |
+3 | def foo[**P, T](fn: Callable[P, T], *args: P.args, **kwargs: P.kwargs): ...
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+4 | def fn1(a: int, b: int, c: int) -> None: ...
+  |
+info: rule `positional-only-parameter-as-kwarg` is enabled by default
+
+```
+
+```
+error[missing-argument]: No argument provided for required parameter `b` of function `foo`
+  --> src/mdtest_snippet.py:25:1
+   |
+23 | # error: [parameter-already-assigned]
+24 | # error: [missing-argument]
+25 | foo(fn4, 1, a=2)
+   | ^^^^^^^^^^^^^^^^
+26 |
+27 | # error: [missing-argument]
+   |
+info: Parameter declared here
+ --> src/mdtest_snippet.py:3:37
+  |
+1 | from typing import Callable
+2 |
+3 | def foo[**P, T](fn: Callable[P, T], *args: P.args, **kwargs: P.kwargs): ...
+  |                                     ^^^^^^^^^^^^^
+4 | def fn1(a: int, b: int, c: int) -> None: ...
+  |
+info: rule `missing-argument` is enabled by default
+
+```
+
+```
+error[parameter-already-assigned]: Multiple values provided for parameter `a` of function `foo`
+  --> src/mdtest_snippet.py:25:13
+   |
+23 | # error: [parameter-already-assigned]
+24 | # error: [missing-argument]
+25 | foo(fn4, 1, a=2)
+   |             ^^^
+26 |
+27 | # error: [missing-argument]
+   |
+info: rule `parameter-already-assigned` is enabled by default
+
+```
+
+```
+error[missing-argument]: No arguments provided for required parameters `a`, `b` of function `foo`
+  --> src/mdtest_snippet.py:28:1
+   |
+27 | # error: [missing-argument]
+28 | foo(fn4)
+   | ^^^^^^^^
+   |
+info: Parameters declared here
+ --> src/mdtest_snippet.py:3:16
+  |
+1 | from typing import Callable
+2 |
+3 | def foo[**P, T](fn: Callable[P, T], *args: P.args, **kwargs: P.kwargs): ...
+  |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+4 | def fn1(a: int, b: int, c: int) -> None: ...
+  |
+info: rule `missing-argument` is enabled by default
+
+```

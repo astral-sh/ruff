@@ -1,10 +1,13 @@
 import sys
+from _typeshed import StrPath
 from abc import ABCMeta, abstractmethod
 from collections.abc import Iterator
 from io import BufferedReader
 from typing import IO, Any, Literal, Protocol, overload, runtime_checkable
+from typing_extensions import deprecated
 
 if sys.version_info >= (3, 11):
+    @deprecated("Deprecated since Python 3.12. Use `importlib.resources.abc.TraversableResources` instead.")
     class ResourceReader(metaclass=ABCMeta):
         """Abstract base class for loaders to provide resource reading support."""
 
@@ -65,7 +68,7 @@ if sys.version_info >= (3, 11):
             """
 
         @abstractmethod
-        def joinpath(self, *descendants: str) -> Traversable:
+        def joinpath(self, *descendants: StrPath) -> Traversable:
             """
             Return Traversable resolved with any descendants applied.
 
@@ -97,7 +100,7 @@ if sys.version_info >= (3, 11):
             The base name of this object without any parent references.
             """
 
-        def __truediv__(self, child: str, /) -> Traversable:
+        def __truediv__(self, child: StrPath, /) -> Traversable:
             """
             Return Traversable child in self
             """

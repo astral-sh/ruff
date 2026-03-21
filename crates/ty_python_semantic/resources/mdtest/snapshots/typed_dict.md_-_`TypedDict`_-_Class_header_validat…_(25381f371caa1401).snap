@@ -1,0 +1,184 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: typed_dict.md - `TypedDict` - Class header validation
+mdtest path: crates/ty_python_semantic/resources/mdtest/typed_dict.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from typing import TypedDict
+ 2 | 
+ 3 | class Foo(TypedDict, int): ...  # error: [invalid-typed-dict-header]
+ 4 | 
+ 5 | # This even fails at runtime!
+ 6 | class Foo2(TypedDict, object): ...  # error: [invalid-typed-dict-header]
+ 7 | class Bar(TypedDict, total=42): ...  # error: [invalid-argument-type]
+ 8 | class Baz(TypedDict, closed=None): ...  # error: [invalid-argument-type]
+ 9 | def f(is_total: bool):
+10 |     class VeryDynamic(TypedDict, total=is_total): ...  # error: [invalid-argument-type]
+11 | class Bazzzz(TypedDict, weird=56): ...  # error: [unknown-argument]
+12 | from abc import ABCMeta
+13 | 
+14 | class Spam(TypedDict, metaclass=ABCMeta): ...  # error: [invalid-typed-dict-header]
+15 | 
+16 | # This one works at runtime, but the metaclass is still `typing._TypedDictMeta`,
+17 | # so there doesn't seem to be any reason why you'd want to do this
+18 | class Ham(TypedDict, metaclass=type): ...  # error: [invalid-typed-dict-header]
+19 | def f(kwargs: dict):
+20 |     class Eggs(TypedDict, **kwargs): ...  # error: [invalid-typed-dict-header]
+```
+
+# Diagnostics
+
+```
+error[invalid-typed-dict-header]: TypedDict class `Foo` can only inherit from TypedDict classes
+   --> src/mdtest_snippet.py:3:22
+    |
+  1 | from typing import TypedDict
+  2 |
+  3 | class Foo(TypedDict, int): ...  # error: [invalid-typed-dict-header]
+    |                      ^^^ `int` is not a `TypedDict` class
+  4 |
+  5 | # This even fails at runtime!
+    |
+   ::: stdlib/builtins.pyi:348:7
+    |
+347 | @disjoint_base
+348 | class int:
+    |       --- `int` defined here
+349 |     """int([x]) -> integer
+350 |     int(x, base=10) -> integer
+    |
+info: rule `invalid-typed-dict-header` is enabled by default
+
+```
+
+```
+error[invalid-typed-dict-header]: TypedDict class `Foo2` can only inherit from TypedDict classes
+   --> src/mdtest_snippet.py:6:23
+    |
+  5 | # This even fails at runtime!
+  6 | class Foo2(TypedDict, object): ...  # error: [invalid-typed-dict-header]
+    |                       ^^^^^^ `object` is not a `TypedDict` class
+  7 | class Bar(TypedDict, total=42): ...  # error: [invalid-argument-type]
+  8 | class Baz(TypedDict, closed=None): ...  # error: [invalid-argument-type]
+    |
+   ::: stdlib/builtins.pyi:121:7
+    |
+120 | @disjoint_base
+121 | class object:
+    |       ------ `object` defined here
+122 |     """The base class of the class hierarchy.
+    |
+info: rule `invalid-typed-dict-header` is enabled by default
+
+```
+
+```
+error[invalid-argument-type]: Invalid argument to parameter `total` in `TypedDict` definition
+ --> src/mdtest_snippet.py:7:22
+  |
+5 | # This even fails at runtime!
+6 | class Foo2(TypedDict, object): ...  # error: [invalid-typed-dict-header]
+7 | class Bar(TypedDict, total=42): ...  # error: [invalid-argument-type]
+  |                      ^^^^^^^^ Expected either `True` or `False`, got object of type `Literal[42]`
+8 | class Baz(TypedDict, closed=None): ...  # error: [invalid-argument-type]
+9 | def f(is_total: bool):
+  |
+info: rule `invalid-argument-type` is enabled by default
+
+```
+
+```
+error[invalid-argument-type]: Invalid argument to parameter `closed` in `TypedDict` definition
+  --> src/mdtest_snippet.py:8:22
+   |
+ 6 | class Foo2(TypedDict, object): ...  # error: [invalid-typed-dict-header]
+ 7 | class Bar(TypedDict, total=42): ...  # error: [invalid-argument-type]
+ 8 | class Baz(TypedDict, closed=None): ...  # error: [invalid-argument-type]
+   |                      ^^^^^^^^^^^ Expected either `True` or `False`, got object of type `None`
+ 9 | def f(is_total: bool):
+10 |     class VeryDynamic(TypedDict, total=is_total): ...  # error: [invalid-argument-type]
+   |
+info: rule `invalid-argument-type` is enabled by default
+
+```
+
+```
+error[invalid-argument-type]: Invalid argument to parameter `total` in `TypedDict` definition
+  --> src/mdtest_snippet.py:10:34
+   |
+ 8 | class Baz(TypedDict, closed=None): ...  # error: [invalid-argument-type]
+ 9 | def f(is_total: bool):
+10 |     class VeryDynamic(TypedDict, total=is_total): ...  # error: [invalid-argument-type]
+   |                                  ^^^^^^^^^^^^^^ Expected either `True` or `False`, got object of type `bool`
+11 | class Bazzzz(TypedDict, weird=56): ...  # error: [unknown-argument]
+12 | from abc import ABCMeta
+   |
+info: rule `invalid-argument-type` is enabled by default
+
+```
+
+```
+error[unknown-argument]: Unknown keyword argument `weird` in `TypedDict` definition
+  --> src/mdtest_snippet.py:11:25
+   |
+ 9 | def f(is_total: bool):
+10 |     class VeryDynamic(TypedDict, total=is_total): ...  # error: [invalid-argument-type]
+11 | class Bazzzz(TypedDict, weird=56): ...  # error: [unknown-argument]
+   |                         ^^^^^^^^
+12 | from abc import ABCMeta
+   |
+info: rule `unknown-argument` is enabled by default
+
+```
+
+```
+error[invalid-typed-dict-header]: Custom metaclasses are not supported in `TypedDict` definitions
+  --> src/mdtest_snippet.py:14:23
+   |
+12 | from abc import ABCMeta
+13 |
+14 | class Spam(TypedDict, metaclass=ABCMeta): ...  # error: [invalid-typed-dict-header]
+   |                       ^^^^^^^^^^^^^^^^^
+15 |
+16 | # This one works at runtime, but the metaclass is still `typing._TypedDictMeta`,
+   |
+info: rule `invalid-typed-dict-header` is enabled by default
+
+```
+
+```
+error[invalid-typed-dict-header]: Custom metaclasses are not supported in `TypedDict` definitions
+  --> src/mdtest_snippet.py:18:22
+   |
+16 | # This one works at runtime, but the metaclass is still `typing._TypedDictMeta`,
+17 | # so there doesn't seem to be any reason why you'd want to do this
+18 | class Ham(TypedDict, metaclass=type): ...  # error: [invalid-typed-dict-header]
+   |                      ^^^^^^^^^^^^^^
+19 | def f(kwargs: dict):
+20 |     class Eggs(TypedDict, **kwargs): ...  # error: [invalid-typed-dict-header]
+   |
+info: rule `invalid-typed-dict-header` is enabled by default
+
+```
+
+```
+error[invalid-typed-dict-header]: Keyword-variadic arguments are not supported in `TypedDict` definitions
+  --> src/mdtest_snippet.py:20:27
+   |
+18 | class Ham(TypedDict, metaclass=type): ...  # error: [invalid-typed-dict-header]
+19 | def f(kwargs: dict):
+20 |     class Eggs(TypedDict, **kwargs): ...  # error: [invalid-typed-dict-header]
+   |                           ^^^^^^^^
+   |
+info: rule `invalid-typed-dict-header` is enabled by default
+
+```

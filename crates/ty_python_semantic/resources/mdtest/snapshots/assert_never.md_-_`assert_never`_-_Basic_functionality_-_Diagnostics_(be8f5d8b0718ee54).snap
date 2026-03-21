@@ -2,6 +2,7 @@
 source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
+
 ---
 mdtest name: assert_never.md - `assert_never` - Basic functionality - Diagnostics
 mdtest path: crates/ty_python_semantic/resources/mdtest/directives/assert_never.md

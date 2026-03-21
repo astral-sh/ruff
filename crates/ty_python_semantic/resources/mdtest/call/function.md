@@ -70,6 +70,8 @@ def _(flag: bool):
 
 ## PEP-484 convention for positional-only parameters
 
+<!-- snapshot-diagnostics -->
+
 PEP 570, introduced in Python 3.8, added dedicated Python syntax for denoting positional-only
 parameters (the `/` in a function signature). However, functions implemented in C were able to have
 positional-only parameters prior to Python 3.8 (there was just no syntax for expressing this at the
@@ -94,15 +96,55 @@ f(1)
 f(__x=1)
 ```
 
-But not if they follow a non-positional-only parameter:
+But not if they follow a non-positional-only parameter. This is flagged with a different error code
+since (per the typing spec), this is likely a mistake from the user:
 
 ```py
+from typing import overload
+
+# error: [invalid-legacy-positional-parameter]
 def g(x: int, __y: str): ...
 
 g(x=1, __y="foo")
+
+# The earlier `g` definition is shadowed here,
+# but we still emit a diagnostic on the earlier definition
+def g(): ...
 ```
 
-And also not if they both start and end with `__`:
+Because the lint is a syntactic check, we emit it for each overload if multiple overloads violate
+the lint:
+
+```py
+import tkinter
+from typing import Callable, TypeVar, Any
+
+@overload
+def g2(x: int, __y: str): ...  # error: [invalid-legacy-positional-parameter]
+@overload
+def g2(x: str, __y: int): ...  # error: [invalid-legacy-positional-parameter]
+def g2(x: str | int, __y: int | str): ...  # error: [invalid-legacy-positional-parameter]
+
+T = TypeVar("T")
+
+def copy_type(f: T) -> Callable[[Any], T]:
+    return lambda x: x
+
+# Naively iterating over the overloads using `.iter_overloads_and_implementation()` and/or
+# using `.signature()` would cause us to panic on this function, because the overloads
+# of this function's public signature are defined in `stdlib/tkinter/__init__.pyi` due to
+# the decorator.
+@copy_type(tkinter.Text.__init__)
+def g3(x, *args: Any, **kwargs: Any) -> None: ...
+def new_signature(): ...
+
+# The check is able to "see through" the decorators and examines the original function's
+# signature:
+@copy_type(new_signature)
+def g4(a, __b): ...  # error: [invalid-legacy-positional-parameter]
+```
+
+Parameters are also not understood as positional-only if they both start and end with `__`:
 
 ```py
 def h(__x__: str): ...
@@ -128,10 +170,15 @@ class C:
     # (the name of the first parameter is irrelevant;
     # a staticmethod works the same as a free function in the global scope)
     @staticmethod
-    def static_method(self, __x: int): ...
+    def static_method(self, __x: int): ...  # error: [invalid-legacy-positional-parameter]
+    # `__new__` is a staticmethod, but the `cls` parameter works in the same way as the `cls`
+    # parameter in a classmethod, and is always passed positionally at runtime,
+    # We therefore understand both `cls` and `__x` here as positional-only; we do not
+    # emit `[invalid-legacy-positional-parameter]` on the method.
+    def __new__(cls, __x: int): ...
 
 # error: [positional-only-parameter-as-kwarg]
-C().method(__x=1)
+C(42).method(__x=1)
 # error: [positional-only-parameter-as-kwarg]
 C.class_method(__x="1")
 C.static_method("x", __x=42)  # fine
@@ -739,6 +786,53 @@ for tup in my_other_args:
     f4(*tup, e=None)
 ```
 
+Regression test for <https://github.com/astral-sh/ty/issues/2734>.
+
+```py
+def f5(x: int | None = None, y: str = "") -> None: ...
+def f6(flag: bool) -> None:
+    args = () if flag else (1,)
+    f5(*args)
+
+def f7(x: int | None = None, y: str = "") -> None: ...
+def f8(flag: bool) -> None:
+    args = () if flag else ("bad",)
+    f7(*args)  # error: [invalid-argument-type]
+
+def f11(*args: int) -> None: ...
+def f12(args: tuple[int] | int) -> None:
+    f11(*args)  # error: [not-iterable]
+
+def f13(a: int, b: int, c: str) -> None: ...
+def f14(a: int, b: int, c: str, d: list[float], e: list[float]) -> None: ...
+def f15(profile: bool, line: str) -> None:
+    matcher = f13
+    timings = []
+    if profile:
+        matcher = f14
+        timings = [[0.0], [1.0], [2.0], [3.0]]
+    matcher(1, 2, line, *timings[:2])
+
+def f9(x: int = 0, y: str = "") -> None: ...
+def f10(args: tuple[int, ...] | tuple[int, str]) -> None:
+    # The variable-length element `int` from `tuple[int, ...]` unions with `str`
+    # from `tuple[int, str]` at position 1, giving `int | str` for `y: str`.
+    f9(*args)  # error: [invalid-argument-type]
+
+def f18(x: int = 0, y: int = 0) -> None: ...
+def f19(args: tuple[int, ...] | tuple[int, int]) -> None:
+    f18(*args)
+
+# TODO: Union variadic unpacking should also work when the non-defaulted parameters
+# are covered by all union elements, even if not all remaining parameters are defaulted.
+# Currently we only apply per-element iteration when all remaining positional parameters
+# have defaults, so this falls back to `iterate()` which produces `tuple[int, ...]` and
+# greedily matches `c: str` with `int`.
+def f16(a: int, b: int = 0, c: str = "") -> None: ...
+def f17(x: tuple[int] | tuple[int, int]) -> None:
+    f16(*x)  # error: [invalid-argument-type]  # TODO: false positive
+```
+
 ### Mixed argument and parameter containing variadic
 
 ```toml
@@ -777,6 +871,65 @@ def _(
 
     # error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `str`, found `int`"
     reveal_type(f(*args6))  # revealed: int
+```
+
+### Variable-length unpacking with explicit keyword arguments
+
+When a variable-length iterable (like a list) is unpacked and followed by explicit keyword
+arguments, the variadic unpacking should not greedily consume parameters that have explicit keyword
+bindings. This prevents false positive "parameter already assigned" errors.
+
+Regression test for <https://github.com/astral-sh/ty/issues/1584>.
+
+```py
+from typing import TypedDict
+
+def f(a: str, b: str, c: float) -> None: ...
+
+# Explicit keyword argument takes precedence over variable-length variadic expansion.
+# The list unpacking should only fill `a` and `b`, leaving `c` for the keyword argument.
+def _(args: list[str]) -> None:
+    f(*args, c=1.0)
+
+# Fixed-length tuple unpacking with keyword argument also works correctly.
+def _(args: tuple[str, str]) -> None:
+    f(*args, c=1.0)
+
+# But, with a fixed-length tuple that is too long, we get the expected error.
+def _(args: tuple[str, str, str]) -> None:
+    # error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `int | float`, found `str`"
+    # error: [parameter-already-assigned] "Multiple values provided for parameter `c` of function `f`"
+    f(*args, c=1.0)
+```
+
+However, when there's no explicit keyword argument, the behavior remains conservative:
+
+```py
+# Positional argument after variable-length variadic is ambiguous
+def _(args: list[str]) -> None:
+    # error: [invalid-argument-type]
+    # error: [too-many-positional-arguments]
+    f(*args, 1.0)
+
+# Multiple variable-length variadics are also ambiguous
+def _(args1: list[str], args2: list[float]) -> None:
+    # error: [invalid-argument-type]
+    f(*args1, *args2)
+
+# Keyword variadic (**dict) with unknown keys is also ambiguous
+def _(args: list[str], kwargs: dict[str, float]) -> None:
+    # error: [invalid-argument-type]
+    f(*args, **kwargs)
+
+# Keyword variadic with TypedDict has known keys but is still handled conservatively
+# but we could possibly improve this in the future.
+class CKwargs(TypedDict):
+    c: float
+
+def _(args: list[str]) -> None:
+    # error: [invalid-argument-type]
+    # error: [parameter-already-assigned]
+    f(*args, **CKwargs(c=1.0))
 ```
 
 ### Keyword argument, positional-or-keyword parameter
@@ -999,6 +1152,7 @@ from ty_extensions import static_assert
 static_assert()
 
 # error: [too-many-positional-arguments] "Too many positional arguments to function `static_assert`: expected 2, got 3"
+# error: [invalid-argument-type] "Argument to function `static_assert` is incorrect: Expected `LiteralString | None`, found `Literal[2]`"
 static_assert(True, 2, 3)
 ```
 
@@ -1185,7 +1339,11 @@ from collections.abc import Mapping
 def f(**kwargs: int) -> None: ...
 
 class DictSubclass(dict[int, int]): ...
-class MappingSubclass(Mapping[int, int]): ...
+
+class MappingSubclass(Mapping[int, int]):
+    def __iter__(self): ...
+    def __len__(self): ...
+    def __getitem__(self, key): ...
 
 class MappingProtocol:
     def keys(self) -> list[int]:
@@ -1237,7 +1395,12 @@ from collections.abc import Mapping
 def f(**kwargs: str) -> None: ...
 
 class DictSubclass(dict[str, int]): ...
-class MappingSubclass(Mapping[str, int]): ...
+
+class MappingSubclass(Mapping[str, int]):
+    def __iter__(self): ...
+    def __len__(self): ...
+    def __getitem__(self, key) -> int:
+        return 42
 
 class MappingProtocol:
     def keys(self) -> list[str]:
@@ -1288,6 +1451,33 @@ def _(kwargs: dict[str, int] | int):
     f(**InvalidMapping())
 ```
 
+### Not a mapping with overloaded function
+
+When `**kwargs` with a non-mapping type is passed to an overloaded function, the error should report
+the specific mapping type error.
+
+`overloaded.pyi`:
+
+```pyi
+from typing import overload
+
+@overload
+def f(x: int, **kwargs: int) -> int: ...
+@overload
+def f(x: str, **kwargs: str) -> str: ...
+```
+
+```py
+from overloaded import f
+
+# error: [invalid-argument-type] "Argument expression after ** must be a mapping type: Found `None`"
+f(1, **None)
+
+def _(kwargs: dict[str, int] | int):
+    # error: [invalid-argument-type] "Argument expression after ** must be a mapping type: Found `dict[str, int] | int`"
+    f(1, **kwargs)
+```
+
 ### Generic
 
 For a generic keywords parameter, the type variable should be specialized to the value type of the
@@ -1321,4 +1511,88 @@ def f(**kwargs: _T) -> _T:
     return kwargs["a"]
 
 reveal_type(f(**Foo(a=1, b="b")))  # revealed: int | str
+```
+
+## Non-iterable variadic argument
+
+A starred argument must be iterable. If it is not, an error should be reported.
+
+```py
+def some_fn(a: int):
+    pass
+
+# error: [not-iterable] "Object of type `None` is not iterable"
+some_fn(*None)
+```
+
+This also applies when the type might not be iterable:
+
+```py
+def f(*args: int) -> int:
+    return 1
+
+def _(x: int | list[int]):
+    # error: [not-iterable] "Object of type `int | list[int]` may not be iterable"
+    f(*x)
+```
+
+## Non-iterable variadic argument with overloaded functions
+
+`overloaded.pyi`:
+
+```pyi
+from typing import overload
+
+@overload
+def foo(a: int) -> tuple[int]: ...
+@overload
+def foo(a: int, b: int) -> tuple[int, int]: ...
+```
+
+```py
+from overloaded import foo
+
+# error: [not-iterable] "Object of type `None` is not iterable"
+foo(*None)
+
+def _(arg: int):
+    # error: [not-iterable] "Object of type `int` is not iterable"
+    foo(*arg)
+```
+
+## Union variadic unpacking with explicit keyword arguments
+
+When a union type containing variable-length elements (like `Unknown`) is unpacked as `*args`, the
+variadic expansion should not greedily consume optional positional parameters that are also provided
+as explicit keyword arguments.
+
+```py
+from ty_extensions import Unknown
+
+def f(a: int = 0, b: int = 0, c: int = 0, fmt: str | None = None) -> None: ...
+def _(args: "Unknown | tuple[int, int, int]"):
+    f(*args, fmt="{key}")  # fine
+```
+
+## Variadic unpacking should stop at max known arity
+
+When unpacking (a union of) fixed-length tuples, variadic matching should stop once the known
+positions are exhausted. Otherwise, optional positional parameters can be incorrectly treated as
+already assigned, causing false positives for `**kwargs`.
+
+(This test uses `**kwargs` unpacking of a `TypedDict` instead of the simpler `c=1` keyword argument,
+because `c=1` is a known keyword argument and we always prevent unpacking `*args` over an
+explicitly-provided keyword argument. The case shown here, without the explicit keyword argument,
+requires instead that we use our knowledge of the tuple length to prevent over-unpacking.)
+
+```py
+from typing import TypedDict
+
+class CKwargs(TypedDict):
+    c: int
+
+def f(a: int = 0, b: int = 0, c: int = 0) -> None: ...
+def _(args_tuple: tuple[int, int], args_union: tuple[int] | tuple[int, int], kwargs: CKwargs) -> None:
+    f(*args_tuple, **kwargs)  # fine
+    f(*args_union, **kwargs)  # fine
 ```

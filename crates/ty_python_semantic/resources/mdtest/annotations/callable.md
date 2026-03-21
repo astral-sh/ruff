@@ -20,10 +20,13 @@ is the return type. Here, we explore various invalid forms.
 A bare `Callable` without any type arguments:
 
 ```py
-from typing import Callable
+from typing import Callable, Any
+from ty_extensions import is_equivalent_to, static_assert
 
 def _(c: Callable):
     reveal_type(c)  # revealed: (...) -> Unknown
+
+static_assert(is_equivalent_to(Callable, Callable[..., Any]))
 ```
 
 ### Invalid parameter type argument
@@ -54,6 +57,21 @@ Or, when one of the parameter type is invalid in the list:
 def _(c: Callable[[int, 42, str, False], None]):
     # revealed: (int, Unknown, str, Unknown, /) -> None
     reveal_type(c)
+```
+
+Or, when an ellipsis literal is used as a parameter type in the list (note that the valid gradual
+form uses `...` as the entire first argument, not inside a list):
+
+```py
+# error: [invalid-type-form] "`[...]` is not a valid parameter list for `Callable`: Did you mean `Callable[..., int]`?"
+def _(c: Callable[[...], int]):
+    reveal_type(c)  # revealed: (...) -> int
+```
+
+```py
+# error: [invalid-type-form] "`...` is not allowed in this context in a type expression"
+def _(c: Callable[[int, ...], int]):
+    reveal_type(c)  # revealed: (int, Unknown, /) -> int
 ```
 
 ### Missing return type
@@ -184,6 +202,100 @@ def _(c: Callable[[int, str], int]):
     reveal_type(c)  # revealed: (int, str, /) -> int
 ```
 
+## Overloaded callable assignability
+
+An overloaded callable should be assignable to a non-overloaded callable type when the overload set
+as a whole is compatible with the target callable.
+
+```py
+from typing import Callable, overload
+
+@overload
+def foo(x: int) -> str: ...
+@overload
+def foo(x: str) -> str: ...
+def foo(x: int | str) -> str:
+    return str(x)
+
+def expects(c: Callable[[int | str], str]) -> None:
+    pass
+
+expects(foo)
+```
+
+```py
+from typing import overload
+
+@overload
+def foo(x: int) -> str: ...
+@overload
+def foo(x: str) -> str: ...
+def foo(x: int | str) -> str:
+    return str(x)
+
+def errors() -> None:
+    for x in map(foo, range(1, 10)):
+        print(x)
+```
+
+```py
+from typing import Callable, overload
+
+@overload
+def converter(x: int) -> str: ...
+@overload
+def converter(x: bytes) -> bytes: ...
+def converter(x: int | bytes) -> str | bytes:
+    if isinstance(x, int):
+        return str(x)
+    return x
+
+def expects_int_str(c: Callable[[int], str]) -> None:
+    pass
+
+expects_int_str(converter)
+```
+
+The overload set must cover the full target parameter domain.
+
+```py
+from typing import Callable, overload
+
+@overload
+def partial_converter(x: int) -> str: ...
+@overload
+def partial_converter(x: bytes) -> str: ...
+def partial_converter(x: int | bytes) -> str:
+    return str(x)
+
+def expects_int_or_str(c: Callable[[int | str], str]) -> None:
+    pass
+
+# error: [invalid-argument-type]
+expects_int_or_str(partial_converter)
+```
+
+Even when the parameter domain is covered, return compatibility must still hold.
+
+```py
+from typing import Callable, overload
+
+@overload
+def wide_return_converter(x: int) -> str: ...
+@overload
+def wide_return_converter(x: str) -> bytes: ...
+def wide_return_converter(x: int | str) -> str | bytes:
+    if isinstance(x, int):
+        return str(x)
+    return x.encode()
+
+def expects_str_return(c: Callable[[int | str], str]) -> None:
+    pass
+
+# error: [invalid-argument-type]
+expects_str_return(wide_return_converter)
+```
+
 ## Union
 
 ```py
@@ -234,7 +346,7 @@ And, as the return type:
 
 ```py
 def _(c: Callable[[int, str], Callable[[int], int]]):
-    reveal_type(c)  # revealed: (int, str, /) -> (int, /) -> int
+    reveal_type(c)  # revealed: (int, str, /) -> ((int, /) -> int)
 ```
 
 ## Gradual form
@@ -257,14 +369,6 @@ Using `Concatenate` as the first argument to `Callable`:
 from typing_extensions import Callable, Concatenate
 
 def _(c: Callable[Concatenate[int, str, ...], int]):
-    # TODO: Should reveal the correct signature
-    reveal_type(c)  # revealed: (...) -> int
-```
-
-And, as one of the parameter types:
-
-```py
-def _(c: Callable[[Concatenate[int, str, ...], int], int]):
     # TODO: Should reveal the correct signature
     reveal_type(c)  # revealed: (...) -> int
 ```
@@ -307,11 +411,10 @@ Using a `ParamSpec` in a `Callable` annotation:
 from typing_extensions import Callable
 
 def _[**P1](c: Callable[P1, int]):
-    reveal_type(P1.args)  # revealed: @Todo(ParamSpec)
-    reveal_type(P1.kwargs)  # revealed: @Todo(ParamSpec)
+    reveal_type(P1.args)  # revealed: P1@_.args
+    reveal_type(P1.kwargs)  # revealed: P1@_.kwargs
 
-    # TODO: Signature should be (**P1) -> int
-    reveal_type(c)  # revealed: (...) -> int
+    reveal_type(c)  # revealed: (**P1@_) -> int
 ```
 
 And, using the legacy syntax:
@@ -321,9 +424,8 @@ from typing_extensions import ParamSpec
 
 P2 = ParamSpec("P2")
 
-# TODO: argument list should not be `...` (requires `ParamSpec` support)
 def _(c: Callable[P2, int]):
-    reveal_type(c)  # revealed: (...) -> int
+    reveal_type(c)  # revealed: (**P2@_) -> int
 ```
 
 ## Using `typing.Unpack`
@@ -369,7 +471,7 @@ def f_wrong(c: Callable[[], None]):
     # error: [unresolved-attribute] "Object of type `() -> None` has no attribute `__qualname__`"
     c.__qualname__
 
-    # error: [unresolved-attribute] "Unresolved attribute `__qualname__` on type `() -> None`."
+    # error: [unresolved-attribute] "Unresolved attribute `__qualname__` on type `() -> None`"
     c.__qualname__ = "my_callable"
 ```
 
@@ -407,6 +509,24 @@ def f_okay(c: Callable[[], None]):
         reveal_type(result)  # revealed: property
         if isinstance(result, property) and result.fset:
             c.__qualname__ = "my_callable"  # okay
+```
+
+## From a class
+
+### Subclasses should return themselves, not superclass
+
+```py
+from ty_extensions import into_regular_callable
+
+class Base:
+    def __init__(self) -> None:
+        pass
+
+class A(Base):
+    pass
+
+# revealed: () -> A
+reveal_type(into_regular_callable(A))
 ```
 
 [gradual form]: https://typing.python.org/en/latest/spec/glossary.html#term-gradual-form

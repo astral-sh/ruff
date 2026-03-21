@@ -30,6 +30,12 @@ use rustc_hash::FxHashMap;
 /// import foo
 /// import bar
 /// ```
+///
+/// ## Options
+///
+/// This rule ignores dummy variables, as determined by:
+///
+/// - `lint.dummy-variable-rgx`
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.171")]
 pub(crate) struct RedefinedWhileUnused {
@@ -118,6 +124,13 @@ pub(crate) fn redefined_while_unused(checker: &Checker, scope_id: ScopeId, scope
                         | BindingKind::SubmoduleImport(..)
                         | BindingKind::FutureImport
                 ) {
+                    continue;
+                }
+
+                // Don't flag explicit re-exports (e.g., `from x import y as y`).
+                // A binding in a nested scope (like a class attribute) doesn't
+                // invalidate a module-level re-export.
+                if shadowed.is_explicit_export() {
                     continue;
                 }
             }

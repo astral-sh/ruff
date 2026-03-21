@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/statement/if.py
-snapshot_kind: text
 ---
 ## Input
 ```python
@@ -301,6 +300,42 @@ if parent_body:
       # d
         # e
           #f
+
+# Compare behavior with `while`/`else` comment placement
+
+if True: pass
+    # 1
+else:
+    pass
+
+if True:
+    pass
+        # 2
+else:
+    pass
+
+if True: pass
+# 3
+else:
+    pass
+
+if True: pass
+    # 4
+else:
+    pass
+
+def foo():
+    if True:
+        pass
+# 5
+    else:
+        pass
+
+if True:
+    first;second
+    # 6
+else:
+    pass
 ```
 
 ## Output
@@ -607,6 +642,48 @@ if parent_body:
 # d
 # e
 # f
+
+# Compare behavior with `while`/`else` comment placement
+
+if True:
+    pass
+# 1
+else:
+    pass
+
+if True:
+    pass
+    # 2
+else:
+    pass
+
+if True:
+    pass
+# 3
+else:
+    pass
+
+if True:
+    pass
+# 4
+else:
+    pass
+
+
+def foo():
+    if True:
+        pass
+    # 5
+    else:
+        pass
+
+
+if True:
+    first
+    second
+# 6
+else:
+    pass
 ```
 
 

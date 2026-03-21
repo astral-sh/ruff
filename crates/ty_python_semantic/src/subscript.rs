@@ -27,7 +27,7 @@ fn from_negative_i32(index: i32) -> usize {
     static_assertions::const_assert!(usize::BITS >= 32);
 
     index.checked_neg().map(from_nonnegative_i32).unwrap_or({
-        // 'checked_neg' only fails for i32::MIN. We can not
+        // 'checked_neg' only fails for i32::MIN. We cannot
         // represent -i32::MIN as a i32, but we can represent
         // it as a usize, since usize is at least 32 bits.
         from_nonnegative_i32(i32::MAX) + 1

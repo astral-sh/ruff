@@ -1,5 +1,5 @@
 use ruff_python_ast::StmtImportFrom;
-use ruff_python_parser::{TokenKind, Tokens};
+use ruff_python_ast::token::{TokenKind, Tokens};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::Locator;

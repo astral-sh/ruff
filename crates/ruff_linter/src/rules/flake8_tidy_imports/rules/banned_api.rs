@@ -47,7 +47,7 @@ pub(crate) fn banned_api<T: Ranged>(checker: &Checker, policy: &NameMatchPolicy,
             checker.report_diagnostic(
                 BannedApi {
                     name: banned_module,
-                    message: reason.msg.to_string(),
+                    message: reason.msg.clone(),
                 },
                 node.range(),
             );
@@ -74,8 +74,8 @@ pub(crate) fn banned_attribute_access(checker: &Checker, expr: &Expr) {
     {
         checker.report_diagnostic(
             BannedApi {
-                name: banned_path.to_string(),
-                message: ban.msg.to_string(),
+                name: banned_path.clone(),
+                message: ban.msg.clone(),
             },
             expr.range(),
         );

@@ -1,0 +1,45 @@
+---
+source: crates/ty_server/tests/e2e/pull_diagnostics.rs
+expression: main_diagnostics
+---
+{
+  "kind": "full",
+  "resultId": "[RESULT_ID]",
+  "items": [
+    {
+      "range": {
+        "start": {
+          "line": 0,
+          "character": 0
+        },
+        "end": {
+          "line": 0,
+          "character": 11
+        }
+      },
+      "severity": 2,
+      "code": "undefined-reveal",
+      "codeDescription": {
+        "href": "https://ty.dev/rules#undefined-reveal"
+      },
+      "source": "ty",
+      "message": "`reveal_type` used without importing it"
+    },
+    {
+      "range": {
+        "start": {
+          "line": 0,
+          "character": 12
+        },
+        "end": {
+          "line": 0,
+          "character": 22
+        }
+      },
+      "severity": 3,
+      "code": "revealed-type",
+      "source": "ty",
+      "message": "Revealed type: `Literal[/"included/"]`"
+    }
+  ]
+}

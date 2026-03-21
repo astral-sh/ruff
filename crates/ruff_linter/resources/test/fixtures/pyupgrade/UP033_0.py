@@ -44,3 +44,11 @@ def lru_cache(maxsize=None):
 @lru_cache(maxsize=None)
 def ok():
     pass
+
+
+
+@functools.lru_cache(
+    maxsize=None,  # text
+)
+def fixme_unsafe():
+    pass

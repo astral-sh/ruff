@@ -3,13 +3,13 @@
 ## Basic set
 
 ```py
-reveal_type({1, 2})  # revealed: set[Unknown | int]
+reveal_type({1, 2})  # revealed: set[int]
 ```
 
 ## Set of tuples
 
 ```py
-reveal_type({(1, 2), (3, 4)})  # revealed: set[Unknown | tuple[int, int]]
+reveal_type({(1, 2), (3, 4)})  # revealed: set[tuple[int, int]]
 ```
 
 ## Set of functions
@@ -22,18 +22,18 @@ def b(_: int) -> int:
     return 1
 
 x = {a, b}
-reveal_type(x)  # revealed: set[Unknown | ((_: int) -> int)]
+reveal_type(x)  # revealed: set[(_: int) -> int]
 ```
 
 ## Mixed set
 
 ```py
-# revealed: set[Unknown | int | tuple[int, int] | tuple[int, int, int]]
+# revealed: set[int | tuple[int, int] | tuple[int, int, int]]
 reveal_type({1, (1, 2), (1, 2, 3)})
 ```
 
 ## Set comprehensions
 
 ```py
-reveal_type({x for x in range(42)})  # revealed: set[@Todo(set comprehension element type)]
+reveal_type({x for x in range(42)})  # revealed: set[int]
 ```

@@ -46,6 +46,7 @@ Functions:
     default_timer() -> float
 """
 
+import time
 from collections.abc import Callable, Sequence
 from typing import IO, Any
 from typing_extensions import TypeAlias
@@ -76,7 +77,11 @@ class Timer:
     """
 
     def __init__(
-        self, stmt: _Stmt = "pass", setup: _Stmt = "pass", timer: _Timer = ..., globals: dict[str, Any] | None = None
+        self,
+        stmt: _Stmt = "pass",
+        setup: _Stmt = "pass",
+        timer: _Timer = time.perf_counter,
+        globals: dict[str, Any] | None = None,
     ) -> None:
         """Constructor.  See class doc string."""
 
@@ -142,14 +147,18 @@ class Timer:
         """
 
 def timeit(
-    stmt: _Stmt = "pass", setup: _Stmt = "pass", timer: _Timer = ..., number: int = 1000000, globals: dict[str, Any] | None = None
+    stmt: _Stmt = "pass",
+    setup: _Stmt = "pass",
+    timer: _Timer = time.perf_counter,
+    number: int = 1000000,
+    globals: dict[str, Any] | None = None,
 ) -> float:
     """Convenience function to create Timer object and call timeit method."""
 
 def repeat(
     stmt: _Stmt = "pass",
     setup: _Stmt = "pass",
-    timer: _Timer = ...,
+    timer: _Timer = time.perf_counter,
     repeat: int = 5,
     number: int = 1000000,
     globals: dict[str, Any] | None = None,

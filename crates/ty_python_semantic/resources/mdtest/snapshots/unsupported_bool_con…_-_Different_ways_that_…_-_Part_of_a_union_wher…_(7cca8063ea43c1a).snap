@@ -2,6 +2,7 @@
 source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
+
 ---
 mdtest name: unsupported_bool_conversion.md - Different ways that `unsupported-bool-conversion` can occur - Part of a union where at least one member has incorrect `__bool__` method
 mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/unsupported_bool_conversion.md
@@ -32,7 +33,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/unsupported_
 # Diagnostics
 
 ```
-error[unsupported-bool-conversion]: Boolean conversion is unsupported for union `NotBoolable1 | NotBoolable2 | NotBoolable3` because `NotBoolable1` doesn't implement `__bool__` correctly
+error[unsupported-bool-conversion]: Boolean conversion is not supported for union `NotBoolable1 | NotBoolable2 | NotBoolable3` because `NotBoolable1` doesn't implement `__bool__` correctly
   --> src/mdtest_snippet.py:15:8
    |
 14 | # error: [unsupported-bool-conversion]

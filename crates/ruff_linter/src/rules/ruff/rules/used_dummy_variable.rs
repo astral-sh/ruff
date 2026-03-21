@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::is_dunder;
-use ruff_python_semantic::{Binding, BindingId};
+use ruff_python_semantic::{Binding, BindingId, BindingKind, ScopeKind};
 use ruff_python_stdlib::identifiers::is_identifier;
 use ruff_text_size::Ranged;
 
@@ -111,7 +111,7 @@ pub(crate) fn used_dummy_variable(checker: &Checker, binding: &Binding, binding_
         return;
     }
 
-    // We only emit the lint on variables defined via assignments.
+    // We only emit the lint on local variables.
     //
     // ## Why not also emit the lint on function parameters?
     //
@@ -127,8 +127,30 @@ pub(crate) fn used_dummy_variable(checker: &Checker, binding: &Binding, binding_
     // autofixing the diagnostic for assignments. See:
     // - <https://github.com/astral-sh/ruff/issues/14790>
     // - <https://github.com/astral-sh/ruff/issues/14799>
-    if !binding.kind.is_assignment() {
-        return;
+    match binding.kind {
+        BindingKind::Annotation
+        | BindingKind::Argument
+        | BindingKind::NamedExprAssignment
+        | BindingKind::Assignment
+        | BindingKind::LoopVar
+        | BindingKind::WithItemVar
+        | BindingKind::BoundException
+        | BindingKind::UnboundException(_) => {}
+
+        BindingKind::TypeParam
+        | BindingKind::Global(_)
+        | BindingKind::Nonlocal(_, _)
+        | BindingKind::Builtin
+        | BindingKind::ClassDefinition(_)
+        | BindingKind::FunctionDefinition(_)
+        | BindingKind::Export(_)
+        | BindingKind::FutureImport
+        | BindingKind::Import(_)
+        | BindingKind::FromImport(_)
+        | BindingKind::SubmoduleImport(_)
+        | BindingKind::Deletion
+        | BindingKind::ConditionalDeletion(_)
+        | BindingKind::DunderClassCell => return,
     }
 
     // This excludes `global` and `nonlocal` variables.
@@ -138,9 +160,12 @@ pub(crate) fn used_dummy_variable(checker: &Checker, binding: &Binding, binding_
 
     let semantic = checker.semantic();
 
-    // Only variables defined in function scopes
+    // Only variables defined in function and generator scopes
     let scope = &semantic.scopes[binding.scope];
-    if !scope.kind.is_function() {
+    if !matches!(
+        scope.kind,
+        ScopeKind::Function(_) | ScopeKind::Generator { .. }
+    ) {
         return;
     }
 

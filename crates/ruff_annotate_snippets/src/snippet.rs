@@ -12,13 +12,19 @@
 
 use std::ops::Range;
 
+#[derive(Copy, Clone, Debug, Default, PartialEq)]
+pub(crate) struct Id<'a> {
+    pub(crate) id: &'a str,
+    pub(crate) url: Option<&'a str>,
+}
+
 /// Primary structure provided for formatting
 ///
 /// See [`Level::title`] to create a [`Message`]
 #[derive(Debug)]
 pub struct Message<'a> {
     pub(crate) level: Level,
-    pub(crate) id: Option<&'a str>,
+    pub(crate) id: Option<Id<'a>>,
     pub(crate) title: &'a str,
     pub(crate) snippets: Vec<Snippet<'a>>,
     pub(crate) footer: Vec<Message<'a>>,
@@ -28,7 +34,12 @@ pub struct Message<'a> {
 
 impl<'a> Message<'a> {
     pub fn id(mut self, id: &'a str) -> Self {
-        self.id = Some(id);
+        self.id = Some(Id { id, url: None });
+        self
+    }
+
+    pub fn id_with_url(mut self, id: &'a str, url: Option<&'a str>) -> Self {
+        self.id = Some(Id { id, url });
         self
     }
 

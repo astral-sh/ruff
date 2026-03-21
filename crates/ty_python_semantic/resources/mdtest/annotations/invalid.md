@@ -86,7 +86,9 @@ async def outer_async():  # avoid unrelated syntax errors on `yield` and `await`
         b: 2.3,  # error: [invalid-type-form] "Float literals are not allowed in type expressions"
         c: 4j,  # error: [invalid-type-form] "Complex literals are not allowed in type expressions"
         d: True,  # error: [invalid-type-form] "Boolean literals are not allowed in this context in a type expression"
-        e: int | b"foo",  # error: [invalid-type-form] "Bytes literals are not allowed in this context in a type expression"
+        # error: [unsupported-operator]
+        # error: [invalid-type-form] "Bytes literals are not allowed in this context in a type expression"
+        e: int | b"foo",
         f: 1 and 2,  # error: [invalid-type-form] "Boolean operations are not allowed in type expressions"
         g: 1 or 2,  # error: [invalid-type-form] "Boolean operations are not allowed in type expressions"
         h: (foo := 1),  # error: [invalid-type-form] "Named expressions are not allowed in type expressions"
@@ -97,8 +99,12 @@ async def outer_async():  # avoid unrelated syntax errors on `yield` and `await`
         m: (yield 1),  # error: [invalid-type-form] "`yield` expressions are not allowed in type expressions"
         n: 1 < 2,  # error: [invalid-type-form] "Comparison expressions are not allowed in type expressions"
         o: bar(),  # error: [invalid-type-form] "Function calls are not allowed in type expressions"
-        p: int | f"foo",  # error: [invalid-type-form] "F-strings are not allowed in type expressions"
-        q: [1, 2, 3][1:2],  # error: [invalid-type-form] "Slices are not allowed in type expressions"
+        # error: [unsupported-operator]
+        # error: [invalid-type-form] "F-strings are not allowed in type expressions"
+        p: int | f"foo",
+        # error: [invalid-type-form] "Slices are not allowed in type expressions"
+        # error: [invalid-type-form] "Invalid subscript"
+        q: [1, 2, 3][1:2],
     ):
         reveal_type(a)  # revealed: Unknown
         reveal_type(b)  # revealed: Unknown
@@ -116,7 +122,7 @@ async def outer_async():  # avoid unrelated syntax errors on `yield` and `await`
         reveal_type(n)  # revealed: Unknown
         reveal_type(o)  # revealed: Unknown
         reveal_type(p)  # revealed: int | Unknown
-        reveal_type(q)  # revealed: @Todo(unknown type subscript)
+        reveal_type(q)  # revealed: Unknown
 
 class Mat:
     def __init__(self, value: int):
@@ -151,6 +157,114 @@ def invalid_binary_operators(
     reveal_type(j)  # revealed: Unknown
     reveal_type(k)  # revealed: Unknown
     reveal_type(l)  # revealed: Unknown
+```
+
+## Multiple starred expressions in a `tuple` specialization
+
+<!-- snapshot-diagnostics -->
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from typing import TypeVarTuple, Unpack
+
+Ts = TypeVarTuple("Ts")
+
+def f(
+    # error: [invalid-type-form] "Multiple unpacked variadic tuples are not allowed in a `tuple` specialization"
+    x: tuple[*tuple[int, ...], *tuple[str, ...]],
+    # error: [invalid-type-form] "Multiple unpacked variadic tuples are not allowed in a `tuple` specialization"
+    x2: tuple[Unpack[tuple[int, ...]], Unpack[tuple[str, ...]]],
+    y: tuple[*tuple[int, ...], str, int, *tuple[str, ...]],  # error: [invalid-type-form]
+    y2: tuple[Unpack[tuple[int, ...]], str, int, Unpack[tuple[str, ...]]],  # error: [invalid-type-form]
+    # Multiple unpacked elements are fine, as long as the unpacked elements are not variadic:
+    z: tuple[*tuple[int, ...], *tuple[str]],
+    z2: tuple[Unpack[tuple[int, ...]], Unpack[tuple[str]]],
+):
+    reveal_type(x)  # revealed: tuple[int | str, ...]
+    reveal_type(x2)  # revealed: tuple[int | str, ...]
+    reveal_type(y)  # revealed: tuple[str | int, ...]
+    reveal_type(y2)  # revealed: tuple[str | int, ...]
+    reveal_type(z)  # revealed: tuple[*tuple[int, ...], str]
+    reveal_type(z2)  # revealed: tuple[*tuple[int, ...], str]
+
+T1 = tuple[int, *Ts, str, *Ts]  # error: [invalid-type-form]
+
+def func3(t: tuple[*Ts]):
+    t5: tuple[*tuple[str], *Ts]  # OK
+    t6: tuple[*tuple[str, ...], *Ts]  # error: [invalid-type-form]
+```
+
+## Ellipses in the wrong place in a `tuple` specialization
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+t1: tuple[int, ...]
+# error: [invalid-type-form] "Invalid `tuple` specialization: `...` can only be used as the second element in a two-element `tuple` specialization"
+t2: tuple[int, int, ...]
+# error: [invalid-type-form] "Invalid `tuple` specialization: `...` can only be used as the second element in a two-element `tuple` specialization"
+t3: tuple[...]
+# error: [invalid-type-form] "Invalid `tuple` specialization: `...` can only be used as the second element in a two-element `tuple` specialization"
+t4: tuple[..., int]
+# error: [invalid-type-form] "Invalid `tuple` specialization: `...` can only be used as the second element in a two-element `tuple` specialization"
+t5: tuple[int, ..., int]
+# error: [invalid-type-form] "Invalid `tuple` specialization: `...` cannot be used after an unpacked element"
+t6: tuple[*tuple[str], ...]
+# error: [invalid-type-form] "Invalid `tuple` specialization: `...` cannot be used after an unpacked element"
+t7: tuple[*tuple[str, ...], ...]
+```
+
+## Invalid AST nodes in string annotations
+
+Invalid AST nodes should also be rejected when they appear in string annotations:
+
+```py
+def bar() -> None:
+    return None
+
+async def baz(): ...
+async def outer_async():  # avoid unrelated syntax errors on `yield` and `await`
+    def _(
+        a: "1",  # error: [invalid-type-form] "Int literals are not allowed in this context in a type expression"
+        b: "2.3",  # error: [invalid-type-form] "Float literals are not allowed in type expressions"
+        c: "4j",  # error: [invalid-type-form] "Complex literals are not allowed in type expressions"
+        d: "True",  # error: [invalid-type-form] "Boolean literals are not allowed in this context in a type expression"
+        e: "1 and 2",  # error: [invalid-type-form] "Boolean operations are not allowed in type expressions"
+        f: "1 or 2",  # error: [invalid-type-form] "Boolean operations are not allowed in type expressions"
+        g: "(foo := 1)",  # error: [invalid-type-form] "Named expressions are not allowed in type expressions"
+        h: "not 1",  # error: [invalid-type-form] "Unary operations are not allowed in type expressions"
+        i: "lambda: 1",  # error: [invalid-type-form] "`lambda` expressions are not allowed in type expressions"
+        j: "1 if True else 2",  # error: [invalid-type-form] "`if` expressions are not allowed in type expressions"
+        k: "await baz()",  # error: [invalid-type-form] "`await` expressions are not allowed in type expressions"
+        l: "(yield 1)",  # error: [invalid-type-form] "`yield` expressions are not allowed in type expressions"
+        m: "1 < 2",  # error: [invalid-type-form] "Comparison expressions are not allowed in type expressions"
+        n: "bar()",  # error: [invalid-type-form] "Function calls are not allowed in type expressions"
+        # error: [invalid-type-form] "Slices are not allowed in type expressions"
+        # error: [invalid-type-form] "Invalid subscript"
+        o: "[1, 2, 3][1:2]",
+    ):
+        reveal_type(a)  # revealed: Unknown
+        reveal_type(b)  # revealed: Unknown
+        reveal_type(c)  # revealed: Unknown
+        reveal_type(d)  # revealed: Unknown
+        reveal_type(e)  # revealed: Unknown
+        reveal_type(f)  # revealed: Unknown
+        reveal_type(g)  # revealed: Unknown
+        reveal_type(h)  # revealed: Unknown
+        reveal_type(i)  # revealed: Unknown
+        reveal_type(j)  # revealed: Unknown
+        reveal_type(k)  # revealed: Unknown
+        reveal_type(l)  # revealed: Unknown
+        reveal_type(m)  # revealed: Unknown
+        reveal_type(n)  # revealed: Unknown
+        reveal_type(o)  # revealed: Unknown
 ```
 
 ## Invalid Collection based AST nodes
@@ -263,4 +377,13 @@ def _(
     x: (int, str),  # error: [invalid-type-form]
 ) -> (int, str):  # error: [invalid-type-form]
     return x
+```
+
+### Special-cased diagnostic for `callable` used in a type expression
+
+```py
+# error: [invalid-type-form]
+# error: [invalid-type-form]
+def decorator(fn: callable) -> callable:
+    return fn
 ```

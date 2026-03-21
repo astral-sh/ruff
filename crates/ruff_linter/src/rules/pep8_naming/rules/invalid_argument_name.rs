@@ -23,7 +23,7 @@ use crate::checkers::ast::Checker;
 /// > mixedCase is allowed only in contexts where that’s already the
 /// > prevailing style (e.g. threading.py), to retain backwards compatibility.
 ///
-/// Methods decorated with `@typing.override` are ignored.
+/// Methods decorated with [`@typing.override`][override] are ignored.
 ///
 /// ## Example
 /// ```python
@@ -43,6 +43,8 @@ use crate::checkers::ast::Checker;
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#function-and-method-arguments
 /// [preview]: https://docs.astral.sh/ruff/preview/
+///
+/// [override]: https://docs.python.org/3/library/typing.html#typing.override
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.77")]
 pub(crate) struct InvalidArgumentName {

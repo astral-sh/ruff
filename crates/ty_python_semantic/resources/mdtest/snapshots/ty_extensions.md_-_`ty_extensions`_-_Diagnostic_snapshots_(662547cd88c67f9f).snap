@@ -2,6 +2,7 @@
 source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
+
 ---
 mdtest name: ty_extensions.md - `ty_extensions` - Diagnostic snapshots
 mdtest path: crates/ty_python_semantic/resources/mdtest/ty_extensions.md
@@ -72,7 +73,7 @@ info: rule `static-assert-error` is enabled by default
 ```
 
 ```
-error[static-assert-error]: Static assertion error: argument of type `Literal[""]` is statically known to be falsy
+error[static-assert-error]: Static assertion error: argument of type `Literal[""]` is always falsy
   --> src/mdtest_snippet.py:17:1
    |
 15 | # evaluates to something falsey

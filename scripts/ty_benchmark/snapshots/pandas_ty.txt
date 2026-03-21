@@ -1,0 +1,1007 @@
+pandas/__init__.py:178:10: error[unresolved-import] Cannot resolve imported module `pandas._version_meson`
+pandas/_libs/sparse.pyi:43:9: error[invalid-method-override] Invalid override of method `intersect`: Definition is incompatible with `SparseIndex.intersect`
+pandas/_libs/sparse.pyi:44:9: error[invalid-method-override] Invalid override of method `make_union`: Definition is incompatible with `SparseIndex.make_union`
+pandas/_libs/tslibs/timestamps.pyi:159:9: error[invalid-method-override] Invalid override of method `__sub__`: Definition is incompatible with `date.__sub__`
+pandas/_testing/__init__.py:507:25: warning[possibly-missing-attribute] Submodule `arrays` may not be available as an attribute on module `pandas.core`
+pandas/_testing/__init__.py:509:25: warning[possibly-missing-attribute] Submodule `arrays` may not be available as an attribute on module `pandas.core`
+pandas/_version.py:44:5: error[unresolved-attribute] Unresolved attribute `VCS` on type `VersioneerConfig`.
+pandas/_version.py:45:5: error[unresolved-attribute] Unresolved attribute `style` on type `VersioneerConfig`.
+pandas/_version.py:46:5: error[unresolved-attribute] Unresolved attribute `tag_prefix` on type `VersioneerConfig`.
+pandas/_version.py:47:5: error[unresolved-attribute] Unresolved attribute `parentdir_prefix` on type `VersioneerConfig`.
+pandas/_version.py:48:5: error[unresolved-attribute] Unresolved attribute `versionfile_source` on type `VersioneerConfig`.
+pandas/_version.py:49:5: error[unresolved-attribute] Unresolved attribute `verbose` on type `VersioneerConfig`.
+pandas/_version.py:101:16: error[unresolved-attribute] Object of type `BaseException | None` has no attribute `errno`
+pandas/_version.py:111:14: error[unresolved-attribute] Object of type `str` has no attribute `decode`
+pandas/conftest.py:2123:10: error[missing-argument] No argument provided for required parameter `cls`
+pandas/conftest.py:2123:10: error[missing-argument] No argument provided for required parameter `cls`
+pandas/core/_numba/executor.py:48:22: error[not-iterable] Object of type `prange` is not iterable
+pandas/core/_numba/executor.py:52:22: error[not-iterable] Object of type `prange` is not iterable
+pandas/core/_numba/executor.py:78:22: error[not-iterable] Object of type `prange` is not iterable
+pandas/core/_numba/executor.py:103:22: error[not-iterable] Object of type `prange` is not iterable
+pandas/core/_numba/extensions.py:22:5: error[unresolved-import] Module `numba.core.extending` has no member `NativeValue`
+pandas/core/_numba/extensions.py:23:5: error[unresolved-import] Module `numba.core.extending` has no member `box`
+pandas/core/_numba/extensions.py:24:5: error[unresolved-import] Module `numba.core.extending` has no member `lower_builtin`
+pandas/core/_numba/extensions.py:29:5: error[unresolved-import] Module `numba.core.extending` has no member `register_model`
+pandas/core/_numba/extensions.py:31:5: error[unresolved-import] Module `numba.core.extending` has no member `typeof_impl`
+pandas/core/_numba/extensions.py:32:5: error[unresolved-import] Module `numba.core.extending` has no member `unbox`
+pandas/core/_numba/extensions.py:61:9: error[unresolved-attribute] Unresolved attribute `_numba_data` on type `Index`.
+pandas/core/_numba/extensions.py:64:13: error[unresolved-attribute] Object of type `Index` has no attribute `_numba_data`
+pandas/core/_numba/extensions.py:74:48: error[invalid-type-form] Variable of type `def any(iterable: Iterable[object], /) -> bool` is not allowed in a type expression
+pandas/core/_numba/extensions.py:299:67: warning[possibly-missing-attribute] Submodule `typed` may not be available as an attribute on module `numba`
+pandas/core/_numba/extensions.py:574:16: error[missing-argument] No argument provided for required parameter `obj` of bound method `__init__`
+pandas/core/_numba/kernels/mean_.py:135:21: error[unresolved-reference] Name `num_consecutive_same_value` used when not defined
+pandas/core/_numba/kernels/mean_.py:136:21: error[unresolved-reference] Name `prev_value` used when not defined
+pandas/core/_numba/kernels/sum_.py:135:21: error[unresolved-reference] Name `num_consecutive_same_value` used when not defined
+pandas/core/_numba/kernels/sum_.py:136:21: error[unresolved-reference] Name `prev_value` used when not defined
+pandas/core/_numba/kernels/var_.py:144:21: error[unresolved-reference] Name `num_consecutive_same_value` used when not defined
+pandas/core/_numba/kernels/var_.py:145:21: error[unresolved-reference] Name `prev_value` used when not defined
+pandas/core/algorithms.py:214:16: error[invalid-return-type] Return type does not match returned value: expected `ArrayLikeT@_reconstruct_data`, found `ExtensionArray`
+pandas/core/algorithms.py:469:16: warning[possibly-missing-attribute] Attribute `unique` may be missing on object of type `ExtensionArray | ndarray[tuple[Any, ...], dtype[Any]]`
+pandas/core/algorithms.py:476:45: error[invalid-argument-type] Argument to function `_get_hashtable_algo` is incorrect: Expected `ndarray[tuple[Any, ...], dtype[Any]]`, found `(ExtensionArray & ~Index) | (ndarray[tuple[Any, ...], dtype[Any]] & ~Index)`
+pandas/core/algorithms.py:546:33: error[invalid-argument-type] Argument to bound method `isin` is incorrect: Expected `ExtensionArray | ndarray[tuple[Any, ...], dtype[Any]]`, found `ExtensionArray | ndarray[tuple[Any, ...], dtype[Any]] | Index | ... omitted 3 union elements`
+pandas/core/algorithms.py:551:30: warning[possibly-missing-attribute] Attribute `dtype` may be missing on object of type `ExtensionArray | ndarray[tuple[Any, ...], dtype[Any]] | Index | ... omitted 3 union elements`
+pandas/core/algorithms.py:555:30: warning[possibly-missing-attribute] Attribute `dtype` may be missing on object of type `ExtensionArray | ndarray[tuple[Any, ...], dtype[Any]] | Index | ... omitted 3 union elements`
+pandas/core/algorithms.py:556:34: warning[possibly-missing-attribute] Attribute `astype` may be missing on object of type `ExtensionArray | ndarray[tuple[Any, ...], dtype[Any]] | Index | ... omitted 3 union elements`
+pandas/core/algorithms.py:558:21: warning[possibly-missing-attribute] Attribute `dtype` may be missing on object of type `ExtensionArray | ndarray[tuple[Any, ...], dtype[Any]] | Index | ... omitted 3 union elements`
+pandas/core/algorithms.py:586:38: warning[possibly-missing-attribute] Attribute `dtype` may be missing on object of type `ExtensionArray | ndarray[tuple[Any, ...], dtype[Any]] | Index | ... omitted 3 union elements`
+pandas/core/algorithms.py:587:18: warning[possibly-missing-attribute] Attribute `astype` may be missing on object of type `ExtensionArray | ndarray[tuple[Any, ...], dtype[Any]] | Index | ... omitted 3 union elements`
+pandas/core/algorithms.py:591:27: error[invalid-argument-type] Argument to function `ismember` is incorrect: Expected `ndarray[tuple[Any, ...], dtype[Any]]`, found `ExtensionArray | ndarray[tuple[Any, ...], dtype[Any]] | Index | ... omitted 5 union elements`
+pandas/core/algorithms.py:855:33: error[invalid-argument-type] Argument to function `_reconstruct_data` is incorrect: Argument type `ExtensionArray | ndarray[tuple[Any, ...], dtype[Any]] | Any | Index | Series` does not satisfy constraints (`ExtensionArray`, `ndarray[tuple[Any, ...], dtype[Any]]`) of type variable `ArrayLikeT`
+pandas/core/algorithms.py:930:54: error[invalid-argument-type] Argument to function `value_counts_arraylike` is incorrect: Expected `ndarray[tuple[Any, ...], dtype[Any]]`, found `ExtensionArray | ndarray[tuple[Any, ...], dtype[Any]]`
+pandas/core/algorithms.py:1062:32: error[invalid-argument-type] Argument to function `_reconstruct_data` is incorrect: Argument type `Unknown | ExtensionArray | ndarray[tuple[Any, ...], dtype[Any]] | ... omitted 3 union elements` does not satisfy constraints (`ExtensionArray`, `ndarray[tuple[Any, ...], dtype[Any]]`) of type variable `ArrayLikeT`
+pandas/core/algorithms.py:1368:33: warning[possibly-missing-attribute] Attribute `is_integer` may be missing on object of type `int | float | integer[Any] | floating[Any]`
+pandas/core/apply.py:197:50: error[invalid-argument-type] Argument expression after ** must be a mapping type: Found `Unknown | None`
+pandas/core/apply.py:379:57: error[invalid-argument-type] Argument to bound method `normalize_dictlike_arg` is incorrect: Expected `DataFrame | Series`, found `(Unknown & NDFrame) | Series | DataFrame | ... omitted 5 union elements`
+pandas/core/apply.py:2000:49: error[invalid-argument-type] Argument to function `relabel_result` is incorrect: Expected `dict[str, list[((...) -> Unknown) | str]]`, found `((...) -> Unknown) | str | list[((...) -> Unknown) | str] | MutableMapping[Hashable, ((...) -> Unknown) | str | list[((...) -> Unknown) | str]]`
+pandas/core/array_algos/quantile.py:145:12: error[no-matching-overload] No overload of function `quantile` matches arguments
+pandas/core/array_algos/quantile.py:218:16: error[no-matching-overload] No overload of function `quantile` matches arguments
+pandas/core/array_algos/take.py:96:43: error[invalid-argument-type] Argument to function `maybe_promote` is incorrect: Expected `dtype[Any]`, found `ExtensionDtype | dtype[Any]`
+pandas/core/array_algos/take.py:112:16: error[no-matching-overload] No overload of bound method `take` matches arguments
+pandas/core/array_algos/take.py:303:16: warning[possibly-missing-attribute] Attribute `dtype` may be missing on object of type `Unknown | int | float`
+pandas/core/array_algos/take.py:304:30: warning[possibly-missing-attribute] Attribute `astype` may be missing on object of type `Unknown | int | float`
+pandas/core/array_algos/take.py:306:30: warning[possibly-missing-attribute] Attribute `astype` may be missing on object of type `Unknown | int | float`
+pandas/core/arrays/_arrow_string_mixins.py:52:18: error[unresolved-attribute] Module `pyarrow.compute` has no member `utf8_length`
+pandas/core/arrays/_arrow_string_mixins.py:56:41: error[unresolved-attribute] Module `pyarrow.compute` has no member `utf8_lower`
+pandas/core/arrays/_arrow_string_mixins.py:59:41: error[unresolved-attribute] Module `pyarrow.compute` has no member `utf8_upper`
+pandas/core/arrays/_arrow_string_mixins.py:63:22: error[unresolved-attribute] Module `pyarrow.compute` has no member `utf8_trim_whitespace`
+pandas/core/arrays/_arrow_string_mixins.py:65:22: error[unresolved-attribute] Module `pyarrow.compute` has no member `utf8_trim`
+pandas/core/arrays/_arrow_string_mixins.py:70:22: error[unresolved-attribute] Module `pyarrow.compute` has no member `utf8_ltrim_whitespace`
+pandas/core/arrays/_arrow_string_mixins.py:72:22: error[unresolved-attribute] Module `pyarrow.compute` has no member `utf8_ltrim`
+pandas/core/arrays/_arrow_string_mixins.py:77:22: error[unresolved-attribute] Module `pyarrow.compute` has no member `utf8_rtrim_whitespace`
+pandas/core/arrays/_arrow_string_mixins.py:79:22: error[unresolved-attribute] Module `pyarrow.compute` has no member `utf8_rtrim`
+pandas/core/arrays/_arrow_string_mixins.py:89:22: error[unresolved-attribute] Module `pyarrow.compute` has no member `utf8_lpad`
+pandas/core/arrays/_arrow_string_mixins.py:91:22: error[unresolved-attribute] Module `pyarrow.compute` has no member `utf8_rpad`
+pandas/core/arrays/_arrow_string_mixins.py:105:34: error[unresolved-attribute] Module `pyarrow.compute` has no member `utf8_center`
+pandas/core/arrays/_arrow_string_mixins.py:115:19: error[unresolved-attribute] Module `pyarrow.compute` has no member `utf8_length`
+pandas/core/arrays/_arrow_string_mixins.py:117:29: error[unresolved-attribute] Module `pyarrow.compute` has no member `greater_equal`
+pandas/core/arrays/_arrow_string_mixins.py:122:29: error[unresolved-attribute] Module `pyarrow.compute` has no member `greater`
+pandas/core/arrays/_arrow_string_mixins.py:126:29: error[unresolved-attribute] Module `pyarrow.compute` has no member `invert`
+pandas/core/arrays/_arrow_string_mixins.py:127:20: error[unresolved-attribute] Module `pyarrow.compute` has no member `utf8_slice_codeunits`
+pandas/core/arrays/_arrow_string_mixins.py:131:18: error[unresolved-attribute] Module `pyarrow.compute` has no member `if_else`
+pandas/core/arrays/_arrow_string_mixins.py:146:13: error[unresolved-attribute] Module `pyarrow.compute` has no member `utf8_slice_codeunits`
+pandas/core/arrays/_arrow_string_mixins.py:159:13: error[unresolved-attribute] Module `pyarrow.compute` has no member `utf8_replace_slice`
+pandas/core/arrays/_arrow_string_mixins.py:184:16: error[unresolved-attribute] Module `pyarrow.compute` has no member `replace_substring_regex`
+pandas/core/arrays/_arrow_string_mixins.py:184:57: error[unresolved-attribute] Module `pyarrow.compute` has no member `replace_substring`
+pandas/core/arrays/_arrow_string_mixins.py:197:41: error[unresolved-attribute] Module `pyarrow.compute` has no member `utf8_capitalize`
+pandas/core/arrays/_arrow_string_mixins.py:200:41: error[unresolved-attribute] Module `pyarrow.compute` has no member `utf8_title`
+pandas/core/arrays/_arrow_string_mixins.py:203:41: error[unresolved-attribute] Module `pyarrow.compute` has no member `utf8_swapcase`
+pandas/core/arrays/_arrow_string_mixins.py:206:23: error[unresolved-attribute] Module `pyarrow.compute` has no member `starts_with`
+pandas/core/arrays/_arrow_string_mixins.py:207:19: error[unresolved-attribute] Module `pyarrow.compute` has no member `utf8_slice_codeunits`
+pandas/core/arrays/_arrow_string_mixins.py:208:18: error[unresolved-attribute] Module `pyarrow.compute` has no member `if_else`
+pandas/core/arrays/_arrow_string_mixins.py:212:21: error[unresolved-attribute] Module `pyarrow.compute` has no member `ends_with`
+pandas/core/arrays/_arrow_string_mixins.py:213:19: error[unresolved-attribute] Module `pyarrow.compute` has no member `utf8_slice_codeunits`
+pandas/core/arrays/_arrow_string_mixins.py:214:18: error[unresolved-attribute] Module `pyarrow.compute` has no member `if_else`
+pandas/core/arrays/_arrow_string_mixins.py:221:22: error[unresolved-attribute] Module `pyarrow.compute` has no member `starts_with`
+pandas/core/arrays/_arrow_string_mixins.py:226:26: error[unresolved-attribute] Module `pyarrow.compute` has no member `if_else`
+pandas/core/arrays/_arrow_string_mixins.py:226:37: error[unresolved-attribute] Module `pyarrow.compute` has no member `is_null`
+pandas/core/arrays/_arrow_string_mixins.py:228:26: error[unresolved-attribute] Module `pyarrow.compute` has no member `starts_with`
+pandas/core/arrays/_arrow_string_mixins.py:231:30: error[unresolved-attribute] Module `pyarrow.compute` has no member `or_`
+pandas/core/arrays/_arrow_string_mixins.py:231:45: error[unresolved-attribute] Module `pyarrow.compute` has no member `starts_with`
+pandas/core/arrays/_arrow_string_mixins.py:238:22: error[unresolved-attribute] Module `pyarrow.compute` has no member `ends_with`
+pandas/core/arrays/_arrow_string_mixins.py:243:26: error[unresolved-attribute] Module `pyarrow.compute` has no member `if_else`
+pandas/core/arrays/_arrow_string_mixins.py:243:37: error[unresolved-attribute] Module `pyarrow.compute` has no member `is_null`
+pandas/core/arrays/_arrow_string_mixins.py:245:26: error[unresolved-attribute] Module `pyarrow.compute` has no member `ends_with`
+pandas/core/arrays/_arrow_string_mixins.py:248:30: error[unresolved-attribute] Module `pyarrow.compute` has no member `or_`
+pandas/core/arrays/_arrow_string_mixins.py:248:45: error[unresolved-attribute] Module `pyarrow.compute` has no member `ends_with`
+pandas/core/arrays/_arrow_string_mixins.py:252:18: error[unresolved-attribute] Module `pyarrow.compute` has no member `utf8_is_alnum`
+pandas/core/arrays/_arrow_string_mixins.py:256:18: error[unresolved-attribute] Module `pyarrow.compute` has no member `utf8_is_alpha`
+pandas/core/arrays/_arrow_string_mixins.py:260:18: error[unresolved-attribute] Module `pyarrow.compute` has no member `string_is_ascii`
+pandas/core/arrays/_arrow_string_mixins.py:264:18: error[unresolved-attribute] Module `pyarrow.compute` has no member `utf8_is_decimal`
+pandas/core/arrays/_arrow_string_mixins.py:274:18: error[unresolved-attribute] Module `pyarrow.compute` has no member `utf8_is_digit`
+pandas/core/arrays/_arrow_string_mixins.py:278:18: error[unresolved-attribute] Module `pyarrow.compute` has no member `utf8_is_lower`
+pandas/core/arrays/_arrow_string_mixins.py:282:18: error[unresolved-attribute] Module `pyarrow.compute` has no member `utf8_is_numeric`
+pandas/core/arrays/_arrow_string_mixins.py:286:18: error[unresolved-attribute] Module `pyarrow.compute` has no member `utf8_is_space`
+pandas/core/arrays/_arrow_string_mixins.py:290:18: error[unresolved-attribute] Module `pyarrow.compute` has no member `utf8_is_title`
+pandas/core/arrays/_arrow_string_mixins.py:294:18: error[unresolved-attribute] Module `pyarrow.compute` has no member `utf8_is_upper`
+pandas/core/arrays/_arrow_string_mixins.py:309:27: error[unresolved-attribute] Module `pyarrow.compute` has no member `match_substring_regex`
+pandas/core/arrays/_arrow_string_mixins.py:311:27: error[unresolved-attribute] Module `pyarrow.compute` has no member `match_substring`
+pandas/core/arrays/_arrow_string_mixins.py:343:22: error[unresolved-attribute] Module `pyarrow.compute` has no member `find_substring`
+pandas/core/arrays/_arrow_string_mixins.py:355:32: error[unresolved-attribute] Module `pyarrow.compute` has no member `add`
+pandas/core/arrays/_arrow_string_mixins.py:355:46: error[unresolved-attribute] Module `pyarrow.compute` has no member `utf8_length`
+pandas/core/arrays/_arrow_string_mixins.py:356:32: error[unresolved-attribute] Module `pyarrow.compute` has no member `if_else`
+pandas/core/arrays/_arrow_string_mixins.py:356:43: error[unresolved-attribute] Module `pyarrow.compute` has no member `less`
+pandas/core/arrays/_arrow_string_mixins.py:359:22: error[unresolved-attribute] Module `pyarrow.compute` has no member `utf8_slice_codeunits`
+pandas/core/arrays/_arrow_string_mixins.py:360:22: error[unresolved-attribute] Module `pyarrow.compute` has no member `find_substring`
+pandas/core/arrays/_arrow_string_mixins.py:361:21: error[unresolved-attribute] Module `pyarrow.compute` has no member `not_equal`
+pandas/core/arrays/_arrow_string_mixins.py:362:29: error[unresolved-attribute] Module `pyarrow.compute` has no member `add`
+pandas/core/arrays/_arrow_string_mixins.py:363:22: error[unresolved-attribute] Module `pyarrow.compute` has no member `if_else`
+pandas/core/arrays/_mixins.py:242:16: error[invalid-return-type] Return type does not match returned value: expected `Self@_concat_same_type`, found `NDArrayBackedExtensionArray`
+pandas/core/arrays/_mixins.py:283:9: error[invalid-method-override] Invalid override of method `__getitem__`: Definition is incompatible with `ExtensionArray.__getitem__`
+pandas/core/arrays/arrow/accessors.py:115:25: error[unresolved-attribute] Module `pyarrow.compute` has no member `list_value_length`
+pandas/core/arrays/arrow/accessors.py:163:23: error[unresolved-attribute] Module `pyarrow.compute` has no member `list_element`
+pandas/core/arrays/arrow/accessors.py:181:22: error[unresolved-attribute] Module `pyarrow.compute` has no member `list_slice`
+pandas/core/arrays/arrow/accessors.py:226:18: error[unresolved-attribute] Module `pyarrow.compute` has no member `list_value_length`
+pandas/core/arrays/arrow/accessors.py:227:21: error[unresolved-attribute] Module `pyarrow.compute` has no member `list_flatten`
+pandas/core/arrays/arrow/accessors.py:454:21: error[unresolved-attribute] Module `pyarrow.compute` has no member `struct_field`
+pandas/core/arrays/arrow/array.py:97:15: error[unresolved-attribute] Module `pyarrow.compute` has no member `equal`
+pandas/core/arrays/arrow/array.py:98:15: error[unresolved-attribute] Module `pyarrow.compute` has no member `not_equal`
+pandas/core/arrays/arrow/array.py:99:15: error[unresolved-attribute] Module `pyarrow.compute` has no member `less`
+pandas/core/arrays/arrow/array.py:100:15: error[unresolved-attribute] Module `pyarrow.compute` has no member `greater`
+pandas/core/arrays/arrow/array.py:101:15: error[unresolved-attribute] Module `pyarrow.compute` has no member `less_equal`
+pandas/core/arrays/arrow/array.py:102:15: error[unresolved-attribute] Module `pyarrow.compute` has no member `greater_equal`
+pandas/core/arrays/arrow/array.py:106:17: error[unresolved-attribute] Module `pyarrow.compute` has no member `and_kleene`
+pandas/core/arrays/arrow/array.py:107:31: error[unresolved-attribute] Module `pyarrow.compute` has no member `and_kleene`
+pandas/core/arrays/arrow/array.py:108:16: error[unresolved-attribute] Module `pyarrow.compute` has no member `or_kleene`
+pandas/core/arrays/arrow/array.py:109:30: error[unresolved-attribute] Module `pyarrow.compute` has no member `or_kleene`
+pandas/core/arrays/arrow/array.py:110:16: error[unresolved-attribute] Module `pyarrow.compute` has no member `xor`
+pandas/core/arrays/arrow/array.py:111:30: error[unresolved-attribute] Module `pyarrow.compute` has no member `xor`
+pandas/core/arrays/arrow/array.py:115:17: error[unresolved-attribute] Module `pyarrow.compute` has no member `bit_wise_and`
+pandas/core/arrays/arrow/array.py:116:31: error[unresolved-attribute] Module `pyarrow.compute` has no member `bit_wise_and`
+pandas/core/arrays/arrow/array.py:117:16: error[unresolved-attribute] Module `pyarrow.compute` has no member `bit_wise_or`
+pandas/core/arrays/arrow/array.py:118:30: error[unresolved-attribute] Module `pyarrow.compute` has no member `bit_wise_or`
+pandas/core/arrays/arrow/array.py:119:16: error[unresolved-attribute] Module `pyarrow.compute` has no member `bit_wise_xor`
+pandas/core/arrays/arrow/array.py:120:30: error[unresolved-attribute] Module `pyarrow.compute` has no member `bit_wise_xor`
+pandas/core/arrays/arrow/array.py:146:23: error[unresolved-attribute] Module `pyarrow.compute` has no member `divide_checked`
+pandas/core/arrays/arrow/array.py:149:33: error[unresolved-attribute] Module `pyarrow.compute` has no member `not_equal`
+pandas/core/arrays/arrow/array.py:149:46: error[unresolved-attribute] Module `pyarrow.compute` has no member `multiply`
+pandas/core/arrays/arrow/array.py:150:44: error[unresolved-attribute] Module `pyarrow.compute` has no member `less`
+pandas/core/arrays/arrow/array.py:151:21: error[unresolved-attribute] Module `pyarrow.compute` has no member `bit_wise_xor`
+pandas/core/arrays/arrow/array.py:154:26: error[unresolved-attribute] Module `pyarrow.compute` has no member `if_else`
+pandas/core/arrays/arrow/array.py:155:21: error[unresolved-attribute] Module `pyarrow.compute` has no member `and_`
+pandas/core/arrays/arrow/array.py:160:21: error[unresolved-attribute] Module `pyarrow.compute` has no member `subtract`
+pandas/core/arrays/arrow/array.py:167:23: error[unresolved-attribute] Module `pyarrow.compute` has no member `divide`
+pandas/core/arrays/arrow/array.py:168:22: error[unresolved-attribute] Module `pyarrow.compute` has no member `floor`
+pandas/core/arrays/arrow/array.py:172:16: error[unresolved-attribute] Module `pyarrow.compute` has no member `add_checked`
+pandas/core/arrays/arrow/array.py:173:30: error[unresolved-attribute] Module `pyarrow.compute` has no member `add_checked`
+pandas/core/arrays/arrow/array.py:174:16: error[unresolved-attribute] Module `pyarrow.compute` has no member `subtract_checked`
+pandas/core/arrays/arrow/array.py:175:30: error[unresolved-attribute] Module `pyarrow.compute` has no member `subtract_checked`
+pandas/core/arrays/arrow/array.py:176:16: error[unresolved-attribute] Module `pyarrow.compute` has no member `multiply_checked`
+pandas/core/arrays/arrow/array.py:177:30: error[unresolved-attribute] Module `pyarrow.compute` has no member `multiply_checked`
+pandas/core/arrays/arrow/array.py:178:33: error[unresolved-attribute] Module `pyarrow.compute` has no member `divide`
+pandas/core/arrays/arrow/array.py:179:34: error[unresolved-attribute] Module `pyarrow.compute` has no member `divide`
+pandas/core/arrays/arrow/array.py:186:16: error[unresolved-attribute] Module `pyarrow.compute` has no member `power_checked`
+pandas/core/arrays/arrow/array.py:187:30: error[unresolved-attribute] Module `pyarrow.compute` has no member `power_checked`
+pandas/core/arrays/arrow/array.py:377:27: error[unresolved-attribute] Module `pyarrow.compute` has no member `if_else`
+pandas/core/arrays/arrow/array.py:398:23: error[unresolved-attribute] Module `pyarrow.compute` has no member `if_else`
+pandas/core/arrays/arrow/array.py:398:34: error[unresolved-attribute] Module `pyarrow.compute` has no member `equal`
+pandas/core/arrays/arrow/array.py:399:23: error[unresolved-attribute] Module `pyarrow.compute` has no member `if_else`
+pandas/core/arrays/arrow/array.py:399:34: error[unresolved-attribute] Module `pyarrow.compute` has no member `equal`
+pandas/core/arrays/arrow/array.py:862:45: error[unresolved-attribute] Module `pyarrow.compute` has no member `bit_wise_not`
+pandas/core/arrays/arrow/array.py:869:45: error[unresolved-attribute] Module `pyarrow.compute` has no member `invert`
+pandas/core/arrays/arrow/array.py:873:45: error[unresolved-attribute] Module `pyarrow.compute` has no member `negate_checked`
+pandas/core/arrays/arrow/array.py:883:41: error[unresolved-attribute] Module `pyarrow.compute` has no member `abs_checked`
+pandas/core/arrays/arrow/array.py:946:30: error[unresolved-attribute] Module `pyarrow.compute` has no member `if_else`
+pandas/core/arrays/arrow/array.py:977:34: error[unresolved-attribute] Module `pyarrow.compute` has no member `binary_join_element_wise`
+pandas/core/arrays/arrow/array.py:979:34: error[unresolved-attribute] Module `pyarrow.compute` has no member `binary_join_element_wise`
+pandas/core/arrays/arrow/array.py:990:31: error[unresolved-attribute] Module `pyarrow.compute` has no member `if_else`
+pandas/core/arrays/arrow/array.py:990:42: error[unresolved-attribute] Module `pyarrow.compute` has no member `less`
+pandas/core/arrays/arrow/array.py:991:26: error[unresolved-attribute] Module `pyarrow.compute` has no member `binary_repeat`
+pandas/core/arrays/arrow/array.py:1002:27: error[unresolved-attribute] Module `pyarrow.compute` has no member `if_else`
+pandas/core/arrays/arrow/array.py:1002:38: error[unresolved-attribute] Module `pyarrow.compute` has no member `less`
+pandas/core/arrays/arrow/array.py:1003:22: error[unresolved-attribute] Module `pyarrow.compute` has no member `binary_repeat`
+pandas/core/arrays/arrow/array.py:1007:17: error[unresolved-attribute] Module `pyarrow.compute` has no member `is_null`
+pandas/core/arrays/arrow/array.py:1073:20: error[unresolved-attribute] Module `pyarrow.compute` has no member `is_nan`
+pandas/core/arrays/arrow/array.py:1074:19: error[unresolved-attribute] Module `pyarrow.compute` has no member `replace_with_mask`
+pandas/core/arrays/arrow/array.py:1109:9: error[invalid-method-override] Invalid override of method `__contains__`: Definition is incompatible with `ExtensionArray.__contains__`
+pandas/core/arrays/arrow/array.py:1116:24: error[unresolved-attribute] Module `pyarrow.compute` has no member `any`
+pandas/core/arrays/arrow/array.py:1116:31: error[unresolved-attribute] Module `pyarrow.compute` has no member `is_nan`
+pandas/core/arrays/arrow/array.py:1284:18: error[unresolved-attribute] Module `pyarrow.compute` has no member `array_sort_indices`
+pandas/core/arrays/arrow/array.py:1332:41: error[unresolved-attribute] Module `pyarrow.compute` has no member `drop_null`
+pandas/core/arrays/arrow/array.py:1350:25: error[unresolved-attribute] Module `pyarrow.compute` has no member `fill_null_forward`
+pandas/core/arrays/arrow/array.py:1354:25: error[unresolved-attribute] Module `pyarrow.compute` has no member `fill_null_backward`
+pandas/core/arrays/arrow/array.py:1366:16: error[invalid-return-type] Return type does not match returned value: expected `Self@_pad_or_backfill`, found `ArrowExtensionArray`
+pandas/core/arrays/arrow/array.py:1381:20: error[invalid-return-type] Return type does not match returned value: expected `Self@fillna`, found `ArrowExtensionArray`
+pandas/core/arrays/arrow/array.py:1409:16: error[invalid-return-type] Return type does not match returned value: expected `Self@fillna`, found `ArrowExtensionArray`
+pandas/core/arrays/arrow/array.py:1416:18: error[unresolved-attribute] Module `pyarrow.compute` has no member `is_in`
+pandas/core/arrays/arrow/array.py:1502:41: error[unresolved-attribute] Module `pyarrow.compute` has no member `round`
+pandas/core/arrays/arrow/array.py:1766:21: error[unresolved-attribute] Module `pyarrow.compute` has no member `unique`
+pandas/core/arrays/arrow/array.py:1920:23: error[unresolved-attribute] Module `pyarrow.compute` has no member `is_null`
+pandas/core/arrays/arrow/array.py:1921:16: error[unresolved-attribute] Module `pyarrow.compute` has no member `all`
+pandas/core/arrays/arrow/array.py:1928:32: error[unresolved-attribute] Module `pyarrow.compute` has no member `fill_null_forward`
+pandas/core/arrays/arrow/array.py:1929:32: error[unresolved-attribute] Module `pyarrow.compute` has no member `fill_null_backward`
+pandas/core/arrays/arrow/array.py:1943:25: error[unresolved-attribute] Module `pyarrow.compute` has no member `if_else`
+pandas/core/arrays/arrow/array.py:1990:22: error[unresolved-attribute] Module `pyarrow.compute` has no member `not_equal`
+pandas/core/arrays/arrow/array.py:2006:29: error[unresolved-attribute] Module `pyarrow.compute` has no member `stddev`
+pandas/core/arrays/arrow/array.py:2007:31: error[unresolved-attribute] Module `pyarrow.compute` has no member `sqrt_checked`
+pandas/core/arrays/arrow/array.py:2007:47: error[unresolved-attribute] Module `pyarrow.compute` has no member `count`
+pandas/core/arrays/arrow/array.py:2008:24: error[unresolved-attribute] Module `pyarrow.compute` has no member `divide_checked`
+pandas/core/arrays/arrow/array.py:2015:24: error[unresolved-attribute] Module `pyarrow.compute` has no member `is_null`
+pandas/core/arrays/arrow/array.py:2026:44: error[unresolved-attribute] Module `pyarrow.compute` has no member `invert`
+pandas/core/arrays/arrow/array.py:2039:24: error[unresolved-attribute] Module `pyarrow.compute` has no member `binary_join`
+pandas/core/arrays/arrow/array.py:2148:12: error[unresolved-attribute] Module `pyarrow.compute` has no member `is_null`
+pandas/core/arrays/arrow/array.py:2167:18: error[unresolved-attribute] Module `pyarrow.compute` has no member `list_value_length`
+pandas/core/arrays/arrow/array.py:2174:25: error[unresolved-attribute] Module `pyarrow.compute` has no member `if_else`
+pandas/core/arrays/arrow/array.py:2179:43: error[unresolved-attribute] Module `pyarrow.compute` has no member `list_flatten`
+pandas/core/arrays/arrow/array.py:2295:18: error[unresolved-attribute] Module `pyarrow.compute` has no member `rank`
+pandas/core/arrays/arrow/array.py:2303:20: error[unresolved-attribute] Module `pyarrow.compute` has no member `is_null`
+pandas/core/arrays/arrow/array.py:2305:22: error[unresolved-attribute] Module `pyarrow.compute` has no member `if_else`
+pandas/core/arrays/arrow/array.py:2308:26: error[unresolved-attribute] Module `pyarrow.compute` has no member `rank`
+pandas/core/arrays/arrow/array.py:2316:22: error[unresolved-attribute] Module `pyarrow.compute` has no member `divide`
+pandas/core/arrays/arrow/array.py:2316:32: error[unresolved-attribute] Module `pyarrow.compute` has no member `add`
+pandas/core/arrays/arrow/array.py:2322:27: error[unresolved-attribute] Module `pyarrow.compute` has no member `max`
+pandas/core/arrays/arrow/array.py:2324:27: error[unresolved-attribute] Module `pyarrow.compute` has no member `count`
+pandas/core/arrays/arrow/array.py:2325:22: error[unresolved-attribute] Module `pyarrow.compute` has no member `divide`
+pandas/core/arrays/arrow/array.py:2376:18: error[unresolved-attribute] Module `pyarrow.compute` has no member `quantile`
+pandas/core/arrays/arrow/array.py:2380:26: error[unresolved-attribute] Module `pyarrow.compute` has no member `floor`
+pandas/core/arrays/arrow/array.py:2421:15: error[unresolved-attribute] Module `pyarrow.compute` has no member `value_counts`
+pandas/core/arrays/arrow/array.py:2423:13: error[unresolved-attribute] Module `pyarrow.compute` has no member `equal`
+pandas/core/arrays/arrow/array.py:2423:43: error[unresolved-attribute] Module `pyarrow.compute` has no member `max`
+pandas/core/arrays/arrow/array.py:2429:40: error[unresolved-attribute] Module `pyarrow.compute` has no member `array_sort_indices`
+pandas/core/arrays/arrow/array.py:2468:24: error[unresolved-attribute] Module `pyarrow.compute` has no member `fill_null_backward`
+pandas/core/arrays/arrow/array.py:2468:46: error[unresolved-attribute] Module `pyarrow.compute` has no member `pairwise_diff_checked`
+pandas/core/arrays/arrow/array.py:2470:23: error[unresolved-attribute] Module `pyarrow.compute` has no member `add_checked`
+pandas/core/arrays/arrow/array.py:2470:51: error[unresolved-attribute] Module `pyarrow.compute` has no member `divide_checked`
+pandas/core/arrays/arrow/array.py:2471:45: error[unresolved-attribute] Module `pyarrow.compute` has no member `coalesce`
+pandas/core/arrays/arrow/array.py:2520:20: error[unresolved-attribute] Module `pyarrow.compute` has no member `if_else`
+pandas/core/arrays/arrow/array.py:2572:20: error[unresolved-attribute] Module `pyarrow.compute` has no member `replace_with_mask`
+pandas/core/arrays/arrow/array.py:2688:41: error[unresolved-attribute] Module `pyarrow.compute` has no member `count_substring_regex`
+pandas/core/arrays/arrow/array.py:2695:41: error[unresolved-attribute] Module `pyarrow.compute` has no member `binary_repeat`
+pandas/core/arrays/arrow/array.py:2705:41: error[unresolved-attribute] Module `pyarrow.compute` has no member `binary_join`
+pandas/core/arrays/arrow/array.py:2733:18: error[unresolved-attribute] Module `pyarrow.compute` has no member `extract_regex`
+pandas/core/arrays/arrow/array.py:2736:47: error[unresolved-attribute] Module `pyarrow.compute` has no member `struct_field`
+pandas/core/arrays/arrow/array.py:2740:31: error[unresolved-attribute] Module `pyarrow.compute` has no member `struct_field`
+pandas/core/arrays/arrow/array.py:2751:17: error[unresolved-attribute] Module `pyarrow.compute` has no member `split_pattern`
+pandas/core/arrays/arrow/array.py:2752:28: error[unresolved-attribute] Module `pyarrow.compute` has no member `list_flatten`
+pandas/core/arrays/arrow/array.py:2754:39: error[unresolved-attribute] Module `pyarrow.compute` has no member `array_sort_indices`
+pandas/core/arrays/arrow/array.py:2755:19: error[unresolved-attribute] Module `pyarrow.compute` has no member `list_value_length`
+pandas/core/arrays/arrow/array.py:2758:19: error[unresolved-attribute] Module `pyarrow.compute` has no member `index_in`
+pandas/core/arrays/arrow/array.py:2802:26: error[unresolved-attribute] Module `pyarrow.compute` has no member `utf8_split_whitespace`
+pandas/core/arrays/arrow/array.py:2804:44: error[unresolved-attribute] Module `pyarrow.compute` has no member `split_pattern_regex`
+pandas/core/arrays/arrow/array.py:2806:44: error[unresolved-attribute] Module `pyarrow.compute` has no member `split_pattern`
+pandas/core/arrays/arrow/array.py:2814:17: error[unresolved-attribute] Module `pyarrow.compute` has no member `utf8_split_whitespace`
+pandas/core/arrays/arrow/array.py:2817:13: error[unresolved-attribute] Module `pyarrow.compute` has no member `split_pattern`
+pandas/core/arrays/arrow/array.py:2929:18: error[unresolved-attribute] Module `pyarrow.compute` has no member `year`
+pandas/core/arrays/arrow/array.py:2934:18: error[unresolved-attribute] Module `pyarrow.compute` has no member `day`
+pandas/core/arrays/arrow/array.py:2939:18: error[unresolved-attribute] Module `pyarrow.compute` has no member `day_of_week`
+pandas/core/arrays/arrow/array.py:2947:18: error[unresolved-attribute] Module `pyarrow.compute` has no member `day_of_year`
+pandas/core/arrays/arrow/array.py:2954:18: error[unresolved-attribute] Module `pyarrow.compute` has no member `hour`
+pandas/core/arrays/arrow/array.py:2958:18: error[unresolved-attribute] Module `pyarrow.compute` has no member `iso_calendar`
+pandas/core/arrays/arrow/array.py:2963:18: error[unresolved-attribute] Module `pyarrow.compute` has no member `is_leap_year`
+pandas/core/arrays/arrow/array.py:2968:18: error[unresolved-attribute] Module `pyarrow.compute` has no member `equal`
+pandas/core/arrays/arrow/array.py:2968:27: error[unresolved-attribute] Module `pyarrow.compute` has no member `day`
+pandas/core/arrays/arrow/array.py:2973:18: error[unresolved-attribute] Module `pyarrow.compute` has no member `equal`
+pandas/core/arrays/arrow/array.py:2974:13: error[unresolved-attribute] Module `pyarrow.compute` has no member `days_between`
+pandas/core/arrays/arrow/array.py:2975:17: error[unresolved-attribute] Module `pyarrow.compute` has no member `floor_temporal`
+pandas/core/arrays/arrow/array.py:2976:17: error[unresolved-attribute] Module `pyarrow.compute` has no member `ceil_temporal`
+pandas/core/arrays/arrow/array.py:2984:18: error[unresolved-attribute] Module `pyarrow.compute` has no member `and_`
+pandas/core/arrays/arrow/array.py:2985:13: error[unresolved-attribute] Module `pyarrow.compute` has no member `equal`
+pandas/core/arrays/arrow/array.py:2985:22: error[unresolved-attribute] Module `pyarrow.compute` has no member `month`
+pandas/core/arrays/arrow/array.py:2986:13: error[unresolved-attribute] Module `pyarrow.compute` has no member `equal`
+pandas/core/arrays/arrow/array.py:2986:22: error[unresolved-attribute] Module `pyarrow.compute` has no member `day`
+pandas/core/arrays/arrow/array.py:2992:18: error[unresolved-attribute] Module `pyarrow.compute` has no member `and_`
+pandas/core/arrays/arrow/array.py:2993:13: error[unresolved-attribute] Module `pyarrow.compute` has no member `equal`
+pandas/core/arrays/arrow/array.py:2993:22: error[unresolved-attribute] Module `pyarrow.compute` has no member `month`
+pandas/core/arrays/arrow/array.py:2994:13: error[unresolved-attribute] Module `pyarrow.compute` has no member `equal`
+pandas/core/arrays/arrow/array.py:2994:22: error[unresolved-attribute] Module `pyarrow.compute` has no member `day`
+pandas/core/arrays/arrow/array.py:3000:18: error[unresolved-attribute] Module `pyarrow.compute` has no member `equal`
+pandas/core/arrays/arrow/array.py:3001:13: error[unresolved-attribute] Module `pyarrow.compute` has no member `floor_temporal`
+pandas/core/arrays/arrow/array.py:3002:13: error[unresolved-attribute] Module `pyarrow.compute` has no member `floor_temporal`
+pandas/core/arrays/arrow/array.py:3008:18: error[unresolved-attribute] Module `pyarrow.compute` has no member `equal`
+pandas/core/arrays/arrow/array.py:3009:13: error[unresolved-attribute] Module `pyarrow.compute` has no member `days_between`
+pandas/core/arrays/arrow/array.py:3010:17: error[unresolved-attribute] Module `pyarrow.compute` has no member `floor_temporal`
+pandas/core/arrays/arrow/array.py:3011:17: error[unresolved-attribute] Module `pyarrow.compute` has no member `ceil_temporal`
+pandas/core/arrays/arrow/array.py:3019:18: error[unresolved-attribute] Module `pyarrow.compute` has no member `days_between`
+pandas/core/arrays/arrow/array.py:3020:13: error[unresolved-attribute] Module `pyarrow.compute` has no member `floor_temporal`
+pandas/core/arrays/arrow/array.py:3021:13: error[unresolved-attribute] Module `pyarrow.compute` has no member `ceil_temporal`
+pandas/core/arrays/arrow/array.py:3030:14: error[unresolved-attribute] Module `pyarrow.compute` has no member `microsecond`
+pandas/core/arrays/arrow/array.py:3031:20: error[unresolved-attribute] Module `pyarrow.compute` has no member `multiply`
+pandas/core/arrays/arrow/array.py:3031:32: error[unresolved-attribute] Module `pyarrow.compute` has no member `millisecond`
+pandas/core/arrays/arrow/array.py:3032:18: error[unresolved-attribute] Module `pyarrow.compute` has no member `add`
+pandas/core/arrays/arrow/array.py:3037:18: error[unresolved-attribute] Module `pyarrow.compute` has no member `minute`
+pandas/core/arrays/arrow/array.py:3042:18: error[unresolved-attribute] Module `pyarrow.compute` has no member `month`
+pandas/core/arrays/arrow/array.py:3047:18: error[unresolved-attribute] Module `pyarrow.compute` has no member `nanosecond`
+pandas/core/arrays/arrow/array.py:3052:18: error[unresolved-attribute] Module `pyarrow.compute` has no member `quarter`
+pandas/core/arrays/arrow/array.py:3057:18: error[unresolved-attribute] Module `pyarrow.compute` has no member `second`
+pandas/core/arrays/arrow/array.py:3084:18: error[unresolved-attribute] Module `pyarrow.compute` has no member `floor_temporal`
+pandas/core/arrays/arrow/array.py:3088:18: error[unresolved-attribute] Module `pyarrow.compute` has no member `strftime`
+pandas/core/arrays/arrow/array.py:3156:18: error[unresolved-attribute] Module `pyarrow.compute` has no member `strftime`
+pandas/core/arrays/arrow/array.py:3162:18: error[unresolved-attribute] Module `pyarrow.compute` has no member `strftime`
+pandas/core/arrays/arrow/array.py:3197:22: error[unresolved-attribute] Module `pyarrow.compute` has no member `local_timestamp`
+pandas/core/arrays/arrow/array.py:3199:22: error[unresolved-attribute] Module `pyarrow.compute` has no member `assume_timezone`
+pandas/core/arrays/arrow/extension_types.py:171:5: error[unresolved-attribute] Unresolved attribute `_hotfix_installed` on type `<module 'pyarrow'>`.
+pandas/core/arrays/boolean.py:259:24: warning[possibly-missing-attribute] Attribute `shape` may be missing on object of type `Unknown | None | ndarray[tuple[Any, ...], dtype[bool[bool]]] | ndarray[tuple[Any, ...], dtype[Any]]`
+pandas/core/arrays/boolean.py:262:12: error[invalid-return-type] Return type does not match returned value: expected `tuple[ndarray[tuple[Any, ...], dtype[Any]], ndarray[tuple[Any, ...], dtype[Any]]]`, found `tuple[@Todo | ndarray[tuple[int], dtype[Any]], Unknown | None | ndarray[tuple[Any, ...], dtype[numpy.bool[builtins.bool]]] | ndarray[tuple[Any, ...], dtype[Any]]]`
+pandas/core/arrays/boolean.py:333:16: error[invalid-return-type] Return type does not match returned value: expected `Self@_simple_new`, found `BooleanArray`
+pandas/core/arrays/boolean.py:385:9: error[invalid-method-override] Invalid override of method `_coerce_to_array`: Definition is incompatible with `BaseMaskedArray._coerce_to_array`
+pandas/core/arrays/categorical.py:385:16: error[invalid-return-type] Return type does not match returned value: expected `Self@_simple_new`, found `Categorical`
+pandas/core/arrays/categorical.py:494:25: warning[possibly-missing-attribute] Attribute `_codes` may be missing on object of type `Unknown | RangeIndex | ndarray[tuple[Any, ...], dtype[Any]] | ExtensionArray`
+pandas/core/arrays/categorical.py:700:18: warning[possibly-missing-attribute] Attribute `is_monotonic_increasing` may be missing on object of type `Index | Unknown | ndarray[tuple[Any, ...], dtype[bool[bool]]]`
+pandas/core/arrays/categorical.py:703:26: warning[possibly-missing-attribute] Attribute `sort_values` may be missing on object of type `Index | Unknown | ndarray[tuple[Any, ...], dtype[bool[bool]]]`
+pandas/core/arrays/categorical.py:1397:21: error[no-matching-overload] No overload of function `find_common_type` matches arguments
+pandas/core/arrays/categorical.py:1655:9: error[invalid-method-override] Invalid override of method `_validate_scalar`: Definition is incompatible with `NDArrayBackedExtensionArray._validate_scalar`
+pandas/core/arrays/categorical.py:2229:9: error[invalid-method-override] Invalid override of method `_box_func`: Definition is incompatible with `NDArrayBackedExtensionArray._box_func`
+pandas/core/arrays/categorical.py:2252:9: error[invalid-method-override] Invalid override of method `__contains__`: Definition is incompatible with `ExtensionArray.__contains__`
+pandas/core/arrays/categorical.py:2567:16: error[invalid-return-type] Return type does not match returned value: expected `Self@unique`, found `Categorical`
+pandas/core/arrays/categorical.py:2611:9: error[invalid-method-override] Invalid override of method `_concat_same_type`: Definition is incompatible with `NDArrayBacked._concat_same_type`
+pandas/core/arrays/categorical.py:2989:9: error[invalid-method-override] Invalid override of method `_delegate_property_get`: Definition is incompatible with `PandasDelegate._delegate_property_get`
+pandas/core/arrays/categorical.py:2992:9: error[invalid-method-override] Invalid override of method `_delegate_property_set`: Definition is incompatible with `PandasDelegate._delegate_property_set`
+pandas/core/arrays/datetimelike.py:387:9: error[invalid-method-override] Invalid override of method `__getitem__`: Definition is incompatible with `ExtensionArray.__getitem__`
+pandas/core/arrays/datetimelike.py:565:18: error[invalid-argument-type] Argument to function `len` is incorrect: Expected `Sized`, found `(Unknown & ~str) | Period | Timestamp | Timedelta | NaTType`
+pandas/core/arrays/datetimelike.py:714:16: warning[possibly-missing-attribute] Attribute `categories` may be missing on object of type `Unknown | Self@_validate_listlike`
+pandas/core/arrays/datetimelike.py:716:25: warning[possibly-missing-attribute] Attribute `_internal_get_values` may be missing on object of type `Unknown | Self@_validate_listlike`
+pandas/core/arrays/datetimelike.py:1582:16: error[invalid-return-type] Return type does not match returned value: expected `Self@_quantile`, found `DatetimeLikeArrayMixin`
+pandas/core/arrays/datetimelike.py:2375:9: error[invalid-method-override] Invalid override of method `_concat_same_type`: Definition is incompatible with `NDArrayBacked._concat_same_type`
+pandas/core/arrays/datetimelike.py:2399:16: error[invalid-return-type] Return type does not match returned value: expected `Self@copy`, found `TimelikeOps`
+pandas/core/arrays/datetimelike.py:2458:16: error[invalid-return-type] Return type does not match returned value: expected `Self@take`, found `TimelikeOps`
+pandas/core/arrays/datetimelike.py:2476:36: error[invalid-argument-type] Argument to function `py_get_unit_from_dtype` is incorrect: Expected `dtype[Any]`, found `ExtensionDtype`
+pandas/core/arrays/datetimes.py:332:16: error[invalid-return-type] Return type does not match returned value: expected `Self@_simple_new`, found `DatetimeArray`
+pandas/core/arrays/datetimes.py:410:9: error[invalid-method-override] Invalid override of method `_generate_range`: Definition is incompatible with `TimelikeOps._generate_range`
+pandas/core/arrays/datetimes.py:483:62: warning[possibly-missing-attribute] Attribute `tz` may be missing on object of type `Timestamp | None`
+pandas/core/arrays/datetimes.py:501:51: error[invalid-argument-type] Argument to bound method `tz_localize` is incorrect: Expected `bool | Literal["NaT", "raise"]`, found `Literal["NaT", "infer", "raise"] | ndarray[tuple[Any, ...], dtype[bool[bool]]]`
+pandas/core/arrays/datetimes.py:503:47: error[invalid-argument-type] Argument to bound method `tz_localize` is incorrect: Expected `bool | Literal["NaT", "raise"]`, found `Literal["NaT", "infer", "raise"] | ndarray[tuple[Any, ...], dtype[bool[bool]]]`
+pandas/core/arrays/datetimes.py:511:32: warning[possibly-missing-attribute] Attribute `_value` may be missing on object of type `Timestamp | None`
+pandas/core/arrays/datetimes.py:511:45: warning[possibly-missing-attribute] Attribute `_value` may be missing on object of type `Timestamp | None`
+pandas/core/arrays/datetimes.py:512:19: warning[possibly-missing-attribute] Attribute `_value` may be missing on object of type `Timestamp | None`
+pandas/core/arrays/datetimes.py:523:34: error[invalid-argument-type] Argument to function `__new__` is incorrect: Expected `integer[Any] | int | float | ... omitted 3 union elements`, found `Timestamp | None`
+pandas/core/arrays/datetimes.py:524:32: error[invalid-argument-type] Argument to function `__new__` is incorrect: Expected `integer[Any] | int | float | ... omitted 3 union elements`, found `Timestamp | None`
+pandas/core/arrays/datetimes.py:561:45: error[invalid-argument-type] Argument to bound method `_from_value_and_reso` is incorrect: Expected `int`, found `datetime64[date | int | None]`
+pandas/core/arrays/datetimes.py:590:21: error[invalid-type-form] Variable of type `property` is not allowed in a type expression
+pandas/core/arrays/datetimes.py:639:25: error[invalid-type-form] Variable of type `property` is not allowed in a type expression
+pandas/core/arrays/datetimes.py:2891:21: error[invalid-assignment] Object of type `Timestamp` is not assignable to `_TimestampNoneT1@_maybe_normalize_endpoints`
+pandas/core/arrays/datetimes.py:2894:19: error[invalid-assignment] Object of type `Timestamp` is not assignable to `_TimestampNoneT2@_maybe_normalize_endpoints`
+pandas/core/arrays/datetimes.py:2928:29: error[invalid-argument-type] Argument to bound method `tz_localize` is incorrect: Expected `bool | Literal["NaT", "raise"]`, found `Unknown | bool | None`
+pandas/core/arrays/datetimes.py:2928:29: error[invalid-argument-type] Argument to bound method `tz_localize` is incorrect: Expected `Literal["NaT", "raise", "shift_backward", "shift_forward"] | timedelta`, found `Unknown | bool | None`
+pandas/core/arrays/interval.py:293:17: error[invalid-argument-type] Argument to function `intervals_to_interval_bounds` is incorrect: Expected `ndarray[tuple[Any, ...], dtype[Any]]`, found `ExtensionArray | ndarray[tuple[Any, ...], dtype[Any]]`
+pandas/core/arrays/interval.py:393:71: warning[possibly-missing-attribute] Attribute `tz` may be missing on object of type `Index | Unknown`
+pandas/core/arrays/interval.py:396:37: warning[possibly-missing-attribute] Attribute `tz` may be missing on object of type `Index | Unknown`
+pandas/core/arrays/interval.py:399:50: warning[possibly-missing-attribute] Attribute `unit` may be missing on object of type `(Index & ~PeriodIndex) | (Unknown & ~PeriodIndex)`
+pandas/core/arrays/interval.py:399:63: warning[possibly-missing-attribute] Attribute `unit` may be missing on object of type `Index | Unknown`
+pandas/core/arrays/interval.py:401:35: warning[possibly-missing-attribute] Attribute `_ensure_matching_resos` may be missing on object of type `ExtensionArray | ndarray[tuple[Any, ...], dtype[Any]] | Unknown`
+pandas/core/arrays/interval.py:831:9: error[invalid-method-override] Invalid override of method `__getitem__`: Definition is incompatible with `ExtensionArray.__getitem__`
+pandas/core/arrays/interval.py:1127:9: error[invalid-method-override] Invalid override of method `_concat_same_type`: Definition is incompatible with `ExtensionArray._concat_same_type`
+pandas/core/arrays/interval.py:1147:73: error[invalid-argument-type] Argument to bound method `_ensure_simple_new_inputs` is incorrect: Expected `Literal["both", "left", "neither", "right"] | None`, found `str | Unknown`
+pandas/core/arrays/interval.py:1801:50: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Argument type `Period | Timestamp | Timedelta | NaTType | Any` does not satisfy constraints (`int`, `int | float`, `Timestamp`, `Timedelta`) of type variable `_OrderableT`
+pandas/core/arrays/interval.py:1801:50: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `int`, found `Period | Timestamp | Timedelta | NaTType | Any`
+pandas/core/arrays/masked.py:156:54: error[invalid-argument-type] Argument to bound method `_coerce_to_array` is incorrect: Expected `dtype[Any] | ExtensionDtype`, found `Unknown | None`
+pandas/core/arrays/masked.py:385:9: error[invalid-method-override] Invalid override of method `__contains__`: Definition is incompatible with `ExtensionArray.__contains__`
+pandas/core/arrays/masked.py:1036:9: error[invalid-method-override] Invalid override of method `_concat_same_type`: Definition is incompatible with `ExtensionArray._concat_same_type`
+pandas/core/arrays/masked.py:1054:9: error[invalid-method-override] Invalid override of method `take`: Definition is incompatible with `ExtensionArray.take`
+pandas/core/arrays/numeric.py:295:9: error[invalid-method-override] Invalid override of method `_coerce_to_array`: Definition is incompatible with `BaseMaskedArray._coerce_to_array`
+pandas/core/arrays/numpy_.py:285:9: error[invalid-method-override] Invalid override of method `_validate_scalar`: Definition is incompatible with `NDArrayBackedExtensionArray._validate_scalar`
+pandas/core/arrays/numpy_.py:388:16: error[invalid-return-type] Return type does not match returned value: expected `Self@take`, found `NumpyExtensionArray`
+pandas/core/arrays/period.py:829:20: error[unresolved-attribute] Object of type `BaseOffset` has no attribute `_period_dtype_code`
+pandas/core/arrays/period.py:917:17: error[unresolved-attribute] Object of type `BaseOffset` has no attribute `_period_dtype_code`
+pandas/core/arrays/period.py:1033:9: error[invalid-method-override] Invalid override of method `_add_offset`: Definition is incompatible with `DatetimeLikeArrayMixin._add_offset`
+pandas/core/arrays/period.py:1370:12: error[unresolved-attribute] Object of type `BaseOffset` has no attribute `_period_dtype_code`
+pandas/core/arrays/period.py:1464:45: error[invalid-argument-type] Argument to function `freq_to_dtype_code` is incorrect: Expected `BaseOffset`, found `None`
+pandas/core/arrays/period.py:1469:12: error[invalid-return-type] Return type does not match returned value: expected `tuple[ndarray[tuple[Any, ...], dtype[Any]], BaseOffset]`, found `tuple[ndarray[tuple[Any, ...], dtype[Any]], BaseOffset | Unknown | None]`
+pandas/core/arrays/sparse/accessor.py:76:24: warning[possibly-missing-attribute] Attribute `array` may be missing on object of type `Unknown | None`
+pandas/core/arrays/sparse/accessor.py:240:13: error[invalid-argument-type] Argument to function `sparse_series_to_coo` is incorrect: Expected `Series`, found `Unknown | None`
+pandas/core/arrays/sparse/accessor.py:271:13: warning[possibly-missing-attribute] Attribute `array` may be missing on object of type `Unknown | None`
+pandas/core/arrays/sparse/accessor.py:272:19: warning[possibly-missing-attribute] Attribute `index` may be missing on object of type `Unknown | None`
+pandas/core/arrays/sparse/accessor.py:273:18: warning[possibly-missing-attribute] Attribute `name` may be missing on object of type `Unknown | None`
+pandas/core/arrays/sparse/accessor.py:391:51: warning[possibly-missing-attribute] Attribute `items` may be missing on object of type `Unknown | None`
+pandas/core/arrays/sparse/accessor.py:392:16: warning[possibly-missing-attribute] Attribute `_constructor` may be missing on object of type `Unknown | None`
+pandas/core/arrays/sparse/accessor.py:393:25: warning[possibly-missing-attribute] Attribute `index` may be missing on object of type `Unknown | None`
+pandas/core/arrays/sparse/accessor.py:393:53: warning[possibly-missing-attribute] Attribute `columns` may be missing on object of type `Unknown | None`
+pandas/core/arrays/sparse/accessor.py:430:34: warning[possibly-missing-attribute] Attribute `dtypes` may be missing on object of type `Unknown | None`
+pandas/core/arrays/sparse/accessor.py:435:40: warning[possibly-missing-attribute] Attribute `items` may be missing on object of type `Unknown | None`
+pandas/core/arrays/sparse/accessor.py:446:67: warning[possibly-missing-attribute] Attribute `shape` may be missing on object of type `Unknown | None`
+pandas/core/arrays/sparse/accessor.py:464:62: warning[possibly-missing-attribute] Attribute `items` may be missing on object of type `Unknown | None`
+pandas/core/arrays/sparse/array.py:844:34: error[invalid-argument-type] Argument to function `result_type` is incorrect: Expected `_Buffer | _SupportsArray[dtype[Any]] | _NestedSequence[_SupportsArray[dtype[Any]]] | ... omitted 12 union elements`, found `object`
+pandas/core/arrays/sparse/array.py:948:16: warning[possibly-missing-attribute] Attribute `any` may be missing on object of type `Unknown | ExtensionArray | ndarray[tuple[Any, ...], dtype[Any]]`
+pandas/core/arrays/sparse/array.py:949:17: error[invalid-argument-type] Method `__getitem__` of type `Overload[(key: ndarray[tuple[Any, ...], dtype[integer[Any] | bool[bool]]] | tuple[ndarray[tuple[Any, ...], dtype[integer[Any] | bool[bool]]], ...], /) -> ndarray[tuple[Any, ...], dtype[signedinteger[_64Bit]]], (key: SupportsIndex | tuple[SupportsIndex, ...], /) -> Any, (key: SupportsIndex | slice[Any, Any, Any] | EllipsisType | ... omitted 5 union elements, /) -> ndarray[tuple[Any, ...], dtype[signedinteger[_64Bit]]], (key: str, /) -> ndarray[tuple[Any, ...], dtype[Any]], (key: list[str], /) -> ndarray[tuple[Any, ...], dtype[void]]]` cannot be called with key of type `Unknown | ExtensionArray | ndarray[tuple[Any, ...], dtype[Any]]` on object of type `ndarray[tuple[Any, ...], dtype[signedinteger[_64Bit]]]`
+pandas/core/arrays/sparse/array.py:978:9: error[invalid-method-override] Invalid override of method `__getitem__`: Definition is incompatible with `ExtensionArray.__getitem__`
+pandas/core/arrays/sparse/array.py:1188:9: error[invalid-method-override] Invalid override of method `searchsorted`: Definition is incompatible with `ExtensionArray.searchsorted`
+pandas/core/arrays/sparse/array.py:1205:9: error[invalid-method-override] Invalid override of method `_concat_same_type`: Definition is incompatible with `ExtensionArray._concat_same_type`
+pandas/core/arrays/sparse/array.py:1933:19: warning[possibly-missing-attribute] Attribute `sp_index` may be missing on object of type `Unknown | ndarray[tuple[Any, ...], dtype[bool[bool]]]`
+pandas/core/arrays/string_.py:225:23: error[invalid-type-form] Invalid subscript of object of type `property` in type expression
+pandas/core/arrays/string_.py:548:16: error[invalid-return-type] Return type does not match returned value: expected `Self@view`, found `BaseStringArray`
+pandas/core/arrays/string_.py:689:9: error[invalid-method-override] Invalid override of method `_validate_scalar`: Definition is incompatible with `NumpyExtensionArray._validate_scalar`
+pandas/core/arrays/string_.py:749:22: error[no-matching-overload] No overload of bound method `astype` matches arguments
+pandas/core/arrays/string_.py:749:22: error[no-matching-overload] No overload of bound method `astype` matches arguments
+pandas/core/arrays/string_arrow.py:245:9: error[invalid-method-override] Invalid override of method `_convert_bool_result`: Definition is incompatible with `ArrowExtensionArray._convert_bool_result`
+pandas/core/arrays/string_arrow.py:291:18: error[unresolved-attribute] Module `pyarrow.compute` has no member `is_in`
+pandas/core/arrays/string_arrow.py:446:18: error[unresolved-attribute] Module `pyarrow.compute` has no member `count_substring_regex`
+pandas/core/arrays/string_arrow.py:493:23: error[unresolved-attribute] Module `pyarrow.compute` has no member `is_null`
+pandas/core/arrays/string_arrow.py:494:23: error[unresolved-attribute] Module `pyarrow.compute` has no member `or_kleene`
+pandas/core/arrays/string_arrow.py:494:41: error[unresolved-attribute] Module `pyarrow.compute` has no member `not_equal`
+pandas/core/arrays/string_arrow.py:496:23: error[unresolved-attribute] Module `pyarrow.compute` has no member `not_equal`
+pandas/core/arrays/timedeltas.py:188:47: error[invalid-argument-type] Argument to bound method `_from_value_and_reso` is incorrect: Expected `signedinteger[_64Bit]`, found `timedelta64[timedelta | int | None]`
+pandas/core/arrays/timedeltas.py:240:16: error[invalid-return-type] Return type does not match returned value: expected `Self@_simple_new`, found `TimedeltaArray`
+pandas/core/arrays/timedeltas.py:243:9: error[invalid-method-override] Invalid override of method `_from_sequence`: Definition is incompatible with `ExtensionArray._from_sequence`
+pandas/core/arrays/timedeltas.py:250:46: error[invalid-argument-type] Argument to function `astype_overflowsafe` is incorrect: Expected `dtype[Any]`, found `(Unknown & ~AlwaysTruthy & ~None) | dtype[Any] | ExtensionDtype`
+pandas/core/arrays/timedeltas.py:276:46: error[invalid-argument-type] Argument to function `astype_overflowsafe` is incorrect: Expected `dtype[Any]`, found `(Unknown & ~AlwaysTruthy & ~None) | dtype[Any] | ExtensionDtype`
+pandas/core/arrays/timedeltas.py:284:9: error[invalid-method-override] Invalid override of method `_generate_range`: Definition is incompatible with `TimelikeOps._generate_range`
+pandas/core/arrays/timedeltas.py:470:9: error[invalid-method-override] Invalid override of method `_add_offset`: Definition is incompatible with `DatetimeLikeArrayMixin._add_offset`
+pandas/core/arrays/timedeltas.py:1147:20: error[unresolved-attribute] Object of type `ExtensionArray | ndarray[tuple[Any, ...], dtype[Any]]` has no attribute `_mask`
+pandas/core/arrays/timedeltas.py:1148:20: error[unresolved-attribute] Object of type `ExtensionArray | ndarray[tuple[Any, ...], dtype[Any]]` has no attribute `_data`
+pandas/core/arrays/timedeltas.py:1152:42: error[invalid-argument-type] Argument to function `cast_from_unit_vectorized` is incorrect: Expected `ndarray[tuple[Any, ...], dtype[Any]]`, found `ExtensionArray | ndarray[tuple[Any, ...], dtype[Any]] | Unknown`
+pandas/core/arrays/timedeltas.py:1158:35: error[invalid-argument-type] Argument to function `is_supported_dtype` is incorrect: Expected `dtype[Any]`, found `ExtensionDtype | dtype[Any]`
+pandas/core/arrays/timedeltas.py:1160:45: error[invalid-argument-type] Argument to function `get_supported_dtype` is incorrect: Expected `dtype[Any]`, found `ExtensionDtype | dtype[Any]`
+pandas/core/arrays/timedeltas.py:1161:40: error[invalid-argument-type] Argument to function `astype_overflowsafe` is incorrect: Expected `ndarray[tuple[Any, ...], dtype[Any]]`, found `ExtensionArray | ndarray[tuple[Any, ...], dtype[Any]]`
+pandas/core/base.py:1265:20: error[call-non-callable] Object of type `object` is not callable
+pandas/core/col.py:170:23: error[unresolved-attribute] Object of type `(...) -> Any` has no attribute `__name__`
+pandas/core/common.py:452:38: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `_SupportsArray[dtype[bool[bool] | integer[Any]]] | _NestedSequence[_SupportsArray[dtype[bool[bool] | integer[Any]]]] | int | ... omitted 3 union elements`, found `int | ndarray[tuple[Any, ...], dtype[Any]] | Generator | ... omitted 3 union elements`
+pandas/core/common.py:522:9: error[invalid-assignment] Invalid subscript assignment with key of type `object` and value of type `_T@pipe` on object of type `dict[str, Any]`
+pandas/core/common.py:523:16: error[call-non-callable] Object of type `object` is not callable
+pandas/core/computation/align.py:161:23: warning[possibly-missing-attribute] Attribute `value` may be missing on object of type `Unknown | list[Unknown]`
+pandas/core/computation/align.py:162:24: warning[possibly-missing-attribute] Attribute `value` may be missing on object of type `Unknown | list[Unknown]`
+pandas/core/computation/align.py:163:20: warning[possibly-missing-attribute] Attribute `value` may be missing on object of type `Unknown | list[Unknown]`
+pandas/core/computation/align.py:163:51: warning[possibly-missing-attribute] Attribute `value` may be missing on object of type `Unknown | list[Unknown]`
+pandas/core/computation/align.py:164:50: warning[possibly-missing-attribute] Attribute `value` may be missing on object of type `Unknown | list[Unknown]`
+pandas/core/computation/align.py:165:31: warning[possibly-missing-attribute] Attribute `type` may be missing on object of type `Unknown | list[Unknown]`
+pandas/core/computation/pytables.py:171:19: error[invalid-argument-type] Argument to bound method `ravel` is incorrect: Argument type `ndarray[tuple[object, ...], dtype[object]]` does not satisfy upper bound `ndarray[_ShapeT_co@ndarray, _DTypeT_co@ndarray]` of type variable `Self`
+pandas/core/computation/pytables.py:624:30: warning[possibly-missing-attribute] Attribute `prune` may be missing on object of type `Unknown | None`
+pandas/core/computation/pytables.py:631:27: warning[possibly-missing-attribute] Attribute `prune` may be missing on object of type `Unknown | None`
+pandas/core/construction.py:585:51: error[invalid-argument-type] Argument to function `construct_1d_arraylike_from_scalar` is incorrect: Expected `str | bytes | date | ... omitted 10 union elements`, found `object`
+pandas/core/construction.py:605:25: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `Iterable[Unknown]`, found `~ExtensionArray & ~<Protocol with members '__array__'>`
+pandas/core/construction.py:616:26: error[no-matching-overload] No overload of function `maybe_convert_objects` matches arguments
+pandas/core/construction.py:658:21: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `Iterable[Unknown]`, found `~ExtensionArray & ~<Protocol with members '__array__'>`
+pandas/core/dtypes/cast.py:197:23: error[invalid-argument-type] Argument to function `__new__` is incorrect: Expected `str | Buffer | SupportsFloat | SupportsIndex`, found `str | bytes | date | ... omitted 12 union elements`
+pandas/core/dtypes/cast.py:199:21: error[invalid-argument-type] Argument to function `__new__` is incorrect: Expected `str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc`, found `str | bytes | date | ... omitted 12 union elements`
+pandas/core/dtypes/cast.py:344:23: error[unresolved-attribute] Object of type `ExtensionArray & ~ndarray[tuple[object, ...], dtype[object]]` has no attribute `iloc`
+pandas/core/dtypes/cast.py:359:44: error[invalid-argument-type] Argument to function `allclose` is incorrect: Expected `_Buffer | _SupportsArray[dtype[Any]] | _NestedSequence[_SupportsArray[dtype[Any]]] | ... omitted 5 union elements`, found `ExtensionArray | ndarray[tuple[Any, ...], dtype[Any]]`
+pandas/core/dtypes/cast.py:380:36: error[invalid-argument-type] Argument to function `allclose` is incorrect: Expected `_Buffer | _SupportsArray[dtype[Any]] | _NestedSequence[_SupportsArray[dtype[Any]]] | ... omitted 5 union elements`, found `ExtensionArray | ndarray[tuple[Any, ...], dtype[Any]]`
+pandas/core/dtypes/cast.py:386:39: error[invalid-argument-type] Argument to function `array_equal` is incorrect: Expected `_Buffer | _SupportsArray[dtype[Any]] | _NestedSequence[_SupportsArray[dtype[Any]]] | ... omitted 5 union elements`, found `ExtensionArray | ndarray[tuple[Any, ...], dtype[Any]]`
+pandas/core/dtypes/cast.py:407:16: error[invalid-argument-type] Argument to bound method `astype` is incorrect: Expected `Index`, found `NumpyIndexT@maybe_upcast_numeric_to_64bit`
+pandas/core/dtypes/cast.py:407:16: error[no-matching-overload] No overload of bound method `astype` matches arguments
+pandas/core/dtypes/cast.py:409:16: error[invalid-argument-type] Argument to bound method `astype` is incorrect: Expected `Index`, found `NumpyIndexT@maybe_upcast_numeric_to_64bit`
+pandas/core/dtypes/cast.py:409:16: error[no-matching-overload] No overload of bound method `astype` matches arguments
+pandas/core/dtypes/cast.py:411:16: error[invalid-argument-type] Argument to bound method `astype` is incorrect: Expected `Index`, found `NumpyIndexT@maybe_upcast_numeric_to_64bit`
+pandas/core/dtypes/cast.py:411:16: error[no-matching-overload] No overload of bound method `astype` matches arguments
+pandas/core/dtypes/cast.py:500:42: error[invalid-argument-type] Argument to function `datetime_data` is incorrect: Expected `str | _SupportsDType[dtype[datetime64[date | int | None]]] | dtype[datetime64[date | int | None]] | dtype[timedelta64[timedelta | int | None]]`, found `Unknown | int | float`
+pandas/core/dtypes/cast.py:1527:26: error[no-matching-overload] No overload of bound method `astype` matches arguments
+pandas/core/dtypes/cast.py:1527:26: error[no-matching-overload] No overload of bound method `astype` matches arguments
+pandas/core/dtypes/dtypes.py:329:35: warning[possibly-missing-attribute] Attribute `dtype` may be missing on object of type `Unknown | None`
+pandas/core/dtypes/dtypes.py:343:21: warning[possibly-missing-attribute] Attribute `dtype` may be missing on object of type `Unknown | None`
+pandas/core/dtypes/dtypes.py:344:17: warning[possibly-missing-attribute] Attribute `dtype` may be missing on object of type `Unknown | None`
+pandas/core/dtypes/dtypes.py:452:34: error[unresolved-attribute] Object of type `~None` has no attribute `dtype`
+pandas/core/dtypes/dtypes.py:455:33: error[invalid-argument-type] Argument to function `len` is incorrect: Expected `Sized`, found `~None`
+pandas/core/dtypes/dtypes.py:472:37: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `Iterable[Unknown]`, found `~None`
+pandas/core/dtypes/dtypes.py:806:43: error[invalid-argument-type] Argument to function `tz_standardize` is incorrect: Expected `tzinfo`, found `tzinfo | None`
+pandas/core/dtypes/dtypes.py:972:24: error[no-matching-overload] No overload of function `amax` matches arguments
+pandas/core/dtypes/dtypes.py:1363:39: error[invalid-type-form] Invalid subscript of object of type `property` in type expression
+pandas/core/dtypes/dtypes.py:1398:23: error[invalid-type-form] Invalid subscript of object of type `property` in type expression
+pandas/core/dtypes/dtypes.py:1548:23: error[invalid-type-form] Invalid subscript of object of type `property` in type expression
+pandas/core/dtypes/inference.py:301:17: error[invalid-argument-type] Argument to function `len` is incorrect: Expected `Sized`, found `<Protocol with members '__len__'>`
+pandas/core/frame.py:894:56: error[invalid-argument-type] Argument to function `construct_1d_arraylike_from_scalar` is incorrect: Expected `str | bytes | date | ... omitted 10 union elements`, found `(@Todo & ~BlockManager & ~None & ~Top[dict[Unknown, Unknown]] & ~ndarray[tuple[object, ...], dtype[object]] & ~Series & ~Index & ~ExtensionArray) | (list[Unknown] & ~BlockManager & ~ndarray[tuple[object, ...], dtype[object]] & ~Series & ~Index & ~ExtensionArray)`
+pandas/core/frame.py:900:21: error[invalid-argument-type] Argument to function `construct_2d_arraylike_from_scalar` is incorrect: Expected `str | bytes | date | ... omitted 10 union elements`, found `(@Todo & ~BlockManager & ~None & ~Top[dict[Unknown, Unknown]] & ~ndarray[tuple[object, ...], dtype[object]] & ~Series & ~Index & ~ExtensionArray) | (list[Unknown] & ~BlockManager & ~ndarray[tuple[object, ...], dtype[object]] & ~Series & ~Index & ~ExtensionArray)`
+pandas/core/frame.py:2358:37: error[no-matching-overload] No overload of function `maybe_convert_objects` matches arguments
+pandas/core/frame.py:2378:21: warning[possibly-missing-attribute] Attribute `get_loc` may be missing on object of type `None | Index`
+pandas/core/frame.py:2399:23: warning[possibly-missing-attribute] Attribute `drop` may be missing on object of type `None | Index`
+pandas/core/frame.py:2401:37: error[invalid-argument-type] Argument to function `arrays_to_mgr` is incorrect: Expected `Index`, found `None | Index`
+pandas/core/frame.py:2541:20: error[unsupported-operator] Operator `in` is not supported between objects of type `Hashable` and `Unknown | None`
+pandas/core/frame.py:2542:37: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+pandas/core/frame.py:2543:22: error[unsupported-operator] Operator `in` is not supported between objects of type `int` and `Unknown | None`
+pandas/core/frame.py:2544:37: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+pandas/core/frame.py:4106:9: error[invalid-method-override] Invalid override of method `__getitem__`: Definition is incompatible with `NDFrame.__getitem__`
+pandas/core/frame.py:4647:29: error[no-matching-overload] No overload of function `tile` matches arguments
+pandas/core/frame.py:5232:32: error[invalid-argument-type] Argument to function `__new__` is incorrect: Expected `Iterable[Unknown]`, found `Unknown | None | tuple[Unknown & ~None] | tuple[()]`
+pandas/core/frame.py:5232:52: error[invalid-argument-type] Argument to function `__new__` is incorrect: Expected `Iterable[Unknown]`, found `Unknown | None | tuple[Unknown & ~None] | tuple[()]`
+pandas/core/frame.py:7272:9: error[invalid-method-override] Invalid override of method `sort_values`: Definition is incompatible with `NDFrame.sort_values`
+pandas/core/frame.py:10299:23: error[invalid-assignment] Object of type `Top[list[Unknown]] & ~AlwaysFalsy` is not assignable to `list[Hashable]`
+pandas/core/frame.py:10614:43: error[unresolved-attribute] Object of type `int` has no attribute `is_integer`
+pandas/core/frame.py:10732:32: error[invalid-argument-type] Argument to function `frame_apply` is incorrect: Expected `((...) -> Unknown) | str | list[((...) -> Unknown) | str] | MutableMapping[Hashable, ((...) -> Unknown) | str | list[((...) -> Unknown) | str]]`, found `Unknown | None`
+pandas/core/frame.py:11024:22: error[unresolved-attribute] Object of type `object` has no attribute `apply`
+pandas/core/frame.py:11426:20: error[invalid-return-type] Return type does not match returned value: expected `DataFrame`, found `Unknown | DataFrame | Series`
+pandas/core/frame.py:11940:41: error[parameter-already-assigned] Multiple values provided for parameter `method` of bound method `corr`
+pandas/core/frame.py:11940:56: error[invalid-argument-type] Argument to bound method `corr` is incorrect: Expected `int`, found `int | None`
+pandas/core/frame.py:13843:22: error[no-matching-overload] No overload of bound method `quantile` matches arguments
+pandas/core/generic.py:1070:55: error[invalid-argument-type] Argument to function `__new__` is incorrect: Expected `Iterable[Unknown]`, found `(Mapping[Any, Hashable] & ~(() -> object)) | (((Any, /) -> Hashable) & ~(() -> object))`
+pandas/core/generic.py:3564:31: error[no-matching-overload] No overload of bound method `pop` matches arguments
+pandas/core/generic.py:3565:32: error[no-matching-overload] No overload of bound method `pop` matches arguments
+pandas/core/generic.py:4592:13: error[invalid-assignment] Object of type `Unknown | str` is not assignable to `int | Literal["columns", "index", "rows"]`
+pandas/core/generic.py:4669:24: error[unresolved-attribute] Object of type `ndarray[tuple[Any, ...], dtype[bool[bool]]]` has no attribute `to_numpy`
+pandas/core/generic.py:6196:21: error[invalid-assignment] Cannot assign to a subscript on an object of type `Self@__setattr__`
+pandas/core/generic.py:6523:16: warning[redundant-cast] Value is already of type `Self@astype`
+pandas/core/generic.py:7154:25: error[invalid-assignment] Cannot assign to a subscript on an object of type `Self@fillna`
+pandas/core/generic.py:7164:33: error[invalid-assignment] Cannot assign to a subscript on an object of type `Self@fillna`
+pandas/core/generic.py:7571:26: warning[possibly-missing-attribute] Attribute `items` may be missing on object of type `Unknown | None | bool`
+pandas/core/generic.py:7621:31: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+pandas/core/generic.py:7622:36: warning[possibly-missing-attribute] Attribute `keys` may be missing on object of type `Unknown | None`
+pandas/core/generic.py:7636:65: warning[possibly-missing-attribute] Attribute `items` may be missing on object of type `Unknown | None`
+pandas/core/generic.py:7646:43: error[invalid-argument-type] Argument to function `len` is incorrect: Expected `Sized`, found `Unknown | None`
+pandas/core/generic.py:7649:24: error[invalid-argument-type] Argument to function `len` is incorrect: Expected `Sized`, found `Unknown | None`
+pandas/core/generic.py:7652:42: error[invalid-argument-type] Argument to function `len` is incorrect: Expected `Sized`, found `Unknown | None`
+pandas/core/generic.py:7655:21: error[invalid-argument-type] Argument to bound method `replace_list` is incorrect: Expected `list[Any]`, found `Unknown | None`
+pandas/core/generic.py:7655:21: error[invalid-argument-type] Argument to bound method `replace_list` is incorrect: Expected `list[Any]`, found `Unknown | None`
+pandas/core/groupby/groupby.py:3510:16: error[invalid-return-type] Return type does not match returned value: expected `NDFrameT@GroupBy`, found `Unknown | DataFrame`
+pandas/core/groupby/grouper.py:545:31: warning[possibly-missing-attribute] Attribute `categories` may be missing on object of type `(Unknown & ~ndarray[tuple[object, ...], dtype[object]]) | (Index & ~ndarray[tuple[object, ...], dtype[object]])`
+pandas/core/groupby/grouper.py:546:50: error[invalid-argument-type] Argument to function `recode_for_groupby` is incorrect: Expected `Categorical`, found `(Unknown & ~ndarray[tuple[object, ...], dtype[object]]) | (Index & ~ndarray[tuple[object, ...], dtype[object]])`
+pandas/core/groupby/grouper.py:623:26: warning[possibly-missing-attribute] Attribute `categories` may be missing on object of type `Unknown | Index | ndarray[tuple[Any, ...], dtype[Any]] | Categorical`
+pandas/core/groupby/grouper.py:626:46: warning[possibly-missing-attribute] Attribute `codes` may be missing on object of type `Unknown | Index | ndarray[tuple[Any, ...], dtype[Any]] | Categorical`
+pandas/core/groupby/grouper.py:635:27: warning[possibly-missing-attribute] Attribute `isna` may be missing on object of type `Unknown | Index | ndarray[tuple[Any, ...], dtype[Any]] | Categorical`
+pandas/core/groupby/grouper.py:645:59: warning[possibly-missing-attribute] Attribute `codes` may be missing on object of type `Unknown | Index | ndarray[tuple[Any, ...], dtype[Any]] | Categorical`
+pandas/core/groupby/grouper.py:649:62: warning[possibly-missing-attribute] Attribute `ordered` may be missing on object of type `Unknown | Index | ndarray[tuple[Any, ...], dtype[Any]] | Categorical`
+pandas/core/groupby/grouper.py:651:21: warning[possibly-missing-attribute] Attribute `codes` may be missing on object of type `Unknown | Index | ndarray[tuple[Any, ...], dtype[Any]] | Categorical`
+pandas/core/groupby/indexing.py:248:6: error[invalid-argument-type] Argument to function `doc` is incorrect: Expected `None | str | ((...) -> Unknown)`, found `property`
+pandas/core/groupby/numba_.py:61:57: error[unresolved-attribute] Object of type `((...) -> Unknown) & (() -> object)` has no attribute `__name__`
+pandas/core/groupby/numba_.py:116:18: error[not-iterable] Object of type `prange` is not iterable
+pandas/core/groupby/numba_.py:118:22: error[not-iterable] Object of type `prange` is not iterable
+pandas/core/groupby/numba_.py:176:18: error[not-iterable] Object of type `prange` is not iterable
+pandas/core/groupby/numba_.py:178:22: error[not-iterable] Object of type `prange` is not iterable
+pandas/core/indexers/utils.py:565:23: warning[possibly-missing-attribute] Attribute `to_numpy` may be missing on object of type `Unknown | ndarray[tuple[Any, ...], dtype[Unknown]]`
+pandas/core/indexes/accessors.py:91:9: error[invalid-method-override] Invalid override of method `_delegate_property_get`: Definition is incompatible with `PandasDelegate._delegate_property_get`
+pandas/core/indexes/accessors.py:175:9: error[invalid-method-override] Invalid override of method `_delegate_property_get`: Definition is incompatible with `PandasDelegate._delegate_property_get`
+pandas/core/indexes/base.py:428:11: error[invalid-type-form] Variable of type `Accessor` is not allowed in a type expression
+pandas/core/indexes/base.py:440:24: error[invalid-type-form] Variable of type `Accessor` is not allowed in a type expression
+pandas/core/indexes/base.py:441:23: error[invalid-type-form] Variable of type `Accessor` is not allowed in a type expression
+pandas/core/indexes/base.py:545:33: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `Iterable[Unknown]`, found `(Unknown & ~range & ~<Protocol with members '__array__'>) | None`
+pandas/core/indexes/base.py:562:29: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `Iterable[Unknown]`, found `(Unknown & ~range & ~<Protocol with members '__array__'> & ~Top[list[Unknown]] & ~tuple[object, ...]) | None`
+pandas/core/indexes/base.py:972:20: error[invalid-argument-type] Argument to function `ndim` is incorrect: Expected `_Buffer | _SupportsArray[dtype[Any]] | _NestedSequence[_SupportsArray[dtype[Any]]] | ... omitted 5 union elements`, found `object`
+pandas/core/indexes/base.py:1359:42: error[invalid-argument-type] Argument to bound method `repeat` is incorrect: Expected `int | Sequence[int]`, found `ndarray[tuple[Any, ...], dtype[signedinteger[_64Bit]]]`
+pandas/core/indexes/base.py:1831:16: error[invalid-argument-type] Argument to function `len` is incorrect: Expected `Sized`, found `Unknown | FrozenList | list[Unknown | None] | None`
+pandas/core/indexes/base.py:1833:75: error[invalid-argument-type] Argument to function `len` is incorrect: Expected `Sized`, found `Unknown | FrozenList | list[Unknown | None] | None`
+pandas/core/indexes/base.py:1839:16: error[invalid-return-type] Return type does not match returned value: expected `list[Hashable]`, found `Unknown | FrozenList | list[Unknown | None] | None`
+pandas/core/indexes/base.py:1874:16: error[invalid-return-type] Return type does not match returned value: expected `list[Hashable]`, found `(Top[list[Unknown]] & ~AlwaysFalsy) | list[Hashable] | list[Unknown | None] | list[Unknown | (Hashable & ~None)]`
+pandas/core/indexes/base.py:2896:16: error[invalid-return-type] Return type does not match returned value: expected `Self@drop_duplicates`, found `Index`
+pandas/core/indexes/base.py:3737:48: error[unresolved-attribute] Object of type `Index` has no attribute `codes`
+pandas/core/indexes/base.py:3755:51: error[unresolved-attribute] Object of type `Index` has no attribute `categories`
+pandas/core/indexes/base.py:3757:57: error[unresolved-attribute] Object of type `Index` has no attribute `codes`
+pandas/core/indexes/base.py:3817:48: error[invalid-argument-type] Argument to bound method `get_indexer` is incorrect: Expected `ndarray[tuple[Any, ...], dtype[Any]]`, found `Unknown | ExtensionArray | ndarray[tuple[Any, ...], dtype[Any]]`
+pandas/core/indexes/base.py:3817:48: error[invalid-argument-type] Argument to bound method `get_indexer` is incorrect: Expected `ndarray[tuple[Any, ...], dtype[Any]]`, found `Unknown | ExtensionArray | ndarray[tuple[Any, ...], dtype[Any]]`
+pandas/core/indexes/base.py:5019:10: error[invalid-argument-type] Argument to function `doc` is incorrect: Expected `None | str | ((...) -> Unknown)`, found `property`
+pandas/core/indexes/base.py:5299:23: error[unresolved-attribute] Object of type `~slice[object, object, object]` has no attribute `to_numpy`
+pandas/core/indexes/base.py:5310:18: error[no-matching-overload] No overload of bound method `__getitem__` matches arguments
+pandas/core/indexes/base.py:5310:18: error[no-matching-overload] No overload of bound method `__getitem__` matches arguments
+pandas/core/indexes/base.py:5745:16: error[no-matching-overload] No overload of bound method `searchsorted` matches arguments
+pandas/core/indexes/base.py:6135:64: error[invalid-argument-type] Argument to bound method `get_indexer_non_unique` is incorrect: Expected `ndarray[tuple[Any, ...], dtype[Any]]`, found `Unknown | ExtensionArray | ndarray[tuple[Any, ...], dtype[Any]]`
+pandas/core/indexes/base.py:6135:64: error[invalid-argument-type] Argument to bound method `get_indexer_non_unique` is incorrect: Expected `ndarray[tuple[Any, ...], dtype[Any]]`, found `Unknown | ExtensionArray | ndarray[tuple[Any, ...], dtype[Any]]`
+pandas/core/indexes/category.py:429:9: error[invalid-method-override] Invalid override of method `_maybe_cast_listlike_indexer`: Definition is incompatible with `Index._maybe_cast_listlike_indexer`
+pandas/core/indexes/datetimelike.py:139:10: error[invalid-argument-type] Argument to function `doc` is incorrect: Expected `None | str | ((...) -> Unknown)`, found `property`
+pandas/core/indexes/datetimelike.py:156:10: error[invalid-argument-type] Argument to function `doc` is incorrect: Expected `None | str | ((...) -> Unknown)`, found `property`
+pandas/core/indexes/datetimelike.py:200:42: warning[possibly-missing-attribute] Attribute `asi8` may be missing on object of type `(Any & Index) | CategoricalIndex | Self@equals`
+pandas/core/indexes/datetimelike.py:527:10: error[invalid-argument-type] Argument to function `doc` is incorrect: Expected `None | str | ((...) -> Unknown)`, found `property`
+pandas/core/indexes/datetimelike.py:756:16: error[invalid-return-type] Return type does not match returned value: expected `tuple[Self@_wrap_join_result, ndarray[tuple[Any, ...], dtype[signedinteger[_64Bit]]] | None, ndarray[tuple[Any, ...], dtype[signedinteger[_64Bit]]] | None]`, found `tuple[DatetimeTimedeltaMixin | Unknown, ndarray[tuple[Any, ...], dtype[signedinteger[_64Bit]]] | None, ndarray[tuple[Any, ...], dtype[signedinteger[_64Bit]]] | None]`
+pandas/core/indexes/datetimelike.py:807:45: error[unsupported-operator] Operator `-` is unsupported between objects of type `Timestamp | NaTType | Timedelta` and `BaseOffset`
+pandas/core/indexes/datetimelike.py:815:45: error[invalid-argument-type] Argument to bound method `is_on_offset` is incorrect: Expected `datetime`, found `Timestamp | NaTType | Timedelta`
+pandas/core/indexes/datetimelike.py:823:16: error[invalid-return-type] Return type does not match returned value: expected `Self@delete`, found `DatetimeTimedeltaMixin`
+pandas/core/indexes/datetimelike.py:855:13: error[invalid-assignment] Object of type `BaseOffset | None` is not assignable to attribute `_freq` on type `DatetimeArray | TimedeltaArray`
+pandas/core/indexes/datetimes.py:609:29: error[invalid-argument-type] Argument to function `__new__` is incorrect: Expected `integer[Any] | int | float | ... omitted 3 union elements`, found `Unknown | NaTType`
+pandas/core/indexes/frozen.py:72:15: error[invalid-method-override] Invalid override of method `__iadd__`: Definition is incompatible with `MutableSequence.__iadd__`
+pandas/core/indexes/frozen.py:74:9: error[invalid-method-override] Invalid override of method `__getitem__`: Definition is incompatible with `MutableSequence.__getitem__`
+pandas/core/indexes/interval.py:670:43: warning[possibly-missing-attribute] Attribute `left` may be missing on object of type `Unknown | Index`
+pandas/core/indexes/interval.py:671:44: warning[possibly-missing-attribute] Attribute `right` may be missing on object of type `Unknown | Index`
+pandas/core/indexes/interval.py:686:50: warning[possibly-missing-attribute] Attribute `asi8` may be missing on object of type `(Unknown & ~Top[Interval[Unknown]]) | (Index & ~Top[Interval[Unknown]])`
+pandas/core/indexes/interval.py:807:20: error[invalid-return-type] Return type does not match returned value: expected `int | slice[Any, Any, Any] | ndarray[tuple[Any, ...], dtype[Any]]`, found `Unknown | signedinteger[_64Bit]`
+pandas/core/indexes/interval.py:1375:36: error[invalid-argument-type] Argument to function `maybe_box_datetimelike` is incorrect: Expected `str | bytes | date | ... omitted 10 union elements`, found `Unknown | None`
+pandas/core/indexes/interval.py:1376:34: error[invalid-argument-type] Argument to function `maybe_box_datetimelike` is incorrect: Expected `str | bytes | date | ... omitted 10 union elements`, found `Unknown | None`
+pandas/core/indexes/interval.py:1397:20: error[no-matching-overload] No overload of function `to_offset` matches arguments
+pandas/core/indexes/interval.py:1435:46: error[unsupported-operator] Operator `*` is unsupported between objects of type `Unknown | None | Literal[1, "D"]` and `float`
+pandas/core/indexes/interval.py:1440:32: error[unsupported-operator] Operator `-` is unsupported between objects of type `str | bytes | date | ... omitted 10 union elements` and `str | bytes | date | ... omitted 10 union elements`
+pandas/core/indexes/interval.py:1446:22: error[no-matching-overload] No overload of function `linspace` matches arguments
+pandas/core/indexes/multi.py:587:54: error[invalid-argument-type] Argument to function `tuples_to_object_array` is incorrect: Expected `ndarray[tuple[Any, ...], dtype[object_]]`, found `(ndarray[tuple[object, ...], dtype[object]] & ~Index) | ndarray[tuple[Any, ...], dtype[Any]]`
+pandas/core/indexes/multi.py:1589:9: error[invalid-method-override] Invalid override of method `_set_names`: Definition is incompatible with `Index._set_names`
+pandas/core/indexes/multi.py:2256:40: error[unsupported-operator] Operator `>` is not supported between objects of type `~None` and `Literal[0]`
+pandas/core/indexes/multi.py:4158:9: error[invalid-method-override] Invalid override of method `_validate_fill_value`: Definition is incompatible with `Index._validate_fill_value`
+pandas/core/indexes/period.py:243:29: error[invalid-argument-type] Argument to function `period_array` is incorrect: Expected `Sequence[Period | str | None] | ExtensionArray | ndarray[tuple[Any, ...], dtype[Any]] | Index | Series`, found `Unknown | None`
+pandas/core/indexes/range.py:808:9: error[invalid-method-override] Invalid override of method `sort_values`: Definition is incompatible with `Index.sort_values`
+pandas/core/indexes/range.py:817:20: error[invalid-return-type] Return type does not match returned value: expected `Self@sort_values | tuple[Self@sort_values, ndarray[tuple[Any, ...], dtype[Any]] | RangeIndex]`, found `RangeIndex | tuple[RangeIndex, ndarray[tuple[Any, ...], dtype[Any]]]`
+pandas/core/indexes/range.py:1184:9: error[invalid-method-override] Invalid override of method `_concat`: Definition is incompatible with `Index._concat`
+pandas/core/indexes/range.py:1289:27: error[invalid-argument-type] Argument to function `__new__` is incorrect: Expected `str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc`, found `~EllipsisType & ~slice[object, object, object]`
+pandas/core/indexes/range.py:1305:23: error[unresolved-attribute] Object of type `~EllipsisType & ~slice[object, object, object]` has no attribute `to_numpy`
+pandas/core/indexing.py:1242:6: error[invalid-argument-type] Argument to function `doc` is incorrect: Expected `None | str | ((...) -> Unknown)`, found `property`
+pandas/core/indexing.py:1430:24: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `Iterable[Unknown]`, found `object`
+pandas/core/indexing.py:1447:45: error[unsupported-operator] Operator `>` is not supported between objects of type `object` and `Literal[1]`
+pandas/core/indexing.py:1593:6: error[invalid-argument-type] Argument to function `doc` is incorrect: Expected `None | str | ((...) -> Unknown)`, found `property`
+pandas/core/indexing.py:1637:31: warning[possibly-missing-attribute] Attribute `_reduce` may be missing on object of type `Unknown | ndarray[tuple[Any, ...], dtype[Unknown]]`
+pandas/core/indexing.py:1638:31: warning[possibly-missing-attribute] Attribute `_reduce` may be missing on object of type `Unknown | ndarray[tuple[Any, ...], dtype[Unknown]]`
+pandas/core/indexing.py:1785:36: error[invalid-argument-type] Argument to bound method `_validate_integer` is incorrect: Expected `int | integer[Any]`, found `object`
+pandas/core/indexing.py:2019:60: error[non-subscriptable] Cannot subscript object of type `Hashable` with no `__getitem__` method
+pandas/core/indexing.py:2033:45: error[invalid-argument-type] Argument to bound method `_setitem_single_column` is incorrect: Expected `int`, found `Hashable`
+pandas/core/indexing.py:2381:32: error[index-out-of-bounds] Index 1 is out of bounds for tuple `tuple[(Unknown & slice[object, object, object]) | (Unknown & ndarray[tuple[object, ...], dtype[object]]) | (Unknown & Top[list[Unknown]]) | (Unknown & Index)]` with length 1
+pandas/core/indexing.py:2382:21: error[index-out-of-bounds] Index 1 is out of bounds for tuple `tuple[(Unknown & slice[object, object, object]) | (Unknown & ndarray[tuple[object, ...], dtype[object]]) | (Unknown & Top[list[Unknown]]) | (Unknown & Index)]` with length 1
+pandas/core/indexing.py:2384:49: error[index-out-of-bounds] Index 1 is out of bounds for tuple `tuple[(Unknown & slice[object, object, object]) | (Unknown & ndarray[tuple[object, ...], dtype[object]]) | (Unknown & Top[list[Unknown]]) | (Unknown & Index)]` with length 1
+pandas/core/indexing.py:2557:6: error[invalid-argument-type] Argument to function `doc` is incorrect: Expected `None | str | ((...) -> Unknown)`, found `property`
+pandas/core/indexing.py:2607:6: error[invalid-argument-type] Argument to function `doc` is incorrect: Expected `None | str | ((...) -> Unknown)`, found `property`
+pandas/core/interchange/utils.py:146:39: error[invalid-argument-type] Argument to function `datetime_data` is incorrect: Expected `str | _SupportsDType[dtype[datetime64[date | int | None]]] | dtype[datetime64[date | int | None]] | dtype[timedelta64[timedelta | int | None]]`, found `dtype[Any] | (ExtensionDtype & ~CategoricalDtype & ~StringDtype)`
+pandas/core/internals/api.py:113:57: error[invalid-argument-type] Argument to function `extract_pandas_array` is incorrect: Expected `int`, found `Unknown | None`
+pandas/core/internals/api.py:133:13: error[invalid-argument-type] Argument to bound method `_simple_new` is incorrect: Expected `ndarray[tuple[Any, ...], dtype[datetime64[date | int | None]]]`, found `ExtensionArray | ndarray[tuple[Any, ...], dtype[Any]]`
+pandas/core/internals/blocks.py:509:22: error[no-matching-overload] No overload of function `maybe_convert_objects` matches arguments
+pandas/core/internals/construction.py:243:22: warning[possibly-missing-attribute] Attribute `reshape` may be missing on object of type `Unknown | ndarray[tuple[int, int], dtype[Any]] | ExtensionArray | ndarray[tuple[Any, ...], dtype[Any]]`
+pandas/core/internals/construction.py:254:29: error[invalid-argument-type] Argument to function `_ensure_2d` is incorrect: Expected `ndarray[tuple[Any, ...], dtype[Any]]`, found `Unknown | ExtensionArray | ndarray[tuple[Any, ...], dtype[Any]]`
+pandas/core/internals/construction.py:286:39: error[invalid-argument-type] Argument to function `_check_values_indices_shape_match` is incorrect: Expected `ndarray[tuple[Any, ...], dtype[Any]]`, found `Unknown | ndarray[tuple[int, int], dtype[Any]] | ExtensionArray | ndarray[tuple[Any, ...], dtype[Any]]`
+pandas/core/internals/construction.py:992:27: error[no-matching-overload] No overload of function `maybe_convert_objects` matches arguments
+pandas/core/internals/construction.py:1021:46: error[invalid-argument-type] Argument to function `maybe_cast_to_datetime` is incorrect: Expected `ndarray[tuple[Any, ...], dtype[Any]] | list[Unknown]`, found `ExtensionArray | ndarray[tuple[Any, ...], dtype[Any]]`
+pandas/core/internals/managers.py:1656:9: error[invalid-method-override] Invalid override of method `_equal_values`: Definition is incompatible with `BaseBlockManager._equal_values`
+pandas/core/internals/managers.py:2231:9: error[invalid-method-override] Invalid override of method `_equal_values`: Definition is incompatible with `BaseBlockManager._equal_values`
+pandas/core/missing.py:153:12: error[invalid-return-type] Return type does not match returned value: expected `ndarray[tuple[Any, ...], dtype[numpy.bool[builtins.bool]]]`, found `Unknown | (ExtensionArray & ndarray[tuple[object, ...], dtype[object]]) | ndarray[tuple[Any, ...], dtype[Any]]`
+pandas/core/missing.py:608:19: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `Literal["linear", "nearest", "nearest-up", "slinear", "zero", ... omitted 4 literals] | int`, found `Unknown | None | (str & ~Literal["polynomial"])`
+pandas/core/missing.py:613:28: error[unsupported-operator] Operator `<=` is not supported between objects of type `Unknown | None` and `Literal[0]`
+pandas/core/missing.py:617:51: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `Literal[1, 2, 3, 4, 5]`, found `Unknown | None`
+pandas/core/nanops.py:657:20: error[invalid-return-type] Return type does not match returned value: expected `ndarray[tuple[Any, ...], dtype[Any]] | datetime64[date | int | None] | timedelta64[timedelta | int | None] | NaTType`, found `signedinteger[_64Bit]`
+pandas/core/nanops.py:908:12: error[invalid-return-type] Return type does not match returned value: expected `tuple[int | float | ndarray[tuple[Any, ...], dtype[Any]], int | float | ndarray[tuple[Any, ...], dtype[Any]]]`, found `tuple[floating[Any] | ndarray[tuple[Any, ...], dtype[floating[Any]]] | int | float | ndarray[tuple[Any, ...], dtype[Any]], Unknown | int | float]`
+pandas/core/nanops.py:1297:12: error[invalid-return-type] Return type does not match returned value: expected `int | float`, found `ndarray[tuple[Any, ...], dtype[Any]] | Unknown`
+pandas/core/nanops.py:1416:12: error[invalid-return-type] Return type does not match returned value: expected `int | float`, found `(Unknown & ~ndarray[tuple[object, ...], dtype[object]]) | ndarray[tuple[Any, ...], dtype[Any]]`
+pandas/core/nanops.py:1525:12: warning[possibly-missing-attribute] Attribute `astype` may be missing on object of type `Any | int`
+pandas/core/nanops.py:1561:30: error[no-matching-overload] No overload of bound method `astype` matches arguments
+pandas/core/nanops.py:1561:30: error[no-matching-overload] No overload of bound method `astype` matches arguments
+pandas/core/nanops.py:1563:30: error[no-matching-overload] No overload of bound method `astype` matches arguments
+pandas/core/nanops.py:1563:30: error[no-matching-overload] No overload of bound method `astype` matches arguments
+pandas/core/ops/array_ops.py:126:48: error[invalid-argument-type] Argument to function `vec_compare` is incorrect: Expected `ndarray[tuple[Any, ...], dtype[object_]]`, found `@Todo | ndarray[tuple[int], dtype[Any]] | ndarray[tuple[int], Unknown] | ExtensionArray`
+pandas/core/ops/array_ops.py:340:44: error[invalid-argument-type] Argument to function `invalid_comparison` is incorrect: Expected `ExtensionArray | ndarray[tuple[Any, ...], dtype[Any]] | list[Unknown] | ... omitted 13 union elements`, found `~Top[list[Unknown]] | ndarray[tuple[Any, ...], dtype[Any]]`
+pandas/core/ops/mask_ops.py:59:18: error[unsupported-operator] Operator `|` is unsupported between objects of type `ndarray[tuple[Any, ...], dtype[Any]] | (NAType & ndarray[tuple[object, ...], dtype[object]])` and `bool | ndarray[tuple[Any, ...], dtype[Any]] | NAType`
+pandas/core/ops/mask_ops.py:122:18: error[unsupported-operator] Operator `^` is unsupported between objects of type `ndarray[tuple[Any, ...], dtype[Any]] | (NAType & ndarray[tuple[object, ...], dtype[object]])` and `bool | ndarray[tuple[Any, ...], dtype[Any]] | NAType`
+pandas/core/ops/mask_ops.py:132:12: error[invalid-return-type] Return type does not match returned value: expected `tuple[ndarray[tuple[Any, ...], dtype[numpy.bool[builtins.bool]]], ndarray[tuple[Any, ...], dtype[numpy.bool[builtins.bool]]]]`, found `tuple[ndarray[tuple[Any, ...], dtype[Any]] | (NAType & ndarray[tuple[object, ...], dtype[object]]) | Unknown, ndarray[tuple[Any, ...], dtype[Any]] | Unknown]`
+pandas/core/ops/mask_ops.py:172:18: error[unsupported-operator] Operator `&` is unsupported between objects of type `(NAType & ndarray[tuple[object, ...], dtype[object]]) | ndarray[tuple[Any, ...], dtype[Any]]` and `bool | NAType | ndarray[tuple[Any, ...], dtype[Any]]`
+pandas/core/ops/mask_ops.py:190:12: error[invalid-return-type] Return type does not match returned value: expected `tuple[ndarray[tuple[Any, ...], dtype[numpy.bool[builtins.bool]]], ndarray[tuple[Any, ...], dtype[numpy.bool[builtins.bool]]]]`, found `tuple[(NAType & ndarray[tuple[object, ...], dtype[object]]) | ndarray[tuple[Any, ...], dtype[Any]] | Unknown, Any | ndarray[tuple[Any, ...], dtype[Any]]]`
+pandas/core/ops/mask_ops.py:194:32: error[no-matching-overload] No overload matches arguments
+pandas/core/resample.py:265:9: error[invalid-method-override] Invalid override of method `pipe`: Definition is incompatible with `BaseGroupBy.pipe`
+pandas/core/resample.py:442:45: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `((...) -> Unknown) | str | list[((...) -> Unknown) | str] | MutableMapping[Hashable, ((...) -> Unknown) | str | list[((...) -> Unknown) | str]]`, found `Unknown | None`
+pandas/core/resample.py:2110:9: error[invalid-method-override] Invalid override of method `_upsample`: Definition is incompatible with `Resampler._upsample`
+pandas/core/resample.py:2242:9: error[invalid-method-override] Invalid override of method `_upsample`: Definition is incompatible with `Resampler._upsample`
+pandas/core/resample.py:2574:26: error[invalid-argument-type] Argument to function `__new__` is incorrect: Expected `str | BaseOffset | _NoDefault`, found `Unknown | None`
+pandas/core/resample.py:2574:26: error[invalid-argument-type] Argument to function `__new__` is incorrect: Expected `str | BaseOffset | _NoDefault`, found `Unknown | None`
+pandas/core/resample.py:2581:13: error[invalid-argument-type] Argument to function `_get_timestamp_range_edges` is incorrect: Expected `BaseOffset`, found `Unknown | None`
+pandas/core/resample.py:2583:13: error[invalid-argument-type] Argument to function `_get_timestamp_range_edges` is incorrect: Expected `Literal["left", "right"]`, found `Unknown | Literal["left", "right"] | None`
+pandas/core/resample.py:2637:12: warning[possibly-missing-attribute] Attribute `name` may be missing on object of type `Unknown | None`
+pandas/core/resample.py:2637:52: warning[possibly-missing-attribute] Attribute `name` may be missing on object of type `Unknown | None`
+pandas/core/resample.py:2757:21: warning[possibly-missing-attribute] Attribute `n` may be missing on object of type `Unknown | None`
+pandas/core/resample.py:2772:17: error[invalid-argument-type] Argument to function `_get_period_range_edges` is incorrect: Expected `Literal["left", "right"]`, found `Unknown | Literal["left", "right"] | None`
+pandas/core/resample.py:3147:12: error[invalid-return-type] Return type does not match returned value: expected `FreqIndexT@_asfreq_compat`, found `Unknown | DatetimeIndex | TimedeltaIndex`
+pandas/core/reshape/concat.py:550:41: error[invalid-argument-type] Argument to function `__new__` is incorrect: Expected `SupportsIndex`, found `Any | None | Literal[0]`
+pandas/core/reshape/concat.py:550:47: error[unsupported-operator] Operator `+` is unsupported between objects of type `Any | None | Literal[0]` and `Literal[1]`
+pandas/core/reshape/concat.py:802:17: error[invalid-argument-type] Method `__getitem__` of type `bound method Mapping[HashableT@_clean_keys_and_objs, Series | DataFrame].__getitem__(key: HashableT@_clean_keys_and_objs, /) -> Series | DataFrame` cannot be called with key of type `object` on object of type `Mapping[HashableT@_clean_keys_and_objs, Series | DataFrame]`
+pandas/core/reshape/concat.py:843:16: warning[possibly-missing-attribute] Attribute `take` may be missing on object of type `(Unknown & ~None) | KeysView[object] | Index`
+pandas/core/reshape/concat.py:848:12: error[invalid-return-type] Return type does not match returned value: expected `tuple[list[Series | DataFrame], Index | None, set[int]]`, found `tuple[list[Unknown], Unknown | KeysView[object] | Index, set[Unknown]]`
+pandas/core/reshape/concat.py:948:16: error[invalid-argument-type] Argument to function `len` is incorrect: Expected `Sized`, found `Unknown | None | list[Unknown | None]`
+pandas/core/reshape/concat.py:949:26: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `Iterable[Unknown]`, found `Unknown | None | list[Unknown | None]`
+pandas/core/reshape/concat.py:958:26: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `Iterable[Unknown]`, found `Unknown | None | list[Unknown | None]`
+pandas/core/reshape/concat.py:969:22: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `Iterable[Unknown]`, found `Unknown | None | list[Unknown | None]`
+pandas/core/reshape/merge.py:1649:25: warning[redundant-cast] Value is already of type `Hashable`
+pandas/core/reshape/merge.py:1671:25: warning[redundant-cast] Value is already of type `Hashable`
+pandas/core/reshape/merge.py:1954:16: error[invalid-argument-type] Argument to function `len` is incorrect: Expected `Sized`, found `Unknown | (Hashable & ~None)`
+pandas/core/reshape/merge.py:1954:33: error[invalid-argument-type] Argument to function `len` is incorrect: Expected `Sized`, found `Unknown | (Hashable & ~None)`
+pandas/core/reshape/merge.py:2434:41: error[invalid-argument-type] Argument to function `len` is incorrect: Expected `Sized`, found `Unknown | None | list[Divergent] | list[Unknown | None | list[Divergent]]`
+pandas/core/reshape/merge.py:2438:24: error[unsupported-operator] Operator `+` is unsupported between objects of type `Unknown | None | list[Divergent] | list[Unknown | None | list[Divergent]]` and `list[Unknown]`
+pandas/core/reshape/merge.py:2920:32: error[invalid-argument-type] Argument to bound method `factorize` is incorrect: Expected `ndarray[tuple[Any, ...], dtype[Any]]`, found `ndarray[tuple[Any, ...], dtype[Any]] | Unknown | ExtensionArray`
+pandas/core/reshape/merge.py:2922:48: error[invalid-argument-type] Argument to bound method `hash_inner_join` is incorrect: Expected `ndarray[tuple[Any, ...], dtype[Any]]`, found `ndarray[tuple[Any, ...], dtype[Any]] | Unknown | (ExtensionArray & ~BaseMaskedArray & ~ArrowExtensionArray)`
+pandas/core/reshape/merge.py:2925:36: error[invalid-argument-type] Argument to bound method `factorize` is incorrect: Expected `ndarray[tuple[Any, ...], dtype[Any]]`, found `ndarray[tuple[Any, ...], dtype[Any]] | Unknown | (ExtensionArray & ~BaseMaskedArray & ~ArrowExtensionArray)`
+pandas/core/reshape/merge.py:2927:32: error[invalid-argument-type] Argument to bound method `factorize` is incorrect: Expected `ndarray[tuple[Any, ...], dtype[Any]]`, found `ndarray[tuple[Any, ...], dtype[Any]] | Unknown | (ExtensionArray & ~BaseMaskedArray & ~ArrowExtensionArray)`
+pandas/core/reshape/merge.py:2928:32: error[invalid-argument-type] Argument to bound method `factorize` is incorrect: Expected `ndarray[tuple[Any, ...], dtype[Any]]`, found `ndarray[tuple[Any, ...], dtype[Any]] | Unknown | ExtensionArray`
+pandas/core/reshape/pivot.py:253:17: error[invalid-argument-type] Argument to function `__internal_pivot_table` is incorrect: Expected `((...) -> Unknown) | str | MutableMapping[Hashable, ((...) -> Unknown) | str | list[((...) -> Unknown) | str]]`, found `object`
+pandas/core/reshape/pivot.py:592:25: error[invalid-argument-type] Argument to bound method `from_tuples` is incorrect: Expected `Iterable[tuple[Hashable, ...]]`, found `list[Hashable]`
+pandas/core/reshape/tile.py:542:18: error[no-matching-overload] No overload of function `take_nd` matches arguments
+pandas/core/series.py:341:16: error[invalid-type-form] Invalid subscript of object of type `Accessor` in type expression
+pandas/core/series.py:341:21: error[invalid-type-form] Variable of type `Accessor` is not allowed in a type expression
+pandas/core/series.py:908:23: error[invalid-type-form] Invalid subscript of object of type `Accessor` in type expression
+pandas/core/series.py:939:9: error[invalid-method-override] Invalid override of method `__getitem__`: Definition is incompatible with `NDFrame.__getitem__`
+pandas/core/series.py:1432:27: error[invalid-type-form] Variable of type `Accessor` is not allowed in a type expression
+pandas/core/series.py:1444:17: error[invalid-type-form] Variable of type `Accessor` is not allowed in a type expression
+pandas/core/series.py:1445:23: error[invalid-type-form] Variable of type `Accessor` is not allowed in a type expression
+pandas/core/series.py:1453:10: error[invalid-type-form] Variable of type `Accessor` is not allowed in a type expression
+pandas/core/series.py:1458:37: error[invalid-type-form] Variable of type `Accessor` is not allowed in a type expression
+pandas/core/series.py:1460:17: error[invalid-type-form] Variable of type `Accessor` is not allowed in a type expression
+pandas/core/series.py:1461:23: error[invalid-type-form] Variable of type `Accessor` is not allowed in a type expression
+pandas/core/series.py:1476:37: error[invalid-type-form] Variable of type `Accessor` is not allowed in a type expression
+pandas/core/series.py:1477:17: error[invalid-type-form] Variable of type `Accessor` is not allowed in a type expression
+pandas/core/series.py:1478:23: error[invalid-type-form] Variable of type `Accessor` is not allowed in a type expression
+pandas/core/series.py:1486:10: error[invalid-type-form] Variable of type `Accessor` is not allowed in a type expression
+pandas/core/series.py:1559:17: error[call-non-callable] Object of type `object` is not callable
+pandas/core/series.py:1570:15: error[invalid-type-form] Variable of type `Accessor` is not allowed in a type expression
+pandas/core/series.py:1574:10: error[invalid-type-form] Variable of type `Accessor` is not allowed in a type expression
+pandas/core/series.py:1579:17: error[invalid-type-form] Variable of type `Accessor` is not allowed in a type expression
+pandas/core/series.py:1581:15: error[invalid-type-form] Variable of type `Accessor` is not allowed in a type expression
+pandas/core/series.py:1590:17: error[invalid-type-form] Variable of type `Accessor` is not allowed in a type expression
+pandas/core/series.py:1592:15: error[invalid-type-form] Variable of type `Accessor` is not allowed in a type expression
+pandas/core/series.py:1596:10: error[invalid-type-form] Variable of type `Accessor` is not allowed in a type expression
+pandas/core/series.py:1603:17: error[invalid-type-form] Variable of type `Accessor` is not allowed in a type expression
+pandas/core/series.py:1604:15: error[invalid-type-form] Variable of type `Accessor` is not allowed in a type expression
+pandas/core/series.py:1608:10: error[invalid-type-form] Variable of type `Accessor` is not allowed in a type expression
+pandas/core/series.py:2835:43: error[unresolved-attribute] Object of type `int` has no attribute `is_integer`
+pandas/core/series.py:4642:32: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `((...) -> Unknown) | str | list[((...) -> Unknown) | str] | MutableMapping[Hashable, ((...) -> Unknown) | str | list[((...) -> Unknown) | str]]`, found `(Unknown & ~None) | dict[str, Unknown]`
+pandas/core/series.py:5073:20: error[no-matching-overload] No overload of bound method `_rename` matches arguments
+pandas/core/series.py:5391:9: error[invalid-method-override] Invalid override of method `rename_axis`: Definition is incompatible with `NDFrame.rename_axis`
+pandas/core/series.py:5461:16: error[invalid-return-type] Return type does not match returned value: expected `Self@rename_axis | None`, found `Series | None`
+pandas/core/series.py:5650:17: error[invalid-type-form] Variable of type `Accessor` is not allowed in a type expression
+pandas/core/series.py:5652:30: error[invalid-type-form] Variable of type `Accessor` is not allowed in a type expression
+pandas/core/series.py:5996:19: error[invalid-type-form] Invalid subscript of object of type `Accessor` in type expression
+pandas/core/series.py:6471:15: error[invalid-type-form] Variable of type `Accessor` is not allowed in a type expression
+pandas/core/series.py:6535:19: error[invalid-type-form] Invalid subscript of object of type `Accessor` in type expression
+pandas/core/sorting.py:428:16: error[invalid-return-type] Return type does not match returned value: expected `ndarray[tuple[Any, ...], dtype[signedinteger[_64Bit]]]`, found `ndarray[tuple[Any, ...], dtype[signedinteger[_64Bit]]] | Series | ndarray[tuple[Any, ...], dtype[Any]]`
+pandas/core/sorting.py:429:13: error[unknown-argument] Argument `ascending` does not match any known parameter of bound method `argsort`
+pandas/core/sorting.py:431:13: error[unknown-argument] Argument `na_position` does not match any known parameter of bound method `argsort`
+pandas/core/strings/accessor.py:310:33: warning[possibly-missing-attribute] Submodule `compute` may not be available as an attribute on module `pyarrow`
+pandas/core/strings/accessor.py:311:27: warning[possibly-missing-attribute] Submodule `compute` may not be available as an attribute on module `pyarrow`
+pandas/core/strings/accessor.py:312:27: warning[possibly-missing-attribute] Submodule `compute` may not be available as an attribute on module `pyarrow`
+pandas/core/strings/accessor.py:321:25: warning[possibly-missing-attribute] Submodule `compute` may not be available as an attribute on module `pyarrow`
+pandas/core/strings/accessor.py:331:21: warning[possibly-missing-attribute] Submodule `compute` may not be available as an attribute on module `pyarrow`
+pandas/core/strings/accessor.py:396:30: warning[possibly-missing-attribute] Attribute `dtype` may be missing on object of type `(Unknown & <Protocol with members 'ndim'> & <Protocol with members 'dtype'>) | dict[Unknown, ArrowExtensionArray | Unknown] | list[Unknown]`
+pandas/core/strings/accessor.py:1411:20: warning[possibly-missing-attribute] Attribute `flags` may be missing on object of type `str | Pattern[Unknown]`
+pandas/core/strings/accessor.py:1426:33: warning[possibly-missing-attribute] Attribute `flags` may be missing on object of type `str | Pattern[Unknown] | Pattern[str]`
+pandas/core/strings/accessor.py:1431:38: warning[possibly-missing-attribute] Attribute `flags` may be missing on object of type `str | Pattern[Unknown] | Pattern[str]`
+pandas/core/strings/object_array.py:115:26: error[no-matching-overload] No overload of function `maybe_convert_objects` matches arguments
+pandas/core/tools/datetimes.py:387:27: warning[possibly-missing-attribute] Attribute `_dt_tz_convert` may be missing on object of type `(Unknown & ~Top[list[Unknown]] & ~tuple[object, ...] & ~NumpyExtensionArray & ~Index) | (ndarray[tuple[Any, ...], dtype[Any]] & ~Index)`
+pandas/core/tools/datetimes.py:389:27: warning[possibly-missing-attribute] Attribute `_dt_tz_localize` may be missing on object of type `(Unknown & ~Top[list[Unknown]] & ~tuple[object, ...] & ~NumpyExtensionArray & ~Index) | (ndarray[tuple[Any, ...], dtype[Any]] & ~Index)`
+pandas/core/tools/datetimes.py:393:35: error[invalid-argument-type] Argument to function `is_supported_dtype` is incorrect: Expected `dtype[Any]`, found `(Any & ~DatetimeTZDtype) | None`
+pandas/core/tools/datetimes.py:1062:22: error[invalid-assignment] Object of type `bool` is not assignable to `Timestamp | NaTType | Series | Index`
+pandas/core/tools/numeric.py:225:16: warning[possibly-missing-attribute] Attribute `isna` may be missing on object of type `(Unknown & ~BaseMaskedArray) | ndarray[tuple[Any, ...], dtype[Any]]`
+pandas/core/tools/numeric.py:226:18: warning[possibly-missing-attribute] Attribute `dropna` may be missing on object of type `(Unknown & ~BaseMaskedArray) | ndarray[tuple[Any, ...], dtype[Any]]`
+pandas/core/util/numba_.py:79:8: warning[possibly-missing-attribute] Submodule `extending` may not be available as an attribute on module `numba`
+pandas/core/util/numba_.py:82:22: error[unresolved-attribute] Object of type `(...) -> Unknown` has no attribute `__name__`
+pandas/core/util/numba_.py:89:22: warning[possibly-missing-attribute] Submodule `extending` may not be available as an attribute on module `numba`
+pandas/core/window/ewm.py:913:38: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `BaseGrouper`, found `Unknown | None`
+pandas/core/window/expanding.py:336:9: error[invalid-method-override] Invalid override of method `pipe`: Definition is incompatible with `RollingAndExpandingMixin.pipe`
+pandas/core/window/numba_.py:67:18: error[not-iterable] Object of type `prange` is not iterable
+pandas/core/window/numba_.py:131:18: error[not-iterable] Object of type `prange` is not iterable
+pandas/core/window/numba_.py:229:18: error[not-iterable] Object of type `prange` is not iterable
+pandas/core/window/numba_.py:257:18: error[not-iterable] Object of type `prange` is not iterable
+pandas/core/window/numba_.py:323:22: error[not-iterable] Object of type `prange` is not iterable
+pandas/core/window/online.py:63:22: error[not-iterable] Object of type `prange` is not iterable
+pandas/core/window/rolling.py:167:44: error[unsupported-operator] Operator `>` is not supported between objects of type `(Unknown & ~None) | int` and `Unknown | None`
+pandas/core/window/rolling.py:419:35: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `int`, found `(Unknown & ~BaseIndexer) | None`
+pandas/core/window/rolling.py:1139:43: error[unsupported-operator] Operator `<` is not supported between objects of type `(Unknown & ~BaseIndexer) | None` and `Literal[0]`
+pandas/core/window/rolling.py:1288:45: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `((...) -> Unknown) | str | list[((...) -> Unknown) | str] | MutableMapping[Hashable, ((...) -> Unknown) | str | list[((...) -> Unknown) | str]]`, found `Unknown | None`
+pandas/core/window/rolling.py:1291:22: error[call-non-callable] Object of type `None` is not callable
+pandas/core/window/rolling.py:2018:45: error[unsupported-operator] Operator `<` is not supported between objects of type `(Unknown & ~BaseIndexer) | None` and `Literal[0]`
+pandas/core/window/rolling.py:2263:9: error[invalid-method-override] Invalid override of method `pipe`: Definition is incompatible with `RollingAndExpandingMixin.pipe`
+pandas/core/window/rolling.py:3494:13: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `int | BaseIndexer`, found `(Unknown & BaseIndexer) | int | (Unknown & ~BaseIndexer) | None`
+pandas/io/clipboard/__init__.py:121:18: error[unresolved-reference] Name `Foundation` used when not defined
+pandas/io/clipboard/__init__.py:122:45: error[unresolved-reference] Name `Foundation` used when not defined
+pandas/io/clipboard/__init__.py:123:17: error[unresolved-reference] Name `AppKit` used when not defined
+pandas/io/clipboard/__init__.py:124:36: error[unresolved-reference] Name `AppKit` used when not defined
+pandas/io/clipboard/__init__.py:125:41: error[unresolved-reference] Name `AppKit` used when not defined
+pandas/io/clipboard/__init__.py:129:17: error[unresolved-reference] Name `AppKit` used when not defined
+pandas/io/clipboard/__init__.py:130:40: error[unresolved-reference] Name `AppKit` used when not defined
+pandas/io/clipboard/__init__.py:137:12: warning[unresolved-global] Invalid global declaration of `QApplication`: `QApplication` has no declarations or bindings in the global scope
+pandas/io/clipboard/__init__.py:142:14: error[unresolved-import] Cannot resolve imported module `qtpy.QtWidgets`
+pandas/io/clipboard/__init__.py:147:18: error[unresolved-import] Cannot resolve imported module `PyQt4.QtGui`
+pandas/io/clipboard/__init__.py:155:14: warning[possibly-missing-attribute] Attribute `clipboard` may be missing on object of type `Unknown | QCoreApplication`
+pandas/io/clipboard/__init__.py:159:14: warning[possibly-missing-attribute] Attribute `clipboard` may be missing on object of type `Unknown | QCoreApplication`
+pandas/io/clipboard/__init__.py:330:15: error[unresolved-attribute] Object of type `Self@__call__` has no attribute `f`
+pandas/io/clipboard/__init__.py:332:64: error[unresolved-attribute] Object of type `Self@__call__` has no attribute `f`
+pandas/io/clipboard/__init__.py:336:17: error[unresolved-attribute] Object of type `Self@__setattr__` has no attribute `f`
+pandas/io/clipboard/__init__.py:340:12: warning[unresolved-global] Invalid global declaration of `HGLOBAL`: `HGLOBAL` has no declarations or bindings in the global scope
+pandas/io/clipboard/__init__.py:340:21: warning[unresolved-global] Invalid global declaration of `LPVOID`: `LPVOID` has no declarations or bindings in the global scope
+pandas/io/clipboard/__init__.py:340:29: warning[unresolved-global] Invalid global declaration of `DWORD`: `DWORD` has no declarations or bindings in the global scope
+pandas/io/clipboard/__init__.py:340:36: warning[unresolved-global] Invalid global declaration of `LPCSTR`: `LPCSTR` has no declarations or bindings in the global scope
+pandas/io/clipboard/__init__.py:340:44: warning[unresolved-global] Invalid global declaration of `INT`: `INT` has no declarations or bindings in the global scope
+pandas/io/clipboard/__init__.py:341:12: warning[unresolved-global] Invalid global declaration of `HWND`: `HWND` has no declarations or bindings in the global scope
+pandas/io/clipboard/__init__.py:341:18: warning[unresolved-global] Invalid global declaration of `HINSTANCE`: `HINSTANCE` has no declarations or bindings in the global scope
+pandas/io/clipboard/__init__.py:341:29: warning[unresolved-global] Invalid global declaration of `HMENU`: `HMENU` has no declarations or bindings in the global scope
+pandas/io/clipboard/__init__.py:341:36: warning[unresolved-global] Invalid global declaration of `BOOL`: `BOOL` has no declarations or bindings in the global scope
+pandas/io/clipboard/__init__.py:341:42: warning[unresolved-global] Invalid global declaration of `UINT`: `UINT` has no declarations or bindings in the global scope
+pandas/io/clipboard/__init__.py:341:48: warning[unresolved-global] Invalid global declaration of `HANDLE`: `HANDLE` has no declarations or bindings in the global scope
+pandas/io/clipboard/__init__.py:356:14: error[unresolved-attribute] Module `ctypes` has no member `windll`
+pandas/io/clipboard/__init__.py:532:12: warning[unresolved-global] Invalid global declaration of `Foundation`: `Foundation` has no declarations or bindings in the global scope
+pandas/io/clipboard/__init__.py:532:24: warning[unresolved-global] Invalid global declaration of `AppKit`: `AppKit` has no declarations or bindings in the global scope
+pandas/io/clipboard/__init__.py:532:32: warning[unresolved-global] Invalid global declaration of `qtpy`: `qtpy` has no declarations or bindings in the global scope
+pandas/io/clipboard/__init__.py:532:38: warning[unresolved-global] Invalid global declaration of `PyQt4`: `PyQt4` has no declarations or bindings in the global scope
+pandas/io/clipboard/__init__.py:532:45: warning[unresolved-global] Invalid global declaration of `PyQt5`: `PyQt5` has no declarations or bindings in the global scope
+pandas/io/clipboard/__init__.py:560:20: error[unresolved-import] Cannot resolve imported module `AppKit`
+pandas/io/clipboard/__init__.py:561:20: error[unresolved-import] Cannot resolve imported module `Foundation`
+pandas/io/clipboard/__init__.py:582:20: error[unresolved-import] Cannot resolve imported module `qtpy`
+pandas/io/clipboard/__init__.py:589:28: error[unresolved-import] Cannot resolve imported module `PyQt4`
+pandas/io/common.py:273:30: error[invalid-assignment] Object of type `object` is not assignable to `str | PathLike[str] | BaseBufferT@stringify_path`
+pandas/io/common.py:274:12: error[no-matching-overload] No overload of function `_expand_user` matches arguments
+pandas/io/common.py:770:26: error[no-matching-overload] No overload of bound method `__init__` matches arguments
+pandas/io/common.py:802:29: warning[possibly-missing-attribute] Attribute `namelist` may be missing on object of type `Unknown | BytesIO | ZipFile`
+pandas/io/common.py:804:30: warning[possibly-missing-attribute] Attribute `open` may be missing on object of type `Unknown | BytesIO | ZipFile`
+pandas/io/common.py:829:25: warning[possibly-missing-attribute] Attribute `getnames` may be missing on object of type `Unknown | BytesIO | TarFile`
+pandas/io/common.py:831:28: warning[possibly-missing-attribute] Attribute `extractfile` may be missing on object of type `Unknown | BytesIO | TarFile`
+pandas/io/common.py:1027:9: warning[possibly-missing-attribute] Attribute `addfile` may be missing on object of type `Unknown | BytesIO | TarFile`
+pandas/io/common.py:1057:23: warning[possibly-missing-attribute] Attribute `filename` may be missing on object of type `Unknown | BytesIO | ZipFile`
+pandas/io/common.py:1058:29: warning[possibly-missing-attribute] Attribute `filename` may be missing on object of type `Unknown | BytesIO | ZipFile`
+pandas/io/common.py:1067:9: warning[possibly-missing-attribute] Attribute `writestr` may be missing on object of type `Unknown | BytesIO | ZipFile`
+pandas/io/common.py:1085:20: error[call-non-callable] Object of type `object` is not callable
+pandas/io/common.py:1095:20: error[call-non-callable] Object of type `object` is not callable
+pandas/io/common.py:1150:13: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `BaseBuffer`, found `mmap`
+pandas/io/common.py:1161:12: error[invalid-return-type] Return type does not match returned value: expected `tuple[str | BaseBuffer, bool, list[BaseBuffer]]`, found `tuple[_IOWrapper, Literal[True], list[BaseBuffer | _IOWrapper]]`
+pandas/io/excel/_base.py:493:13: error[invalid-argument-type] Argument to bound method `parse` is incorrect: Expected `str | int | list[int] | list[str] | None`, found `str | int | list[IntStrT@read_excel] | None`
+pandas/io/excel/_base.py:496:13: error[invalid-argument-type] Argument to bound method `parse` is incorrect: Expected `int | Sequence[int] | None`, found `int | str | Sequence[int] | None`
+pandas/io/excel/_base.py:520:12: error[invalid-return-type] Return type does not match returned value: expected `DataFrame | dict[IntStrT@read_excel, DataFrame]`, found `DataFrame | dict[str, DataFrame] | dict[int, DataFrame]`
+pandas/io/excel/_base.py:574:17: error[call-non-callable] Object of type `object` is not callable
+pandas/io/excel/_base.py:578:17: error[call-non-callable] Object of type `object` is not callable
+pandas/io/excel/_base.py:844:21: error[unsupported-operator] Operator `+=` is unsupported between objects of type `object` and `int`
+pandas/io/excel/_base.py:846:20: error[unsupported-operator] Operator `>` is not supported between objects of type `object` and `int`
+pandas/io/excel/_base.py:852:17: error[invalid-assignment] Invalid subscript assignment with key of type `object` and value of type `list[Hashable]` on object of type `list[Unknown]`
+pandas/io/excel/_base.py:852:57: error[invalid-argument-type] Method `__getitem__` of type `Overload[(i: SupportsIndex, /) -> Unknown, (s: slice[Any, Any, Any], /) -> list[Unknown]]` cannot be called with key of type `object` on object of type `list[Unknown]`
+pandas/io/excel/_base.py:855:54: error[invalid-argument-type] Method `__getitem__` of type `Overload[(i: SupportsIndex, /) -> Unknown, (s: slice[Any, Any, Any], /) -> list[Unknown]]` cannot be called with key of type `object` on object of type `list[Unknown]`
+pandas/io/excel/_base.py:1174:16: error[invalid-return-type] Return type does not match returned value: expected `Self@__new__`, found `@Todo | ExcelWriter[Unknown]`
+pandas/io/excel/_base.py:1366:16: error[invalid-return-type] Return type does not match returned value: expected `tuple[int | float | str | date, str | None]`, found `tuple[Unknown | int | float | Decimal | str, None | Unknown | str]`
+pandas/io/excel/_calamine.py:100:9: error[invalid-method-override] Invalid override of method `get_sheet_data`: Definition is incompatible with `BaseExcelReader.get_sheet_data`
+pandas/io/excel/_odfreader.py:102:9: error[invalid-method-override] Invalid override of method `get_sheet_data`: Definition is incompatible with `BaseExcelReader.get_sheet_data`
+pandas/io/excel/_odswriter.py:68:23: error[invalid-type-form] Variable of type `def OpenDocumentSpreadsheet() -> Unknown` is not allowed in a type expression
+pandas/io/excel/_openpyxl.py:614:9: error[invalid-method-override] Invalid override of method `get_sheet_data`: Definition is incompatible with `BaseExcelReader.get_sheet_data`
+pandas/io/excel/_pyxlsb.py:97:9: error[invalid-method-override] Invalid override of method `get_sheet_data`: Definition is incompatible with `BaseExcelReader.get_sheet_data`
+pandas/io/excel/_xlrd.py:79:9: error[invalid-method-override] Invalid override of method `get_sheet_data`: Definition is incompatible with `BaseExcelReader.get_sheet_data`
+pandas/io/formats/excel.py:252:21: error[invalid-argument-type] Argument to function `remove_none` is incorrect: Expected `dict[str, str | None]`, found `dict[Unknown | str, Unknown | dict[str, bool | str | None] | dict[str, dict[str, str | None]] | dict[str, int | float | str | None] | dict[str, str | None]]`
+pandas/io/formats/excel.py:253:16: error[invalid-return-type] Return type does not match returned value: expected `dict[str, dict[str, str]]`, found `dict[Unknown | str, Unknown | dict[str, bool | str | None] | dict[str, dict[str, str | None]] | dict[str, int | float | str | None] | dict[str, str | None]]`
+pandas/io/formats/format.py:572:22: error[invalid-assignment] Object of type `(Sequence[str | int] & Top[Mapping[Unknown, object]] & ~int & ~str) | (Mapping[Hashable, str | int] & ~int & ~str)` is not assignable to `Mapping[Hashable, str | int]`
+pandas/io/formats/format.py:1266:35: error[call-non-callable] Object of type `str` is not callable
+pandas/io/formats/format.py:1729:18: error[unresolved-attribute] Object of type `Timedelta` has no attribute `_repr_base`
+pandas/io/formats/info.py:462:44: error[invalid-argument-type] Argument to function `_get_dataframe_dtype_counts` is incorrect: Expected `DataFrame`, found `DataFrame | Series`
+pandas/io/formats/info.py:474:16: error[invalid-return-type] Return type does not match returned value: expected `Iterable[ExtensionDtype | str | dtype[Any] | type]`, found `Unknown | dtype[Any] | ExtensionDtype`
+pandas/io/formats/info.py:496:16: error[invalid-return-type] Return type does not match returned value: expected `Series`, found `Series | int`
+pandas/io/formats/info.py:501:16: warning[possibly-missing-attribute] Attribute `sum` may be missing on object of type `Series | int`
+pandas/io/formats/info.py:555:16: error[invalid-return-type] Return type does not match returned value: expected `list[int]`, found `list[int | Series]`
+pandas/io/formats/info.py:577:16: error[invalid-return-type] Return type does not match returned value: expected `int`, found `Series | int`
+pandas/io/formats/info.py:811:16: error[invalid-return-type] Return type does not match returned value: expected `DataFrame`, found `DataFrame | Series`
+pandas/io/formats/info.py:816:16: error[unresolved-attribute] Object of type `_BaseInfo` has no attribute `ids`
+pandas/io/formats/info.py:821:16: error[unresolved-attribute] Object of type `_BaseInfo` has no attribute `col_count`
+pandas/io/formats/info.py:1034:16: error[invalid-return-type] Return type does not match returned value: expected `Series`, found `DataFrame | Series`
+pandas/io/formats/printing.py:211:17: error[no-matching-overload] No overload of bound method `update` matches arguments
+pandas/io/formats/printing.py:214:28: error[invalid-assignment] Object of type `list[object]` is not assignable to `Iterable[str] | None`
+pandas/io/formats/printing.py:219:18: error[not-iterable] Object of type `Iterable[str] | None` may not be iterable
+pandas/io/formats/printing.py:439:20: error[unsupported-operator] Operator `+` is unsupported between objects of type `Unknown | tuple[str, ...] | str` and `LiteralString`
+pandas/io/formats/printing.py:448:20: error[unsupported-operator] Operator `+` is unsupported between objects of type `Unknown | tuple[str, ...] | str` and `LiteralString`
+pandas/io/formats/printing.py:452:53: error[invalid-argument-type] Argument to function `_extend_line` is incorrect: Expected `str`, found `Unknown | tuple[str, ...] | str`
+pandas/io/formats/style.py:2591:38: error[invalid-argument-type] Argument to bound method `set_table_styles` is incorrect: Expected `dict[Any, list[CSSDict]] | list[CSSDict] | None`, found `list[CSSDict] | list[Unknown | dict[Unknown | str, Unknown | str]] | list[Unknown]`
+pandas/io/formats/style.py:2711:23: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+pandas/io/formats/style.py:2711:63: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+pandas/io/formats/style.py:2713:28: error[invalid-assignment] Object of type `list[dict[Unknown | str, Unknown | str | list[tuple[str, str | int | float]]] | Unknown]` is not assignable to `dict[Any, list[CSSDict]] | list[CSSDict] | None`
+pandas/io/formats/style.py:2723:28: error[invalid-assignment] Object of type `list[dict[Unknown | str, Unknown | str | list[tuple[str, str | int | float]]] | Unknown]` is not assignable to `dict[Any, list[CSSDict]] | list[CSSDict] | None`
+pandas/io/formats/style.py:2732:13: warning[possibly-missing-attribute] Attribute `extend` may be missing on object of type `(Unknown & ~None) | dict[Any, list[CSSDict]] | list[CSSDict]`
+pandas/io/formats/style.py:2732:38: error[invalid-argument-type] Argument to bound method `extend` is incorrect: Expected `Iterable[CSSDict]`, found `dict[Any, list[CSSDict]] | list[CSSDict] | None`
+pandas/io/formats/style.py:4022:41: error[invalid-argument-type] Argument to function `_validate_apply_axis_arg` is incorrect: Expected `NDFrame | Sequence[Unknown] | ndarray[tuple[Any, ...], dtype[Any]]`, found `bytes | (date & Iterable[object]) | (timedelta & Iterable[object]) | ... omitted 12 union elements`
+pandas/io/formats/style.py:4025:42: error[invalid-argument-type] Argument to function `_validate_apply_axis_arg` is incorrect: Expected `NDFrame | Sequence[Unknown] | ndarray[tuple[Any, ...], dtype[Any]]`, found `bytes | (date & Iterable[object]) | (timedelta & Iterable[object]) | ... omitted 12 union elements`
+pandas/io/formats/style_render.py:1222:17: error[invalid-argument-type] Argument to function `_maybe_wrap_formatter` is incorrect: Expected `str | ((...) -> Unknown) | None`, found `object`
+pandas/io/formats/style_render.py:1402:25: error[invalid-assignment] Object of type `dict[int | Unknown, object]` is not assignable to `str | ((...) -> Unknown) | dict[Any, str | ((...) -> Unknown) | None] | None`
+pandas/io/formats/style_render.py:1409:17: warning[possibly-missing-attribute] Attribute `get` may be missing on object of type `dict[Any, str | ((...) -> Unknown) | None] | str | ((...) -> Unknown) | None`
+pandas/io/formats/style_render.py:1697:25: error[invalid-assignment] Object of type `dict[int | Unknown, object]` is not assignable to `str | ((...) -> Unknown) | dict[Any, str | ((...) -> Unknown) | None] | None`
+pandas/io/formats/style_render.py:1704:17: warning[possibly-missing-attribute] Attribute `get` may be missing on object of type `dict[Any, str | ((...) -> Unknown) | None] | str | ((...) -> Unknown) | None`
+pandas/io/formats/style_render.py:1849:32: error[unresolved-reference] Name `last_label` used when not defined
+pandas/io/formats/style_render.py:1855:33: error[unresolved-reference] Name `last_label` used when not defined
+pandas/io/formats/style_render.py:1878:12: error[invalid-return-type] Return type does not match returned value: expected `list[CSSDict]`, found `list[dict[Unknown | str, Unknown | str | list[tuple[str, str | int | float]]] | Unknown]`
+pandas/io/formats/xml.py:449:14: error[unresolved-import] Cannot resolve imported module `lxml.etree`
+pandas/io/formats/xml.py:511:14: error[unresolved-import] Cannot resolve imported module `lxml.etree`
+pandas/io/formats/xml.py:523:14: error[unresolved-import] Cannot resolve imported module `lxml.etree`
+pandas/io/html.py:639:9: error[invalid-method-override] Invalid override of method `_parse_td`: Definition is incompatible with `_HtmlFrameParser._parse_td`
+pandas/io/html.py:731:9: error[invalid-method-override] Invalid override of method `_parse_td`: Definition is incompatible with `_HtmlFrameParser._parse_td`
+pandas/io/html.py:736:9: error[invalid-method-override] Invalid override of method `_parse_tables`: Definition is incompatible with `_HtmlFrameParser._parse_tables`
+pandas/io/html.py:784:14: error[unresolved-import] Cannot resolve imported module `lxml.etree`
+pandas/io/json/_json.py:792:19: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `JsonReader[FrameSeriesStrT@JsonReader]`, found `JsonReader[str]`
+pandas/io/json/_json.py:1025:38: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `ExtensionDtype | str | dtype[Any] | ... omitted 3 union elements`, found `Unknown | bool | None | str | _NoDefault`
+pandas/io/json/_json.py:1025:38: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `bool`, found `Unknown | bool | None | str | _NoDefault`
+pandas/io/json/_json.py:1025:38: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `bool | list[str]`, found `Unknown | bool | None | str | _NoDefault`
+pandas/io/json/_json.py:1025:38: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `bool`, found `Unknown | bool | None | str | _NoDefault`
+pandas/io/json/_json.py:1025:38: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `bool`, found `Unknown | bool | None | str | _NoDefault`
+pandas/io/json/_json.py:1025:38: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `Literal["numpy_nullable", "pyarrow"] | _NoDefault`, found `Unknown | bool | None | str | _NoDefault`
+pandas/io/json/_json.py:1029:39: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `ExtensionDtype | str | dtype[Any] | ... omitted 3 union elements`, found `Unknown | bool | None | str | _NoDefault`
+pandas/io/json/_json.py:1029:39: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `bool`, found `Unknown | bool | None | str | _NoDefault`
+pandas/io/json/_json.py:1029:39: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `bool | list[str]`, found `Unknown | bool | None | str | _NoDefault`
+pandas/io/json/_json.py:1029:39: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `bool`, found `Unknown | bool | None | str | _NoDefault`
+pandas/io/json/_json.py:1029:39: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `bool`, found `Unknown | bool | None | str | _NoDefault`
+pandas/io/json/_json.py:1029:39: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `Literal["numpy_nullable", "pyarrow"] | _NoDefault`, found `Unknown | bool | None | str | _NoDefault`
+pandas/io/json/_json.py:1222:36: error[invalid-argument-type] Argument to bound method `get` is incorrect: Expected `Never`, found `Hashable`
+pandas/io/json/_table_schema.py:311:36: warning[possibly-missing-attribute] Attribute `levels` may be missing on object of type `Unknown | Index`
+pandas/io/parsers/arrow_parser_wrapper.py:184:30: error[unsupported-operator] Operator `+` is unsupported between objects of type `list[str | Unknown]` and `(Unknown & ~None) | range`
+pandas/io/parsers/base_parser.py:489:39: error[no-matching-overload] No overload of function `maybe_convert_numeric` matches arguments
+pandas/io/parsers/base_parser.py:529:33: error[no-matching-overload] No overload of function `maybe_convert_bool` matches arguments
+pandas/io/parsers/base_parser.py:997:12: error[invalid-return-type] Return type does not match returned value: expected `SequenceT@evaluate_callable_usecols | set[int]`, found `(((Hashable, /) -> object) & ~(() -> object)) | (SequenceT@evaluate_callable_usecols & ~(() -> object))`
+pandas/io/parsers/c_parser_wrapper.py:195:47: error[not-iterable] Object of type `Unknown | None | Sequence[Hashable]` may not be iterable
+pandas/io/parsers/c_parser_wrapper.py:198:13: error[invalid-argument-type] Argument to bound method `_set_noconvert_dtype_columns` is incorrect: Expected `Sequence[Hashable]`, found `Unknown | None | Sequence[Hashable]`
+pandas/io/parsers/c_parser_wrapper.py:217:52: error[invalid-argument-type] Argument to function `_concatenate_chunks` is incorrect: Expected `list[str]`, found `Unknown | None | Sequence[Hashable]`
+pandas/io/parsers/c_parser_wrapper.py:240:57: error[invalid-argument-type] Argument to function `_filter_usecols` is incorrect: Argument type `list[Hashable] | MultiIndex` does not satisfy upper bound `Sequence[Hashable]` of type variable `SequenceT`
+pandas/io/parsers/c_parser_wrapper.py:289:51: error[invalid-argument-type] Argument to function `_filter_usecols` is incorrect: Argument type `Unknown | None | Sequence[Hashable]` does not satisfy upper bound `Sequence[Hashable]` of type variable `SequenceT`
+pandas/io/parsers/python_parser.py:142:13: error[invalid-assignment] Object of type `(ReadCsvBuffer[str] & Top[list[Unknown]]) | list[Unknown]` is not assignable to attribute `data` of type `Iterator[list[str]] | list[list[str | bytes | date | ... omitted 10 union elements]]`
+pandas/io/parsers/python_parser.py:428:48: error[invalid-argument-type] Argument to function `isin` is incorrect: Expected `ExtensionArray | ndarray[tuple[Any, ...], dtype[Any]] | Index | ... omitted 3 union elements`, found `Unknown | set[Unknown]`
+pandas/io/parsers/python_parser.py:449:49: error[invalid-argument-type] Argument to function `map_infer_mask` is incorrect: Expected `ndarray[tuple[Any, ...], dtype[Any]]`, found `Unknown | ExtensionArray | ndarray[tuple[Any, ...], dtype[Any]]`
+pandas/io/parsers/python_parser.py:528:25: error[unknown-argument] Argument `true_values` does not match any known parameter of bound method `_from_sequence_of_strings`
+pandas/io/parsers/python_parser.py:529:25: error[unknown-argument] Argument `false_values` does not match any known parameter of bound method `_from_sequence_of_strings`
+pandas/io/parsers/python_parser.py:530:25: error[unknown-argument] Argument `none_values` does not match any known parameter of bound method `_from_sequence_of_strings`
+pandas/io/parsers/python_parser.py:736:48: error[invalid-argument-type] Argument to bound method `_handle_usecols` is incorrect: Expected `list[list[str | bytes | date | ... omitted 11 union elements]]`, found `list[Unknown | list[int]]`
+pandas/io/parsers/python_parser.py:736:57: error[invalid-argument-type] Argument to bound method `_handle_usecols` is incorrect: Expected `list[str | bytes | date | ... omitted 11 union elements]`, found `Unknown | list[int]`
+pandas/io/parsers/readers.py:1574:41: error[invalid-argument-type] Argument to function `len` is incorrect: Expected `Sized`, found `(@Todo & ~Literal[False] & ~_NoDefault) | None`
+pandas/io/pytables.py:483:8: error[unsupported-operator] Operator `<=` is not supported between two objects of type `Unknown | None | int`
+pandas/io/pytables.py:487:11: error[unsupported-operator] Operator `>` is not supported between objects of type `Unknown | None | int` and `Literal[1]`
+pandas/io/pytables.py:639:30: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+pandas/io/pytables.py:702:20: error[invalid-return-type] Return type does not match returned value: expected `list[str]`, found `list[Unknown | None | str]`
+pandas/io/pytables.py:1941:55: error[invalid-argument-type] Argument to bound method `_create_storer` is incorrect: Expected `str`, found `Unknown | None`
+pandas/io/pytables.py:2091:15: error[unsupported-operator] Operator `<` is not supported between two objects of type `Unknown | None | Literal[0]`
+pandas/io/pytables.py:2092:24: error[unsupported-operator] Operator `+` is unsupported between objects of type `Unknown | None | Literal[0]` and `int | None`
+pandas/io/pytables.py:2092:50: error[invalid-argument-type] Argument to function `min` is incorrect: Argument type `Unknown | None | Literal[0]` does not satisfy upper bound `SupportsDunderLT[Any] | SupportsDunderGT[Any]` of type variable `SupportsRichComparisonT`
+pandas/io/pytables.py:2196:16: warning[possibly-missing-attribute] Attribute `itemsize` may be missing on object of type `Unknown | None`
+pandas/io/pytables.py:2254:41: error[invalid-argument-type] Argument to function `_maybe_convert` is incorrect: Expected `str`, found `Unknown | None`
+pandas/io/pytables.py:2312:16: warning[possibly-missing-attribute] Attribute `_v_attrs` may be missing on object of type `Unknown | None`
+pandas/io/pytables.py:2316:16: warning[possibly-missing-attribute] Attribute `description` may be missing on object of type `Unknown | None`
+pandas/io/pytables.py:2329:16: error[no-matching-overload] No overload of function `iter` matches arguments
+pandas/io/pytables.py:2341:45: warning[possibly-missing-attribute] Attribute `itemsize` may be missing on object of type `Unknown | None`
+pandas/io/pytables.py:2645:72: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `Iterable[Unknown]`, found `Unknown | None`
+pandas/io/pytables.py:2700:12: warning[possibly-missing-attribute] Attribute `startswith` may be missing on object of type `(Unknown & ~None) | ExtensionDtype | str | ... omitted 3 union elements`
+pandas/io/pytables.py:2702:48: error[invalid-argument-type] Argument to function `_set_tz` is incorrect: Expected `str`, found `(Unknown & ~None) | ExtensionDtype | str | ... omitted 3 union elements`
+pandas/io/pytables.py:2742:29: error[no-matching-overload] No overload of bound method `astype` matches arguments
+pandas/io/pytables.py:2749:17: error[invalid-argument-type] Argument to function `_unconvert_string_array` is incorrect: Expected `ndarray[tuple[Any, ...], dtype[Any]]`, found `DatetimeArray | ndarray[tuple[Any, ...], dtype[Any]] | Categorical | @Todo | ndarray[tuple[Any, ...], Unknown]`
+pandas/io/pytables.py:2841:20: error[invalid-return-type] Return type does not match returned value: expected `tuple[int, int, int]`, found `tuple[int, ...]`
+pandas/io/pytables.py:3118:35: error[invalid-argument-type] Argument to bound method `write_array` is incorrect: Expected `ExtensionArray | ndarray[tuple[Any, ...], dtype[Any]] | Index | Series`, found `Unknown | None`
+pandas/io/pytables.py:3146:41: error[invalid-argument-type] Argument to bound method `write_array` is incorrect: Expected `ExtensionArray | ndarray[tuple[Any, ...], dtype[Any]] | Index | Series`, found `Unknown | None`
+pandas/io/pytables.py:3184:16: error[non-subscriptable] Cannot subscript object of type `Node` with no `__getitem__` method
+pandas/io/pytables.py:3289:45: error[invalid-argument-type] Argument to bound method `write_array_empty` is incorrect: Expected `ExtensionArray | ndarray[tuple[Any, ...], dtype[Any]]`, found `ExtensionArray | ndarray[tuple[Any, ...], dtype[Any]] | Index | Series | Unknown`
+pandas/io/pytables.py:3333:41: error[invalid-argument-type] Argument to bound method `write_array_empty` is incorrect: Expected `ExtensionArray | ndarray[tuple[Any, ...], dtype[Any]]`, found `(ExtensionArray & ~BaseStringArray) | (ndarray[tuple[Any, ...], dtype[Any]] & ~BaseStringArray) | (Index & ~BaseStringArray) | (Series & ~BaseStringArray) | (Unknown & ~BaseStringArray)`
+pandas/io/pytables.py:3666:24: error[invalid-argument-type] Argument to function `len` is incorrect: Expected `Sized`, found `Unknown | None`
+pandas/io/pytables.py:3678:22: error[invalid-argument-type] Argument to function `__new__` is incorrect: Expected `str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc`, found `Unknown | None`
+pandas/io/pytables.py:4135:13: error[invalid-argument-type] Method `__getitem__` of type `Overload[(i: SupportsIndex, /) -> Index, (s: slice[Any, Any, Any], /) -> list[Index]]` cannot be called with key of type `int | Unknown | None` on object of type `list[Index]`
+pandas/io/pytables.py:4136:40: error[invalid-argument-type] Argument to bound method `_get_axis_name` is incorrect: Expected `int | Literal["columns", "index", "rows"]`, found `int | Unknown | None`
+pandas/io/pytables.py:4824:26: error[no-matching-overload] No overload of bound method `reshape` matches arguments
+pandas/io/pytables.py:4824:26: error[no-matching-overload] No overload of bound method `reshape` matches arguments
+pandas/io/pytables.py:5205:19: warning[possibly-missing-attribute] Attribute `to_numpy` may be missing on object of type `ExtensionArray | ndarray[tuple[Any, ...], dtype[Any]]`
+pandas/io/pytables.py:5506:26: error[no-matching-overload] No overload of bound method `generate` matches arguments
+pandas/io/sas/sas7bdat.py:519:63: error[invalid-argument-type] Argument to bound method `_convert_header_text` is incorrect: Expected `bytes`, found `Unknown | str | bytes`
+pandas/io/sql.py:1036:20: warning[possibly-missing-attribute] Attribute `copy` may be missing on object of type `Unknown | None | DataFrame`
+pandas/io/sql.py:1045:38: warning[possibly-missing-attribute] Attribute `columns` may be missing on object of type `Unknown | DataFrame | None`
+pandas/io/sql.py:1051:38: warning[possibly-missing-attribute] Attribute `items` may be missing on object of type `Unknown | DataFrame | None`
+pandas/io/sql.py:1100:21: error[invalid-argument-type] Argument to function `len` is incorrect: Expected `Sized`, found `Unknown | None | DataFrame`
+pandas/io/sql.py:1217:23: warning[possibly-missing-attribute] Attribute `index` may be missing on object of type `Unknown | None | DataFrame`
+pandas/io/sql.py:1231:36: warning[possibly-missing-attribute] Attribute `columns` may be missing on object of type `Unknown | None | DataFrame`
+pandas/io/sql.py:1232:21: warning[possibly-missing-attribute] Attribute `index` may be missing on object of type `Unknown | None | DataFrame`
+pandas/io/sql.py:1236:47: warning[possibly-missing-attribute] Attribute `index` may be missing on object of type `Unknown | None | DataFrame`
+pandas/io/sql.py:1250:41: warning[possibly-missing-attribute] Attribute `index` may be missing on object of type `Unknown | None | DataFrame`
+pandas/io/sql.py:1254:18: warning[possibly-missing-attribute] Attribute `columns` may be missing on object of type `Unknown | None | DataFrame`
+pandas/io/sql.py:1254:55: warning[possibly-missing-attribute] Attribute `iloc` may be missing on object of type `Unknown | None | DataFrame`
+pandas/io/sql.py:1255:32: warning[possibly-missing-attribute] Attribute `columns` may be missing on object of type `Unknown | None | DataFrame`
+pandas/io/sql.py:1311:26: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+pandas/io/sql.py:1320:21: error[invalid-assignment] Cannot assign to a subscript on an object of type `None`
+pandas/io/sql.py:1333:21: error[invalid-assignment] Cannot assign to a subscript on an object of type `None`
+pandas/io/sql.py:1336:21: error[invalid-assignment] Cannot assign to a subscript on an object of type `None`
+pandas/io/sql.py:1340:41: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+pandas/io/sql.py:1342:21: error[invalid-assignment] Cannot assign to a subscript on an object of type `None`
+pandas/io/sql.py:1346:25: error[invalid-assignment] Cannot assign to a subscript on an object of type `None`
+pandas/io/sql.py:1914:33: warning[possibly-missing-attribute] Attribute `items` may be missing on object of type `ExtensionDtype | str | dtype[Any] | ... omitted 4 union elements`
+pandas/io/sql.py:2548:31: warning[possibly-missing-attribute] Attribute `columns` may be missing on object of type `Unknown | None | DataFrame`
+pandas/io/sql.py:2866:33: warning[possibly-missing-attribute] Attribute `items` may be missing on object of type `ExtensionDtype | str | dtype[Any] | ... omitted 4 union elements`
+pandas/io/stata.py:313:30: error[no-matching-overload] No overload of bound method `astype` matches arguments
+pandas/io/stata.py:2253:16: error[invalid-return-type] Return type does not match returned value: expected `AnyStr@_pad_bytes`, found `bytes`
+pandas/io/stata.py:2254:12: error[invalid-return-type] Return type does not match returned value: expected `AnyStr@_pad_bytes`, found `str`
+pandas/io/stata.py:2915:21: error[invalid-argument-type] Argument to function `isfile` is incorrect: Expected `int | str | bytes | PathLike[str] | PathLike[bytes]`, found `str | (Unknown & PathLike[object]) | PathLike[str] | (WriteBuffer[bytes] & PathLike[object])`
+pandas/io/stata.py:2918:35: error[invalid-argument-type] Argument to function `unlink` is incorrect: Expected `str | bytes | PathLike[str] | PathLike[bytes]`, found `str | (Unknown & PathLike[object]) | PathLike[str] | (WriteBuffer[bytes] & PathLike[object])`
+pandas/io/xml.py:46:22: error[unresolved-import] Module `lxml` has no member `etree`
+pandas/io/xml.py:545:14: error[unresolved-import] Cannot resolve imported module `lxml.etree`
+pandas/io/xml.py:617:14: error[unresolved-import] Cannot resolve imported module `lxml.etree`
+pandas/io/xml.py:655:14: error[unresolved-import] Cannot resolve imported module `lxml.etree`
+pandas/plotting/_matplotlib/boxplot.py:278:9: warning[possibly-missing-attribute] Submodule `artist` may not be available as an attribute on module `matplotlib`
+pandas/plotting/_matplotlib/boxplot.py:280:9: warning[possibly-missing-attribute] Submodule `artist` may not be available as an attribute on module `matplotlib`
+pandas/plotting/_matplotlib/boxplot.py:282:9: warning[possibly-missing-attribute] Submodule `artist` may not be available as an attribute on module `matplotlib`
+pandas/plotting/_matplotlib/boxplot.py:284:9: warning[possibly-missing-attribute] Submodule `artist` may not be available as an attribute on module `matplotlib`
+pandas/plotting/_matplotlib/boxplot.py:338:14: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+pandas/plotting/_matplotlib/boxplot.py:338:27: error[invalid-argument-type] Argument to function `len` is incorrect: Expected `Sized`, found `Unknown | None | list[Unknown | None]`
+pandas/plotting/_matplotlib/converter.py:78:12: error[invalid-return-type] Return type does not match returned value: expected `list[tuple[type, type[DateConverter]]]`, found `list[Unknown | tuple[<class 'Timestamp'>, <class 'DatetimeConverter'>] | tuple[<class 'Period'>, <class 'PeriodConverter'>] | ... omitted 4 union elements]`
+pandas/plotting/_matplotlib/converter.py:157:9: error[invalid-method-override] Invalid override of method `convert`: Definition is incompatible with `ConversionInterface.convert`
+pandas/plotting/_matplotlib/converter.py:172:18: warning[possibly-missing-attribute] Submodule `ticker` may not be available as an attribute on module `matplotlib`
+pandas/plotting/_matplotlib/converter.py:182:21: warning[possibly-missing-attribute] Submodule `ticker` may not be available as an attribute on module `matplotlib`
+pandas/plotting/_matplotlib/converter.py:227:9: error[invalid-method-override] Invalid override of method `convert`: Definition is incompatible with `DateConverter.convert`
+pandas/plotting/_matplotlib/converter.py:236:16: error[no-matching-overload] No overload of function `to_offset` matches arguments
+pandas/plotting/_matplotlib/converter.py:291:9: error[invalid-method-override] Invalid override of method `convert`: Definition is incompatible with `DateConverter.convert`
+pandas/plotting/_matplotlib/converter.py:932:30: warning[possibly-missing-attribute] Submodule `ticker` may not be available as an attribute on module `matplotlib`
+pandas/plotting/_matplotlib/converter.py:1013:16: warning[possibly-missing-attribute] Submodule `transforms` may not be available as an attribute on module `matplotlib`
+pandas/plotting/_matplotlib/converter.py:1021:32: warning[possibly-missing-attribute] Submodule `ticker` may not be available as an attribute on module `matplotlib`
+pandas/plotting/_matplotlib/converter.py:1097:37: warning[possibly-missing-attribute] Submodule `ticker` may not be available as an attribute on module `matplotlib`
+pandas/plotting/_matplotlib/core.py:541:20: error[invalid-return-type] Return type does not match returned value: expected `Axes`, found `object`
+pandas/plotting/_matplotlib/core.py:745:21: error[unresolved-attribute] Object of type `object` has no attribute `yaxis`
+pandas/plotting/_matplotlib/core.py:756:21: error[unresolved-attribute] Object of type `object` has no attribute `yaxis`
+pandas/plotting/_matplotlib/core.py:1063:35: error[invalid-return-type] Function can implicitly return `None`, which is not assignable to return type `bool`
+pandas/plotting/_matplotlib/core.py:1240:32: warning[possibly-missing-attribute] Submodule `axes` may not be available as an attribute on module `matplotlib`
+pandas/plotting/_matplotlib/core.py:1383:21: warning[possibly-missing-attribute] Submodule `patches` may not be available as an attribute on module `matplotlib`
+pandas/plotting/_matplotlib/core.py:1389:13: error[invalid-argument-type] Argument to bound method `scatter` is incorrect: Expected `int | float | _Buffer | ... omitted 5 union elements`, found `Unknown | ExtensionArray | ndarray[tuple[Any, ...], dtype[Any]]`
+pandas/plotting/_matplotlib/core.py:1457:39: error[invalid-argument-type] Argument to bound method `get_cmap` is incorrect: Expected `str | Colormap`, found `Unknown | None`
+pandas/plotting/_matplotlib/misc.py:131:22: warning[possibly-missing-attribute] Submodule `lines` may not be available as an attribute on module `matplotlib`
+pandas/plotting/_matplotlib/misc.py:192:18: warning[possibly-missing-attribute] Submodule `patches` may not be available as an attribute on module `matplotlib`
+pandas/plotting/_matplotlib/misc.py:195:22: warning[possibly-missing-attribute] Submodule `patches` may not be available as an attribute on module `matplotlib`
+pandas/plotting/_matplotlib/misc.py:416:27: error[invalid-argument-type] Argument to bound method `axvline` is incorrect: Expected `int | float`, found `Unknown | int | str`
+pandas/plotting/_matplotlib/misc.py:416:27: error[invalid-argument-type] Argument to bound method `axvline` is incorrect: Expected `int | float`, found `Unknown | int | str`
+pandas/plotting/_matplotlib/style.py:99:16: error[invalid-return-type] Return type does not match returned value: expected `dict[str, str | Sequence[int | float]] | list[str | Sequence[int | float]]`, found `dict[str, str | Sequence[int | float]] | (Sequence[str | Sequence[int | float]] & Top[dict[Unknown, Unknown]]) | (Sequence[int | float] & Top[dict[Unknown, Unknown]])`
+pandas/plotting/_matplotlib/timeseries.py:120:38: error[invalid-argument-type] Argument to function `_replot_ax` is incorrect: Expected `Axes`, found `~None`
+pandas/plotting/_matplotlib/timeseries.py:360:23: error[invalid-argument-type] Argument to function `decorate_axes` is incorrect: Expected `Axes`, found `object`
+pandas/plotting/_matplotlib/timeseries.py:362:23: error[invalid-argument-type] Argument to function `decorate_axes` is incorrect: Expected `Axes`, found `object`
+pandas/plotting/_matplotlib/tools.py:82:12: warning[possibly-missing-attribute] Submodule `table` may not be available as an attribute on module `matplotlib`
+pandas/plotting/_matplotlib/tools.py:332:45: warning[possibly-missing-attribute] Submodule `ticker` may not be available as an attribute on module `matplotlib`
+pandas/plotting/_matplotlib/tools.py:333:32: warning[possibly-missing-attribute] Submodule `ticker` may not be available as an attribute on module `matplotlib`
+pandas/plotting/_matplotlib/tools.py:334:47: warning[possibly-missing-attribute] Submodule `ticker` may not be available as an attribute on module `matplotlib`
+pandas/plotting/_matplotlib/tools.py:335:34: warning[possibly-missing-attribute] Submodule `ticker` may not be available as an attribute on module `matplotlib`
+pandas/plotting/_matplotlib/tools.py:477:18: error[unresolved-attribute] Object of type `object` has no attribute `get_lines`
+pandas/plotting/_matplotlib/tools.py:480:18: error[unresolved-attribute] Object of type `object` has no attribute `get_lines`
+pandas/tseries/holiday.py:325:48: error[invalid-argument-type] Argument to function `__new__` is incorrect: Expected `SupportsIndex`, found `Unknown | None`
+pandas/tseries/holiday.py:325:60: error[invalid-argument-type] Argument to function `__new__` is incorrect: Expected `SupportsIndex`, found `Unknown | None`
+pandas/tseries/holiday.py:380:43: error[invalid-argument-type] Argument to function `__new__` is incorrect: Expected `SupportsIndex`, found `Unknown | None`
+pandas/tseries/holiday.py:380:55: error[invalid-argument-type] Argument to function `__new__` is incorrect: Expected `SupportsIndex`, found `Unknown | None`
+pandas/tseries/holiday.py:384:41: error[invalid-argument-type] Argument to function `__new__` is incorrect: Expected `SupportsIndex`, found `Unknown | None`
+pandas/tseries/holiday.py:384:53: error[invalid-argument-type] Argument to function `__new__` is incorrect: Expected `SupportsIndex`, found `Unknown | None`
+pandas/tseries/holiday.py:413:40: error[call-non-callable] Object of type `None` is not callable
+pandas/util/_decorators.py:64:28: error[unresolved-attribute] Object of type `(...) -> Any` has no attribute `__name__`
+pandas/util/_decorators.py:199:41: error[call-non-callable] Object of type `object` is not callable
+pandas/util/_decorators.py:377:21: error[invalid-argument-type] Argument to bound method `extend` is incorrect: Expected `Iterable[str | ((...) -> Unknown)]`, found `object`
+pandas/util/_exceptions.py:45:15: error[no-matching-overload] No overload of function `dirname` matches arguments
+pandas/util/_print_versions.py:29:14: error[unresolved-import] Cannot resolve imported module `pandas._version_meson`
+pandas/util/_validators.py:388:33: error[invalid-argument-type] Argument to function `validate_bool_kwarg` is incorrect: Argument type `object` does not satisfy constraints (`bool`, `int`, `None`) of type variable `BoolishNoneT`
+typings/numba.pyi:24:21: error[unresolved-attribute] Module `numba` has no member `compiler`
+Found 1006 diagnostics

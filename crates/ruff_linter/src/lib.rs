@@ -46,6 +46,7 @@ pub mod rule_selector;
 pub mod rules;
 pub mod settings;
 pub mod source_kind;
+pub mod suppression;
 mod text_helpers;
 pub mod upstream_categories;
 mod violation;
@@ -59,7 +60,7 @@ pub const RUFF_PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
 mod tests {
     use std::path::Path;
 
-    use ruff_python_ast::PySourceType;
+    use ruff_python_ast::{PySourceType, SourceType};
 
     use crate::codes::Rule;
     use crate::settings::LinterSettings;
@@ -76,7 +77,7 @@ mod tests {
             Returns:
             """
 "#;
-        let source_type = PySourceType::Python;
+        let source_type = SourceType::Python(PySourceType::Python);
         let rule = Rule::OverIndentation;
 
         let source_kind = SourceKind::from_source_code(code.to_string(), source_type)

@@ -1,0 +1,28 @@
+---
+source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
+---
+TC003 [*] Move standard library import `os` into a type-checking block
+  --> TC003.py:8:12
+   |
+ 7 | def f():
+ 8 |     import os
+   |            ^^
+ 9 |
+10 |     x: os
+   |
+help: Move into type-checking block
+2  | 
+3  | For typing-only import detection tests, see `TC002.py`.
+4  | """
+5  + from typing import TYPE_CHECKING
+6  + 
+7  + if TYPE_CHECKING:
+8  +     import os
+9  | 
+10 | 
+11 | def f():
+   -     import os
+12 | 
+13 |     x: os
+14 | 
+note: This is an unsafe fix and may change runtime behavior

@@ -1,5 +1,6 @@
 //! Access to the Ruff linting API for the LSP
 
+use ruff_python_ast::SourceType;
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 
@@ -18,8 +19,10 @@ use ruff_linter::{
     linter::check_path,
     package::PackageRoot,
     packaging::detect_package_root,
-    settings::flags,
+    preview::is_warning_severity_enabled,
+    settings::{flags, types::PreviewMode},
     source_kind::SourceKind,
+    suppression::Suppressions,
 };
 use ruff_notebook::Notebook;
 use ruff_python_codegen::Stylist;
@@ -71,6 +74,10 @@ pub(crate) fn check(
     let settings = query.settings();
     let document_path = query.virtual_file_path();
 
+    let SourceType::Python(source_type) = query.source_type() else {
+        return DiagnosticsMap::default();
+    };
+
     // If the document is excluded, return an empty list of diagnostics.
     if is_document_excluded_for_linting(
         &document_path,
@@ -94,8 +101,6 @@ pub(crate) fn check(
         None
     };
 
-    let source_type = query.source_type();
-
     let target_version = settings.linter.resolve_target_version(&document_path);
 
     let parse_options =
@@ -118,6 +123,9 @@ pub(crate) fn check(
     // Extract the `# noqa` and `# isort: skip` directives from the source.
     let directives = extract_directives(parsed.tokens(), Flags::all(), &locator, &indexer);
 
+    // Parse range suppression comments
+    let suppressions = Suppressions::from_tokens(locator.contents(), parsed.tokens(), &indexer);
+
     // Generate checks.
     let diagnostics = check_path(
         &document_path,
@@ -132,6 +140,7 @@ pub(crate) fn check(
         source_type,
         &parsed,
         target_version,
+        &suppressions,
     );
 
     let noqa_edits = generate_noqa_edits(
@@ -142,6 +151,7 @@ pub(crate) fn check(
         &settings.linter.external,
         &directives.noqa_line_for,
         stylist.line_ending(),
+        &suppressions,
     );
 
     let mut diagnostics_map = DiagnosticsMap::default();
@@ -172,6 +182,7 @@ pub(crate) fn check(
                         &source_kind,
                         locator.to_index(),
                         encoding,
+                        settings.linter.preview,
                     ))
                 }
             });
@@ -233,10 +244,11 @@ fn to_lsp_diagnostic(
     source_kind: &SourceKind,
     index: &LineIndex,
     encoding: PositionEncoding,
+    preview: PreviewMode,
 ) -> (usize, lsp_types::Diagnostic) {
     let diagnostic_range = diagnostic.range().unwrap_or_default();
     let name = diagnostic.name();
-    let body = diagnostic.body().to_string();
+    let body = diagnostic.concise_message().to_string();
     let fix = diagnostic.fix();
     let suggestion = diagnostic.first_help_text();
     let code = diagnostic.secondary_code();
@@ -283,27 +295,32 @@ fn to_lsp_diagnostic(
         range = diagnostic_range.to_range(source_kind.source_code(), index, encoding);
     }
 
-    let (severity, tags, code) = if let Some(code) = code {
-        let code = code.to_string();
-        (
-            Some(severity(&code)),
-            tags(diagnostic),
-            Some(lsp_types::NumberOrString::String(code)),
-        )
+    let (severity, code) = if let Some(code) = code
+        && !is_warning_severity_enabled(preview)
+    {
+        (severity(code), code.to_string())
     } else {
-        (None, None, None)
+        (
+            match diagnostic.severity() {
+                ruff_db::diagnostic::Severity::Info => lsp_types::DiagnosticSeverity::INFORMATION,
+                ruff_db::diagnostic::Severity::Warning => lsp_types::DiagnosticSeverity::WARNING,
+                ruff_db::diagnostic::Severity::Error => lsp_types::DiagnosticSeverity::ERROR,
+                ruff_db::diagnostic::Severity::Fatal => lsp_types::DiagnosticSeverity::ERROR,
+            },
+            diagnostic.secondary_code_or_id().to_string(),
+        )
     };
 
     (
         cell,
         lsp_types::Diagnostic {
             range,
-            severity,
-            tags,
-            code,
-            code_description: diagnostic.to_ruff_url().and_then(|url| {
+            severity: Some(severity),
+            tags: tags(diagnostic),
+            code: Some(lsp_types::NumberOrString::String(code)),
+            code_description: diagnostic.documentation_url().and_then(|url| {
                 Some(lsp_types::CodeDescription {
-                    href: lsp_types::Url::parse(&url).ok()?,
+                    href: lsp_types::Url::parse(url).ok()?,
                 })
             }),
             source: Some(DIAGNOSTIC_NAME.into()),

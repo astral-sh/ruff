@@ -1,0 +1,227 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/re_lexing/ty_1828.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        node_index: NodeIndex(None),
+        range: 0..112,
+        body: [
+            AnnAssign(
+                StmtAnnAssign {
+                    node_index: NodeIndex(None),
+                    range: 66..93,
+                    target: Name(
+                        ExprName {
+                            node_index: NodeIndex(None),
+                            range: 67..68,
+                            id: Name("c"),
+                            ctx: Store,
+                        },
+                    ),
+                    annotation: Name(
+                        ExprName {
+                            node_index: NodeIndex(None),
+                            range: 70..73,
+                            id: Name("int"),
+                            ctx: Load,
+                        },
+                    ),
+                    value: Some(
+                        Tuple(
+                            ExprTuple {
+                                node_index: NodeIndex(None),
+                                range: 76..93,
+                                elts: [
+                                    NumberLiteral(
+                                        ExprNumberLiteral {
+                                            node_index: NodeIndex(None),
+                                            range: 76..77,
+                                            value: Int(
+                                                1,
+                                            ),
+                                        },
+                                    ),
+                                    Subscript(
+                                        ExprSubscript {
+                                            node_index: NodeIndex(None),
+                                            range: 78..90,
+                                            value: FString(
+                                                ExprFString {
+                                                    node_index: NodeIndex(None),
+                                                    range: 78..85,
+                                                    value: FStringValue {
+                                                        inner: Single(
+                                                            FString(
+                                                                FString {
+                                                                    range: 78..85,
+                                                                    node_index: NodeIndex(None),
+                                                                    elements: [
+                                                                        Interpolation(
+                                                                            InterpolatedElement {
+                                                                                range: 82..85,
+                                                                                node_index: NodeIndex(None),
+                                                                                expression: Name(
+                                                                                    ExprName {
+                                                                                        node_index: NodeIndex(None),
+                                                                                        range: 83..84,
+                                                                                        id: Name("d"),
+                                                                                        ctx: Load,
+                                                                                    },
+                                                                                ),
+                                                                                debug_text: Some(
+                                                                                    DebugText {
+                                                                                        leading: "",
+                                                                                        trailing: "=",
+                                                                                    },
+                                                                                ),
+                                                                                conversion: None,
+                                                                                format_spec: None,
+                                                                            },
+                                                                        ),
+                                                                    ],
+                                                                    flags: FStringFlags {
+                                                                        quote_style: Double,
+                                                                        prefix: Regular,
+                                                                        triple_quoted: true,
+                                                                        unclosed: true,
+                                                                    },
+                                                                },
+                                                            ),
+                                                        ),
+                                                    },
+                                                },
+                                            ),
+                                            slice: Slice(
+                                                ExprSlice {
+                                                    node_index: NodeIndex(None),
+                                                    range: 87..90,
+                                                    lower: None,
+                                                    upper: Some(
+                                                        Name(
+                                                            ExprName {
+                                                                node_index: NodeIndex(None),
+                                                                range: 87..90,
+                                                                id: Name("def"),
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                    ),
+                                                    step: None,
+                                                },
+                                            ),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    Call(
+                                        ExprCall {
+                                            node_index: NodeIndex(None),
+                                            range: 91..93,
+                                            func: Name(
+                                                ExprName {
+                                                    node_index: NodeIndex(None),
+                                                    range: 91..92,
+                                                    id: Name("a"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            arguments: Arguments {
+                                                range: 92..93,
+                                                node_index: NodeIndex(None),
+                                                args: [],
+                                                keywords: [],
+                                            },
+                                        },
+                                    ),
+                                ],
+                                ctx: Load,
+                                parenthesized: false,
+                            },
+                        ),
+                    ),
+                    simple: false,
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | # Regression test for https://github.com/astral-sh/ty/issues/1828
+2 | (c: int = 1,f"""{d=[
+  |   ^ Syntax Error: Expected `)`, found `:`
+3 | def a(
+4 | class A:
+  |
+
+
+  |
+1 | # Regression test for https://github.com/astral-sh/ty/issues/1828
+2 | (c: int = 1,f"""{d=[
+  |                    ^ Syntax Error: f-string: expecting `}`
+3 | def a(
+4 | class A:
+  |
+
+
+  |
+1 | # Regression test for https://github.com/astral-sh/ty/issues/1828
+2 | (c: int = 1,f"""{d=[
+3 | def a(
+  | ^^^ Syntax Error: Expected `:`, found `def`
+4 | class A:
+5 |     pass
+  |
+
+
+  |
+1 | # Regression test for https://github.com/astral-sh/ty/issues/1828
+2 | (c: int = 1,f"""{d=[
+3 | def a(
+  |     ^ Syntax Error: Expected `]`, found name
+4 | class A:
+5 |     pass
+  |
+
+
+  |
+1 |   # Regression test for https://github.com/astral-sh/ty/issues/1828
+2 |   (c: int = 1,f"""{d=[
+3 |   def a(
+  |  _______^
+4 | | class A:
+5 | |     pass
+  | |_________^ Syntax Error: f-string: unterminated triple-quoted string
+  |
+
+
+  |
+2 | (c: int = 1,f"""{d=[
+3 | def a(
+4 | class A:
+  | ^^^^^ Syntax Error: Expected `)`, found `class`
+5 |     pass
+  |
+
+
+  |
+1 |   # Regression test for https://github.com/astral-sh/ty/issues/1828
+2 |   (c: int = 1,f"""{d=[
+3 |   def a(
+  |  _______^
+4 | | class A:
+5 | |     pass
+  | |_________^ Syntax Error: Expected a statement
+  |
+
+
+  |
+4 | class A:
+5 |     pass
+  |         ^ Syntax Error: unexpected EOF while parsing
+  |

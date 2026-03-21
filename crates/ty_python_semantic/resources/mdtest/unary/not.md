@@ -187,7 +187,7 @@ class MethodBoolInvalid:
     def __bool__(self) -> int:
         return 0
 
-# error: [unsupported-bool-conversion] "Boolean conversion is unsupported for type `MethodBoolInvalid`"
+# error: [unsupported-bool-conversion] "Boolean conversion is not supported for type `MethodBoolInvalid`"
 # revealed: bool
 reveal_type(not MethodBoolInvalid())
 

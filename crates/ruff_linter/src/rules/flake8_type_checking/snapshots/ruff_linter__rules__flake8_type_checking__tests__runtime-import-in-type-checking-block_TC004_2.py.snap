@@ -8,6 +8,12 @@ TC004 [*] Move import `datetime.date` out of type-checking block. Import is used
 4 |     from datetime import date
   |                          ^^^^
   |
+ ::: TC004_2.py:8:12
+  |
+7 | def example():
+8 |     return date()
+  |            ---- Used at runtime here
+  |
 help: Move out of type-checking block
 1 | from typing import TYPE_CHECKING
 2 + from datetime import date

@@ -81,3 +81,7 @@ round(# a comment
 round(
     17 # a comment
 )
+
+# See: https://github.com/astral-sh/ruff/issues/21209
+print(round(125, **{"ndigits": -2}))
+print(round(125, *[-2]))

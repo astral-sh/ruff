@@ -91,7 +91,7 @@ The `Unknown` type is a special type that we use to represent actually unknown t
 annotation), as opposed to `Any` which represents an explicitly unknown type.
 
 ```py
-from ty_extensions import Unknown, static_assert, is_assignable_to
+from ty_extensions import Unknown, static_assert, is_assignable_to, reveal_mro
 
 static_assert(is_assignable_to(Unknown, int))
 static_assert(is_assignable_to(int, Unknown))
@@ -99,7 +99,7 @@ static_assert(is_assignable_to(int, Unknown))
 def explicit_unknown(x: Unknown, y: tuple[str, Unknown], z: Unknown = 1) -> None:
     reveal_type(x)  # revealed: Unknown
     reveal_type(y)  # revealed: tuple[str, Unknown]
-    reveal_type(z)  # revealed: Unknown | Literal[1]
+    reveal_type(z)  # revealed: Unknown
 ```
 
 `Unknown` can be subclassed, just like `Any`:
@@ -107,8 +107,8 @@ def explicit_unknown(x: Unknown, y: tuple[str, Unknown], z: Unknown = 1) -> None
 ```py
 class C(Unknown): ...
 
-# revealed: tuple[<class 'C'>, Unknown, <class 'object'>]
-reveal_type(C.__mro__)
+# revealed: (<class 'C'>, Unknown, <class 'object'>)
+reveal_mro(C)
 
 # error: "Special form `ty_extensions.Unknown` expected no type parameter"
 u: Unknown[str]
@@ -203,19 +203,19 @@ from ty_extensions import static_assert
 static_assert(True)
 static_assert(False)  # error: "Static assertion error: argument evaluates to `False`"
 
-static_assert(None)  # error: "Static assertion error: argument of type `None` is statically known to be falsy"
+static_assert(None)  # error: "Static assertion error: argument of type `None` is always falsy"
 
 static_assert(1)
-static_assert(0)  # error: "Static assertion error: argument of type `Literal[0]` is statically known to be falsy"
+static_assert(0)  # error: "Static assertion error: argument of type `Literal[0]` is always falsy"
 
 static_assert((0,))
-static_assert(())  # error: "Static assertion error: argument of type `tuple[()]` is statically known to be falsy"
+static_assert(())  # error: "Static assertion error: argument of type `tuple[()]` is always falsy"
 
 static_assert("a")
-static_assert("")  # error: "Static assertion error: argument of type `Literal[""]` is statically known to be falsy"
+static_assert("")  # error: "Static assertion error: argument of type `Literal[""]` is always falsy"
 
 static_assert(b"a")
-static_assert(b"")  # error: "Static assertion error: argument of type `Literal[b""]` is statically known to be falsy"
+static_assert(b"")  # error: "Static assertion error: argument of type `Literal[b""]` is always falsy"
 ```
 
 ### Error messages
@@ -237,7 +237,7 @@ class InvalidBoolDunder:
     def __bool__(self) -> int:
         return 1
 
-# error: [unsupported-bool-conversion]  "Boolean conversion is unsupported for type `InvalidBoolDunder`"
+# error: [unsupported-bool-conversion]  "Boolean conversion is not supported for type `InvalidBoolDunder`"
 static_assert(InvalidBoolDunder())
 ```
 
@@ -390,7 +390,7 @@ static_assert(not is_single_valued(Literal["a"] | Literal["b"]))
 
 We use `TypeOf` to get the inferred type of an expression. This is useful when we want to refer to
 it in a type expression. For example, if we want to make sure that the class literal type `str` is a
-subtype of `type[str]`, we can not use `is_subtype_of(str, type[str])`, as that would test if the
+subtype of `type[str]`, we cannot use `is_subtype_of(str, type[str])`, as that would test if the
 type `str` itself is a subtype of `type[str]`. Instead, we can use `TypeOf[str]` to get the type of
 the expression `str`:
 
@@ -398,7 +398,7 @@ the expression `str`:
 from ty_extensions import TypeOf, is_subtype_of, static_assert
 
 # This is incorrect and therefore fails with ...
-# error: "Static assertion error: argument of type `ty_extensions.ConstraintSet[never]` is statically known to be falsy"
+# error: "Static assertion error: argument of type `ConstraintSet[Literal[False]]` is always falsy"
 static_assert(is_subtype_of(str, type[str]))
 
 # Correct, returns True:
@@ -427,11 +427,57 @@ def f(x: TypeOf) -> None:
     reveal_type(x)  # revealed: Unknown
 ```
 
+## Self-referential `TypeOf` in annotations
+
+A function can reference itself via `TypeOf` in a deferred annotation. This should not cause a stack
+overflow:
+
+```py
+from ty_extensions import TypeOf
+
+def foo(x: "TypeOf[foo]"):
+    reveal_type(x)  # revealed: def foo(x: def foo(...)) -> Unknown
+```
+
+## Deeply nested `TypeOf` chains
+
+Multiple redefinitions of a function with `TypeOf[foo]` as the return type create a chain of
+distinct function types. The display of such chains is truncated to prevent extremely long output:
+
+```py
+from ty_extensions import TypeOf
+
+def foo() -> TypeOf[foo]:  # error: [unresolved-reference]
+    return foo
+
+def foo() -> TypeOf[foo]:
+    return foo  # error: [invalid-return-type]
+
+def foo() -> TypeOf[foo]:
+    return foo  # error: [invalid-return-type]
+
+def foo() -> TypeOf[foo]:
+    return foo  # error: [invalid-return-type]
+
+def foo() -> TypeOf[foo]:
+    return foo  # error: [invalid-return-type]
+
+def foo() -> TypeOf[foo]:
+    return foo  # error: [invalid-return-type]
+
+# Truncated after 4 levels of function type nesting:
+reveal_type(foo)  # revealed: def foo() -> def foo() -> def foo() -> def foo() -> def foo(...)
+```
+
 ## `CallableTypeOf`
 
-The `CallableTypeOf` special form can be used to extract the `Callable` structural type inhabited by
-a given callable object. This can be used to get the externally visibly signature of the object,
-which can then be used to test various type properties.
+The `CallableTypeOf` special form can be used to extract the callable type inhabited by a given
+callable object. This can be used to get the externally visible signature of the object, which can
+then be used to test various type properties.
+
+Unlike a plain `typing.Callable[...]`, `CallableTypeOf[...]` preserves function-like behavior. This
+means method-like and descriptor-like callables remain distinct from regular callables in some
+type-theoretic checks.
 
 It accepts a single type parameter which is expected to be a callable object.
 
@@ -503,4 +549,24 @@ def _(
     reveal_type(c6)  # revealed: (x: int) -> Foo
     reveal_type(c7)  # revealed: (x: int) -> Foo
     reveal_type(c8)  # revealed: (x: int) -> str
+```
+
+## `RegularCallableTypeOf`
+
+The `RegularCallableTypeOf` special form also extracts a callable type from a callable object, but
+it normalizes the result to a regular `typing.Callable`-style type.
+
+This keeps the callable signatures while discarding function-like behavior. Use it when you want to
+compare a callable against ordinary `Callable[...]` types without preserving descriptor semantics.
+
+It accepts a single type parameter which is expected to be a callable object.
+
+```py
+from typing import Callable
+from ty_extensions import CallableTypeOf, RegularCallableTypeOf, is_assignable_to, static_assert
+
+def f(x: int, /) -> None: ...
+
+static_assert(not is_assignable_to(Callable[[int], None], CallableTypeOf[f]))
+static_assert(is_assignable_to(Callable[[int], None], RegularCallableTypeOf[f]))
 ```

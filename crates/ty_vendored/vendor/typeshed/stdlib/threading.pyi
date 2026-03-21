@@ -2,7 +2,7 @@
 
 import _thread
 import sys
-from _thread import _excepthook, _ExceptHookArgs, get_native_id as get_native_id
+from _thread import _ExceptHookArgs, get_native_id as get_native_id
 from _typeshed import ProfileFunction, TraceFunction
 from collections.abc import Callable, Iterable, Mapping
 from contextvars import ContextVar
@@ -105,7 +105,7 @@ def main_thread() -> Thread:
     Python interpreter was started.
     """
 
-def settrace(func: TraceFunction) -> None:
+def settrace(func: TraceFunction | None) -> None:
     """Set a trace function for all threads started from the threading module.
 
     The func will be passed to sys.settrace() for each thread, before its run()
@@ -128,7 +128,7 @@ if sys.version_info >= (3, 12):
         run() method is called.
         """
 
-    def settrace_all_threads(func: TraceFunction) -> None:
+    def settrace_all_threads(func: TraceFunction | None) -> None:
         """Set a trace function for all threads started from the threading module
         and all Python threads that are currently executing.
 
@@ -177,6 +177,13 @@ class Thread:
     """
 
     name: str
+    """A string used for identification purposes only.
+
+    It has no semantics. Multiple threads may be given the same name. The
+    initial name is set by the constructor.
+
+    """
+
     @property
     def ident(self) -> int | None:
         """Thread identifier of this thread or None if it has not been started.
@@ -187,6 +194,17 @@ class Thread:
 
         """
     daemon: bool
+    """A boolean value indicating whether this thread is a daemon thread.
+
+    This must be set before start() is called, otherwise RuntimeError is
+    raised. Its initial value is inherited from the creating thread; the
+    main thread is not a daemon thread and therefore all threads created in
+    the main thread default to daemon = False.
+
+    The entire Python program exits when only daemon threads are left.
+
+    """
+
     if sys.version_info >= (3, 14):
         def __init__(
             self,
@@ -447,6 +465,9 @@ class Condition:
     ) -> None: ...
     def acquire(self, blocking: bool = True, timeout: float = -1) -> bool: ...
     def release(self) -> None: ...
+    if sys.version_info >= (3, 14):
+        def locked(self) -> bool: ...
+
     def wait(self, timeout: float | None = None) -> bool:
         """Wait until notified or until a timeout occurs.
 
@@ -643,11 +664,14 @@ class Event:
         (or fractions thereof).
 
         This method returns the internal flag on exit, so it will always return
-        True except if a timeout is given and the operation times out.
+        ``True`` except if a timeout is given and the operation times out, when
+        it will return ``False``.
 
         """
 
-excepthook = _excepthook
+excepthook: Callable[[_ExceptHookArgs], object]
+if sys.version_info >= (3, 10):
+    __excepthook__: Callable[[_ExceptHookArgs], object]
 ExceptHookArgs = _ExceptHookArgs
 
 class Timer(Thread):

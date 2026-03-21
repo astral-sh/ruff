@@ -1,3 +1,4 @@
+use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::ExprCall;
 
@@ -72,6 +73,6 @@ pub(crate) fn os_path_exists(checker: &Checker, call: &ExprCall, segments: &[&st
         "path",
         is_fix_os_path_exists_enabled(checker.settings()),
         OsPathExists,
-        None,
+        Applicability::Safe,
     );
 }

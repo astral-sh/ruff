@@ -2,6 +2,7 @@
 source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
+
 ---
 mdtest name: instance_layout_conflict.md - Tests for ty's `instance-layout-conflict` error code - `__slots__`: incompatible tuples
 mdtest path: crates/ty_python_semantic/resources/mdtest/instance_layout_conflict.md

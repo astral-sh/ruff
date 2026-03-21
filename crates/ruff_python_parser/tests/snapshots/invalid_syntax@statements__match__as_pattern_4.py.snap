@@ -114,7 +114,7 @@ Module(
 2 |     # This `as` pattern is unparenthesized so the parser never takes the path
 3 |     # where it might be confused as a mapping key pattern.
 4 |     case {x as y: 1}:
-  |             ^^ Syntax Error: Expected ':', found 'as'
+  |             ^^ Syntax Error: Expected `:`, found `as`
 5 |         pass
   |
 
@@ -123,6 +123,6 @@ Module(
 2 |     # This `as` pattern is unparenthesized so the parser never takes the path
 3 |     # where it might be confused as a mapping key pattern.
 4 |     case {x as y: 1}:
-  |                ^ Syntax Error: Expected ',', found name
+  |                ^ Syntax Error: Expected `,`, found name
 5 |         pass
   |

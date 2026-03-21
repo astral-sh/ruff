@@ -4,6 +4,7 @@ use bitflags::bitflags;
 use rustc_hash::{FxBuildHasher, FxHashSet};
 
 use ruff_python_ast::name::Name;
+use ruff_python_ast::token::TokenKind;
 use ruff_python_ast::{
     self as ast, AnyStringFlags, AtomicNodeIndex, BoolOp, CmpOp, ConversionFlag, Expr, ExprContext,
     FString, InterpolatedStringElement, InterpolatedStringElements, IpyEscapeKind, Number,
@@ -18,7 +19,7 @@ use crate::string::{
     InterpolatedStringKind, StringType, parse_interpolated_string_literal_element,
     parse_string_literal,
 };
-use crate::token::{TokenKind, TokenValue};
+use crate::token::TokenValue;
 use crate::token_set::TokenSet;
 use crate::{
     InterpolatedStringErrorType, Mode, ParseErrorType, UnsupportedSyntaxError,
@@ -476,6 +477,17 @@ impl<'src> Parser<'src> {
         }
     }
 
+    pub(super) fn parse_missing_name(&mut self) -> ast::ExprName {
+        let identifier = self.parse_missing_identifier();
+
+        ast::ExprName {
+            range: identifier.range,
+            id: identifier.id,
+            ctx: ExprContext::Invalid,
+            node_index: AtomicNodeIndex::NONE,
+        }
+    }
+
     /// Parses an identifier.
     ///
     /// For an invalid identifier, the `id` field will be an empty string.
@@ -523,16 +535,20 @@ impl<'src> Parser<'src> {
                 node_index: AtomicNodeIndex::NONE,
             }
         } else {
-            self.add_error(
-                ParseErrorType::OtherError("Expected an identifier".into()),
-                range,
-            );
+            self.parse_missing_identifier()
+        }
+    }
 
-            ast::Identifier {
-                id: Name::empty(),
-                range: self.missing_node_range(),
-                node_index: AtomicNodeIndex::NONE,
-            }
+    fn parse_missing_identifier(&mut self) -> ast::Identifier {
+        self.add_error(
+            ParseErrorType::OtherError("Expected an identifier".into()),
+            self.current_token_range(),
+        );
+
+        ast::Identifier {
+            id: Name::empty(),
+            range: self.missing_node_range(),
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -1772,7 +1788,7 @@ impl<'src> Parser<'src> {
             let spec_start = self.node_start();
             let elements = self.parse_interpolated_string_elements(
                 flags,
-                InterpolatedStringElementsKind::FormatSpec,
+                InterpolatedStringElementsKind::FormatSpec(string_kind),
                 string_kind,
             );
             Some(Box::new(ast::InterpolatedStringFormatSpec {
@@ -1973,10 +1989,19 @@ impl<'src> Parser<'src> {
             TokenKind::Async | TokenKind::For => {
                 // Parenthesized starred expression isn't allowed either but that is
                 // handled by the `parse_parenthesized_expression` method.
+
+                // test_ok starred_list_comp_py315
+                // # parse_options: {"target-version": "3.15"}
+                // [*x for x in y]
+                // [*factor.dims for factor in bases]
+
+                // test_err starred_list_comp_py314
+                // # parse_options: {"target-version": "3.14"}
+                // [*x for x in y]
                 if first_element.is_unparenthesized_starred_expr() {
-                    self.add_error(
-                        ParseErrorType::IterableUnpackingInComprehension,
-                        &first_element,
+                    self.add_unsupported_syntax_error(
+                        UnsupportedSyntaxErrorKind::IterableUnpackingInListComprehension,
+                        first_element.range(),
                     );
                 }
 

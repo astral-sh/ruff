@@ -1,6 +1,8 @@
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::ExprUnaryOp;
 use ruff_python_ast::UnaryOp;
+use ruff_python_ast::parenthesize::parenthesized_range;
+use ruff_text_size::Ranged;
 
 use crate::comments::trailing_comments;
 use crate::expression::parentheses::{
@@ -39,20 +41,25 @@ impl FormatNodeRule<ExprUnaryOp> for FormatExprUnaryOp {
         // ```
         trailing_comments(dangling).fmt(f)?;
 
-        // Insert a line break if the operand has comments but itself is not parenthesized.
+        // Insert a line break if the operand has comments but itself is not parenthesized or if the
+        // operand is parenthesized but has a leading comment before the parentheses.
         // ```python
         // if (
         //  not
         //  # comment
-        //  a)
+        //  a):
+        //      pass
+        //
+        // if 1 and (
+        //     not
+        //     # comment
+        //     (
+        //         a
+        //     )
+        // ):
+        //     pass
         // ```
-        if comments.has_leading(operand.as_ref())
-            && !is_expression_parenthesized(
-                operand.as_ref().into(),
-                f.context().comments().ranges(),
-                f.context().source(),
-            )
-        {
+        if needs_line_break(item, f.context()) {
             hard_line_break().fmt(f)?;
         } else if op.is_not() {
             space().fmt(f)?;
@@ -76,17 +83,51 @@ impl NeedsParentheses for ExprUnaryOp {
         context: &PyFormatContext,
     ) -> OptionalParentheses {
         if parent.is_expr_await() {
-            OptionalParentheses::Always
-        } else if is_expression_parenthesized(
+            return OptionalParentheses::Always;
+        }
+
+        if needs_line_break(self, context) {
+            return OptionalParentheses::Always;
+        }
+
+        if is_expression_parenthesized(
             self.operand.as_ref().into(),
             context.comments().ranges(),
             context.source(),
         ) {
-            OptionalParentheses::Never
-        } else if context.comments().has(self.operand.as_ref()) {
-            OptionalParentheses::Always
-        } else {
-            self.operand.needs_parentheses(self.into(), context)
+            return OptionalParentheses::Never;
         }
+
+        if context.comments().has(self.operand.as_ref()) {
+            return OptionalParentheses::Always;
+        }
+
+        self.operand.needs_parentheses(self.into(), context)
     }
+}
+
+/// Returns `true` if the unary operator will have a hard line break between the operator and its
+/// operand and thus requires parentheses.
+fn needs_line_break(item: &ExprUnaryOp, context: &PyFormatContext) -> bool {
+    let comments = context.comments();
+    let parenthesized_operand_range = parenthesized_range(
+        item.operand.as_ref().into(),
+        item.into(),
+        comments.ranges(),
+        context.source(),
+    );
+    let leading_operand_comments = comments.leading(item.operand.as_ref());
+    let has_leading_comments_before_parens = parenthesized_operand_range.is_some_and(|range| {
+        leading_operand_comments
+            .iter()
+            .any(|comment| comment.start() < range.start())
+    });
+
+    !leading_operand_comments.is_empty()
+        && !is_expression_parenthesized(
+            item.operand.as_ref().into(),
+            context.comments().ranges(),
+            context.source(),
+        )
+        || has_leading_comments_before_parens
 }

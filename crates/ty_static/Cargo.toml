@@ -12,8 +12,8 @@ license = { workspace = true }
 [lib]
 doctest = false
 
-[lints]
-workspace = true
-
 [dependencies]
 ruff_macros = { workspace = true }
+
+[lints]
+workspace = true

@@ -93,7 +93,7 @@ class A:
         class C: ...
 
 def _(u: type[BasicUser | ProUser | A.B.C]):
-    # revealed: type[BasicUser] | type[ProUser] | type[C]
+    # revealed: type[BasicUser | ProUser | C]
     reveal_type(u)
 ```
 
@@ -110,9 +110,9 @@ class A:
         class C: ...
 
 def f(a: type[Union[BasicUser, ProUser, A.B.C]], b: type[Union[str]], c: type[Union[BasicUser, Union[ProUser, A.B.C]]]):
-    reveal_type(a)  # revealed: type[BasicUser] | type[ProUser] | type[C]
+    reveal_type(a)  # revealed: type[BasicUser | ProUser | C]
     reveal_type(b)  # revealed: type[str]
-    reveal_type(c)  # revealed: type[BasicUser] | type[ProUser] | type[C]
+    reveal_type(c)  # revealed: type[BasicUser | ProUser | C]
 ```
 
 ## New-style and old-style unions in combination
@@ -128,8 +128,31 @@ class A:
         class C: ...
 
 def f(a: type[BasicUser | Union[ProUser, A.B.C]], b: type[Union[BasicUser | Union[ProUser, A.B.C | str]]]):
-    reveal_type(a)  # revealed: type[BasicUser] | type[ProUser] | type[C]
-    reveal_type(b)  # revealed: type[BasicUser] | type[ProUser] | type[C] | type[str]
+    reveal_type(a)  # revealed: type[BasicUser | ProUser | C]
+    reveal_type(b)  # revealed: type[BasicUser | ProUser | C | str]
+```
+
+## Special case for `None`
+
+The typing conformance suite contains this test case. It's debatable whether it's correct to do so,
+since the spec states that:
+
+> The value corresponding to `type[C]` must be an actual class object that’s a subtype of `C`, not a
+> special form or other kind of type.
+
+However, for now we support this annotation in the way the conformance suite expects, until and
+unless the spec is amended.
+
+```py
+import types
+
+def f(x: type[None]):
+    reveal_type(x)  # revealed: <class 'NoneType'>
+
+f(type(None))
+f(None.__class__)
+f(types.NoneType)
+f(None)  # error: [invalid-argument-type]
 ```
 
 ## Illegal parameters
@@ -142,35 +165,31 @@ class B: ...
 _: type[A, B]
 ```
 
+## Callable types are not valid parameters
+
+```py
+from collections.abc import Callable
+
+def f(
+    x: type[Callable],  # error: [invalid-type-form]
+    y: type[Callable[[int], str]],  # error: [invalid-type-form]
+    # error: [invalid-type-form] "Special form `typing.Callable` expected exactly two arguments"
+    # error: [invalid-type-form] "The first argument to `Callable` must be either a list of types, ParamSpec, Concatenate, or `...`"
+    z: type[Callable[int]],  # error: [invalid-type-form] "The argument to `type[]` must be a class object type"
+):
+    reveal_type(x)  # revealed: type[Unknown]
+    reveal_type(y)  # revealed: type[Unknown]
+    reveal_type(z)  # revealed: type[Unknown]
+```
+
 ## As a base class
 
 ```py
+from ty_extensions import reveal_mro
+
 class Foo(type[int]): ...
 
-# TODO: should be `tuple[<class 'Foo'>, <class 'type'>, <class 'object'>]
-reveal_type(Foo.__mro__)  # revealed: tuple[<class 'Foo'>, @Todo(GenericAlias instance), <class 'object'>]
-```
-
-## Display of generic `type[]` types
-
-```toml
-[environment]
-python-version = "3.12"
-```
-
-```py
-from typing import Generic, TypeVar
-
-class Foo[T]: ...
-
-S = TypeVar("S")
-
-class Bar(Generic[S]): ...
-
-def _(x: Foo[int], y: Bar[str], z: list[bytes]):
-    reveal_type(type(x))  # revealed: type[Foo[int]]
-    reveal_type(type(y))  # revealed: type[Bar[str]]
-    reveal_type(type(z))  # revealed: type[list[bytes]]
+reveal_mro(Foo)  # revealed: (<class 'Foo'>, <class 'type'>, <class 'object'>)
 ```
 
 ## `@final` classes
@@ -181,7 +200,7 @@ same also applies to enum classes with members, which are implicitly final:
 
 ```toml
 [environment]
-python-version = "3.10"
+python-version = "3.12"
 ```
 
 ```py
@@ -200,4 +219,280 @@ def _(x: type[Foo], y: type[EllipsisType], z: type[Answer]):
     reveal_type(x)  # revealed: <class 'Foo'>
     reveal_type(y)  # revealed: <class 'EllipsisType'>
     reveal_type(z)  # revealed: <class 'Answer'>
+```
+
+## Subtyping `@final` classes
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import final, Any
+from ty_extensions import is_assignable_to, is_subtype_of, is_disjoint_from, static_assert
+
+class Biv[T]: ...
+
+class Cov[T]:
+    def pop(self) -> T:
+        raise NotImplementedError
+
+class Contra[T]:
+    def push(self, value: T) -> None:
+        pass
+
+class Inv[T]:
+    x: T
+
+@final
+class BivSub[T](Biv[T]): ...
+
+@final
+class CovSub[T](Cov[T]): ...
+
+@final
+class ContraSub[T](Contra[T]): ...
+
+@final
+class InvSub[T](Inv[T]): ...
+
+def _[T, U]():
+    static_assert(is_subtype_of(type[BivSub[T]], type[BivSub[U]]))
+    static_assert(not is_disjoint_from(type[BivSub[U]], type[BivSub[T]]))
+
+    # `T` and `U` could specialize to the same type.
+    static_assert(not is_subtype_of(type[CovSub[T]], type[CovSub[U]]))
+    static_assert(not is_disjoint_from(type[CovSub[U]], type[CovSub[T]]))
+
+    static_assert(not is_subtype_of(type[ContraSub[T]], type[ContraSub[U]]))
+    static_assert(not is_disjoint_from(type[ContraSub[U]], type[ContraSub[T]]))
+
+    static_assert(not is_subtype_of(type[InvSub[T]], type[InvSub[U]]))
+    static_assert(not is_disjoint_from(type[InvSub[U]], type[InvSub[T]]))
+
+def _():
+    static_assert(is_subtype_of(type[BivSub[bool]], type[BivSub[int]]))
+    static_assert(is_subtype_of(type[BivSub[int]], type[BivSub[bool]]))
+    static_assert(not is_disjoint_from(type[BivSub[bool]], type[BivSub[int]]))
+    # `BivSub[int]` and `BivSub[str]` are mutual subtypes.
+    static_assert(not is_disjoint_from(type[BivSub[int]], type[BivSub[str]]))
+
+    static_assert(is_subtype_of(type[CovSub[bool]], type[CovSub[int]]))
+    static_assert(not is_subtype_of(type[CovSub[int]], type[CovSub[bool]]))
+    static_assert(not is_disjoint_from(type[CovSub[bool]], type[CovSub[int]]))
+    # `CovSub[Never]` is a subtype of both `CovSub[int]` and `CovSub[str]`.
+    static_assert(not is_disjoint_from(type[CovSub[int]], type[CovSub[str]]))
+
+    static_assert(not is_subtype_of(type[ContraSub[bool]], type[ContraSub[int]]))
+    static_assert(is_subtype_of(type[ContraSub[int]], type[ContraSub[bool]]))
+    static_assert(not is_disjoint_from(type[ContraSub[bool]], type[ContraSub[int]]))
+    # `ContraSub[int | str]` is a subtype of both `ContraSub[int]` and `ContraSub[str]`.
+    static_assert(not is_disjoint_from(type[ContraSub[int]], type[ContraSub[str]]))
+
+    static_assert(not is_subtype_of(type[InvSub[bool]], type[InvSub[int]]))
+    static_assert(not is_subtype_of(type[InvSub[int]], type[InvSub[bool]]))
+    static_assert(is_disjoint_from(type[InvSub[int]], type[InvSub[str]]))
+    # TODO: These are disjoint.
+    static_assert(not is_disjoint_from(type[InvSub[bool]], type[InvSub[int]]))
+
+def _[T]():
+    static_assert(is_subtype_of(type[BivSub[T]], type[BivSub[Any]]))
+    static_assert(is_subtype_of(type[BivSub[Any]], type[BivSub[T]]))
+    static_assert(is_assignable_to(type[BivSub[T]], type[BivSub[Any]]))
+    static_assert(is_assignable_to(type[BivSub[Any]], type[BivSub[T]]))
+    static_assert(not is_disjoint_from(type[BivSub[T]], type[BivSub[Any]]))
+
+    static_assert(not is_subtype_of(type[CovSub[T]], type[CovSub[Any]]))
+    static_assert(not is_subtype_of(type[CovSub[Any]], type[CovSub[T]]))
+    static_assert(is_assignable_to(type[CovSub[T]], type[CovSub[Any]]))
+    static_assert(is_assignable_to(type[CovSub[Any]], type[CovSub[T]]))
+    static_assert(not is_disjoint_from(type[CovSub[T]], type[CovSub[Any]]))
+
+    static_assert(not is_subtype_of(type[ContraSub[T]], type[ContraSub[Any]]))
+    static_assert(not is_subtype_of(type[ContraSub[Any]], type[ContraSub[T]]))
+    static_assert(is_assignable_to(type[ContraSub[T]], type[ContraSub[Any]]))
+    static_assert(is_assignable_to(type[ContraSub[Any]], type[ContraSub[T]]))
+    static_assert(not is_disjoint_from(type[ContraSub[T]], type[ContraSub[Any]]))
+
+    static_assert(not is_subtype_of(type[InvSub[T]], type[InvSub[Any]]))
+    static_assert(not is_subtype_of(type[InvSub[Any]], type[InvSub[T]]))
+    static_assert(is_assignable_to(type[InvSub[T]], type[InvSub[Any]]))
+    static_assert(is_assignable_to(type[InvSub[Any]], type[InvSub[T]]))
+    static_assert(not is_disjoint_from(type[InvSub[T]], type[InvSub[Any]]))
+
+def _[T, U]():
+    static_assert(is_subtype_of(type[BivSub[T]], type[Biv[T]]))
+    static_assert(not is_subtype_of(type[Biv[T]], type[BivSub[T]]))
+    static_assert(not is_disjoint_from(type[BivSub[T]], type[Biv[T]]))
+    static_assert(not is_disjoint_from(type[BivSub[U]], type[Biv[T]]))
+    static_assert(not is_disjoint_from(type[BivSub[U]], type[Biv[U]]))
+
+    static_assert(is_subtype_of(type[CovSub[T]], type[Cov[T]]))
+    static_assert(not is_subtype_of(type[Cov[T]], type[CovSub[T]]))
+    static_assert(not is_disjoint_from(type[CovSub[T]], type[Cov[T]]))
+    static_assert(not is_disjoint_from(type[CovSub[U]], type[Cov[T]]))
+    static_assert(not is_disjoint_from(type[CovSub[U]], type[Cov[U]]))
+
+    static_assert(is_subtype_of(type[ContraSub[T]], type[Contra[T]]))
+    static_assert(not is_subtype_of(type[Contra[T]], type[ContraSub[T]]))
+    static_assert(not is_disjoint_from(type[ContraSub[T]], type[Contra[T]]))
+    static_assert(not is_disjoint_from(type[ContraSub[U]], type[Contra[T]]))
+    static_assert(not is_disjoint_from(type[ContraSub[U]], type[Contra[U]]))
+
+    static_assert(is_subtype_of(type[InvSub[T]], type[Inv[T]]))
+    static_assert(not is_subtype_of(type[Inv[T]], type[InvSub[T]]))
+    static_assert(not is_disjoint_from(type[InvSub[T]], type[Inv[T]]))
+    static_assert(not is_disjoint_from(type[InvSub[U]], type[Inv[T]]))
+    static_assert(not is_disjoint_from(type[InvSub[U]], type[Inv[U]]))
+
+def _():
+    static_assert(is_subtype_of(type[BivSub[bool]], type[Biv[int]]))
+    static_assert(is_subtype_of(type[BivSub[int]], type[Biv[bool]]))
+    static_assert(not is_disjoint_from(type[BivSub[bool]], type[Biv[int]]))
+    static_assert(not is_disjoint_from(type[BivSub[int]], type[Biv[bool]]))
+
+    static_assert(is_subtype_of(type[CovSub[bool]], type[Cov[int]]))
+    static_assert(not is_subtype_of(type[CovSub[int]], type[Cov[bool]]))
+    static_assert(not is_disjoint_from(type[CovSub[bool]], type[Cov[int]]))
+    static_assert(not is_disjoint_from(type[CovSub[int]], type[Cov[bool]]))
+
+    static_assert(not is_subtype_of(type[ContraSub[bool]], type[Contra[int]]))
+    static_assert(is_subtype_of(type[ContraSub[int]], type[Contra[bool]]))
+    static_assert(not is_disjoint_from(type[ContraSub[int]], type[Contra[bool]]))
+    static_assert(not is_disjoint_from(type[ContraSub[bool]], type[Contra[int]]))
+
+    static_assert(not is_subtype_of(type[InvSub[bool]], type[Inv[int]]))
+    static_assert(not is_subtype_of(type[InvSub[int]], type[Inv[bool]]))
+    # TODO: These are disjoint.
+    static_assert(not is_disjoint_from(type[InvSub[bool]], type[Inv[int]]))
+    # TODO: These are disjoint.
+    static_assert(not is_disjoint_from(type[InvSub[int]], type[Inv[bool]]))
+
+def _[T]():
+    static_assert(is_subtype_of(type[BivSub[T]], type[Biv[Any]]))
+    static_assert(is_subtype_of(type[BivSub[Any]], type[Biv[T]]))
+    static_assert(is_assignable_to(type[BivSub[T]], type[Biv[Any]]))
+    static_assert(is_assignable_to(type[BivSub[Any]], type[Biv[T]]))
+    static_assert(not is_disjoint_from(type[BivSub[T]], type[Biv[Any]]))
+
+    static_assert(not is_subtype_of(type[CovSub[T]], type[Cov[Any]]))
+    static_assert(not is_subtype_of(type[CovSub[Any]], type[Cov[T]]))
+    static_assert(is_assignable_to(type[CovSub[T]], type[Cov[Any]]))
+    static_assert(is_assignable_to(type[CovSub[Any]], type[Cov[T]]))
+    static_assert(not is_disjoint_from(type[CovSub[T]], type[Cov[Any]]))
+
+    static_assert(not is_subtype_of(type[ContraSub[T]], type[Contra[Any]]))
+    static_assert(not is_subtype_of(type[ContraSub[Any]], type[Contra[T]]))
+    static_assert(is_assignable_to(type[ContraSub[T]], type[Contra[Any]]))
+    static_assert(is_assignable_to(type[ContraSub[Any]], type[Contra[T]]))
+    static_assert(not is_disjoint_from(type[ContraSub[T]], type[Contra[Any]]))
+
+    static_assert(not is_subtype_of(type[InvSub[T]], type[Inv[Any]]))
+    static_assert(not is_subtype_of(type[InvSub[Any]], type[Inv[T]]))
+    static_assert(is_assignable_to(type[InvSub[T]], type[Inv[Any]]))
+    static_assert(is_assignable_to(type[InvSub[Any]], type[Inv[T]]))
+    static_assert(not is_disjoint_from(type[InvSub[T]], type[Inv[Any]]))
+```
+
+## `type[]` types in unions with `Callable` types and callback protocols
+
+`type[Foo]` is assignable to `Callable[[], Foo]` here:
+
+```py
+from typing import Callable, Protocol
+from ty_extensions import is_assignable_to, is_subtype_of, static_assert, TypeOf, Top
+
+class Foo:
+    def __init__(self): ...
+
+class CustomCallback(Protocol):
+    def __call__(self, /) -> Foo: ...
+
+static_assert(is_assignable_to(type[Foo], Callable[[], Foo]))
+static_assert(is_assignable_to(type[Foo], CustomCallback))
+```
+
+but it is not a subtype of `Callable[[], Foo]` or redundant with `Callable[[], Foo]`:
+
+```py
+static_assert(not is_subtype_of(type[Foo], Callable[[], Foo]))
+static_assert(not is_subtype_of(type[Foo], CustomCallback))
+```
+
+and the reason for that is that constructor signatures are not checked for Liskov violations,
+meaning that no type checker would complain about `Bar` here, even though the `__init__` signature
+of `Bar` is inconsistent with `Foo.__init__`:
+
+```py
+class Bar(Foo):
+    def __init__(self, x: int): ...
+```
+
+so if `type[Foo]` were considered a subtype of `Callable[[], Foo]`, then this union type would be
+incorrectly simplified to `Callable[[], Foo]`:
+
+```py
+def test(x: type[Foo] | Callable[[], Foo], y: type[Foo] | CustomCallback):
+    # these remain unsimplified!
+    reveal_type(x)  # revealed: type[Foo] | (() -> Foo)
+    reveal_type(y)  # revealed: type[Foo] | CustomCallback
+```
+
+which means that these assertions would fail:
+
+```py
+static_assert(is_subtype_of(type[Bar], type[Foo] | Callable[[], Foo]))
+static_assert(is_subtype_of(type[Bar], type[Foo] | CustomCallback))
+```
+
+despite the fact that this would still pass!
+
+```py
+static_assert(is_subtype_of(type[Bar], type[Foo]))
+```
+
+leading to an embarrassing intransivity of subtyping, and failing property tests.
+
+`type[]` types *are* callable, however, so they are always subtypes of `Top[Callable[..., object]]`:
+
+```py
+static_assert(is_subtype_of(type[Foo], Top[Callable[..., object]]))
+static_assert(is_subtype_of(type[Foo], Top[Callable[..., Foo]]))
+static_assert(is_subtype_of(TypeOf[Foo], Top[Callable[..., Foo]]))
+
+static_assert(is_subtype_of(type[Bar], Top[Callable[..., object]]))
+static_assert(is_subtype_of(type[Bar], Top[Callable[..., Foo]]))
+static_assert(is_subtype_of(type[Bar], Top[Callable[..., Bar]]))
+static_assert(is_subtype_of(TypeOf[Foo], Top[Callable[..., Foo]]))
+```
+
+And class-literal types cannot be unsoundly subtyped in the same way as `type[]` types, so they can
+still be considered subtypes of (and redundant with) the `Callable` types describing their
+constructor signatures:
+
+```py
+static_assert(is_subtype_of(TypeOf[Foo], Callable[[], Foo]))
+static_assert(is_subtype_of(TypeOf[Foo], CustomCallback))
+static_assert(is_subtype_of(TypeOf[Bar], Callable[[int], Bar]))
+static_assert(not is_subtype_of(TypeOf[Bar], TypeOf[Foo]))
+static_assert(is_subtype_of(TypeOf[Foo], TypeOf[Foo] | Callable[[], Foo]))
+static_assert(is_subtype_of(TypeOf[Foo], TypeOf[Foo] | CustomCallback))
+static_assert(is_subtype_of(TypeOf[Bar], type[Foo] | Callable[[], Foo]))
+static_assert(is_subtype_of(TypeOf[Bar], type[Foo] | CustomCallback))
+static_assert(is_subtype_of(TypeOf[Bar], TypeOf[Bar] | Callable[[], Bar]))
+static_assert(is_subtype_of(TypeOf[Bar], type[Bar] | Callable[[], Bar]))
+static_assert(is_subtype_of(TypeOf[Bar], TypeOf[Bar] | Callable[[int], Bar]))
+static_assert(is_subtype_of(TypeOf[Bar], type[Bar] | Callable[[int], Bar]))
+
+def f(
+    a: TypeOf[Foo] | Callable[[], Foo],
+    b: TypeOf[Bar] | Callable[[int], Bar],
+    c: TypeOf[Bar] | Callable[[], Bar],
+    d: TypeOf[Foo] | CustomCallback,
+):
+    reveal_type(a)  # revealed: () -> Foo
+    reveal_type(b)  # revealed: (int, /) -> Bar
+    reveal_type(c)  # revealed: <class 'Bar'> | (() -> Bar)
+    reveal_type(d)  # revealed: CustomCallback
 ```

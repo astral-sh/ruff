@@ -14,7 +14,11 @@ import {
   VerticalResizeHandle,
 } from "shared";
 import { FileHandle, Workspace } from "ty_wasm";
-import { Panel, PanelGroup } from "react-resizable-panels";
+import {
+  Panel,
+  Group as PanelGroup,
+  useDefaultLayout,
+} from "react-resizable-panels";
 import { Files, isPythonFile } from "./Files";
 import SecondarySideBar from "./SecondarySideBar";
 import SecondaryPanel, {
@@ -159,6 +163,18 @@ export default function Chrome({
     [workspace, files.index, onRemoveFile],
   );
 
+  const handleChange = useCallback(
+    (content: string) => {
+      onChangeFile(workspace, content);
+    },
+    [onChangeFile, workspace],
+  );
+
+  const { defaultLayout, onLayoutChange } = useDefaultLayout({
+    groupId: "editor-diagnostics",
+    storage: localStorage,
+  });
+
   const checkResult = useCheckResult(
     files,
     workspace,
@@ -179,19 +195,20 @@ export default function Chrome({
             onSelect={onSelectFile}
             onRemove={handleRemoved}
           />
-          <PanelGroup direction="horizontal" autoSaveId="main">
-            <Panel
-              id="main"
-              order={0}
-              className={`flex flex-col gap-2 ${files.currentVendoredFile ? "mb-4" : "my-4"}`}
-              minSize={10}
-            >
-              <PanelGroup id="vertical" direction="vertical">
-                <Panel
-                  minSize={10}
-                  className={files.currentVendoredFile ? "mb-2" : "my-2"}
-                  order={0}
-                >
+          <PanelGroup
+            id="main-group"
+            orientation="horizontal"
+            className="h-full"
+          >
+            <Panel id="main" minSize={100}>
+              <PanelGroup
+                id="editor-diagnostics"
+                orientation="vertical"
+                className="h-full"
+                defaultLayout={defaultLayout}
+                onLayoutChange={onLayoutChange}
+              >
+                <Panel id="editor" minSize={100}>
                   {files.currentVendoredFile != null && (
                     <VendoredFileBanner
                       currentVendoredFile={files.currentVendoredFile}
@@ -211,7 +228,7 @@ export default function Chrome({
                     diagnostics={checkResult.diagnostics}
                     workspace={workspace}
                     onMount={handleEditorMount}
-                    onChange={(content) => onChangeFile(workspace, content)}
+                    onChange={handleChange}
                     onOpenFile={onSelectFile}
                     onVendoredFileChange={onSelectVendoredFile}
                     onBackToUserFile={handleBackToUserFile}
@@ -231,12 +248,7 @@ export default function Chrome({
                   ) : null}
                 </Panel>
                 <VerticalResizeHandle />
-                <Panel
-                  id="diagnostics"
-                  minSize={3}
-                  order={1}
-                  className="my-2 flex grow"
-                >
+                <Panel id="diagnostics" minSize={150} className="my-2">
                   <Diagnostics
                     diagnostics={checkResult.diagnostics}
                     onGoTo={handleGoTo}
@@ -248,12 +260,7 @@ export default function Chrome({
             {secondaryTool != null && (
               <>
                 <HorizontalResizeHandle />
-                <Panel
-                  id="secondary-panel"
-                  order={1}
-                  className={"my-2"}
-                  minSize={10}
-                >
+                <Panel id="secondary-panel" minSize={100}>
                   <SecondaryPanel
                     files={files}
                     theme={theme}
@@ -355,6 +362,7 @@ function useCheckResult(
         severity: diagnostic.severity(),
         range: diagnostic.toRange(workspace) ?? null,
         textRange: diagnostic.textRange() ?? null,
+        raw: diagnostic,
       }));
 
       return {

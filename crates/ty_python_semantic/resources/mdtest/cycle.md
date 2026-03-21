@@ -32,6 +32,42 @@ reveal_type(p.x)  # revealed: Unknown | int
 reveal_type(p.y)  # revealed: Unknown | int
 ```
 
+## Self-referential bare type alias
+
+```toml
+[environment]
+python-version = "3.12"  # typing.TypeAliasType
+```
+
+```py
+from typing import Union, TypeAliasType, Sequence, Mapping
+
+A = list["A | None"]
+
+def f(x: A):
+    # TODO: should be `list[A | None]`?
+    reveal_type(x)  # revealed: list[Divergent]
+    # TODO: should be `A | None`?
+    reveal_type(x[0])  # revealed: Divergent
+
+JSONPrimitive = Union[str, int, float, bool, None]
+JSONValue = TypeAliasType("JSONValue", 'Union[JSONPrimitive, Sequence["JSONValue"], Mapping[str, "JSONValue"]]')
+
+def _(x: JSONValue):
+    reveal_type(x)  # revealed: Sequence[JSONValue] | int | float | None | Mapping[str, JSONValue]
+```
+
+## Self-referential legacy type variables
+
+```py
+from typing import Generic, TypeVar
+
+B = TypeVar("B", bound="Base")
+
+class Base(Generic[B]):
+    pass
+```
+
 ## Parameter default values
 
 This is a regression test for <https://github.com/astral-sh/ty/issues/1402>. When a parameter has a
@@ -50,25 +86,25 @@ class C:
         def inner_a(positional=self.a):
             return
         self.a = inner_a
-        # revealed: def inner_a(positional=Unknown | (def inner_a(positional=Unknown) -> Unknown)) -> Unknown
+        # revealed: def inner_a(positional=...) -> Unknown
         reveal_type(inner_a)
 
         def inner_b(*, kw_only=self.b):
             return
         self.b = inner_b
-        # revealed: def inner_b(*, kw_only=Unknown | (def inner_b(*, kw_only=Unknown) -> Unknown)) -> Unknown
+        # revealed: def inner_b(*, kw_only=...) -> Unknown
         reveal_type(inner_b)
 
         def inner_c(positional_only=self.c, /):
             return
         self.c = inner_c
-        # revealed: def inner_c(positional_only=Unknown | (def inner_c(positional_only=Unknown, /) -> Unknown), /) -> Unknown
+        # revealed: def inner_c(positional_only=..., /) -> Unknown
         reveal_type(inner_c)
 
         def inner_d(*, kw_only=self.d):
             return
         self.d = inner_d
-        # revealed: def inner_d(*, kw_only=Unknown | (def inner_d(*, kw_only=Unknown) -> Unknown)) -> Unknown
+        # revealed: def inner_d(*, kw_only=...) -> Unknown
         reveal_type(inner_d)
 ```
 
@@ -77,7 +113,7 @@ We do, however, still check assignability of the default value to the parameter 
 ```py
 class D:
     def f(self: "D"):
-        # error: [invalid-parameter-default] "Default value of type `Unknown | (def inner_a(a: int = Unknown | (def inner_a(a: int = Unknown) -> Unknown)) -> Unknown)` is not assignable to annotated parameter type `int`"
+        # error: [invalid-parameter-default] "Default value of type `Unknown | (def inner_a(a: int = ...) -> Unknown)` is not assignable to annotated parameter type `int`"
         def inner_a(a: int = self.a): ...
         self.a = inner_a
 ```
@@ -92,15 +128,100 @@ class C:
         self.c = lambda positional_only=self.c, /: positional_only
         self.d = lambda *, kw_only=self.d: kw_only
 
-        # revealed: (positional=Unknown | ((positional=Unknown) -> Unknown)) -> Unknown
+        # revealed: (positional=...) -> Unknown
         reveal_type(self.a)
 
-        # revealed: (*, kw_only=Unknown | ((*, kw_only=Unknown) -> Unknown)) -> Unknown
+        # revealed: (*, kw_only=...) -> Unknown
         reveal_type(self.b)
 
-        # revealed: (positional_only=Unknown | ((positional_only=Unknown, /) -> Unknown), /) -> Unknown
+        # revealed: (positional_only=..., /) -> Unknown
         reveal_type(self.c)
 
-        # revealed: (*, kw_only=Unknown | ((*, kw_only=Unknown) -> Unknown)) -> Unknown
+        # revealed: (*, kw_only=...) -> Unknown
         reveal_type(self.d)
+```
+
+## Self-referential implicit attributes
+
+```py
+class Cyclic:
+    def __init__(self, data: str | dict):
+        self.data = data
+
+    def update(self):
+        if isinstance(self.data, str):
+            self.data = {"url": self.data}
+
+# revealed: Unknown | str | dict[Unknown, Unknown] | dict[str, str]
+reveal_type(Cyclic("").data)
+```
+
+## Decorator defined on a base class with constrained typevars, accessed from a subclass with decorated generic parameters
+
+This example was minimized from
+[a real issue in `robotframework`](https://github.com/astral-sh/ty/issues/2637#issuecomment-3807037935).
+It created
+[a complicated cycle with multiple cycle heads](https://gist.github.com/oconnor663/c996ed2cc97d172dd4b9a8d8207dc7ac),
+which also involved
+[a tricky Salsa behavior that comes up when a query oscillates between being a cycle head and not being one](https://gist.github.com/oconnor663/c2a7662e3d88048b691754da957121d1).
+
+`entry.py`:
+
+```py
+from derived import Derived
+
+Derived.decorate
+# revealed: bound method <class 'Derived'>.decorate[T](item_class: type[T]) -> type[T]
+reveal_type(Derived.decorate)
+```
+
+`derived.py`:
+
+```py
+from ty_extensions import reveal_mro
+import bases
+
+class Derived(bases.GenericBase["Foo", "Bar"]): ...
+
+@Derived.decorate
+class Foo(bases.Foo): ...
+
+# revealed: <class 'Foo'>
+reveal_type(Foo)
+# revealed: (<class 'derived.Foo'>, <class 'bases.Foo'>, <class 'object'>)
+reveal_mro(Foo)
+
+@Derived.decorate
+class Bar(bases.Bar): ...
+
+# revealed: <class 'Bar'>
+reveal_type(Bar)
+# revealed: (<class 'derived.Bar'>, <class 'bases.Bar'>, <class 'object'>)
+reveal_mro(Bar)
+```
+
+`bases.py`:
+
+```py
+from typing import Generic, TypeVar, Type
+from ty_extensions import reveal_mro
+
+T = TypeVar("T")
+B1 = TypeVar("B1", bound="Foo")
+B2 = TypeVar("B2", bound="Bar")
+
+class GenericBase(Generic[B1, B2]):
+    @classmethod
+    def decorate(cls, item_class: Type[T]) -> Type[T]:
+        return item_class
+
+# revealed: <class 'GenericBase'>
+reveal_type(GenericBase)
+# revealed: (<class 'GenericBase[Unknown, Unknown]'>, typing.Generic, <class 'object'>)
+reveal_mro(GenericBase)
+# revealed: (<class 'GenericBase[Foo, Bar]'>, typing.Generic, <class 'object'>)
+reveal_mro(GenericBase["Foo", "Bar"])
+
+class Foo: ...
+class Bar: ...
 ```

@@ -32,6 +32,8 @@ class _WritelnDecorator:
     # These attributes are prevented by __getattr__
     stream: Never
     __getstate__: Never
+    """Helper for pickle."""
+
     # Methods proxied from the wrapped stream object via __getattr__
     def flush(self) -> object: ...
     def write(self, s: str, /) -> object: ...
@@ -70,6 +72,11 @@ class TextTestRunner:
     """
 
     resultclass: _ResultClassType
+    """A test result class that can print formatted text results to a stream.
+
+    Used by TextTestRunner.
+    """
+
     stream: _WritelnDecorator
     descriptions: bool
     verbosity: int

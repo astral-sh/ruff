@@ -42,3 +42,11 @@ def  test4(<RANGE_START>   a):
 
 <RANGE_START>if b   + c :<RANGE_END>              # trailing clause header comment
     print("Not formatted"  )
+
+def test5():
+    x    =     1
+    <RANGE_START>try:
+        a;
+    finally:
+        b
+    <RANGE_END>

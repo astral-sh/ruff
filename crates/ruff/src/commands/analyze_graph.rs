@@ -2,15 +2,17 @@ use crate::args::{AnalyzeGraphArgs, ConfigArguments};
 use crate::resolve::resolve;
 use crate::{ExitStatus, resolve_default_files};
 use anyhow::Result;
+use indexmap::IndexSet;
 use log::{debug, warn};
 use path_absolutize::CWD;
-use ruff_db::system::{SystemPath, SystemPathBuf};
+use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
 use ruff_graph::{Direction, ImportMap, ModuleDb, ModuleImports};
 use ruff_linter::package::PackageRoot;
+use ruff_linter::source_kind::SourceKind;
 use ruff_linter::{warn_user, warn_user_once};
-use ruff_python_ast::{PySourceType, SourceType};
-use ruff_workspace::resolver::{ResolvedFile, match_exclusion, python_files_in_path};
-use rustc_hash::FxHashMap;
+use ruff_python_ast::SourceType;
+use ruff_workspace::resolver::{ResolvedFile, match_exclusion, project_files_in_path};
+use rustc_hash::{FxBuildHasher, FxHashMap};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
@@ -33,7 +35,16 @@ pub(crate) fn analyze_graph(
 
     // Find all Python files.
     let files = resolve_default_files(args.files, false);
-    let (paths, resolver) = python_files_in_path(&files, &pyproject_config, config_arguments)?;
+    let (mut paths, resolver) = project_files_in_path(&files, &pyproject_config, config_arguments)?;
+
+    // Filter to only Python files
+    paths.retain(|path| {
+        if let Ok(ResolvedFile::Root(path) | ResolvedFile::Nested(path)) = path {
+            matches!(SourceType::from(path), SourceType::Python(_))
+        } else {
+            true
+        }
+    });
 
     if paths.is_empty() {
         warn_user_once!("No Python files found under the given path(s)");
@@ -58,17 +69,36 @@ pub(crate) fn analyze_graph(
         })
         .collect::<FxHashMap<_, _>>();
 
-    // Create a database from the source roots.
-    let src_roots = package_roots
-        .values()
-        .filter_map(|package| package.as_deref())
-        .filter_map(|package| package.parent())
-        .map(Path::to_path_buf)
-        .filter_map(|path| SystemPathBuf::from_path_buf(path).ok())
-        .collect();
+    // Create a database from the source roots, combining configured `src` paths with detected
+    // package roots. Configured paths are added first so they take precedence, and duplicates
+    // are removed.
+    let mut src_roots: IndexSet<SystemPathBuf, FxBuildHasher> = IndexSet::default();
 
+    // Add configured `src` paths first (for precedence), filtering to only include existing
+    // directories.
+    src_roots.extend(
+        pyproject_config
+            .settings
+            .linter
+            .src
+            .iter()
+            .filter(|path| path.is_dir())
+            .filter_map(|path| SystemPathBuf::from_path_buf(path.clone()).ok()),
+    );
+
+    // Add detected package roots.
+    src_roots.extend(
+        package_roots
+            .values()
+            .filter_map(|package| package.as_deref())
+            .filter_map(|path| path.parent())
+            .filter_map(|path| SystemPathBuf::from_path_buf(path.to_path_buf()).ok()),
+    );
+
+    let system = OsSystem::default();
     let db = ModuleDb::from_src_roots(
-        src_roots,
+        system,
+        src_roots.into_iter().collect(),
         pyproject_config
             .settings
             .analyze
@@ -104,6 +134,8 @@ pub(crate) fn analyze_graph(
                 let settings = resolver.resolve(path);
                 let string_imports = settings.analyze.string_imports;
                 let include_dependencies = settings.analyze.include_dependencies.get(path).cloned();
+                let type_checking_imports = settings.analyze.type_checking_imports;
+                let source_type = settings.analyze.extension.get_source_type(path);
 
                 // Skip excluded files.
                 if (settings.file_resolver.force_exclude || !resolved_file.is_root())
@@ -113,22 +145,6 @@ pub(crate) fn analyze_graph(
                         &settings.analyze.exclude,
                     )
                 {
-                    continue;
-                }
-
-                // Ignore non-Python files.
-                let source_type = match settings.analyze.extension.get(path) {
-                    None => match SourceType::from(&path) {
-                        SourceType::Python(source_type) => source_type,
-                        SourceType::Toml(_) => {
-                            debug!("Ignoring TOML file: {}", path.display());
-                            continue;
-                        }
-                    },
-                    Some(language) => PySourceType::from(language),
-                };
-                if matches!(source_type, PySourceType::Ipynb) {
-                    debug!("Ignoring Jupyter notebook: {}", path.display());
                     continue;
                 }
 
@@ -147,13 +163,35 @@ pub(crate) fn analyze_graph(
                 let root = root.clone();
                 let result = inner_result.clone();
                 scope.spawn(move |_| {
+                    // Extract source code (handles both .py and .ipynb files)
+                    let source_kind = match SourceKind::from_path(path.as_std_path(), source_type) {
+                        Ok(Some(source_kind)) => source_kind,
+                        Ok(None) => {
+                            debug!("Skipping non-Python notebook: {path}");
+                            return;
+                        }
+                        Err(err) => {
+                            warn!("Failed to read source for {path}: {err}");
+                            return;
+                        }
+                    };
+
+                    let source_code = source_kind.source_code();
+
                     // Identify any imports via static analysis.
-                    let mut imports =
-                        ModuleImports::detect(&db, &path, package.as_deref(), string_imports)
-                            .unwrap_or_else(|err| {
-                                warn!("Failed to generate import map for {path}: {err}");
-                                ModuleImports::default()
-                            });
+                    let mut imports = ModuleImports::detect(
+                        &db,
+                        source_code,
+                        source_type.expect_python(),
+                        &path,
+                        package.as_deref(),
+                        string_imports,
+                        type_checking_imports,
+                    )
+                    .unwrap_or_else(|err| {
+                        warn!("Failed to generate import map for {path}: {err}");
+                        ModuleImports::default()
+                    });
 
                     debug!("Discovered {} imports for {}", imports.len(), path);
 

@@ -2,6 +2,7 @@
 source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
+
 ---
 mdtest name: attribute_assignment.md - Attribute assignment - Unknown attributes
 mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/attribute_assignment.md
@@ -38,7 +39,7 @@ info: rule `unresolved-attribute` is enabled by default
 ```
 
 ```
-error[unresolved-attribute]: Unresolved attribute `non_existent` on type `C`.
+error[unresolved-attribute]: Unresolved attribute `non_existent` on type `C`
  --> src/mdtest_snippet.py:6:1
   |
 5 | instance = C()

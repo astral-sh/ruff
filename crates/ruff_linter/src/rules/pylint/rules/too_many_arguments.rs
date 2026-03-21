@@ -1,6 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_ast::identifier::Identifier;
+use ruff_python_semantic::analyze::function_type::is_subject_to_liskov_substitution_principle;
 use ruff_python_semantic::analyze::{function_type, visibility};
 
 use crate::Violation;
@@ -11,6 +12,16 @@ use crate::checkers::ast::Checker;
 ///
 /// By default, this rule allows up to five arguments, as configured by the
 /// [`lint.pylint.max-args`] option.
+///
+/// This rule exempts methods decorated with [`@typing.override`][override].
+/// Changing the signature of a subclass method may cause type checkers to
+/// complain about a violation of the Liskov Substitution Principle if it
+/// means that the method now incompatibly overrides a method defined on a
+/// superclass. Explicitly decorating an overriding method with `@override`
+/// signals to Ruff that the method is intended to override a superclass
+/// method and that a type checker will enforce that it does so; Ruff
+/// therefore knows that it should not enforce rules about methods having
+/// too many arguments.
 ///
 /// ## Why is this bad?
 /// Functions with many arguments are harder to understand, maintain, and call.
@@ -43,6 +54,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Options
 /// - `lint.pylint.max-args`
+///
+/// [override]: https://docs.python.org/3/library/typing.html#typing.override
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.238")]
 pub(crate) struct TooManyArguments {
@@ -109,11 +122,24 @@ pub(crate) fn too_many_arguments(checker: &Checker, function_def: &ast::StmtFunc
         return;
     }
 
-    checker.report_diagnostic(
+    let mut diagnostic = checker.report_diagnostic(
         TooManyArguments {
             c_args: num_arguments,
             max_args: checker.settings().pylint.max_args,
         },
         function_def.identifier(),
     );
+    if is_subject_to_liskov_substitution_principle(
+        &function_def.name,
+        &function_def.decorator_list,
+        semantic.current_scope(),
+        semantic,
+        &checker.settings().pep8_naming.classmethod_decorators,
+        &checker.settings().pep8_naming.staticmethod_decorators,
+    ) {
+        diagnostic.help(
+            "Consider adding `@typing.override` if changing the function signature \
+            would violate the Liskov Substitution Principle",
+        );
+    }
 }

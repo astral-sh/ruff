@@ -106,6 +106,25 @@ impl TextSize {
     pub fn checked_sub(self, rhs: TextSize) -> Option<TextSize> {
         self.raw.checked_sub(rhs.raw).map(|raw| TextSize { raw })
     }
+
+    /// Saturating addition. Returns maximum `TextSize` if overflow occurred.
+    #[inline]
+    #[must_use]
+    pub fn saturating_add(self, rhs: TextSize) -> TextSize {
+        TextSize {
+            raw: self.raw.saturating_add(rhs.raw),
+        }
+    }
+
+    /// Saturating subtraction. Returns minimum `TextSize` if overflow
+    /// occurred.
+    #[inline]
+    #[must_use]
+    pub fn saturating_sub(self, rhs: TextSize) -> TextSize {
+        TextSize {
+            raw: self.raw.saturating_sub(rhs.raw),
+        }
+    }
 }
 
 impl From<u32> for TextSize {

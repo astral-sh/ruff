@@ -1,7 +1,5 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
-input_file: crates/ruff_python_formatter/resources/test/fixtures/black/cases/form_feeds.py
-snapshot_kind: text
 ---
 ## Input
 
@@ -150,25 +148,25 @@ a = [
  #
  
 -
-+
- #
- 
--
-+
- #
- 
--
-+
- #
- 
--
-+
- #
--
-+
- #
--
 -#
+ 
+-
+ #
+ 
+-
++
+ #
+ 
+-
++
+ #
+-
++
++
+ #
+-
++
+ #
  
 +#
  
@@ -213,7 +211,7 @@ a = [
  pass
  
  
-@@ -69,25 +68,23 @@
+@@ -69,7 +68,7 @@
  def foo():
      pass
  
@@ -222,10 +220,7 @@ a = [
  pass
  
  
- # form feeds are prohibited inside blocks, or on a line with nonwhitespace
- def bar(a=1, b: bool = False):
--
-     pass
+@@ -80,14 +79,13 @@
  
  
  class Baz:
@@ -322,6 +317,7 @@ pass
 
 # form feeds are prohibited inside blocks, or on a line with nonwhitespace
 def bar(a=1, b: bool = False):
+
     pass
 
 

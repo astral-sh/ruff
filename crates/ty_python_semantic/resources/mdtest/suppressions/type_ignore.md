@@ -85,6 +85,51 @@ a = test \
   + 2  # type: ignore
 ```
 
+## Interpolated strings
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+Suppressions for expressions within interpolated strings can be placed after the interpolated string
+if it's a single-line interpolation.
+
+```py
+a = f"""
+{test}
+"""  # type: ignore
+```
+
+For multiline-interpolation, put the ignore comment on the expression's start or end line:
+
+```py
+# fmt:off
+a = f"""
+{
+  10 /  # type: ignore
+  0
+}
+"""
+
+a = f"""
+{
+  10 /
+  0  # type: ignore
+}
+"""
+```
+
+But not at the end of the f-string:
+
+```py
+a = f"""
+{
+    10 / 0  # error: [division-by-zero]
+}
+"""  # error: [unused-type-ignore-comment]  # type: ignore
+```
+
 ## Codes
 
 Mypy supports `type: ignore[code]`. ty doesn't understand mypy's rule names. Therefore, ignore the
@@ -96,6 +141,8 @@ a = test  # type: ignore[name-defined]
 
 ## Nested comments
 
+<!-- snapshot-diagnostics -->
+
 ```py
 # fmt: off
 a = test \
@@ -103,6 +150,14 @@ a = test \
 
 a = test \
   + 2  # type: ignore # fmt: skip
+
+a = (3
+  # error: [unused-ignore-comment]
+  + 2)  # ty:ignore[division-by-zero] # fmt: skip
+
+a = (3
+  # error: [unused-ignore-comment]
+  + 2)  # fmt: skip # ty:ignore[division-by-zero]
 ```
 
 ## Misspelled `type: ignore`
@@ -120,7 +175,7 @@ in Pyright. Neither Ruff, nor mypy support this and neither does ty.
 
 ```py
 # fmt: off
-# error: [unused-ignore-comment]
+# error: [unused-type-ignore-comment]
 a = (  # type: ignore
     test + 4  # error: [unresolved-reference]
 )
@@ -153,9 +208,37 @@ File level suppressions must come before any non-trivia token,
 including module docstrings.
 """
 
-# error: [unused-ignore-comment] "Unused blanket `type: ignore` directive"
+# error: [unused-type-ignore-comment] "Unused blanket `type: ignore` directive"
 # type: ignore
 
 a = 10 / 0  # error: [division-by-zero]
 b = a / 0  # error: [division-by-zero]
+```
+
+## `respect-type-ignore-comments=false`
+
+ty ignore `type-ignore` comments if `respect-type-ignore-comments` is set to false.
+
+```toml
+[analysis]
+respect-type-ignore-comments = false
+```
+
+`type: ignore` comments can't be used to suppress an error:
+
+```py
+# error: [unresolved-reference]
+a = b + 10  # type: ignore
+```
+
+ty doesn't report or remove unused `type: ignore` comments:
+
+```py
+a = 10 + 5  # type: ignore
+```
+
+ty doesn't report invalid `type: ignore` comments:
+
+```py
+a = 10 + 4  # type: ignoreee
 ```

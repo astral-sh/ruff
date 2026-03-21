@@ -1,5 +1,8 @@
+use crate::document::DocumentKey;
 use crate::server::Result;
-use crate::server::api::diagnostics::{publish_diagnostics, publish_settings_diagnostics};
+use crate::server::api::diagnostics::{
+    publish_diagnostics_if_needed, publish_settings_diagnostics,
+};
 use crate::server::api::traits::{NotificationHandler, SyncNotificationHandler};
 use crate::session::Session;
 use crate::session::client::Client;
@@ -7,7 +10,7 @@ use crate::system::AnySystemPath;
 use lsp_types as types;
 use lsp_types::{FileChangeType, notification as notif};
 use rustc_hash::FxHashMap;
-use ty_project::Db;
+use ty_project::Db as _;
 use ty_project::watch::{ChangeEvent, ChangedKind, CreatedKind, DeletedKind};
 
 pub(crate) struct DidChangeWatchedFiles;
@@ -25,16 +28,7 @@ impl SyncNotificationHandler for DidChangeWatchedFiles {
         let mut events_by_db: FxHashMap<_, Vec<ChangeEvent>> = FxHashMap::default();
 
         for change in params.changes {
-            let path = match AnySystemPath::try_from_url(&change.uri) {
-                Ok(path) => path,
-                Err(err) => {
-                    tracing::warn!(
-                        "Failed to convert URI '{}` to system path: {err:?}",
-                        change.uri
-                    );
-                    continue;
-                }
-            };
+            let path = DocumentKey::from_url(&change.uri).into_file_path();
 
             let system_path = match path {
                 AnySystemPath::System(system) => system,
@@ -99,11 +93,10 @@ impl SyncNotificationHandler for DidChangeWatchedFiles {
                 |_, ()| {},
             );
         } else {
-            for key in session.text_document_keys() {
-                publish_diagnostics(session, &key, client);
+            for key in session.text_document_handles() {
+                publish_diagnostics_if_needed(&key, session, client);
             }
         }
-        // TODO: always publish diagnostics for notebook files (since they don't use pull diagnostics)
 
         if client_capabilities.supports_inlay_hint_refresh() {
             client.send_request::<types::request::InlayHintRefreshRequest>(session, (), |_, ()| {});

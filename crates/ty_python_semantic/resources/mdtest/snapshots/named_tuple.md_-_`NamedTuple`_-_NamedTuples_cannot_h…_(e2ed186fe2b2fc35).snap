@@ -1,0 +1,113 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: named_tuple.md - `NamedTuple` - NamedTuples cannot have field names starting with underscores
+mdtest path: crates/ty_python_semantic/resources/mdtest/named_tuple.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from typing import NamedTuple
+ 2 | 
+ 3 | class Foo(NamedTuple):
+ 4 |     # error: [invalid-named-tuple] "NamedTuple field `_bar` cannot start with an underscore"
+ 5 |     _bar: int
+ 6 | 
+ 7 | class Bar(NamedTuple):
+ 8 |     x: int
+ 9 | 
+10 | class Baz(Bar):
+11 |     _whatever: str  # `Baz` is not a NamedTuple class, so this is fine
+12 | from typing import NamedTuple
+13 | 
+14 | # error: [invalid-named-tuple] "Field name `_x` in `NamedTuple()` cannot start with an underscore"
+15 | Underscore = NamedTuple("Underscore", [("_x", int), ("y", str)])
+16 | reveal_type(Underscore)  # revealed: <class 'Underscore'>
+17 | 
+18 | # error: [invalid-named-tuple] "Field name `class` in `NamedTuple()` cannot be a Python keyword"
+19 | Keyword = NamedTuple("Keyword", [("x", int), ("class", str)])
+20 | reveal_type(Keyword)  # revealed: <class 'Keyword'>
+21 | 
+22 | # error: [invalid-named-tuple] "Duplicate field name `x` in `NamedTuple()`"
+23 | Duplicate = NamedTuple("Duplicate", [("x", int), ("y", str), ("x", float)])
+24 | reveal_type(Duplicate)  # revealed: <class 'Duplicate'>
+25 | 
+26 | # error: [invalid-named-tuple] "Field name `not valid` in `NamedTuple()` is not a valid identifier"
+27 | Invalid = NamedTuple("Invalid", [("not valid", int), ("ok", str)])
+28 | reveal_type(Invalid)  # revealed: <class 'Invalid'>
+```
+
+# Diagnostics
+
+```
+error[invalid-named-tuple]: NamedTuple field name cannot start with an underscore
+ --> src/mdtest_snippet.py:5:5
+  |
+3 | class Foo(NamedTuple):
+4 |     # error: [invalid-named-tuple] "NamedTuple field `_bar` cannot start with an underscore"
+5 |     _bar: int
+  |     ^^^^^^^^^ Class definition will raise `TypeError` at runtime due to this field
+6 |
+7 | class Bar(NamedTuple):
+  |
+info: rule `invalid-named-tuple` is enabled by default
+
+```
+
+```
+error[invalid-named-tuple]: Field name `_x` in `NamedTuple()` cannot start with an underscore
+  --> src/mdtest_snippet.py:15:39
+   |
+14 | # error: [invalid-named-tuple] "Field name `_x` in `NamedTuple()` cannot start with an underscore"
+15 | Underscore = NamedTuple("Underscore", [("_x", int), ("y", str)])
+   |                                       ^^^^^^^^^^^^^^^^^^^^^^^^^ Will raise `ValueError` at runtime
+16 | reveal_type(Underscore)  # revealed: <class 'Underscore'>
+   |
+info: rule `invalid-named-tuple` is enabled by default
+
+```
+
+```
+error[invalid-named-tuple]: Field name `class` in `NamedTuple()` cannot be a Python keyword
+  --> src/mdtest_snippet.py:19:33
+   |
+18 | # error: [invalid-named-tuple] "Field name `class` in `NamedTuple()` cannot be a Python keyword"
+19 | Keyword = NamedTuple("Keyword", [("x", int), ("class", str)])
+   |                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Will raise `ValueError` at runtime
+20 | reveal_type(Keyword)  # revealed: <class 'Keyword'>
+   |
+info: rule `invalid-named-tuple` is enabled by default
+
+```
+
+```
+error[invalid-named-tuple]: Duplicate field name `x` in `NamedTuple()`
+  --> src/mdtest_snippet.py:23:37
+   |
+22 | # error: [invalid-named-tuple] "Duplicate field name `x` in `NamedTuple()`"
+23 | Duplicate = NamedTuple("Duplicate", [("x", int), ("y", str), ("x", float)])
+   |                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Field `x` already defined; will raise `ValueError` at runtime
+24 | reveal_type(Duplicate)  # revealed: <class 'Duplicate'>
+   |
+info: rule `invalid-named-tuple` is enabled by default
+
+```
+
+```
+error[invalid-named-tuple]: Field name `not valid` in `NamedTuple()` is not a valid identifier
+  --> src/mdtest_snippet.py:27:33
+   |
+26 | # error: [invalid-named-tuple] "Field name `not valid` in `NamedTuple()` is not a valid identifier"
+27 | Invalid = NamedTuple("Invalid", [("not valid", int), ("ok", str)])
+   |                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Will raise `ValueError` at runtime
+28 | reveal_type(Invalid)  # revealed: <class 'Invalid'>
+   |
+info: rule `invalid-named-tuple` is enabled by default
+
+```

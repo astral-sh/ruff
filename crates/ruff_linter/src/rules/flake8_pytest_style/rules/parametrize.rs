@@ -2,10 +2,9 @@ use rustc_hash::{FxBuildHasher, FxHashMap};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
-use ruff_python_ast::parenthesize::parenthesized_range;
+use ruff_python_ast::token::{Tokens, parenthesized_range};
 use ruff_python_ast::{self as ast, Expr, ExprCall, ExprContext, StringLiteralFlags};
 use ruff_python_codegen::Generator;
-use ruff_python_trivia::CommentRanges;
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -322,18 +321,8 @@ fn elts_to_csv(elts: &[Expr], generator: Generator, flags: StringLiteralFlags) -
 /// ```
 ///
 /// This method assumes that the first argument is a string.
-fn get_parametrize_name_range(
-    call: &ExprCall,
-    expr: &Expr,
-    comment_ranges: &CommentRanges,
-    source: &str,
-) -> Option<TextRange> {
-    parenthesized_range(
-        expr.into(),
-        (&call.arguments).into(),
-        comment_ranges,
-        source,
-    )
+fn get_parametrize_name_range(call: &ExprCall, expr: &Expr, tokens: &Tokens) -> Option<TextRange> {
+    parenthesized_range(expr.into(), (&call.arguments).into(), tokens)
 }
 
 /// PT006
@@ -349,13 +338,8 @@ fn check_names(checker: &Checker, call: &ExprCall, expr: &Expr, argvalues: &Expr
             if names.len() > 1 {
                 match names_type {
                     types::ParametrizeNameType::Tuple => {
-                        let name_range = get_parametrize_name_range(
-                            call,
-                            expr,
-                            checker.comment_ranges(),
-                            checker.locator().contents(),
-                        )
-                        .unwrap_or(expr.range());
+                        let name_range = get_parametrize_name_range(call, expr, checker.tokens())
+                            .unwrap_or(expr.range());
                         let mut diagnostic = checker.report_diagnostic(
                             PytestParametrizeNamesWrongType {
                                 single_argument: false,
@@ -386,13 +370,8 @@ fn check_names(checker: &Checker, call: &ExprCall, expr: &Expr, argvalues: &Expr
                         )));
                     }
                     types::ParametrizeNameType::List => {
-                        let name_range = get_parametrize_name_range(
-                            call,
-                            expr,
-                            checker.comment_ranges(),
-                            checker.locator().contents(),
-                        )
-                        .unwrap_or(expr.range());
+                        let name_range = get_parametrize_name_range(call, expr, checker.tokens())
+                            .unwrap_or(expr.range());
                         let mut diagnostic = checker.report_diagnostic(
                             PytestParametrizeNamesWrongType {
                                 single_argument: false,
@@ -726,7 +705,8 @@ fn handle_single_name(checker: &Checker, argnames: &Expr, value: &Expr, argvalue
     //     assert isinstance(x, int)  # fails because `x` is a tuple, not an int
     // ```
     let argvalues_edits = unpack_single_element_items(checker, argvalues);
-    let argnames_edit = Edit::range_replacement(checker.generator().expr(value), argnames.range());
+    let argnames_edit =
+        Edit::range_replacement(unparse_expr_in_sequence(value, checker), argnames.range());
     let fix = if checker.comment_ranges().intersects(argnames_edit.range())
         || argvalues_edits
             .iter()
@@ -764,11 +744,21 @@ fn unpack_single_element_items(checker: &Checker, expr: &Expr) -> Vec<Edit> {
         }
 
         edits.push(Edit::range_replacement(
-            checker.generator().expr(elt),
+            unparse_expr_in_sequence(elt, checker),
             value.range(),
         ));
     }
     edits
+}
+
+fn unparse_expr_in_sequence(expr: &Expr, checker: &Checker) -> String {
+    let content = checker.locator().slice(expr);
+    if let Expr::Tuple(tuple) = expr {
+        if !tuple.is_empty() && !tuple.parenthesized {
+            return format!("({content})");
+        }
+    }
+    content.to_string()
 }
 
 fn handle_value_rows(

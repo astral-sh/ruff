@@ -1,5 +1,5 @@
 ---
-source: crates/ruff/tests/lint.rs
+source: crates/ruff/tests/cli/lint.rs
 info:
   program: ruff
   args:

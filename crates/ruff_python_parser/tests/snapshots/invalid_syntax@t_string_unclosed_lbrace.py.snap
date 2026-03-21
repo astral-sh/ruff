@@ -259,7 +259,7 @@ Module(
 1 | # parse_options: {"target-version": "3.14"}
 2 | t"{"
 3 | t"{foo!r"
-  |         ^ Syntax Error: t-string: expecting '}'
+  |         ^ Syntax Error: t-string: expecting `}`
 4 | t"{foo="
 5 | t"{"
   |
@@ -269,7 +269,7 @@ Module(
 2 | t"{"
 3 | t"{foo!r"
 4 | t"{foo="
-  |        ^ Syntax Error: t-string: expecting '}'
+  |        ^ Syntax Error: t-string: expecting `}`
 5 | t"{"
 6 | t"""{"""
   |

@@ -1,11 +1,28 @@
 """Various utility functions."""
 
 from collections.abc import MutableSequence, Sequence
-from typing import Any, Final, TypeVar
+from typing import Any, Final, Literal, Protocol, TypeVar, type_check_only
 from typing_extensions import TypeAlias
+
+@type_check_only
+class _SupportsDunderLT(Protocol):
+    def __lt__(self, other: Any, /) -> bool: ...
+
+@type_check_only
+class _SupportsDunderGT(Protocol):
+    def __gt__(self, other: Any, /) -> bool: ...
+
+@type_check_only
+class _SupportsDunderLE(Protocol):
+    def __le__(self, other: Any, /) -> bool: ...
+
+@type_check_only
+class _SupportsDunderGE(Protocol):
+    def __ge__(self, other: Any, /) -> bool: ...
 
 _T = TypeVar("_T")
 _Mismatch: TypeAlias = tuple[_T, _T, int]
+_SupportsComparison: TypeAlias = _SupportsDunderLE | _SupportsDunderGE | _SupportsDunderGT | _SupportsDunderLT
 
 _MAX_LENGTH: Final = 80
 _PLACEHOLDER_LEN: Final = 12
@@ -35,7 +52,7 @@ def unorderable_list_difference(expected: MutableSequence[_T], actual: MutableSe
     has O(n*n) performance.
     """
 
-def three_way_cmp(x: Any, y: Any) -> int:
+def three_way_cmp(x: _SupportsComparison, y: _SupportsComparison) -> Literal[-1, 0, 1]:
     """Return -1 if x < y, 0 if x == y and 1 if x > y"""
 
 def _count_diff_all_purpose(actual: Sequence[_T], expected: Sequence[_T]) -> list[_Mismatch[_T]]:

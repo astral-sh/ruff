@@ -224,7 +224,17 @@ class AbstractEventLoop:
     @abstractmethod
     def create_future(self) -> Future[Any]: ...
     # Tasks methods
-    if sys.version_info >= (3, 11):
+    if sys.version_info >= (3, 14):
+        @abstractmethod
+        def create_task(
+            self,
+            coro: _CoroutineLike[_T],
+            *,
+            name: str | None = None,
+            context: Context | None = None,
+            eager_start: bool | None = None,
+        ) -> Task[_T]: ...
+    elif sys.version_info >= (3, 11):
         @abstractmethod
         def create_task(
             self, coro: _CoroutineLike[_T], *, name: str | None = None, context: Context | None = None

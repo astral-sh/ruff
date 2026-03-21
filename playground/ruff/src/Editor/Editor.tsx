@@ -5,7 +5,11 @@ import {
   useRef,
   useState,
 } from "react";
-import { Panel, PanelGroup } from "react-resizable-panels";
+import {
+  Panel,
+  Group as PanelGroup,
+  useDefaultLayout,
+} from "react-resizable-panels";
 import { Diagnostic, Workspace, PositionEncoding } from "ruff_wasm";
 import {
   ErrorMessage,
@@ -236,14 +240,25 @@ export default function Editor({
     }
   }, [deferredSource, secondaryTool]);
 
+  const { defaultLayout, onLayoutChange } = useDefaultLayout({
+    groupId: "main",
+    storage: localStorage,
+  });
+
   return (
     <>
-      <PanelGroup direction="horizontal" autoSaveId="main">
+      <PanelGroup
+        id="chrome"
+        orientation="horizontal"
+        defaultLayout={defaultLayout}
+        onLayoutChange={onLayoutChange}
+        className="flex-1"
+      >
         <PrimarySideBar onSelectTool={(tool) => setTab(tool)} selected={tab} />
 
-        <Panel id="main" order={0} minSize={10}>
-          <PanelGroup id="vertical" direction="vertical">
-            <Panel minSize={10} className="my-2" order={0}>
+        <Panel id="main" minSize={100}>
+          <PanelGroup id="vertical" orientation="vertical" className="h-full">
+            <Panel minSize={100} id="editor">
               <SourceEditor
                 visible={tab === "Source"}
                 source={source.pythonSource}
@@ -262,12 +277,7 @@ export default function Editor({
             {tab === "Source" && (
               <>
                 <VerticalResizeHandle />
-                <Panel
-                  id="diagnostics"
-                  minSize={3}
-                  order={1}
-                  className="my-2 flex grow"
-                >
+                <Panel id="diagnostics" minSize={150} className="my-2">
                   <Diagnostics
                     diagnostics={checkResult.diagnostics}
                     onGoTo={handleGoTo}
@@ -281,12 +291,7 @@ export default function Editor({
         {secondaryTool != null && (
           <>
             <HorizontalResizeHandle />
-            <Panel
-              id="secondary-panel"
-              order={1}
-              className={"my-2"}
-              minSize={10}
-            >
+            <Panel id="secondary-panel" minSize={100}>
               <SecondaryPanel
                 theme={theme}
                 tool={secondaryTool}

@@ -17,10 +17,10 @@ def sequence2st(sequence: Sequence[Any]) -> STType:
 def tuple2st(sequence: Sequence[Any]) -> STType:
     """Creates an ST object from a tree representation."""
 
-def st2list(st: STType, line_info: bool = ..., col_info: bool = ...) -> list[Any]:
+def st2list(st: STType, line_info: bool = False, col_info: bool = False) -> list[Any]:
     """Creates a list-tree representation of an ST."""
 
-def st2tuple(st: STType, line_info: bool = ..., col_info: bool = ...) -> tuple[Any, ...]:
+def st2tuple(st: STType, line_info: bool = False, col_info: bool = False) -> tuple[Any, ...]:
     """Creates a tuple-tree representation of an ST."""
 
 def compilest(st: STType, filename: StrOrBytesPath = ...) -> CodeType:
@@ -48,8 +48,8 @@ class STType:
     def issuite(self) -> bool:
         """Determines if this ST object was created from a suite."""
 
-    def tolist(self, line_info: bool = ..., col_info: bool = ...) -> list[Any]:
+    def tolist(self, line_info: bool = False, col_info: bool = False) -> list[Any]:
         """Creates a list-tree representation of this ST."""
 
-    def totuple(self, line_info: bool = ..., col_info: bool = ...) -> tuple[Any, ...]:
+    def totuple(self, line_info: bool = False, col_info: bool = False) -> tuple[Any, ...]:
         """Creates a tuple-tree representation of this ST."""

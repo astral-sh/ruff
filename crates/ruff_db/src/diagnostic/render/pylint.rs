@@ -55,7 +55,7 @@ impl PylintRenderer<'_> {
                 f,
                 "{path}:{row}: [{code}] {body}",
                 path = filename,
-                body = diagnostic.body()
+                body = diagnostic.concise_message()
             )?;
         }
 

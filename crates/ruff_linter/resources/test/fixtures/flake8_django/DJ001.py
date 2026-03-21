@@ -46,3 +46,9 @@ class CorrectModel(models.Model):
         max_length=255, null=True, blank=True, unique=True
     )
     urlfieldu = models.URLField(max_length=255, null=True, blank=True, unique=True)
+
+
+class IncorrectModelWithSimpleAnnotations(models.Model):
+    charfield: models.CharField = models.CharField(max_length=255, null=True)
+    textfield: models.TextField = models.TextField(max_length=255, null=True)
+    slugfield: models.SlugField = models.SlugField(max_length=255, null=True)

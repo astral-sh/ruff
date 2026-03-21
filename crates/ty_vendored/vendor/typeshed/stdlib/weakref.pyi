@@ -51,6 +51,8 @@ class CallableProxyType(Generic[_CallableT]):  # "weakcallableproxy"
     def __eq__(self, value: object, /) -> bool: ...
     def __getattr__(self, attr: str) -> Any: ...
     __call__: _CallableT
+    """Call self as a function."""
+
     __hash__: ClassVar[None]  # type: ignore[assignment]
 
 @final
@@ -58,6 +60,7 @@ class ProxyType(Generic[_T]):  # "weakproxy"
     def __eq__(self, value: object, /) -> bool: ...
     def __getattr__(self, attr: str) -> Any: ...
     __hash__: ClassVar[None]  # type: ignore[assignment]
+    """Return hash(self)."""
 
 @disjoint_base
 class ReferenceType(Generic[_T]):  # "weakref"
@@ -291,3 +294,4 @@ class finalize(Generic[_P, _T]):
     def alive(self) -> bool:
         """Whether finalizer is alive"""
     atexit: bool
+    """Whether finalizer should be called at exit"""

@@ -32,6 +32,10 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///     bar(i)
 /// ```
 ///
+/// ## Options
+///
+/// - `lint.dummy-variable-rgx`
+///
 /// ## References
 /// - [PEP 8: Naming Conventions](https://peps.python.org/pep-0008/#naming-conventions)
 #[derive(ViolationMetadata)]
@@ -130,6 +134,11 @@ pub(crate) fn unused_loop_control_variable(checker: &Checker, stmt_for: &ast::St
             },
             expr.range(),
         );
+
+        if certainty == Certainty::Certain {
+            diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Unnecessary);
+        }
+
         if let Some(rename) = rename {
             if certainty == Certainty::Certain {
                 // Avoid fixing if the variable, or any future bindings to the variable, are

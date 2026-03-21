@@ -33,7 +33,7 @@ pub struct LintMetadata {
     pub line: u32,
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, get_size2::GetSize)]
 #[cfg_attr(
     feature = "serde",
     derive(serde::Serialize, serde::Deserialize),
@@ -116,6 +116,10 @@ impl LintMetadata {
         self.documentation_lines().join("\n")
     }
 
+    pub fn documentation_url(&self) -> String {
+        lint_documentation_url(self.name())
+    }
+
     pub fn default_level(&self) -> Level {
         self.default_level
     }
@@ -133,6 +137,10 @@ impl LintMetadata {
     }
 }
 
+pub fn lint_documentation_url(lint_name: LintName) -> String {
+    format!("https://ty.dev/rules#{lint_name}")
+}
+
 #[doc(hidden)]
 pub const fn lint_metadata_defaults() -> LintMetadata {
     LintMetadata {
@@ -147,6 +155,11 @@ pub const fn lint_metadata_defaults() -> LintMetadata {
 }
 
 #[derive(Copy, Clone, Debug)]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize),
+    serde(tag = "type", rename_all = "lowercase")
+)]
 pub enum LintStatus {
     /// The lint has been added to the linter, but is not yet stable.
     Preview {
@@ -381,11 +394,11 @@ impl LintRegistry {
                     }
                 }
 
-                let suggestion = did_you_mean(self.by_name.keys(), code);
+                let suggestion = did_you_mean(self.by_name.keys().copied(), code);
 
                 Err(GetLintError::Unknown {
                     code: code.to_string(),
-                    suggestion,
+                    suggestion: suggestion.map(str::to_string),
                 })
             }
         }
@@ -607,4 +620,7 @@ pub enum LintSource {
 
     /// The rule was enabled in a configuration file.
     File,
+
+    /// The rule was enabled from the configuration in the editor.
+    Editor,
 }

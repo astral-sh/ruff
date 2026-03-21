@@ -3,12 +3,13 @@ use std::path::Path;
 use bitflags::bitflags;
 use rustc_hash::FxHashMap;
 
-use ruff_python_ast::helpers::from_relative_import;
+use ruff_python_ast::helpers::{from_relative_import, map_subscript};
 use ruff_python_ast::name::{QualifiedName, UnqualifiedName};
 use ruff_python_ast::{self as ast, Expr, ExprContext, PySourceType, Stmt};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::Imported;
+use crate::analyze::visibility;
 use crate::binding::{
     Binding, BindingFlags, BindingId, BindingKind, Bindings, Exceptions, FromImport, Import,
     SubmoduleImport,
@@ -208,7 +209,7 @@ impl<'a> SemanticModel<'a> {
         }
 
         if self.typing_modules.iter().any(|module| {
-            let module = QualifiedName::from_dotted_name(module);
+            let module = QualifiedName::user_defined(module);
             qualified_name == &module.append_member(target)
         }) {
             return true;
@@ -501,7 +502,48 @@ impl<'a> SemanticModel<'a> {
                     // print(x)
                     //
                     // The `x` in `print(x)` should be treated as unresolved.
-                    BindingKind::Deletion | BindingKind::UnboundException(None) => {
+                    BindingKind::Deletion => {
+                        // In stub files, `del` is used to hide names from re-export
+                        // while the name is still valid for use in type annotations
+                        // within the same file. Since annotations are deferred in
+                        // stubs, the `Deletion` binding is seen at resolve time even
+                        // though the reference textually precedes the `del`. Resolve
+                        // to the shadowed (pre-`del`) binding when available.
+                        if self.in_stub_file() {
+                            if let Some(shadowed_id) =
+                                self.scopes[scope_id].shadowed_binding(binding_id)
+                            {
+                                // Only suppress F821 when the reference textually precedes
+                                // the `del` statement. If `del` comes before the reference,
+                                // the name is genuinely undefined at that point and F821
+                                // should still fire.
+                                let deletion_range = self.bindings[binding_id].range;
+                                if !self.bindings[shadowed_id].is_unbound()
+                                    && name.range.start() < deletion_range.start()
+                                {
+                                    let reference_id = self.resolved_references.push(
+                                        self.scope_id,
+                                        self.node_id,
+                                        ExprContext::Load,
+                                        self.flags,
+                                        name.range,
+                                    );
+                                    self.bindings[shadowed_id].references.push(reference_id);
+                                    self.resolved_names.insert(name.into(), shadowed_id);
+                                    return ReadResult::Resolved(shadowed_id);
+                                }
+                            }
+                        }
+
+                        self.unresolved_references.push(
+                            name.range,
+                            self.exceptions(),
+                            UnresolvedReferenceFlags::empty(),
+                        );
+                        return ReadResult::UnboundLocal(binding_id);
+                    }
+
+                    BindingKind::UnboundException(None) => {
                         self.unresolved_references.push(
                             name.range,
                             self.exceptions(),
@@ -1594,8 +1636,13 @@ impl<'a> SemanticModel<'a> {
     /// Return `true` if the model is in an async context.
     pub fn in_async_context(&self) -> bool {
         for scope in self.current_scopes() {
-            if let ScopeKind::Function(ast::StmtFunctionDef { is_async, .. }) = scope.kind {
-                return *is_async;
+            match scope.kind {
+                ScopeKind::Class(_) | ScopeKind::Lambda(_) => return false,
+                ScopeKind::Function(ast::StmtFunctionDef { is_async, .. }) => return *is_async,
+                ScopeKind::Generator { .. }
+                | ScopeKind::Module
+                | ScopeKind::Type
+                | ScopeKind::DunderClassCell => {}
             }
         }
         false
@@ -1682,6 +1729,48 @@ impl<'a> SemanticModel<'a> {
             .collect::<Vec<_>>();
 
         left == right
+    }
+
+    /// Returns `true` if any execution path to `node` passes through `dominator`.
+    ///
+    /// More precisely, it returns true if the path of branches leading
+    /// to `dominator` is a prefix of the path of branches leading to `node`.
+    ///
+    /// In this code snippet:
+    ///
+    /// ```python
+    /// if cond:
+    ///     dominator
+    ///     if other_cond:
+    ///         node
+    /// else:
+    ///     other_node
+    /// ```
+    ///
+    /// we have that `node` is dominated by `dominator` but that
+    /// `other_node` is not dominated by `dominator`.
+    ///
+    /// This implementation assumes that the statements are in the same scope.
+    pub fn dominates(&self, dominator: NodeId, node: NodeId) -> bool {
+        // Collect the branch path for the left statement.
+        let dominator = self
+            .nodes
+            .branch_id(dominator)
+            .iter()
+            .flat_map(|branch_id| self.branches.ancestor_ids(*branch_id))
+            .collect::<Vec<_>>();
+
+        // Collect the branch path for the right statement.
+        let node = self
+            .nodes
+            .branch_id(node)
+            .iter()
+            .flat_map(|branch_id| self.branches.ancestor_ids(*branch_id))
+            .collect::<Vec<_>>();
+
+        // Note that the paths are in "reverse" order -
+        // from most nested to least nested.
+        node.ends_with(&dominator)
     }
 
     /// Returns `true` if the given expression is an unused variable, or consists solely of
@@ -2109,6 +2198,21 @@ impl<'a> SemanticModel<'a> {
                 return false;
             };
             function.range() == function_def.range()
+        })
+    }
+
+    /// Return `true` if the model is in a `typing.Protocol` subclass or an abstract
+    /// method.
+    pub fn in_protocol_or_abstract_method(&self) -> bool {
+        self.current_scopes().any(|scope| match scope.kind {
+            ScopeKind::Class(class_def) => class_def
+                .bases()
+                .iter()
+                .any(|base| self.match_typing_expr(map_subscript(base), "Protocol")),
+            ScopeKind::Function(function_def) => {
+                visibility::is_abstract(&function_def.decorator_list, self)
+            }
+            _ => false,
         })
     }
 }

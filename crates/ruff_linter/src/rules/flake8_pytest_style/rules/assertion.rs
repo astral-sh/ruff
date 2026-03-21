@@ -10,7 +10,7 @@ use libcst_native::{
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::Truthiness;
-use ruff_python_ast::parenthesize::parenthesized_range;
+use ruff_python_ast::token::parenthesized_range;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{
     self as ast, AnyNodeRef, Arguments, BoolOp, ExceptHandler, Expr, Keyword, Stmt, UnaryOp,
@@ -104,6 +104,16 @@ impl Violation for PytestCompositeAssertion {
 ///     with pytest.raises(ZeroDivisionError) as exc_info:
 ///         1 / 0
 ///     assert exc_info.value.args
+/// ```
+///
+/// Or, for pytest 8.4.0 and later:
+/// ```python
+/// import pytest
+///
+///
+/// def test_foo():
+///     with pytest.raises(ZeroDivisionError, check=lambda e: e.args):
+///         1 / 0
 /// ```
 ///
 /// ## References
@@ -303,8 +313,7 @@ pub(crate) fn unittest_assertion(
                 parenthesized_range(
                     expr.into(),
                     checker.semantic().current_statement().into(),
-                    checker.comment_ranges(),
-                    checker.locator().contents(),
+                    checker.tokens(),
                 )
                 .unwrap_or(expr.range()),
             )));

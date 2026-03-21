@@ -18,7 +18,7 @@ fn configuration_rule_severity() -> anyhow::Result<()> {
     )?;
 
     // Assert that there's an `unresolved-reference` diagnostic (error).
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -35,7 +35,7 @@ fn configuration_rule_severity() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    ");
 
     case.write_file(
         "pyproject.toml",
@@ -46,7 +46,7 @@ fn configuration_rule_severity() -> anyhow::Result<()> {
     "#,
     )?;
 
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -63,7 +63,7 @@ fn configuration_rule_severity() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    ");
 
     Ok(())
 }
@@ -87,7 +87,7 @@ fn cli_rule_severity() -> anyhow::Result<()> {
 
     // Assert that there's an `unresolved-reference` diagnostic (error)
     // and an unresolved-import (error) diagnostic by default.
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -118,7 +118,7 @@ fn cli_rule_severity() -> anyhow::Result<()> {
     Found 2 diagnostics
 
     ----- stderr -----
-    "###);
+    ");
 
     assert_cmd_snapshot!(
         case
@@ -129,7 +129,7 @@ fn cli_rule_severity() -> anyhow::Result<()> {
             .arg("division-by-zero")
             .arg("--warn")
             .arg("unresolved-import"),
-        @r###"
+        @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -162,7 +162,7 @@ fn cli_rule_severity() -> anyhow::Result<()> {
     Found 2 diagnostics
 
     ----- stderr -----
-    "###
+    "
     );
 
     Ok(())
@@ -185,7 +185,7 @@ fn cli_rule_severity_precedence() -> anyhow::Result<()> {
     )?;
 
     // Assert that there's a `unresolved-reference` diagnostic (error) by default.
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -202,7 +202,7 @@ fn cli_rule_severity_precedence() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    ");
 
     assert_cmd_snapshot!(
         case
@@ -213,7 +213,7 @@ fn cli_rule_severity_precedence() -> anyhow::Result<()> {
             .arg("division-by-zero")
             .arg("--ignore")
             .arg("unresolved-reference"),
-        @r###"
+        @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -230,7 +230,7 @@ fn cli_rule_severity_precedence() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    "###
+    "
     );
 
     Ok(())
@@ -275,7 +275,7 @@ fn configuration_unknown_rules() -> anyhow::Result<()> {
 fn cli_unknown_rules() -> anyhow::Result<()> {
     let case = CliTest::with_file("test.py", "print(10)")?;
 
-    assert_cmd_snapshot!(case.command().arg("--ignore").arg("division-by-zer"), @r"
+    assert_cmd_snapshot!(case.command().arg("--ignore").arg("division-by-zer"), @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -326,7 +326,7 @@ fn overrides_basic() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -363,7 +363,7 @@ fn overrides_basic() -> anyhow::Result<()> {
     Found 3 diagnostics
 
     ----- stderr -----
-    "###);
+    ");
 
     Ok(())
 }
@@ -405,7 +405,7 @@ fn overrides_precedence() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -420,7 +420,7 @@ fn overrides_precedence() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    ");
 
     Ok(())
 }
@@ -456,7 +456,7 @@ fn overrides_exclude() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -479,7 +479,7 @@ fn overrides_exclude() -> anyhow::Result<()> {
     Found 2 diagnostics
 
     ----- stderr -----
-    "###);
+    ");
 
     Ok(())
 }
@@ -519,7 +519,7 @@ fn overrides_inherit_global() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -553,7 +553,7 @@ fn overrides_inherit_global() -> anyhow::Result<()> {
     Found 3 diagnostics
 
     ----- stderr -----
-    "###);
+    ");
 
     Ok(())
 }
@@ -582,14 +582,14 @@ fn overrides_invalid_include_glob() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @r#"
     success: false
     exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
     ty failed
-      Cause: error[invalid-glob]: Invalid include pattern
+      Cause: error[invalid-glob]: Invalid pattern
      --> pyproject.toml:6:12
       |
     5 | [[tool.ty.overrides]]
@@ -598,7 +598,7 @@ fn overrides_invalid_include_glob() -> anyhow::Result<()> {
     7 | [tool.ty.overrides.rules]
     8 | division-by-zero = "warn"
       |
-    "###);
+    "#);
 
     Ok(())
 }
@@ -628,14 +628,14 @@ fn overrides_invalid_exclude_glob() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @r#"
     success: false
     exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
     ty failed
-      Cause: error[invalid-glob]: Invalid exclude pattern
+      Cause: error[invalid-glob]: Invalid pattern
      --> pyproject.toml:7:12
       |
     5 | [[tool.ty.overrides]]
@@ -645,7 +645,7 @@ fn overrides_invalid_exclude_glob() -> anyhow::Result<()> {
     8 | [tool.ty.overrides.rules]
     9 | division-by-zero = "warn"
       |
-    "###);
+    "#);
 
     Ok(())
 }
@@ -674,7 +674,7 @@ fn overrides_missing_include_exclude() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @r#"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -703,7 +703,7 @@ fn overrides_missing_include_exclude() -> anyhow::Result<()> {
     Found 2 diagnostics
 
     ----- stderr -----
-    "###);
+    "#);
 
     Ok(())
 }
@@ -732,7 +732,7 @@ fn overrides_empty_include() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @r#"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -758,7 +758,7 @@ fn overrides_empty_include() -> anyhow::Result<()> {
     Found 2 diagnostics
 
     ----- stderr -----
-    "###);
+    "#);
 
     Ok(())
 }
@@ -786,7 +786,7 @@ fn overrides_no_actual_overrides() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @r#"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -796,12 +796,12 @@ fn overrides_no_actual_overrides() -> anyhow::Result<()> {
     3 | division-by-zero = "error"
     4 |
     5 | [[tool.ty.overrides]]
-      | ^^^^^^^^^^^^^^^^^^^^^ This overrides section configures no rules
+      | ^^^^^^^^^^^^^^^^^^^^^ This overrides section overrides no settings
     6 | include = ["*.py"]  # Has patterns but no rule overrides
     7 | # Missing [tool.ty.overrides.rules] section entirely
       |
-    info: It has no `rules` table
-    info: Add a `[overrides.rules]` table...
+    info: It has no `rules` or `analysis` table
+    info: Add a `[overrides.rules]` or `[overrides.analysis]` table...
     info: or remove the `[[overrides]]` section if there's nothing to override
 
     error[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
@@ -815,7 +815,7 @@ fn overrides_no_actual_overrides() -> anyhow::Result<()> {
     Found 2 diagnostics
 
     ----- stderr -----
-    "###);
+    "#);
 
     Ok(())
 }
@@ -885,6 +885,423 @@ fn overrides_unknown_rules() -> anyhow::Result<()> {
 
     ----- stderr -----
     "#);
+
+    Ok(())
+}
+
+/// The "all" keyword can be used to set all rules to a specific severity
+#[test]
+fn cli_all_rules_ignore() -> anyhow::Result<()> {
+    let case = CliTest::with_file(
+        "test.py",
+        r#"
+        import does_not_exit
+
+        y = 4 / 0
+
+        prin(y)  # unresolved-reference
+        "#,
+    )?;
+
+    // Using --ignore all should disable all rules
+    assert_cmd_snapshot!(
+        case
+            .command()
+            .arg("--ignore")
+            .arg("all"),
+        @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    "
+    );
+
+    Ok(())
+}
+
+/// The "all" keyword works with --warn to set all rules to warn severity
+#[test]
+fn cli_all_rules_warn() -> anyhow::Result<()> {
+    let case = CliTest::with_file(
+        "test.py",
+        r#"
+        prin(x)  # unresolved-reference
+        "#,
+    )?;
+
+    // Using --warn all should make all rules warnings (not errors)
+    assert_cmd_snapshot!(
+        case
+            .command()
+            .arg("--warn")
+            .arg("all"),
+        @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    warning[unresolved-reference]: Name `prin` used when not defined
+     --> test.py:2:1
+      |
+    2 | prin(x)  # unresolved-reference
+      | ^^^^
+      |
+    info: rule `unresolved-reference` was selected on the command line
+
+    warning[unresolved-reference]: Name `x` used when not defined
+     --> test.py:2:6
+      |
+    2 | prin(x)  # unresolved-reference
+      |      ^
+      |
+    info: rule `unresolved-reference` was selected on the command line
+
+    Found 2 diagnostics
+
+    ----- stderr -----
+    "
+    );
+
+    Ok(())
+}
+
+/// The "all" keyword can be overridden by subsequent specific rule settings
+#[test]
+fn cli_all_rules_precedence() -> anyhow::Result<()> {
+    let case = CliTest::with_file(
+        "test.py",
+        r#"
+        import does_not_exit
+
+        y = 4 / 0
+
+        prin(y)  # unresolved-reference
+        "#,
+    )?;
+
+    // Using --ignore all followed by --error for a specific rule should
+    // disable all rules except the one specified
+    assert_cmd_snapshot!(
+        case
+            .command()
+            .arg("--ignore")
+            .arg("all")
+            .arg("--error")
+            .arg("unresolved-reference"),
+        @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-reference]: Name `prin` used when not defined
+     --> test.py:6:1
+      |
+    4 | y = 4 / 0
+    5 |
+    6 | prin(y)  # unresolved-reference
+      | ^^^^
+      |
+    info: rule `unresolved-reference` was selected on the command line
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    "
+    );
+
+    Ok(())
+}
+
+/// A specific rule can be set first and then overridden by "all"
+#[test]
+fn cli_specific_then_all() -> anyhow::Result<()> {
+    let case = CliTest::with_file(
+        "test.py",
+        r#"
+        prin(x)  # unresolved-reference
+        "#,
+    )?;
+
+    // Using --error for a specific rule followed by --ignore all should
+    // ignore all rules (including the previously set one)
+    assert_cmd_snapshot!(
+        case
+            .command()
+            .arg("--error")
+            .arg("unresolved-reference")
+            .arg("--ignore")
+            .arg("all"),
+        @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    "
+    );
+
+    Ok(())
+}
+
+/// The "all" keyword works in configuration files
+#[test]
+fn configuration_all_rules() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        (
+            "pyproject.toml",
+            r#"
+            [tool.ty.rules]
+            all = "ignore"
+            unresolved-reference = "error"
+            "#,
+        ),
+        (
+            "test.py",
+            r#"
+            import does_not_exit
+
+            y = 4 / 0
+
+            prin(y)  # unresolved-reference
+            "#,
+        ),
+    ])?;
+
+    // The "all" rule should be processed first, ignoring all rules,
+    // then unresolved-reference should be enabled as error
+    assert_cmd_snapshot!(case.command(), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-reference]: Name `prin` used when not defined
+     --> test.py:6:1
+      |
+    4 | y = 4 / 0
+    5 |
+    6 | prin(y)  # unresolved-reference
+      | ^^^^
+      |
+    info: rule `unresolved-reference` was selected in the configuration file
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
+/// In TOML, key order in a table is not semantically meaningful, so specific rules should
+/// still override `all` even if they sort lexicographically before `all`.
+#[test]
+fn configuration_all_rules_with_rule_sorting_before_all() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        (
+            "pyproject.toml",
+            r#"
+            [tool.ty.rules]
+            all = "warn"
+            abstract-method-in-final-class = "error"
+            "#,
+        ),
+        (
+            "test.py",
+            r#"
+            from typing import final
+            from abc import ABC, abstractmethod
+
+            class Base(ABC):
+                @abstractmethod
+                def foo(self) -> int:
+                    raise NotImplementedError
+
+            @final
+            class Derived(Base):
+                pass
+            "#,
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(case.command(), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[abstract-method-in-final-class]: Final class `Derived` has unimplemented abstract methods
+      --> test.py:11:7
+       |
+    10 | @final
+    11 | class Derived(Base):
+       |       ^^^^^^^ `foo` is unimplemented
+    12 |     pass
+       |
+      ::: test.py:7:9
+       |
+     5 | class Base(ABC):
+     6 |     @abstractmethod
+     7 |     def foo(self) -> int:
+       |         --- `foo` declared as abstract on superclass `Base`
+     8 |         raise NotImplementedError
+       |
+    info: rule `abstract-method-in-final-class` was selected in the configuration file
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
+/// Same TOML key ordering issue, but within an override's `[rules]` table.
+/// `abstract-method-in-final-class` sorts before `all` lexicographically, but
+/// the specific rule should still take precedence over `all`.
+#[test]
+fn overrides_all_rules_with_rule_sorting_before_all() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        (
+            "pyproject.toml",
+            r#"
+            [[tool.ty.overrides]]
+            include = ["src/**"]
+
+            [tool.ty.overrides.rules]
+            all = "warn"
+            abstract-method-in-final-class = "error"
+            "#,
+        ),
+        (
+            "src/test.py",
+            r#"
+            from typing import final
+            from abc import ABC, abstractmethod
+
+            class Base(ABC):
+                @abstractmethod
+                def foo(self) -> int:
+                    raise NotImplementedError
+
+            @final
+            class Derived(Base):
+                pass
+            "#,
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(case.command(), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[abstract-method-in-final-class]: Final class `Derived` has unimplemented abstract methods
+      --> src/test.py:11:7
+       |
+    10 | @final
+    11 | class Derived(Base):
+       |       ^^^^^^^ `foo` is unimplemented
+    12 |     pass
+       |
+      ::: src/test.py:7:9
+       |
+     5 | class Base(ABC):
+     6 |     @abstractmethod
+     7 |     def foo(self) -> int:
+       |         --- `foo` declared as abstract on superclass `Base`
+     8 |         raise NotImplementedError
+       |
+    info: rule `abstract-method-in-final-class` was selected in the configuration file
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
+/// Tests the `all` selector in an `overrides` section
+#[test]
+fn all_overrides() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        (
+            "pyproject.toml",
+            r#"
+            [tool.ty.rules]
+            all = "error"
+
+            [[tool.ty.overrides]]
+            include = ["tests/**"]
+
+            [tool.ty.overrides.rules]
+            unresolved-reference = "warn"
+            "#,
+        ),
+        (
+            "main.py",
+            r#"
+            y = 4 / 0  # division-by-zero: error (global)
+            x = 1
+            prin(x)    # unresolved-reference: error (global)
+            "#,
+        ),
+        (
+            "tests/test_main.py",
+            r#"
+            y = 4 / 0  # division-by-zero: error (global)
+            x = 1
+            prin(x)    # unresolved-reference: warn (override)
+            "#,
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(case.command(), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
+     --> main.py:2:5
+      |
+    2 | y = 4 / 0  # division-by-zero: error (global)
+      |     ^^^^^
+    3 | x = 1
+    4 | prin(x)    # unresolved-reference: error (global)
+      |
+    info: rule `division-by-zero` was selected in the configuration file
+
+    error[unresolved-reference]: Name `prin` used when not defined
+     --> main.py:4:1
+      |
+    2 | y = 4 / 0  # division-by-zero: error (global)
+    3 | x = 1
+    4 | prin(x)    # unresolved-reference: error (global)
+      | ^^^^
+      |
+    info: rule `unresolved-reference` was selected in the configuration file
+
+    error[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
+     --> tests/test_main.py:2:5
+      |
+    2 | y = 4 / 0  # division-by-zero: error (global)
+      |     ^^^^^
+    3 | x = 1
+    4 | prin(x)    # unresolved-reference: warn (override)
+      |
+    info: rule `division-by-zero` was selected in the configuration file
+
+    warning[unresolved-reference]: Name `prin` used when not defined
+     --> tests/test_main.py:4:1
+      |
+    2 | y = 4 / 0  # division-by-zero: error (global)
+    3 | x = 1
+    4 | prin(x)    # unresolved-reference: warn (override)
+      | ^^^^
+      |
+    info: rule `unresolved-reference` was selected in the configuration file
+
+    Found 4 diagnostics
+
+    ----- stderr -----
+    ");
 
     Ok(())
 }

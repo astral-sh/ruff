@@ -62,13 +62,14 @@ impl Violation for PytestRaisesWithMultipleStatements {
 }
 
 /// ## What it does
-/// Checks for `pytest.raises` calls without a `match` parameter.
+/// Checks for `pytest.raises` calls without a `match` or `check` parameter.
 ///
 /// ## Why is this bad?
 /// `pytest.raises(Error)` will catch any `Error` and may catch errors that are
 /// unrelated to the code under test. To avoid this, `pytest.raises` should be
-/// called with a `match` parameter. The exception names that require a `match`
-/// parameter can be configured via the
+/// called with a `match` parameter (to constrain the exception message) or a
+/// `check` parameter (to constrain the exception itself). The exception names
+/// that require a `match` or `check` parameter can be configured via the
 /// [`lint.flake8-pytest-style.raises-require-match-for`] and
 /// [`lint.flake8-pytest-style.raises-extend-require-match-for`] settings.
 ///
@@ -93,6 +94,16 @@ impl Violation for PytestRaisesWithMultipleStatements {
 ///
 /// def test_foo():
 ///     with pytest.raises(ValueError, match="expected message"):
+///         ...
+/// ```
+///
+/// Or, for pytest 8.4.0 and later:
+/// ```python
+/// import pytest
+///
+///
+/// def test_foo():
+///     with pytest.raises(OSError, check=lambda e: e.errno == 42):
 ///         ...
 /// ```
 ///
@@ -125,6 +136,9 @@ impl Violation for PytestRaisesTooBroad {
 /// ## Why is this bad?
 /// `pytest.raises` expects to receive an expected exception as its first
 /// argument. If omitted, the `pytest.raises` call will fail at runtime.
+/// The rule will also accept calls without an expected exception but with
+/// `match` and/or `check` keyword arguments, which are also valid after
+/// pytest version 8.4.0.
 ///
 /// ## Example
 /// ```python
@@ -181,6 +195,8 @@ pub(crate) fn raises_call(checker: &Checker, call: &ast::ExprCall) {
                 .arguments
                 .find_argument("expected_exception", 0)
                 .is_none()
+                && call.arguments.find_keyword("match").is_none()
+                && call.arguments.find_keyword("check").is_none()
             {
                 checker.report_diagnostic(PytestRaisesWithoutException, call.func.range());
             }
@@ -196,11 +212,15 @@ pub(crate) fn raises_call(checker: &Checker, call: &ast::ExprCall) {
             if call.arguments.find_argument("func", 1).is_none() {
                 if let Some(exception) = call.arguments.find_argument_value("expected_exception", 0)
                 {
-                    if call
+                    let match_is_empty_or_absent = call
                         .arguments
                         .find_keyword("match")
-                        .is_none_or(|k| is_empty_or_null_string(&k.value))
-                    {
+                        .is_none_or(|k| is_empty_or_null_string(&k.value));
+                    let check_is_absent_or_none = call
+                        .arguments
+                        .find_keyword("check")
+                        .is_none_or(|k| k.value.is_none_literal_expr());
+                    if match_is_empty_or_absent && check_is_absent_or_none {
                         exception_needs_match(checker, exception);
                     }
                 }

@@ -49,12 +49,9 @@ def _(flag: bool):
 a = reveal_type(__import__("a.b.c"))  # revealed: ModuleType
 
 # TODO: Should be `int`, `str`, `bytes`
-# error: [unresolved-attribute]
-reveal_type(a.a)  # revealed: Unknown
-# error: [unresolved-attribute]
-reveal_type(a.b.b)  # revealed: Unknown
-# error: [unresolved-attribute]
-reveal_type(a.b.c.c)  # revealed: Unknown
+reveal_type(a.a)  # revealed: Any
+reveal_type(a.b.b)  # revealed: Any
+reveal_type(a.b.c.c)  # revealed: Any
 ```
 
 `a/__init__.py`:

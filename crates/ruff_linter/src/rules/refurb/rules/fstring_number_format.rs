@@ -28,8 +28,9 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 ///
 /// ## Fix safety
 /// The fix is only marked as safe for integer literals, all other cases
-/// are display-only, as they may change the runtime behaviour of the program
-/// or introduce syntax errors.
+/// are display-only, as they may change the runtime behavior of the program
+/// or introduce syntax errors. The fix for integer literals is also marked as unsafe
+/// if the expression contains comments that would be removed by the fix.
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "0.13.0")]
 pub(crate) struct FStringNumberFormat {
@@ -82,7 +83,7 @@ pub(crate) fn fstring_number_format(checker: &Checker, subscript: &ast::ExprSubs
     };
 
     let Expr::NumberLiteral(ast::ExprNumberLiteral {
-        value: ast::Number::Int(int),
+        value: Number::Int(int),
         ..
     }) = lower.as_ref()
     else {
@@ -139,7 +140,11 @@ pub(crate) fn fstring_number_format(checker: &Checker, subscript: &ast::ExprSubs
     };
 
     let applicability = if matches!(maybe_number, Expr::NumberLiteral(_)) {
-        Applicability::Safe
+        if checker.comment_ranges().intersects(subscript.range()) {
+            Applicability::Unsafe
+        } else {
+            Applicability::Safe
+        }
     } else {
         Applicability::DisplayOnly
     };

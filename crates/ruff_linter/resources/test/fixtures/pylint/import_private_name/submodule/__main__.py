@@ -44,3 +44,5 @@ class Class:
 
     def __init__(self, arg: vv) -> "zz":
         pass
+
+from foo.    _bar import baz

@@ -2,6 +2,7 @@
 source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
+
 ---
 mdtest name: mro.md - Method Resolution Order tests - `__bases__` lists that include objects that are not instances of `type`
 mdtest path: crates/ty_python_semantic/resources/mdtest/mro.md
@@ -47,17 +48,17 @@ info: rule `invalid-base` is enabled by default
 ```
 
 ```
-warning[unsupported-base]: Unsupported class base with type `Foo`
+warning[unsupported-base]: Unsupported class base
  --> src/mdtest_snippet.py:6:11
   |
 4 |         return ()
 5 |
 6 | class Bar(Foo()): ...  # error: [unsupported-base]
-  |           ^^^^^
+  |           ^^^^^ Has type `Foo`
 7 | class Bad1:
 8 |     def __mro_entries__(self, bases, extra_arg):
   |
-info: ty cannot resolve a consistent MRO for class `Bar` due to this base
+info: ty cannot resolve a consistent method resolution order (MRO) for class `Bar` due to this base
 info: Only class objects or `Any` are supported as class bases
 info: rule `unsupported-base` is enabled by default
 

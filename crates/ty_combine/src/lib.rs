@@ -3,12 +3,10 @@
     reason = "Prefer System trait methods over std methods in ty crates"
 )]
 
-use std::{collections::HashMap, hash::BuildHasher};
-
 use ordermap::OrderMap;
 use ruff_db::system::SystemPathBuf;
 use ruff_python_ast::PythonVersion;
-use ty_python_semantic::PythonPlatform;
+use std::{collections::HashMap, hash::BuildHasher};
 
 /// Combine two values, preferring the values in `self`.
 ///
@@ -122,9 +120,18 @@ where
     K: Eq + std::hash::Hash,
     S: BuildHasher,
 {
-    fn combine_with(&mut self, other: Self) {
+    fn combine_with(&mut self, mut other: Self) {
+        // `self` takes precedence over `other` but values with higher precedence must be placed after.
+        // Swap the vectors so that `other` is the one that gets extended, so that the values of `self` come after.
+        std::mem::swap(self, &mut other);
+
         for (k, v) in other {
-            self.entry(k).or_insert(v);
+            // If there's an existing entry, remove it to ensure `k` (previously self)
+            // comes after any item in `self`.
+            self.remove(&k);
+
+            // Append `k` at the end.
+            self.insert(k, v);
         }
     }
 }
@@ -145,7 +152,6 @@ macro_rules! impl_noop_combine {
 }
 
 impl_noop_combine!(SystemPathBuf);
-impl_noop_combine!(PythonPlatform);
 impl_noop_combine!(PythonVersion);
 
 // std types
@@ -210,21 +216,15 @@ mod tests {
 
     #[test]
     fn combine_order_map() {
-        let a: OrderMap<u32, _> = OrderMap::from_iter([(1, "a"), (2, "a"), (3, "a")]);
-        let b: OrderMap<u32, _> = OrderMap::from_iter([(0, "b"), (2, "b"), (5, "b")]);
+        let a: OrderMap<_, _> = OrderMap::from_iter([(1, "a"), (2, "a"), (3, "a")]);
+        let b: OrderMap<_, _> = OrderMap::from_iter([(0, "b"), (2, "b"), (5, "b")]);
 
         assert_eq!(None.combine(Some(b.clone())), Some(b.clone()));
         assert_eq!(Some(a.clone()).combine(None), Some(a.clone()));
         assert_eq!(
-            Some(a).combine(Some(b)),
+            a.combine(b),
             // The value from `a` takes precedence
-            Some(OrderMap::from_iter([
-                (1, "a"),
-                (2, "a"),
-                (3, "a"),
-                (0, "b"),
-                (5, "b")
-            ]))
+            OrderMap::<_, _>::from_iter([(0, "b"), (5, "b"), (1, "a"), (2, "a"), (3, "a"),])
         );
     }
 }

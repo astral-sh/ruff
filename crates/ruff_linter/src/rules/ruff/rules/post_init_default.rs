@@ -2,7 +2,8 @@ use anyhow::Context;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
-use ruff_python_ast::parenthesize::parenthesized_range;
+use ruff_python_ast::helpers::any_over_expr;
+use ruff_python_ast::token::parenthesized_range;
 use ruff_python_semantic::{Scope, ScopeKind};
 use ruff_python_trivia::{indentation_at_offset, textwrap};
 use ruff_source_file::LineRanges;
@@ -146,6 +147,21 @@ fn use_initvar(
         ));
     }
 
+    // If the annotation references a type variable scoped to `__post_init__`
+    // (PEP 695), moving it to the class body would produce a `NameError`.
+    if let Some(annotation) = parameter.annotation() {
+        if let Some(type_params) = &post_init_def.type_params {
+            if any_over_expr(annotation, &|expr| {
+                expr.as_name_expr()
+                    .is_some_and(|name| type_params.iter().any(|tp| tp.name().id == name.id))
+            }) {
+                return Err(anyhow::anyhow!(
+                    "Annotation references a type variable scoped to `__post_init__`"
+                ));
+            }
+        }
+    }
+
     // Ensure that `dataclasses.InitVar` is accessible. For example,
     // + `from dataclasses import InitVar`
     let (import_edit, initvar_binding) = checker.importer().get_or_import_symbol(
@@ -159,8 +175,7 @@ fn use_initvar(
     let default_loc = parenthesized_range(
         default.into(),
         parameter_with_default.into(),
-        checker.comment_ranges(),
-        checker.source(),
+        checker.tokens(),
     )
     .unwrap_or(default.range());
 

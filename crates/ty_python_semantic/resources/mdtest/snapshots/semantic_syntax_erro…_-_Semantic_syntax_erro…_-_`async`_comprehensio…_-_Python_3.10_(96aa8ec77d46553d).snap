@@ -2,6 +2,7 @@
 source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
+
 ---
 mdtest name: semantic_syntax_errors.md - Semantic syntax error diagnostics - `async` comprehensions in synchronous comprehensions - Python 3.10
 mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/semantic_syntax_errors.md

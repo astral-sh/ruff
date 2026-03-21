@@ -1,0 +1,2 @@
+Success: no issues found in 42 source files
+Warning: unused section(s) in pyproject.toml: module = ['tests.data.*']

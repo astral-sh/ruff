@@ -107,3 +107,24 @@ PLR1708 Explicit `raise StopIteration` in generator
     |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
     |
 help: Use `return` instead
+
+PLR1708 Explicit `raise StopIteration` in generator
+   --> stop_iteration_return.py:149:9
+    |
+147 |     yield 1
+148 |     class C:
+149 |         raise StopIteration  # Should trigger
+    |         ^^^^^^^^^^^^^^^^^^^
+150 |     yield C
+    |
+help: Use `return` instead
+
+PLR1708 Explicit `raise StopIteration` in generator
+   --> stop_iteration_return.py:154:5
+    |
+152 | # https://github.com/astral-sh/ruff/pull/21177#discussion_r2539702728
+153 | def foo():
+154 |     raise StopIteration((yield 1))  # Should trigger
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: Use `return` instead

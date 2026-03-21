@@ -4,8 +4,8 @@ use anyhow::Result;
 
 use libcst_native::{LeftParen, ParenthesizedNode, RightParen};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::token::TokenKind;
 use ruff_python_ast::{self as ast, Expr, OperatorPrecedence};
-use ruff_python_parser::TokenKind;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;

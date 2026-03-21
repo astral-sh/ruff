@@ -45,7 +45,7 @@ class ZstdFile(_streams.BaseStream):
         *,
         level: None = None,
         options: Mapping[int, int] | None = None,
-        zstd_dict: ZstdDict | None = None,
+        zstd_dict: ZstdDict | tuple[ZstdDict, int] | None = None,
     ) -> None:
         """Open a Zstandard compressed file in binary mode.
 
@@ -75,7 +75,7 @@ class ZstdFile(_streams.BaseStream):
         *,
         level: int | None = None,
         options: Mapping[int, int] | None = None,
-        zstd_dict: ZstdDict | None = None,
+        zstd_dict: ZstdDict | tuple[ZstdDict, int] | None = None,
     ) -> None: ...
     def write(self, data: ReadableBuffer, /) -> int:
         """Write a bytes-like object *data* to the file.
@@ -170,7 +170,7 @@ def open(
     *,
     level: None = None,
     options: Mapping[int, int] | None = None,
-    zstd_dict: ZstdDict | None = None,
+    zstd_dict: ZstdDict | tuple[ZstdDict, int] | None = None,
     encoding: str | None = None,
     errors: str | None = None,
     newline: str | None = None,
@@ -211,7 +211,7 @@ def open(
     *,
     level: int | None = None,
     options: Mapping[int, int] | None = None,
-    zstd_dict: ZstdDict | None = None,
+    zstd_dict: ZstdDict | tuple[ZstdDict, int] | None = None,
     encoding: str | None = None,
     errors: str | None = None,
     newline: str | None = None,
@@ -224,7 +224,7 @@ def open(
     *,
     level: None = None,
     options: Mapping[int, int] | None = None,
-    zstd_dict: ZstdDict | None = None,
+    zstd_dict: ZstdDict | tuple[ZstdDict, int] | None = None,
     encoding: str | None = None,
     errors: str | None = None,
     newline: str | None = None,
@@ -237,7 +237,7 @@ def open(
     *,
     level: int | None = None,
     options: Mapping[int, int] | None = None,
-    zstd_dict: ZstdDict | None = None,
+    zstd_dict: ZstdDict | tuple[ZstdDict, int] | None = None,
     encoding: str | None = None,
     errors: str | None = None,
     newline: str | None = None,

@@ -2,6 +2,7 @@
 source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
+
 ---
 mdtest name: no_matching_overload.md - No matching overload diagnostics - A class constructor with unmatched overloads
 mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/no_matching_overload.md
@@ -24,6 +25,7 @@ error[no-matching-overload]: No overload of class `type` matches arguments
 1 | type()  # error: [no-matching-overload]
   | ^^^^^^
   |
+help: `builtins.type()` can either be called with one or three positional arguments (got 0)
 info: rule `no-matching-overload` is enabled by default
 
 ```

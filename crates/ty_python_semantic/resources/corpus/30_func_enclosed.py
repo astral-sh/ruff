@@ -3,4 +3,3 @@ def foo():
 
     def inner():
         a
-

@@ -137,3 +137,37 @@ os.rename("pth1_file", "pth1_file1", None, None, 1, *[1], **{"x": 1}, foo=1)
 os.replace("pth1_file1", "pth1_file", None, None, 1, *[1], **{"x": 1}, foo=1)
 
 os.path.samefile("pth1_file", "pth1_link", 1, *[1], **{"x": 1}, foo=1)
+
+# See: https://github.com/astral-sh/ruff/issues/21794
+import sys
+
+if os.rename("pth1.py", "pth1.py.bak"):
+    print("rename: truthy")
+else:
+    print("rename: falsey")
+
+if os.replace("pth1.py.bak", "pth1.py"):
+    print("replace: truthy")
+else:
+    print("replace: falsey")
+
+try:
+    for _ in os.getcwd():
+        print("getcwd: iterable")
+        break
+except TypeError as e:
+    print("getcwd: not iterable")
+
+try:
+    for _ in os.getcwdb():
+        print("getcwdb: iterable")
+        break
+except TypeError as e:
+    print("getcwdb: not iterable")
+
+try:
+    for _ in os.readlink(sys.executable):
+        print("readlink: iterable")
+        break
+except TypeError as e:
+    print("readlink: not iterable")

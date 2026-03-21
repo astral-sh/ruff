@@ -38,7 +38,7 @@ See: <https://github.com/astral-sh/ty/issues/113>
 from pkg.sub import A
 
 # TODO: This should be `<class 'A'>`
-reveal_type(A)  # revealed: Never
+reveal_type(A)  # revealed: Divergent
 ```
 
 `pkg/outer.py`:
@@ -78,6 +78,25 @@ reveal_type(x)  # revealed: Unknown
 ```py
 # error: [unresolved-import]
 from module import x
+```
+
+### Self-referential `from` import in a nested scope
+
+A `from <self> import <name>` inside a function body should resolve the name from the module's
+global scope without triggering a cycle.
+
+See: <https://github.com/astral-sh/ty/issues/2596>
+
+`main.py`:
+
+```py
+def foo() -> int:
+    return 0
+
+def bar() -> int:
+    from main import foo
+
+    return foo()
 ```
 
 ### Normal self-referential import

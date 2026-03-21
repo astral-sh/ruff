@@ -109,6 +109,8 @@ def _(o: object):
 
 ### Unsupported operators for positive contributions
 
+<!-- snapshot-diagnostics -->
+
 Raise an error if the given operator is unsupported for all positive contributions to the
 intersection type:
 
@@ -121,7 +123,7 @@ def _(x: object):
         if isinstance(x, NonContainer2):
             reveal_type(x)  # revealed: NonContainer1 & NonContainer2
 
-            # error: [unsupported-operator] "Operator `in` is not supported for types `int` and `NonContainer1`"
+            # error: [unsupported-operator] "Operator `in` is not supported between objects of type `Literal[2]` and `NonContainer1 & NonContainer2`"
             reveal_type(2 in x)  # revealed: bool
 ```
 
@@ -149,7 +151,7 @@ def _(x: object):
     if not isinstance(x, NonContainer1):
         reveal_type(x)  # revealed: ~NonContainer1
 
-        # error: [unsupported-operator] "Operator `in` is not supported for types `int` and `object`, in comparing `Literal[2]` with `~NonContainer1`"
+        # error: [unsupported-operator] "Operator `in` is not supported between objects of type `Literal[2]` and `~NonContainer1`"
         reveal_type(2 in x)  # revealed: bool
 
         reveal_type(2 is x)  # revealed: bool

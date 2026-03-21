@@ -2,6 +2,7 @@
 source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
+
 ---
 mdtest name: for.md - For loops - Union type as iterable where one union element has invalid `__iter__` method
 mdtest path: crates/ty_python_semantic/resources/mdtest/loops/for.md

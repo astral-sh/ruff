@@ -89,3 +89,24 @@ ISC002 Implicitly concatenated string literals over multiple lines
 209 | |     t"def"} g"
     | |__________^
     |
+
+ISC002 Implicitly concatenated string literals over multiple lines
+   --> ISC.py:217:5
+    |
+215 |   # See https://github.com/astral-sh/ruff/issues/19757
+216 |   _ = "abc" + (
+217 | /     "def"
+218 | |     "ghi"
+    | |_________^
+219 |   )
+    |
+
+ISC002 Implicitly concatenated string literals over multiple lines
+   --> ISC.py:222:5
+    |
+221 |   _ = (
+222 | /     "abc"
+223 | |     "def"
+    | |_________^
+224 |   ) + "ghi"
+    |

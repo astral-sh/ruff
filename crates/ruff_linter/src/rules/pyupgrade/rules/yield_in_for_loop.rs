@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::parenthesize::parenthesized_range;
+use ruff_python_ast::token::parenthesized_range;
 use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_text_size::Ranged;
 
@@ -139,13 +139,8 @@ pub(crate) fn yield_in_for_loop(checker: &Checker, stmt_for: &ast::StmtFor) {
     let mut diagnostic = checker.report_diagnostic(YieldInForLoop, stmt_for.range());
 
     let contents = checker.locator().slice(
-        parenthesized_range(
-            iter.as_ref().into(),
-            stmt_for.into(),
-            checker.comment_ranges(),
-            checker.locator().contents(),
-        )
-        .unwrap_or(iter.range()),
+        parenthesized_range(iter.as_ref().into(), stmt_for.into(), checker.tokens())
+            .unwrap_or(iter.range()),
     );
     let contents = if iter.as_tuple_expr().is_some_and(|it| !it.parenthesized) {
         format!("yield from ({contents})")

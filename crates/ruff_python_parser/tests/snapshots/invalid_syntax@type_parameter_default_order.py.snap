@@ -1,0 +1,277 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/type_parameter_default_order.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        node_index: NodeIndex(None),
+        range: 0..89,
+        body: [
+            ClassDef(
+                StmtClassDef {
+                    node_index: NodeIndex(None),
+                    range: 0..24,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("C"),
+                        range: 6..7,
+                        node_index: NodeIndex(None),
+                    },
+                    type_params: Some(
+                        TypeParams {
+                            range: 7..19,
+                            node_index: NodeIndex(None),
+                            type_params: [
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        node_index: NodeIndex(None),
+                                        range: 8..15,
+                                        name: Identifier {
+                                            id: Name("T"),
+                                            range: 8..9,
+                                            node_index: NodeIndex(None),
+                                        },
+                                        bound: None,
+                                        default: Some(
+                                            Name(
+                                                ExprName {
+                                                    node_index: NodeIndex(None),
+                                                    range: 12..15,
+                                                    id: Name("int"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ),
+                                    },
+                                ),
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        node_index: NodeIndex(None),
+                                        range: 17..18,
+                                        name: Identifier {
+                                            id: Name("U"),
+                                            range: 17..18,
+                                            node_index: NodeIndex(None),
+                                        },
+                                        bound: None,
+                                        default: None,
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                    arguments: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                node_index: NodeIndex(None),
+                                range: 21..24,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        node_index: NodeIndex(None),
+                                        range: 21..24,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            ClassDef(
+                StmtClassDef {
+                    node_index: NodeIndex(None),
+                    range: 25..59,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("C"),
+                        range: 31..32,
+                        node_index: NodeIndex(None),
+                    },
+                    type_params: Some(
+                        TypeParams {
+                            range: 32..54,
+                            node_index: NodeIndex(None),
+                            type_params: [
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        node_index: NodeIndex(None),
+                                        range: 33..35,
+                                        name: Identifier {
+                                            id: Name("T1"),
+                                            range: 33..35,
+                                            node_index: NodeIndex(None),
+                                        },
+                                        bound: None,
+                                        default: None,
+                                    },
+                                ),
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        node_index: NodeIndex(None),
+                                        range: 37..45,
+                                        name: Identifier {
+                                            id: Name("T2"),
+                                            range: 37..39,
+                                            node_index: NodeIndex(None),
+                                        },
+                                        bound: None,
+                                        default: Some(
+                                            Name(
+                                                ExprName {
+                                                    node_index: NodeIndex(None),
+                                                    range: 42..45,
+                                                    id: Name("int"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ),
+                                    },
+                                ),
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        node_index: NodeIndex(None),
+                                        range: 47..49,
+                                        name: Identifier {
+                                            id: Name("T3"),
+                                            range: 47..49,
+                                            node_index: NodeIndex(None),
+                                        },
+                                        bound: None,
+                                        default: None,
+                                    },
+                                ),
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        node_index: NodeIndex(None),
+                                        range: 51..53,
+                                        name: Identifier {
+                                            id: Name("T4"),
+                                            range: 51..53,
+                                            node_index: NodeIndex(None),
+                                        },
+                                        bound: None,
+                                        default: None,
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                    arguments: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                node_index: NodeIndex(None),
+                                range: 56..59,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        node_index: NodeIndex(None),
+                                        range: 56..59,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            TypeAlias(
+                StmtTypeAlias {
+                    node_index: NodeIndex(None),
+                    range: 60..88,
+                    name: Name(
+                        ExprName {
+                            node_index: NodeIndex(None),
+                            range: 65..70,
+                            id: Name("Alias"),
+                            ctx: Store,
+                        },
+                    ),
+                    type_params: Some(
+                        TypeParams {
+                            range: 70..82,
+                            node_index: NodeIndex(None),
+                            type_params: [
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        node_index: NodeIndex(None),
+                                        range: 71..78,
+                                        name: Identifier {
+                                            id: Name("T"),
+                                            range: 71..72,
+                                            node_index: NodeIndex(None),
+                                        },
+                                        bound: None,
+                                        default: Some(
+                                            Name(
+                                                ExprName {
+                                                    node_index: NodeIndex(None),
+                                                    range: 75..78,
+                                                    id: Name("int"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ),
+                                    },
+                                ),
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        node_index: NodeIndex(None),
+                                        range: 80..81,
+                                        name: Identifier {
+                                            id: Name("U"),
+                                            range: 80..81,
+                                            node_index: NodeIndex(None),
+                                        },
+                                        bound: None,
+                                        default: None,
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                    value: EllipsisLiteral(
+                        ExprEllipsisLiteral {
+                            node_index: NodeIndex(None),
+                            range: 85..88,
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Semantic Syntax Errors
+
+  |
+1 | class C[T = int, U]: ...
+  |                  ^ Syntax Error: non default type parameter `U` follows default type parameter
+2 | class C[T1, T2 = int, T3, T4]: ...
+3 | type Alias[T = int, U] = ...
+  |
+
+
+  |
+1 | class C[T = int, U]: ...
+2 | class C[T1, T2 = int, T3, T4]: ...
+  |                       ^^ Syntax Error: non default type parameter `T3` follows default type parameter
+3 | type Alias[T = int, U] = ...
+  |
+
+
+  |
+1 | class C[T = int, U]: ...
+2 | class C[T1, T2 = int, T3, T4]: ...
+  |                           ^^ Syntax Error: non default type parameter `T4` follows default type parameter
+3 | type Alias[T = int, U] = ...
+  |
+
+
+  |
+1 | class C[T = int, U]: ...
+2 | class C[T1, T2 = int, T3, T4]: ...
+3 | type Alias[T = int, U] = ...
+  |                     ^ Syntax Error: non default type parameter `U` follows default type parameter
+  |

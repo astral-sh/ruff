@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
-input_file: crates/ruff_python_parser/resources/inline/err/from_import_missing_module.py
 ---
 ## AST
 
@@ -17,6 +16,7 @@ Module(
                     module: None,
                     names: [],
                     level: 0,
+                    is_lazy: false,
                 },
             ),
             ImportFrom(
@@ -37,6 +37,7 @@ Module(
                         },
                     ],
                     level: 0,
+                    is_lazy: false,
                 },
             ),
         ],

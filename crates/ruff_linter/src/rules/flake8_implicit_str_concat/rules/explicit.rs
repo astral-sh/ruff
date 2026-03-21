@@ -1,12 +1,12 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::token::parenthesized_range;
 use ruff_python_ast::{self as ast, Expr, Operator};
 use ruff_python_trivia::is_python_whitespace;
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
-use crate::AlwaysFixableViolation;
 use crate::checkers::ast::Checker;
-use crate::{Edit, Fix};
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for string literals that are explicitly concatenated (using the
@@ -32,18 +32,27 @@ use crate::{Edit, Fix};
 ///     "dog"
 /// )
 /// ```
+///
+/// ## Options
+///
+/// Setting `lint.flake8-implicit-str-concat.allow-multiline = false` will disable this rule because
+/// it would leave no allowed way to write a multi-line string.
+///
+/// - `lint.flake8-implicit-str-concat.allow-multiline`
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.201")]
 pub(crate) struct ExplicitStringConcatenation;
 
-impl AlwaysFixableViolation for ExplicitStringConcatenation {
+impl Violation for ExplicitStringConcatenation {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         "Explicitly concatenated string should be implicitly concatenated".to_string()
     }
 
-    fn fix_title(&self) -> String {
-        "Remove redundant '+' operator to implicitly concatenate".to_string()
+    fn fix_title(&self) -> Option<String> {
+        Some("Remove redundant '+' operator to implicitly concatenate".to_string())
     }
 }
 
@@ -82,9 +91,21 @@ pub(crate) fn explicit(checker: &Checker, expr: &Expr) {
                     .locator()
                     .contains_line_break(TextRange::new(left.end(), right.start()))
             {
-                checker
-                    .report_diagnostic(ExplicitStringConcatenation, expr.range())
-                    .set_fix(generate_fix(checker, bin_op));
+                let mut diagnostic =
+                    checker.report_diagnostic(ExplicitStringConcatenation, expr.range());
+
+                let is_parenthesized = |expr: &Expr| {
+                    parenthesized_range(expr.into(), bin_op.into(), checker.tokens()).is_some()
+                };
+                // If either `left` or `right` is parenthesized, generating
+                // a fix would be too involved. Just report the diagnostic.
+                // Currently, attempting `generate_fix` would result in
+                // an invalid code. See: #19757
+                if is_parenthesized(left) || is_parenthesized(right) {
+                    return;
+                }
+
+                diagnostic.set_fix(generate_fix(checker, bin_op));
             }
         }
     }

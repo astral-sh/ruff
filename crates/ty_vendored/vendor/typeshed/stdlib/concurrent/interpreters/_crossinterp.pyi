@@ -25,12 +25,7 @@ if sys.version_info >= (3, 13):  # needed to satisfy pyright checks for Python <
         __slots__ = ()
         def __new__(cls) -> Never: ...
         @classonly
-        def singleton(cls, kind: str, module: str, name: str = "UNBOUND") -> Self:
-            """A non-data descriptor that makes a value only visible on the class.
-
-            This is like the "classmethod" builtin, but does not show up on
-            instances of the class.  It may be used as a decorator.
-            """
+        def singleton(cls, kind: str, module: str, name: str = "UNBOUND") -> Self: ...
 
     # Sentinel types and alias that don't exist at runtime.
     _UnboundErrorType = NewType("_UnboundErrorType", object)

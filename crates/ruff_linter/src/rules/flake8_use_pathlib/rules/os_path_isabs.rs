@@ -1,3 +1,4 @@
+use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::ExprCall;
 
@@ -71,6 +72,6 @@ pub(crate) fn os_path_isabs(checker: &Checker, call: &ExprCall, segments: &[&str
         "s",
         is_fix_os_path_isabs_enabled(checker.settings()),
         OsPathIsabs,
-        None,
+        Applicability::Safe,
     );
 }

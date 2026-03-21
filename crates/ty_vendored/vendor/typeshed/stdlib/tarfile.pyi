@@ -123,17 +123,17 @@ class TarFile:
     OPEN_METH: ClassVar[Mapping[str, str]]
     name: StrOrBytesPath | None
     mode: Literal["r", "a", "w", "x"]
-    fileobj: _Fileobj | None
-    format: _TarFormat | None
+    fileobj: _Fileobj
+    format: _TarFormat
     tarinfo: type[TarInfo]
-    dereference: bool | None
-    ignore_zeros: bool | None
-    encoding: str | None
+    dereference: bool
+    ignore_zeros: bool
+    encoding: str
     errors: str
     fileobject: type[ExFileObject]  # undocumented
-    pax_headers: Mapping[str, str] | None
-    debug: int | None
-    errorlevel: int | None
+    pax_headers: Mapping[str, str]
+    debug: Literal[0, 1, 2, 3]
+    errorlevel: Literal[0, 1, 2]
     offset: int  # undocumented
     extraction_filter: _FilterFunction | None
     if sys.version_info >= (3, 13):
@@ -150,8 +150,8 @@ class TarFile:
             encoding: str | None = None,
             errors: str = "surrogateescape",
             pax_headers: Mapping[str, str] | None = None,
-            debug: int | None = None,
-            errorlevel: int | None = None,
+            debug: Literal[0, 1, 2, 3] | None = None,  # default 0
+            errorlevel: Literal[0, 1, 2] | None = None,  # default 1
             copybufsize: int | None = None,  # undocumented
             stream: bool = False,
         ) -> None:
@@ -176,8 +176,8 @@ class TarFile:
             encoding: str | None = None,
             errors: str = "surrogateescape",
             pax_headers: Mapping[str, str] | None = None,
-            debug: int | None = None,
-            errorlevel: int | None = None,
+            debug: Literal[0, 1, 2, 3] | None = None,  # default 0
+            errorlevel: Literal[0, 1, 2] | None = None,  # default 1
             copybufsize: int | None = None,  # undocumented
         ) -> None:
             """Open an (uncompressed) tar archive `name'. `mode' is either 'r' to
@@ -212,8 +212,8 @@ class TarFile:
         encoding: str | None = ...,
         errors: str = ...,
         pax_headers: Mapping[str, str] | None = ...,
-        debug: int | None = ...,
-        errorlevel: int | None = ...,
+        debug: Literal[0, 1, 2, 3] | None = None,  # default 0
+        errorlevel: Literal[0, 1, 2] | None = None,  # default 1
     ) -> Self:
         """Open a tar archive for reading, writing or appending. Return
         an appropriate TarFile class.
@@ -272,11 +272,11 @@ class TarFile:
             encoding: str | None = ...,
             errors: str = ...,
             pax_headers: Mapping[str, str] | None = ...,
-            debug: int | None = ...,
-            errorlevel: int | None = ...,
+            debug: Literal[0, 1, 2, 3] | None = None,  # default 0
+            errorlevel: Literal[0, 1, 2] | None = None,  # default 1
             level: None = None,
             options: Mapping[int, int] | None = None,
-            zstd_dict: ZstdDict | None = None,
+            zstd_dict: ZstdDict | tuple[ZstdDict, int] | None = None,
         ) -> Self:
             """Open a tar archive for reading, writing or appending. Return
             an appropriate TarFile class.
@@ -335,8 +335,8 @@ class TarFile:
         encoding: str | None = ...,
         errors: str = ...,
         pax_headers: Mapping[str, str] | None = ...,
-        debug: int | None = ...,
-        errorlevel: int | None = ...,
+        debug: Literal[0, 1, 2, 3] | None = None,  # default 0
+        errorlevel: Literal[0, 1, 2] | None = None,  # default 1
     ) -> Self: ...
     @overload
     @classmethod
@@ -354,8 +354,8 @@ class TarFile:
         encoding: str | None = ...,
         errors: str = ...,
         pax_headers: Mapping[str, str] | None = ...,
-        debug: int | None = ...,
-        errorlevel: int | None = ...,
+        debug: Literal[0, 1, 2, 3] | None = None,  # default 0
+        errorlevel: Literal[0, 1, 2] | None = None,  # default 1
     ) -> Self: ...
     @overload
     @classmethod
@@ -373,8 +373,8 @@ class TarFile:
         encoding: str | None = ...,
         errors: str = ...,
         pax_headers: Mapping[str, str] | None = ...,
-        debug: int | None = ...,
-        errorlevel: int | None = ...,
+        debug: Literal[0, 1, 2, 3] | None = None,  # default 0
+        errorlevel: Literal[0, 1, 2] | None = None,  # default 1
         compresslevel: int = 9,
     ) -> Self: ...
     @overload
@@ -393,8 +393,8 @@ class TarFile:
         encoding: str | None = ...,
         errors: str = ...,
         pax_headers: Mapping[str, str] | None = ...,
-        debug: int | None = ...,
-        errorlevel: int | None = ...,
+        debug: Literal[0, 1, 2, 3] | None = None,  # default 0
+        errorlevel: Literal[0, 1, 2] | None = None,  # default 1
         compresslevel: int = 9,
     ) -> Self: ...
     @overload
@@ -413,8 +413,8 @@ class TarFile:
         encoding: str | None = ...,
         errors: str = ...,
         pax_headers: Mapping[str, str] | None = ...,
-        debug: int | None = ...,
-        errorlevel: int | None = ...,
+        debug: Literal[0, 1, 2, 3] | None = None,  # default 0
+        errorlevel: Literal[0, 1, 2] | None = None,  # default 1
         preset: Literal[0, 1, 2, 3, 4, 5, 6, 7, 8, 9] | None = ...,
     ) -> Self: ...
     @overload
@@ -433,8 +433,8 @@ class TarFile:
         encoding: str | None = ...,
         errors: str = ...,
         pax_headers: Mapping[str, str] | None = ...,
-        debug: int | None = ...,
-        errorlevel: int | None = ...,
+        debug: Literal[0, 1, 2, 3] | None = None,  # default 0
+        errorlevel: Literal[0, 1, 2] | None = None,  # default 1
         preset: Literal[0, 1, 2, 3, 4, 5, 6, 7, 8, 9] | None = ...,
     ) -> Self: ...
     if sys.version_info >= (3, 14):
@@ -454,10 +454,10 @@ class TarFile:
             encoding: str | None = ...,
             errors: str = ...,
             pax_headers: Mapping[str, str] | None = ...,
-            debug: int | None = ...,
-            errorlevel: int | None = ...,
+            debug: Literal[0, 1, 2, 3] | None = None,  # default 0
+            errorlevel: Literal[0, 1, 2] | None = None,  # default 1
             options: Mapping[int, int] | None = None,
-            zstd_dict: ZstdDict | None = None,
+            zstd_dict: ZstdDict | tuple[ZstdDict, int] | None = None,
         ) -> Self:
             """Open a tar archive for reading, writing or appending. Return
             an appropriate TarFile class.
@@ -516,10 +516,10 @@ class TarFile:
             encoding: str | None = ...,
             errors: str = ...,
             pax_headers: Mapping[str, str] | None = ...,
-            debug: int | None = ...,
-            errorlevel: int | None = ...,
+            debug: Literal[0, 1, 2, 3] | None = None,  # default 0
+            errorlevel: Literal[0, 1, 2] | None = None,  # default 1
             options: Mapping[int, int] | None = None,
-            zstd_dict: ZstdDict | None = None,
+            zstd_dict: ZstdDict | tuple[ZstdDict, int] | None = None,
         ) -> Self: ...
 
     @overload
@@ -538,8 +538,8 @@ class TarFile:
         encoding: str | None = ...,
         errors: str = ...,
         pax_headers: Mapping[str, str] | None = ...,
-        debug: int | None = ...,
-        errorlevel: int | None = ...,
+        debug: Literal[0, 1, 2, 3] | None = None,  # default 0
+        errorlevel: Literal[0, 1, 2] | None = None,  # default 1
     ) -> Self: ...
     @overload
     @classmethod
@@ -557,8 +557,8 @@ class TarFile:
         encoding: str | None = ...,
         errors: str = ...,
         pax_headers: Mapping[str, str] | None = ...,
-        debug: int | None = ...,
-        errorlevel: int | None = ...,
+        debug: Literal[0, 1, 2, 3] | None = None,  # default 0
+        errorlevel: Literal[0, 1, 2] | None = None,  # default 1
     ) -> Self: ...
     @overload
     @classmethod
@@ -576,8 +576,8 @@ class TarFile:
         encoding: str | None = ...,
         errors: str = ...,
         pax_headers: Mapping[str, str] | None = ...,
-        debug: int | None = ...,
-        errorlevel: int | None = ...,
+        debug: Literal[0, 1, 2, 3] | None = None,  # default 0
+        errorlevel: Literal[0, 1, 2] | None = None,  # default 1
     ) -> Self: ...
     @overload
     @classmethod
@@ -595,8 +595,8 @@ class TarFile:
         encoding: str | None = ...,
         errors: str = ...,
         pax_headers: Mapping[str, str] | None = ...,
-        debug: int | None = ...,
-        errorlevel: int | None = ...,
+        debug: Literal[0, 1, 2, 3] | None = None,  # default 0
+        errorlevel: Literal[0, 1, 2] | None = None,  # default 1
     ) -> Self: ...
     @overload
     @classmethod
@@ -614,8 +614,8 @@ class TarFile:
         encoding: str | None = ...,
         errors: str = ...,
         pax_headers: Mapping[str, str] | None = ...,
-        debug: int | None = ...,
-        errorlevel: int | None = ...,
+        debug: Literal[0, 1, 2, 3] | None = None,  # default 0
+        errorlevel: Literal[0, 1, 2] | None = None,  # default 1
         compresslevel: int = 9,
     ) -> Self: ...
     @overload
@@ -634,8 +634,8 @@ class TarFile:
         encoding: str | None = ...,
         errors: str = ...,
         pax_headers: Mapping[str, str] | None = ...,
-        debug: int | None = ...,
-        errorlevel: int | None = ...,
+        debug: Literal[0, 1, 2, 3] | None = None,  # default 0
+        errorlevel: Literal[0, 1, 2] | None = None,  # default 1
         compresslevel: int = 9,
     ) -> Self: ...
     @classmethod
@@ -652,8 +652,8 @@ class TarFile:
         ignore_zeros: bool | None = ...,
         encoding: str | None = ...,
         pax_headers: Mapping[str, str] | None = ...,
-        debug: int | None = ...,
-        errorlevel: int | None = ...,
+        debug: Literal[0, 1, 2, 3] | None = None,  # default 0
+        errorlevel: Literal[0, 1, 2] | None = None,  # default 1
     ) -> Self:
         """Open uncompressed tar archive name for reading or writing."""
 
@@ -672,8 +672,8 @@ class TarFile:
         ignore_zeros: bool | None = ...,
         encoding: str | None = ...,
         pax_headers: Mapping[str, str] | None = ...,
-        debug: int | None = ...,
-        errorlevel: int | None = ...,
+        debug: Literal[0, 1, 2, 3] | None = None,  # default 0
+        errorlevel: Literal[0, 1, 2] | None = None,  # default 1
     ) -> Self:
         """Open gzip compressed tar archive name for reading or writing.
         Appending is not allowed.
@@ -694,8 +694,8 @@ class TarFile:
         ignore_zeros: bool | None = ...,
         encoding: str | None = ...,
         pax_headers: Mapping[str, str] | None = ...,
-        debug: int | None = ...,
-        errorlevel: int | None = ...,
+        debug: Literal[0, 1, 2, 3] | None = None,  # default 0
+        errorlevel: Literal[0, 1, 2] | None = None,  # default 1
     ) -> Self: ...
     @overload
     @classmethod
@@ -712,8 +712,8 @@ class TarFile:
         ignore_zeros: bool | None = ...,
         encoding: str | None = ...,
         pax_headers: Mapping[str, str] | None = ...,
-        debug: int | None = ...,
-        errorlevel: int | None = ...,
+        debug: Literal[0, 1, 2, 3] | None = None,  # default 0
+        errorlevel: Literal[0, 1, 2] | None = None,  # default 1
     ) -> Self:
         """Open bzip2 compressed tar archive name for reading or writing.
         Appending is not allowed.
@@ -734,8 +734,8 @@ class TarFile:
         ignore_zeros: bool | None = ...,
         encoding: str | None = ...,
         pax_headers: Mapping[str, str] | None = ...,
-        debug: int | None = ...,
-        errorlevel: int | None = ...,
+        debug: Literal[0, 1, 2, 3] | None = None,  # default 0
+        errorlevel: Literal[0, 1, 2] | None = None,  # default 1
     ) -> Self: ...
     @classmethod
     def xzopen(
@@ -751,8 +751,8 @@ class TarFile:
         ignore_zeros: bool | None = ...,
         encoding: str | None = ...,
         pax_headers: Mapping[str, str] | None = ...,
-        debug: int | None = ...,
-        errorlevel: int | None = ...,
+        debug: Literal[0, 1, 2, 3] | None = None,  # default 0
+        errorlevel: Literal[0, 1, 2] | None = None,  # default 1
     ) -> Self:
         """Open lzma compressed tar archive name for reading or writing.
         Appending is not allowed.
@@ -767,7 +767,7 @@ class TarFile:
             fileobj: IO[bytes] | None = None,
             level: None = None,
             options: Mapping[int, int] | None = None,
-            zstd_dict: ZstdDict | None = None,
+            zstd_dict: ZstdDict | tuple[ZstdDict, int] | None = None,
             *,
             format: int | None = ...,
             tarinfo: type[TarInfo] | None = ...,
@@ -775,8 +775,8 @@ class TarFile:
             ignore_zeros: bool | None = ...,
             encoding: str | None = ...,
             pax_headers: Mapping[str, str] | None = ...,
-            debug: int | None = ...,
-            errorlevel: int | None = ...,
+            debug: Literal[0, 1, 2, 3] | None = None,  # default 0
+            errorlevel: Literal[0, 1, 2] | None = None,  # default 1
         ) -> Self:
             """Open zstd compressed tar archive name for reading or writing.
             Appending is not allowed.
@@ -791,7 +791,7 @@ class TarFile:
             fileobj: IO[bytes] | None = None,
             level: int | None = None,
             options: Mapping[int, int] | None = None,
-            zstd_dict: ZstdDict | None = None,
+            zstd_dict: ZstdDict | tuple[ZstdDict, int] | None = None,
             *,
             format: int | None = ...,
             tarinfo: type[TarInfo] | None = ...,
@@ -799,8 +799,8 @@ class TarFile:
             ignore_zeros: bool | None = ...,
             encoding: str | None = ...,
             pax_headers: Mapping[str, str] | None = ...,
-            debug: int | None = ...,
-            errorlevel: int | None = ...,
+            debug: Literal[0, 1, 2, 3] | None = None,  # default 0
+            errorlevel: Literal[0, 1, 2] | None = None,  # default 1
         ) -> Self: ...
 
     def getmember(self, name: str) -> TarInfo:
@@ -992,6 +992,46 @@ class TarFile:
         """
 
 open = TarFile.open
+"""Open a tar archive for reading, writing or appending. Return
+an appropriate TarFile class.
+
+mode:
+'r' or 'r:*' open for reading with transparent compression
+'r:'         open for reading exclusively uncompressed
+'r:gz'       open for reading with gzip compression
+'r:bz2'      open for reading with bzip2 compression
+'r:xz'       open for reading with lzma compression
+'r:zst'      open for reading with zstd compression
+'a' or 'a:'  open for appending, creating the file if necessary
+'w' or 'w:'  open for writing without compression
+'w:gz'       open for writing with gzip compression
+'w:bz2'      open for writing with bzip2 compression
+'w:xz'       open for writing with lzma compression
+'w:zst'      open for writing with zstd compression
+
+'x' or 'x:'  create a tarfile exclusively without compression, raise
+             an exception if the file is already created
+'x:gz'       create a gzip compressed tarfile, raise an exception
+             if the file is already created
+'x:bz2'      create a bzip2 compressed tarfile, raise an exception
+             if the file is already created
+'x:xz'       create an lzma compressed tarfile, raise an exception
+             if the file is already created
+'x:zst'      create a zstd compressed tarfile, raise an exception
+             if the file is already created
+
+'r|*'        open a stream of tar blocks with transparent compression
+'r|'         open an uncompressed stream of tar blocks for reading
+'r|gz'       open a gzip compressed stream of tar blocks
+'r|bz2'      open a bzip2 compressed stream of tar blocks
+'r|xz'       open an lzma compressed stream of tar blocks
+'r|zst'      open a zstd compressed stream of tar blocks
+'w|'         open an uncompressed stream for writing
+'w|gz'       open a gzip compressed stream for writing
+'w|bz2'      open a bzip2 compressed stream for writing
+'w|xz'       open an lzma compressed stream for writing
+'w|zst'      open a zstd compressed stream for writing
+"""
 
 def is_tarfile(name: StrOrBytesPath | IO[bytes]) -> bool:
     """Return True if name points to a tar archive that we
@@ -1077,6 +1117,8 @@ class TarInfo:
     )
     name: str
     path: str
+    """In pax headers, "name" is called "path"."""
+
     size: int
     mtime: int | float
     chksum: int

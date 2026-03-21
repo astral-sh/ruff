@@ -2,6 +2,7 @@
 source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
+
 ---
 mdtest name: tuples.md - Comparison: Tuples - Chained comparisons with elements that incorrectly implement `__bool__`
 mdtest path: crates/ty_python_semantic/resources/mdtest/comparison/tuples.md
@@ -34,7 +35,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/comparison/tuples.md
 # Diagnostics
 
 ```
-error[unsupported-bool-conversion]: Boolean conversion is unsupported for type `NotBoolable | Literal[False]`
+error[unsupported-bool-conversion]: Boolean conversion is not supported for type `NotBoolable | Literal[False]`
   --> src/mdtest_snippet.py:15:1
    |
 14 | # error: [unsupported-bool-conversion]

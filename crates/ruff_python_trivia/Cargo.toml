@@ -13,8 +13,8 @@ license = { workspace = true }
 [lib]
 
 [dependencies]
-ruff_text_size = { workspace = true }
 ruff_source_file = { workspace = true }
+ruff_text_size = { workspace = true }
 
 itertools = { workspace = true }
 unicode-ident = { workspace = true }

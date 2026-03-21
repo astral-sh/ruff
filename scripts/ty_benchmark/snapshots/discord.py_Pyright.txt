@@ -1,0 +1,653 @@
+<CWD>/discord/abc.py
+  <CWD>/discord/abc.py:122:9 - error: "pinned_at" incorrectly overrides property of same name in class "Message" (reportIncompatibleMethodOverride)
+  <CWD>/discord/abc.py:123:9 - error: "pinned" overrides symbol of same name in class "Message"
+    Variable is mutable so its type is invariant
+      Override type "Literal[True]" is not the same as base type "bool" (reportIncompatibleVariableOverride)
+<CWD>/discord/activity.py
+  <CWD>/discord/activity.py:286:9 - error: Method "to_dict" overrides class "BaseActivity" in an incompatible manner
+    Return type mismatch: base method returns type "Activity", override returns type "Dict[str, Any]"
+      "Dict[str, Any]" is not assignable to "Activity" (reportIncompatibleMethodOverride)
+  <CWD>/discord/activity.py:455:9 - error: Method "to_dict" overrides class "BaseActivity" in an incompatible manner
+    Return type mismatch: base method returns type "Activity", override returns type "Dict[str, Any]"
+      "Dict[str, Any]" is not assignable to "Activity" (reportIncompatibleMethodOverride)
+  <CWD>/discord/activity.py:566:9 - error: Method "to_dict" overrides class "BaseActivity" in an incompatible manner
+    Return type mismatch: base method returns type "Activity", override returns type "Dict[str, Any]"
+      "Dict[str, Any]" is not assignable to "Activity" (reportIncompatibleMethodOverride)
+  <CWD>/discord/activity.py:822:9 - error: Method "to_dict" overrides class "BaseActivity" in an incompatible manner
+    Return type mismatch: base method returns type "Activity", override returns type "Dict[str, Any]"
+      "Dict[str, Any]" is not assignable to "Activity" (reportIncompatibleMethodOverride)
+<CWD>/discord/app_commands/commands.py
+  <CWD>/discord/app_commands/commands.py:235:18 - error: Cannot assign to attribute "pass_command_binding" for class "FunctionType"
+    Attribute "pass_command_binding" is unknown (reportFunctionMemberAccess)
+  <CWD>/discord/app_commands/commands.py:393:34 - error: Cannot access attribute "__discord_app_commands_param_description__" for class "FunctionType"
+    Attribute "__discord_app_commands_param_description__" is unknown (reportFunctionMemberAccess)
+  <CWD>/discord/app_commands/commands.py:402:24 - error: Cannot access attribute "__discord_app_commands_param_rename__" for class "FunctionType"
+    Attribute "__discord_app_commands_param_rename__" is unknown (reportFunctionMemberAccess)
+  <CWD>/discord/app_commands/commands.py:409:24 - error: Cannot access attribute "__discord_app_commands_param_choices__" for class "FunctionType"
+    Attribute "__discord_app_commands_param_choices__" is unknown (reportFunctionMemberAccess)
+  <CWD>/discord/app_commands/commands.py:416:29 - error: Cannot access attribute "__discord_app_commands_param_autocomplete__" for class "FunctionType"
+    Attribute "__discord_app_commands_param_autocomplete__" is unknown (reportFunctionMemberAccess)
+  <CWD>/discord/app_commands/commands.py:456:10 - error: Cannot assign to attribute "__discord_app_commands_base_function__" for class "FunctionType"
+    Attribute "__discord_app_commands_base_function__" is unknown (reportFunctionMemberAccess)
+  <CWD>/discord/app_commands/commands.py:683:37 - error: Cannot access attribute "__self__" for class "FunctionType"
+    Attribute "__self__" is unknown (reportFunctionMemberAccess)
+  <CWD>/discord/app_commands/commands.py:684:50 - error: Cannot access attribute "__func__" for class "FunctionType"
+    Attribute "__func__" is unknown (reportFunctionMemberAccess)
+  <CWD>/discord/app_commands/commands.py:2477:22 - error: Cannot assign to attribute "__discord_app_commands_checks__" for class "FunctionType"
+    Attribute "__discord_app_commands_checks__" is unknown (reportFunctionMemberAccess)
+  <CWD>/discord/app_commands/commands.py:2479:18 - error: Cannot access attribute "__discord_app_commands_checks__" for class "FunctionType"
+    Attribute "__discord_app_commands_checks__" is unknown (reportFunctionMemberAccess)
+<CWD>/discord/app_commands/errors.py
+  <CWD>/discord/app_commands/errors.py:483:27 - error: "errors" is possibly unbound (reportPossiblyUnboundVariable)
+<CWD>/discord/app_commands/tree.py
+  <CWD>/discord/app_commands/tree.py:605:9 - error: Overload 1 for "get_commands" overlaps overload 4 and returns an incompatible type (reportOverlappingOverload)
+<CWD>/discord/asset.py
+  <CWD>/discord/asset.py:385:9 - error: "url" overrides symbol of same name in class "AssetMixin"
+    "property" is not assignable to "str" (reportIncompatibleVariableOverride)
+<CWD>/discord/channel.py
+  <CWD>/discord/channel.py:374:9 - error: Method "_update" overrides class "GuildChannel" in an incompatible manner
+    Parameter 3 type mismatch: base parameter is type "Dict[str, Any]", override parameter is type "TextChannel | NewsChannel"
+      Type "Dict[str, Any]" is not assignable to type "TextChannel | NewsChannel"
+        "Dict[str, Any]" is not assignable to "TextChannel"
+        "Dict[str, Any]" is not assignable to "NewsChannel" (reportIncompatibleMethodOverride)
+  <CWD>/discord/channel.py:393:9 - error: "type" overrides symbol of same name in class "GuildChannel"
+    "property" is not assignable to "ChannelType" (reportIncompatibleVariableOverride)
+  <CWD>/discord/channel.py:1098:15 - error: Method "_get_channel" overrides class "Messageable" in an incompatible manner
+    Return type mismatch: base method returns type "CoroutineType[Any, Any, MessageableChannel]", override returns type "CoroutineType[Any, Any, VocalGuildChannel]"
+      "CoroutineType[Any, Any, VocalGuildChannel]" is not assignable to "CoroutineType[Any, Any, MessageableChannel]"
+        Type parameter "_ReturnT_nd_co@CoroutineType" is covariant, but "VocalGuildChannel" is not a subtype of "MessageableChannel"
+          Type "VocalGuildChannel" is not assignable to type "MessageableChannel"
+            "VocalGuildChannel" is not assignable to "TextChannel"
+            "VocalGuildChannel" is not assignable to "VoiceChannel"
+            "VocalGuildChannel" is not assignable to "StageChannel"
+            "VocalGuildChannel" is not assignable to "Thread"
+    ... (reportIncompatibleMethodOverride)
+  <CWD>/discord/channel.py:1107:9 - error: Method "_update" overrides class "GuildChannel" in an incompatible manner
+    Parameter 3 type mismatch: base parameter is type "Dict[str, Any]", override parameter is type "VoiceChannel | StageChannel"
+      Type "Dict[str, Any]" is not assignable to type "VoiceChannel | StageChannel"
+        "Dict[str, Any]" is not assignable to "VoiceChannel"
+        "Dict[str, Any]" is not assignable to "StageChannel" (reportIncompatibleMethodOverride)
+  <CWD>/discord/channel.py:1546:9 - error: "type" overrides symbol of same name in class "GuildChannel"
+    "property" is not assignable to "ChannelType" (reportIncompatibleVariableOverride)
+  <CWD>/discord/channel.py:1770:9 - error: Method "_update" overrides class "VocalGuildChannel" in an incompatible manner
+    Parameter 3 type mismatch: base parameter is type "VoiceChannel | StageChannel", override parameter is type "StageChannel"
+      Type "VoiceChannel | StageChannel" is not assignable to type "StageChannel"
+        "type" is an incompatible type
+          "Literal[2]" is not assignable to type "Literal[13]" (reportIncompatibleMethodOverride)
+  <CWD>/discord/channel.py:1813:9 - error: "type" overrides symbol of same name in class "GuildChannel"
+    "property" is not assignable to "ChannelType" (reportIncompatibleVariableOverride)
+  <CWD>/discord/channel.py:2065:9 - error: Method "_update" overrides class "GuildChannel" in an incompatible manner
+    Parameter 3 type mismatch: base parameter is type "Dict[str, Any]", override parameter is type "CategoryChannel"
+      "Dict[str, Any]" is not assignable to "CategoryChannel" (reportIncompatibleMethodOverride)
+  <CWD>/discord/channel.py:2082:9 - error: "type" overrides symbol of same name in class "GuildChannel"
+    "property" is not assignable to "ChannelType" (reportIncompatibleVariableOverride)
+  <CWD>/discord/channel.py:2478:9 - error: Method "_update" overrides class "GuildChannel" in an incompatible manner
+    Parameter 3 type mismatch: base parameter is type "Dict[str, Any]", override parameter is type "ForumChannel | MediaChannel"
+      Type "Dict[str, Any]" is not assignable to type "ForumChannel | MediaChannel"
+        "Dict[str, Any]" is not assignable to "ForumChannel"
+        "Dict[str, Any]" is not assignable to "MediaChannel" (reportIncompatibleMethodOverride)
+  <CWD>/discord/channel.py:2512:9 - error: "type" overrides symbol of same name in class "GuildChannel"
+    "property" is not assignable to "ChannelType" (reportIncompatibleVariableOverride)
+  <CWD>/discord/channel.py:2619:15 - error: Method "clone" overrides class "GuildChannel" in an incompatible manner
+    Keyword parameter "category" mismatch: base parameter has default argument value, override parameter does not (reportIncompatibleMethodOverride)
+<CWD>/discord/components.py
+  <CWD>/discord/components.py:382:14 - error: "type" incorrectly overrides property of same name in class "Component" (reportIncompatibleMethodOverride)
+<CWD>/discord/embeds.py
+  <CWD>/discord/embeds.py:308:9 - error: Method "__eq__" overrides class "object" in an incompatible manner
+    Parameter 2 type mismatch: base parameter is type "object", override parameter is type "Embed"
+      "object" is not assignable to "Embed" (reportIncompatibleMethodOverride)
+<CWD>/discord/emoji.py
+  <CWD>/discord/emoji.py:166:9 - error: "url" overrides symbol of same name in class "AssetMixin"
+    "property" is not assignable to "str" (reportIncompatibleVariableOverride)
+<CWD>/discord/enums.py
+  <CWD>/discord/enums.py:113:9 - error: Class variable "__name__" overrides instance variable of same name in class "type" (reportIncompatibleVariableOverride)
+  <CWD>/discord/enums.py:960:5 - error: "name" incorrectly overrides property of same name in class "Enum" (reportIncompatibleMethodOverride)
+<CWD>/discord/errors.py
+  <CWD>/discord/errors.py:30:10 - warning: Import "requests" could not be resolved from source (reportMissingModuleSource)
+<CWD>/discord/ext/commands/cog.py
+  <CWD>/discord/ext/commands/cog.py:268:10 - error: Cannot assign to attribute "__cog_special_method__" for class "FunctionType"
+    Attribute "__cog_special_method__" is unknown (reportFunctionMemberAccess)
+  <CWD>/discord/ext/commands/cog.py:497:31 - error: Cannot access attribute "__func__" for class "FunctionType"
+    Attribute "__func__" is unknown (reportFunctionMemberAccess)
+  <CWD>/discord/ext/commands/cog.py:527:20 - error: Cannot assign to attribute "__cog_listener__" for class "FunctionType"
+    Attribute "__cog_listener__" is unknown (reportFunctionMemberAccess)
+  <CWD>/discord/ext/commands/cog.py:530:24 - error: Cannot access attribute "__cog_listener_names__" for class "FunctionType"
+    Attribute "__cog_listener_names__" is unknown (reportFunctionMemberAccess)
+  <CWD>/discord/ext/commands/cog.py:532:24 - error: Cannot assign to attribute "__cog_listener_names__" for class "FunctionType"
+    Attribute "__cog_listener_names__" is unknown (reportFunctionMemberAccess)
+<CWD>/discord/ext/commands/context.py
+  <CWD>/discord/ext/commands/context.py:411:15 - error: Method "_get_channel" overrides class "Messageable" in an incompatible manner
+    Return type mismatch: base method returns type "CoroutineType[Any, Any, MessageableChannel]", override returns type "CoroutineType[Any, Any, Messageable]"
+      "CoroutineType[Any, Any, Messageable]" is not assignable to "CoroutineType[Any, Any, MessageableChannel]"
+        Type parameter "_ReturnT_nd_co@CoroutineType" is covariant, but "Messageable" is not a subtype of "MessageableChannel"
+          Type "Messageable" is not assignable to type "MessageableChannel"
+            "Messageable" is not assignable to "TextChannel"
+            "Messageable" is not assignable to "VoiceChannel"
+            "Messageable" is not assignable to "StageChannel"
+            "Messageable" is not assignable to "Thread"
+    ... (reportIncompatibleMethodOverride)
+  <CWD>/discord/ext/commands/context.py:783:9 - error: Method "typing" overrides class "Messageable" in an incompatible manner
+    Return type mismatch: base method returns type "Typing", override returns type "Typing | DeferTyping[BotT@Context]"
+      Type "Typing | DeferTyping[BotT@Context]" is not assignable to type "Typing"
+        "DeferTyping[BotT@Context]" is not assignable to "Typing" (reportIncompatibleMethodOverride)
+<CWD>/discord/ext/commands/converter.py
+  <CWD>/discord/ext/commands/converter.py:1119:9 - error: Method "__class_getitem__" overrides class "list" in an incompatible manner
+    Return type mismatch: base method returns type "GenericAlias", override returns type "Greedy[T@Greedy]"
+      "Greedy[T@Greedy]" is not assignable to "GenericAlias" (reportIncompatibleMethodOverride)
+<CWD>/discord/ext/commands/cooldowns.py
+  <CWD>/discord/ext/commands/cooldowns.py:171:9 - error: Method "create_bucket" overrides class "CooldownMapping" in an incompatible manner
+    Return type mismatch: base method returns type "Cooldown", override returns type "Cooldown | None"
+      Type "Cooldown | None" is not assignable to type "Cooldown"
+        "None" is not assignable to "Cooldown" (reportIncompatibleMethodOverride)
+<CWD>/discord/ext/commands/core.py
+  <CWD>/discord/ext/commands/core.py:141:33 - error: Cannot access attribute "__wrapped__" for class "FunctionType"
+    Attribute "__wrapped__" is unknown (reportFunctionMemberAccess)
+  <CWD>/discord/ext/commands/core.py:462:27 - error: Cannot access attribute "__commands_checks__" for class "FunctionType"
+    Attribute "__commands_checks__" is unknown (reportFunctionMemberAccess)
+  <CWD>/discord/ext/commands/core.py:470:29 - error: Cannot access attribute "__commands_cooldown__" for class "FunctionType"
+    Attribute "__commands_cooldown__" is unknown (reportFunctionMemberAccess)
+  <CWD>/discord/ext/commands/core.py:483:36 - error: Cannot access attribute "__commands_max_concurrency__" for class "FunctionType"
+    Attribute "__commands_max_concurrency__" is unknown (reportFunctionMemberAccess)
+  <CWD>/discord/ext/commands/core.py:500:34 - error: Cannot access attribute "__before_invoke__" for class "FunctionType"
+    Attribute "__before_invoke__" is unknown (reportFunctionMemberAccess)
+  <CWD>/discord/ext/commands/core.py:508:33 - error: Cannot access attribute "__after_invoke__" for class "FunctionType"
+    Attribute "__after_invoke__" is unknown (reportFunctionMemberAccess)
+  <CWD>/discord/ext/commands/core.py:1753:5 - error: Overload 1 for "command" overlaps overload 2 and returns an incompatible type (reportOverlappingOverload)
+  <CWD>/discord/ext/commands/core.py:1821:5 - error: Overload 1 for "group" overlaps overload 2 and returns an incompatible type (reportOverlappingOverload)
+  <CWD>/discord/ext/commands/core.py:1942:22 - error: Cannot assign to attribute "__commands_checks__" for class "FunctionType"
+    Attribute "__commands_checks__" is unknown (reportFunctionMemberAccess)
+  <CWD>/discord/ext/commands/core.py:1944:18 - error: Cannot access attribute "__commands_checks__" for class "FunctionType"
+    Attribute "__commands_checks__" is unknown (reportFunctionMemberAccess)
+  <CWD>/discord/ext/commands/core.py:1949:19 - error: Cannot assign to attribute "predicate" for class "FunctionType"
+    Attribute "predicate" is unknown (reportFunctionMemberAccess)
+  <CWD>/discord/ext/commands/core.py:1956:19 - error: Cannot assign to attribute "predicate" for class "FunctionType"
+    Attribute "predicate" is unknown (reportFunctionMemberAccess)
+  <CWD>/discord/ext/commands/core.py:2365:22 - error: Cannot assign to attribute "__commands_checks__" for class "FunctionType"
+    Attribute "__commands_checks__" is unknown (reportFunctionMemberAccess)
+  <CWD>/discord/ext/commands/core.py:2367:18 - error: Cannot access attribute "__commands_checks__" for class "FunctionType"
+    Attribute "__commands_checks__" is unknown (reportFunctionMemberAccess)
+  <CWD>/discord/ext/commands/core.py:2368:18 - error: Cannot assign to attribute "__discord_app_commands_guild_only__" for class "FunctionType"
+    Attribute "__discord_app_commands_guild_only__" is unknown (reportFunctionMemberAccess)
+  <CWD>/discord/ext/commands/core.py:2373:19 - error: Cannot assign to attribute "predicate" for class "FunctionType"
+    Attribute "predicate" is unknown (reportFunctionMemberAccess)
+  <CWD>/discord/ext/commands/core.py:2380:19 - error: Cannot assign to attribute "predicate" for class "FunctionType"
+    Attribute "predicate" is unknown (reportFunctionMemberAccess)
+  <CWD>/discord/ext/commands/core.py:2440:22 - error: Cannot assign to attribute "__commands_checks__" for class "FunctionType"
+    Attribute "__commands_checks__" is unknown (reportFunctionMemberAccess)
+  <CWD>/discord/ext/commands/core.py:2442:18 - error: Cannot access attribute "__commands_checks__" for class "FunctionType"
+    Attribute "__commands_checks__" is unknown (reportFunctionMemberAccess)
+  <CWD>/discord/ext/commands/core.py:2443:18 - error: Cannot assign to attribute "__discord_app_commands_is_nsfw__" for class "FunctionType"
+    Attribute "__discord_app_commands_is_nsfw__" is unknown (reportFunctionMemberAccess)
+  <CWD>/discord/ext/commands/core.py:2448:19 - error: Cannot assign to attribute "predicate" for class "FunctionType"
+    Attribute "predicate" is unknown (reportFunctionMemberAccess)
+  <CWD>/discord/ext/commands/core.py:2455:19 - error: Cannot assign to attribute "predicate" for class "FunctionType"
+    Attribute "predicate" is unknown (reportFunctionMemberAccess)
+  <CWD>/discord/ext/commands/core.py:2499:18 - error: Cannot assign to attribute "__commands_cooldown__" for class "FunctionType"
+    Attribute "__commands_cooldown__" is unknown (reportFunctionMemberAccess)
+  <CWD>/discord/ext/commands/core.py:2547:18 - error: Cannot assign to attribute "__commands_cooldown__" for class "FunctionType"
+    Attribute "__commands_cooldown__" is unknown (reportFunctionMemberAccess)
+  <CWD>/discord/ext/commands/core.py:2582:18 - error: Cannot assign to attribute "__commands_max_concurrency__" for class "FunctionType"
+    Attribute "__commands_max_concurrency__" is unknown (reportFunctionMemberAccess)
+  <CWD>/discord/ext/commands/core.py:2634:18 - error: Cannot assign to attribute "__before_invoke__" for class "FunctionType"
+    Attribute "__before_invoke__" is unknown (reportFunctionMemberAccess)
+  <CWD>/discord/ext/commands/core.py:2657:18 - error: Cannot assign to attribute "__after_invoke__" for class "FunctionType"
+    Attribute "__after_invoke__" is unknown (reportFunctionMemberAccess)
+<CWD>/discord/ext/commands/help.py
+  <CWD>/discord/ext/commands/help.py:248:7 - error: Cannot assign to attribute "__help_command_not_overridden__" for class "FunctionType"
+    Attribute "__help_command_not_overridden__" is unknown (reportFunctionMemberAccess)
+  <CWD>/discord/ext/commands/help.py:1255:9 - error: Method "get_destination" overrides class "HelpCommand" in an incompatible manner
+    Return type mismatch: base method returns type "MessageableChannel", override returns type "Messageable"
+      Type "Messageable" is not assignable to type "MessageableChannel"
+        "Messageable" is not assignable to "TextChannel"
+        "Messageable" is not assignable to "VoiceChannel"
+        "Messageable" is not assignable to "StageChannel"
+        "Messageable" is not assignable to "Thread"
+        "Messageable" is not assignable to "DMChannel"
+        "Messageable" is not assignable to "PartialMessageable"
+    ... (reportIncompatibleMethodOverride)
+  <CWD>/discord/ext/commands/help.py:1520:9 - error: Method "get_destination" overrides class "HelpCommand" in an incompatible manner
+    Return type mismatch: base method returns type "MessageableChannel", override returns type "Messageable"
+      Type "Messageable" is not assignable to type "MessageableChannel"
+        "Messageable" is not assignable to "TextChannel"
+        "Messageable" is not assignable to "VoiceChannel"
+        "Messageable" is not assignable to "StageChannel"
+        "Messageable" is not assignable to "Thread"
+        "Messageable" is not assignable to "DMChannel"
+        "Messageable" is not assignable to "PartialMessageable"
+    ... (reportIncompatibleMethodOverride)
+<CWD>/discord/ext/commands/hybrid.py
+  <CWD>/discord/ext/commands/hybrid.py:61:9 - error: "description" overrides symbol of same name in class "_CommandDecoratorKwargs"
+    Variable is mutable so its type is invariant
+      Override type "str | locale_str" is not the same as base type "str" (reportIncompatibleVariableOverride)
+  <CWD>/discord/ext/commands/hybrid.py:69:9 - error: "description" overrides symbol of same name in class "_HybridCommandDecoratorKwargs"
+    Variable is mutable so its type is invariant
+      Override type "str" is not the same as base type "str | locale_str" (reportIncompatibleVariableOverride)
+  <CWD>/discord/ext/commands/hybrid.py:73:9 - error: "description" overrides symbol of same name in class "_HybridGroupKwargs"
+    Variable is mutable so its type is invariant
+      Override type "str | locale_str" is not the same as base type "str" (reportIncompatibleVariableOverride)
+  <CWD>/discord/ext/commands/hybrid.py:113:9 - error: "__class__" incorrectly overrides property of same name in class "object"
+    Property method "fset" is missing in override (reportIncompatibleMethodOverride)
+  <CWD>/discord/ext/commands/hybrid.py:232:22 - error: Cannot assign to attribute "__hybrid_command_flag__" for class "FunctionType"
+    Attribute "__hybrid_command_flag__" is unknown (reportFunctionMemberAccess)
+  <CWD>/discord/ext/commands/hybrid.py:328:26 - error: Cannot assign to attribute "__signature__" for class "FunctionType"
+    Attribute "__signature__" is unknown (reportFunctionMemberAccess)
+  <CWD>/discord/ext/commands/hybrid.py:338:34 - error: Cannot delete attribute "__signature__" for class "FunctionType"
+    Attribute "__signature__" is unknown (reportFunctionMemberAccess)
+  <CWD>/discord/ext/commands/hybrid.py:563:9 - error: Method "_ensure_assignment_on_copy" overrides class "Command" in an incompatible manner
+    Parameter 2 type mismatch: base parameter is type "Command[CogT@HybridCommand, P@HybridCommand, T@HybridCommand]", override parameter is type "HybridCommand[CogT@HybridCommand, P@HybridCommand, T@HybridCommand]"
+      "Command[CogT@HybridCommand, P@HybridCommand, T@HybridCommand]" is not assignable to "HybridCommand[CogT@HybridCommand, P@HybridCommand, T@HybridCommand]" (reportIncompatibleMethodOverride)
+  <CWD>/discord/ext/commands/hybrid.py:731:9 - error: Method "_ensure_assignment_on_copy" overrides class "Command" in an incompatible manner
+    Parameter 2 type mismatch: base parameter is type "Command[CogT@HybridGroup, P@HybridGroup, T@HybridGroup]", override parameter is type "HybridGroup[CogT@HybridGroup, P@HybridGroup, T@HybridGroup]"
+      "Command[CogT@HybridGroup, P@HybridGroup, T@HybridGroup]" is not assignable to "HybridGroup[CogT@HybridGroup, P@HybridGroup, T@HybridGroup]" (reportIncompatibleMethodOverride)
+  <CWD>/discord/ext/commands/hybrid.py:790:9 - error: Method "add_command" overrides class "GroupMixin" in an incompatible manner
+    Parameter 2 type mismatch: base parameter is type "Command[CogT@HybridGroup, ..., Any]", override parameter is type "HybridGroup[CogT@HybridGroup, ..., Any] | HybridCommand[CogT@HybridGroup, ..., Any]"
+      Type "Command[CogT@HybridGroup, ..., Any]" is not assignable to type "HybridGroup[CogT@HybridGroup, ..., Any] | HybridCommand[CogT@HybridGroup, ..., Any]"
+        "Command[CogT@HybridGroup, ..., Any]" is not assignable to "HybridCommand[CogT@HybridGroup, ..., Any]"
+        "Command[CogT@HybridGroup, ..., Any]" is not assignable to "HybridGroup[CogT@HybridGroup, ..., Any]" (reportIncompatibleMethodOverride)
+  <CWD>/discord/ext/commands/hybrid.py:836:9 - error: Method "command" overrides class "GroupMixin" in an incompatible manner
+    Keyword parameter "with_app_command" type mismatch: base parameter is type "*_CommandDecoratorKwargs", override parameter is type "bool"
+    Keyword parameter "name" type mismatch: base parameter is type "*_CommandDecoratorKwargs", override parameter is type "str"
+    Keyword parameter "guild_ids" type mismatch: base parameter is type "*_CommandDecoratorKwargs", override parameter is type "list[int]"
+    Keyword parameter "guild_only" type mismatch: base parameter is type "*_CommandDecoratorKwargs", override parameter is type "bool"
+    Keyword parameter "default_permissions" type mismatch: base parameter is type "*_CommandDecoratorKwargs", override parameter is type "bool"
+    Keyword parameter "nsfw" type mismatch: base parameter is type "*_CommandDecoratorKwargs", override parameter is type "bool"
+    Keyword parameter "with_app_command" type mismatch: base parameter is type "*_CommandDecoratorKwargs", override parameter is type "bool"
+      "*_CommandDecoratorKwargs" is not assignable to "bool" (reportIncompatibleMethodOverride)
+  <CWD>/discord/ext/commands/hybrid.py:860:9 - error: Method "group" overrides class "GroupMixin" in an incompatible manner
+    Keyword parameter "invoke_without_command" type mismatch: base parameter is type "bool", override parameter is type "*_HybridGroupDecoratorKwargs"
+    Keyword parameter "with_app_command" type mismatch: base parameter is type "*_GroupDecoratorKwargs", override parameter is type "bool"
+    Keyword parameter "name" type mismatch: base parameter is type "*_GroupDecoratorKwargs", override parameter is type "str"
+    Keyword parameter "guild_ids" type mismatch: base parameter is type "*_GroupDecoratorKwargs", override parameter is type "list[int]"
+    Keyword parameter "guild_only" type mismatch: base parameter is type "*_GroupDecoratorKwargs", override parameter is type "bool"
+    Keyword parameter "default_permissions" type mismatch: base parameter is type "*_GroupDecoratorKwargs", override parameter is type "bool"
+    Keyword parameter "nsfw" type mismatch: base parameter is type "*_GroupDecoratorKwargs", override parameter is type "bool"
+    Keyword parameter "with_app_command" type mismatch: base parameter is type "*_GroupDecoratorKwargs", override parameter is type "bool" (reportIncompatibleMethodOverride)
+<CWD>/discord/ext/commands/parameters.py
+  <CWD>/discord/ext/commands/parameters.py:115:9 - error: Method "replace" overrides class "Parameter" in an incompatible manner
+    Keyword parameter "name" type mismatch: base parameter is type "str | type[_void]", override parameter is type "str"
+    Keyword parameter "kind" type mismatch: base parameter is type "_ParameterKind | type[_void]", override parameter is type "ParamKinds"
+      Type "str | type[_void]" is not assignable to type "str"
+        Type "type[_void]" is not assignable to type "str"
+      Type "_ParameterKind | type[_void]" is not assignable to type "ParamKinds"
+        Type "_ParameterKind" is not assignable to type "ParamKinds"
+          "_ParameterKind" is not assignable to type "Literal[_ParameterKind.POSITIONAL_ONLY]"
+          "_ParameterKind" is not assignable to type "Literal[_ParameterKind.POSITIONAL_OR_KEYWORD]"
+    ... (reportIncompatibleMethodOverride)
+  <CWD>/discord/ext/commands/parameters.py:324:5 - error: "parameters" incorrectly overrides property of same name in class "Signature" (reportIncompatibleMethodOverride)
+<CWD>/discord/flags.py
+  <CWD>/discord/flags.py:1784:9 - error: Method "_from_value" overrides class "BaseFlags" in an incompatible manner
+    Parameter 2 type mismatch: base parameter is type "int", override parameter is type "Sequence[int]"
+      "int" is not assignable to "Sequence[int]" (reportIncompatibleMethodOverride)
+  <CWD>/discord/flags.py:1881:9 - error: Method "to_array" overrides class "ArrayFlags" in an incompatible manner
+    Parameter "offset" is missing in override (reportIncompatibleMethodOverride)
+<CWD>/discord/gateway.py
+  <CWD>/discord/gateway.py:218:9 - error: "ws" overrides symbol of same name in class "KeepAliveHandler"
+    Variable is mutable so its type is invariant
+      Override type "DiscordVoiceWebSocket" is not the same as base type "DiscordWebSocket" (reportIncompatibleVariableOverride)
+  <CWD>/discord/gateway.py:377:27 - error: "with_query" is not a known attribute of "None" (reportOptionalMemberAccess)
+  <CWD>/discord/gateway.py:379:27 - error: "with_query" is not a known attribute of "None" (reportOptionalMemberAccess)
+  <CWD>/discord/gateway.py:391:22 - error: Cannot assign to attribute "gateway" for class "DiscordWebSocket*"
+    Type "URL | None" is not assignable to type "URL"
+      "None" is not assignable to "URL" (reportAttributeAccessIssue)
+<CWD>/discord/integrations.py
+  <CWD>/discord/integrations.py:200:9 - error: Method "_from_data" overrides class "Integration" in an incompatible manner
+    Parameter 2 type mismatch: base parameter is type "Integration", override parameter is type "StreamIntegration"
+      Type "Integration" is not assignable to type "StreamIntegration"
+        "role_id" is missing from "BaseIntegration"
+        "enable_emoticons" is missing from "BaseIntegration"
+        "subscriber_count" is missing from "BaseIntegration"
+        "revoked" is missing from "BaseIntegration" (reportIncompatibleMethodOverride)
+  <CWD>/discord/integrations.py:359:9 - error: Method "_from_data" overrides class "Integration" in an incompatible manner
+    Parameter 2 type mismatch: base parameter is type "Integration", override parameter is type "BotIntegration"
+      Type "Integration" is not assignable to type "BotIntegration"
+        "application" is missing from "BaseIntegration" (reportIncompatibleMethodOverride)
+<CWD>/discord/interactions.py
+  <CWD>/discord/interactions.py:1427:5 - error: "_state" overrides symbol of same name in class "Message"
+    Variable is mutable so its type is invariant
+      Override type "_InteractionMessageState" is not the same as base type "ConnectionState[Client]" (reportIncompatibleVariableOverride)
+  <CWD>/discord/interactions.py:1453:15 - error: Method "edit" overrides class "Message" in an incompatible manner
+    No overload signature in override is compatible with base method (reportIncompatibleMethodOverride)
+<CWD>/discord/invite.py
+  <CWD>/discord/invite.py:518:9 - error: "id" overrides symbol of same name in class "EqualityComparable"
+    "property" is not assignable to "int" (reportIncompatibleVariableOverride)
+<CWD>/discord/partial_emoji.py
+  <CWD>/discord/partial_emoji.py:105:14 - error: "id" overrides symbol of same name in class "_EmojiTag"
+    Variable is mutable so its type is invariant
+      Override type "int | None" is not the same as base type "int" (reportIncompatibleVariableOverride)
+  <CWD>/discord/partial_emoji.py:240:9 - error: "url" overrides symbol of same name in class "AssetMixin"
+    "property" is not assignable to "str" (reportIncompatibleVariableOverride)
+<CWD>/discord/shard.py
+  <CWD>/discord/shard.py:372:9 - error: "_connection" overrides symbol of same name in class "Client"
+    Variable is mutable so its type is invariant
+      Override type "AutoShardedConnectionState[Client]" is not the same as base type "ConnectionState[Client]" (reportIncompatibleVariableOverride)
+  <CWD>/discord/shard.py:499:18 - error: "shard_count" overrides symbol of same name in class "Client"
+    Variable is mutable so its type is invariant
+      Override type "int" is not the same as base type "int | None" (reportIncompatibleVariableOverride)
+<CWD>/discord/soundboard.py
+  <CWD>/discord/soundboard.py:98:9 - error: "url" overrides symbol of same name in class "AssetMixin"
+    "property" is not assignable to "str" (reportIncompatibleVariableOverride)
+  <CWD>/discord/soundboard.py:208:9 - error: Method "_update" overrides class "BaseSoundboardSound" in an incompatible manner
+    Parameter 2 type mismatch: base parameter is type "BaseSoundboardSound", override parameter is type "SoundboardSound"
+      "name" is missing from "BaseSoundboardSound"
+      "emoji_name" is missing from "BaseSoundboardSound"
+      "emoji_id" is missing from "BaseSoundboardSound"
+      "user_id" is missing from "BaseSoundboardSound"
+      "available" is missing from "BaseSoundboardSound"
+      "guild_id" is missing from "BaseSoundboardSound"
+      "user" is missing from "BaseSoundboardSound" (reportIncompatibleMethodOverride)
+<CWD>/discord/sticker.py
+  <CWD>/discord/sticker.py:335:9 - error: Method "_from_data" overrides class "Sticker" in an incompatible manner
+    Parameter 2 type mismatch: base parameter is type "Sticker", override parameter is type "StandardSticker"
+      Type "Sticker" is not assignable to type "StandardSticker"
+        "type" is an incompatible type
+          "Literal[2]" is not assignable to type "Literal[1]"
+        "sort_value" is missing from "GuildSticker"
+        "pack_id" is missing from "GuildSticker" (reportIncompatibleMethodOverride)
+  <CWD>/discord/sticker.py:415:9 - error: Method "_from_data" overrides class "Sticker" in an incompatible manner
+    Parameter 2 type mismatch: base parameter is type "Sticker", override parameter is type "GuildSticker"
+      Type "Sticker" is not assignable to type "GuildSticker"
+        "type" is an incompatible type
+          "Literal[1]" is not assignable to type "Literal[2]"
+        "available" is missing from "StandardSticker"
+        "guild_id" is missing from "StandardSticker"
+        "user" is missing from "StandardSticker" (reportIncompatibleMethodOverride)
+<CWD>/discord/types/components.py
+  <CWD>/discord/types/components.py:47:5 - error: "type" overrides symbol of same name in class "ComponentBase"
+    Variable is mutable so its type is invariant
+      Override type "Literal[1]" is not the same as base type "int" (reportIncompatibleVariableOverride)
+  <CWD>/discord/types/components.py:52:5 - error: "type" overrides symbol of same name in class "ComponentBase"
+    Variable is mutable so its type is invariant
+      Override type "Literal[2]" is not the same as base type "int" (reportIncompatibleVariableOverride)
+  <CWD>/discord/types/components.py:84:5 - error: "type" overrides symbol of same name in class "ComponentBase"
+    Variable is mutable so its type is invariant
+      Override type "Literal[3]" is not the same as base type "int" (reportIncompatibleVariableOverride)
+  <CWD>/discord/types/components.py:89:5 - error: "type" overrides symbol of same name in class "ComponentBase"
+    Variable is mutable so its type is invariant
+      Override type "Literal[5]" is not the same as base type "int" (reportIncompatibleVariableOverride)
+  <CWD>/discord/types/components.py:94:5 - error: "type" overrides symbol of same name in class "ComponentBase"
+    Variable is mutable so its type is invariant
+      Override type "Literal[6]" is not the same as base type "int" (reportIncompatibleVariableOverride)
+  <CWD>/discord/types/components.py:99:5 - error: "type" overrides symbol of same name in class "ComponentBase"
+    Variable is mutable so its type is invariant
+      Override type "Literal[7]" is not the same as base type "int" (reportIncompatibleVariableOverride)
+  <CWD>/discord/types/components.py:104:5 - error: "type" overrides symbol of same name in class "ComponentBase"
+    Variable is mutable so its type is invariant
+      Override type "Literal[8]" is not the same as base type "int" (reportIncompatibleVariableOverride)
+  <CWD>/discord/types/components.py:110:5 - error: "type" overrides symbol of same name in class "ComponentBase"
+    Variable is mutable so its type is invariant
+      Override type "Literal[4]" is not the same as base type "int" (reportIncompatibleVariableOverride)
+  <CWD>/discord/types/components.py:122:5 - error: "type" overrides symbol of same name in class "ComponentBase"
+    Variable is mutable so its type is invariant
+      Override type "Literal[3, 5, 6, 7, 8]" is not the same as base type "int" (reportIncompatibleVariableOverride)
+  <CWD>/discord/types/components.py:130:5 - error: "type" overrides symbol of same name in class "ComponentBase"
+    Variable is mutable so its type is invariant
+      Override type "Literal[9]" is not the same as base type "int" (reportIncompatibleVariableOverride)
+  <CWD>/discord/types/components.py:136:5 - error: "type" overrides symbol of same name in class "ComponentBase"
+    Variable is mutable so its type is invariant
+      Override type "Literal[10]" is not the same as base type "int" (reportIncompatibleVariableOverride)
+  <CWD>/discord/types/components.py:153:5 - error: "type" overrides symbol of same name in class "ComponentBase"
+    Variable is mutable so its type is invariant
+      Override type "Literal[11]" is not the same as base type "int" (reportIncompatibleVariableOverride)
+  <CWD>/discord/types/components.py:166:5 - error: "type" overrides symbol of same name in class "ComponentBase"
+    Variable is mutable so its type is invariant
+      Override type "Literal[12]" is not the same as base type "int" (reportIncompatibleVariableOverride)
+  <CWD>/discord/types/components.py:171:5 - error: "type" overrides symbol of same name in class "ComponentBase"
+    Variable is mutable so its type is invariant
+      Override type "Literal[13]" is not the same as base type "int" (reportIncompatibleVariableOverride)
+  <CWD>/discord/types/components.py:179:5 - error: "type" overrides symbol of same name in class "ComponentBase"
+    Variable is mutable so its type is invariant
+      Override type "Literal[14]" is not the same as base type "int" (reportIncompatibleVariableOverride)
+  <CWD>/discord/types/components.py:185:5 - error: "type" overrides symbol of same name in class "ComponentBase"
+    Variable is mutable so its type is invariant
+      Override type "Literal[17]" is not the same as base type "int" (reportIncompatibleVariableOverride)
+  <CWD>/discord/types/components.py:192:5 - error: "type" overrides symbol of same name in class "ComponentBase"
+    Variable is mutable so its type is invariant
+      Override type "Literal[18]" is not the same as base type "int" (reportIncompatibleVariableOverride)
+  <CWD>/discord/types/components.py:199:5 - error: "type" overrides symbol of same name in class "ComponentBase"
+    Variable is mutable so its type is invariant
+      Override type "Literal[19]" is not the same as base type "int" (reportIncompatibleVariableOverride)
+<CWD>/discord/types/interactions.py
+  <CWD>/discord/types/interactions.py:209:5 - error: "type" overrides symbol of same name in class "ComponentBase"
+    Variable is mutable so its type is invariant
+      Override type "Literal[4]" is not the same as base type "int" (reportIncompatibleVariableOverride)
+  <CWD>/discord/types/interactions.py:215:5 - error: "type" overrides symbol of same name in class "ComponentBase"
+    Variable is mutable so its type is invariant
+      Override type "Literal[3, 5, 6, 7, 8]" is not the same as base type "int" (reportIncompatibleVariableOverride)
+  <CWD>/discord/types/interactions.py:221:5 - error: "type" overrides symbol of same name in class "ComponentBase"
+    Variable is mutable so its type is invariant
+      Override type "Literal[19]" is not the same as base type "int" (reportIncompatibleVariableOverride)
+  <CWD>/discord/types/interactions.py:237:5 - error: "type" overrides symbol of same name in class "ComponentBase"
+    Variable is mutable so its type is invariant
+      Override type "Literal[10]" is not the same as base type "int" (reportIncompatibleVariableOverride)
+  <CWD>/discord/types/interactions.py:242:5 - error: "type" overrides symbol of same name in class "ComponentBase"
+    Variable is mutable so its type is invariant
+      Override type "Literal[18]" is not the same as base type "int" (reportIncompatibleVariableOverride)
+<CWD>/discord/types/scheduled_event.py
+  <CWD>/discord/types/scheduled_event.py:84:7 - error: TypedDict item "user_count" cannot be redefined as NotRequired (reportIncompatibleVariableOverride)
+  <CWD>/discord/types/scheduled_event.py:87:7 - error: TypedDict item "user_count" cannot be redefined as NotRequired (reportIncompatibleVariableOverride)
+  <CWD>/discord/types/scheduled_event.py:90:7 - error: TypedDict item "user_count" cannot be redefined as NotRequired (reportIncompatibleVariableOverride)
+<CWD>/discord/ui/action_row.py
+  <CWD>/discord/ui/action_row.py:163:31 - error: Cannot access attribute "__discord_ui_model_type__" for class "FunctionType"
+    Attribute "__discord_ui_model_type__" is unknown (reportFunctionMemberAccess)
+  <CWD>/discord/ui/action_row.py:163:64 - error: Cannot access attribute "__discord_ui_model_kwargs__" for class "FunctionType"
+    Attribute "__discord_ui_model_kwargs__" is unknown (reportFunctionMemberAccess)
+  <CWD>/discord/ui/action_row.py:412:9 - error: Overload 1 for "select" overlaps overload 2 and returns an incompatible type (reportOverlappingOverload)
+  <CWD>/discord/ui/action_row.py:412:9 - error: Overload 1 for "select" overlaps overload 3 and returns an incompatible type (reportOverlappingOverload)
+  <CWD>/discord/ui/action_row.py:412:9 - error: Overload 1 for "select" overlaps overload 4 and returns an incompatible type (reportOverlappingOverload)
+  <CWD>/discord/ui/action_row.py:412:9 - error: Overload 1 for "select" overlaps overload 5 and returns an incompatible type (reportOverlappingOverload)
+  <CWD>/discord/ui/action_row.py:597:9 - error: Method "from_component" overrides class "Item" in an incompatible manner
+    Parameter 2 type mismatch: base parameter is type "Component", override parameter is type "ActionRow"
+      "Component" is not assignable to "ActionRow" (reportIncompatibleMethodOverride)
+<CWD>/discord/ui/button.py
+  <CWD>/discord/ui/button.py:259:9 - error: Method "from_component" overrides class "Item" in an incompatible manner
+    Parameter 2 name mismatch: base parameter is named "component", override parameter is named "button" (reportIncompatibleMethodOverride)
+  <CWD>/discord/ui/button.py:276:9 - error: Method "to_component_dict" overrides class "Item" in an incompatible manner
+    Return type mismatch: base method returns type "Dict[str, Any]", override returns type "ButtonComponent"
+      "ButtonComponent" is not assignable to "Dict[str, Any]" (reportIncompatibleMethodOverride)
+  <CWD>/discord/ui/button.py:287:9 - error: Method "_refresh_component" overrides class "Item" in an incompatible manner
+    Parameter 2 name mismatch: base parameter is named "component", override parameter is named "button" (reportIncompatibleMethodOverride)
+  <CWD>/discord/ui/button.py:376:14 - error: Cannot assign to attribute "__discord_ui_model_type__" for class "FunctionType"
+    Attribute "__discord_ui_model_type__" is unknown (reportFunctionMemberAccess)
+  <CWD>/discord/ui/button.py:377:14 - error: Cannot assign to attribute "__discord_ui_model_kwargs__" for class "FunctionType"
+    Attribute "__discord_ui_model_kwargs__" is unknown (reportFunctionMemberAccess)
+<CWD>/discord/ui/container.py
+  <CWD>/discord/ui/container.py:151:34 - error: Cannot access attribute "__discord_ui_model_type__" for class "FunctionType"
+    Attribute "__discord_ui_model_type__" is unknown (reportFunctionMemberAccess)
+  <CWD>/discord/ui/container.py:151:66 - error: Cannot access attribute "__discord_ui_model_kwargs__" for class "FunctionType"
+    Attribute "__discord_ui_model_kwargs__" is unknown (reportFunctionMemberAccess)
+  <CWD>/discord/ui/container.py:179:9 - error: Method "_update_view" overrides class "Item" in an incompatible manner
+    Return type mismatch: base method returns type "None", override returns type "bool"
+      "bool" is not assignable to "None" (reportIncompatibleMethodOverride)
+  <CWD>/discord/ui/container.py:260:9 - error: Method "from_component" overrides class "Item" in an incompatible manner
+    Parameter 2 type mismatch: base parameter is type "Component", override parameter is type "Container"
+      "Component" is not assignable to "Container" (reportIncompatibleMethodOverride)
+<CWD>/discord/ui/file.py
+  <CWD>/discord/ui/file.py:162:9 - error: Method "from_component" overrides class "Item" in an incompatible manner
+    Parameter 2 type mismatch: base parameter is type "Component", override parameter is type "FileComponent"
+      "Component" is not assignable to "FileComponent" (reportIncompatibleMethodOverride)
+<CWD>/discord/ui/file_upload.py
+  <CWD>/discord/ui/file_upload.py:172:9 - error: Method "to_component_dict" overrides class "Item" in an incompatible manner
+    Return type mismatch: base method returns type "Dict[str, Any]", override returns type "FileUploadComponent"
+      "FileUploadComponent" is not assignable to "Dict[str, Any]" (reportIncompatibleMethodOverride)
+  <CWD>/discord/ui/file_upload.py:175:9 - error: Method "_refresh_component" overrides class "Item" in an incompatible manner
+    Parameter 2 type mismatch: base parameter is type "Component", override parameter is type "FileUploadComponent"
+      "Component" is not assignable to "FileUploadComponent" (reportIncompatibleMethodOverride)
+  <CWD>/discord/ui/file_upload.py:178:9 - error: Method "_handle_submit" overrides class "Item" in an incompatible manner
+    Parameter 3 type mismatch: base parameter is type "Dict[str, Any]", override parameter is type "ModalSubmitTextInputInteractionData"
+      "Dict[str, Any]" is not assignable to "ModalSubmitTextInputInteractionData" (reportIncompatibleMethodOverride)
+  <CWD>/discord/ui/file_upload.py:184:9 - error: Method "from_component" overrides class "Item" in an incompatible manner
+    Parameter 2 type mismatch: base parameter is type "Component", override parameter is type "FileUploadComponent"
+      "Component" is not assignable to "FileUploadComponent" (reportIncompatibleMethodOverride)
+<CWD>/discord/ui/label.py
+  <CWD>/discord/ui/label.py:112:9 - error: Method "to_component_dict" overrides class "Item" in an incompatible manner
+    Return type mismatch: base method returns type "Dict[str, Any]", override returns type "LabelComponent"
+      "LabelComponent" is not assignable to "Dict[str, Any]" (reportIncompatibleMethodOverride)
+  <CWD>/discord/ui/label.py:125:9 - error: Method "from_component" overrides class "Item" in an incompatible manner
+    Parameter 2 type mismatch: base parameter is type "Component", override parameter is type "LabelComponent"
+      "Component" is not assignable to "LabelComponent" (reportIncompatibleMethodOverride)
+<CWD>/discord/ui/media_gallery.py
+  <CWD>/discord/ui/media_gallery.py:259:9 - error: Method "from_component" overrides class "Item" in an incompatible manner
+    Parameter 2 type mismatch: base parameter is type "Component", override parameter is type "MediaGalleryComponent"
+      "Component" is not assignable to "MediaGalleryComponent" (reportIncompatibleMethodOverride)
+<CWD>/discord/ui/modal.py
+  <CWD>/discord/ui/modal.py:159:15 - error: Method "on_error" overrides class "BaseView" in an incompatible manner
+    Positional parameter count mismatch; base method has 4, but override has 3 (reportIncompatibleMethodOverride)
+  <CWD>/discord/ui/modal.py:176:9 - error: Method "_refresh" overrides class "BaseView" in an incompatible manner
+    Positional parameter count mismatch; base method has 2, but override has 4
+    Parameter 2 name mismatch: base parameter is named "components", override parameter is named "interaction" (reportIncompatibleMethodOverride)
+  <CWD>/discord/ui/modal.py:202:15 - error: Method "_scheduled_task" overrides class "BaseView" in an incompatible manner
+    Positional parameter count mismatch; base method has 3, but override has 4
+    Parameter 2 name mismatch: base parameter is named "item", override parameter is named "interaction"
+    Parameter 3 name mismatch: base parameter is named "interaction", override parameter is named "components" (reportIncompatibleMethodOverride)
+<CWD>/discord/ui/section.py
+  <CWD>/discord/ui/section.py:251:9 - error: Method "from_component" overrides class "Item" in an incompatible manner
+    Parameter 2 type mismatch: base parameter is type "Component", override parameter is type "SectionComponent"
+      "Component" is not assignable to "SectionComponent" (reportIncompatibleMethodOverride)
+<CWD>/discord/ui/select.py
+  <CWD>/discord/ui/select.py:270:14 - error: "row" incorrectly overrides property of same name in class "Item" (reportIncompatibleMethodOverride)
+  <CWD>/discord/ui/select.py:363:9 - error: Method "to_component_dict" overrides class "Item" in an incompatible manner
+    Return type mismatch: base method returns type "Dict[str, Any]", override returns type "SelectMenu"
+      "SelectMenu" is not assignable to "Dict[str, Any]" (reportIncompatibleMethodOverride)
+  <CWD>/discord/ui/select.py:366:9 - error: Method "_refresh_component" overrides class "Item" in an incompatible manner
+    Parameter 2 type mismatch: base parameter is type "Component", override parameter is type "SelectMenu"
+      "Component" is not assignable to "SelectMenu" (reportIncompatibleMethodOverride)
+  <CWD>/discord/ui/select.py:369:9 - error: Method "_handle_submit" overrides class "Item" in an incompatible manner
+    Parameter 3 type mismatch: base parameter is type "Dict[str, Any]", override parameter is type "SelectMessageComponentInteractionData"
+      "Dict[str, Any]" is not assignable to "SelectMessageComponentInteractionData" (reportIncompatibleMethodOverride)
+  <CWD>/discord/ui/select.py:382:9 - error: Method "_refresh_state" overrides class "Item" in an incompatible manner
+    Parameter 3 type mismatch: base parameter is type "Dict[str, Any]", override parameter is type "SelectMessageComponentInteractionData"
+      "Dict[str, Any]" is not assignable to "SelectMessageComponentInteractionData" (reportIncompatibleMethodOverride)
+  <CWD>/discord/ui/select.py:405:9 - error: Method "from_component" overrides class "Item" in an incompatible manner
+    Parameter 2 type mismatch: base parameter is type "Component", override parameter is type "SelectMenu"
+      "Component" is not assignable to "SelectMenu" (reportIncompatibleMethodOverride)
+  <CWD>/discord/ui/select.py:493:9 - error: "values" incorrectly overrides property of same name in class "BaseSelect"
+    Property method "fget" is incompatible
+      Return type mismatch: base method returns type "List[PossibleValue]", override returns type "List[str]"
+        "List[str]" is not assignable to "List[PossibleValue]"
+          Type parameter "_T@list" is invariant, but "str" is not the same as "PossibleValue"
+          Consider switching from "list" to "Sequence" which is covariant (reportIncompatibleMethodOverride)
+  <CWD>/discord/ui/select.py:669:9 - error: "values" incorrectly overrides property of same name in class "BaseSelect"
+    Property method "fget" is incompatible
+      Return type mismatch: base method returns type "List[PossibleValue]", override returns type "List[Member | User]"
+        "List[Member | User]" is not assignable to "List[PossibleValue]"
+          Type parameter "_T@list" is invariant, but "Member | User" is not the same as "PossibleValue"
+          Consider switching from "list" to "Sequence" which is covariant (reportIncompatibleMethodOverride)
+  <CWD>/discord/ui/select.py:777:9 - error: "values" incorrectly overrides property of same name in class "BaseSelect"
+    Property method "fget" is incompatible
+      Return type mismatch: base method returns type "List[PossibleValue]", override returns type "List[Role]"
+        "List[Role]" is not assignable to "List[PossibleValue]"
+          Type parameter "_T@list" is invariant, but "Role" is not the same as "PossibleValue"
+          Consider switching from "list" to "Sequence" which is covariant (reportIncompatibleMethodOverride)
+  <CWD>/discord/ui/select.py:881:9 - error: "values" incorrectly overrides property of same name in class "BaseSelect"
+    Property method "fget" is incompatible
+      Return type mismatch: base method returns type "List[PossibleValue]", override returns type "List[Member | User | Role]"
+        "List[Member | User | Role]" is not assignable to "List[PossibleValue]"
+          Type parameter "_T@list" is invariant, but "Member | User | Role" is not the same as "PossibleValue"
+          Consider switching from "list" to "Sequence" which is covariant (reportIncompatibleMethodOverride)
+  <CWD>/discord/ui/select.py:1010:9 - error: "values" incorrectly overrides property of same name in class "BaseSelect"
+    Property method "fget" is incompatible
+      Return type mismatch: base method returns type "List[PossibleValue]", override returns type "List[AppCommandChannel | AppCommandThread]"
+        "List[AppCommandChannel | AppCommandThread]" is not assignable to "List[PossibleValue]"
+          Type parameter "_T@list" is invariant, but "AppCommandChannel | AppCommandThread" is not the same as "PossibleValue"
+          Consider switching from "list" to "Sequence" which is covariant (reportIncompatibleMethodOverride)
+  <CWD>/discord/ui/select.py:1028:5 - error: Overload 1 for "select" overlaps overload 2 and returns an incompatible type (reportOverlappingOverload)
+  <CWD>/discord/ui/select.py:1028:5 - error: Overload 1 for "select" overlaps overload 3 and returns an incompatible type (reportOverlappingOverload)
+  <CWD>/discord/ui/select.py:1028:5 - error: Overload 1 for "select" overlaps overload 4 and returns an incompatible type (reportOverlappingOverload)
+  <CWD>/discord/ui/select.py:1028:5 - error: Overload 1 for "select" overlaps overload 5 and returns an incompatible type (reportOverlappingOverload)
+  <CWD>/discord/ui/select.py:1221:14 - error: Cannot assign to attribute "__discord_ui_model_type__" for class "FunctionType"
+    Attribute "__discord_ui_model_type__" is unknown (reportFunctionMemberAccess)
+  <CWD>/discord/ui/select.py:1222:14 - error: Cannot assign to attribute "__discord_ui_model_kwargs__" for class "FunctionType"
+    Attribute "__discord_ui_model_kwargs__" is unknown (reportFunctionMemberAccess)
+  <CWD>/discord/ui/select.py:1232:18 - error: Cannot access attribute "__discord_ui_model_kwargs__" for class "FunctionType"
+    Attribute "__discord_ui_model_kwargs__" is unknown (reportFunctionMemberAccess)
+  <CWD>/discord/ui/select.py:1234:18 - error: Cannot access attribute "__discord_ui_model_kwargs__" for class "FunctionType"
+    Attribute "__discord_ui_model_kwargs__" is unknown (reportFunctionMemberAccess)
+  <CWD>/discord/ui/select.py:1250:18 - error: Cannot access attribute "__discord_ui_model_kwargs__" for class "FunctionType"
+    Attribute "__discord_ui_model_kwargs__" is unknown (reportFunctionMemberAccess)
+<CWD>/discord/ui/separator.py
+  <CWD>/discord/ui/separator.py:129:9 - error: Method "from_component" overrides class "Item" in an incompatible manner
+    Parameter 2 type mismatch: base parameter is type "Component", override parameter is type "SeparatorComponent"
+      "Component" is not assignable to "SeparatorComponent" (reportIncompatibleMethodOverride)
+<CWD>/discord/ui/text_display.py
+  <CWD>/discord/ui/text_display.py:87:9 - error: Method "from_component" overrides class "Item" in an incompatible manner
+    Parameter 2 type mismatch: base parameter is type "Component", override parameter is type "TextDisplay"
+      "Component" is not assignable to "TextDisplay" (reportIncompatibleMethodOverride)
+<CWD>/discord/ui/text_input.py
+  <CWD>/discord/ui/text_input.py:249:9 - error: Method "to_component_dict" overrides class "Item" in an incompatible manner
+    Return type mismatch: base method returns type "Dict[str, Any]", override returns type "TextInput"
+      "TextInput" is not assignable to "Dict[str, Any]" (reportIncompatibleMethodOverride)
+  <CWD>/discord/ui/text_input.py:252:9 - error: Method "_refresh_component" overrides class "Item" in an incompatible manner
+    Parameter 2 type mismatch: base parameter is type "Component", override parameter is type "TextInput"
+      "Component" is not assignable to "TextInput" (reportIncompatibleMethodOverride)
+  <CWD>/discord/ui/text_input.py:255:9 - error: Method "_refresh_state" overrides class "Item" in an incompatible manner
+    Parameter 3 type mismatch: base parameter is type "Dict[str, Any]", override parameter is type "ModalSubmitTextInputInteractionData"
+      "Dict[str, Any]" is not assignable to "ModalSubmitTextInputInteractionData" (reportIncompatibleMethodOverride)
+  <CWD>/discord/ui/text_input.py:259:9 - error: Method "from_component" overrides class "Item" in an incompatible manner
+    Parameter 2 type mismatch: base parameter is type "Component", override parameter is type "TextInput"
+      "Component" is not assignable to "TextInput" (reportIncompatibleMethodOverride)
+<CWD>/discord/ui/thumbnail.py
+  <CWD>/discord/ui/thumbnail.py:138:9 - error: Method "from_component" overrides class "Item" in an incompatible manner
+    Parameter 2 type mismatch: base parameter is type "Component", override parameter is type "ThumbnailComponent"
+      "Component" is not assignable to "ThumbnailComponent" (reportIncompatibleMethodOverride)
+<CWD>/discord/ui/view.py
+  <CWD>/discord/ui/view.py:246:34 - error: Cannot access attribute "__discord_ui_model_type__" for class "FunctionType"
+    Attribute "__discord_ui_model_type__" is unknown (reportFunctionMemberAccess)
+  <CWD>/discord/ui/view.py:246:66 - error: Cannot access attribute "__discord_ui_model_kwargs__" for class "FunctionType"
+    Attribute "__discord_ui_model_kwargs__" is unknown (reportFunctionMemberAccess)
+<CWD>/discord/user.py
+  <CWD>/discord/user.py:428:9 - error: Method "_update" overrides class "BaseUser" in an incompatible manner
+    Parameter 2 type mismatch: base parameter is type "User | PartialUser", override parameter is type "User"
+      Type "User | PartialUser" is not assignable to type "User"
+        "bot" is missing from "PartialUser"
+        "system" is missing from "PartialUser"
+        "mfa_enabled" is missing from "PartialUser"
+        "locale" is missing from "PartialUser"
+        "verified" is missing from "PartialUser"
+        "email" is missing from "PartialUser"
+    ... (reportIncompatibleMethodOverride)
+<CWD>/discord/utils.py
+  <CWD>/discord/utils.py:662:16 - error: "orjson" is possibly unbound (reportPossiblyUnboundVariable)
+  <CWD>/discord/utils.py:1447:33 - error: "ZstdDecompressor" is possibly unbound (reportPossiblyUnboundVariable)
+  <CWD>/discord/utils.py:1469:28 - error: "zlib" is possibly unbound (reportPossiblyUnboundVariable)
+<CWD>/discord/voice_client.py
+  <CWD>/discord/voice_client.py:216:5 - error: "channel" overrides symbol of same name in class "VoiceProtocol"
+    Variable is mutable so its type is invariant
+      Override type "VocalGuildChannel" is not the same as base type "Connectable" (reportIncompatibleVariableOverride)
+  <CWD>/discord/voice_client.py:388:15 - error: "nacl" is possibly unbound (reportPossiblyUnboundVariable)
+  <CWD>/discord/voice_client.py:399:15 - error: "nacl" is possibly unbound (reportPossiblyUnboundVariable)
+  <CWD>/discord/voice_client.py:408:15 - error: "nacl" is possibly unbound (reportPossiblyUnboundVariable)
+  <CWD>/discord/voice_client.py:409:17 - error: "nacl" is possibly unbound (reportPossiblyUnboundVariable)
+  <CWD>/discord/voice_client.py:409:35 - error: "nacl" is possibly unbound (reportPossiblyUnboundVariable)
+  <CWD>/discord/voice_client.py:416:15 - error: "nacl" is possibly unbound (reportPossiblyUnboundVariable)
+<CWD>/discord/webhook/async_.py
+  <CWD>/discord/webhook/async_.py:803:5 - error: "_state" overrides symbol of same name in class "Message"
+    Variable is mutable so its type is invariant
+      Override type "_WebhookState" is not the same as base type "ConnectionState[Client]" (reportIncompatibleVariableOverride)
+  <CWD>/discord/webhook/async_.py:805:15 - error: Method "edit" overrides class "Message" in an incompatible manner
+    Parameter "suppress" is missing in override
+    Parameter "delete_after" is missing in override (reportIncompatibleMethodOverride)
+<CWD>/discord/webhook/sync.py
+  <CWD>/discord/webhook/sync.py:81:14 - warning: Import "requests" could not be resolved from source (reportMissingModuleSource)
+  <CWD>/discord/webhook/sync.py:408:5 - error: "_state" overrides symbol of same name in class "Message"
+    Variable is mutable so its type is invariant
+      Override type "_WebhookState" is not the same as base type "ConnectionState[Client]" (reportIncompatibleVariableOverride)
+  <CWD>/discord/webhook/sync.py:410:9 - error: Method "edit" overrides class "Message" in an incompatible manner
+    Parameter "suppress" is missing in override
+    Parameter "delete_after" is missing in override
+    Parameter "view" is missing in override
+    Return type mismatch: base method returns type "CoroutineType[Any, Any, Message]", override returns type "SyncWebhookMessage"
+      "SyncWebhookMessage" is not assignable to "CoroutineType[Any, Any, Message]" (reportIncompatibleMethodOverride)
+  <CWD>/discord/webhook/sync.py:474:9 - error: Method "add_files" overrides class "Message" in an incompatible manner
+    Return type mismatch: base method returns type "CoroutineType[Any, Any, Message]", override returns type "SyncWebhookMessage"
+      "SyncWebhookMessage" is not assignable to "CoroutineType[Any, Any, Message]" (reportIncompatibleMethodOverride)
+  <CWD>/discord/webhook/sync.py:498:9 - error: Method "remove_attachments" overrides class "Message" in an incompatible manner
+    Return type mismatch: base method returns type "CoroutineType[Any, Any, Message]", override returns type "SyncWebhookMessage"
+      "SyncWebhookMessage" is not assignable to "CoroutineType[Any, Any, Message]" (reportIncompatibleMethodOverride)
+  <CWD>/discord/webhook/sync.py:522:9 - error: Method "delete" overrides class "PartialMessage" in an incompatible manner
+    Return type mismatch: base method returns type "CoroutineType[Any, Any, None]", override returns type "None"
+      "None" is not assignable to "CoroutineType[Any, Any, None]" (reportIncompatibleMethodOverride)
+  <CWD>/discord/webhook/sync.py:652:16 - warning: Import "requests" could not be resolved from source (reportMissingModuleSource)
+  <CWD>/discord/webhook/sync.py:695:16 - warning: Import "requests" could not be resolved from source (reportMissingModuleSource)
+<CWD>/discord/widget.py
+  <CWD>/discord/widget.py:161:9 - error: "avatar" incorrectly overrides property of same name in class "BaseUser" (reportIncompatibleMethodOverride)
+210 errors, 4 warnings, 0 informations

@@ -2,6 +2,7 @@
 source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
+
 ---
 mdtest name: rich_comparison.md - Comparison: Rich Comparison - Chained comparisons with objects that don't implement `__bool__` correctly
 mdtest path: crates/ty_python_semantic/resources/mdtest/comparison/instances/rich_comparison.md
@@ -33,7 +34,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/comparison/instances/ric
 # Diagnostics
 
 ```
-error[unsupported-bool-conversion]: Boolean conversion is unsupported for type `NotBoolable`
+error[unsupported-bool-conversion]: Boolean conversion is not supported for type `NotBoolable`
   --> src/mdtest_snippet.py:12:1
    |
 11 | # error: [unsupported-bool-conversion]
@@ -48,7 +49,7 @@ info: rule `unsupported-bool-conversion` is enabled by default
 ```
 
 ```
-error[unsupported-bool-conversion]: Boolean conversion is unsupported for type `NotBoolable`
+error[unsupported-bool-conversion]: Boolean conversion is not supported for type `NotBoolable`
   --> src/mdtest_snippet.py:14:1
    |
 12 | 10 < Comparable() < 20

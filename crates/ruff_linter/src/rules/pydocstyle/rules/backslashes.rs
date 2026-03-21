@@ -38,6 +38,10 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// foobar.__doc__  # "Docstring for foo\bar."
 /// ```
 ///
+/// ## Options
+///
+/// - `lint.pydocstyle.ignore-decorators`
+///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [Python documentation: String and Bytes literals](https://docs.python.org/3/reference/lexical_analysis.html#string-and-bytes-literals)

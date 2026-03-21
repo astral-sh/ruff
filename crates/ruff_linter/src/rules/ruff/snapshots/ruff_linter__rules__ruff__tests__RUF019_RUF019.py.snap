@@ -114,3 +114,26 @@ help: Replace with `dict.get`
 19 | 
 20 | # OK
 21 | v = "k" in d and d["k"]
+
+RUF019 [*] Unnecessary key check before dictionary access
+  --> RUF019.py:28:9
+   |
+27 |   if (
+28 | /         "key" in d
+29 | |         and  # text
+30 | |         d ["key"]
+   | |_________________^
+31 |   ):
+32 |       ...
+   |
+help: Replace with `dict.get`
+25 | 
+26 | 
+27 | if (
+   -         "key" in d
+   -         and  # text
+   -         d ["key"]
+28 +         d.get("key")
+29 | ):
+30 |     ...
+note: This is an unsafe fix and may change runtime behavior

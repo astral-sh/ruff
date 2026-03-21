@@ -1,0 +1,36 @@
+---
+source: crates/ty_server/tests/e2e/rename.rs
+expression: edits
+---
+{
+  "changes": {
+    "file://<temp_dir>/foo.py": [
+      {
+        "range": {
+          "start": {
+            "line": 0,
+            "character": 4
+          },
+          "end": {
+            "line": 0,
+            "character": 8
+          }
+        },
+        "newText": "new_name"
+      },
+      {
+        "range": {
+          "start": {
+            "line": 2,
+            "character": 0
+          },
+          "end": {
+            "line": 2,
+            "character": 4
+          }
+        },
+        "newText": "new_name"
+      }
+    ]
+  }
+}

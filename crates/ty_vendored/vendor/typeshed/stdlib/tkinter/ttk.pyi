@@ -16,10 +16,10 @@ import _tkinter
 import sys
 import tkinter
 from _typeshed import MaybeNone
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Sequence
 from tkinter.font import _FontDescription
-from typing import Any, Literal, TypedDict, overload, type_check_only
-from typing_extensions import Never, TypeAlias, Unpack
+from typing import Any, Literal, TypedDict, TypeVar, overload, type_check_only
+from typing_extensions import Never, ParamSpec, TypeAlias, Unpack
 
 __all__ = [
     "Button",
@@ -78,6 +78,9 @@ _Padding: TypeAlias = (
 _Statespec: TypeAlias = tuple[Unpack[tuple[str, ...]], Any]
 _ImageStatespec: TypeAlias = tuple[Unpack[tuple[str, ...]], tkinter._Image | str]
 _VsapiStatespec: TypeAlias = tuple[Unpack[tuple[str, ...]], int]
+
+_P = ParamSpec("_P")
+_T = TypeVar("_T")
 
 class _Layout(TypedDict, total=False):
     side: Literal["left", "right", "top", "bottom"]
@@ -318,7 +321,7 @@ class Style:
 class Widget(tkinter.Widget):
     """Base class for Tk themed widgets."""
 
-    def __init__(self, master: tkinter.Misc | None, widgetname, kw=None) -> None:
+    def __init__(self, master: tkinter.Misc | None, widgetname: str | None, kw: dict[str, Any] | None = None) -> None:
         """Constructs a Ttk Widget with the parent master.
 
         STANDARD OPTIONS
@@ -346,7 +349,8 @@ class Widget(tkinter.Widget):
         x and y are pixel coordinates relative to the widget.
         """
 
-    def instate(self, statespec, callback=None, *args, **kw):
+    @overload
+    def instate(self, statespec: Sequence[str], callback: None = None) -> bool:
         """Test the widget's state.
 
         If callback is not specified, returns True if the widget state
@@ -355,7 +359,11 @@ class Widget(tkinter.Widget):
         matches statespec. statespec is expected to be a sequence.
         """
 
-    def state(self, statespec=None):
+    @overload
+    def instate(
+        self, statespec: Sequence[str], callback: Callable[_P, _T], *args: _P.args, **kw: _P.kwargs
+    ) -> Literal[False] | _T: ...
+    def state(self, statespec: Sequence[str] | None = None) -> tuple[str, ...]:
         """Modify or inquire widget state.
 
         Widget state is returned if statespec is None, otherwise it is
@@ -420,11 +428,17 @@ class Button(Widget):
         underline: int = ...,
         width: int | Literal[""] = ...,
     ) -> dict[str, tuple[str, str, str, Any, Any]] | None:
-        """Configure resources of a widget.
+        """Query or modify the configuration options of the widget.
 
-        The values for resources are specified as keyword
-        arguments. To get an overview about
-        the allowed keyword arguments call the method keys.
+        If no arguments are specified, return a dictionary describing
+        all of the available options for the widget.
+
+        If an option name is specified, then return a tuple describing
+        the one named option.
+
+        If one or more keyword arguments are specified or a dictionary
+        is specified, then modify the widget option(s) to have the given
+        value(s).
         """
 
     @overload
@@ -494,11 +508,17 @@ class Checkbutton(Widget):
         variable: tkinter.Variable = ...,
         width: int | Literal[""] = ...,
     ) -> dict[str, tuple[str, str, str, Any, Any]] | None:
-        """Configure resources of a widget.
+        """Query or modify the configuration options of the widget.
 
-        The values for resources are specified as keyword
-        arguments. To get an overview about
-        the allowed keyword arguments call the method keys.
+        If no arguments are specified, return a dictionary describing
+        all of the available options for the widget.
+
+        If an option name is specified, then return a tuple describing
+        the one named option.
+
+        If one or more keyword arguments are specified or a dictionary
+        is specified, then modify the widget option(s) to have the given
+        value(s).
         """
 
     @overload
@@ -581,11 +601,17 @@ class Entry(Widget, tkinter.Entry):
         width: int = ...,
         xscrollcommand: str | Callable[[float, float], object] = ...,
     ) -> dict[str, tuple[str, str, str, Any, Any]] | None:
-        """Configure resources of a widget.
+        """Query or modify the configuration options of the widget.
 
-        The values for resources are specified as keyword
-        arguments. To get an overview about
-        the allowed keyword arguments call the method keys.
+        If no arguments are specified, return a dictionary describing
+        all of the available options for the widget.
+
+        If an option name is specified, then return a tuple describing
+        the one named option.
+
+        If one or more keyword arguments are specified or a dictionary
+        is specified, then modify the widget option(s) to have the given
+        value(s).
         """
 
     @overload
@@ -613,11 +639,17 @@ class Entry(Widget, tkinter.Entry):
         width: int = ...,
         xscrollcommand: str | Callable[[float, float], object] = ...,
     ) -> dict[str, tuple[str, str, str, Any, Any]] | None:
-        """Configure resources of a widget.
+        """Query or modify the configuration options of the widget.
 
-        The values for resources are specified as keyword
-        arguments. To get an overview about
-        the allowed keyword arguments call the method keys.
+        If no arguments are specified, return a dictionary describing
+        all of the available options for the widget.
+
+        If an option name is specified, then return a tuple describing
+        the one named option.
+
+        If one or more keyword arguments are specified or a dictionary
+        is specified, then modify the widget option(s) to have the given
+        value(s).
         """
 
     @overload
@@ -706,11 +738,17 @@ class Combobox(Entry):
         width: int = ...,
         xscrollcommand: str | Callable[[float, float], object] = ...,
     ) -> dict[str, tuple[str, str, str, Any, Any]] | None:
-        """Configure resources of a widget.
+        """Query or modify the configuration options of the widget.
 
-        The values for resources are specified as keyword
-        arguments. To get an overview about
-        the allowed keyword arguments call the method keys.
+        If no arguments are specified, return a dictionary describing
+        all of the available options for the widget.
+
+        If an option name is specified, then return a tuple describing
+        the one named option.
+
+        If one or more keyword arguments are specified or a dictionary
+        is specified, then modify the widget option(s) to have the given
+        value(s).
         """
 
     @overload
@@ -741,11 +779,17 @@ class Combobox(Entry):
         width: int = ...,
         xscrollcommand: str | Callable[[float, float], object] = ...,
     ) -> dict[str, tuple[str, str, str, Any, Any]] | None:
-        """Configure resources of a widget.
+        """Query or modify the configuration options of the widget.
 
-        The values for resources are specified as keyword
-        arguments. To get an overview about
-        the allowed keyword arguments call the method keys.
+        If no arguments are specified, return a dictionary describing
+        all of the available options for the widget.
+
+        If an option name is specified, then return a tuple describing
+        the one named option.
+
+        If one or more keyword arguments are specified or a dictionary
+        is specified, then modify the widget option(s) to have the given
+        value(s).
         """
 
     @overload
@@ -809,11 +853,17 @@ class Frame(Widget):
         takefocus: bool | Literal[0, 1, ""] | Callable[[str], bool | None] = ...,
         width: float | str = ...,
     ) -> dict[str, tuple[str, str, str, Any, Any]] | None:
-        """Configure resources of a widget.
+        """Query or modify the configuration options of the widget.
 
-        The values for resources are specified as keyword
-        arguments. To get an overview about
-        the allowed keyword arguments call the method keys.
+        If no arguments are specified, return a dictionary describing
+        all of the available options for the widget.
+
+        If an option name is specified, then return a tuple describing
+        the one named option.
+
+        If one or more keyword arguments are specified or a dictionary
+        is specified, then modify the widget option(s) to have the given
+        value(s).
         """
 
     @overload
@@ -889,11 +939,17 @@ class Label(Widget):
         width: int | Literal[""] = ...,
         wraplength: float | str = ...,
     ) -> dict[str, tuple[str, str, str, Any, Any]] | None:
-        """Configure resources of a widget.
+        """Query or modify the configuration options of the widget.
 
-        The values for resources are specified as keyword
-        arguments. To get an overview about
-        the allowed keyword arguments call the method keys.
+        If no arguments are specified, return a dictionary describing
+        all of the available options for the widget.
+
+        If an option name is specified, then return a tuple describing
+        the one named option.
+
+        If one or more keyword arguments are specified or a dictionary
+        is specified, then modify the widget option(s) to have the given
+        value(s).
         """
 
     @overload
@@ -956,11 +1012,17 @@ class Labelframe(Widget):
         underline: int = ...,
         width: float | str = ...,
     ) -> dict[str, tuple[str, str, str, Any, Any]] | None:
-        """Configure resources of a widget.
+        """Query or modify the configuration options of the widget.
 
-        The values for resources are specified as keyword
-        arguments. To get an overview about
-        the allowed keyword arguments call the method keys.
+        If no arguments are specified, return a dictionary describing
+        all of the available options for the widget.
+
+        If an option name is specified, then return a tuple describing
+        the one named option.
+
+        If one or more keyword arguments are specified or a dictionary
+        is specified, then modify the widget option(s) to have the given
+        value(s).
         """
 
     @overload
@@ -1025,11 +1087,17 @@ class Menubutton(Widget):
         underline: int = ...,
         width: int | Literal[""] = ...,
     ) -> dict[str, tuple[str, str, str, Any, Any]] | None:
-        """Configure resources of a widget.
+        """Query or modify the configuration options of the widget.
 
-        The values for resources are specified as keyword
-        arguments. To get an overview about
-        the allowed keyword arguments call the method keys.
+        If no arguments are specified, return a dictionary describing
+        all of the available options for the widget.
+
+        If an option name is specified, then return a tuple describing
+        the one named option.
+
+        If one or more keyword arguments are specified or a dictionary
+        is specified, then modify the widget option(s) to have the given
+        value(s).
         """
 
     @overload
@@ -1096,11 +1164,17 @@ class Notebook(Widget):
         takefocus: bool | Literal[0, 1, ""] | Callable[[str], bool | None] = ...,
         width: int = ...,
     ) -> dict[str, tuple[str, str, str, Any, Any]] | None:
-        """Configure resources of a widget.
+        """Query or modify the configuration options of the widget.
 
-        The values for resources are specified as keyword
-        arguments. To get an overview about
-        the allowed keyword arguments call the method keys.
+        If no arguments are specified, return a dictionary describing
+        all of the available options for the widget.
+
+        If an option name is specified, then return a tuple describing
+        the one named option.
+
+        If one or more keyword arguments are specified or a dictionary
+        is specified, then modify the widget option(s) to have the given
+        value(s).
         """
 
     @overload
@@ -1253,11 +1327,17 @@ class Panedwindow(Widget, tkinter.PanedWindow):
         takefocus: bool | Literal[0, 1, ""] | Callable[[str], bool | None] = ...,
         width: int = ...,
     ) -> dict[str, tuple[str, str, str, Any, Any]] | None:
-        """Configure resources of a widget.
+        """Query or modify the configuration options of the widget.
 
-        The values for resources are specified as keyword
-        arguments. To get an overview about
-        the allowed keyword arguments call the method keys.
+        If no arguments are specified, return a dictionary describing
+        all of the available options for the widget.
+
+        If an option name is specified, then return a tuple describing
+        the one named option.
+
+        If one or more keyword arguments are specified or a dictionary
+        is specified, then modify the widget option(s) to have the given
+        value(s).
         """
 
     @overload
@@ -1274,11 +1354,17 @@ class Panedwindow(Widget, tkinter.PanedWindow):
         takefocus: bool | Literal[0, 1, ""] | Callable[[str], bool | None] = ...,
         width: int = ...,
     ) -> dict[str, tuple[str, str, str, Any, Any]] | None:
-        """Configure resources of a widget.
+        """Query or modify the configuration options of the widget.
 
-        The values for resources are specified as keyword
-        arguments. To get an overview about
-        the allowed keyword arguments call the method keys.
+        If no arguments are specified, return a dictionary describing
+        all of the available options for the widget.
+
+        If an option name is specified, then return a tuple describing
+        the one named option.
+
+        If one or more keyword arguments are specified or a dictionary
+        is specified, then modify the widget option(s) to have the given
+        value(s).
         """
 
     @overload
@@ -1365,11 +1451,17 @@ class Progressbar(Widget):
         value: float = ...,
         variable: tkinter.IntVar | tkinter.DoubleVar = ...,
     ) -> dict[str, tuple[str, str, str, Any, Any]] | None:
-        """Configure resources of a widget.
+        """Query or modify the configuration options of the widget.
 
-        The values for resources are specified as keyword
-        arguments. To get an overview about
-        the allowed keyword arguments call the method keys.
+        If no arguments are specified, return a dictionary describing
+        all of the available options for the widget.
+
+        If an option name is specified, then return a tuple describing
+        the one named option.
+
+        If one or more keyword arguments are specified or a dictionary
+        is specified, then modify the widget option(s) to have the given
+        value(s).
         """
 
     @overload
@@ -1451,11 +1543,17 @@ class Radiobutton(Widget):
         variable: tkinter.Variable | Literal[""] = ...,
         width: int | Literal[""] = ...,
     ) -> dict[str, tuple[str, str, str, Any, Any]] | None:
-        """Configure resources of a widget.
+        """Query or modify the configuration options of the widget.
 
-        The values for resources are specified as keyword
-        arguments. To get an overview about
-        the allowed keyword arguments call the method keys.
+        If no arguments are specified, return a dictionary describing
+        all of the available options for the widget.
+
+        If an option name is specified, then return a tuple describing
+        the one named option.
+
+        If one or more keyword arguments are specified or a dictionary
+        is specified, then modify the widget option(s) to have the given
+        value(s).
         """
 
     @overload
@@ -1547,11 +1645,17 @@ class Scale(Widget, tkinter.Scale):  # type: ignore[misc]
         value: float = ...,
         variable: tkinter.IntVar | tkinter.DoubleVar = ...,
     ) -> dict[str, tuple[str, str, str, Any, Any]] | None:
-        """Configure resources of a widget.
+        """Query or modify the configuration options of the widget.
 
-        The values for resources are specified as keyword
-        arguments. To get an overview about
-        the allowed keyword arguments call the method keys.
+        If no arguments are specified, return a dictionary describing
+        all of the available options for the widget.
+
+        If an option name is specified, then return a tuple describing
+        the one named option.
+
+        If one or more keyword arguments are specified or a dictionary
+        is specified, then modify the widget option(s) to have the given
+        value(s).
         """
 
     @overload
@@ -1602,11 +1706,17 @@ class Scrollbar(Widget, tkinter.Scrollbar):  # type: ignore[misc]
         style: str = ...,
         takefocus: bool | Literal[0, 1, ""] | Callable[[str], bool | None] = ...,
     ) -> dict[str, tuple[str, str, str, Any, Any]] | None:
-        """Configure resources of a widget.
+        """Query or modify the configuration options of the widget.
 
-        The values for resources are specified as keyword
-        arguments. To get an overview about
-        the allowed keyword arguments call the method keys.
+        If no arguments are specified, return a dictionary describing
+        all of the available options for the widget.
+
+        If an option name is specified, then return a tuple describing
+        the one named option.
+
+        If one or more keyword arguments are specified or a dictionary
+        is specified, then modify the widget option(s) to have the given
+        value(s).
         """
 
     @overload
@@ -1623,11 +1733,17 @@ class Scrollbar(Widget, tkinter.Scrollbar):  # type: ignore[misc]
         style: str = ...,
         takefocus: bool | Literal[0, 1, ""] | Callable[[str], bool | None] = ...,
     ) -> dict[str, tuple[str, str, str, Any, Any]] | None:
-        """Configure resources of a widget.
+        """Query or modify the configuration options of the widget.
 
-        The values for resources are specified as keyword
-        arguments. To get an overview about
-        the allowed keyword arguments call the method keys.
+        If no arguments are specified, return a dictionary describing
+        all of the available options for the widget.
+
+        If an option name is specified, then return a tuple describing
+        the one named option.
+
+        If one or more keyword arguments are specified or a dictionary
+        is specified, then modify the widget option(s) to have the given
+        value(s).
         """
 
     @overload
@@ -1670,11 +1786,17 @@ class Separator(Widget):
         style: str = ...,
         takefocus: bool | Literal[0, 1, ""] | Callable[[str], bool | None] = ...,
     ) -> dict[str, tuple[str, str, str, Any, Any]] | None:
-        """Configure resources of a widget.
+        """Query or modify the configuration options of the widget.
 
-        The values for resources are specified as keyword
-        arguments. To get an overview about
-        the allowed keyword arguments call the method keys.
+        If no arguments are specified, return a dictionary describing
+        all of the available options for the widget.
+
+        If an option name is specified, then return a tuple describing
+        the one named option.
+
+        If one or more keyword arguments are specified or a dictionary
+        is specified, then modify the widget option(s) to have the given
+        value(s).
         """
 
     @overload
@@ -1712,11 +1834,17 @@ class Sizegrip(Widget):
         style: str = ...,
         takefocus: bool | Literal[0, 1, ""] | Callable[[str], bool | None] = ...,
     ) -> dict[str, tuple[str, str, str, Any, Any]] | None:
-        """Configure resources of a widget.
+        """Query or modify the configuration options of the widget.
 
-        The values for resources are specified as keyword
-        arguments. To get an overview about
-        the allowed keyword arguments call the method keys.
+        If no arguments are specified, return a dictionary describing
+        all of the available options for the widget.
+
+        If an option name is specified, then return a tuple describing
+        the one named option.
+
+        If one or more keyword arguments are specified or a dictionary
+        is specified, then modify the widget option(s) to have the given
+        value(s).
         """
 
     @overload
@@ -1801,11 +1929,17 @@ class Spinbox(Entry):
         wrap: bool = ...,
         xscrollcommand: str | Callable[[float, float], object] = ...,
     ) -> dict[str, tuple[str, str, str, Any, Any]] | None:
-        """Configure resources of a widget.
+        """Query or modify the configuration options of the widget.
 
-        The values for resources are specified as keyword
-        arguments. To get an overview about
-        the allowed keyword arguments call the method keys.
+        If no arguments are specified, return a dictionary describing
+        all of the available options for the widget.
+
+        If an option name is specified, then return a tuple describing
+        the one named option.
+
+        If one or more keyword arguments are specified or a dictionary
+        is specified, then modify the widget option(s) to have the given
+        value(s).
         """
 
     @overload
@@ -1913,11 +2047,17 @@ class Treeview(Widget, tkinter.XView, tkinter.YView):
         xscrollcommand: str | Callable[[float, float], object] = ...,
         yscrollcommand: str | Callable[[float, float], object] = ...,
     ) -> dict[str, tuple[str, str, str, Any, Any]] | None:
-        """Configure resources of a widget.
+        """Query or modify the configuration options of the widget.
 
-        The values for resources are specified as keyword
-        arguments. To get an overview about
-        the allowed keyword arguments call the method keys.
+        If no arguments are specified, return a dictionary describing
+        all of the available options for the widget.
+
+        If an option name is specified, then return a tuple describing
+        the one named option.
+
+        If one or more keyword arguments are specified or a dictionary
+        is specified, then modify the widget option(s) to have the given
+        value(s).
         """
 
     @overload
@@ -2315,6 +2455,7 @@ class LabeledScale(Frame):
         """
     # destroy is overridden, signature does not change
     value: Any
+    """Return current scale value."""
 
 class OptionMenu(Menubutton):
     """Themed OptionMenu, based after tkinter's OptionMenu, which allows
@@ -2333,7 +2474,7 @@ class OptionMenu(Menubutton):
         command: Callable[[tkinter.StringVar], object] | None = None,
     ) -> None:
         """Construct a themed OptionMenu widget with master as the parent,
-        the resource textvariable set to variable, the initially selected
+        the option textvariable set to variable, the initially selected
         value specified by the default parameter, the menu values given by
         *values and additional keywords.
 

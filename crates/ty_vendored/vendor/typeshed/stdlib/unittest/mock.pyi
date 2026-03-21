@@ -322,6 +322,7 @@ class NonCallableMock(Base, Any):
     call_count: int
     call_args: _Call | MaybeNone
     call_args_list: _CallList
+    method_calls: _CallList
     mock_calls: _CallList
     def _format_mock_call_signature(self, args: Any, kwargs: Any) -> str: ...
     def _call_matcher(self, _call: tuple[_Call, ...]) -> _Call:
@@ -571,7 +572,10 @@ class _patch_dict:
     def __exit__(self, *args: object) -> Any:
         """Unpatch the dict."""
     start: Any
+    """Activate a patch, returning any created mock."""
+
     stop: Any
+    """Stop an active patch."""
 
 # This class does not exist at runtime, it's a hack to add methods to the
 # patch() function.
@@ -719,6 +723,77 @@ class _patcher:
     def stopall() -> None: ...
 
 patch: _patcher
+"""
+`patch` acts as a function decorator, class decorator or a context
+manager. Inside the body of the function or with statement, the `target`
+is patched with a `new` object. When the function/with statement exits
+the patch is undone.
+
+If `new` is omitted, then the target is replaced with an
+`AsyncMock` if the patched object is an async function or a
+`MagicMock` otherwise. If `patch` is used as a decorator and `new` is
+omitted, the created mock is passed in as an extra argument to the
+decorated function. If `patch` is used as a context manager the created
+mock is returned by the context manager.
+
+`target` should be a string in the form `'package.module.ClassName'`. The
+`target` is imported and the specified object replaced with the `new`
+object, so the `target` must be importable from the environment you are
+calling `patch` from. The target is imported when the decorated function
+is executed, not at decoration time.
+
+The `spec` and `spec_set` keyword arguments are passed to the `MagicMock`
+if patch is creating one for you.
+
+In addition you can pass `spec=True` or `spec_set=True`, which causes
+patch to pass in the object being mocked as the spec/spec_set object.
+
+`new_callable` allows you to specify a different class, or callable object,
+that will be called to create the `new` object. By default `AsyncMock` is
+used for async functions and `MagicMock` for the rest.
+
+A more powerful form of `spec` is `autospec`. If you set `autospec=True`
+then the mock will be created with a spec from the object being replaced.
+All attributes of the mock will also have the spec of the corresponding
+attribute of the object being replaced. Methods and functions being
+mocked will have their arguments checked and will raise a `TypeError` if
+they are called with the wrong signature. For mocks replacing a class,
+their return value (the 'instance') will have the same spec as the class.
+
+Instead of `autospec=True` you can pass `autospec=some_object` to use an
+arbitrary object as the spec instead of the one being replaced.
+
+By default `patch` will fail to replace attributes that don't exist. If
+you pass in `create=True`, and the attribute doesn't exist, patch will
+create the attribute for you when the patched function is called, and
+delete it again afterwards. This is useful for writing tests against
+attributes that your production code creates at runtime. It is off by
+default because it can be dangerous. With it switched on you can write
+passing tests against APIs that don't actually exist!
+
+Patch can be used as a `TestCase` class decorator. It works by
+decorating each test method in the class. This reduces the boilerplate
+code when your test methods share a common patchings set. `patch` finds
+tests by looking for method names that start with `patch.TEST_PREFIX`.
+By default this is `test`, which matches the way `unittest` finds tests.
+You can specify an alternative prefix by setting `patch.TEST_PREFIX`.
+
+Patch can be used as a context manager, with the with statement. Here the
+patching applies to the indented block after the with statement. If you
+use "as" then the patched object will be bound to the name after the
+"as"; very useful if `patch` is creating a mock object for you.
+
+Patch will raise a `RuntimeError` if passed some common misspellings of
+the arguments autospec and spec_set. Pass the argument `unsafe` with the
+value True to disable that check.
+
+`patch` takes arbitrary keyword arguments. These will be passed to
+`AsyncMock` if the patched object is asynchronous, to `MagicMock`
+otherwise or to `new_callable` if specified.
+
+`patch.dict(...)`, `patch.multiple(...)` and `patch.object(...)` are
+available for alternate use-cases.
+"""
 
 class MagicMixin(Base):
     def __init__(self, *args: Any, **kw: Any) -> None: ...

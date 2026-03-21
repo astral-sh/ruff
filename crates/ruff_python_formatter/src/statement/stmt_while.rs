@@ -5,7 +5,7 @@ use ruff_text_size::Ranged;
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::Parenthesize;
 use crate::prelude::*;
-use crate::statement::clause::{ClauseHeader, ElseClause, clause_body, clause_header};
+use crate::statement::clause::{ClauseHeader, ElseClause, clause};
 use crate::statement::suite::SuiteKind;
 
 #[derive(Default)]
@@ -33,22 +33,17 @@ impl FormatNodeRule<StmtWhile> for FormatStmtWhile {
 
         write!(
             f,
-            [
-                clause_header(
-                    ClauseHeader::While(item),
-                    trailing_condition_comments,
-                    &format_args![
-                        token("while"),
-                        space(),
-                        maybe_parenthesize_expression(test, item, Parenthesize::IfBreaks),
-                    ]
-                ),
-                clause_body(
-                    body,
-                    SuiteKind::other(orelse.is_empty()),
-                    trailing_condition_comments
-                ),
-            ]
+            [clause(
+                ClauseHeader::While(item),
+                &format_args![
+                    token("while"),
+                    space(),
+                    maybe_parenthesize_expression(test, item, Parenthesize::IfBreaks),
+                ],
+                trailing_condition_comments,
+                body,
+                SuiteKind::other(orelse.is_empty()),
+            )]
         )?;
 
         if !orelse.is_empty() {
@@ -60,15 +55,14 @@ impl FormatNodeRule<StmtWhile> for FormatStmtWhile {
 
             write!(
                 f,
-                [
-                    clause_header(
-                        ClauseHeader::OrElse(ElseClause::While(item)),
-                        trailing,
-                        &token("else")
-                    )
-                    .with_leading_comments(leading, body.last()),
-                    clause_body(orelse, SuiteKind::other(true), trailing),
-                ]
+                [clause(
+                    ClauseHeader::OrElse(ElseClause::While(item)),
+                    &token("else"),
+                    trailing,
+                    orelse,
+                    SuiteKind::other(true),
+                )
+                .with_leading_comments(leading, body.last()),]
             )?;
         }
 

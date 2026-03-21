@@ -2,6 +2,7 @@
 source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
+
 ---
 mdtest name: attribute_assignment.md - Attribute assignment - `ClassVar`s
 mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/attribute_assignment.md

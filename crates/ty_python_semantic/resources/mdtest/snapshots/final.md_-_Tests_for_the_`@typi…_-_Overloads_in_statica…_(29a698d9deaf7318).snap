@@ -1,0 +1,97 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: final.md - Tests for the `@typing(_extensions).final` decorator - Overloads in statically-known branches in stub files
+mdtest path: crates/ty_python_semantic/resources/mdtest/final.md
+---
+
+# Python source files
+
+## mdtest_snippet.pyi
+
+```
+ 1 | import sys
+ 2 | from typing_extensions import overload, final
+ 3 | 
+ 4 | class Foo:
+ 5 |     if sys.version_info >= (3, 10):
+ 6 |         @overload
+ 7 |         @final
+ 8 |         def method(self, x: int) -> int: ...
+ 9 | 
+10 |     else:
+11 |         @overload
+12 |         def method(self, x: int) -> int: ...
+13 |     @overload
+14 |     def method(self, x: str) -> str: ...
+15 | 
+16 |     if sys.version_info >= (3, 10):
+17 |         @overload
+18 |         def method2(self, x: int) -> int: ...
+19 | 
+20 |     else:
+21 |         @overload
+22 |         @final
+23 |         def method2(self, x: int) -> int: ...
+24 |     @overload
+25 |     def method2(self, x: str) -> str: ...
+26 | 
+27 | class Bar(Foo):
+28 |     @overload
+29 |     def method(self, x: int) -> int: ...
+30 |     @overload
+31 |     def method(self, x: str) -> str: ...  # error: [override-of-final-method]
+32 | 
+33 |     # This is fine: the only overload that is marked `@final`
+34 |     # is in a statically-unreachable branch
+35 |     @overload
+36 |     def method2(self, x: int) -> int: ...
+37 |     @overload
+38 |     def method2(self, x: str) -> str: ...
+```
+
+# Diagnostics
+
+```
+error[override-of-final-method]: Cannot override `Foo.method`
+  --> src/mdtest_snippet.pyi:31:9
+   |
+29 |     def method(self, x: int) -> int: ...
+30 |     @overload
+31 |     def method(self, x: str) -> str: ...  # error: [override-of-final-method]
+   |         ^^^^^^ Overrides a definition from superclass `Foo`
+32 |
+33 |     # This is fine: the only overload that is marked `@final`
+   |
+info: `Foo.method` is decorated with `@final`, forbidding overrides
+  --> src/mdtest_snippet.pyi:7:9
+   |
+ 5 |     if sys.version_info >= (3, 10):
+ 6 |         @overload
+ 7 |         @final
+   |         ------
+ 8 |         def method(self, x: int) -> int: ...
+   |             ------ `Foo.method` defined here
+ 9 |
+10 |     else:
+   |
+help: Remove all overloads for `method`
+info: rule `override-of-final-method` is enabled by default
+25 |     def method2(self, x: str) -> str: ...
+26 | 
+27 | class Bar(Foo):
+   -     @overload
+   -     def method(self, x: int) -> int: ...
+   -     @overload
+   -     def method(self, x: str) -> str: ...  # error: [override-of-final-method]
+28 +     
+29 +       # error: [override-of-final-method]
+30 | 
+31 |     # This is fine: the only overload that is marked `@final`
+32 |     # is in a statically-unreachable branch
+note: This is an unsafe fix and may change runtime behavior
+
+```

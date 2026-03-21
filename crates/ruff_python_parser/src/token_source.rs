@@ -1,10 +1,11 @@
+use ruff_python_ast::token::{Token, TokenFlags, TokenKind};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::Mode;
 use crate::error::LexicalError;
 use crate::lexer::{Lexer, LexerCheckpoint};
 use crate::string::InterpolatedStringKind;
-use crate::token::{Token, TokenFlags, TokenKind, TokenValue};
+use crate::token::TokenValue;
 
 /// Token source for the parser that skips over any trivia tokens.
 #[derive(Debug)]
@@ -66,26 +67,59 @@ impl<'src> TokenSource<'src> {
     ///
     /// [`re_lex_logical_token`]: Lexer::re_lex_logical_token
     pub(crate) fn re_lex_logical_token(&mut self) {
-        let mut non_logical_newline_start = None;
-        for token in self.tokens.iter().rev() {
+        let mut non_logical_newline = None;
+
+        #[cfg(debug_assertions)]
+        let last_non_trivia_end_before = {
+            self.tokens
+                .iter()
+                .rev()
+                .find(|tok| !tok.kind().is_trivia())
+                .map(ruff_text_size::Ranged::end)
+        };
+
+        for (index, token) in self.tokens.iter().enumerate().rev() {
             match token.kind() {
                 TokenKind::NonLogicalNewline => {
-                    non_logical_newline_start = Some(token.start());
+                    non_logical_newline = Some((index, token.start()));
                 }
                 TokenKind::Comment => continue,
                 _ => break,
             }
         }
 
-        if self.lexer.re_lex_logical_token(non_logical_newline_start) {
-            let current_start = self.current_range().start();
-            while self
-                .tokens
-                .last()
-                .is_some_and(|last| last.start() >= current_start)
-            {
-                self.tokens.pop();
-            }
+        if !self
+            .lexer
+            .re_lex_logical_token(non_logical_newline.map(|(_, start)| start))
+        {
+            return;
+        }
+
+        let non_logical_line_index = non_logical_newline
+            .expect(
+                "`re_lex_logical_token` should only return `true` if `non_logical_line` is `Some`",
+            )
+            .0;
+
+        // Trim the already bumped logical line token (and comments coming after it) as it might now have become a logical line token
+        self.tokens.truncate(non_logical_line_index);
+
+        #[cfg(debug_assertions)]
+        {
+            let last_non_trivia_end_now = {
+                self.tokens
+                    .iter()
+                    .rev()
+                    .find(|tok| !tok.kind().is_trivia())
+                    .map(ruff_text_size::Ranged::end)
+            };
+
+            assert_eq!(last_non_trivia_end_before, last_non_trivia_end_now);
+        }
+
+        // Ensure `current` is positioned at a non-trivia token.
+        if self.current_kind().is_trivia() {
+            self.bump(self.current_kind());
         }
     }
 

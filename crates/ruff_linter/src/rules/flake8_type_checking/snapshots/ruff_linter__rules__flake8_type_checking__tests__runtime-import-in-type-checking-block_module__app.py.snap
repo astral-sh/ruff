@@ -9,6 +9,13 @@ TC004 [*] Move import `datetime` out of type-checking block. Import is used for 
    |            ^^^^^^^^
 10 |     from array import array  # TC004
    |
+  ::: app.py:20:25
+   |
+19 | @app.put("/datetime")
+20 | def set_datetime(value: datetime.datetime):
+   |                         -------- Used at runtime here
+21 |     pass
+   |
 help: Move out of type-checking block
 4  | 
 5  | import fastapi
@@ -31,6 +38,13 @@ TC004 [*] Move import `array.array` out of type-checking block. Import is used f
    |                       ^^^^^
 11 |
 12 | app = fastapi.FastAPI("First application")
+   |
+  ::: app.py:24:20
+   |
+23 | @app_container.app.get("/array")
+24 | def get_array() -> array:
+   |                    ----- Used at runtime here
+25 |     pass
    |
 help: Move out of type-checking block
 4  | 

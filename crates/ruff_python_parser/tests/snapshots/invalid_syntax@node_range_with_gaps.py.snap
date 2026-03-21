@@ -106,7 +106,7 @@ Module(
 
   |
 1 | def foo # comment
-  |                  ^ Syntax Error: Expected '(', found newline
+  |                  ^ Syntax Error: Expected `(`, found newline
 2 | def bar(): ...
 3 | def baz
   |
@@ -115,7 +115,7 @@ Module(
   |
 1 | def foo # comment
 2 | def bar(): ...
-  | ^^^ Syntax Error: Expected ')', found 'def'
+  | ^^^ Syntax Error: Expected `)`, found `def`
 3 | def baz
   |
 
@@ -124,12 +124,12 @@ Module(
 1 | def foo # comment
 2 | def bar(): ...
 3 | def baz
-  |        ^ Syntax Error: Expected '(', found newline
+  |        ^ Syntax Error: Expected `(`, found newline
   |
 
 
   |
 2 | def bar(): ...
 3 | def baz
-  |        ^ Syntax Error: Expected ')', found end of file
+  |        ^ Syntax Error: Expected `)`, found end of file
   |

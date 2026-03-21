@@ -93,7 +93,7 @@ Module(
 
   |
 1 | call(a, b, # comment \
-  |                       ^ Syntax Error: Expected ')', found newline
+  |                       ^ Syntax Error: Expected `)`, found newline
 2 |
 3 | def bar():
 4 |     pass

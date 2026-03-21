@@ -139,3 +139,17 @@ b_string_te_1: "UnionTE[NamedTupleTE]" = None
 b_string_te_2: "UnionTE[NamedTupleTE, None]" = None
 b_string_typing_1: "typing.Union[typing.NamedTuple]" = None
 b_string_typing_2: "typing.Union[typing.NamedTuple, None]" = None
+
+
+# Regression test for https://github.com/astral-sh/ruff/issues/23207
+# Multi-line single-argument Union should be wrapped in parentheses
+from __future__ import annotations
+
+if TYPE_CHECKING:
+    from typing import Literal, TypeAlias
+
+    LongLiterals: TypeAlias = Union[
+        Literal["LongLiteralNumberOne"]
+        | Literal["LongLiteralNumberTwo"]
+        | Literal["LongLiteralNumberThree"]
+    ]

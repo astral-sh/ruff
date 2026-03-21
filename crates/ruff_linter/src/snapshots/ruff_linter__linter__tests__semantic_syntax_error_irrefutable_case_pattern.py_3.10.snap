@@ -1,0 +1,22 @@
+---
+source: crates/ruff_linter/src/linter.rs
+---
+invalid-syntax: wildcard makes remaining patterns unreachable
+ --> resources/test/fixtures/semantic_errors/irrefutable_case_pattern.py:2:10
+  |
+1 | match value:
+2 |     case _:
+  |          ^
+3 |         pass
+4 |     case 1:
+  |
+
+invalid-syntax: name capture `irrefutable` makes remaining patterns unreachable
+  --> resources/test/fixtures/semantic_errors/irrefutable_case_pattern.py:8:10
+   |
+ 7 | match value:
+ 8 |     case irrefutable:
+   |          ^^^^^^^^^^^
+ 9 |         pass
+10 |     case 1:
+   |

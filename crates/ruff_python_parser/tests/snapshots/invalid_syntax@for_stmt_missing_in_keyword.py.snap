@@ -94,7 +94,7 @@ Module(
 
   |
 1 | for a b: ...
-  |       ^ Syntax Error: Expected 'in', found name
+  |       ^ Syntax Error: Expected `in`, found name
 2 | for a: ...
   |
 
@@ -102,5 +102,5 @@ Module(
   |
 1 | for a b: ...
 2 | for a: ...
-  |      ^ Syntax Error: Expected 'in', found ':'
+  |      ^ Syntax Error: Expected `in`, found `:`
   |

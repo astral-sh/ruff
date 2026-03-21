@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-#[cfg(feature = "instrumented")]
+#[cfg(any(feature = "ty_instrumented", feature = "ruff_instrumented"))]
 pub mod criterion;
 pub mod real_world_projects;
 

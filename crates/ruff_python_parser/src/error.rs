@@ -1,9 +1,10 @@
 use std::fmt::{self, Display};
 
 use ruff_python_ast::PythonVersion;
+use ruff_python_ast::token::TokenKind;
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::{TokenKind, string::InterpolatedStringKind};
+use crate::string::InterpolatedStringKind;
 
 /// Represents represent errors that occur during parsing and are
 /// returned by the `parse_*` functions.
@@ -78,9 +79,9 @@ pub enum InterpolatedStringErrorType {
 impl std::fmt::Display for InterpolatedStringErrorType {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            Self::UnclosedLbrace => write!(f, "expecting '}}'"),
+            Self::UnclosedLbrace => write!(f, "expecting `}}`"),
             Self::InvalidConversionFlag => write!(f, "invalid conversion character"),
-            Self::SingleRbrace => write!(f, "single '}}' is not allowed"),
+            Self::SingleRbrace => write!(f, "single `}}` is not allowed"),
             Self::UnterminatedString => write!(f, "unterminated string"),
             Self::UnterminatedTripleQuotedString => write!(f, "unterminated triple-quoted string"),
             Self::LambdaWithoutParentheses => {
@@ -232,7 +233,7 @@ impl std::fmt::Display for ParseErrorType {
             ParseErrorType::UnexpectedTokenAfterAsync(kind) => {
                 write!(
                     f,
-                    "Expected 'def', 'with' or 'for' to follow 'async', found {kind}",
+                    "Expected `def`, `with` or `for` to follow `async`, found {kind}",
                 )
             }
             ParseErrorType::InvalidArgumentUnpackingOrder => {
@@ -286,10 +287,10 @@ impl std::fmt::Display for ParseErrorType {
                 f.write_str("Parameter without a default cannot follow a parameter with a default")
             }
             ParseErrorType::ExpectedKeywordParam => {
-                f.write_str("Expected one or more keyword parameter after '*' separator")
+                f.write_str("Expected one or more keyword parameter after `*` separator")
             }
             ParseErrorType::VarParameterWithDefault => {
-                f.write_str("Parameter with '*' or '**' cannot have default value")
+                f.write_str("Parameter with `*` or `**` cannot have default value")
             }
             ParseErrorType::InvalidStarPatternUsage => {
                 f.write_str("Star pattern cannot be used here")
@@ -709,6 +710,7 @@ pub enum UnsupportedSyntaxErrorKind {
     /// [PEP 695]: https://peps.python.org/pep-0695/
     /// [`typing.TypeVar`]: https://docs.python.org/3/library/typing.html#typevar
     TypeParameterList,
+    LazyImportStatement,
     TypeAliasStatement,
     TypeParamDefault,
 
@@ -835,6 +837,28 @@ pub enum UnsupportedSyntaxErrorKind {
     /// [PEP 646]: https://peps.python.org/pep-0646/#change-2-args-as-a-typevartuple
     StarAnnotation,
 
+    /// Represents the use of iterable unpacking inside a list comprehension
+    /// before Python 3.15.
+    ///
+    /// ## Examples
+    ///
+    /// Before Python 3.15, list comprehensions could not use iterable
+    /// unpacking in their element expression:
+    ///
+    /// ```python
+    /// [*x for x in y]  # SyntaxError
+    /// ```
+    ///
+    /// Starting with Python 3.15, [PEP 798] allows iterable unpacking within
+    /// list comprehensions:
+    ///
+    /// ```python
+    /// [*x for x in y]
+    /// ```
+    ///
+    /// [PEP 798]: https://peps.python.org/pep-0798/
+    IterableUnpackingInListComprehension,
+
     /// Represents the use of tuple unpacking in a `for` statement iterator clause before Python
     /// 3.9.
     ///
@@ -956,6 +980,7 @@ impl Display for UnsupportedSyntaxError {
                 "Cannot use positional-only parameter separator"
             }
             UnsupportedSyntaxErrorKind::TypeParameterList => "Cannot use type parameter lists",
+            UnsupportedSyntaxErrorKind::LazyImportStatement => "Cannot use `lazy` import statement",
             UnsupportedSyntaxErrorKind::TypeAliasStatement => "Cannot use `type` alias statement",
             UnsupportedSyntaxErrorKind::TypeParamDefault => {
                 "Cannot set default type for a type parameter"
@@ -976,6 +1001,9 @@ impl Display for UnsupportedSyntaxError {
                 "Cannot use star expression in index"
             }
             UnsupportedSyntaxErrorKind::StarAnnotation => "Cannot use star annotation",
+            UnsupportedSyntaxErrorKind::IterableUnpackingInListComprehension => {
+                "Cannot use iterable unpacking in a list comprehension"
+            }
             UnsupportedSyntaxErrorKind::UnparenthesizedUnpackInFor => {
                 "Cannot use iterable unpacking in `for` statements"
             }
@@ -1037,6 +1065,7 @@ impl UnsupportedSyntaxErrorKind {
                 Change::Removed(PythonVersion::PY38)
             }
             UnsupportedSyntaxErrorKind::TypeParameterList => Change::Added(PythonVersion::PY312),
+            UnsupportedSyntaxErrorKind::LazyImportStatement => Change::Added(PythonVersion::PY315),
             UnsupportedSyntaxErrorKind::TypeAliasStatement => Change::Added(PythonVersion::PY312),
             UnsupportedSyntaxErrorKind::TypeParamDefault => Change::Added(PythonVersion::PY313),
             UnsupportedSyntaxErrorKind::Pep701FString(_) => Change::Added(PythonVersion::PY312),
@@ -1047,6 +1076,9 @@ impl UnsupportedSyntaxErrorKind {
                 Change::Added(PythonVersion::PY311)
             }
             UnsupportedSyntaxErrorKind::StarAnnotation => Change::Added(PythonVersion::PY311),
+            UnsupportedSyntaxErrorKind::IterableUnpackingInListComprehension => {
+                Change::Added(PythonVersion::PY315)
+            }
             UnsupportedSyntaxErrorKind::UnparenthesizedUnpackInFor => {
                 Change::Added(PythonVersion::PY39)
             }

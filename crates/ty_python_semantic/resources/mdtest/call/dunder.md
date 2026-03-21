@@ -53,7 +53,7 @@ class ClassWithNormalDunder:
     def __getitem__(self, key: int) -> str:
         return str(key)
 
-# error: [non-subscriptable]
+# error: [not-subscriptable]
 ClassWithNormalDunder[0]
 ```
 
@@ -85,7 +85,7 @@ class ThisFails:
 
 this_fails = ThisFails()
 
-# error: [non-subscriptable] "Cannot subscript object of type `ThisFails` with no `__getitem__` method"
+# error: [not-subscriptable] "Cannot subscript object of type `ThisFails` with no `__getitem__` method"
 reveal_type(this_fails[0])  # revealed: Unknown
 ```
 
@@ -194,7 +194,7 @@ class_with_descriptor_dunder = ClassWithDescriptorDunder()
 reveal_type(class_with_descriptor_dunder[0])  # revealed: str
 ```
 
-## Dunders can not be overwritten on instances
+## Dunders cannot be overwritten on instances
 
 If we attempt to overwrite a dunder method on an instance, it does not affect the behavior of
 implicit dunder calls:
@@ -205,7 +205,7 @@ class C:
         return str(key)
 
     def f(self):
-        # error: [invalid-assignment] "Implicit shadowing of function `__getitem__`"
+        # error: [invalid-assignment]
         self.__getitem__ = None
 
 # This is still fine, and simply calls the `__getitem__` method on the class
@@ -220,6 +220,7 @@ def _(flag: bool):
         if flag:
             def __getitem__(self, key: int) -> str:
                 return str(key)
+
         else:
             def __getitem__(self, key: int) -> bytes:
                 return bytes()
@@ -259,8 +260,8 @@ class NotSubscriptable2:
         self.__getitem__ = external_getitem
 
 def _(union: NotSubscriptable1 | NotSubscriptable2):
-    # error: [non-subscriptable] "Cannot subscript object of type `NotSubscriptable2` with no `__getitem__` method"
-    # error: [non-subscriptable] "Cannot subscript object of type `NotSubscriptable1` with no `__getitem__` method"
+    # error: [not-subscriptable] "Cannot subscript object of type `NotSubscriptable2` with no `__getitem__` method"
+    # error: [not-subscriptable] "Cannot subscript object of type `NotSubscriptable1` with no `__getitem__` method"
     union[0]
 ```
 

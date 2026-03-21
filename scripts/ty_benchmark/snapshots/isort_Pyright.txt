@@ -1,0 +1,50 @@
+<CWD>/isort/api.py
+  <CWD>/isort/api.py:206:33 - error: "file_content" is possibly unbound (reportPossiblyUnboundVariable)
+  <CWD>/isort/api.py:574:12 - error: "key" is possibly unbound (reportPossiblyUnboundVariable)
+<CWD>/isort/format.py
+  <CWD>/isort/format.py:120:47 - error: "colorama" is possibly unbound (reportPossiblyUnboundVariable)
+  <CWD>/isort/format.py:121:51 - error: "colorama" is possibly unbound (reportPossiblyUnboundVariable)
+  <CWD>/isort/format.py:122:27 - error: "colorama" is possibly unbound (reportPossiblyUnboundVariable)
+  <CWD>/isort/format.py:123:29 - error: "colorama" is possibly unbound (reportPossiblyUnboundVariable)
+  <CWD>/isort/format.py:129:35 - error: "colorama" is possibly unbound (reportPossiblyUnboundVariable)
+  <CWD>/isort/format.py:156:9 - error: "colorama" is possibly unbound (reportPossiblyUnboundVariable)
+<CWD>/isort/main.py
+  <CWD>/isort/main.py:542:32 - error: Cannot access attribute "__members__" for class "Enum"
+    Attribute "__members__" is unknown (reportAttributeAccessIssue)
+  <CWD>/isort/main.py:543:50 - error: Cannot access attribute "__members__" for class "Enum"
+    Attribute "__members__" is unknown (reportAttributeAccessIssue)
+  <CWD>/isort/main.py:949:46 - error: Object of type "Enum" is not callable
+    Attribute "__call__" is unknown (reportCallIssue)
+  <CWD>/isort/main.py:951:46 - error: "__getitem__" method not defined on type "Enum" (reportIndexIssue)
+  <CWD>/isort/main.py:960:25 - error: Argument of type "Enum" cannot be assigned to parameter "class_or_tuple" of type "_ClassInfo" in function "isinstance"
+    Type "Enum" is not assignable to type "_ClassInfo"
+      "Enum" is not assignable to "type"
+      "Enum" is not assignable to "UnionType"
+      "Enum" is not assignable to "tuple[_ClassInfo, ...]" (reportArgumentType)
+<CWD>/isort/output.py
+  <CWD>/isort/output.py:491:69 - error: "from_import" is possibly unbound (reportPossiblyUnboundVariable)
+  <CWD>/isort/output.py:534:34 - error: Argument of type "Any | list[Any] | None" cannot be assigned to parameter "comments" of type "Sequence[str]" in function "import_statement"
+    Type "Any | list[Any] | None" is not assignable to type "Sequence[str]"
+      "None" is not assignable to "Sequence[str]" (reportArgumentType)
+  <CWD>/isort/output.py:544:34 - error: Argument of type "Any | list[Any] | None" cannot be assigned to parameter "comments" of type "Sequence[str]" in function "import_statement"
+    Type "Any | list[Any] | None" is not assignable to type "Sequence[str]"
+      "None" is not assignable to "Sequence[str]" (reportArgumentType)
+  <CWD>/isort/output.py:552:38 - error: Argument of type "Any | list[Any] | None" cannot be assigned to parameter "comments" of type "Sequence[str]" in function "import_statement"
+    Type "Any | list[Any] | None" is not assignable to type "Sequence[str]"
+      "None" is not assignable to "Sequence[str]" (reportArgumentType)
+  <CWD>/isort/output.py:665:20 - error: No overloads for "__new__" match the provided arguments (reportCallIssue)
+  <CWD>/isort/output.py:665:36 - error: Argument of type "type[_LineWithComments]" cannot be assigned to parameter "cls" of type "type[Self@_LineWithComments]" in function "__new__"
+    Type "type[_LineWithComments]" is not assignable to type "type[Self@_LineWithComments]" (reportArgumentType)
+<CWD>/isort/place.py
+  <CWD>/isort/place.py:104:41 - error: "machinery" is not a known attribute of module "importlib" (reportAttributeAccessIssue)
+<CWD>/isort/settings.py
+  <CWD>/isort/settings.py:711:16 - error: Type "((...) -> list[str]) | None" is not assignable to return type "(...) -> list[str]"
+    Type "((...) -> list[str]) | None" is not assignable to type "(...) -> list[str]"
+      Type "None" is not assignable to type "(...) -> list[str]" (reportReturnType)
+<CWD>/isort/wrap.py
+  <CWD>/isort/wrap.py:16:24 - error: Variable not allowed in type expression (reportInvalidTypeForm)
+<CWD>/isort/wrap_modes.py
+  <CWD>/isort/wrap_modes.py:13:33 - error: Variable not allowed in type expression (reportInvalidTypeForm)
+  <CWD>/isort/wrap_modes.py:14:52 - error: Object of type "Enum" is not callable
+    Attribute "__call__" is unknown (reportCallIssue)
+24 errors, 0 warnings, 0 informations

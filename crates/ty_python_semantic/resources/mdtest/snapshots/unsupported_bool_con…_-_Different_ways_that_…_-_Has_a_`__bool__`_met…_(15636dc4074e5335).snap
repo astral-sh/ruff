@@ -2,6 +2,7 @@
 source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
+
 ---
 mdtest name: unsupported_bool_conversion.md - Different ways that `unsupported-bool-conversion` can occur - Has a `__bool__` method, but has an incorrect return type
 mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/unsupported_bool_conversion.md
@@ -25,7 +26,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/unsupported_
 # Diagnostics
 
 ```
-error[unsupported-bool-conversion]: Boolean conversion is unsupported for type `NotBoolable`
+error[unsupported-bool-conversion]: Boolean conversion is not supported for type `NotBoolable`
  --> src/mdtest_snippet.py:8:8
   |
 7 | # error: [unsupported-bool-conversion]

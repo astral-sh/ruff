@@ -589,14 +589,28 @@ impl FormatString {
         Ok((first_char, chars.as_str()))
     }
 
-    fn parse_literal(text: &str) -> Result<(FormatPart, &str), FormatParseError> {
+    fn parse_literal(text: &str, is_raw: bool) -> Result<(FormatPart, &str), FormatParseError> {
         let mut cur_text = text;
         let mut result_string = String::new();
+        let mut pending_escape = false;
         while !cur_text.is_empty() {
+            // Raw strings: \N{...} is literal, not a Unicode escape
+            if !is_raw
+                && pending_escape
+                && let Some((unicode_string, remaining)) =
+                    FormatString::parse_escaped_unicode_string(cur_text)
+            {
+                result_string.push_str(unicode_string);
+                cur_text = remaining;
+                pending_escape = false;
+                continue;
+            }
+
             match FormatString::parse_literal_single(cur_text) {
                 Ok((next_char, remaining)) => {
                     result_string.push(next_char);
                     cur_text = remaining;
+                    pending_escape = next_char == '\\' && !pending_escape;
                 }
                 Err(err) => {
                     return if result_string.is_empty() {
@@ -678,23 +692,21 @@ impl FormatString {
         }
         Err(FormatParseError::UnmatchedBracket)
     }
-}
 
-pub trait FromTemplate<'a>: Sized {
-    type Err;
-    fn from_str(s: &'a str) -> Result<Self, Self::Err>;
-}
+    fn parse_escaped_unicode_string(text: &str) -> Option<(&str, &str)> {
+        text.strip_prefix("N{")?.find('}').map(|idx| {
+            let end_idx = idx + 3; // 3 for "N{"
+            (&text[..end_idx], &text[end_idx..])
+        })
+    }
 
-impl<'a> FromTemplate<'a> for FormatString {
-    type Err = FormatParseError;
-
-    fn from_str(text: &'a str) -> Result<Self, Self::Err> {
+    fn parse(text: &str, is_raw: bool) -> Result<Self, FormatParseError> {
         let mut cur_text: &str = text;
         let mut parts: Vec<FormatPart> = Vec::new();
         while !cur_text.is_empty() {
             // Try to parse both literals and bracketed format parts until we
             // run out of text
-            cur_text = FormatString::parse_literal(cur_text)
+            cur_text = FormatString::parse_literal(cur_text, is_raw)
                 .or_else(|_| FormatString::parse_spec(cur_text, AllowPlaceholderNesting::Yes))
                 .map(|(part, new_text)| {
                     parts.push(part);
@@ -704,6 +716,24 @@ impl<'a> FromTemplate<'a> for FormatString {
         Ok(FormatString {
             format_parts: parts,
         })
+    }
+}
+
+pub trait FromTemplate<'a>: Sized {
+    type Err;
+    fn from_str(s: &'a str) -> Result<Self, Self::Err>;
+    fn from_raw_str(s: &'a str) -> Result<Self, Self::Err>;
+}
+
+impl<'a> FromTemplate<'a> for FormatString {
+    type Err = FormatParseError;
+
+    fn from_str(text: &'a str) -> Result<Self, Self::Err> {
+        FormatString::parse(text, false)
+    }
+
+    fn from_raw_str(text: &'a str) -> Result<Self, Self::Err> {
+        FormatString::parse(text, true)
     }
 }
 
@@ -1019,5 +1049,49 @@ mod tests {
             FieldName::parse("key[0]after"),
             Err(FormatParseError::InvalidCharacterAfterRightBracket)
         );
+    }
+
+    #[test]
+    fn test_format_unicode_escape() {
+        let expected = Ok(FormatString {
+            format_parts: vec![FormatPart::Literal("I am a \\N{snowman}".to_owned())],
+        });
+
+        assert_eq!(FormatString::from_str("I am a \\N{snowman}"), expected);
+    }
+
+    #[test]
+    fn test_format_unicode_escape_with_field() {
+        let expected = Ok(FormatString {
+            format_parts: vec![
+                FormatPart::Literal("I am a \\N{snowman}".to_owned()),
+                FormatPart::Field {
+                    field_name: "snowman".to_owned(),
+                    conversion_spec: None,
+                    format_spec: String::new(),
+                },
+            ],
+        });
+
+        assert_eq!(
+            FormatString::from_str("I am a \\N{snowman}{snowman}"),
+            expected
+        );
+    }
+
+    #[test]
+    fn test_format_multiple_escape_with_field() {
+        let expected = Ok(FormatString {
+            format_parts: vec![
+                FormatPart::Literal("I am a \\\\N".to_owned()),
+                FormatPart::Field {
+                    field_name: "snowman".to_owned(),
+                    conversion_spec: None,
+                    format_spec: String::new(),
+                },
+            ],
+        });
+
+        assert_eq!(FormatString::from_str("I am a \\\\N{snowman}"), expected);
     }
 }

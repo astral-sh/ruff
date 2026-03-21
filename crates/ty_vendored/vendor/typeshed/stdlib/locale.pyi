@@ -251,6 +251,10 @@ def currency(val: float | Decimal, symbol: bool = True, grouping: bool = False, 
 def delocalize(string: _str) -> _str:
     """Parses a string as a normalized number according to the locale settings."""
 
+if sys.version_info >= (3, 10):
+    def localize(string: _str, grouping: bool = False, monetary: bool = False) -> _str:
+        """Parses a string as locale number according to the locale settings."""
+
 def atof(string: _str, func: Callable[[_str], float] = ...) -> float:
     """Parses a string as a float according to the locale settings."""
 

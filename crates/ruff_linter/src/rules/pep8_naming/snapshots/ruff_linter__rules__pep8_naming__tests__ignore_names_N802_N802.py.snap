@@ -20,3 +20,4 @@ N802 Function name `stillBad` should be lowercase
    |         ^^^^^^^^
 14 |         return super().tearDown()
    |
+help: Consider adding `@typing.override` if this method overrides a method from a superclass

@@ -149,6 +149,10 @@ impl Fix {
         &self.edits
     }
 
+    pub fn into_edits(self) -> Vec<Edit> {
+        self.edits
+    }
+
     /// Return the [`Applicability`] of the [`Fix`].
     pub fn applicability(&self) -> Applicability {
         self.applicability

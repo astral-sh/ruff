@@ -27,7 +27,7 @@ fn exclude_argument() -> anyhow::Result<()> {
     ])?;
 
     // Test that exclude argument is recognized and works
-    assert_cmd_snapshot!(case.command().arg("--exclude").arg("tests/"), @r###"
+    assert_cmd_snapshot!(case.command().arg("--exclude").arg("tests/"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -50,10 +50,10 @@ fn exclude_argument() -> anyhow::Result<()> {
     Found 2 diagnostics
 
     ----- stderr -----
-    "###);
+    ");
 
     // Test multiple exclude patterns
-    assert_cmd_snapshot!(case.command().arg("--exclude").arg("tests/").arg("--exclude").arg("temp_*.py"), @r###"
+    assert_cmd_snapshot!(case.command().arg("--exclude").arg("tests/").arg("--exclude").arg("temp_*.py"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -68,7 +68,7 @@ fn exclude_argument() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    ");
 
     Ok(())
 }
@@ -106,7 +106,7 @@ fn configuration_include() -> anyhow::Result<()> {
         "#,
     )?;
 
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -121,7 +121,7 @@ fn configuration_include() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    ");
 
     // Test multiple include patterns via configuration
     case.write_file(
@@ -132,7 +132,7 @@ fn configuration_include() -> anyhow::Result<()> {
         "#,
     )?;
 
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -155,7 +155,66 @@ fn configuration_include() -> anyhow::Result<()> {
     Found 2 diagnostics
 
     ----- stderr -----
-    "###);
+    ");
+
+    Ok(())
+}
+
+/// Files without extensions can be included by adding a literal glob to `include` that matches
+/// the path exactly. A literal glob is a glob without any meta characters.
+#[test]
+fn configuration_include_no_extension() -> anyhow::Result<()> {
+    let case = CliTest::with_files([(
+        "src/main",
+        r#"
+            print(undefined_var)  # error: unresolved-reference
+            "#,
+    )])?;
+
+    // By default, `src/main` is excluded because the file has no supported extension.
+    case.write_file(
+        "ty.toml",
+        r#"
+        [src]
+        include = ["src"]
+        "#,
+    )?;
+
+    assert_cmd_snapshot!(case.command(), @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    WARN No python files found under the given path(s)
+    ");
+
+    // The file can be included by adding an exactly matching pattern
+    case.write_file(
+        "ty.toml",
+        r#"
+        [src]
+        include = ["src", "src/main"]
+        "#,
+    )?;
+
+    assert_cmd_snapshot!(case.command(), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-reference]: Name `undefined_var` used when not defined
+     --> src/main:2:7
+      |
+    2 | print(undefined_var)  # error: unresolved-reference
+      |       ^^^^^^^^^^^^^
+      |
+    info: rule `unresolved-reference` is enabled by default
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
 
     Ok(())
 }
@@ -193,7 +252,7 @@ fn configuration_exclude() -> anyhow::Result<()> {
         "#,
     )?;
 
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -216,7 +275,7 @@ fn configuration_exclude() -> anyhow::Result<()> {
     Found 2 diagnostics
 
     ----- stderr -----
-    "###);
+    ");
 
     // Test multiple exclude patterns via configuration
     case.write_file(
@@ -227,7 +286,7 @@ fn configuration_exclude() -> anyhow::Result<()> {
         "#,
     )?;
 
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -242,7 +301,7 @@ fn configuration_exclude() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    ");
 
     Ok(())
 }
@@ -281,7 +340,7 @@ fn exclude_precedence_over_include() -> anyhow::Result<()> {
         "#,
     )?;
 
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -296,7 +355,7 @@ fn exclude_precedence_over_include() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    ");
 
     Ok(())
 }
@@ -334,7 +393,7 @@ fn exclude_argument_precedence_include_argument() -> anyhow::Result<()> {
         "#,
     )?;
 
-    assert_cmd_snapshot!(case.command().arg("--exclude").arg("tests/"), @r###"
+    assert_cmd_snapshot!(case.command().arg("--exclude").arg("tests/"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -349,7 +408,7 @@ fn exclude_argument_precedence_include_argument() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    ");
 
     Ok(())
 }
@@ -373,7 +432,7 @@ fn remove_default_exclude() -> anyhow::Result<()> {
     ])?;
 
     // By default, 'dist' directory should be excluded (see default excludes)
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -388,7 +447,7 @@ fn remove_default_exclude() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    ");
 
     // Now override the default exclude by using a negated pattern to re-include 'dist'
     case.write_file(
@@ -399,7 +458,7 @@ fn remove_default_exclude() -> anyhow::Result<()> {
         "#,
     )?;
 
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -422,7 +481,7 @@ fn remove_default_exclude() -> anyhow::Result<()> {
     Found 2 diagnostics
 
     ----- stderr -----
-    "###);
+    ");
 
     Ok(())
 }
@@ -455,7 +514,7 @@ fn cli_removes_config_exclude() -> anyhow::Result<()> {
     )?;
 
     // Verify that build/ is excluded by configuration
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -470,10 +529,10 @@ fn cli_removes_config_exclude() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    ");
 
     // Now remove the configuration exclude via CLI negation
-    assert_cmd_snapshot!(case.command().arg("--exclude").arg("!build/"), @r###"
+    assert_cmd_snapshot!(case.command().arg("--exclude").arg("!build/"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -496,7 +555,7 @@ fn cli_removes_config_exclude() -> anyhow::Result<()> {
     Found 2 diagnostics
 
     ----- stderr -----
-    "###);
+    ");
 
     Ok(())
 }
@@ -533,7 +592,7 @@ fn explicit_path_overrides_exclude() -> anyhow::Result<()> {
     ])?;
 
     // dist is excluded by default and `tests/generated` is excluded in the project, so only src/main.py should be checked
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -548,10 +607,10 @@ fn explicit_path_overrides_exclude() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    ");
 
     // Explicitly checking a file in an excluded directory should still check that file
-    assert_cmd_snapshot!(case.command().arg("tests/generated.py"), @r###"
+    assert_cmd_snapshot!(case.command().arg("tests/generated.py"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -566,10 +625,10 @@ fn explicit_path_overrides_exclude() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    ");
 
     // Explicitly checking the entire excluded directory should check all files in it
-    assert_cmd_snapshot!(case.command().arg("dist/"), @r###"
+    assert_cmd_snapshot!(case.command().arg("dist/"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -584,7 +643,275 @@ fn explicit_path_overrides_exclude() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    ");
+
+    Ok(())
+}
+
+/// Test behavior when explicitly checking a path that matches an exclude pattern and `--force-exclude` is provided
+#[test]
+fn explicit_path_overrides_exclude_force_exclude() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        (
+            "src/main.py",
+            r#"
+            print(undefined_var)  # error: unresolved-reference
+            "#,
+        ),
+        (
+            "tests/generated.py",
+            r#"
+            print(dist_undefined_var)  # error: unresolved-reference
+            "#,
+        ),
+        (
+            "dist/other.py",
+            r#"
+            print(other_undefined_var)  # error: unresolved-reference
+            "#,
+        ),
+        (
+            "ty.toml",
+            r#"
+            [src]
+            exclude = ["tests/generated.py"]
+            "#,
+        ),
+    ])?;
+
+    // Explicitly checking a file in an excluded directory should still check that file
+    assert_cmd_snapshot!(case.command().arg("tests/generated.py").arg("src/main.py"), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-reference]: Name `undefined_var` used when not defined
+     --> src/main.py:2:7
+      |
+    2 | print(undefined_var)  # error: unresolved-reference
+      |       ^^^^^^^^^^^^^
+      |
+    info: rule `unresolved-reference` is enabled by default
+
+    error[unresolved-reference]: Name `dist_undefined_var` used when not defined
+     --> tests/generated.py:2:7
+      |
+    2 | print(dist_undefined_var)  # error: unresolved-reference
+      |       ^^^^^^^^^^^^^^^^^^
+      |
+    info: rule `unresolved-reference` is enabled by default
+
+    Found 2 diagnostics
+
+    ----- stderr -----
+    ");
+
+    // Except when `--force-exclude` is set.
+    assert_cmd_snapshot!(case.command().arg("tests/generated.py").arg("src/main.py").arg("--force-exclude"), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-reference]: Name `undefined_var` used when not defined
+     --> src/main.py:2:7
+      |
+    2 | print(undefined_var)  # error: unresolved-reference
+      |       ^^^^^^^^^^^^^
+      |
+    info: rule `unresolved-reference` is enabled by default
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
+
+    // Explicitly checking the entire excluded directory should check all files in it
+    assert_cmd_snapshot!(case.command().arg("dist/").arg("src/main.py"), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-reference]: Name `other_undefined_var` used when not defined
+     --> dist/other.py:2:7
+      |
+    2 | print(other_undefined_var)  # error: unresolved-reference
+      |       ^^^^^^^^^^^^^^^^^^^
+      |
+    info: rule `unresolved-reference` is enabled by default
+
+    error[unresolved-reference]: Name `undefined_var` used when not defined
+     --> src/main.py:2:7
+      |
+    2 | print(undefined_var)  # error: unresolved-reference
+      |       ^^^^^^^^^^^^^
+      |
+    info: rule `unresolved-reference` is enabled by default
+
+    Found 2 diagnostics
+
+    ----- stderr -----
+    ");
+
+    // Except when using `--force-exclude`
+    assert_cmd_snapshot!(case.command().arg("dist/").arg("src/main.py").arg("--force-exclude"), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-reference]: Name `undefined_var` used when not defined
+     --> src/main.py:2:7
+      |
+    2 | print(undefined_var)  # error: unresolved-reference
+      |       ^^^^^^^^^^^^^
+      |
+    info: rule `unresolved-reference` is enabled by default
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
+/// Test that `--force-exclude` respects exclude patterns even for explicitly passed files.
+#[test]
+fn force_exclude_directory_exclusion() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        (
+            "src/main.py",
+            r#"
+            print(undefined_var)  # error: unresolved-reference
+            "#,
+        ),
+        (
+            "out/amd64/install/_setup_util.py",
+            r#"
+            base_path: str = "/path"
+            if base_path not in CMAKE_PREFIX_PATH:
+                CMAKE_PREFIX_PATH.insert(0, base_path)
+            "#,
+        ),
+        (
+            "ty.toml",
+            r#"
+            [src]
+            exclude = ["out"]
+            "#,
+        ),
+    ])?;
+
+    // Without --force-exclude, explicitly passed file overrides exclude.
+    assert_cmd_snapshot!(case.command().arg("out/amd64/install/_setup_util.py"), @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-reference]: Name `CMAKE_PREFIX_PATH` used when not defined
+     --> out/amd64/install/_setup_util.py:3:21
+      |
+    2 | base_path: str = "/path"
+    3 | if base_path not in CMAKE_PREFIX_PATH:
+      |                     ^^^^^^^^^^^^^^^^^
+    4 |     CMAKE_PREFIX_PATH.insert(0, base_path)
+      |
+    info: rule `unresolved-reference` is enabled by default
+
+    error[unresolved-reference]: Name `CMAKE_PREFIX_PATH` used when not defined
+     --> out/amd64/install/_setup_util.py:4:5
+      |
+    2 | base_path: str = "/path"
+    3 | if base_path not in CMAKE_PREFIX_PATH:
+    4 |     CMAKE_PREFIX_PATH.insert(0, base_path)
+      |     ^^^^^^^^^^^^^^^^^
+      |
+    info: rule `unresolved-reference` is enabled by default
+
+    Found 2 diagnostics
+
+    ----- stderr -----
+    "#);
+
+    // With --force-exclude, the exclude pattern is enforced even for explicit paths.
+    assert_cmd_snapshot!(case.command().arg("--force-exclude").arg("out/amd64/install/_setup_util.py"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    WARN No python files found under the given path(s)
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn cli_and_configuration_exclude() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        (
+            "src/main.py",
+            r#"
+            print(undefined_var)  # error: unresolved-reference
+            "#,
+        ),
+        (
+            "tests/generated.py",
+            r#"
+            print(dist_undefined_var)  # error: unresolved-reference
+            "#,
+        ),
+        (
+            "my_dist/other.py",
+            r#"
+            print(other_undefined_var)  # error: unresolved-reference
+            "#,
+        ),
+        (
+            "ty.toml",
+            r#"
+            [src]
+            exclude = ["tests/"]
+            "#,
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(case.command(), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-reference]: Name `other_undefined_var` used when not defined
+     --> my_dist/other.py:2:7
+      |
+    2 | print(other_undefined_var)  # error: unresolved-reference
+      |       ^^^^^^^^^^^^^^^^^^^
+      |
+    info: rule `unresolved-reference` is enabled by default
+
+    error[unresolved-reference]: Name `undefined_var` used when not defined
+     --> src/main.py:2:7
+      |
+    2 | print(undefined_var)  # error: unresolved-reference
+      |       ^^^^^^^^^^^^^
+      |
+    info: rule `unresolved-reference` is enabled by default
+
+    Found 2 diagnostics
+
+    ----- stderr -----
+    ");
+
+    assert_cmd_snapshot!(case.command().arg("--exclude").arg("my_dist/"), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-reference]: Name `undefined_var` used when not defined
+     --> src/main.py:2:7
+      |
+    2 | print(undefined_var)  # error: unresolved-reference
+      |       ^^^^^^^^^^^^^
+      |
+    info: rule `unresolved-reference` is enabled by default
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
 
     Ok(())
 }
@@ -610,14 +937,14 @@ fn invalid_include_pattern() -> anyhow::Result<()> {
     ])?;
 
     // By default, dist/ is excluded, so only src/main.py should be checked
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @r#"
     success: false
     exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
     ty failed
-      Cause: error[invalid-glob]: Invalid include pattern
+      Cause: error[invalid-glob]: Invalid pattern
      --> ty.toml:4:5
       |
     2 | [src]
@@ -626,7 +953,7 @@ fn invalid_include_pattern() -> anyhow::Result<()> {
       |     ^^^^^^^^^^^^^ Too many stars at position 5
     5 | ]
       |
-    "###);
+    "#);
 
     Ok(())
 }
@@ -652,15 +979,15 @@ fn invalid_include_pattern_concise_output() -> anyhow::Result<()> {
     ])?;
 
     // By default, dist/ is excluded, so only src/main.py should be checked
-    assert_cmd_snapshot!(case.command().arg("--output-format").arg("concise"), @r###"
+    assert_cmd_snapshot!(case.command().arg("--output-format").arg("concise"), @"
     success: false
     exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
     ty failed
-      Cause: ty.toml:4:5: error[invalid-glob] Invalid include pattern: Too many stars at position 5
-    "###);
+      Cause: ty.toml:4:5: error[invalid-glob] Invalid include pattern `src/**test/`: Too many stars at position 5
+    ");
 
     Ok(())
 }
@@ -686,14 +1013,14 @@ fn invalid_exclude_pattern() -> anyhow::Result<()> {
     ])?;
 
     // By default, dist/ is excluded, so only src/main.py should be checked
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @r#"
     success: false
     exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
     ty failed
-      Cause: error[invalid-glob]: Invalid exclude pattern
+      Cause: error[invalid-glob]: Invalid pattern
      --> ty.toml:4:5
       |
     2 | [src]
@@ -702,7 +1029,7 @@ fn invalid_exclude_pattern() -> anyhow::Result<()> {
       |     ^^^^^^^^ The parent directory operator (`..`) at position 1 is not allowed
     5 | ]
       |
-    "###);
+    "#);
 
     Ok(())
 }
@@ -754,7 +1081,7 @@ print(other_undefined)  # error: unresolved-reference
 
     // Change to the bazel-out directory and run ty from there
     // The symlinks should be followed and errors should be found
-    assert_cmd_snapshot!(case.command().current_dir(case.project_dir.join("bazel-out/k8-fastbuild/bin")), @r###"
+    assert_cmd_snapshot!(case.command().current_dir(case.project_dir.join("bazel-out/k8-fastbuild/bin")), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -779,10 +1106,10 @@ print(other_undefined)  # error: unresolved-reference
     Found 2 diagnostics
 
     ----- stderr -----
-    "###);
+    ");
 
     // Test that when checking a specific symlinked file from the bazel-out directory, it works correctly
-    assert_cmd_snapshot!(case.command().current_dir(case.project_dir.join("bazel-out/k8-fastbuild/bin")).arg("main.py"), @r###"
+    assert_cmd_snapshot!(case.command().current_dir(case.project_dir.join("bazel-out/k8-fastbuild/bin")).arg("main.py"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -798,7 +1125,7 @@ print(other_undefined)  # error: unresolved-reference
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    ");
 
     Ok(())
 }
@@ -837,7 +1164,7 @@ print(regular_undefined)  # error: unresolved-reference
     case.write_symlink("src/utils.py", "generated_utils.py")?;
 
     // Exclude pattern should match on the symlink name (generated_*), not the target name
-    assert_cmd_snapshot!(case.command().arg("--exclude").arg("generated_*.py"), @r###"
+    assert_cmd_snapshot!(case.command().arg("--exclude").arg("generated_*.py"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -870,10 +1197,10 @@ print(regular_undefined)  # error: unresolved-reference
     Found 3 diagnostics
 
     ----- stderr -----
-    "###);
+    ");
 
     // Exclude pattern on target path should not affect symlinks with different names
-    assert_cmd_snapshot!(case.command().arg("--exclude").arg("src/*.py"), @r###"
+    assert_cmd_snapshot!(case.command().arg("--exclude").arg("src/*.py"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -906,10 +1233,10 @@ print(regular_undefined)  # error: unresolved-reference
     Found 3 diagnostics
 
     ----- stderr -----
-    "###);
+    ");
 
     // Test that explicitly passing a symlink always checks it, even if excluded
-    assert_cmd_snapshot!(case.command().arg("--exclude").arg("generated_*.py").arg("generated_module.py"), @r###"
+    assert_cmd_snapshot!(case.command().arg("--exclude").arg("generated_*.py").arg("generated_module.py"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -925,7 +1252,7 @@ print(regular_undefined)  # error: unresolved-reference
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    ");
 
     Ok(())
 }

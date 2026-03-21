@@ -5,8 +5,7 @@
 python-version = "3.12"
 ```
 
-Most of these tests come from the [Scoping rules for type variables][scoping] section of the typing
-spec.
+Most of these tests come from the [Scoping rules for type variables] section of the typing spec.
 
 ## Typevar used outside of generic function or class
 
@@ -17,15 +16,15 @@ from typing import TypeVar
 
 T = TypeVar("T")
 
-# TODO: error
+# error: [unbound-type-variable]
 x: T
 
 class C:
-    # TODO: error
+    # error: [unbound-type-variable]
     x: T
 
 def f() -> None:
-    # TODO: error
+    # error: [unbound-type-variable]
     x: T
 ```
 
@@ -102,7 +101,7 @@ class C[T]:
         return "a"
 
 reveal_type(getattr_static(C[int], "f"))  # revealed: def f(self, x: int) -> str
-reveal_type(getattr_static(C[int], "f").__get__)  # revealed: <method-wrapper `__get__` of `f`>
+reveal_type(getattr_static(C[int], "f").__get__)  # revealed: <method-wrapper '__get__' of function 'f'>
 reveal_type(getattr_static(C[int], "f").__get__(None, C[int]))  # revealed: def f(self, x: int) -> str
 # revealed: bound method C[int].f(x: int) -> str
 reveal_type(getattr_static(C[int], "f").__get__(C[int](), C[int]))
@@ -153,9 +152,11 @@ already solved and specialized when the class was specialized:
 from ty_extensions import generic_context
 
 legacy.m("string", None)  # error: [invalid-argument-type]
-reveal_type(legacy.m)  # revealed: bound method Legacy[int].m[S](x: int, y: S@m) -> S@m
-reveal_type(generic_context(Legacy))  # revealed: tuple[T@Legacy]
-reveal_type(generic_context(legacy.m))  # revealed: tuple[Self@m, S@m]
+reveal_type(legacy.m)  # revealed: bound method Legacy[int].m[S](x: int, y: S) -> S
+# revealed: ty_extensions.GenericContext[T@Legacy]
+reveal_type(generic_context(Legacy))
+# revealed: ty_extensions.GenericContext[Self@m, S@m]
+reveal_type(generic_context(legacy.m))
 ```
 
 With PEP 695 syntax, it is clearer that the method uses a separate typevar:
@@ -184,11 +185,11 @@ S = TypeVar("S")
 
 def f(x: T) -> None:
     x: list[T] = []
-    # TODO: invalid-assignment error
+    # error: [unbound-type-variable]
     y: list[S] = []
 
 class C(Generic[T]):
-    # TODO: error: cannot use S if it's not in the current generic context
+    # error: [unbound-type-variable]
     x: list[S] = []
 
     # This is not an error, as shown in the previous test
@@ -208,11 +209,11 @@ S = TypeVar("S")
 
 def f[T](x: T) -> None:
     x: list[T] = []
-    # TODO: invalid assignment error
+    # error: [unbound-type-variable]
     y: list[S] = []
 
 class C[T]:
-    # TODO: error: cannot use S if it's not in the current generic context
+    # error: [unbound-type-variable]
     x: list[S] = []
 
     def m1(self, x: S) -> S:
@@ -220,6 +221,44 @@ class C[T]:
 
     def m2[S](self, x: S) -> S:
         return x
+```
+
+## Should `Callable` annotations create an implicit generic context?
+
+There is disagreement among type checkers around how to handle this case. For now, we do not emit an
+error on the following snippet, but we may change this in the future.
+
+```py
+from typing import TypeVar, Callable
+from ty_extensions import generic_context
+
+T = TypeVar("T")
+
+x: Callable[[T], T] = lambda obj: obj
+
+# TODO: if we decide that `Callable` annotations always create an implicit generic context,
+# all of these revealed types and `invalid-argument-type` diagnostics are incorrect.
+# If we decide that they do not, we should emit `unbound-type-variable` on both the
+# declaration of `x` in the global scope and the parameter annotation of `y`.
+#
+# NOTE: all the `reveal_type`s are inside a function here so that we test the behaviour
+# of the declared type (from the annotation) rather than the local inferred type
+def test(y: Callable[[T], T]):
+    # revealed: None
+    reveal_type(generic_context(x))
+    # revealed: (TypeVar, /) -> TypeVar
+    reveal_type(x)
+    # error: [invalid-argument-type]
+    # revealed: TypeVar
+    reveal_type(x(42))
+
+    # revealed: None
+    reveal_type(generic_context(y))
+    # revealed: (T@test, /) -> T@test
+    reveal_type(y)
+    # error: [invalid-argument-type]
+    # revealed: T@test
+    reveal_type(y(42))
 ```
 
 ## Nested formal typevars must be distinct
@@ -240,21 +279,25 @@ We assume that the more general form holds.
 
 ### Generic function within generic function
 
+<!-- snapshot-diagnostics -->
+
 ```py
 def f[T](x: T, y: T) -> None:
     def ok[S](a: S, b: S) -> None: ...
 
-    # TODO: error
+    # error: [shadowed-type-variable]
     def bad[T](a: T, b: T) -> None: ...
 ```
 
 ### Generic method within generic class
 
+<!-- snapshot-diagnostics -->
+
 ```py
 class C[T]:
     def ok[S](self, a: S, b: S) -> None: ...
 
-    # TODO: error
+    # error: [shadowed-type-variable]
     def bad[T](self, a: T, b: T) -> None: ...
 ```
 
@@ -267,9 +310,9 @@ from typing import Iterable
 
 def f[T](x: T, y: T) -> None:
     class Ok[S]: ...
-    # error: [invalid-generic-class]
+    # error: [shadowed-type-variable]
     class Bad1[T]: ...
-    # error: [invalid-generic-class]
+    # error: [shadowed-type-variable]
     class Bad2(Iterable[T]): ...
 ```
 
@@ -282,10 +325,71 @@ from typing import Iterable
 
 class C[T]:
     class Ok1[S]: ...
-    # error: [invalid-generic-class]
+    # error: [shadowed-type-variable]
     class Bad1[T]: ...
-    # error: [invalid-generic-class]
+    # error: [shadowed-type-variable]
     class Bad2(Iterable[T]): ...
+```
+
+### Generic class with base that has same-named typevar as enclosing scope
+
+A nested generic class that inherits from a generic base should not be flagged when the base class
+happens to have a type parameter with the same name as the enclosing scope's type parameter, as long
+as the nested class only uses its own type parameters.
+
+```py
+class Base[T]:
+    pass
+
+class Outer[T]:
+    class Inner[U](Base[U]):
+        pass
+```
+
+But it is still an error to directly reference the enclosing scope's type variable in the base class
+list:
+
+```py
+class Outer[T]:
+    # error: [shadowed-type-variable]
+    class Bad(list[T]): ...
+```
+
+## Class bases are evaluated within the type parameter scope
+
+```py
+class C[_T](
+    # error: [unresolved-reference] "Name `C` used when not defined"
+    C
+): ...
+
+# `D` in `list[D]` is resolved to be a type variable of class `D`.
+class D[D](list[D]): ...
+
+# error: [unresolved-reference] "Name `E` used when not defined"
+if E:
+    class E[_T](
+        # error: [unresolved-reference] "Name `E` used when not defined"
+        E
+    ): ...
+
+# error: [unresolved-reference] "Name `F` used when not defined"
+F
+
+# error: [unresolved-reference] "Name `F` used when not defined"
+class F[_T](F): ...
+
+def foo():
+    class G[_T](
+        # error: [unresolved-reference] "Name `G` used when not defined"
+        G
+    ): ...
+    # error: [unresolved-reference] "Name `H` used when not defined"
+    if H:
+        class H[_T](
+            # error: [unresolved-reference] "Name `H` used when not defined"
+            H
+        ): ...
 ```
 
 ## Class scopes do not cover inner scopes
@@ -298,11 +402,164 @@ class C[T]:
     ok1: list[T] = []
 
     class Bad:
-        # TODO: error: cannot refer to T in nested scope
+        # error: [unbound-type-variable]
         bad: list[T] = []
 
     class Inner[S]: ...
     ok2: Inner[T]
 ```
 
-[scoping]: https://typing.python.org/en/latest/spec/generics.html#scoping-rules-for-type-variables
+## Type parameter defaults cannot reference outer-scope type parameters
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+Per the [typing spec][scoping rules], the default of a type parameter must not reference type
+parameters from an outer scope. Out-of-scope defaults on class type parameters are validated as part
+of `invalid-generic-class`; the tests here cover the remaining cases for PEP 695 function and type
+alias scopes, as well as legacy `TypeVar`s used in function/method signatures.
+
+### Nested functions
+
+<!-- snapshot-diagnostics -->
+
+```py
+def outer[T]():
+    # error: [invalid-type-variable-default] "Type parameter `U` cannot use outer-scope type parameter `T` as its default"
+    def inner[U = T](): ...
+    def ok[U = int](): ...  # OK
+```
+
+### Function nested in class
+
+<!-- snapshot-diagnostics -->
+
+```py
+class C[T]:
+    # error: [invalid-type-variable-default]
+    def f[U = T](self): ...
+    def g[U = int](self): ...  # OK
+```
+
+### Type alias nested in class
+
+<!-- snapshot-diagnostics -->
+
+```py
+class C[T]:
+    # error: [invalid-type-variable-default]
+    type Alias[U = T] = list[U]
+
+    type Ok[U = int] = list[U]  # OK
+```
+
+### Legacy TypeVar in method with outer-scope class TypeVar
+
+<!-- snapshot-diagnostics -->
+
+```py
+from typing import TypeVar, Generic
+
+T1 = TypeVar("T1")
+T2 = TypeVar("T2", default=T1)
+
+class Foo(Generic[T1]):
+    # error: [invalid-type-variable-default] "Invalid use of type variable `T2`: default of `T2` refers to out-of-scope type variable `T1`"
+    def method(self, x: T2) -> T2:
+        return x
+```
+
+### Legacy TypeVar in nested function
+
+<!-- snapshot-diagnostics -->
+
+```py
+from typing import TypeVar, Generic
+
+T = TypeVar("T")
+U = TypeVar("U", default=T)
+
+def outer(x: T) -> T:
+    # error: [invalid-type-variable-default]
+    def inner(y: U) -> U:
+        return y
+    return x
+```
+
+### Legacy TypeVar with default referring to later Typevar
+
+<!-- snapshot-diagnostics -->
+
+```py
+from typing import TypeVar, Generic
+
+T = TypeVar("T", default=int)
+U = TypeVar("U", default=T)
+
+# error: [invalid-type-variable-default]
+def bad(y: U, z: T) -> tuple[U, T]:
+    return y, z
+
+# OK, because the typevar with the default comes after the one without
+def fine(y: T, z: U) -> tuple[U, T]:
+    return z, y
+```
+
+### Legacy TypeVar ordering: default before non-default in function
+
+<!-- snapshot-diagnostics -->
+
+```py
+from typing import TypeVar
+
+T1 = TypeVar("T1", default=int)
+T2 = TypeVar("T2")
+T3 = TypeVar("T3")
+DefaultStrT = TypeVar("DefaultStrT", default=str)
+
+# error: [invalid-type-variable-default]
+def f(x: T1, y: T2) -> tuple[T1, T2]:
+    return x, y
+
+# error: [invalid-type-variable-default]
+def g(x: T2, y: T1, z: T3) -> tuple[T2, T1, T3]:
+    return x, y, z
+
+# error: [invalid-type-variable-default]
+def h(x: T1, y: T2, z: DefaultStrT, w: T3) -> tuple[T1, T2, DefaultStrT, T3]:
+    return x, y, z, w
+
+def ok(x: T2, y: T1) -> tuple[T2, T1]:
+    return x, y
+
+def ok2(x: T1, y: DefaultStrT) -> tuple[T1, DefaultStrT]:
+    return x, y
+```
+
+## Mixed-scope type parameters
+
+Methods can have type parameters that are scoped to the method itself, while also referring to type
+parameters from the enclosing class.
+
+```py
+from typing import Generic, TypeVar
+
+from ty_extensions import into_regular_callable
+
+T = TypeVar("T")
+S = TypeVar("S")
+
+class Foo(Generic[T]):
+    def bar(self, x: T, y: S) -> tuple[T, S]:
+        raise NotImplementedError
+
+def f(x: type[Foo[T]]) -> T:
+    # revealed: [S](self, x: T@f, y: S) -> tuple[T@f, S]
+    reveal_type(into_regular_callable(x.bar))
+    raise NotImplementedError
+```
+
+[scoping rules]: https://typing.python.org/en/latest/spec/generics.html#scoping-rules
+[scoping rules for type variables]: https://typing.python.org/en/latest/spec/generics.html#scoping-rules-for-type-variables

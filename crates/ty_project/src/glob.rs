@@ -1,10 +1,13 @@
 use ruff_db::system::SystemPath;
 
+use crate::glob::include::MatchFile;
 pub(crate) use exclude::{ExcludeFilter, ExcludeFilterBuilder};
 pub(crate) use include::{IncludeFilter, IncludeFilterBuilder};
 pub(crate) use portable::{
     AbsolutePortableGlobPattern, PortableGlobError, PortableGlobKind, PortableGlobPattern,
 };
+
+use crate::metadata::options::DEFAULT_SRC_EXCLUDES;
 
 mod exclude;
 mod include;
@@ -39,7 +42,9 @@ impl IncludeExcludeFilter {
         if self.exclude.match_directory(path, mode) {
             IncludeResult::Excluded
         } else if self.include.match_directory(path) {
-            IncludeResult::Included
+            IncludeResult::Included {
+                literal_match: None,
+            }
         } else {
             IncludeResult::NotIncluded
         }
@@ -52,10 +57,50 @@ impl IncludeExcludeFilter {
     ) -> IncludeResult {
         if self.exclude.match_file(path, mode) {
             IncludeResult::Excluded
-        } else if self.include.match_file(path) {
-            IncludeResult::Included
         } else {
-            IncludeResult::NotIncluded
+            match self.include.match_file(path) {
+                MatchFile::Literal => IncludeResult::Included {
+                    literal_match: Some(true),
+                },
+                MatchFile::Pattern => IncludeResult::Included {
+                    literal_match: Some(false),
+                },
+                MatchFile::No => IncludeResult::NotIncluded,
+            }
+        }
+    }
+}
+
+impl Default for IncludeExcludeFilter {
+    fn default() -> Self {
+        let mut includes = IncludeFilterBuilder::new();
+        includes
+            .add(
+                &PortableGlobPattern::parse("**", PortableGlobKind::Include)
+                    .unwrap()
+                    .into_absolute(""),
+            )
+            .expect("default include filter to be infallible");
+
+        let mut excludes = ExcludeFilterBuilder::new();
+
+        for pattern in DEFAULT_SRC_EXCLUDES {
+            PortableGlobPattern::parse(pattern, PortableGlobKind::Exclude)
+                .and_then(|exclude| Ok(excludes.add(&exclude.into_absolute(""))?))
+                .unwrap_or_else(|err| {
+                    panic!(
+                        "Expected default exclude to be valid glob but adding it failed with: {err}"
+                    )
+                });
+        }
+
+        Self {
+            include: includes
+                .build()
+                .expect("default include filter to be infallible"),
+            exclude: excludes
+                .build()
+                .expect("default exclude filter to be infallible"),
         }
     }
 }
@@ -66,7 +111,7 @@ impl std::fmt::Display for IncludeExcludeFilter {
     }
 }
 
-#[derive(Copy, Clone, Eq, PartialEq)]
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub(crate) enum GlobFilterCheckMode {
     /// The paths are checked top-to-bottom and inclusion is determined
     /// for each path during the traversal.
@@ -86,7 +131,7 @@ pub(crate) enum IncludeResult {
     ///
     /// For directories: This isn't a guarantee that any file in this directory gets included
     /// but we need to traverse it to make this decision.
-    Included,
+    Included { literal_match: Option<bool> },
 
     /// The path matches an exclude pattern.
     Excluded,

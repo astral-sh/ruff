@@ -29,7 +29,7 @@ fn check_project_include_defaults() {
         filters => TEST_FILTERS.to_vec()
     }, {
         assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(["check", "--show-files"]).current_dir(Path::new("./resources/test/fixtures/include-test")), @r"
+        .args(["check", "--show-files"]).current_dir(Path::new("./resources/test/fixtures/include-test")), @"
         success: true
         exit_code: 0
         ----- stdout -----
@@ -53,7 +53,7 @@ fn check_project_respects_direct_paths() {
         filters => TEST_FILTERS.to_vec()
     }, {
         assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(["check", "--show-files", "b.py"]).current_dir(Path::new("./resources/test/fixtures/include-test")), @r"
+        .args(["check", "--show-files", "b.py"]).current_dir(Path::new("./resources/test/fixtures/include-test")), @"
         success: true
         exit_code: 0
         ----- stdout -----
@@ -72,7 +72,7 @@ fn check_project_respects_subdirectory_includes() {
         filters => TEST_FILTERS.to_vec()
     }, {
         assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(["check", "--show-files", "subdirectory"]).current_dir(Path::new("./resources/test/fixtures/include-test")), @r"
+        .args(["check", "--show-files", "subdirectory"]).current_dir(Path::new("./resources/test/fixtures/include-test")), @"
         success: true
         exit_code: 0
         ----- stdout -----
@@ -91,7 +91,7 @@ fn check_project_from_project_subdirectory_respects_includes() {
         filters => TEST_FILTERS.to_vec()
     }, {
         assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(["check", "--show-files"]).current_dir(Path::new("./resources/test/fixtures/include-test/subdirectory")), @r"
+        .args(["check", "--show-files"]).current_dir(Path::new("./resources/test/fixtures/include-test/subdirectory")), @"
         success: true
         exit_code: 0
         ----- stdout -----

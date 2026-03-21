@@ -4,11 +4,30 @@ permissions: {}
 
 on:
   pull_request:
-    types: [labeled]
+    paths:
+      - "crates/ty*/**"
+      - "!crates/ty_ide/**"
+      - "!crates/ty_server/**"
+      - "!crates/ty_test/**"
+      - "!crates/ty_completion_eval/**"
+      - "!crates/ty_wasm/**"
+      - "crates/ruff_db"
+      - "crates/ruff_python_ast"
+      - "crates/ruff_python_parser"
+      - ".github/workflows/ty-ecosystem-analyzer.yaml"
+      - ".github/ty-ecosystem.toml"
+      - "crates/ty_python_semantic/resources/primer/**"
+      - "Cargo.lock"
+      - "!**.md"
+      - "!**.snap"
+      # It's tempting to skip all Python files in every directory,
+      # but changes to Python files in `ty_vendored` can affect the output of ecosystem analysis,
+      # so we apply a narrow exemption for all files in the corpus directory instead.
+      - "!crates/ty_python_semantic/resources/corpus/**"
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref_name }}-${{ github.event.pull_request.number || github.sha }}
-  cancel-in-progress: true
+  group: ty-ecosystem-analyzer-${{ github.ref_name }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   CARGO_INCREMENTAL: 0
@@ -17,47 +36,48 @@ env:
   RUSTUP_MAX_RETRIES: 10
   RUST_BACKTRACE: 1
   REF_NAME: ${{ github.ref_name }}
-  CF_API_TOKEN_EXISTS: ${{ secrets.CF_API_TOKEN != '' }}
 
 jobs:
   ty-ecosystem-analyzer:
     name: Compute diagnostic diff
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-32' || 'ubuntu-latest' }}
-    timeout-minutes: 20
-    if: contains(github.event.label.name, 'ecosystem-analyzer')
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           path: ruff
           fetch-depth: 0
           persist-credentials: false
 
       - name: Install the latest version of uv
-        uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
         with:
-          enable-cache: true # zizmor: ignore[cache-poisoning] acceptable risk for CloudFlare pages artifact
+          enable-cache: true
+          version: "0.10.10"
 
-      - uses: Swatinem/rust-cache@f13886b937689c021905a6b90929199931d60db1 # v2.8.1
+      - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
         with:
           workspaces: "ruff"
-          lookup-only: false # zizmor: ignore[cache-poisoning] acceptable risk for CloudFlare pages artifact
+          lookup-only: false
 
       - name: Install Rust toolchain
         run: rustup show
 
       - name: Compute diagnostic diff
+        id: compute-diagnostic-diff
         shell: bash
         run: |
           cd ruff
 
-          echo "Enabling configuration overloads (see .github/mypy-primer-ty.toml)"
+          echo "Enabling configuration overloads (see .github/ty-ecosystem.toml)"
           mkdir -p ~/.config/ty
-          cp .github/mypy-primer-ty.toml ~/.config/ty/ty.toml
+          cp .github/ty-ecosystem.toml ~/.config/ty/ty.toml
 
           echo "new commit"
           git checkout -b new_commit "$GITHUB_SHA"
           git rev-list --format=%s --max-count=1 new_commit
           cp crates/ty_python_semantic/resources/primer/good.txt projects_new.txt
+          cp crates/ty_python_semantic/resources/primer/flaky.txt projects_flaky.txt
 
           echo "old commit (merge base)"
           MERGE_BASE="$(git merge-base "$GITHUB_SHA" "origin/$GITHUB_BASE_REF")"
@@ -67,14 +87,16 @@ jobs:
 
           cd ..
 
-          uv tool install "git+https://github.com/astral-sh/ecosystem-analyzer@908758da02a73ef3f3308e1dbb2248510029bbe4"
+          uv tool install "git+https://github.com/astral-sh/ecosystem-analyzer@79409a4cee665cc079b54a532e5885cbcd97118c"
 
           ecosystem-analyzer \
             --repository ruff \
+            --flaky-runs 10 \
             diff \
             --profile=profiling \
             --projects-old ruff/projects_old.txt \
             --projects-new ruff/projects_new.txt \
+            --projects-flaky ruff/projects_flaky.txt \
             --old old_commit \
             --new new_commit \
             --output-old diagnostics-old.json \
@@ -90,13 +112,17 @@ jobs:
             --new-name "$REF_NAME" \
             --output-html dist/diff.html
 
+          set +e
           ecosystem-analyzer \
             generate-diff-statistics \
             diagnostics-old.json \
             diagnostics-new.json \
+            --fail-on-new-abnormal-exits \
             --old-name "main (merge base)" \
             --new-name "$REF_NAME" \
             --output diff-statistics.md
+          DIFF_STATISTICS_EXIT_CODE=$?
+          set -e
 
           ecosystem-analyzer \
             generate-timing-diff \
@@ -112,45 +138,36 @@ jobs:
 
           cat diff-statistics.md >> "$GITHUB_STEP_SUMMARY"
 
-          echo ${{ github.event.number }} > pr-number
+          echo "diff_statistics_exit_code=$DIFF_STATISTICS_EXIT_CODE" >> "$GITHUB_OUTPUT"
 
-      - name: "Deploy to Cloudflare Pages"
-        if: ${{ env.CF_API_TOKEN_EXISTS == 'true' }}
-        id: deploy
-        uses: cloudflare/wrangler-action@da0e0dfe58b7a431659754fdf3f186c529afbe65 # v3.14.1
+      # NOTE: astral-sh-bot uses this artifact to post comments on PRs.
+      # Make sure to update the bot if you rename the artifact.
+      - name: "Upload full report"
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
-          apiToken: ${{ secrets.CF_API_TOKEN }}
-          accountId: ${{ secrets.CF_ACCOUNT_ID }}
-          command: pages deploy dist --project-name=ty-ecosystem --branch ${{ github.head_ref }} --commit-hash ${GITHUB_SHA}
+          name: full-report
+          path: dist/
 
-      - name: "Append deployment URL"
-        if: ${{ env.CF_API_TOKEN_EXISTS == 'true' }}
-        env:
-          DEPLOYMENT_URL: ${{ steps.deploy.outputs.pages-deployment-alias-url }}
-        run: |
-          echo >> comment.md
-          echo "**[Full report with detailed diff]($DEPLOYMENT_URL/diff)** ([timing results]($DEPLOYMENT_URL/timing))" >> comment.md
-
+      # NOTE: astral-sh-bot uses this artifact to post comments on PRs.
+      # Make sure to update the bot if you rename the artifact.
       - name: Upload comment
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: comment.md
           path: comment.md
 
-      - name: Upload pr-number
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: pr-number
-          path: pr-number
-
       - name: Upload diagnostics diff
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: diff.html
           path: dist/diff.html
 
       - name: Upload timing diff
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: timing.html
           path: dist/timing.html
+
+      - name: Fail on new abnormal exits
+        if: steps.compute-diagnostic-diff.outputs.diff_statistics_exit_code != '0'
+        run: exit 1

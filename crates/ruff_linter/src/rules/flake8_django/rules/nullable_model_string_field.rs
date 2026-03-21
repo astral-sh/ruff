@@ -61,9 +61,14 @@ pub(crate) fn nullable_model_string_field(checker: &Checker, body: &[Stmt]) {
     }
 
     for statement in body {
-        let Stmt::Assign(ast::StmtAssign { value, .. }) = statement else {
-            continue;
+        let value = match statement {
+            Stmt::Assign(ast::StmtAssign { value, .. }) => value,
+            Stmt::AnnAssign(ast::StmtAnnAssign {
+                value: Some(value), ..
+            }) => value,
+            _ => continue,
         };
+
         if let Some(field_name) = is_nullable_field(value, checker.semantic()) {
             checker.report_diagnostic(
                 DjangoNullableModelStringField {

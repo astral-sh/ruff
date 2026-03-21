@@ -1,0 +1,36 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: unsupported_base_dynamic_type.md - Unsupported base for dynamic `type()` classes - `Protocol` base
+mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/unsupported_base_dynamic_type.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | from typing import Protocol
+2 | 
+3 | X = type("X", (Protocol,), {})  # error: [unsupported-dynamic-base]
+```
+
+# Diagnostics
+
+```
+info[unsupported-dynamic-base]: Unsupported base for class created via `type()`
+ --> src/mdtest_snippet.py:3:16
+  |
+1 | from typing import Protocol
+2 |
+3 | X = type("X", (Protocol,), {})  # error: [unsupported-dynamic-base]
+  |                ^^^^^^^^ Has type `<special-form 'typing.Protocol'>`
+  |
+info: Classes created via `type()` cannot be protocols
+info: Consider using `class X(Protocol): ...` instead
+info: rule `unsupported-dynamic-base` is enabled by default
+
+```

@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::helpers::is_const_true;
+use ruff_python_ast::helpers::Truthiness;
 use ruff_python_ast::statement_visitor::{StatementVisitor, walk_stmt};
 use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_python_semantic::SemanticModel;
@@ -8,6 +8,9 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::preview::is_ble001_exc_info_suppression_enabled;
+use crate::rules::flake8_logging::helpers::is_logger_method_name;
+use crate::settings::LinterSettings;
 
 /// ## What it does
 /// Checks for `except` clauses that catch all exceptions.  This includes
@@ -47,8 +50,7 @@ use crate::checkers::ast::Checker;
 ///     raise
 /// ```
 ///
-/// Exceptions that are logged via `logging.exception()` or are logged via
-/// `logging.error()` or `logging.critical()` with `exc_info` enabled will
+/// Exceptions that are logged with `exc_info` enabled will
 /// _not_ be flagged, as this is a common pattern for propagating exception
 /// traces:
 /// ```python
@@ -57,6 +59,10 @@ use crate::checkers::ast::Checker;
 /// except BaseException:
 ///     logging.exception("Something went wrong")
 /// ```
+///
+/// ## Options
+///
+/// - `lint.logger-objects`
 ///
 /// ## References
 /// - [Python documentation: The `try` statement](https://docs.python.org/3/reference/compound_stmts.html#the-try-statement)
@@ -116,7 +122,11 @@ pub(crate) fn blind_except(
     }
 
     // If the exception is logged, don't flag an error.
-    let mut visitor = LogExceptionVisitor::new(semantic, &checker.settings().logger_objects);
+    let mut visitor = LogExceptionVisitor::new(
+        semantic,
+        &checker.settings().logger_objects,
+        checker.settings(),
+    );
     visitor.visit_body(body);
     if visitor.seen() {
         return;
@@ -180,19 +190,44 @@ impl<'a> StatementVisitor<'a> for ReraiseVisitor<'a> {
     }
 }
 
+/// Returns `true` if the `exc_info` keyword argument is truthy.
+fn is_exc_info_enabled(
+    method_name: &str,
+    arguments: &ast::Arguments,
+    semantic: &SemanticModel,
+    settings: &LinterSettings,
+) -> bool {
+    if is_ble001_exc_info_suppression_enabled(settings)
+        || matches!(method_name, "error" | "critical")
+    {
+        arguments.find_keyword("exc_info").is_some_and(|keyword| {
+            Truthiness::from_expr(&keyword.value, |id| semantic.has_builtin_binding(id)).into_bool()
+                != Some(false)
+        })
+    } else {
+        false
+    }
+}
+
 /// A visitor to detect whether the exception was logged.
 struct LogExceptionVisitor<'a> {
     semantic: &'a SemanticModel<'a>,
     logger_objects: &'a [String],
+    settings: &'a LinterSettings,
     seen: bool,
 }
 
 impl<'a> LogExceptionVisitor<'a> {
     /// Create a new [`LogExceptionVisitor`] with the given exception name.
-    fn new(semantic: &'a SemanticModel<'a>, logger_objects: &'a [String]) -> Self {
+    fn new(
+        semantic: &'a SemanticModel<'a>,
+        logger_objects: &'a [String],
+        settings: &'a LinterSettings,
+    ) -> Self {
         Self {
             semantic,
             logger_objects,
+            settings,
             seen: false,
         }
     }
@@ -223,9 +258,12 @@ impl<'a> StatementVisitor<'a> for LogExceptionVisitor<'a> {
                             ) {
                                 if match attr.as_str() {
                                     "exception" => true,
-                                    "error" | "critical" => arguments
-                                        .find_keyword("exc_info")
-                                        .is_some_and(|keyword| is_const_true(&keyword.value)),
+                                    _ if is_logger_method_name(attr) => is_exc_info_enabled(
+                                        attr,
+                                        arguments,
+                                        self.semantic,
+                                        self.settings,
+                                    ),
                                     _ => false,
                                 } {
                                     self.seen = true;
@@ -236,9 +274,14 @@ impl<'a> StatementVisitor<'a> for LogExceptionVisitor<'a> {
                             if self.semantic.resolve_qualified_name(func).is_some_and(
                                 |qualified_name| match qualified_name.segments() {
                                     ["logging", "exception"] => true,
-                                    ["logging", "error" | "critical"] => arguments
-                                        .find_keyword("exc_info")
-                                        .is_some_and(|keyword| is_const_true(&keyword.value)),
+                                    ["logging", method] if is_logger_method_name(method) => {
+                                        is_exc_info_enabled(
+                                            method,
+                                            arguments,
+                                            self.semantic,
+                                            self.settings,
+                                        )
+                                    }
                                     _ => false,
                                 },
                             ) {

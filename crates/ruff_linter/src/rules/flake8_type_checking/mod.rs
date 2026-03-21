@@ -98,6 +98,26 @@ mod tests {
         Ok(())
     }
 
+    #[test_case(Rule::TypingOnlyStandardLibraryImport, Path::new("TC003.py"))]
+    fn add_future_import_dataclass_kw_only_py313(rule: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "add_future_import_kw_only__{}_{}",
+            rule.noqa_code(),
+            path.to_string_lossy()
+        );
+        let diagnostics = test_path(
+            Path::new("flake8_type_checking").join(path).as_path(),
+            &settings::LinterSettings {
+                future_annotations: true,
+                // The issue in #21121 also didn't trigger on Python 3.14
+                unresolved_target_version: PythonVersion::PY313.into(),
+                ..settings::LinterSettings::for_rule(rule)
+            },
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
     // we test these rules as a pair, since they're opposites of one another
     // so we want to make sure their fixes are not going around in circles.
     #[test_case(Rule::UnquotedTypeAlias, Path::new("TC007.py"))]

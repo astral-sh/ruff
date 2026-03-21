@@ -88,3 +88,22 @@ help: Remove parentheses
 22 |     pass
 23 | 
 24 | # OK
+
+UP039 [*] Unnecessary parentheses after class definition
+  --> UP039.py:46:10
+   |
+46 |   class Foo(
+   |  __________^
+47 | |     # text
+48 | | ): ...
+   | |_^
+   |
+help: Remove parentheses
+43 |     pass
+44 | 
+45 | 
+   - class Foo(
+   -     # text
+   - ): ...
+46 + class Foo: ...
+note: This is an unsafe fix and may change runtime behavior

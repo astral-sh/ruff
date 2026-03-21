@@ -108,4 +108,22 @@ help: Remove duplicate field definition for `name`
 50 |     name: str = "Foo"
 51 |     name: str = name + " Bar"
    -     name: str = "Bar"  # PIE794
+52 | 
+53 | 
+54 | class TextEdit:
+note: This is an unsafe fix and may change runtime behavior
+
+PIE794 [*] Class field `start_line` is defined multiple times
+  --> PIE794.py:57:5
+   |
+55 | class TextEdit:
+56 |     start_line: int
+57 |     start_line: int  # PIE794
+   |     ^^^^^^^^^^^^^^^
+   |
+help: Remove duplicate field definition for `start_line`
+54 | 
+55 | class TextEdit:
+56 |     start_line: int
+   -     start_line: int  # PIE794
 note: This is an unsafe fix and may change runtime behavior

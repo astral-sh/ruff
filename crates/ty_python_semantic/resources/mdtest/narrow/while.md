@@ -52,9 +52,7 @@ while x != 1:
     reveal_type(x)  # revealed: Literal[2, 3]
 
     while x != 2:
-        # TODO: this should be Literal[1, 3]; Literal[3] is only correct
-        # in the first loop iteration
-        reveal_type(x)  # revealed: Literal[3]
+        reveal_type(x)  # revealed: Literal[3, 1]
         x = next_item()
 
     x = next_item()

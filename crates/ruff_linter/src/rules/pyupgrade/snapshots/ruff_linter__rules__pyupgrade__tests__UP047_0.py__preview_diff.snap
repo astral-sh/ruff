@@ -1,0 +1,29 @@
+---
+source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+---
+--- Linter settings ---
+-linter.preview = disabled
++linter.preview = enabled
+
+--- Summary ---
+Removed: 0
+Added: 1
+
+--- Added ---
+UP047 [*] Generic function `default_var` should use type parameters
+  --> UP047_0.py:51:5
+   |
+51 | def default_var(v: V) -> V:
+   |     ^^^^^^^^^^^^^^^^^
+52 |     return v
+   |
+help: Use type parameters
+48 | V = TypeVar("V", default=Any, bound=str)
+49 | 
+50 | 
+   - def default_var(v: V) -> V:
+51 + def default_var[V: str = Any](v: V) -> V:
+52 |     return v
+53 | 
+54 | 
+note: This is an unsafe fix and may change runtime behavior

@@ -2,6 +2,7 @@
 source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
+
 ---
 mdtest name: legacy_typevars.md - Legacy typevar creation diagnostics - Name can't be given more than once
 mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/legacy_typevars.md

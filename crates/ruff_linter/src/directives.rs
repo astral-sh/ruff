@@ -5,13 +5,14 @@ use std::str::FromStr;
 
 use bitflags::bitflags;
 
+use ruff_python_ast::token::{TokenKind, Tokens};
 use ruff_python_index::Indexer;
-use ruff_python_parser::{TokenKind, Tokens};
 use ruff_python_trivia::CommentRanges;
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::Locator;
+use crate::comments::shebang::ShebangDirective;
 use crate::noqa::NoqaMapping;
 use crate::settings::LinterSettings;
 
@@ -124,6 +125,17 @@ fn extract_noqa_line_for(tokens: &Tokens, locator: &Locator, indexer: &Indexer) 
         }
     }
 
+    let mut shebang_mapping = None;
+    if let Some(first_token) = tokens.first()
+        && first_token.kind() == TokenKind::Comment
+        && ShebangDirective::try_extract(locator.slice(first_token)).is_some()
+    {
+        shebang_mapping = Some(TextRange::new(
+            first_token.start(),
+            locator.full_line_end(first_token.end()),
+        ));
+    }
+
     // The capacity allocated here might be more than we need if there are
     // nested interpolated strings.
     let mut interpolated_string_mappings =
@@ -173,18 +185,24 @@ fn extract_noqa_line_for(tokens: &Tokens, locator: &Locator, indexer: &Indexer) 
 
     // Merge the mappings in sorted order
     let mut mappings = NoqaMapping::with_capacity(
-        continuation_mappings.len() + string_mappings.len() + interpolated_string_mappings.len(),
+        continuation_mappings.len()
+            + string_mappings.len()
+            + interpolated_string_mappings.len()
+            + usize::from(shebang_mapping.is_some()),
     );
 
-    let string_mappings = SortedMergeIter {
+    let all_mappings = SortedMergeIter {
         left: interpolated_string_mappings.into_iter().peekable(),
         right: string_mappings.into_iter().peekable(),
     };
     let all_mappings = SortedMergeIter {
-        left: string_mappings.peekable(),
+        left: all_mappings.peekable(),
         right: continuation_mappings.into_iter().peekable(),
     };
 
+    if let Some(mapping) = shebang_mapping {
+        mappings.push_mapping(mapping);
+    }
     for mapping in all_mappings {
         mappings.push_mapping(mapping);
     }

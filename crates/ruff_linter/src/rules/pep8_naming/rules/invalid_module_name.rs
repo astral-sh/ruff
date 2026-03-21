@@ -36,6 +36,10 @@ use crate::rules::pep8_naming::settings::IgnoreNames;
 /// - Instead of `example-module-name` or `example module name`, use `example_module_name`.
 /// - Instead of `ExampleModule`, use `example_module`.
 ///
+/// ## Options
+///
+/// - `lint.pep8-naming.ignore-names`
+///
 /// [PEP 8]: https://peps.python.org/pep-0008/#package-and-module-names
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.248")]

@@ -40,6 +40,14 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///
 /// This fix is always marked as unsafe because it might remove comments.
 ///
+/// ## Options
+///
+/// The rule will avoid flagging cases where using the builtin function would exceed the configured
+/// line length, as determined by these options:
+///
+/// - `lint.pycodestyle.max-line-length`
+/// - `indent-width`
+///
 /// ## References
 /// - [Python documentation: `any`](https://docs.python.org/3/library/functions.html#any)
 /// - [Python documentation: `all`](https://docs.python.org/3/library/functions.html#all)
@@ -116,7 +124,7 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &Checker, stmt: &Stmt) {
 
             let mut diagnostic = checker.report_diagnostic(
                 ReimplementedBuiltin {
-                    replacement: contents.to_string(),
+                    replacement: contents.clone(),
                 },
                 TextRange::new(stmt.start(), terminal.stmt.end()),
             );
@@ -212,7 +220,7 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &Checker, stmt: &Stmt) {
 
             let mut diagnostic = checker.report_diagnostic(
                 ReimplementedBuiltin {
-                    replacement: contents.to_string(),
+                    replacement: contents.clone(),
                 },
                 TextRange::new(stmt.start(), terminal.stmt.end()),
             );

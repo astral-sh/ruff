@@ -187,8 +187,8 @@ python-platform = "all"
 
 If `python-platform` is set to `all`, we treat the platform as unspecified. This means that we do
 not infer a literal type like `Literal["win32"]` for `sys.platform`, but instead fall back to
-`LiteralString` (the `typeshed` annotation for `sys.platform`). This means that we can not
-statically determine the truthiness of a branch like `sys.platform == "win32"`.
+`LiteralString` (the `typeshed` annotation for `sys.platform`). This means that we cannot statically
+determine the truthiness of a branch like `sys.platform == "win32"`.
 
 See <https://github.com/astral-sh/ruff/issues/16983#issuecomment-2777146188> for a plan on how this
 could be improved.
@@ -580,4 +580,36 @@ if False:
     d()
 
     1 / number
+```
+
+## `Never`-inferred variables in type expressions
+
+We offer a helpful subdiagnostic if a variable in a type expression is inferred as having type
+`Never`, since this almost certainly resulted in the definition of the type being inferred by ty as
+being unreachable:
+
+<!-- snapshot-diagnostics -->
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+`module.py`:
+
+```py
+import sys
+
+if sys.version_info >= (3, 14):
+    raise RuntimeError("this library doesn't support 3.14 yet!!!")
+
+class AwesomeAPI: ...
+```
+
+`main.py`:
+
+```py
+import module
+
+def f(x: module.AwesomeAPI): ...  # error: [invalid-type-form]
 ```

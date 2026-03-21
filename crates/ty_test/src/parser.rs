@@ -273,20 +273,36 @@ impl EmbeddedFileSourceMap {
         }
     }
 
-    pub(crate) fn to_absolute_line_number(&self, relative_line_number: OneIndexed) -> OneIndexed {
-        let mut absolute_line_number = 0;
+    /// Returns the absolute line number in the markdown file for a given line number
+    /// relative to the concatenated code blocks.
+    ///
+    /// Returns an `Err` if the relative line number is out of bounds where
+    /// the returned value is the absolute line number of the last code block.
+    ///
+    /// # Panics
+    ///  If called when the markdown file has no code blocks.
+    pub(crate) fn to_absolute_line_number(
+        &self,
+        relative_line_number: OneIndexed,
+    ) -> std::result::Result<OneIndexed, OneIndexed> {
         let mut relative_line_number = relative_line_number.get();
 
         for (start_line, line_count) in &self.start_line_and_line_count {
             if relative_line_number > *line_count {
                 relative_line_number -= *line_count;
             } else {
-                absolute_line_number = start_line + relative_line_number;
-                break;
+                let absolute_line_number = start_line + relative_line_number;
+                return Ok(OneIndexed::new(absolute_line_number)
+                    .expect("absolute line number must be >= 1"));
             }
         }
 
-        OneIndexed::new(absolute_line_number).expect("Relative line number out of bounds")
+        let last_line_number = self
+            .start_line_and_line_count
+            .last()
+            .and_then(|(start_line, line_count)| OneIndexed::new(start_line + line_count));
+
+        Err(last_line_number.expect("markdown file to have at least one code block"))
     }
 }
 
@@ -429,6 +445,10 @@ struct Parser<'s> {
 
     /// Whether or not the current section has a config block.
     current_section_has_config: bool,
+
+    /// Whether or not any section in the file has external dependencies.
+    /// Only one section per file is allowed to have dependencies (for lockfile support).
+    file_has_dependencies: bool,
 }
 
 impl<'s> Parser<'s> {
@@ -451,6 +471,7 @@ impl<'s> Parser<'s> {
             stack: SectionStack::new(root_section_id),
             current_section_files: FxHashMap::default(),
             current_section_has_config: false,
+            file_has_dependencies: false,
         }
     }
 
@@ -499,7 +520,7 @@ impl<'s> Parser<'s> {
         const SECTION_CONFIG_SNAPSHOT: &str = "snapshot-diagnostics";
         const SECTION_CONFIG_PULLTYPES: &str = "pull-types:skip";
         const SECTION_CONFIG_EXPECT_PANIC: &str = "expect-panic";
-        const HTML_COMMENT_ALLOWLIST: &[&str] = &["blacken-docs:on", "blacken-docs:off"];
+        const HTML_COMMENT_ALLOWLIST: &[&str] = &["fmt:on", "fmt:off"];
         const CODE_BLOCK_END: &[u8] = b"```";
         const HTML_COMMENT_END: &[u8] = b"-->";
 
@@ -820,8 +841,20 @@ impl<'s> Parser<'s> {
             bail!("Multiple TOML configuration blocks in the same section are not allowed.");
         }
 
+        let config = MarkdownTestConfig::from_str(code)?;
+
+        if config.dependencies().is_some() {
+            if self.file_has_dependencies {
+                bail!(
+                    "Multiple sections with `[project]` dependencies in the same file are not allowed. \
+                     External dependencies must be specified in a single top-level configuration block."
+                );
+            }
+            self.file_has_dependencies = true;
+        }
+
         let current_section = &mut self.sections[self.stack.top()];
-        current_section.config = MarkdownTestConfig::from_str(code)?;
+        current_section.config = config;
 
         self.current_section_has_config = true;
 
@@ -919,6 +952,7 @@ impl MdtestDirectives {
 mod tests {
     use ruff_python_ast::PySourceType;
     use ruff_python_trivia::textwrap::dedent;
+    use ruff_source_file::OneIndexed;
 
     use insta::assert_snapshot;
 
@@ -929,6 +963,31 @@ mod tests {
         let mf = super::parse("file.md", "").unwrap();
 
         assert!(mf.tests().next().is_none());
+    }
+
+    #[test]
+    fn source_map_to_absolute_line_number() {
+        let map = super::EmbeddedFileSourceMap {
+            start_line_and_line_count: vec![(10, 5), (25, 3)],
+        };
+
+        let absolute = map
+            .to_absolute_line_number(OneIndexed::new(6).unwrap())
+            .unwrap();
+        assert_eq!(absolute.get(), 26);
+    }
+
+    #[test]
+    fn source_map_reports_invalid_relative_line() {
+        let map = super::EmbeddedFileSourceMap {
+            start_line_and_line_count: vec![(9, 2)],
+        };
+
+        let error = map
+            .to_absolute_line_number(OneIndexed::new(3).unwrap())
+            .unwrap_err();
+
+        assert_eq!(error.get(), 11);
     }
 
     #[test]
@@ -2007,16 +2066,51 @@ mod tests {
         let source = dedent(
             "
             # Some header
-            <!-- blacken-docs:off -->
+            <!-- fmt:off -->
 
             ```py
             x = 1
             ```
 
-            <!-- blacken-docs:on -->
+            <!-- fmt:on -->
             ",
         );
         let parse_result = super::parse("file.md", &source);
         assert!(parse_result.is_ok(), "{parse_result:?}");
+    }
+
+    #[test]
+    fn multiple_sections_with_dependencies_not_allowed() {
+        let source = dedent(
+            r#"
+            # First section
+
+            ```toml
+            [project]
+            dependencies = ["pydantic==2.12.2"]
+            ```
+
+            ```py
+            x = 1
+            ```
+
+            # Second section
+
+            ```toml
+            [project]
+            dependencies = ["numpy==2.0.0"]
+            ```
+
+            ```py
+            y = 2
+            ```
+            "#,
+        );
+        let err = super::parse("file.md", &source).expect_err("Should fail to parse");
+        assert_eq!(
+            err.to_string(),
+            "Multiple sections with `[project]` dependencies in the same file are not allowed. \
+             External dependencies must be specified in a single top-level configuration block."
+        );
     }
 }

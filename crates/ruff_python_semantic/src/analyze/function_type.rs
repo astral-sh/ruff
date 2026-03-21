@@ -47,6 +47,35 @@ pub fn classify(
     }
 }
 
+/// Return `true` if this function is subject to the Liskov Substitution Principle.
+///
+/// Type checkers will check nearly all methods for compliance with the Liskov Substitution
+/// Principle, but some methods are exempt.
+pub fn is_subject_to_liskov_substitution_principle(
+    function_name: &str,
+    decorator_list: &[Decorator],
+    parent_scope: &Scope,
+    semantic: &SemanticModel,
+    classmethod_decorators: &[String],
+    staticmethod_decorators: &[String],
+) -> bool {
+    let kind = classify(
+        function_name,
+        decorator_list,
+        parent_scope,
+        semantic,
+        classmethod_decorators,
+        staticmethod_decorators,
+    );
+
+    match (kind, function_name) {
+        (FunctionType::Function | FunctionType::NewMethod, _) => false,
+        (FunctionType::Method, "__init__" | "__post_init__" | "__replace__") => false,
+        (_, "__init_subclass__") => false,
+        (FunctionType::Method | FunctionType::ClassMethod | FunctionType::StaticMethod, _) => true,
+    }
+}
+
 /// Return `true` if a [`Decorator`] is indicative of a static method.
 /// Note: Implicit static methods like `__new__` are not considered.
 fn is_static_method(

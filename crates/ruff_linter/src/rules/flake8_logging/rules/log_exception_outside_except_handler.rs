@@ -42,6 +42,10 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ## Fix safety
 /// The fix, if available, will always be marked as unsafe, as it changes runtime behavior.
 ///
+/// ## Options
+///
+/// - `lint.logger-objects`
+///
 /// [The documentation]: https://docs.python.org/3/library/logging.html#logging.exception
 #[derive(ViolationMetadata)]
 #[violation_metadata(preview_since = "0.9.5")]

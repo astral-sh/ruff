@@ -8,12 +8,16 @@ use crate::{
     Db, DisplaySettings,
     place::{Place, PlaceAndQualifiers},
     types::{
-        ClassBase, ClassType, DynamicType, IntersectionBuilder, KnownClass, MemberLookupPolicy,
-        NominalInstanceType, NormalizedVisitor, SpecialFormType, SubclassOfInner, Type,
-        TypeVarBoundOrConstraints, TypeVarInstance, UnionBuilder,
+        BoundTypeVarInstance, ClassBase, ClassType, DynamicType, IntersectionBuilder, KnownClass,
+        MemberLookupPolicy, NominalInstanceType, SpecialFormType, SubclassOfInner, SubclassOfType,
+        Type, TypeVarBoundOrConstraints, UnionBuilder,
+        constraints::ConstraintSet,
         context::InferContext,
         diagnostic::{INVALID_SUPER_ARGUMENT, UNAVAILABLE_IMPLICIT_SUPER_ARGUMENTS},
-        todo_type, visitor,
+        relation::EquivalenceChecker,
+        todo_type,
+        typevar::{TypeVarConstraints, TypeVarInstance},
+        visitor,
     },
 };
 
@@ -76,15 +80,25 @@ impl<'db> BoundSuperError<'db> {
             BoundSuperError::InvalidPivotClassType { pivot_class } => {
                 if let Some(builder) = context.report_lint(&INVALID_SUPER_ARGUMENT, node) {
                     match pivot_class {
-                        Type::GenericAlias(alias) => builder.into_diagnostic(format_args!(
-                            "`types.GenericAlias` instance `{}` is not a valid class",
-                            alias.display_with(context.db(), DisplaySettings::default()),
-                        )),
-                        _ => builder.into_diagnostic(format_args!(
-                            "`{pivot_class}` is not a valid class",
-                            pivot_class = pivot_class.display(context.db()),
-                        )),
-                    };
+                        Type::GenericAlias(alias) => {
+                            builder.into_diagnostic(format_args!(
+                                "`types.GenericAlias` instance `{}` is not a valid class",
+                                alias.display_with(context.db(), DisplaySettings::default()),
+                            ));
+                        }
+                        _ => {
+                            let mut diagnostic =
+                                builder.into_diagnostic("Argument is not a valid class");
+                            diagnostic.set_primary_message(format_args!(
+                                "Argument has type `{}`",
+                                pivot_class.display(context.db())
+                            ));
+                            diagnostic.set_concise_message(format_args!(
+                                "`{}` is not a valid class",
+                                pivot_class.display(context.db()),
+                            ));
+                        }
+                    }
                 }
             }
             BoundSuperError::FailingConditionCheck {
@@ -157,7 +171,7 @@ impl<'db> BoundSuperError<'db> {
                         .map(|c| c.display(db))
                         .join(", ")
                 ));
-                Type::Union(constraints)
+                constraints.as_type(db)
             }
             None => {
                 diagnostic.info(format_args!(
@@ -170,25 +184,40 @@ impl<'db> BoundSuperError<'db> {
     }
 }
 
-#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, get_size2::GetSize)]
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, get_size2::GetSize, salsa::Update)]
 pub enum SuperOwnerKind<'db> {
     Dynamic(DynamicType<'db>),
     Class(ClassType<'db>),
     Instance(NominalInstanceType<'db>),
+    /// An instance-like type variable owner (e.g., `self: Self` in an instance method).
+    /// The second element is the class extracted from the `TypeVar` bound for MRO lookup.
+    InstanceTypeVar(BoundTypeVarInstance<'db>, ClassType<'db>),
+    /// A class-like type variable owner (e.g., `cls: type[Self]` in a classmethod).
+    /// The second element is the class extracted from the `TypeVar` bound for MRO lookup.
+    ClassTypeVar(BoundTypeVarInstance<'db>, ClassType<'db>),
 }
 
 impl<'db> SuperOwnerKind<'db> {
-    fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+    fn recursive_type_normalized_impl(
+        self,
+        db: &'db dyn Db,
+        div: Type<'db>,
+        nested: bool,
+    ) -> Option<Self> {
         match self {
-            SuperOwnerKind::Dynamic(dynamic) => SuperOwnerKind::Dynamic(dynamic.normalized()),
-            SuperOwnerKind::Class(class) => {
-                SuperOwnerKind::Class(class.normalized_impl(db, visitor))
+            SuperOwnerKind::Dynamic(dynamic) => {
+                Some(SuperOwnerKind::Dynamic(dynamic.recursive_type_normalized()))
             }
-            SuperOwnerKind::Instance(instance) => instance
-                .normalized_impl(db, visitor)
-                .into_nominal_instance()
-                .map(Self::Instance)
-                .unwrap_or(Self::Dynamic(DynamicType::Any)),
+            SuperOwnerKind::Class(class) => Some(SuperOwnerKind::Class(
+                class.recursive_type_normalized_impl(db, div, nested)?,
+            )),
+            SuperOwnerKind::Instance(instance) => Some(SuperOwnerKind::Instance(
+                instance.recursive_type_normalized_impl(db, div, nested)?,
+            )),
+            SuperOwnerKind::InstanceTypeVar(_, _) | SuperOwnerKind::ClassTypeVar(_, _) => {
+                // TODO: we might need to normalize the nested class here?
+                Some(self)
+            }
         }
     }
 
@@ -199,6 +228,9 @@ impl<'db> SuperOwnerKind<'db> {
             }
             SuperOwnerKind::Class(class) => Either::Right(class.iter_mro(db)),
             SuperOwnerKind::Instance(instance) => Either::Right(instance.class(db).iter_mro(db)),
+            SuperOwnerKind::InstanceTypeVar(_, class) | SuperOwnerKind::ClassTypeVar(_, class) => {
+                Either::Right(class.iter_mro(db))
+            }
         }
     }
 
@@ -207,16 +239,31 @@ impl<'db> SuperOwnerKind<'db> {
             SuperOwnerKind::Dynamic(_) => None,
             SuperOwnerKind::Class(class) => Some(class),
             SuperOwnerKind::Instance(instance) => Some(instance.class(db)),
+            SuperOwnerKind::InstanceTypeVar(_, class) | SuperOwnerKind::ClassTypeVar(_, class) => {
+                Some(class)
+            }
         }
     }
-}
 
-impl<'db> From<SuperOwnerKind<'db>> for Type<'db> {
-    fn from(owner: SuperOwnerKind<'db>) -> Self {
-        match owner {
+    /// Returns the `TypeVar` instance if this owner is a `TypeVar` variant.
+    fn typevar(self, db: &'db dyn Db) -> Option<TypeVarInstance<'db>> {
+        match self {
+            SuperOwnerKind::InstanceTypeVar(bound_typevar, _)
+            | SuperOwnerKind::ClassTypeVar(bound_typevar, _) => Some(bound_typevar.typevar(db)),
+            _ => None,
+        }
+    }
+
+    /// Returns the type representation of this owner.
+    pub(super) fn owner_type(self, db: &'db dyn Db) -> Type<'db> {
+        match self {
             SuperOwnerKind::Dynamic(dynamic) => Type::Dynamic(dynamic),
             SuperOwnerKind::Class(class) => class.into(),
             SuperOwnerKind::Instance(instance) => instance.into(),
+            SuperOwnerKind::InstanceTypeVar(bound_typevar, _) => Type::TypeVar(bound_typevar),
+            SuperOwnerKind::ClassTypeVar(bound_typevar, _) => {
+                SubclassOfType::from(db, SubclassOfInner::TypeVar(bound_typevar))
+            }
         }
     }
 }
@@ -237,7 +284,7 @@ pub(super) fn walk_bound_super_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     visitor: &V,
 ) {
     visitor.visit_type(db, Type::from(bound_super.pivot_class(db)));
-    visitor.visit_type(db, Type::from(bound_super.owner(db)));
+    visitor.visit_type(db, bound_super.owner(db).owner_type(db));
 }
 
 impl<'db> BoundSuperType<'db> {
@@ -256,6 +303,7 @@ impl<'db> BoundSuperType<'db> {
         let delegate_to =
             |type_to_delegate_to| BoundSuperType::build(db, pivot_class_type, type_to_delegate_to);
 
+        // Delegate but rewrite errors to preserve TypeVar context.
         let delegate_with_error_mapped =
             |type_to_delegate_to, error_context: Option<TypeVarInstance<'db>>| {
                 delegate_to(type_to_delegate_to).map_err(|err| match err {
@@ -286,6 +334,87 @@ impl<'db> BoundSuperType<'db> {
                 })
             };
 
+        // We don't use `ClassBase::try_from_type` here because:
+        // - There are objects that may validly be present in a class's bases list
+        //   but are not valid as pivot classes, e.g. `typing.ChainMap`
+        // - There are objects that are not valid in a class's bases list
+        //   but are valid as pivot classes, e.g. unsubscripted `typing.Generic`
+        let pivot_class = match pivot_class_type {
+            Type::ClassLiteral(class) => ClassBase::Class(ClassType::NonGeneric(class)),
+            Type::SubclassOf(subclass_of) => match subclass_of.subclass_of() {
+                SubclassOfInner::Dynamic(dynamic) => ClassBase::Dynamic(dynamic),
+                _ => match subclass_of.subclass_of().into_class(db) {
+                    Some(class) => ClassBase::Class(class),
+                    None => {
+                        return Err(BoundSuperError::InvalidPivotClassType {
+                            pivot_class: pivot_class_type,
+                        });
+                    }
+                },
+            },
+            Type::SpecialForm(SpecialFormType::Protocol) => ClassBase::Protocol,
+            Type::SpecialForm(SpecialFormType::Generic) => ClassBase::Generic,
+            Type::SpecialForm(SpecialFormType::TypedDict) => ClassBase::TypedDict,
+            Type::Dynamic(dynamic) => ClassBase::Dynamic(dynamic),
+            _ => {
+                return Err(BoundSuperError::InvalidPivotClassType {
+                    pivot_class: pivot_class_type,
+                });
+            }
+        };
+
+        // Helper to build a union of bound-super instances for constrained TypeVars.
+        // Each constraint must be a subclass of the pivot class.
+        let build_constrained_union =
+            |constraints: TypeVarConstraints<'db>,
+             bound_typevar: BoundTypeVarInstance<'db>,
+             typevar: TypeVarInstance<'db>,
+             make_owner: fn(BoundTypeVarInstance<'db>, ClassType<'db>) -> SuperOwnerKind<'db>|
+             -> Result<Type<'db>, BoundSuperError<'db>> {
+                let pivot_class_literal = pivot_class.into_class().map(|c| c.class_literal(db));
+                let mut builder = UnionBuilder::new(db);
+                for constraint in constraints.elements(db) {
+                    let class = match constraint {
+                        Type::NominalInstance(instance) => Some(instance.class(db)),
+                        _ => constraint.to_class_type(db),
+                    };
+                    match class {
+                        Some(class) => {
+                            // Validate constraint is a subclass of pivot class.
+                            if let Some(pivot) = pivot_class_literal {
+                                if !class.iter_mro(db).any(|superclass| match superclass {
+                                    ClassBase::Dynamic(_) => true,
+                                    ClassBase::Generic
+                                    | ClassBase::Protocol
+                                    | ClassBase::TypedDict => false,
+                                    ClassBase::Class(superclass) => {
+                                        superclass.class_literal(db) == pivot
+                                    }
+                                }) {
+                                    return Err(BoundSuperError::FailingConditionCheck {
+                                        pivot_class: pivot_class_type,
+                                        owner: owner_type,
+                                        typevar_context: Some(typevar),
+                                    });
+                                }
+                            }
+                            let owner = make_owner(bound_typevar, class);
+                            builder = builder.add(Type::BoundSuper(BoundSuperType::new(
+                                db,
+                                pivot_class,
+                                owner,
+                            )));
+                        }
+                        None => {
+                            // Delegate to the constraint to get better error messages
+                            // if the constraint is incompatible with the pivot class.
+                            builder = builder.add(delegate_to(*constraint)?);
+                        }
+                    }
+                }
+                Ok(builder.build())
+            };
+
         let owner = match owner_type {
             Type::Never => SuperOwnerKind::Dynamic(DynamicType::Unknown),
             Type::Dynamic(dynamic) => SuperOwnerKind::Dynamic(dynamic),
@@ -293,11 +422,44 @@ impl<'db> BoundSuperType<'db> {
             Type::SubclassOf(subclass_of_type) => match subclass_of_type.subclass_of() {
                 SubclassOfInner::Class(class) => SuperOwnerKind::Class(class),
                 SubclassOfInner::Dynamic(dynamic) => SuperOwnerKind::Dynamic(dynamic),
+                SubclassOfInner::TypeVar(bound_typevar) => {
+                    let typevar = bound_typevar.typevar(db);
+                    match typevar.bound_or_constraints(db) {
+                        Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                            let class = match bound {
+                                Type::NominalInstance(instance) => Some(instance.class(db)),
+                                Type::ProtocolInstance(protocol) => protocol
+                                    .to_nominal_instance()
+                                    .map(|instance| instance.class(db)),
+                                _ => None,
+                            };
+                            if let Some(class) = class {
+                                SuperOwnerKind::ClassTypeVar(bound_typevar, class)
+                            } else {
+                                let subclass_of = SubclassOfType::try_from_instance(db, bound)
+                                    .unwrap_or_else(SubclassOfType::subclass_of_unknown);
+                                return delegate_with_error_mapped(subclass_of, Some(typevar));
+                            }
+                        }
+                        Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                            return build_constrained_union(
+                                constraints,
+                                bound_typevar,
+                                typevar,
+                                SuperOwnerKind::ClassTypeVar,
+                            );
+                        }
+                        None => {
+                            // No bound means the implicit upper bound is `object`.
+                            SuperOwnerKind::ClassTypeVar(bound_typevar, ClassType::object(db))
+                        }
+                    }
+                }
             },
             Type::NominalInstance(instance) => SuperOwnerKind::Instance(instance),
 
             Type::ProtocolInstance(protocol) => {
-                if let Some(nominal_instance) = protocol.as_nominal_type() {
+                if let Some(nominal_instance) = protocol.to_nominal_instance() {
                     SuperOwnerKind::Instance(nominal_instance)
                 } else {
                     return Err(BoundSuperError::AbstractOwnerType {
@@ -341,30 +503,43 @@ impl<'db> BoundSuperType<'db> {
                 return Ok(builder.build());
             }
             Type::TypeAlias(alias) => {
-                return delegate_with_error_mapped(alias.value_type(db), None);
+                return delegate_to(alias.value_type(db));
             }
-            Type::TypeVar(type_var) => {
-                let type_var = type_var.typevar(db);
-                return match type_var.bound_or_constraints(db) {
+            Type::TypeVar(bound_typevar) => {
+                let typevar = bound_typevar.typevar(db);
+                match typevar.bound_or_constraints(db) {
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                        delegate_with_error_mapped(bound, Some(type_var))
+                        let class = match bound {
+                            Type::NominalInstance(instance) => Some(instance.class(db)),
+                            Type::ProtocolInstance(protocol) => protocol
+                                .to_nominal_instance()
+                                .map(|instance| instance.class(db)),
+                            _ => None,
+                        };
+                        if let Some(class) = class {
+                            SuperOwnerKind::InstanceTypeVar(bound_typevar, class)
+                        } else {
+                            return delegate_with_error_mapped(bound, Some(typevar));
+                        }
                     }
                     Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                        delegate_with_error_mapped(Type::Union(constraints), Some(type_var))
+                        return build_constrained_union(
+                            constraints,
+                            bound_typevar,
+                            typevar,
+                            SuperOwnerKind::InstanceTypeVar,
+                        );
                     }
-                    None => delegate_with_error_mapped(Type::object(), Some(type_var)),
-                };
+                    None => {
+                        // No bound means the implicit upper bound is `object`.
+                        SuperOwnerKind::InstanceTypeVar(bound_typevar, ClassType::object(db))
+                    }
+                }
             }
-            Type::BooleanLiteral(_) | Type::TypeIs(_) => {
+            Type::TypeIs(_) | Type::TypeGuard(_) => {
                 return delegate_to(KnownClass::Bool.to_instance(db));
             }
-            Type::IntLiteral(_) => return delegate_to(KnownClass::Int.to_instance(db)),
-            Type::StringLiteral(_) | Type::LiteralString => {
-                return delegate_to(KnownClass::Str.to_instance(db));
-            }
-            Type::BytesLiteral(_) => {
-                return delegate_to(KnownClass::Bytes.to_instance(db));
-            }
+            Type::LiteralValue(literal) => return delegate_to(literal.fallback_instance(db)),
             Type::SpecialForm(special_form) => {
                 return delegate_to(special_form.instance_fallback(db));
             }
@@ -386,9 +561,6 @@ impl<'db> BoundSuperType<'db> {
             }
             Type::GenericAlias(_) => return delegate_to(KnownClass::GenericAlias.to_instance(db)),
             Type::PropertyInstance(_) => return delegate_to(KnownClass::Property.to_instance(db)),
-            Type::EnumLiteral(enum_literal_type) => {
-                return delegate_to(enum_literal_type.enum_class_instance(db));
-            }
             Type::BoundSuper(_) => return delegate_to(KnownClass::Super.to_instance(db)),
             Type::TypedDict(td) => {
                 // In general it isn't sound to upcast a `TypedDict` to a `dict`,
@@ -396,13 +568,16 @@ impl<'db> BoundSuperType<'db> {
                 let mut key_builder = UnionBuilder::new(db);
                 let mut value_builder = UnionBuilder::new(db);
                 for (name, field) in td.items(db) {
-                    key_builder = key_builder.add(Type::string_literal(db, &name));
+                    key_builder = key_builder.add(Type::string_literal(db, name));
                     value_builder = value_builder.add(field.declared_ty);
                 }
                 return delegate_to(
                     KnownClass::Dict
-                        .to_specialized_instance(db, [key_builder.build(), value_builder.build()]),
+                        .to_specialized_instance(db, &[key_builder.build(), value_builder.build()]),
                 );
+            }
+            Type::NewTypeInstance(newtype) => {
+                return delegate_to(newtype.concrete_base_type(db));
             }
             Type::Callable(callable) if callable.is_function_like(db) => {
                 return delegate_to(KnownClass::FunctionType.to_instance(db));
@@ -419,41 +594,19 @@ impl<'db> BoundSuperType<'db> {
             }
         };
 
-        // We don't use `Classbase::try_from_type` here because:
-        // - There are objects that may validly be present in a class's bases list
-        //   but are not valid as pivot classes, e.g. `typing.ChainMap`
-        // - There are objects that are not valid in a class's bases list
-        //   but are valid as pivot classes, e.g. unsubscripted `typing.Generic`
-        let pivot_class = match pivot_class_type {
-            Type::ClassLiteral(class) => ClassBase::Class(ClassType::NonGeneric(class)),
-            Type::SubclassOf(subclass_of) => match subclass_of.subclass_of() {
-                SubclassOfInner::Class(class) => ClassBase::Class(class),
-                SubclassOfInner::Dynamic(dynamic) => ClassBase::Dynamic(dynamic),
-            },
-            Type::SpecialForm(SpecialFormType::Protocol) => ClassBase::Protocol,
-            Type::SpecialForm(SpecialFormType::Generic) => ClassBase::Generic,
-            Type::SpecialForm(SpecialFormType::TypedDict) => ClassBase::TypedDict,
-            Type::Dynamic(dynamic) => ClassBase::Dynamic(dynamic),
-            _ => {
-                return Err(BoundSuperError::InvalidPivotClassType {
-                    pivot_class: pivot_class_type,
-                });
-            }
-        };
-
         if let Some(pivot_class) = pivot_class.into_class()
             && let Some(owner_class) = owner.into_class(db)
         {
-            let pivot_class = pivot_class.class_literal(db).0;
+            let pivot_class = pivot_class.class_literal(db);
             if !owner_class.iter_mro(db).any(|superclass| match superclass {
                 ClassBase::Dynamic(_) => true,
                 ClassBase::Generic | ClassBase::Protocol | ClassBase::TypedDict => false,
-                ClassBase::Class(superclass) => superclass.class_literal(db).0 == pivot_class,
+                ClassBase::Class(superclass) => superclass.class_literal(db) == pivot_class,
             }) {
                 return Err(BoundSuperError::FailingConditionCheck {
                     pivot_class: pivot_class_type,
                     owner: owner_type,
-                    typevar_context: None,
+                    typevar_context: owner.typevar(db),
                 });
             }
         }
@@ -508,25 +661,23 @@ impl<'db> BoundSuperType<'db> {
             // Also, invoking a descriptor on a dynamic attribute is meaningless, so we don't handle this.
             SuperOwnerKind::Dynamic(_) => None,
             SuperOwnerKind::Class(_) => Some(
-                Type::try_call_dunder_get_on_attribute(
-                    db,
-                    attribute,
-                    Type::none(db),
-                    Type::from(owner),
-                )
-                .0,
+                Type::try_call_dunder_get_on_attribute(db, attribute, None, owner.owner_type(db)).0,
             ),
-            SuperOwnerKind::Instance(_) => {
-                let owner = Type::from(owner);
+            SuperOwnerKind::Instance(_) | SuperOwnerKind::InstanceTypeVar(..) => {
+                let owner_type = owner.owner_type(db);
                 Some(
                     Type::try_call_dunder_get_on_attribute(
                         db,
                         attribute,
-                        owner,
-                        owner.to_meta_type(db),
+                        Some(owner_type),
+                        owner_type.to_meta_type(db),
                     )
                     .0,
                 )
+            }
+            SuperOwnerKind::ClassTypeVar(..) => {
+                let owner_type = owner.owner_type(db);
+                Some(Type::try_call_dunder_get_on_attribute(db, attribute, None, owner_type).0)
             }
         }
     }
@@ -548,9 +699,12 @@ impl<'db> BoundSuperType<'db> {
             }
             SuperOwnerKind::Class(class) => class,
             SuperOwnerKind::Instance(instance) => instance.class(db),
+            SuperOwnerKind::InstanceTypeVar(_, class) | SuperOwnerKind::ClassTypeVar(_, class) => {
+                class
+            }
         };
 
-        let (class_literal, _) = class.class_literal(db);
+        let class_literal = class.class_literal(db);
         // TODO properly support super() with generic types
         // * requires a fix for https://github.com/astral-sh/ruff/issues/17432
         // * also requires understanding how we should handle cases like this:
@@ -572,11 +726,106 @@ impl<'db> BoundSuperType<'db> {
         }
     }
 
-    pub(super) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
-        Self::new(
+    pub(super) fn recursive_type_normalized_impl(
+        self,
+        db: &'db dyn Db,
+        div: Type<'db>,
+        nested: bool,
+    ) -> Option<Self> {
+        Some(Self::new(
             db,
-            self.pivot_class(db).normalized_impl(db, visitor),
-            self.owner(db).normalized_impl(db, visitor),
-        )
+            self.pivot_class(db)
+                .recursive_type_normalized_impl(db, div, nested)?,
+            self.owner(db)
+                .recursive_type_normalized_impl(db, div, nested)?,
+        ))
+    }
+}
+
+impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
+    /// Check whether two `BoundSuperType`s are equivalent by recursing into
+    /// their fields.
+    ///
+    /// This method is necessary because [`super::relation::TypeRelationChecker::check_type_pair`]
+    /// should only return an always-satisfied constraint set for two
+    /// `Type::BoundSuper` types if the two types are exactly equivalent. But
+    /// `TypeRelationChecker::check_type_pair` cannot simply delegate to
+    /// [`EquivalenceChecker::check_type_pair`] for this case, because
+    /// `EquivalenceChecker::check_type_pair` itself delegates back to
+    /// `TypeRelationChecker::check_type_pair`, which would cause an infinite loop.
+    pub(super) fn check_bound_super_pair(
+        &self,
+        db: &'db dyn Db,
+        left: BoundSuperType<'db>,
+        right: BoundSuperType<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        let mut class_equivalence = match (left.pivot_class(db), right.pivot_class(db)) {
+            (ClassBase::Class(left), ClassBase::Class(right)) => {
+                self.check_type_pair(db, Type::from(left), Type::from(right))
+            }
+
+            (ClassBase::Class(_), _) => self.never(),
+
+            // A `Divergent` type is only equivalent to itself
+            (
+                ClassBase::Dynamic(DynamicType::Divergent(l)),
+                ClassBase::Dynamic(DynamicType::Divergent(r)),
+            ) => ConstraintSet::from_bool(self.constraints, l == r),
+            (ClassBase::Dynamic(DynamicType::Divergent(_)), _)
+            | (_, ClassBase::Dynamic(DynamicType::Divergent(_))) => self.never(),
+            (ClassBase::Dynamic(_), ClassBase::Dynamic(_)) => self.always(),
+            (ClassBase::Dynamic(_), _) => self.never(),
+
+            (ClassBase::Generic, ClassBase::Generic) => self.always(),
+            (ClassBase::Generic, _) => self.never(),
+
+            (ClassBase::Protocol, ClassBase::Protocol) => self.always(),
+            (ClassBase::Protocol, _) => self.never(),
+
+            (ClassBase::TypedDict, ClassBase::TypedDict) => self.always(),
+            (ClassBase::TypedDict, _) => self.never(),
+        };
+        if class_equivalence.is_never_satisfied(db) {
+            return self.never();
+        }
+        let owner_equivalence = match (left.owner(db), right.owner(db)) {
+            (SuperOwnerKind::Class(left), SuperOwnerKind::Class(right)) => {
+                self.check_type_pair(db, Type::from(left), Type::from(right))
+            }
+            (SuperOwnerKind::Class(_), _) => self.never(),
+
+            (SuperOwnerKind::Instance(left), SuperOwnerKind::Instance(right)) => {
+                self.check_type_pair(db, Type::from(left), Type::from(right))
+            }
+            (SuperOwnerKind::Instance(_), _) => self.never(),
+
+            // A `Divergent` type is only equivalent to itself
+            (
+                SuperOwnerKind::Dynamic(DynamicType::Divergent(l)),
+                SuperOwnerKind::Dynamic(DynamicType::Divergent(r)),
+            ) => ConstraintSet::from_bool(self.constraints, l == r),
+            (SuperOwnerKind::Dynamic(DynamicType::Divergent(_)), _)
+            | (_, SuperOwnerKind::Dynamic(DynamicType::Divergent(_))) => self.never(),
+            (SuperOwnerKind::Dynamic(_), SuperOwnerKind::Dynamic(_)) => self.always(),
+            (SuperOwnerKind::Dynamic(_), _) => self.never(),
+
+            (
+                SuperOwnerKind::InstanceTypeVar(l_typevar, l_class),
+                SuperOwnerKind::InstanceTypeVar(r_typevar, r_class),
+            )
+            | (
+                SuperOwnerKind::ClassTypeVar(l_typevar, l_class),
+                SuperOwnerKind::ClassTypeVar(r_typevar, r_class),
+            ) => self
+                .check_type_pair(db, Type::TypeVar(l_typevar), Type::TypeVar(r_typevar))
+                .and(db, self.constraints, || {
+                    self.check_type_pair(db, Type::from(l_class), Type::from(r_class))
+                }),
+
+            (SuperOwnerKind::InstanceTypeVar(..) | SuperOwnerKind::ClassTypeVar(..), _) => {
+                self.never()
+            }
+        };
+        class_equivalence.intersect(db, self.constraints, owner_equivalence)
     }
 }

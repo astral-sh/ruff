@@ -1,0 +1,21 @@
+---
+source: crates/ruff_python_formatter/src/comments/mod.rs
+expression: comments.debug(test_case.source_code)
+---
+{
+    Node {
+        kind: StmtWhile,
+        range: 0..45,
+        source: `while True: pass⏎`,
+    }: {
+        "leading": [],
+        "dangling": [
+            SourceComment {
+                text: "# comment",
+                position: OwnLine,
+                formatted: false,
+            },
+        ],
+        "trailing": [],
+    },
+}

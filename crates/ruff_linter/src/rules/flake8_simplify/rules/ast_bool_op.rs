@@ -10,7 +10,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::{Truthiness, contains_effect};
 use ruff_python_ast::name::Name;
-use ruff_python_ast::parenthesize::parenthesized_range;
+use ruff_python_ast::token::parenthesized_range;
 use ruff_python_codegen::Generator;
 use ruff_python_semantic::SemanticModel;
 
@@ -800,14 +800,9 @@ fn is_short_circuit(
             edit = Some(get_short_circuit_edit(
                 value,
                 TextRange::new(
-                    parenthesized_range(
-                        furthest.into(),
-                        expr.into(),
-                        checker.comment_ranges(),
-                        checker.locator().contents(),
-                    )
-                    .unwrap_or(furthest.range())
-                    .start(),
+                    parenthesized_range(furthest.into(), expr.into(), checker.tokens())
+                        .unwrap_or(furthest.range())
+                        .start(),
                     expr.end(),
                 ),
                 short_circuit_truthiness,
@@ -828,14 +823,9 @@ fn is_short_circuit(
             edit = Some(get_short_circuit_edit(
                 next_value,
                 TextRange::new(
-                    parenthesized_range(
-                        furthest.into(),
-                        expr.into(),
-                        checker.comment_ranges(),
-                        checker.locator().contents(),
-                    )
-                    .unwrap_or(furthest.range())
-                    .start(),
+                    parenthesized_range(furthest.into(), expr.into(), checker.tokens())
+                        .unwrap_or(furthest.range())
+                        .start(),
                     expr.end(),
                 ),
                 short_circuit_truthiness,

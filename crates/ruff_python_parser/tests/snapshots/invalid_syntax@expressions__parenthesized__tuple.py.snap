@@ -315,7 +315,7 @@ Module(
    |
  9 | # Missing comma
 10 | (1 2)
-   |    ^ Syntax Error: Expected ')', found int
+   |    ^ Syntax Error: Expected `)`, found int
 11 |
 12 | # Dictionary element in a list
    |
@@ -343,7 +343,7 @@ Module(
    |
 12 | # Dictionary element in a list
 13 | (1: 2)
-   |   ^ Syntax Error: Expected ')', found ':'
+   |   ^ Syntax Error: Expected `)`, found `:`
 14 |
 15 | # Missing expression
    |
@@ -390,7 +390,7 @@ Module(
 16 | (1, x + )
 17 |
 18 | (1; 2)
-   |   ^ Syntax Error: Expected ')', found ';'
+   |   ^ Syntax Error: Expected `)`, found `;`
 19 |
 20 | # Unparenthesized named expression is not allowed
    |
@@ -420,5 +420,5 @@ Module(
    |
 20 | # Unparenthesized named expression is not allowed
 21 | x, y := 2, z
-   |      ^^ Syntax Error: Expected ',', found ':='
+   |      ^^ Syntax Error: Expected `,`, found `:=`
    |

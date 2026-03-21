@@ -6,8 +6,7 @@ use crate::expression::expr_tuple::TupleParentheses;
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::Parenthesize;
 use crate::prelude::*;
-use crate::preview::is_remove_parens_around_except_types_enabled;
-use crate::statement::clause::{ClauseHeader, clause_body, clause_header};
+use crate::statement::clause::{ClauseHeader, clause};
 use crate::statement::suite::SuiteKind;
 
 #[derive(Copy, Clone, Default)]
@@ -55,77 +54,88 @@ impl FormatNodeRule<ExceptHandlerExceptHandler> for FormatExceptHandlerExceptHan
 
         write!(
             f,
-            [
-                clause_header(
-                    ClauseHeader::ExceptHandler(item),
-                    dangling_comments,
-                    &format_with(|f: &mut PyFormatter| {
-                        write!(
-                            f,
-                            [
-                                token("except"),
-                                match except_handler_kind {
-                                    ExceptHandlerKind::Regular => None,
-                                    ExceptHandlerKind::Starred => Some(token("*")),
-                                }
-                            ]
-                        )?;
+            [clause(
+                ClauseHeader::ExceptHandler(item),
+                &format_with(|f: &mut PyFormatter| {
+                    write!(
+                        f,
+                        [
+                            token("except"),
+                            match except_handler_kind {
+                                ExceptHandlerKind::Regular => None,
+                                ExceptHandlerKind::Starred => Some(token("*")),
+                            }
+                        ]
+                    )?;
 
-                        match type_.as_deref() {
-                            // For tuples of exception types without an `as` name and on 3.14+, the
-                            // parentheses are optional.
-                            //
-                            // ```py
-                            // try:
-                            //     ...
-                            // except BaseException, Exception:  # Ok
-                            //     ...
-                            // ```
-                            Some(Expr::Tuple(tuple))
-                                if f.options().target_version() >= PythonVersion::PY314
-                                    && is_remove_parens_around_except_types_enabled(
-                                        f.context(),
-                                    )
-                                    && name.is_none() =>
-                            {
-                                write!(
-                                    f,
-                                    [
-                                        space(),
-                                        tuple
-                                            .format()
-                                            .with_options(TupleParentheses::NeverPreserve)
-                                    ]
-                                )?;
-                            }
-                            Some(type_) => {
-                                write!(
-                                    f,
-                                    [
-                                        space(),
-                                        maybe_parenthesize_expression(
-                                            type_,
-                                            item,
-                                            Parenthesize::IfBreaks
-                                        )
-                                    ]
-                                )?;
-                                if let Some(name) = name {
-                                    write!(f, [space(), token("as"), space(), name.format()])?;
-                                }
-                            }
-                            _ => {}
+                    match type_.as_deref() {
+                        // For tuples of exception types without an `as` name and on 3.14+, the
+                        // parentheses are optional.
+                        //
+                        // ```py
+                        // try:
+                        //     ...
+                        // except BaseException, Exception:  # Ok
+                        //     ...
+                        // ```
+                        //
+                        // Unless any component of the tuple is starred. This case is actually valid
+                        // syntax on its own but is parsed as `except*`, not a tuple with a starred
+                        // element:
+                        //
+                        // ```py
+                        // try:
+                        //     ...
+                        // except *exceptions, BaseException:
+                        //     ...
+                        // ```
+                        //
+                        // And this case is an outright `SyntaxError`:
+                        //
+                        // ```py
+                        // try:
+                        //     ...
+                        // except BaseException, *exceptions:  # SyntaxError
+                        //     ...
+                        // ```
+                        Some(Expr::Tuple(tuple))
+                            if f.options().target_version() >= PythonVersion::PY314
+                                && name.is_none()
+                                && !tuple.iter().any(Expr::is_starred_expr) =>
+                        {
+                            write!(
+                                f,
+                                [
+                                    space(),
+                                    tuple.format().with_options(TupleParentheses::NeverPreserve)
+                                ]
+                            )?;
                         }
+                        Some(type_) => {
+                            write!(
+                                f,
+                                [
+                                    space(),
+                                    maybe_parenthesize_expression(
+                                        type_,
+                                        item,
+                                        Parenthesize::IfBreaks
+                                    )
+                                ]
+                            )?;
+                            if let Some(name) = name {
+                                write!(f, [space(), token("as"), space(), name.format()])?;
+                            }
+                        }
+                        _ => {}
+                    }
 
-                        Ok(())
-                    }),
-                ),
-                clause_body(
-                    body,
-                    SuiteKind::other(self.last_suite_in_statement),
-                    dangling_comments
-                ),
-            ]
+                    Ok(())
+                }),
+                dangling_comments,
+                body,
+                SuiteKind::other(self.last_suite_in_statement),
+            )]
         )
     }
 }

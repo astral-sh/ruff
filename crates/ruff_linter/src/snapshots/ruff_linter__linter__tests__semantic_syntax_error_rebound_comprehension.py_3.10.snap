@@ -1,0 +1,9 @@
+---
+source: crates/ruff_linter/src/linter.rs
+---
+invalid-syntax: assignment expression cannot rebind comprehension variable
+ --> resources/test/fixtures/semantic_errors/rebound_comprehension.py:1:2
+  |
+1 | [x:= 2 for x in range(2)]
+  |  ^
+  |

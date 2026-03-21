@@ -61,7 +61,7 @@ Module(
 
   |
 1 | match foo: case _: ...
-  |            ^^^^ Syntax Error: Expected newline, found 'case'
+  |            ^^^^ Syntax Error: Expected newline, found `case`
   |
 
 

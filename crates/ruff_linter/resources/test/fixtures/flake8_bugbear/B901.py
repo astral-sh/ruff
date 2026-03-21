@@ -52,16 +52,16 @@ def not_broken5():
     yield inner()
 
 
-def not_broken6():
+def broken3():
     return (yield from [])
 
 
-def not_broken7():
+def broken4():
     x = yield from []
     return x
 
 
-def not_broken8():
+def broken5():
     x = None
 
     def inner(ex):
@@ -76,3 +76,53 @@ class NotBroken9(object):
     def __await__(self):
         yield from function()
         return 42
+
+
+async def broken6():
+    yield 1
+    return foo()
+
+
+async def broken7():
+    yield 1
+    return [1, 2, 3]
+
+
+import pytest
+
+
+@pytest.hookimpl(wrapper=True)
+def pytest_runtest_makereport():
+    result = yield
+    return result
+
+
+@pytest.hookimpl(wrapper=True)
+def pytest_fixture_setup():
+    result = yield
+    result.some_attr = "modified"
+    return result
+
+
+@pytest.hookimpl(hookwrapper=True)
+def pytest_runtest_call():
+    result = yield
+    return result
+
+
+@pytest.hookimpl()
+def pytest_configure():
+    yield
+    return "should error"
+
+
+@pytest.hookimpl(wrapper=False)
+def pytest_unconfigure():
+    yield
+    return "should error"
+
+
+@pytest.fixture()
+def my_fixture():
+    yield
+    return "should error"

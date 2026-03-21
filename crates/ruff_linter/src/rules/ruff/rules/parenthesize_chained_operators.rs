@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
-use ruff_python_ast::parenthesize::parenthesized_range;
+use ruff_python_ast::token::parenthesized_range;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -77,14 +77,7 @@ pub(crate) fn parenthesize_chained_logical_operators(checker: &Checker, expr: &a
             ) => {
                 let locator = checker.locator();
                 let source_range = bool_op.range();
-                if parenthesized_range(
-                    bool_op.into(),
-                    expr.into(),
-                    checker.comment_ranges(),
-                    locator.contents(),
-                )
-                .is_none()
-                {
+                if parenthesized_range(bool_op.into(), expr.into(), checker.tokens()).is_none() {
                     let new_source = format!("({})", locator.slice(source_range));
                     let edit = Edit::range_replacement(new_source, source_range);
                     checker

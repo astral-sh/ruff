@@ -1095,9 +1095,9 @@ impl OperandIndex {
         }
     }
 
-    /// Returns the index of the operand's right operator. The method always returns an index
-    /// even if the operand has no right operator. Use [`BinaryCallChain::get_operator`] to test if
-    /// the operand has a right operator.
+    /// Returns the index of the operand's right operator. The method always returns an index even
+    /// if the operand has no right operator. Use [`FlatBinaryExpressionSlice::get_operator`] to
+    /// test if the operand has a right operator.
     fn right_operator(self) -> OperatorIndex {
         OperatorIndex::new(self.0 + 1)
     }

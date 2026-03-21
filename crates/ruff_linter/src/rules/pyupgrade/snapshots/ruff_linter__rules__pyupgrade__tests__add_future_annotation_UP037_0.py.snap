@@ -590,5 +590,44 @@ help: Remove quotes
 119 |     #
 120 |     
     -     """:
-121 +     ):
+121 +     
+122 + ):
+123 |     return 0
+124 | 
+125 | # https://github.com/astral-sh/ruff/issues/19835
+
+UP037 [*] Remove quotes from type annotation
+   --> UP037_0.py:125:14
+    |
+124 | # https://github.com/astral-sh/ruff/issues/19835
+125 | def foo(bar: "A\n#"): ...
+    |              ^^^^^^
+126 | def foo(bar: "A\n#\n"): ...
+    |
+help: Remove quotes
 122 |     return 0
+123 | 
+124 | # https://github.com/astral-sh/ruff/issues/19835
+    - def foo(bar: "A\n#"): ...
+125 + def foo(bar: (A
+126 + #
+127 + )): ...
+128 | def foo(bar: "A\n#\n"): ...
+
+UP037 [*] Remove quotes from type annotation
+   --> UP037_0.py:126:14
+    |
+124 | # https://github.com/astral-sh/ruff/issues/19835
+125 | def foo(bar: "A\n#"): ...
+126 | def foo(bar: "A\n#\n"): ...
+    |              ^^^^^^^^
+    |
+help: Remove quotes
+123 | 
+124 | # https://github.com/astral-sh/ruff/issues/19835
+125 | def foo(bar: "A\n#"): ...
+    - def foo(bar: "A\n#\n"): ...
+126 + def foo(bar: (A
+127 + #
+128 + 
+129 + )): ...

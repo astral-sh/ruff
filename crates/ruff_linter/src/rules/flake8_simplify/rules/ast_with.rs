@@ -44,6 +44,15 @@ use crate::{FixAvailability, Violation};
 ///     pass
 /// ```
 ///
+/// ## Options
+///
+/// The rule will consult these two settings when deciding if a fix can be provided:
+///
+/// - `lint.pycodestyle.max-line-length`
+/// - `indent-width`
+///
+/// Lines that would exceed the configured line length will not be fixed automatically.
+///
 /// ## References
 /// - [Python documentation: The `with` statement](https://docs.python.org/3/reference/compound_stmts.html#the-with-statement)
 #[derive(ViolationMetadata)]

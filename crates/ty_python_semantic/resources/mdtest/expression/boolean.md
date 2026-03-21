@@ -223,7 +223,7 @@ class NotBoolable:
 # TODO: This should emit an error that `NotBoolable` can't be converted to a bool but it currently doesn't
 #   because `Never` is assignable to `bool`. This probably requires dead code analysis to fix.
 if NotBoolable():
-    ...
+    pass
 ```
 
 ## Not callable `__bool__`
@@ -232,9 +232,9 @@ if NotBoolable():
 class NotBoolable:
     __bool__: None = None
 
-# error: [unsupported-bool-conversion] "Boolean conversion is unsupported for type `NotBoolable`"
+# error: [unsupported-bool-conversion] "Boolean conversion is not supported for type `NotBoolable`"
 if NotBoolable():
-    ...
+    pass
 ```
 
 ## Not-boolable union
@@ -244,9 +244,9 @@ def test(cond: bool):
     class NotBoolable:
         __bool__: int | None = None if cond else 3
 
-    # error: [unsupported-bool-conversion] "Boolean conversion is unsupported for type `NotBoolable`"
+    # error: [unsupported-bool-conversion] "Boolean conversion is not supported for type `NotBoolable`"
     if NotBoolable():
-        ...
+        pass
 ```
 
 ## Union with some variants implementing `__bool__` incorrectly
@@ -258,7 +258,7 @@ def test(cond: bool):
 
     a = 10 if cond else NotBoolable()
 
-    # error: [unsupported-bool-conversion] "Boolean conversion is unsupported for type `Literal[10] | NotBoolable`"
+    # error: [unsupported-bool-conversion] "Boolean conversion is not supported for type `Literal[10] | NotBoolable`"
     if a:
-        ...
+        pass
 ```

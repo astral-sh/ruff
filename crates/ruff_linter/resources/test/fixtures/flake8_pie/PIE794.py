@@ -50,3 +50,8 @@ class Person:
     name: str = "Foo"
     name: str = name + " Bar"
     name: str = "Bar"  # PIE794
+
+
+class TextEdit:
+    start_line: int
+    start_line: int  # PIE794

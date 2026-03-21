@@ -1,0 +1,134 @@
+---
+source: crates/ruff_linter/src/rules/flake8_implicit_str_concat/mod.rs
+---
+ISC001 Implicitly concatenated string literals on one line
+ --> ISC_syntax_error_2.py:2:1
+  |
+1 | # Regression test for https://github.com/astral-sh/ruff/issues/21023
+2 | '' '
+  | ^^^^
+3 | "" ""
+4 | '' '' '
+  |
+help: Combine string literals
+
+invalid-syntax: missing closing quote in string literal
+ --> ISC_syntax_error_2.py:2:4
+  |
+1 | # Regression test for https://github.com/astral-sh/ruff/issues/21023
+2 | '' '
+  |    ^
+3 | "" ""
+4 | '' '' '
+  |
+
+ISC001 Implicitly concatenated string literals on one line
+ --> ISC_syntax_error_2.py:3:1
+  |
+1 | # Regression test for https://github.com/astral-sh/ruff/issues/21023
+2 | '' '
+3 | "" ""
+  | ^^^^^
+4 | '' '' '
+5 | "" "" "
+  |
+help: Combine string literals
+
+ISC001 Implicitly concatenated string literals on one line
+ --> ISC_syntax_error_2.py:4:1
+  |
+2 | '' '
+3 | "" ""
+4 | '' '' '
+  | ^^^^^
+5 | "" "" "
+6 | f"" f"
+  |
+help: Combine string literals
+
+ISC001 Implicitly concatenated string literals on one line
+ --> ISC_syntax_error_2.py:4:4
+  |
+2 | '' '
+3 | "" ""
+4 | '' '' '
+  |    ^^^^
+5 | "" "" "
+6 | f"" f"
+  |
+help: Combine string literals
+
+invalid-syntax: missing closing quote in string literal
+ --> ISC_syntax_error_2.py:4:7
+  |
+2 | '' '
+3 | "" ""
+4 | '' '' '
+  |       ^
+5 | "" "" "
+6 | f"" f"
+  |
+
+ISC001 Implicitly concatenated string literals on one line
+ --> ISC_syntax_error_2.py:5:1
+  |
+3 | "" ""
+4 | '' '' '
+5 | "" "" "
+  | ^^^^^
+6 | f"" f"
+7 | f"" f"" f"
+  |
+help: Combine string literals
+
+ISC001 Implicitly concatenated string literals on one line
+ --> ISC_syntax_error_2.py:5:4
+  |
+3 | "" ""
+4 | '' '' '
+5 | "" "" "
+  |    ^^^^
+6 | f"" f"
+7 | f"" f"" f"
+  |
+help: Combine string literals
+
+invalid-syntax: missing closing quote in string literal
+ --> ISC_syntax_error_2.py:5:7
+  |
+3 | "" ""
+4 | '' '' '
+5 | "" "" "
+  |       ^
+6 | f"" f"
+7 | f"" f"" f"
+  |
+
+invalid-syntax: f-string: unterminated string
+ --> ISC_syntax_error_2.py:6:7
+  |
+4 | '' '' '
+5 | "" "" "
+6 | f"" f"
+  |       ^
+7 | f"" f"" f"
+  |
+
+ISC001 Implicitly concatenated string literals on one line
+ --> ISC_syntax_error_2.py:7:1
+  |
+5 | "" "" "
+6 | f"" f"
+7 | f"" f"" f"
+  | ^^^^^^^
+  |
+help: Combine string literals
+
+invalid-syntax: f-string: unterminated string
+ --> ISC_syntax_error_2.py:7:11
+  |
+5 | "" "" "
+6 | f"" f"
+7 | f"" f"" f"
+  |           ^
+  |

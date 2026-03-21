@@ -9,7 +9,7 @@ from collections.abc import Callable
 from threading import Thread
 from types import TracebackType
 from typing import Any, Final, NoReturn, final, overload
-from typing_extensions import TypeVarTuple, Unpack, disjoint_base
+from typing_extensions import TypeVarTuple, Unpack, deprecated, disjoint_base
 
 _Ts = TypeVarTuple("_Ts")
 
@@ -53,6 +53,8 @@ class RLock:
         to be available for other threads.
         """
     __enter__ = acquire
+    """Lock the lock."""
+
     def __exit__(self, t: type[BaseException] | None, v: BaseException | None, tb: TracebackType | None) -> None:
         """Release the lock."""
     if sys.version_info >= (3, 14):
@@ -117,13 +119,16 @@ if sys.version_info >= (3, 13):
         def locked(self) -> bool:
             """Return whether the lock is in the locked state."""
 
-        def acquire_lock(self, blocking: bool = True, timeout: float = -1) -> bool:
+        @deprecated("Obsolete synonym. Use `acquire()` instead.")
+        def acquire_lock(self, blocking: bool = True, timeout: float = -1) -> bool:  # undocumented
             """An obsolete synonym of acquire()."""
 
-        def release_lock(self) -> None:
+        @deprecated("Obsolete synonym. Use `release()` instead.")
+        def release_lock(self) -> None:  # undocumented
             """An obsolete synonym of release()."""
 
-        def locked_lock(self) -> bool:
+        @deprecated("Obsolete synonym. Use `locked()` instead.")
+        def locked_lock(self) -> bool:  # undocumented
             """An obsolete synonym of locked()."""
 
         def __enter__(self) -> bool:
@@ -178,7 +183,8 @@ else:
             Return whether the lock is in the locked state.
             """
 
-        def acquire_lock(self, blocking: bool = True, timeout: float = -1) -> bool:
+        @deprecated("Obsolete synonym. Use `acquire()` instead.")
+        def acquire_lock(self, blocking: bool = True, timeout: float = -1) -> bool:  # undocumented
             """acquire(blocking=True, timeout=-1) -> bool
             (acquire_lock() is an obsolete synonym)
 
@@ -190,7 +196,8 @@ else:
             The blocking operation is interruptible.
             """
 
-        def release_lock(self) -> None:
+        @deprecated("Obsolete synonym. Use `release()` instead.")
+        def release_lock(self) -> None:  # undocumented
             """release()
             (release_lock() is an obsolete synonym)
 
@@ -199,7 +206,8 @@ else:
             but it needn't be locked by the same thread that unlocks it.
             """
 
-        def locked_lock(self) -> bool:
+        @deprecated("Obsolete synonym. Use `locked()` instead.")
+        def locked_lock(self) -> bool:  # undocumented
             """locked() -> bool
             (locked_lock() is an obsolete synonym)
 
@@ -243,14 +251,14 @@ def start_new_thread(function: Callable[[Unpack[_Ts]], object], args: tuple[Unpa
 
 @overload
 def start_new_thread(function: Callable[..., object], args: tuple[Any, ...], kwargs: dict[str, Any], /) -> int: ...
-
-# Obsolete synonym for start_new_thread()
 @overload
-def start_new(function: Callable[[Unpack[_Ts]], object], args: tuple[Unpack[_Ts]], /) -> int:
+@deprecated("Obsolete synonym. Use `start_new_thread()` instead.")
+def start_new(function: Callable[[Unpack[_Ts]], object], args: tuple[Unpack[_Ts]], /) -> int:  # undocumented
     """An obsolete synonym of start_new_thread()."""
 
 @overload
-def start_new(function: Callable[..., object], args: tuple[Any, ...], kwargs: dict[str, Any], /) -> int: ...
+@deprecated("Obsolete synonym. Use `start_new_thread()` instead.")
+def start_new(function: Callable[..., object], args: tuple[Any, ...], kwargs: dict[str, Any], /) -> int: ...  # undocumented
 
 if sys.version_info >= (3, 10):
     def interrupt_main(signum: signal.Signals = signal.SIGINT, /) -> None:
@@ -275,7 +283,8 @@ def exit() -> NoReturn:
     thread to exit silently unless the exception is caught.
     """
 
-def exit_thread() -> NoReturn:  # Obsolete synonym for exit()
+@deprecated("Obsolete synonym. Use `exit()` instead.")
+def exit_thread() -> NoReturn:  # undocumented
     """An obsolete synonym of exit()."""
 
 def allocate_lock() -> LockType:
@@ -283,7 +292,8 @@ def allocate_lock() -> LockType:
     information about locks.
     """
 
-def allocate() -> LockType:  # Obsolete synonym for allocate_lock()
+@deprecated("Obsolete synonym. Use `allocate_lock()` instead.")
+def allocate() -> LockType:  # undocumented
     """An obsolete synonym of allocate_lock()."""
 
 def get_ident() -> int:
@@ -350,6 +360,7 @@ class _ExceptHookArgs(structseq[Any], tuple[type[BaseException], BaseException |
         """Thread"""
 
 _excepthook: Callable[[_ExceptHookArgs], Any]
+"""Handle uncaught Thread.run() exception."""
 
 if sys.version_info >= (3, 12):
     def daemon_threads_allowed() -> bool:

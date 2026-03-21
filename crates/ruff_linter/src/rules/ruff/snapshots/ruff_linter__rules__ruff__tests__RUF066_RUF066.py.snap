@@ -1,0 +1,31 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF066 `name` is a property without a `return` statement
+ --> RUF066.py:7:9
+  |
+5 | class User:  # Test normal class properties
+6 |     @property
+7 |     def name(self):  # ERROR: No return
+  |         ^^^^
+8 |         f"{self.first_name} {self.last_name}"
+  |
+
+RUF066 `nested` is a property without a `return` statement
+  --> RUF066.py:18:9
+   |
+17 |     @property
+18 |     def nested(self):  # ERROR: Property itself doesn't return
+   |         ^^^^^^
+19 |         def inner():
+20 |             return 0
+   |
+
+RUF066 `prop2` is a property without a `return` statement
+  --> RUF066.py:43:9
+   |
+42 |     @property
+43 |     def prop2(self):  # ERROR: Not returning something (even when we are inside an ABC)
+   |         ^^^^^
+44 |         50
+   |

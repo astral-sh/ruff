@@ -1,0 +1,51 @@
+---
+source: crates/ty_server/tests/e2e/code_actions.rs
+expression: code_actions
+---
+[
+  {
+    "title": "Ignore 'possibly-missing-submodule' for this line",
+    "kind": "quickfix",
+    "diagnostics": [
+      {
+        "range": {
+          "start": {
+            "line": 1,
+            "character": 0
+          },
+          "end": {
+            "line": 1,
+            "character": 11
+          }
+        },
+        "severity": 2,
+        "code": "possibly-missing-submodule",
+        "codeDescription": {
+          "href": "https://ty.dev/rules#possibly-missing-submodule"
+        },
+        "source": "ty",
+        "message": "Submodule `parser` might not have been imported"
+      }
+    ],
+    "edit": {
+      "changes": {
+        "file://<temp_dir>/src/foo.py": [
+          {
+            "range": {
+              "start": {
+                "line": 1,
+                "character": 11
+              },
+              "end": {
+                "line": 1,
+                "character": 11
+              }
+            },
+            "newText": "  # ty:ignore[possibly-missing-submodule]"
+          }
+        ]
+      }
+    },
+    "isPreferred": false
+  }
+]

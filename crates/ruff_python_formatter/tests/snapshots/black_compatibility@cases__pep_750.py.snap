@@ -1,0 +1,188 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+---
+## Input
+
+```python
+x = t"foo"
+x = t'foo {{ {2 + 2}bar {{ baz'
+
+x = t"foo {f'abc'} bar"
+
+x = t"""foo {{ a
+    foo {2 + 2}bar {{ baz
+
+    x = f"foo {{ {
+        2 + 2  # comment
+    }bar"
+
+    {{ baz
+
+    }} buzz
+
+    {print("abc" + "def"
+)}
+abc"""
+
+t'{(abc:=10)}'
+
+t'''This is a really long string, but just make sure that you reflow tstrings {
+    2+2:d
+}'''
+t'This is a really long string, but just make sure that you reflow tstrings correctly {2+2:d}'
+
+t"{     2      +     2    =    }"
+
+t'{
+X
+!r
+}'
+
+tr'\{{\}}'
+
+t'''
+    WITH {f'''
+    {1}_cte AS ()'''}
+'''
+```
+
+## Black Differences
+
+```diff
+--- Black
++++ Ruff
+@@ -7,34 +7,32 @@
+     foo {2 + 2}bar {{ baz
+ 
+     x = f"foo {{ {
+-        2 + 2  # comment
+-    }bar"
++    2 + 2  # comment
++}bar"
+ 
+     {{ baz
+ 
+     }} buzz
+ 
+-    {print("abc" + "def"
+-)}
++    {print("abc" + "def")}
+ abc"""
+ 
+-t"{(abc:=10)}"
++t"{(abc := 10)}"
+ 
+ t"""This is a really long string, but just make sure that you reflow tstrings {
+-    2+2:d
++    2 + 2:d
+ }"""
+-t"This is a really long string, but just make sure that you reflow tstrings correctly {2+2:d}"
++t"This is a really long string, but just make sure that you reflow tstrings correctly {2 + 2:d}"
+ 
+ t"{     2      +     2    =    }"
+ 
+-t"{
+-X
+-!r
+-}"
++t"{X!r}"
+ 
+ rt"\{{\}}"
+ 
+ t"""
+-    WITH {f'''
+-    {1}_cte AS ()'''}
++    WITH {
++    f'''
++    {1}_cte AS ()'''
++}
+ """
+```
+
+## Ruff Output
+
+```python
+x = t"foo"
+x = t"foo {{ {2 + 2}bar {{ baz"
+
+x = t"foo {f'abc'} bar"
+
+x = t"""foo {{ a
+    foo {2 + 2}bar {{ baz
+
+    x = f"foo {{ {
+    2 + 2  # comment
+}bar"
+
+    {{ baz
+
+    }} buzz
+
+    {print("abc" + "def")}
+abc"""
+
+t"{(abc := 10)}"
+
+t"""This is a really long string, but just make sure that you reflow tstrings {
+    2 + 2:d
+}"""
+t"This is a really long string, but just make sure that you reflow tstrings correctly {2 + 2:d}"
+
+t"{     2      +     2    =    }"
+
+t"{X!r}"
+
+rt"\{{\}}"
+
+t"""
+    WITH {
+    f'''
+    {1}_cte AS ()'''
+}
+"""
+```
+
+## Black Output
+
+```python
+x = t"foo"
+x = t"foo {{ {2 + 2}bar {{ baz"
+
+x = t"foo {f'abc'} bar"
+
+x = t"""foo {{ a
+    foo {2 + 2}bar {{ baz
+
+    x = f"foo {{ {
+        2 + 2  # comment
+    }bar"
+
+    {{ baz
+
+    }} buzz
+
+    {print("abc" + "def"
+)}
+abc"""
+
+t"{(abc:=10)}"
+
+t"""This is a really long string, but just make sure that you reflow tstrings {
+    2+2:d
+}"""
+t"This is a really long string, but just make sure that you reflow tstrings correctly {2+2:d}"
+
+t"{     2      +     2    =    }"
+
+t"{
+X
+!r
+}"
+
+rt"\{{\}}"
+
+t"""
+    WITH {f'''
+    {1}_cte AS ()'''}
+"""
+```

@@ -21,12 +21,13 @@
 //! represents the lint-rule analysis phase. In the future, these steps may be separated into
 //! distinct passes over the AST.
 
-use std::cell::RefCell;
+use std::cell::{OnceCell, RefCell};
 use std::path::Path;
 
 use itertools::Itertools;
 use log::debug;
 use rustc_hash::{FxHashMap, FxHashSet};
+use smallvec::SmallVec;
 
 use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticTag, IntoDiagnosticMessage, Span};
 use ruff_diagnostics::{Applicability, Fix, IsolationLevel};
@@ -35,6 +36,7 @@ use ruff_python_ast::helpers::{collect_import_from_member, is_docstring_stmt, to
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::str::Quote;
+use ruff_python_ast::token::Tokens;
 use ruff_python_ast::visitor::{Visitor, walk_except_handler, walk_pattern};
 use ruff_python_ast::{
     self as ast, AnyParameterRef, ArgOrKeyword, Comprehension, ElifElseClause, ExceptHandler, Expr,
@@ -45,10 +47,11 @@ use ruff_python_ast::{PySourceType, helpers, str, visitor};
 use ruff_python_codegen::{Generator, Stylist};
 use ruff_python_index::Indexer;
 use ruff_python_parser::semantic_errors::{
-    SemanticSyntaxChecker, SemanticSyntaxContext, SemanticSyntaxError, SemanticSyntaxErrorKind,
+    LazyImportContext, SemanticSyntaxChecker, SemanticSyntaxContext, SemanticSyntaxError,
+    SemanticSyntaxErrorKind,
 };
 use ruff_python_parser::typing::{AnnotationKind, ParsedAnnotation, parse_type_annotation};
-use ruff_python_parser::{ParseError, Parsed, Tokens};
+use ruff_python_parser::{ParseError, Parsed};
 use ruff_python_semantic::all::{DunderAllDefinition, DunderAllFlags};
 use ruff_python_semantic::analyze::{imports, typing};
 use ruff_python_semantic::{
@@ -66,14 +69,18 @@ use crate::docstrings::extraction::ExtractionTarget;
 use crate::importer::{ImportRequest, Importer, ResolutionError};
 use crate::noqa::NoqaMapping;
 use crate::package::PackageRoot;
-use crate::preview::is_undefined_export_in_dunder_init_enabled;
+use crate::preview::{
+    is_incorrect_dict_iterator_comprehension_enabled, is_undefined_export_in_dunder_init_enabled,
+};
 use crate::registry::Rule;
+use crate::rules::flake8_bugbear::rules::ReturnInGenerator;
 use crate::rules::pyflakes::rules::{
     LateFutureImport, MultipleStarredExpressions, ReturnOutsideFunction,
     UndefinedLocalWithNestedImportStarUsage, YieldOutsideFunction,
 };
 use crate::rules::pylint::rules::{
-    AwaitOutsideAsync, LoadBeforeGlobalDeclaration, YieldFromInAsyncFunction,
+    AwaitOutsideAsync, LoadBeforeGlobalDeclaration, NonlocalWithoutBinding,
+    YieldFromInAsyncFunction,
 };
 use crate::rules::{flake8_pyi, flake8_type_checking, pyflakes, pyupgrade};
 use crate::settings::rule_table::RuleTable;
@@ -195,6 +202,8 @@ pub(crate) struct Checker<'a> {
     parsed_type_annotation: Option<&'a ParsedAnnotation>,
     /// The [`Path`] to the file under analysis.
     path: &'a Path,
+    /// Whether `path` points to an `__init__.py` file.
+    in_init_module: OnceCell<bool>,
     /// The [`Path`] to the package containing the current file.
     package: Option<PackageRoot<'a>>,
     /// The module representation of the current file (e.g., `foo.bar`).
@@ -271,6 +280,7 @@ impl<'a> Checker<'a> {
             noqa_line_for,
             noqa,
             path,
+            in_init_module: OnceCell::new(),
             package,
             module,
             source_type,
@@ -320,6 +330,29 @@ impl<'a> Checker<'a> {
     /// Create a [`Generator`] to generate source code based on the current AST state.
     pub(crate) fn generator(&self) -> Generator<'_> {
         Generator::new(self.stylist.indentation(), self.stylist.line_ending())
+    }
+
+    pub(crate) fn lazy_import_context(&self) -> Option<LazyImportContext> {
+        match self.semantic.current_scope().kind {
+            // Possible, but invalid positions.
+            ScopeKind::Function(_) => return Some(LazyImportContext::Function),
+            ScopeKind::Class(_) => return Some(LazyImportContext::Class),
+            // Valid position.
+            ScopeKind::Module => {}
+            // Impossible positions because lambdas and comprehensions can't contain statements.
+            ScopeKind::Lambda(_)
+            | ScopeKind::Generator { .. }
+            | ScopeKind::Type
+            | ScopeKind::DunderClassCell => {}
+        }
+
+        for statement in self.semantic.current_statements().skip(1) {
+            if matches!(statement, Stmt::Try(_)) {
+                return Some(LazyImportContext::TryExceptBlocks);
+            }
+        }
+
+        None
     }
 
     /// Return the preferred quote for a generated `StringLiteral` node, given where we are in the
@@ -415,6 +448,18 @@ impl<'a> Checker<'a> {
         self.context.report_diagnostic_if_enabled(kind, range)
     }
 
+    /// Return a [`DiagnosticGuard`] for reporting a diagnostic, with its fix title deferred.
+    ///
+    /// Prefer [`Checker::report_diagnostic`] unless you need to attach sub-diagnostics before the
+    /// fix title. See its documentation for more details.
+    pub(crate) fn report_custom_diagnostic<'chk, T: Violation>(
+        &'chk self,
+        kind: T,
+        range: TextRange,
+    ) -> DiagnosticGuard<'chk, 'a> {
+        self.context.report_custom_diagnostic(kind, range)
+    }
+
     /// Adds a [`TextRange`] to the set of ranges of variable names
     /// flagged in `flake8-bugbear` violations so far.
     ///
@@ -432,6 +477,15 @@ impl<'a> Checker<'a> {
         } else {
             self.parsed.tokens()
         }
+    }
+
+    /// Returns the [`Tokens`] for the parsed source file.
+    ///
+    ///
+    /// Unlike [`Self::tokens`], this method always returns
+    /// the tokens for the current file, even when within a parsed type annotation.
+    pub(crate) fn source_tokens(&self) -> &'a Tokens {
+        self.parsed.tokens()
     }
 
     /// The [`Locator`] for the current file, which enables extraction of source code from byte
@@ -470,9 +524,11 @@ impl<'a> Checker<'a> {
         self.context.settings
     }
 
-    /// The [`Path`] to the file under analysis.
-    pub(crate) const fn path(&self) -> &'a Path {
-        self.path
+    /// Returns whether the file under analysis is an `__init__.py` file.
+    pub(crate) fn in_init_module(&self) -> bool {
+        *self
+            .in_init_module
+            .get_or_init(|| self.path.ends_with("__init__.py"))
     }
 
     /// The [`Path`] to the package containing the current file.
@@ -641,6 +697,10 @@ impl SemanticSyntaxContext for Checker<'_> {
         self.semantic.global(name)
     }
 
+    fn has_nonlocal_binding(&self, name: &str) -> bool {
+        self.semantic.nonlocal(name).is_some()
+    }
+
     fn report_semantic_error(&self, error: SemanticSyntaxError) {
         match error.kind {
             SemanticSyntaxErrorKind::LateFutureImport => {
@@ -717,7 +777,22 @@ impl SemanticSyntaxContext for Checker<'_> {
                     self.report_diagnostic(pyflakes::rules::ContinueOutsideLoop, error.range);
                 }
             }
+            SemanticSyntaxErrorKind::NonlocalWithoutBinding(name) => {
+                // PLE0117
+                if self.is_rule_enabled(Rule::NonlocalWithoutBinding) {
+                    self.report_diagnostic(NonlocalWithoutBinding { name }, error.range);
+                }
+            }
+            SemanticSyntaxErrorKind::ReturnInGenerator => {
+                // B901
+                if self.is_rule_enabled(Rule::ReturnInGenerator) {
+                    self.report_diagnostic(ReturnInGenerator, error.range);
+                }
+            }
             SemanticSyntaxErrorKind::ReboundComprehensionVariable
+            | SemanticSyntaxErrorKind::LazyImportNotAllowed { .. }
+            | SemanticSyntaxErrorKind::LazyImportStar
+            | SemanticSyntaxErrorKind::LazyFutureImport
             | SemanticSyntaxErrorKind::DuplicateTypeParameter
             | SemanticSyntaxErrorKind::MultipleCaseAssignment(_)
             | SemanticSyntaxErrorKind::IrrefutableCasePattern(_)
@@ -735,6 +810,7 @@ impl SemanticSyntaxContext for Checker<'_> {
             | SemanticSyntaxErrorKind::LoadBeforeNonlocalDeclaration { .. }
             | SemanticSyntaxErrorKind::NonlocalAndGlobal(_)
             | SemanticSyntaxErrorKind::AnnotatedGlobal(_)
+            | SemanticSyntaxErrorKind::TypeParameterDefaultOrder(_)
             | SemanticSyntaxErrorKind::AnnotatedNonlocal(_) => {
                 self.semantic_errors.borrow_mut().push(error);
             }
@@ -749,18 +825,12 @@ impl SemanticSyntaxContext for Checker<'_> {
         self.semantic.future_annotations_or_stub()
     }
 
+    fn lazy_import_context(&self) -> Option<LazyImportContext> {
+        self.lazy_import_context()
+    }
+
     fn in_async_context(&self) -> bool {
-        for scope in self.semantic.current_scopes() {
-            match scope.kind {
-                ScopeKind::Class(_) | ScopeKind::Lambda(_) => return false,
-                ScopeKind::Function(ast::StmtFunctionDef { is_async, .. }) => return *is_async,
-                ScopeKind::Generator { .. }
-                | ScopeKind::Module
-                | ScopeKind::Type
-                | ScopeKind::DunderClassCell => {}
-            }
-        }
-        false
+        self.semantic.in_async_context()
     }
 
     fn in_await_allowed_context(&self) -> bool {
@@ -768,6 +838,10 @@ impl SemanticSyntaxContext for Checker<'_> {
             match scope.kind {
                 ScopeKind::Class(_) => return false,
                 ScopeKind::Function(_) | ScopeKind::Lambda(_) => return true,
+                ScopeKind::Generator {
+                    kind: GeneratorKind::Generator,
+                    ..
+                } => return true,
                 ScopeKind::Generator { .. }
                 | ScopeKind::Module
                 | ScopeKind::Type
@@ -817,14 +891,19 @@ impl SemanticSyntaxContext for Checker<'_> {
         self.source_type.is_ipynb()
     }
 
-    fn in_generator_scope(&self) -> bool {
-        matches!(
-            &self.semantic.current_scope().kind,
-            ScopeKind::Generator {
-                kind: GeneratorKind::Generator,
-                ..
+    fn in_generator_context(&self) -> bool {
+        for scope in self.semantic.current_scopes() {
+            if matches!(
+                scope.kind,
+                ScopeKind::Generator {
+                    kind: GeneratorKind::Generator,
+                    ..
+                }
+            ) {
+                return true;
             }
-        )
+        }
+        false
     }
 
     fn in_loop_context(&self) -> bool {
@@ -849,23 +928,17 @@ impl SemanticSyntaxContext for Checker<'_> {
     }
 
     fn is_bound_parameter(&self, name: &str) -> bool {
-        for scope in self.semantic.current_scopes() {
-            match scope.kind {
-                ScopeKind::Class(_) => return false,
-                ScopeKind::Function(ast::StmtFunctionDef { parameters, .. })
-                | ScopeKind::Lambda(ast::ExprLambda {
-                    parameters: Some(parameters),
-                    ..
-                }) => return parameters.includes(name),
-                ScopeKind::Lambda(_)
-                | ScopeKind::Generator { .. }
-                | ScopeKind::Module
-                | ScopeKind::Type
-                | ScopeKind::DunderClassCell => {}
+        match self.semantic.current_scope().kind {
+            ScopeKind::Function(ast::StmtFunctionDef { parameters, .. }) => {
+                parameters.includes(name)
             }
+            ScopeKind::Class(_)
+            | ScopeKind::Lambda(_)
+            | ScopeKind::Generator { .. }
+            | ScopeKind::Module
+            | ScopeKind::Type
+            | ScopeKind::DunderClassCell => false,
         }
-
-        false
     }
 }
 
@@ -900,11 +973,17 @@ impl<'a> Visitor<'a> for Checker<'a> {
             {
                 self.semantic.flags |= SemanticModelFlags::MODULE_DOCSTRING_BOUNDARY;
             }
-            Stmt::ImportFrom(ast::StmtImportFrom { module, names, .. }) => {
+            Stmt::ImportFrom(ast::StmtImportFrom {
+                module,
+                names,
+                is_lazy,
+                ..
+            }) => {
                 self.semantic.flags |= SemanticModelFlags::MODULE_DOCSTRING_BOUNDARY;
 
-                // Allow __future__ imports until we see a non-__future__ import.
-                if let Some("__future__") = module.as_deref() {
+                // Allow eager `__future__` imports until we see any other import. Lazy imports,
+                // including `lazy from __future__ import ...`, don't enable future annotations.
+                if !*is_lazy && matches!(module.as_deref(), Some("__future__")) {
                     if names
                         .iter()
                         .any(|alias| alias.name.as_str() == "annotations")
@@ -960,6 +1039,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
             }
             Stmt::Import(ast::StmtImport {
                 names,
+                is_lazy: _,
                 range: _,
                 node_index: _,
             }) => {
@@ -1015,6 +1095,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 names,
                 module,
                 level,
+                is_lazy,
                 range: _,
                 node_index: _,
             }) => {
@@ -1024,6 +1105,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
 
                 let module = module.as_deref();
                 let level = *level;
+                let is_lazy = *is_lazy;
 
                 // Mark the top-level module as "seen" by the semantic model.
                 if level == 0 {
@@ -1033,7 +1115,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 }
 
                 for alias in names {
-                    if let Some("__future__") = module {
+                    if !is_lazy && matches!(module, Some("__future__")) {
                         let name = alias.asname.as_ref().unwrap_or(&alias.name);
                         self.add_binding(
                             name,
@@ -1398,6 +1480,14 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     self.target_version(),
                 ) {
                     AnnotationContext::RuntimeRequired => {
+                        self.visit_runtime_required_annotation(annotation);
+                    }
+                    AnnotationContext::RuntimeEvaluated
+                        if flake8_type_checking::helpers::is_dataclass_meta_annotation(
+                            annotation,
+                            self.semantic(),
+                        ) =>
+                    {
                         self.visit_runtime_required_annotation(annotation);
                     }
                     AnnotationContext::RuntimeEvaluated => {
@@ -1833,6 +1923,9 @@ impl<'a> Visitor<'a> for Checker<'a> {
                                 } else {
                                     self.visit_non_type_definition(value);
                                 }
+                            } else {
+                                // Ex: typing.TypeVar(**kwargs)
+                                self.visit_non_type_definition(value);
                             }
                         }
                     }
@@ -2239,6 +2332,9 @@ impl<'a> Visitor<'a> for Checker<'a> {
 
         // Step 2: Traversal
         walk_pattern(self, pattern);
+
+        // Step 4: Analysis
+        analyze::pattern(pattern, self);
     }
 
     fn visit_body(&mut self, body: &'a [Stmt]) {
@@ -2413,6 +2509,12 @@ impl<'a> Checker<'a> {
         // Step 4: Analysis
         for generator in generators {
             analyze::comprehension(generator, self);
+        }
+
+        if self.is_rule_enabled(Rule::IncorrectDictIterator)
+            && is_incorrect_dict_iterator_comprehension_enabled(self.settings())
+        {
+            self.analyze.comprehensions.push(self.semantic.snapshot());
         }
     }
 
@@ -3131,7 +3233,7 @@ impl<'a> Checker<'a> {
                         // F822
                         if self.is_rule_enabled(Rule::UndefinedExport) {
                             if is_undefined_export_in_dunder_init_enabled(self.settings())
-                                || !self.path.ends_with("__init__.py")
+                                || !self.in_init_module()
                             {
                                 self.report_diagnostic(
                                     pyflakes::rules::UndefinedExport {
@@ -3258,9 +3360,11 @@ pub(crate) fn check_ast(
     // Check docstrings, bindings, and unresolved references.
     analyze::deferred_lambdas(&mut checker);
     analyze::deferred_for_loops(&mut checker);
+    analyze::deferred_comprehensions(&mut checker);
     analyze::definitions(&mut checker);
     analyze::bindings(&checker);
     analyze::unresolved_references(&checker);
+    analyze::deferred_with_statements(&mut checker);
 
     // Reset the scope to module-level, and check all consumed scopes.
     checker.semantic.scope_id = ScopeId::global();
@@ -3319,6 +3423,7 @@ impl<'a> LintContext<'a> {
             context: self,
             diagnostic: Some(kind.into_diagnostic(range, &self.source_file)),
             rule: T::rule(),
+            before_drop_fns: SmallVec::new(),
         }
     }
 
@@ -3338,10 +3443,60 @@ impl<'a> LintContext<'a> {
                 context: self,
                 diagnostic: Some(kind.into_diagnostic(range, &self.source_file)),
                 rule,
+                before_drop_fns: SmallVec::new(),
             })
         } else {
             None
         }
+    }
+
+    /// Return a [`DiagnosticGuard`] for reporting a diagnostic, with its fix title deferred.
+    ///
+    /// Prefer [`LintContext::report_diagnostic`] unless you need to attach sub-diagnostics before
+    /// the fix title. See its documentation for more details.
+    #[expect(clippy::needless_pass_by_value)]
+    pub(crate) fn report_custom_diagnostic<'chk, T: Violation>(
+        &'chk self,
+        kind: T,
+        range: TextRange,
+    ) -> DiagnosticGuard<'chk, 'a> {
+        let diagnostic = crate::message::create_lint_diagnostic(
+            kind.message(),
+            Option::<&'static str>::None,
+            range,
+            None,
+            None,
+            self.source_file.clone(),
+            None,
+            T::rule(),
+        );
+
+        let mut guard = DiagnosticGuard {
+            context: self,
+            diagnostic: Some(diagnostic),
+            rule: T::rule(),
+            before_drop_fns: SmallVec::new(),
+        };
+
+        if let Some(fix_title) = kind.fix_title() {
+            guard.before_drop(move |diag| diag.help(&fix_title));
+        }
+
+        guard
+    }
+
+    /// Return a [`DiagnosticGuard`] for reporting a diagnostic, with its fix title deferred, if the
+    /// corresponding rule is enabled.
+    ///
+    /// Prefer [`LintContext::report_diagnostic_if_enabled`] unless you need to attach
+    /// sub-diagnostics before the fix title. See its documentation for more details.
+    pub(crate) fn report_custom_diagnostic_if_enabled<'chk, T: Violation>(
+        &'chk self,
+        kind: T,
+        range: TextRange,
+    ) -> Option<DiagnosticGuard<'chk, 'a>> {
+        self.is_rule_enabled(T::rule())
+            .then(|| self.report_custom_diagnostic(kind, range))
     }
 
     #[inline]
@@ -3385,6 +3540,8 @@ impl<'a> LintContext<'a> {
     }
 }
 
+type BeforeDropFn = Box<dyn Fn(&mut Diagnostic)>;
+
 /// An abstraction for mutating a diagnostic.
 ///
 /// Callers can build this guard by starting with `Checker::report_diagnostic`.
@@ -3399,6 +3556,8 @@ pub(crate) struct DiagnosticGuard<'a, 'b> {
     ///
     /// This is always `Some` until the `Drop` (or `defuse`) call.
     diagnostic: Option<Diagnostic>,
+    /// Functions to call before dropping the guard and storing the diagnostic.
+    before_drop_fns: SmallVec<[BeforeDropFn; 1]>,
     rule: Rule,
 }
 
@@ -3459,6 +3618,27 @@ impl DiagnosticGuard<'_, '_> {
     pub(crate) fn add_primary_tag(&mut self, tag: DiagnosticTag) {
         let ann = self.primary_annotation_mut().unwrap();
         ann.push_tag(tag);
+    }
+
+    /// Register a function to call before dropping the guard.
+    ///
+    /// This is intended for use with the [`Checker::report_custom_diagnostic`]
+    /// or [`LintContext::report_custom_diagnostic`] methods in cases where a
+    /// fix title should be added as a `help` diagnostic after all other
+    /// sub-diagnostics. `report_custom_diagnostic` uses this method to defer
+    /// adding the fix title, but you can defer additional diagnostics if you
+    /// want them to appear after the fix title. For example:
+    ///
+    /// ```ignore
+    /// let mut diagnostic = checker.report_custom_diagnostic(MyViolation, range);
+    /// diagnostic.info("This will appear first");
+    /// diagnostic.before_drop(|diag| diag.info("This will appear last, after the fix title"));
+    /// ```
+    pub(crate) fn before_drop<F>(&mut self, f: F)
+    where
+        F: Fn(&mut Diagnostic) + 'static,
+    {
+        self.before_drop_fns.push(Box::new(f));
     }
 }
 
@@ -3544,7 +3724,10 @@ impl Drop for DiagnosticGuard<'_, '_> {
             return;
         }
 
-        if let Some(diagnostic) = self.diagnostic.take() {
+        if let Some(mut diagnostic) = self.diagnostic.take() {
+            for f in &self.before_drop_fns {
+                f(&mut diagnostic);
+            }
             self.context.diagnostics.borrow_mut().push(diagnostic);
         }
     }

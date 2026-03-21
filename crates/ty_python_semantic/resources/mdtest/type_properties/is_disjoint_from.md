@@ -45,7 +45,7 @@ class C(B1, B2): ...
 # ... which lies in their intersection:
 static_assert(is_subtype_of(C, Intersection[B1, B2]))
 
-# However, if a class is marked final, it can not be subclassed ...
+# However, if a class is marked final, it cannot be subclassed ...
 @final
 class FinalSubclass(A): ...
 
@@ -85,6 +85,34 @@ static_assert(is_disjoint_from(slice, Foo))
 static_assert(is_disjoint_from(type[slice], type[Foo]))
 static_assert(is_disjoint_from(memoryview, Foo))
 static_assert(is_disjoint_from(type[memoryview], type[Foo]))
+```
+
+## Specialized `@final` types
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any, final
+from ty_extensions import static_assert, is_disjoint_from
+
+@final
+class Foo[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+class A: ...
+class B: ...
+
+static_assert(not is_disjoint_from(A, B))
+static_assert(not is_disjoint_from(Foo[A], Foo[B]))
+static_assert(not is_disjoint_from(Foo[A], Foo[Any]))
+static_assert(not is_disjoint_from(Foo[Any], Foo[B]))
+
+# `Foo[Never]` is a subtype of both `Foo[int]` and `Foo[str]`.
+static_assert(not is_disjoint_from(Foo[int], Foo[str]))
 ```
 
 ## "Disjoint base" builtin types
@@ -550,8 +578,7 @@ from typing_extensions import TypeGuard, TypeIs
 static_assert(not is_disjoint_from(bool, TypeGuard[str]))
 static_assert(not is_disjoint_from(bool, TypeIs[str]))
 
-# TODO no error
-static_assert(is_disjoint_from(str, TypeGuard[str]))  # error: [static-assert-error]
+static_assert(is_disjoint_from(str, TypeGuard[str]))
 static_assert(is_disjoint_from(str, TypeIs[str]))
 ```
 
@@ -641,6 +668,45 @@ static_assert(is_disjoint_from(Path, tuple[Path | None, str, int]))
 static_assert(is_disjoint_from(Path, Path2))
 ```
 
+## Generic aliases
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import final
+from ty_extensions import static_assert, is_disjoint_from, TypeOf
+
+class GenericClass[T]:
+    x: T  # invariant
+
+static_assert(not is_disjoint_from(TypeOf[GenericClass], type[GenericClass]))
+static_assert(not is_disjoint_from(TypeOf[GenericClass[int]], type[GenericClass]))
+static_assert(not is_disjoint_from(TypeOf[GenericClass], type[GenericClass[int]]))
+static_assert(not is_disjoint_from(TypeOf[GenericClass[int]], type[GenericClass[int]]))
+static_assert(is_disjoint_from(TypeOf[GenericClass[str]], type[GenericClass[int]]))
+
+class GenericClassIntBound[T: int]:
+    x: T  # invariant
+
+static_assert(not is_disjoint_from(TypeOf[GenericClassIntBound], type[GenericClassIntBound]))
+static_assert(not is_disjoint_from(TypeOf[GenericClassIntBound[int]], type[GenericClassIntBound]))
+static_assert(not is_disjoint_from(TypeOf[GenericClassIntBound], type[GenericClassIntBound[int]]))
+static_assert(not is_disjoint_from(TypeOf[GenericClassIntBound[int]], type[GenericClassIntBound[int]]))
+
+@final
+class GenericFinalClass[T]:
+    x: T  # invariant
+
+static_assert(not is_disjoint_from(TypeOf[GenericFinalClass], type[GenericFinalClass]))
+static_assert(not is_disjoint_from(TypeOf[GenericFinalClass[int]], type[GenericFinalClass]))
+static_assert(not is_disjoint_from(TypeOf[GenericFinalClass], type[GenericFinalClass[int]]))
+static_assert(not is_disjoint_from(TypeOf[GenericFinalClass[int]], type[GenericFinalClass[int]]))
+static_assert(is_disjoint_from(TypeOf[GenericFinalClass[str]], type[GenericFinalClass[int]]))
+```
+
 ## Callables
 
 No two callable types are disjoint because there exists a non-empty callable type
@@ -649,13 +715,13 @@ As such, for any two callable types, it is possible to conceive of a runtime cal
 would inhabit both types simultaneously.
 
 ```py
-from ty_extensions import CallableTypeOf, is_disjoint_from, static_assert
+from ty_extensions import RegularCallableTypeOf, is_disjoint_from, static_assert
 from typing_extensions import Callable, Literal, Never
 
 def mixed(a: int, /, b: str, *args: int, c: int = 2, **kwargs: int) -> None: ...
 
-static_assert(not is_disjoint_from(Callable[[], Never], CallableTypeOf[mixed]))
-static_assert(not is_disjoint_from(Callable[[int, str], float], CallableTypeOf[mixed]))
+static_assert(not is_disjoint_from(Callable[[], Never], RegularCallableTypeOf[mixed]))
+static_assert(not is_disjoint_from(Callable[[int, str], float], RegularCallableTypeOf[mixed]))
 
 # Using gradual form
 static_assert(not is_disjoint_from(Callable[..., None], Callable[[], None]))
@@ -670,7 +736,7 @@ static_assert(not is_disjoint_from(Callable[[Never], str], Callable[[Never], int
 A callable type is disjoint from all literal types.
 
 ```py
-from ty_extensions import CallableTypeOf, is_disjoint_from, static_assert
+from ty_extensions import RegularCallableTypeOf, is_disjoint_from, static_assert
 from typing_extensions import Callable, Literal, Never
 
 static_assert(is_disjoint_from(Callable[[], None], Literal[""]))
@@ -683,7 +749,7 @@ A callable type is disjoint from nominal instance types where the classes are fi
 `__call__` is not callable.
 
 ```py
-from ty_extensions import CallableTypeOf, is_disjoint_from, static_assert
+from ty_extensions import RegularCallableTypeOf, is_disjoint_from, static_assert
 from typing_extensions import Any, Callable, final
 
 @final

@@ -2,6 +2,7 @@
 source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
+
 ---
 mdtest name: unresolved_import.md - Unresolved import diagnostics - An unresolvable import that does not use `from`
 mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/unresolved_import.md

@@ -60,6 +60,16 @@ impl Violation for UnusedFunctionArgument {
 /// prefixed with an underscore, or some other value that adheres to the
 /// [`lint.dummy-variable-rgx`] pattern.
 ///
+/// This rule exempts methods decorated with [`@typing.override`][override].
+/// Removing a parameter from a subclass method (or changing a parameter's
+/// name) may cause type checkers to complain about a violation of the Liskov
+/// Substitution Principle if it means that the method now incompatibly
+/// overrides a method defined on a superclass. Explicitly decorating an
+/// overriding method with `@override` signals to Ruff that the method is
+/// intended to override a superclass method and that a type checker will
+/// enforce that it does so; Ruff therefore knows that it should not enforce
+/// rules about unused arguments on such methods.
+///
 /// ## Example
 /// ```python
 /// class Class:
@@ -76,6 +86,8 @@ impl Violation for UnusedFunctionArgument {
 ///
 /// ## Options
 /// - `lint.dummy-variable-rgx`
+///
+/// [override]: https://docs.python.org/3/library/typing.html#typing.override
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.168")]
 pub(crate) struct UnusedMethodArgument {
@@ -101,6 +113,16 @@ impl Violation for UnusedMethodArgument {
 /// prefixed with an underscore, or some other value that adheres to the
 /// [`lint.dummy-variable-rgx`] pattern.
 ///
+/// This rule exempts methods decorated with [`@typing.override`][override].
+/// Removing a parameter from a subclass method (or changing a parameter's
+/// name) may cause type checkers to complain about a violation of the Liskov
+/// Substitution Principle if it means that the method now incompatibly
+/// overrides a method defined on a superclass. Explicitly decorating an
+/// overriding method with `@override` signals to Ruff that the method is
+/// intended to override a superclass method and that a type checker will
+/// enforce that it does so; Ruff therefore knows that it should not enforce
+/// rules about unused arguments on such methods.
+///
 /// ## Example
 /// ```python
 /// class Class:
@@ -119,6 +141,8 @@ impl Violation for UnusedMethodArgument {
 ///
 /// ## Options
 /// - `lint.dummy-variable-rgx`
+///
+/// [override]: https://docs.python.org/3/library/typing.html#typing.override
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.168")]
 pub(crate) struct UnusedClassMethodArgument {
@@ -144,6 +168,16 @@ impl Violation for UnusedClassMethodArgument {
 /// prefixed with an underscore, or some other value that adheres to the
 /// [`lint.dummy-variable-rgx`] pattern.
 ///
+/// This rule exempts methods decorated with [`@typing.override`][override].
+/// Removing a parameter from a subclass method (or changing a parameter's
+/// name) may cause type checkers to complain about a violation of the Liskov
+/// Substitution Principle if it means that the method now incompatibly
+/// overrides a method defined on a superclass. Explicitly decorating an
+/// overriding method with `@override` signals to Ruff that the method is
+/// intended to override a superclass method, and that a type checker will
+/// enforce that it does so; Ruff therefore knows that it should not enforce
+/// rules about unused arguments on such methods.
+///
 /// ## Example
 /// ```python
 /// class Class:
@@ -162,6 +196,8 @@ impl Violation for UnusedClassMethodArgument {
 ///
 /// ## Options
 /// - `lint.dummy-variable-rgx`
+///
+/// [override]: https://docs.python.org/3/library/typing.html#typing.override
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.168")]
 pub(crate) struct UnusedStaticMethodArgument {

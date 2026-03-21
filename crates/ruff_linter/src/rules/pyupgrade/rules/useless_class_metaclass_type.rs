@@ -70,7 +70,7 @@ pub(crate) fn useless_class_metaclass_type(checker: &Checker, class_def: &StmtCl
                         arguments,
                         Parentheses::Remove,
                         checker.locator().contents(),
-                        checker.comment_ranges(),
+                        checker.tokens(),
                     )?;
 
                     let range = edit.range();

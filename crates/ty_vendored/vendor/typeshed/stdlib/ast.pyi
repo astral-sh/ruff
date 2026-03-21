@@ -1444,6 +1444,8 @@ class Tuple(expr):
     elts: list[expr]
     ctx: expr_context  # Not present in Python < 3.13 if not passed to `__init__`
     dims: list[expr]
+    """Deprecated. Use elts instead."""
+
     if sys.version_info >= (3, 13):
         def __init__(self, elts: list[expr] = ..., ctx: expr_context = ..., **kwargs: Unpack[_Attributes]) -> None: ...
     else:
@@ -1677,7 +1679,7 @@ class ExceptHandler(excepthandler):
             """Return a copy of the AST node with new values for the specified fields."""
 
 class arguments(AST):
-    """arguments(arg* posonlyargs, arg* args, arg? vararg, arg* kwonlyargs, expr* kw_defaults, arg? kwarg, expr* defaults)"""
+    """arguments(arg* posonlyargs, arg* args, arg? vararg, arg* kwonlyargs, expr?* kw_defaults, arg? kwarg, expr* defaults)"""
 
     if sys.version_info >= (3, 10):
         __match_args__ = ("posonlyargs", "args", "vararg", "kwonlyargs", "kw_defaults", "kwarg", "defaults")

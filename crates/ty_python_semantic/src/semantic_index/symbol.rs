@@ -38,6 +38,7 @@ bitflags! {
         const MARKED_NONLOCAL       = 1 << 4;
         /// true if the symbol is assigned more than once, or if it is assigned even though it is already in use
         const IS_REASSIGNED         = 1 << 5;
+        const IS_PARAMETER          = 1 << 6;
     }
 }
 
@@ -116,6 +117,10 @@ impl Symbol {
         self.flags.contains(SymbolFlags::IS_REASSIGNED)
     }
 
+    pub(crate) fn is_parameter(&self) -> bool {
+        self.flags.contains(SymbolFlags::IS_PARAMETER)
+    }
+
     pub(super) fn mark_global(&mut self) {
         self.insert_flags(SymbolFlags::MARKED_GLOBAL);
     }
@@ -138,6 +143,10 @@ impl Symbol {
 
     pub(super) fn mark_declared(&mut self) {
         self.insert_flags(SymbolFlags::IS_DECLARED);
+    }
+
+    pub(super) fn mark_parameter(&mut self) {
+        self.insert_flags(SymbolFlags::IS_PARAMETER);
     }
 
     fn insert_flags(&mut self, flags: SymbolFlags) {

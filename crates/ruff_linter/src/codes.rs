@@ -288,6 +288,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "R1706") => rules::pylint::rules::AndOrTernary,
         (Pylint, "R1708") => rules::pylint::rules::StopIterationReturn,
         (Pylint, "R1711") => rules::pylint::rules::UselessReturn,
+        (Pylint, "R1712") => rules::pylint::rules::SwapWithTemporaryVariable,
         (Pylint, "R1714") => rules::pylint::rules::RepeatedEqualityComparison,
         (Pylint, "R1722") => rules::pylint::rules::SysExitAlias,
         (Pylint, "R1730") => rules::pylint::rules::IfStmtMinMax,
@@ -392,6 +393,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Bugbear, "034") => rules::flake8_bugbear::rules::ReSubPositionalArgs,
         (Flake8Bugbear, "035") => rules::flake8_bugbear::rules::StaticKeyDictComprehension,
         (Flake8Bugbear, "039") => rules::flake8_bugbear::rules::MutableContextvarDefault,
+        (Flake8Bugbear, "043") => rules::flake8_bugbear::rules::DelAttrWithConstant,
         (Flake8Bugbear, "901") => rules::flake8_bugbear::rules::ReturnInGenerator,
         (Flake8Bugbear, "903") => rules::flake8_bugbear::rules::ClassAsDataStructure,
         (Flake8Bugbear, "904") => rules::flake8_bugbear::rules::RaiseWithoutFromInsideExcept,
@@ -434,6 +436,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8TidyImports, "251") => rules::flake8_tidy_imports::rules::BannedApi,
         (Flake8TidyImports, "252") => rules::flake8_tidy_imports::rules::RelativeImports,
         (Flake8TidyImports, "253") => rules::flake8_tidy_imports::rules::BannedModuleLevelImports,
+        (Flake8TidyImports, "254") => rules::flake8_tidy_imports::rules::LazyImportMismatch,
 
         // flake8-return
         (Flake8Return, "501") => rules::flake8_return::rules::UnnecessaryReturnNone,
@@ -454,6 +457,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8ImplicitStrConcat, "001") => rules::flake8_implicit_str_concat::rules::SingleLineImplicitStringConcatenation,
         (Flake8ImplicitStrConcat, "002") => rules::flake8_implicit_str_concat::rules::MultiLineImplicitStringConcatenation,
         (Flake8ImplicitStrConcat, "003") => rules::flake8_implicit_str_concat::rules::ExplicitStringConcatenation,
+        (Flake8ImplicitStrConcat, "004") => rules::flake8_implicit_str_concat::rules::ImplicitStringConcatenationInCollectionLiteral,
 
         // flake8-print
         (Flake8Print, "1") => rules::flake8_print::rules::Print,
@@ -628,6 +632,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pydocstyle, "417") => rules::pydocstyle::rules::UndocumentedParam,
         (Pydocstyle, "418") => rules::pydocstyle::rules::OverloadWithDocstring,
         (Pydocstyle, "419") => rules::pydocstyle::rules::EmptyDocstring,
+        (Pydocstyle, "420") => rules::pydocstyle::rules::IncorrectSectionOrder,
 
         // pep8-naming
         (PEP8Naming, "801") => rules::pep8_naming::rules::InvalidClassName,
@@ -1058,10 +1063,18 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "063") => rules::ruff::rules::AccessAnnotationsFromClassDict,
         (Ruff, "064") => rules::ruff::rules::NonOctalPermissions,
         (Ruff, "065") => rules::ruff::rules::LoggingEagerConversion,
+        (Ruff, "066") => rules::ruff::rules::PropertyWithoutReturn,
+        (Ruff, "067") => rules::ruff::rules::NonEmptyInitModule,
+        (Ruff, "068") => rules::ruff::rules::DuplicateEntryInDunderAll,
+        (Ruff, "069") => rules::ruff::rules::FloatEqualityComparison,
+        (Ruff, "070") => rules::ruff::rules::UnnecessaryAssignBeforeYield,
+        (Ruff, "071") => rules::ruff::rules::OsPathCommonprefix,
 
         (Ruff, "100") => rules::ruff::rules::UnusedNOQA,
         (Ruff, "101") => rules::ruff::rules::RedirectedNOQA,
         (Ruff, "102") => rules::ruff::rules::InvalidRuleCode,
+        (Ruff, "103") => rules::ruff::rules::InvalidSuppressionComment,
+        (Ruff, "104") => rules::ruff::rules::UnmatchedSuppressionComment,
 
         (Ruff, "200") => rules::ruff::rules::InvalidPyprojectToml,
         #[cfg(any(feature = "test-rules", test))]
@@ -1117,10 +1130,14 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         // airflow
         (Airflow, "001") => rules::airflow::rules::AirflowVariableNameTaskIdMismatch,
         (Airflow, "002") => rules::airflow::rules::AirflowDagNoScheduleArgument,
+        (Airflow, "003") => rules::airflow::rules::AirflowVariableGetOutsideTask,
         (Airflow, "301") => rules::airflow::rules::Airflow3Removal,
         (Airflow, "302") => rules::airflow::rules::Airflow3MovedToProvider,
+        (Airflow, "303") => rules::airflow::rules::Airflow3IncompatibleFunctionSignature,
+        (Airflow, "304") => rules::airflow::rules::Airflow3DagDynamicValue,
         (Airflow, "311") => rules::airflow::rules::Airflow3SuggestedUpdate,
         (Airflow, "312") => rules::airflow::rules::Airflow3SuggestedToMoveToProvider,
+        (Airflow, "321") => rules::airflow::rules::Airflow31Moved,
 
         // perflint
         (Perflint, "101") => rules::perflint::rules::UnnecessaryListCast,

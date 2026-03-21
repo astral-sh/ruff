@@ -14,6 +14,7 @@ altair
 antidote
 anyio
 apprise
+archinstall
 artigraph
 arviz
 async-utils
@@ -25,14 +26,19 @@ bidict
 black
 bokeh
 boostedblob
+build
 check-jsonschema
+cibuildwheel
 cki-lib
 cloud-init
 colour
 com2ann
 comtypes
 core
-cpython
+CPython (Argument Clinic)
+CPython (cases_generator)
+CPython (peg_generator)
+cryptography
 cwltool
 dacite
 dd-trace-py
@@ -76,6 +82,7 @@ mypy-protobuf
 mypy_primer
 nionutils
 nox
+numpy-stl
 openlibrary
 operator
 optuna
@@ -104,6 +111,7 @@ pylox
 pyodide
 pyp
 pyppeteer
+pyproject-metadata
 pytest
 pytest-robotframework
 python-chess
@@ -118,6 +126,7 @@ schemathesis
 scikit-build-core
 scikit-learn
 scipy
+scipy-stubs
 scrapy
 setuptools
 sockeye

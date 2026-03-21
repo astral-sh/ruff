@@ -23,6 +23,12 @@ DEFAULT_TARGETS = [
     Project(
         repo=Repository(owner="apache", name="airflow", ref="main"),
         check_options=CheckOptions(select="ALL"),
+        config_overrides={
+            # Broken symlink
+            "exclude": [
+                "task-sdk/src/airflow/sdk/_shared/AGENTS.md",
+            ]
+        },
     ),
     Project(
         repo=Repository(owner="apache", name="superset", ref="master"),
@@ -151,4 +157,5 @@ DEFAULT_TARGETS = [
     ),
     Project(repo=Repository(owner="pdm-project", name="pdm", ref="main")),
     Project(repo=Repository(owner="astropy", name="astropy", ref="main")),
+    Project(repo=Repository(owner="home-assistant", name="core", ref="dev")),
 ]

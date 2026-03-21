@@ -2,6 +2,7 @@ use compact_str::CompactString;
 use std::fmt::{Display, Write};
 
 use ruff_python_ast::name::Name;
+use ruff_python_ast::token::TokenKind;
 use ruff_python_ast::{
     self as ast, AtomicNodeIndex, ExceptHandler, Expr, ExprContext, IpyEscapeKind, Operator,
     PythonVersion, Stmt, WithItem,
@@ -14,7 +15,7 @@ use crate::parser::progress::ParserProgress;
 use crate::parser::{
     FunctionKind, Parser, RecoveryContext, RecoveryContextKind, WithItemKind, helpers,
 };
-use crate::token::{TokenKind, TokenValue};
+use crate::token::TokenValue;
 use crate::token_set::TokenSet;
 use crate::{Mode, ParseErrorType, UnsupportedSyntaxErrorKind};
 
@@ -262,8 +263,14 @@ impl<'src> Parser<'src> {
     fn parse_simple_statement(&mut self) -> Stmt {
         match self.current_token_kind() {
             TokenKind::Return => Stmt::Return(self.parse_return_statement()),
-            TokenKind::Import => Stmt::Import(self.parse_import_statement()),
-            TokenKind::From => Stmt::ImportFrom(self.parse_from_import_statement()),
+            TokenKind::Import => {
+                let start = self.node_start();
+                Stmt::Import(self.parse_import_statement(start, false))
+            }
+            TokenKind::From => {
+                let start = self.node_start();
+                Stmt::ImportFrom(self.parse_from_import_statement(start, false))
+            }
             TokenKind::Pass => Stmt::Pass(self.parse_pass_statement()),
             TokenKind::Continue => Stmt::Continue(self.parse_continue_statement()),
             TokenKind::Break => Stmt::Break(self.parse_break_statement()),
@@ -276,6 +283,59 @@ impl<'src> Parser<'src> {
                 Stmt::IpyEscapeCommand(self.parse_ipython_escape_command_statement())
             }
             token => {
+                if token == TokenKind::Lazy {
+                    let start = self.node_start();
+                    let lazy_range = self.current_token_range();
+
+                    match self.peek() {
+                        // test_ok lazy_import_stmt_py315
+                        // # parse_options: {"target-version": "3.15"}
+                        // lazy import foo
+                        // lazy import foo as bar
+                        // lazy from bar import baz
+                        // lazy from sys import x as y
+                        // lazy = 1
+                        // import foo as lazy
+                        // from lazy import qux
+
+                        // test_ok lazy_import_relative_py315
+                        // # parse_options: {"target-version": "3.15"}
+                        // lazy from . import basic2
+                        // lazy from .basic2 import x, f
+                        // lazy from . import b, x
+
+                        // test_ok lazy_import_soft_keyword_split_py315
+                        // # parse_options: {"target-version": "3.15"}
+                        // lazy
+                        // import os
+                        //
+                        // lazy  # comment
+                        // from sys import path
+
+                        // test_err lazy_import_stmt_py314
+                        // # parse_options: {"target-version": "3.14"}
+                        // lazy import foo
+                        // lazy from bar import baz
+                        TokenKind::Import => {
+                            self.bump(TokenKind::Lazy);
+                            self.add_unsupported_syntax_error(
+                                UnsupportedSyntaxErrorKind::LazyImportStatement,
+                                lazy_range,
+                            );
+                            return Stmt::Import(self.parse_import_statement(start, true));
+                        }
+                        TokenKind::From => {
+                            self.bump(TokenKind::Lazy);
+                            self.add_unsupported_syntax_error(
+                                UnsupportedSyntaxErrorKind::LazyImportStatement,
+                                lazy_range,
+                            );
+                            return Stmt::ImportFrom(self.parse_from_import_statement(start, true));
+                        }
+                        _ => {}
+                    }
+                }
+
                 if token == TokenKind::Type {
                     // Type is considered a soft keyword, so we will treat it as an identifier if
                     // it's followed by an unexpected token.
@@ -534,8 +594,7 @@ impl<'src> Parser<'src> {
     /// If the parser isn't positioned at an `import` token.
     ///
     /// See: <https://docs.python.org/3/reference/simple_stmts.html#the-import-statement>
-    fn parse_import_statement(&mut self) -> ast::StmtImport {
-        let start = self.node_start();
+    fn parse_import_statement(&mut self, start: TextSize, is_lazy: bool) -> ast::StmtImport {
         self.bump(TokenKind::Import);
 
         // test_err import_stmt_parenthesized_names
@@ -562,8 +621,9 @@ impl<'src> Parser<'src> {
         }
 
         ast::StmtImport {
-            range: self.node_range(start),
             names,
+            is_lazy,
+            range: self.node_range(start),
             node_index: AtomicNodeIndex::NONE,
         }
     }
@@ -575,8 +635,11 @@ impl<'src> Parser<'src> {
     /// If the parser isn't positioned at a `from` token.
     ///
     /// See: <https://docs.python.org/3/reference/simple_stmts.html#grammar-token-python-grammar-import_stmt>
-    fn parse_from_import_statement(&mut self) -> ast::StmtImportFrom {
-        let start = self.node_start();
+    fn parse_from_import_statement(
+        &mut self,
+        start: TextSize,
+        is_lazy: bool,
+    ) -> ast::StmtImportFrom {
         self.bump(TokenKind::From);
 
         let mut leading_dots = 0;
@@ -599,6 +662,7 @@ impl<'src> Parser<'src> {
             // from match import pattern
             // from type import bar
             // from case import pattern
+            // from lazy import qux
             // from match.type.case import foo
             Some(self.parse_dotted_name())
         } else {
@@ -675,6 +739,7 @@ impl<'src> Parser<'src> {
             module,
             names,
             level: leading_dots,
+            is_lazy,
             range: self.node_range(start),
             node_index: AtomicNodeIndex::NONE,
         }
@@ -712,6 +777,7 @@ impl<'src> Parser<'src> {
                 // import foo as match
                 // import bar as case
                 // import baz as type
+                // import qux as lazy
                 Some(self.parse_identifier())
             } else {
                 // test_err import_alias_missing_asname
@@ -2447,8 +2513,13 @@ impl<'src> Parser<'src> {
         let subject = self.parse_match_subject_expression();
 
         match self.current_token_kind() {
-            TokenKind::Colon => {
-                // `match` is a keyword
+            // test_ok match_annotated_assignment
+            // match[0]: int
+            // match [x, y, z]: dict
+            TokenKind::Colon if self.peek() == TokenKind::Newline => {
+                // `match` is a keyword — colon followed by newline confirms
+                // this is a match statement, not an annotated assignment like
+                // `match [x, y, z]: {dict}` or `match[0]: int`.
                 self.bump(TokenKind::Colon);
 
                 let cases = self.parse_match_body();
@@ -2781,13 +2852,20 @@ impl<'src> Parser<'src> {
         // def foo(): ...
         // @@
         // def foo(): ...
+        // @test
+        // @
+        // class Test
         while self.at(TokenKind::At) {
             progress.assert_progressing(self);
 
             let decorator_start = self.node_start();
             self.bump(TokenKind::At);
 
-            let parsed_expr = self.parse_named_expression_or_higher(ExpressionContext::default());
+            let parsed_expr = if self.at(TokenKind::Def) || self.at(TokenKind::Class) {
+                Expr::Name(self.parse_missing_name()).into()
+            } else {
+                self.parse_named_expression_or_higher(ExpressionContext::default())
+            };
 
             if self.options.target_version < PythonVersion::PY39 {
                 // test_ok decorator_expression_dotted_ident_py38
@@ -2913,21 +2991,27 @@ impl<'src> Parser<'src> {
                     self.current_token_range(),
                 );
 
-                // TODO(dhruvmanila): It seems that this recovery drops all the parsed
-                // decorators. Maybe we could convert them into statement expression
-                // with a flag indicating that this expression is part of a decorator.
-                // It's only possible to keep them if it's a function or class definition.
-                // We could possibly keep them if there's indentation error:
-                //
-                // ```python
-                // @decorator
-                //   @decorator
-                // def foo(): ...
-                // ```
-                //
-                // Or, parse it as a binary expression where the left side is missing.
-                // We would need to convert each decorator into a binary expression.
-                self.parse_statement()
+                let range = self.node_range(start);
+
+                ast::StmtFunctionDef {
+                    node_index: AtomicNodeIndex::default(),
+                    range,
+                    is_async: false,
+                    decorator_list: decorators,
+                    name: ast::Identifier {
+                        id: Name::empty(),
+                        range: self.missing_node_range(),
+                        node_index: AtomicNodeIndex::NONE,
+                    },
+                    type_params: None,
+                    parameters: Box::new(ast::Parameters {
+                        range: self.missing_node_range(),
+                        ..ast::Parameters::default()
+                    }),
+                    returns: None,
+                    body: vec![],
+                }
+                .into()
             }
         }
     }
@@ -3173,8 +3257,6 @@ impl<'src> Parser<'src> {
             let param_start = parser.node_start();
 
             if parameters.kwarg.is_some() {
-                // TODO(dhruvmanila): This fails AST validation in tests because
-                // of the pre-order visit
                 // test_err params_follows_var_keyword_param
                 // def foo(**kwargs, a, /, b=10, *, *args): ...
                 parser.add_error(
