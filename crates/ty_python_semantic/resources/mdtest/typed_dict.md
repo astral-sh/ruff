@@ -51,11 +51,23 @@ Methods that are available on `dict`s are also available on `TypedDict`s:
 bob.update(age=26)
 bob.update({"age": 27})
 
+class NamePatch(TypedDict, total=False):
+    name: str
+
+name_update: NamePatch = {"name": "Bobby"}
+
+bob.update(name_update)
+bob.update({"name": "Robert"})
+
 # error: [invalid-argument-type]
 bob.update(age="bad")
 
 # error: [no-matching-overload]
 bob.update(other=1)
+
+# error: [invalid-argument-type]
+# error: [invalid-key]
+bob.update({"other": 1})
 
 # error: [invalid-argument-type]
 # error: [invalid-argument-type]
