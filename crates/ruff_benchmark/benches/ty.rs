@@ -989,7 +989,7 @@ fn datetype(criterion: &mut Criterion) {
             max_dep_date: "2025-07-04",
             python_version: PythonVersion::PY313,
         },
-        4,
+        10,
     );
 
     bench_project(&benchmark, criterion);

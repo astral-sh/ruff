@@ -596,7 +596,7 @@
         },
         "ignore-comment-unknown-rule": {
           "title": "detects `ty: ignore` comments that reference unknown rules",
-          "description": "## What it does\nChecks for `ty: ignore[code]` where `code` isn't a known lint rule.\n\n## Why is this bad?\nA `ty: ignore[code]` directive with a `code` that doesn't match\nany known rule will not suppress any type errors, and is probably a mistake.\n\n## Examples\n```py\na = 20 / 0  # ty: ignore[division-by-zer]\n```\n\nUse instead:\n\n```py\na = 20 / 0  # ty: ignore[division-by-zero]\n```",
+          "description": "## What it does\nChecks for `ty: ignore[code]` or `type: ignore[ty:code]` comments where `code` isn't a known lint rule.\n\n## Why is this bad?\nA `ty: ignore[code]` or a `type:ignore[ty:code] directive with a `code` that doesn't match\nany known rule will not suppress any type errors, and is probably a mistake.\n\n## Examples\n```py\na = 20 / 0  # ty: ignore[division-by-zer]\n```\n\nUse instead:\n\n```py\na = 20 / 0  # ty: ignore[division-by-zero]\n```",
           "default": "warn",
           "oneOf": [
             {
