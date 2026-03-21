@@ -98,30 +98,34 @@ fn add_base_class_methods_completions<'db>(
     class_def: &ast::StmtClassDef,
     completions: &mut Completions<'db>,
 ) {
-    if let Some(arguments) = &class_def.arguments {
-        for base_expr in &arguments.args {
-            if let Some(base_class_type) = base_expr.inferred_type(model) {
-                for member in all_members(db, base_class_type) {
-                    if matches!(member.ty, Type::FunctionLiteral(_)) {
-                        let semantic_completion = SemanticCompletion {
-                            name: member.name,
-                            ty: Some(member.ty),
-                            builtin: false,
-                        };
+    let Some(arguments) = class_def.arguments.as_ref() else {
+        return;
+    };
 
-                        let mut signature = member.ty.display(db).to_string();
-                        signature.push(':');
-                        let signature = signature.strip_prefix("def ").unwrap_or(&signature);
+    for base_expr in &arguments.args {
+        let Some(base_class_type) = base_expr.inferred_type(model) else {
+            continue;
+        };
 
-                        completions.add(
-                            CompletionBuilder::from_semantic_completion(db, semantic_completion)
-                                .kind(CompletionKind::Method)
-                                .context_specific(true)
-                                .module_dependency_kind(ModuleDependencyKind::Current)
-                                .insert(signature),
-                        );
-                    }
-                }
+        for member in all_members(db, base_class_type) {
+            if matches!(member.ty, Type::FunctionLiteral(_)) {
+                let semantic_completion = SemanticCompletion {
+                    name: member.name,
+                    ty: Some(member.ty),
+                    builtin: false,
+                };
+
+                let mut signature = member.ty.display(db).to_string();
+                signature.push(':');
+                let signature = signature.strip_prefix("def ").unwrap_or(&signature);
+
+                completions.add(
+                    CompletionBuilder::from_semantic_completion(db, semantic_completion)
+                        .kind(CompletionKind::Method)
+                        .context_specific(true)
+                        .module_dependency_kind(ModuleDependencyKind::Current)
+                        .insert(signature),
+                );
             }
         }
     }
