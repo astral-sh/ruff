@@ -4216,6 +4216,19 @@ impl<'db> Type<'db> {
             owner: Type<'db>,
             place: Place<'db>,
         ) -> Option<(Type<'db>, Definedness)> {
+            // If `__new__` itself resolved to `Any`, treat it as absent rather than as a real
+            // constructor override. This preserves the known nominal constructor result for
+            // subclasses of `Any` while still allowing explicitly typed `__new__` callables
+            // returning `Any` to keep their annotated behavior.
+            if matches!(
+                place,
+                Place::Defined(DefinedPlace {
+                    ty: Type::Dynamic(DynamicType::Any),
+                    ..
+                })
+            ) {
+                return None;
+            }
             match place.try_call_dunder_get(db, owner) {
                 Place::Defined(DefinedPlace {
                     ty: callable,

@@ -5,8 +5,7 @@ use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::generics::Specialization;
 use crate::types::signatures::Parameter;
 use crate::types::{
-    BoundTypeVarInstance, ClassBase, ClassLiteral, ClassType, DynamicType, SpecialFormType, Type,
-    TypeContext,
+    BoundTypeVarInstance, ClassBase, ClassLiteral, ClassType, DynamicType, Type, TypeContext,
 };
 
 /// Bindings for a constructor call.
@@ -125,6 +124,13 @@ impl<'db> ConstructorBinding<'db> {
                         .iter()
                         .copied()
                         .map(|mapped_ty| {
+                            // TODO This is a hacky work-around to a situation that can occur with
+                            // a case like `def __init__(self: "Class6[V1, V2]", v1: V1, v2: V2)`,
+                            // where we don't currently solve across the entire call, so the self
+                            // annotation gives us `V1 = T1`, `V2 = T2` (where `T1` and `T2` are
+                            // the class typevars), and we consider T1 and T2 as unknowns. This
+                            // will be fixed when we start building up constraint sets across the
+                            // full call.
                             let without_unknown =
                                 mapped_ty.filter_union(db, |element| !element.is_unknown());
                             let mapped_ty = if without_unknown.is_never() {
@@ -221,18 +227,6 @@ impl<'db> ConstructorBinding<'db> {
             .map(|inst| inst.class(db));
         let constructor_class_literal =
             constructor_class.map(|class_ty| class_ty.class_literal(db));
-        let constructor_is_subclass_of_any = constructor_class.is_some_and(|class_ty| {
-            class_ty
-                .class_literal(db)
-                .explicit_bases(db)
-                .iter()
-                .any(|base| {
-                    matches!(
-                        base,
-                        Type::SpecialForm(SpecialFormType::Any) | Type::Dynamic(DynamicType::Any)
-                    )
-                })
-        });
         if let Some(constructor_class_literal) = constructor_class_literal {
             let callable = self.callable();
             let is_instance_of_constructor = |return_ty: Type<'db>| {
@@ -312,8 +306,7 @@ impl<'db> ConstructorBinding<'db> {
                             return self.combine_constructor_return_type(db);
                         };
                         if matches!(first_non_instance_return, Type::Dynamic(DynamicType::Any))
-                            && (callable.matching_overloads().next().is_none()
-                                || constructor_is_subclass_of_any)
+                            && callable.matching_overloads().next().is_none()
                             && let Some(downstream) = self.downstream_constructor()
                             && !self.constructor_kind().is_metaclass_call()
                         {
