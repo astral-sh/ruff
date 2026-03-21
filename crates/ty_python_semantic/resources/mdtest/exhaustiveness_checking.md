@@ -497,16 +497,82 @@ infrastructure!
 class A: ...
 class B: ...
 
-def f[T: A | B](x: T) -> bool:
+def j[T: A | B](x: T) -> bool:
     if isinstance(x, A):
         return True
     elif isinstance(x, B):
         return False
 
-def g[T: A | B](x: T) -> bool:
+def k[T: (A, B)](x: T) -> bool:
+    if isinstance(x, A):
+        return True
+    elif isinstance(x, B):
+        return False
+
+def l[T](x: T) -> bool:
+    if isinstance(x, int):
+        return True
+    elif not isinstance(x, int):
+        return False
+
+def m[T: A | B](x: T) -> bool:
     match x:
         case A():
             return True
         case B():
             return False
+
+def n[T: (A, B)](x: T) -> bool:
+    match x:
+        case A():
+            return True
+        case B():
+            return False
+```
+
+## Exhaustiveness checking for `NewType`s of `float` and `complex`
+
+```py
+from typing_extensions import NewType, assert_never
+
+FloatN = NewType("FloatN", float)
+ComplexN = NewType("ComplexN", complex)
+
+def f(x: FloatN) -> bool:
+    if isinstance(x, int):
+        return True
+    elif isinstance(x, float):
+        return False
+    else:
+        assert_never(x)
+
+def g(x: ComplexN) -> bool:
+    if isinstance(x, int):
+        return True
+    elif isinstance(x, float):
+        return True
+    elif isinstance(x, complex):
+        return False
+    else:
+        assert_never(x)
+
+# the same version of the above tests, but isolated
+# from the fact that `assert_never` creates its own
+# reachability constraint:
+
+# no `invalid-return-type` diagnostic
+def h(x: FloatN) -> bool:
+    if isinstance(x, int):
+        return True
+    elif isinstance(x, float):
+        return False
+
+# no `invalid-return-type` diagnostic
+def i(x: ComplexN) -> bool:
+    if isinstance(x, int):
+        return True
+    elif isinstance(x, float):
+        return True
+    elif isinstance(x, complex):
+        return False
 ```
