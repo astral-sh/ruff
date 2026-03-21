@@ -7,7 +7,7 @@ use ruff_python_ast::comparable::ComparableStmt;
 use ruff_python_ast::stmt_if::{IfElifBranch, if_elif_branches};
 use ruff_python_ast::token::parenthesized_range;
 use ruff_python_ast::{self as ast, Expr};
-use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
+use ruff_python_trivia::{CommentRanges, SimpleTokenKind, SimpleTokenizer};
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -74,17 +74,34 @@ pub(crate) fn if_with_same_arms(checker: &Checker, stmt_if: &ast::StmtIf) {
         }
 
         // ...and the same comments
-        let first_comments = checker
+        let first_comment_ranges = checker
             .comment_ranges()
-            .comments_in_range(body_range(&current_branch, checker.locator()))
-            .iter()
-            .map(|range| checker.locator().slice(*range));
-        let second_comments = checker
+            .comments_in_range(body_range(&current_branch, checker.locator()));
+        let second_comment_ranges = checker
             .comment_ranges()
-            .comments_in_range(body_range(following_branch, checker.locator()))
+            .comments_in_range(body_range(following_branch, checker.locator()));
+
+        let first_comments: Vec<_> = first_comment_ranges
             .iter()
-            .map(|range| checker.locator().slice(*range));
-        if !first_comments.eq(second_comments) {
+            .map(|range| checker.locator().slice(*range))
+            .collect();
+        let second_comments: Vec<_> = second_comment_ranges
+            .iter()
+            .map(|range| checker.locator().slice(*range))
+            .collect();
+
+        if first_comments != second_comments {
+            // If any comment is a pragma comment (e.g., `# noqa: SIM114`), skip the
+            // diagnostic entirely so the pragma isn't flagged as unused (RUF100).
+            let has_pragma = first_comments
+                .iter()
+                .chain(second_comments.iter())
+                .any(|comment| is_pragma_comment(comment));
+            if has_pragma {
+                continue;
+            }
+            // Otherwise skip — the branches have different non-pragma comments,
+            // suggesting the duplication is intentional.
             continue;
         }
 
@@ -100,6 +117,7 @@ pub(crate) fn if_with_same_arms(checker: &Checker, stmt_if: &ast::StmtIf) {
                 following_branch,
                 checker.locator(),
                 checker.tokens(),
+                checker.comment_ranges(),
             )
         });
     }
@@ -112,6 +130,7 @@ fn merge_branches(
     following_branch: &IfElifBranch,
     locator: &Locator,
     tokens: &ruff_python_ast::token::Tokens,
+    comment_ranges: &ruff_python_ast::CommentRanges,
 ) -> Result<Fix> {
     // Identify the colon (`:`) at the end of the current branch's test.
     let Some(current_branch_colon) =
@@ -120,6 +139,14 @@ fn merge_branches(
     else {
         return Err(anyhow::anyhow!("Expected colon after test"));
     };
+
+    // Check if there are comments between the current branch body and the following branch
+    // that would be deleted by the merge. If so, the fix must be unsafe.
+    let between_range = TextRange::new(
+        locator.line_end(current_branch.end()),
+        following_branch.test.start(),
+    );
+    let has_comments_between = !comment_ranges.comments_in_range(between_range).is_empty();
 
     let deletion_edit = Edit::deletion(
         locator.full_line_end(current_branch.end()),
@@ -164,17 +191,32 @@ fn merge_branches(
             None
         };
 
-    Ok(Fix::safe_edits(
-        deletion_edit,
-        parenthesize_edit.into_iter().chain(Some(insertion_edit)),
-    ))
+    let fix = if has_comments_between {
+        Fix::unsafe_edits(
+            deletion_edit,
+            parenthesize_edit.into_iter().chain(Some(insertion_edit)),
+        )
+    } else {
+        Fix::safe_edits(
+            deletion_edit,
+            parenthesize_edit.into_iter().chain(Some(insertion_edit)),
+        )
+    };
+
+    Ok(fix)
 }
 
 /// Return the [`TextRange`] of an [`IfElifBranch`]'s body (from the end of the test to the end of
 /// the body).
 fn body_range(branch: &IfElifBranch, locator: &Locator) -> TextRange {
-    TextRange::new(
-        locator.line_end(branch.test.end()),
-        locator.line_end(branch.end()),
-    )
+    TextRange::new(branch.test.end(), locator.line_end(branch.end()))
+}
+
+/// Check if a comment is a pragma comment (e.g., `# noqa`, `# type: ignore`, `# pragma: no cover`).
+fn is_pragma_comment(comment: &str) -> bool {
+    let comment = comment.trim_start_matches('#').trim();
+    comment.starts_with("noqa")
+        || comment.starts_with("type:")
+        || comment.starts_with("pragma:")
+        || comment.starts_with("pyright:")
 }

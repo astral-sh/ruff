@@ -157,3 +157,26 @@ elif True:
     print(1)
 else:
     print(2)
+
+
+# See: https://github.com/astral-sh/ruff/issues/19576
+# Comments between branches should make the fix unsafe
+if exc.status == 408:
+    return True
+elif exc.status == 429:
+    return True
+elif exc.status == 500:
+    # This comment explains the next branch
+    return True
+
+# Pragma comments — should NOT trigger SIM114 (noqa remains useful)
+if a:
+    b
+elif c:  # noqa: SIM114
+    b
+
+# EOL comments differ — should NOT trigger (comments are different)
+if a:  # branch 1
+    b
+elif c:  # branch 2
+    b
