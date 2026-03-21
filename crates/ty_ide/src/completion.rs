@@ -1206,11 +1206,15 @@ struct Relevance {
     /// other non-module symbols, even when those symbols are in
     /// the user's project.
     is_module: Sort,
+    /// Sorts based on whether this symbol is only available during
+    /// type checking and not at runtime.
+    type_check_only: Sort,
     /// Deprecated symbols appear lower in the completion result.
     ///
     /// This appears before `module_dependency_kind` so deprecation
     /// downranking applies even when a symbol's module origin would
-    /// otherwise boost it.
+    /// otherwise boost it, but after `type_check_only` so runtime-
+    /// unavailable symbols still sort last.
     deprecated: Sort,
     /// The "dependency kind" of the module where this symbol
     /// originates from.
@@ -1225,9 +1229,6 @@ struct Relevance {
     /// other sorting criteria being applied or that it is generally
     /// more specific than completions where this is set.
     module_dependency_kind: Option<ModuleDependencyKind>,
-    /// Sorts based on whether this symbol is only available during
-    /// type checking and not at runtime.
-    type_check_only: Sort,
 }
 
 impl Relevance {
@@ -1272,17 +1273,17 @@ impl Relevance {
             } else {
                 Sort::Even
             },
+            type_check_only: if c.is_type_check_only {
+                Sort::Lower
+            } else {
+                Sort::Even
+            },
             deprecated: if c.deprecated {
                 Sort::Lower
             } else {
                 Sort::Even
             },
             module_dependency_kind: c.module_dependency_kind,
-            type_check_only: if c.is_type_check_only {
-                Sort::Lower
-            } else {
-                Sort::Even
-            },
         }
     }
 }
