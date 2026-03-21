@@ -1373,6 +1373,43 @@ mod tests {
     }
 
     #[test]
+    fn del_conditional_except() {
+        // Ignores conditional bindings deletion.
+        flakes(
+            r"
+        context = None
+        test = True
+        try:
+            ...
+        except Exception:
+            del(test)
+        else:
+            assert(test)
+        ",
+            &[],
+        );
+    }
+
+    #[test]
+    fn del_conditional_orelse() {
+        // Ignores conditional bindings deletion.
+        flakes(
+            r"
+        context = None
+        test = True
+        try:
+            ...
+        except Exception:
+            print(test)
+        else:
+            del test
+        assert(test)
+        ",
+            &[],
+        );
+    }
+
+    #[test]
     fn del_conditional_nested() {
         // Ignored conditional bindings deletion even if they are nested in other
         // blocks.
