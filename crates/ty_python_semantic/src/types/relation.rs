@@ -605,6 +605,9 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         source: Type<'db>,
         target: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        let is_exact_class_object =
+            |ty: Type<'db>| matches!(ty, Type::ClassLiteral(_) | Type::GenericAlias(_));
+
         // Subtyping implies assignability, so if subtyping is reflexive and the two types are
         // equal, it is both a subtype and assignable. Assignability is always reflexive.
         //
@@ -781,16 +784,19 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 self.never()
             }
 
-            // `type[T]` is a subtype of the class object `A` if every instance of `T` is a subtype of an instance
-            // of `A`, and vice versa.
+            // For non-exact-class-object targets with an instance view, `type[T]` can inherit
+            // subtype facts from `T`. Exact class-object targets are handled by dedicated branches
+            // below; collapsing them to instances would incorrectly make `type[T] <: <class 'Y'>`
+            // hold whenever `T <: Y`.
             (Type::SubclassOf(subclass_of), _)
-                if !subclass_of
-                    .into_type_var()
-                    .zip(target.to_instance(db))
-                    .when_some_and(db, self.constraints, |(source_i, target_i)| {
-                        self.check_type_pair(db, Type::TypeVar(source_i), target_i)
-                    })
-                    .is_never_satisfied(db) =>
+                if !is_exact_class_object(target)
+                    && !subclass_of
+                        .into_type_var()
+                        .zip(target.to_instance(db))
+                        .when_some_and(db, self.constraints, |(source_i, target_i)| {
+                            self.check_type_pair(db, Type::TypeVar(source_i), target_i)
+                        })
+                        .is_never_satisfied(db) =>
             {
                 // TODO: The repetition here isn't great, but we need the fallthrough logic.
                 subclass_of
@@ -802,13 +808,14 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             }
 
             (_, Type::SubclassOf(subclass_of))
-                if !subclass_of
-                    .into_type_var()
-                    .zip(source.to_instance(db))
-                    .when_some_and(db, self.constraints, |(target_i, source_i)| {
-                        self.check_type_pair(db, source_i, Type::TypeVar(target_i))
-                    })
-                    .is_never_satisfied(db) =>
+                if !is_exact_class_object(source)
+                    && !subclass_of
+                        .into_type_var()
+                        .zip(source.to_instance(db))
+                        .when_some_and(db, self.constraints, |(target_i, source_i)| {
+                            self.check_type_pair(db, source_i, Type::TypeVar(target_i))
+                        })
+                        .is_never_satisfied(db) =>
             {
                 // TODO: The repetition here isn't great, but we need the fallthrough logic.
                 subclass_of
@@ -1407,6 +1414,26 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
             (Type::BoundSuper(_), _) => {
                 self.check_type_pair(db, KnownClass::Super.to_instance(db), target)
+            }
+
+            (Type::ClassLiteral(source_cls), Type::SubclassOf(target_subclass_ty))
+                if target_subclass_ty.is_type_var() =>
+            {
+                self.check_type_pair(
+                    db,
+                    Type::instance(db, source_cls.default_specialization(db)),
+                    Type::TypeVar(target_subclass_ty.subclass_of().into_type_var().unwrap()),
+                )
+            }
+
+            (Type::GenericAlias(source_alias), Type::SubclassOf(target_subclass_ty))
+                if target_subclass_ty.is_type_var() =>
+            {
+                self.check_type_pair(
+                    db,
+                    Type::instance(db, ClassType::Generic(source_alias)),
+                    Type::TypeVar(target_subclass_ty.subclass_of().into_type_var().unwrap()),
+                )
             }
 
             (Type::SubclassOf(subclass_of), _) | (_, Type::SubclassOf(subclass_of))

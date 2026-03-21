@@ -164,24 +164,29 @@ def _(a: Literal[1], b: Literal[1, 2], c: Literal[1, 2, 3]):
         reveal_type(c)  # revealed: Literal[1]
 ```
 
-Identity narrowing should not widen an operand that is already more precise than the compared type:
+Identity narrowing should preserve singleton information on the compared class object:
+
+```toml
+[environment]
+python-version = "3.12"
+```
 
 ```py
-from typing import TypeVar
-
 class Y:
     def __init__(self) -> None: ...
 
 class Z(Y):
     def __init__(self, x: int) -> None: ...
 
-T = TypeVar("T", Y, Z)
-
-def f(klass: type[T]) -> None:
+def f[T: (Y, Z)](klass: type[T]) -> None:
     reveal_type(Y)  # revealed: <class 'Y'>
     if klass is Y:
-        reveal_type(Y)  # revealed: <class 'Y'>
+        reveal_type(klass)  # revealed: type[T@f] & <class 'Y'>
+        reveal_type(Y)  # revealed: <class 'Y'> & type[T@f]
         Y()
+    if klass is Z:
+        reveal_type(klass)  # revealed: <class 'Z'>
+        reveal_type(Z)  # revealed: <class 'Z'>
 ```
 
 ## `is` where the other operand is a call expression

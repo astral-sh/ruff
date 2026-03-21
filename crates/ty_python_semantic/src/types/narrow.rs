@@ -1132,18 +1132,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     None
                 }
             }
-            ast::CmpOp::Is => {
-                let rhs_ty = rhs_ty.resolve_type_alias(self.db);
-
-                // Identity checks should not feed a new constraint back into an operand that is
-                // already single-valued. For example, `klass is Y` should narrow `klass: type[T]`,
-                // but it must not widen `Y` to `type[T]`.
-                if lhs_ty.is_single_valued(self.db) {
-                    None
-                } else {
-                    Some(rhs_ty)
-                }
-            }
+            ast::CmpOp::Is => Some(rhs_ty.resolve_type_alias(self.db)),
             ast::CmpOp::Eq => self.evaluate_expr_eq(lhs_ty, rhs_ty),
             ast::CmpOp::NotEq => self.evaluate_expr_ne(lhs_ty, rhs_ty),
             ast::CmpOp::In => self.evaluate_expr_in(lhs_ty, rhs_ty),
