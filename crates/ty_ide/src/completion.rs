@@ -13,13 +13,13 @@ use ruff_python_codegen::Stylist;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use rustc_hash::FxHashSet;
 use ty_module_resolver::{KnownModule, Module, ModuleName};
-use ty_python_semantic::HasType;
 use ty_python_semantic::types::list_members::all_members;
 use ty_python_semantic::types::{SpecialFormType, UnionType};
 use ty_python_semantic::{
     Completion as SemanticCompletion, NameKind, SemanticModel,
     types::{CycleDetector, KnownClass, Type},
 };
+use ty_python_semantic::{DisplaySettings, HasType};
 
 use crate::docstring::Docstring;
 use crate::goto::Definitions;
@@ -115,7 +115,10 @@ fn add_base_class_methods_completions<'db>(
                     builtin: false,
                 };
 
-                let mut signature = member.ty.display(db).to_string();
+                let mut signature = member
+                    .ty
+                    .display_with(db, DisplaySettings::default().preserve_long_unions())
+                    .to_string();
                 signature.push(':');
                 let signature = signature.strip_prefix("def ").unwrap_or(&signature);
 
