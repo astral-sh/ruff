@@ -164,6 +164,26 @@ def _(a: Literal[1], b: Literal[1, 2], c: Literal[1, 2, 3]):
         reveal_type(c)  # revealed: Literal[1]
 ```
 
+Identity narrowing should not widen an operand that is already more precise than the compared type:
+
+```py
+from typing import TypeVar
+
+class Y:
+    def __init__(self) -> None: ...
+
+class Z(Y):
+    def __init__(self, x: int) -> None: ...
+
+T = TypeVar("T", Y, Z)
+
+def f(klass: type[T]) -> None:
+    reveal_type(Y)  # revealed: <class 'Y'>
+    if klass is Y:
+        reveal_type(Y)  # revealed: <class 'Y'>
+        Y()
+```
+
 ## `is` where the other operand is a call expression
 
 ```py
