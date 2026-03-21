@@ -22,8 +22,8 @@ use crate::{
         use_def_map,
     },
     types::{
-        CallableType, ClassBase, ClassType, KnownClass, MemberLookupPolicy, Parameter, Parameters,
-        Signature, StaticClassLiteral, Type, TypeContext, TypeQualifiers,
+        CallableType, ClassBase, ClassType, KnownClass, Parameter, Parameters, Signature,
+        StaticClassLiteral, Type, TypeContext, TypeQualifiers,
         call::CallArguments,
         class::{CodeGeneratorKind, FieldKind},
         constraints::ConstraintSetBuilder,
@@ -311,9 +311,8 @@ fn check_class_declaration<'db>(
             let Place::Defined(DefinedPlace {
                 ty: superclass_type,
                 ..
-            }) = superclass
-                .class_literal(db)
-                .class_member(db, &member.name, MemberLookupPolicy::all())
+            }) = Type::instance(db, superclass)
+                .member(db, &member.name)
                 .place
             else {
                 // If not defined on any superclass, no point in continuing to walk up the MRO
@@ -348,13 +347,13 @@ fn check_class_declaration<'db>(
                 ));
                 if let Some(definition) = superclass_own_type.definition(db) {
                     if let Some(file_range) = definition.focus_range(db) {
-                        diagnostic.annotate(
-                            Annotation::secondary(Span::from(file_range)).message(format_args!(
+                        diagnostic.annotate(Annotation::secondary(Span::from(file_range)).message(
+                            format_args!(
                                 "Property `{}.{}` defined here with no setter",
                                 superclass.name(db),
                                 &member.name
-                            )),
-                        );
+                            ),
+                        ));
                     }
                 }
                 liskov_diagnostic_emitted = true;
