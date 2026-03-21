@@ -2,6 +2,68 @@
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 ---
 UP018 [*] Unnecessary `str` call (rewrite as a literal)
+  --> UP018.py:8:1
+   |
+ 6 |   str("foo", **k)
+ 7 |   str("foo", encoding="UTF-8")
+ 8 | / str("foo"
+ 9 | |     "bar")
+   | |__________^
+10 |   str(b"foo")
+11 |   bytes("foo", encoding="UTF-8")
+   |
+help: Replace with string literal
+5  | str(**k)
+6  | str("foo", **k)
+7  | str("foo", encoding="UTF-8")
+   - str("foo"
+8  + ("foo"
+9  |     "bar")
+10 | str(b"foo")
+11 | bytes("foo", encoding="UTF-8")
+
+UP018 [*] Unnecessary `bytes` call (rewrite as a literal)
+  --> UP018.py:15:1
+   |
+13 |   bytes("foo", *a)
+14 |   bytes("foo", **a)
+15 | / bytes(b"foo"
+16 | |       b"bar")
+   | |_____________^
+17 |   bytes("foo")
+18 |   bytes(1)
+   |
+help: Replace with bytes literal
+12 | bytes(*a)
+13 | bytes("foo", *a)
+14 | bytes("foo", **a)
+   - bytes(b"foo"
+15 + (b"foo"
+16 |       b"bar")
+17 | bytes("foo")
+18 | bytes(1)
+
+UP018 [*] Unnecessary `int` call (rewrite as a literal)
+  --> UP018.py:34:1
+   |
+32 | bool(b"")
+33 | bool(1.0)
+34 | int().denominator
+   | ^^^^^
+35 |
+36 | # These become literals
+   |
+help: Replace with integer literal
+31 | bool("")
+32 | bool(b"")
+33 | bool(1.0)
+   - int().denominator
+34 + (0).denominator
+35 | 
+36 | # These become literals
+37 | str()
+
+UP018 [*] Unnecessary `str` call (rewrite as a literal)
   --> UP018.py:37:1
    |
 36 | # These become literals
@@ -667,3 +729,220 @@ help: Replace with boolean literal
 93 | 
 94 | 
 95 | # t-strings are not native literals
+
+UP018 [*] Unnecessary `str` call (rewrite as a literal)
+   --> UP018.py:99:1
+    |
+ 98 | # UP018 - Extended detections
+ 99 | str("A" "B")
+    | ^^^^^^^^^^^^
+100 | str(
+101 |     "A"
+    |
+help: Replace with string literal
+96  | str(t"hey")
+97  | 
+98  | # UP018 - Extended detections
+    - str("A" "B")
+99  + "A" "B"
+100 | str(
+101 |     "A"
+102 |     "B"
+
+UP018 [*] Unnecessary `str` call (rewrite as a literal)
+   --> UP018.py:100:1
+    |
+ 98 |   # UP018 - Extended detections
+ 99 |   str("A" "B")
+100 | / str(
+101 | |     "A"
+102 | |     "B"
+103 | | )
+    | |_^
+104 |   str(object="!")
+105 |   complex(1j)
+    |
+help: Replace with string literal
+97  | 
+98  | # UP018 - Extended detections
+99  | str("A" "B")
+    - str(
+    -     "A"
+    -     "B"
+    - )
+100 + ("A"
+101 +     "B")
+102 | str(object="!")
+103 | complex(1j)
+104 | complex(real=1j)
+
+UP018 [*] Unnecessary `str` call (rewrite as a literal)
+   --> UP018.py:104:1
+    |
+102 |     "B"
+103 | )
+104 | str(object="!")
+    | ^^^^^^^^^^^^^^^
+105 | complex(1j)
+106 | complex(real=1j)
+    |
+help: Replace with string literal
+101 |     "A"
+102 |     "B"
+103 | )
+    - str(object="!")
+104 + "!"
+105 | complex(1j)
+106 | complex(real=1j)
+107 | complex()
+
+UP018 [*] Unnecessary `complex` call (rewrite as a literal)
+   --> UP018.py:105:1
+    |
+103 | )
+104 | str(object="!")
+105 | complex(1j)
+    | ^^^^^^^^^^^
+106 | complex(real=1j)
+107 | complex()
+    |
+help: Replace with complex literal
+102 |     "B"
+103 | )
+104 | str(object="!")
+    - complex(1j)
+105 + 1j
+106 | complex(real=1j)
+107 | complex()
+108 | complex(0j)
+
+UP018 [*] Unnecessary `complex` call (rewrite as a literal)
+   --> UP018.py:106:1
+    |
+104 | str(object="!")
+105 | complex(1j)
+106 | complex(real=1j)
+    | ^^^^^^^^^^^^^^^^
+107 | complex()
+108 | complex(0j)
+    |
+help: Replace with complex literal
+103 | )
+104 | str(object="!")
+105 | complex(1j)
+    - complex(real=1j)
+106 + 1j
+107 | complex()
+108 | complex(0j)
+109 | complex(real=0j)
+
+UP018 [*] Unnecessary `complex` call (rewrite as a literal)
+   --> UP018.py:107:1
+    |
+105 | complex(1j)
+106 | complex(real=1j)
+107 | complex()
+    | ^^^^^^^^^
+108 | complex(0j)
+109 | complex(real=0j)
+    |
+help: Replace with complex literal
+104 | str(object="!")
+105 | complex(1j)
+106 | complex(real=1j)
+    - complex()
+107 + 0j
+108 | complex(0j)
+109 | complex(real=0j)
+110 | (complex(0j)).real
+
+UP018 [*] Unnecessary `complex` call (rewrite as a literal)
+   --> UP018.py:108:1
+    |
+106 | complex(real=1j)
+107 | complex()
+108 | complex(0j)
+    | ^^^^^^^^^^^
+109 | complex(real=0j)
+110 | (complex(0j)).real
+    |
+help: Replace with complex literal
+105 | complex(1j)
+106 | complex(real=1j)
+107 | complex()
+    - complex(0j)
+108 + 0j
+109 | complex(real=0j)
+110 | (complex(0j)).real
+111 | complex(1j).real
+
+UP018 [*] Unnecessary `complex` call (rewrite as a literal)
+   --> UP018.py:109:1
+    |
+107 | complex()
+108 | complex(0j)
+109 | complex(real=0j)
+    | ^^^^^^^^^^^^^^^^
+110 | (complex(0j)).real
+111 | complex(1j).real
+    |
+help: Replace with complex literal
+106 | complex(real=1j)
+107 | complex()
+108 | complex(0j)
+    - complex(real=0j)
+109 + 0j
+110 | (complex(0j)).real
+111 | complex(1j).real
+112 | complex(real=1j).real
+
+UP018 [*] Unnecessary `complex` call (rewrite as a literal)
+   --> UP018.py:110:2
+    |
+108 | complex(0j)
+109 | complex(real=0j)
+110 | (complex(0j)).real
+    |  ^^^^^^^^^^^
+111 | complex(1j).real
+112 | complex(real=1j).real
+    |
+help: Replace with complex literal
+107 | complex()
+108 | complex(0j)
+109 | complex(real=0j)
+    - (complex(0j)).real
+110 + (0j).real
+111 | complex(1j).real
+112 | complex(real=1j).real
+
+UP018 [*] Unnecessary `complex` call (rewrite as a literal)
+   --> UP018.py:111:1
+    |
+109 | complex(real=0j)
+110 | (complex(0j)).real
+111 | complex(1j).real
+    | ^^^^^^^^^^^
+112 | complex(real=1j).real
+    |
+help: Replace with complex literal
+108 | complex(0j)
+109 | complex(real=0j)
+110 | (complex(0j)).real
+    - complex(1j).real
+111 + 1j.real
+112 | complex(real=1j).real
+
+UP018 [*] Unnecessary `complex` call (rewrite as a literal)
+   --> UP018.py:112:1
+    |
+110 | (complex(0j)).real
+111 | complex(1j).real
+112 | complex(real=1j).real
+    | ^^^^^^^^^^^^^^^^
+    |
+help: Replace with complex literal
+109 | complex(real=0j)
+110 | (complex(0j)).real
+111 | complex(1j).real
+    - complex(real=1j).real
+112 + 1j.real
