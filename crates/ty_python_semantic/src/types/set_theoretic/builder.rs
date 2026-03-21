@@ -1145,18 +1145,13 @@ impl<'db> IntersectionBuilder<'db> {
         self
     }
 
-    pub(crate) fn build(mut self) -> Type<'db> {
-        // Avoid allocating the UnionBuilder unnecessarily if we have just one intersection:
-        if self.intersections.len() == 1 {
-            self.intersections.pop().unwrap().build(self.db)
-        } else {
-            UnionType::from_elements(
-                self.db,
-                self.intersections
-                    .into_iter()
-                    .map(|inner| inner.build(self.db)),
-            )
-        }
+    pub(crate) fn build(self) -> Type<'db> {
+        UnionType::from_elements(
+            self.db,
+            self.intersections
+                .into_iter()
+                .map(|inner| inner.build(self.db)),
+        )
     }
 }
 
