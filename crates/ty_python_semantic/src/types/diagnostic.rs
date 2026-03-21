@@ -153,6 +153,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_TYPED_DICT_STATEMENT);
     registry.register_lint(&INVALID_TYPED_DICT_HEADER);
     registry.register_lint(&INVALID_METHOD_OVERRIDE);
+    registry.register_lint(&INVALID_PROPERTY_OVERRIDE);
     registry.register_lint(&INVALID_EXPLICIT_OVERRIDE);
     registry.register_lint(&SUPER_CALL_IN_NAMED_TUPLE_METHOD);
     registry.register_lint(&INVALID_FROZEN_DATACLASS_SUBCLASS);
@@ -3138,6 +3139,35 @@ declare_lint! {
     pub(crate) static INVALID_METHOD_OVERRIDE = {
         summary: "detects method definitions that violate the Liskov Substitution Principle",
         status: LintStatus::stable("0.0.1-alpha.20"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for invalid attempts to override a read-only property with a mutable attribute.
+    ///
+    /// ## Why is this bad?
+    /// Overriding a property with a type annotation in a subclass does not actually
+    /// override the property at runtime. Attempting to assign to the attribute on
+    /// an instance of the subclass will still trigger the property's setter, which
+    /// will raise an `AttributeError` if no setter is defined.
+    ///
+    /// ## Examples
+    /// ```python
+    /// class A:
+    ///     @property
+    ///     def f(self) -> int:
+    ///         return 42
+    ///
+    /// class B(A):
+    ///     f: int  # error: [invalid-property-override]
+    ///
+    /// B().f = 42  # AttributeError: property 'f' of 'B' object has no setter
+    /// ```
+    pub(crate) static INVALID_PROPERTY_OVERRIDE = {
+        summary: "detects invalid attempts to override a read-only property with a mutable attribute",
+        status: LintStatus::stable("0.1.0"),
         default_level: Level::Error,
     }
 }

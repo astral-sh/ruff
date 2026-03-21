@@ -94,7 +94,7 @@ But if the annotation does not use `ClassVar`, we do not see that as overriding 
 
 ```py
 class StillAbstractDynamic(AbstractDynamic):
-    f: int
+    f: int  # error: [invalid-property-override]
 
 StillAbstractDynamic()  # TODO: should emit an error!
 ```
