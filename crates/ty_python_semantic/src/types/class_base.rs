@@ -226,6 +226,7 @@ impl<'db> ClassBase<'db> {
                 | SpecialFormType::Intersection
                 | SpecialFormType::TypeOf
                 | SpecialFormType::CallableTypeOf
+                | SpecialFormType::RegularCallableTypeOf
                 | SpecialFormType::AlwaysTruthy
                 | SpecialFormType::AlwaysFalsy => None,
 

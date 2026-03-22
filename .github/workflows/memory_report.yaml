@@ -20,7 +20,7 @@ on:
       - "!**.md"
       - "!**.snap"
       # It's tempting to skip all Python files in every directory,
-      # but changes to Python files in `ty_vendored` can affect the output of mypy_primer,
+      # but changes to Python files in `ty_vendored` can affect the output of ecosystem runs,
       # so we apply a narrow exemption for all files in the corpus directory instead.
       - "!crates/ty_python_semantic/resources/corpus/**"
 
@@ -98,7 +98,7 @@ jobs:
       # NOTE: astral-sh-bot uses this artifact to post comments on PRs.
       # Make sure to update the bot if you rename the artifact.
       - name: Upload diff
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: memory_report_diff
           path: memory_report_diff.diff

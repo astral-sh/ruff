@@ -303,3 +303,43 @@ class C(B):
     def f(self):
         __class__ = B  # Local variable __class__ shadows the implicit __class__
         return super(__class__, self).f()  # Should NOT trigger UP008
+
+class Base:
+    def __init__(self, foo):
+        self.foo = foo
+
+
+class Outer(Base):
+    def __init__(self, foo):
+        super().__init__(foo)  # Should not trigger UP008
+
+    class Inner(Base):
+        def __init__(self, foo):
+            super(Outer.Inner, self).__init__(foo)  # UP008: matches enclosing class chain
+
+
+# super() first arg is an attribute that only matches on the last segment,
+# but refers to a different class (Outer.Inner, not __class__ which is Inner).
+class Inner(Outer.Inner):
+    def __init__(self, foo):
+        super(Outer.Inner, self).__init__(foo)  # Should NOT trigger UP008
+
+# super() first arg has an unrelated module prefix
+class Outer2:
+    class Inner2(Base):
+        def __init__(self, foo):
+            super(some_module.Outer2.Inner2, self).__init__(foo)  # Should NOT trigger UP008
+
+# 3-level deep nesting: super(A.B.C, self) should trigger UP008
+class A:
+    class B:
+        class C(Base):
+            def __init__(self, foo):
+                super(A.B.C, self).__init__(foo)  # UP008: matches full chain
+
+# Mismatched middle segment: Wrong.Inner doesn't match Outer3.Inner
+class Outer3:
+    class Inner(Base):
+        def __init__(self, foo):
+            super(Wrong.Inner, self).__init__(foo)  # Should NOT trigger UP008
+

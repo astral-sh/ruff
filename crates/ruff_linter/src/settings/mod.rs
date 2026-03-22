@@ -523,9 +523,7 @@ pub const PREVIEW_DEFAULT_SELECTORS: &[RuleSelector] = &[
     RuleSelector::rule(RuleCodePrefix::PEP8Naming(codes::PEP8Naming::_999)), // N999
     RuleSelector::rule(RuleCodePrefix::Perflint(codes::Perflint::_101)), // PERF101
     RuleSelector::rule(RuleCodePrefix::Perflint(codes::Perflint::_102)), // PERF102
-    RuleSelector::rule(RuleCodePrefix::Perflint(codes::Perflint::_401)), // PERF401
     RuleSelector::rule(RuleCodePrefix::Perflint(codes::Perflint::_402)), // PERF402
-    RuleSelector::rule(RuleCodePrefix::Perflint(codes::Perflint::_403)), // PERF403
     RuleSelector::rule(RuleCodePrefix::PygrepHooks(codes::PygrepHooks::_005)), // PGH005
     RuleSelector::rule(RuleCodePrefix::Flake8Pie(codes::Flake8Pie::_790)), // PIE790
     RuleSelector::rule(RuleCodePrefix::Flake8Pie(codes::Flake8Pie::_794)), // PIE794
@@ -581,7 +579,6 @@ pub const PREVIEW_DEFAULT_SELECTORS: &[RuleSelector] = &[
     RuleSelector::rule(RuleCodePrefix::Pylint(codes::Pylint::R0402)), // PLR0402
     RuleSelector::rule(RuleCodePrefix::Pylint(codes::Pylint::R1704)), // PLR1704
     RuleSelector::rule(RuleCodePrefix::Pylint(codes::Pylint::R1711)), // PLR1711
-    RuleSelector::rule(RuleCodePrefix::Pylint(codes::Pylint::R1714)), // PLR1714
     RuleSelector::rule(RuleCodePrefix::Pylint(codes::Pylint::R1716)), // PLR1716
     RuleSelector::rule(RuleCodePrefix::Pylint(codes::Pylint::R1722)), // PLR1722
     RuleSelector::rule(RuleCodePrefix::Pylint(codes::Pylint::R1730)), // PLR1730
@@ -664,7 +661,6 @@ pub const PREVIEW_DEFAULT_SELECTORS: &[RuleSelector] = &[
     RuleSelector::rule(RuleCodePrefix::Flake8Pyi(codes::Flake8Pyi::_064)), // PYI064
     RuleSelector::rule(RuleCodePrefix::Flake8Pyi(codes::Flake8Pyi::_066)), // PYI066
     RuleSelector::rule(RuleCodePrefix::Flake8Return(codes::Flake8Return::_501)), // RET501
-    RuleSelector::rule(RuleCodePrefix::Flake8Return(codes::Flake8Return::_504)), // RET504
     RuleSelector::rule(RuleCodePrefix::Ruff(codes::Ruff::_007)), // RUF007
     RuleSelector::rule(RuleCodePrefix::Ruff(codes::Ruff::_008)), // RUF008
     RuleSelector::rule(RuleCodePrefix::Ruff(codes::Ruff::_009)), // RUF009
@@ -732,7 +728,6 @@ pub const PREVIEW_DEFAULT_SELECTORS: &[RuleSelector] = &[
     RuleSelector::rule(RuleCodePrefix::Tryceratops(codes::Tryceratops::_004)), // TRY004
     RuleSelector::rule(RuleCodePrefix::Tryceratops(codes::Tryceratops::_201)), // TRY201
     RuleSelector::rule(RuleCodePrefix::Tryceratops(codes::Tryceratops::_203)), // TRY203
-    RuleSelector::rule(RuleCodePrefix::Tryceratops(codes::Tryceratops::_300)), // TRY300
     RuleSelector::rule(RuleCodePrefix::Tryceratops(codes::Tryceratops::_401)), // TRY401
     RuleSelector::rule(RuleCodePrefix::Pyupgrade(codes::Pyupgrade::_001)), // UP001
     RuleSelector::rule(RuleCodePrefix::Pyupgrade(codes::Pyupgrade::_003)), // UP003

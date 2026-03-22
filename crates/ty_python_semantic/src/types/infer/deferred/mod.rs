@@ -6,4 +6,5 @@ pub(super) mod final_variable;
 pub(super) mod function;
 pub(super) mod overloaded_function;
 pub(super) mod static_class;
+pub(super) mod type_param_validation;
 pub(super) mod typeguard;

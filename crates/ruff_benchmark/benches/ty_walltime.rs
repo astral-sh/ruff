@@ -51,7 +51,7 @@ impl<'a> Benchmark<'a> {
             ..Options::default()
         });
 
-        let mut db = ProjectDatabase::new(metadata, system).unwrap();
+        let mut db = ProjectDatabase::fallible(metadata, system).unwrap();
 
         db.project().set_included_paths(
             &mut db,
@@ -224,8 +224,8 @@ static STATIC_FRAME: Benchmark = Benchmark::new(
         repository: "https://github.com/static-frame/static-frame",
         commit: "34962b41baca5e7f98f5a758d530bff02748a421",
         paths: &["static_frame"],
-        // N.B. `arraykit` is installed as a dependency during mypy_primer runs,
-        // but it takes much longer to be installed in a Codspeed run than it does in a mypy_primer run
+        // N.B. `arraykit` is installed as a dependency during ecosystem runs,
+        // but it takes much longer to be installed in a Codspeed run
         // (seems to be built from source on the Codspeed CI runners for some reason).
         dependencies: &["numpy"],
         max_dep_date: "2025-08-09",

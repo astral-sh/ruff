@@ -401,7 +401,8 @@ impl Configuration {
                     .unwrap_or_default(),
                 flake8_tidy_imports: lint
                     .flake8_tidy_imports
-                    .map(Flake8TidyImportsOptions::into_settings)
+                    .map(Flake8TidyImportsOptions::try_into_settings)
+                    .transpose()?
                     .unwrap_or_default(),
                 flake8_type_checking: lint
                     .flake8_type_checking

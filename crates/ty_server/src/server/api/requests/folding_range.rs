@@ -2,9 +2,12 @@ use std::borrow::Cow;
 
 use lsp_types::request::FoldingRangeRequest;
 use lsp_types::{FoldingRange, FoldingRangeKind, FoldingRangeParams, Url};
+use ruff_db::source::source_text;
+use ruff_text_size::TextRange;
 use ty_ide::folding_ranges;
 use ty_project::ProjectDatabase;
 
+use crate::db::Db;
 use crate::document::ToRangeExt;
 use crate::server::api::traits::{
     BackgroundDocumentRequestHandler, RequestHandler, RetriableRequestHandler,
@@ -40,7 +43,20 @@ impl BackgroundDocumentRequestHandler for FoldingRangeRequestHandler {
             return Ok(None);
         };
 
-        let results: Vec<_> = folding_ranges(db, file)
+        // If this document is a notebook cell, only return folding ranges for this cell.
+        // Folding ranges are reported as local ranges, so returning notebook-wide ranges
+        // would produce invalid coordinates for every other cell.
+        let mut cell_range: Option<TextRange> = None;
+
+        if snapshot.document().is_cell()
+            && let Some(notebook_document) = db.notebook_document(file)
+            && let Some(notebook) = source_text(db, file).as_notebook()
+        {
+            let cell_index = notebook_document.cell_index_by_uri(snapshot.url());
+            cell_range = cell_index.and_then(|index| notebook.cell_range(index));
+        }
+
+        let results: Vec<_> = folding_ranges(db, file, cell_range)
             .into_iter()
             .filter_map(|folding_range| {
                 let lsp_range = folding_range

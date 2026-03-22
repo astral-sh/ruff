@@ -716,7 +716,7 @@ impl SemanticSyntaxChecker {
         ctx: &Ctx,
     ) {
         let mut seen_default = false;
-        for type_param in type_params.iter() {
+        for type_param in type_params {
             let has_default = match type_param {
                 ast::TypeParam::TypeVar(ast::TypeParamTypeVar { default, .. })
                 | ast::TypeParam::TypeVarTuple(ast::TypeParamTypeVarTuple { default, .. })

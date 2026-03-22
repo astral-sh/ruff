@@ -91,6 +91,7 @@ pub enum KnownClass {
     // Typing
     Awaitable,
     Generator,
+    AsyncGenerator,
     Deprecated,
     StdlibAlias,
     SpecialForm,
@@ -108,6 +109,7 @@ pub enum KnownClass {
     SupportsIndex,
     Iterable,
     Iterator,
+    AsyncIterator,
     Sequence,
     Mapping,
     // typing_extensions
@@ -226,6 +228,7 @@ impl KnownClass {
             | Self::ABCMeta
             | Self::Iterable
             | Self::Iterator
+            | Self::AsyncIterator
             | Self::Sequence
             | Self::Mapping
             // Evaluating `NotImplementedType` in a boolean context was deprecated in Python 3.9
@@ -236,6 +239,7 @@ impl KnownClass {
             | Self::Classmethod
             | Self::Awaitable
             | Self::Generator
+            | Self::AsyncGenerator
             | Self::Deprecated
             | Self::Field
             | Self::KwOnly
@@ -281,6 +285,7 @@ impl KnownClass {
             | KnownClass::Classmethod
             | KnownClass::Awaitable
             | KnownClass::Generator
+            | KnownClass::AsyncGenerator
             | KnownClass::Deprecated
             | KnownClass::Super
             | KnownClass::Enum
@@ -316,6 +321,7 @@ impl KnownClass {
             | KnownClass::SupportsIndex
             | KnownClass::Iterable
             | KnownClass::Iterator
+            | KnownClass::AsyncIterator
             | KnownClass::Sequence
             | KnownClass::Mapping
             | KnownClass::ChainMap
@@ -370,6 +376,7 @@ impl KnownClass {
             | KnownClass::Classmethod
             | KnownClass::Awaitable
             | KnownClass::Generator
+            | KnownClass::AsyncGenerator
             | KnownClass::Deprecated
             | KnownClass::Super
             | KnownClass::Enum
@@ -405,6 +412,7 @@ impl KnownClass {
             | KnownClass::SupportsIndex
             | KnownClass::Iterable
             | KnownClass::Iterator
+            | KnownClass::AsyncIterator
             | KnownClass::Sequence
             | KnownClass::Mapping
             | KnownClass::ChainMap
@@ -459,6 +467,7 @@ impl KnownClass {
             | KnownClass::Classmethod
             | KnownClass::Awaitable
             | KnownClass::Generator
+            | KnownClass::AsyncGenerator
             | KnownClass::Deprecated
             | KnownClass::Super
             | KnownClass::Enum
@@ -494,6 +503,7 @@ impl KnownClass {
             | KnownClass::SupportsIndex
             | KnownClass::Iterable
             | KnownClass::Iterator
+            | KnownClass::AsyncIterator
             | KnownClass::Sequence
             | KnownClass::Mapping
             | KnownClass::ChainMap
@@ -536,8 +546,10 @@ impl KnownClass {
             Self::SupportsIndex
             | Self::Iterable
             | Self::Iterator
+            | Self::AsyncIterator
             | Self::Awaitable
             | Self::NamedTupleLike
+            | Self::AsyncGenerator
             | Self::Generator => true,
 
             Self::Bool
@@ -674,6 +686,7 @@ impl KnownClass {
             | KnownClass::NoneType
             | KnownClass::Awaitable
             | KnownClass::Generator
+            | KnownClass::AsyncGenerator
             | KnownClass::Deprecated
             | KnownClass::StdlibAlias
             | KnownClass::SpecialForm
@@ -691,6 +704,7 @@ impl KnownClass {
             | KnownClass::SupportsIndex
             | KnownClass::Iterable
             | KnownClass::Iterator
+            | KnownClass::AsyncIterator
             | KnownClass::Sequence
             | KnownClass::Mapping
             | KnownClass::ChainMap
@@ -739,6 +753,7 @@ impl KnownClass {
             Self::Classmethod => "classmethod",
             Self::Awaitable => "Awaitable",
             Self::Generator => "Generator",
+            Self::AsyncGenerator => "AsyncGenerator",
             Self::Deprecated => "deprecated",
             Self::GenericAlias => "GenericAlias",
             Self::ModuleType => "ModuleType",
@@ -785,6 +800,7 @@ impl KnownClass {
             Self::Super => "super",
             Self::Iterable => "Iterable",
             Self::Iterator => "Iterator",
+            Self::AsyncIterator => "AsyncIterator",
             Self::Sequence => "Sequence",
             Self::Mapping => "Mapping",
             // For example, `typing.List` is defined as `List = _Alias()` in typeshed
@@ -1125,11 +1141,13 @@ impl KnownClass {
             Self::NoneType => KnownModule::Typeshed,
             Self::Awaitable
             | Self::Generator
+            | Self::AsyncGenerator
             | Self::SpecialForm
             | Self::TypeVar
             | Self::StdlibAlias
             | Self::Iterable
             | Self::Iterator
+            | Self::AsyncIterator
             | Self::Sequence
             | Self::Mapping
             | Self::ProtocolMeta
@@ -1232,6 +1250,7 @@ impl KnownClass {
             | Self::Classmethod
             | Self::Awaitable
             | Self::Generator
+            | Self::AsyncGenerator
             | Self::Deprecated
             | Self::GenericAlias
             | Self::ModuleType
@@ -1271,6 +1290,7 @@ impl KnownClass {
             | Self::InitVar
             | Self::Iterable
             | Self::Iterator
+            | Self::AsyncIterator
             | Self::Sequence
             | Self::Mapping
             | Self::NamedTupleFallback
@@ -1342,6 +1362,7 @@ impl KnownClass {
             | Self::Classmethod
             | Self::Awaitable
             | Self::Generator
+            | Self::AsyncGenerator
             | Self::Deprecated
             | Self::TypeVar
             | Self::ExtensionsTypeVar
@@ -1365,6 +1386,7 @@ impl KnownClass {
             | Self::InitVar
             | Self::Iterable
             | Self::Iterator
+            | Self::AsyncIterator
             | Self::Sequence
             | Self::Mapping
             | Self::NamedTupleFallback
@@ -1413,6 +1435,7 @@ impl KnownClass {
             "classmethod" => &[Self::Classmethod],
             "Awaitable" => &[Self::Awaitable],
             "Generator" => &[Self::Generator],
+            "AsyncGenerator" => &[Self::AsyncGenerator],
             "deprecated" => &[Self::Deprecated],
             "GenericAlias" => &[Self::GenericAlias],
             "NoneType" => &[Self::NoneType],
@@ -1431,6 +1454,7 @@ impl KnownClass {
             "TypeVar" => &[Self::TypeVar, Self::ExtensionsTypeVar],
             "Iterable" => &[Self::Iterable],
             "Iterator" => &[Self::Iterator],
+            "AsyncIterator" => &[Self::AsyncIterator],
             "Sequence" => &[Self::Sequence],
             "Mapping" => &[Self::Mapping],
             "ParamSpec" => &[Self::ParamSpec, Self::ExtensionsParamSpec],
@@ -1564,6 +1588,7 @@ impl KnownClass {
             | Self::Specialization
             | Self::Awaitable
             | Self::Generator
+            | Self::AsyncGenerator
             | Self::Template
             | Self::Path => module == self.canonical_module(db),
             Self::NoneType => matches!(module, KnownModule::Typeshed | KnownModule::Types),
@@ -1576,6 +1601,7 @@ impl KnownClass {
             | Self::TypeVarTuple
             | Self::Iterable
             | Self::Iterator
+            | Self::AsyncIterator
             | Self::Sequence
             | Self::Mapping
             | Self::ProtocolMeta
@@ -1720,7 +1746,9 @@ impl KnownClass {
                 };
 
                 overload.set_return_type(Type::KnownInstance(KnownInstanceType::Deprecated(
-                    DeprecatedInstance::new(db, message.as_string_literal()),
+                    DeprecatedInstance {
+                        message: message.as_string_literal(),
+                    },
                 )));
             }
 

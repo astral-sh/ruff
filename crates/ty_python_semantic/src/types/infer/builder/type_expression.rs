@@ -5,7 +5,8 @@ use super::{DeferredExpressionState, TypeInferenceBuilder};
 use crate::semantic_index::scope::ScopeKind;
 use crate::types::diagnostic::{
     self, INVALID_TYPE_FORM, NOT_SUBSCRIPTABLE, UNBOUND_TYPE_VARIABLE, UNSUPPORTED_OPERATOR,
-    report_invalid_argument_number_to_special_form, report_invalid_arguments_to_callable,
+    note_py_version_too_old_for_pep_604, report_invalid_argument_number_to_special_form,
+    report_invalid_arguments_to_callable,
 };
 use crate::types::infer::InferenceFlags;
 use crate::types::infer::builder::{InnerExpressionInferenceState, MultiInferenceState};
@@ -264,14 +265,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                             && !binary.left.is_string_literal_expr()
                                             && !binary.right.is_string_literal_expr()
                                         {
-                                            diagnostic.info(
-                                                "PEP 604 `|` unions are only available on \
-                                                Python 3.10+ unless they are quoted",
-                                            );
-                                            add_inferred_python_version_hint_to_diagnostic(
+                                            note_py_version_too_old_for_pep_604(
                                                 self.db(),
+                                                self.index,
                                                 &mut diagnostic,
-                                                "inferring types",
                                             );
                                         } else if python_version < PythonVersion::PY314 {
                                             diagnostic.info(
@@ -1752,7 +1749,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 type_of_type
             }
 
-            SpecialFormType::CallableTypeOf => {
+            SpecialFormType::CallableTypeOf | SpecialFormType::RegularCallableTypeOf => {
                 let arguments = if let ast::Expr::Tuple(tuple) = arguments_slice {
                     &*tuple.elts
                 } else {
@@ -1779,9 +1776,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
                 let argument_type = self.infer_expression(&arguments[0], TypeContext::default());
 
-                let Some(callable_type) = argument_type
-                    .try_upcast_to_callable(db)
-                    .map(|callables| callables.into_type(self.db()))
+                let Some(callable_type) =
+                    argument_type.try_upcast_to_callable(db).map(|callables| {
+                        if special_form == SpecialFormType::RegularCallableTypeOf {
+                            callables
+                                .map(|callable| callable.into_regular(db))
+                                .into_type(db)
+                        } else {
+                            callables.into_type(db)
+                        }
+                    })
                 else {
                     if let Some(builder) = self
                         .context
@@ -1831,17 +1835,25 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
                     Type::unknown()
                 }
-                _ => TypeIsType::unbound(
-                    self.db(),
-                    // N.B. Using the top materialization here is a pragmatic decision
-                    // that makes us produce more intuitive results given how
-                    // `TypeIs` is used in the real world (in particular, in typeshed).
-                    // However, there's some debate about whether this is really
-                    // fully correct. See <https://github.com/astral-sh/ruff/pull/20591>
-                    // for more discussion.
-                    self.infer_type_expression(arguments_slice)
-                        .top_materialization(self.db()),
-                ),
+                _ => {
+                    let narrowed = self.infer_type_expression(arguments_slice);
+                    let expanded = narrowed.expand_eagerly(self.db());
+
+                    if expanded.is_divergent() {
+                        expanded
+                    } else {
+                        TypeIsType::unbound(
+                            self.db(),
+                            // N.B. Using the top materialization here is a pragmatic decision
+                            // that makes us produce more intuitive results given how
+                            // `TypeIs` is used in the real world (in particular, in typeshed).
+                            // However, there's some debate about whether this is really
+                            // fully correct. See <https://github.com/astral-sh/ruff/pull/20591>
+                            // for more discussion.
+                            narrowed.top_materialization(self.db()),
+                        )
+                    }
+                }
             },
             SpecialFormType::TypeGuard => match arguments_slice {
                 ast::Expr::Tuple(_) => {

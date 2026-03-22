@@ -56,6 +56,7 @@ pub(crate) enum AnnotatedImport<'a> {
         module: Option<&'a str>,
         names: Vec<AnnotatedAliasData<'a>>,
         level: u32,
+        is_lazy: bool,
         atop: Vec<Comment<'a>>,
         inline: Vec<Comment<'a>>,
         trailing: Vec<Comment<'a>>,
@@ -341,6 +342,7 @@ mod tests {
     #[test_case(Path::new("insert_empty_lines.py"))]
     #[test_case(Path::new("insert_empty_lines.pyi"))]
     #[test_case(Path::new("isort_skip_file.py"))]
+    #[test_case(Path::new("lazy_imports.py"))]
     #[test_case(Path::new("leading_prefix.py"))]
     #[test_case(Path::new("magic_trailing_comma.py"))]
     #[test_case(Path::new("match_case.py"))]
@@ -766,6 +768,7 @@ mod tests {
     }
 
     #[test_case(Path::new("force_sort_within_sections.py"))]
+    #[test_case(Path::new("lazy_force_sort_within_sections.py"))]
     #[test_case(Path::new("force_sort_within_sections_with_as_names.py"))]
     #[test_case(Path::new("force_sort_within_sections_future.py"))]
     fn force_sort_within_sections(path: &Path) -> Result<()> {
@@ -1064,6 +1067,7 @@ mod tests {
     }
 
     #[test_case(Path::new("from_first.py"))]
+    #[test_case(Path::new("lazy_from_first.py"))]
     fn from_first(path: &Path) -> Result<()> {
         let snapshot = format!("from_first_{}", path.to_string_lossy());
         let diagnostics = test_path(

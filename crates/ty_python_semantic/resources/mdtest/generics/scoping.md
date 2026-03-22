@@ -546,7 +546,7 @@ parameters from the enclosing class.
 ```py
 from typing import Generic, TypeVar
 
-from ty_extensions import into_callable
+from ty_extensions import into_regular_callable
 
 T = TypeVar("T")
 S = TypeVar("S")
@@ -557,7 +557,7 @@ class Foo(Generic[T]):
 
 def f(x: type[Foo[T]]) -> T:
     # revealed: [S](self, x: T@f, y: S) -> tuple[T@f, S]
-    reveal_type(into_callable(x.bar))
+    reveal_type(into_regular_callable(x.bar))
     raise NotImplementedError
 ```
 

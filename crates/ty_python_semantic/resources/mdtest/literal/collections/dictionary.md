@@ -146,3 +146,97 @@ reveal_type(x12[0][1]["b"])  # revealed: Literal["4"]
 reveal_type(x12[0][2]["a"])  # revealed: int
 reveal_type(x12[0][3]["b"])  # revealed: int
 ```
+
+## Dict unpacking in function calls
+
+Narrowing is also performed for dictionary unpacking expressions:
+
+```py
+def f1(a: int): ...
+def f2(a: int, b: str): ...
+def f3(a: int, b: str, c: float): ...
+
+x1: dict[str, float | str] = {"a": 1, "b": "a"}
+
+f2(**x1)  # ok
+
+# N.B. We only use dictionary narrowing to narrow known keys to a more precise type, and fallback
+# to the dictionary value type otherwise. We avoid making assumptions about which keys may or may
+# not be present in ways that could lead to false positives.
+f1(**x1)  # ok
+
+# error: [invalid-argument-type]
+f3(**x1)
+
+x1["c"] = 1.0
+f3(**x1)  # ok
+
+def _(x: dict[str, int]):
+    # error: [invalid-argument-type]
+    f2(**x)
+
+def _(x: dict[str, int | str]):
+    # error: [invalid-argument-type]
+    f1(**x)
+
+    x["a"] = 1
+    f1(**x)  # ok
+
+def _(x: dict[str, int | str], flag: bool):
+    if flag:
+        x["a"] = 1
+
+    # error: [invalid-argument-type]
+    f1(**x)
+
+x2: dict[str, object] = {"inner": {"a": 1}}
+# error: [invalid-argument-type]
+f1(**x2)
+
+x3: dict[str, dict[str, object]] = {"inner": {"a": 1, "b": "a"}}
+
+f2(**x3["inner"])  # ok
+f1(**x3["inner"])  # ok
+# error: [invalid-argument-type]
+f3(**x3["inner"])
+
+x3["inner"]["c"] = 1.0
+f3(**x3["inner"])  # ok
+
+x3["inner"] = {"inner": {"a": 1}}
+# error: [invalid-argument-type]
+f1(**x3["inner"])
+
+def _(x: dict[str, object]):
+    x["inner"]: dict[str, float | str] = {"a": 1, "b": "a"}
+
+    f2(**x["inner"])  # ok
+    f1(**x["inner"])  # ok
+    # error: [invalid-argument-type]
+    f3(**x["inner"])
+
+    x["inner"]["c"] = 1.0
+    f3(**x["inner"])  # ok
+
+    x["inner"] = {"inner": {"a": 1}}
+    # error: [invalid-argument-type]
+    f1(**x["inner"])
+
+class Y:
+    inner: dict[str, object]
+
+def _(y: Y):
+    y.inner = {"a": 1, "b": "a"}
+
+    f2(**y.inner)  # ok
+    f1(**y.inner)  # ok
+    # error: [invalid-argument-type]
+    f3(**y.inner)
+
+    y.inner["c"] = 1.0
+    f3(**y.inner)  # ok
+
+    y.inner = {"inner": {"a": 1}}
+    # error: [invalid-argument-type]
+    f1(**y.inner)
+```

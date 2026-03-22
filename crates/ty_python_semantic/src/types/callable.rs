@@ -10,9 +10,8 @@ use crate::{
         KnownInstanceType, LiteralValueTypeKind, MemberLookupPolicy, Parameter, Parameters,
         Signature, SubclassOfInner, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
         UnionType,
-        constraints::{ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension},
-        generics::InferableTypeVars,
-        relation::{HasRelationToVisitor, IsDisjointVisitor, TypeRelation},
+        constraints::{ConstraintSet, IteratorConstraintsExtension},
+        relation::{TypeRelation, TypeRelationChecker},
         signatures::CallableSignature,
         visitor, walk_signature,
     },
@@ -41,6 +40,14 @@ impl<'db> Type<'db> {
     }
 
     pub(crate) fn try_upcast_to_callable(self, db: &'db dyn Db) -> Option<CallableTypes<'db>> {
+        self.try_upcast_to_callable_with_policy(db, UpcastPolicy::default())
+    }
+
+    pub(crate) fn try_upcast_to_callable_with_policy(
+        self,
+        db: &'db dyn Db,
+        policy: UpcastPolicy,
+    ) -> Option<CallableTypes<'db>> {
         match self {
             Type::Callable(callable) => Some(CallableTypes::one(callable)),
 
@@ -68,7 +75,7 @@ impl<'db> Type<'db> {
                 if let Place::Defined(place) = call_symbol
                     && place.is_definitely_defined()
                 {
-                    place.ty.try_upcast_to_callable(db)
+                    place.ty.try_upcast_to_callable_with_policy(db, policy)
                 } else {
                     None
                 }
@@ -79,8 +86,15 @@ impl<'db> Type<'db> {
 
             Type::GenericAlias(alias) => Some(ClassType::Generic(alias).into_callable(db)),
 
-            Type::NewTypeInstance(newtype) => {
-                newtype.concrete_base_type(db).try_upcast_to_callable(db)
+            Type::NewTypeInstance(newtype) => newtype
+                .concrete_base_type(db)
+                .try_upcast_to_callable_with_policy(db, policy),
+
+            Type::SubclassOf(subclass_of_ty) if policy == UpcastPolicy::Sound => {
+                Some(CallableTypes::one(CallableType::function_like(
+                    db,
+                    Signature::new(Parameters::top(), subclass_of_ty.to_instance(db)),
+                )))
             }
 
             // TODO: This is unsound so in future we can consider an opt-in option to disable it.
@@ -88,7 +102,9 @@ impl<'db> Type<'db> {
                 SubclassOfInner::Class(class) => Some(class.into_callable(db)),
                 SubclassOfInner::TypeVar(tvar) => match tvar.typevar(db).bound_or_constraints(db) {
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                        let upcast_callables = bound.to_meta_type(db).try_upcast_to_callable(db)?;
+                        let upcast_callables = bound
+                            .to_meta_type(db)
+                            .try_upcast_to_callable_with_policy(db, policy)?;
                         Some(upcast_callables.map(|callable| {
                             let signatures = callable
                                 .signatures(db)
@@ -104,8 +120,9 @@ impl<'db> Type<'db> {
                     Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
                         let mut callables = SmallVec::new();
                         for constraint in constraints.elements(db) {
-                            let element_upcast =
-                                constraint.to_meta_type(db).try_upcast_to_callable(db)?;
+                            let element_upcast = constraint
+                                .to_meta_type(db)
+                                .try_upcast_to_callable_with_policy(db, policy)?;
                             for callable in element_upcast.into_inner() {
                                 let signatures = callable
                                     .signatures(db)
@@ -134,7 +151,8 @@ impl<'db> Type<'db> {
             Type::Union(union) => {
                 let mut callables = SmallVec::new();
                 for element in union.elements(db) {
-                    let element_callable = element.try_upcast_to_callable(db)?;
+                    let element_callable =
+                        element.try_upcast_to_callable_with_policy(db, policy)?;
                     callables.extend(element_callable.into_inner());
                 }
                 Some(CallableTypes::new(callables))
@@ -143,11 +161,13 @@ impl<'db> Type<'db> {
             Type::LiteralValue(literal) => match literal.kind() {
                 LiteralValueTypeKind::Enum(enum_literal) => enum_literal
                     .enum_class_instance(db)
-                    .try_upcast_to_callable(db),
+                    .try_upcast_to_callable_with_policy(db, policy),
                 _ => None,
             },
 
-            Type::TypeAlias(alias) => alias.value_type(db).try_upcast_to_callable(db),
+            Type::TypeAlias(alias) => alias
+                .value_type(db)
+                .try_upcast_to_callable_with_policy(db, policy),
 
             Type::KnownBoundMethod(method) => Some(CallableTypes::one(CallableType::new(
                 db,
@@ -218,6 +238,50 @@ pub enum CallableTypeKind {
 
     /// Represents the value bound to a `typing.ParamSpec` type variable.
     ParamSpecValue,
+}
+
+/// A "policy" enum that describes how `type[]` types should be upcast
+/// to `Callable` types.
+///
+/// `type[T]` is generally considered assignable to
+/// `Callable[<constructor signature of T>, T]` in Python, and most
+/// type-checking in Python uses assignability rather than subtyping
+/// when determining whether to emit errors on code, so -- despite its
+/// scary name -- [`UpcastPolicy::Unsound`] is actually the policy that
+/// you probably want in most situations. We *have* to use
+/// [`UpcastPolicy::Sound`], however, when doing subtyping or redundancy
+/// checks, because constructor signatures in subclasses are not checked
+/// for Liskov substitutability: `type[S]` may not be a subtype of
+/// `Callable[<constructor signature of T>, T]` even if `S` is a subtype
+/// of `T`. If this unsoundness leaked into our union simplification or
+/// subtyping checks, it would ead to nontransitivity of subtyping,
+/// breaking fundamental assumptions in our model.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Default)]
+pub(crate) enum UpcastPolicy {
+    /// Only upcast types to callables in a sound fashion.
+    ///
+    /// This means that `type[T]` is upcast to `Top[Callable[..., T]]`
+    /// rather than `Callable[<constructor signature of T>, T]`,
+    /// since the former is sound while the latter is not.
+    Sound,
+
+    /// Allow unsound upcasts to callables, such as treating `type[T]` as
+    /// `Callable[<constructor signature of T>, T`.
+    #[default]
+    Unsound,
+}
+
+impl From<TypeRelation> for UpcastPolicy {
+    fn from(relation: TypeRelation) -> Self {
+        match relation {
+            TypeRelation::Subtyping
+            | TypeRelation::Redundancy { .. }
+            | TypeRelation::SubtypingAssuming => UpcastPolicy::Sound,
+            TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability => {
+                UpcastPolicy::Unsound
+            }
+        }
+    }
 }
 
 /// This type represents the set of all callable objects with a certain, possibly overloaded,
@@ -292,6 +356,10 @@ impl<'db> CallableType<'db> {
         matches!(self.kind(db), CallableTypeKind::StaticMethodLike)
     }
 
+    pub(crate) fn into_regular(self, db: &'db dyn Db) -> CallableType<'db> {
+        CallableType::new(db, self.signatures(db), CallableTypeKind::Regular)
+    }
+
     pub(crate) fn bind_self(
         self,
         db: &'db dyn Db,
@@ -363,35 +431,6 @@ impl<'db> CallableType<'db> {
         self.signatures(db)
             .find_legacy_typevars_impl(db, binding_context, typevars, visitor);
     }
-
-    /// Check whether this callable type has the given relation to another callable type.
-    ///
-    /// See [`Type::is_subtype_of`] and [`Type::is_assignable_to`] for more details.
-    #[expect(clippy::too_many_arguments)]
-    pub(super) fn has_relation_to_impl<'c>(
-        self,
-        db: &'db dyn Db,
-        other: Self,
-        constraints: &'c ConstraintSetBuilder<'db>,
-        inferable: InferableTypeVars<'_, 'db>,
-        relation: TypeRelation,
-        relation_visitor: &HasRelationToVisitor<'db, 'c>,
-        disjointness_visitor: &IsDisjointVisitor<'db, 'c>,
-    ) -> ConstraintSet<'db, 'c> {
-        if other.is_function_like(db) && !self.is_function_like(db) {
-            return ConstraintSet::from_bool(constraints, false);
-        }
-
-        self.signatures(db).has_relation_to_impl(
-            db,
-            other.signatures(db),
-            constraints,
-            inferable,
-            relation,
-            relation_visitor,
-            disjointness_visitor,
-        )
-    }
 }
 
 /// Converting a type "into a callable" can possibly return a _union_ of callables. Eventually,
@@ -435,39 +474,53 @@ impl<'db> CallableTypes<'db> {
         self.0
     }
 
+    pub(super) fn iter(&self) -> std::slice::Iter<'_, CallableType<'db>> {
+        self.0.iter()
+    }
+
     pub(crate) fn into_type(self, db: &'db dyn Db) -> Type<'db> {
-        match self.0.as_slice() {
-            [] => unreachable!("CallableTypes should not be empty"),
-            [single] => Type::Callable(*single),
-            slice => UnionType::from_elements(db, slice.iter().copied().map(Type::Callable)),
-        }
+        assert!(!self.0.is_empty(), "CallableTypes should not be empty");
+        UnionType::from_elements(db, self.0.into_iter().map(Type::Callable))
     }
 
     pub(crate) fn map(self, mut f: impl FnMut(CallableType<'db>) -> CallableType<'db>) -> Self {
         Self::from_elements(self.0.iter().map(|element| f(*element)))
     }
+}
 
-    #[expect(clippy::too_many_arguments)]
-    pub(crate) fn has_relation_to_impl<'c>(
-        self,
+impl<'a, 'db> IntoIterator for &'a CallableTypes<'db> {
+    type IntoIter = std::slice::Iter<'a, CallableType<'db>>;
+    type Item = &'a CallableType<'db>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.iter()
+    }
+}
+
+impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
+    /// Check whether one callable type has the given relation to another callable type.
+    ///
+    /// See [`Type::is_subtype_of`] and [`Type::is_assignable_to`] for more details.
+    pub(super) fn check_callable_pair(
+        &self,
         db: &'db dyn Db,
-        other: CallableType<'db>,
-        constraints: &'c ConstraintSetBuilder<'db>,
-        inferable: InferableTypeVars<'_, 'db>,
-        relation: TypeRelation,
-        relation_visitor: &HasRelationToVisitor<'db, 'c>,
-        disjointness_visitor: &IsDisjointVisitor<'db, 'c>,
+        source: CallableType<'db>,
+        target: CallableType<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        self.0.iter().when_all(db, constraints, |element| {
-            element.has_relation_to_impl(
-                db,
-                other,
-                constraints,
-                inferable,
-                relation,
-                relation_visitor,
-                disjointness_visitor,
-            )
+        if target.is_function_like(db) && !source.is_function_like(db) {
+            return self.never();
+        }
+        self.check_callable_signature_pair(db, source.signatures(db), target.signatures(db))
+    }
+
+    pub(super) fn check_callables_vs_callable(
+        &self,
+        db: &'db dyn Db,
+        source: &CallableTypes<'db>,
+        target: CallableType<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        source.iter().when_all(db, self.constraints, |element| {
+            self.check_callable_pair(db, *element, target)
         })
     }
 }

@@ -28,9 +28,11 @@ use std::iter::FusedIterator;
 use std::panic::{AssertUnwindSafe, UnwindSafe};
 use std::sync::Arc;
 use thiserror::Error;
-use ty_python_semantic::add_inferred_python_version_hint_to_diagnostic;
 use ty_python_semantic::lint::RuleSelection;
 use ty_python_semantic::types::check_types;
+use ty_python_semantic::{
+    FallibleStrategy, MisconfigurationStrategy, add_inferred_python_version_hint_to_diagnostic,
+};
 
 mod db;
 mod files;
@@ -172,15 +174,15 @@ impl ProgressReporter for CollectReporter {
 
 #[salsa::tracked]
 impl Project {
-    pub fn from_metadata(db: &dyn Db, metadata: ProjectMetadata) -> Result<Self, ToSettingsError> {
-        let (settings, diagnostics) = metadata.options().to_settings(db, metadata.root())?;
-
-        // This adds a file root for the project itself. This enables
-        // tracking of when changes are made to the files in a project
-        // at the directory level. At time of writing (2025-07-17),
-        // this is used for caching completions for submodules.
-        db.files()
-            .try_add_root(db, metadata.root(), FileRootKind::Project);
+    pub fn from_metadata<Strategy: MisconfigurationStrategy>(
+        db: &dyn Db,
+        metadata: ProjectMetadata,
+        strategy: &Strategy,
+    ) -> Result<Self, Strategy::Error<ToSettingsError>> {
+        let (settings, diagnostics) =
+            metadata
+                .options()
+                .to_settings(db, metadata.root(), strategy)?;
 
         let project = Project::builder(Box::new(metadata), Box::new(settings), diagnostics)
             .durability(Durability::MEDIUM)
@@ -188,7 +190,18 @@ impl Project {
             .file_set_durability(Durability::LOW)
             .new(db);
 
+        project.try_add_file_root(db);
+
         Ok(project)
+    }
+
+    fn try_add_file_root(self, db: &dyn Db) {
+        // This adds a file root for the project itself. This enables
+        // tracking of when changes are made to the files in a project
+        // at the directory level. At time of writing (2025-07-17),
+        // this is used for caching completions for submodules.
+        db.files()
+            .try_add_root(db, self.root(db), FileRootKind::Project);
     }
 
     pub fn root(self, db: &dyn Db) -> &SystemPath {
@@ -233,29 +246,37 @@ impl Project {
 
     pub fn reload(self, db: &mut dyn Db, metadata: ProjectMetadata) {
         tracing::debug!("Reloading project");
-        assert_eq!(self.root(db), metadata.root());
-
-        if &metadata != self.metadata(db) {
-            match metadata.options().to_settings(db, metadata.root()) {
-                Ok((settings, settings_diagnostics)) => {
-                    if self.settings(db) != &settings {
-                        self.set_settings(db).to(Box::new(settings));
-                    }
-
-                    if self.settings_diagnostics(db) != settings_diagnostics {
-                        self.set_settings_diagnostics(db).to(settings_diagnostics);
-                    }
-                }
-                Err(error) => {
-                    self.set_settings_diagnostics(db)
-                        .to(vec![error.into_diagnostic()]);
-                }
-            }
-
-            self.set_metadata(db).to(Box::new(metadata));
-        }
 
         self.reload_files(db);
+
+        if &metadata == self.metadata(db) {
+            return;
+        }
+
+        match metadata
+            .options()
+            .to_settings(db, metadata.root(), &FallibleStrategy)
+        {
+            Ok((settings, settings_diagnostics)) => {
+                if self.settings(db) != &settings {
+                    self.set_settings(db).to(Box::new(settings));
+                }
+
+                if self.settings_diagnostics(db) != settings_diagnostics {
+                    self.set_settings_diagnostics(db).to(settings_diagnostics);
+                }
+            }
+            Err(error) => {
+                tracing::warn!(
+                    "Keeping old project configuration because loading the new settings failed with: {error}"
+                );
+                self.set_settings_diagnostics(db)
+                    .to(vec![error.into_diagnostic()]);
+            }
+        }
+
+        self.set_metadata(db).to(Box::new(metadata));
+        self.try_add_file_root(db);
     }
 
     /// Checks the project and its dependencies according to the project's check mode.

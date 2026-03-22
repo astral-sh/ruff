@@ -10,7 +10,7 @@ use ruff_db::parsed::ParsedModuleRef;
 use ruff_db::source::{SourceText, source_text};
 use ruff_index::IndexVec;
 use ruff_python_ast::name::Name;
-use ruff_python_ast::visitor::{Visitor, walk_expr, walk_pattern, walk_stmt};
+use ruff_python_ast::visitor::{Visitor, walk_expr, walk_keyword, walk_pattern, walk_stmt};
 use ruff_python_ast::{self as ast, AtomicNodeIndex, NodeIndex, PySourceType, PythonVersion};
 use ruff_python_parser::semantic_errors::{
     LazyImportContext, SemanticSyntaxChecker, SemanticSyntaxContext, SemanticSyntaxError,
@@ -35,8 +35,8 @@ use crate::semantic_index::expression::{Expression, ExpressionKind};
 use crate::semantic_index::member::MemberExprBuilder;
 use crate::semantic_index::place::{PlaceExpr, PlaceTableBuilder, ScopedPlaceId};
 use crate::semantic_index::predicate::{
-    CallableAndCallExpr, ClassPatternKind, PatternPredicate, PatternPredicateKind, Predicate,
-    PredicateNode, PredicateOrLiteral, ScopedPredicateId, StarImportPlaceholderPredicate,
+    ClassPatternKind, PatternPredicate, PatternPredicateKind, Predicate, PredicateNode,
+    PredicateOrLiteral, ScopedPredicateId, StarImportPlaceholderPredicate,
 };
 use crate::semantic_index::re_exports::exported_names;
 use crate::semantic_index::reachability_constraints::{
@@ -59,6 +59,8 @@ use crate::semantic_model::HasTrackedScope;
 use crate::types::{EvaluationMode, PossiblyNarrowedPlaces};
 use crate::unpack::{Unpack, UnpackKind, UnpackPosition, UnpackValue};
 use crate::{Db, Program};
+
+use super::place::PlaceExprRef;
 
 mod except_handlers;
 mod loop_bindings_visitor;
@@ -855,14 +857,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 continue;
             };
 
-            // Recurse into nested dictionaries.
-            self.add_dict_key_assignment_definitions_impl(
-                &member_expr,
-                (&item.value).into(),
-                assignment,
-            );
-
-            if let Some(place_expr) = PlaceExpr::try_from_member_expr(member_expr) {
+            if let Some(place_expr) = PlaceExpr::try_from_member_expr(member_expr.clone()) {
                 let place_id = self.add_place(place_expr);
 
                 self.add_definition(
@@ -872,6 +867,16 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         assignment,
                         value: &item.value,
                     },
+                );
+
+                // Recurse into nested dictionaries.
+                //
+                // Note that we must do this _after_ adding the outer place in order to track
+                // sub-member places correctly.
+                self.add_dict_key_assignment_definitions_impl(
+                    &member_expr,
+                    (&item.value).into(),
+                    assignment,
                 );
             }
         }
@@ -1053,7 +1058,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         PossiblyNarrowedPlacesBuilder::new(self.db, place_table)
                             .pattern(pattern, module)
                     }
-                    PredicateNode::ReturnsNever(_) | PredicateNode::StarImportPlaceholder(_) => {
+                    PredicateNode::IsNonTerminalCall(_)
+                    | PredicateNode::StarImportPlaceholder(_) => {
                         // These predicates don't narrow any places
                         PossiblyNarrowedPlaces::default()
                     }
@@ -2784,50 +2790,79 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 // We also only add these inside function scopes, since considering module-level
                 // constraints can affect the type of imported symbols, leading to a lot more
                 // work in third-party code.
-                let call_info = match value.as_ref() {
-                    ast::Expr::Call(ast::ExprCall { func, .. }) => {
-                        Some((func.as_ref(), value.as_ref(), false))
-                    }
-                    ast::Expr::Await(ast::ExprAwait { value: inner, .. }) => match inner.as_ref() {
-                        ast::Expr::Call(ast::ExprCall { func, .. }) => {
-                            Some((func.as_ref(), value.as_ref(), true))
-                        }
-                        _ => None,
-                    },
-                    _ => None,
+                let is_call = match value.as_ref() {
+                    ast::Expr::Call(_) => true,
+                    ast::Expr::Await(ast::ExprAwait { value: inner, .. }) => inner.is_call_expr(),
+                    _ => false,
                 };
 
-                if let Some((func, expr, is_await)) = call_info {
-                    if !self.source_type.is_stub() && self.in_function_scope() {
-                        let callable = self.add_standalone_expression(func);
-                        let call_expr = self.add_standalone_expression(expr);
+                if is_call && !self.source_type.is_stub() && self.in_function_scope() {
+                    let call_expr = self.add_standalone_expression(value.as_ref());
 
-                        let predicate = Predicate {
-                            node: PredicateNode::ReturnsNever(CallableAndCallExpr {
-                                callable,
-                                call_expr,
-                                is_await,
-                            }),
-                            is_positive: false,
-                        };
-                        let constraint = self.record_reachability_constraint(
-                            PredicateOrLiteral::Predicate(predicate),
-                        );
+                    let predicate = Predicate {
+                        node: PredicateNode::IsNonTerminalCall(call_expr),
+                        is_positive: true,
+                    };
+                    let constraint = self
+                        .record_reachability_constraint(PredicateOrLiteral::Predicate(predicate));
 
-                        // Also gate narrowing by this constraint: if the call returns
-                        // `Never`, any narrowing in the current branch should be
-                        // invalidated (since this path is unreachable). This enables
-                        // narrowing to be preserved after if-statements where one branch
-                        // calls a `NoReturn` function like `sys.exit()`.
-                        self.current_use_def_map_mut()
-                            .record_narrowing_constraint_for_all_places(constraint);
-                    }
+                    // Also gate narrowing by this constraint: if the call returns
+                    // `Never`, any narrowing in the current branch should be
+                    // invalidated (since this path is unreachable). This enables
+                    // narrowing to be preserved after if-statements where one branch
+                    // calls a `NoReturn` function like `sys.exit()`.
+                    self.current_use_def_map_mut()
+                        .record_narrowing_constraint_for_all_places(constraint);
                 }
             }
             _ => {
                 walk_stmt(self, stmt);
             }
         }
+    }
+
+    fn visit_keyword(&mut self, keyword: &'ast ast::Keyword) {
+        walk_keyword(self, keyword);
+
+        if keyword.arg.is_some() {
+            return;
+        }
+
+        // Record a use of all members of `x` for a splatted keyword argument `**x`.
+        let current_scope = self.current_scope();
+        let member_places = PlaceExpr::try_from_expr(&keyword.value)
+            .and_then(|value_place_expr| {
+                self.current_place_table()
+                    .place_id((&value_place_expr).into())
+            })
+            .map(|value_place_id| {
+                let place_table = &self.place_tables[current_scope];
+                place_table
+                    .associated_place_ids(value_place_id)
+                    .iter()
+                    .filter(move |key_member_id| {
+                        let key_member_expr = place_table.member(**key_member_id).expression();
+
+                        // Only include top-level keys.
+                        let Some(key_parent) = key_member_expr.as_ref().parent() else {
+                            return true;
+                        };
+                        match place_table.place(value_place_id) {
+                            PlaceExprRef::Symbol(_) => false,
+                            PlaceExprRef::Member(value_member) => {
+                                key_parent == value_member.expression()
+                            }
+                        }
+                    })
+                    .map(|key_member_id| ScopedPlaceId::from(*key_member_id))
+            });
+
+        let use_id = self.ast_ids[current_scope].record_use(keyword);
+        self.use_def_maps[current_scope].record_multi_use(
+            member_places.into_iter().flatten(),
+            use_id,
+            NodeKey::from_node(keyword),
+        );
     }
 
     fn visit_expr(&mut self, expr: &'ast ast::Expr) {

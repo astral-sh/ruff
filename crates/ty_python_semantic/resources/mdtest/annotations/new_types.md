@@ -20,7 +20,7 @@ type (i.e. not an alias).
 
 ```py
 from typing_extensions import NewType
-from ty_extensions import static_assert, is_subtype_of, is_equivalent_to
+from ty_extensions import static_assert, is_subtype_of, is_equivalent_to, Not, Intersection, AlwaysFalsy, is_assignable_to
 
 Foo = NewType("Foo", int)
 Bar = NewType("Bar", Foo)
@@ -53,6 +53,21 @@ g(Bar(Foo(42)))
 h(42)  # error: [invalid-argument-type] "Argument to function `h` is incorrect: Expected `Bar`, found `Literal[42]`"
 h(Foo(42))  # error: [invalid-argument-type] "Argument to function `h` is incorrect: Expected `Bar`, found `Foo`"
 h(Bar(Foo(42)))
+
+FloatNewType = NewType("FloatNewType", float)
+
+static_assert(is_subtype_of(FloatNewType, float))
+static_assert(is_subtype_of(Intersection[FloatNewType, AlwaysFalsy], float))
+static_assert(is_subtype_of(Intersection[FloatNewType, Not[AlwaysFalsy]], float))
+
+ComplexNewType = NewType("ComplexNewType", complex)
+
+static_assert(is_subtype_of(ComplexNewType, complex))
+static_assert(is_subtype_of(Intersection[ComplexNewType, AlwaysFalsy], complex))
+static_assert(is_subtype_of(Intersection[ComplexNewType, Not[AlwaysFalsy]], complex))
+static_assert(not is_assignable_to(ComplexNewType, float))
+static_assert(not is_assignable_to(Intersection[ComplexNewType, AlwaysFalsy], float))
+static_assert(not is_assignable_to(Intersection[ComplexNewType, Not[AlwaysFalsy]], float))
 ```
 
 ## Member and method lookup work
@@ -84,11 +99,11 @@ reveal_type(Baz.__supertype__)  # revealed: type | NewType
 ```py
 from collections.abc import Callable
 from typing_extensions import NewType
-from ty_extensions import CallableTypeOf
+from ty_extensions import RegularCallableTypeOf
 
 Foo = NewType("Foo", int)
 
-def _(obj: CallableTypeOf[Foo]):
+def _(obj: RegularCallableTypeOf[Foo]):
     reveal_type(obj)  # revealed: (int, /) -> Foo
 
 def f(_: Callable[[int], Foo]): ...
@@ -105,15 +120,15 @@ g(Foo)  # error: [invalid-argument-type]
 
 ```py
 from typing import NewType, Callable, Any
-from ty_extensions import CallableTypeOf
+from ty_extensions import RegularCallableTypeOf
 
 N = NewType("N", int)
 i = N(42)
 
 y: Callable[..., Any] = i  # error: [invalid-assignment] "Object of type `N` is not assignable to `(...) -> Any`"
 
-# error: [invalid-type-form] "Expected the first argument to `ty_extensions.CallableTypeOf` to be a callable object, but got an object of type `N`"
-def f(x: CallableTypeOf[i]):
+# error: [invalid-type-form] "Expected the first argument to `ty_extensions.RegularCallableTypeOf` to be a callable object, but got an object of type `N`"
+def f(x: RegularCallableTypeOf[i]):
     reveal_type(x)  # revealed: Unknown
 
 class SomethingCallable:
@@ -125,7 +140,7 @@ j = N2(SomethingCallable())
 
 z: Callable[[str], bytes] = j  # fine
 
-def g(x: CallableTypeOf[j]):
+def g(x: RegularCallableTypeOf[j]):
     reveal_type(x)  # revealed: (a: str) -> bytes
 ```
 
@@ -412,6 +427,17 @@ def _(x: Foo | float, y: Bar | complex):
     reveal_type(+y)  # revealed: int | float | complex
     ~y  # error: [unsupported-operator]
     reveal_type(not y)  # revealed: bool
+```
+
+Intersections with `NewType`s solve to `Never` if the intersection with the `NewType`'s concrete
+base type would also solve to `Never`:
+
+```py
+TFloat = NewType("TFloat", float)
+
+def f(x: TFloat) -> None:
+    if not isinstance(x, float | int):
+        reveal_type(x)  # revealed: Never
 ```
 
 ## A `NewType` definition must be a simple variable assignment

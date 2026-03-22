@@ -449,7 +449,7 @@ the generic callable.)
 
 ```py
 from typing import Callable
-from ty_extensions import CallableTypeOf, ConstraintSet, TypeOf, is_subtype_of, static_assert
+from ty_extensions import RegularCallableTypeOf, ConstraintSet, TypeOf, is_subtype_of, static_assert
 
 def identity[T](t: T) -> T:
     return t
@@ -462,9 +462,9 @@ static_assert(constraints.implies_subtype_of(TypeOf[identity], Callable[[int], i
 static_assert(constraints.implies_subtype_of(TypeOf[identity], Callable[[str], str]))
 static_assert(not constraints.implies_subtype_of(TypeOf[identity], Callable[[str], int]))
 
-static_assert(constraints.implies_subtype_of(CallableTypeOf[identity], Callable[[int], int]))
-static_assert(constraints.implies_subtype_of(CallableTypeOf[identity], Callable[[str], str]))
-static_assert(not constraints.implies_subtype_of(CallableTypeOf[identity], Callable[[str], int]))
+static_assert(constraints.implies_subtype_of(RegularCallableTypeOf[identity], Callable[[int], int]))
+static_assert(constraints.implies_subtype_of(RegularCallableTypeOf[identity], Callable[[str], str]))
+static_assert(not constraints.implies_subtype_of(RegularCallableTypeOf[identity], Callable[[str], int]))
 
 static_assert(constraints.implies_subtype_of(TypeOf[identity], GenericIdentity[int]))
 static_assert(constraints.implies_subtype_of(TypeOf[identity], GenericIdentity[str]))
@@ -481,9 +481,9 @@ static_assert(not constraints.implies_subtype_of(Callable[[int], int], TypeOf[id
 static_assert(not constraints.implies_subtype_of(Callable[[str], str], TypeOf[identity]))
 static_assert(not constraints.implies_subtype_of(Callable[[str], int], TypeOf[identity]))
 
-static_assert(not constraints.implies_subtype_of(Callable[[int], int], CallableTypeOf[identity]))
-static_assert(not constraints.implies_subtype_of(Callable[[str], str], CallableTypeOf[identity]))
-static_assert(not constraints.implies_subtype_of(Callable[[str], int], CallableTypeOf[identity]))
+static_assert(not constraints.implies_subtype_of(Callable[[int], int], RegularCallableTypeOf[identity]))
+static_assert(not constraints.implies_subtype_of(Callable[[str], str], RegularCallableTypeOf[identity]))
+static_assert(not constraints.implies_subtype_of(Callable[[str], int], RegularCallableTypeOf[identity]))
 
 static_assert(not constraints.implies_subtype_of(GenericIdentity[int], TypeOf[identity]))
 static_assert(not constraints.implies_subtype_of(GenericIdentity[str], TypeOf[identity]))

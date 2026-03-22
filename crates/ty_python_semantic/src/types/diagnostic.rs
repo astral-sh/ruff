@@ -11,7 +11,7 @@ use crate::lint::{Level, LintRegistryBuilder, LintStatus};
 use crate::place::{DefinedPlace, Place};
 use crate::semantic_index::definition::{Definition, DefinitionKind};
 use crate::semantic_index::place::{PlaceTable, ScopedPlaceId};
-use crate::semantic_index::{global_scope, place_table, use_def_map};
+use crate::semantic_index::{SemanticIndex, global_scope, place_table, use_def_map};
 use crate::suppression::FileSuppressionId;
 use crate::types::call::CallError;
 use crate::types::class::{CodeGeneratorKind, DisjointBase, DisjointBaseKind, MethodDecorator};
@@ -29,8 +29,8 @@ use crate::types::typed_dict::TypedDictSchema;
 use crate::types::typevar::TypeVarInstance;
 use crate::types::{
     BoundTypeVarInstance, ClassType, DynamicType, LintDiagnosticGuard, Protocol,
-    ProtocolInstanceType, SpecialFormType, SubclassOfInner, Type, TypeContext, binding_type,
-    protocol_class::ProtocolClass,
+    ProtocolInstanceType, SpecialFormType, SubclassOfInner, Type, TypeContext, TypeVarVariance,
+    binding_type, protocol_class::ProtocolClass,
 };
 use crate::types::{KnownInstanceType, MemberLookupPolicy, UnionType};
 use crate::{Db, DisplaySettings, FxIndexMap, Program, declare_lint};
@@ -78,6 +78,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&ISINSTANCE_AGAINST_TYPED_DICT);
     registry.register_lint(&INVALID_ARGUMENT_TYPE);
     registry.register_lint(&INVALID_RETURN_TYPE);
+    registry.register_lint(&INVALID_YIELD);
     registry.register_lint(&INVALID_ASSIGNMENT);
     registry.register_lint(&INVALID_AWAIT);
     registry.register_lint(&INVALID_BASE);
@@ -116,6 +117,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&UNSUPPORTED_BOOL_CONVERSION);
     registry.register_lint(&PARAMETER_ALREADY_ASSIGNED);
     registry.register_lint(&POSSIBLY_MISSING_ATTRIBUTE);
+    registry.register_lint(&POSSIBLY_MISSING_SUBMODULE);
     registry.register_lint(&POSSIBLY_MISSING_IMPORT);
     registry.register_lint(&POSSIBLY_UNRESOLVED_REFERENCE);
     registry.register_lint(&SHADOWED_TYPE_VARIABLE);
@@ -800,9 +802,9 @@ declare_lint! {
     /// alice = Person(name="Alice", age=30)
     /// alice["height"]  # KeyError: 'height'
     ///
-    /// bob: Person = { "name": "Bob", "age": 30 }  # typo!
+    /// bob: Person = { "namee": "Bob", "age": 30 }  # typo!
     ///
-    /// carol = Person(name="Carol", age=25)  # typo!
+    /// carol = Person(name="Carol", aeg=25)  # typo!
     /// ```
     pub(crate) static INVALID_KEY = {
         summary: "detects invalid subscript accesses or TypedDict literal keys",
@@ -935,6 +937,31 @@ declare_lint! {
     pub(crate) static INVALID_RETURN_TYPE = {
         summary: "detects returned values that can't be assigned to the function's annotated return type",
         status: LintStatus::stable("0.0.1-alpha.1"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Detects `yield` and `yield from` expressions where the "yield" or "send" type
+    /// is incompatible with the generator function's annotated return type.
+    ///
+    /// ## Why is this bad?
+    /// Yielding a value of a type that doesn't match the generator's declared yield type,
+    /// or using `yield from` with a sub-iterator whose yield or send type is incompatible,
+    /// is a type error that may cause downstream consumers of the generator to receive
+    /// values of an unexpected type.
+    ///
+    /// ## Examples
+    /// ```python
+    /// from typing import Iterator
+    ///
+    /// def gen() -> Iterator[int]:
+    ///     yield "not an int"  # error: [invalid-yield]
+    /// ```
+    pub(crate) static INVALID_YIELD = {
+        summary: "detects yield expressions where the \"yield\" or \"send\" type is incompatible with the annotated return type",
+        status: LintStatus::stable("0.0.25"),
         default_level: Level::Error,
     }
 }
@@ -1087,7 +1114,7 @@ declare_lint! {
     /// Checks for dynamic class definitions (using `type()`) that have bases
     /// which are unsupported by ty.
     ///
-    /// This is equivalent to [`unsupported-base`] but applies to classes created
+    /// This is equivalent to `unsupported-base` but applies to classes created
     /// via `type()` rather than `class` statements.
     ///
     /// ## Why is this bad?
@@ -1108,7 +1135,6 @@ declare_lint! {
     /// ```
     ///
     /// [method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
-    /// [`unsupported-base`]: https://docs.astral.sh/ty/rules/unsupported-base
     pub(crate) static UNSUPPORTED_DYNAMIC_BASE = {
         summary: "detects dynamic class bases that are unsupported as ty could not feasibly calculate the class's MRO",
         status: LintStatus::stable("0.0.12"),
@@ -2064,6 +2090,10 @@ declare_lint! {
     /// ## Why is this bad?
     /// Attempting to access a missing attribute will raise an `AttributeError` at runtime.
     ///
+    /// ## Rule status
+    /// This rule is currently disabled by default because of the number of
+    /// false positives it can produce.
+    ///
     /// ## Examples
     /// ```python
     /// class A:
@@ -2075,6 +2105,27 @@ declare_lint! {
     pub(crate) static POSSIBLY_MISSING_ATTRIBUTE = {
         summary: "detects references to possibly missing attributes",
         status: LintStatus::stable("0.0.1-alpha.22"),
+        default_level: Level::Ignore,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for accesses of submodules that might not've been imported.
+    ///
+    /// ## Why is this bad?
+    /// When module `a` has a submodule `b`, `import a` isn't generally enough to let you access
+    /// `a.b.` You either need to explicitly `import a.b`, or else you need the `__init__.py` file
+    /// of `a` to include `from . import b`. Without one of those, `a.b` is an `AttributeError`.
+    ///
+    /// ## Examples
+    /// ```python
+    /// import html
+    /// html.parser  # AttributeError: module 'html' has no attribute 'parser'
+    /// ```
+    pub(crate) static POSSIBLY_MISSING_SUBMODULE = {
+        summary: "detects accesses of submodules that may not be available as attributes on their parent module",
+        status: LintStatus::stable("0.0.23"),
         default_level: Level::Warn,
     }
 }
@@ -3422,6 +3473,109 @@ pub(super) fn note_numbers_module_not_supported<'db>(
     }
 }
 
+fn covariant_supertype_hint<'db>(
+    class: ClassType<'db>,
+    db: &'db dyn Db,
+    mismatched_invariant_parameters: &[usize],
+) -> Option<&'static str> {
+    match (class.known(db), mismatched_invariant_parameters) {
+        (Some(KnownClass::List | KnownClass::Deque), [0]) => {
+            Some("Consider using the covariant supertype `collections.abc.Sequence`")
+        }
+        (Some(KnownClass::Set), [0]) => {
+            Some("Consider using the covariant supertype `collections.abc.Set`")
+        }
+        (
+            Some(
+                KnownClass::Dict
+                | KnownClass::DefaultDict
+                | KnownClass::OrderedDict
+                | KnownClass::ChainMap,
+            ),
+            [1],
+        ) => Some(
+            "Consider using the supertype `collections.abc.Mapping`, which is covariant in its value type",
+        ),
+        _ => None,
+    }
+}
+
+/// Add a diagnostic hint for cases like an invalid `list[bool]` to `list[int]` assignment,
+/// that fails due to invariance.
+pub(super) fn add_invariant_generic_hints<'db>(
+    db: &'db dyn Db,
+    diag: &mut Diagnostic,
+    expected_ty: Type<'db>,
+    provided_ty: Type<'db>,
+) {
+    let Some(expected_class) = expected_ty.nominal_class(db) else {
+        return;
+    };
+    let Some(provided_class) = provided_ty.nominal_class(db) else {
+        return;
+    };
+    let Some(expected_specialization) = expected_ty.class_specialization(db) else {
+        return;
+    };
+    let Some(provided_specialization) = provided_ty.class_specialization(db) else {
+        return;
+    };
+
+    if expected_class.class_literal(db) != provided_class.class_literal(db) {
+        return;
+    }
+
+    let generic_context = expected_specialization.generic_context(db);
+    if generic_context != provided_specialization.generic_context(db) {
+        return;
+    }
+
+    let mismatched_invariant_arguments = generic_context
+        .variables(db)
+        .zip(expected_specialization.types(db))
+        .zip(provided_specialization.types(db))
+        .enumerate()
+        .filter_map(|(index, ((bound_typevar, expected_arg), provided_arg))| {
+            (bound_typevar.variance(db) == TypeVarVariance::Invariant
+                && !expected_arg.is_equivalent_to(db, *provided_arg))
+            .then_some((index, expected_arg, provided_arg))
+        });
+
+    let mut mismatch_indices = Vec::new();
+    for (index, expected_arg, provided_arg) in mismatched_invariant_arguments {
+        if !provided_arg.is_assignable_to(db, *expected_arg) {
+            return;
+        }
+        mismatch_indices.push(index);
+    }
+
+    if mismatch_indices.is_empty() {
+        return;
+    }
+
+    let class_name = expected_class.name(db);
+    let message = match (generic_context.len(db), mismatch_indices.as_slice()) {
+        (1, _) => {
+            format!("`{class_name}` is invariant in its type parameter")
+        }
+        (_, [0]) => format!("`{class_name}` is invariant in its first type parameter"),
+        (_, [1]) => format!("`{class_name}` is invariant in its second type parameter"),
+        (_, [2]) => format!("`{class_name}` is invariant in its third type parameter"),
+        (2, [0, 1]) => {
+            format!("`{class_name}` is invariant in its first and second type parameters")
+        }
+        _ => format!("`{class_name}` is invariant in (one of) its type parameters"),
+    };
+    diag.info(message);
+
+    if let Some(note) = covariant_supertype_hint(expected_class, db, &mismatch_indices) {
+        diag.info(note);
+    }
+    diag.info(
+        "For more information, see https://docs.astral.sh/ty/reference/typing-faq/#invariant-generics",
+    );
+}
+
 pub(super) fn report_invalid_assignment<'db>(
     context: &InferContext<'db, '_>,
     target_node: AnyNodeRef,
@@ -3506,6 +3660,7 @@ pub(super) fn report_invalid_assignment<'db>(
 
     // special case message
     note_numbers_module_not_supported(context.db(), &mut diag, target_ty, value_ty);
+    add_invariant_generic_hints(context.db(), &mut diag, target_ty, value_ty);
 }
 
 pub(super) fn report_invalid_attribute_assignment(
@@ -3633,6 +3788,61 @@ pub(super) fn report_invalid_generator_function_return_type(
         "Function is inferred as returning `{inferred_ty}` because it is {description}"
     ));
     diag.info(format_args!("See {link} for more details"));
+}
+
+#[derive(Copy, Clone)]
+pub(super) enum GeneratorMismatchKind {
+    YieldType,
+    SendType,
+}
+
+pub(super) fn report_invalid_generator_yield_type(
+    context: &InferContext,
+    object_range: impl Ranged,
+    return_type_span: Option<Span>,
+    expected_ty: Type,
+    actual_ty: Type,
+    kind: GeneratorMismatchKind,
+) {
+    let Some(builder) = context.report_lint(&INVALID_YIELD, object_range) else {
+        return;
+    };
+
+    let settings =
+        DisplaySettings::from_possibly_ambiguous_types(context.db(), [expected_ty, actual_ty]);
+    let expected_ty = expected_ty.display_with(context.db(), settings.clone());
+    let actual_ty = actual_ty.display_with(context.db(), settings);
+
+    let (kind_name, title, concise) = match kind {
+        GeneratorMismatchKind::YieldType => (
+            "yield",
+            "Yield expression type does not match annotation",
+            format!("Yield type `{actual_ty}` does not match annotated yield type `{expected_ty}`"),
+        ),
+        GeneratorMismatchKind::SendType => (
+            "send",
+            "Send type does not match annotation",
+            format!("Send type `{actual_ty}` does not match annotated send type `{expected_ty}`"),
+        ),
+    };
+
+    let mut diag = builder.into_diagnostic(title);
+    diag.set_concise_message(concise);
+    let primary = match kind {
+        GeneratorMismatchKind::YieldType => {
+            format!("expression of type `{actual_ty}`, expected `{expected_ty}`")
+        }
+        GeneratorMismatchKind::SendType => {
+            format!("generator with send type `{actual_ty}`, expected `{expected_ty}`")
+        }
+    };
+    diag.set_primary_message(primary);
+
+    if let Some(return_type_span) = return_type_span {
+        diag.annotate(Annotation::secondary(return_type_span).message(format!(
+            "Function annotated with {kind_name} type `{expected_ty}` here"
+        )));
+    }
 }
 
 pub(super) fn report_implicit_return_type(
@@ -4767,6 +4977,9 @@ pub(crate) fn report_invalid_key_on_typed_dict<'db>(
                     ));
                 } else {
                     diagnostic.set_primary_message(format_args!("Unknown key \"{key}\""));
+                    diagnostic.set_concise_message(format_args!(
+                        "Unknown key \"{key}\" for TypedDict `{typed_dict_name}`",
+                    ));
                 }
             }
             _ => {
@@ -5142,7 +5355,7 @@ pub(super) fn report_invalid_method_override<'db>(
     let db = context.db();
 
     let signature_span =
-        |function: FunctionType<'db>| function.literal(db).last_definition(db).spans(db).signature;
+        |function: FunctionType<'db>| function.literal(db).last_definition.spans(db).signature;
 
     let subclass_definition_kind = subclass_definition.kind(db);
     let subclass_definition_signature_span = signature_span(subclass_function);
@@ -5384,7 +5597,7 @@ pub(super) fn report_overridden_final_method<'db>(
     } else {
         first_final_superclass_definition
             .literal(db)
-            .last_definition(db)
+            .last_definition
     };
 
     sub.annotate(
@@ -5674,6 +5887,7 @@ pub(super) fn report_unsupported_augmented_assignment<'db>(
 
 pub(super) fn report_unsupported_binary_operation<'db>(
     context: &InferContext<'db, '_>,
+    index: &SemanticIndex<'db>,
     binary_expression: &ast::ExprBinOp,
     left_ty: Type<'db>,
     right_ty: Type<'db>,
@@ -5699,11 +5913,21 @@ pub(super) fn report_unsupported_binary_operation<'db>(
             || right_ty.is_subtype_of(db, KnownClass::Type.to_instance(db)))
         && Program::get(db).python_version(db) < PythonVersion::PY310
     {
-        diagnostic.info(
-            "Note that `X | Y` PEP 604 union syntax is only available in Python 3.10 and later",
-        );
-        add_inferred_python_version_hint_to_diagnostic(db, &mut diagnostic, "resolving types");
+        note_py_version_too_old_for_pep_604(db, index, &mut diagnostic);
     }
+}
+
+pub(super) fn note_py_version_too_old_for_pep_604<'db>(
+    db: &'db dyn Db,
+    index: &SemanticIndex<'db>,
+    diagnostic: &mut Diagnostic,
+) {
+    diagnostic.info("PEP 604 `|` unions are only available on Python 3.10+ unless they are quoted");
+    if index.has_future_annotations() {
+        diagnostic
+            .info("`from __future__ import annotations` has no effect outside type annotations");
+    }
+    add_inferred_python_version_hint_to_diagnostic(db, diagnostic, "resolving types");
 }
 
 #[derive(Debug, Copy, Clone)]

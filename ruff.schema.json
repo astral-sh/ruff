@@ -99,7 +99,7 @@
       }
     },
     "extend-ignore": {
-      "description": "A list of rule codes or prefixes to ignore, in addition to those\nspecified by `ignore`.",
+      "description": "A list of rule codes or prefixes to ignore, in addition to those\nspecified by `ignore`.\n\nThis option is deprecated because it is now interchangeable with\n[`ignore`](#lint_ignore). In earlier versions of Ruff, `ignore` would\n_replace_ the set of ignored rules when using configuration inheritance\n(via the top-level [`extend`](https://docs.astral.sh/ruff/settings/#extend)\nsetting), while `extend-ignore` would _add_ to the inherited set. Ruff\nnow merges both `ignore` and `extend-ignore` into a single set, so the\ndistinction no longer applies. Use [`ignore`](#lint_ignore) instead.",
       "type": [
         "array",
         "null"
@@ -145,7 +145,7 @@
       }
     },
     "extend-select": {
-      "description": "A list of rule codes or prefixes to enable, in addition to those\nspecified by [`select`](#lint_select).",
+      "description": "A list of rule codes or prefixes to enable, in addition to those\nspecified by [`select`](#lint_select).\n\nUnlike [`select`](#lint_select), which _replaces_ the default rule set\nwhen specified, `extend-select` _adds_ to whatever rules are already\nactive. This makes `extend-select` the preferred option when you want\nto enable additional rules on top of the defaults without having to\nenumerate them.\n\nFor example, to enable the defaults plus flake8-bugbear:\n\n```toml\n[tool.ruff.lint]\n# Adds flake8-bugbear on top of the default rules (E4, E7, E9, F).\nextend-select = [\"B\"]\n```\n\nUsing `select = [\"B\"]` instead would _replace_ the defaults, enabling\nonly flake8-bugbear.",
       "type": [
         "array",
         "null"
@@ -767,6 +767,12 @@
   "definitions": {
     "Alias": {
       "type": "string"
+    },
+    "AllImports": {
+      "type": "string",
+      "enum": [
+        "all"
+      ]
     },
     "AnalyzeOptions": {
       "description": "Configures Ruff's `analyze` command.",
@@ -1432,6 +1438,17 @@
       "description": "Options for the `flake8-tidy-imports` plugin",
       "type": "object",
       "properties": {
+        "ban-lazy": {
+          "description": "Specific modules that may not be imported lazily, or `\"all\"` to forbid lazy imports except\nfor any modules excluded from the selector. This rule is only enforced when targeting\nPython 3.15 or newer.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ImportSelector"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "ban-relative-imports": {
           "description": "Whether to ban all relative imports (`\"all\"`), or only those imports\nthat extend into the parent module or beyond (`\"parents\"`).",
           "anyOf": [
@@ -1462,6 +1479,17 @@
           "items": {
             "type": "string"
           }
+        },
+        "require-lazy": {
+          "description": "Specific modules that must be imported lazily in contexts where `lazy import` is legal, or\n`\"all\"` to require every lazily-convertible import to use the `lazy` keyword. Ruff ignores\ncontexts where `lazy import` is invalid, such as functions, classes, `try`/`except`\nblocks, `__future__` imports, and `from ... import *` statements. This rule is only\nenforced when targeting Python 3.15 or newer.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ImportSelector"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "additionalProperties": false
@@ -1621,6 +1649,48 @@
         {
           "type": "string"
         }
+      ]
+    },
+    "ImportSelection": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/AllImports"
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      ]
+    },
+    "ImportSelector": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/ImportSelection"
+        },
+        {
+          "$ref": "#/definitions/ImportSelectorSettings"
+        }
+      ]
+    },
+    "ImportSelectorSettings": {
+      "type": "object",
+      "properties": {
+        "exclude": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          }
+        },
+        "include": {
+          "$ref": "#/definitions/ImportSelection"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "include"
       ]
     },
     "ImportType": {
@@ -2084,7 +2154,7 @@
           }
         },
         "extend-ignore": {
-          "description": "A list of rule codes or prefixes to ignore, in addition to those\nspecified by `ignore`.",
+          "description": "A list of rule codes or prefixes to ignore, in addition to those\nspecified by `ignore`.\n\nThis option is deprecated because it is now interchangeable with\n[`ignore`](#lint_ignore). In earlier versions of Ruff, `ignore` would\n_replace_ the set of ignored rules when using configuration inheritance\n(via the top-level [`extend`](https://docs.astral.sh/ruff/settings/#extend)\nsetting), while `extend-ignore` would _add_ to the inherited set. Ruff\nnow merges both `ignore` and `extend-ignore` into a single set, so the\ndistinction no longer applies. Use [`ignore`](#lint_ignore) instead.",
           "type": [
             "array",
             "null"
@@ -2118,7 +2188,7 @@
           }
         },
         "extend-select": {
-          "description": "A list of rule codes or prefixes to enable, in addition to those\nspecified by [`select`](#lint_select).",
+          "description": "A list of rule codes or prefixes to enable, in addition to those\nspecified by [`select`](#lint_select).\n\nUnlike [`select`](#lint_select), which _replaces_ the default rule set\nwhen specified, `extend-select` _adds_ to whatever rules are already\nactive. This makes `extend-select` the preferred option when you want\nto enable additional rules on top of the defaults without having to\nenumerate them.\n\nFor example, to enable the defaults plus flake8-bugbear:\n\n```toml\n[tool.ruff.lint]\n# Adds flake8-bugbear on top of the default rules (E4, E7, E9, F).\nextend-select = [\"B\"]\n```\n\nUsing `select = [\"B\"]` instead would _replace_ the defaults, enabling\nonly flake8-bugbear.",
           "type": [
             "array",
             "null"
@@ -3043,11 +3113,13 @@
         "AIR00",
         "AIR001",
         "AIR002",
+        "AIR003",
         "AIR3",
         "AIR30",
         "AIR301",
         "AIR302",
         "AIR303",
+        "AIR304",
         "AIR31",
         "AIR311",
         "AIR312",
@@ -3144,6 +3216,8 @@
         "B034",
         "B035",
         "B039",
+        "B04",
+        "B043",
         "B9",
         "B90",
         "B901",
@@ -4153,6 +4227,7 @@
         "RUF069",
         "RUF07",
         "RUF070",
+        "RUF071",
         "RUF1",
         "RUF10",
         "RUF100",
@@ -4346,6 +4421,7 @@
         "TID251",
         "TID252",
         "TID253",
+        "TID254",
         "TRY",
         "TRY0",
         "TRY00",
