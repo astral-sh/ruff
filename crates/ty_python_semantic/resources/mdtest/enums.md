@@ -1285,7 +1285,6 @@ def color_name_without_assertion(color: Color) -> str:
     elif color is Color.BLUE:
         return "Blue"
 
-# error: [invalid-return-type] "Function can implicitly return `None`, which is not assignable to return type `str`"
 def color_name_misses_one_variant(color: Color) -> str:
     if color is Color.RED:
         return "Red"
@@ -1340,7 +1339,6 @@ def color_name_without_assertion(color: Color) -> str:
         case Color.BLUE:
             return "Blue"
 
-# error: [invalid-return-type] "Function can implicitly return `None`, which is not assignable to return type `str`"
 def color_name_misses_one_variant(color: Color) -> str:
     match color:
         case Color.RED:

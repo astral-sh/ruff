@@ -1102,11 +1102,7 @@ impl ReachabilityConstraints {
                             infer_expression_type(db, function, TypeContext::default())
                         && matches!(
                             function.known(db),
-                            Some(
-                                KnownFunction::AssertNever
-                                    | KnownFunction::AssertType
-                                    | KnownFunction::RevealType
-                            )
+                            Some(KnownFunction::AssertType | KnownFunction::RevealType)
                         )
                     {
                         Truthiness::AlwaysTrue
