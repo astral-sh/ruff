@@ -2432,7 +2432,8 @@ fn markdown_formatting_preview_disabled() -> Result<()> {
     ----- stdout -----
 
     ----- stderr -----
-    error: Failed to format CRATE_ROOT/resources/test/fixtures/unformatted.md: Markdown formatting is experimental, enable preview mode.
+    preview-feature: Markdown formatting is experimental, enable preview mode.
+      --> CRATE_ROOT/resources/test/fixtures/unformatted.md:1:1
     ");
     Ok(())
 }

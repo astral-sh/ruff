@@ -191,15 +191,53 @@ pub(crate) fn format(
 
     // Report on any errors.
     //
-    // We only convert errors to `Diagnostic`s in `Check` mode with preview enabled, otherwise we
-    // fall back on printing simple messages.
-    if !(preview.is_enabled() && mode.is_check()) {
-        errors.sort_unstable_by(|a, b| a.path().cmp(&b.path()));
+    // We render MarkdownExperimental errors as warning diagnostics so that users
+    // get a clear, visible warning when markdown files are skipped due to preview
+    // being disabled. In preview check mode, these are already rendered by
+    // `write_changed_preview`, so we only render them separately in other modes.
+    // For other errors, we only convert to Diagnostics in check mode with preview
+    // enabled; otherwise we fall back on printing simple messages.
+    let (markdown_warnings, other_errors): (Vec<_>, Vec<_>) = errors
+        .into_iter()
+        .partition(|err| matches!(err, FormatCommandError::MarkdownExperimental(_)));
 
-        for error in &errors {
+    if !(preview.is_enabled() && mode.is_check()) {
+        // Render markdown preview warnings as diagnostics to stderr
+        if !markdown_warnings.is_empty() {
+            let diagnostics: Vec<_> = markdown_warnings
+                .iter()
+                .map(Diagnostic::from)
+                .sorted_unstable_by(Diagnostic::ruff_start_ordering)
+                .collect();
+
+            let notebook_index = FxHashMap::default();
+            let context = EmitterContext::new(&notebook_index);
+            let config = DisplayDiagnosticConfig::new("ruff")
+                .hide_severity(true)
+                .show_fix_diff(true)
+                .color(!cfg!(test) && colored::control::SHOULD_COLORIZE.should_colorize());
+
+            render_diagnostics(
+                &mut stderr().lock(),
+                output_format,
+                config,
+                &context,
+                &diagnostics,
+            )?;
+        }
+
+        // Print other errors via error!()
+        let mut other_errors = other_errors;
+        other_errors.sort_unstable_by(|a, b| a.path().cmp(&b.path()));
+
+        for error in &other_errors {
             error!("{error}");
         }
     }
+
+    // Re-combine all errors for downstream checks and diagnostic rendering
+    let mut errors: Vec<FormatCommandError> = markdown_warnings;
+    errors.extend(other_errors);
 
     let results = FormatResults::new(results.as_slice(), mode);
     if config_arguments.log_level > LogLevel::Silent {
@@ -1341,7 +1379,8 @@ mod tests {
                     "Cannot write to file",
                 )),
             ),
-            FormatCommandError::RangeFormatNotSupported(Some(path)),
+            FormatCommandError::RangeFormatNotSupported(Some(path.clone())),
+            FormatCommandError::MarkdownExperimental(Some(path)),
         ];
 
         let results = FormatResults::new(&[], FormatMode::Check);
@@ -1373,6 +1412,9 @@ mod tests {
         --> test.py:1:1
 
         invalid-cli-option: Range formatting is only supported for Python files.
+        --> test.py:1:1
+
+        preview-feature: Markdown formatting is experimental, enable preview mode.
         --> test.py:1:1
 
         panic: Panicked at <location> when checking `test.py`: `Test panic for FormatCommandError`
