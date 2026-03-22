@@ -867,10 +867,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         match expression.kind(self.db()) {
             ExpressionKind::Normal => {
-                self.infer_expression_impl(expression.node_ref(self.db(), self.module()), tcx);
+                self.infer_expression_impl(expression.node_ref(self.db()).node(self.module()), tcx);
             }
             ExpressionKind::TypeExpression => {
-                self.infer_type_expression(expression.node_ref(self.db(), self.module()));
+                self.infer_type_expression(expression.node_ref(self.db()).node(self.module()));
             }
         }
     }
@@ -6463,12 +6463,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             //  but only if the target is a name. We should report a diagnostic here if the target isn't a name:
             //  `[... for a.x in not_iterable]
             if is_first {
-                infer_same_file_expression_type(
-                    builder.db(),
-                    builder.index.expression(iter),
-                    tcx,
-                    builder.module(),
-                )
+                infer_same_file_expression_type(builder.db(), builder.index.expression(iter), tcx)
             } else {
                 builder.infer_maybe_standalone_expression(iter, tcx)
             }

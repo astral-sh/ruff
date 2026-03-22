@@ -617,7 +617,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         expression: Expression<'db>,
         is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
-        let expression_node = expression.node_ref(self.db, self.module);
+        let expression_node = expression.node_ref(self.db).node(self.module);
         self.evaluate_expression_node_predicate(expression_node, expression, is_positive)
     }
 
@@ -1651,7 +1651,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         singleton: ast::Singleton,
         is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
-        let subject = PlaceExpr::try_from_expr(subject.node_ref(self.db, self.module))?;
+        let subject = PlaceExpr::try_from_expr(subject.node_ref(self.db).node(self.module))?;
         let place = self.expect_place(&subject);
 
         let ty = match singleton {
@@ -1680,11 +1680,10 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             return None;
         }
 
-        let subject = PlaceExpr::try_from_expr(subject.node_ref(self.db, self.module))?;
+        let subject = PlaceExpr::try_from_expr(subject.node_ref(self.db).node(self.module))?;
         let place = self.expect_place(&subject);
 
-        let class_type =
-            infer_same_file_expression_type(self.db, cls, TypeContext::default(), self.module);
+        let class_type = infer_same_file_expression_type(self.db, cls, TypeContext::default());
 
         let narrowed_type = match class_type {
             Type::ClassLiteral(class) => {
@@ -1711,7 +1710,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             return None;
         }
 
-        let subject = PlaceExpr::try_from_expr(subject.node_ref(self.db, self.module))?;
+        let subject = PlaceExpr::try_from_expr(subject.node_ref(self.db).node(self.module))?;
         let place = self.expect_place(&subject);
 
         let mapping_type = ClassInfoConstraintFunction::IsInstance
@@ -1734,16 +1733,13 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         value: Expression<'db>,
         is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
-        let subject_node = subject.node_ref(self.db, self.module);
+        let subject_node = subject.node_ref(self.db).node(self.module);
         let place = {
             let subject = PlaceExpr::try_from_expr(subject_node)?;
             self.expect_place(&subject)
         };
-        let subject_ty =
-            infer_same_file_expression_type(self.db, subject, TypeContext::default(), self.module);
-
-        let value_ty =
-            infer_same_file_expression_type(self.db, value, TypeContext::default(), self.module);
+        let subject_ty = infer_same_file_expression_type(self.db, subject, TypeContext::default());
+        let value_ty = infer_same_file_expression_type(self.db, value, TypeContext::default());
 
         let mut constraints = self
             .evaluate_expr_compare_op(subject_ty, value_ty, ast::CmpOp::Eq, is_positive)
@@ -2353,7 +2349,7 @@ impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
         let mut places = PossiblyNarrowedPlaces::default();
 
         // The match subject can always be narrowed by a pattern
-        let subject_node = subject.node_ref(self.db, module);
+        let subject_node = subject.node_ref(self.db).node(module);
         if let Some(subject_place_expr) = PlaceExpr::try_from_expr(subject_node) {
             if let Some(place) = self.places.place_id((&subject_place_expr).into()) {
                 places.insert(place);
