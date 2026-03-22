@@ -1049,6 +1049,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "047") => rules::ruff::rules::NeedlessElse,
         (Ruff, "048") => rules::ruff::rules::MapIntVersionParsing,
         (Ruff, "049") => rules::ruff::rules::DataclassEnum,
+        (Ruff, "050") => rules::ruff::rules::UnnecessaryIf,
         (Ruff, "051") => rules::ruff::rules::IfKeyInDictDel,
         (Ruff, "052") => rules::ruff::rules::UsedDummyVariable,
         (Ruff, "053") => rules::ruff::rules::ClassWithMixedTypeVars,

@@ -1,0 +1,63 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF047 [*] Empty `else` clause
+ --> RUF050_RUF047.py:6:1
+  |
+4 |   if sys.version_info >= (3, 11):
+5 |       pass
+6 | / else:
+7 | |     pass
+  | |________^
+8 |
+9 |   # Same with elif.
+  |
+help: Remove the `else` clause
+3 | # RUF047 removes the else, then RUF050 removes the remaining if.
+4 | if sys.version_info >= (3, 11):
+5 |     pass
+  - else:
+  -     pass
+6 | 
+7 | # Same with elif.
+8 | if sys.version_info >= (3, 11):
+
+RUF047 [*] Empty `else` clause
+  --> RUF050_RUF047.py:14:1
+   |
+12 |   elif sys.version_info >= (3, 10):
+13 |       pass
+14 | / else:
+15 | |     pass
+   | |________^
+16 |
+17 |   # Side-effect in condition: RUF047 removes the else, then RUF050
+   |
+help: Remove the `else` clause
+11 |     pass
+12 | elif sys.version_info >= (3, 10):
+13 |     pass
+   - else:
+   -     pass
+14 | 
+15 | # Side-effect in condition: RUF047 removes the else, then RUF050
+16 | # replaces the remaining `if` with the condition expression
+
+RUF047 [*] Empty `else` clause
+  --> RUF050_RUF047.py:21:1
+   |
+19 |   if foo():
+20 |       pass
+21 | / else:
+22 | |     pass
+   | |________^
+   |
+help: Remove the `else` clause
+18 | # replaces the remaining `if` with the condition expression
+19 | if foo():
+20 |     pass
+   - else:
+   -     pass
+21 | 
+22 | 
+23 | ### No errors

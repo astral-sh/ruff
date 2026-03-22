@@ -98,6 +98,7 @@ mod tests {
     #[test_case(Rule::MapIntVersionParsing, Path::new("RUF048.py"))]
     #[test_case(Rule::MapIntVersionParsing, Path::new("RUF048_1.py"))]
     #[test_case(Rule::DataclassEnum, Path::new("RUF049.py"))]
+    #[test_case(Rule::UnnecessaryIf, Path::new("RUF050.py"))]
     #[test_case(Rule::IfKeyInDictDel, Path::new("RUF051.py"))]
     #[test_case(Rule::UsedDummyVariable, Path::new("RUF052_0.py"))]
     #[test_case(Rule::UsedDummyVariable, Path::new("RUF052_1.py"))]
@@ -191,6 +192,47 @@ mod tests {
             Rule::NeedlessElse,
             Rule::SuppressibleException,
         ]);
+
+        let (diagnostics, transformed) = test_contents(&source_kind, &path, &settings);
+        assert_diagnostics!(diagnostics);
+
+        insta::assert_snapshot!(transformed.source_code());
+        Ok(())
+    }
+
+    /// Test that RUF047 (needless-else) and RUF050 (unnecessary-if) converge
+    /// when both are enabled: RUF047 removes the empty `else` first, then
+    /// RUF050 removes the remaining empty `if` on the next fix iteration.
+    #[test]
+    fn unnecessary_if_and_needless_else() -> Result<()> {
+        use ruff_python_ast::{PySourceType, SourceType};
+
+        let path = test_resource_path("fixtures").join("ruff/RUF050_RUF047.py");
+        let source_type = SourceType::Python(PySourceType::from(&path));
+        let source_kind = SourceKind::from_path(&path, source_type)?.expect("valid source");
+        let settings =
+            settings::LinterSettings::for_rules(vec![Rule::NeedlessElse, Rule::UnnecessaryIf]);
+
+        let (diagnostics, transformed) = test_contents(&source_kind, &path, &settings);
+        assert_diagnostics!(diagnostics);
+
+        insta::assert_snapshot!(transformed.source_code());
+        Ok(())
+    }
+
+    /// Reproduces issue #9472: F401 removes unused imports leaving empty `if`
+    /// blocks, then RUF050 removes those, then F401 cleans up the now-unused
+    /// guard imports. Verifies the full chain converges and produces the
+    /// expected output.
+    #[test]
+    fn unnecessary_if_and_unused_import() -> Result<()> {
+        use ruff_python_ast::{PySourceType, SourceType};
+
+        let path = test_resource_path("fixtures").join("ruff/RUF050_F401.py");
+        let source_type = SourceType::Python(PySourceType::from(&path));
+        let source_kind = SourceKind::from_path(&path, source_type)?.expect("valid source");
+        let settings =
+            settings::LinterSettings::for_rules(vec![Rule::UnusedImport, Rule::UnnecessaryIf]);
 
         let (diagnostics, transformed) = test_contents(&source_kind, &path, &settings);
         assert_diagnostics!(diagnostics);
