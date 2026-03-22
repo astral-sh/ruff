@@ -13,7 +13,7 @@ mod tests {
     use crate::settings::LinterSettings;
     use crate::settings::types::PreviewMode;
     use crate::test::test_path;
-    use crate::{assert_diagnostics, settings};
+    use crate::{assert_diagnostics, assert_diagnostics_diff, settings};
 
     #[test_case(Rule::DuplicateIsinstanceCall, Path::new("SIM101.py"))]
     #[test_case(Rule::CollapsibleIf, Path::new("SIM102.py"))]
@@ -78,32 +78,17 @@ mod tests {
         Ok(())
     }
 
-    #[test_case(
-        Rule::SuppressibleException,
-        Path::new("SIM105_5.py"),
-        PythonVersion::PY311
-    )]
-    #[test_case(
-        Rule::SuppressibleException,
-        Path::new("SIM105_5.py"),
-        PythonVersion::PY312
-    )]
-    fn version_specific_rules(
-        rule_code: Rule,
-        path: &Path,
-        py_version: PythonVersion,
-    ) -> Result<()> {
-        let snapshot = format!(
-            "{}_{}_{}",
-            rule_code.noqa_code(),
-            path.to_string_lossy(),
-            py_version
-        );
-        let diagnostics = test_path(
+    #[test_case(Rule::SuppressibleException, Path::new("SIM105_5.py"))]
+    fn version_specific_rules(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!("diff_{}_{}", rule_code.noqa_code(), path.to_string_lossy());
+        assert_diagnostics_diff!(
+            snapshot,
             Path::new("flake8_simplify").join(path).as_path(),
-            &settings::LinterSettings::for_rule(rule_code).with_target_version(py_version),
-        )?;
-        assert_diagnostics!(snapshot, diagnostics);
+            &settings::LinterSettings::for_rule(rule_code)
+                .with_target_version(PythonVersion::PY311),
+            &settings::LinterSettings::for_rule(rule_code)
+                .with_target_version(PythonVersion::PY312)
+        );
         Ok(())
     }
 }
