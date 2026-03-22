@@ -1048,6 +1048,7 @@ impl<'db> UseDefMapBuilder<'db> {
         place_state.record_binding(
             def_id,
             self.reachability,
+            &mut self.reachability_constraints,
             self.is_class_scope,
             place.is_symbol(),
             previous_definitions,
@@ -1065,6 +1066,7 @@ impl<'db> UseDefMapBuilder<'db> {
         bindings.record_binding(
             def_id,
             self.reachability,
+            &mut self.reachability_constraints,
             self.is_class_scope,
             place.is_symbol(),
             PreviousDefinitions::AreKept,
@@ -1328,6 +1330,7 @@ impl<'db> UseDefMapBuilder<'db> {
         place_state.record_binding(
             def_id,
             self.reachability,
+            &mut self.reachability_constraints,
             self.is_class_scope,
             place.is_symbol(),
             PreviousDefinitions::AreShadowed,
@@ -1346,6 +1349,7 @@ impl<'db> UseDefMapBuilder<'db> {
         reachable_definitions.bindings.record_binding(
             def_id,
             self.reachability,
+            &mut self.reachability_constraints,
             self.is_class_scope,
             place.is_symbol(),
             PreviousDefinitions::AreKept,
@@ -1362,6 +1366,7 @@ impl<'db> UseDefMapBuilder<'db> {
         place_state.record_binding(
             def_id,
             self.reachability,
+            &mut self.reachability_constraints,
             self.is_class_scope,
             place.is_symbol(),
             PreviousDefinitions::AreShadowed,

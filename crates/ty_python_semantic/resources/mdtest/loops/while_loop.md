@@ -459,6 +459,19 @@ while random():
     reveal_type(y)  # revealed: Literal[1, 2]
 ```
 
+### Stale loopback bindings are pruned once the entry type settles
+
+```py
+def random() -> bool:
+    return False
+
+x = 0
+while random():
+    reveal_type(x)  # revealed: Literal[0]
+    if x == 1:
+        x = 2
+```
+
 ### Conditional unpacking and loop exits converge normally
 
 This reduced example from issue #3057 used to panic with "too many cycle iterations":

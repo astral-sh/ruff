@@ -214,6 +214,7 @@ impl Bindings {
         for binding in &self.live_bindings {
             reachability_constraints.mark_used(binding.reachability_constraint);
             reachability_constraints.mark_used(binding.narrowing_constraint);
+            reachability_constraints.mark_used(binding.pre_binding_narrowing_constraint);
         }
     }
 }
@@ -223,6 +224,8 @@ impl Bindings {
 pub(crate) struct LiveBinding {
     pub(crate) binding: ScopedDefinitionId,
     pub(crate) narrowing_constraint: ScopedNarrowingConstraint,
+    /// Narrowing that held for this place immediately before `binding` was recorded.
+    pub(crate) pre_binding_narrowing_constraint: ScopedNarrowingConstraint,
     pub(crate) reachability_constraint: ScopedReachabilityConstraintId,
 }
 
@@ -233,6 +236,7 @@ impl Bindings {
         let initial_binding = LiveBinding {
             binding: ScopedDefinitionId::UNBOUND,
             narrowing_constraint: ScopedNarrowingConstraint::ALWAYS_TRUE,
+            pre_binding_narrowing_constraint: ScopedNarrowingConstraint::ALWAYS_TRUE,
             reachability_constraint,
         };
         Self {
@@ -246,10 +250,16 @@ impl Bindings {
         &mut self,
         binding: ScopedDefinitionId,
         reachability_constraint: ScopedReachabilityConstraintId,
+        reachability_constraints: &mut ReachabilityConstraintsBuilder,
         is_class_scope: bool,
         is_place_name: bool,
         previous_definitions: PreviousDefinitions,
     ) {
+        let pre_binding_narrowing_constraint = self
+            .live_bindings
+            .iter()
+            .map(|binding| binding.narrowing_constraint)
+            .reduce(|a, b| reachability_constraints.add_or_constraint(a, b));
         // If we are in a class scope, and the unbound name binding was previously visible, but we will
         // now replace it, record the narrowing constraints on it:
         if is_class_scope && is_place_name && self.live_bindings[0].binding.is_unbound() {
@@ -263,6 +273,8 @@ impl Bindings {
         self.live_bindings.push(LiveBinding {
             binding,
             narrowing_constraint: ScopedNarrowingConstraint::ALWAYS_TRUE,
+            pre_binding_narrowing_constraint: pre_binding_narrowing_constraint
+                .unwrap_or(ScopedNarrowingConstraint::ALWAYS_TRUE),
             reachability_constraint,
         });
     }
@@ -325,6 +337,11 @@ impl Bindings {
                     // constraints: the type should be narrowed by whichever path was taken.
                     let narrowing_constraint = reachability_constraints
                         .add_or_constraint(a.narrowing_constraint, b.narrowing_constraint);
+                    let pre_binding_narrowing_constraint = reachability_constraints
+                        .add_or_constraint(
+                            a.pre_binding_narrowing_constraint,
+                            b.pre_binding_narrowing_constraint,
+                        );
 
                     // For reachability constraints, we also merge using a ternary OR operation:
                     let reachability_constraint = reachability_constraints
@@ -333,6 +350,7 @@ impl Bindings {
                     self.live_bindings.push(LiveBinding {
                         binding: a.binding,
                         narrowing_constraint,
+                        pre_binding_narrowing_constraint,
                         reachability_constraint,
                     });
                 }
@@ -365,6 +383,7 @@ impl PlaceState {
         &mut self,
         binding_id: ScopedDefinitionId,
         reachability_constraint: ScopedReachabilityConstraintId,
+        reachability_constraints: &mut ReachabilityConstraintsBuilder,
         is_class_scope: bool,
         is_place_name: bool,
         previous_definitions: PreviousDefinitions,
@@ -373,6 +392,7 @@ impl PlaceState {
         self.bindings.record_binding(
             binding_id,
             reachability_constraint,
+            reachability_constraints,
             is_class_scope,
             is_place_name,
             previous_definitions,
@@ -491,10 +511,12 @@ mod tests {
 
     #[test]
     fn with() {
+        let mut reachability_constraints = ReachabilityConstraintsBuilder::default();
         let mut sym = PlaceState::undefined(ScopedReachabilityConstraintId::ALWAYS_TRUE);
         sym.record_binding(
             ScopedDefinitionId::from_u32(1),
             ScopedReachabilityConstraintId::ALWAYS_TRUE,
+            &mut reachability_constraints,
             false,
             true,
             PreviousDefinitions::AreShadowed,
@@ -510,6 +532,7 @@ mod tests {
         sym.record_binding(
             ScopedDefinitionId::from_u32(1),
             ScopedReachabilityConstraintId::ALWAYS_TRUE,
+            &mut reachability_constraints,
             false,
             true,
             PreviousDefinitions::AreShadowed,
@@ -529,6 +552,7 @@ mod tests {
         sym1a.record_binding(
             ScopedDefinitionId::from_u32(1),
             ScopedReachabilityConstraintId::ALWAYS_TRUE,
+            &mut reachability_constraints,
             false,
             true,
             PreviousDefinitions::AreShadowed,
@@ -540,6 +564,7 @@ mod tests {
         sym1b.record_binding(
             ScopedDefinitionId::from_u32(1),
             ScopedReachabilityConstraintId::ALWAYS_TRUE,
+            &mut reachability_constraints,
             false,
             true,
             PreviousDefinitions::AreShadowed,
@@ -556,6 +581,7 @@ mod tests {
         sym2a.record_binding(
             ScopedDefinitionId::from_u32(2),
             ScopedReachabilityConstraintId::ALWAYS_TRUE,
+            &mut reachability_constraints,
             false,
             true,
             PreviousDefinitions::AreShadowed,
@@ -567,6 +593,7 @@ mod tests {
         sym1b.record_binding(
             ScopedDefinitionId::from_u32(2),
             ScopedReachabilityConstraintId::ALWAYS_TRUE,
+            &mut reachability_constraints,
             false,
             true,
             PreviousDefinitions::AreShadowed,
@@ -588,6 +615,7 @@ mod tests {
         sym3a.record_binding(
             ScopedDefinitionId::from_u32(3),
             ScopedReachabilityConstraintId::ALWAYS_TRUE,
+            &mut reachability_constraints,
             false,
             true,
             PreviousDefinitions::AreShadowed,

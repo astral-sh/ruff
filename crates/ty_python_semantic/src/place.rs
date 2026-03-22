@@ -1204,6 +1204,7 @@ fn loop_header_reachability_impl<'db>(
                 reachable_bindings.insert(ReachableLoopBinding {
                     definition: def,
                     narrowing_constraint: live_binding.narrowing_constraint,
+                    pre_binding_narrowing_constraint: live_binding.pre_binding_narrowing_constraint,
                 });
             }
             // `del` in the loop body is always visible to code after the loop via the
@@ -1253,6 +1254,7 @@ impl<'db> LoopHeaderReachability<'db> {
 pub(crate) struct ReachableLoopBinding<'db> {
     pub(crate) definition: Definition<'db>,
     pub(crate) narrowing_constraint: ScopedNarrowingConstraint,
+    pub(crate) pre_binding_narrowing_constraint: ScopedNarrowingConstraint,
 }
 
 /// Implementation of [`place_from_bindings`].

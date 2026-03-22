@@ -28,10 +28,10 @@ use crate::diagnostic::format_enumeration;
 use crate::node_key::NodeKey;
 use crate::place::{
     ConsideredDefinitions, DefinedPlace, Definedness, LookupError, Place, PlaceAndQualifiers,
-    TypeOrigin, builtins_module_scope, builtins_symbol, class_body_implicit_symbol,
-    explicit_global_symbol, global_symbol, loop_header_reachability,
+    RequiresExplicitReExport, TypeOrigin, builtins_module_scope, builtins_symbol,
+    class_body_implicit_symbol, explicit_global_symbol, global_symbol, loop_header_reachability,
     module_type_implicit_global_declaration, module_type_implicit_global_symbol, place,
-    place_from_bindings, place_from_declarations, typing_extensions_symbol,
+    place_by_id, place_from_bindings, place_from_declarations, typing_extensions_symbol,
 };
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::ast_ids::{HasScopedUseId, ScopedUseId};
@@ -1744,10 +1744,27 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .index
             .use_def_map(self.scope().file_scope_id(self.db()));
         let loop_header = loop_header_reachability(db, definition);
+        let entry_ty = place_by_id(
+            db,
+            self.scope(),
+            place,
+            RequiresExplicitReExport::No,
+            ConsideredDefinitions::AllReachable,
+        )
+        .place
+        .ignore_possibly_undefined()
+        .unwrap_or(Type::Never);
 
         let mut union = UnionBuilder::new(db).recursively_defined(RecursivelyDefined::Yes);
 
         for reachable_binding in &loop_header.reachable_bindings {
+            let reachable_entry_ty = use_def
+                .narrowing_evaluator(reachable_binding.pre_binding_narrowing_constraint)
+                .narrow(db, entry_ty, place);
+            if reachable_entry_ty.is_never() {
+                continue;
+            }
+
             let binding_ty = binding_type(db, reachable_binding.definition);
             let narrowed_ty = use_def
                 .narrowing_evaluator(reachable_binding.narrowing_constraint)
