@@ -73,12 +73,11 @@ use crate::types::diagnostic::{
     UNSUPPORTED_DYNAMIC_BASE, UNSUPPORTED_OPERATOR, UNUSED_AWAITABLE,
     hint_if_stdlib_attribute_exists_on_other_versions, report_attempted_protocol_instantiation,
     report_bad_dunder_set_call, report_call_to_abstract_method,
-    report_cannot_pop_required_field_on_typed_dict, report_conflicting_metaclass_from_bases,
-    report_instance_layout_conflict, report_invalid_assignment,
-    report_invalid_attribute_assignment, report_invalid_class_match_pattern,
-    report_invalid_exception_caught, report_invalid_exception_cause,
-    report_invalid_exception_raised, report_invalid_exception_tuple_caught,
-    report_invalid_generator_yield_type, report_invalid_key_on_typed_dict,
+    report_conflicting_metaclass_from_bases, report_instance_layout_conflict,
+    report_invalid_assignment, report_invalid_attribute_assignment,
+    report_invalid_class_match_pattern, report_invalid_exception_caught,
+    report_invalid_exception_cause, report_invalid_exception_raised,
+    report_invalid_exception_tuple_caught, report_invalid_generator_yield_type,
     report_invalid_type_checking_constant,
     report_match_pattern_against_non_runtime_checkable_protocol,
     report_match_pattern_against_typed_dict, report_possibly_missing_attribute,
@@ -127,6 +126,7 @@ mod named_tuple;
 mod paramspec_validation;
 mod subscript;
 mod type_expression;
+mod typed_dict;
 mod typevar;
 
 use super::comparisons::{self, BinaryComparisonVisitor};
@@ -5143,8 +5143,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// Infer the argument types for all bindings.
     ///
     /// Note that this method may infer the type of a given argument expression multiple times with
-    /// distinct type context. The provided `MultiInferenceState` can be used to dictate multi-inference
-    /// behavior.
+    /// distinct type context.
     fn infer_all_argument_types<'bindings>(
         &mut self,
         ast_arguments: ArgumentsIter<'_>,
@@ -6976,6 +6975,36 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return self.infer_namedtuple_call_expression(call_expression, None, namedtuple_kind);
         }
 
+        // TypedDict method specialization: for known-key calls like `td.get("key")`, replace
+        // the generic callable with a specialized signature that encodes the field type.
+        let mut callable_type = callable_type;
+        if let ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() {
+            let value_type = self.expression_type(value);
+
+            if let Type::TypedDict(typed_dict_ty) = value_type
+                && matches!(attr.id.as_str(), "pop" | "setdefault")
+                && !arguments.args.is_empty()
+                && let Some(ty) = self.check_typed_dict_pop_or_setdefault_call(
+                    typed_dict_ty,
+                    attr.id.as_str(),
+                    arguments,
+                )
+            {
+                return ty;
+            }
+
+            if matches!(attr.id.as_str(), "get" | "pop" | "setdefault")
+                && let Some(specialized_callable) = self
+                    .specialize_typed_dict_known_key_method_call(
+                        value_type,
+                        attr.id.as_str(),
+                        arguments,
+                    )
+            {
+                callable_type = specialized_callable;
+            }
+        }
+
         // We don't call `Type::try_call`, because we want to perform type inference on the
         // arguments after matching them to parameters, but before checking that the argument types
         // are assignable to any parameter annotations.
@@ -7041,57 +7070,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 );
             }
             return Type::unknown();
-        }
-
-        // Special handling for `TypedDict` method calls
-        if let ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() {
-            let value_type = self.expression_type(value);
-
-            if let Type::TypedDict(typed_dict_ty) = value_type
-                && matches!(attr.id.as_str(), "pop" | "setdefault")
-                && !arguments.args.is_empty()
-
-                // Validate the key argument for `TypedDict` methods
-                && let Some(first_arg) = arguments.args.first()
-                    && let ast::Expr::StringLiteral(ast::ExprStringLiteral {
-                        value: key_literal,
-                        ..
-                    }) = first_arg
-            {
-                let key = key_literal.to_str();
-                let items = typed_dict_ty.items(self.db());
-
-                // Check if key exists
-                if let Some((_, field)) = items
-                    .iter()
-                    .find(|(field_name, _)| field_name.as_str() == key)
-                {
-                    // Key exists - check if it's a `pop()` on a required field
-                    if attr.id.as_str() == "pop" && field.is_required() {
-                        report_cannot_pop_required_field_on_typed_dict(
-                            &self.context,
-                            first_arg.into(),
-                            Type::TypedDict(typed_dict_ty),
-                            key,
-                        );
-                        return Type::unknown();
-                    }
-                } else {
-                    // Key not found, report error with suggestion and return early
-                    let key_ty = Type::string_literal(self.db(), key);
-                    report_invalid_key_on_typed_dict(
-                        &self.context,
-                        first_arg.into(),
-                        first_arg.into(),
-                        Type::TypedDict(typed_dict_ty),
-                        None,
-                        key_ty,
-                        items,
-                    );
-                    // Return `Unknown` to prevent the overload system from generating its own error
-                    return Type::unknown();
-                }
-            }
         }
 
         if let Type::FunctionLiteral(function) = callable_type {

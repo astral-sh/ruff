@@ -1733,8 +1733,7 @@ def _(p: Person) -> None:
     reveal_type(p.get("extra", 0))  # revealed: str | Literal[0]
 
     # Even another typed dict:
-    # TODO: This should evaluate to `Inner`.
-    reveal_type(p.get("inner", {"inner": 0}))  # revealed: Inner | dict[str, int]
+    reveal_type(p.get("inner", {"inner": 0}))  # revealed: Inner
 
     # We allow access to unknown keys (they could be set for a subtype of Person)
     reveal_type(p.get("unknown"))  # revealed: Unknown | None
@@ -1755,6 +1754,57 @@ def _(p: Person) -> None:
 
     # error: [invalid-key] "Unknown key "extraz" for TypedDict `Person` - did you mean "extra"?"
     reveal_type(p.setdefault("extraz", "value"))  # revealed: Unknown
+```
+
+Known-key specialization for mutating methods preserves per-arm constraints on `TypedDict` unions:
+
+```py
+from typing import TypedDict
+from typing_extensions import NotRequired
+
+class IntX(TypedDict):
+    x: int
+
+class StrX(TypedDict):
+    x: str
+
+class OptionalX(TypedDict):
+    x: NotRequired[int]
+
+class RequiredX(TypedDict):
+    x: int
+
+def _(u: IntX | StrX, v: OptionalX | RequiredX) -> None:
+    # error: [invalid-argument-type]
+    reveal_type(u.setdefault("x", 1))  # revealed: int | str
+
+    # error: [call-non-callable]
+    reveal_type(v.pop("x"))  # revealed: Unknown
+```
+
+Known-key `get()` calls also use the field type as bidirectional context when that produces a valid
+default:
+
+```py
+from typing import TypedDict
+
+class ResolvedData(TypedDict, total=False):
+    x: int
+
+class Payload(TypedDict, total=False):
+    resolved: ResolvedData
+
+class Payload2(TypedDict, total=False):
+    resolved: ResolvedData
+
+def takes_resolved(value: ResolvedData) -> None: ...
+def _(payload: Payload) -> None:
+    reveal_type(payload.get("resolved", {}))  # revealed: ResolvedData
+    takes_resolved(payload.get("resolved", {}))
+
+def _(payload: Payload | Payload2) -> None:
+    reveal_type(payload.get("resolved", {}))  # revealed: ResolvedData
+    takes_resolved(payload.get("resolved", {}))
 ```
 
 ## Unlike normal classes
