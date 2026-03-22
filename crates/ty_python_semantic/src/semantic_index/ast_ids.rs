@@ -120,7 +120,7 @@ impl AstIdsBuilder {
 pub(crate) mod node_key {
     use ruff_python_ast as ast;
 
-    use crate::node_key::NodeKey;
+    use crate::{ast_node_ref::AstNodeRef, node_key::NodeKey};
 
     #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug, salsa::Update, get_size2::GetSize)]
     pub(crate) struct ExpressionNodeKey(NodeKey);
@@ -158,6 +158,12 @@ pub(crate) mod node_key {
     impl From<&ast::Keyword> for ExpressionNodeKey {
         fn from(value: &ast::Keyword) -> Self {
             Self(NodeKey::from_node(value))
+        }
+    }
+
+    impl<T> From<&AstNodeRef<T>> for ExpressionNodeKey {
+        fn from(value: &AstNodeRef<T>) -> Self {
+            Self(NodeKey::from_node_ref(value))
         }
     }
 }
