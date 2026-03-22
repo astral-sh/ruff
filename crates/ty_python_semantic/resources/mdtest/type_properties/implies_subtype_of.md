@@ -885,40 +885,33 @@ def covariant_upper[B, S, U]():
     constraints = ConstraintSet.range(Never, B, S) & ConstraintSet.range(Never, U, Covariant[B])
     static_assert(constraints.implies_subtype_of(U, Covariant[S]))
 
-
 def covariant_lower[B, S, U]():
     # (S ≤ B) ∧ (Covariant[B] ≤ U) -> (Covariant[S] ≤ U)
     constraints = ConstraintSet.range(S, B, object) & ConstraintSet.range(Covariant[B], U, object)
     static_assert(constraints.implies_subtype_of(Covariant[S], U))
-
 
 def contravariant_upper[B, S, U]():
     # (S ≤ B) ∧ (U ≤ Contravariant[B]) -> (U ≤ Contravariant[S])
     constraints = ConstraintSet.range(S, B, object) & ConstraintSet.range(Never, U, Contravariant[B])
     static_assert(constraints.implies_subtype_of(U, Contravariant[S]))
 
-
 def contravariant_lower[B, S, U]():
     # (B ≤ S) ∧ (Contravariant[B] ≤ U) -> (Contravariant[S] ≤ U)
     constraints = ConstraintSet.range(Never, B, S) & ConstraintSet.range(Contravariant[B], U, object)
     static_assert(constraints.implies_subtype_of(Contravariant[S], U))
-
 
 def invariant_upper_requires_equality[B, S, U]():
     # Invariant replacement only holds under equality constraints on B.
     constraints = ConstraintSet.range(S, B, S) & ConstraintSet.range(Never, U, Invariant[B])
     static_assert(constraints.implies_subtype_of(U, Invariant[S]))
 
-
 def invariant_lower_requires_equality[B, S, U]():
     constraints = ConstraintSet.range(S, B, S) & ConstraintSet.range(Invariant[B], U, object)
     static_assert(constraints.implies_subtype_of(Invariant[S], U))
 
-
 def invariant_upper_one_sided_is_not_enough[B, S, U]():
     constraints = ConstraintSet.range(Never, B, S) & ConstraintSet.range(Never, U, Invariant[B])
     static_assert(not constraints.implies_subtype_of(U, Invariant[S]))
-
 
 def invariant_lower_one_sided_is_not_enough[B, S, U]():
     constraints = ConstraintSet.range(S, B, object) & ConstraintSet.range(Invariant[B], U, object)
