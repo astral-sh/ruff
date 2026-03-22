@@ -53,7 +53,7 @@ reveal_type(b)  # revealed: list[list[int]]
 `typed_dict.py`:
 
 ```py
-from typing import TypedDict
+from typing import Callable, Hashable, Mapping, TypedDict
 
 class TD(TypedDict):
     x: int
@@ -81,6 +81,14 @@ nested: dict[str, dict[str, float]] = dict(
     a={"x": 1.5, "y": 2},
     b={"x": 3, "y": 4},
 )
+
+class Reducer:
+    def from_label_map(self, func_map: Mapping[Hashable, Callable[..., object]]) -> None:
+        pass
+
+# Regression test: keyword-only `dict(...)` should respect broader mapping key context.
+r = Reducer()
+r.from_label_map(dict(a=lambda: 1))
 ```
 
 ## Propagating return type annotation
