@@ -6978,30 +6978,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // TypedDict method specialization: for known-key calls like `td.get("key")`, replace
         // the generic callable with a specialized signature that encodes the field type.
         let mut callable_type = callable_type;
-        if let ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() {
+        if let ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref()
+            && matches!(attr.id.as_str(), "get" | "pop" | "setdefault")
+        {
             let value_type = self.expression_type(value);
 
-            if let Type::TypedDict(typed_dict_ty) = value_type
-                && matches!(attr.id.as_str(), "pop" | "setdefault")
-                && !arguments.args.is_empty()
-                && let Some(ty) = self.check_typed_dict_pop_or_setdefault_call(
-                    typed_dict_ty,
-                    attr.id.as_str(),
-                    arguments,
-                )
-            {
-                return ty;
-            }
-
-            if matches!(attr.id.as_str(), "get" | "pop" | "setdefault")
-                && let Some(specialized_callable) = self
-                    .specialize_typed_dict_known_key_method_call(
-                        value_type,
-                        attr.id.as_str(),
-                        arguments,
-                    )
-            {
-                callable_type = specialized_callable;
+            if let Some(result) = self.specialize_typed_dict_known_key_method_call(
+                value_type,
+                attr.id.as_str(),
+                arguments,
+            ) {
+                match result {
+                    typed_dict::TypedDictMethodSpecialization::Callable(ty) => {
+                        callable_type = ty;
+                    }
+                    typed_dict::TypedDictMethodSpecialization::Diagnosed(ty) => {
+                        return ty;
+                    }
+                }
             }
         }
 
