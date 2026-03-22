@@ -76,6 +76,11 @@ def _() -> TD:
     # error: [missing-typed-dict-key] "Missing required key 'x' in TypedDict `TD` constructor"
     # error: [invalid-return-type]
     return {}
+
+nested: dict[str, dict[str, float]] = dict(
+    a={"x": 1.5, "y": 2},
+    b={"x": 3, "y": 4},
+)
 ```
 
 ## Propagating return type annotation
