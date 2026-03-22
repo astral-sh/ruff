@@ -429,6 +429,12 @@ impl<'db> TypeContext<'db> {
     }
 }
 
+impl<'db> From<Type<'db>> for TypeContext<'db> {
+    fn from(annotation: Type<'db>) -> Self {
+        Self::new(Some(annotation))
+    }
+}
+
 /// Infer the types for an [`Unpack`] operation.
 ///
 /// This infers the expression type and performs structural match against the target expression

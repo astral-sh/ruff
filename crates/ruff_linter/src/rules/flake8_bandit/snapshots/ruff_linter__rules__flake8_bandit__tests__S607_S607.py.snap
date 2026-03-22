@@ -241,3 +241,12 @@ S607 Starting a process with a partial executable path
 38 |
 39 | # Check it does not fail for full paths.
    |
+
+S607 Starting a process with a partial executable path
+  --> S607.py:49:16
+   |
+47 | # Check that "partial path" checks tuples too
+48 | import subprocess
+49 | subprocess.run(("echo", "foo"))
+   |                ^^^^^^^^^^^^^^^
+   |
