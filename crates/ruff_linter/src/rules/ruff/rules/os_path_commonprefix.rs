@@ -17,6 +17,10 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///
 /// `os.path.commonpath` correctly compares path components.
 ///
+/// Note that `os.path.commonprefix` is valid for non-path string
+/// comparisons (e.g., finding a common prefix among version numbers
+/// or identifiers). In such cases, this rule should be ignored.
+///
 /// `os.path.commonprefix` is deprecated as of Python 3.15.
 ///
 /// ## Example
@@ -33,6 +37,32 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///
 /// # Returns "/usr" — correct common path
 /// os.path.commonpath(["/usr/lib", "/usr/local/lib"])
+/// ```
+///
+/// ## Fix safety
+///
+/// This fix is marked as unsafe because `os.path.commonprefix` and
+/// `os.path.commonpath` have different semantics:
+///
+/// - `commonprefix` performs a character-by-character string comparison
+///   and returns the longest common string prefix.
+/// - `commonpath` compares path components and returns the longest common
+///   path prefix.
+///
+/// If you are intentionally using `commonprefix` for non-path string
+/// comparisons (e.g., finding a common prefix among arbitrary strings
+/// like version numbers or identifiers), ignore this rule using
+/// `# noqa: RUF071` or the [`lint.ruff.per-file-ignores`] configuration
+/// option.
+///
+/// For example:
+///
+/// ```python
+/// import os
+///
+/// # commonprefix works on non-path strings
+/// os.path.commonprefix(["12345", "12378"])  # "123"
+/// os.path.commonpath(["12345", "12378"])    # raises ValueError
 /// ```
 ///
 /// ## References
