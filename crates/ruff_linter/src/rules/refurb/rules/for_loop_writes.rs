@@ -14,7 +14,7 @@ use crate::rules::refurb::helpers::parenthesize_loop_iter_if_necessary;
 /// Checks for the use of `IOBase.write` in a for loop.
 ///
 /// ## Why is this bad?
-/// When writing a batch of elements, it's more idiomatic to use a single method call to
+/// When writing a batch of elements, it's more performant to use a single method call to
 /// `IOBase.writelines`, rather than write elements one by one.
 ///
 /// ## Example
