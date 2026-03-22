@@ -35,8 +35,8 @@ use crate::semantic_index::expression::{Expression, ExpressionKind};
 use crate::semantic_index::member::MemberExprBuilder;
 use crate::semantic_index::place::{PlaceExpr, PlaceTableBuilder, ScopedPlaceId};
 use crate::semantic_index::predicate::{
-    ClassPatternKind, NonTerminalCallPredicate, PatternPredicate, PatternPredicateKind, Predicate,
-    PredicateNode, PredicateOrLiteral, ScopedPredicateId, StarImportPlaceholderPredicate,
+    ClassPatternKind, PatternPredicate, PatternPredicateKind, Predicate, PredicateNode,
+    PredicateOrLiteral, ScopedPredicateId, StarImportPlaceholderPredicate,
 };
 use crate::semantic_index::re_exports::exported_names;
 use crate::semantic_index::reachability_constraints::{
@@ -2798,20 +2798,8 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 if is_call && !self.source_type.is_stub() && self.in_function_scope() {
                     let call_expr = self.add_standalone_expression(value);
 
-                    let called_function = value
-                        .as_call_expr()
-                        .map(|call| self.add_standalone_expression(&call.func));
-
-                    if let ast::Expr::Call(ast::ExprCall { func, .. }) = &**value {
-                        self.add_standalone_expression(func);
-                    }
-
                     let predicate = Predicate {
-                        node: PredicateNode::IsNonTerminalCall(NonTerminalCallPredicate::new(
-                            self.db,
-                            call_expr,
-                            called_function,
-                        )),
+                        node: PredicateNode::IsNonTerminalCall(call_expr),
                         is_positive: true,
                     };
                     let constraint = self
