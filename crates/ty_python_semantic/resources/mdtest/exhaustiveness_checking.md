@@ -486,6 +486,37 @@ def i[T: (int, str)](x: T) -> T:
             assert_never(x)
 
     return x
+
+def eq_narrow_match_constrained[T: (Literal["foo"], Literal["bar"])](x: T) -> T:
+    match x:
+        case "foo":
+            pass
+        case "bar":
+            pass
+        case _:
+            assert_never(x)
+
+    return x
+
+def eq_narrow_if_bounded[T: Literal["foo", "bar"]](x: T) -> T:
+    if x == "foo":
+        pass
+    elif x == "bar":
+        pass
+    else:
+        assert_never(x)
+
+    return x
+
+def eq_narrow_if_constrained[T: (Literal["foo"], Literal["bar"])](x: T) -> T:
+    if x == "foo":
+        pass
+    elif x == "bar":
+        pass
+    else:
+        assert_never(x)
+
+    return x
 ```
 
 In these examples, no `invalid-return-type` diagnostics are emitted, despite the fact there are no
@@ -494,8 +525,6 @@ In these examples, no `invalid-return-type` diagnostics are emitted, despite the
 predicates in our reachability infrastructure!
 
 ```py
-from typing import Literal
-
 class A: ...
 class B: ...
 
@@ -531,13 +560,26 @@ def n[T: (A, B)](x: T) -> bool:
         case B():
             return False
 
-def h[T: Literal["foo", "bar"]](x: T) -> bool:
+def o[T: Literal["foo", "bar"]](x: T) -> bool:
     if x == "foo":
         return True
     elif x == "bar":
         return False
 
-def i[T: Literal["foo", "bar"]](x: T) -> bool:
+def p[T: Literal["foo", "bar"]](x: T) -> bool:
+    match x:
+        case "foo":
+            return True
+        case "bar":
+            return False
+
+def q[T: (Literal["foo"], Literal["bar"])](x: T) -> bool:
+    if x == "foo":
+        return True
+    elif x == "bar":
+        return False
+
+def r[T: (Literal["foo"], Literal["bar"])](x: T) -> bool:
     match x:
         case "foo":
             return True

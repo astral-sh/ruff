@@ -188,6 +188,31 @@ pub(super) fn infer_binary_type_comparison<'db>(
             Some(Ok(builder.build()))
         }
 
+        (Type::Intersection(intersection), right)
+            if intersection.positive(db).iter().copied().any(Type::is_type_var) =>
+        {
+            Some(infer_binary_type_comparison(
+                context,
+                intersection.with_expanded_typevars_and_newtypes(db),
+                op,
+                right,
+                range,
+                visitor
+            ))
+        }
+        (left, Type::Intersection(intersection))
+            if intersection.positive(db).iter().copied().any(Type::is_type_var) =>
+        {
+            Some(infer_binary_type_comparison(
+                context,
+                left,
+                op,
+                intersection.with_expanded_typevars_and_newtypes(db),
+                range,
+                visitor
+            ))
+        }
+
         (Type::Intersection(intersection), right) => {
             Some(
                 infer_binary_intersection_type_comparison(
@@ -654,31 +679,13 @@ fn infer_binary_intersection_type_comparison<'db>(
     // If a comparison yields a definitive true/false answer on a (positive) part
     // of an intersection type, it will also yield a definitive answer on the full
     // intersection type, which is even more specific.
-    for &pos in intersection.positive(db) {
-        // If the positive element is a TypeVar with a bound, try expanding the
-        // TypeVar to its bound and applying the intersection's negative elements.
-        // This handles cases like `(T & ~Literal["foo"]) == Literal["bar"]` where
-        // `T: Literal["foo", "bar"]`: expanding to the bound and excluding
-        // `Literal["foo"]` simplifies to `Literal["bar"]`, giving a definitive result.
-        let pos = if let Type::TypeVar(tvar) = pos
-            && let Some(TypeVarBoundOrConstraints::UpperBound(bound)) =
-                tvar.typevar(db).bound_or_constraints(db)
-        {
-            let mut builder = IntersectionBuilder::new(db).add_positive(bound);
-            for neg in intersection.negative(db) {
-                builder = builder.add_negative(*neg);
-            }
-            builder.build()
-        } else {
-            pos
-        };
-
+    for pos in intersection.positive(db) {
         let result = match intersection_on {
             IntersectionOn::Left => {
-                infer_binary_type_comparison(context, pos, op, other, range, visitor)
+                infer_binary_type_comparison(context, *pos, op, other, range, visitor)
             }
             IntersectionOn::Right => {
-                infer_binary_type_comparison(context, other, op, pos, range, visitor)
+                infer_binary_type_comparison(context, other, op, *pos, range, visitor)
             }
         };
 

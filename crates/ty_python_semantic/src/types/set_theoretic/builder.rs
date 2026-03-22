@@ -38,6 +38,7 @@
 
 use super::RecursivelyDefined;
 use crate::types::enums::{enum_member_literals, enum_metadata};
+use crate::types::set_theoretic::expand_intersection_typevars_and_newtypes;
 use crate::types::{
     BytesLiteralType, ClassLiteral, EnumLiteralType, IntersectionType, KnownClass,
     LiteralValueType, LiteralValueTypeKind, NegativeIntersectionElements, StringLiteralType, Type,
@@ -1516,32 +1517,9 @@ impl<'db> InnerIntersectionBuilder<'db> {
             .iter()
             .any(|ty| matches!(ty, Type::TypeVar(_) | Type::NewTypeInstance(_)))
         {
-            let mut speculative = IntersectionBuilder::new(db);
-            for pos in &self.positive {
-                match pos {
-                    Type::TypeVar(type_var) => {
-                        match type_var.typevar(db).bound_or_constraints(db) {
-                            Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                                speculative = speculative.add_positive(bound);
-                            }
-                            Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                                speculative = speculative.add_positive(constraints.as_type(db));
-                            }
-                            // TypeVars without a bound or constraint implicitly have `object` as their
-                            // upper bound, and it is always a no-op to add `object` to an intersection.
-                            None => {}
-                        }
-                    }
-                    Type::NewTypeInstance(newtype) => {
-                        speculative = speculative.add_positive(newtype.concrete_base_type(db));
-                    }
-                    _ => speculative = speculative.add_positive(*pos),
-                }
-            }
-            for neg in &self.negative {
-                speculative = speculative.add_negative(*neg);
-            }
-            if speculative.build().is_never() {
+            let speculative =
+                expand_intersection_typevars_and_newtypes(db, &self.positive, &self.negative);
+            if speculative.is_never() {
                 return Type::Never;
             }
         }
