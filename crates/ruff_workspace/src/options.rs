@@ -525,6 +525,22 @@ pub struct LintOptions {
     )]
     pub exclude: Option<Vec<String>>,
 
+    /// A list of callables that should be treated as exception-logging
+    /// functions when used inside `except` blocks, suppressing `BLE001`.
+    ///
+    /// This is useful for projects that use custom error-reporting callables
+    /// (e.g., Sentry or custom project-wide error handlers) which properly
+    /// handle exceptions.
+    ///
+    /// Expects to receive a list of fully-qualified names (e.g.,
+    /// `sentry_sdk.capture_exception`, rather than `capture_exception`).
+    #[option(
+        default = r#"[]"#,
+        value_type = "list[str]",
+        example = r#"logger-callables = ["sentry_sdk.capture_exception", "my_module.report_error"]"#
+    )]
+    pub logger_callables: Option<Vec<String>>,
+
     /// Options for the `pydoclint` plugin.
     #[option_group]
     pub pydoclint: Option<PydoclintOptions>,
@@ -807,22 +823,6 @@ pub struct LintCommonOptions {
         note = "`ignore-init-module-imports` will be removed in a future version because F401 now recommends appropriate fixes for unused imports in `__init__.py` (currently in preview mode). See documentation for more information and please update your configuration."
     )]
     pub ignore_init_module_imports: Option<bool>,
-
-    /// A list of callables that should be treated as exception-logging
-    /// functions when used inside `except` blocks, suppressing `BLE001`.
-    ///
-    /// This is useful for projects that use custom error-reporting callables
-    /// (e.g., Sentry or custom project-wide error handlers) which properly
-    /// handle exceptions.
-    ///
-    /// Expects to receive a list of fully-qualified names (e.g.,
-    /// `sentry_sdk.capture_exception`, rather than `capture_exception`).
-    #[option(
-        default = r#"[]"#,
-        value_type = "list[str]",
-        example = r#"logger-callables = ["sentry_sdk.capture_exception", "my_module.report_error"]"#
-    )]
-    pub logger_callables: Option<Vec<String>>,
 
     /// A list of objects that should be treated equivalently to a
     /// `logging.Logger` object.
@@ -4141,7 +4141,6 @@ impl From<LintOptionsWire> for LintOptions {
                 extend_safe_fixes,
                 extend_unsafe_fixes,
                 ignore_init_module_imports,
-                logger_callables,
                 logger_objects,
                 select,
                 explicit_preview_rules,
@@ -4177,6 +4176,7 @@ impl From<LintOptionsWire> for LintOptions {
                 extend_per_file_ignores,
             },
             exclude,
+            logger_callables,
             pydoclint,
             ruff,
             preview,

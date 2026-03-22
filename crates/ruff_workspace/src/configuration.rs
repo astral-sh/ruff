@@ -802,7 +802,7 @@ impl LintConfiguration {
                     .collect()
             }),
             task_tags: options.common.task_tags,
-            logger_callables: options.common.logger_callables,
+            logger_callables: options.logger_callables,
             logger_objects: options.common.logger_objects,
             typing_modules: options.common.typing_modules,
             typing_extensions: options.typing_extensions,
@@ -1425,7 +1425,6 @@ fn warn_about_deprecated_top_level_lint_options(
         extend_safe_fixes,
         extend_unsafe_fixes,
         ignore_init_module_imports,
-        logger_callables,
         logger_objects,
         select,
         explicit_preview_rules,
@@ -1508,10 +1507,6 @@ fn warn_about_deprecated_top_level_lint_options(
 
     if ignore_init_module_imports.is_some() {
         used_options.push("ignore-init-module-imports");
-    }
-
-    if logger_callables.is_some() {
-        used_options.push("logger-callables");
     }
 
     if logger_objects.is_some() {
