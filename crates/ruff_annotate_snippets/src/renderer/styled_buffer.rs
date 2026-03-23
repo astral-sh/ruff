@@ -76,17 +76,17 @@ impl StyledBuffer {
     /// and fills the last line with unstyled whitespace.
     pub(crate) fn puts(&mut self, line: usize, col: usize, string: &str, style: Style) {
         let char_count = string.chars().count();
-        if char_count > 0 {
-            self.ensure_lines(line);
-            let needed = col + char_count;
-            if needed > self.lines[line].len() {
-                self.lines[line].resize(needed, StyledChar::SPACE);
-            }
+        if char_count == 0 {
+            return;
         }
-        let mut n = col;
-        for c in string.chars() {
-            self.putc(line, n, c, style);
-            n += 1;
+        self.ensure_lines(line);
+        let needed = col + char_count;
+        if needed > self.lines[line].len() {
+            self.lines[line].resize(needed, StyledChar::SPACE);
+        }
+        let line = &mut self.lines[line];
+        for (i, c) in string.chars().enumerate() {
+            line[col + i] = StyledChar::new(c, style);
         }
     }
     /// For given `line` inserts `string` with `style` after old content of that line,
