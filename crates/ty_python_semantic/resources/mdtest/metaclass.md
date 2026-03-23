@@ -221,6 +221,18 @@ reveal_type(D)  # revealed: <class 'D'>
 reveal_type(D.__class__)  # revealed: <class 'SignatureMismatch'>
 ```
 
+## Diagnostic range
+
+<!-- snapshot-diagnostics -->
+
+```py
+def _(n: int):
+    # error: [invalid-metaclass]
+    class B(metaclass=n):
+        x = 1
+        y = 2
+```
+
 ## Cyclic
 
 Retrieving the metaclass of a cyclically defined class should not cause an infinite loop.
