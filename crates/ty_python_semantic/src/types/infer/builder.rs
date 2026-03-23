@@ -57,7 +57,7 @@ use crate::types::class::{
     ClassLiteral, CodeGeneratorKind, DynamicClassAnchor, DynamicClassLiteral,
     DynamicMetaclassConflict, MethodDecorator,
 };
-use crate::types::constraints::{ConstraintSetBuilder, Solutions};
+use crate::types::constraints::{ConstraintSetBuilder, PathBounds, Solutions};
 use crate::types::context::InferContext;
 use crate::types::diagnostic::{
     self, CALL_NON_CALLABLE, CONFLICTING_DECLARATIONS, CYCLIC_CLASS_DEFINITION,
@@ -6087,13 +6087,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     db,
                     &constraints,
                     inferable,
-                    |typevar, variance, _lower, _upper| {
+                    |typevar, variance, lower, upper| {
                         let identity = typevar.identity(db);
                         elt_tcx_variance
                             .entry(identity)
                             .and_modify(|current| *current = current.join(variance))
                             .or_insert(variance);
-                        None // Use default solution selection
+                        PathBounds::default_solve(db, typevar, variance, lower, upper)
                     },
                 );
 

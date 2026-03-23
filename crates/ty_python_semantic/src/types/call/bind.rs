@@ -27,7 +27,7 @@ use crate::place::{DefinedPlace, Definedness, Place, known_module_symbol};
 use crate::subscript::PyIndex;
 use crate::types::call::arguments::{CallArgumentTypes, Expansion, is_expandable_type};
 use crate::types::callable::CallableTypeKind;
-use crate::types::constraints::{ConstraintSet, ConstraintSetBuilder, Solutions};
+use crate::types::constraints::{ConstraintSet, ConstraintSetBuilder, PathBounds, Solutions};
 use crate::types::diagnostic::{
     CALL_NON_CALLABLE, CALL_TOP_CALLABLE, CONFLICTING_ARGUMENT_FORMS, INVALID_ARGUMENT_TYPE,
     INVALID_DATACLASS, MISSING_ARGUMENT, NO_MATCHING_OVERLOAD, PARAMETER_ALREADY_ASSIGNED,
@@ -3799,13 +3799,13 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     self.db,
                     constraints,
                     self.inferable_typevars,
-                    |typevar, variance, _lower, _upper| {
+                    |typevar, variance, lower, upper| {
                         let identity = typevar.identity(self.db);
                         variance_map
                             .entry(identity)
                             .and_modify(|current| *current = current.join(variance))
                             .or_insert(variance);
-                        None // Use default solution selection
+                        PathBounds::default_solve(self.db, typevar, variance, lower, upper)
                     },
                 );
 
