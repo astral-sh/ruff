@@ -1658,15 +1658,8 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     /// are set to the inferred type (representing an equality constraint). Unmapped typevars
     /// are left to `specialize_recursive` to fill in with defaults.
     ///
-    /// The hook returns:
-    /// - `Some(ty)` to use `ty` as the specialization for this typevar
-    /// - `None` to use the inferred type unchanged
-    ///
-    /// This method replaces the pattern of `mapped(...).build(...)`, allowing callers to
-    /// transform inferred types (e.g., literal promotion) in a single step. In the future,
-    /// when the builder's internal representation switches from a `HashMap` to a `ConstraintSet`,
-    /// the hook will receive actual lower/upper bounds from the constraint set instead of
-    /// synthetic equality bounds.
+    /// The hook should return `Some(ty)` to use `ty` as the specialization for this typevar, or
+    /// `None` to use the inferred type unchanged.
     pub(crate) fn build_with(
         &mut self,
         generic_context: GenericContext<'db>,

@@ -3766,11 +3766,11 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         // Attempt to solve the specialization while preferring the declared type of non-covariant
         // type parameters from generic classes.
         //
-        // We use a forward assignability check (`return_ty ≤ tcx`) to infer what each typevar in
-        // the function's return type maps to in the type context. (We use _constraint set_
+        // We use an assignability check (`return_ty ≤ tcx`) to infer what each typevar in the
+        // function's return type maps to in the type context. (We use _constraint set_
         // assignability so that we get a constraint set describing the typevars.) For example, if
         // the return type is `list[T]` and the type context is `list[int]`, the check produces
-        // `T ≤ int`, from which we extract the preferred type `int`.
+        // `T = int`, from which we extract the preferred type `int`.
         //
         // TODO: This two-phase approach (extract preferred types from the type context, then check
         // argument compatibility) should eventually be replaced by conjoining the type context

@@ -6056,18 +6056,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             if let Some(tcx) = tcx.annotation
                 && tcx.class_specialization(self.db()).is_some()
-                // Skip constraint extraction when the type context contains
-                // UnspecializedTypeVar placeholders (from partially-specialized
-                // parameter types during multi-inference for overloaded calls).
-                // The CSA would walk through protocol supertypes and produce
-                // constraints contaminated by the placeholder, which collapse to
-                // `Any` during solution extraction and bypass downstream filters.
+                // Skip constraint extraction when the type context contains UnspecializedTypeVar
+                // placeholders (from partially-specialized parameter types during multi-inference
+                // for overloaded calls). The assignability check would walk through protocol
+                // supertypes and produce constraints contaminated by the placeholder, which
+                // collapse to `Any` during solution extraction and bypass downstream filters.
                 //
                 // TODO: UnspecializedTypeVar should be removed entirely once the
-                // SpecializationBuilder uses constraint sets internally, at which
-                // point the typevars that it currently replaces can instead be
-                // existentially quantified away (as is already done for generic
-                // callable assignability in `check_signature_pair`).
+                // SpecializationBuilder uses constraint sets internally, at which point the
+                // typevars that it currently replaces can instead be existentially quantified away
+                // (as is already done for generic callable assignability in
+                // `check_signature_pair`).
                 && !tcx.has_unspecialized_type_var(self.db())
             {
                 let db = self.db();
