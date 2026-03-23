@@ -1159,12 +1159,12 @@ pub(crate) fn loop_header_reachability<'db>(
 
 fn loop_header_reachability_cycle_recover<'db>(
     _db: &'db dyn Db,
-    _cycle: &salsa::Cycle,
+    cycle: &salsa::Cycle,
     previous: &LoopHeaderReachability<'db>,
     result: LoopHeaderReachability<'db>,
     _definition: Definition<'db>,
 ) -> LoopHeaderReachability<'db> {
-    result.cycle_normalized(previous)
+    result.cycle_normalized(previous, cycle)
 }
 
 fn loop_header_reachability_impl<'db>(
@@ -1236,10 +1236,16 @@ impl<'db> LoopHeaderReachability<'db> {
     fn cycle_normalized(
         self,
         previous: &LoopHeaderReachability<'db>,
+        cycle: &salsa::Cycle,
     ) -> LoopHeaderReachability<'db> {
-        let mut reachable_bindings = FxIndexSet::default();
-        reachable_bindings.extend(previous.reachable_bindings.iter().copied());
-        reachable_bindings.extend(self.reachable_bindings);
+        // Avoid losing precision for cycles that are soon to converge.
+        // See [`Type::cycle_normalized`] for more details.
+        let reachable_bindings = if cycle.iteration() <= 1 {
+            self.reachable_bindings
+        } else {
+            let previous_bindings = previous.reachable_bindings.iter().copied();
+            previous_bindings.chain(self.reachable_bindings).collect()
+        };
 
         LoopHeaderReachability {
             deleted_reachability: self.deleted_reachability,

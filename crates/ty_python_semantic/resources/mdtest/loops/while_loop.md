@@ -477,8 +477,7 @@ def random() -> bool:
 
 x = 0
 while random():
-    # TODO: This should reveal `Literal[0]`.
-    reveal_type(x)  # revealed: Literal[0, 2]
+    reveal_type(x)  # revealed: Literal[0]
     if x == 1:
         x = 2
 ```

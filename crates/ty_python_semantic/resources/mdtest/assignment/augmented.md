@@ -16,6 +16,15 @@ x += (3, 4)
 reveal_type(x)  # revealed: tuple[Literal[1, 2, 3, 4], ...]
 ```
 
+## Walrus target
+
+```py
+def f(xs: list[int | str]) -> None:
+    ys = xs
+    ys[0] = "s"
+    (ys := [1])[0] += 1
+```
+
 ## Dunder methods
 
 ```py

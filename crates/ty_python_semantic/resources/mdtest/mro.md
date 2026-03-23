@@ -507,7 +507,7 @@ the class "header":
 
 class A: ...
 
-class B(  # type: ignore[duplicate-base]
+class B(  # type: ignore[ty:duplicate-base]
     A,
     A,
 ): ...
@@ -515,7 +515,7 @@ class B(  # type: ignore[duplicate-base]
 class C(
     A,
     A
-):  # type: ignore[duplicate-base]
+):  # type: ignore[ty:duplicate-base]
     x: int
 
 # fmt: on
@@ -532,7 +532,7 @@ exception at runtime, not a sub-expression in the class's bases list.
 class D(
     A,
     # error: [unused-type-ignore-comment]
-    A,  # type: ignore[duplicate-base]
+    A,  # type: ignore[ty:duplicate-base]
 ): ...
 
 # error: [duplicate-base]
@@ -541,7 +541,7 @@ class E(
     A
 ):
     # error: [unused-type-ignore-comment]
-    x: int  # type: ignore[duplicate-base]
+    x: int  # type: ignore[ty:duplicate-base]
 
 # fmt: on
 ```

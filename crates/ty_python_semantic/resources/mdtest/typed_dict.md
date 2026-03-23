@@ -49,6 +49,81 @@ Methods that are available on `dict`s are also available on `TypedDict`s:
 
 ```py
 bob.update(age=26)
+bob.update({"age": 27})
+
+class NamePatch(TypedDict, total=False):
+    name: str
+
+name_update: NamePatch = {"name": "Bobby"}
+string_key_updates: list[tuple[str, str]] = [("name", "Bobby")]
+bad_key_updates: list[tuple[int, str]] = [(1, "Bobby")]
+
+bob.update(name_update)
+bob.update({"name": "Robert"})
+bob.update([("name", "Bobby")])
+bob.update([("age", 27)])
+bob.update(name_update, age=26)
+bob.update([("name", "Bobby")], age=26)
+
+# error: [invalid-argument-type]
+bob.update(age="bad")
+
+# error: [unknown-argument]
+bob.update(other=1)
+
+# error: [invalid-argument-type]
+bob.update(name_update, age="bad")
+
+# error: [unknown-argument]
+bob.update(name_update, other=1)
+
+# error: [invalid-argument-type]
+# error: [invalid-key]
+bob.update({"other": 1})
+
+# error: [invalid-argument-type]
+# error: [invalid-argument-type]
+bob.update({"age": "bad"})
+
+bob.update([("other", 1)])
+
+bob.update([("age", "bad")])
+
+bob.update(string_key_updates)
+
+# error: [invalid-argument-type]
+bob.update(bad_key_updates)
+```
+
+`update()` treats the patch operand as partial even when the target `TypedDict` uses `Required` and
+`NotRequired`:
+
+```py
+from typing_extensions import NotRequired, Required
+
+class Movie(TypedDict, total=False):
+    title: Required[str]
+    year: int
+    director: NotRequired[str]
+
+class MissingRequiredTitle(TypedDict, total=False):
+    year: int
+
+movie: Movie = {"title": "Alien"}
+missing_required_title: MissingRequiredTitle = {"year": 1986}
+
+movie.update(year=1986)
+movie.update(director="Cameron")
+movie.update({"title": "Aliens"})
+movie.update({"director": "Cameron"})
+movie.update(missing_required_title)
+
+# error: [invalid-argument-type]
+movie.update(title=1986)
+
+# error: [invalid-argument-type]
+# error: [invalid-argument-type]
+movie.update({"director": 1986})
 ```
 
 PEP 584-style immutable updates preserve the `TypedDict` type when the other operand is compatible:

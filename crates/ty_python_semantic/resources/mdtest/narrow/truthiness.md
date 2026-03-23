@@ -46,6 +46,27 @@ else:
     reveal_type(x)  # revealed: Literal[b"", b"bar", 0, False, ""] | None | tuple[()]
 ```
 
+## Walrus Member Access
+
+We can narrow on an attribute expression, even when its base is a named expression:
+
+```py
+class Foo:
+    val: int | None
+
+if (foo := Foo()).val:
+    reveal_type(foo.val)  # revealed: int & ~AlwaysFalsy
+```
+
+But we don't pick up stale narrowings from before the assignment in the named expression:
+
+```py
+foo1 = Foo()
+foo1.val = None
+if (foo1 := Foo()).val:
+    reveal_type(foo1.val)  # revealed: int & ~AlwaysFalsy
+```
+
 ## Function Literals
 
 Basically functions are always truthy.

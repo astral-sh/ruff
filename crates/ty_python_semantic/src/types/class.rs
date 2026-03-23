@@ -1842,6 +1842,24 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source: ClassType<'db>,
         target: ClassType<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        // Fast path: if source and target are the same class (possibly with different
+        // specializations), we can compare them directly without walking the MRO.
+        match (source, target) {
+            (ClassType::NonGeneric(source), ClassType::NonGeneric(target)) if source == target => {
+                return self.always();
+            }
+            (ClassType::Generic(source_alias), ClassType::Generic(target_alias))
+                if source_alias.origin(db) == target_alias.origin(db) =>
+            {
+                return self.check_specialization_pair(
+                    db,
+                    source_alias.specialization(db),
+                    target_alias.specialization(db),
+                );
+            }
+            _ => {}
+        }
+
         source.iter_mro(db).when_any(db, self.constraints, |base| {
             match base {
                 ClassBase::Dynamic(_) => match self.relation {
@@ -2002,6 +2020,47 @@ impl<'db> VarianceInferable<'db> for ClassLiteral<'db> {
             Self::Dynamic(_) | Self::DynamicNamedTuple(_) => TypeVarVariance::Bivariant,
         }
     }
+}
+
+pub(super) fn synthesize_typed_dict_update_member<'db>(
+    db: &'db dyn Db,
+    instance_ty: Type<'db>,
+    keyword_parameters: &[Parameter<'db>],
+) -> Type<'db> {
+    let partial_ty = if let Type::TypedDict(typed_dict) = instance_ty {
+        Type::TypedDict(typed_dict.to_partial(db))
+    } else {
+        instance_ty
+    };
+
+    let value_ty = UnionBuilder::new(db)
+        .add(partial_ty)
+        .add(KnownClass::Iterable.to_specialized_instance(
+            db,
+            &[Type::heterogeneous_tuple(
+                db,
+                [KnownClass::Str.to_instance(db), Type::object()],
+            )],
+        ))
+        .build();
+
+    let update_signature = Signature::new(
+        Parameters::new(
+            db,
+            [
+                Parameter::positional_only(Some(Name::new_static("self")))
+                    .with_annotated_type(instance_ty),
+                Parameter::positional_only(Some(Name::new_static("value")))
+                    .with_annotated_type(value_ty)
+                    .with_default_type(Type::none(db)),
+            ]
+            .into_iter()
+            .chain(keyword_parameters.iter().cloned()),
+        ),
+        Type::none(db),
+    );
+
+    Type::function_like_callable(db, update_signature)
 }
 
 /// Performs member lookups over an MRO (Method Resolution Order).
