@@ -544,6 +544,23 @@ pub(super) struct TypeRelationChecker<'a, 'c, 'db> {
 }
 
 impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
+    pub(super) fn assignability(
+        constraints: &'c ConstraintSetBuilder<'db>,
+        inferable: InferableTypeVars<'db>,
+        relation_visitor: &'a HasRelationToVisitor<'db, 'c>,
+        disjointness_visitor: &'a IsDisjointVisitor<'db, 'c>,
+    ) -> Self {
+        Self {
+            constraints,
+            inferable,
+            relation: TypeRelation::Assignability,
+            allow_generic_callable_assignability_path: true,
+            given: ConstraintSet::from_bool(constraints, false),
+            relation_visitor,
+            disjointness_visitor,
+        }
+    }
+
     pub(super) fn subtyping(
         constraints: &'c ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'db>,

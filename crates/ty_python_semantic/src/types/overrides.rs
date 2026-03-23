@@ -36,7 +36,9 @@ use crate::{
         },
         enums::{EnumMetadata, enum_metadata},
         function::{FunctionDecorators, FunctionType, KnownFunction},
+        generics::InferableTypeVars,
         list_members::{Member, MemberWithDefinition, all_end_of_scope_members},
+        relation::{HasRelationToVisitor, IsDisjointVisitor, TypeRelationChecker},
         tuple::Tuple,
     },
 };
@@ -82,6 +84,25 @@ pub(super) fn check_class<'db>(context: &InferContext<'db, '_>, class: StaticCla
             &member,
         );
     }
+}
+
+fn is_assignable_for_override<'db>(db: &'db dyn Db, source: Type<'db>, target: Type<'db>) -> bool {
+    let constraints = ConstraintSetBuilder::new();
+    let relation_visitor = HasRelationToVisitor::default(&constraints);
+    let disjointness_visitor = IsDisjointVisitor::default(&constraints);
+    // The generic-callable assignability special path is for first-class callable values, not
+    // method override checks on class members.
+    let checker = TypeRelationChecker::assignability(
+        &constraints,
+        InferableTypeVars::None,
+        &relation_visitor,
+        &disjointness_visitor,
+    )
+    .without_generic_callable_assignability_path();
+
+    checker
+        .check_type_pair(db, source, target)
+        .is_always_satisfied(db)
 }
 
 fn check_class_declaration<'db>(
@@ -420,7 +441,7 @@ fn check_class_declaration<'db>(
 
             let superclass_type_as_type = superclass_type_as_callable.into_type(db);
 
-            if type_on_subclass_instance.is_assignable_to(db, superclass_type_as_type) {
+            if is_assignable_for_override(db, type_on_subclass_instance, superclass_type_as_type) {
                 continue;
             }
 
@@ -434,7 +455,11 @@ fn check_class_declaration<'db>(
                     // The immediate parent already defines this method and is different from the
                     // current ancestor we're checking. Check if the immediate parent's method
                     // is also incompatible with this ancestor.
-                    if !immediate_parent_type.is_assignable_to(db, superclass_type_as_type) {
+                    if !is_assignable_for_override(
+                        db,
+                        immediate_parent_type,
+                        superclass_type_as_type,
+                    ) {
                         // The immediate parent already has an LSP violation with this ancestor.
                         // Don't report the same violation for the child.
                         continue;

@@ -41,6 +41,34 @@ class Sub4(Super):
     def method(self) -> str: ...  # error: [invalid-method-override]
 ```
 
+Generic class typevars bounded by the parent return type should still be valid covariant overrides.
+
+```pyi
+from typing import Generic, TypeVar, Union
+
+class Root: ...
+
+class Base:
+    def get_parent_id(self) -> Union["Base", Root]: ...
+
+PT = TypeVar("PT", bound=Union[Base, Root])
+
+class Child(Base, Generic[PT]):
+    parent_id: PT
+
+    def get_parent_id(self) -> PT: ...
+
+class DataArray: ...
+
+class Coordinates:
+    def __getitem__(self, key: object) -> DataArray: ...
+
+T_DataArray = TypeVar("T_DataArray", bound=DataArray)
+
+class DataArrayCoordinates(Coordinates, Generic[T_DataArray]):
+    def __getitem__(self, key: object) -> T_DataArray: ...
+```
+
 ## Method parameters
 
 <!-- snapshot-diagnostics -->
