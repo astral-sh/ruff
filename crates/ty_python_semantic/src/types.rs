@@ -757,6 +757,14 @@ fn recursive_type_normalize_type_guard_like<'db, T: TypeGuardLike<'db>>(
     Some(guard.with_type(db, ty))
 }
 
+#[derive(Debug, Clone, Copy)]
+#[expect(clippy::struct_field_names)]
+struct GeneratorTypes<'db> {
+    yield_ty: Option<Type<'db>>,
+    send_ty: Option<Type<'db>>,
+    return_ty: Option<Type<'db>>,
+}
+
 #[salsa::tracked]
 impl<'db> Type<'db> {
     pub(crate) const fn any() -> Self {
@@ -1043,18 +1051,22 @@ impl<'db> Type<'db> {
         self.specialization_of_optional(db, None)
     }
 
+    /// If this type is a class instance, returns its class.
+    pub(crate) fn nominal_class(self, db: &'db dyn Db) -> Option<ClassType<'db>> {
+        match self {
+            Type::NominalInstance(instance) => Some(instance.class(db)),
+            Type::ProtocolInstance(instance) => instance.to_nominal_instance().map(|i| i.class(db)),
+            Type::TypeAlias(alias) => alias.value_type(db).nominal_class(db),
+            _ => None,
+        }
+    }
+
     fn specialization_of_optional(
         self,
         db: &'db dyn Db,
         expected_class: Option<StaticClassLiteral<'_>>,
     ) -> Option<Specialization<'db>> {
-        let class_type = match self {
-            Type::NominalInstance(instance) => instance,
-            Type::ProtocolInstance(instance) => instance.to_nominal_instance()?,
-            Type::TypeAlias(alias) => alias.value_type(db).as_nominal_instance()?,
-            _ => return None,
-        }
-        .class(db);
+        let class_type = self.nominal_class(db)?;
 
         let (class_literal, specialization) = class_type.static_class_literal(db)?;
         if expected_class.is_some_and(|expected_class| expected_class != class_literal) {
@@ -1183,6 +1195,13 @@ impl<'db> Type<'db> {
         }
     }
 
+    pub(crate) const fn as_new_type(self) -> Option<NewType<'db>> {
+        match self {
+            Type::NewTypeInstance(new_type) => Some(new_type),
+            _ => None,
+        }
+    }
+
     /// If this type is a `Type::TypeAlias`, recursively resolves it to its
     /// underlying value type. Otherwise, returns `self` unchanged.
     pub(crate) fn resolve_type_alias(self, db: &'db dyn Db) -> Type<'db> {
@@ -1305,7 +1324,7 @@ impl<'db> Type<'db> {
         matches!(self, Type::Union(_))
     }
 
-    pub(crate) const fn as_union(self) -> Option<UnionType<'db>> {
+    pub const fn as_union(self) -> Option<UnionType<'db>> {
         match self {
             Type::Union(union_type) => Some(union_type),
             _ => None,
@@ -3388,6 +3407,35 @@ impl<'db> Type<'db> {
         }
     }
 
+    // Returns the value type of a `__getitem__` dunder call on this object.
+    //
+    // Returns `None` if `__getitem__` is undefined or results in a call error.
+    fn getitem_dunder_call(self, db: &'db dyn Db, key: Option<&str>) -> Option<Type<'db>> {
+        let key = key
+            .map(|key| Type::string_literal(db, key))
+            .unwrap_or(Type::unknown());
+
+        match self
+            .member_lookup_with_policy(
+                db,
+                Name::new_static("__getitem__"),
+                MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+            )
+            .place
+        {
+            Place::Defined(DefinedPlace {
+                ty: getitem_method,
+                definedness: Definedness::AlwaysDefined,
+                ..
+            }) => getitem_method
+                .try_call(db, &CallArguments::positional([key]))
+                .ok()
+                .map(|bindings| bindings.return_type(db)),
+
+            _ => None,
+        }
+    }
+
     /// Returns the key and value types of this object if it was unpacked using `**`,
     /// or `None` if the object does not support unpacking.
     fn unpack_keys_and_items(self, db: &'db dyn Db) -> Option<(Type<'db>, Type<'db>)> {
@@ -3419,25 +3467,9 @@ impl<'db> Type<'db> {
             _ => return None,
         };
 
-        let value_ty = match self
-            .member_lookup_with_policy(
-                db,
-                Name::new_static("__getitem__"),
-                MemberLookupPolicy::NO_INSTANCE_FALLBACK,
-            )
-            .place
-        {
-            Place::Defined(DefinedPlace {
-                ty: getitem_method,
-                definedness: Definedness::AlwaysDefined,
-                ..
-            }) => getitem_method
-                .try_call(db, &CallArguments::positional([Type::unknown()]))
-                .ok()
-                .map_or_else(Type::unknown, |bindings| bindings.return_type(db)),
-
-            _ => Type::unknown(),
-        };
+        let value_ty = self
+            .getitem_dunder_call(db, None)
+            .unwrap_or(Type::unknown());
 
         Some((key_ty, value_ty))
     }
@@ -4755,7 +4787,7 @@ impl<'db> Type<'db> {
     ///
     /// This corresponds to the `ReturnT` parameter of the generic `typing.Generator[YieldT, SendT, ReturnT]`
     /// protocol.
-    fn generator_return_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
+    fn generator_types(self, db: &'db dyn Db) -> Option<GeneratorTypes<'db>> {
         // TODO: Ideally, we would first try to upcast `self` to an instance of `Generator` and *then*
         // match on the protocol instance to get the `ReturnType` type parameter. For now, implement
         // an ad-hoc solution that works for protocols and instances of classes that explicitly inherit
@@ -4763,12 +4795,36 @@ impl<'db> Type<'db> {
 
         let from_class_base = |base: ClassBase<'db>| {
             let class = base.into_class()?;
+            let (_, Some(specialization)) = class.static_class_literal_specialized(db, None)?
+            else {
+                return None;
+            };
+
             if class.is_known(db, KnownClass::Generator)
-                && let Some((_, Some(specialization))) =
-                    class.static_class_literal_specialized(db, None)
-                && let [_, _, return_ty] = specialization.types(db)
+                && let [yield_ty, send_ty, return_ty] = specialization.types(db)
             {
-                Some(*return_ty)
+                Some(GeneratorTypes {
+                    yield_ty: Some(*yield_ty),
+                    send_ty: Some(*send_ty),
+                    return_ty: Some(*return_ty),
+                })
+            } else if class.is_known(db, KnownClass::AsyncGenerator)
+                && let [yield_ty, send_ty] = specialization.types(db)
+            {
+                Some(GeneratorTypes {
+                    yield_ty: Some(*yield_ty),
+                    send_ty: Some(*send_ty),
+                    return_ty: None,
+                })
+            } else if (class.is_known(db, KnownClass::Iterator)
+                || class.is_known(db, KnownClass::AsyncIterator))
+                && let [yield_ty] = specialization.types(db)
+            {
+                Some(GeneratorTypes {
+                    yield_ty: Some(*yield_ty),
+                    send_ty: Some(Type::none(db)),
+                    return_ty: Some(Type::unknown()),
+                })
             } else {
                 None
             }
@@ -4785,24 +4841,94 @@ impl<'db> Type<'db> {
                     None
                 }
             }
-            Type::Union(union) => union.try_map(db, |ty| ty.generator_return_type(db)),
+            Type::Union(union) => {
+                let mut yield_builder = Some(UnionBuilder::new(db));
+                let mut send_builder = Some(UnionBuilder::new(db));
+                let mut return_builder = Some(UnionBuilder::new(db));
+
+                for ty in union.elements(db) {
+                    let gt = ty.generator_types(db)?;
+                    match gt.yield_ty {
+                        Some(ty) => yield_builder = yield_builder.map(|b| b.add(ty)),
+                        None => yield_builder = None,
+                    }
+                    match gt.send_ty {
+                        Some(ty) => send_builder = send_builder.map(|b| b.add(ty)),
+                        None => send_builder = None,
+                    }
+                    match gt.return_ty {
+                        Some(ty) => return_builder = return_builder.map(|b| b.add(ty)),
+                        None => return_builder = None,
+                    }
+                }
+
+                Some(GeneratorTypes {
+                    yield_ty: yield_builder.map(UnionBuilder::build),
+                    send_ty: send_builder.map(UnionBuilder::build),
+                    return_ty: return_builder.map(UnionBuilder::build),
+                })
+            }
             Type::Intersection(intersection) => {
-                let mut builder = IntersectionBuilder::new(db);
-                let mut any_success = false;
                 // Using `positive()` rather than `positive_elements_or_object()` is safe
                 // here because `object` is not a generator, so falling back to it would
                 // still return `None`.
+                let mut yield_builder = Some(IntersectionBuilder::new(db));
+                let mut send_builder = Some(IntersectionBuilder::new(db));
+                let mut return_builder = Some(IntersectionBuilder::new(db));
+                let mut any_success = false;
+
                 for ty in intersection.positive(db) {
-                    if let Some(return_ty) = ty.generator_return_type(db) {
-                        builder = builder.add_positive(return_ty);
-                        any_success = true;
+                    let Some(gt) = ty.generator_types(db) else {
+                        continue;
+                    };
+                    any_success = true;
+                    match gt.yield_ty {
+                        Some(ty) => {
+                            yield_builder = yield_builder.map(|b| b.add_positive(ty));
+                        }
+                        None => yield_builder = None,
+                    }
+                    match gt.send_ty {
+                        Some(ty) => {
+                            send_builder = send_builder.map(|b| b.add_positive(ty));
+                        }
+                        None => send_builder = None,
+                    }
+                    match gt.return_ty {
+                        Some(ty) => {
+                            return_builder = return_builder.map(|b| b.add_positive(ty));
+                        }
+                        None => return_builder = None,
                     }
                 }
-                any_success.then(|| builder.build())
+
+                if !any_success {
+                    return None;
+                }
+
+                Some(GeneratorTypes {
+                    yield_ty: yield_builder.map(IntersectionBuilder::build),
+                    send_ty: send_builder.map(IntersectionBuilder::build),
+                    return_ty: return_builder.map(IntersectionBuilder::build),
+                })
             }
-            ty @ (Type::Dynamic(_) | Type::Never) => Some(ty),
+            ty @ (Type::Dynamic(_) | Type::Never) => Some(GeneratorTypes {
+                yield_ty: Some(ty),
+                send_ty: Some(ty),
+                return_ty: Some(ty),
+            }),
             _ => None,
         }
+    }
+
+    fn generator_return_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        self.generator_types(db)
+            .and_then(|generator_types| generator_types.return_ty)
+    }
+
+    fn generator_send_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        self.generator_types(db)
+            .and_then(|generator_types| generator_types.send_ty)
     }
 
     #[must_use]

@@ -36,7 +36,7 @@
 //! of iterations, so if we fail to converge, Salsa will eventually panic. (This should of course
 //! be considered a bug.)
 
-use ruff_db::parsed::{ParsedModuleRef, parsed_module};
+use ruff_db::parsed::parsed_module;
 use ruff_text_size::Ranged;
 use rustc_hash::{FxHashMap, FxHashSet};
 use salsa;
@@ -240,7 +240,7 @@ pub(super) fn infer_expression_types_impl<'db>(
     let _span = tracing::trace_span!(
         "infer_expression_types",
         expression = ?expression.as_id(),
-        range = ?expression.node_ref(db, &module).range(),
+        range = ?expression.node_ref(db).node(&module).range(),
         ?file
     )
     .entered();
@@ -275,10 +275,9 @@ pub(crate) fn infer_same_file_expression_type<'db>(
     db: &'db dyn Db,
     expression: Expression<'db>,
     tcx: TypeContext<'db>,
-    parsed: &ParsedModuleRef,
 ) -> Type<'db> {
     let inference = infer_expression_types(db, expression, tcx);
-    inference.expression_type(expression.node_ref(db, parsed))
+    inference.expression_type(expression.node_ref(db))
 }
 
 /// Infers the type of an expression where the expression might come from another file.
@@ -306,13 +305,10 @@ pub(crate) fn infer_expression_type<'db>(
 fn infer_expression_type_impl<'db>(db: &'db dyn Db, input: InferExpression<'db>) -> Type<'db> {
     let (expression, _) = input.into_inner(db);
 
-    let file = expression.file(db);
-    let module = parsed_module(db, file).load(db);
-
     // It's okay to call the "same file" version here because we're inside a salsa query.
     let inference = infer_expression_types_impl(db, input);
 
-    inference.expression_type(expression.node_ref(db, &module))
+    inference.expression_type(expression.node_ref(db))
 }
 
 /// An `Expression` with an optional `TypeContext`.
@@ -426,6 +422,12 @@ impl<'db> TypeContext<'db> {
     pub(crate) fn is_typealias(&self) -> bool {
         self.annotation
             .is_some_and(|ty| ty.is_typealias_special_form())
+    }
+}
+
+impl<'db> From<Type<'db>> for TypeContext<'db> {
+    fn from(annotation: Type<'db>) -> Self {
+        Self::new(Some(annotation))
     }
 }
 

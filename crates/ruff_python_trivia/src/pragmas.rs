@@ -9,6 +9,7 @@
 /// assert!(ruff_python_trivia::is_pragma_comment("# nosec B602, B607"));
 /// assert!(ruff_python_trivia::is_pragma_comment("# isort: off"));
 /// assert!(ruff_python_trivia::is_pragma_comment("# isort: skip"));
+/// assert!(ruff_python_trivia::is_pragma_comment("# pyrefly: ignore[missing-attribute]"));
 /// ```
 pub fn is_pragma_comment(comment: &str) -> bool {
     let Some(content) = comment.strip_prefix('#') else {
@@ -26,5 +27,5 @@ pub fn is_pragma_comment(comment: &str) -> bool {
         // Case-sensitive match against a variety of pragmas that _do_ require a trailing colon.
         trimmed
         .split_once(':')
-        .is_some_and(|(maybe_pragma, _)| matches!(maybe_pragma, "isort" | "type" | "pyright" | "pylint" | "flake8" | "ruff" | "ty"))
+        .is_some_and(|(maybe_pragma, _)| matches!(maybe_pragma, "isort" | "type" | "pyright" | "pyrefly" | "pylint" | "flake8" | "ruff" | "ty"))
 }

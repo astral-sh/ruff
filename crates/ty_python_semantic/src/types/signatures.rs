@@ -936,24 +936,15 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             let target_is_single_paramspec =
                 CallableSignature::signatures_is_single_paramspec(target_overloads);
 
-            // If either callable is a ParamSpec, the constraint set should bind the ParamSpec to
-            // the other callable's signature. We also need to compare the return types — for
-            // instance, to verify in `Callable[P, int]` that the return type is assignable to
-            // `int`, or in `Callable[P, T]` to bind `T` to the return type of the other callable.
-            match (source_is_single_paramspec, target_is_single_paramspec) {
-                (Some((source_tvar, source_return)), Some((target_tvar, target_return))) => {
-                    let param_spec_matches = ConstraintSet::constrain_typevar(
-                        db,
-                        self.constraints,
-                        source_tvar,
-                        Type::TypeVar(target_tvar),
-                        Type::TypeVar(target_tvar),
-                    );
-                    let return_types_match = self.check_type_pair(db, source_return, target_return);
-                    return param_spec_matches.and(db, self.constraints, || return_types_match);
-                }
+            // TODO: Adding proper support for overloads with ParamSpec will likely require some
+            // changes here.
 
-                (Some((source_tvar, source_return)), None) => {
+            // Only handle ParamSpec here when we still need the whole overload set. Once we're
+            // down to a single signature on both sides, let
+            // `TypeRelationChecker::check_signature_pair_inner` handle the ParamSpec binding
+            // instead.
+            match (source_is_single_paramspec, target_is_single_paramspec) {
+                (Some((source_tvar, source_return)), None) if target_overloads.len() > 1 => {
                     let upper = Type::Callable(CallableType::new(
                         db,
                         CallableSignature::from_overloads(target_overloads.iter().map(
@@ -985,7 +976,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     return param_spec_matches.and(db, self.constraints, return_types_match);
                 }
 
-                (None, Some((target_tvar, target_return))) => {
+                (None, Some((target_tvar, target_return))) if source_overloads.len() > 1 => {
                     let lower = Type::Callable(CallableType::new(
                         db,
                         CallableSignature::from_overloads(source_overloads.iter().map(
@@ -1017,22 +1008,29 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     return param_spec_matches.and(db, self.constraints, return_types_match);
                 }
 
-                (None, None) => {}
+                _ => {}
             }
         }
 
         match (source_overloads, target_overloads) {
-            ([self_signature], [other_signature]) => {
+            ([source_signature], [target_signature]) => {
                 // Base case: both callable types contain a single signature.
-                self.check_signature_pair(db, self_signature, other_signature)
+                if self.relation.is_constraint_set_assignability()
+                    && (source_signature.parameters.as_paramspec().is_some()
+                        || target_signature.parameters.as_paramspec().is_some())
+                {
+                    self.check_signature_pair_inner(db, source_signature, target_signature)
+                } else {
+                    self.check_signature_pair(db, source_signature, target_signature)
+                }
             }
 
-            // `self` is possibly overloaded while `other` is definitely not overloaded.
-            (_, [other_signature]) => {
+            // source is possibly overloaded while target is definitely not overloaded.
+            (_, [target_signature]) => {
                 if let Some(aggregate_relation) = self.try_unary_overload_aggregate_relation(
                     db,
                     source_overloads,
-                    other_signature,
+                    target_signature,
                 ) {
                     return aggregate_relation;
                 }
@@ -1048,7 +1046,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     })
             }
 
-            // `self` is definitely not overloaded while `other` is possibly overloaded.
+            // source is definitely not overloaded while target is possibly overloaded.
             ([_], _) => {
                 target_overloads
                     .iter()
@@ -1061,7 +1059,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     })
             }
 
-            // `self` is definitely overloaded while `other` is possibly overloaded.
+            // source is definitely overloaded while target is possibly overloaded.
             (_, _) => target_overloads
                 .iter()
                 .when_all(db, self.constraints, |target_signature| {
@@ -1210,8 +1208,79 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 .is_never_satisfied(db)
         };
 
-        // Return types are covariant.
-        if !check_types(source.return_ty, target.return_ty) {
+        // Avoid returning early after checking the return types in case there is a `ParamSpec` type
+        // variable in either signature to ensure that the `ParamSpec` binding is still applied even
+        // if the return types are incompatible.
+        let return_type_checks = check_types(source.return_ty, target.return_ty);
+
+        if self.relation.is_constraint_set_assignability() {
+            let source_as_paramspec = source.parameters.as_paramspec();
+            let target_as_paramspec = target.parameters.as_paramspec();
+
+            // If either signature is a ParamSpec, the constraint set should bind the ParamSpec to
+            // the other signature before the return-type and gradual/top fast paths can return
+            // early. We also need to compare the return types here so a return-type mismatch still
+            // preserves the inferred ParamSpec binding.
+            match (source_as_paramspec, target_as_paramspec) {
+                (Some(source_bound_typevar), Some(target_bound_typevar)) => {
+                    let param_spec_matches = ConstraintSet::constrain_typevar(
+                        db,
+                        self.constraints,
+                        source_bound_typevar,
+                        Type::TypeVar(target_bound_typevar),
+                        Type::TypeVar(target_bound_typevar),
+                    );
+                    result.intersect(db, self.constraints, param_spec_matches);
+                    return result;
+                }
+
+                (Some(source_bound_typevar), None) => {
+                    let upper = Type::Callable(CallableType::new(
+                        db,
+                        CallableSignature::single(Signature::new_generic(
+                            target.generic_context,
+                            target.parameters.clone(),
+                            Type::unknown(),
+                        )),
+                        CallableTypeKind::ParamSpecValue,
+                    ));
+                    let param_spec_matches = ConstraintSet::constrain_typevar(
+                        db,
+                        self.constraints,
+                        source_bound_typevar,
+                        Type::Never,
+                        upper,
+                    );
+                    result.intersect(db, self.constraints, param_spec_matches);
+                    return result;
+                }
+
+                (None, Some(target_bound_typevar)) => {
+                    let lower = Type::Callable(CallableType::new(
+                        db,
+                        CallableSignature::single(Signature::new_generic(
+                            source.generic_context,
+                            source.parameters.clone(),
+                            Type::unknown(),
+                        )),
+                        CallableTypeKind::ParamSpecValue,
+                    ));
+                    let param_spec_matches = ConstraintSet::constrain_typevar(
+                        db,
+                        self.constraints,
+                        target_bound_typevar,
+                        lower,
+                        Type::object(),
+                    );
+                    result.intersect(db, self.constraints, param_spec_matches);
+                    return result;
+                }
+
+                (None, None) => {}
+            }
+        }
+
+        if !return_type_checks {
             return result;
         }
 
@@ -1254,71 +1323,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 ),
                 TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability => result,
             };
-        }
-
-        if self.relation.is_constraint_set_assignability() {
-            let source_is_paramspec = source.parameters.as_paramspec();
-            let target_is_paramspec = target.parameters.as_paramspec();
-
-            // If either signature is a ParamSpec, the constraint set should bind the ParamSpec to
-            // the other signature.
-            match (source_is_paramspec, target_is_paramspec) {
-                (Some(source_tvar), Some(target_tvar)) => {
-                    let param_spec_matches = ConstraintSet::constrain_typevar(
-                        db,
-                        self.constraints,
-                        source_tvar,
-                        Type::TypeVar(target_tvar),
-                        Type::TypeVar(target_tvar),
-                    );
-                    result.intersect(db, self.constraints, param_spec_matches);
-                    return result;
-                }
-
-                (Some(source_tvar), None) => {
-                    let upper = Type::Callable(CallableType::new(
-                        db,
-                        CallableSignature::single(Signature::new_generic(
-                            target.generic_context,
-                            target.parameters.clone(),
-                            Type::unknown(),
-                        )),
-                        CallableTypeKind::ParamSpecValue,
-                    ));
-                    let param_spec_matches = ConstraintSet::constrain_typevar(
-                        db,
-                        self.constraints,
-                        source_tvar,
-                        Type::Never,
-                        upper,
-                    );
-                    result.intersect(db, self.constraints, param_spec_matches);
-                    return result;
-                }
-
-                (None, Some(target_tvar)) => {
-                    let lower = Type::Callable(CallableType::new(
-                        db,
-                        CallableSignature::single(Signature::new_generic(
-                            source.generic_context,
-                            source.parameters.clone(),
-                            Type::unknown(),
-                        )),
-                        CallableTypeKind::ParamSpecValue,
-                    ));
-                    let param_spec_matches = ConstraintSet::constrain_typevar(
-                        db,
-                        self.constraints,
-                        target_tvar,
-                        lower,
-                        Type::object(),
-                    );
-                    result.intersect(db, self.constraints, param_spec_matches);
-                    return result;
-                }
-
-                (None, None) => {}
-            }
         }
 
         let mut parameters = ParametersZip {
@@ -2371,6 +2375,15 @@ impl<'db> Parameter<'db> {
             self.kind,
             ParameterKind::PositionalOnly { .. } | ParameterKind::PositionalOrKeyword { .. }
         )
+    }
+
+    /// Returns the name of this parameter if it is a keyword-only or standard parameter.
+    pub(crate) fn keyword_name(&self) -> Option<&Name> {
+        match &self.kind {
+            ParameterKind::PositionalOrKeyword { name, .. }
+            | ParameterKind::KeywordOnly { name, .. } => Some(name),
+            _ => None,
+        }
     }
 
     pub(crate) fn callable_by_name(&self, name: &str) -> bool {

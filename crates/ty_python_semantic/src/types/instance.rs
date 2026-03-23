@@ -24,7 +24,7 @@ use crate::types::relation::{
 };
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::{
-    ApplyTypeMappingVisitor, ClassBase, ClassLiteral, FindLegacyTypeVarsVisitor,
+    ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, FindLegacyTypeVarsVisitor,
     LiteralValueTypeKind, TypeContext, TypeMapping, VarianceInferable,
 };
 use crate::{Db, FxOrderSet, Program};
@@ -139,6 +139,16 @@ impl<'db> Type<'db> {
     {
         Self::ProtocolInstance(ProtocolInstanceType::synthesized(
             SynthesizedProtocolType::new(ProtocolInterface::with_property_members(db, members)),
+        ))
+    }
+
+    /// Synthesize a protocol instance type with a given set of methods.
+    pub(super) fn protocol_with_methods<'a, M>(db: &'db dyn Db, methods: M) -> Self
+    where
+        M: IntoIterator<Item = (&'a str, CallableType<'db>)>,
+    {
+        Self::ProtocolInstance(ProtocolInstanceType::synthesized(
+            SynthesizedProtocolType::new(ProtocolInterface::with_methods(db, methods)),
         ))
     }
 }

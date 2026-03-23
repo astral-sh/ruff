@@ -1,7 +1,7 @@
+use crate::ProjectMetadata;
 use crate::db::{Db, ProjectDatabase};
 use crate::metadata::options::ProjectOptionsOverrides;
 use crate::watch::{ChangeEvent, CreatedKind, DeletedKind};
-use crate::{Project, ProjectMetadata};
 use std::collections::BTreeSet;
 
 use crate::walk::ProjectFilesWalker;
@@ -38,7 +38,7 @@ impl ProjectDatabase {
         changes: Vec<ChangeEvent>,
         project_options_overrides: Option<&ProjectOptionsOverrides>,
     ) -> ChangeResult {
-        let mut project = self.project();
+        let project = self.project();
         let project_root = project.root(self).to_path_buf();
         let config_file_override =
             project_options_overrides.and_then(|options| options.config_file_override.clone());
@@ -59,11 +59,12 @@ impl ProjectDatabase {
         let mut sync_recursively = BTreeSet::default();
 
         for change in changes {
-            tracing::trace!("Handle change: {:?}", change);
+            tracing::debug!("Handling file watcher change event: {:?}", change);
 
             if let Some(path) = change.system_path() {
                 if let Some(config_file) = &config_file_override {
                     if config_file.as_path() == path {
+                        File::sync_path(self, path);
                         result.project_changed = true;
 
                         continue;
@@ -74,6 +75,7 @@ impl ProjectDatabase {
                     path.file_name(),
                     Some(".gitignore" | ".ignore" | "ty.toml" | "pyproject.toml")
                 ) {
+                    File::sync_path(self, path);
                     // Changes to ignore files or settings can change the project structure or add/remove files.
                     result.project_changed = true;
 
@@ -279,28 +281,8 @@ impl ProjectDatabase {
                         }
                     }
 
-                    if metadata.root() == project.root(self) {
-                        tracing::debug!("Reloading project after structural change");
-                        project.reload(self, metadata);
-                    } else {
-                        match Project::from_metadata(self, metadata, &FallibleStrategy) {
-                            Ok(new_project) => {
-                                tracing::debug!("Replace project after structural change");
-                                project = new_project;
-                            }
-                            Err(error) => {
-                                tracing::error!(
-                                    "Keeping old project configuration because loading the new settings failed with: {error}"
-                                );
-
-                                project
-                                    .set_settings_diagnostics(self)
-                                    .to(vec![error.into_diagnostic()]);
-                            }
-                        }
-
-                        self.project = Some(project);
-                    }
+                    tracing::debug!("Reloading project after structural change");
+                    project.reload(self, metadata);
                 }
                 Err(error) => {
                     tracing::error!(

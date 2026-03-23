@@ -15,9 +15,8 @@ on:
       - "crates/ruff_python_ast"
       - "crates/ruff_python_parser"
       - ".github/workflows/ty-ecosystem-analyzer.yaml"
-      - ".github/workflows/mypy_primer.yaml"
-      - "scripts/mypy_primer.sh"
-      - "scripts/mypy_primer_selector.py"
+      - ".github/ty-ecosystem.toml"
+      - "crates/ty_python_semantic/resources/primer/**"
       - "Cargo.lock"
       - "!**.md"
       - "!**.snap"
@@ -54,9 +53,9 @@ jobs:
         uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
         with:
           enable-cache: true
-          version: "0.10.10"
+          version: "0.10.12"
 
-      - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
           workspaces: "ruff"
           lookup-only: false
@@ -65,13 +64,14 @@ jobs:
         run: rustup show
 
       - name: Compute diagnostic diff
+        id: compute-diagnostic-diff
         shell: bash
         run: |
           cd ruff
 
-          echo "Enabling configuration overloads (see .github/mypy-primer-ty.toml)"
+          echo "Enabling configuration overloads (see .github/ty-ecosystem.toml)"
           mkdir -p ~/.config/ty
-          cp .github/mypy-primer-ty.toml ~/.config/ty/ty.toml
+          cp .github/ty-ecosystem.toml ~/.config/ty/ty.toml
 
           echo "new commit"
           git checkout -b new_commit "$GITHUB_SHA"
@@ -87,7 +87,7 @@ jobs:
 
           cd ..
 
-          uv tool install "git+https://github.com/astral-sh/ecosystem-analyzer@3b27e0b28a5314240c218e939bde0c6c02a39652"
+          uv tool install "git+https://github.com/astral-sh/ecosystem-analyzer@73fe4d9a7c940023ac2addc008097758c877b7ec"
 
           ecosystem-analyzer \
             --repository ruff \
@@ -112,13 +112,17 @@ jobs:
             --new-name "$REF_NAME" \
             --output-html dist/diff.html
 
+          set +e
           ecosystem-analyzer \
             generate-diff-statistics \
             diagnostics-old.json \
             diagnostics-new.json \
+            --fail-on-new-abnormal-exits \
             --old-name "main (merge base)" \
             --new-name "$REF_NAME" \
             --output diff-statistics.md
+          DIFF_STATISTICS_EXIT_CODE=$?
+          set -e
 
           ecosystem-analyzer \
             generate-timing-diff \
@@ -128,11 +132,11 @@ jobs:
             --new-name "$REF_NAME" \
             --output-html dist/timing.html
 
-          echo '## `ecosystem-analyzer` results' > comment.md
-          echo >> comment.md
           cat diff-statistics.md >> comment.md
 
           cat diff-statistics.md >> "$GITHUB_STEP_SUMMARY"
+
+          echo "diff_statistics_exit_code=$DIFF_STATISTICS_EXIT_CODE" >> "$GITHUB_OUTPUT"
 
       # NOTE: astral-sh-bot uses this artifact to post comments on PRs.
       # Make sure to update the bot if you rename the artifact.
@@ -161,3 +165,7 @@ jobs:
         with:
           name: timing.html
           path: dist/timing.html
+
+      - name: Fail on new abnormal exits
+        if: steps.compute-diagnostic-diff.outputs.diff_statistics_exit_code != '0'
+        run: exit 1
