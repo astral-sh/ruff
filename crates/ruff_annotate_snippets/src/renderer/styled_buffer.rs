@@ -38,7 +38,8 @@ impl StyledBuffer {
     }
 
     pub(crate) fn render(&self, stylesheet: &Stylesheet) -> Result<String, fmt::Error> {
-        let mut str = String::new();
+        let capacity = self.lines.iter().map(|line| line.len()).sum();
+        let mut str = String::with_capacity(capacity);
         for (i, line) in self.lines.iter().enumerate() {
             let mut current_style = stylesheet.none;
             for ch in line {
