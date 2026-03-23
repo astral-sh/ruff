@@ -610,6 +610,44 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         Self::from_node(builder, self.node.exists(db, builder, to_remove))
     }
 
+    /// Like `reduce_inferable`, but preserves the bounds and constraints of selected inferable
+    /// typevars before abstracting away the full inferable set.
+    ///
+    /// This matters for bounded and constrained typevars: existentially quantifying them must not
+    /// lose the restriction imposed by their bounds or constraints. Some callers also need to
+    /// abstract inferables that do not themselves carry a bound or constraint, such as outer
+    /// class typevars inferred through `Self`.
+    pub(crate) fn reduce_inferable_with_valid_specializations(
+        self,
+        db: &'db dyn Db,
+        builder: &'c ConstraintSetBuilder<'db>,
+        with_valid_specializations: impl IntoIterator<Item = BoundTypeVarInstance<'db>>,
+        to_remove: impl IntoIterator<Item = BoundTypeVarIdentity<'db>>,
+    ) -> Self {
+        self.verify_builder(builder);
+
+        let with_valid_specializations: Vec<_> = with_valid_specializations.into_iter().collect();
+        let to_remove: Vec<_> = to_remove.into_iter().collect();
+        let with_valid_specializations =
+            with_valid_specializations
+                .iter()
+                .fold(self, |constraints, typevar| {
+                    Self::from_node(
+                        builder,
+                        constraints
+                            .node
+                            .and_with_offset(builder, typevar.valid_specializations(db, builder)),
+                    )
+                });
+
+        Self::from_node(
+            builder,
+            with_valid_specializations
+                .node
+                .exists(db, builder, to_remove.iter().copied()),
+        )
+    }
+
     pub(crate) fn solutions(
         self,
         db: &'db dyn Db,

@@ -323,6 +323,7 @@ impl<'db> Type<'db> {
             constraints,
             inferable,
             relation: TypeRelation::SubtypingAssuming,
+            allow_generic_callable_assignability_path: true,
             given: assuming,
             relation_visitor: &HasRelationToVisitor::default(constraints),
             disjointness_visitor: &IsDisjointVisitor::default(constraints),
@@ -421,6 +422,7 @@ impl<'db> Type<'db> {
             constraints,
             inferable,
             relation,
+            allow_generic_callable_assignability_path: true,
             given: ConstraintSet::from_bool(constraints, false),
             relation_visitor: &HasRelationToVisitor::default(constraints),
             disjointness_visitor: &IsDisjointVisitor::default(constraints),
@@ -453,6 +455,7 @@ impl<'db> Type<'db> {
     ) -> ConstraintSet<'db, 'c> {
         let checker = EquivalenceChecker {
             constraints,
+            allow_generic_callable_assignability_path: true,
             given: ConstraintSet::from_bool(constraints, false),
             relation_visitor: &HasRelationToVisitor::default(constraints),
             disjointness_visitor: &IsDisjointVisitor::default(constraints),
@@ -491,6 +494,7 @@ impl<'db> Type<'db> {
         let checker = DisjointnessChecker {
             constraints,
             inferable,
+            allow_generic_callable_assignability_path: true,
             given: ConstraintSet::from_bool(constraints, false),
             disjointness_visitor: &IsDisjointVisitor::default(constraints),
             relation_visitor: &HasRelationToVisitor::default(constraints),
@@ -526,6 +530,7 @@ pub(super) struct TypeRelationChecker<'a, 'c, 'db> {
     pub(super) constraints: &'c ConstraintSetBuilder<'db>,
     pub(super) inferable: InferableTypeVars<'db>,
     pub(super) relation: TypeRelation,
+    pub(super) allow_generic_callable_assignability_path: bool,
     given: ConstraintSet<'db, 'c>,
 
     // N.B. these fields are private to reduce the risk of
@@ -549,6 +554,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             constraints,
             inferable,
             relation: TypeRelation::Subtyping,
+            allow_generic_callable_assignability_path: true,
             given: ConstraintSet::from_bool(constraints, false),
             relation_visitor,
             disjointness_visitor,
@@ -564,6 +570,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             constraints,
             inferable: InferableTypeVars::None,
             relation: TypeRelation::ConstraintSetAssignability,
+            allow_generic_callable_assignability_path: true,
             given: ConstraintSet::from_bool(constraints, false),
             relation_visitor,
             disjointness_visitor,
@@ -573,6 +580,13 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
     pub(super) fn with_inferable_typevars(&self, inferable: InferableTypeVars<'db>) -> Self {
         Self {
             inferable,
+            ..self.clone()
+        }
+    }
+
+    pub(super) fn without_generic_callable_assignability_path(&self) -> Self {
+        Self {
+            allow_generic_callable_assignability_path: false,
             ..self.clone()
         }
     }
@@ -1534,6 +1548,8 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
     pub(super) fn as_equivalence_checker(&self) -> EquivalenceChecker<'_, 'c, 'db> {
         EquivalenceChecker {
             constraints: self.constraints,
+            allow_generic_callable_assignability_path: self
+                .allow_generic_callable_assignability_path,
             given: self.given,
             relation_visitor: self.relation_visitor,
             disjointness_visitor: self.disjointness_visitor,
@@ -1544,6 +1560,8 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         DisjointnessChecker {
             constraints: self.constraints,
             inferable: self.inferable,
+            allow_generic_callable_assignability_path: self
+                .allow_generic_callable_assignability_path,
             given: self.given,
             relation_visitor: self.relation_visitor,
             disjointness_visitor: self.disjointness_visitor,
@@ -1553,6 +1571,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
 pub(super) struct EquivalenceChecker<'a, 'c, 'db> {
     pub(super) constraints: &'c ConstraintSetBuilder<'db>,
+    allow_generic_callable_assignability_path: bool,
     given: ConstraintSet<'db, 'c>,
 
     // N.B. these fields are private to reduce the risk of
@@ -1572,6 +1591,8 @@ impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
             constraints: self.constraints,
             given: self.given,
             inferable: InferableTypeVars::None,
+            allow_generic_callable_assignability_path: self
+                .allow_generic_callable_assignability_path,
             relation_visitor: self.relation_visitor,
             disjointness_visitor: self.disjointness_visitor,
         }
@@ -1603,6 +1624,7 @@ impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
 pub(super) struct DisjointnessChecker<'a, 'c, 'db> {
     pub(super) constraints: &'c ConstraintSetBuilder<'db>,
     pub(super) inferable: InferableTypeVars<'db>,
+    allow_generic_callable_assignability_path: bool,
     given: ConstraintSet<'db, 'c>,
 
     // N.B. these fields are private to reduce the risk of
@@ -1625,6 +1647,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
         Self {
             constraints,
             inferable,
+            allow_generic_callable_assignability_path: true,
             given: ConstraintSet::from_bool(constraints, false),
             disjointness_visitor,
             relation_visitor,
@@ -1640,6 +1663,8 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             constraints: self.constraints,
             inferable: self.inferable,
             given: self.given,
+            allow_generic_callable_assignability_path: self
+                .allow_generic_callable_assignability_path,
             relation_visitor: self.relation_visitor,
             disjointness_visitor: self.disjointness_visitor,
         }
@@ -1648,6 +1673,8 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
     pub(super) fn as_equivalence_checker(&self) -> EquivalenceChecker<'_, 'c, 'db> {
         EquivalenceChecker {
             constraints: self.constraints,
+            allow_generic_callable_assignability_path: self
+                .allow_generic_callable_assignability_path,
             given: self.given,
             relation_visitor: self.relation_visitor,
             disjointness_visitor: self.disjointness_visitor,
