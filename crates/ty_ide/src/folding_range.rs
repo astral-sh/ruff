@@ -244,7 +244,7 @@ impl FoldingRangeVisitor<'_> {
                 !text.starts_with("region") && !text.starts_with("endregion");
 
             if is_non_region_comment {
-                // Extend the current comment block unless a blank line or a statement separates the comments r
+                // Extend the current comment block unless a blank line or a statement separates the comments.
                 if let Some(ref mut comment_block_range) = comment_block_range {
                     let has_text_between = !self.source
                         [TextRange::new(comment_block_range.end(), comment_range.start())]
