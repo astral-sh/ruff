@@ -1027,28 +1027,18 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 self.never()
             }
 
-            (_, Type::TypeVar(typevar))
-                if typevar.is_inferable(db, self.inferable)
-                    && self.relation.is_assignability()
-                    && typevar.typevar(db).upper_bound(db).is_none_or(|bound| {
-                        !self
-                            .check_type_pair(db, source, bound)
-                            .is_never_satisfied(db)
-                    }) =>
-            {
-                // TODO: record the unification constraints
-
-                typevar
-                    .typevar(db)
-                    .upper_bound(db)
-                    .when_none_or(db, self.constraints, |bound| {
-                        self.check_type_pair(db, source, bound)
-                    })
-            }
-
             // TODO: Infer specializations here
-            (_, Type::TypeVar(bound_typevar)) if bound_typevar.is_inferable(db, self.inferable) => {
-                self.never()
+            (_, Type::TypeVar(typevar)) if typevar.is_inferable(db, self.inferable) => {
+                if self.relation.is_assignability() {
+                    // TODO: record the unification constraints
+                    typevar.typevar(db).upper_bound(db).when_none_or(
+                        db,
+                        self.constraints,
+                        |bound| self.check_type_pair(db, source, bound),
+                    )
+                } else {
+                    self.never()
+                }
             }
             (Type::TypeVar(bound_typevar), _) => {
                 // All inferable cases should have been handled above
