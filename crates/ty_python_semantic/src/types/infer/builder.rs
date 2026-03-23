@@ -6749,6 +6749,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let previous_deferred_state = std::mem::replace(&mut self.deferred_state, in_stub.into());
 
         let callable_tcx = if let Some(tcx) = tcx.annotation
+            // TODO: We could perform multi-inference here if there are multiple `Callable` annotations
+            // in the union.
             && let Some(callable) = tcx
                 .filter_union(self.db(), Type::is_callable_type)
                 .as_callable()
@@ -6762,27 +6764,48 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             None
         };
 
+        // Extract the annotated parameter types.
+        //
+        // Note that `Callable` annotations are only valid for positional parameters.
+        let mut parameter_types = match callable_tcx {
+            None => [].iter(),
+            Some(signature) => signature.parameters().into_iter(),
+        }
+        .map(Parameter::annotated_type);
+
         let parameters = if let Some(parameters) = parameters {
             let positional_only = parameters
                 .posonlyargs
                 .iter()
                 .map(|param| {
-                    Parameter::positional_only(Some(param.name().id.clone()))
+                    let parameter = Parameter::positional_only(Some(param.name().id.clone()))
                         .with_optional_default_type(param.default().map(|default_expr| {
                             self.infer_expression(default_expr, TypeContext::default())
                                 .replace_parameter_defaults(self.db())
-                        }))
+                        }));
+
+                    if let Some(annotated_type) = parameter_types.next() {
+                        parameter.with_annotated_type(annotated_type)
+                    } else {
+                        parameter
+                    }
                 })
                 .collect::<Vec<_>>();
             let positional_or_keyword = parameters
                 .args
                 .iter()
                 .map(|param| {
-                    Parameter::positional_or_keyword(param.name().id.clone())
+                    let parameter = Parameter::positional_or_keyword(param.name().id.clone())
                         .with_optional_default_type(param.default().map(|default_expr| {
                             self.infer_expression(default_expr, TypeContext::default())
                                 .replace_parameter_defaults(self.db())
-                        }))
+                        }));
+
+                    if let Some(annotated_type) = parameter_types.next() {
+                        parameter.with_annotated_type(annotated_type)
+                    } else {
+                        parameter
+                    }
                 })
                 .collect::<Vec<_>>();
             let variadic = parameters
@@ -6813,25 +6836,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .chain(keyword_only)
                 .chain(keyword_variadic);
 
-            if let Some(signature) = callable_tcx {
-                let mut parameter_types = signature
-                    .parameters()
-                    .into_iter()
-                    .map(Parameter::annotated_type);
-
-                Parameters::new(
-                    self.db(),
-                    parameters.map(|parameter| {
-                        if let Some(annotated_type) = parameter_types.next() {
-                            parameter.with_annotated_type(annotated_type)
-                        } else {
-                            parameter
-                        }
-                    }),
-                )
-            } else {
-                Parameters::new(self.db(), parameters)
-            }
+            Parameters::new(self.db(), parameters)
         } else {
             Parameters::empty()
         };
