@@ -16,6 +16,7 @@ mod tests {
 
     #[test_case(Rule::PrivateMemberAccess, Path::new("SLF001.py"))]
     #[test_case(Rule::PrivateMemberAccess, Path::new("SLF001_1.py"))]
+    #[test_case(Rule::PrivateMemberAccess, Path::new("SLF001_self.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(

@@ -202,8 +202,13 @@ impl SameClassInstanceChecker {
 }
 
 impl TypeChecker for SameClassInstanceChecker {
-    /// `C`, `C[T]`, `Annotated[C, ...]`, `Annotated[C[T], ...]`
+    /// `C`, `C[T]`, `Annotated[C, ...]`, `Annotated[C[T], ...]`, `Self`, `typing.Self`
     fn match_annotation(annotation: &Expr, semantic: &SemanticModel) -> bool {
+        // Check for `Self` (from typing or typing_extensions)
+        if semantic.match_typing_expr(annotation, "Self") {
+            return true;
+        }
+
         let Some(class_name) = find_class_name(annotation, semantic) else {
             return false;
         };
