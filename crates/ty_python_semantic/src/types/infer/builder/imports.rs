@@ -69,7 +69,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         let mut diagnostic = builder.into_diagnostic(format_args!(
-            "Cannot resolvee imported module `{}`",
+            "Cannot resolve imported module `{}`",
             format_import_from_module(level, module)
         ));
 
