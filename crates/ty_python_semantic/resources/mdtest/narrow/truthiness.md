@@ -57,6 +57,10 @@ def test() -> None:
     if foo1.val:
         reveal_type(foo1.val)  # revealed: int & ~AlwaysFalsy
 
+    foo0 = Foo()
+    foo0.val = None
+    reveal_type((foo0 := Foo()).val)  # revealed: int | None
+
     if (foo2 := Foo()).val:
         reveal_type(foo2.val)  # revealed: int & ~AlwaysFalsy
 ```

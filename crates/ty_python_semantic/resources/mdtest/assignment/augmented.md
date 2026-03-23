@@ -16,6 +16,17 @@ x += (3, 4)
 reveal_type(x)  # revealed: tuple[Literal[1, 2, 3, 4], ...]
 ```
 
+## Walrus target
+
+```py
+from typing import cast
+
+xs = cast(list[int | str], [0])
+xs[0] = "s"
+
+(xs := [1])[0] += 1
+```
+
 ## Dunder methods
 
 ```py
