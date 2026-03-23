@@ -464,6 +464,33 @@ if False:
             print(x)
 ```
 
+This also applies to deferred annotations on Python 3.14+, which are resolved from the perspective
+of the end of the scope, which may not be part of the unreachable section.
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+from typing import TYPE_CHECKING
+
+class NonCallable:
+    pass
+
+if not TYPE_CHECKING:
+    def _(non_callable: NonCallable):
+        # TODO: no error here
+        # error: [call-non-callable]
+        non_callable()
+
+if False:
+    def _(non_callable: NonCallable):
+        # TODO: no error here
+        # error: [call-non-callable]
+        non_callable()
+```
+
 ### Type annotations
 
 Silencing of diagnostics also works for type annotations, even if they are stringified:
