@@ -3835,12 +3835,6 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                         // SequentMap transitivity) and unspecialized typevars (from partially
                         // specialized contexts).
                         let inferred_ty = binding.solution.filter_union(self.db, |ty| {
-                            if ty
-                                .as_typevar()
-                                .is_some_and(|tv| tv.is_inferable(self.db, self.inferable_typevars))
-                            {
-                                return false;
-                            }
                             if ty.has_unspecialized_type_var(self.db) {
                                 partially_specialized_declared_type.insert(identity);
                                 return false;
