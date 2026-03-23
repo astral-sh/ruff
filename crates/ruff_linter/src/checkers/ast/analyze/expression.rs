@@ -8,7 +8,8 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::preview::{
-    is_future_required_preview_generics_enabled, is_up006_future_annotations_fix_enabled,
+    is_future_required_preview_generics_enabled, is_pep604_future_annotations_fix_enabled,
+    is_up006_future_annotations_fix_enabled,
 };
 use crate::registry::Rule;
 use crate::rules::{
@@ -39,6 +40,10 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                             && checker.target_version() >= PythonVersion::PY37
                             && checker.semantic.in_annotation()
                             && !checker.settings().pyupgrade.keep_runtime_typing
+                            && !((checker.is_rule_enabled(Rule::NonPEP604AnnotationUnion)
+                                || checker.is_rule_enabled(Rule::NonPEP604AnnotationOptional))
+                                && is_pep604_future_annotations_fix_enabled(checker.settings())
+                                && checker.settings().future_annotations)
                         {
                             flake8_future_annotations::rules::future_rewritable_type_annotation(
                                 checker, value,
@@ -52,7 +57,10 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                         if checker.source_type.is_stub()
                             || checker.target_version() >= PythonVersion::PY310
                             || (checker.target_version() >= PythonVersion::PY37
-                                && checker.semantic.future_annotations_or_stub()
+                                && (checker.semantic.future_annotations_or_stub()
+                                    || (is_pep604_future_annotations_fix_enabled(
+                                        checker.settings(),
+                                    ) && checker.settings().future_annotations))
                                 && (checker.semantic.in_annotation()
                                     || checker.semantic.in_string_type_definition())
                                 && !checker.settings().pyupgrade.keep_runtime_typing)
