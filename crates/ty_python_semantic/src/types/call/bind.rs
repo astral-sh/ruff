@@ -3800,12 +3800,16 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     constraints,
                     self.inferable_typevars,
                     |typevar, variance, lower, upper| {
+                        if !typevar.is_inferable(self.db, self.inferable_typevars) {
+                            return Ok(None);
+                        }
+
                         let identity = typevar.identity(self.db);
                         variance_map
                             .entry(identity)
                             .and_modify(|current| *current = current.join(variance))
                             .or_insert(variance);
-                        PathBounds::default_solve(self.db, typevar, variance, lower, upper)
+                        PathBounds::default_solve(self.db, typevar, lower, upper)
                     },
                 );
 

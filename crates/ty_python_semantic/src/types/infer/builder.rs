@@ -6088,12 +6088,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     &constraints,
                     inferable,
                     |typevar, variance, lower, upper| {
+                        if !typevar.is_inferable(db, inferable) {
+                            return Ok(None);
+                        }
+
                         let identity = typevar.identity(db);
                         elt_tcx_variance
                             .entry(identity)
                             .and_modify(|current| *current = current.join(variance))
                             .or_insert(variance);
-                        PathBounds::default_solve(db, typevar, variance, lower, upper)
+                        PathBounds::default_solve(db, typevar, lower, upper)
                     },
                 );
 

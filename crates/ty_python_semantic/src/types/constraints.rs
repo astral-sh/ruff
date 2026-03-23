@@ -661,8 +661,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
             return Solutions::Unsatisfiable;
         }
 
-        self.node
-            .solutions_with(db, builder, Some(inferable), choose)
+        self.node.solutions_with(db, builder, choose)
     }
 
     #[expect(dead_code)] // Keep this around for debugging purposes
@@ -1792,7 +1791,6 @@ impl NodeId {
         self,
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
-        inferable: Option<InferableTypeVars<'_, 'db>>,
         choose: impl FnMut(
             BoundTypeVarInstance<'db>,
             TypeVarVariance,
@@ -1803,7 +1801,7 @@ impl NodeId {
         match self.node() {
             Node::AlwaysTrue => Solutions::Unconstrained,
             Node::AlwaysFalse => Solutions::Unsatisfiable,
-            Node::Interior(interior) => interior.solutions_with(db, builder, inferable, choose),
+            Node::Interior(interior) => interior.solutions_with(db, builder, choose),
         }
     }
 
@@ -2792,7 +2790,9 @@ impl<'db> PathBounds<'db> {
     }
 
     fn solve(&self, db: &'db dyn Db) -> Vec<Solution<'db>> {
-        self.solve_with(db, Self::default_solve)
+        self.solve_with(|bound_typevar, _variance, lower, upper| {
+            Self::default_solve(db, bound_typevar, lower, upper)
+        })
     }
 
     /// Solves each path by applying a per-typevar solver function, collecting valid solutions.
@@ -2803,9 +2803,7 @@ impl<'db> PathBounds<'db> {
     /// - `Err(())` to invalidate the entire path
     fn solve_with(
         &self,
-        db: &'db dyn Db,
-        mut solver: impl FnMut(
-            &'db dyn Db,
+        mut choose: impl FnMut(
             BoundTypeVarInstance<'db>,
             TypeVarVariance,
             Type<'db>,
@@ -2834,7 +2832,7 @@ impl<'db> PathBounds<'db> {
                     TypeVarVariance::Invariant
                 };
 
-                match solver(db, bound_typevar, variance, lower, upper) {
+                match choose(bound_typevar, variance, lower, upper) {
                     Ok(Some(ty)) => solution.push(TypeVarSolution {
                         bound_typevar,
                         solution: ty,
@@ -2858,7 +2856,6 @@ impl<'db> PathBounds<'db> {
     pub(crate) fn default_solve(
         db: &'db dyn Db,
         bound_typevar: BoundTypeVarInstance<'db>,
-        _variance: TypeVarVariance,
         lower: Type<'db>,
         upper: Type<'db>,
     ) -> Result<Option<Type<'db>>, ()> {
@@ -3470,8 +3467,7 @@ impl InteriorNode {
         self,
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
-        inferable: Option<InferableTypeVars<'_, 'db>>,
-        mut choose: impl FnMut(
+        choose: impl FnMut(
             BoundTypeVarInstance<'db>,
             TypeVarVariance,
             Type<'db>,
@@ -3479,17 +3475,7 @@ impl InteriorNode {
         ) -> Result<Option<Type<'db>>, ()>,
     ) -> Solutions<Vec<Solution<'db>>> {
         let path_bounds = PathBounds::compute(db, builder, self.node());
-        let solutions = path_bounds.solve_with(db, |db, bound_typevar, variance, lower, upper| {
-            // When filtering by inferable typevars, skip non-inferable ones — they appear
-            // due to BDD constraint reordering and should not be solved.
-            if let Some(inferable) = inferable {
-                if !bound_typevar.is_inferable(db, inferable) {
-                    return Ok(None);
-                }
-            }
-
-            choose(bound_typevar, variance, lower, upper)
-        });
+        let solutions = path_bounds.solve_with(choose);
         if solutions.is_empty() {
             return Solutions::Unsatisfiable;
         }
