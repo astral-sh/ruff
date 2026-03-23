@@ -106,7 +106,8 @@ use crate::types::visitor::{
     TypeCollector, TypeVisitor, any_over_type, walk_type_with_recursion_guard,
 };
 use crate::types::{
-    BoundTypeVarInstance, IntersectionType, Type, TypeVarBoundOrConstraints, UnionType,
+    BoundTypeVarInstance, IntersectionType, Type, TypeVarBoundOrConstraints, TypeVarVariance,
+    UnionType,
 };
 use crate::{Db, FxIndexMap, FxIndexSet};
 
@@ -647,7 +648,12 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'_, 'db>,
-        choose: impl FnMut(BoundTypeVarInstance<'db>, Type<'db>, Type<'db>) -> Option<Type<'db>>,
+        choose: impl FnMut(
+            BoundTypeVarInstance<'db>,
+            TypeVarVariance,
+            Type<'db>,
+            Type<'db>,
+        ) -> Option<Type<'db>>,
     ) -> Solutions<Vec<Solution<'db>>> {
         self.verify_builder(builder);
 
@@ -1787,7 +1793,12 @@ impl NodeId {
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
         inferable: Option<InferableTypeVars<'_, 'db>>,
-        choose: impl FnMut(BoundTypeVarInstance<'db>, Type<'db>, Type<'db>) -> Option<Type<'db>>,
+        choose: impl FnMut(
+            BoundTypeVarInstance<'db>,
+            TypeVarVariance,
+            Type<'db>,
+            Type<'db>,
+        ) -> Option<Type<'db>>,
     ) -> Solutions<Vec<Solution<'db>>> {
         match self.node() {
             Node::AlwaysTrue => Solutions::Unconstrained,
@@ -3444,7 +3455,12 @@ impl InteriorNode {
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
         inferable: Option<InferableTypeVars<'_, 'db>>,
-        mut choose: impl FnMut(BoundTypeVarInstance<'db>, Type<'db>, Type<'db>) -> Option<Type<'db>>,
+        mut choose: impl FnMut(
+            BoundTypeVarInstance<'db>,
+            TypeVarVariance,
+            Type<'db>,
+            Type<'db>,
+        ) -> Option<Type<'db>>,
     ) -> Solutions<Vec<Solution<'db>>> {
         let path_bounds = compute_path_bounds(db, builder, self.node());
         let solutions = solve_paths(db, &path_bounds, |db, bound_typevar, lower, upper| {
@@ -3455,7 +3471,20 @@ impl InteriorNode {
                     return Ok(None);
                 }
             }
-            if let Some(ty) = choose(bound_typevar, lower, upper) {
+
+            // Determine variance from the constraint bounds:
+            // - Only upper bound (lower = Never) → covariant position
+            // - Only lower bound (upper = object) → contravariant position
+            // - Both bounds set → invariant position
+            let variance = if lower.is_never() {
+                TypeVarVariance::Covariant
+            } else if upper == Type::object() {
+                TypeVarVariance::Contravariant
+            } else {
+                TypeVarVariance::Invariant
+            };
+
+            if let Some(ty) = choose(bound_typevar, variance, lower, upper) {
                 return Ok(Some(TypeVarSolution {
                     bound_typevar,
                     solution: ty,

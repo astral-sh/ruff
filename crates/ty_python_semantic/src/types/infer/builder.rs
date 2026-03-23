@@ -6087,18 +6087,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     db,
                     &constraints,
                     inferable,
-                    |typevar, lower, upper| {
-                        // Determine variance from the constraint bounds:
-                        // - Only upper bound (lower = Never) → covariant position
-                        // - Only lower bound (upper = object) → contravariant position
-                        // - Both bounds set → invariant position
-                        let variance = if lower.is_never() {
-                            TypeVarVariance::Covariant
-                        } else if upper == Type::object() {
-                            TypeVarVariance::Contravariant
-                        } else {
-                            TypeVarVariance::Invariant
-                        };
+                    |typevar, variance, _lower, _upper| {
                         let identity = typevar.identity(db);
                         elt_tcx_variance
                             .entry(identity)

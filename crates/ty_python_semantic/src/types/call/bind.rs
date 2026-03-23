@@ -3799,14 +3799,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     self.db,
                     constraints,
                     self.inferable_typevars,
-                    |typevar, lower, upper| {
-                        let variance = if lower.is_never() {
-                            TypeVarVariance::Covariant
-                        } else if upper == Type::object() {
-                            TypeVarVariance::Contravariant
-                        } else {
-                            TypeVarVariance::Invariant
-                        };
+                    |typevar, variance, _lower, _upper| {
                         let identity = typevar.identity(self.db);
                         variance_map
                             .entry(identity)
