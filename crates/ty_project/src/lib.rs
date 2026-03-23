@@ -20,8 +20,7 @@ use ruff_db::parsed::parsed_module;
 use ruff_db::source::{SourceTextError, source_text};
 use ruff_db::system::{SystemPath, SystemPathBuf};
 use rustc_hash::FxHashSet;
-use salsa::Durability;
-use salsa::Setter;
+use salsa::{Database, Durability, Setter};
 use std::backtrace::BacktraceStatus;
 use std::collections::hash_set;
 use std::iter::FusedIterator;
@@ -319,6 +318,9 @@ impl Project {
                 for file in &files {
                     let db = db.clone();
                     let reporter = &*reporter;
+
+                    db.unwind_if_revision_cancelled();
+
                     scope.spawn(move |_| {
                         let check_file_span =
                             tracing::debug_span!(parent: project_span, "check_file", ?file);
@@ -646,10 +648,9 @@ pub(crate) fn check_file_impl(db: &dyn Db, file: File) -> Result<Box<[Diagnostic
     {
         let db = AssertUnwindSafe(db);
         match catch(&**db, file, || check_types(*db, file)) {
-            Ok(Some(type_check_diagnostics)) => {
+            Ok(type_check_diagnostics) => {
                 diagnostics.extend(type_check_diagnostics);
             }
-            Ok(None) => {}
             Err(diagnostic) => diagnostics.push(diagnostic),
         }
     }
@@ -749,16 +750,29 @@ enum IOErrorKind {
     SourceText(#[from] SourceTextError),
 }
 
-fn catch<F, R>(db: &dyn Db, file: File, f: F) -> Result<Option<R>, Diagnostic>
+fn catch<F, R>(db: &dyn Db, file: File, f: F) -> Result<R, Diagnostic>
 where
     F: FnOnce() -> R + UnwindSafe,
 {
-    match ruff_db::panic::catch_unwind(|| {
-        // Ignore salsa errors
-        salsa::Cancelled::catch(f).ok()
-    }) {
+    match ruff_db::panic::catch_unwind(f) {
         Ok(result) => Ok(result),
         Err(error) => {
+            match error.payload.downcast_ref::<salsa::Cancelled>() {
+                Some(salsa::Cancelled::PropagatedPanic) | None => {
+                    // Add a diagnostic (fall through) for
+                    // propagated Salsa panics (query A depends on query B and query B panics)
+                    // or any non Salsa panic (logical error).
+                    //
+                    // The propagated Salsa panic isn't very actionalbe for users
+                    // but it can be useful to know that file A failed to type check
+                    // because file B panicked (both files will have a panicked diagnostic).
+                }
+                // For normal cancellations, resume the panic
+                Some(_) => {
+                    error.resume_unwind();
+                }
+            }
+
             let message = error.to_diagnostic_message(Some(file.path(db)));
             let mut diagnostic = Diagnostic::new(DiagnosticId::Panic, Severity::Fatal, message);
             diagnostic.add_bug_sub_diagnostics("%5Bpanic%5D");
@@ -789,6 +803,10 @@ where
                     ));
                 });
             }
+
+            // Report an untracked read because Salsa didn't carry over
+            // the dependencies of any query called by `f` because it panicked.
+            db.report_untracked_read();
 
             Err(diagnostic)
         }
