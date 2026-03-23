@@ -144,11 +144,9 @@ pub fn unused_bindings(db: &dyn Db, file: ruff_db::files::File) -> Vec<UnusedBin
                 .node()
                 .as_function()
                 .is_some_and(|function| function_has_stub_body(function.node(&parsed)));
-        let skip_unused_parameters_for_override =
-            method_name_exists_in_superclass(db, index, &parsed, file_scope_id);
-
         let place_table = index.place_table(file_scope_id);
         let use_def_map = index.use_def_map(file_scope_id);
+        let mut skip_unused_parameters_for_override = None;
 
         for (_, state, is_used) in use_def_map.all_definitions_with_usage() {
             let DefinitionState::Defined(definition) = state else {
@@ -165,8 +163,13 @@ pub fn unused_bindings(db: &dyn Db, file: ruff_db::files::File) -> Vec<UnusedBin
             }
 
             let is_parameter = kind.is_parameter_def();
+
             if is_parameter
-                && (is_stub_file || skip_unused_parameters_for_override || method_has_stub_body)
+                && (is_stub_file
+                    || method_has_stub_body
+                    || *skip_unused_parameters_for_override.get_or_insert_with(|| {
+                        method_name_exists_in_superclass(db, index, &parsed, file_scope_id)
+                    }))
             {
                 continue;
             }
