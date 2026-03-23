@@ -55,9 +55,15 @@ class NamePatch(TypedDict, total=False):
     name: str
 
 name_update: NamePatch = {"name": "Bobby"}
+string_key_updates: list[tuple[str, str]] = [("name", "Bobby")]
+bad_key_updates: list[tuple[int, str]] = [(1, "Bobby")]
 
 bob.update(name_update)
 bob.update({"name": "Robert"})
+bob.update([("name", "Bobby")])
+bob.update([("age", 27)])
+bob.update(name_update, age=26)
+bob.update([("name", "Bobby")], age=26)
 
 # error: [invalid-argument-type]
 bob.update(age="bad")
@@ -66,12 +72,27 @@ bob.update(age="bad")
 bob.update(other=1)
 
 # error: [invalid-argument-type]
+bob.update(name_update, age="bad")
+
+# error: [no-matching-overload]
+bob.update(name_update, other=1)
+
+# error: [invalid-argument-type]
 # error: [invalid-key]
 bob.update({"other": 1})
 
 # error: [invalid-argument-type]
 # error: [invalid-argument-type]
 bob.update({"age": "bad"})
+
+bob.update([("other", 1)])
+
+bob.update([("age", "bad")])
+
+bob.update(string_key_updates)
+
+# error: [invalid-argument-type]
+bob.update(bad_key_updates)
 ```
 
 `update()` treats the patch operand as partial even when the target `TypedDict` uses `Required` and

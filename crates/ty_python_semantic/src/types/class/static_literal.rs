@@ -1977,13 +1977,23 @@ impl<'db> StaticClassLiteral<'db> {
                     CallableTypeKind::FunctionLike,
                 )))
             }
-            (CodeGeneratorKind::TypedDict, "update") => Some(synthesize_typed_dict_update_member(
-                db,
-                instance_ty,
-                self.fields(db, specialization, field_policy)
+            (CodeGeneratorKind::TypedDict, "update") => {
+                let keyword_parameters: Vec<_> = self
+                    .fields(db, specialization, field_policy)
                     .iter()
-                    .map(|(name, field)| (name.clone(), field.declared_ty)),
-            )),
+                    .map(|(name, field)| {
+                        Parameter::keyword_only(name.clone())
+                            .with_annotated_type(field.declared_ty)
+                            .with_default_type(field.declared_ty)
+                    })
+                    .collect();
+
+                Some(synthesize_typed_dict_update_member(
+                    db,
+                    instance_ty,
+                    &keyword_parameters,
+                ))
+            }
             _ => None,
         }
     }
