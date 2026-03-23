@@ -51,3 +51,12 @@ def f(xs: list[int | str]) -> None:
     ys[0] = "s"
     reveal_type((ys := [1])[0])  # revealed: int
 ```
+
+## Walrus subscript access after later rebinding
+
+```py
+def f() -> None:
+    (ys := [1])[0] = 2
+    ys = ["s"]
+    reveal_type(ys[0])  # revealed: str
+```

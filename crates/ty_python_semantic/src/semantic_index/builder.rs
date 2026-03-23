@@ -2977,7 +2977,8 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
             | ast::Expr::Subscript(ast::ExprSubscript { ctx, .. }) => {
                 // Record place effects after walking the expression. For names, this is
                 // equivalent because `walk_expr` is a no-op; for attribute/subscript places,
-                // child evaluation can introduce bindings (for example via walrus operators).
+                // child evaluation can introduce bindings (for example via walrus operators),
+                // and those bindings need to exist before we register parent/member associations.
                 let mut deferred_effects = None;
                 if let Some(mut place_expr) = PlaceExpr::try_from_expr(expr) {
                     if let Some(method_scope_id) = self.is_method_or_eagerly_executed_in_method() {
@@ -3013,9 +3014,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         (ast::ExprContext::Del, _) => (true, true),
                         (ast::ExprContext::Invalid, _) => (false, false),
                     };
-                    let place_id = self.add_place(place_expr);
-
-                    deferred_effects = Some((place_id, is_use, is_definition));
+                    deferred_effects = Some((place_expr, is_use, is_definition));
                 }
 
                 // Track reachability of attribute expressions to silence `unresolved-attribute`
@@ -3027,7 +3026,8 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
 
                 walk_expr(self, expr);
 
-                if let Some((place_id, is_use, is_definition)) = deferred_effects {
+                if let Some((place_expr, is_use, is_definition)) = deferred_effects {
+                    let place_id = self.add_place(place_expr);
                     if is_use {
                         self.record_place_use(place_id, expr);
                     }
