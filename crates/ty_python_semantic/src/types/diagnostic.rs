@@ -4935,7 +4935,7 @@ pub(crate) fn report_invalid_key_on_typed_dict<'db>(
                 let typed_dict_name = typed_dict_ty.display(db);
 
                 let mut diagnostic = builder.into_diagnostic(format_args!(
-                    "Unknown keyy \"{key}\" for TypedDict `{typed_dict_name}`",
+                    "Unknown key \"{key}\" for TypedDict `{typed_dict_name}`",
                 ));
 
                 diagnostic.annotate(if let Some(full_object_ty) = full_object_ty {
