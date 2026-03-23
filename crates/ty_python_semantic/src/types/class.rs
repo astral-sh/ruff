@@ -2015,24 +2015,26 @@ pub(super) fn synthesize_typed_dict_update_member<'db>(
         instance_ty
     };
 
-    let positional_update = Signature::new(
+    let value_ty = UnionBuilder::new(db)
+        .add(partial_ty)
+        .add(KnownClass::Iterable.to_specialized_instance(
+            db,
+            &[Type::heterogeneous_tuple(
+                db,
+                [KnownClass::Str.to_instance(db), Type::object()],
+            )],
+        ))
+        .build();
+
+    let update_signature = Signature::new(
         Parameters::new(
             db,
             [
                 Parameter::positional_only(Some(Name::new_static("self")))
                     .with_annotated_type(instance_ty),
-                Parameter::positional_only(Some(Name::new_static("value"))).with_annotated_type(
-                    UnionBuilder::new(db)
-                        .add(partial_ty)
-                        .add(KnownClass::Iterable.to_specialized_instance(
-                            db,
-                            &[Type::heterogeneous_tuple(
-                                db,
-                                [KnownClass::Str.to_instance(db), Type::object()],
-                            )],
-                        ))
-                        .build(),
-                ),
+                Parameter::positional_only(Some(Name::new_static("value")))
+                    .with_annotated_type(value_ty)
+                    .with_default_type(Type::none(db)),
             ]
             .into_iter()
             .chain(keyword_parameters.iter().cloned()),
@@ -2040,23 +2042,7 @@ pub(super) fn synthesize_typed_dict_update_member<'db>(
         Type::none(db),
     );
 
-    let keyword_update = Signature::new(
-        Parameters::new(
-            db,
-            std::iter::once(
-                Parameter::positional_only(Some(Name::new_static("self")))
-                    .with_annotated_type(instance_ty),
-            )
-            .chain(keyword_parameters.iter().cloned()),
-        ),
-        Type::none(db),
-    );
-
-    Type::Callable(CallableType::new(
-        db,
-        CallableSignature::from_overloads([positional_update, keyword_update]),
-        CallableTypeKind::FunctionLike,
-    ))
+    Type::function_like_callable(db, update_signature)
 }
 
 /// Performs member lookups over an MRO (Method Resolution Order).

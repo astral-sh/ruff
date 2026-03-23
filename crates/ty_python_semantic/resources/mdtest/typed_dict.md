@@ -68,13 +68,13 @@ bob.update([("name", "Bobby")], age=26)
 # error: [invalid-argument-type]
 bob.update(age="bad")
 
-# error: [no-matching-overload]
+# error: [unknown-argument]
 bob.update(other=1)
 
 # error: [invalid-argument-type]
 bob.update(name_update, age="bad")
 
-# error: [no-matching-overload]
+# error: [unknown-argument]
 bob.update(name_update, other=1)
 
 # error: [invalid-argument-type]
