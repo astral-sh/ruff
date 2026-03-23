@@ -20,7 +20,6 @@ impl<'db> Type<'db> {
     /// This method should only be used outside of type checking because it omits any errors.
     /// For type checking, use [`try_iterate`](Self::try_iterate) instead.
     pub(super) fn iterate(self, db: &'db dyn Db) -> Cow<'db, TupleSpec<'db>> {
-        panic!("Iteration is illegal");
         self.try_iterate(db)
             .unwrap_or_else(|err| Cow::Owned(TupleSpec::homogeneous(err.fallback_element_type(db))))
     }
