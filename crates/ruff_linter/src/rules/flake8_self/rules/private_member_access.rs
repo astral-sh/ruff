@@ -202,8 +202,12 @@ impl SameClassInstanceChecker {
 }
 
 impl TypeChecker for SameClassInstanceChecker {
-    /// `C`, `C[T]`, `Annotated[C, ...]`, `Annotated[C[T], ...]`
+    /// `C`, `C[T]`, `Annotated[C, ...]`, `Annotated[C[T], ...]`, `Self`
     fn match_annotation(annotation: &Expr, semantic: &SemanticModel) -> bool {
+        if semantic.match_typing_expr(annotation, "Self") {
+            return true;
+        }
+
         let Some(class_name) = find_class_name(annotation, semantic) else {
             return false;
         };
@@ -211,8 +215,15 @@ impl TypeChecker for SameClassInstanceChecker {
         Self::is_current_class_name(class_name, semantic)
     }
 
-    /// `cls()`, `C()`, `C[T]()`, `super().__new__()`
+    /// `cls()`, `C()`, `C[T]()`, `super().__new__()`, `self`
     fn match_initializer(initializer: &Expr, semantic: &SemanticModel) -> bool {
+        // `this = self` — a direct assignment from `self`.
+        if let Expr::Name(name) = initializer {
+            if matches!(&*name.id, "self") {
+                return true;
+            }
+        }
+
         let Expr::Call(call) = initializer else {
             return false;
         };

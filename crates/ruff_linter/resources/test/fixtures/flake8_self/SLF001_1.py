@@ -43,3 +43,19 @@ class M(type):
     def f(mcs):
         cls = mcs()
         cls._value = 1
+
+
+# https://github.com/astral-sh/ruff/issues/24140
+
+from typing import Self
+
+class Sit:
+    def __init__(self, x: int) -> None:
+        self._x = x
+
+    def f(self) -> None:
+        this = self
+        print(this._x)  # fine (assigned from self)
+
+    def g(self, other: Self) -> None:
+        print(other._x)  # fine (annotated as Self)
