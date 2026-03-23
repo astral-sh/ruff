@@ -10,10 +10,9 @@ use crate::types::cyclic::PairVisitor;
 use crate::types::enums::is_single_member_enum;
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::{
-    CallableType, ClassBase, ClassType, CycleDetector, DynamicType, IntersectionBuilder,
-    KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind, MemberLookupPolicy,
-    PropertyInstanceType, ProtocolInstanceType, SubclassOfInner, TypeVarBoundOrConstraints,
-    UnionType, UpcastPolicy,
+    CallableType, ClassBase, ClassType, CycleDetector, DynamicType, KnownBoundMethodType,
+    KnownClass, KnownInstanceType, LiteralValueTypeKind, MemberLookupPolicy, PropertyInstanceType,
+    ProtocolInstanceType, SubclassOfInner, TypeVarBoundOrConstraints, UnionType, UpcastPolicy,
 };
 use crate::{
     Db,
@@ -903,85 +902,6 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 self.check_newtype_pair(db, source_newtype, target_newtype)
             }
 
-            // In the special cases of `NewType`s of `float` or `complex`, the concrete base type
-            // can be a union (`int | float` or `int | float | complex`). For that reason,
-            // `NewType` assignability to a union needs to consider two different cases. It could
-            // be that we need to treat the `NewType` as the underlying union it's assignable to,
-            // for example:
-            //
-            // ```py
-            // Foo = NewType("Foo", float)
-            // static_assert(is_assignable_to(Foo, float | None))
-            // ```
-            //
-            // The right side there is equivalent to `int | float | None`, but `Foo` as a whole
-            // isn't assignable to any of those three types. However, `Foo`s concrete base type is
-            // `int | float`, which is assignable, because union members on the left side get
-            // checked individually. On the other hand, we need to be careful not to break the
-            // following case, where `int | float` is *not* assignable to the right side:
-            //
-            // ```py
-            // static_assert(is_assignable_to(Foo, Foo | None))
-            // ```
-            //
-            // To handle both cases, we have to check that *either* `Foo` as a whole is assignable
-            // (or subtypeable etc.) *or* that its concrete base type is. Note that this match arm
-            // needs to take precedence over the `Type::Union` arms immediately below.
-            (Type::NewTypeInstance(source_newtype), Type::Union(union)) => {
-                // First the normal "assign to union" case, unfortunately duplicated from below.
-                union
-                    .elements(db)
-                    .iter()
-                    .when_any(db, self.constraints, |&elem_ty| {
-                        self.check_type_pair(db, source, elem_ty)
-                    })
-                    // Failing that, if the concrete base type is a union, try delegating to that.
-                    // Otherwise, this would be equivalent to what we just checked, and we
-                    // shouldn't waste time checking it twice.
-                    .or(db, self.constraints, || {
-                        let concrete_base = source_newtype.concrete_base_type(db);
-                        if matches!(concrete_base, Type::Union(_)) {
-                            self.check_type_pair(db, concrete_base, target)
-                        } else {
-                            self.never()
-                        }
-                    })
-            }
-
-            // Similar to above, another somewhat unfortunate special case for
-            // intersections of newtypes of unions vs unions.
-            (Type::Intersection(intersection), Type::Union(union))
-                if intersection.positive(db).iter().any(|element| {
-                    element
-                        .as_new_type()
-                        .is_some_and(|newtype| newtype.concrete_base_type(db).is_union())
-                }) =>
-            {
-                // First the normal "assign to union" case, unfortunately duplicated from below (and above :().
-                union
-                    .elements(db)
-                    .iter()
-                    .when_any(db, self.constraints, |&elem_ty| {
-                        self.check_type_pair(db, source, elem_ty)
-                    })
-                    // Construct a new intersection with every newtype mapped to its concrete base
-                    // type and check that.
-                    .or(db, self.constraints, || {
-                        let mut builder = IntersectionBuilder::new(db);
-                        for &pos in intersection.positive(db) {
-                            if let Some(newtype) = pos.as_new_type() {
-                                builder = builder.add_positive(newtype.concrete_base_type(db));
-                            } else {
-                                builder = builder.add_positive(pos);
-                            }
-                        }
-                        for &neg in intersection.negative(db) {
-                            builder = builder.add_negative(neg);
-                        }
-                        self.check_type_pair(db, builder.build(), target)
-                    })
-            }
-
             (Type::Union(union), _) => {
                 union
                     .elements(db)
@@ -991,14 +911,46 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     })
             }
 
-            (_, Type::Union(union)) => {
-                union
-                    .elements(db)
-                    .iter()
-                    .when_any(db, self.constraints, |&elem_ty| {
-                        self.check_type_pair(db, source, elem_ty)
-                    })
-            }
+            (_, Type::Union(union)) => union
+                .elements(db)
+                .iter()
+                .when_any(db, self.constraints, |&elem_ty| {
+                    self.check_type_pair(db, source, elem_ty)
+                })
+                .or(db, self.constraints, || {
+                    // Normally non-unions cannot directly contain unions in our model due to the fact that we
+                    // enforce a DNF structure on our set-theoretic types. However, it *is* possible for there
+                    // to be a newtype of a union, or for an intersection to contain a newtype of a union; this
+                    // requires special handling.
+                    match source {
+                        Type::Intersection(intersection) => {
+                            if intersection.positive(db).iter().any(|&element| {
+                                element.as_new_type().is_some_and(|newtype| {
+                                    newtype.concrete_base_type(db).is_union()
+                                })
+                            }) {
+                                let mapped = intersection.map_positive(db, |&t| match t {
+                                    Type::NewTypeInstance(newtype) => {
+                                        newtype.concrete_base_type(db)
+                                    }
+                                    _ => t,
+                                });
+                                self.check_type_pair(db, mapped, target)
+                            } else {
+                                self.never()
+                            }
+                        }
+                        Type::NewTypeInstance(newtype) => {
+                            let concrete_base = newtype.concrete_base_type(db);
+                            if concrete_base.is_union() {
+                                self.check_type_pair(db, concrete_base, target)
+                            } else {
+                                self.never()
+                            }
+                        }
+                        _ => self.never(),
+                    }
+                }),
 
             // If both sides are intersections we need to handle the right side first
             // (A & B & C) is a subtype of (A & B) because the left is a subtype of both A and B,
