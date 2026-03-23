@@ -572,6 +572,12 @@ pub(crate) fn check_static_class_definitions<'db>(
 
     // Check that the class's metaclass can be determined without error.
     if let Err(metaclass_error) = class.try_metaclass(db) {
+        let invalid_metaclass_range = class_node
+            .arguments
+            .as_ref()
+            .and_then(|arguments| arguments.find_keyword("metaclass"))
+            .map(Ranged::range)
+            .unwrap_or_else(|| class.header_range(db));
         match metaclass_error.reason() {
             MetaclassErrorKind::Cycle => {
                 if let Some(builder) = context.report_lint(&CYCLIC_CLASS_DEFINITION, class_node) {
@@ -580,12 +586,16 @@ pub(crate) fn check_static_class_definitions<'db>(
                 }
             }
             MetaclassErrorKind::GenericMetaclass => {
-                if let Some(builder) = context.report_lint(&INVALID_METACLASS, class_node) {
+                if let Some(builder) =
+                    context.report_lint(&INVALID_METACLASS, invalid_metaclass_range)
+                {
                     builder.into_diagnostic("Generic metaclasses are not supported");
                 }
             }
             MetaclassErrorKind::NotCallable(ty) => {
-                if let Some(builder) = context.report_lint(&INVALID_METACLASS, class_node) {
+                if let Some(builder) =
+                    context.report_lint(&INVALID_METACLASS, invalid_metaclass_range)
+                {
                     builder.into_diagnostic(format_args!(
                         "Metaclass type `{}` is not callable",
                         ty.display(db)
@@ -593,7 +603,9 @@ pub(crate) fn check_static_class_definitions<'db>(
                 }
             }
             MetaclassErrorKind::PartlyNotCallable(ty) => {
-                if let Some(builder) = context.report_lint(&INVALID_METACLASS, class_node) {
+                if let Some(builder) =
+                    context.report_lint(&INVALID_METACLASS, invalid_metaclass_range)
+                {
                     builder.into_diagnostic(format_args!(
                         "Metaclass type `{}` is partly not callable",
                         ty.display(db)
