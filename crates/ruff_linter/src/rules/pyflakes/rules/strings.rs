@@ -757,6 +757,28 @@ pub(crate) fn percent_format_positional_count_mismatch(
                 location,
             );
         }
+    } else if matches!(
+        right,
+        Expr::NumberLiteral(_)
+            | Expr::StringLiteral(_)
+            | Expr::BytesLiteral(_)
+            | Expr::BooleanLiteral(_)
+            | Expr::NoneLiteral(_)
+            | Expr::EllipsisLiteral(_)
+            | Expr::FString(_)
+    ) {
+        // A literal non-tuple right-hand side is always a single positional
+        // argument. Variables, attribute accesses, subscripts, etc. are not
+        // flagged because they could be tuples at runtime.
+        if summary.num_positional != 1 {
+            checker.report_diagnostic(
+                PercentFormatPositionalCountMismatch {
+                    wanted: summary.num_positional,
+                    got: 1,
+                },
+                location,
+            );
+        }
     }
 }
 
