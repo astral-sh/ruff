@@ -3786,6 +3786,9 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 tcx.filter_union(self.db, |ty| ty.class_specialization(self.db).is_some())
                     .class_specialization(self.db)?;
 
+                let return_ty =
+                    return_ty.filter_disjoint_elements(self.db, tcx, self.inferable_typevars);
+                let tcx = tcx.filter_disjoint_elements(self.db, return_ty, self.inferable_typevars);
                 let set = return_ty.when_constraint_set_assignable_to(self.db, tcx, constraints);
 
                 // Use `solutions_with` to determine per-typevar variance from the raw
