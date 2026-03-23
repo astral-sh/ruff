@@ -1635,6 +1635,47 @@ config["host"] = "127.0.0.1"
 config["port"] = 80
 ```
 
+## `update()` with `ReadOnly` items
+
+`update()` also cannot write to `ReadOnly` items, unless the source key is bottom-typed and
+therefore cannot be present:
+
+```py
+from typing_extensions import Never, NotRequired, ReadOnly, TypedDict
+
+class ReadOnlyPerson(TypedDict):
+    id: ReadOnly[int]
+    age: int
+
+class AgePatch(TypedDict, total=False):
+    age: int
+
+class IdPatch(TypedDict, total=False):
+    id: int
+
+class ImpossibleIdPatch(TypedDict, total=False):
+    id: NotRequired[Never]
+
+person: ReadOnlyPerson = {"id": 1, "age": 30}
+age_patch: AgePatch = {"age": 31}
+id_patch: IdPatch = {"id": 2}
+impossible_id_patch: ImpossibleIdPatch = {}
+
+person.update(age_patch)
+
+# error: [invalid-argument-type]
+person.update(id_patch)
+
+# error: [invalid-argument-type]
+# error: [invalid-argument-type]
+person.update({"id": 2})
+
+# error: [invalid-argument-type]
+person.update(id=2)
+
+person.update(impossible_id_patch)
+```
+
 ## Methods on `TypedDict`
 
 ```py

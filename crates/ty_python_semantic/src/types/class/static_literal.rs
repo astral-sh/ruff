@@ -1978,15 +1978,20 @@ impl<'db> StaticClassLiteral<'db> {
                 )))
             }
             (CodeGeneratorKind::TypedDict, "update") => {
-                let keyword_parameters: Vec<_> = self
-                    .fields(db, specialization, field_policy)
-                    .iter()
-                    .map(|(name, field)| {
-                        Parameter::keyword_only(name.clone())
-                            .with_annotated_type(field.declared_ty)
-                            .with_default_type(field.declared_ty)
-                    })
-                    .collect();
+                let keyword_parameters: Vec<_> = if let Type::TypedDict(typed_dict) = instance_ty {
+                    typed_dict
+                        .to_update_patch(db)
+                        .items(db)
+                        .iter()
+                        .map(|(name, field)| {
+                            Parameter::keyword_only(name.clone())
+                                .with_annotated_type(field.declared_ty)
+                                .with_default_type(field.declared_ty)
+                        })
+                        .collect()
+                } else {
+                    Vec::new()
+                };
 
                 Some(synthesize_typed_dict_update_member(
                     db,
