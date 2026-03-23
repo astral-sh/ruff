@@ -2981,26 +2981,31 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 // and those bindings need to exist before we register parent/member associations.
                 let mut deferred_effects = None;
                 if let Some(mut place_expr) = PlaceExpr::try_from_expr(expr) {
-                    if let Some(method_scope_id) = self.is_method_or_eagerly_executed_in_method() {
-                        if let PlaceExpr::Member(member) = &mut place_expr {
-                            if member.is_instance_attribute_candidate() {
-                                // We specifically mark attribute assignments to the first parameter of a method,
-                                // i.e. typically `self` or `cls`.
-                                // However, we must check that the symbol hasn't been shadowed by an intermediate
-                                // scope (e.g., a comprehension variable: `for self in [...]`).
-                                let accessed_object_refers_to_first_parameter =
-                                    self.current_first_parameter_name.is_some_and(|first| {
-                                        member.symbol_name() == first
-                                            && !self.is_symbol_bound_in_intermediate_eager_scopes(
-                                                first,
-                                                method_scope_id,
-                                            )
-                                    });
+                    if let Some(method_scope_id) = self.is_method_or_eagerly_executed_in_method()
+                        && let PlaceExpr::Member(member) = &mut place_expr
+                        && member.is_instance_attribute_candidate()
+                        && let Some(attribute) = expr.as_attribute_expr()
+                    {
+                        // We specifically mark direct attribute assignments to the first
+                        // parameter of a method, i.e. typically `self` or `cls`.
+                        // However, we must check that the symbol hasn't been shadowed by an
+                        // intermediate scope (e.g., a comprehension variable: `for self in [...]`)
+                        // and that the AST base is still the original name rather than a
+                        // rebinding expression such as `(self := other).x`.
+                        let accessed_object_refers_to_first_parameter =
+                            self.current_first_parameter_name.is_some_and(|first| {
+                                attribute
+                                    .value
+                                    .as_name_expr()
+                                    .is_some_and(|name| name.id == first)
+                                    && !self.is_symbol_bound_in_intermediate_eager_scopes(
+                                        first,
+                                        method_scope_id,
+                                    )
+                            });
 
-                                if accessed_object_refers_to_first_parameter {
-                                    member.mark_instance_attribute();
-                                }
-                            }
+                        if accessed_object_refers_to_first_parameter {
+                            member.mark_instance_attribute();
                         }
                     }
 
