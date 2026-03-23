@@ -3,8 +3,9 @@ use std::borrow::Cow;
 use itertools::Itertools;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::name::QualifiedName;
+use ruff_python_ast::{self as ast, helpers::is_dunder, name::QualifiedName};
 use ruff_python_semantic::{FromImport, Import, Imported, ResolvedReference, Scope};
+use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -96,7 +97,7 @@ pub(crate) fn import_private_name(checker: &Checker, scope: &Scope) {
         // We can also ignore dunder names.
         // Ex) `from __future__ import annotations`
         // Ex) `from foo import __version__`
-        if root_module.starts_with("__") || import_info.member_name.starts_with("__") {
+        if is_dunder(root_module) || is_dunder(&import_info.member_name) {
             continue;
         }
 
@@ -116,7 +117,7 @@ pub(crate) fn import_private_name(checker: &Checker, scope: &Scope) {
             .qualified_name
             .segments()
             .iter()
-            .find_position(|name| name.starts_with('_'))
+            .find_position(|name| name.starts_with('_') && !is_dunder(name))
         else {
             continue;
         };
@@ -137,7 +138,29 @@ pub(crate) fn import_private_name(checker: &Checker, scope: &Scope) {
         } else {
             None
         };
-        checker.report_diagnostic(ImportPrivateName { name, module }, binding.range());
+        let range = match binding.source.map(|id| checker.semantic().statement(id)) {
+            Some(ast::Stmt::ImportFrom(ast::StmtImportFrom { module, names, .. })) => {
+                if index < import_info.module_name.len() {
+                    module.as_ref().map_or(binding.range(), |module| {
+                        SimpleTokenizer::starts_at(module.start(), checker.locator().contents())
+                            .skip_trivia()
+                            .find(|token| {
+                                token.kind == SimpleTokenKind::Name
+                                    && checker.locator().slice(token.range()) == *private_name
+                            })
+                            .map_or(binding.range(), |token| token.range())
+                    })
+                } else {
+                    names
+                        .iter()
+                        .find(|alias| alias.name.as_str() == import_info.member_name)
+                        .map_or(binding.range(), |alias| alias.name.range())
+                }
+            }
+            _ => binding.range(),
+        };
+
+        checker.report_diagnostic(ImportPrivateName { name, module }, range);
     }
 }
 

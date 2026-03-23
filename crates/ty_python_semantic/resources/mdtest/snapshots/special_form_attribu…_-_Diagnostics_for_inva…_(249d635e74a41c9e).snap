@@ -31,8 +31,8 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/special_form
 16 | Foo.X.startswith  # error: [unresolved-attribute]
 17 | Foo.Bar().y.startswith  # error: [unresolved-attribute]
 18 | 
-19 | # TODO: false positive (just testing the diagnostic in the meantime)
-20 | Foo().b.a  # error: [unresolved-attribute]
+19 | # `Foo().b` resolves `Self` to `Foo`, so `.a` is valid.
+20 | Foo().b.a
 ```
 
 # Diagnostics
@@ -95,21 +95,9 @@ error[unresolved-attribute]: Special form `typing.LiteralString` has no attribut
 17 | Foo.Bar().y.startswith  # error: [unresolved-attribute]
    | ^^^^^^^^^^^^^^^^^^^^^^
 18 |
-19 | # TODO: false positive (just testing the diagnostic in the meantime)
+19 | # `Foo().b` resolves `Self` to `Foo`, so `.a` is valid.
    |
 help: Objects with type `LiteralString` have a `startswith` attribute, but the symbol `typing.LiteralString` does not itself inhabit the type `LiteralString`
-info: rule `unresolved-attribute` is enabled by default
-
-```
-
-```
-error[unresolved-attribute]: Special form `typing.Self` has no attribute `a`
-  --> src/mdtest_snippet.py:20:1
-   |
-19 | # TODO: false positive (just testing the diagnostic in the meantime)
-20 | Foo().b.a  # error: [unresolved-attribute]
-   | ^^^^^^^^^
-   |
 info: rule `unresolved-attribute` is enabled by default
 
 ```

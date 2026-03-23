@@ -4,7 +4,7 @@ use ruff_db::diagnostic::Severity;
 use ruff_db::files::{File, Files};
 use ruff_db::system::{
     CaseSensitivity, DbWithWritableSystem, InMemorySystem, OsSystem, System, SystemPath,
-    SystemPathBuf, WritableSystem,
+    SystemPathBuf, WhichResult, WritableSystem,
 };
 use ruff_db::vendored::VendoredFileSystem;
 use ruff_notebook::{Notebook, NotebookError};
@@ -12,7 +12,7 @@ use salsa::Setter as _;
 use std::borrow::Cow;
 use std::sync::Arc;
 use tempfile::TempDir;
-use ty_module_resolver::SearchPaths;
+use ty_module_resolver::{ModuleGlobSetBuilder, SearchPaths};
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
 use ty_python_semantic::{AnalysisSettings, Db as SemanticDb, Program, default_lint_registry};
 
@@ -54,16 +54,52 @@ impl Db {
         self.settings.unwrap()
     }
 
+    pub(crate) fn set_verbosity(&mut self, verbose: bool) {
+        self.settings().set_verbose(self).to(verbose);
+    }
+
     pub(crate) fn update_analysis_options(&mut self, options: Option<&Analysis>) {
         let analysis = if let Some(options) = options {
             let AnalysisSettings {
                 respect_type_ignore_comments: respect_type_ignore_comments_default,
+                allowed_unresolved_imports: allowed_unresolved_imports_default,
+                replace_imports_with_any: replace_imports_with_any_default,
             } = AnalysisSettings::default();
+
+            let allowed_unresolved_imports = if let Some(allowed_unresolved_imports) =
+                options.allowed_unresolved_imports.as_deref()
+            {
+                let mut builder = ModuleGlobSetBuilder::new();
+                for pattern in allowed_unresolved_imports {
+                    builder
+                        .add(pattern)
+                        .expect("Invalid `allowed-unresolved-imports` pattern `{pattern}");
+                }
+                builder.build().unwrap()
+            } else {
+                allowed_unresolved_imports_default
+            };
+
+            let replace_imports_with_any = if let Some(replace_imports_with_any) =
+                options.replace_imports_with_any.as_deref()
+            {
+                let mut builder = ModuleGlobSetBuilder::new();
+                for pattern in replace_imports_with_any {
+                    builder
+                        .add(pattern)
+                        .expect("Invalid `replace-imports-with-any` pattern `{pattern}");
+                }
+                builder.build().unwrap()
+            } else {
+                replace_imports_with_any_default
+            };
 
             AnalysisSettings {
                 respect_type_ignore_comments: options
                     .respect_type_ignore_comments
                     .unwrap_or(respect_type_ignore_comments_default),
+                allowed_unresolved_imports,
+                replace_imports_with_any,
             }
         } else {
             AnalysisSettings::default()
@@ -131,7 +167,7 @@ impl SemanticDb for Db {
     }
 
     fn verbose(&self) -> bool {
-        false
+        self.settings().verbose(self)
     }
 
     fn analysis_settings(&self, _file: File) -> &AnalysisSettings {
@@ -154,6 +190,8 @@ struct Settings {
     #[default]
     #[returns(ref)]
     analysis: AnalysisSettings,
+    #[default]
+    verbose: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -272,6 +310,10 @@ impl System for MdtestSystem {
 
     fn case_sensitivity(&self) -> CaseSensitivity {
         self.as_system().case_sensitivity()
+    }
+
+    fn which(&self, name: &str) -> WhichResult {
+        self.as_system().which(name)
     }
 
     fn current_directory(&self) -> &SystemPath {

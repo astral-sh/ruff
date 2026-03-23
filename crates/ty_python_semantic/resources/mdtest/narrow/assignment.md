@@ -96,7 +96,7 @@ reveal_type(a.dynamically_added)  # revealed: Literal[0]
 # error: [unresolved-reference]
 does.nt.exist = 0
 # error: [unresolved-reference]
-reveal_type(does.nt.exist)  # revealed: Unknown
+reveal_type(does.nt.exist)  # revealed: Literal[0]
 ```
 
 ### Narrowing chain
@@ -135,9 +135,9 @@ a.b = B()
 reveal_type(a.b)  # revealed: B
 reveal_type(a.b.c1)  # revealed: C | None
 reveal_type(a.b.c2)  # revealed: C | None
-# error: [possibly-missing-attribute]
+# error: [unresolved-attribute]
 reveal_type(a.b.c1.d)  # revealed: D | None
-# error: [possibly-missing-attribute]
+# error: [unresolved-attribute]
 reveal_type(a.b.c2.d)  # revealed: D | None
 ```
 
@@ -294,11 +294,35 @@ class C:
     reveal_type(b.a.x[0])  # revealed: Literal[0]
 
 def _():
-    # error: [possibly-missing-attribute]
+    # error: [unresolved-attribute]
     reveal_type(b.a.x[0])  # revealed: int | None
-    # error: [possibly-missing-attribute]
+    # error: [unresolved-attribute]
     reveal_type(b.a.x)  # revealed: list[int | None]
     reveal_type(b.a)  # revealed: A | None
+
+class D: ...
+
+class E:
+    def __init__(self):
+        self.d = D()
+
+class F:
+    def __init__(self):
+        self.e = E()
+
+class Mock: ...
+
+f = F()
+reveal_type(f.e)  # revealed: Unknown | E
+f.e = Mock()
+reveal_type(f.e)  # revealed: Mock
+
+f2 = F()
+reveal_type(f2.e.d)  # revealed: Unknown | D
+f2.e.d = Mock()
+# Strictly speaking, this narrowing is not safe because the inferred attribute type includes `Unknown`,
+# and `Unknown` could be a data descriptor type. But we enable it for practical convenience.
+reveal_type(f2.e.d)  # revealed: Mock
 ```
 
 ## Invalid assignments are not used for narrowing

@@ -9,6 +9,8 @@ extend-exclude = [
     # words naturally. It's annoying to have to make all
     # of them actually words. So just ignore typos here.
     "crates/ty_ide/src/completion.rs",
+    # Same for "Did you mean...?" levenshtein tests.
+    "crates/ty_python_semantic/src/diagnostic/levenshtein.rs",
 ]
 
 [default.extend-words]
@@ -22,6 +24,7 @@ poit = "poit"
 BA = "BA" # acronym for "Bad Allowed", used in testing.
 jod = "jod" # e.g., `jod-thread`
 Numer = "Numer" # Library name 'NumerBlox' in "Who's Using Ruff?"
+CPY = "CPY"  # it's a Ruff rule category
 
 [default]
 extend-ignore-re = [

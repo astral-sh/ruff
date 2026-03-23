@@ -127,6 +127,7 @@ environment) if we detect that an ephemeral uv environment has been activated.
 ```toml
 [environment]
 python = "/.venv"
+python-version = "3.13"
 ```
 
 `/.venv/pyvenv.cfg`:
@@ -177,6 +178,7 @@ includes `=` characters. The following is a regression test for
 ```toml
 [environment]
 python = "/.venv"
+python-version = "3.13"
 ```
 
 `/.venv/pyvenv.cfg`:

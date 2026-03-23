@@ -1,0 +1,77 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: invalid_argument_type.md - Invalid argument type diagnostics - Numbers special case
+mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/invalid_argument_type.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | from numbers import Number
+2 | 
+3 | def f(x: Number): ...
+4 | 
+5 | f(5)  # error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `Number`, found `Literal[5]`"
+6 | 
+7 | def g(x: float):
+8 |     f(x)  # error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `Number`, found `int | float`"
+```
+
+# Diagnostics
+
+```
+error[invalid-argument-type]: Argument to function `f` is incorrect
+ --> src/mdtest_snippet.py:5:3
+  |
+3 | def f(x: Number): ...
+4 |
+5 | f(5)  # error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `Number`, found `Literal[5]`"
+  |   ^ Expected `Number`, found `Literal[5]`
+6 |
+7 | def g(x: float):
+  |
+info: Function defined here
+ --> src/mdtest_snippet.py:3:5
+  |
+1 | from numbers import Number
+2 |
+3 | def f(x: Number): ...
+  |     ^ --------- Parameter declared here
+4 |
+5 | f(5)  # error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `Number`, found `Literal[5]`"
+  |
+info: Types from the `numbers` module aren't supported for static type checking
+help: Consider using a protocol instead, such as `typing.SupportsFloat`
+info: rule `invalid-argument-type` is enabled by default
+
+```
+
+```
+error[invalid-argument-type]: Argument to function `f` is incorrect
+ --> src/mdtest_snippet.py:8:7
+  |
+7 | def g(x: float):
+8 |     f(x)  # error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `Number`, found `int | float`"
+  |       ^ Expected `Number`, found `int | float`
+  |
+info: Function defined here
+ --> src/mdtest_snippet.py:3:5
+  |
+1 | from numbers import Number
+2 |
+3 | def f(x: Number): ...
+  |     ^ --------- Parameter declared here
+4 |
+5 | f(5)  # error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `Number`, found `Literal[5]`"
+  |
+info: Types from the `numbers` module aren't supported for static type checking
+help: Consider using a protocol instead, such as `typing.SupportsFloat`
+info: rule `invalid-argument-type` is enabled by default
+
+```

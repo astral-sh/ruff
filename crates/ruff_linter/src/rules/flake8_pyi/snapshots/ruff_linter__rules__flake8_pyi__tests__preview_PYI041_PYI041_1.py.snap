@@ -1,0 +1,10 @@
+---
+source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
+---
+--- Linter settings ---
+-linter.preview = disabled
++linter.preview = enabled
+
+--- Summary ---
+Removed: 0
+Added: 0

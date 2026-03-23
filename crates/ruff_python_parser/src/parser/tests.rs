@@ -157,3 +157,23 @@ t"i}'"#;
 
     insta::assert_debug_snapshot!(error);
 }
+
+#[test]
+fn test_tstring_fstring_middle() {
+    let source = "t'{:{F'{\0}F";
+    let parsed = parse_expression(source);
+
+    let error = parsed.unwrap_err();
+
+    insta::assert_debug_snapshot!(error);
+}
+
+#[test]
+fn test_tstring_fstring_middle_fuzzer() {
+    let source = "A1[A\u{c}\0:+,>1t'{:f\0:{f\"f\0:\0{fm\0:{f:\u{10}\0\0\0:bb\0{@f>f\u{1}'\0f";
+    let parsed = parse_expression(source);
+
+    let error = parsed.unwrap_err();
+
+    insta::assert_debug_snapshot!(error);
+}

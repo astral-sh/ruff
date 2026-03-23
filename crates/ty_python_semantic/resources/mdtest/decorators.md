@@ -150,6 +150,19 @@ reveal_type(f)
 reveal_type(f(1))
 ```
 
+### `functools.cached_property`
+
+```py
+from functools import cached_property
+
+class Foo:
+    @cached_property
+    def foo(self) -> str:
+        return "a"
+
+reveal_type(Foo().foo)  # revealed: str
+```
+
 ## Lambdas as decorators
 
 ```py

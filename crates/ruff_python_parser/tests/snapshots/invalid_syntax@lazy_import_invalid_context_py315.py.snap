@@ -1,0 +1,377 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+---
+## AST
+
+```
+Module(
+    ModModule {
+        node_index: NodeIndex(None),
+        range: 0..322,
+        body: [
+            Try(
+                StmtTry {
+                    node_index: NodeIndex(None),
+                    range: 44..84,
+                    body: [
+                        Import(
+                            StmtImport {
+                                node_index: NodeIndex(None),
+                                range: 53..67,
+                                names: [
+                                    Alias {
+                                        range: 65..67,
+                                        node_index: NodeIndex(None),
+                                        name: Identifier {
+                                            id: Name("os"),
+                                            range: 65..67,
+                                            node_index: NodeIndex(None),
+                                        },
+                                        asname: None,
+                                    },
+                                ],
+                                is_lazy: true,
+                            },
+                        ),
+                    ],
+                    handlers: [
+                        ExceptHandler(
+                            ExceptHandlerExceptHandler {
+                                range: 68..84,
+                                node_index: NodeIndex(None),
+                                type_: None,
+                                name: None,
+                                body: [
+                                    Pass(
+                                        StmtPass {
+                                            node_index: NodeIndex(None),
+                                            range: 80..84,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    ],
+                    orelse: [],
+                    finalbody: [],
+                    is_star: false,
+                },
+            ),
+            Try(
+                StmtTry {
+                    node_index: NodeIndex(None),
+                    range: 86..135,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                node_index: NodeIndex(None),
+                                range: 95..96,
+                                value: Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 95..96,
+                                        id: Name("x"),
+                                        ctx: Load,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                    handlers: [
+                        ExceptHandler(
+                            ExceptHandlerExceptHandler {
+                                range: 97..135,
+                                node_index: NodeIndex(None),
+                                type_: Some(
+                                    Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 105..114,
+                                            id: Name("Exception"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ),
+                                name: None,
+                                body: [
+                                    Import(
+                                        StmtImport {
+                                            node_index: NodeIndex(None),
+                                            range: 120..135,
+                                            names: [
+                                                Alias {
+                                                    range: 132..135,
+                                                    node_index: NodeIndex(None),
+                                                    name: Identifier {
+                                                        id: Name("sys"),
+                                                        range: 132..135,
+                                                        node_index: NodeIndex(None),
+                                                    },
+                                                    asname: None,
+                                                },
+                                            ],
+                                            is_lazy: true,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    ],
+                    orelse: [],
+                    finalbody: [],
+                    is_star: true,
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    node_index: NodeIndex(None),
+                    range: 137..169,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("func"),
+                        range: 141..145,
+                        node_index: NodeIndex(None),
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 145..147,
+                        node_index: NodeIndex(None),
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Import(
+                            StmtImport {
+                                node_index: NodeIndex(None),
+                                range: 153..169,
+                                names: [
+                                    Alias {
+                                        range: 165..169,
+                                        node_index: NodeIndex(None),
+                                        name: Identifier {
+                                            id: Name("math"),
+                                            range: 165..169,
+                                            node_index: NodeIndex(None),
+                                        },
+                                        asname: None,
+                                    },
+                                ],
+                                is_lazy: true,
+                            },
+                        ),
+                    ],
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    node_index: NodeIndex(None),
+                    range: 171..226,
+                    is_async: true,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("async_func"),
+                        range: 181..191,
+                        node_index: NodeIndex(None),
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 191..193,
+                        node_index: NodeIndex(None),
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        ImportFrom(
+                            StmtImportFrom {
+                                node_index: NodeIndex(None),
+                                range: 199..226,
+                                module: Some(
+                                    Identifier {
+                                        id: Name("json"),
+                                        range: 209..213,
+                                        node_index: NodeIndex(None),
+                                    },
+                                ),
+                                names: [
+                                    Alias {
+                                        range: 221..226,
+                                        node_index: NodeIndex(None),
+                                        name: Identifier {
+                                            id: Name("loads"),
+                                            range: 221..226,
+                                            node_index: NodeIndex(None),
+                                        },
+                                        asname: None,
+                                    },
+                                ],
+                                level: 0,
+                                is_lazy: true,
+                            },
+                        ),
+                    ],
+                },
+            ),
+            ClassDef(
+                StmtClassDef {
+                    node_index: NodeIndex(None),
+                    range: 228..265,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("MyClass"),
+                        range: 234..241,
+                        node_index: NodeIndex(None),
+                    },
+                    type_params: None,
+                    arguments: None,
+                    body: [
+                        Import(
+                            StmtImport {
+                                node_index: NodeIndex(None),
+                                range: 247..265,
+                                names: [
+                                    Alias {
+                                        range: 259..265,
+                                        node_index: NodeIndex(None),
+                                        name: Identifier {
+                                            id: Name("typing"),
+                                            range: 259..265,
+                                            node_index: NodeIndex(None),
+                                        },
+                                        asname: None,
+                                    },
+                                ],
+                                is_lazy: true,
+                            },
+                        ),
+                    ],
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    node_index: NodeIndex(None),
+                    range: 267..321,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("outer"),
+                        range: 271..276,
+                        node_index: NodeIndex(None),
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 276..278,
+                        node_index: NodeIndex(None),
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        ClassDef(
+                            StmtClassDef {
+                                node_index: NodeIndex(None),
+                                range: 284..321,
+                                decorator_list: [],
+                                name: Identifier {
+                                    id: Name("Inner"),
+                                    range: 290..295,
+                                    node_index: NodeIndex(None),
+                                },
+                                type_params: None,
+                                arguments: None,
+                                body: [
+                                    Import(
+                                        StmtImport {
+                                            node_index: NodeIndex(None),
+                                            range: 305..321,
+                                            names: [
+                                                Alias {
+                                                    range: 317..321,
+                                                    node_index: NodeIndex(None),
+                                                    name: Identifier {
+                                                        id: Name("json"),
+                                                        range: 317..321,
+                                                        node_index: NodeIndex(None),
+                                                    },
+                                                    asname: None,
+                                                },
+                                            ],
+                                            is_lazy: true,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```
+## Semantic Syntax Errors
+
+  |
+1 | # parse_options: {"target-version": "3.15"}
+2 | try:
+3 |     lazy import os
+  |     ^^^^^^^^^^^^^^ Syntax Error: lazy import not allowed inside try/except blocks
+4 | except:
+5 |     pass
+  |
+
+
+   |
+ 8 |     x
+ 9 | except* Exception:
+10 |     lazy import sys
+   |     ^^^^^^^^^^^^^^^ Syntax Error: lazy import not allowed inside try/except blocks
+11 |
+12 | def func():
+   |
+
+
+   |
+12 | def func():
+13 |     lazy import math
+   |     ^^^^^^^^^^^^^^^^ Syntax Error: lazy import not allowed inside functions
+14 |
+15 | async def async_func():
+   |
+
+
+   |
+15 | async def async_func():
+16 |     lazy from json import loads
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^ Syntax Error: lazy from ... import not allowed inside functions
+17 |
+18 | class MyClass:
+   |
+
+
+   |
+18 | class MyClass:
+19 |     lazy import typing
+   |     ^^^^^^^^^^^^^^^^^^ Syntax Error: lazy import not allowed inside classes
+20 |
+21 | def outer():
+   |
+
+
+   |
+21 | def outer():
+22 |     class Inner:
+23 |         lazy import json
+   |         ^^^^^^^^^^^^^^^^ Syntax Error: lazy import not allowed inside classes
+   |

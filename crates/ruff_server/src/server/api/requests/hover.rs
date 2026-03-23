@@ -5,6 +5,7 @@ use lsp_types::{self as types, request as req};
 use regex::Regex;
 use ruff_linter::FixAvailability;
 use ruff_linter::registry::{Linter, Rule, RuleNamespace};
+use ruff_python_ast::SourceType;
 use ruff_source_file::OneIndexed;
 use std::fmt::Write;
 
@@ -31,7 +32,11 @@ pub(crate) fn hover(
     snapshot: &DocumentSnapshot,
     position: &types::TextDocumentPositionParams,
 ) -> Option<types::Hover> {
-    // Hover only operates on text documents or notebook cells
+    // Don't show noqa hover for non-Python documents (e.g., markdown files).
+    let SourceType::Python(_) = snapshot.query().source_type() else {
+        return None;
+    };
+
     let document = snapshot
         .query()
         .as_single_document()
@@ -121,4 +126,91 @@ fn format_rule_text(rule: Rule) -> String {
         output.push_str("An issue occurred: an explanation for this rule was not found.");
     }
     output
+}
+
+#[cfg(test)]
+mod tests {
+    use lsp_types::{self as types, ClientCapabilities, Url};
+
+    use crate::session::{Client, GlobalOptions};
+    use crate::{PositionEncoding, TextDocument, Workspace, Workspaces};
+
+    use super::*;
+
+    fn create_session_and_snapshot(
+        file_name: &str,
+        language_id: &str,
+        content: &str,
+    ) -> (crate::Session, Url) {
+        let (main_loop_sender, _) = crossbeam::channel::unbounded();
+        let (client_sender, _) = crossbeam::channel::unbounded();
+        let client = Client::new(main_loop_sender, client_sender);
+
+        let workspace_dir = std::env::temp_dir();
+        let workspace_url = Url::from_file_path(&workspace_dir).unwrap();
+
+        let options = GlobalOptions::default();
+        let global = options.into_settings(client.clone());
+
+        let mut session = crate::Session::new(
+            &ClientCapabilities::default(),
+            PositionEncoding::UTF16,
+            global,
+            &Workspaces::new(vec![
+                Workspace::new(workspace_url).with_options(crate::ClientOptions::default()),
+            ]),
+            &client,
+        )
+        .unwrap();
+
+        let file_url = Url::from_file_path(workspace_dir.join(file_name)).unwrap();
+        let document = TextDocument::new(content.to_string(), 0).with_language_id(language_id);
+        session.open_text_document(file_url.clone(), document);
+
+        (session, file_url)
+    }
+
+    #[test]
+    fn no_hover_for_markdown() {
+        let (session, file_url) =
+            create_session_and_snapshot("test.md", "markdown", "# noqa: RUF100\n");
+
+        let snapshot = session.take_snapshot(file_url.clone()).unwrap();
+
+        let position = types::TextDocumentPositionParams {
+            text_document: types::TextDocumentIdentifier { uri: file_url },
+            position: types::Position {
+                line: 0,
+                character: 9,
+            },
+        };
+
+        let result = hover(&snapshot, &position);
+        assert!(
+            result.is_none(),
+            "Expected no hover for markdown file, got: {result:?}"
+        );
+    }
+
+    #[test]
+    fn hover_for_python_noqa() {
+        let (session, file_url) =
+            create_session_and_snapshot("test.py", "python", "x = 1  # noqa: RUF100\n");
+
+        let snapshot = session.take_snapshot(file_url.clone()).unwrap();
+
+        let position = types::TextDocumentPositionParams {
+            text_document: types::TextDocumentIdentifier { uri: file_url },
+            position: types::Position {
+                line: 0,
+                character: 16,
+            },
+        };
+
+        let result = hover(&snapshot, &position);
+        assert!(
+            result.is_some(),
+            "Expected hover tooltip for Python noqa comment"
+        );
+    }
 }

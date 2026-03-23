@@ -2,6 +2,7 @@ mod args;
 mod logging;
 mod printer;
 mod python_version;
+mod rule;
 mod version;
 
 use std::fmt::Write;
@@ -30,7 +31,7 @@ use ty_project::{ProjectDatabase, ProjectMetadata};
 use ty_server::run_server;
 use ty_static::EnvVars;
 
-use crate::args::{CheckCommand, Command, TerminalColor};
+use crate::args::{CheckCommand, Command, ExplainCommand, HelpFormat, TerminalColor};
 use crate::logging::{VerbosityLevel, setup_tracing};
 use crate::printer::Printer;
 pub use args::Cli;
@@ -47,20 +48,41 @@ pub fn run() -> anyhow::Result<ExitStatus> {
     match args.command {
         Command::Server => run_server().map(|()| ExitStatus::Success),
         Command::Check(check_args) => run_check(check_args),
-        Command::Version => version().map(|()| ExitStatus::Success),
+        Command::Version { output_format } => version(output_format).map(|()| ExitStatus::Success),
         Command::GenerateShellCompletion { shell } => {
             use std::io::stdout;
 
             shell.generate(&mut Cli::command(), &mut stdout());
             Ok(ExitStatus::Success)
         }
+        Command::Explain { command } => match command {
+            ExplainCommand::Rule {
+                rule,
+                output_format,
+            } => {
+                if let Some(name) = rule {
+                    rule::rule(&name, output_format)?;
+                } else {
+                    rule::rules(output_format)?;
+                }
+                Ok(ExitStatus::Success)
+            }
+        },
     }
 }
 
-pub(crate) fn version() -> Result<()> {
+pub(crate) fn version(output_format: HelpFormat) -> Result<()> {
     let mut stdout = Printer::default().stream_for_requested_summary().lock();
     let version_info = crate::version::version();
-    writeln!(stdout, "ty {}", &version_info)?;
+
+    match output_format {
+        HelpFormat::Text => {
+            writeln!(stdout, "ty {}", &version_info)?;
+        }
+        HelpFormat::Json => {
+            serde_json::to_writer_pretty(&mut stdout, &version_info)?;
+        }
+    }
     Ok(())
 }
 
@@ -138,7 +160,7 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     let project_options_overrides = ProjectOptionsOverrides::new(config_file, args.into_options());
     project_metadata.apply_overrides(&project_options_overrides);
 
-    let mut db = ProjectDatabase::new(project_metadata, system)?;
+    let mut db = ProjectDatabase::fallible(project_metadata, system)?;
     let project = db.project();
 
     project.set_verbose(&mut db, verbosity >= VerbosityLevel::Verbose);
@@ -170,13 +192,11 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     let mut stdout = printer.stream_for_requested_summary().lock();
     match std::env::var(EnvVars::TY_MEMORY_REPORT).as_deref() {
         Ok("short") => write!(stdout, "{}", db.salsa_memory_dump().display_short())?,
-        Ok("mypy_primer") => write!(stdout, "{}", db.salsa_memory_dump().display_mypy_primer())?,
-        Ok("full") => {
-            write!(stdout, "{}", db.salsa_memory_dump().display_full())?;
-        }
+        Ok("full") => write!(stdout, "{}", db.salsa_memory_dump().display_full())?,
+        Ok("json") => writeln!(stdout, "{}", db.salsa_memory_dump().to_json())?,
         Ok(other) => {
             tracing::warn!(
-                "Unknown value for `TY_MEMORY_REPORT`: `{other}`. Valid values are `short`, `mypy_primer`, and `full`."
+                "Unknown value for `TY_MEMORY_REPORT`: `{other}`. Valid values are `short`, `full`, and `json`."
             );
         }
         Err(_) => {}
@@ -348,7 +368,7 @@ impl MainLoop {
                     let result = match self.mode {
                         MainLoopMode::Check => {
                             // TODO: We should have an official flag to silence workspace diagnostics.
-                            if std::env::var("TY_MEMORY_REPORT").as_deref() == Ok("mypy_primer") {
+                            if std::env::var("TY_MEMORY_REPORT").as_deref() == Ok("json") {
                                 return Ok(ExitStatus::Success);
                             }
 
@@ -442,14 +462,12 @@ impl MainLoop {
         let is_human_readable = terminal_settings.output_format.is_human_readable();
 
         match diagnostics {
-            [] => {
-                if is_human_readable {
-                    writeln!(
-                        self.printer.stream_for_success_summary(),
-                        "{}",
-                        "All checks passed!".green().bold()
-                    )?;
-                }
+            [] if is_human_readable => {
+                writeln!(
+                    self.printer.stream_for_success_summary(),
+                    "{}",
+                    "All checks passed!".green().bold()
+                )?;
             }
             diagnostics => {
                 let diagnostics_count = diagnostics.len();
@@ -459,7 +477,7 @@ impl MainLoop {
                 // Only render diagnostics if they're going to be displayed, since doing
                 // so is expensive.
                 if stdout.is_enabled() {
-                    let display_config = DisplayDiagnosticConfig::default()
+                    let display_config = DisplayDiagnosticConfig::new("ty")
                         .format(terminal_settings.output_format.into())
                         .color(colored::control::SHOULD_COLORIZE.should_colorize())
                         .with_cancellation_token(Some(self.cancellation_token.clone()))

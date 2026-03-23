@@ -1,0 +1,61 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: final.md - Tests for the `@typing(_extensions).final` decorator - Overriding a `@final` method by assigning a function to a class variable
+mdtest path: crates/ty_python_semantic/resources/mdtest/final.md
+---
+
+# Python source files
+
+## base.py
+
+```
+1 | from typing import final
+2 | 
+3 | class Base:
+4 |     @final
+5 |     def method(self) -> None: ...
+```
+
+## other.py
+
+```
+1 | def replacement_method() -> None: ...
+```
+
+## derived.py
+
+```
+1 | from base import Base
+2 | from other import replacement_method
+3 | 
+4 | class Derived(Base):
+5 |     method = replacement_method  # error: [override-of-final-method]
+```
+
+# Diagnostics
+
+```
+error[override-of-final-method]: Cannot override `Base.method`
+ --> src/derived.py:5:5
+  |
+4 | class Derived(Base):
+5 |     method = replacement_method  # error: [override-of-final-method]
+  |     ^^^^^^ Overrides a definition from superclass `Base`
+  |
+info: `Base.method` is decorated with `@final`, forbidding overrides
+ --> src/base.py:4:5
+  |
+3 | class Base:
+4 |     @final
+  |     ------
+5 |     def method(self) -> None: ...
+  |         ------ `Base.method` defined here
+  |
+help: Remove the override of `method`
+info: rule `override-of-final-method` is enabled by default
+
+```

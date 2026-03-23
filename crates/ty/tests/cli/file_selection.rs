@@ -944,7 +944,7 @@ fn invalid_include_pattern() -> anyhow::Result<()> {
 
     ----- stderr -----
     ty failed
-      Cause: error[invalid-glob]: Invalid include pattern
+      Cause: error[invalid-glob]: Invalid pattern
      --> ty.toml:4:5
       |
     2 | [src]
@@ -986,7 +986,7 @@ fn invalid_include_pattern_concise_output() -> anyhow::Result<()> {
 
     ----- stderr -----
     ty failed
-      Cause: ty.toml:4:5: error[invalid-glob] Invalid include pattern: Too many stars at position 5
+      Cause: ty.toml:4:5: error[invalid-glob] Invalid include pattern `src/**test/`: Too many stars at position 5
     ");
 
     Ok(())
@@ -1020,7 +1020,7 @@ fn invalid_exclude_pattern() -> anyhow::Result<()> {
 
     ----- stderr -----
     ty failed
-      Cause: error[invalid-glob]: Invalid exclude pattern
+      Cause: error[invalid-glob]: Invalid pattern
      --> ty.toml:4:5
       |
     2 | [src]

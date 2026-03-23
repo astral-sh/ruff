@@ -14,7 +14,8 @@ use ruff_db::files::{File, FilePath};
 use ruff_db::system::walk_directory::WalkDirectoryBuilder;
 use ruff_db::system::{
     CaseSensitivity, DirectoryEntry, FileType, GlobError, Metadata, PatternError, Result, System,
-    SystemPath, SystemPathBuf, SystemVirtualPath, SystemVirtualPathBuf, WritableSystem,
+    SystemPath, SystemPathBuf, SystemVirtualPath, SystemVirtualPathBuf, WhichResult,
+    WritableSystem,
 };
 use ruff_notebook::{Notebook, NotebookError};
 use ruff_python_ast::PySourceType;
@@ -124,7 +125,7 @@ impl LSPSystem {
         extension: Option<&str>,
     ) -> Option<PySourceType> {
         match document {
-            Document::Text(text) => match text.language_id()? {
+            Document::Text(text) => match text.language_id() {
                 LanguageId::Python => Some(
                     extension
                         .and_then(PySourceType::try_from_extension)
@@ -226,6 +227,10 @@ impl System for LSPSystem {
             Document::Text(document) => Notebook::from_source_code(document.contents()),
             Document::Notebook(notebook) => Ok(notebook.to_ruff_notebook(self.index())),
         }
+    }
+
+    fn which(&self, name: &str) -> WhichResult {
+        self.native_system.which(name)
     }
 
     fn current_directory(&self) -> &SystemPath {

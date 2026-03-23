@@ -86,3 +86,43 @@ async def broken6():
 async def broken7():
     yield 1
     return [1, 2, 3]
+
+
+import pytest
+
+
+@pytest.hookimpl(wrapper=True)
+def pytest_runtest_makereport():
+    result = yield
+    return result
+
+
+@pytest.hookimpl(wrapper=True)
+def pytest_fixture_setup():
+    result = yield
+    result.some_attr = "modified"
+    return result
+
+
+@pytest.hookimpl(hookwrapper=True)
+def pytest_runtest_call():
+    result = yield
+    return result
+
+
+@pytest.hookimpl()
+def pytest_configure():
+    yield
+    return "should error"
+
+
+@pytest.hookimpl(wrapper=False)
+def pytest_unconfigure():
+    yield
+    return "should error"
+
+
+@pytest.fixture()
+def my_fixture():
+    yield
+    return "should error"

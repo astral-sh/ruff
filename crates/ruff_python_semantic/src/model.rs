@@ -209,7 +209,7 @@ impl<'a> SemanticModel<'a> {
         }
 
         if self.typing_modules.iter().any(|module| {
-            let module = QualifiedName::from_dotted_name(module);
+            let module = QualifiedName::user_defined(module);
             qualified_name == &module.append_member(target)
         }) {
             return true;
@@ -502,7 +502,39 @@ impl<'a> SemanticModel<'a> {
                     // print(x)
                     //
                     // The `x` in `print(x)` should be treated as unresolved.
-                    BindingKind::Deletion | BindingKind::UnboundException(None) => {
+                    BindingKind::Deletion => {
+                        // In stub files, `del` is used to hide names from re-export
+                        // while the name is still valid for use in type annotations
+                        // within the same file. Since annotations are deferred in
+                        // stubs, the `Deletion` binding is seen at resolve time even
+                        // though the reference textually precedes the `del`. Resolve
+                        // to the shadowed (pre-`del`) binding when available.
+                        if self.in_stub_file() {
+                            if let Some(shadowed_id) =
+                                self.scopes[scope_id].shadowed_binding(binding_id)
+                            {
+                                // Only suppress F821 when the reference textually precedes
+                                // the `del` statement. If `del` comes before the reference,
+                                // the name is genuinely undefined at that point and F821
+                                // should still fire.
+                                let deletion_range = self.bindings[binding_id].range;
+                                if !self.bindings[shadowed_id].is_unbound()
+                                    && name.range.start() < deletion_range.start()
+                                {
+                                    let reference_id = self.resolved_references.push(
+                                        self.scope_id,
+                                        self.node_id,
+                                        ExprContext::Load,
+                                        self.flags,
+                                        name.range,
+                                    );
+                                    self.bindings[shadowed_id].references.push(reference_id);
+                                    self.resolved_names.insert(name.into(), shadowed_id);
+                                    return ReadResult::Resolved(shadowed_id);
+                                }
+                            }
+                        }
+
                         self.unresolved_references.push(
                             name.range,
                             self.exceptions(),
@@ -511,7 +543,7 @@ impl<'a> SemanticModel<'a> {
                         return ReadResult::UnboundLocal(binding_id);
                     }
 
-                    BindingKind::ConditionalDeletion(binding_id) => {
+                    BindingKind::UnboundException(None) => {
                         self.unresolved_references.push(
                             name.range,
                             self.exceptions(),
@@ -671,7 +703,6 @@ impl<'a> SemanticModel<'a> {
                 match self.bindings[binding_id].kind {
                     BindingKind::Annotation => continue,
                     BindingKind::Deletion | BindingKind::UnboundException(None) => return None,
-                    BindingKind::ConditionalDeletion(binding_id) => return Some(binding_id),
                     BindingKind::UnboundException(Some(binding_id)) => return Some(binding_id),
                     _ => return Some(binding_id),
                 }
@@ -804,8 +835,7 @@ impl<'a> SemanticModel<'a> {
                         }
                         if let BindingKind::Annotation
                         | BindingKind::Deletion
-                        | BindingKind::UnboundException(..)
-                        | BindingKind::ConditionalDeletion(..) = binding.kind
+                        | BindingKind::UnboundException(..) = binding.kind
                         {
                             continue;
                         }
@@ -829,7 +859,6 @@ impl<'a> SemanticModel<'a> {
                     let candidate_id = match self.bindings[binding_id].kind {
                         BindingKind::Annotation => continue,
                         BindingKind::Deletion | BindingKind::UnboundException(None) => return None,
-                        BindingKind::ConditionalDeletion(binding_id) => binding_id,
                         BindingKind::UnboundException(Some(binding_id)) => binding_id,
                         _ => binding_id,
                     };
@@ -1595,8 +1624,13 @@ impl<'a> SemanticModel<'a> {
     /// Return `true` if the model is in an async context.
     pub fn in_async_context(&self) -> bool {
         for scope in self.current_scopes() {
-            if let ScopeKind::Function(ast::StmtFunctionDef { is_async, .. }) = scope.kind {
-                return *is_async;
+            match scope.kind {
+                ScopeKind::Class(_) | ScopeKind::Lambda(_) => return false,
+                ScopeKind::Function(ast::StmtFunctionDef { is_async, .. }) => return *is_async,
+                ScopeKind::Generator { .. }
+                | ScopeKind::Module
+                | ScopeKind::Type
+                | ScopeKind::DunderClassCell => {}
             }
         }
         false
@@ -1985,6 +2019,11 @@ impl<'a> SemanticModel<'a> {
     /// Return `true` if the model is in an exception handler.
     pub const fn in_exception_handler(&self) -> bool {
         self.flags.intersects(SemanticModelFlags::EXCEPTION_HANDLER)
+    }
+
+    /// Return `true` if the model is in an exception handler.
+    pub const fn in_orelse(&self) -> bool {
+        self.flags.intersects(SemanticModelFlags::ORELSE)
     }
 
     /// Return `true` if the model is in an `assert` statement.
@@ -2653,6 +2692,19 @@ bitflags! {
         /// t'{x}'
         /// ```
         const T_STRING = 1 << 29;
+
+        /// The model is in the body of an `else` clause.
+        ///
+        /// For example, the model could be visiting `x` in:
+        /// ```python
+        /// try:
+        ///     ...
+        /// except Exception:
+        ///     ...
+        /// else:
+        ///     print(x)
+        /// ```
+        const ORELSE = 1 << 30;
 
 
         /// The context is in any type annotation.

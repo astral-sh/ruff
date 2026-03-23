@@ -383,7 +383,8 @@ want to explicitly set the `src` option in the extended configuration file:
     ```
 
 Beyond this `src`-based detection, Ruff will also attempt to determine the current Python package
-for a given Python file, and mark imports from within the same package as first-party. For example,
+for a given Python file (determined via the existence of a `__init__.py` file in a directory), 
+and mark imports from within the same package as first-party. For example,
 above, `baz.py` would be identified as part of the Python package beginning at
 `./my_project/src/foo`, and so any imports in `baz.py` that begin with `foo` (like `import foo.bar`)
 would be considered first-party based on this same-package heuristic.

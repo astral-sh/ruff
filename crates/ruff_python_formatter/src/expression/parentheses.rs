@@ -6,7 +6,7 @@ use ruff_python_trivia::CommentRanges;
 use ruff_python_trivia::{
     BackwardsTokenizer, SimpleToken, SimpleTokenKind, first_non_trivia_token,
 };
-use ruff_text_size::Ranged;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::comments::{
     SourceComment, dangling_comments, dangling_open_parenthesis_comments, trailing_comments,
@@ -40,6 +40,19 @@ pub(crate) trait NeedsParentheses {
         parent: AnyNodeRef,
         context: &PyFormatContext,
     ) -> OptionalParentheses;
+}
+
+/// Returns `true` if `expr_range` identifies a type annotation child of `parent`,
+/// i.e. the annotation of a `StmtAnnAssign` or the return annotation of a `StmtFunctionDef`.
+pub(crate) fn is_type_annotation_of(expr_range: TextRange, parent: AnyNodeRef) -> bool {
+    match parent {
+        AnyNodeRef::StmtAnnAssign(stmt) => stmt.annotation.range() == expr_range,
+        AnyNodeRef::StmtFunctionDef(stmt) => stmt
+            .returns
+            .as_deref()
+            .is_some_and(|r| r.range() == expr_range),
+        _ => false,
+    }
 }
 
 /// From the perspective of the parent statement or expression, when should the child expression

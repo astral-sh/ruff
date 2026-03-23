@@ -1,15 +1,16 @@
 [build-system]
-requires = ["maturin>=1.9,<2.0"]
+requires = ["maturin>=1.9.3,<2.0"]
 build-backend = "maturin"
 
 [project]
 name = "ruff"
-version = "0.14.14"
+version = "0.15.7"
 description = "An extremely fast Python linter and code formatter, written in Rust."
 authors = [{ name = "Astral Software Inc.", email = "hey@astral.sh" }]
 readme = "README.md"
 requires-python = ">=3.7"
-license = { file = "LICENSE" }
+license = "MIT"
+license-files = ["LICENSE"]
 keywords = [
     "automation",
     "flake8",
@@ -80,6 +81,7 @@ select = [
     "PGH", # pygrep-hooks
     "PYI", # flake8-pyi
     "RUF",
+    "S602", # flake8-bandit: subprocess-popen-with-shell-equals-true
 ]
 
 ignore = [
@@ -118,6 +120,8 @@ ignore_labels = ["internal", "ci", "testing", "ty"]
 version_files = [
     "README.md",
     "pyproject.toml",
+    # Might become unneeded once Markdown formatting is stabilized.
+    "docs/formatter.md",
     "docs/integrations.md",
     "docs/tutorial.md",
     "crates/ruff/Cargo.toml",

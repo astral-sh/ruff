@@ -207,7 +207,7 @@ impl<'a> Visitor<'a> for ReturnVisitor<'_, 'a> {
 ///         data = data.decode()
 ///     return data
 /// ```
-fn has_conditional_body(with: &ast::StmtWith, semantic: &SemanticModel) -> bool {
+pub(crate) fn has_conditional_body(with: &ast::StmtWith, semantic: &SemanticModel) -> bool {
     with.items.iter().any(|item| {
         let ast::WithItem {
             context_expr: Expr::Call(ast::ExprCall { func, .. }),

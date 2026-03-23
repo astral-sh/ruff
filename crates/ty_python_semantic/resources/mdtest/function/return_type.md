@@ -42,7 +42,6 @@ ellipsis (`...`) or `pass`.
 
 ```pyi
 def f() -> int: ...
-
 def f() -> int:
     pass
 
@@ -68,7 +67,7 @@ class Bar(Protocol):
     def f(self) -> int: ...
 
 class Baz(Bar):
-    # error: [invalid-return-type]
+    # error: [empty-body]
     def f(self) -> int: ...
 
 T = TypeVar("T")
@@ -106,9 +105,9 @@ class Bar[T](ABC):
     @abstractmethod
     def f(self) -> int: ...
     @abstractmethod
-    def g[T](self, x: T) -> T: ...
+    def g[U](self, x: U) -> U: ...
 
-# error: [invalid-return-type]
+# error: [empty-body]
 def f() -> int: ...
 @abstractmethod  # Semantically meaningless, accepted nevertheless
 def g() -> int: ...
@@ -166,7 +165,7 @@ else:
 reveal_type(f)  # revealed: def f() -> int
 
 if not TYPE_CHECKING:
-    ...
+    pass
 elif True:
     def g() -> str: ...
 
@@ -183,17 +182,19 @@ else:
 reveal_type(i)  # revealed: def i() -> str
 
 if False:
-    ...
+    pass
 elif TYPE_CHECKING:
     def j() -> str: ...
 
 else:
-    def j_() -> str: ...  # error: [invalid-return-type]
+    def j():
+        raise NotImplementedError
 
 if False:
-    ...
+    pass
 elif not TYPE_CHECKING:
-    def k_() -> str: ...  # error: [invalid-return-type]
+    def k() -> str:
+        raise NotImplementedError
 
 else:
     def k() -> str: ...
@@ -225,19 +226,22 @@ if typing.TYPE_CHECKING:
     def o() -> str: ...
 
 if not typing.TYPE_CHECKING:
-    def p() -> str: ...  # error: [invalid-return-type]
+    def p() -> str:
+        raise NotImplementedError
 
 if compat.sub.sub.TYPE_CHECKING:
     def q() -> str: ...
 
 if not compat.sub.sub.TYPE_CHECKING:
-    def r() -> str: ...  # error: [invalid-return-type]
+    def r() -> str:
+        raise NotImplementedError
 
 if t.TYPE_CHECKING:
     def s() -> str: ...
 
 if not t.TYPE_CHECKING:
-    def t() -> str: ...  # error: [invalid-return-type]
+    def t() -> str:
+        raise NotImplementedError
 ```
 
 ## Conditional return type
@@ -321,7 +325,7 @@ from typing import TypeVar
 
 T = TypeVar("T")
 
-# error: [invalid-return-type]
+# error: [empty-body]
 def m(x: T) -> T: ...
 
 class A[T]: ...
@@ -558,7 +562,7 @@ async def j() -> str:  # error: [invalid-return-type]
     yield 42
 ```
 
-## Diagnostics for `invalid-return-type` on non-protocol subclasses of protocol classes
+## Diagnostics for `empty-body` on non-protocol subclasses of protocol classes
 
 <!-- snapshot-diagnostics -->
 
@@ -571,7 +575,7 @@ class Abstract(Protocol):
     def method(self) -> str: ...
 
 class Concrete(Abstract):
-    def method(self) -> str: ...  # error: [invalid-return-type]
+    def method(self) -> str: ...  # error: [empty-body]
 ```
 
 ## Diagnostics for `invalid-return-type` on dynamic type

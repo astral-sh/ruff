@@ -154,7 +154,9 @@ class IMAP4:
         (code, [data]) = <instance>.response(code)
         """
 
-    def append(self, mailbox: str, flags: str, date_time: str, message: ReadableBuffer) -> tuple[str, _list[bytes]]:
+    def append(
+        self, mailbox: str | None, flags: str | None, date_time: _TimeLike | None, message: ReadableBuffer
+    ) -> tuple[str, _list[bytes]]:
         """Append message to named mailbox.
 
         (typ, [data]) = <instance>.append(mailbox, flags, date_time, message)
@@ -615,7 +617,9 @@ def Int2AP(num: SupportsAbs[SupportsInt]) -> bytes:
 def ParseFlags(resp: ReadableBuffer) -> tuple[bytes, ...]:
     """Convert IMAP4 flags response to python tuple."""
 
-def Time2Internaldate(date_time: float | time.struct_time | time._TimeTuple | datetime | str) -> str:
+_TimeLike: TypeAlias = float | time.struct_time | time._TimeTuple | datetime | str
+
+def Time2Internaldate(date_time: _TimeLike) -> str:
     """Convert date_time to IMAP4 INTERNALDATE representation.
 
     Return string in form: '"DD-Mmm-YYYY HH:MM:SS +HHMM"'.  The

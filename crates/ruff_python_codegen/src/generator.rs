@@ -634,10 +634,14 @@ impl<'a> Generator<'a> {
             }
             Stmt::Import(ast::StmtImport {
                 names,
+                is_lazy,
                 range: _,
                 node_index: _,
             }) => {
                 statement!({
+                    if *is_lazy {
+                        self.p("lazy ");
+                    }
                     self.p("import ");
                     let mut first = true;
                     for alias in names {
@@ -650,10 +654,14 @@ impl<'a> Generator<'a> {
                 module,
                 names,
                 level,
+                is_lazy,
                 range: _,
                 node_index: _,
             }) => {
                 statement!({
+                    if *is_lazy {
+                        self.p("lazy ");
+                    }
                     self.p("from ");
                     if *level > 0 {
                         for _ in 0..*level {
@@ -866,7 +874,7 @@ impl<'a> Generator<'a> {
     fn unparse_type_params(&mut self, type_params: &TypeParams) {
         self.p("[");
         let mut first = true;
-        for type_param in type_params.iter() {
+        for type_param in type_params {
             self.p_delim(&mut first, ", ");
             self.unparse_type_param(type_param);
         }

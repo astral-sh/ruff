@@ -1,0 +1,38 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: annotations.md - Assignment with annotations - Numbers special case
+mdtest path: crates/ty_python_semantic/resources/mdtest/assignment/annotations.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | from numbers import Number
+2 | 
+3 | a: Number = 1  # error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to `Number`"
+```
+
+# Diagnostics
+
+```
+error[invalid-assignment]: Object of type `Literal[1]` is not assignable to `Number`
+ --> src/mdtest_snippet.py:3:4
+  |
+1 | from numbers import Number
+2 |
+3 | a: Number = 1  # error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to `Number`"
+  |    ------   ^ Incompatible value of type `Literal[1]`
+  |    |
+  |    Declared type
+  |
+info: Types from the `numbers` module aren't supported for static type checking
+help: Consider using a protocol instead, such as `typing.SupportsFloat`
+info: rule `invalid-assignment` is enabled by default
+
+```

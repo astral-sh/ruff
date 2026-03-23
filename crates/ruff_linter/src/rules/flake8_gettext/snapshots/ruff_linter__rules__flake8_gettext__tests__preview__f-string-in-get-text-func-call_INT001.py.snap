@@ -30,6 +30,16 @@ INT001 f-string is resolved before function call; consider `_("string %s") % arg
 9 | _gettext(f"{'value'}")  # no lint
   |
 
+INT001 f-string in plural argument is resolved before function call
+ --> INT001.py:7:24
+  |
+6 | gettext(f"{'value'}")
+7 | ngettext(f"{'value'}", f"{'values'}", 2)
+  |                        ^^^^^^^^^^^^^
+8 |
+9 | _gettext(f"{'value'}")  # no lint
+  |
+
 INT001 f-string is resolved before function call; consider `_("string %s") % arg`
   --> INT001.py:22:21
    |
@@ -51,6 +61,16 @@ INT001 f-string is resolved before function call; consider `_("string %s") % arg
 25 | ngettext_fn(f"Hello, {name}!", f"Hello, {name}s!", 2)
    |
 
+INT001 f-string in plural argument is resolved before function call
+  --> INT001.py:23:41
+   |
+22 | gettext_mod.gettext(f"Hello, {name}!")
+23 | gettext_mod.ngettext(f"Hello, {name}!", f"Hello, {name}s!", 2)
+   |                                         ^^^^^^^^^^^^^^^^^^
+24 | gettext_fn(f"Hello, {name}!")
+25 | ngettext_fn(f"Hello, {name}!", f"Hello, {name}s!", 2)
+   |
+
 INT001 f-string is resolved before function call; consider `_("string %s") % arg`
   --> INT001.py:24:12
    |
@@ -68,6 +88,15 @@ INT001 f-string is resolved before function call; consider `_("string %s") % arg
 24 | gettext_fn(f"Hello, {name}!")
 25 | ngettext_fn(f"Hello, {name}!", f"Hello, {name}s!", 2)
    |             ^^^^^^^^^^^^^^^^^
+   |
+
+INT001 f-string in plural argument is resolved before function call
+  --> INT001.py:25:32
+   |
+23 | gettext_mod.ngettext(f"Hello, {name}!", f"Hello, {name}s!", 2)
+24 | gettext_fn(f"Hello, {name}!")
+25 | ngettext_fn(f"Hello, {name}!", f"Hello, {name}s!", 2)
+   |                                ^^^^^^^^^^^^^^^^^^
    |
 
 INT001 f-string is resolved before function call; consider `_("string %s") % arg`
@@ -159,4 +188,13 @@ INT001 f-string is resolved before function call; consider `_("string %s") % arg
 52 | builtins.gettext(f"{'value'}")
 53 | builtins.ngettext(f"{'value'}", f"{'values'}", 2)
    |                   ^^^^^^^^^^^^
+   |
+
+INT001 f-string in plural argument is resolved before function call
+  --> INT001.py:53:33
+   |
+51 | builtins._(f"{'value'}")
+52 | builtins.gettext(f"{'value'}")
+53 | builtins.ngettext(f"{'value'}", f"{'values'}", 2)
+   |                                 ^^^^^^^^^^^^^
    |

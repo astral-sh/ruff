@@ -1,3 +1,5 @@
+use rustc_hash::FxHashSet;
+
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::StmtFunctionDef;
 use ruff_python_ast::visitor::Visitor;
@@ -158,6 +160,10 @@ pub(crate) fn non_pep695_generic_function(checker: &Checker, function_def: &Stmt
             type_vars.extend(vars);
         }
     }
+
+    // Deduplicate type vars that appear in multiple parameter annotations
+    let mut seen = FxHashSet::default();
+    type_vars.retain(|tv| seen.insert(tv.name));
 
     let Some(type_vars) = check_type_vars(type_vars, checker) else {
         return;

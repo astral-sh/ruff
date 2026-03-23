@@ -2,9 +2,9 @@ use memchr::memchr2_iter;
 use rustc_hash::FxHashSet;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast as ast;
+use ruff_python_ast::{self as ast, PythonVersion};
 use ruff_python_literal::format::FormatSpec;
-use ruff_python_parser::parse_expression;
+use ruff_python_parser::{UnsupportedSyntaxErrorKind, parse_expression};
 use ruff_python_semantic::analyze::logging::is_logger_candidate;
 use ruff_python_semantic::{Modules, SemanticModel, TypingOnlyBindingsStatus};
 use ruff_text_size::{Ranged, TextRange};
@@ -120,7 +120,12 @@ pub(crate) fn missing_fstring_syntax(checker: &Checker, literal: &ast::StringLit
         return;
     }
 
-    if should_be_fstring(literal, checker.locator(), semantic) {
+    if should_be_fstring(
+        literal,
+        checker.locator(),
+        semantic,
+        checker.target_version(),
+    ) {
         checker
             .report_diagnostic(MissingFStringSyntax, literal.range())
             .set_fix(fix_fstring_syntax(literal.range()));
@@ -184,6 +189,7 @@ fn should_be_fstring(
     literal: &ast::StringLiteral,
     locator: &Locator,
     semantic: &SemanticModel,
+    target_version: PythonVersion,
 ) -> bool {
     if !has_brackets(&literal.value) {
         return false;
@@ -193,6 +199,18 @@ fn should_be_fstring(
     let Ok(parsed) = parse_expression(&fstring_expr) else {
         return false;
     };
+
+    // For Python < 3.12, reject if the parser detected any PEP 701 f-string
+    // features.
+    if target_version < PythonVersion::PY312 {
+        let has_pep701 = parsed
+            .unsupported_syntax_errors()
+            .iter()
+            .any(|e| matches!(e.kind, UnsupportedSyntaxErrorKind::Pep701FString(_)));
+        if has_pep701 {
+            return false;
+        }
+    }
 
     // Note: Range offsets for `value` are based on `fstring_expr`
     let ast::Expr::FString(ast::ExprFString { value, .. }) = parsed.expr() else {

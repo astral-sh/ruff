@@ -79,7 +79,10 @@ T = TypeVar("T")
 class CanIndex(Protocol[T]):
     def __getitem__(self, index: int, /) -> T: ...
 
-class ExplicitlyImplements(CanIndex[T]): ...
+class ExplicitlyImplements(CanIndex[T]):
+    def __getitem__(self, index: int, /) -> T:
+        raise NotImplementedError
+
 class SubProtocol(CanIndex[T], Protocol): ...
 
 def takes_in_list(x: list[T]) -> list[T]:
@@ -90,13 +93,11 @@ def takes_in_protocol(x: CanIndex[T]) -> T:
 
 def deep_list(x: list[str]) -> None:
     reveal_type(takes_in_list(x))  # revealed: list[str]
-    # TODO: revealed: str
-    reveal_type(takes_in_protocol(x))  # revealed: Unknown
+    reveal_type(takes_in_protocol(x))  # revealed: str
 
 def deeper_list(x: list[set[str]]) -> None:
     reveal_type(takes_in_list(x))  # revealed: list[set[str]]
-    # TODO: revealed: set[str]
-    reveal_type(takes_in_protocol(x))  # revealed: Unknown
+    reveal_type(takes_in_protocol(x))  # revealed: set[str]
 
 def deep_explicit(x: ExplicitlyImplements[str]) -> None:
     reveal_type(takes_in_protocol(x))  # revealed: str
@@ -129,12 +130,10 @@ class Sub(list[int]): ...
 class GenericSub(list[T]): ...
 
 reveal_type(takes_in_list(Sub()))  # revealed: list[int]
-# TODO: revealed: int
-reveal_type(takes_in_protocol(Sub()))  # revealed: Unknown
+reveal_type(takes_in_protocol(Sub()))  # revealed: int
 
 reveal_type(takes_in_list(GenericSub[str]()))  # revealed: list[str]
-# TODO: revealed: str
-reveal_type(takes_in_protocol(GenericSub[str]()))  # revealed: Unknown
+reveal_type(takes_in_protocol(GenericSub[str]()))  # revealed: str
 
 class ExplicitSub(ExplicitlyImplements[int]): ...
 class ExplicitGenericSub(ExplicitlyImplements[T]): ...
@@ -307,6 +306,23 @@ def negate_typevar(t: S) -> S:
 
 def positive_typevar(t: S) -> S:
     return +t
+```
+
+Narrowing should preserve the constrained typevar identity so the narrowed value remains assignable
+to the function's return type:
+
+```py
+from typing import TypeVar
+
+class P: ...
+class Q: ...
+
+T = TypeVar("T", P, Q)
+
+def return_narrowed_typevar(x: T) -> T:
+    if isinstance(x, P):
+        return x
+    return x
 ```
 
 Unary operations that are not supported by all constraints should error:
@@ -807,4 +823,189 @@ reveal_type(result)  # revealed: Derived
 
 # Accessing an attribute that only exists on Derived should work
 print(result.attr)  # No error
+```
+
+## Passing a constrained TypeVar to a function expecting a compatible constrained TypeVar
+
+A constrained TypeVar should be assignable to a different constrained TypeVar if each constraint of
+the actual TypeVar is equivalent to at least one constraint of the formal TypeVar. This commonly
+arises when wrapping functions from external packages that define private TypeVars with the same
+constraints.
+
+See: <https://github.com/astral-sh/ty/issues/2728>
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T", int, str)
+S = TypeVar("S", int, str)
+
+def callee(x: T) -> T:
+    return x
+
+def caller(x: S) -> S:
+    return callee(x)
+
+reveal_type(caller(1))  # revealed: int
+reveal_type(caller("hello"))  # revealed: str
+```
+
+A constrained TypeVar with a subset of constraints is also compatible:
+
+```py
+from typing import TypeVar
+
+Wide = TypeVar("Wide", int, str, bytes)
+Narrow = TypeVar("Narrow", int, str)
+
+def wide(x: Wide) -> Wide:
+    return x
+
+def narrow(x: Narrow) -> Narrow:
+    return wide(x)
+
+reveal_type(narrow(1))  # revealed: int
+reveal_type(narrow("hello"))  # revealed: str
+```
+
+But a constrained TypeVar with constraints not satisfied by the formal TypeVar should still error:
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T", int, str)
+U = TypeVar("U", int, bytes)
+
+def target(x: T) -> T:
+    return x
+
+def source(x: U) -> U:
+    return target(x)  # error: [invalid-argument-type]
+```
+
+We require equivalence rather than mere assignability when matching constraints. Constrained
+TypeVars allow narrowing via `isinstance` checks in the function body, so a constraint that is a
+strict subtype would be unsound. For example, a function constrained to `(int, str)` may narrow `T`
+to `int` and return `int(x)`, which would violate a caller's `bool` constraint:
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T", int, str)
+S = TypeVar("S", bool, str)
+
+def f(x: T) -> T:
+    return x
+
+def g(x: S) -> S:
+    return f(x)  # error: [invalid-argument-type]
+```
+
+## Inferring typevars in iterable parameters from literal string and bytes arguments
+
+```py
+from typing import Iterable, TypeVar
+from typing_extensions import LiteralString
+
+FlatT = TypeVar("FlatT")
+
+def flatten(*iterables: Iterable[FlatT]) -> list[FlatT]:
+    return [x for iterable in iterables for x in iterable]
+
+def flatten_covariant(*iterables: Iterable[FlatT]) -> tuple[FlatT, ...]:
+    return tuple(x for iterable in iterables for x in iterable)
+
+reveal_type(flatten("abc", (1, 2, 3)))  # revealed: list[str | int]
+# TODO: we could have `Literal["a", "b", "c"]` instead of `str` here
+reveal_type(flatten_covariant("abc", (1, 2, 3)))  # revealed: tuple[str | Literal[1, 2, 3], ...]
+
+def literal_string_case(literal_string: LiteralString):
+    reveal_type(flatten(literal_string, (1, 2, 3)))  # revealed: list[str | int]
+
+reveal_type(flatten(b"abc"))  # revealed: list[int]
+reveal_type(flatten(b"abc", ("x",)))  # revealed: list[int | str]
+# TODO: we could have `Literal[97, 98, 99]` instead of `int` in the next two lines
+reveal_type(flatten_covariant(b"abc"))  # revealed: tuple[int, ...]
+reveal_type(flatten_covariant(b"abc", ("x",)))  # revealed: tuple[int | Literal["x"], ...]
+```
+
+## Inferring typevars in intersections (formal type position)
+
+```py
+from typing import TypeVar, Iterable
+from ty_extensions import Intersection
+
+T = TypeVar("T")
+
+class Foo: ...
+
+def foo(x: Intersection[Iterable[T], Foo]) -> T:
+    return next(iter(x))
+
+class Bar(list[int], Foo): ...
+
+reveal_type(foo(Bar()))  # revealed: int
+```
+
+## Inferring typevars in intersections (actual type position)
+
+```py
+from typing import TypeVar, Sequence, Iterable
+
+T = TypeVar("T")
+
+def first(iterable: Iterable[T]) -> T:
+    return next(iter(iterable))
+
+def narrowed_via_isinstance(x: Sequence[str] | int):
+    if isinstance(x, int):
+        reveal_type(x)  # revealed: int
+    else:
+        reveal_type(x)  # revealed: Sequence[str] & ~int
+        reveal_type(first(x))  # revealed: str
+
+def narrowed_via_truthiness(y: list[str]):
+    if y:
+        reveal_type(y)  # revealed: list[str] & ~AlwaysFalsy
+        reveal_type(first(y))  # revealed: str
+```
+
+## Inferring typevars in intersections (actual type position, multiple positive types)
+
+When an actual intersection has multiple positive elements and a bounded typevar, inference can fail
+for some elements but succeed for others:
+
+```py
+from typing import Sequence, TypeVar
+from ty_extensions import Intersection
+
+class Base: ...
+class Sub1(Base): ...
+class Sub2(Base): ...
+class Unrelated1: ...
+class Unrelated2: ...
+
+T = TypeVar("T", bound=Base)
+
+def first(x: Sequence[T]) -> T:
+    return x[0]
+
+# An intersection where both positive elements satisfy the bound.
+def _(x: Intersection[Sequence[Sub1], Sequence[Sub2]]) -> None:
+    reveal_type(first(x))  # revealed: Sub1 | Sub2
+
+# An intersection with one positive element that satisfies the bound and one that doesn't.
+def _(x: Intersection[Sequence[Sub1], Sequence[Unrelated1]]) -> None:
+    reveal_type(first(x))  # revealed: Sub1
+
+# An intersection with two positive elements that satisfy the bound and one that doesn't.
+def _(x: Intersection[Sequence[Sub1], Sequence[Sub2], Sequence[Unrelated1]]) -> None:
+    reveal_type(first(x))  # revealed: Sub1 | Sub2
+
+# An intersection with two positive elements, neither of which satisfies the bound. In this case,
+# only the error related to the first element is reported.
+def _(x: Intersection[Sequence[Unrelated1], Sequence[Unrelated2]]) -> None:
+    # TODO: We only report the first error here, but we should report both.
+    # error: [invalid-argument-type] "Argument to function `first` is incorrect: Argument type `Unrelated1` does not satisfy upper bound `Base` of type variable `T`"
+    reveal_type(first(x))  # revealed: Unknown
 ```

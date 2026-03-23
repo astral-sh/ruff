@@ -1,0 +1,162 @@
+---
+source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
+---
+B043 [*] Do not call `delattr` with a constant attribute value. It is not any safer than normal property deletion.
+  --> B043.py:18:1
+   |
+17 | # Invalid usage
+18 | delattr(foo, "bar")
+   | ^^^^^^^^^^^^^^^^^^^
+19 | delattr(foo, "_123abc")
+20 | delattr(foo, "__123abc__")
+   |
+help: Replace `delattr` with `del` statement
+15 |     pass
+16 | 
+17 | # Invalid usage
+   - delattr(foo, "bar")
+18 + del foo.bar
+19 | delattr(foo, "_123abc")
+20 | delattr(foo, "__123abc__")
+21 | delattr(foo, "abc123")
+
+B043 [*] Do not call `delattr` with a constant attribute value. It is not any safer than normal property deletion.
+  --> B043.py:19:1
+   |
+17 | # Invalid usage
+18 | delattr(foo, "bar")
+19 | delattr(foo, "_123abc")
+   | ^^^^^^^^^^^^^^^^^^^^^^^
+20 | delattr(foo, "__123abc__")
+21 | delattr(foo, "abc123")
+   |
+help: Replace `delattr` with `del` statement
+16 | 
+17 | # Invalid usage
+18 | delattr(foo, "bar")
+   - delattr(foo, "_123abc")
+19 + del foo._123abc
+20 | delattr(foo, "__123abc__")
+21 | delattr(foo, "abc123")
+22 | delattr(foo, r"abc123")
+
+B043 [*] Do not call `delattr` with a constant attribute value. It is not any safer than normal property deletion.
+  --> B043.py:20:1
+   |
+18 | delattr(foo, "bar")
+19 | delattr(foo, "_123abc")
+20 | delattr(foo, "__123abc__")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^
+21 | delattr(foo, "abc123")
+22 | delattr(foo, r"abc123")
+   |
+help: Replace `delattr` with `del` statement
+17 | # Invalid usage
+18 | delattr(foo, "bar")
+19 | delattr(foo, "_123abc")
+   - delattr(foo, "__123abc__")
+20 + del foo.__123abc__
+21 | delattr(foo, "abc123")
+22 | delattr(foo, r"abc123")
+23 | 
+
+B043 [*] Do not call `delattr` with a constant attribute value. It is not any safer than normal property deletion.
+  --> B043.py:21:1
+   |
+19 | delattr(foo, "_123abc")
+20 | delattr(foo, "__123abc__")
+21 | delattr(foo, "abc123")
+   | ^^^^^^^^^^^^^^^^^^^^^^
+22 | delattr(foo, r"abc123")
+   |
+help: Replace `delattr` with `del` statement
+18 | delattr(foo, "bar")
+19 | delattr(foo, "_123abc")
+20 | delattr(foo, "__123abc__")
+   - delattr(foo, "abc123")
+21 + del foo.abc123
+22 | delattr(foo, r"abc123")
+23 | 
+24 | # Starred argument
+
+B043 [*] Do not call `delattr` with a constant attribute value. It is not any safer than normal property deletion.
+  --> B043.py:22:1
+   |
+20 | delattr(foo, "__123abc__")
+21 | delattr(foo, "abc123")
+22 | delattr(foo, r"abc123")
+   | ^^^^^^^^^^^^^^^^^^^^^^^
+23 |
+24 | # Starred argument
+   |
+help: Replace `delattr` with `del` statement
+19 | delattr(foo, "_123abc")
+20 | delattr(foo, "__123abc__")
+21 | delattr(foo, "abc123")
+   - delattr(foo, r"abc123")
+22 + del foo.abc123
+23 | 
+24 | # Starred argument
+25 | delattr(*foo, "bar")
+
+B043 [*] Do not call `delattr` with a constant attribute value. It is not any safer than normal property deletion.
+  --> B043.py:28:1
+   |
+27 | # Non-NFKC attribute name (unsafe fix)
+28 | delattr(foo, "\u017f")
+   | ^^^^^^^^^^^^^^^^^^^^^^
+29 |
+30 | # Comment in expression (unsafe fix)
+   |
+help: Replace `delattr` with `del` statement
+25 | delattr(*foo, "bar")
+26 | 
+27 | # Non-NFKC attribute name (unsafe fix)
+   - delattr(foo, "\u017f")
+28 + del foo.ſ
+29 | 
+30 | # Comment in expression (unsafe fix)
+31 | delattr(
+note: This is an unsafe fix and may change runtime behavior
+
+B043 [*] Do not call `delattr` with a constant attribute value. It is not any safer than normal property deletion.
+  --> B043.py:31:1
+   |
+30 |   # Comment in expression (unsafe fix)
+31 | / delattr(
+32 | |     obj,
+33 | |     # text
+34 | |     "foo",
+35 | | )
+   | |_^
+36 |
+37 |   import builtins
+   |
+help: Replace `delattr` with `del` statement
+28 | delattr(foo, "\u017f")
+29 | 
+30 | # Comment in expression (unsafe fix)
+   - delattr(
+   -     obj,
+   -     # text
+   -     "foo",
+   - )
+31 + del obj.foo
+32 | 
+33 | import builtins
+34 | builtins.delattr(foo, "bar")
+note: This is an unsafe fix and may change runtime behavior
+
+B043 [*] Do not call `delattr` with a constant attribute value. It is not any safer than normal property deletion.
+  --> B043.py:38:1
+   |
+37 | import builtins
+38 | builtins.delattr(foo, "bar")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+help: Replace `delattr` with `del` statement
+35 | )
+36 | 
+37 | import builtins
+   - builtins.delattr(foo, "bar")
+38 + del foo.bar

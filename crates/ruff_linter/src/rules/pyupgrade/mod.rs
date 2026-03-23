@@ -128,6 +128,76 @@ mod tests {
         Ok(())
     }
 
+    /// Test that enabling preview switches from `FA100` to `UP006` when `future-annotations` is on.
+    #[test]
+    fn up006_preview_with_fa100() -> Result<()> {
+        assert_diagnostics_diff!(
+            Path::new("pyupgrade/UP006_4.py"),
+            &settings::LinterSettings {
+                future_annotations: true,
+                preview: PreviewMode::Disabled,
+                unresolved_target_version: PythonVersion::PY38.into(),
+                ..settings::LinterSettings::for_rules(vec![
+                    Rule::NonPEP585Annotation,
+                    Rule::FutureRewritableTypeAnnotation
+                ])
+            },
+            &settings::LinterSettings {
+                future_annotations: true,
+                preview: PreviewMode::Enabled,
+                unresolved_target_version: PythonVersion::PY38.into(),
+                ..settings::LinterSettings::for_rules(vec![
+                    Rule::NonPEP585Annotation,
+                    Rule::FutureRewritableTypeAnnotation
+                ])
+            },
+        );
+        Ok(())
+    }
+
+    /// Test that `FA100` fires when added alongside `UP006` in preview on 3.8 with
+    /// `future-annotations` disabled.
+    #[test]
+    fn up006_preview_with_fa100_no_future_annotations_setting() -> Result<()> {
+        assert_diagnostics_diff!(
+            Path::new("pyupgrade/UP006_4.py"),
+            &settings::LinterSettings {
+                preview: PreviewMode::Enabled,
+                unresolved_target_version: PythonVersion::PY38.into(),
+                ..settings::LinterSettings::for_rule(Rule::NonPEP585Annotation)
+            },
+            &settings::LinterSettings {
+                preview: PreviewMode::Enabled,
+                unresolved_target_version: PythonVersion::PY38.into(),
+                ..settings::LinterSettings::for_rules(vec![
+                    Rule::NonPEP585Annotation,
+                    Rule::FutureRewritableTypeAnnotation,
+                ])
+            },
+        );
+        Ok(())
+    }
+
+    /// On 3.10, the `__future__` import is unnecessary from either the `future-annotations` setting
+    /// or from FA100.
+    #[test]
+    fn up006_preview_with_fa100_and_future_annotations_py39() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pyupgrade/UP006_4.py"),
+            &settings::LinterSettings {
+                preview: PreviewMode::Enabled,
+                future_annotations: true,
+                unresolved_target_version: PythonVersion::PY310.into(),
+                ..settings::LinterSettings::for_rules(vec![
+                    Rule::NonPEP585Annotation,
+                    Rule::FutureRewritableTypeAnnotation,
+                ])
+            },
+        )?;
+        assert_diagnostics!(diagnostics);
+        Ok(())
+    }
+
     #[test_case(Rule::NonPEP695GenericClass, Path::new("UP046_2.py"))]
     #[test_case(Rule::NonPEP695GenericFunction, Path::new("UP047_1.py"))]
     fn rules_not_applied_default_typevar_backported(rule_code: Rule, path: &Path) -> Result<()> {
@@ -144,8 +214,8 @@ mod tests {
         Ok(())
     }
 
-    #[test_case(Rule::SuperCallWithParameters, Path::new("UP008.py"))]
     #[test_case(Rule::TypingTextStrAlias, Path::new("UP019.py"))]
+    #[test_case(Rule::OSErrorAlias, Path::new("UP024_0.py"))]
     fn rules_preview(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}__preview", path.to_string_lossy());
         let diagnostics = test_path(
@@ -440,12 +510,11 @@ mod tests {
     }
 
     #[test]
-    fn unnecessary_default_type_args_stubs_py312_preview() -> Result<()> {
-        let snapshot = format!("{}__preview", "UP043.pyi");
+    fn unnecessary_default_type_args_stubs_py312() -> Result<()> {
+        let snapshot = "UP043.pyi";
         let diagnostics = test_path(
             Path::new("pyupgrade/UP043.pyi"),
             &settings::LinterSettings {
-                preview: PreviewMode::Enabled,
                 unresolved_target_version: PythonVersion::PY312.into(),
                 ..settings::LinterSettings::for_rule(Rule::UnnecessaryDefaultTypeArgs)
             },

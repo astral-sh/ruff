@@ -132,6 +132,12 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
                 range: _,
                 node_index: _,
             }) => {
+                // Mark immediately-invoked lambdas as safe — the closure
+                // is consumed right away, so late-binding is not a concern.
+                if func.is_lambda_expr() {
+                    self.safe_functions.push(func);
+                }
+
                 match func.as_ref() {
                     Expr::Name(ast::ExprName { id, .. }) => {
                         if matches!(id.as_str(), "filter" | "reduce" | "map") {

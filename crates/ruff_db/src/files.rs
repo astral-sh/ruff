@@ -323,7 +323,7 @@ pub struct File {
     /// Salsa doesn't support deleting inputs. The only way to signal dependent queries that
     /// the file has been deleted is to change the status to `Deleted`.
     #[default]
-    status: FileStatus,
+    pub status: FileStatus,
 
     /// Overrides the result of [`source_text`](crate::source::source_text).
     ///
