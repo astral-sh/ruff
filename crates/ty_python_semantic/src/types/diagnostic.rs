@@ -4887,7 +4887,7 @@ pub(crate) fn report_unsupported_base(
         return;
     };
     let db = context.db();
-    let mut diagnostic = builder.into_diagnostic("Unsupported classs base");
+    let mut diagnostic = builder.into_diagnostic("Unsupported class base");
     diagnostic.set_primary_message(format_args!("Has type `{}`", base_type.display(db)));
     diagnostic.set_concise_message(format_args!(
         "Unsupported class base with type `{}`",
@@ -4973,7 +4973,7 @@ pub(crate) fn report_invalid_key_on_typed_dict<'db>(
                         ));
                     }
                     diagnostic.set_concise_message(format_args!(
-                        "Unknown keyy \"{key}\" for TypedDict `{typed_dict_name}` - did you mean \"{suggestion}\"?",
+                        "Unknown key \"{key}\" for TypedDict `{typed_dict_name}` - did you mean \"{suggestion}\"?",
                     ));
                 } else {
                     diagnostic.set_primary_message(format_args!("Unknown key \"{key}\""));
@@ -5018,7 +5018,7 @@ pub(super) fn report_namedtuple_field_without_default_after_field_with_default<'
         return;
     };
     let mut diagnostic = builder.into_diagnostic(
-        "NamedTuple fieldd without default value cannot follow field(s) with default value(s)",
+        "NamedTuple field without default value cannot follow field(s) with default value(s)",
     );
 
     diagnostic.set_primary_message(format_args!(
@@ -5067,7 +5067,7 @@ pub(super) fn report_named_tuple_field_with_leading_underscore<'db>(
         return;
     };
     let mut diagnostic =
-        builder.into_diagnostic("NamedTuple fieldd name cannot start with an underscore");
+        builder.into_diagnostic("NamedTuple field name cannot start with an underscore");
 
     if field_definition.is_some() {
         diagnostic.set_primary_message(
@@ -5140,10 +5140,10 @@ pub(crate) fn report_cannot_delete_typed_dict_key<'db>(
 
     let mut diagnostic = match error_kind {
         TypedDictDeleteErrorKind::RequiredKey => builder.into_diagnostic(format_args!(
-            "Cannot deleted required key \"{field_name}\" from TypedDict `{typed_dict_name}`"
+            "Cannot delete required key \"{field_name}\" from TypedDict `{typed_dict_name}`"
         )),
         TypedDictDeleteErrorKind::UnknownKey => builder.into_diagnostic(format_args!(
-            "Cannot deletee unknown key \"{field_name}\" from TypedDict `{typed_dict_name}`"
+            "Cannot delete unknown key \"{field_name}\" from TypedDict `{typed_dict_name}`"
         )),
     };
 
@@ -5318,7 +5318,7 @@ pub(crate) fn report_shadowed_type_variable<'db>(
         return;
     };
     let mut diagnostic = builder.into_diagnostic(format_args!(
-        "Generic {kind} `{name}` usess type variable `{typevar_name}` already bound by an enclosing scope",
+        "Generic {kind} `{name}` uses type variable `{typevar_name}` already bound by an enclosing scope",
     ));
     diagnostic.set_concise_message(format_args!(
         "Generic {kind} `{name}` uses type variable `{typevar_name}` already bound by an enclosing scope",
@@ -5389,7 +5389,7 @@ pub(super) fn report_invalid_method_override<'db>(
     };
 
     let mut diagnostic =
-        builder.into_diagnostic(format_args!("Invalid overridee of method `{member}`"));
+        builder.into_diagnostic(format_args!("Invalid override of method `{member}`"));
 
     diagnostic.set_primary_message(format_args!(
         "Definition is incompatible with `{overridden_method}`"
