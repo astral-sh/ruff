@@ -87,7 +87,11 @@ pub(crate) fn suppressible_exception(
     handlers: &[ExceptHandler],
     orelse: &[Stmt],
     finalbody: &[Stmt],
+    is_star: bool,
 ) {
+    if is_star {
+        return;
+    }
     if !matches!(
         try_body,
         [Stmt::Delete(_)
