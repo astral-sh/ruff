@@ -82,12 +82,14 @@ impl<'a> Resolver<'a> {
                     .take(count.saturating_sub(min_dots))
                     .find_map(|name| {
                         let file = self.resolve_module(&name)?;
-                        let source_file = (file.extension() == Some("pyi"))
-                            .then(|| self.resolve_real_module(&name))
-                            .flatten();
-                        Some((file, source_file))
+                        // If the file is a stub, look for the corresponding source file.
+                        if file.extension() == Some("pyi") {
+                            Some((Some(file), self.resolve_real_module(&name)))
+                        } else {
+                            Some((Some(file), None))
+                        }
                     })
-                    .map_or((None, None), |(file, source)| (Some(file), source));
+                    .unwrap_or_default();
 
                 std::iter::once(resolved)
                     .chain(std::iter::once(source_file))
