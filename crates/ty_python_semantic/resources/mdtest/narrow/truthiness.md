@@ -46,6 +46,21 @@ else:
     reveal_type(x)  # revealed: Literal[b"", b"bar", 0, False, ""] | None | tuple[()]
 ```
 
+## Walrus Member Access
+
+```py
+class Foo:
+    val: int | None
+
+def test() -> None:
+    foo1 = Foo()
+    if foo1.val:
+        reveal_type(foo1.val)  # revealed: int & ~AlwaysFalsy
+
+    if (foo2 := Foo()).val:
+        reveal_type(foo2.val)  # revealed: int & ~AlwaysFalsy
+```
+
 ## Function Literals
 
 Basically functions are always truthy.
