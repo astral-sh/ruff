@@ -132,8 +132,6 @@ jobs:
             --new-name "$REF_NAME" \
             --output-html dist/timing.html
 
-          echo '## `ecosystem-analyzer` results' > comment.md
-          echo >> comment.md
           cat diff-statistics.md >> comment.md
 
           cat diff-statistics.md >> "$GITHUB_STEP_SUMMARY"
