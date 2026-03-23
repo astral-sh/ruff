@@ -2,7 +2,7 @@ use ruff_python_ast::Suite;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Rule;
-use crate::rules::{flake8_bugbear, ruff};
+use crate::rules::{flake8_bugbear, flake8_type_checking, ruff};
 
 /// Run lint rules over a module.
 pub(crate) fn module(suite: &Suite, checker: &Checker) {
@@ -11,5 +11,8 @@ pub(crate) fn module(suite: &Suite, checker: &Checker) {
     }
     if checker.is_rule_enabled(Rule::InvalidFormatterSuppressionComment) {
         ruff::rules::ignored_formatter_suppression_comment(checker, suite);
+    }
+    if checker.is_rule_enabled(Rule::TypeCheckingBlockBeforeImports) {
+        flake8_type_checking::rules::type_checking_block_before_imports(checker, suite);
     }
 }

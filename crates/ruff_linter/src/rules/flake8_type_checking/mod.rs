@@ -19,6 +19,7 @@ mod tests {
 
     #[test_case(Rule::EmptyTypeCheckingBlock, Path::new("TC005.py"))]
     #[test_case(Rule::RuntimeCastValue, Path::new("TC006.py"))]
+    #[test_case(Rule::TypeCheckingBlockBeforeImports, Path::new("TC009.py"))]
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TC004_1.py"))]
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TC004_10.py"))]
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TC004_11.py"))]

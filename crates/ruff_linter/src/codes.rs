@@ -916,6 +916,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8TypeChecking, "006") => rules::flake8_type_checking::rules::RuntimeCastValue,
         (Flake8TypeChecking, "007") => rules::flake8_type_checking::rules::UnquotedTypeAlias,
         (Flake8TypeChecking, "008") => rules::flake8_type_checking::rules::QuotedTypeAlias,
+        (Flake8TypeChecking, "009") => rules::flake8_type_checking::rules::TypeCheckingBlockBeforeImports,
         (Flake8TypeChecking, "010") => rules::flake8_type_checking::rules::RuntimeStringUnion,
 
         // tryceratops
