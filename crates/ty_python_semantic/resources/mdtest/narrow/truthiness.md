@@ -48,21 +48,23 @@ else:
 
 ## Walrus Member Access
 
+We can narrow on an attribute expression, even when its base is a named expression:
+
 ```py
 class Foo:
     val: int | None
 
-def test() -> None:
-    foo1 = Foo()
-    if foo1.val:
-        reveal_type(foo1.val)  # revealed: int & ~AlwaysFalsy
+if (foo := Foo()).val:
+    reveal_type(foo.val)  # revealed: int & ~AlwaysFalsy
+```
 
-    foo0 = Foo()
-    foo0.val = None
-    reveal_type((foo0 := Foo()).val)  # revealed: int | None
+But we don't pick up stale narrowings from before the assignment in the named expression:
 
-    if (foo2 := Foo()).val:
-        reveal_type(foo2.val)  # revealed: int & ~AlwaysFalsy
+```py
+foo1 = Foo()
+foo1.val = None
+if (foo1 := Foo()).val:
+    reveal_type(foo1.val)  # revealed: int & ~AlwaysFalsy
 ```
 
 ## Function Literals
