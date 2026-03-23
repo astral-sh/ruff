@@ -26,6 +26,7 @@ Foo = NewType("Foo", int)
 Bar = NewType("Bar", Foo)
 
 static_assert(is_subtype_of(Foo, int))
+static_assert(is_subtype_of(Foo, int | None))
 static_assert(not is_equivalent_to(Foo, int))
 
 static_assert(is_subtype_of(Bar, Foo))
@@ -57,14 +58,23 @@ h(Bar(Foo(42)))
 FloatNewType = NewType("FloatNewType", float)
 
 static_assert(is_subtype_of(FloatNewType, float))
+static_assert(is_subtype_of(FloatNewType, FloatNewType | None))
 static_assert(is_subtype_of(Intersection[FloatNewType, AlwaysFalsy], float))
+static_assert(is_subtype_of(Intersection[FloatNewType, AlwaysFalsy], FloatNewType))
+static_assert(is_subtype_of(Intersection[FloatNewType, AlwaysFalsy], FloatNewType | None))
 static_assert(is_subtype_of(Intersection[FloatNewType, Not[AlwaysFalsy]], float))
+static_assert(is_subtype_of(Intersection[FloatNewType, Not[AlwaysFalsy]], FloatNewType))
+static_assert(is_subtype_of(Intersection[FloatNewType, Not[AlwaysFalsy]], FloatNewType | None))
 
 ComplexNewType = NewType("ComplexNewType", complex)
 
 static_assert(is_subtype_of(ComplexNewType, complex))
 static_assert(is_subtype_of(Intersection[ComplexNewType, AlwaysFalsy], complex))
+static_assert(is_subtype_of(Intersection[ComplexNewType, AlwaysFalsy], ComplexNewType))
+static_assert(is_subtype_of(Intersection[ComplexNewType, AlwaysFalsy], ComplexNewType | None))
 static_assert(is_subtype_of(Intersection[ComplexNewType, Not[AlwaysFalsy]], complex))
+static_assert(is_subtype_of(Intersection[ComplexNewType, Not[AlwaysFalsy]], ComplexNewType))
+static_assert(is_subtype_of(Intersection[ComplexNewType, Not[AlwaysFalsy]], ComplexNewType | None))
 static_assert(not is_assignable_to(ComplexNewType, float))
 static_assert(not is_assignable_to(Intersection[ComplexNewType, AlwaysFalsy], float))
 static_assert(not is_assignable_to(Intersection[ComplexNewType, Not[AlwaysFalsy]], float))
@@ -716,4 +726,38 @@ NT = NewType("NT", C)
 
 x = NT(C())
 reveal_type(x.copy())  # revealed: NT
+```
+
+## TypeVar solving for `NewType`s in combination with generic `Protocol`s
+
+In an early version of <https://github.com/astral-sh/ruff/pull/24109>, we revealed `F[Baz]` on the
+final line here, rather than `F[N]`:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import NewType, Protocol, overload
+
+class Foo: ...
+class Bar: ...
+class Baz: ...
+
+N = NewType("N", Baz)
+
+class I[T](Protocol):
+    def f(self) -> T: ...
+
+class F[T]:
+    @overload
+    def __new__(cls, xs: I[T | Foo]): ...
+    @overload
+    def __new__(cls, xs: I[T]): ...
+    def __new__(cls, xs):
+        raise NotImplementedError
+
+def taxa(xs: I[N]):
+    reveal_type(F(xs))  # revealed: F[N]
 ```
