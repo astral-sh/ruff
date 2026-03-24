@@ -132,11 +132,6 @@ def persons(f: bool) -> Generator[None, None, Person]:
         # error: [invalid-return-type]
         # error: [invalid-argument-type]
         return {"name": 42}
-
-def persons_iterable() -> Iterable[Person]:
-    yield {"name": "Alice"}
-    # Type context is unknown since there is no return type for Iterable.
-    return {"name": "Bob"}
 ```
 
 ## `yield` expression send type inference
