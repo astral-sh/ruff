@@ -75,11 +75,11 @@ impl StyledBuffer {
     /// If `line` does not exist in our buffer, adds empty lines up to the given
     /// and fills the last line with unstyled whitespace.
     pub(crate) fn puts(&mut self, line: usize, col: usize, string: &str, style: Style) {
-        let char_count = string.chars().count();
-        if char_count == 0 {
+        if string.is_empty() {
             return;
         }
         self.ensure_lines(line);
+        let char_count = string.chars().count();
         let needed = col + char_count;
         if needed > self.lines[line].len() {
             self.lines[line].resize(needed, StyledChar::SPACE);
