@@ -17,10 +17,6 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///
 /// `os.path.commonpath` correctly compares path components.
 ///
-/// Note that `os.path.commonprefix` is valid for non-path string
-/// comparisons (e.g., finding a common prefix among version numbers
-/// or identifiers). In such cases, this rule should be ignored.
-///
 /// `os.path.commonprefix` is deprecated as of Python 3.15.
 ///
 /// ## Example
@@ -51,9 +47,9 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///
 /// If you are intentionally using `commonprefix` for non-path string
 /// comparisons (e.g., finding a common prefix among arbitrary strings
-/// like version numbers or identifiers), ignore this rule using
-/// `# noqa: RUF071` or the [`lint.ruff.per-file-ignores`] configuration
-/// option.
+/// like version numbers or identifiers), see the
+/// [error suppression](https://docs.astral.sh/ruff/linter/#error-suppression)
+/// documentation for ways to disable this rule.
 ///
 /// For example:
 ///
@@ -62,7 +58,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///
 /// # commonprefix works on non-path strings
 /// os.path.commonprefix(["12345", "12378"])  # "123"
-/// os.path.commonpath(["12345", "12378"])    # raises ValueError
+/// os.path.commonpath(["12345", "12378"])    # ""
 /// ```
 ///
 /// ## References
