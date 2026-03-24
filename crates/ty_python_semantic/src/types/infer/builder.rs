@@ -7641,6 +7641,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 return (Place::Undefined, None);
             }
 
+            // A named expression can show up here when resolving the parent place of something
+            // like `(foo := bar()).baz`. It binds `foo`, but it is not a normal load site and
+            // therefore has no `ScopedUseId`, so resolve it from its binding definition instead.
+            if let ast::ExprRef::Named(named) = expr_ref {
+                let place = if named.target.is_name_expr() {
+                    let definition = self.index.expect_single_definition(named);
+                    Place::bound(binding_type(db, definition))
+                } else {
+                    Place::Undefined
+                };
+                return (place, None);
+            }
+
             let use_id = expr_ref.scoped_use_id(db, scope);
             let place = place_from_bindings(db, use_def.bindings_at_use(use_id)).place;
 
