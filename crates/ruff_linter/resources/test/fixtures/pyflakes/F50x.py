@@ -25,3 +25,30 @@ k = {}
 '%(k)s' % {**k}
 '%s' % [1, 2, 3]
 '%s' % {1, 2, 3}
+# F507: literal non-tuple RHS with multiple positional placeholders
+'%s %s' % 42  # F507
+'%s %s' % 3.14  # F507
+'%s %s' % "hello"  # F507
+'%s %s' % b"hello"  # F507
+'%s %s' % True  # F507
+'%s %s' % None  # F507
+'%s %s' % ...  # F507
+'%s %s' % f"hello {name}"  # F507
+# F507: ResolvedPythonType catches compound expressions with known types
+'%s %s' % -1  # F507 (unary op on int → int)
+'%s %s' % (1 + 2)  # F507 (int + int → int)
+'%s %s' % (not x)  # F507 (not → bool)
+'%s %s' % ("a" + "b")  # F507 (str + str → str)
+'%s %s' % (1 if True else 2)  # F507 (int if ... else int → int)
+# ok: single placeholder with literal RHS
+'%s' % 42
+'%s' % "hello"
+'%s' % True
+# ok: variables/expressions could be tuples at runtime
+'%s %s' % banana
+'%s %s' % obj.attr
+'%s %s' % arr[0]
+'%s %s' % get_args()
+# ok: ternary/binop where one branch could be a tuple → Unknown
+'%s %s' % (a if cond else b)
+'%s %s' % (a + b)
