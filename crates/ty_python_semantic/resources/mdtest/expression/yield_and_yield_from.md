@@ -266,3 +266,17 @@ def outer() -> Generator[int, str, None]:
     # error: [invalid-yield] "Send type `int` does not match annotated send type `str`"
     yield from inner()
 ```
+
+### Non generator function with `Generator` annotation
+
+<!-- snapshot-diagnostics -->
+
+```py
+from typing import Generator
+
+def non_gen() -> Generator[int, int, None]:
+    # error: [invalid-return-type]
+    return 1
+
+reveal_type(non_gen)  # revealed: def non_gen() -> Generator[int, int, None]
+```
