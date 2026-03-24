@@ -4606,9 +4606,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // For generator functions, the declared return type is e.g.
                     // `Generator[YieldType, SendType, ReturnType]`. The type context
                     // for a `return` statement should be the `ReturnType` type parameter
-                    let context_ty = return_ty
-                        .generator_return_type(self.db())
-                        .unwrap_or(return_ty);
+                    let file_scope_id = self.scope().file_scope_id(self.db());
+                    let context_ty = if file_scope_id.is_generator_function(self.index) {
+                        return_ty
+                            .generator_return_type(self.db())
+                            .unwrap_or(return_ty)
+                    } else {
+                        return_ty
+                    };
 
                     TypeContext::new(Some(context_ty))
                 })
