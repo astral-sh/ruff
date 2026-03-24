@@ -121,7 +121,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         .return_types_and_ranges
                         .iter()
                         .copied()
-                        .filter(|ty_range| !ty_range.ty.is_assignable_to(db, expected_return_ty))
+                        .filter(|actual_return_ty| !actual_return_ty.ty.is_assignable_to(db, expected_return_ty))
                     {
                         report_invalid_return_type(
                             &self.context,
