@@ -209,6 +209,7 @@ impl<'db> ConstructorBinding<'db> {
 
     pub(super) fn return_type(&self, db: &'db dyn Db) -> Type<'db> {
         let constructed_instance_type = self.constructed_instance_type();
+        let mut single_relevant_overload = None;
 
         // If any matched overload's signature return type, when resolved with the inferred
         // specialization, is a non-instance type (e.g. `__new__[S] -> S` with `S` inferred as
@@ -228,128 +229,61 @@ impl<'db> ConstructorBinding<'db> {
             // `__init__` is a post-construction validator and does not determine the
             // constructor return type.
             if !self.constructor_kind().is_init() {
-                let matching_overloads = callable
-                    .matching_overloads()
-                    .map(|(_, overload)| overload)
-                    .collect::<Vec<_>>();
-                let candidate_overloads = if matching_overloads.is_empty() {
-                    match callable.overloads() {
-                        [overload] => vec![overload],
-                        overloads if overloads.len() > 1 => {
-                            let has_instance_like_overload = overloads.iter().any(|overload| {
-                                overload_returns_instance(db, constructor_class_literal, overload)
-                            });
+                match analyze_constructor_overloads(db, constructor_class_literal, callable) {
+                    ConstructorOverloadAnalysis::AmbiguousUnmatched {
+                        has_instance_return: false,
+                    } => {
+                        // If none of the unmatched overloads could produce the constructed
+                        // instance, fall back to the overloaded callable result instead of
+                        // inventing an instance return.
+                        return self.entry.return_type();
+                    }
+                    ConstructorOverloadAnalysis::AmbiguousUnmatched {
+                        has_instance_return: true,
+                    } => {}
+                    ConstructorOverloadAnalysis::Relevant(relevant_overloads) => {
+                        single_relevant_overload = relevant_overloads.single_relevant_overload;
 
-                            // If none of the unmatched overloads could produce the constructed
-                            // instance, fall back to the overloaded callable result instead of
-                            // inventing an instance return.
-                            if !has_instance_like_overload {
-                                return self.entry.return_type();
+                        match relevant_overloads.return_kind {
+                            RelevantConstructorReturnKind::AllSameNonInstance(return_ty) => {
+                                return return_ty;
                             }
-
-                            Vec::new()
-                        }
-                        _ => Vec::new(),
-                    }
-                } else {
-                    matching_overloads
-                };
-
-                if !candidate_overloads.is_empty() {
-                    let mut saw_instance_return = false;
-                    let mut non_instance_returns = Vec::new();
-                    for overload in candidate_overloads {
-                        let outcome =
-                            constructor_return_outcome(db, constructor_class_literal, overload);
-                        let is_unknown_like = outcome.resolved_return.is_unknown()
-                            || (outcome.resolved_return.has_typevar(db)
-                                && outcome.resolved_return.as_nominal_instance().is_none());
-                        if is_unknown_like {
-                            saw_instance_return = true;
-                            continue;
-                        }
-
-                        let is_simple_instance_return = outcome
-                            .resolved_return
-                            .as_nominal_instance()
-                            .is_some_and(|instance| {
-                                is_subtype_of_class_literal(
-                                    db,
-                                    instance.class(db),
-                                    constructor_class_literal,
-                                )
-                            });
-                        if is_simple_instance_return {
-                            saw_instance_return = true;
-                        } else {
-                            non_instance_returns.push(outcome.resolved_return);
-                        }
-                    }
-
-                    if !saw_instance_return {
-                        let Some(first_non_instance_return) = non_instance_returns.first().copied()
-                        else {
-                            return self.combine_constructor_return_type(db);
-                        };
-                        if matches!(first_non_instance_return, Type::Dynamic(DynamicType::Any))
-                            && callable.matching_overloads().next().is_none()
-                            && let Some(downstream) = self.downstream_constructor()
-                            && !self.constructor_kind().is_metaclass_call()
-                        {
-                            return downstream.bindings.return_type(db);
-                        }
-                        if non_instance_returns
-                            .iter()
-                            .all(|return_ty| *return_ty == first_non_instance_return)
-                        {
-                            return first_non_instance_return;
-                        }
-                        return Type::unknown();
-                    }
-
-                    // For layered mixed-constructor handling (metaclass `__call__` mixed with
-                    // downstream constructor logic), if the downstream constructor resolves to a
-                    // non-instance return, that becomes the effective constructor return.
-                    if let Some(downstream) = self.checkable_downstream_constructor(db) {
-                        let downstream_return = downstream.bindings.return_type(db);
-                        if !is_instance_of_constructor(downstream_return) {
-                            return downstream_return;
+                            RelevantConstructorReturnKind::DivergentNonInstance => {
+                                return Type::unknown();
+                            }
+                            RelevantConstructorReturnKind::AllInstance
+                            | RelevantConstructorReturnKind::Mixed => {
+                                // For layered mixed-constructor handling (metaclass `__call__`
+                                // mixed with downstream constructor logic), if the downstream
+                                // constructor resolves to a non-instance return, that becomes the
+                                // effective constructor return.
+                                if let Some(downstream) = self.checkable_downstream_constructor(db)
+                                {
+                                    let downstream_return = downstream.bindings.return_type(db);
+                                    if !is_instance_of_constructor(downstream_return) {
+                                        return downstream_return;
+                                    }
+                                }
+                            }
                         }
                     }
                 }
             }
         }
 
-        // Preserve explicit strict-subclass constructor returns, e.g. constructing `C` from
-        // `__new__ -> D` where `D` is a subclass of `C`.
-        if let Some(constructor_class) = constructor_class {
-            let constructor_class_literal = constructor_class.class_literal(db);
-            let callable = self.callable();
-            let mut matching_overloads = callable.matching_overloads();
-            if !self.constructor_kind().is_init()
-                && let Some((_, overload)) = matching_overloads.next()
-                && matching_overloads.next().is_none()
+        let combined_return = self.combine_constructor_return_type(db);
+        if let (Some(constructor_class_literal), Some(overload)) =
+            (constructor_class_literal, single_relevant_overload)
+        {
+            let outcome = constructor_return_outcome(db, constructor_class_literal, overload);
+            if outcome.kind.is_instance()
+                && outcome.resolved_return.is_subtype_of(db, combined_return)
             {
-                let sig_return = overload.signature.return_ty;
-                if !sig_return.has_typevar(db)
-                    && !sig_return.is_unknown()
-                    && let Some(returned_instance) = sig_return.as_nominal_instance()
-                {
-                    let returned_class = returned_instance.class(db);
-                    if returned_class.class_literal(db) != constructor_class_literal
-                        && is_subtype_of_class_literal(
-                            db,
-                            returned_class,
-                            constructor_class_literal,
-                        )
-                    {
-                        return sig_return;
-                    }
-                }
+                return outcome.resolved_return;
             }
         }
 
-        self.combine_constructor_return_type(db)
+        combined_return
     }
 
     fn constructor_kind(&self) -> ConstructorCallableKind {
@@ -567,6 +501,26 @@ struct ConstructorReturnOutcome<'db> {
     kind: ConstructorReturnKind,
 }
 
+#[derive(Debug, Clone, Copy)]
+enum RelevantConstructorReturnKind<'db> {
+    AllInstance,
+    AllSameNonInstance(Type<'db>),
+    DivergentNonInstance,
+    Mixed,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct RelevantConstructorOverloads<'a, 'db> {
+    single_relevant_overload: Option<&'a Binding<'db>>,
+    return_kind: RelevantConstructorReturnKind<'db>,
+}
+
+#[derive(Debug, Clone, Copy)]
+enum ConstructorOverloadAnalysis<'a, 'db> {
+    Relevant(RelevantConstructorOverloads<'a, 'db>),
+    AmbiguousUnmatched { has_instance_return: bool },
+}
+
 /// Return `true` if `class_ty` is a subtype of (any specialization of) `class_literal`.
 fn is_subtype_of_class_literal<'db>(
     db: &'db dyn Db,
@@ -647,6 +601,91 @@ fn overload_returns_instance<'db>(
     constructor_return_outcome(db, class_literal, overload)
         .kind
         .is_instance()
+}
+
+fn analyze_relevant_constructor_overloads<'a, 'db, I>(
+    db: &'db dyn Db,
+    class_literal: ClassLiteral<'db>,
+    overloads: I,
+) -> Option<RelevantConstructorOverloads<'a, 'db>>
+where
+    I: IntoIterator<Item = &'a Binding<'db>>,
+{
+    let mut overloads = overloads.into_iter();
+    let first_overload = overloads.next()?;
+    let first_outcome = constructor_return_outcome(db, class_literal, first_overload);
+
+    let mut single_relevant_overload = Some(first_overload);
+    let mut saw_instance_return = first_outcome.kind.is_instance();
+    let mut first_non_instance_return =
+        (!first_outcome.kind.is_instance()).then_some(first_outcome.resolved_return);
+    let mut saw_distinct_non_instance_return = false;
+
+    for overload in overloads {
+        single_relevant_overload = None;
+
+        let outcome = constructor_return_outcome(db, class_literal, overload);
+        if outcome.kind.is_instance() {
+            saw_instance_return = true;
+        } else if let Some(first_non_instance_return) = first_non_instance_return {
+            saw_distinct_non_instance_return |=
+                outcome.resolved_return != first_non_instance_return;
+        } else {
+            first_non_instance_return = Some(outcome.resolved_return);
+        }
+    }
+
+    let return_kind = match (saw_instance_return, first_non_instance_return) {
+        (true, Some(_)) => RelevantConstructorReturnKind::Mixed,
+        (true, None) => RelevantConstructorReturnKind::AllInstance,
+        (false, Some(_)) if saw_distinct_non_instance_return => {
+            RelevantConstructorReturnKind::DivergentNonInstance
+        }
+        (false, Some(first_non_instance_return)) => {
+            RelevantConstructorReturnKind::AllSameNonInstance(first_non_instance_return)
+        }
+        (false, None) => RelevantConstructorReturnKind::AllInstance,
+    };
+
+    Some(RelevantConstructorOverloads {
+        single_relevant_overload,
+        return_kind,
+    })
+}
+
+fn analyze_constructor_overloads<'a, 'db>(
+    db: &'db dyn Db,
+    class_literal: ClassLiteral<'db>,
+    callable: &'a CallableBinding<'db>,
+) -> ConstructorOverloadAnalysis<'a, 'db> {
+    let mut matching_overloads = callable.matching_overloads().map(|(_, overload)| overload);
+
+    if let Some(first_matching_overload) = matching_overloads.next()
+        && let Some(relevant_overloads) = analyze_relevant_constructor_overloads(
+            db,
+            class_literal,
+            std::iter::once(first_matching_overload).chain(matching_overloads),
+        )
+    {
+        return ConstructorOverloadAnalysis::Relevant(relevant_overloads);
+    }
+
+    match callable.overloads() {
+        [overload] => {
+            analyze_relevant_constructor_overloads(db, class_literal, std::iter::once(overload))
+                .map_or(
+                    ConstructorOverloadAnalysis::AmbiguousUnmatched {
+                        has_instance_return: false,
+                    },
+                    ConstructorOverloadAnalysis::Relevant,
+                )
+        }
+        overloads => ConstructorOverloadAnalysis::AmbiguousUnmatched {
+            has_instance_return: overloads
+                .iter()
+                .any(|overload| overload_returns_instance(db, class_literal, overload)),
+        },
+    }
 }
 
 impl<'db> Binding<'db> {

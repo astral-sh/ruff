@@ -610,9 +610,8 @@ class C[T]:
 
 # error: [missing-argument]
 reveal_type(C())  # revealed: C[int]
-# TODO `C[int]` might be better here?
 # error: [missing-argument]
-reveal_type(C[str]())  # revealed: C[int | str]
+reveal_type(C[str]())  # revealed: C[int]
 # error: [missing-argument]
 reveal_type(C[int]())  # revealed: C[int]
 ```
