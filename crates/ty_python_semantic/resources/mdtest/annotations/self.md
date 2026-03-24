@@ -639,8 +639,13 @@ class C[T: Base]:
 # Calling a method on a specialized instance should not produce an error
 C[Base]().g()
 
+BaseNewType = NewType("BaseNewType", Base)
+
+C[BaseNewType]().g()
+
 # Test with a NewType bound
 K = NewType("K", int)
+K2 = NewType("K2", K)
 
 class D[T: K]:
     x: T
@@ -650,6 +655,30 @@ class D[T: K]:
 
 # Calling a method on a specialized instance should not produce an error
 D[K]().h()
+D[K2]().h()
+
+# Test with a union-NewType bound
+K3 = NewType("K3", float)
+K4 = NewType("K4", K3)
+
+class D2[T: K3]:
+    x: T
+
+    def h(self) -> None:
+        pass
+
+# Calling a method on a specialized instance should not produce an error
+D2[K3]().h()
+D2[K4]().h()
+
+class D3[T: float]:
+    x: T
+
+    def h(self) -> None:
+        pass
+
+D3[K3]().h()
+D3[K4]().h()
 ```
 
 ## Protocols

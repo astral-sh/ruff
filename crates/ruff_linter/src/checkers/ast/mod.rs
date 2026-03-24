@@ -1461,7 +1461,10 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 }
 
                 self.semantic.set_branch(branch);
+                let flags_snapshot = self.semantic.flags;
+                self.semantic.flags |= SemanticModelFlags::ORELSE;
                 self.visit_body(orelse);
+                self.semantic.flags = flags_snapshot;
                 self.semantic.pop_branch();
 
                 self.semantic.push_branch();
@@ -1557,7 +1560,27 @@ impl<'a> Visitor<'a> for Checker<'a> {
             }) => {
                 self.visit_boolean_test(test);
                 self.visit_body(body);
+                let flags_snapshot = self.semantic.flags;
+                self.semantic.flags |= SemanticModelFlags::ORELSE;
                 self.visit_body(orelse);
+                self.semantic.flags = flags_snapshot;
+            }
+            Stmt::For(ast::StmtFor {
+                node_index: _,
+                range: _,
+                is_async: _,
+                target,
+                iter,
+                body,
+                orelse,
+            }) => {
+                self.visit_expr(iter);
+                self.visit_expr(target);
+                self.visit_body(body);
+                let flags_snapshot = self.semantic.flags;
+                self.semantic.flags |= SemanticModelFlags::ORELSE;
+                self.visit_body(orelse);
+                self.semantic.flags = flags_snapshot;
             }
             Stmt::If(
                 stmt_if @ ast::StmtIf {
@@ -1786,7 +1809,10 @@ impl<'a> Visitor<'a> for Checker<'a> {
             }) => {
                 self.visit_boolean_test(test);
                 self.visit_expr(body);
+                let flags_snapshot = self.semantic.flags;
+                self.semantic.flags |= SemanticModelFlags::ORELSE;
                 self.visit_expr(orelse);
+                self.semantic.flags = flags_snapshot;
             }
             Expr::UnaryOp(ast::ExprUnaryOp {
                 op: UnaryOp::Not,
@@ -2866,7 +2892,10 @@ impl<'a> Checker<'a> {
 
         self.semantic.resolve_del(id, expr.range());
 
-        if helpers::on_conditional_branch(&mut self.semantic.current_statements()) {
+        if helpers::on_conditional_branch(&mut self.semantic.current_statements())
+            || self.semantic.in_exception_handler()
+            || self.semantic.in_orelse()
+        {
             return;
         }
 

@@ -597,6 +597,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             .visit((source, target, self.relation), work)
     }
 
+    /// Return a constraint set indicating the conditions under which `self.relation` holds between `source` and `target`.
     pub(super) fn check_type_pair(
         &self,
         db: &'db dyn Db,
@@ -900,50 +901,6 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             (Type::NewTypeInstance(source_newtype), Type::NewTypeInstance(target_newtype)) => {
                 self.check_newtype_pair(db, source_newtype, target_newtype)
             }
-            // In the special cases of `NewType`s of `float` or `complex`, the concrete base type
-            // can be a union (`int | float` or `int | float | complex`). For that reason,
-            // `NewType` assignability to a union needs to consider two different cases. It could
-            // be that we need to treat the `NewType` as the underlying union it's assignable to,
-            // for example:
-            //
-            // ```py
-            // Foo = NewType("Foo", float)
-            // static_assert(is_assignable_to(Foo, float | None))
-            // ```
-            //
-            // The right side there is equivalent to `int | float | None`, but `Foo` as a whole
-            // isn't assignable to any of those three types. However, `Foo`s concrete base type is
-            // `int | float`, which is assignable, because union members on the left side get
-            // checked individually. On the other hand, we need to be careful not to break the
-            // following case, where `int | float` is *not* assignable to the right side:
-            //
-            // ```py
-            // static_assert(is_assignable_to(Foo, Foo | None))
-            // ```
-            //
-            // To handle both cases, we have to check that *either* `Foo` as a whole is assignable
-            // (or subtypeable etc.) *or* that its concrete base type is. Note that this match arm
-            // needs to take precedence over the `Type::Union` arms immediately below.
-            (Type::NewTypeInstance(source_newtype), Type::Union(union)) => {
-                // First the normal "assign to union" case, unfortunately duplicated from below.
-                union
-                    .elements(db)
-                    .iter()
-                    .when_any(db, self.constraints, |&elem_ty| {
-                        self.check_type_pair(db, source, elem_ty)
-                    })
-                    // Failing that, if the concrete base type is a union, try delegating to that.
-                    // Otherwise, this would be equivalent to what we just checked, and we
-                    // shouldn't waste time checking it twice.
-                    .or(db, self.constraints, || {
-                        let concrete_base = source_newtype.concrete_base_type(db);
-                        if matches!(concrete_base, Type::Union(_)) {
-                            self.check_type_pair(db, concrete_base, target)
-                        } else {
-                            self.never()
-                        }
-                    })
-            }
 
             (Type::Union(union), _) => {
                 union
@@ -954,14 +911,46 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     })
             }
 
-            (_, Type::Union(union)) => {
-                union
-                    .elements(db)
-                    .iter()
-                    .when_any(db, self.constraints, |&elem_ty| {
-                        self.check_type_pair(db, source, elem_ty)
-                    })
-            }
+            (_, Type::Union(union)) => union
+                .elements(db)
+                .iter()
+                .when_any(db, self.constraints, |&elem_ty| {
+                    self.check_type_pair(db, source, elem_ty)
+                })
+                .or(db, self.constraints, || {
+                    // Normally non-unions cannot directly contain unions in our model due to the fact that we
+                    // enforce a DNF structure on our set-theoretic types. However, it *is* possible for there
+                    // to be a newtype of a union, or for an intersection to contain a newtype of a union; this
+                    // requires special handling.
+                    match source {
+                        Type::Intersection(intersection) => {
+                            if intersection.positive(db).iter().any(|&element| {
+                                element.as_new_type().is_some_and(|newtype| {
+                                    newtype.concrete_base_type(db).is_union()
+                                })
+                            }) {
+                                let mapped = intersection.map_positive(db, |&t| match t {
+                                    Type::NewTypeInstance(newtype) => {
+                                        newtype.concrete_base_type(db)
+                                    }
+                                    _ => t,
+                                });
+                                self.check_type_pair(db, mapped, target)
+                            } else {
+                                self.never()
+                            }
+                        }
+                        Type::NewTypeInstance(newtype) => {
+                            let concrete_base = newtype.concrete_base_type(db);
+                            if concrete_base.is_union() {
+                                self.check_type_pair(db, concrete_base, target)
+                            } else {
+                                self.never()
+                            }
+                        }
+                        _ => self.never(),
+                    }
+                }),
 
             // If both sides are intersections we need to handle the right side first
             // (A & B & C) is a subtype of (A & B) because the left is a subtype of both A and B,
@@ -1038,28 +1027,18 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 self.never()
             }
 
-            (_, Type::TypeVar(typevar))
-                if typevar.is_inferable(db, self.inferable)
-                    && self.relation.is_assignability()
-                    && typevar.typevar(db).upper_bound(db).is_none_or(|bound| {
-                        !self
-                            .check_type_pair(db, source, bound)
-                            .is_never_satisfied(db)
-                    }) =>
-            {
-                // TODO: record the unification constraints
-
-                typevar
-                    .typevar(db)
-                    .upper_bound(db)
-                    .when_none_or(db, self.constraints, |bound| {
-                        self.check_type_pair(db, source, bound)
-                    })
-            }
-
             // TODO: Infer specializations here
-            (_, Type::TypeVar(bound_typevar)) if bound_typevar.is_inferable(db, self.inferable) => {
-                self.never()
+            (_, Type::TypeVar(typevar)) if typevar.is_inferable(db, self.inferable) => {
+                if self.relation.is_assignability() {
+                    // TODO: record the unification constraints
+                    typevar.typevar(db).upper_bound(db).when_none_or(
+                        db,
+                        self.constraints,
+                        |bound| self.check_type_pair(db, source, bound),
+                    )
+                } else {
+                    self.never()
+                }
             }
             (Type::TypeVar(bound_typevar), _) => {
                 // All inferable cases should have been handled above

@@ -1048,8 +1048,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
                 match pred.node {
                     PredicateNode::Expression(expression) => {
-                        let module = self.module;
-                        let expression_node = expression.node_ref(self.db, module);
+                        let expression_node = expression.node_ref(self.db).node(self.module);
                         PossiblyNarrowedPlacesBuilder::new(self.db, place_table)
                             .expression(expression_node)
                     }

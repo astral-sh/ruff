@@ -61,22 +61,23 @@ use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::context::InferContext;
 use crate::types::diagnostic::{
     self, CALL_NON_CALLABLE, CONFLICTING_DECLARATIONS, CYCLIC_CLASS_DEFINITION,
-    CYCLIC_TYPE_ALIAS_DEFINITION, DUPLICATE_BASE, INCONSISTENT_MRO, INEFFECTIVE_FINAL,
-    INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, INVALID_BASE,
-    INVALID_DECLARATION, INVALID_ENUM_MEMBER_ANNOTATION, INVALID_LEGACY_TYPE_VARIABLE,
-    INVALID_NEWTYPE, INVALID_PARAMSPEC, INVALID_TYPE_ALIAS_TYPE, INVALID_TYPE_FORM,
-    INVALID_TYPE_GUARD_CALL, INVALID_TYPE_VARIABLE_BOUND, INVALID_TYPE_VARIABLE_CONSTRAINTS,
-    IncompatibleBases, NO_MATCHING_OVERLOAD, POSSIBLY_MISSING_IMPLICIT_CALL,
-    POSSIBLY_MISSING_SUBMODULE, SUBCLASS_OF_FINAL_CLASS, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE,
-    UNRESOLVED_GLOBAL, UNRESOLVED_REFERENCE, UNSUPPORTED_DYNAMIC_BASE, UNSUPPORTED_OPERATOR,
-    UNUSED_AWAITABLE, hint_if_stdlib_attribute_exists_on_other_versions,
-    report_attempted_protocol_instantiation, report_bad_dunder_set_call,
-    report_call_to_abstract_method, report_cannot_pop_required_field_on_typed_dict,
-    report_conflicting_metaclass_from_bases, report_instance_layout_conflict,
-    report_invalid_assignment, report_invalid_attribute_assignment,
-    report_invalid_class_match_pattern, report_invalid_exception_caught,
-    report_invalid_exception_cause, report_invalid_exception_raised,
-    report_invalid_exception_tuple_caught, report_invalid_key_on_typed_dict,
+    CYCLIC_TYPE_ALIAS_DEFINITION, DUPLICATE_BASE, GeneratorMismatchKind, INCONSISTENT_MRO,
+    INEFFECTIVE_FINAL, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS,
+    INVALID_BASE, INVALID_DECLARATION, INVALID_ENUM_MEMBER_ANNOTATION,
+    INVALID_LEGACY_TYPE_VARIABLE, INVALID_NEWTYPE, INVALID_PARAMSPEC, INVALID_TYPE_ALIAS_TYPE,
+    INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL, INVALID_TYPE_VARIABLE_BOUND,
+    INVALID_TYPE_VARIABLE_CONSTRAINTS, IncompatibleBases, NO_MATCHING_OVERLOAD,
+    POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_SUBMODULE, SUBCLASS_OF_FINAL_CLASS,
+    UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_REFERENCE,
+    UNSUPPORTED_DYNAMIC_BASE, UNSUPPORTED_OPERATOR, UNUSED_AWAITABLE,
+    hint_if_stdlib_attribute_exists_on_other_versions, report_attempted_protocol_instantiation,
+    report_bad_dunder_set_call, report_call_to_abstract_method,
+    report_cannot_pop_required_field_on_typed_dict, report_conflicting_metaclass_from_bases,
+    report_instance_layout_conflict, report_invalid_assignment,
+    report_invalid_attribute_assignment, report_invalid_class_match_pattern,
+    report_invalid_exception_caught, report_invalid_exception_cause,
+    report_invalid_exception_raised, report_invalid_exception_tuple_caught,
+    report_invalid_generator_yield_type, report_invalid_key_on_typed_dict,
     report_invalid_type_checking_constant,
     report_match_pattern_against_non_runtime_checkable_protocol,
     report_match_pattern_against_typed_dict, report_possibly_missing_attribute,
@@ -866,10 +867,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         match expression.kind(self.db()) {
             ExpressionKind::Normal => {
-                self.infer_expression_impl(expression.node_ref(self.db(), self.module()), tcx);
+                self.infer_expression_impl(expression.node_ref(self.db()).node(self.module()), tcx);
             }
             ExpressionKind::TypeExpression => {
-                self.infer_type_expression(expression.node_ref(self.db(), self.module()));
+                self.infer_type_expression(expression.node_ref(self.db()).node(self.module()));
             }
         }
     }
@@ -6468,12 +6469,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             //  but only if the target is a name. We should report a diagnostic here if the target isn't a name:
             //  `[... for a.x in not_iterable]
             if is_first {
-                infer_same_file_expression_type(
-                    builder.db(),
-                    builder.index.expression(iter),
-                    tcx,
-                    builder.module(),
-                )
+                infer_same_file_expression_type(builder.db(), builder.index.expression(iter), tcx)
             } else {
                 builder.infer_maybe_standalone_expression(iter, tcx)
             }
@@ -7297,8 +7293,45 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             node_index: _,
             value,
         } = yield_expression;
-        self.infer_optional_expression(value.as_deref(), TypeContext::default());
-        todo_type!("yield expressions")
+        let Some(enclosing_function) =
+            nearest_enclosing_function(self.db(), self.index, self.scope())
+        else {
+            let _ = self.infer_optional_expression(value.as_deref(), TypeContext::default());
+            return Type::unknown();
+        };
+        let declared_return_ty = enclosing_function
+            .last_definition_raw_signature(self.db())
+            .return_ty;
+        let return_type_span = enclosing_function.spans(self.db()).return_type;
+
+        let Some(generator_type_params) = declared_return_ty.generator_types(self.db()) else {
+            let _ = self.infer_optional_expression(value.as_deref(), TypeContext::default());
+            return Type::unknown();
+        };
+
+        let expected_yield_ty = generator_type_params.yield_ty;
+        let tcx = TypeContext::new(expected_yield_ty);
+        let yielded_ty = self
+            .infer_optional_expression(value.as_deref(), tcx)
+            .unwrap_or_else(|| Type::none(self.db()));
+        let diagnostic_node: AnyNodeRef = value
+            .as_deref()
+            .map_or_else(|| yield_expression.into(), AnyNodeRef::from);
+
+        if let Some(expected_yield_ty) = expected_yield_ty
+            && !yielded_ty.is_assignable_to(self.db(), expected_yield_ty)
+        {
+            report_invalid_generator_yield_type(
+                &self.context,
+                diagnostic_node,
+                return_type_span,
+                expected_yield_ty,
+                yielded_ty,
+                GeneratorMismatchKind::YieldType,
+            );
+        }
+
+        generator_type_params.send_ty.unwrap_or_else(Type::unknown)
     }
 
     fn infer_yield_from_expression(&mut self, yield_from: &ast::ExprYieldFrom) -> Type<'db> {
@@ -7308,14 +7341,63 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             value,
         } = yield_from;
 
-        let iterable_type = self.infer_expression(value, TypeContext::default());
-        iterable_type
+        let Some(enclosing_function) =
+            nearest_enclosing_function(self.db(), self.index, self.scope())
+        else {
+            let _ = self.infer_expression(value, TypeContext::default());
+            return Type::unknown();
+        };
+        let annotated_return_ty = enclosing_function
+            .last_definition_raw_signature(self.db())
+            .return_ty;
+
+        let Some(outer_expected) = annotated_return_ty.generator_types(self.db()) else {
+            let _ = self.infer_expression(value, TypeContext::default());
+            return Type::unknown();
+        };
+        let return_type_span = enclosing_function.spans(self.db()).return_type;
+
+        let tcx = TypeContext::new(outer_expected.yield_ty.map(|yielded_ty| {
+            KnownClass::Iterable.to_specialized_instance(self.db(), &[yielded_ty])
+        }));
+        let iterable_type = self.infer_expression(value, tcx);
+
+        let inner_yield_ty = iterable_type
             .try_iterate(self.db())
             .map(|tuple| tuple.homogeneous_element_type(self.db()))
             .unwrap_or_else(|err| {
                 err.report_diagnostic(&self.context, iterable_type, value.as_ref().into());
                 err.fallback_element_type(self.db())
             });
+
+        if let Some(outer_yield_ty) = outer_expected.yield_ty
+            && !inner_yield_ty.is_assignable_to(self.db(), outer_yield_ty)
+        {
+            report_invalid_generator_yield_type(
+                &self.context,
+                value.as_ref(),
+                return_type_span.clone(),
+                outer_yield_ty,
+                inner_yield_ty,
+                GeneratorMismatchKind::YieldType,
+            );
+        }
+
+        if let Some(outer_send_ty) = outer_expected.send_ty {
+            let inner_send_ty = iterable_type
+                .generator_send_type(self.db())
+                .unwrap_or_else(|| Type::none(self.db()));
+            if !outer_send_ty.is_assignable_to(self.db(), inner_send_ty) {
+                report_invalid_generator_yield_type(
+                    &self.context,
+                    value.as_ref(),
+                    return_type_span,
+                    outer_send_ty,
+                    inner_send_ty,
+                    GeneratorMismatchKind::SendType,
+                );
+            }
+        }
 
         iterable_type
             .generator_return_type(self.db())
