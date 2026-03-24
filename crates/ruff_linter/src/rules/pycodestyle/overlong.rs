@@ -139,11 +139,12 @@ impl<'a> StrippedLine<'a> {
                 // Strip only the pragma suffix from the comment, preserving any
                 // preceding non-pragma comment text.
                 let pragma_start = usize::from(comment_range.start()) + offset;
-                let prefix = &line.as_str()[..pragma_start].trim_end();
+                let prefix = line[..pragma_start].trim_end();
                 return Self::WithoutPragma(Line::new(prefix, line.start()));
             }
-        } else if is_pragma_comment(comment) {
-            // Stable behavior: only strip when the entire comment is a pragma.
+        }
+        // Stable behavior: only strip when the entire comment is a pragma.
+        else if is_pragma_comment(comment) {
             let prefix = &line.as_str()[..usize::from(comment_range.start())].trim_end();
             return Self::WithoutPragma(Line::new(prefix, line.start()));
         }

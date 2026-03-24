@@ -26,6 +26,7 @@ pub(crate) const fn is_fluent_layout_split_first_call_enabled(context: &PyFormat
 /// is enabled.
 /// When enabled, comments like `# text # noqa: F401` only reserve width for
 /// the non-pragma prefix (`# text`), not the trailing pragma.
+/// Make sure to stabilize the corresponding linter preview behavior when stabilizing this preview style.
 pub(crate) const fn is_trailing_pragma_in_comment_width_enabled(context: &PyFormatContext) -> bool {
     context.is_preview()
 }

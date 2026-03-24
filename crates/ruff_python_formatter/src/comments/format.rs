@@ -381,31 +381,23 @@ impl Format<PyFormatContext<'_>> for FormatTrailingEndOfLineComment<'_> {
         // Don't reserve width for pragma comments. In preview, comments
         // containing a trailing pragma (e.g., `# comment # noqa: F401`) only
         // reserve width for the non-pragma prefix.
-        let reserved_width = if is_trailing_pragma_in_comment_width_enabled(f.context()) {
+        let non_pragma_comment_part = if is_trailing_pragma_in_comment_width_enabled(f.context()) {
             match find_trailing_pragma_offset(&normalized_comment) {
-                Some(0) => 0,
-                Some(offset) => {
-                    let prefix = normalized_comment[..offset].trim_end();
-                    2u32.saturating_add(
-                        TextWidth::from_text(prefix, f.options().indent_width())
-                            .width()
-                            .expect("Expected comment not to contain any newlines")
-                            .value(),
-                    )
-                }
-                None => 2u32.saturating_add(
-                    TextWidth::from_text(&normalized_comment, f.options().indent_width())
-                        .width()
-                        .expect("Expected comment not to contain any newlines")
-                        .value(),
-                ),
+                Some(offset) => normalized_comment[..offset].trim_end(),
+                None => &normalized_comment,
             }
         } else if is_pragma_comment(&normalized_comment) {
+            ""
+        } else {
+            &normalized_comment
+        };
+
+        let reserved_width = if non_pragma_comment_part.is_empty() {
             0
         } else {
             // Start with 2 because of the two leading spaces.
             2u32.saturating_add(
-                TextWidth::from_text(&normalized_comment, f.options().indent_width())
+                TextWidth::from_text(non_pragma_comment_part, f.options().indent_width())
                     .width()
                     .expect("Expected comment not to contain any newlines")
                     .value(),

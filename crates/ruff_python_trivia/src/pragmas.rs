@@ -45,22 +45,12 @@ pub fn is_pragma_comment(comment: &str) -> bool {
 /// assert_eq!(ruff_python_trivia::find_trailing_pragma_offset("# just a comment"), None);
 /// ```
 pub fn find_trailing_pragma_offset(comment: &str) -> Option<usize> {
-    // Check if the entire comment is a pragma.
-    if is_pragma_comment(comment) {
-        return Some(0);
-    }
-
-    // Look for nested pragma comments by finding subsequent `#` characters
-    // after the initial one.
-    let content = comment.strip_prefix('#')?;
-
-    for (i, _) in content.match_indices('#') {
-        let sub_comment = &content[i..];
+    comment.match_indices('#').find_map(|(offset, _)| {
+        let sub_comment = &comment[offset..];
         if is_pragma_comment(sub_comment) {
-            // +1 accounts for the initial `#` we stripped.
-            return Some(i + 1);
+            Some(offset)
+        } else {
+            None
         }
-    }
-
-    None
+    })
 }
