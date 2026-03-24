@@ -106,7 +106,8 @@ use crate::types::visitor::{
     TypeCollector, TypeVisitor, any_over_type, walk_type_with_recursion_guard,
 };
 use crate::types::{
-    BoundTypeVarInstance, IntersectionType, Type, TypeVarBoundOrConstraints, UnionType,
+    BoundTypeVarInstance, IntersectionType, Type, TypeVarBoundOrConstraints, TypeVarVariance,
+    UnionType,
 };
 use crate::{Db, FxIndexMap, FxIndexSet};
 
@@ -337,6 +338,14 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
     /// neither bound _is_ a typevar. And it's not something we can create a specialization from,
     /// since we would endlessly substitute until we stack overflow.
     pub(crate) fn is_cyclic(self, db: &'db dyn Db) -> bool {
+        self.is_cyclic_impl(db, None)
+    }
+
+    fn is_cyclic_impl(
+        self,
+        db: &'db dyn Db,
+        inferable: Option<InferableTypeVars<'_, 'db>>,
+    ) -> bool {
         #[derive(Default)]
         struct CollectReachability<'db> {
             reachable_typevars: RefCell<FxHashSet<BoundTypeVarIdentity<'db>>>,
@@ -403,21 +412,33 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
             false
         }
 
-        // First find all of the typevars that each constraint directly mentions.
+        // First find all of the typevars that each constraint directly mentions. When `inferable`
+        // is provided, only include inferable typevars as sources and targets in the graph.
         let mut reachable_typevars: FxHashMap<
             BoundTypeVarIdentity<'db>,
             FxHashSet<BoundTypeVarIdentity<'db>>,
         > = FxHashMap::default();
         self.node
             .for_each_constraint(self.builder, &mut |constraint, _| {
-                let visitor = CollectReachability::default();
                 let constraint = self.builder.constraint_data(constraint);
+                let identity = constraint.typevar.identity(db);
+                if inferable.is_some_and(|inferable| !identity.is_inferable(inferable)) {
+                    return;
+                }
+                let visitor = CollectReachability::default();
                 visitor.visit_type(db, constraint.lower);
                 visitor.visit_type(db, constraint.upper);
-                reachable_typevars
-                    .entry(constraint.typevar.identity(db))
-                    .or_default()
-                    .extend(visitor.reachable_typevars.into_inner());
+                let reachable = visitor.reachable_typevars.into_inner();
+                let entry = reachable_typevars.entry(identity).or_default();
+                if let Some(inferable) = inferable {
+                    entry.extend(
+                        reachable
+                            .into_iter()
+                            .filter(|tv| tv.is_inferable(inferable)),
+                    );
+                } else {
+                    entry.extend(reachable);
+                }
             });
 
         // Then perform a depth-first search to see if there are any cycles.
@@ -597,7 +618,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         self,
         db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
-    ) -> Solutions<'db, 'c> {
+    ) -> Solutions<Ref<'c, Vec<Solution<'db>>>> {
         self.verify_builder(builder);
 
         // If the constraint set is cyclic, we'll hit an infinite expansion when trying to add type
@@ -607,6 +628,40 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         }
 
         self.node.solutions(db, builder)
+    }
+
+    /// Computes solutions for each BDD path, using a caller-provided hook to select solutions.
+    ///
+    /// We only consider cycles among inferable typevars. Non-inferable typevars (e.g., from outer
+    /// scopes that appear due to BDD constraint reordering) are skipped during both cycle
+    /// detection and solution extraction.
+    ///
+    /// The `choose` hook is called for each typevar on each BDD path with the typevar's
+    /// materialized lower and upper bounds. It returns:
+    /// - `Some(ty)` to use `ty` as the solution for this typevar on this path
+    /// - `None` to fall back to the default solution selection logic
+    ///
+    /// For multi-path BDDs, the hook is called per-path. The caller is responsible for combining
+    /// results across paths (typically via union).
+    pub(crate) fn solutions_with_inferable(
+        self,
+        db: &'db dyn Db,
+        builder: &'c ConstraintSetBuilder<'db>,
+        inferable: InferableTypeVars<'_, 'db>,
+        choose: impl FnMut(
+            BoundTypeVarInstance<'db>,
+            TypeVarVariance,
+            Type<'db>,
+            Type<'db>,
+        ) -> Result<Option<Type<'db>>, ()>,
+    ) -> Solutions<Vec<Solution<'db>>> {
+        self.verify_builder(builder);
+
+        if self.is_cyclic_impl(db, Some(inferable)) {
+            return Solutions::Unsatisfiable;
+        }
+
+        self.node.solutions_with(db, builder, choose)
     }
 
     #[expect(dead_code)] // Keep this around for debugging purposes
@@ -1724,11 +1779,29 @@ impl NodeId {
         self,
         db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
-    ) -> Solutions<'db, 'c> {
+    ) -> Solutions<Ref<'c, Vec<Solution<'db>>>> {
         match self.node() {
             Node::AlwaysTrue => Solutions::Unconstrained,
             Node::AlwaysFalse => Solutions::Unsatisfiable,
             Node::Interior(interior) => interior.solutions(db, builder),
+        }
+    }
+
+    fn solutions_with<'db>(
+        self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        choose: impl FnMut(
+            BoundTypeVarInstance<'db>,
+            TypeVarVariance,
+            Type<'db>,
+            Type<'db>,
+        ) -> Result<Option<Type<'db>>, ()>,
+    ) -> Solutions<Vec<Solution<'db>>> {
+        match self.node() {
+            Node::AlwaysTrue => Solutions::Unconstrained,
+            Node::AlwaysFalse => Solutions::Unsatisfiable,
+            Node::Interior(interior) => interior.solutions_with(db, builder, choose),
         }
     }
 
@@ -2598,6 +2671,252 @@ struct InteriorNodeData {
     max_source_order: usize,
 }
 
+/// Accumulated lower and upper bounds for a single typevar on a single BDD path.
+///
+/// Lower bounds are collected into a union (they are alternatives for the minimum type the
+/// typevar can specialize to). Upper bounds are collected into an intersection (the typevar
+/// must satisfy all of them simultaneously).
+#[derive(Default)]
+struct Bounds<'db> {
+    lower: FxIndexSet<Type<'db>>,
+    upper: FxIndexSet<Type<'db>>,
+}
+
+impl<'db> Bounds<'db> {
+    fn add_lower(&mut self, _db: &'db dyn Db, ty: Type<'db>) {
+        // Lower bounds are unioned. Our type representation is in DNF, so unioning a new
+        // element is typically cheap (in that it does not involve a combinatorial
+        // explosion from distributing the clause through an existing disjunction). So we
+        // don't need to be as clever here as in `add_upper`.
+        self.lower.insert(ty);
+    }
+
+    fn add_upper(&mut self, db: &'db dyn Db, ty: Type<'db>) {
+        // Upper bounds are intersectioned. If `ty` is a union, that involves distributing
+        // the union elements through the existing type. That makes it worth checking first
+        // whether any of the types in the upper bound are redundant.
+
+        // First check if there's an existing upper bound clause that is a subtype of the
+        // new type. If so, adding the new type does nothing to the intersection.
+        if self
+            .upper
+            .iter()
+            .any(|existing| existing.is_redundant_with(db, ty))
+        {
+            return;
+        }
+
+        // Otherwise remove any existing clauses that are a supertype of the new type,
+        // since the intersection will clip them to the new type.
+        self.upper
+            .retain(|existing| !ty.is_redundant_with(db, *existing));
+        self.upper.insert(ty);
+    }
+}
+
+/// Materialized lower and upper bounds for a single typevar on a single BDD path.
+struct TypeVarBounds<'db> {
+    bound_typevar: BoundTypeVarInstance<'db>,
+    /// The union of all lower bounds on this path.
+    lower: Type<'db>,
+    /// The intersection of all upper bounds on this path (NOT including the typevar's declared
+    /// upper bound).
+    upper: Type<'db>,
+}
+
+/// Per-path bounds for all typevars. Each element is the set of typevar bounds for one BDD path.
+pub(crate) struct PathBounds<'db>(Vec<Vec<TypeVarBounds<'db>>>);
+
+impl<'db> PathBounds<'db> {
+    /// Computes sorted BDD paths and accumulates per-typevar lower/upper bounds for each path.
+    ///
+    /// Returns a list of paths, where each path contains the materialized lower/upper bounds for
+    /// each typevar that appears in the path's constraints.
+    fn compute(db: &'db dyn Db, builder: &ConstraintSetBuilder<'db>, node: NodeId) -> Self {
+        // Sort the constraints in each path by their `source_order`s, to ensure that we construct
+        // any unions or intersections in our type mappings in a stable order. Constraints might
+        // come out of `PathAssignment`s with identical `source_order`s, but if they do, those
+        // "tied" constraints will still be ordered in a stable way. So we need a stable sort to
+        // retain that stable per-tie ordering.
+        let mut sorted_paths = Vec::new();
+        node.for_each_path(db, builder, |path| {
+            let mut path: Vec<_> = path.positive_constraints().collect();
+            path.sort_by_key(|(_, source_order)| *source_order);
+            sorted_paths.push(path);
+        });
+        sorted_paths.sort_by(|path1, path2| {
+            let source_orders1 = path1.iter().map(|(_, source_order)| *source_order);
+            let source_orders2 = path2.iter().map(|(_, source_order)| *source_order);
+            source_orders1.cmp(source_orders2)
+        });
+
+        let mut result = Vec::with_capacity(sorted_paths.len());
+        let mut mappings: FxHashMap<BoundTypeVarInstance<'db>, Bounds<'db>> = FxHashMap::default();
+
+        for path in sorted_paths {
+            mappings.clear();
+            for (constraint, _) in path {
+                let constraint = builder.constraint_data(constraint);
+                let typevar = constraint.typevar;
+                let lower = constraint.lower;
+                let upper = constraint.upper;
+                let bounds = mappings.entry(typevar).or_default();
+                bounds.add_lower(db, lower);
+                bounds.add_upper(db, upper);
+
+                if let Type::TypeVar(lower_bound_typevar) = lower {
+                    let bounds = mappings.entry(lower_bound_typevar).or_default();
+                    bounds.add_upper(db, Type::TypeVar(typevar));
+                }
+
+                if let Type::TypeVar(upper_bound_typevar) = upper {
+                    let bounds = mappings.entry(upper_bound_typevar).or_default();
+                    bounds.add_lower(db, Type::TypeVar(typevar));
+                }
+            }
+
+            let path_bounds = mappings
+                .drain()
+                .map(|(bound_typevar, bounds)| TypeVarBounds {
+                    bound_typevar,
+                    lower: UnionType::from_elements(db, bounds.lower),
+                    upper: IntersectionType::from_elements(db, bounds.upper),
+                })
+                .collect();
+            result.push(path_bounds);
+        }
+
+        Self(result)
+    }
+
+    fn solve(&self, db: &'db dyn Db) -> Vec<Solution<'db>> {
+        self.solve_with(|bound_typevar, _variance, lower, upper| {
+            Self::default_solve(db, bound_typevar, lower, upper)
+        })
+    }
+
+    /// Solves each path by applying a per-typevar solver function, collecting valid solutions.
+    ///
+    /// The solver receives the typevar and its materialized lower/upper bounds, and returns:
+    /// - `Ok(Some(solution))` to add a solution for this typevar on this path
+    /// - `Ok(None)` to leave this typevar unsolved on this path
+    /// - `Err(())` to invalidate the entire path
+    fn solve_with(
+        &self,
+        mut choose: impl FnMut(
+            BoundTypeVarInstance<'db>,
+            TypeVarVariance,
+            Type<'db>,
+            Type<'db>,
+        ) -> Result<Option<Type<'db>>, ()>,
+    ) -> Vec<Solution<'db>> {
+        let mut solutions = Vec::with_capacity(self.0.len());
+        'paths: for path in &self.0 {
+            let mut solution = Vec::with_capacity(path.len());
+            for bounds in path {
+                let TypeVarBounds {
+                    bound_typevar,
+                    lower,
+                    upper,
+                } = *bounds;
+
+                // Determine variance from the constraint bounds:
+                // - Only upper bound (lower = Never) → covariant position
+                // - Only lower bound (upper = object) → contravariant position
+                // - Both bounds set → invariant position
+                let variance = if lower.is_never() {
+                    TypeVarVariance::Covariant
+                } else if upper == Type::object() {
+                    TypeVarVariance::Contravariant
+                } else {
+                    TypeVarVariance::Invariant
+                };
+
+                match choose(bound_typevar, variance, lower, upper) {
+                    Ok(Some(ty)) => solution.push(TypeVarSolution {
+                        bound_typevar,
+                        solution: ty,
+                    }),
+                    Ok(None) => {}
+                    Err(()) => continue 'paths,
+                }
+            }
+            solutions.push(solution);
+        }
+        solutions
+    }
+
+    /// The default solution selection logic for a single typevar on a single BDD path.
+    ///
+    /// Given the materialized lower and upper bounds for a typevar, selects the solution type.
+    /// Returns:
+    /// - `Ok(Some(solution))` if the typevar is solved on this path
+    /// - `Ok(None)` if the typevar is unsolved (no solution added)
+    /// - `Err(())` if the path is invalid (bounds violate the typevar's declared constraints)
+    pub(crate) fn default_solve(
+        db: &'db dyn Db,
+        bound_typevar: BoundTypeVarInstance<'db>,
+        lower: Type<'db>,
+        upper: Type<'db>,
+    ) -> Result<Option<Type<'db>>, ()> {
+        match bound_typevar.typevar(db).require_bound_or_constraints(db) {
+            TypeVarBoundOrConstraints::UpperBound(bound) => {
+                let bound = bound.top_materialization(db);
+                if !lower.is_assignable_to(db, bound) {
+                    // This path does not satisfy the typevar's upper bound, and is
+                    // therefore not a valid specialization.
+                    return Err(());
+                }
+
+                // Prefer the lower bound (often the concrete actual type seen) over the
+                // upper bound (which may include TypeVar bounds/constraints). The upper bound
+                // should only be used as a fallback when no concrete type was inferred.
+                if !lower.is_never() {
+                    return Ok(Some(lower));
+                }
+
+                let upper = IntersectionType::from_elements(
+                    db,
+                    std::iter::once(upper).chain(std::iter::once(bound)),
+                );
+                if upper != bound {
+                    Ok(Some(upper))
+                } else {
+                    Ok(None)
+                }
+            }
+
+            TypeVarBoundOrConstraints::Constraints(constraints) => {
+                // Filter out the typevar constraints that aren't satisfied by this path.
+                let compatible_constraints = constraints.elements(db).iter().filter(|constraint| {
+                    let constraint_lower = constraint.bottom_materialization(db);
+                    let constraint_upper = constraint.top_materialization(db);
+                    lower.is_assignable_to(db, constraint_lower)
+                        && constraint_upper.is_assignable_to(db, upper)
+                });
+
+                // If only one constraint remains, that's our specialization for this path.
+                match compatible_constraints.at_most_one() {
+                    Ok(None) => {
+                        // This path does not satisfy any of the constraints, and is
+                        // therefore not a valid specialization.
+                        Err(())
+                    }
+
+                    Ok(Some(compatible_constraint)) => Ok(Some(*compatible_constraint)),
+
+                    Err(_) => {
+                        // This path satisfies multiple constraints. For now, don't
+                        // prefer any of them, and fall back on the default
+                        // specialization for this typevar.
+                        Ok(None)
+                    }
+                }
+            }
+        }
+    }
+}
+
 impl InteriorNode {
     fn node(self) -> NodeId {
         self.0
@@ -3112,45 +3431,7 @@ impl InteriorNode {
         self,
         db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
-    ) -> Solutions<'db, 'c> {
-        #[derive(Default)]
-        struct Bounds<'db> {
-            lower: FxIndexSet<Type<'db>>,
-            upper: FxIndexSet<Type<'db>>,
-        }
-
-        impl<'db> Bounds<'db> {
-            fn add_lower(&mut self, _db: &'db dyn Db, ty: Type<'db>) {
-                // Lower bounds are unioned. Our type representation is in DNF, so unioning a new
-                // element is typically cheap (in that it does not involve a combinatorial
-                // explosion from distributing the clause through an existing disjunction). So we
-                // don't need to be as clever here as in `add_upper`.
-                self.lower.insert(ty);
-            }
-
-            fn add_upper(&mut self, db: &'db dyn Db, ty: Type<'db>) {
-                // Upper bounds are intersectioned. If `ty` is a union, that involves distributing
-                // the union elements through the existing type. That makes it worth checking first
-                // whether any of the types in the upper bound are redundant.
-
-                // First check if there's an existing upper bound clause that is a subtype of the
-                // new type. If so, adding the new type does nothing to the intersection.
-                if self
-                    .upper
-                    .iter()
-                    .any(|existing| existing.is_redundant_with(db, ty))
-                {
-                    return;
-                }
-
-                // Otherwise remove any existing clauses that are a supertype of the new type,
-                // since the intersection will clip them to the new type.
-                self.upper
-                    .retain(|existing| !ty.is_redundant_with(db, *existing));
-                self.upper.insert(ty);
-            }
-        }
-
+    ) -> Solutions<Ref<'c, Vec<Solution<'db>>>> {
         fn solutions_inner<'db, 'c>(
             db: &'db dyn Db,
             builder: &'c ConstraintSetBuilder<'db>,
@@ -3164,122 +3445,8 @@ impl InteriorNode {
                 return solutions;
             }
 
-            // Sort the constraints in each path by their `source_order`s, to ensure that we construct
-            // any unions or intersections in our type mappings in a stable order. Constraints might
-            // come out of `PathAssignment`s with identical `source_order`s, but if they do, those
-            // "tied" constraints will still be ordered in a stable way. So we need a stable sort to
-            // retain that stable per-tie ordering.
-            let mut sorted_paths = Vec::new();
-            interior.for_each_path(db, builder, |path| {
-                let mut path: Vec<_> = path.positive_constraints().collect();
-                path.sort_by_key(|(_, source_order)| *source_order);
-                sorted_paths.push(path);
-            });
-            sorted_paths.sort_by(|path1, path2| {
-                let source_orders1 = path1.iter().map(|(_, source_order)| *source_order);
-                let source_orders2 = path2.iter().map(|(_, source_order)| *source_order);
-                source_orders1.cmp(source_orders2)
-            });
-
-            let mut solutions = Vec::with_capacity(sorted_paths.len());
-            let mut mappings: FxHashMap<BoundTypeVarInstance<'db>, Bounds<'db>> =
-                FxHashMap::default();
-            'paths: for path in sorted_paths {
-                mappings.clear();
-                for (constraint, _) in path {
-                    let constraint = builder.constraint_data(constraint);
-                    let typevar = constraint.typevar;
-                    let lower = constraint.lower;
-                    let upper = constraint.upper;
-                    let bounds = mappings.entry(typevar).or_default();
-                    bounds.add_lower(db, lower);
-                    bounds.add_upper(db, upper);
-
-                    if let Type::TypeVar(lower_bound_typevar) = lower {
-                        let bounds = mappings.entry(lower_bound_typevar).or_default();
-                        bounds.add_upper(db, Type::TypeVar(typevar));
-                    }
-
-                    if let Type::TypeVar(upper_bound_typevar) = upper {
-                        let bounds = mappings.entry(upper_bound_typevar).or_default();
-                        bounds.add_lower(db, Type::TypeVar(typevar));
-                    }
-                }
-
-                let mut solution = Vec::with_capacity(mappings.len());
-                for (bound_typevar, bounds) in mappings.drain() {
-                    match bound_typevar.typevar(db).require_bound_or_constraints(db) {
-                        TypeVarBoundOrConstraints::UpperBound(bound) => {
-                            let bound = bound.top_materialization(db);
-                            let lower = UnionType::from_elements(db, bounds.lower);
-                            if !lower.is_assignable_to(db, bound) {
-                                // This path does not satisfy the typevar's upper bound, and is
-                                // therefore not a valid specialization.
-                                continue 'paths;
-                            }
-
-                            // Prefer the lower bound (often the concrete actual type seen) over the
-                            // upper bound (which may include TypeVar bounds/constraints). The upper bound
-                            // should only be used as a fallback when no concrete type was inferred.
-                            if !lower.is_never() {
-                                solution.push(TypeVarSolution {
-                                    bound_typevar,
-                                    solution: lower,
-                                });
-                                continue;
-                            }
-
-                            let upper = IntersectionType::from_elements(
-                                db,
-                                std::iter::chain(bounds.upper, [bound]),
-                            );
-                            if upper != bound {
-                                solution.push(TypeVarSolution {
-                                    bound_typevar,
-                                    solution: upper,
-                                });
-                            }
-                        }
-
-                        TypeVarBoundOrConstraints::Constraints(constraints) => {
-                            // Filter out the typevar constraints that aren't satisfied by this path.
-                            let lower = UnionType::from_elements(db, bounds.lower);
-                            let upper = IntersectionType::from_elements(db, bounds.upper);
-                            let compatible_constraints =
-                                constraints.elements(db).iter().filter(|constraint| {
-                                    let constraint_lower = constraint.bottom_materialization(db);
-                                    let constraint_upper = constraint.top_materialization(db);
-                                    lower.is_assignable_to(db, constraint_lower)
-                                        && constraint_upper.is_assignable_to(db, upper)
-                                });
-
-                            // If only one constraint remains, that's our specialization for this path.
-                            match compatible_constraints.at_most_one() {
-                                Ok(None) => {
-                                    // This path does not satisfy any of the constraints, and is
-                                    // therefore not a valid specialization.
-                                    continue 'paths;
-                                }
-
-                                Ok(Some(compatible_constraint)) => {
-                                    solution.push(TypeVarSolution {
-                                        bound_typevar,
-                                        solution: *compatible_constraint,
-                                    });
-                                }
-
-                                Err(_) => {
-                                    // This path satisfies multiple constraints. For now, don't
-                                    // prefer any of them, and fall back on the default
-                                    // specialization for this typevar.
-                                }
-                            }
-                        }
-                    }
-                }
-
-                solutions.push(solution);
-            }
+            let path_bounds = PathBounds::compute(db, builder, interior);
+            let solutions = path_bounds.solve(db);
 
             let mut storage = builder.storage.borrow_mut();
             storage.solutions_cache.insert(key, solutions);
@@ -3290,6 +3457,25 @@ impl InteriorNode {
         }
 
         let solutions = solutions_inner(db, builder, self.node());
+        if solutions.is_empty() {
+            return Solutions::Unsatisfiable;
+        }
+        Solutions::Constrained(solutions)
+    }
+
+    fn solutions_with<'db>(
+        self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        choose: impl FnMut(
+            BoundTypeVarInstance<'db>,
+            TypeVarVariance,
+            Type<'db>,
+            Type<'db>,
+        ) -> Result<Option<Type<'db>>, ()>,
+    ) -> Solutions<Vec<Solution<'db>>> {
+        let path_bounds = PathBounds::compute(db, builder, self.node());
+        let solutions = path_bounds.solve_with(choose);
         if solutions.is_empty() {
             return Solutions::Unsatisfiable;
         }
@@ -3738,11 +3924,17 @@ impl InteriorNode {
     }
 }
 
+/// The result of solving a constraint set for per-typevar specializations.
+///
+/// Generic over the container type `S`: cached solutions use
+/// `Ref<'c, Vec<Solution<'db>>>` (borrowed from the builder's cache), while
+/// hook-based solutions use `Vec<Solution<'db>>` (owned, since the hook makes
+/// caching inappropriate).
 #[derive(Debug)]
-pub(crate) enum Solutions<'db, 'c> {
+pub(crate) enum Solutions<S> {
     Unsatisfiable,
     Unconstrained,
-    Constrained(Ref<'c, Vec<Solution<'db>>>),
+    Constrained(S),
 }
 
 pub(crate) type Solution<'db> = Vec<TypeVarSolution<'db>>;
