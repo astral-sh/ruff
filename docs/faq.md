@@ -439,6 +439,21 @@ like so:
 Ruff does not yet support all of isort's configuration options, though it does support many of
 them. You can find the supported settings in the [API reference](settings.md#lintisort).
 
+### How can I replicate isort's `force_alphabetical_sort`?
+
+isort's [`force_alphabetical_sort`](https://pycqa.github.io/isort/docs/configuration/options.html#force-alphabetical-sort)
+is a convenience option that sets four settings at once
+([source](https://github.com/PyCQA/isort/blob/main/isort/settings.py#L264-L268)).
+You can approximate it in Ruff with:
+
+```toml
+[tool.ruff.lint.isort]
+no-sections = true
+from-first = true
+order-by-type = false
+lines-between-types = 1
+```
+
 ## Does Ruff support Jupyter Notebooks?
 
 Ruff has built-in support for linting and formatting [Jupyter Notebooks](https://jupyter.org/). Refer to the

@@ -2751,18 +2751,6 @@ pub struct IsortOptions {
     /// import pandas
     /// import sys
     /// ```
-    ///
-    /// To approximate isort's `force_alphabetical_sort` option, use:
-    /// ```toml
-    /// [tool.ruff.lint.isort]
-    /// force-sort-within-sections = true
-    /// no-sections = true
-    /// from-first = true
-    /// ```
-    ///
-    /// Note: isort's `force_alphabetical_sort` also sets `lines_between_types = 1`,
-    /// but Ruff ignores `lines-between-types` when `force-sort-within-sections` is
-    /// enabled, so the replication is not exact.
     #[option(
         default = r#"false"#,
         value_type = "bool",
