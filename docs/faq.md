@@ -443,7 +443,13 @@ them. You can find the supported settings in the [API reference](settings.md#lin
 
 isort's [`force_alphabetical_sort`](https://pycqa.github.io/isort/docs/configuration/options.html#force-alphabetical-sort)
 is a convenience option that sets four settings at once
-([source](https://github.com/PyCQA/isort/blob/main/isort/settings.py#L264-L268)).
+([source](https://github.com/PyCQA/isort/blob/main/isort/settings.py#L264-L268)):
+
+- `no_sections = True` — removes section grouping (standard library, third-party, etc.)
+- `from_first = True` — places `from` imports before straight `import` statements
+- `force_alphabetical_sort_within_sections = True` — sorts names within `from X import ...` purely alphabetically, ignoring type-based ordering (i.e., no grouping of `CONSTANTS` before `Classes` before `names`)
+- `lines_between_types = 1` — adds a blank line between `import` and `from` statements
+
 You can approximate it in Ruff with:
 
 ```toml
@@ -453,6 +459,25 @@ from-first = true
 order-by-type = false
 lines-between-types = 1
 ```
+
+[`order-by-type`](settings.md#lint_isort_order-by-type) is set to `false` because isort's
+`force_alphabetical_sort_within_sections` disables type-based ordering of names within `from`
+imports. By default, Ruff groups names by type (`CONSTANTS` first, then `Classes`, then
+`lowercase`). Setting it to `false` disables this grouping, matching isort's behavior of
+sorting all names purely alphabetically:
+
+```python
+# order-by-type = true (default): TYPE_CHECKING (constant) is grouped first
+from typing import TYPE_CHECKING, Counter, Final, OrderedDict
+
+# order-by-type = false (matches force_alphabetical_sort): purely alphabetical
+from typing import Counter, Final, OrderedDict, TYPE_CHECKING
+```
+
+For most inputs, this configuration produces identical output to isort's
+`force_alphabetical_sort`. The only known difference is when two names differ only in
+casing (e.g., `Final` vs `final`): isort preserves the original source order (stable sort),
+while Ruff sorts uppercase before lowercase (`Final, final`).
 
 ## Does Ruff support Jupyter Notebooks?
 
