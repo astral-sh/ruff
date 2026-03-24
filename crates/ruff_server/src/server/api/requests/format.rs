@@ -22,15 +22,15 @@ impl super::BackgroundDocumentRequestHandler for Format {
     super::define_document_url!(params: &types::DocumentFormattingParams);
     fn run_with_snapshot(
         snapshot: DocumentSnapshot,
-        _client: &Client,
+        client: &Client,
         _params: types::DocumentFormattingParams,
     ) -> Result<super::FormatResponse> {
-        format_document(&snapshot)
+        format_document(&snapshot, Some(client))
     }
 }
 
 /// Formats either a full text document or each individual cell in a single notebook document.
-pub(super) fn format_full_document(snapshot: &DocumentSnapshot) -> Result<Fixes> {
+pub(super) fn format_full_document(snapshot: &DocumentSnapshot, client: Option<&Client>) -> Result<Fixes> {
     let mut fixes = Fixes::default();
     let query = snapshot.query();
     let backend = snapshot
@@ -45,7 +45,7 @@ pub(super) fn format_full_document(snapshot: &DocumentSnapshot) -> Result<Fixes>
                 .map(|url| (url.clone(), notebook.cell_document_by_uri(url).unwrap()))
             {
                 if let Some(changes) =
-                    format_text_document(text_document, query, snapshot.encoding(), true, backend)?
+                    format_text_document(text_document, query, snapshot.encoding(), true, backend, client)?
                 {
                     fixes.insert(url, changes);
                 }
@@ -53,7 +53,7 @@ pub(super) fn format_full_document(snapshot: &DocumentSnapshot) -> Result<Fixes>
         }
         DocumentQuery::Text { document, .. } => {
             if let Some(changes) =
-                format_text_document(document, query, snapshot.encoding(), false, backend)?
+                format_text_document(document, query, snapshot.encoding(), false, backend, client)?
             {
                 fixes.insert(snapshot.query().make_key().into_url(), changes);
             }
@@ -65,7 +65,7 @@ pub(super) fn format_full_document(snapshot: &DocumentSnapshot) -> Result<Fixes>
 
 /// Formats either a full text document or an specific notebook cell. If the query within the snapshot is a notebook document
 /// with no selected cell, this will throw an error.
-pub(super) fn format_document(snapshot: &DocumentSnapshot) -> Result<super::FormatResponse> {
+pub(super) fn format_document(snapshot: &DocumentSnapshot, client: Option<&Client>) -> Result<super::FormatResponse> {
     let text_document = snapshot
         .query()
         .as_single_document()
@@ -82,6 +82,7 @@ pub(super) fn format_document(snapshot: &DocumentSnapshot) -> Result<super::Form
         snapshot.encoding(),
         query.as_notebook().is_some(),
         backend,
+        client,
     )
 }
 
@@ -91,6 +92,7 @@ fn format_text_document(
     encoding: PositionEncoding,
     is_notebook: bool,
     backend: crate::format::FormatBackend,
+    client: Option<&Client>,
 ) -> Result<super::FormatResponse> {
     let settings = query.settings();
     let file_path = query.virtual_file_path();
@@ -112,6 +114,7 @@ fn format_text_document(
         &settings.formatter,
         &file_path,
         backend,
+        client,
     )
     .with_failure_code(lsp_server::ErrorCode::InternalError)?;
     let Some(mut formatted) = formatted else {

@@ -13,6 +13,7 @@ use ruff_text_size::TextRange;
 use ruff_workspace::FormatterSettings;
 
 use crate::edit::TextDocument;
+use crate::session::Client;
 
 /// The backend to use for formatting.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Deserialize)]
@@ -35,10 +36,11 @@ pub(crate) fn format(
     formatter_settings: &FormatterSettings,
     path: &Path,
     backend: FormatBackend,
+    client: Option<&Client>,
 ) -> crate::Result<Option<String>> {
     match backend {
         FormatBackend::Uv => format_external(document, source_type, formatter_settings, path),
-        FormatBackend::Internal => format_internal(document, source_type, formatter_settings, path),
+        FormatBackend::Internal => format_internal(document, source_type, formatter_settings, path, client),
     }
 }
 
@@ -48,6 +50,7 @@ fn format_internal(
     source_type: SourceType,
     formatter_settings: &FormatterSettings,
     path: &Path,
+    client: Option<&Client>,
 ) -> crate::Result<Option<String>> {
     match source_type {
         SourceType::Python(py_source_type) => {
@@ -77,6 +80,12 @@ fn format_internal(
         SourceType::Markdown => {
             if !formatter_settings.preview.is_enabled() {
                 tracing::warn!("Markdown formatting is experimental, enable preview mode.");
+                if let Some(client) = client {
+                    client.show_message(
+                        "Markdown formatting requires preview mode. Enable `preview = true` in your Ruff configuration.",
+                        lsp_types::MessageType::WARNING,
+                    );
+                }
                 return Ok(None);
             }
 
@@ -403,6 +412,7 @@ with open("a_really_long_foo") as foo, open("a_really_long_bar") as bar, open("a
             },
             Path::new("test.py"),
             FormatBackend::Internal,
+            None,
         )
         .expect("Expected no errors when formatting")
         .expect("Expected formatting changes");
@@ -426,6 +436,7 @@ with open("a_really_long_foo") as foo, open("a_really_long_bar") as bar, open("a
             },
             Path::new("test.py"),
             FormatBackend::Internal,
+            None,
         )
         .expect("Expected no errors when formatting")
         .expect("Expected formatting changes");
@@ -538,6 +549,7 @@ def world(  ):
                 &FormatterSettings::default(),
                 Path::new("test.py"),
                 FormatBackend::Uv,
+                None,
             )
             .expect("Expected no errors when formatting with uv")
             .expect("Expected formatting changes");
@@ -621,6 +633,7 @@ def hello(very_long_parameter_name_1, very_long_parameter_name_2, very_long_para
                 &formatter_settings,
                 Path::new("test.py"),
                 FormatBackend::Uv,
+                None,
             )
             .expect("Expected no errors when formatting with uv")
             .expect("Expected formatting changes");
@@ -668,6 +681,7 @@ def hello():
                 &formatter_settings,
                 Path::new("test.py"),
                 FormatBackend::Uv,
+                None,
             )
             .expect("Expected no errors when formatting with uv")
             .expect("Expected formatting changes");
@@ -700,6 +714,7 @@ def broken(:
                 &FormatterSettings::default(),
                 Path::new("test.py"),
                 FormatBackend::Uv,
+                None,
             )
             .expect("Expected no errors from format function");
 
@@ -734,6 +749,7 @@ line'''
                 &formatter_settings,
                 Path::new("test.py"),
                 FormatBackend::Uv,
+                None,
             )
             .expect("Expected no errors when formatting with uv")
             .expect("Expected formatting changes");
@@ -776,6 +792,7 @@ bar = [1, 2, 3,]
                 &formatter_settings,
                 Path::new("test.py"),
                 FormatBackend::Uv,
+                None,
             )
             .expect("Expected no errors when formatting with uv")
             .expect("Expected formatting changes");
