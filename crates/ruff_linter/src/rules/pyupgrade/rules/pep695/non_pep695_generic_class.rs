@@ -21,6 +21,11 @@ use super::{
 /// Special type parameter syntax was introduced in Python 3.12 by [PEP 695] for defining generic
 /// classes. This syntax is easier to read and provides cleaner support for generics.
 ///
+/// In particular, old-style `TypeVar` variables are typically allocated at module scope, but their
+/// semantic meaning is only valid within the context of a generic class, function, or type alias.
+/// [PEP 695] eliminates this source of confusion by declaring type parameters at their point of
+/// use.
+///
 /// ## Known problems
 ///
 /// The rule currently skips generic classes nested inside of other functions or classes. It also
@@ -59,6 +64,31 @@ use super::{
 ///     var: T
 /// ```
 ///
+/// When a `TypeVar` is reused across multiple classes, a [type alias] can be used
+/// for the bound:
+///
+/// ```python
+/// from typing import Generic, TypeVar
+///
+/// ReusableT = TypeVar("ReusableT", bound=int | str | dict[int, str])
+///
+///
+/// class GenericClass1(Generic[ReusableT]): ...
+/// class GenericClass2(Generic[ReusableT]): ...
+/// class GenericClass3(Generic[ReusableT]): ...
+/// ```
+///
+/// Use instead:
+///
+/// ```python
+/// type ReusableTBound = int | str | dict[int, str]
+///
+///
+/// class GenericClass1[ReusableT: ReusableTBound]: ...
+/// class GenericClass2[ReusableT: ReusableTBound]: ...
+/// class GenericClass3[ReusableT: ReusableTBound]: ...
+/// ```
+///
 /// ## See also
 ///
 /// This rule replaces standalone type variables in classes but doesn't remove
@@ -89,6 +119,7 @@ use super::{
 /// [UP047]: https://docs.astral.sh/ruff/rules/non-pep695-generic-function/
 /// [UP049]: https://docs.astral.sh/ruff/rules/private-type-parameter/
 /// [fail]: https://github.com/python/mypy/issues/18507
+/// [type alias]: https://docs.python.org/3/reference/simple_stmts.html#type-aliases
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "0.12.0")]
 pub(crate) struct NonPEP695GenericClass {
