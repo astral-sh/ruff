@@ -1500,13 +1500,13 @@ impl<'a> Generator<'a> {
         self.p(brace);
 
         if let Some(debug_text) = debug_text {
-            self.buffer += debug_text.leading.as_str();
+            self.buffer += debug_text.leading();
         }
 
         self.buffer += &generator.buffer;
 
         if let Some(debug_text) = debug_text {
-            self.buffer += debug_text.trailing.as_str();
+            self.buffer += debug_text.trailing();
         }
 
         if !conversion.is_none() {

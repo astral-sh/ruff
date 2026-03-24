@@ -387,13 +387,67 @@ impl ConversionFlag {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct DebugText {
+    /// The full text between the `{` and the conversion / `format_spec` / `}`.
+    /// Contains leading whitespace, the expression source, and trailing whitespace + `=`.
+    expression: String,
+    /// Byte offset where the leading portion ends and the expression source begins.
+    leading_end: u32,
+    /// Byte offset where the expression source ends and the trailing portion begins.
+    trailing_start: u32,
+}
+
+impl std::fmt::Debug for DebugText {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DebugText")
+            .field("leading", &self.leading())
+            .field("source", &self.source())
+            .field("trailing", &self.trailing())
+            .finish()
+    }
+}
+
+impl DebugText {
+    pub fn new(leading: &str, source: &str, trailing: &str) -> Self {
+        let leading_end =
+            u32::try_from(leading.len()).expect("DebugText leading exceeds u32::MAX bytes");
+        let trailing_start = leading_end
+            + u32::try_from(source.len()).expect("DebugText source exceeds u32::MAX bytes");
+        let mut expression = String::with_capacity(leading.len() + source.len() + trailing.len());
+        expression.push_str(leading);
+        expression.push_str(source);
+        expression.push_str(trailing);
+        Self {
+            expression,
+            leading_end,
+            trailing_start,
+        }
+    }
+
     /// The text between the `{` and the expression node.
-    pub leading: String,
-    /// The text between the expression and the conversion, the `format_spec`, or the `}`, depending on what's present in the source
-    pub trailing: String,
+    pub fn leading(&self) -> &str {
+        &self.expression[..self.leading_end as usize]
+    }
+
+    /// The source text of the expression (e.g., `0x0` in `f"{0x0=}"`).
+    pub fn source(&self) -> &str {
+        &self.expression[self.leading_end as usize..self.trailing_start as usize]
+    }
+
+    /// The text between the expression and the conversion, the `format_spec`, or the `}`.
+    pub fn trailing(&self) -> &str {
+        &self.expression[self.trailing_start as usize..]
+    }
+
+    /// Replace `\r\n` and `\r` with `\n` in the leading and trailing portions.
+    pub fn normalize_newlines(&mut self) {
+        let leading = self.leading().replace("\r\n", "\n").replace('\r', "\n");
+        let source = self.source().to_string();
+        let trailing = self.trailing().replace("\r\n", "\n").replace('\r', "\n");
+        *self = Self::new(&leading, &source, &trailing);
+    }
 }
 
 impl ExprFString {

@@ -1708,10 +1708,11 @@ impl<'src> Parser<'src> {
         let debug_text = if self.eat(TokenKind::Equal) {
             let leading_range = TextRange::new(start + "{".text_len(), value.start());
             let trailing_range = TextRange::new(value.end(), self.current_token_range().start());
-            Some(ast::DebugText {
-                leading: self.src_text(leading_range).to_string(),
-                trailing: self.src_text(trailing_range).to_string(),
-            })
+            Some(ast::DebugText::new(
+                self.src_text(leading_range),
+                self.src_text(value.range()),
+                self.src_text(trailing_range),
+            ))
         } else {
             None
         };

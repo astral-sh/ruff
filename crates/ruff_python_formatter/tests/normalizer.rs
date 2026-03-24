@@ -198,8 +198,7 @@ impl Transformer for Normalizer {
         };
 
         // Changing the newlines to the configured newline is okay because Python normalizes all newlines to `\n`
-        debug.leading = debug.leading.replace("\r\n", "\n").replace('\r', "\n");
-        debug.trailing = debug.trailing.replace("\r\n", "\n").replace('\r', "\n");
+        debug.normalize_newlines();
     }
 
     fn visit_string_literal(&self, string_literal: &mut ast::StringLiteral) {
