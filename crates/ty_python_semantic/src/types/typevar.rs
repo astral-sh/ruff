@@ -15,8 +15,8 @@ use crate::{
         ApplySpecialization, ApplyTypeMappingVisitor, CycleDetector, DynamicType, KnownClass,
         KnownInstanceType, MaterializationKind, Parameter, Parameters, Type, TypeAliasType,
         TypeContext, TypeMapping, TypeVarVariance, UnionBuilder, UnionType, any_over_type,
-        binding_type, definition_expression_type, tuple::Tuple, variance::VarianceInferable,
-        visitor,
+        binding_type, definition_expression_type, generics::InferableTypeVars, tuple::Tuple,
+        variance::VarianceInferable, visitor,
     },
 };
 
@@ -46,6 +46,17 @@ impl<'db> Type<'db> {
             Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) => {
                 typevar_id == typevar.identity(db)
             }
+            _ => false,
+        })
+    }
+
+    pub(crate) fn mentions_noninferable_typevars(
+        self,
+        db: &'db dyn Db,
+        inferable: InferableTypeVars<'db>,
+    ) -> bool {
+        any_over_type(db, self, false, |ty| match ty {
+            Type::TypeVar(bound_typevar) => !bound_typevar.is_inferable(db, inferable),
             _ => false,
         })
     }
