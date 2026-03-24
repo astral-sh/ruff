@@ -611,6 +611,19 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         Self::from_node(builder, self.node.exists(db, builder, to_remove))
     }
 
+    pub(crate) fn remove_noninferable(
+        self,
+        db: &'db dyn Db,
+        builder: &'c ConstraintSetBuilder<'db>,
+        inferable: InferableTypeVars<'db>,
+    ) -> Self {
+        self.verify_builder(builder);
+        Self::from_node(
+            builder,
+            self.node.remove_noninferable(db, builder, inferable),
+        )
+    }
+
     pub(crate) fn solutions(
         self,
         db: &'db dyn Db,
@@ -2285,6 +2298,19 @@ impl NodeId {
         }
     }
 
+    fn remove_noninferable<'db>(
+        self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        inferable: InferableTypeVars<'db>,
+    ) -> Self {
+        match self.node() {
+            Node::AlwaysTrue => ALWAYS_TRUE,
+            Node::AlwaysFalse => ALWAYS_FALSE,
+            Node::Interior(interior) => interior.remove_noninferable(db, builder, inferable),
+        }
+    }
+
     fn abstract_one_inner<'db>(
         self,
         db: &'db dyn Db,
@@ -3235,6 +3261,34 @@ impl InteriorNode {
         let mut storage = builder.storage.borrow_mut();
         storage.exists_one_cache.insert(key, result);
         result
+    }
+
+    fn remove_noninferable<'db>(
+        self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        inferable: InferableTypeVars<'db>,
+    ) -> NodeId {
+        let mut path = self.path_assignments(builder);
+        self.abstract_one_inner(
+            db,
+            builder,
+            // Remove any node that constrains `bound_typevar`, or that has a lower/upper bound
+            // that mentions `bound_typevar`. The sequent map ensures that derived facts are
+            // propagated for nested typevar references, using the variance of the typevar's
+            // position to determine the correct substitution.
+            &mut |constraint| {
+                let constraint = builder.constraint_data(constraint);
+                !constraint.typevar.is_inferable(db, inferable)
+                    || constraint
+                        .lower
+                        .mentions_noninferable_typevars(db, inferable)
+                    || constraint
+                        .upper
+                        .mentions_noninferable_typevars(db, inferable)
+            },
+            &mut path,
+        )
     }
 
     fn abstract_one_inner<'db>(
