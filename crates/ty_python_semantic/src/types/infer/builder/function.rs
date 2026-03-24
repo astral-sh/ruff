@@ -116,12 +116,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
 
                 if let Some(expected_return_ty) = declared_ty.generator_return_type(db) {
-                {
-                    for invalid in self
-                        .return_types_and_ranges
-                        .iter()
-                        .copied()
-                        .filter(|actual_return_ty| !actual_return_ty.ty.is_assignable_to(db, expected_return_ty))
+                    for invalid in
+                        self.return_types_and_ranges
+                            .iter()
+                            .copied()
+                            .filter(|actual_return_ty| {
+                                !actual_return_ty.ty.is_assignable_to(db, expected_return_ty)
+                            })
                     {
                         report_invalid_return_type(
                             &self.context,

@@ -553,6 +553,15 @@ def missing_return() -> typing.Generator[int, int, int]:  # error: [invalid-retu
     yield 1
 ```
 
+Iterators must not return anything.
+
+```py
+def iterator_must_not_return() -> typing.Iterator[int]:
+    yield 2
+    # error: [invalid-return-type]
+    return "foo"
+```
+
 ### Asynchronous
 
 If it is an `async` function with a `yield` statement in its body, it is an

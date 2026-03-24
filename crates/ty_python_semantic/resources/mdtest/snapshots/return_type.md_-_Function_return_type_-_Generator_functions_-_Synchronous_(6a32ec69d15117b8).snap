@@ -45,6 +45,10 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/function/return_type.md
 30 | 
 31 | def missing_return() -> typing.Generator[int, int, int]:  # error: [invalid-return-type]
 32 |     yield 1
+33 | def iterator_must_not_return() -> typing.Iterator[int]:
+34 |     yield 2
+35 |     # error: [invalid-return-type]
+36 |     return "foo"
 ```
 
 # Diagnostics
@@ -110,8 +114,26 @@ error[invalid-return-type]: Function always implicitly returns `None`, which is 
 31 | def missing_return() -> typing.Generator[int, int, int]:  # error: [invalid-return-type]
    |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 32 |     yield 1
+33 | def iterator_must_not_return() -> typing.Iterator[int]:
    |
 info: Consider changing the return annotation to `-> None` or adding a `return` statement
+info: rule `invalid-return-type` is enabled by default
+
+```
+
+```
+error[invalid-return-type]: Return type does not match returned value
+  --> src/mdtest_snippet.py:33:35
+   |
+31 | def missing_return() -> typing.Generator[int, int, int]:  # error: [invalid-return-type]
+32 |     yield 1
+33 | def iterator_must_not_return() -> typing.Iterator[int]:
+   |                                   -------------------- Expected `None` because of return type
+34 |     yield 2
+35 |     # error: [invalid-return-type]
+36 |     return "foo"
+   |            ^^^^^ expected `None`, found `Literal["foo"]`
+   |
 info: rule `invalid-return-type` is enabled by default
 
 ```

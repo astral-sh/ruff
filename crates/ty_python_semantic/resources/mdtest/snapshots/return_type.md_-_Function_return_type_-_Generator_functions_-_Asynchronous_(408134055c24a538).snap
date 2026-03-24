@@ -31,7 +31,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/function/return_type.md
 16 | async def j() -> str:  # error: [invalid-return-type]
 17 |     yield 42
 18 | 
-19 | async def j() -> typing.AsyncGenerator:
+19 | async def k() -> typing.AsyncGenerator:
 20 |     yield 42
 21 |     return 2  # error: [invalid-syntax] "`return` with value in async generator"
 ```
@@ -58,7 +58,7 @@ info: rule `invalid-return-type` is enabled by default
 error[invalid-syntax]: `return` with value in async generator
   --> src/mdtest_snippet.py:21:5
    |
-19 | async def j() -> typing.AsyncGenerator:
+19 | async def k() -> typing.AsyncGenerator:
 20 |     yield 42
 21 |     return 2  # error: [invalid-syntax] "`return` with value in async generator"
    |     ^^^^^^^^
