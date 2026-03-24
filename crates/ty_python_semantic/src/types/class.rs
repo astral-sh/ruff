@@ -2027,14 +2027,14 @@ pub(super) fn synthesize_typed_dict_update_member<'db>(
     instance_ty: Type<'db>,
     keyword_parameters: &[Parameter<'db>],
 ) -> Type<'db> {
-    let partial_ty = if let Type::TypedDict(typed_dict) = instance_ty {
-        Type::TypedDict(typed_dict.to_partial(db))
+    let update_patch_ty = if let Type::TypedDict(typed_dict) = instance_ty {
+        Type::TypedDict(typed_dict.to_update_patch(db))
     } else {
         instance_ty
     };
 
     let value_ty = UnionBuilder::new(db)
-        .add(partial_ty)
+        .add(update_patch_ty)
         .add(KnownClass::Iterable.to_specialized_instance(
             db,
             &[Type::heterogeneous_tuple(
