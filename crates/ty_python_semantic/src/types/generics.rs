@@ -1760,10 +1760,10 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         set: ConstraintSet<'db, 'c>,
         mut f: impl FnMut(TypeVarAssignment<'db>) -> Option<Type<'db>>,
     ) -> Result<(), ()> {
-        let solutions = match set.solutions_with_inferable(
+        let set = set.remove_noninferable(self.db, self.constraints, self.inferable);
+        let solutions = match set.solutions_with(
             self.db,
             self.constraints,
-            self.inferable,
             |typevar, _variance, lower, upper| {
                 PathBounds::default_solve(self.db, typevar, lower, upper)
             },

@@ -6171,34 +6171,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let db = self.db();
                 let collection_instance = Type::instance(db, ClassType::Generic(collection_alias));
 
-                let set =
-                    collection_instance.when_constraint_set_assignable_to(db, tcx, &constraints);
+                let set = collection_instance
+                    .when_constraint_set_assignable_to(db, tcx, &constraints)
+                    .remove_noninferable(db, &constraints, inferable);
 
-                // Use `solutions_with_inferable` to capture per-typevar variance from the raw
-                // lower/upper bounds on each BDD path. We must use the inferable-aware variant so
-                // that non-inferable typevars from outer scopes (which the assignability check
-                // constrains alongside the collection's own typevars) are excluded from cycle
-                // detection and solution extraction. Without this, a type context like
-                // `list[T@MyClass]` would create mutual constraints between `_T` (list's typevar)
-                // and `T@MyClass`, which `is_cyclic` would flag as a cycle, returning
-                // `Unsatisfiable` and losing the type context information entirely.
-                let solutions = set.solutions_with_inferable(
-                    db,
-                    &constraints,
-                    inferable,
-                    |typevar, variance, lower, upper| {
-                        if !typevar.is_inferable(db, inferable) {
-                            return Ok(None);
-                        }
-
+                let solutions =
+                    set.solutions_with(db, &constraints, |typevar, variance, lower, upper| {
                         let identity = typevar.identity(db);
                         elt_tcx_variance
                             .entry(identity)
                             .and_modify(|current| *current = current.join(variance))
                             .or_insert(variance);
                         PathBounds::default_solve(db, typevar, lower, upper)
-                    },
-                );
+                    });
 
                 match solutions {
                     // If the type context is not compatible with the collection type (e.g., a

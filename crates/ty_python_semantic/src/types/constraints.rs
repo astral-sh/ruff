@@ -653,11 +653,10 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
     ///
     /// For multi-path BDDs, the hook is called per-path. The caller is responsible for combining
     /// results across paths (typically via union).
-    pub(crate) fn solutions_with_inferable(
+    pub(crate) fn solutions_with(
         self,
         db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
-        inferable: InferableTypeVars<'db>,
         choose: impl FnMut(
             BoundTypeVarInstance<'db>,
             TypeVarVariance,
@@ -667,7 +666,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
     ) -> Solutions<Vec<Solution<'db>>> {
         self.verify_builder(builder);
 
-        if self.is_cyclic_impl(db, Some(inferable)) {
+        if self.is_cyclic(db) {
             return Solutions::Unsatisfiable;
         }
 
