@@ -209,9 +209,6 @@ impl<'db> ConstructorBinding<'db> {
 
     pub(super) fn return_type(&self, db: &'db dyn Db) -> Type<'db> {
         let constructed_instance_type = self.constructed_instance_type();
-        let mut saw_matching_upstream_overload = false;
-        let mut saw_unmatched_all_non_instance_overloaded_upstream = false;
-        let mut saw_unmatched_instance_like_overloaded_upstream = false;
 
         // If any matched overload's signature return type, when resolved with the inferred
         // specialization, is a non-instance type (e.g. `__new__[S] -> S` with `S` inferred as
@@ -231,37 +228,31 @@ impl<'db> ConstructorBinding<'db> {
             // `__init__` is a post-construction validator and does not determine the
             // constructor return type.
             if !self.constructor_kind().is_init() {
-                let matching_overloads = callable.matching_overloads().collect::<Vec<_>>();
+                let matching_overloads = callable
+                    .matching_overloads()
+                    .map(|(_, overload)| overload)
+                    .collect::<Vec<_>>();
                 let candidate_overloads = if matching_overloads.is_empty() {
-                    if callable.overloads().len() > 1 {
-                        let has_instance_like_overload =
-                            callable.overloads().iter().any(|overload| {
-                                let outcome = constructor_return_outcome(
-                                    db,
-                                    constructor_class_literal,
-                                    overload,
-                                );
-                                outcome.kind.is_instance()
-                                    || outcome.resolved_return.is_unknown()
-                                    || (outcome.resolved_return.has_typevar(db)
-                                        && outcome.resolved_return.as_nominal_instance().is_none())
-                            });
-                        if has_instance_like_overload {
-                            saw_unmatched_instance_like_overloaded_upstream = true;
-                        } else {
-                            saw_unmatched_all_non_instance_overloaded_upstream = true;
-                        }
-                    }
                     match callable.overloads() {
                         [overload] => vec![overload],
+                        overloads if overloads.len() > 1 => {
+                            let has_instance_like_overload = overloads.iter().any(|overload| {
+                                overload_returns_instance(db, constructor_class_literal, overload)
+                            });
+
+                            // If none of the unmatched overloads could produce the constructed
+                            // instance, fall back to the overloaded callable result instead of
+                            // inventing an instance return.
+                            if !has_instance_like_overload {
+                                return self.entry.return_type();
+                            }
+
+                            Vec::new()
+                        }
                         _ => Vec::new(),
                     }
                 } else {
-                    saw_matching_upstream_overload = true;
                     matching_overloads
-                        .into_iter()
-                        .map(|(_, overload)| overload)
-                        .collect()
                 };
 
                 if !candidate_overloads.is_empty() {
@@ -327,13 +318,6 @@ impl<'db> ConstructorBinding<'db> {
                     }
                 }
             }
-        }
-
-        if !saw_matching_upstream_overload
-            && saw_unmatched_all_non_instance_overloaded_upstream
-            && !saw_unmatched_instance_like_overloaded_upstream
-        {
-            return self.entry.return_type();
         }
 
         // Preserve explicit strict-subclass constructor returns, e.g. constructing `C` from
