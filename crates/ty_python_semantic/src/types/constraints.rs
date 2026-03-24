@@ -3272,19 +3272,12 @@ impl InteriorNode {
         self.abstract_one_inner(
             db,
             builder,
-            // Remove any node that constrains `bound_typevar`, or that has a lower/upper bound
-            // that mentions `bound_typevar`. The sequent map ensures that derived facts are
-            // propagated for nested typevar references, using the variance of the typevar's
-            // position to determine the correct substitution.
+            // Remove constraints whose _constrained_ typevar is non-inferable. We still keep
+            // constraints on inferable typevars even if their bounds mention non-inferable
+            // typevars, because those mixed bounds can carry useful solution information.
             &mut |constraint| {
                 let constraint = builder.constraint_data(constraint);
                 !constraint.typevar.is_inferable(db, inferable)
-                    || constraint
-                        .lower
-                        .mentions_noninferable_typevars(db, inferable)
-                    || constraint
-                        .upper
-                        .mentions_noninferable_typevars(db, inferable)
             },
             &mut path,
         )
