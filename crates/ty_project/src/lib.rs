@@ -758,16 +758,24 @@ where
         Ok(result) => Ok(result),
         Err(error) => {
             match error.payload.downcast_ref::<salsa::Cancelled>() {
-                Some(salsa::Cancelled::PropagatedPanic) | None => {
-                    // Add a diagnostic (fall through) for
-                    // propagated Salsa panics (query A depends on query B and query B panics)
-                    // or any non Salsa panic (logical error).
-                    //
-                    // The propagated Salsa panic isn't very actionalbe for users
-                    // but it can be useful to know that file A failed to type check
-                    // because file B panicked (both files will have a panicked diagnostic).
+                None => {
+                    // Add a diagnostic (by not early returning) for
+                    // any non Salsa panic (a bug in ty)
                 }
-                // For normal cancellations, resume the panic
+                Some(salsa::Cancelled::PropagatedPanic) => {
+                    // Add a diagnostic for propagated Salsa panics. That is, query `A`
+                    // running on thread `a` depends on query `B` running on thread `b`
+                    // and query `B` panics. However, avoid adding such a diagnostic
+                    // if query `B` panicked because of a cancellation by calling
+                    // `unwind_if_revision_cancelled`.
+                    //
+                    // The propagated Salsa panic isn't very actionable for users,
+                    // but it can be useful to know that file A failed to type check
+                    // because file B panicked (both files will have a panic-diagnostic).
+                    db.unwind_if_revision_cancelled();
+                }
+
+                // For any pending write or local cancellation, resume the panic to abort the outer query.
                 Some(_) => {
                     error.resume_unwind();
                 }
