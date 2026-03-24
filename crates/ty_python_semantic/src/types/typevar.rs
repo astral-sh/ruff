@@ -1365,7 +1365,7 @@ pub(super) fn walk_type_var_bounds<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
 }
 
 impl<'db> TypeVarBoundOrConstraints<'db> {
-    fn materialize_impl(
+    pub(super) fn materialize_impl(
         self,
         db: &'db dyn Db,
         materialization_kind: MaterializationKind,

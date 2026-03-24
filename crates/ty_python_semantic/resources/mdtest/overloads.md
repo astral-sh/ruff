@@ -897,3 +897,43 @@ def baz(x, y, z=None) -> bytes | list[str]:
 # revealed: Overload[(x, y) -> bytes, (x, y, z) -> list[str]]
 reveal_type(baz)
 ```
+
+### Overload solving in cases involving type variables bound to gradual types
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+`library.pyi`:
+
+```pyi
+from typing import Any, Never, overload
+
+class Foo: ...
+
+class Bar[T: Any]:
+    def get1(self) -> T: ...
+
+@overload
+def foo(obj: Bar[Foo]) -> Never: ...
+@overload
+def foo(obj) -> Foo: ...
+```
+
+`app.py`:
+
+```py
+from library import Bar, foo, Foo
+
+def test(obj: Bar):
+    # Not all materializations of `Bar` (== `Bar[Unknown]`) are assignable to
+    # the parameter type of the first overload (`Bar[Foo]`), so neither overload
+    # can be eliminated by step 5 of the overload evaluation algorithm. The return
+    # types of the two overloads are not equivalent, so we must assume a return type
+    # of `Any`/`Unknown` and stop, according to step 5.
+    reveal_type(foo(obj))  # revealed: Unknown
+
+def test2(obj: Bar[Foo]):
+    reveal_type(foo(obj))  # revealed: Never
+```

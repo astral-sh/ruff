@@ -796,14 +796,14 @@ def test_covariant_narrowing(x: object):
 
     if isinstance(x, Covariant2):
         # TODO: solving a constrained TypeVar to anything except `Unknown` or one of its constraints is invalid.
-        # A more accurate revealed type here might be something like
+        # A more accurate revealed type here would be
         #
-        # Top[
+        # (
         #     Covariant2[Constraint1, Constraint1]
         #     | Covariant2[Constraint1, Constraint2]
         #     | Covariant2[Constraint2, Constraint1]
         #     | Covariant2[Constraint2, Constraint2]
-        # ]
+        # )
         #
         # revealed: Covariant2[Constraint1 | Constraint2, Constraint1 | Constraint2]
         reveal_type(x)
@@ -853,14 +853,14 @@ def test_invariant_narrowing_from_object(obj: object):
 
     if isinstance(obj, Invariant2):
         # TODO: solving a constrained TypeVar to anything except `Unknown` or one of its constraints is invalid.
-        # A more accurate revealed type here might be something like
+        # A more accurate revealed type here would be
         #
-        # Top[
-        #     (Invariant2[Constraint1, Constraint1] & Unknown)
-        #     | (Invariant2[Constraint1, Constraint2] & Unknown)
-        #     | (Invariant2[Constraint2, Constraint1] & Unknown)
-        #     | (Invariant2[Constraint2, Constraint2] & Unknown)
-        # ]
+        # (
+        #     Invariant2[Constraint1, Constraint1]
+        #     | Invariant2[Constraint1, Constraint2]
+        #     | Invariant2[Constraint2, Constraint1]
+        #     | Invariant2[Constraint2, Constraint2]
+        # )
         #
         # revealed: Top[Invariant2[(Unknown & Constraint1) | (Unknown & Constraint2), (Unknown & Constraint1) | (Unknown & Constraint2)]]
         reveal_type(obj)

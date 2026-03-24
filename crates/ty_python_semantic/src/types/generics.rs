@@ -1289,7 +1289,9 @@ impl<'db> Specialization<'db> {
                     ) | (MaterializationKind::Bottom, TypeVarVariance::Contravariant)
                 ) && let Some(bounds) = bound_typevar.typevar(db).bound_or_constraints(db)
                 {
-                    materialized = bounds.intersect_with(db, materialized);
+                    materialized = bounds
+                        .materialize_impl(db, MaterializationKind::Top, visitor)
+                        .intersect_with(db, materialized);
                 }
 
                 materialized
@@ -1471,7 +1473,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 let effective_source_type = tvar
                     .bound_or_constraints(db)
                     .map(|bound_or_constraints| {
-                        bound_or_constraints.intersect_with(db, source_type)
+                        bound_or_constraints
+                            .materialize_impl(
+                                db,
+                                MaterializationKind::Top,
+                                &ApplyTypeMappingVisitor::default(),
+                            )
+                            .intersect_with(db, source_type)
                     })
                     .unwrap_or(source_type);
 
