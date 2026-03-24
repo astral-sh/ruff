@@ -2,6 +2,7 @@ use std::string::ToString;
 
 use ruff_diagnostics::Applicability;
 use ruff_python_ast::helpers::contains_effect;
+use ruff_python_semantic::analyze::type_inference::{PythonType, ResolvedPythonType};
 use rustc_hash::FxHashSet;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -757,20 +758,12 @@ pub(crate) fn percent_format_positional_count_mismatch(
                 location,
             );
         }
-    } else if matches!(
-        right,
-        Expr::NumberLiteral(_)
-            | Expr::StringLiteral(_)
-            | Expr::BytesLiteral(_)
-            | Expr::BooleanLiteral(_)
-            | Expr::NoneLiteral(_)
-            | Expr::EllipsisLiteral(_)
-            | Expr::FString(_)
-    ) {
-        // A literal non-tuple right-hand side is always a single positional
-        // argument. Variables, attribute accesses, subscripts, etc. are not
-        // flagged because they could be tuples at runtime.
-        if summary.num_positional != 1 {
+    } else if let ResolvedPythonType::Atom(resolved_type) = ResolvedPythonType::from(right) {
+        // If we can infer a concrete non-tuple type for the RHS, it's always
+        // a single positional argument. Variables, attribute accesses, calls,
+        // etc. resolve to `Unknown` and are not flagged because they could be
+        // tuples at runtime.
+        if resolved_type != PythonType::Tuple && summary.num_positional != 1 {
             checker.report_diagnostic(
                 PercentFormatPositionalCountMismatch {
                     wanted: summary.num_positional,

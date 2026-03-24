@@ -34,6 +34,12 @@ k = {}
 '%s %s' % None  # F507
 '%s %s' % ...  # F507
 '%s %s' % f"hello {name}"  # F507
+# F507: ResolvedPythonType catches compound expressions with known types
+'%s %s' % -1  # F507 (unary op on int → int)
+'%s %s' % (1 + 2)  # F507 (int + int → int)
+'%s %s' % (not x)  # F507 (not → bool)
+'%s %s' % ("a" + "b")  # F507 (str + str → str)
+'%s %s' % (1 if True else 2)  # F507 (int if ... else int → int)
 # ok: single placeholder with literal RHS
 '%s' % 42
 '%s' % "hello"
@@ -43,5 +49,6 @@ k = {}
 '%s %s' % obj.attr
 '%s %s' % arr[0]
 '%s %s' % get_args()
+# ok: ternary/binop where one branch could be a tuple → Unknown
 '%s %s' % (a if cond else b)
 '%s %s' % (a + b)
