@@ -1,0 +1,67 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+assertion_line: 685
+---
+RUF073 `%` operator used on an f-string
+ --> RUF073.py:5:1
+  |
+4 | # Errors: f-string used with % operator
+5 | f"{banana}" % banana  # RUF073
+  | ^^^^^^^^^^^^^^^^^^^^
+6 | f"hello %s" % "world"  # RUF073
+7 | f"hello %s %s" % (1, 2)  # RUF073
+  |
+
+RUF073 `%` operator used on an f-string
+ --> RUF073.py:6:1
+  |
+4 | # Errors: f-string used with % operator
+5 | f"{banana}" % banana  # RUF073
+6 | f"hello %s" % "world"  # RUF073
+  | ^^^^^^^^^^^^^^^^^^^^^
+7 | f"hello %s %s" % (1, 2)  # RUF073
+8 | f"{name} %s" % "extra"  # RUF073
+  |
+
+RUF073 `%` operator used on an f-string
+ --> RUF073.py:7:1
+  |
+5 | f"{banana}" % banana  # RUF073
+6 | f"hello %s" % "world"  # RUF073
+7 | f"hello %s %s" % (1, 2)  # RUF073
+  | ^^^^^^^^^^^^^^^^^^^^^^^
+8 | f"{name} %s" % "extra"  # RUF073
+9 | f"no placeholders" % banana  # RUF073
+  |
+
+RUF073 `%` operator used on an f-string
+  --> RUF073.py:8:1
+   |
+ 6 | f"hello %s" % "world"  # RUF073
+ 7 | f"hello %s %s" % (1, 2)  # RUF073
+ 8 | f"{name} %s" % "extra"  # RUF073
+   | ^^^^^^^^^^^^^^^^^^^^^^
+ 9 | f"no placeholders" % banana  # RUF073
+10 | f"{'nested'} %s" % 42  # RUF073
+   |
+
+RUF073 `%` operator used on an f-string
+  --> RUF073.py:9:1
+   |
+ 7 | f"hello %s %s" % (1, 2)  # RUF073
+ 8 | f"{name} %s" % "extra"  # RUF073
+ 9 | f"no placeholders" % banana  # RUF073
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+10 | f"{'nested'} %s" % 42  # RUF073
+   |
+
+RUF073 `%` operator used on an f-string
+  --> RUF073.py:10:1
+   |
+ 8 | f"{name} %s" % "extra"  # RUF073
+ 9 | f"no placeholders" % banana  # RUF073
+10 | f"{'nested'} %s" % 42  # RUF073
+   | ^^^^^^^^^^^^^^^^^^^^^
+11 |
+12 | # OK: regular string with % operator
+   |
