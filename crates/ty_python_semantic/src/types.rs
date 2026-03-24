@@ -1645,7 +1645,7 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         target: Type<'db>,
-        inferable: InferableTypeVars<'_, 'db>,
+        inferable: InferableTypeVars<'db>,
     ) -> Type<'db> {
         let constraints = ConstraintSetBuilder::new();
         self.filter_union(db, |elem| {
