@@ -1849,42 +1849,36 @@ fn is_annotation_empty(annotation: &Annotation<'_>) -> bool {
         .all(|fragment| fragment.content.is_empty())
 }
 
+// We replace some characters so the CLI output is always consistent and underlines aligned.
+const OUTPUT_REPLACEMENTS: &[(char, &str)] = &[
+    ('\t', "    "),   // We do our own tab replacement
+    ('\u{200D}', ""), // Replace ZWJ with nothing for consistent terminal output of grapheme clusters.
+    ('\u{202A}', ""), // The following unicode text flow control characters are inconsistently
+    ('\u{202B}', ""), // supported across CLIs and can cause confusion due to the bytes on disk
+    ('\u{202D}', ""), // not corresponding to the visible source code, so we replace them always.
+    ('\u{202E}', ""),
+    ('\u{2066}', ""),
+    ('\u{2067}', ""),
+    ('\u{2068}', ""),
+    ('\u{202C}', ""),
+    ('\u{2069}', ""),
+];
+
 fn normalize_whitespace(str: &str) -> Cow<'_, str> {
-    let mut output = String::new();
-    let mut last_index = 0usize;
-
-    // We replace some characters so the CLI output is always consistent and underlines aligned.
-    for (index, c) in str.char_indices() {
-        let replacement = match c {
-            '\t' => "    ",   // We do our own tab replacement
-            '\u{200D}' => "", // Replace ZWJ with nothing for consistent terminal output of grapheme clusters.
-            '\u{202A}' => "", // The following unicode text flow control characters are inconsistently
-            '\u{202B}' => "", // supported across CLIs and can cause confusion due to the bytes on disk
-            '\u{202D}' => "", // not corresponding to the visible source code, so we replace them always.
-            '\u{202E}' => "",
-            '\u{2066}' => "",
-            '\u{2067}' => "",
-            '\u{2068}' => "",
-            '\u{202C}' => "",
-            '\u{2069}' => "",
-            _ => continue,
-        };
-
-        if output.is_empty() {
-            output.reserve(str.len());
-        }
-
-        output.push_str(&str[last_index..index]);
-        output.push_str(replacement);
-        last_index = index + c.len_utf8();
+    // This is an optimization to avoid repeated `str::replace` calls in the typical case of no
+    // valid replacements. Note that this list needs to be kept in sync with `OUTPUT_REPLACEMENTS`.
+    if !str.contains([
+        '\t', '\u{200d}', '\u{202a}', '\u{202b}', '\u{202d}', '\u{202e}', '\u{2066}', '\u{2067}',
+        '\u{2068}', '\u{202c}', '\u{2069}',
+    ]) {
+        return Cow::Borrowed(str);
     }
 
-    if output.is_empty() {
-        Cow::Borrowed(str)
-    } else {
-        output.push_str(&str[last_index..]);
-        Cow::Owned(output)
+    let mut s = str.to_owned();
+    for (c, replacement) in OUTPUT_REPLACEMENTS {
+        s = s.replace(*c, replacement);
     }
+    Cow::Owned(s)
 }
 
 fn overlaps(
