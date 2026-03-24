@@ -95,7 +95,7 @@ def outer_generator():
 A dict literal that is structurally compatible with a `TypedDict` should be accepted.
 
 ```py
-from typing import Iterator, TypedDict
+from typing import Iterator, Generator, TypedDict
 
 class Person(TypedDict):
     name: str
@@ -119,6 +119,24 @@ def persons() -> Iterator[Person]:
     # error: [invalid-yield]
     # error: [invalid-argument-type]
     yield from [{"name": 42}]
+```
+
+This also works for return values:
+
+```py
+def persons(f: bool) -> Generator[None, None, Person]:
+    yield
+    if f:
+        return {"name": "Bob"}
+    else:
+        # error: [invalid-return-type]
+        # error: [invalid-argument-type]
+        return {"name": 42}
+
+def persons_iterable() -> Iterable[Person]:
+    yield {"name": "Alice"}
+    # Type context is unknown since there is no return type for Iterable.
+    return {"name": "Bob"}
 ```
 
 ## `yield` expression send type inference

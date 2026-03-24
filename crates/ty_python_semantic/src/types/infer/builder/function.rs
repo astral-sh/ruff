@@ -115,8 +115,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     );
                 }
 
-                if let Some(generator_types) = declared_ty.generator_types(db)
-                    && let Some(expected_return_ty) = generator_types.return_ty
+                if let Some(annotated_generator_ty) = declared_ty.generator_types(db)
+                    && let Some(expected_return_ty) = annotated_generator_ty.return_ty
                 {
                     for invalid in self
                         .return_types_and_ranges
