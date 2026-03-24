@@ -57,7 +57,7 @@ use crate::types::class::{
     ClassLiteral, CodeGeneratorKind, DynamicClassAnchor, DynamicClassLiteral,
     DynamicMetaclassConflict, MethodDecorator,
 };
-use crate::types::constraints::ConstraintSetBuilder;
+use crate::types::constraints::{ConstraintSetBuilder, PathBounds, Solutions};
 use crate::types::context::InferContext;
 use crate::types::diagnostic::{
     self, CALL_NON_CALLABLE, CONFLICTING_DECLARATIONS, CYCLIC_CLASS_DEFINITION,
@@ -5189,33 +5189,57 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // If this is a generic call, attempt to specialize the parameter type using the
                 // declared type context, if provided.
                 if let Some(generic_context) = overload.signature.generic_context {
-                    let mut builder =
-                        SpecializationBuilder::new(db, generic_context.inferable_typevars(db));
-
+                    // Use a forward assignability check to infer typevar specializations from the
+                    // declared type context. For example, if the return type is `list[T]` and the
+                    // declared type context is `list[int]`, the check produces `T = int`.
+                    let mut tcx_mappings = FxHashMap::default();
                     if let Some(declared_return_ty) = call_expression_tcx.annotation {
-                        let _ = builder.infer_reverse(
-                            &constraints,
+                        let return_ty = overload
+                            .constructor_instance_type
+                            .unwrap_or(overload.signature.return_ty);
+                        let set = return_ty.when_constraint_set_assignable_to(
+                            db,
                             declared_return_ty,
-                            overload
-                                .constructor_instance_type
-                                .unwrap_or(overload.signature.return_ty),
+                            &constraints,
                         );
+                        if let Solutions::Constrained(solutions) = set.solutions(db, &constraints) {
+                            for solution in solutions.iter() {
+                                for binding in solution {
+                                    tcx_mappings
+                                        .entry(binding.bound_typevar.identity(db))
+                                        .and_modify(|existing| {
+                                            *existing = UnionType::from_two_elements(
+                                                db,
+                                                *existing,
+                                                binding.solution,
+                                            );
+                                        })
+                                        .or_insert(binding.solution);
+                                }
+                            }
+                        }
                     }
 
-                    let specialization = builder
-                        // Default specialize any type variables to a marker type, which will be ignored
-                        // during argument inference, allowing the concrete subset of the parameter
-                        // type to still affect argument inference.
-                        //
-                        // TODO: Eventually, we want to "tie together" the typevars of the two calls
-                        // so that we can infer their specializations at the same time — or at least, for
-                        // the specialization of one to influence the specialization of the other. It's
-                        // not yet clear how we're going to do that. (We might have to start inferring
-                        // constraint sets for each expression, instead of simple types?)
-                        .with_default(generic_context, |_| {
-                            Type::Dynamic(DynamicType::UnspecializedTypeVar)
-                        })
-                        .build(generic_context);
+                    // Default specialize any type variables to a marker type, which will be ignored
+                    // during argument inference, allowing the concrete subset of the parameter
+                    // type to still affect argument inference.
+                    //
+                    // TODO: Eventually, we want to "tie together" the typevars of the two calls
+                    // so that we can infer their specializations at the same time — or at least, for
+                    // the specialization of one to influence the specialization of the other. It's
+                    // not yet clear how we're going to do that. (We might have to start inferring
+                    // constraint sets for each expression, instead of simple types?)
+                    let specialization = generic_context.specialize_recursive(
+                        db,
+                        generic_context.variables(db).map(|typevar| {
+                            Some(
+                                tcx_mappings
+                                    .get(&typevar.identity(db))
+                                    .copied()
+                                    .unwrap_or(Type::Dynamic(DynamicType::UnspecializedTypeVar)),
+                            )
+                        }),
+                    );
 
                     parameter_type = parameter_type.apply_specialization(db, specialization);
                 }
@@ -6014,52 +6038,127 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         });
 
         // Collect type constraints from the declared element types.
+        //
+        // We use a forward assignability check (`collection_instance ≤ tcx`) to infer what each
+        // typevar maps to in the type context. For example, if the type context is `list[int]` and
+        // `collection_instance` is `list[T]`, the check produces `T = int`.
+        //
+        // Variance is determined from the constraint bounds: a constraint with only an upper bound
+        // (`lower = Never`) indicates a covariant position, while a constraint with only a lower
+        // bound (`upper = object`) indicates contravariant. This correctly handles cases where the
+        // type context is a covariant superclass of the collection (e.g., `Sequence[Any]` as type
+        // context for `list[T]`).
         let (elt_tcx_constraints, elt_tcx_variance) = {
-            let mut builder = SpecializationBuilder::new(self.db(), inferable);
-
-            // For a given type variable, we keep track of the variance of any assignments to
-            // that type variable in the type context.
+            let mut elt_tcx_constraints: FxHashMap<BoundTypeVarIdentity<'_>, Type<'db>> =
+                FxHashMap::default();
             let mut elt_tcx_variance: FxHashMap<BoundTypeVarIdentity<'_>, TypeVarVariance> =
                 FxHashMap::default();
 
             if let Some(tcx) = tcx.annotation
                 && tcx.class_specialization(self.db()).is_some()
+                // Skip constraint extraction when the type context contains UnspecializedTypeVar
+                // placeholders (from partially-specialized parameter types during multi-inference
+                // for overloaded calls). The assignability check would walk through protocol
+                // supertypes and produce constraints contaminated by the placeholder, which
+                // collapse to `Any` during solution extraction and bypass downstream filters.
+                //
+                // TODO: UnspecializedTypeVar should be removed entirely once the
+                // SpecializationBuilder uses constraint sets internally, at which point the
+                // typevars that it currently replaces can instead be existentially quantified away
+                // (as is already done for generic callable assignability in
+                // `check_signature_pair`).
+                && !tcx.has_unspecialized_type_var(self.db())
             {
-                let collection_instance =
-                    Type::instance(self.db(), ClassType::Generic(collection_alias));
+                let db = self.db();
+                let collection_instance = Type::instance(db, ClassType::Generic(collection_alias));
 
-                builder
-                    .infer_reverse_map(
-                        &constraints,
-                        tcx,
-                        collection_instance,
-                        |(typevar, variance, inferred_ty)| {
-                            // Avoid inferring a preferred type based on partially specialized type context
-                            // from an outer generic call. If the type context is a union, we try to keep
-                            // any concrete elements.
-                            let inferred_ty = inferred_ty.filter_union(self.db(), |ty| {
-                                !ty.has_unspecialized_type_var(self.db())
-                            });
-                            if inferred_ty.has_unspecialized_type_var(self.db()) {
-                                return None;
+                let set =
+                    collection_instance.when_constraint_set_assignable_to(db, tcx, &constraints);
+
+                // Use `solutions_with_inferable` to capture per-typevar variance from the raw
+                // lower/upper bounds on each BDD path. We must use the inferable-aware variant so
+                // that non-inferable typevars from outer scopes (which the assignability check
+                // constrains alongside the collection's own typevars) are excluded from cycle
+                // detection and solution extraction. Without this, a type context like
+                // `list[T@MyClass]` would create mutual constraints between `_T` (list's typevar)
+                // and `T@MyClass`, which `is_cyclic` would flag as a cycle, returning
+                // `Unsatisfiable` and losing the type context information entirely.
+                let solutions = set.solutions_with_inferable(
+                    db,
+                    &constraints,
+                    inferable,
+                    |typevar, variance, lower, upper| {
+                        if !typevar.is_inferable(db, inferable) {
+                            return Ok(None);
+                        }
+
+                        let identity = typevar.identity(db);
+                        elt_tcx_variance
+                            .entry(identity)
+                            .and_modify(|current| *current = current.join(variance))
+                            .or_insert(variance);
+                        PathBounds::default_solve(db, typevar, lower, upper)
+                    },
+                );
+
+                match solutions {
+                    // If the type context is not compatible with the collection type (e.g., a
+                    // `list` literal where a `tuple` is expected), the assignability check
+                    // produces an unsatisfiable result. In that case, we simply proceed without
+                    // type context constraints rather than aborting the entire collection literal
+                    // inference.
+                    Solutions::Unsatisfiable | Solutions::Unconstrained => {}
+                    Solutions::Constrained(solutions) => {
+                        for solution in &solutions {
+                            for binding in solution {
+                                // The SequentMap's transitivity reasoning can inject
+                                // cross-typevar references into the solution bounds.
+                                // For example, `_KT ≤ str ∧ str ≤ _VT` derives `_KT ≤ _VT`,
+                                // which adds `_KT` to `_VT`'s lower bound. Filter out any
+                                // inferable typevars from the solution, since they represent
+                                // cross-typevar relationships that are resolved independently.
+                                let inferred_ty = binding.solution.filter_union(db, |ty| {
+                                    !ty.as_typevar()
+                                        .is_some_and(|tv| tv.is_inferable(db, inferable))
+                                });
+
+                                // Avoid inferring a preferred type based on partially specialized
+                                // type context from an outer generic call. If the type context is
+                                // a union, we try to keep any concrete elements.
+                                let inferred_ty = inferred_ty
+                                    .filter_union(db, |ty| !ty.has_unspecialized_type_var(db));
+                                if inferred_ty.has_unspecialized_type_var(db) {
+                                    continue;
+                                }
+
+                                let identity = binding.bound_typevar.identity(db);
+                                elt_tcx_constraints
+                                    .entry(identity)
+                                    .and_modify(|existing| {
+                                        *existing = UnionType::from_two_elements(
+                                            db,
+                                            *existing,
+                                            inferred_ty,
+                                        );
+                                    })
+                                    .or_insert(inferred_ty);
                             }
+                        }
 
-                            elt_tcx_variance
-                                .entry(typevar)
-                                .and_modify(|current| *current = current.join(variance))
-                                .or_insert(variance);
-
-                            Some(inferred_ty)
-                        },
-                    )
-                    .ok()?;
+                        // Remove variance entries for typevars whose solutions were filtered out
+                        // (e.g., due to unspecialized typevars). Variance should only be tracked
+                        // for typevars with actual type context constraints.
+                        elt_tcx_variance
+                            .retain(|identity, _| elt_tcx_constraints.contains_key(identity));
+                    }
+                }
             }
 
-            (builder.into_type_mappings(), elt_tcx_variance)
+            (elt_tcx_constraints, elt_tcx_variance)
         };
 
         // Create a set of constraints to infer a precise type for `T`.
-        let mut builder = SpecializationBuilder::new(self.db(), inferable);
+        let mut builder = SpecializationBuilder::new(self.db(), &constraints, inferable);
 
         for elt_ty in elt_tys.clone() {
             let elt_ty_identity = elt_ty.identity(self.db());
@@ -6088,9 +6187,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // our inference is compatible with subsequent additions to the collection), but it
             // matches the behavior of other type checkers and is usually the desired behavior.
             if let Some(elt_tcx) = elt_tcx {
-                builder
-                    .infer(&constraints, Type::TypeVar(elt_ty), elt_tcx)
-                    .ok()?;
+                builder.insert_type_mapping(elt_ty, elt_tcx);
             }
         }
 
@@ -6119,12 +6216,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 let mut elt_tys = elt_tys.clone();
                 if let Some((key_ty, value_ty)) = elt_tys.next_tuple() {
-                    builder
-                        .infer(&constraints, Type::TypeVar(key_ty), unpacked_key_ty)
-                        .ok()?;
+                    builder.infer(Type::TypeVar(key_ty), unpacked_key_ty).ok()?;
 
                     builder
-                        .infer(&constraints, Type::TypeVar(value_ty), unpacked_value_ty)
+                        .infer(Type::TypeVar(value_ty), unpacked_value_ty)
                         .ok()?;
                 }
 
@@ -6171,7 +6266,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 builder
                     .infer(
-                        &constraints,
                         Type::TypeVar(elt_ty),
                         if elt.is_starred_expr() {
                             inferred_elt_ty
@@ -6185,15 +6279,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
-        // Promote singleton types to `T | Unknown` in inferred type parameters,
-        // so that e.g. `[None]` is inferred as `list[None | Unknown]`.
-        if elt_tcx_constraints.is_empty() {
-            builder.map_types(|ty| ty.promote_singletons(self.db()));
-        }
-
         let class_type = collection_alias
             .origin(self.db())
-            .apply_specialization(self.db(), |_| builder.build(generic_context));
+            .apply_specialization(self.db(), |_| {
+                builder.build_with(generic_context, |_, lower, _| {
+                    // Promote singleton types to `T | Unknown` in inferred type parameters,
+                    // so that e.g. `[None]` is inferred as `list[None | Unknown]`.
+                    if elt_tcx_constraints.is_empty() {
+                        return Some(lower.promote_singletons(self.db()));
+                    }
+                    None
+                })
+            });
 
         Type::from(class_type).to_instance(self.db())
     }
