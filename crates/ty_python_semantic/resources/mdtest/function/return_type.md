@@ -579,7 +579,7 @@ async def i() -> typing.AsyncIterable:
 async def j() -> str:  # error: [invalid-return-type]
     yield 42
 
-async def j() -> typing.AsyncGenerator:
+async def k() -> typing.AsyncGenerator:
     yield 42
     return 2  # error: [invalid-syntax] "`return` with value in async generator"
 ```
