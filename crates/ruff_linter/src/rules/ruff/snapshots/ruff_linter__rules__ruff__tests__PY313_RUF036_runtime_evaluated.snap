@@ -1,0 +1,18 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF036 [*] `None` not at the end of the type union.
+ --> <filename>:2:15
+  |
+2 | def func(arg: None | int):
+  |               ^^^^^^^^^^
+3 |     ...
+  |
+help: Move `None` to the end of the type union
+1 | 
+  - def func(arg: None | int):
+2 + def func(arg: int | None):
+3 |     ...
+4 | 
+5 | print(None | (int)and 2)
+note: This is an unsafe fix and may change runtime behavior

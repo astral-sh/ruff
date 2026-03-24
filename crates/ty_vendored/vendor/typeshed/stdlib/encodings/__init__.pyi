@@ -31,6 +31,8 @@ Written by Marc-Andre Lemburg (mal@lemburg.com).
 import sys
 from codecs import CodecInfo
 
+from . import aliases as aliases
+
 class CodecRegistryError(LookupError, SystemError): ...
 
 def normalize_encoding(encoding: str | bytes) -> str:

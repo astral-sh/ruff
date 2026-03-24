@@ -42,6 +42,61 @@ def _(x: Literal["a", "b", "c", 1]):
         reveal_type(x)  # revealed: Literal[1]
 ```
 
+## `in` for PEP 695 aliases
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Literal, assert_never
+
+type Foo = Literal["a", "b", "c", "d"]
+
+def _(x: Foo):
+    if x in ("a", "b"):
+        reveal_type(x)  # revealed: Literal["a", "b"]
+    else:
+        reveal_type(x)  # revealed: Literal["c", "d"]
+
+def _(x: Foo) -> str:
+    if x in ("a", "b"):
+        return "AB"
+    match x:
+        case "c":
+            return "C"
+        case "d":
+            return "D"
+        case _ as never:
+            assert_never(never)
+```
+
+## `in` for mixed PEP 695 aliases
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Literal
+
+type Foo = Literal["a", "b", "c"] | int
+
+def _(x: Foo):
+    if x in ("a", "b"):
+        reveal_type(x)  # revealed: Literal["a", "b"] | int
+    else:
+        reveal_type(x)  # revealed: Literal["c"] | int
+
+def _(x: Foo):
+    if x not in ("a", "c"):
+        reveal_type(x)  # revealed: Literal["b"] | int
+    else:
+        reveal_type(x)  # revealed: Literal["a", "c"] | int
+```
+
 ## `in` for `str` and literal strings
 
 ```py
@@ -119,6 +174,31 @@ def test(x: Literal["a", "b", "c"] | None | int = None):
         reveal_type(x)  # revealed: Literal["b"] | None | int
     else:
         reveal_type(x)  # revealed: Literal["a", "c"] | int
+```
+
+## No narrowing for the right-hand side (currently)
+
+No narrowing is done for the right-hand side currently, even if the right-hand side is a valid
+"target" (name/attribute/subscript) that could potentially be narrowed. We may change this in the
+future:
+
+```py
+from typing import Literal
+
+def f(x: Literal["abc", "def"]):
+    if "a" in x:
+        # `x` could also be validly narrowed to `Literal["abc"]` here:
+        reveal_type(x)  # revealed: Literal["abc", "def"]
+    else:
+        # `x` could also be validly narrowed to `Literal["def"]` here:
+        reveal_type(x)  # revealed: Literal["abc", "def"]
+
+    if "a" not in x:
+        # `x` could also be validly narrowed to `Literal["def"]` here:
+        reveal_type(x)  # revealed: Literal["abc", "def"]
+    else:
+        # `x` could also be validly narrowed to `Literal["abc"]` here:
+        reveal_type(x)  # revealed: Literal["abc", "def"]
 ```
 
 ## bool

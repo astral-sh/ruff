@@ -1,3 +1,4 @@
+use ruff_diagnostics::Applicability;
 use ruff_python_ast::{self as ast, Arguments, Expr, str_prefix::StringLiteralPrefix};
 use ruff_text_size::{Ranged, TextRange};
 
@@ -88,6 +89,9 @@ impl Violation for UncapitalizedEnvironmentVariables {
 /// ages = {"Tom": 23, "Maria": 23, "Dog": 11}
 /// age = ages.get("Cat")
 /// ```
+///
+/// ## Fix safety
+/// This rule's fix is marked as safe, unless the expression contains comments.
 ///
 /// ## References
 /// - [Python documentation: `dict.get`](https://docs.python.org/3/library/stdtypes.html#dict.get)
@@ -266,11 +270,6 @@ pub(crate) fn dict_get_with_none_default(checker: &Checker, expr: &Expr) {
     let Some(key) = args.first() else {
         return;
     };
-    if !crate::preview::is_sim910_expanded_key_support_enabled(checker.settings()) {
-        if !(key.is_literal_expr() || key.is_name_expr()) {
-            return;
-        }
-    }
     let Some(default) = args.get(1) else {
         return;
     };
@@ -310,8 +309,15 @@ pub(crate) fn dict_get_with_none_default(checker: &Checker, expr: &Expr) {
         },
         expr.range(),
     );
-    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-        expected,
-        expr.range(),
-    )));
+
+    let applicability = if checker.comment_ranges().intersects(expr.range()) {
+        Applicability::Unsafe
+    } else {
+        Applicability::Safe
+    };
+
+    diagnostic.set_fix(Fix::applicable_edit(
+        Edit::range_replacement(expected, expr.range()),
+        applicability,
+    ));
 }

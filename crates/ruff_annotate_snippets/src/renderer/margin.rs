@@ -41,9 +41,15 @@ impl Margin {
         //    |                     ^^^^^^^^^
         // ```
 
+        let whitespace_left = whitespace_left.saturating_sub(ELLIPSIS_PASSING);
+        let span_left = span_left.saturating_sub(ELLIPSIS_PASSING);
+
         let mut m = Margin {
-            whitespace_left: whitespace_left.saturating_sub(ELLIPSIS_PASSING),
-            span_left: span_left.saturating_sub(ELLIPSIS_PASSING),
+            // When an annotation points at leading whitespace (e.g. an indentation error),
+            // `whitespace_left` can exceed `span_left`. Clamp it so that trimming whitespace
+            // never hides the leftmost annotation.
+            whitespace_left: min(whitespace_left, span_left),
+            span_left,
             span_right: span_right + ELLIPSIS_PASSING,
             computed_left: 0,
             computed_right: 0,

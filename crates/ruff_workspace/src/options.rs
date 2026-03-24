@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 use regex::Regex;
 use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
 use serde::de::{self};
@@ -19,7 +19,9 @@ use ruff_linter::rules::flake8_import_conventions::settings::BannedAliases;
 use ruff_linter::rules::flake8_pytest_style::settings::SettingsError;
 use ruff_linter::rules::flake8_pytest_style::types;
 use ruff_linter::rules::flake8_quotes::settings::Quote;
-use ruff_linter::rules::flake8_tidy_imports::settings::{ApiBan, Strictness};
+use ruff_linter::rules::flake8_tidy_imports::settings::{
+    AllImports, ApiBan, ImportSelection, ImportSelector, Strictness,
+};
 use ruff_linter::rules::isort::settings::RelativeImportsOrder;
 use ruff_linter::rules::isort::{ImportSection, ImportType};
 use ruff_linter::rules::pep8_naming::settings::IgnoreNames;
@@ -32,7 +34,7 @@ use ruff_linter::rules::{
     pycodestyle, pydoclint, pydocstyle, pyflakes, pylint, pyupgrade, ruff,
 };
 use ruff_linter::settings::types::{
-    IdentifierPattern, OutputFormat, PythonVersion, RequiredVersion,
+    IdentifierPattern, Language, OutputFormat, PreviewMode, PythonVersion, RequiredVersion,
 };
 use ruff_linter::{RuleSelector, warn_user_once};
 use ruff_macros::{CombineOptions, OptionsMetadata};
@@ -262,7 +264,7 @@ pub struct Options {
     ///
     /// For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).
     #[option(
-        default = r#"["*.py", "*.pyi", "*.pyw", "*.ipynb", "**/pyproject.toml"]"#,
+        default = r#"["*.py", "*.pyi", "*.pyw", "*.ipynb", "*.md", "**/pyproject.toml"]"#,
         value_type = "list[str]",
         example = r#"
             include = ["*.py"]
@@ -281,6 +283,24 @@ pub struct Options {
         "#
     )]
     pub respect_gitignore: Option<bool>,
+
+    /// A mapping of custom file extensions to known file types (overridden
+    /// by the `--extension` command-line flag).
+    ///
+    /// Supported file types include `python`, `pyi`, `ipynb`, and `markdown`.
+    ///
+    /// Any file extensions listed here will be automatically added to the
+    /// default `include` list as a `*.{ext}` glob, so that they are linted
+    /// and formatted without needing any additional configuration settings.
+    #[option(
+        default = "{}",
+        value_type = "dict[str, Language]",
+        example = r#"
+            # Add a custom file extension mapped to Python
+            extension = {rpy="python"}
+        "#
+    )]
+    pub extension: Option<FxHashMap<String, Language>>,
 
     // Generic python options
     /// A list of builtins to treat as defined references, in addition to the
@@ -657,6 +677,14 @@ pub struct LintCommonOptions {
 
     /// A list of rule codes or prefixes to ignore, in addition to those
     /// specified by `ignore`.
+    ///
+    /// This option is deprecated because it is now interchangeable with
+    /// [`ignore`](#lint_ignore). In earlier versions of Ruff, `ignore` would
+    /// _replace_ the set of ignored rules when using configuration inheritance
+    /// (via the top-level [`extend`](https://docs.astral.sh/ruff/settings/#extend)
+    /// setting), while `extend-ignore` would _add_ to the inherited set. Ruff
+    /// now merges both `ignore` and `extend-ignore` into a single set, so the
+    /// distinction no longer applies. Use [`ignore`](#lint_ignore) instead.
     #[option(
         default = "[]",
         value_type = "list[RuleSelector]",
@@ -672,6 +700,23 @@ pub struct LintCommonOptions {
 
     /// A list of rule codes or prefixes to enable, in addition to those
     /// specified by [`select`](#lint_select).
+    ///
+    /// Unlike [`select`](#lint_select), which _replaces_ the default rule set
+    /// when specified, `extend-select` _adds_ to whatever rules are already
+    /// active. This makes `extend-select` the preferred option when you want
+    /// to enable additional rules on top of the defaults without having to
+    /// enumerate them.
+    ///
+    /// For example, to enable the defaults plus flake8-bugbear:
+    ///
+    /// ```toml
+    /// [tool.ruff.lint]
+    /// # Adds flake8-bugbear on top of the default rules (E4, E7, E9, F).
+    /// extend-select = ["B"]
+    /// ```
+    ///
+    /// Using `select = ["B"]` instead would _replace_ the defaults, enabling
+    /// only flake8-bugbear.
     #[option(
         default = "[]",
         value_type = "list[RuleSelector]",
@@ -1671,13 +1716,14 @@ impl<'de> Deserialize<'de> for Alias {
 impl Flake8ImportConventionsOptions {
     pub fn try_into_settings(
         self,
+        preview: PreviewMode,
     ) -> anyhow::Result<flake8_import_conventions::settings::Settings> {
         let mut aliases: FxHashMap<String, String> = match self.aliases {
             Some(options_aliases) => options_aliases
                 .into_iter()
                 .map(|(module, alias)| (module.into_string(), alias.into_string()))
                 .collect(),
-            None => flake8_import_conventions::settings::default_aliases(),
+            None => flake8_import_conventions::settings::default_aliases(preview),
         };
         if let Some(extend_aliases) = self.extend_aliases {
             aliases.extend(
@@ -1698,9 +1744,13 @@ impl Flake8ImportConventionsOptions {
             normalized_aliases.insert(module, normalized_alias);
         }
 
+        let banned_aliases = self.banned_aliases.unwrap_or_else(|| {
+            flake8_import_conventions::settings::default_banned_aliases(preview)
+        });
+
         Ok(flake8_import_conventions::settings::Settings {
             aliases: normalized_aliases,
-            banned_aliases: self.banned_aliases.unwrap_or_default(),
+            banned_aliases,
             banned_from: self.banned_from.unwrap_or_default(),
         })
     }
@@ -2058,16 +2108,118 @@ pub struct Flake8TidyImportsOptions {
         "#
     )]
     pub banned_module_level_imports: Option<Vec<String>>,
+
+    /// Specific modules that must be imported lazily in contexts where `lazy import` is legal, or
+    /// `"all"` to require every lazily-convertible import to use the `lazy` keyword. Ruff ignores
+    /// contexts where `lazy import` is invalid, such as functions, classes, `try`/`except`
+    /// blocks, `__future__` imports, and `from ... import *` statements. This rule is only
+    /// enforced when targeting Python 3.15 or newer.
+    #[option(
+        default = r#"[]"#,
+        value_type = r#""all" | list[str] | { include = "all" | list[str], exclude = list[str] }"#,
+        example = r#"
+            # Require lazy imports for specific modules.
+            require-lazy = ["typing", "foo"]
+
+            # Require lazy imports by default, except for modules with import-time side effects.
+            require-lazy = { include = "all", exclude = ["sitecustomize"] }
+        "#
+    )]
+    pub require_lazy: Option<ImportSelector>,
+
+    /// Specific modules that may not be imported lazily, or `"all"` to forbid lazy imports except
+    /// for any modules excluded from the selector. This rule is only enforced when targeting
+    /// Python 3.15 or newer.
+    #[option(
+        default = r#"[]"#,
+        value_type = r#""all" | list[str] | { include = "all" | list[str], exclude = list[str] }"#,
+        example = r#"
+            # Forbid lazy imports for specific modules.
+            ban-lazy = ["sitecustomize"]
+
+            # Forbid lazy imports by default, while allowing specific exceptions.
+            ban-lazy = { include = "all", exclude = ["typing"] }
+        "#
+    )]
+    pub ban_lazy: Option<ImportSelector>,
 }
 
 impl Flake8TidyImportsOptions {
-    pub fn into_settings(self) -> flake8_tidy_imports::settings::Settings {
-        flake8_tidy_imports::settings::Settings {
+    pub fn try_into_settings(self) -> Result<flake8_tidy_imports::settings::Settings> {
+        let require_lazy = self.require_lazy.unwrap_or_default();
+        let ban_lazy = self.ban_lazy.unwrap_or_default();
+
+        if conflicting_lazy_import_settings(&require_lazy, &ban_lazy) {
+            return Err(anyhow!(
+                "`require-lazy` and `ban-lazy` must not overlap after applying exclusions"
+            ));
+        }
+
+        Ok(flake8_tidy_imports::settings::Settings {
             ban_relative_imports: self.ban_relative_imports.unwrap_or(Strictness::Parents),
             banned_api: self.banned_api.unwrap_or_default(),
             banned_module_level_imports: self.banned_module_level_imports.unwrap_or_default(),
+            require_lazy,
+            ban_lazy,
+        })
+    }
+}
+
+fn conflicting_lazy_import_settings(
+    require_lazy: &ImportSelector,
+    ban_lazy: &ImportSelector,
+) -> bool {
+    overlapping_import_selectors(require_lazy, ban_lazy)
+}
+
+fn overlapping_import_selectors(left: &ImportSelector, right: &ImportSelector) -> bool {
+    match (left.include(), right.include()) {
+        (ImportSelection::All(AllImports::All), ImportSelection::All(AllImports::All)) => true,
+        (ImportSelection::All(AllImports::All), ImportSelection::Imports(imports))
+        | (ImportSelection::Imports(imports), ImportSelection::All(AllImports::All)) => imports
+            .iter()
+            .any(|candidate| candidate_has_overlap(candidate, left.exclude(), right.exclude())),
+        (ImportSelection::Imports(left_imports), ImportSelection::Imports(right_imports)) => {
+            left_imports.iter().any(|left_import| {
+                right_imports.iter().any(|right_import| {
+                    overlapping_root(left_import, right_import).is_some_and(|candidate| {
+                        candidate_has_overlap(candidate, left.exclude(), right.exclude())
+                    })
+                })
+            })
         }
     }
+}
+
+fn candidate_has_overlap(
+    candidate: &str,
+    left_excludes: &[String],
+    right_excludes: &[String],
+) -> bool {
+    !is_fully_excluded(candidate, left_excludes) && !is_fully_excluded(candidate, right_excludes)
+}
+
+fn overlapping_root<'a>(left: &'a str, right: &'a str) -> Option<&'a str> {
+    if matches_module_prefix(left, right) {
+        Some(right)
+    } else if matches_module_prefix(right, left) {
+        Some(left)
+    } else {
+        None
+    }
+}
+
+fn is_fully_excluded(candidate: &str, excludes: &[String]) -> bool {
+    excludes
+        .iter()
+        .any(|exclude| matches_module_prefix(candidate, exclude))
+}
+
+fn matches_module_prefix(module: &str, prefix: &str) -> bool {
+    module == prefix
+        || module
+            .strip_prefix(prefix)
+            .is_some_and(|suffix| suffix.starts_with('.'))
 }
 
 /// Options for the `flake8-type-checking` plugin
@@ -2131,7 +2283,7 @@ pub struct Flake8TypeCheckingOptions {
     ///
     /// For example:
     /// ```python
-    /// import fastapi
+    /// from fastapi import FastAPI
     ///
     /// app = FastAPI("app")
     ///
@@ -2497,6 +2649,27 @@ pub struct IsortOptions {
     )]
     pub no_lines_before: Option<Vec<ImportSection>>,
 
+    /// A mapping from import section names to their heading comments.
+    ///
+    /// When set, a comment with the specified text will be added above imports
+    /// in the corresponding section. If a heading comment already exists, it
+    /// will be replaced.
+    ///
+    /// Compatible with isort's `import_heading_{section_name}` settings.
+    #[option(
+        default = r#"{}"#,
+        value_type = r#"dict["future" | "standard-library" | "third-party" | "first-party" | "local-folder" | str, str]"#,
+        scope = "import-heading",
+        example = r#"
+            future = "Future imports"
+            standard-library = "Standard library imports"
+            third-party = "Third party imports"
+            first-party = "First party imports"
+            local-folder = "Local folder imports"
+        "#
+    )]
+    pub import_heading: Option<FxHashMap<ImportSection, String>>,
+
     /// The number of blank lines to place after imports.
     /// Use `-1` for automatic determination.
     ///
@@ -2843,6 +3016,17 @@ impl IsortOptions {
             }
         }
 
+        let import_heading = self.import_heading.unwrap_or_default();
+
+        // Verify that all sections listed in `import_heading` are defined in `sections`.
+        for section in import_heading.keys() {
+            if let ImportSection::UserDefined(section_name) = section {
+                if !sections.contains_key(section_name) {
+                    warn_user_once!("`import-heading` contains unknown section: `{:?}`", section,);
+                }
+            }
+        }
+
         // Verify that `default_section` is in `section_order`.
         if !section_order.contains(&default_section) {
             warn_user_once!(
@@ -2883,6 +3067,10 @@ impl IsortOptions {
             constants: FxHashSet::from_iter(self.constants.unwrap_or_default()),
             variables: FxHashSet::from_iter(self.variables.unwrap_or_default()),
             no_lines_before: FxHashSet::from_iter(no_lines_before),
+            import_headings: import_heading
+                .into_iter()
+                .map(|(section, heading)| (section, format!("# {heading}")))
+                .collect(),
             lines_after_imports: self.lines_after_imports.unwrap_or(-1),
             lines_between_types,
             forced_separate: Vec::from_iter(self.forced_separate.unwrap_or_default()),
@@ -4110,8 +4298,11 @@ impl From<LintOptionsWire> for LintOptions {
 
 #[cfg(test)]
 mod tests {
-    use crate::options::Flake8SelfOptions;
+    use crate::options::{Flake8SelfOptions, Flake8TidyImportsOptions};
     use ruff_linter::rules::flake8_self;
+    use ruff_linter::rules::flake8_tidy_imports::settings::{
+        AllImports, ImportSelection, ImportSelector, ImportSelectorSettings,
+    };
     use ruff_python_ast::name::Name;
 
     #[test]
@@ -4158,6 +4349,65 @@ mod tests {
         assert_eq!(
             settings.ignore_names,
             vec![Name::new_static("_foo"), Name::new_static("_bar")]
+        );
+    }
+
+    #[test]
+    fn flake8_tidy_imports_options_allow_disjoint_lazy_import_selectors() {
+        let settings = Flake8TidyImportsOptions {
+            require_lazy: Some(ImportSelector::Settings(ImportSelectorSettings {
+                include: ImportSelection::All(AllImports::All),
+                exclude: vec!["sitecustomize".to_string()],
+            })),
+            ban_lazy: Some(ImportSelector::Selection(ImportSelection::Imports(vec![
+                "sitecustomize".to_string(),
+            ]))),
+            ..Default::default()
+        }
+        .try_into_settings()
+        .unwrap();
+
+        assert!(settings.require_lazy.includes_all());
+        assert!(settings.ban_lazy.exclude().is_empty());
+    }
+
+    #[test]
+    fn flake8_tidy_imports_options_reject_overlapping_lazy_import_selectors() {
+        let error = Flake8TidyImportsOptions {
+            require_lazy: Some(ImportSelector::Selection(ImportSelection::All(
+                AllImports::All,
+            ))),
+            ban_lazy: Some(ImportSelector::Selection(ImportSelection::Imports(vec![
+                "typing".to_string(),
+            ]))),
+            ..Default::default()
+        }
+        .try_into_settings()
+        .unwrap_err();
+
+        assert_eq!(
+            error.to_string(),
+            "`require-lazy` and `ban-lazy` must not overlap after applying exclusions"
+        );
+    }
+
+    #[test]
+    fn flake8_tidy_imports_options_reject_all_on_both_sides() {
+        let error = Flake8TidyImportsOptions {
+            require_lazy: Some(ImportSelector::Selection(ImportSelection::All(
+                AllImports::All,
+            ))),
+            ban_lazy: Some(ImportSelector::Selection(ImportSelection::All(
+                AllImports::All,
+            ))),
+            ..Default::default()
+        }
+        .try_into_settings()
+        .unwrap_err();
+
+        assert_eq!(
+            error.to_string(),
+            "`require-lazy` and `ban-lazy` must not overlap after applying exclusions"
         );
     }
 }

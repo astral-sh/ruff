@@ -163,6 +163,13 @@ export default function Chrome({
     [workspace, files.index, onRemoveFile],
   );
 
+  const handleChange = useCallback(
+    (content: string) => {
+      onChangeFile(workspace, content);
+    },
+    [onChangeFile, workspace],
+  );
+
   const { defaultLayout, onLayoutChange } = useDefaultLayout({
     groupId: "editor-diagnostics",
     storage: localStorage,
@@ -221,7 +228,7 @@ export default function Chrome({
                     diagnostics={checkResult.diagnostics}
                     workspace={workspace}
                     onMount={handleEditorMount}
-                    onChange={(content) => onChangeFile(workspace, content)}
+                    onChange={handleChange}
                     onOpenFile={onSelectFile}
                     onVendoredFileChange={onSelectVendoredFile}
                     onBackToUserFile={handleBackToUserFile}

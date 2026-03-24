@@ -342,7 +342,8 @@ class PlaygroundServer
         label: {
           label: completion.name,
           detail:
-            completion.module_name == null
+            completion.module_name == null ||
+            completion.additional_text_edits == null
               ? undefined
               : ` (import ${completion.module_name})`,
           description: completion.detail ?? undefined,
@@ -402,21 +403,13 @@ class PlaygroundServer
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _token: CancellationToken,
   ): languages.ProviderResult<languages.DocumentHighlight[]> {
-    const workspace = this.props.workspace;
-    const selectedFile = this.props.files.selected;
-
-    if (selectedFile == null) {
-      return;
+    const fileHandle = this.getFileHandleForModel(model);
+    if (fileHandle == null) {
+      return undefined;
     }
 
-    const selectedHandle = this.props.files.handles[selectedFile];
-
-    if (selectedHandle == null) {
-      return;
-    }
-
-    const highlights = workspace.documentHighlights(
-      selectedHandle,
+    const highlights = this.props.workspace.documentHighlights(
+      fileHandle,
       new TyPosition(position.lineNumber, position.column),
     );
 
@@ -501,6 +494,14 @@ class PlaygroundServer
     this.inVendoredFileCondition.set(isViewingVendoredFile);
   }
 
+  private getPlaygroundFileIdForUri(uri: Uri): FileId | null {
+    return (
+      this.props.files.index.find((file) => {
+        return Uri.file(file.name).toString() === uri.toString();
+      })?.id ?? null
+    );
+  }
+
   private getOrCreateVendoredFileHandle(vendoredPath: string): FileHandle {
     const cachedHandle = this.vendoredFileHandles.get(vendoredPath);
     // Check if we already have a handle for this vendored file
@@ -523,13 +524,12 @@ class PlaygroundServer
       return this.getOrCreateVendoredFileHandle(vendoredPath);
     }
 
-    // Handle regular user files
-    const selectedFile = this.props.files.selected;
-    if (selectedFile == null) {
+    const fileId = this.getPlaygroundFileIdForUri(model.uri);
+    if (fileId == null) {
       return null;
     }
 
-    return this.props.files.handles[selectedFile];
+    return this.props.files.handles[fileId] ?? null;
   }
 
   private formatSignatureHelp(
@@ -804,9 +804,7 @@ class PlaygroundServer
       this.props.onVendoredFileChange(fileHandle);
     } else {
       // Handle regular files
-      const fileId = files.index.find((file) => {
-        return Uri.file(file.name).toString() === resource.toString();
-      })?.id;
+      const fileId = this.getPlaygroundFileIdForUri(resource);
 
       if (fileId == null) {
         return false;
@@ -836,12 +834,7 @@ class PlaygroundServer
   provideDocumentFormattingEdits(
     model: editor.ITextModel,
   ): languages.ProviderResult<languages.TextEdit[]> {
-    if (this.props.files.selected == null) {
-      return null;
-    }
-
-    const fileHandle = this.props.files.handles[this.props.files.selected];
-
+    const fileHandle = this.getFileHandleForModel(model);
     if (fileHandle == null) {
       return null;
     }
@@ -872,9 +865,7 @@ class PlaygroundServer
         this.monaco.editor.createModel(content, "python", uri);
       } else {
         // Handle regular files
-        const fileId = this.props.files.index.find((file) => {
-          return Uri.file(file.name).toString() === uri.toString();
-        })?.id;
+        const fileId = this.getPlaygroundFileIdForUri(uri);
 
         if (fileId != null) {
           const handle = this.props.files.handles[fileId];

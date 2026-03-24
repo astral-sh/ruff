@@ -3,9 +3,7 @@ use ruff_python_ast::StmtImportFrom;
 use ruff_text_size::Ranged;
 
 use crate::builders::{PyFormatterExtensions, TrailingComma, parenthesize_if_expands};
-use crate::comments::SourceComment;
 use crate::expression::parentheses::parenthesized;
-use crate::has_skip_comment;
 use crate::other::identifier::DotDelimitedIdentifier;
 use crate::prelude::*;
 
@@ -18,9 +16,14 @@ impl FormatNodeRule<StmtImportFrom> for FormatStmtImportFrom {
             module,
             names,
             level,
+            is_lazy,
             range: _,
             node_index: _,
         } = item;
+
+        if *is_lazy {
+            write!(f, [token("lazy"), space()])?;
+        }
 
         write!(
             f,
@@ -71,13 +74,5 @@ impl FormatNodeRule<StmtImportFrom> for FormatStmtImportFrom {
                 .with_dangling_comments(parenthesized_comments)
                 .fmt(f)
         }
-    }
-
-    fn is_suppressed(
-        &self,
-        trailing_comments: &[SourceComment],
-        context: &PyFormatContext,
-    ) -> bool {
-        has_skip_comment(trailing_comments, context.source())
     }
 }

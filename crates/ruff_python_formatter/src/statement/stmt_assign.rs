@@ -19,14 +19,13 @@ use crate::expression::{
     maybe_parenthesize_expression,
 };
 use crate::other::interpolated_string::InterpolatedStringLayout;
-use crate::preview::is_parenthesize_lambda_bodies_enabled;
+use crate::prelude::*;
 use crate::statement::trailing_semicolon;
 use crate::string::StringLikeExtensions;
 use crate::string::implicit::{
     FormatImplicitConcatenatedStringExpanded, FormatImplicitConcatenatedStringFlat,
     ImplicitConcatenatedLayout,
 };
-use crate::{has_skip_comment, prelude::*};
 
 #[derive(Default)]
 pub struct FormatStmtAssign;
@@ -103,14 +102,6 @@ impl FormatNodeRule<StmtAssign> for FormatStmtAssign {
         }
 
         Ok(())
-    }
-
-    fn is_suppressed(
-        &self,
-        trailing_comments: &[SourceComment],
-        context: &PyFormatContext,
-    ) -> bool {
-        has_skip_comment(trailing_comments, context.source())
     }
 }
 
@@ -1363,7 +1354,7 @@ fn is_attribute_with_parenthesized_value(target: &Expr, context: &PyFormatContex
     }
 }
 
-/// Like [`maybe_parenthesize_expression`] but with special handling for lambdas in preview.
+/// Like [`maybe_parenthesize_expression`] but with special handling for lambdas.
 fn maybe_parenthesize_value<'a>(
     expression: &'a Expr,
     parent: AnyNodeRef<'a>,
@@ -1380,8 +1371,7 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeValue<'_> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
         let MaybeParenthesizeValue { expression, parent } = self;
 
-        if is_parenthesize_lambda_bodies_enabled(f.context())
-            && let Expr::Lambda(lambda) = expression
+        if let Expr::Lambda(lambda) = expression
             && !f.context().comments().has_leading(lambda)
         {
             parenthesize_if_expands(&lambda.format().with_options(ExprLambdaLayout::Assignment))

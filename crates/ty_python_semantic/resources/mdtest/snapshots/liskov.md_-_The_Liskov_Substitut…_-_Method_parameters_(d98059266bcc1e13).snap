@@ -39,7 +39,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/liskov.md
 24 |     def method(self, x: int, *args, **kwargs): ...  # fine
 25 | 
 26 | class Sub9(Super):
-27 |     def method(self, x: int, extra_positional_arg=42, /): ... # fine
+27 |     def method(self, x: int, extra_positional_arg=42, /): ...  # fine
 28 | 
 29 | class Sub10(Super):
 30 |     def method(self, x: int, extra_pos_or_kw_arg=42): ...  # fine

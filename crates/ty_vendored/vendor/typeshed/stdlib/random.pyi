@@ -51,8 +51,8 @@ import sys
 from _typeshed import SupportsLenAndGetItem
 from collections.abc import Callable, Iterable, MutableSequence, Sequence, Set as AbstractSet
 from fractions import Fraction
-from typing import Any, ClassVar, NoReturn, TypeVar
-from typing_extensions import Self
+from typing import Any, ClassVar, NoReturn, TypeVar, overload
+from typing_extensions import Self, deprecated
 
 __all__ = [
     "Random",
@@ -173,7 +173,8 @@ class Random(_random.Random):
         def shuffle(self, x: MutableSequence[Any]) -> None:
             """Shuffle list x in place, and return None."""
     else:
-        def shuffle(self, x: MutableSequence[Any], random: Callable[[], float] | None = None) -> None:
+        @overload
+        def shuffle(self, x: MutableSequence[Any]) -> None:
             """Shuffle list x in place, and return None.
 
             Optional argument random is a 0-argument function returning a
@@ -181,6 +182,10 @@ class Random(_random.Random):
             standard random.random will be used.
 
             """
+
+        @overload
+        @deprecated("The `random` parameter is deprecated since Python 3.9; removed in Python 3.11.")
+        def shuffle(self, x: MutableSequence[Any], random: Callable[[], float] | None = None) -> None: ...
     if sys.version_info >= (3, 11):
         def sample(self, population: Sequence[_T], k: int, *, counts: Iterable[int] | None = None) -> list[_T]:
             """Chooses k unique random elements from a population sequence.

@@ -5,13 +5,13 @@ use anyhow::Result;
 use indexmap::IndexSet;
 use log::{debug, warn};
 use path_absolutize::CWD;
-use ruff_db::system::{SystemPath, SystemPathBuf};
+use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
 use ruff_graph::{Direction, ImportMap, ModuleDb, ModuleImports};
 use ruff_linter::package::PackageRoot;
 use ruff_linter::source_kind::SourceKind;
 use ruff_linter::{warn_user, warn_user_once};
-use ruff_python_ast::{PySourceType, SourceType};
-use ruff_workspace::resolver::{ResolvedFile, match_exclusion, python_files_in_path};
+use ruff_python_ast::SourceType;
+use ruff_workspace::resolver::{ResolvedFile, match_exclusion, project_files_in_path};
 use rustc_hash::{FxBuildHasher, FxHashMap};
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -35,7 +35,16 @@ pub(crate) fn analyze_graph(
 
     // Find all Python files.
     let files = resolve_default_files(args.files, false);
-    let (paths, resolver) = python_files_in_path(&files, &pyproject_config, config_arguments)?;
+    let (mut paths, resolver) = project_files_in_path(&files, &pyproject_config, config_arguments)?;
+
+    // Filter to only Python files
+    paths.retain(|path| {
+        if let Ok(ResolvedFile::Root(path) | ResolvedFile::Nested(path)) = path {
+            matches!(SourceType::from(path), SourceType::Python(_))
+        } else {
+            true
+        }
+    });
 
     if paths.is_empty() {
         warn_user_once!("No Python files found under the given path(s)");
@@ -86,7 +95,9 @@ pub(crate) fn analyze_graph(
             .filter_map(|path| SystemPathBuf::from_path_buf(path.to_path_buf()).ok()),
     );
 
+    let system = OsSystem::default();
     let db = ModuleDb::from_src_roots(
+        system,
         src_roots.into_iter().collect(),
         pyproject_config
             .settings
@@ -124,6 +135,7 @@ pub(crate) fn analyze_graph(
                 let string_imports = settings.analyze.string_imports;
                 let include_dependencies = settings.analyze.include_dependencies.get(path).cloned();
                 let type_checking_imports = settings.analyze.type_checking_imports;
+                let source_type = settings.analyze.extension.get_source_type(path);
 
                 // Skip excluded files.
                 if (settings.file_resolver.force_exclude || !resolved_file.is_root())
@@ -135,18 +147,6 @@ pub(crate) fn analyze_graph(
                 {
                     continue;
                 }
-
-                // Ignore non-Python files.
-                let source_type = match settings.analyze.extension.get(path) {
-                    None => match SourceType::from(&path) {
-                        SourceType::Python(source_type) => source_type,
-                        SourceType::Toml(_) => {
-                            debug!("Ignoring TOML file: {}", path.display());
-                            continue;
-                        }
-                    },
-                    Some(language) => PySourceType::from(language),
-                };
 
                 // Convert to system paths.
                 let Ok(package) = package.map(SystemPathBuf::from_path_buf).transpose() else {
@@ -182,7 +182,7 @@ pub(crate) fn analyze_graph(
                     let mut imports = ModuleImports::detect(
                         &db,
                         source_code,
-                        source_type,
+                        source_type.expect_python(),
                         &path,
                         package.as_deref(),
                         string_imports,

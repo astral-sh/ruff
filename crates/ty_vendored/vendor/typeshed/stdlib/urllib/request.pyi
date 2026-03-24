@@ -75,7 +75,7 @@ from email.message import Message
 from http.client import HTTPConnection, HTTPMessage, HTTPResponse
 from http.cookiejar import CookieJar
 from re import Pattern
-from typing import IO, Any, ClassVar, NoReturn, Protocol, TypeVar, overload, type_check_only
+from typing import IO, Any, ClassVar, Literal, NoReturn, Protocol, TypeVar, overload, type_check_only
 from typing_extensions import TypeAlias, deprecated
 from urllib.error import HTTPError as HTTPError
 from urllib.response import addclosehook, addinfourl
@@ -174,14 +174,15 @@ if sys.version_info >= (3, 13):
         """
 
 else:
+    @overload
     def urlopen(
         url: str | Request,
         data: _DataType | None = None,
         timeout: float | None = ...,
         *,
-        cafile: str | None = None,
-        capath: str | None = None,
-        cadefault: bool = False,
+        cafile: None = None,
+        capath: None = None,
+        cadefault: Literal[False] = False,
         context: ssl.SSLContext | None = None,
     ) -> _UrlopenRet:
         """Open the URL url, which can be either a string or a Request object.
@@ -234,7 +235,23 @@ else:
 
         """
 
-def install_opener(opener: OpenerDirector) -> None: ...
+    @overload
+    @deprecated(
+        "The `cafile`, `capath`, `cadefault` parameters are deprecated since Python 3.6; "
+        "removed in Python 3.13. Use `context` parameter instead."
+    )
+    def urlopen(
+        url: str | Request,
+        data: _DataType | None = None,
+        timeout: float | None = ...,
+        *,
+        cafile: StrOrBytesPath | None = None,
+        capath: StrOrBytesPath | None = None,
+        cadefault: bool = False,
+        context: None = None,
+    ) -> _UrlopenRet: ...
+
+def install_opener(opener: OpenerDirector | None) -> None: ...
 def build_opener(*handlers: BaseHandler | Callable[[], BaseHandler]) -> OpenerDirector:
     """Create an opener object from a list of handlers.
 

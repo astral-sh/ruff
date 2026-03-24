@@ -131,6 +131,31 @@ def f(x: Foo[int]):
     reveal_type(x.foo())  # revealed: int
 ```
 
+## Stringified values
+
+<!-- snapshot-diagnostics -->
+
+Stringifying the right-hand side of a type alias is redundant, but allowed:
+
+```py
+type X = "int | str"
+
+def f(obj: X):
+    reveal_type(obj)  # revealed: int | str
+```
+
+The right-hand side of a PEP-695 type alias will not usually be executed, but can be if the user
+accesses the `.__value__` attribute. Normal runtime rules still therefore apply regarding partially
+stringified alias values:
+
+```py
+# error: [unsupported-operator]
+type Y = "int" | str
+
+def g(obj: Y):
+    reveal_type(obj)  # revealed: int | str
+```
+
 ## In unions and intersections
 
 We can "break apart" a type alias by e.g. adding it to a union:
@@ -227,6 +252,23 @@ def f(x: IntAndT[str]) -> None:
     reveal_type(x)  # revealed: Unknown
 ```
 
+### Generic value binds type variables to alias definition
+
+```py
+from typing import Generic
+from typing_extensions import TypeAliasType, TypeVar
+
+T = TypeVar("T", bound=int)
+A = TypeAliasType("A", tuple[T], type_params=(T,))
+
+S = TypeVar("S", bound=tuple[int])
+
+class C(Generic[S]):
+    pass
+
+x: C[A]
+```
+
 ### Error cases
 
 #### Name is not a string literal
@@ -237,8 +279,47 @@ from typing_extensions import TypeAliasType
 def get_name() -> str:
     return "IntOrStr"
 
-# error: [invalid-type-alias-type] "The name of a `typing.TypeAlias` must be a string literal"
+# error: [invalid-type-alias-type] "The first argument to `TypeAliasType` must be a string literal"
 IntOrStr = TypeAliasType(get_name(), int | str)
+```
+
+#### Name does not match variable
+
+```py
+from typing_extensions import TypeAliasType
+
+# error: [invalid-type-alias-type] "The name of a `TypeAliasType` (`WrongName`) must match the name of the variable it is assigned to (`IntOrStr`)"
+IntOrStr = TypeAliasType("WrongName", int | str)
+```
+
+#### Not a simple variable assignment
+
+`TypeAliasType` must be used in a simple variable assignment. Using it as a standalone expression or
+in a tuple unpacking is not supported.
+
+```py
+from typing_extensions import TypeAliasType
+
+# error: [invalid-type-alias-type] "A `TypeAliasType` definition must be a simple variable assignment"
+TypeAliasType("IntOrStr", "int | str")
+```
+
+### Mutually recursive `TypeAliasType` definitions
+
+Mutually recursive type aliases created via the `TypeAliasType` constructor should not cause the
+type checker to hang. The value type is computed lazily to break cycles.
+
+```py
+from typing_extensions import TypeAliasType, Union
+
+A = TypeAliasType("A", Union[str, "B"])
+B = TypeAliasType("B", list[A])
+
+def f(x: A) -> None:
+    reveal_type(x)  # revealed: str | list[A]
+
+def g(x: B) -> None:
+    reveal_type(x)  # revealed: list[A]
 ```
 
 ## Cyclic aliases
@@ -413,7 +494,7 @@ def f(x: A):
 #### With new-style union
 
 ```py
-type A = list["A" | str]
+type A = list[A | str]
 
 def f(x: A):
     reveal_type(x)  # revealed: list[A | str]
@@ -452,4 +533,30 @@ type Y = X | str | dict[str, Y]
 def _(y: Y):
     if isinstance(y, dict):
         reveal_type(y)  # revealed: dict[str, X] | dict[str, Y]
+```
+
+### Recursive alias with tuple - stack overflow test (issue 2470)
+
+This test case used to cause a stack overflow. The returned type `list[int]` is not assignable to
+`RecursiveT = int | tuple[RecursiveT, ...]`, so we get an error.
+
+```py
+type RecursiveT = int | tuple[RecursiveT, ...]
+
+def foo(a: int, b: int) -> RecursiveT:
+    some_intermediate_var = (a, b)
+    # error: [invalid-return-type] "Return type does not match returned value: expected `RecursiveT`, found `list[int]`"
+    return list(some_intermediate_var)
+```
+
+### Recursive `TypeIs` and `TypeGuard` aliases don't stack overflow
+
+```py
+from typing_extensions import TypeGuard, TypeIs
+
+type RecursiveIs = TypeIs[RecursiveIs]  # error: [cyclic-type-alias-definition]
+type RecursiveGuard = TypeGuard[RecursiveGuard]
+
+type AliasIs = RecursiveIs  # error: [cyclic-type-alias-definition]
+type AliasGuard = RecursiveGuard
 ```

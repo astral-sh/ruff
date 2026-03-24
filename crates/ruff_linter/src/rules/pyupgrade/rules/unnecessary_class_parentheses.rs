@@ -1,3 +1,4 @@
+use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast};
 use ruff_text_size::Ranged;
@@ -24,6 +25,10 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// class Foo:
 ///     ...
 /// ```
+///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe if it would delete any comments
+/// within the parentheses range.
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.273")]
 pub(crate) struct UnnecessaryClassParentheses;
@@ -50,8 +55,15 @@ pub(crate) fn unnecessary_class_parentheses(checker: &Checker, class_def: &ast::
     }
 
     let mut diagnostic = checker.report_diagnostic(UnnecessaryClassParentheses, arguments.range());
-    diagnostic.set_fix(Fix::safe_edit(Edit::deletion(
-        arguments.start(),
-        arguments.end(),
-    )));
+
+    let applicability = if checker.comment_ranges().intersects(arguments.range()) {
+        Applicability::Unsafe
+    } else {
+        Applicability::Safe
+    };
+
+    diagnostic.set_fix(Fix::applicable_edit(
+        Edit::deletion(arguments.start(), arguments.end()),
+        applicability,
+    ));
 }

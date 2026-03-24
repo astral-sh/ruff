@@ -1,15 +1,14 @@
-use super::TypeVarVariance;
 use crate::place::PlaceAndQualifiers;
 use crate::semantic_index::definition::Definition;
+use crate::types::class::DynamicClassLiteral;
 use crate::types::constraints::ConstraintSet;
-use crate::types::generics::InferableTypeVars;
 use crate::types::protocol_class::ProtocolClass;
-use crate::types::relation::{HasRelationToVisitor, IsDisjointVisitor, TypeRelation};
+use crate::types::relation::{DisjointnessChecker, TypeRelationChecker};
 use crate::types::variance::VarianceInferable;
 use crate::types::{
-    ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassType, DynamicType,
+    ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassLiteral, ClassType, DynamicType,
     FindLegacyTypeVarsVisitor, KnownClass, MaterializationKind, MemberLookupPolicy,
-    NormalizedVisitor, SpecialFormType, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
+    SpecialFormType, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints, TypeVarVariance,
     TypedDictType, UnionType, todo_type,
 };
 use crate::{Db, FxOrderSet};
@@ -158,11 +157,15 @@ impl<'db> SubclassOfType<'db> {
                 },
                 _ => Type::SubclassOf(self),
             },
-            SubclassOfInner::TypeVar(typevar) => SubclassOfType::try_from_instance(
-                db,
-                typevar.apply_type_mapping_impl(db, type_mapping, visitor),
-            )
-            .unwrap_or(SubclassOfType::subclass_of_unknown()),
+            SubclassOfInner::TypeVar(typevar) => {
+                let mapped = typevar.apply_type_mapping_impl(db, type_mapping, visitor);
+                if mapped.is_never() {
+                    Type::Never
+                } else {
+                    SubclassOfType::try_from_instance(db, mapped)
+                        .unwrap_or(SubclassOfType::subclass_of_unknown())
+                }
+            }
         }
     }
 
@@ -210,75 +213,6 @@ impl<'db> SubclassOfType<'db> {
         };
 
         class_like.find_name_in_mro_with_policy(db, name, policy)
-    }
-
-    /// Return `true` if `self` has a certain relation to `other`.
-    pub(crate) fn has_relation_to_impl(
-        self,
-        db: &'db dyn Db,
-        other: SubclassOfType<'db>,
-        inferable: InferableTypeVars<'_, 'db>,
-        relation: TypeRelation<'db>,
-        relation_visitor: &HasRelationToVisitor<'db>,
-        disjointness_visitor: &IsDisjointVisitor<'db>,
-    ) -> ConstraintSet<'db> {
-        match (self.subclass_of, other.subclass_of) {
-            (SubclassOfInner::Dynamic(_), SubclassOfInner::Dynamic(_)) => {
-                ConstraintSet::from(!relation.is_subtyping())
-            }
-            (SubclassOfInner::Dynamic(_), SubclassOfInner::Class(other_class)) => {
-                ConstraintSet::from(other_class.is_object(db) || relation.is_assignability())
-            }
-            (SubclassOfInner::Class(_), SubclassOfInner::Dynamic(_)) => {
-                ConstraintSet::from(relation.is_assignability())
-            }
-
-            // For example, `type[bool]` describes all possible runtime subclasses of the class `bool`,
-            // and `type[int]` describes all possible runtime subclasses of the class `int`.
-            // The first set is a subset of the second set, because `bool` is itself a subclass of `int`.
-            (SubclassOfInner::Class(self_class), SubclassOfInner::Class(other_class)) => self_class
-                .has_relation_to_impl(
-                    db,
-                    other_class,
-                    inferable,
-                    relation,
-                    relation_visitor,
-                    disjointness_visitor,
-                ),
-
-            (SubclassOfInner::TypeVar(_), _) | (_, SubclassOfInner::TypeVar(_)) => {
-                unreachable!()
-            }
-        }
-    }
-
-    /// Return` true` if `self` is a disjoint type from `other`.
-    ///
-    /// See [`Type::is_disjoint_from`] for more details.
-    pub(crate) fn is_disjoint_from_impl(
-        self,
-        db: &'db dyn Db,
-        other: Self,
-        _inferable: InferableTypeVars<'_, 'db>,
-        _visitor: &IsDisjointVisitor<'db>,
-    ) -> ConstraintSet<'db> {
-        match (self.subclass_of, other.subclass_of) {
-            (SubclassOfInner::Dynamic(_), _) | (_, SubclassOfInner::Dynamic(_)) => {
-                ConstraintSet::from(false)
-            }
-            (SubclassOfInner::Class(self_class), SubclassOfInner::Class(other_class)) => {
-                ConstraintSet::from(!self_class.could_coexist_in_mro_with(db, other_class))
-            }
-            (SubclassOfInner::TypeVar(_), _) | (_, SubclassOfInner::TypeVar(_)) => {
-                unreachable!()
-            }
-        }
-    }
-
-    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
-        Self {
-            subclass_of: self.subclass_of.normalized_impl(db, visitor),
-        }
     }
 
     pub(super) fn recursive_type_normalized_impl(
@@ -334,7 +268,7 @@ impl<'db> SubclassOfType<'db> {
     pub(crate) fn is_typed_dict(self, db: &'db dyn Db) -> bool {
         self.subclass_of
             .into_class(db)
-            .is_some_and(|class| class.class_literal(db).0.is_typed_dict(db))
+            .is_some_and(|class| class.class_literal(db).is_typed_dict(db))
     }
 }
 
@@ -343,6 +277,69 @@ impl<'db> VarianceInferable<'db> for SubclassOfType<'db> {
         match self.subclass_of {
             SubclassOfInner::Class(class) => class.variance_of(db, typevar),
             SubclassOfInner::Dynamic(_) | SubclassOfInner::TypeVar(_) => TypeVarVariance::Bivariant,
+        }
+    }
+}
+
+impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
+    /// Return `true` if `source` has a certain relation to `other`.
+    pub(crate) fn check_subclassof_pair(
+        &self,
+        db: &'db dyn Db,
+        source: SubclassOfType<'db>,
+        target: SubclassOfType<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        match (source.subclass_of, target.subclass_of) {
+            (SubclassOfInner::Dynamic(_), SubclassOfInner::Dynamic(_)) => {
+                ConstraintSet::from_bool(self.constraints, !self.relation.is_subtyping())
+            }
+            (SubclassOfInner::Dynamic(_), SubclassOfInner::Class(target_class)) => {
+                ConstraintSet::from_bool(
+                    self.constraints,
+                    target_class.is_object(db) || self.relation.is_assignability(),
+                )
+            }
+            (SubclassOfInner::Class(_), SubclassOfInner::Dynamic(_)) => {
+                ConstraintSet::from_bool(self.constraints, self.relation.is_assignability())
+            }
+
+            // For example, `type[bool]` describes all possible runtime subclasses of the class `bool`,
+            // and `type[int]` describes all possible runtime subclasses of the class `int`.
+            // The first set is a subset of the second set, because `bool` is itself a subclass of `int`.
+            (SubclassOfInner::Class(source), SubclassOfInner::Class(target)) => {
+                self.check_class_pair(db, source, target)
+            }
+
+            (SubclassOfInner::TypeVar(_), _) | (_, SubclassOfInner::TypeVar(_)) => {
+                unreachable!()
+            }
+        }
+    }
+}
+
+impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
+    /// Return` true` if `left` is a disjoint type from `right`.
+    ///
+    /// See [`Type::is_disjoint_from`] for more details.
+    pub(super) fn check_subclassof_pair(
+        &self,
+        db: &'db dyn Db,
+        left: SubclassOfType<'db>,
+        right: SubclassOfType<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        match (left.subclass_of, right.subclass_of) {
+            (SubclassOfInner::Dynamic(_), _) | (_, SubclassOfInner::Dynamic(_)) => {
+                ConstraintSet::from_bool(self.constraints, false)
+            }
+            (SubclassOfInner::Class(left), SubclassOfInner::Class(right)) => {
+                ConstraintSet::from_bool(
+                    self.constraints,
+                    !left.could_coexist_in_mro_with(db, right, self.constraints),
+                )
+            }
+            (SubclassOfInner::TypeVar(_), _) | (_, SubclassOfInner::TypeVar(_)) => {
+                unreachable!()
+            }
         }
     }
 }
@@ -393,13 +390,8 @@ impl<'db> SubclassOfInner<'db> {
                         Self::try_from_instance(db, bound)
                             .and_then(|subclass_of| subclass_of.into_class(db))
                     }
-                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                        match &**constraints.elements(db) {
-                            [bound] => Self::try_from_instance(db, *bound)
-                                .and_then(|subclass_of| subclass_of.into_class(db)),
-                            _ => Some(ClassType::object(db)),
-                        }
-                    }
+                    // TODO this is quite imprecise
+                    Some(TypeVarBoundOrConstraints::Constraints(_)) => Some(ClassType::object(db)),
                 }
             }
         }
@@ -475,16 +467,6 @@ impl<'db> SubclassOfInner<'db> {
         Self::TypeVar(bound_typevar)
     }
 
-    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
-        match self {
-            Self::Class(class) => Self::Class(class.normalized_impl(db, visitor)),
-            Self::Dynamic(dynamic) => Self::Dynamic(dynamic.normalized()),
-            Self::TypeVar(bound_typevar) => {
-                Self::TypeVar(bound_typevar.normalized_impl(db, visitor))
-            }
-        }
-    }
-
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
@@ -532,5 +514,11 @@ impl<'db> From<SubclassOfType<'db>> for Type<'db> {
             SubclassOfInner::Dynamic(dynamic) => Type::Dynamic(dynamic),
             SubclassOfInner::TypeVar(bound_typevar) => Type::TypeVar(bound_typevar),
         }
+    }
+}
+
+impl<'db> From<DynamicClassLiteral<'db>> for SubclassOfInner<'db> {
+    fn from(value: DynamicClassLiteral<'db>) -> Self {
+        SubclassOfInner::Class(ClassType::NonGeneric(ClassLiteral::Dynamic(value)))
     }
 }

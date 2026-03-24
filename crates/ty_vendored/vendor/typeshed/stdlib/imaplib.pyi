@@ -13,7 +13,7 @@ Public functions:       Internaldate2tuple
 import subprocess
 import sys
 import time
-from _typeshed import ReadableBuffer, SizedBuffer, Unused
+from _typeshed import ReadableBuffer, SizedBuffer, StrOrBytesPath, Unused
 from builtins import list as _list  # conflicts with a method named "list"
 from collections.abc import Callable, Generator
 from datetime import datetime
@@ -21,7 +21,7 @@ from re import Pattern
 from socket import socket as _socket
 from ssl import SSLContext, SSLSocket
 from types import TracebackType
-from typing import IO, Any, Literal, SupportsAbs, SupportsInt
+from typing import IO, Any, Literal, SupportsAbs, SupportsInt, overload
 from typing_extensions import Self, TypeAlias, deprecated
 
 __all__ = ["IMAP4", "IMAP4_stream", "Internaldate2tuple", "Int2AP", "ParseFlags", "Time2Internaldate", "IMAP4_SSL"]
@@ -154,7 +154,9 @@ class IMAP4:
         (code, [data]) = <instance>.response(code)
         """
 
-    def append(self, mailbox: str, flags: str, date_time: str, message: ReadableBuffer) -> tuple[str, _list[bytes]]:
+    def append(
+        self, mailbox: str | None, flags: str | None, date_time: _TimeLike | None, message: ReadableBuffer
+    ) -> tuple[str, _list[bytes]]:
         """Append message to named mailbox.
 
         (typ, [data]) = <instance>.append(mailbox, flags, date_time, message)
@@ -516,23 +518,37 @@ class IMAP4_SSL(IMAP4):
     for more documentation see the docstring of the parent class IMAP4.
     """
 
-    if sys.version_info < (3, 12):
-        keyfile: str
-        certfile: str
     if sys.version_info >= (3, 12):
         def __init__(
             self, host: str = "", port: int = 993, *, ssl_context: SSLContext | None = None, timeout: float | None = None
         ) -> None: ...
     else:
+        @overload
         def __init__(
             self,
             host: str = "",
             port: int = 993,
-            keyfile: str | None = None,
-            certfile: str | None = None,
+            keyfile: None = None,
+            certfile: None = None,
             ssl_context: SSLContext | None = None,
             timeout: float | None = None,
         ) -> None: ...
+        @overload
+        @deprecated(
+            "The `keyfile`, `certfile` parameters are deprecated since Python 3.6; "
+            "removed in Python 3.12. Use `ssl_context` parameter instead."
+        )
+        def __init__(
+            self,
+            host: str = "",
+            port: int = 993,
+            keyfile: StrOrBytesPath | None = None,
+            certfile: StrOrBytesPath | None = None,
+            ssl_context: None = None,
+            timeout: float | None = None,
+        ) -> None: ...
+        keyfile: StrOrBytesPath | None
+        certfile: StrOrBytesPath | None
     sslobj: SSLSocket
     if sys.version_info >= (3, 14):
         @property
@@ -601,7 +617,9 @@ def Int2AP(num: SupportsAbs[SupportsInt]) -> bytes:
 def ParseFlags(resp: ReadableBuffer) -> tuple[bytes, ...]:
     """Convert IMAP4 flags response to python tuple."""
 
-def Time2Internaldate(date_time: float | time.struct_time | time._TimeTuple | datetime | str) -> str:
+_TimeLike: TypeAlias = float | time.struct_time | time._TimeTuple | datetime | str
+
+def Time2Internaldate(date_time: _TimeLike) -> str:
     """Convert date_time to IMAP4 INTERNALDATE representation.
 
     Return string in form: '"DD-Mmm-YYYY HH:MM:SS +HHMM"'.  The

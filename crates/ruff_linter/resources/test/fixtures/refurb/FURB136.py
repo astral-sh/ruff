@@ -23,3 +23,11 @@ x if (
     x
     > y
 ) else y  # FURB136
+
+
+highest_score = (
+    x
+    # text
+    if x > y
+    else y
+)

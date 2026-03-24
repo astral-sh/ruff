@@ -47,3 +47,11 @@ z = (
     if y > 0
     else None
 )
+
+
+z = (
+    x
+    if x
+    # text
+    else y
+)

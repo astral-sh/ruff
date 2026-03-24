@@ -7,9 +7,10 @@ This test suite covers certain basic properties and simplification strategies fo
 ```py
 from typing import Literal
 
-def _(u1: int | str, u2: Literal[0] | Literal[1]) -> None:
+def _(u1: int | str, u2: Literal[0] | Literal[1], u3: type[int] | type[str]) -> None:
     reveal_type(u1)  # revealed: int | str
     reveal_type(u2)  # revealed: Literal[0, 1]
+    reveal_type(u3)  # revealed: type[int | str]
 ```
 
 ## Duplicate elements are collapsed

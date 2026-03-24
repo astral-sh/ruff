@@ -184,4 +184,29 @@ help: Replace with `itertools.starmap`
 31 + set(sm(foo, [(85, 60), (100, 80)]))
 32 | 
 33 | # Non-errors.
-34 |
+34 | 
+
+FURB140 [*] Use `itertools.starmap` instead of the generator
+  --> FURB140.py:62:5
+   |
+61 |   all(
+62 | /     predicate(a, b)
+63 | |     # text
+64 | |     for a, b
+65 | |     # text
+66 | |     in some_iterable
+   | |____________________^
+67 |   )
+   |
+help: Replace with `itertools.starmap`
+59 | [" ".join(x)(*x) for x in zipped()]
+60 | 
+61 | all(
+   -     predicate(a, b)
+   -     # text
+   -     for a, b
+   -     # text
+   -     in some_iterable
+62 +     sm(predicate, some_iterable)
+63 | )
+note: This is an unsafe fix and may change runtime behavior

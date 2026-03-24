@@ -20,22 +20,23 @@ use ruff_db::parsed::parsed_module;
 use ruff_db::source::{SourceTextError, source_text};
 use ruff_db::system::{SystemPath, SystemPathBuf};
 use rustc_hash::FxHashSet;
-use salsa::Durability;
-use salsa::Setter;
+use salsa::{Database, Durability, Setter};
 use std::backtrace::BacktraceStatus;
 use std::collections::hash_set;
 use std::iter::FusedIterator;
 use std::panic::{AssertUnwindSafe, UnwindSafe};
 use std::sync::Arc;
 use thiserror::Error;
-use ty_python_semantic::add_inferred_python_version_hint_to_diagnostic;
 use ty_python_semantic::lint::RuleSelection;
 use ty_python_semantic::types::check_types;
+use ty_python_semantic::{
+    FallibleStrategy, MisconfigurationStrategy, add_inferred_python_version_hint_to_diagnostic,
+};
 
 mod db;
 mod files;
 mod fixes;
-mod glob;
+pub mod glob;
 pub mod metadata;
 mod walk;
 pub mod watch;
@@ -172,15 +173,15 @@ impl ProgressReporter for CollectReporter {
 
 #[salsa::tracked]
 impl Project {
-    pub fn from_metadata(db: &dyn Db, metadata: ProjectMetadata) -> Result<Self, ToSettingsError> {
-        let (settings, diagnostics) = metadata.options().to_settings(db, metadata.root())?;
-
-        // This adds a file root for the project itself. This enables
-        // tracking of when changes are made to the files in a project
-        // at the directory level. At time of writing (2025-07-17),
-        // this is used for caching completions for submodules.
-        db.files()
-            .try_add_root(db, metadata.root(), FileRootKind::Project);
+    pub fn from_metadata<Strategy: MisconfigurationStrategy>(
+        db: &dyn Db,
+        metadata: ProjectMetadata,
+        strategy: &Strategy,
+    ) -> Result<Self, Strategy::Error<ToSettingsError>> {
+        let (settings, diagnostics) =
+            metadata
+                .options()
+                .to_settings(db, metadata.root(), strategy)?;
 
         let project = Project::builder(Box::new(metadata), Box::new(settings), diagnostics)
             .durability(Durability::MEDIUM)
@@ -188,7 +189,18 @@ impl Project {
             .file_set_durability(Durability::LOW)
             .new(db);
 
+        project.try_add_file_root(db);
+
         Ok(project)
+    }
+
+    fn try_add_file_root(self, db: &dyn Db) {
+        // This adds a file root for the project itself. This enables
+        // tracking of when changes are made to the files in a project
+        // at the directory level. At time of writing (2025-07-17),
+        // this is used for caching completions for submodules.
+        db.files()
+            .try_add_root(db, self.root(db), FileRootKind::Project);
     }
 
     pub fn root(self, db: &dyn Db) -> &SystemPath {
@@ -233,29 +245,37 @@ impl Project {
 
     pub fn reload(self, db: &mut dyn Db, metadata: ProjectMetadata) {
         tracing::debug!("Reloading project");
-        assert_eq!(self.root(db), metadata.root());
-
-        if &metadata != self.metadata(db) {
-            match metadata.options().to_settings(db, metadata.root()) {
-                Ok((settings, settings_diagnostics)) => {
-                    if self.settings(db) != &settings {
-                        self.set_settings(db).to(Box::new(settings));
-                    }
-
-                    if self.settings_diagnostics(db) != settings_diagnostics {
-                        self.set_settings_diagnostics(db).to(settings_diagnostics);
-                    }
-                }
-                Err(error) => {
-                    self.set_settings_diagnostics(db)
-                        .to(vec![error.into_diagnostic()]);
-                }
-            }
-
-            self.set_metadata(db).to(Box::new(metadata));
-        }
 
         self.reload_files(db);
+
+        if &metadata == self.metadata(db) {
+            return;
+        }
+
+        match metadata
+            .options()
+            .to_settings(db, metadata.root(), &FallibleStrategy)
+        {
+            Ok((settings, settings_diagnostics)) => {
+                if self.settings(db) != &settings {
+                    self.set_settings(db).to(Box::new(settings));
+                }
+
+                if self.settings_diagnostics(db) != settings_diagnostics {
+                    self.set_settings_diagnostics(db).to(settings_diagnostics);
+                }
+            }
+            Err(error) => {
+                tracing::warn!(
+                    "Keeping old project configuration because loading the new settings failed with: {error}"
+                );
+                self.set_settings_diagnostics(db)
+                    .to(vec![error.into_diagnostic()]);
+            }
+        }
+
+        self.set_metadata(db).to(Box::new(metadata));
+        self.try_add_file_root(db);
     }
 
     /// Checks the project and its dependencies according to the project's check mode.
@@ -298,6 +318,9 @@ impl Project {
                 for file in &files {
                     let db = db.clone();
                     let reporter = &*reporter;
+
+                    db.unwind_if_revision_cancelled();
+
                     scope.spawn(move |_| {
                         let check_file_span =
                             tracing::debug_span!(parent: project_span, "check_file", ?file);
@@ -365,10 +388,7 @@ impl Project {
 
         let mut open_files = self.take_open_files(db);
         let removed = open_files.remove(&file);
-
-        if removed {
-            self.set_open_files(db, open_files);
-        }
+        self.set_open_files(db, open_files);
 
         removed
     }
@@ -453,17 +473,60 @@ impl Project {
     pub fn should_check_file(self, db: &dyn Db, file: File) -> bool {
         let path = file.path(db);
 
+        // NOTE: The tracing messages below were added because
+        // whether a file should be checked or not can sometimes
+        // be at the root of confusing UX like "diagnostics all
+        // of a sudden stopped working." Having a trace message
+        // indicating *why* a particular file isn't being checked
+        // can be quite helpful for narrowing down the issue.
+        //
+        // The problem is that it's incredibly noisy. Which is why
+        // we set them to the TRACE level.
+
         // Try to return early to avoid adding a dependency on `open_files` or `file_set` which
         // both have a durability of `LOW`.
         if path.is_vendored_path() {
+            tracing::trace!("Not checking {path} because it is a vendored path");
             return false;
         }
 
         match self.check_mode(db) {
-            CheckMode::OpenFiles => self.open_files(db).contains(&file),
+            CheckMode::OpenFiles => {
+                let should_check = self.open_files(db).contains(&file);
+                if !should_check {
+                    tracing::trace!(
+                        "Not checking {path} because check mode is `OpenFiles` \
+                         and it is not in the open file set"
+                    );
+                }
+                should_check
+            }
             CheckMode::AllFiles => {
                 // Virtual files are always checked.
-                path.is_system_virtual_path() || self.files(db).contains(&file)
+                //
+                // We also check the open file set. In theory, we
+                // shouldn't need to do this since it is accounted for
+                // by the virtual file check (for the case when a file
+                // wants to be checked but isn't saved to disk yet).
+                // However, not all clients follow the LSP convention
+                // that URIs for documents not on disk yet use the
+                // `untitled://...` scheme. That is, we assume that a
+                // `file://...` scheme corresponds to a saved file on
+                // disk, and anything else is "virtual." For example,
+                // neovim uses `file://...` even for an open buffer
+                // that does not correspond to a file saved to disk
+                // yet.
+                let should_check = path.is_system_virtual_path()
+                    || self.files(db).contains(&file)
+                    || self.open_files(db).contains(&file);
+                if !should_check {
+                    tracing::trace!(
+                        "Not checking {path} because check mode is `AllFiles` \
+                         and it is not a virtual path, in the project files \
+                         or in the open file set"
+                    );
+                }
+                should_check
             }
         }
     }
@@ -585,10 +648,9 @@ pub(crate) fn check_file_impl(db: &dyn Db, file: File) -> Result<Box<[Diagnostic
     {
         let db = AssertUnwindSafe(db);
         match catch(&**db, file, || check_types(*db, file)) {
-            Ok(Some(type_check_diagnostics)) => {
+            Ok(type_check_diagnostics) => {
                 diagnostics.extend(type_check_diagnostics);
             }
-            Ok(None) => {}
             Err(diagnostic) => diagnostics.push(diagnostic),
         }
     }
@@ -688,16 +750,37 @@ enum IOErrorKind {
     SourceText(#[from] SourceTextError),
 }
 
-fn catch<F, R>(db: &dyn Db, file: File, f: F) -> Result<Option<R>, Diagnostic>
+fn catch<F, R>(db: &dyn Db, file: File, f: F) -> Result<R, Diagnostic>
 where
     F: FnOnce() -> R + UnwindSafe,
 {
-    match ruff_db::panic::catch_unwind(|| {
-        // Ignore salsa errors
-        salsa::Cancelled::catch(f).ok()
-    }) {
+    match ruff_db::panic::catch_unwind(f) {
         Ok(result) => Ok(result),
         Err(error) => {
+            match error.payload.downcast_ref::<salsa::Cancelled>() {
+                None => {
+                    // Add a diagnostic (by not early returning) for
+                    // any non Salsa panic (a bug in ty)
+                }
+                Some(salsa::Cancelled::PropagatedPanic) => {
+                    // Add a diagnostic for propagated Salsa panics. That is, query `A`
+                    // running on thread `a` depends on query `B` running on thread `b`
+                    // and query `B` panics. However, avoid adding such a diagnostic
+                    // if query `B` panicked because of a cancellation by calling
+                    // `unwind_if_revision_cancelled`.
+                    //
+                    // The propagated Salsa panic isn't very actionable for users,
+                    // but it can be useful to know that file A failed to type check
+                    // because file B panicked (both files will have a panic-diagnostic).
+                    db.unwind_if_revision_cancelled();
+                }
+
+                // For any pending write or local cancellation, resume the panic to abort the outer query.
+                Some(_) => {
+                    error.resume_unwind();
+                }
+            }
+
             let message = error.to_diagnostic_message(Some(file.path(db)));
             let mut diagnostic = Diagnostic::new(DiagnosticId::Panic, Severity::Fatal, message);
             diagnostic.add_bug_sub_diagnostics("%5Bpanic%5D");
@@ -728,6 +811,10 @@ where
                     ));
                 });
             }
+
+            // Report an untracked read because Salsa didn't carry over
+            // the dependencies of any query called by `f` because it panicked.
+            db.report_untracked_read();
 
             Err(diagnostic)
         }

@@ -18,38 +18,40 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/loops/for.md
  3 |         if flag:
  4 |             def __getitem__(self, item: int) -> str:
  5 |                 return "foo"
- 6 |         else:
- 7 |             __getitem__: None = None
- 8 | 
- 9 |     class Iterable2:
-10 |         if flag:
-11 |             def __getitem__(self, item: int) -> str:
-12 |                 return "foo"
-13 |         else:
-14 |             def __getitem__(self, item: str) -> int:
-15 |                 return 42
-16 | 
-17 |     # error: [not-iterable]
-18 |     for x in Iterable1():
-19 |         # TODO: `str` might be better
-20 |         reveal_type(x)  # revealed: str | Unknown
-21 | 
-22 |     # error: [not-iterable]
-23 |     for y in Iterable2():
-24 |         reveal_type(y)  # revealed: str | int
+ 6 | 
+ 7 |         else:
+ 8 |             __getitem__: None = None
+ 9 | 
+10 |     class Iterable2:
+11 |         if flag:
+12 |             def __getitem__(self, item: int) -> str:
+13 |                 return "foo"
+14 | 
+15 |         else:
+16 |             def __getitem__(self, item: str) -> int:
+17 |                 return 42
+18 | 
+19 |     # error: [not-iterable]
+20 |     for x in Iterable1():
+21 |         # TODO: `str` might be better
+22 |         reveal_type(x)  # revealed: str | Unknown
+23 | 
+24 |     # error: [not-iterable]
+25 |     for y in Iterable2():
+26 |         reveal_type(y)  # revealed: str | int
 ```
 
 # Diagnostics
 
 ```
 error[not-iterable]: Object of type `Iterable1` may not be iterable
-  --> src/mdtest_snippet.py:18:14
+  --> src/mdtest_snippet.py:20:14
    |
-17 |     # error: [not-iterable]
-18 |     for x in Iterable1():
+19 |     # error: [not-iterable]
+20 |     for x in Iterable1():
    |              ^^^^^^^^^^^
-19 |         # TODO: `str` might be better
-20 |         reveal_type(x)  # revealed: str | Unknown
+21 |         # TODO: `str` might be better
+22 |         reveal_type(x)  # revealed: str | Unknown
    |
 info: It has no `__iter__` method and its `__getitem__` attribute is invalid
 info: `__getitem__` has type `(bound method Iterable1.__getitem__(item: int) -> str) | None`, which is not callable
@@ -59,12 +61,12 @@ info: rule `not-iterable` is enabled by default
 
 ```
 error[not-iterable]: Object of type `Iterable2` may not be iterable
-  --> src/mdtest_snippet.py:23:14
+  --> src/mdtest_snippet.py:25:14
    |
-22 |     # error: [not-iterable]
-23 |     for y in Iterable2():
+24 |     # error: [not-iterable]
+25 |     for y in Iterable2():
    |              ^^^^^^^^^^^
-24 |         reveal_type(y)  # revealed: str | int
+26 |         reveal_type(y)  # revealed: str | int
    |
 info: It has no `__iter__` method and its `__getitem__` method (with type `(bound method Iterable2.__getitem__(item: int) -> str) | (bound method Iterable2.__getitem__(item: str) -> int)`) may have an incorrect signature for the old-style iteration protocol
 info: `__getitem__` must be at least as permissive as `def __getitem__(self, key: int): ...` to satisfy the old-style iteration protocol

@@ -49,7 +49,7 @@ from types import CellType, CodeType, GenericAlias, TracebackType
 
 # mypy crashes if any of {ByteString, Sequence, MutableSequence, Mapping, MutableMapping}
 # are imported from collections.abc in builtins.pyi
-from typing import (  # noqa: Y022,UP035
+from typing import (  # noqa: Y022,UP035,RUF100
     IO,
     Any,
     BinaryIO,
@@ -1403,11 +1403,11 @@ class str(Sequence[str]):
     def __eq__(self, value: object, /) -> bool: ...
     def __ge__(self, value: str, /) -> bool: ...
     @overload
-    def __getitem__(self: LiteralString, key: SupportsIndex | slice, /) -> LiteralString:
+    def __getitem__(self: LiteralString, key: SupportsIndex | slice[SupportsIndex | None], /) -> LiteralString:
         """Return self[key]."""
 
     @overload
-    def __getitem__(self, key: SupportsIndex | slice, /) -> str: ...  # type: ignore[misc]
+    def __getitem__(self, key: SupportsIndex | slice[SupportsIndex | None], /) -> str: ...  # type: ignore[misc]
     def __gt__(self, value: str, /) -> bool: ...
     def __hash__(self) -> int: ...
     @overload
@@ -1874,7 +1874,7 @@ class bytes(Sequence[int]):
         """Return self[key]."""
 
     @overload
-    def __getitem__(self, key: slice, /) -> bytes: ...
+    def __getitem__(self, key: slice[SupportsIndex | None], /) -> bytes: ...
     def __add__(self, value: ReadableBuffer, /) -> bytes:
         """Return self+value."""
 
@@ -2377,14 +2377,14 @@ class bytearray(MutableSequence[int]):
         """Return self[key]."""
 
     @overload
-    def __getitem__(self, key: slice, /) -> bytearray: ...
+    def __getitem__(self, key: slice[SupportsIndex | None], /) -> bytearray: ...
     @overload
     def __setitem__(self, key: SupportsIndex, value: SupportsIndex, /) -> None:
         """Set self[key] to value."""
 
     @overload
-    def __setitem__(self, key: slice, value: Iterable[SupportsIndex] | bytes, /) -> None: ...
-    def __delitem__(self, key: SupportsIndex | slice, /) -> None:
+    def __setitem__(self, key: slice[SupportsIndex | None], value: Iterable[SupportsIndex] | bytes, /) -> None: ...
+    def __delitem__(self, key: SupportsIndex | slice[SupportsIndex | None], /) -> None:
         """Delete self[key]."""
 
     def __add__(self, value: ReadableBuffer, /) -> bytearray:
@@ -2525,7 +2525,7 @@ class memoryview(Sequence[_I]):
         """Return self[key]."""
 
     @overload
-    def __getitem__(self, key: slice, /) -> memoryview[_I]: ...
+    def __getitem__(self, key: slice[SupportsIndex | None], /) -> memoryview[_I]: ...
     def __contains__(self, x: object, /) -> bool: ...
     def __iter__(self) -> Iterator[_I]:
         """Implement iter(self)."""
@@ -2536,7 +2536,7 @@ class memoryview(Sequence[_I]):
     def __eq__(self, value: object, /) -> bool: ...
     def __hash__(self) -> int: ...
     @overload
-    def __setitem__(self, key: slice, value: ReadableBuffer, /) -> None:
+    def __setitem__(self, key: slice[SupportsIndex | None], value: ReadableBuffer, /) -> None:
         """Set self[key] to value."""
 
     @overload
@@ -2740,7 +2740,7 @@ class tuple(Sequence[_T_co]):
         """Return self[key]."""
 
     @overload
-    def __getitem__(self, key: slice, /) -> tuple[_T_co, ...]: ...
+    def __getitem__(self, key: slice[SupportsIndex | None], /) -> tuple[_T_co, ...]: ...
     def __iter__(self) -> Iterator[_T_co]:
         """Implement iter(self)."""
 
@@ -2901,14 +2901,14 @@ class list(MutableSequence[_T]):
         """Return self[index]."""
 
     @overload
-    def __getitem__(self, s: slice, /) -> list[_T]: ...
+    def __getitem__(self, s: slice[SupportsIndex | None], /) -> list[_T]: ...
     @overload
     def __setitem__(self, key: SupportsIndex, value: _T, /) -> None:
         """Set self[key] to value."""
 
     @overload
-    def __setitem__(self, key: slice, value: Iterable[_T], /) -> None: ...
-    def __delitem__(self, key: SupportsIndex | slice, /) -> None:
+    def __setitem__(self, key: slice[SupportsIndex | None], value: Iterable[_T], /) -> None: ...
+    def __delitem__(self, key: SupportsIndex | slice[SupportsIndex | None], /) -> None:
         """Delete self[key]."""
     # Overloading looks unnecessary, but is needed to work around complex mypy problems
     @overload
@@ -2959,9 +2959,9 @@ class dict(MutableMapping[_KT, _VT]):
     # __init__ should be kept roughly in line with `collections.UserDict.__init__`, which has similar semantics
     # Also multiprocessing.managers.SyncManager.dict()
     @overload
-    def __init__(self) -> None: ...
+    def __init__(self, /) -> None: ...
     @overload
-    def __init__(self: dict[str, _VT], **kwargs: _VT) -> None: ...  # pyright: ignore[reportInvalidTypeVarUse]  #11780
+    def __init__(self: dict[str, _VT], /, **kwargs: _VT) -> None: ...  # pyright: ignore[reportInvalidTypeVarUse]  #11780
     @overload
     def __init__(self, map: SupportsKeysAndGetItem[_KT, _VT], /) -> None: ...
     @overload
@@ -2986,7 +2986,7 @@ class dict(MutableMapping[_KT, _VT]):
     def __init__(self: dict[str, str], iterable: Iterable[list[str]], /) -> None: ...
     @overload
     def __init__(self: dict[bytes, bytes], iterable: Iterable[list[bytes]], /) -> None: ...
-    def __new__(cls, *args: Any, **kwargs: Any) -> Self: ...
+    def __new__(cls, /, *args: Any, **kwargs: Any) -> Self: ...
     def copy(self) -> dict[_KT, _VT]:
         """Return a shallow copy of the dict."""
 
@@ -3053,18 +3053,11 @@ class dict(MutableMapping[_KT, _VT]):
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
         """See PEP 585"""
 
-    @overload
-    def __or__(self, value: dict[_KT, _VT], /) -> dict[_KT, _VT]:
+    def __or__(self, value: dict[_T1, _T2], /) -> dict[_KT | _T1, _VT | _T2]:
         """Return self|value."""
 
-    @overload
-    def __or__(self, value: dict[_T1, _T2], /) -> dict[_KT | _T1, _VT | _T2]: ...
-    @overload
-    def __ror__(self, value: dict[_KT, _VT], /) -> dict[_KT, _VT]:
+    def __ror__(self, value: dict[_T1, _T2], /) -> dict[_KT | _T1, _VT | _T2]:
         """Return value|self."""
-
-    @overload
-    def __ror__(self, value: dict[_T1, _T2], /) -> dict[_KT | _T1, _VT | _T2]: ...
     # dict.__ior__ should be kept roughly in line with MutableMapping.update()
     @overload  # type: ignore[misc]
     def __ior__(self, value: SupportsKeysAndGetItem[_KT, _VT], /) -> Self:
@@ -3090,32 +3083,32 @@ class set(MutableSet[_T]):
     def copy(self) -> set[_T]:
         """Return a shallow copy of a set."""
 
-    def difference(self, *s: Iterable[Any]) -> set[_T]:
+    def difference(self, *s: Iterable[object]) -> set[_T]:
         """Return a new set with elements in the set that are not in the others."""
 
-    def difference_update(self, *s: Iterable[Any]) -> None:
+    def difference_update(self, *s: Iterable[object]) -> None:
         """Update the set, removing elements found in others."""
 
-    def discard(self, element: _T, /) -> None:
+    def discard(self, element: object, /) -> None:
         """Remove an element from a set if it is a member.
 
         Unlike set.remove(), the discard() method does not raise
         an exception when an element is missing from the set.
         """
 
-    def intersection(self, *s: Iterable[Any]) -> set[_T]:
+    def intersection(self, *s: Iterable[object]) -> set[_T]:
         """Return a new set with elements common to the set and all others."""
 
-    def intersection_update(self, *s: Iterable[Any]) -> None:
+    def intersection_update(self, *s: Iterable[object]) -> None:
         """Update the set, keeping only elements found in it and all others."""
 
-    def isdisjoint(self, s: Iterable[Any], /) -> bool:
+    def isdisjoint(self, s: Iterable[object], /) -> bool:
         """Return True if two sets have a null intersection."""
 
-    def issubset(self, s: Iterable[Any], /) -> bool:
+    def issubset(self, s: Iterable[object], /) -> bool:
         """Report whether another set contains this set."""
 
-    def issuperset(self, s: Iterable[Any], /) -> bool:
+    def issuperset(self, s: Iterable[object], /) -> bool:
         """Report whether this set contains another set."""
 
     def remove(self, element: _T, /) -> None:
@@ -3124,7 +3117,7 @@ class set(MutableSet[_T]):
         If the element is not a member, raise a KeyError.
         """
 
-    def symmetric_difference(self, s: Iterable[_T], /) -> set[_T]:
+    def symmetric_difference(self, s: Iterable[_S], /) -> set[_T | _S]:
         """Return a new set with elements in either the set or other but not both."""
 
     def symmetric_difference_update(self, s: Iterable[_T], /) -> None:
@@ -3157,7 +3150,7 @@ class set(MutableSet[_T]):
     def __ior__(self, value: AbstractSet[_T], /) -> Self:  # type: ignore[override,misc]
         """Return self|=value."""
 
-    def __sub__(self, value: AbstractSet[_T | None], /) -> set[_T]:
+    def __sub__(self, value: AbstractSet[object], /) -> set[_T]:
         """Return self-value."""
 
     def __isub__(self, value: AbstractSet[object], /) -> Self:
@@ -3195,7 +3188,7 @@ class frozenset(AbstractSet[_T_co]):
     def intersection(self, *s: Iterable[object]) -> frozenset[_T_co]:
         """Return a new set with elements common to the set and all others."""
 
-    def isdisjoint(self, s: Iterable[_T_co], /) -> bool:
+    def isdisjoint(self, s: Iterable[object], /) -> bool:
         """Return True if two sets have a null intersection."""
 
     def issubset(self, s: Iterable[object], /) -> bool:
@@ -3204,7 +3197,7 @@ class frozenset(AbstractSet[_T_co]):
     def issuperset(self, s: Iterable[object], /) -> bool:
         """Report whether this set contains another set."""
 
-    def symmetric_difference(self, s: Iterable[_T_co], /) -> frozenset[_T_co]:
+    def symmetric_difference(self, s: Iterable[_S], /) -> frozenset[_T_co | _S]:
         """Return a new set with elements in either the set or other but not both."""
 
     def union(self, *s: Iterable[_S]) -> frozenset[_T_co | _S]:
@@ -3219,13 +3212,13 @@ class frozenset(AbstractSet[_T_co]):
     def __iter__(self) -> Iterator[_T_co]:
         """Implement iter(self)."""
 
-    def __and__(self, value: AbstractSet[_T_co], /) -> frozenset[_T_co]:
+    def __and__(self, value: AbstractSet[object], /) -> frozenset[_T_co]:
         """Return self&value."""
 
     def __or__(self, value: AbstractSet[_S], /) -> frozenset[_T_co | _S]:
         """Return self|value."""
 
-    def __sub__(self, value: AbstractSet[_T_co], /) -> frozenset[_T_co]:
+    def __sub__(self, value: AbstractSet[object], /) -> frozenset[_T_co]:
         """Return self-value."""
 
     def __xor__(self, value: AbstractSet[_S], /) -> frozenset[_T_co | _S]:
@@ -3310,7 +3303,7 @@ class range(Sequence[int]):
         """Return self[key]."""
 
     @overload
-    def __getitem__(self, key: slice, /) -> range: ...
+    def __getitem__(self, key: slice[SupportsIndex | None], /) -> range: ...
     def __reversed__(self) -> Iterator[int]:
         """Return a reverse iterator."""
 
@@ -3409,7 +3402,7 @@ def ascii(obj: object, /) -> str:
     to that returned by repr() in Python 2.
     """
 
-def bin(number: int | SupportsIndex, /) -> str:
+def bin(number: SupportsIndex, /) -> str:
     """Return the binary representation of an integer.
 
     >>> bin(2796202)
@@ -3430,7 +3423,7 @@ def callable(obj: object, /) -> TypeIs[Callable[..., object]]:
     __call__() method.
     """
 
-def chr(i: int | SupportsIndex, /) -> str:
+def chr(i: SupportsIndex, /) -> str:
     """Return a Unicode string of one character with ordinal i; 0 <= i <= 0x10ffff."""
 
 if sys.version_info >= (3, 10):
@@ -3715,7 +3708,7 @@ def hash(obj: object, /) -> int:
 
 help: _sitebuiltins._Helper
 
-def hex(number: int | SupportsIndex, /) -> str:
+def hex(number: SupportsIndex, /) -> str:
     """Return the hexadecimal representation of an integer.
 
     >>> hex(12648430)
@@ -3967,7 +3960,7 @@ def next(i: SupportsNext[_T], /) -> _T:
 
 @overload
 def next(i: SupportsNext[_T], default: _VT, /) -> _T | _VT: ...
-def oct(number: int | SupportsIndex, /) -> str:
+def oct(number: SupportsIndex, /) -> str:
     """Return the octal representation of an integer.
 
     >>> oct(342391)

@@ -14,7 +14,7 @@ pub trait Db: ModuleResolverDb {
 
     fn lint_registry(&self) -> &LintRegistry;
 
-    fn analysis_settings(&self) -> &AnalysisSettings;
+    fn analysis_settings(&self, file: File) -> &AnalysisSettings;
 
     /// Whether ty is running with logging verbosity INFO or higher (`-v` or more).
     fn verbose(&self) -> bool;
@@ -26,7 +26,7 @@ pub(crate) mod tests {
 
     use crate::program::Program;
     use crate::{
-        AnalysisSettings, ProgramSettings, PythonPlatform, PythonVersionSource,
+        AnalysisSettings, FallibleStrategy, ProgramSettings, PythonPlatform, PythonVersionSource,
         PythonVersionWithSource, default_lint_registry,
     };
     use ty_module_resolver::SearchPathSettings;
@@ -138,7 +138,7 @@ pub(crate) mod tests {
             default_lint_registry()
         }
 
-        fn analysis_settings(&self) -> &AnalysisSettings {
+        fn analysis_settings(&self, _file: File) -> &AnalysisSettings {
             &self.analysis_settings
         }
 
@@ -207,7 +207,7 @@ pub(crate) mod tests {
                     },
                     python_platform: self.python_platform,
                     search_paths: SearchPathSettings::new(vec![src_root])
-                        .to_search_paths(db.system(), db.vendored())
+                        .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
                         .context("Invalid search path settings")?,
                 },
             );

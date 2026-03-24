@@ -235,7 +235,7 @@ mod stable {
     // `Iterable` but assigns `__iter__ = None` in the class body (or similar).
     type_property_test!(
         all_types_assignable_to_iterable_are_iterable, db,
-        forall types t. t.is_assignable_to(db, KnownClass::Iterable.to_specialized_instance(db, [Type::object()])) => t.try_iterate(db).is_ok()
+        forall types t. t.is_assignable_to(db, KnownClass::Iterable.to_specialized_instance(db, &[Type::object()])) => t.try_iterate(db).is_ok()
     );
 
     // Our optimized `Type::negate()` function should always produce the exact same type

@@ -49,9 +49,9 @@ within a string.  Escaped quotation marks, nested semicolons, and other
 such trickeries do not confuse it.
 
    >>> C = cookies.SimpleCookie()
-   >>> C.load('keebler="E=everybody; L=\\\\"Loves\\\\"; fudge=\\\\012;";')
+   >>> C.load('keebler="E=everybody; L=\\\\"Loves\\\\"; fudge=;";')
    >>> print(C)
-   Set-Cookie: keebler="E=everybody; L=\\"Loves\\"; fudge=\\012;"
+   Set-Cookie: keebler="E=everybody; L=\\"Loves\\"; fudge=;"
 
 Each element of the Cookie also supports all of the RFC 2109
 Cookie attributes.  Here's an example which sets the Path
@@ -88,6 +88,7 @@ the value to a string, when the values are set dictionary-style.
 Finis.
 """
 
+from _typeshed import MaybeNone
 from collections.abc import Iterable, Mapping
 from types import GenericAlias
 from typing import Any, Generic, TypeVar, overload
@@ -126,11 +127,11 @@ class Morsel(dict[str, Any], Generic[_T]):
     """
 
     @property
-    def value(self) -> str: ...
+    def value(self) -> str | MaybeNone: ...
     @property
-    def coded_value(self) -> _T: ...
+    def coded_value(self) -> _T | MaybeNone: ...
     @property
-    def key(self) -> str: ...
+    def key(self) -> str | MaybeNone: ...
     def __init__(self) -> None: ...
     def set(self, key: str, val: str, coded_val: _T) -> None: ...
     def setdefault(self, key: str, val: str | None = None) -> str: ...
@@ -164,7 +165,7 @@ class BaseCookie(dict[str, Morsel[_T]], Generic[_T]):
         Override this function to modify the behavior of cookies.
         """
 
-    def value_encode(self, val: _T) -> tuple[_T, str]:
+    def value_encode(self, val: _T) -> tuple[str, str]:
         """real_value, coded_value = value_encode(VALUE)
         Called prior to setting a cookie's value from the dictionary
         representation.  The VALUE is the value being assigned.

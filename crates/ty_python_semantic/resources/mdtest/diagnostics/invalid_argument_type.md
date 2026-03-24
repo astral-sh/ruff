@@ -244,3 +244,29 @@ def f[T: Foo](x: T) -> T:
     needs_a_foo(x)  # error: [invalid-argument-type]
     return x
 ```
+
+## Numbers special case
+
+```py
+from numbers import Number
+
+def f(x: Number): ...
+
+f(5)  # error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `Number`, found `Literal[5]`"
+
+def g(x: float):
+    f(x)  # error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `Number`, found `int | float`"
+```
+
+## Invariant generic classes
+
+We show a special diagnostic hint for invariant generic classes. For more details, see the
+[`invalid_assignment_details.md`](./invalid_assignment_details.md) test.
+
+```py
+def modify(xs: list[int]):
+    xs.append(42)
+
+xs: list[bool] = [True, False]
+modify(xs)  # error: [invalid-argument-type]
+```

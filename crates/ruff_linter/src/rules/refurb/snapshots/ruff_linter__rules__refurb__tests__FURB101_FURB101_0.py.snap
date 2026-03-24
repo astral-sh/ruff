@@ -190,6 +190,54 @@ FURB101 `open` and `read` should be replaced by `Path("file.txt").read_text()`
    |
 help: Replace with `Path("file.txt").read_text()`
 
+FURB101 [*] `open` and `read` should be replaced by `Path("file.txt").read_text(newline="\r\n")`
+  --> FURB101_0.py:85:6
+   |
+84 | # FURB101 (newline is supported in read_text on Python 3.13+)
+85 | with open("file.txt", newline="\r\n") as f:
+   |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+86 |     x = f.read()
+   |
+help: Replace with `Path("file.txt").read_text(newline="\r\n")`
+1  + import pathlib
+2  | def foo():
+3  |     ...
+4  | 
+--------------------------------------------------------------------------------
+83 |     x = f.read()
+84 | 
+85 | # FURB101 (newline is supported in read_text on Python 3.13+)
+   - with open("file.txt", newline="\r\n") as f:
+   -     x = f.read()
+86 + x = pathlib.Path("file.txt").read_text(newline="\r\n")
+87 | 
+88 | # FURB101 (dont mistake "newline" for "mode")
+89 | with open("file.txt", newline="b") as f:
+
+FURB101 [*] `open` and `read` should be replaced by `Path("file.txt").read_text(newline="b")`
+  --> FURB101_0.py:89:6
+   |
+88 | # FURB101 (dont mistake "newline" for "mode")
+89 | with open("file.txt", newline="b") as f:
+   |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+90 |     x = f.read()
+   |
+help: Replace with `Path("file.txt").read_text(newline="b")`
+1  + import pathlib
+2  | def foo():
+3  |     ...
+4  | 
+--------------------------------------------------------------------------------
+87 |     x = f.read()
+88 | 
+89 | # FURB101 (dont mistake "newline" for "mode")
+   - with open("file.txt", newline="b") as f:
+   -     x = f.read()
+90 + x = pathlib.Path("file.txt").read_text(newline="b")
+91 | 
+92 | # I guess we can possibly also report this case, but the question
+93 | # is why the user would put "r+" here in the first place.
+
 FURB101 [*] `open` and `read` should be replaced by `Path("file.txt").read_text(encoding="utf-8")`
    --> FURB101_0.py:130:6
     |

@@ -75,7 +75,7 @@ def test(a: f"f-string type annotation", b: b"byte-string-type-annotation"): ...
 
 ## Can't suppress syntax errors
 
-<!-- blacken-docs:off -->
+<!-- fmt:off -->
 
 ```py
 # error: [invalid-syntax]
@@ -84,7 +84,7 @@ def test($):  # ty: ignore
     pass
 ```
 
-<!-- blacken-docs:on -->
+<!-- fmt:on -->
 
 ## Can't suppress `revealed-type` diagnostics
 
@@ -127,14 +127,14 @@ a = 10 / 0  # ty: ignore[*-*]
 
 ## Trailing whitespace
 
-<!-- blacken-docs:off -->
+<!-- fmt:off -->
 
 ```py
 a = 10 / 0  # ty: ignore[division-by-zero]       
             #                               ^^^^^^ trailing whitespace
 ```
 
-<!-- blacken-docs:on -->
+<!-- fmt:on -->
 
 ## Missing comma
 
@@ -167,15 +167,13 @@ a = 4 / 0  # ty: ignore[]
 
 ## File-level suppression comments
 
-File level suppression comments are currently intentionally unsupported because we've yet to decide
-if they should use a different syntax that also supports enabling rules or changing the rule's
-severity: `ty: possibly-undefined-reference=error`
+File level suppression comments suppress all errors in a file with a given code.
 
 ```py
-# error: [unused-ignore-comment]
 # ty: ignore[division-by-zero]
 
-a = 4 / 0  # error: [division-by-zero]
+a = 4 / 0
+b = a + c  # error: [unresolved-reference]
 ```
 
 ## Unknown rule

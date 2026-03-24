@@ -156,8 +156,8 @@ class NotBoolable:
 
 # error: [unsupported-bool-conversion] "Boolean conversion is not supported for type `NotBoolable`"
 if NotBoolable():
-    ...
+    pass
 # error: [unsupported-bool-conversion] "Boolean conversion is not supported for type `NotBoolable`"
 elif NotBoolable():
-    ...
+    pass
 ```

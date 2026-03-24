@@ -27,6 +27,7 @@ ty_project = { workspace = true, features = ["testing"] }
 ty_python_semantic = { workspace = true }
 ty_vendored = { workspace = true }
 
+compact_str = { workspace = true }
 get-size2 = { workspace = true }
 itertools = { workspace = true }
 rayon = { workspace = true }

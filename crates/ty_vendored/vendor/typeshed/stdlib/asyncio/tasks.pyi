@@ -609,7 +609,6 @@ else:
         """
 
 if sys.version_info >= (3, 11):
-    @overload
     async def wait(
         fs: Iterable[_FT], *, timeout: float | None = None, return_when: str = "ALL_COMPLETED"
     ) -> tuple[set[_FT], set[_FT]]:
@@ -626,11 +625,6 @@ if sys.version_info >= (3, 11):
         Note: This does not raise TimeoutError! Futures that aren't done
         when the timeout occurs are returned in the second set.
         """
-
-    @overload
-    async def wait(
-        fs: Iterable[Task[_T]], *, timeout: float | None = None, return_when: str = "ALL_COMPLETED"
-    ) -> tuple[set[Task[_T]], set[Task[_T]]]: ...
 
 elif sys.version_info >= (3, 10):
     @overload
@@ -700,7 +694,16 @@ else:
 def all_tasks(loop: AbstractEventLoop | None = None) -> set[Task[Any]]:
     """Return a set of all tasks for the loop."""
 
-if sys.version_info >= (3, 11):
+if sys.version_info >= (3, 14):
+    def create_task(
+        coro: _CoroutineLike[_T], *, name: str | None = None, context: Context | None = None, eager_start: bool | None = None
+    ) -> Task[_T]:
+        """Schedule the execution of a coroutine object in a spawn task.
+
+        Return a Task object.
+        """
+
+elif sys.version_info >= (3, 11):
     def create_task(coro: _CoroutineLike[_T], *, name: str | None = None, context: Context | None = None) -> Task[_T]:
         """Schedule the execution of a coroutine object in a spawn task.
 

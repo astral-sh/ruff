@@ -48,8 +48,6 @@ from typing import no_type_check
 @unknown_decorator  # error: [unresolved-reference]
 @no_type_check
 def test() -> int:
-    # TODO: this should not be an error
-    # error: [unresolved-reference]
     return a + 5
 ```
 
@@ -66,8 +64,6 @@ from typing import no_type_check
 @no_type_check
 @unknown_decorator
 def test() -> int:
-    # TODO: this should not be an error
-    # error: [unresolved-reference]
     return a + 5
 ```
 

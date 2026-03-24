@@ -515,7 +515,9 @@ fn is_full_path(text: &str) -> bool {
 /// partial path.
 fn is_partial_path(expr: &Expr) -> bool {
     let string_literal = match expr {
-        Expr::List(ast::ExprList { elts, .. }) => elts.first().and_then(string_literal),
+        Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+            elts.first().and_then(string_literal)
+        }
         _ => string_literal(expr),
     };
     string_literal.is_some_and(|text| !is_full_path(text))

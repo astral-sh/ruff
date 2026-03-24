@@ -1,6 +1,9 @@
 #![allow(clippy::disallowed_names)]
 use ruff_benchmark::criterion;
-use ruff_benchmark::real_world_projects::{InstalledProject, RealWorldProject};
+use ruff_benchmark::real_world_projects::{
+    InstalledProject, RealWorldProject, copy_directory_recursive, get_project_cache_dir,
+    install_dependencies_to_cache,
+};
 
 use std::fmt::Write;
 use std::ops::Range;
@@ -15,7 +18,7 @@ use ruff_db::files::{File, system_path_to_file};
 use ruff_db::source::source_text;
 use ruff_db::system::{InMemorySystem, MemoryFileSystem, SystemPath, SystemPathBuf, TestSystem};
 use ruff_python_ast::PythonVersion;
-use ty_project::metadata::options::{EnvironmentOptions, Options};
+use ty_project::metadata::options::{AnalysisOptions, EnvironmentOptions, Options};
 use ty_project::metadata::value::{RangedValue, RelativePathBuf};
 use ty_project::watch::{ChangeEvent, ChangedKind};
 use ty_project::{CheckMode, Db, ProjectDatabase, ProjectMetadata};
@@ -85,10 +88,14 @@ fn setup_tomllib_case() -> Case {
             python_version: Some(RangedValue::cli(PythonVersion::PY312)),
             ..EnvironmentOptions::default()
         }),
+        analysis: Some(AnalysisOptions {
+            respect_type_ignore_comments: Some(false),
+            ..AnalysisOptions::default()
+        }),
         ..Options::default()
     });
 
-    let mut db = ProjectDatabase::new(metadata, system).unwrap();
+    let mut db = ProjectDatabase::fallible(metadata, system).unwrap();
     let mut tomllib_files = FxHashSet::default();
     let mut re: Option<File> = None;
 
@@ -215,8 +222,39 @@ fn assert_diagnostics(db: &dyn Db, diagnostics: &[Diagnostic], expected: &[KeyDi
 }
 
 fn setup_micro_case(code: &str) -> Case {
+    setup_micro_case_inner(code, None)
+}
+
+fn setup_micro_case_with_dependencies(name: &str, dependencies: &[&str], code: &str) -> Case {
+    setup_micro_case_inner(code, Some((name, dependencies)))
+}
+
+fn setup_micro_case_inner(code: &str, dependencies: Option<(&str, &[&str])>) -> Case {
     let system = TestSystem::default();
     let fs = system.memory_file_system().clone();
+
+    let python = dependencies.map(|(name, dependencies)| {
+        let cache_dir = get_project_cache_dir(name).expect("Failed to get cache directory");
+        std::fs::create_dir_all(&cache_dir).expect("Failed to create cache directory");
+
+        let venv_path = cache_dir.join(".venv");
+        install_dependencies_to_cache(
+            name,
+            dependencies,
+            &venv_path,
+            PythonVersion::PY312,
+            "2025-06-17",
+        )
+        .expect("Failed to install dependencies");
+
+        // Copy the on-disk venv into the in-memory filesystem.
+        // ProjectMetadata::discover walks up from /src and uses / as the project root,
+        // so the venv must be at /.venv for the `python = ".venv"` option to resolve correctly.
+        copy_directory_recursive(&fs, &venv_path, SystemPath::new("/.venv"))
+            .expect("Failed to copy venv to memory filesystem");
+
+        RelativePathBuf::cli(SystemPath::new(".venv"))
+    });
 
     let file_path = "src/test.py";
     fs.write_file_all(
@@ -230,12 +268,13 @@ fn setup_micro_case(code: &str) -> Case {
     metadata.apply_options(Options {
         environment: Some(EnvironmentOptions {
             python_version: Some(RangedValue::cli(PythonVersion::PY312)),
+            python,
             ..EnvironmentOptions::default()
         }),
         ..Options::default()
     });
 
-    let mut db = ProjectDatabase::new(metadata, system).unwrap();
+    let mut db = ProjectDatabase::fallible(metadata, system).unwrap();
     let file = system_path_to_file(&db, SystemPathBuf::from(file_path)).unwrap();
 
     db.set_check_mode(CheckMode::OpenFiles);
@@ -557,6 +596,49 @@ fn benchmark_many_enum_members(criterion: &mut Criterion) {
     });
 }
 
+/// Micro-benchmark that tests our performance when slicing and unpacking
+/// a very large tuple that has many varied literal strings inside it.
+///
+/// Adapted from <https://github.com/MMD-Blender/blender_mmd_tools/blob/6ae13d6039763b6813832622c13da464983e93b3/mmd_tools/m17n.py>
+fn benchmark_very_large_tuple(criterion: &mut Criterion) {
+    /// Number of entries in the tuple -- must be >64 to trigger the literal-promotion optimization
+    const NUM_ENTRIES: usize = 65;
+
+    setup_rayon();
+
+    let mut code = "translations_tuple = (\n".to_string();
+    for i in 0..NUM_ENTRIES {
+        writeln!(
+            &mut code,
+            r#"    (("*", "Description {i}"), (("ref.path.{i}",), ()), ("ja_JP", "翻訳{i}", (False, ())), ("zh_HANS", "翻译{i}", (False, ()))),"#
+        )
+        .ok();
+    }
+    code.push_str(")\n\n");
+
+    // This slice operation (msg[2:]) is what triggers the expensive type inference:
+    // ty must compute the union of all possible slice results.
+    code.push_str(
+        "\
+for msg in translations_tuple:
+    for lang, trans, (is_fuzzy, comments) in msg[2:]:
+        pass
+",
+    );
+
+    criterion.bench_function("ty_micro[very_large_tuple]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 fn benchmark_many_enum_members_2(criterion: &mut Criterion) {
     const NUM_ENUM_MEMBERS: usize = 48;
 
@@ -611,6 +693,158 @@ class E(Enum):
     });
 }
 
+/// Benchmark for narrowing a large union type through multiple match statements.
+///
+/// This is extracted from egglog-python's `pretty.py`, where a ~30-class union type
+/// (`AllDecls`) is narrowed by exhaustive match statements.
+///
+/// Sample code structure:
+/// ```python
+/// from __future__ import annotations
+/// from dataclasses import dataclass
+///
+/// @dataclass
+/// class C0:
+///     value: int
+/// ...
+///
+/// AllDecls = C0 | C1 | ...
+///
+/// def process(decl: AllDecls) -> None:
+///     match decl:
+///         case C0(): pass
+///         ...
+///         case _: pass
+/// ```
+fn benchmark_large_union_narrowing(criterion: &mut Criterion) {
+    const NUM_CLASSES: usize = 30;
+    const NUM_MATCH_BRANCHES: usize = 29;
+
+    setup_rayon();
+
+    let mut code =
+        "from __future__ import annotations\nfrom dataclasses import dataclass\n\n".to_string();
+
+    for i in 0..NUM_CLASSES {
+        writeln!(&mut code, "@dataclass\nclass C{i}:\n    value: int\n").ok();
+    }
+
+    code.push_str("AllDecls = ");
+    for i in 0..NUM_CLASSES {
+        if i > 0 {
+            code.push_str(" | ");
+        }
+        write!(&mut code, "C{i}").ok();
+    }
+    code.push_str("\n\n");
+
+    code.push_str("def process(decl: AllDecls) -> None:\n    match decl:\n");
+    for i in 0..NUM_MATCH_BRANCHES {
+        writeln!(&mut code, "        case C{i}():\n            pass",).ok();
+    }
+    code.push_str("        case _:\n            pass\n\n");
+
+    criterion.bench_function("ty_micro[large_union_narrowing]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+/// Benchmark for narrowing through a long `isinstance` elif chain.
+///
+/// This pattern is common in visitor-style dispatch code (e.g. koda-validate's
+/// `generate_schema_validator`) where a base class parameter is narrowed through
+/// many sequential `isinstance` checks.
+///
+/// Sample code structure:
+/// ```python
+/// class Base: ...
+/// class C0(Base): ...
+/// class C1(Base): ...
+/// ...
+///
+/// def f(obj: Base) -> None:
+///     if isinstance(obj, C0):
+///         pass
+///     elif isinstance(obj, C1):
+///         pass
+///     ...
+/// ```
+fn benchmark_large_isinstance_narrowing(criterion: &mut Criterion) {
+    const NUM_CLASSES: usize = 50;
+
+    setup_rayon();
+
+    let mut code = String::new();
+    writeln!(&mut code, "class Base: ...").ok();
+    for i in 0..NUM_CLASSES {
+        writeln!(&mut code, "class C{i}(Base): ...").ok();
+    }
+    writeln!(&mut code).ok();
+
+    writeln!(&mut code, "def f(obj: Base) -> None:").ok();
+    for i in 0..NUM_CLASSES {
+        if i == 0 {
+            writeln!(&mut code, "    if isinstance(obj, C{i}):").ok();
+        } else {
+            writeln!(&mut code, "    elif isinstance(obj, C{i}):").ok();
+        }
+        writeln!(&mut code, "        pass").ok();
+    }
+
+    criterion.bench_function("ty_micro[large_isinstance_narrowing]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+fn benchmark_pandas_tdd(criterion: &mut Criterion) {
+    setup_rayon();
+
+    // This example was reported in https://github.com/astral-sh/ty/issues/3039.
+    criterion.bench_function("ty_micro[pandas_tdd]", |b| {
+        b.iter_batched_ref(
+            || {
+                setup_micro_case_with_dependencies(
+                    "pandas_tdd",
+                    &["pandas-stubs"],
+                    r#"
+                    import pandas as pd
+
+                    df = pd.DataFrame({
+                        "a": [1, 2, 3],
+                        "b": [4, 5, 6],
+                        "c": [7, 8, 9],
+                    })
+                    df["d"] = df["a"] + df["b"] + df["c"] + 1 + (
+                        df["a"] ** 2 + df["b"] ** 2 + df["c"] ** 2)
+                    "#,
+                )
+            },
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 struct ProjectBenchmark<'a> {
     project: InstalledProject<'a>,
     fs: MemoryFileSystem,
@@ -646,7 +880,7 @@ impl<'a> ProjectBenchmark<'a> {
             ..Options::default()
         });
 
-        let mut db = ProjectDatabase::new(metadata, system).unwrap();
+        let mut db = ProjectDatabase::fallible(metadata, system).unwrap();
 
         db.project().set_included_paths(
             &mut db,
@@ -755,7 +989,7 @@ fn datetype(criterion: &mut Criterion) {
             max_dep_date: "2025-07-04",
             python_version: PythonVersion::PY313,
         },
-        2,
+        10,
     );
 
     bench_project(&benchmark, criterion);
@@ -772,6 +1006,10 @@ criterion_group!(
     benchmark_complex_constrained_attributes_3,
     benchmark_many_enum_members,
     benchmark_many_enum_members_2,
+    benchmark_very_large_tuple,
+    benchmark_large_union_narrowing,
+    benchmark_large_isinstance_narrowing,
+    benchmark_pandas_tdd,
 );
 criterion_group!(project, anyio, attrs, hydra, datetype);
 criterion_main!(check_file, micro, project);

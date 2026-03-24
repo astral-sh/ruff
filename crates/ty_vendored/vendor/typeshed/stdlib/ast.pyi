@@ -1679,7 +1679,7 @@ class ExceptHandler(excepthandler):
             """Return a copy of the AST node with new values for the specified fields."""
 
 class arguments(AST):
-    """arguments(arg* posonlyargs, arg* args, arg? vararg, arg* kwonlyargs, expr* kw_defaults, arg? kwarg, expr* defaults)"""
+    """arguments(arg* posonlyargs, arg* args, arg? vararg, arg* kwonlyargs, expr?* kw_defaults, arg? kwarg, expr* defaults)"""
 
     if sys.version_info >= (3, 10):
         __match_args__ = ("posonlyargs", "args", "vararg", "kwonlyargs", "kw_defaults", "kwarg", "defaults")

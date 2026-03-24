@@ -22,23 +22,27 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 ///
 /// ## Example
 /// ```python
+/// x, y = 1, 2
+///
 /// z = x if x else y
 /// ```
 ///
 /// Use instead:
 /// ```python
+/// x, y = 1, 2
+///
 /// z = x or y
 /// ```
 ///
 /// ## Fix safety
 /// This rule's fix is marked as unsafe in the event that the body of the
-/// `if` expression contains side effects.
+/// `if` expression contains side effects or comments.
 ///
 /// For example, `foo` will be called twice in `foo() if foo() else bar()`
 /// (assuming `foo()` returns a truthy value), but only once in
 /// `foo() or bar()`.
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.3.6")]
+#[violation_metadata(stable_since = "0.15.0")]
 pub(crate) struct IfExpInsteadOfOrOperator;
 
 impl Violation for IfExpInsteadOfOrOperator {
@@ -70,6 +74,8 @@ pub(crate) fn if_exp_instead_of_or_operator(checker: &Checker, if_expr: &ast::Ex
 
     let mut diagnostic = checker.report_diagnostic(IfExpInsteadOfOrOperator, *range);
 
+    let has_comments = checker.comment_ranges().intersects(*range);
+
     // Replace with `{test} or {orelse}`.
     diagnostic.set_fix(Fix::applicable_edit(
         Edit::range_replacement(
@@ -80,7 +86,7 @@ pub(crate) fn if_exp_instead_of_or_operator(checker: &Checker, if_expr: &ast::Ex
             ),
             if_expr.range(),
         ),
-        if contains_effect(body, |id| checker.semantic().has_builtin_binding(id)) {
+        if contains_effect(body, |id| checker.semantic().has_builtin_binding(id)) || has_comments {
             Applicability::Unsafe
         } else {
             Applicability::Safe

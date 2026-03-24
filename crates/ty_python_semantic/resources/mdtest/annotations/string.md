@@ -35,7 +35,13 @@ def f(v: tuple[int, "str"]):
 def f(v: "Foo"):
     reveal_type(v)  # revealed: Foo
 
+def f(x: "int | 'Foo'"): ...
+
 class Foo: ...
+
+f("not an int or a Foo")  # error: [invalid-argument-type]
+f(Foo())  # fine
+f(42)  # fine
 ```
 
 ## Deferred (undefined)
@@ -46,13 +52,153 @@ def f(v: "Foo"):
     reveal_type(v)  # revealed: Unknown
 ```
 
-## Partial deferred
+## Partially deferred annotations
+
+### Python less than 3.14
+
+"Partially stringified" PEP-604 unions can raise `TypeError` on Python \<3.14; we try to detect this
+common runtime error:
+
+<!-- snapshot-diagnostics -->
+
+```toml
+[environment]
+python-version = "3.13"
+```
 
 ```py
-def f(v: int | "Foo"):
+from typing import Any, TypeVar, Callable, Protocol, TypedDict, TYPE_CHECKING
+
+class TD(TypedDict): ...
+
+class P(Protocol):
+    x: int
+
+class Meta(type):
+    def __or__(cls, other: str) -> Any:
+        return "wow, so fancy, bet type checkers can't handle this"
+
+class UsesMeta(metaclass=Meta): ...
+
+T = TypeVar("T")
+
+# fmt: off
+def f(
+    # error: [unsupported-operator]
+    a: int | "Foo",
+    # error: [unsupported-operator]
+    b: int | "memoryview" | bytes,
+    # error: [unsupported-operator]
+    c: "TD" | None,
+    # error: [unsupported-operator]
+    d: "P" | None,
+    # fine: `TypeVar.__or__` accepts strings at runtime
+    e: T | "Foo",
+    # fine: _SpecialForm.__ror__` accepts strings at runtime
+    f: "Foo" | Callable[..., None],
+    # also fine due to the custom metaclass
+    g: UsesMeta | "Foo",
+    # error: [unsupported-operator]
+    h: None | None,
+    # error: [unresolved-reference] "SomethingUndefined"
+    # error: [unresolved-reference] "SomethingAlsoUndefined"
+    i: SomethingUndefined | SomethingAlsoUndefined,
+    # error: [unsupported-operator]
+    # error: [unsupported-operator]
+    j: list["int" | None] | "bytes",
+):
+    reveal_type(a)  # revealed: int | Foo
+    reveal_type(b)  # revealed: int | memoryview[int] | bytes
+    reveal_type(c)  # revealed: TD | None
+    reveal_type(d)  # revealed: P | None
+    reveal_type(e)  # revealed: T@f | Foo
+    reveal_type(f)  # revealed: Foo | ((...) -> None)
+    reveal_type(g)  # revealed: UsesMeta | Foo
+    reveal_type(h)  # revealed: None
+    reveal_type(i)  # revealed: Unknown
+
+# fmt: on
+
+class Foo: ...
+
+# error: [unsupported-operator]
+X = list["int" | None]
+
+if TYPE_CHECKING:
+    # TODO: ideally we would not error here, since `if TYPE_CHECKING`
+    # blocks are not executed at runtime. Requires
+    # https://github.com/astral-sh/ty/issues/1553.
+    bar: "int" | "None"  # error: [unsupported-operator]
+
+    # TODO: same as above
+    # error: [unsupported-operator]
+    def foo(x: "int" | "None"): ...
+
+    class Bar:
+        # no error because this annotation is resolved inside a scope
+        # fully defined inside an `if TYPE_CHECKING` block
+        def f(x: "int" | "None"): ...
+```
+
+### Python less than 3.14 in a stub file
+
+This error is never emitted on stub files, because they are never executed at runtime:
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```pyi
+# fine
+def f(x: "int" | None): ...
+```
+
+### Python less than 3.14 with `__future__` annotations
+
+The errors can be avoided in type-annotation contexts by using `__future__` annotations on Python
+\<3.14:
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from __future__ import annotations
+
+def f(v: int | "Foo"):  # fine
+    reveal_type(v)  # revealed: int | Foo
+
+class Foo:
+    def __init__(self):
+        self.x: "int" | "str" = 42
+
+d = {}
+d[0]: "int" | "str" = 42
+
+# error: [unsupported-operator]
+X = list["int" | None]
+```
+
+### Python >=3.14
+
+Runtime errors are also less common for partially stringified annotations if the Python version
+being used is >=3.14:
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+def f(v: int | "Foo"):  # fine
     reveal_type(v)  # revealed: int | Foo
 
 class Foo: ...
+
+# error: [unsupported-operator]
+X = list["int" | None]
 ```
 
 ## `typing.Literal`
@@ -87,7 +233,7 @@ def f1(
     h: """int""",
     # error: [byte-string-type-annotation] "Type expressions cannot use bytes literal"
     i: "b'int'",
-):
+):  # fmt:skip
     reveal_type(a)  # revealed: Unknown
     reveal_type(b)  # revealed: Unknown
     reveal_type(c)  # revealed: Unknown
@@ -104,7 +250,7 @@ def f1(
 ```py
 from typing import Literal
 
-def f(v: Literal["a", r"b", b"c", "d" "e", "\N{LATIN SMALL LETTER F}", "\x67", """h"""]):
+def f(v: Literal["a", r"b", b"c", "d" "e", "\N{LATIN SMALL LETTER F}", "\x67", """h"""]):  # fmt:skip
     reveal_type(v)  # revealed: Literal["a", "b", "de", "f", "g", "h", b"c"]
 ```
 
@@ -128,18 +274,24 @@ reveal_type(Aliases.not_forward)  # revealed: str
 ```py
 a: "int" = 1
 b: "'int'" = 1
-c: "Foo"
+# error: [invalid-syntax-in-forward-annotation] "too many levels of nested string annotations; remove the redundant nested quotes"
+c: """'"int"'""" = 1
+d: "Foo"
 # error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to `Foo`"
-d: "Foo" = 1
+e: "Foo" = 1
+# error: [invalid-syntax-in-forward-annotation] "nested string annotation is too long; remove the redundant nested quotes"
+f: "'str | int | bool | Foo | Bar'" = 1
 
 class Foo: ...
 
-c = Foo()
+d = Foo()
 
 reveal_type(a)  # revealed: Literal[1]
 reveal_type(b)  # revealed: Literal[1]
-reveal_type(c)  # revealed: Foo
+reveal_type(c)  # revealed: Literal[1]
 reveal_type(d)  # revealed: Foo
+reveal_type(e)  # revealed: Foo
+reveal_type(f)  # revealed: Literal[1]
 ```
 
 ## Parameter
@@ -166,29 +318,48 @@ stringified_fstring_with_dict_comprehension: "f'{ {i: i for i in range(5)} }'"
 # error: [fstring-type-annotation]
 stringified_fstring_with_set_comprehension: "f'{ {i for i in range(5)} }'"
 
+# error: [invalid-type-form]
 a: "1 or 2"
+# error: [invalid-type-form]
 b: "(x := 1)"
 # error: [invalid-type-form]
 c: "1 + 2"
 # Regression test for https://github.com/astral-sh/ty/issues/1847
 # error: [invalid-type-form]
 c2: "a*(i for i in [])"
+# error: [invalid-type-form]
 d: "lambda x: x"
+# error: [invalid-type-form]
 e: "x if True else y"
+# error: [invalid-type-form]
 f: "{'a': 1, 'b': 2}"
+# error: [invalid-type-form]
 g: "{1, 2}"
+# error: [invalid-type-form]
 h: "[i for i in range(5)]"
+# error: [invalid-type-form]
 i: "{i for i in range(5)}"
+# error: [invalid-type-form]
 j: "{i: i for i in range(5)}"
+# error: [invalid-type-form]
 k: "(i for i in range(5))"
+# error: [invalid-type-form]
 l: "await 1"
 # error: [invalid-syntax-in-forward-annotation]
 m: "yield 1"
 # error: [invalid-syntax-in-forward-annotation]
 n: "yield from 1"
+# error: [invalid-type-form]
 o: "1 < 2"
+# error: [invalid-type-form]
 p: "call()"
+# error: [invalid-type-form] "List literals are not allowed"
+# error: [invalid-type-form] "Int literals are not allowed"
+# error: [invalid-type-form] "Int literals are not allowed"
 r: "[1, 2]"
+# error: [invalid-type-form] "Tuple literals are not allowed"
+# error: [invalid-type-form] "Int literals are not allowed"
+# error: [invalid-type-form] "Int literals are not allowed"
 s: "(1, 2)"
 ```
 

@@ -1,0 +1,34 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: type.md - Calls to `type()` - MRO error highlighting (snapshot)
+mdtest path: crates/ty_python_semantic/resources/mdtest/call/type.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | class A: ...
+2 | 
+3 | Dup = type("Dup", (A, A), {})  # error: [duplicate-base]
+```
+
+# Diagnostics
+
+```
+error[duplicate-base]: Duplicate base class <class 'A'> in class `Dup`
+ --> src/mdtest_snippet.py:3:7
+  |
+1 | class A: ...
+2 |
+3 | Dup = type("Dup", (A, A), {})  # error: [duplicate-base]
+  |       ^^^^^^^^^^^^^^^^^^^^^^^
+  |
+info: rule `duplicate-base` is enabled by default
+
+```

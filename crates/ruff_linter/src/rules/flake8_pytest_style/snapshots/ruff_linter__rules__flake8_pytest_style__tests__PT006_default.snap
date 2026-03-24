@@ -422,3 +422,96 @@ help: Use a string for the first argument
 143 |     [
 144 |         (1,),
 145 |         (2, 3),
+
+PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `str`
+   --> PT006.py:164:5
+    |
+162 | # See: https://github.com/astral-sh/ruff/issues/22441
+163 | @pytest.mark.parametrize(
+164 |     ["param"],
+    |     ^^^^^^^^^
+165 |     [
+166 |         ((),),
+    |
+help: Use a string for the first argument
+161 | # Regression tests for nested tuples that could cause syntax errors when unpacked.
+162 | # See: https://github.com/astral-sh/ruff/issues/22441
+163 | @pytest.mark.parametrize(
+    -     ["param"],
+164 +     "param",
+165 |     [
+    -         ((),),
+    -         ((1,),),
+166 +         (),
+167 +         (1,),
+168 |     ],
+169 | )
+170 | def test_single_element_nested_empty_tuple(param):
+
+PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `str`
+   --> PT006.py:175:5
+    |
+174 | @pytest.mark.parametrize(
+175 |     ["param"],
+    |     ^^^^^^^^^
+176 |     [
+177 |         ((1, 2),),
+    |
+help: Use a string for the first argument
+172 | 
+173 | 
+174 | @pytest.mark.parametrize(
+    -     ["param"],
+175 +     "param",
+176 |     [
+    -         ((1, 2),),
+    -         ((3, 4),),
+177 +         (1, 2),
+178 +         (3, 4),
+179 |     ],
+180 | )
+181 | def test_single_element_nested_multi_tuple(param):
+
+PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `str`
+   --> PT006.py:186:5
+    |
+185 | @pytest.mark.parametrize(
+186 |     ["param"],
+    |     ^^^^^^^^^
+187 |     [
+188 |         (((1,),),),
+    |
+help: Use a string for the first argument
+183 | 
+184 | 
+185 | @pytest.mark.parametrize(
+    -     ["param"],
+186 +     "param",
+187 |     [
+    -         (((1,),),),
+188 +         ((1,),),
+189 |     ],
+190 | )
+191 | def test_single_element_deeply_nested_tuple(param):
+
+PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `str`
+   --> PT006.py:196:5
+    |
+195 | @pytest.mark.parametrize(
+196 |     ["param"],
+    |     ^^^^^^^^^
+197 |     [
+198 |         (((1,)),),
+    |
+help: Use a string for the first argument
+193 | 
+194 | 
+195 | @pytest.mark.parametrize(
+    -     ["param"],
+196 +     "param",
+197 |     [
+    -         (((1,)),),
+198 +         (1,),
+199 |     ],
+200 | )
+201 | def test_single_element_grouped_tuple(param): ...

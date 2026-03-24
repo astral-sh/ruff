@@ -1,0 +1,44 @@
+---
+source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+---
+UP029 [*] Unnecessary builtin import: `pow`
+  --> UP029_3.py:19:5
+   |
+17 | def star_import():
+18 |     from math import *
+19 |     from builtins import pow  # UP029, false positive due to the star import
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^
+20 |
+21 |     pow(1, 1, 1)
+   |
+help: Remove unnecessary builtin import
+16 | 
+17 | def star_import():
+18 |     from math import *
+   -     from builtins import pow  # UP029, false positive due to the star import
+19 | 
+20 |     pow(1, 1, 1)
+21 | 
+note: This is an unsafe fix and may change runtime behavior
+
+UP029 [*] Unnecessary builtin import: `str`
+  --> UP029_3.py:25:5
+   |
+24 |   def unsafe_fix():
+25 | /     from builtins import (
+26 | |         str,  # UP029, removes this comment
+27 | |     )
+   | |_____^
+28 |
+29 |       str(1)
+   |
+help: Remove unnecessary builtin import
+22 | 
+23 | 
+24 | def unsafe_fix():
+   -     from builtins import (
+   -         str,  # UP029, removes this comment
+   -     )
+25 | 
+26 |     str(1)
+note: This is an unsafe fix and may change runtime behavior

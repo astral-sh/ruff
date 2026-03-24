@@ -29,4 +29,3 @@ deflate = ["zip/deflate"]
 
 [lints]
 workspace = true
-

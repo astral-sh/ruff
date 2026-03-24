@@ -520,7 +520,7 @@ impl<'s> Parser<'s> {
         const SECTION_CONFIG_SNAPSHOT: &str = "snapshot-diagnostics";
         const SECTION_CONFIG_PULLTYPES: &str = "pull-types:skip";
         const SECTION_CONFIG_EXPECT_PANIC: &str = "expect-panic";
-        const HTML_COMMENT_ALLOWLIST: &[&str] = &["blacken-docs:on", "blacken-docs:off"];
+        const HTML_COMMENT_ALLOWLIST: &[&str] = &["fmt:on", "fmt:off"];
         const CODE_BLOCK_END: &[u8] = b"```";
         const HTML_COMMENT_END: &[u8] = b"-->";
 
@@ -2066,13 +2066,13 @@ mod tests {
         let source = dedent(
             "
             # Some header
-            <!-- blacken-docs:off -->
+            <!-- fmt:off -->
 
             ```py
             x = 1
             ```
 
-            <!-- blacken-docs:on -->
+            <!-- fmt:on -->
             ",
         );
         let parse_result = super::parse("file.md", &source);

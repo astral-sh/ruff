@@ -6,7 +6,7 @@ use smallvec::SmallVec;
 use std::fmt;
 
 use ruff_db::diagnostic::{
-    Annotation, Diagnostic, DiagnosticId, IntoDiagnosticMessage, Severity, Span,
+    Annotation, Diagnostic, DiagnosticId, IntoDiagnosticMessage, LintName, Severity, Span,
 };
 use ruff_db::{files::File, parsed::parsed_module, source::source_text};
 use ruff_python_ast::token::TokenKind;
@@ -24,10 +24,10 @@ use crate::{Db, declare_lint, lint::LintId};
 
 declare_lint! {
     /// ## What it does
-    /// Checks for `type: ignore` or `ty: ignore` directives that are no longer applicable.
+    /// Checks for `ty: ignore` directives that are no longer applicable.
     ///
     /// ## Why is this bad?
-    /// A `type: ignore` directive that no longer matches any diagnostic violations is likely
+    /// A `ty: ignore` directive that no longer matches any diagnostic violations is likely
     /// included by mistake, and should be removed to avoid confusion.
     ///
     /// ## Examples
@@ -40,19 +40,53 @@ declare_lint! {
     /// ```py
     /// a = 20 / 2
     /// ```
+    ///
+    /// ## Options
+    /// Set [`analysis.respect-type-ignore-comments`](https://docs.astral.sh/ty/reference/configuration/#respect-type-ignore-comments)
+    /// to `false` to prevent this rule from reporting unused `type: ignore` comments.
     pub static UNUSED_IGNORE_COMMENT = {
-        summary: "detects unused `type: ignore` comments",
+        summary: "detects unused `ty: ignore` comments",
         status: LintStatus::stable("0.0.1-alpha.1"),
-        default_level: Level::Ignore,
+        default_level: Level::Warn,
     }
 }
 
 declare_lint! {
     /// ## What it does
-    /// Checks for `ty: ignore[code]` where `code` isn't a known lint rule.
+    /// Checks for `type: ignore` directives that are no longer applicable.
     ///
     /// ## Why is this bad?
-    /// A `ty: ignore[code]` directive with a `code` that doesn't match
+    /// A `type: ignore` directive that no longer matches any diagnostic violations is likely
+    /// included by mistake, and should be removed to avoid confusion.
+    ///
+    /// ## Examples
+    /// ```py
+    /// a = 20 / 2  # type: ignore
+    /// ```
+    ///
+    /// Use instead:
+    ///
+    /// ```py
+    /// a = 20 / 2
+    /// ```
+    ///
+    /// ## Options
+    ///
+    /// This rule is skipped if [`analysis.respect-type-ignore-comments`](https://docs.astral.sh/ty/reference/configuration/#respect-type-ignore-comments)
+    /// to `false`.
+    pub(crate) static UNUSED_TYPE_IGNORE_COMMENT = {
+        summary: "detects unused `type: ignore` comments",
+        status: LintStatus::stable("0.0.14"),
+        default_level: Level::Warn,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for `ty: ignore[code]` or `type: ignore[ty:code]` comments where `code` isn't a known lint rule.
+    ///
+    /// ## Why is this bad?
+    /// A `ty: ignore[code]` or a `type:ignore[ty:code] directive with a `code` that doesn't match
     /// any known rule will not suppress any type errors, and is probably a mistake.
     ///
     /// ## Examples
@@ -96,12 +130,16 @@ declare_lint! {
     }
 }
 
+pub fn is_unused_ignore_comment_lint(name: LintName) -> bool {
+    name == UNUSED_IGNORE_COMMENT.name() || name == UNUSED_TYPE_IGNORE_COMMENT.name()
+}
+
 #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
 pub(crate) fn suppressions(db: &dyn Db, file: File) -> Suppressions {
     let parsed = parsed_module(db, file).load(db);
     let source = source_text(db, file);
 
-    let respect_type_ignore = db.analysis_settings().respect_type_ignore_comments;
+    let respect_type_ignore = db.analysis_settings(file).respect_type_ignore_comments;
 
     let mut builder = SuppressionsBuilder::new(&source, db.lint_registry());
     let mut line_start = TextSize::default();
@@ -166,7 +204,7 @@ pub(crate) fn check_suppressions(
     context.diagnostics.into_inner().into_diagnostics()
 }
 
-/// Checks for `ty: ignore` comments that reference unknown rules.
+/// Checks for `ty: ignore` and `type: ignore[ty:<code>]` comments that reference unknown rules.
 fn check_unknown_rule(context: &mut CheckSuppressionsContext) {
     if context.is_lint_disabled(&IGNORE_COMMENT_UNKNOWN_RULE) {
         return;
@@ -301,8 +339,6 @@ pub(crate) struct Suppressions {
     ///
     /// The suppressions are sorted by [`Suppression::comment_range`] and the [`Suppression::suppressed_range`]
     /// spans the entire file.
-    ///
-    /// For now, this is limited to `type: ignore` comments.
     file: SmallVec<[Suppression; 1]>,
 
     /// Suppressions that apply to a specific line (or lines).
@@ -493,7 +529,7 @@ struct SuppressionsBuilder<'a> {
     lint_registry: &'a LintRegistry,
     source: &'a str,
 
-    /// `type: ignore` comments at the top of the file before any non-trivia code apply to the entire file.
+    /// Ignore comments at the top of the file before any non-trivia code apply to the entire file.
     /// This boolean tracks if there has been any non trivia token.
     seen_non_trivia_token: bool,
 
@@ -536,13 +572,13 @@ impl<'a> SuppressionsBuilder<'a> {
 
     #[expect(clippy::needless_pass_by_value)]
     fn add_comment(&mut self, comment: SuppressionComment, line_range: TextRange) {
-        // `type: ignore` comments at the start of the file apply to the entire range.
+        // ignore comments at the start of the file apply to the entire range.
         // > A # type: ignore comment on a line by itself at the top of a file, before any docstrings,
         // > imports, or other executable code, silences all errors in the file.
         // > Blank lines and other comments, such as shebang lines and coding cookies,
         // > may precede the # type: ignore comment.
         // > https://typing.python.org/en/latest/spec/directives.html#type-ignore-comments
-        let is_file_suppression = comment.kind().is_type_ignore() && !self.seen_non_trivia_token;
+        let is_file_suppression = !self.seen_non_trivia_token;
 
         let suppressed_range = if is_file_suppression {
             TextRange::new(0.into(), self.source.text_len())
@@ -550,7 +586,7 @@ impl<'a> SuppressionsBuilder<'a> {
             line_range
         };
 
-        let mut push_type_ignore_suppression = |suppression: Suppression| {
+        let mut push_ignore_suppression = |suppression: Suppression| {
             if is_file_suppression {
                 self.file.push(suppression);
             } else {
@@ -561,7 +597,7 @@ impl<'a> SuppressionsBuilder<'a> {
         match comment.codes() {
             // `type: ignore`
             None => {
-                push_type_ignore_suppression(Suppression {
+                push_ignore_suppression(Suppression {
                     target: SuppressionTarget::All,
                     kind: comment.kind(),
                     comment_range: comment.range(),
@@ -570,22 +606,9 @@ impl<'a> SuppressionsBuilder<'a> {
                 });
             }
 
-            // `type: ignore[..]`
-            // The suppression applies to all lints if it is a `type: ignore`
-            // comment. `type: ignore` apply to all lints for better mypy compatibility.
-            Some(_) if comment.kind().is_type_ignore() => {
-                push_type_ignore_suppression(Suppression {
-                    target: SuppressionTarget::All,
-                    kind: comment.kind(),
-                    comment_range: comment.range(),
-                    range: comment.range(),
-                    suppressed_range,
-                });
-            }
-
-            // `ty: ignore[]`
+            // `ty: ignore[]` or `type: ignore[]`
             Some([]) => {
-                self.line.push(Suppression {
+                push_ignore_suppression(Suppression {
                     target: SuppressionTarget::Empty,
                     kind: comment.kind(),
                     range: comment.range(),
@@ -594,14 +617,25 @@ impl<'a> SuppressionsBuilder<'a> {
                 });
             }
 
-            // `ty: ignore[a, b]`
+            // `ty: ignore[a, b]` or `type: ignore[a, b]`
             Some(codes) => {
                 for &code_range in codes {
                     let code = &self.source[code_range];
 
+                    // For `type:ignore`, ignore codes that don't start with `ty:`.
+                    let code = if comment.kind().is_type_ignore() {
+                        if let Some(prefix) = code.strip_prefix("ty:") {
+                            prefix
+                        } else {
+                            continue;
+                        }
+                    } else {
+                        code
+                    };
+
                     match self.lint_registry.get(code) {
                         Ok(lint) => {
-                            self.line.push(Suppression {
+                            push_ignore_suppression(Suppression {
                                 target: SuppressionTarget::Lint(lint),
                                 kind: comment.kind(),
                                 range: code_range,

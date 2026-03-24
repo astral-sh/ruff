@@ -63,6 +63,42 @@ markdown_extensions:
 plugins:
   - search
   - gh-admonitions
+  - llmstxt:
+      markdown_description: |
+        Ruff is an extremely fast Python linter and code formatter, written in Rust.
+        It can be used to replace Flake8 (plus dozens of plugins), Black, isort, pydocstyle,
+        pyupgrade, autoflake, and more, all while executing tens or hundreds of times faster
+        than any individual tool.
+
+        Ruff includes both a linter (`ruff check`) and a formatter (`ruff format`).
+
+        When fetching documentation, use explicit `index.md` paths for directories, e.g.,
+        `https://docs.astral.sh/ruff/editors/index.md`. This returns clean markdown instead
+        of rendered HTML with JS/CSS.
+      sections:
+        Getting started:
+          - installation.md
+          - tutorial.md
+        Configuration:
+          - configuration.md
+        Linter:
+          - linter.md
+        Formatter:
+          - formatter.md
+          - formatter/black.md
+        Editors:
+          - editors/index.md
+          - editors/setup.md
+          - editors/settings.md
+          - editors/features.md
+          - editors/migration.md
+        Integrations:
+          - integrations.md
+        Concepts:
+          - preview.md
+          - versioning.md
+        Reference:
+          - faq.md
 extra_css:
   - stylesheets/extra.css
 extra_javascript:

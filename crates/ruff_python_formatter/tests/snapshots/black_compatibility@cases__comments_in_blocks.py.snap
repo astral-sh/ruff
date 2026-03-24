@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
-input_file: crates/ruff_python_formatter/resources/test/fixtures/black/cases/comments_in_blocks.py
 ---
 ## Input
 
@@ -123,29 +122,43 @@ if (
 ```diff
 --- Black
 +++ Ruff
-@@ -5,9 +5,9 @@
+@@ -5,23 +5,25 @@
  # - https://github.com/psf/black/issues/563
  
  (
 -    lambda
-+    lambda:
-     # a comment
+-    # a comment
 -    : None
-+    None
++    lambda: (
++        # a comment
++        None
++    )
  )
  
  (
-@@ -17,9 +17,8 @@
+-    lambda:
+-    # b comment
+-    None
++    lambda: (
++        # b comment
++        None
++    )
  )
  
  (
 -    lambda
-+    lambda:
-     # a comment
+-    # a comment
 -    :
-     # b comment
-     None
+-    # b comment
+-    None
++    lambda: (
++        # a comment
++        # b comment
++        None
++    )
  )
+ 
+ [
 ```
 
 ## Ruff Output
@@ -158,22 +171,25 @@ if (
 # - https://github.com/psf/black/issues/563
 
 (
-    lambda:
-    # a comment
-    None
+    lambda: (
+        # a comment
+        None
+    )
 )
 
 (
-    lambda:
-    # b comment
-    None
+    lambda: (
+        # b comment
+        None
+    )
 )
 
 (
-    lambda:
-    # a comment
-    # b comment
-    None
+    lambda: (
+        # a comment
+        # b comment
+        None
+    )
 )
 
 [

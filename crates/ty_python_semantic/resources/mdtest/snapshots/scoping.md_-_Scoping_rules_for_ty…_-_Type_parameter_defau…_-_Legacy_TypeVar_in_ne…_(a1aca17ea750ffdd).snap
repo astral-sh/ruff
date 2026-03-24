@@ -1,0 +1,49 @@
+---
+source: crates/ty_test/src/lib.rs
+assertion_line: 624
+expression: snapshot
+---
+
+---
+mdtest name: scoping.md - Scoping rules for type variables - Type parameter defaults cannot reference outer-scope type parameters - Legacy TypeVar in nested function
+mdtest path: crates/ty_python_semantic/resources/mdtest/generics/scoping.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from typing import TypeVar, Generic
+ 2 | 
+ 3 | T = TypeVar("T")
+ 4 | U = TypeVar("U", default=T)
+ 5 | 
+ 6 | def outer(x: T) -> T:
+ 7 |     # error: [invalid-type-variable-default]
+ 8 |     def inner(y: U) -> U:
+ 9 |         return y
+10 |     return x
+```
+
+# Diagnostics
+
+```
+error[invalid-type-variable-default]: Invalid use of type variable `U`
+  --> src/mdtest_snippet.py:4:1
+   |
+ 3 | T = TypeVar("T")
+ 4 | U = TypeVar("U", default=T)
+   | --------------------------- `U` defined here
+ 5 |
+ 6 | def outer(x: T) -> T:
+ 7 |     # error: [invalid-type-variable-default]
+ 8 |     def inner(y: U) -> U:
+   |                  ^ Default of `U` references out-of-scope type variable `T`
+ 9 |         return y
+10 |     return x
+   |
+info: See https://typing.python.org/en/latest/spec/generics.html#scoping-rules
+info: rule `invalid-type-variable-default` is enabled by default
+
+```

@@ -42,9 +42,11 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/invalid_type
 27 |     pass
 28 | 
 29 | class VeryBad(
-30 |     Protocol[T1, T2, DefaultStrT, T3],  # error: [invalid-generic-class]
-31 |     Generic[T1, T2, DefaultStrT, T3],
-32 | ): ...
+30 |     # error: [invalid-generic-class]
+31 |     # error: [invalid-generic-class]
+32 |     Protocol[T1, T2, DefaultStrT, T3],
+33 |     Generic[T1, T2, DefaultStrT, T3],
+34 | ): ...
 ```
 
 # Diagnostics
@@ -163,17 +165,42 @@ info: rule `invalid-generic-class` is enabled by default
 ```
 
 ```
-error[invalid-generic-class]: Type parameters without defaults cannot follow type parameters with defaults
-  --> src/mdtest_snippet.py:30:14
+error[invalid-generic-class]: Cannot both inherit from subscripted `Protocol` and subscripted `Generic`
+  --> src/mdtest_snippet.py:32:5
    |
+30 |     # error: [invalid-generic-class]
+31 |     # error: [invalid-generic-class]
+32 |     Protocol[T1, T2, DefaultStrT, T3],
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+33 |     Generic[T1, T2, DefaultStrT, T3],
+34 | ): ...
+   |
+help: Remove the type parameters from the `Protocol` base
+info: rule `invalid-generic-class` is enabled by default
 29 | class VeryBad(
-30 |     Protocol[T1, T2, DefaultStrT, T3],  # error: [invalid-generic-class]
+30 |     # error: [invalid-generic-class]
+31 |     # error: [invalid-generic-class]
+   -     Protocol[T1, T2, DefaultStrT, T3],
+32 +     Protocol,
+33 |     Generic[T1, T2, DefaultStrT, T3],
+34 | ): ...
+note: This is an unsafe fix and may change runtime behavior
+
+```
+
+```
+error[invalid-generic-class]: Type parameters without defaults cannot follow type parameters with defaults
+  --> src/mdtest_snippet.py:32:14
+   |
+30 |     # error: [invalid-generic-class]
+31 |     # error: [invalid-generic-class]
+32 |     Protocol[T1, T2, DefaultStrT, T3],
    |              ^^^^^^^^^^^^^^^^^^^^^^^
    |              |
    |              Type variables `T2` and `T3` do not have defaults
    |              Earlier TypeVar `T1` does
-31 |     Generic[T1, T2, DefaultStrT, T3],
-32 | ): ...
+33 |     Generic[T1, T2, DefaultStrT, T3],
+34 | ): ...
    |
   ::: src/mdtest_snippet.py:3:1
    |

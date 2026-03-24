@@ -263,7 +263,35 @@ impl<'src> Lexer<'src> {
                             self.token_range(),
                         )));
                     }
-                    indentation = Indentation::root();
+                    // test_ok backslash_continuation_indentation
+                    // if True:
+                    //     \
+                    //         1
+                    //     \
+                    // 2
+                    // else:\
+                    //     3
+
+                    // test_err backslash_continuation_indentation_error
+                    // if True:
+                    //     1
+                    //       \
+                    //     2
+
+                    // > Indentation cannot be split over multiple physical lines using backslashes;
+                    // > the whitespace up to the first backslash determines the indentation.
+                    // >
+                    // > https://docs.python.org/3/reference/lexical_analysis.html#indentation
+                    //
+                    // Skip whitespace after the continuation-line without accumulating it into
+                    // `indentation`. However, if the backslash is at column 0 (no prior
+                    // indentation), let the loop continue so the next line's whitespace is
+                    // accumulated normally.
+                    //
+                    // See also: https://github.com/python/cpython/issues/90249
+                    if indentation != Indentation::root() {
+                        self.cursor.eat_while(is_python_whitespace);
+                    }
                 }
                 // Form feed
                 '\x0C' => {
@@ -406,7 +434,10 @@ impl<'src> Lexer<'src> {
                     && self.nesting == 0 =>
             {
                 // SAFETY: Safe because `c` has been matched against one of the possible escape command token
-                self.lex_ipython_escape_command(IpyEscapeKind::try_from(c).unwrap())
+                self.lex_ipython_escape_command(
+                    IpyEscapeKind::try_from(c).unwrap(),
+                    IpyEscapeLexContext::Assignment,
+                )
             }
 
             c @ ('%' | '!' | '?' | '/' | ';' | ',')
@@ -420,7 +451,7 @@ impl<'src> Lexer<'src> {
                     IpyEscapeKind::try_from(c).unwrap()
                 };
 
-                self.lex_ipython_escape_command(kind)
+                self.lex_ipython_escape_command(kind, IpyEscapeLexContext::LogicalLineStart)
             }
 
             '?' if self.mode == Mode::Ipython => TokenKind::Question,
@@ -696,6 +727,7 @@ impl<'src> Lexer<'src> {
             "import" => TokenKind::Import,
             "in" => TokenKind::In,
             "is" => TokenKind::Is,
+            "lazy" => TokenKind::Lazy,
             "lambda" => TokenKind::Lambda,
             "match" => TokenKind::Match,
             "nonlocal" => TokenKind::Nonlocal,
@@ -1233,7 +1265,11 @@ impl<'src> Lexer<'src> {
     }
 
     /// Lex a single IPython escape command.
-    fn lex_ipython_escape_command(&mut self, escape_kind: IpyEscapeKind) -> TokenKind {
+    fn lex_ipython_escape_command(
+        &mut self,
+        escape_kind: IpyEscapeKind,
+        context: IpyEscapeLexContext,
+    ) -> TokenKind {
         let mut value = String::new();
 
         loop {
@@ -1279,6 +1315,27 @@ impl<'src> Lexer<'src> {
                     let mut question_count = 1u32;
                     while self.cursor.eat_char('?') {
                         question_count += 1;
+                    }
+
+                    // Help end tokens (`?` / `??`) are only valid in certain contexts
+                    // (e.g., not within f-strings or parenthesized expressions), and only
+                    // for escape kinds that IPython recognizes as supporting a trailing `?`
+                    // (i.e., `%`, `%%`, `?`, and `??`). For other escape kinds like `!` or
+                    // `/`, the `?` is just part of the command value.
+                    if !context.allows_help_end()
+                        || !matches!(
+                            escape_kind,
+                            IpyEscapeKind::Magic
+                                | IpyEscapeKind::Magic2
+                                | IpyEscapeKind::Help
+                                | IpyEscapeKind::Help2
+                        )
+                    {
+                        value.reserve(question_count as usize);
+                        for _ in 0..question_count {
+                            value.push('?');
+                        }
+                        continue;
                     }
 
                     // The original implementation in the IPython codebase is based on regex which
@@ -1720,6 +1777,18 @@ impl State {
 }
 
 #[derive(Copy, Clone, Debug)]
+enum IpyEscapeLexContext {
+    Assignment,
+    LogicalLineStart,
+}
+
+impl IpyEscapeLexContext {
+    const fn allows_help_end(self) -> bool {
+        matches!(self, Self::LogicalLineStart)
+    }
+}
+
+#[derive(Copy, Clone, Debug)]
 enum Radix {
     Binary,
     Octal,
@@ -2079,7 +2148,9 @@ pwd = !pwd
 foo = %timeit a = b
 bar = %timeit a % 3
 baz = %matplotlib \
-        inline"
+        inline
+qux = %foo?
+quux = !pwd?"
             .trim();
         assert_snapshot!(lex_jupyter_source(source));
     }
@@ -3060,5 +3131,72 @@ t"{(lambda x:{x})}"
             lex_tstring_error(r#"t""""""#),
             UnterminatedTripleQuotedString
         );
+    }
+
+    #[test]
+    fn backslash_continuation_indentation() {
+        // The first `\` has 4 spaces before it which matches the indentation level at that point,
+        // so the whitespace before `2` is irrelevant and shouldn't produce an indentation error.
+        // Similarly, the second `\` is also at the same indentation level, so the `3` line is also
+        // valid.
+        let source = r"if True:
+    1
+    \
+        2
+    \
+3
+else:
+    pass
+"
+        .to_string();
+        assert_snapshot!(lex_source(&source));
+    }
+
+    #[test]
+    fn backslash_continuation_at_root() {
+        // But, it's a different when the backslash character itself is at the root indentation
+        // level. Then, the whitespaces following it determines the indentation level of the next
+        // line, so `1` is indented with 4 spaces and `2` is indented with 8 spaces, and `3` is
+        // indented with 4 spaces, all of which are valid.
+        let source = r"if True:
+\
+    1
+    if True:
+\
+        2
+else:\
+    3
+"
+        .to_string();
+        assert_snapshot!(lex_source(&source));
+    }
+
+    #[test]
+    fn multiple_backslash_continuation() {
+        // It's only the first backslash character that determines the indentation level of the next
+        // line, so all the lines after the first `\` are indented with 4 spaces, and the remaining
+        // backslashes are just ignored and don't affect the indentation level.
+        let source = r"if True:
+    1
+    \
+            \
+        \
+    \
+    2
+"
+        .to_string();
+        assert_snapshot!(lex_source(&source));
+    }
+
+    #[test]
+    fn backslash_continuation_mismatch_indentation() {
+        // Indentation doesn't match any previous indentation level
+        let source = r"if True:
+    1
+  \
+    2
+"
+        .to_string();
+        assert_snapshot!(lex_invalid(&source, Mode::Module));
     }
 }

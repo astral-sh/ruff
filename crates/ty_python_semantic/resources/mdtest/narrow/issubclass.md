@@ -141,7 +141,7 @@ python-version = "3.10"
 ```py
 def f(x: type[int | str | bytes | range]):
     if issubclass(x, int | str):
-        reveal_type(x)  # revealed: type[int] | type[str]
+        reveal_type(x)  # revealed: type[int | str]
     elif issubclass(x, bytes | memoryview):
         reveal_type(x)  # revealed: type[bytes]
     else:
@@ -154,7 +154,7 @@ runtime a special exception is made for `None` so that `issubclass(x, int | None
 ```py
 def _(x: type):
     if issubclass(x, int | str | None):
-        reveal_type(x)  # revealed: type[int] | type[str] | <class 'NoneType'>
+        reveal_type(x)  # revealed: type[int | str] | <class 'NoneType'>
     else:
         reveal_type(x)  # revealed: type & ~type[int] & ~type[str] & ~<class 'NoneType'>
 ```
@@ -176,9 +176,44 @@ python-version = "3.10"
 def _(x: type[int | list | bytes]):
     # error: [invalid-argument-type]
     if issubclass(x, int | list[int]):
-        reveal_type(x)  # revealed: type[int] | type[list[Unknown]] | type[bytes]
+        reveal_type(x)  # revealed: type[int | list[Unknown] | bytes]
     else:
-        reveal_type(x)  # revealed: type[int] | type[list[Unknown]] | type[bytes]
+        reveal_type(x)  # revealed: type[int | list[Unknown] | bytes]
+```
+
+The same validation also applies when an invalid `UnionType` is nested inside a tuple:
+
+```py
+def _(x: type[int | list | bytes]):
+    # error: [invalid-argument-type]
+    if issubclass(x, (int, list[int] | bytes)):
+        reveal_type(x)  # revealed: type[int | list[Unknown] | bytes]
+    else:
+        reveal_type(x)  # revealed: type[int | list[Unknown] | bytes]
+```
+
+Including nested tuples:
+
+```py
+def _(x: type[int | list | bytes]):
+    # error: [invalid-argument-type]
+    if issubclass(x, (int, (str, list[int] | bytes))):
+        reveal_type(x)  # revealed: type[int | list[Unknown] | bytes]
+    else:
+        reveal_type(x)  # revealed: type[int | list[Unknown] | bytes]
+```
+
+And non-literal tuples:
+
+```py
+classes = (int, list[int] | bytes)
+
+def _(x: type[int | list | bytes]):
+    # error: [invalid-argument-type]
+    if issubclass(x, classes):
+        reveal_type(x)  # revealed: type[int | list[Unknown] | bytes]
+    else:
+        reveal_type(x)  # revealed: type[int | list[Unknown] | bytes]
 ```
 
 ## PEP-604 unions on Python \<3.10
@@ -213,7 +248,7 @@ reveal_type(IntOrStr)  # revealed: <types.UnionType special-form 'int | str'>
 
 def f(x: type[int | str | bytes | range]):
     if issubclass(x, IntOrStr):
-        reveal_type(x)  # revealed: type[int] | type[str]
+        reveal_type(x)  # revealed: type[int | str]
     elif issubclass(x, Union[bytes, memoryview]):
         reveal_type(x)  # revealed: type[bytes]
     else:

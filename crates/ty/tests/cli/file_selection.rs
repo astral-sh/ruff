@@ -770,6 +770,77 @@ fn explicit_path_overrides_exclude_force_exclude() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Test that `--force-exclude` respects exclude patterns even for explicitly passed files.
+#[test]
+fn force_exclude_directory_exclusion() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        (
+            "src/main.py",
+            r#"
+            print(undefined_var)  # error: unresolved-reference
+            "#,
+        ),
+        (
+            "out/amd64/install/_setup_util.py",
+            r#"
+            base_path: str = "/path"
+            if base_path not in CMAKE_PREFIX_PATH:
+                CMAKE_PREFIX_PATH.insert(0, base_path)
+            "#,
+        ),
+        (
+            "ty.toml",
+            r#"
+            [src]
+            exclude = ["out"]
+            "#,
+        ),
+    ])?;
+
+    // Without --force-exclude, explicitly passed file overrides exclude.
+    assert_cmd_snapshot!(case.command().arg("out/amd64/install/_setup_util.py"), @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-reference]: Name `CMAKE_PREFIX_PATH` used when not defined
+     --> out/amd64/install/_setup_util.py:3:21
+      |
+    2 | base_path: str = "/path"
+    3 | if base_path not in CMAKE_PREFIX_PATH:
+      |                     ^^^^^^^^^^^^^^^^^
+    4 |     CMAKE_PREFIX_PATH.insert(0, base_path)
+      |
+    info: rule `unresolved-reference` is enabled by default
+
+    error[unresolved-reference]: Name `CMAKE_PREFIX_PATH` used when not defined
+     --> out/amd64/install/_setup_util.py:4:5
+      |
+    2 | base_path: str = "/path"
+    3 | if base_path not in CMAKE_PREFIX_PATH:
+    4 |     CMAKE_PREFIX_PATH.insert(0, base_path)
+      |     ^^^^^^^^^^^^^^^^^
+      |
+    info: rule `unresolved-reference` is enabled by default
+
+    Found 2 diagnostics
+
+    ----- stderr -----
+    "#);
+
+    // With --force-exclude, the exclude pattern is enforced even for explicit paths.
+    assert_cmd_snapshot!(case.command().arg("--force-exclude").arg("out/amd64/install/_setup_util.py"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    WARN No python files found under the given path(s)
+    ");
+
+    Ok(())
+}
+
 #[test]
 fn cli_and_configuration_exclude() -> anyhow::Result<()> {
     let case = CliTest::with_files([
@@ -873,7 +944,7 @@ fn invalid_include_pattern() -> anyhow::Result<()> {
 
     ----- stderr -----
     ty failed
-      Cause: error[invalid-glob]: Invalid include pattern
+      Cause: error[invalid-glob]: Invalid pattern
      --> ty.toml:4:5
       |
     2 | [src]
@@ -915,7 +986,7 @@ fn invalid_include_pattern_concise_output() -> anyhow::Result<()> {
 
     ----- stderr -----
     ty failed
-      Cause: ty.toml:4:5: error[invalid-glob] Invalid include pattern: Too many stars at position 5
+      Cause: ty.toml:4:5: error[invalid-glob] Invalid include pattern `src/**test/`: Too many stars at position 5
     ");
 
     Ok(())
@@ -949,7 +1020,7 @@ fn invalid_exclude_pattern() -> anyhow::Result<()> {
 
     ----- stderr -----
     ty failed
-      Cause: error[invalid-glob]: Invalid exclude pattern
+      Cause: error[invalid-glob]: Invalid pattern
      --> ty.toml:4:5
       |
     2 | [src]

@@ -35,7 +35,10 @@ colour
 com2ann
 comtypes
 core
-cpython
+CPython (Argument Clinic)
+CPython (cases_generator)
+CPython (peg_generator)
+cryptography
 cwltool
 dacite
 dd-trace-py
@@ -79,6 +82,7 @@ mypy-protobuf
 mypy_primer
 nionutils
 nox
+numpy-stl
 openlibrary
 operator
 optuna

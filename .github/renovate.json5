@@ -55,7 +55,7 @@
       groupName: "Artifact GitHub Actions dependencies",
       matchManagers: ["github-actions"],
       matchDatasources: ["gitea-tags", "github-tags"],
-      matchPackageNames: ["actions/.*-artifact"],
+      matchPackageNames: ["actions/upload-artifact", "actions/download-artifact"],
       description: "Weekly update of artifact-related GitHub Actions dependencies",
     },
     {
@@ -76,9 +76,9 @@
       enabled: false,
     },
     {
-      groupName: "pre-commit dependencies",
+      groupName: "prek dependencies",
       matchManagers: ["pre-commit"],
-      description: "Weekly update of pre-commit dependencies",
+      description: "Weekly update of prek dependencies",
     },
     {
       groupName: "NPM Development dependencies",
@@ -95,7 +95,7 @@
     {
       groupName: "strum",
       matchManagers: ["cargo"],
-      matchPackageNames: ["strum"],
+      matchPackageNames: ["strum", "strum_macros"],
       description: "Weekly update of strum dependencies",
     }
   ],

@@ -1,0 +1,38 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: attribute_assignment.md - Attribute assignment - Invalid annotated assignment to attribute
+mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/attribute_assignment.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | class C:
+2 |     def __init__(self):
+3 |         self.attr: str = None  # error: [invalid-assignment]
+4 |         self.attr2: int = 1  # fine
+```
+
+# Diagnostics
+
+```
+error[invalid-assignment]: Object of type `None` is not assignable to `str`
+ --> src/mdtest_snippet.py:3:20
+  |
+1 | class C:
+2 |     def __init__(self):
+3 |         self.attr: str = None  # error: [invalid-assignment]
+  |                    ---   ^^^^ Incompatible value of type `None`
+  |                    |
+  |                    Declared type
+4 |         self.attr2: int = 1  # fine
+  |
+info: rule `invalid-assignment` is enabled by default
+
+```

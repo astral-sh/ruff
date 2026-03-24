@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
-input_file: crates/ruff_python_formatter/resources/test/fixtures/black/cases/allow_empty_first_line.py
 ---
 ## Input
 
@@ -102,7 +101,7 @@ def top_level(
          # This is also now fine
          a = 123
  
-@@ -14,52 +13,41 @@
+@@ -14,26 +13,20 @@
          a = 123
  
      if y:
@@ -129,38 +128,13 @@ def top_level(
              """also this"""
              a = 123
  
- 
- def bar():
--
-     if x:
-         a = 123
- 
- 
- def baz():
--
-     # OK
-     if x:
-         a = 123
- 
- 
- def quux():
--
-     new_line = here
+@@ -57,7 +50,6 @@
  
  
  class Cls:
 -
      def method(self):
--
-         pass
  
- 
-@@ -76,6 +64,5 @@
-     a: int,
-     b: str,
- ) -> Whatever[Generic, Something]:
--
-     def nested(x: int) -> int:
          pass
 ```
 
@@ -201,22 +175,26 @@ def foo():
 
 
 def bar():
+
     if x:
         a = 123
 
 
 def baz():
+
     # OK
     if x:
         a = 123
 
 
 def quux():
+
     new_line = here
 
 
 class Cls:
     def method(self):
+
         pass
 
 
@@ -233,6 +211,7 @@ def top_level(
     a: int,
     b: str,
 ) -> Whatever[Generic, Something]:
+
     def nested(x: int) -> int:
         pass
 ```

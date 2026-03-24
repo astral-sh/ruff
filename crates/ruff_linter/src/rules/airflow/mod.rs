@@ -15,6 +15,12 @@ mod tests {
 
     #[test_case(Rule::AirflowVariableNameTaskIdMismatch, Path::new("AIR001.py"))]
     #[test_case(Rule::AirflowDagNoScheduleArgument, Path::new("AIR002.py"))]
+    #[test_case(Rule::AirflowVariableGetOutsideTask, Path::new("AIR003.py"))]
+    #[test_case(Rule::AirflowVariableGetOutsideTask, Path::new("AIR003_no_dag.py"))]
+    #[test_case(
+        Rule::AirflowVariableGetOutsideTask,
+        Path::new("AIR003_dag_decorator.py")
+    )]
     #[test_case(Rule::Airflow3Removal, Path::new("AIR301_args.py"))]
     #[test_case(Rule::Airflow3Removal, Path::new("AIR301_names.py"))]
     #[test_case(Rule::Airflow3Removal, Path::new("AIR301_names_fix.py"))]
@@ -23,6 +29,8 @@ mod tests {
     #[test_case(Rule::Airflow3Removal, Path::new("AIR301_class_attribute.py"))]
     #[test_case(Rule::Airflow3Removal, Path::new("AIR301_airflow_plugin.py"))]
     #[test_case(Rule::Airflow3Removal, Path::new("AIR301_context.py"))]
+    #[test_case(Rule::Airflow3Removal, Path::new("AIR301_decorator.py"))]
+    #[test_case(Rule::Airflow31Moved, Path::new("AIR321_names.py"))]
     #[test_case(Rule::Airflow3MovedToProvider, Path::new("AIR302_amazon.py"))]
     #[test_case(Rule::Airflow3MovedToProvider, Path::new("AIR302_celery.py"))]
     #[test_case(Rule::Airflow3MovedToProvider, Path::new("AIR302_common_sql.py"))]
@@ -48,6 +56,7 @@ mod tests {
     #[test_case(Rule::Airflow3MovedToProvider, Path::new("AIR302_standard.py"))]
     #[test_case(Rule::Airflow3MovedToProvider, Path::new("AIR302_try.py"))]
     #[test_case(Rule::Airflow3IncompatibleFunctionSignature, Path::new("AIR303.py"))]
+    #[test_case(Rule::Airflow3DagDynamicValue, Path::new("AIR304.py"))]
     #[test_case(Rule::Airflow3SuggestedUpdate, Path::new("AIR311_args.py"))]
     #[test_case(Rule::Airflow3SuggestedUpdate, Path::new("AIR311_names.py"))]
     #[test_case(Rule::Airflow3SuggestedUpdate, Path::new("AIR311_try.py"))]

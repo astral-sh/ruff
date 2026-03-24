@@ -104,6 +104,7 @@ a = f"""
 For multiline-interpolation, put the ignore comment on the expression's start or end line:
 
 ```py
+# fmt:off
 a = f"""
 {
   10 /  # type: ignore
@@ -124,18 +125,26 @@ But not at the end of the f-string:
 ```py
 a = f"""
 {
-  10 / 0  # error: [division-by-zero]
+    10 / 0  # error: [division-by-zero]
 }
-"""  # error: [unused-ignore-comment]  # type: ignore
+"""  # error: [unused-type-ignore-comment]  # type: ignore
 ```
 
 ## Codes
 
-Mypy supports `type: ignore[code]`. ty doesn't understand mypy's rule names. Therefore, ignore the
-codes and suppress all errors.
+Similar to mypy support `type: ignore[codes]` comments. But unlike mypy, ty only respects codes
+starting with `ty:` to avoid ambiguity with suppression comments from mypy and other type checkers.
 
 ```py
-a = test  # type: ignore[name-defined]
+a = test  # type: ignore[name-defined, ty:unresolved-reference]
+```
+
+## Unknown codes starting with `ty`
+
+```py
+# error: [unresolved-reference]
+# error: [ignore-comment-unknown-rule]
+a = test  # type: ignore[ty:name-defined]
 ```
 
 ## Nested comments
@@ -174,7 +183,7 @@ in Pyright. Neither Ruff, nor mypy support this and neither does ty.
 
 ```py
 # fmt: off
-# error: [unused-ignore-comment]
+# error: [unused-type-ignore-comment]
 a = (  # type: ignore
     test + 4  # error: [unresolved-reference]
 )
@@ -187,6 +196,15 @@ a = (  # type: ignore
 
 a = 10 / 0
 b = a / 0
+```
+
+## File level suppression with code
+
+```py
+# type: ignore[ty:division-by-zero]
+
+a = 10 / 0
+b = a + c  # error: [unresolved-reference]
 ```
 
 ## File level suppression with leading shebang
@@ -207,7 +225,7 @@ File level suppressions must come before any non-trivia token,
 including module docstrings.
 """
 
-# error: [unused-ignore-comment] "Unused blanket `type: ignore` directive"
+# error: [unused-type-ignore-comment] "Unused blanket `type: ignore` directive"
 # type: ignore
 
 a = 10 / 0  # error: [division-by-zero]
@@ -240,4 +258,27 @@ ty doesn't report invalid `type: ignore` comments:
 
 ```py
 a = 10 + 4  # type: ignoreee
+```
+
+## Unused ignore comment mixed with mypy comments
+
+<!-- snapshot-diagnostics -->
+
+```py
+# error: [unused-type-ignore-comment] "Unused `type: ignore` directive: 'division-by-zero'"
+a = 10 / 2  # type: ignore[mypy-code, ty:division-by-zero]
+```
+
+## Unused ignore comment
+
+```py
+# error: [unused-type-ignore-comment] "Unused `type: ignore` directive"
+a = 10 / 2  # type: ignore[ty:division-by-zero]
+```
+
+## Unknown ignore code
+
+```py
+# error: [ignore-comment-unknown-rule] "Unknown rule `division-by`. Did you mean"
+a = 10 / 2  # type: ignore[ty:division-by]
 ```

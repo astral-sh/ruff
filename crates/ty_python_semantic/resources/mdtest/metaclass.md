@@ -221,6 +221,18 @@ reveal_type(D)  # revealed: <class 'D'>
 reveal_type(D.__class__)  # revealed: <class 'SignatureMismatch'>
 ```
 
+## Diagnostic range
+
+<!-- snapshot-diagnostics -->
+
+```py
+def _(n: int):
+    # error: [invalid-metaclass]
+    class B(metaclass=n):
+        x = 1
+        y = 2
+```
+
 ## Cyclic
 
 Retrieving the metaclass of a cyclically defined class should not cause an infinite loop.
@@ -245,6 +257,58 @@ class M(type): ...
 class A[T: str](metaclass=M): ...
 
 reveal_type(A.__class__)  # revealed: <class 'M'>
+```
+
+## Generic metaclass
+
+### Fully specialized
+
+A generic metaclass fully specialized with concrete types is fine:
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+class Foo[T](type):
+    x: T
+
+class Bar(metaclass=Foo[int]): ...
+
+reveal_type(Bar.__class__)  # revealed: <class 'Foo[int]'>
+```
+
+### Parameterized by type variables (legacy)
+
+A generic metaclass parameterized by type variables is not supported:
+
+```py
+from typing import TypeVar, Generic
+
+T = TypeVar("T")
+
+class GenericMeta(type, Generic[T]): ...
+
+# error: [invalid-metaclass] "Generic metaclasses are not supported"
+class GenericMetaInstance(metaclass=GenericMeta[T]): ...
+```
+
+### Parameterized by type variables (PEP 695)
+
+The same applies using PEP 695 syntax:
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+class Foo[T](type):
+    x: T
+
+# error: [invalid-metaclass]
+class Bar[T](metaclass=Foo[T]): ...
 ```
 
 ## Metaclasses of metaclasses

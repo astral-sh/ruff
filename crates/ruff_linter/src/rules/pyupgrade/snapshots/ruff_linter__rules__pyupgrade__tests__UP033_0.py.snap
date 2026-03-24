@@ -55,3 +55,26 @@ help: Rewrite with `@functools.cache
 16 | @other_decorator
 17 | def fixme():
 18 |     pass
+
+UP033 [*] Use `@functools.cache` instead of `@functools.lru_cache(maxsize=None)`
+  --> UP033_0.py:50:21
+   |
+50 |   @functools.lru_cache(
+   |  _____________________^
+51 | |     maxsize=None,  # text
+52 | | )
+   | |_^
+53 |   def fixme_unsafe():
+54 |       pass
+   |
+help: Rewrite with `@functools.cache
+47 | 
+48 | 
+49 | 
+   - @functools.lru_cache(
+   -     maxsize=None,  # text
+   - )
+50 + @functools.cache
+51 | def fixme_unsafe():
+52 |     pass
+note: This is an unsafe fix and may change runtime behavior

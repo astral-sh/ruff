@@ -21,6 +21,8 @@ pub(crate) struct ProjectFilesFilter<'a> {
 
     /// The resolved `src.include` and `src.exclude` filter.
     src_filter: &'a IncludeExcludeFilter,
+
+    force_exclude: bool,
 }
 
 impl<'a> ProjectFilesFilter<'a> {
@@ -28,7 +30,12 @@ impl<'a> ProjectFilesFilter<'a> {
         Self {
             included_paths: project.included_paths_or_root(db),
             src_filter: &project.settings(db).src().files,
+            force_exclude: project.force_exclude(db),
         }
+    }
+
+    pub(crate) fn force_exclude(&self) -> bool {
+        self.force_exclude
     }
 
     fn match_included_paths(
@@ -43,8 +50,8 @@ impl<'a> ProjectFilesFilter<'a> {
                     .iter()
                     .filter_map(|included_path| {
                         if let Ok(relative_path) = path.strip_prefix(included_path) {
-                            // Exact matches are always included
-                            if relative_path.as_str().is_empty() {
+                            // Exact matches are always included, unless forced to exclude
+                            if relative_path.as_str().is_empty() && !self.force_exclude {
                                 Some(CheckPathMatch::Full)
                             } else {
                                 Some(CheckPathMatch::Partial)
@@ -115,8 +122,6 @@ pub(crate) struct ProjectFilesWalker<'a> {
     walker: WalkDirectoryBuilder,
 
     filter: ProjectFilesFilter<'a>,
-
-    force_exclude: bool,
 }
 
 impl<'a> ProjectFilesWalker<'a> {
@@ -164,11 +169,7 @@ impl<'a> ProjectFilesWalker<'a> {
             walker = walker.add(path);
         }
 
-        Some(Self {
-            walker,
-            filter,
-            force_exclude: db.project().force_exclude(db),
-        })
+        Some(Self { walker, filter })
     }
 
     /// Walks the project paths and collects the paths of all files that
@@ -182,6 +183,7 @@ impl<'a> ProjectFilesWalker<'a> {
             let filter = &self.filter;
             let files = &files;
             let diagnostics = &diagnostics;
+            let force_exclude = filter.force_exclude();
 
             Box::new(move |entry| {
                 match entry {
@@ -189,7 +191,7 @@ impl<'a> ProjectFilesWalker<'a> {
                         // Skip excluded directories unless they were explicitly passed to the walker
                         // (which is the case passed to `ty check <paths>`).
                         if entry.file_type().is_directory() {
-                            if entry.depth() > 0 || self.force_exclude {
+                            if entry.depth() > 0 || force_exclude {
                                 let directory_included = filter
                                     .is_directory_included(entry.path(), GlobFilterCheckMode::TopDown);
                                 return match directory_included {
@@ -213,9 +215,14 @@ impl<'a> ProjectFilesWalker<'a> {
                         } else {
                             // For all files, except the ones that were explicitly passed to the walker (CLI),
                             // check if they're included in the project.
-                            if entry.depth() > 0 || self.force_exclude {
+                            if entry.depth() > 0 || force_exclude {
+                                let match_mode = if entry.depth() == 0 && force_exclude {
+                                    GlobFilterCheckMode::Adhoc
+                                } else {
+                                    GlobFilterCheckMode::TopDown
+                                };
                                 match filter
-                                    .is_file_included(entry.path(), GlobFilterCheckMode::TopDown)
+                                    .is_file_included(entry.path(), match_mode)
                                 {
                                     IncludeResult::Included { literal_match } => {
                                         // Ignore any non python files to avoid creating too many entries in `Files`.
@@ -229,7 +236,7 @@ impl<'a> ProjectFilesWalker<'a> {
 
                                         if source_type.is_none()
                                         {
-                                            return WalkState::Continue;
+                                            return WalkState::Skip;
                                         }
                                     }
                                     IncludeResult::Excluded => {
@@ -237,14 +244,14 @@ impl<'a> ProjectFilesWalker<'a> {
                                             "Ignoring file `{path}` because it is excluded by a default or `src.exclude` pattern.",
                                             path=entry.path()
                                         );
-                                        return WalkState::Continue;
+                                        return WalkState::Skip;
                                     }
                                     IncludeResult::NotIncluded => {
                                         tracing::debug!(
                                             "Ignoring file `{path}` because it doesn't match any `src.include` pattern or path specified on the CLI.",
                                             path=entry.path()
                                         );
-                                        return WalkState::Continue;
+                                        return WalkState::Skip;
                                     }
                                 }
                             }

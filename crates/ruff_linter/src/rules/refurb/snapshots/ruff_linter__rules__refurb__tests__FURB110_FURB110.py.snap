@@ -113,6 +113,7 @@ help: Replace with `or` operator
 17 |     # Test for y.
 18 |     y
 19 | )
+note: This is an unsafe fix and may change runtime behavior
 
 FURB110 [*] Replace ternary `if` expression with `or` operator
   --> FURB110.py:23:5
@@ -142,6 +143,7 @@ help: Replace with `or` operator
 27 |         # Test for y.
 28 |         y
 29 |     )
+note: This is an unsafe fix and may change runtime behavior
 
 FURB110 [*] Replace ternary `if` expression with `or` operator
   --> FURB110.py:34:5
@@ -171,6 +173,7 @@ help: Replace with `or` operator
 35 | )
 36 | 
 37 | # FURB110
+note: This is an unsafe fix and may change runtime behavior
 
 FURB110 [*] Replace ternary `if` expression with `or` operator
   --> FURB110.py:44:5
@@ -197,3 +200,28 @@ help: Replace with `or` operator
    -     else None
 46 +     else None)
 47 | )
+48 | 
+49 | 
+
+FURB110 [*] Replace ternary `if` expression with `or` operator
+  --> FURB110.py:53:5
+   |
+52 |   z = (
+53 | /     x
+54 | |     if x
+55 | |     # text
+56 | |     else y
+   | |__________^
+57 |   )
+   |
+help: Replace with `or` operator
+50 | 
+51 | 
+52 | z = (
+   -     x
+   -     if x
+   -     # text
+   -     else y
+53 +     x or y
+54 | )
+note: This is an unsafe fix and may change runtime behavior

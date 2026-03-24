@@ -1076,57 +1076,6 @@ include = ["*.ipy"]
 }
 
 #[test]
-fn warn_invalid_noqa_with_no_diagnostics() {
-    assert_cmd_snapshot!(
-        Command::new(get_cargo_bin(BIN_NAME))
-            .args(STDIN_BASE_OPTIONS)
-            .args(["--isolated"])
-            .arg("--select")
-            .arg("F401")
-            .arg("-")
-            .pass_stdin(
-                r#"
-# ruff: noqa: AAA101
-print("Hello world!")
-"#
-            )
-    );
-}
-
-#[test]
-fn file_noqa_external() -> Result<()> {
-    let fixture = CliTest::with_file(
-        "ruff.toml",
-        r#"
-[lint]
-external = ["AAA"]
-"#,
-    )?;
-
-    assert_cmd_snapshot!(fixture
-        .check_command()
-        .arg("--config")
-        .arg("ruff.toml")
-        .arg("-")
-        .pass_stdin(r#"
-# flake8: noqa: AAA101, BBB102
-import os
-"#), @"
-    success: false
-    exit_code: 1
-    ----- stdout -----
-    -:3:8: F401 [*] `os` imported but unused
-    Found 1 error.
-    [*] 1 fixable with the `--fix` option.
-
-    ----- stderr -----
-    warning: Invalid rule code provided to `# ruff: noqa` at -:2: BBB102
-    ");
-
-    Ok(())
-}
-
-#[test]
 fn required_version_fails_to_parse() -> Result<()> {
     let fixture = CliTest::with_file(
         "ruff.toml",
@@ -1539,22 +1488,6 @@ import sys
         .args(["--config", "ruff.toml"])
         .arg("noqa.py"),
         @"
-    success: false
-    exit_code: 1
-    ----- stdout -----
-    noqa.py:5:8: F401 [*] `sys` imported but unused
-    Found 1 error.
-    [*] 1 fixable with the `--fix` option.
-
-    ----- stderr -----
-    ");
-
-    assert_cmd_snapshot!(fixture
-        .check_command()
-        .args(["--config", "ruff.toml"])
-        .arg("noqa.py")
-        .args(["--preview"]),
-        @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1563,12 +1496,12 @@ import sys
     ----- stderr -----
     ");
 
-    // with --ignore-noqa --preview
+    // with --ignore-noqa
     assert_cmd_snapshot!(fixture
         .check_command()
         .args(["--config", "ruff.toml"])
         .arg("noqa.py")
-        .args(["--ignore-noqa", "--preview"]),
+        .args(["--ignore-noqa"]),
         @"
     success: false
     exit_code: 1
@@ -1931,6 +1864,88 @@ print(
         % name
     )
     "#);
+
+    Ok(())
+}
+
+#[test]
+fn add_noqa_top_of_file() -> Result<()> {
+    let fixture = CliTest::new()?;
+    fixture.write_file(
+        "ruff.toml",
+        r#"
+[lint]
+select = ["D100"]
+"#,
+    )?;
+
+    fixture.write_file(
+        "noqa.py", r"
+",
+    )?;
+
+    assert_cmd_snapshot!(fixture
+        .check_command()
+        .args(["--config", "ruff.toml"])
+        .arg("noqa.py")
+        .arg("--preview")
+        .args(["--add-noqa"])
+        , @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Added 1 noqa directive.
+    ");
+
+    let test_code =
+        fs::read_to_string(fixture.root().join("noqa.py")).expect("should read test file");
+
+    insta::assert_snapshot!(test_code, @"# noqa: D100");
+
+    Ok(())
+}
+
+#[test]
+fn add_noqa_top_of_file_with_shebang() -> Result<()> {
+    let fixture = CliTest::new()?;
+    fixture.write_file(
+        "ruff.toml",
+        r#"
+[lint]
+select = ["D100"]
+"#,
+    )?;
+
+    fixture.write_file(
+        "noqa.py",
+        r"#!/usr/bin/env fake command
+",
+    )?;
+
+    assert_cmd_snapshot!(fixture
+        .check_command()
+        .args(["--config", "ruff.toml"])
+        .arg("noqa.py")
+        .arg("--preview")
+        .args(["--add-noqa"])
+        , @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Added 1 noqa directive.
+    ");
+
+    let test_code =
+        fs::read_to_string(fixture.root().join("noqa.py")).expect("should read test file");
+
+    insta::assert_snapshot!(test_code, @"
+    #!/usr/bin/env fake command
+    # noqa: D100
+    ");
 
     Ok(())
 }
@@ -2712,15 +2727,15 @@ fn nested_implicit_namespace_package() -> Result<()> {
         .arg("--select")
         .arg("INP")
         .arg("--preview")
-        , @"
+        , @r###"
     success: false
     exit_code: 1
     ----- stdout -----
-    foo/bar/baz/__init__.py:1:1: INP001 File `foo/bar/baz/__init__.py` declares a package, but is nested under an implicit namespace package. Add an `__init__.py` to `foo/bar`.
+    foo/bar/baz/__init__.py:1:1: error[INP001] File `foo/bar/baz/__init__.py` declares a package, but is nested under an implicit namespace package. Add an `__init__.py` to `foo/bar`.
     Found 1 error.
 
     ----- stderr -----
-    ");
+    "###);
 
     Ok(())
 }
@@ -2882,6 +2897,48 @@ fn flake8_import_convention_unused_aliased_import_no_conflict() {
             .args(["--stdin-filename", "test.py"])
             .arg("--unsafe-fixes")
             .arg("--fix")
+            .arg("-")
+            .pass_stdin("1")
+    );
+}
+
+// https://github.com/astral-sh/ruff/issues/20891
+#[test]
+fn required_import_set_conflicts_with_pyi025() {
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME))
+            .args(STDIN_BASE_OPTIONS)
+            .arg("--config")
+            .arg(r#"lint.isort.required-imports = ["from collections.abc import Set"]"#)
+            .args(["--select", "I002,PYI025"])
+            .arg("-")
+            .pass_stdin("1")
+    );
+}
+
+// https://github.com/astral-sh/ruff/issues/20891
+#[test]
+fn required_import_set_aliased_as_abstract_set_no_conflict() {
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME))
+            .args(STDIN_BASE_OPTIONS)
+            .arg("--config")
+            .arg(r#"lint.isort.required-imports = ["from collections.abc import Set as AbstractSet"]"#)
+            .args(["--select", "I002,PYI025"])
+            .arg("-")
+            .pass_stdin("1")
+    );
+}
+
+// https://github.com/astral-sh/ruff/issues/20891
+#[test]
+fn required_import_set_without_pyi025_no_conflict() {
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME))
+            .args(STDIN_BASE_OPTIONS)
+            .arg("--config")
+            .arg(r#"lint.isort.required-imports = ["from collections.abc import Set"]"#)
+            .args(["--select", "I002"])
             .arg("-")
             .pass_stdin("1")
     );
@@ -3055,7 +3112,7 @@ class Foo[_T, __T]:
     pass
 "#
         ),
-        @"
+        @r###"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -3064,9 +3121,9 @@ class Foo[_T, __T]:
         pass
 
     ----- stderr -----
-    test.py:2:14: UP049 Generic class uses private type parameters
+    test.py:2:14: error[UP049] Generic class uses private type parameters
     Found 2 errors (1 fixed, 1 remaining).
-    "
+    "###
     );
 }
 
@@ -3206,16 +3263,16 @@ T = TypeVar("T")
 class A(Generic[T]):
     var: T
 "#),
-        @"
+        @r###"
     success: false
     exit_code: 1
     ----- stdout -----
-    test.py:6:9: UP046 Generic class `A` uses `Generic` subclass instead of type parameters
+    test.py:6:9: error[UP046] Generic class `A` uses `Generic` subclass instead of type parameters
     Found 1 error.
     No fixes available (1 hidden fix can be enabled with the `--unsafe-fixes` option).
 
     ----- stderr -----
-    "
+    "###
     );
 
     // with per-file-target-version, there should be no errors because the new generic syntax is
@@ -3271,7 +3328,6 @@ fn walrus_before_py38() {
         .args(STDIN_BASE_OPTIONS)
         .args(["--stdin-filename", "test.py"])
         .arg("--target-version=py37")
-        .arg("--preview")
         .arg("-")
         .pass_stdin(r#"(x := 1)"#),
         @"
@@ -3349,15 +3405,15 @@ match 2:
         print("it's one")
 "#
         ),
-        @"
+        @r###"
     success: false
     exit_code: 1
     ----- stdout -----
-    test.py:2:1: invalid-syntax: Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)
+    test.py:2:1: error[invalid-syntax] Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)
     Found 1 error.
 
     ----- stderr -----
-    "
+    "###
     );
 }
 
@@ -3375,27 +3431,27 @@ fn cache_syntax_errors() -> Result<()> {
 
     assert_cmd_snapshot!(
         cmd,
-        @"
+        @r###"
     success: false
     exit_code: 1
     ----- stdout -----
-    main.py:1:1: invalid-syntax: Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)
+    main.py:1:1: error[invalid-syntax] Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)
 
     ----- stderr -----
-    "
+    "###
     );
 
     // this should *not* be cached, like normal parse errors
     assert_cmd_snapshot!(
         cmd,
-        @"
+        @r###"
     success: false
     exit_code: 1
     ----- stdout -----
-    main.py:1:1: invalid-syntax: Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)
+    main.py:1:1: error[invalid-syntax] Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)
 
     ----- stderr -----
-    "
+    "###
     );
 
     Ok(())
@@ -3496,29 +3552,29 @@ fn semantic_syntax_errors() -> Result<()> {
 
     assert_cmd_snapshot!(
         cmd,
-        @"
+        @r###"
     success: false
     exit_code: 1
     ----- stdout -----
-    main.py:1:3: invalid-syntax: assignment expression cannot rebind comprehension variable
-    main.py:1:20: F821 Undefined name `foo`
+    main.py:1:3: error[invalid-syntax] assignment expression cannot rebind comprehension variable
+    main.py:1:20: error[F821] Undefined name `foo`
 
     ----- stderr -----
-    "
+    "###
     );
 
     // this should *not* be cached, like normal parse errors
     assert_cmd_snapshot!(
         cmd,
-        @"
+        @r###"
     success: false
     exit_code: 1
     ----- stdout -----
-    main.py:1:3: invalid-syntax: assignment expression cannot rebind comprehension variable
-    main.py:1:20: F821 Undefined name `foo`
+    main.py:1:3: error[invalid-syntax] assignment expression cannot rebind comprehension variable
+    main.py:1:20: error[F821] Undefined name `foo`
 
     ----- stderr -----
-    "
+    "###
     );
 
     // ensure semantic errors are caught even without AST-based rules selected
@@ -3528,15 +3584,15 @@ fn semantic_syntax_errors() -> Result<()> {
             .arg("--preview")
             .arg("-")
             .pass_stdin(contents),
-        @"
+        @r###"
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:3: invalid-syntax: assignment expression cannot rebind comprehension variable
+    -:1:3: error[invalid-syntax] assignment expression cannot rebind comprehension variable
     Found 1 error.
 
     ----- stderr -----
-    "
+    "###
     );
 
     Ok(())
@@ -3685,11 +3741,11 @@ fn show_fixes_in_full_output_with_preview_enabled() {
             .arg("--preview")
             .arg("-")
             .pass_stdin("import math"),
-        @"
+        @r###"
     success: false
     exit_code: 1
     ----- stdout -----
-    F401 [*] `math` imported but unused
+    error[F401][*]: `math` imported but unused
      --> -:1:8
       |
     1 | import math
@@ -3702,7 +3758,7 @@ fn show_fixes_in_full_output_with_preview_enabled() {
     [*] 1 fixable with the `--fix` option.
 
     ----- stderr -----
-    ",
+    "###,
     );
 }
 
@@ -3716,17 +3772,17 @@ fn rule_panic_mixed_results_concise() -> Result<()> {
         fixture.check_command()
             .args(["--select", "RUF9", "--preview"])
             .args(["normal.py", "panic.py"]),
-        @"
+        @r###"
     success: false
     exit_code: 2
     ----- stdout -----
-    normal.py:1:1: RUF900 Hey this is a stable test rule.
-    normal.py:1:1: RUF901 [*] Hey this is a stable test rule with a safe fix.
-    normal.py:1:1: RUF902 Hey this is a stable test rule with an unsafe fix.
-    normal.py:1:1: RUF903 Hey this is a stable test rule with a display only fix.
-    normal.py:1:1: RUF911 Hey this is a preview test rule.
-    normal.py:1:1: RUF950 Hey this is a test rule that was redirected from another.
-    panic.py: panic: Panicked at <location> when checking `[TMP]/panic.py`: `This is a fake panic for testing.`
+    normal.py:1:1: error[RUF900] Hey this is a stable test rule.
+    normal.py:1:1: error[RUF901] [*] Hey this is a stable test rule with a safe fix.
+    normal.py:1:1: error[RUF902] Hey this is a stable test rule with an unsafe fix.
+    normal.py:1:1: error[RUF903] Hey this is a stable test rule with a display only fix.
+    normal.py:1:1: error[RUF911] Hey this is a preview test rule.
+    normal.py:1:1: error[RUF950] Hey this is a test rule that was redirected from another.
+    panic.py: fatal[panic] Panicked at <location> when checking `[TMP]/panic.py`: `This is a fake panic for testing.`
     Found 7 errors.
     [*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
 
@@ -3736,7 +3792,7 @@ fn rule_panic_mixed_results_concise() -> Result<()> {
     https://github.com/astral-sh/ruff/issues/new?title=%5BLinter%20panic%5D
 
     ...with the relevant file contents, the `pyproject.toml` settings, and the stack trace above, we'd be very appreciative!
-    ");
+    "###);
 
     Ok(())
 }
@@ -3751,31 +3807,31 @@ fn rule_panic_mixed_results_full() -> Result<()> {
         fixture.command()
             .args(["check", "--select", "RUF9", "--preview", "--output-format=full", "--no-cache"])
             .args(["normal.py", "panic.py"]),
-        @"
+        @r###"
     success: false
     exit_code: 2
     ----- stdout -----
-    RUF900 Hey this is a stable test rule.
+    error[RUF900]: Hey this is a stable test rule.
     --> normal.py:1:1
 
-    RUF901 [*] Hey this is a stable test rule with a safe fix.
+    error[RUF901][*]: Hey this is a stable test rule with a safe fix.
     --> normal.py:1:1
     1 + # fix from stable-test-rule-safe-fix
     2 | import os
 
-    RUF902 Hey this is a stable test rule with an unsafe fix.
+    error[RUF902]: Hey this is a stable test rule with an unsafe fix.
     --> normal.py:1:1
 
-    RUF903 Hey this is a stable test rule with a display only fix.
+    error[RUF903]: Hey this is a stable test rule with a display only fix.
     --> normal.py:1:1
 
-    RUF911 Hey this is a preview test rule.
+    error[RUF911]: Hey this is a preview test rule.
     --> normal.py:1:1
 
-    RUF950 Hey this is a test rule that was redirected from another.
+    error[RUF950]: Hey this is a test rule that was redirected from another.
     --> normal.py:1:1
 
-    panic: Panicked at <location> when checking `[TMP]/panic.py`: `This is a fake panic for testing.`
+    error[panic]: Panicked at <location> when checking `[TMP]/panic.py`: `This is a fake panic for testing.`
     --> panic.py:1:1
     info: This indicates a bug in Ruff.
     info: If you could open an issue at https://github.com/astral-sh/ruff/issues/new?title=%5Bpanic%5D, we'd be very appreciative!
@@ -3790,7 +3846,7 @@ fn rule_panic_mixed_results_full() -> Result<()> {
     https://github.com/astral-sh/ruff/issues/new?title=%5BLinter%20panic%5D
 
     ...with the relevant file contents, the `pyproject.toml` settings, and the stack trace above, we'd be very appreciative!
-    ");
+    "###);
 
     Ok(())
 }
@@ -3940,18 +3996,444 @@ fn supported_file_extensions_preview_enabled() -> Result<()> {
         fixture.check_command()
             .args(["--select", "F401", "--preview"])
             .arg("src"),
-        @"
+        @r###"
     success: false
     exit_code: 1
     ----- stdout -----
-    src/thing.ipynb:cell 1:1:8: F401 [*] `os` imported but unused
-    src/thing.py:1:8: F401 [*] `os` imported but unused
-    src/thing.pyi:1:8: F401 [*] `os` imported but unused
-    src/thing.pyw:1:8: F401 [*] `os` imported but unused
+    src/thing.ipynb:cell 1:1:8: error[F401] [*] `os` imported but unused
+    src/thing.py:1:8: error[F401] [*] `os` imported but unused
+    src/thing.pyi:1:8: error[F401] [*] `os` imported but unused
+    src/thing.pyw:1:8: error[F401] [*] `os` imported but unused
     Found 4 errors.
     [*] 4 fixable with the `--fix` option.
 
     ----- stderr -----
-    ");
+    "###);
+    Ok(())
+}
+
+#[test]
+fn preview_default_rules() -> Result<()> {
+    let test = CliTest::with_settings(|_path, mut settings| {
+        settings.add_filter(r"(?s).*(linter\.rules\.enabled[^]]+]).*", "$1");
+        settings
+    })?;
+
+    test.write_file("try.py", "1")?;
+
+    assert_cmd_snapshot!(
+        test.check_command().args(["--preview", "--show-settings"]),
+        @"
+    linter.rules.enabled = [
+    	sys-version-slice3 (YTT101),
+    	sys-version2 (YTT102),
+    	sys-version-cmp-str3 (YTT103),
+    	sys-version-info0-eq3 (YTT201),
+    	six-py3 (YTT202),
+    	sys-version-info1-cmp-int (YTT203),
+    	sys-version-info-minor-cmp-int (YTT204),
+    	sys-version0 (YTT301),
+    	sys-version-cmp-str10 (YTT302),
+    	sys-version-slice1 (YTT303),
+    	cancel-scope-no-checkpoint (ASYNC100),
+    	trio-sync-call (ASYNC105),
+    	async-zero-sleep (ASYNC115),
+    	long-sleep-not-forever (ASYNC116),
+    	blocking-http-call-in-async-function (ASYNC210),
+    	create-subprocess-in-async-function (ASYNC220),
+    	run-process-in-async-function (ASYNC221),
+    	wait-for-process-in-async-function (ASYNC222),
+    	blocking-open-call-in-async-function (ASYNC230),
+    	blocking-sleep-in-async-function (ASYNC251),
+    	exec-builtin (S102),
+    	try-except-pass (S110),
+    	try-except-continue (S112),
+    	blind-except (BLE001),
+    	unary-prefix-increment-decrement (B002),
+    	assignment-to-os-environ (B003),
+    	unreliable-callable-check (B004),
+    	strip-with-multi-characters (B005),
+    	mutable-argument-default (B006),
+    	function-call-in-default-argument (B008),
+    	get-attr-with-constant (B009),
+    	set-attr-with-constant (B010),
+    	jump-statement-in-finally (B012),
+    	redundant-tuple-in-exception-handler (B013),
+    	duplicate-handler-exception (B014),
+    	useless-comparison (B015),
+    	raise-literal (B016),
+    	assert-raises-exception (B017),
+    	useless-expression (B018),
+    	cached-instance-method (B019),
+    	loop-variable-overrides-iterator (B020),
+    	f-string-docstring (B021),
+    	useless-contextlib-suppress (B022),
+    	function-uses-loop-variable (B023),
+    	duplicate-try-block-exception (B025),
+    	star-arg-unpacking-after-keyword-arg (B026),
+    	except-with-empty-tuple (B029),
+    	except-with-non-exception-classes (B030),
+    	reuse-of-groupby-generator (B031),
+    	unintentional-type-annotation (B032),
+    	duplicate-value (B033),
+    	static-key-dict-comprehension (B035),
+    	mutable-contextvar-default (B039),
+    	unnecessary-generator-list (C400),
+    	unnecessary-generator-set (C401),
+    	unnecessary-generator-dict (C402),
+    	unnecessary-list-comprehension-set (C403),
+    	unnecessary-list-comprehension-dict (C404),
+    	unnecessary-literal-set (C405),
+    	unnecessary-literal-dict (C406),
+    	unnecessary-collection-call (C408),
+    	unnecessary-literal-within-tuple-call (C409),
+    	unnecessary-literal-within-list-call (C410),
+    	unnecessary-list-call (C411),
+    	unnecessary-call-around-sorted (C413),
+    	unnecessary-double-cast-or-process (C414),
+    	unnecessary-subscript-reversal (C415),
+    	unnecessary-map (C417),
+    	unnecessary-literal-within-dict-call (C418),
+    	unnecessary-comprehension-in-call (C419),
+    	call-datetime-without-tzinfo (DTZ001),
+    	call-datetime-today (DTZ002),
+    	call-datetime-utcnow (DTZ003),
+    	call-datetime-utcfromtimestamp (DTZ004),
+    	call-datetime-now-without-tzinfo (DTZ005),
+    	call-datetime-fromtimestamp (DTZ006),
+    	call-datetime-strptime-without-zone (DTZ007),
+    	call-date-today (DTZ011),
+    	call-date-fromtimestamp (DTZ012),
+    	datetime-min-max (DTZ901),
+    	debugger (T100),
+    	shebang-not-executable (EXE001),
+    	shebang-missing-executable-file (EXE002),
+    	shebang-leading-whitespace (EXE004),
+    	shebang-not-first-line (EXE005),
+    	future-rewritable-type-annotation (FA100),
+    	future-required-type-annotation (FA102),
+    	f-string-in-get-text-func-call (INT001),
+    	format-in-get-text-func-call (INT002),
+    	printf-in-get-text-func-call (INT003),
+    	direct-logger-instantiation (LOG001),
+    	invalid-get-logger-argument (LOG002),
+    	undocumented-warn (LOG009),
+    	exc-info-outside-except-handler (LOG014),
+    	root-logger-call (LOG015),
+    	logging-warn (G010),
+    	logging-extra-attr-clash (G101),
+    	logging-exc-info (G201),
+    	logging-redundant-exc-info (G202),
+    	unnecessary-placeholder (PIE790),
+    	duplicate-class-field-definition (PIE794),
+    	non-unique-enums (PIE796),
+    	unnecessary-spread (PIE800),
+    	unnecessary-dict-kwargs (PIE804),
+    	reimplemented-container-builtin (PIE807),
+    	unnecessary-range-start (PIE808),
+    	multiple-starts-ends-with (PIE810),
+    	unprefixed-type-param (PYI001),
+    	complex-if-statement-in-stub (PYI002),
+    	unrecognized-version-info-check (PYI003),
+    	patch-version-comparison (PYI004),
+    	wrong-tuple-length-version-comparison (PYI005),
+    	bad-version-info-comparison (PYI006),
+    	unrecognized-platform-check (PYI007),
+    	unrecognized-platform-name (PYI008),
+    	pass-statement-stub-body (PYI009),
+    	non-empty-stub-body (PYI010),
+    	pass-in-class-body (PYI012),
+    	ellipsis-in-non-empty-class-body (PYI013),
+    	assignment-default-in-stub (PYI015),
+    	duplicate-union-member (PYI016),
+    	complex-assignment-in-stub (PYI017),
+    	unused-private-type-var (PYI018),
+    	custom-type-var-for-self (PYI019),
+    	quoted-annotation-in-stub (PYI020),
+    	unaliased-collections-abc-set-import (PYI025),
+    	type-alias-without-annotation (PYI026),
+    	str-or-repr-defined-in-stub (PYI029),
+    	unnecessary-literal-union (PYI030),
+    	any-eq-ne-annotation (PYI032),
+    	type-comment-in-stub (PYI033),
+    	non-self-return-type (PYI034),
+    	unassigned-special-variable-in-stub (PYI035),
+    	bad-exit-annotation (PYI036),
+    	redundant-numeric-union (PYI041),
+    	snake-case-type-alias (PYI042),
+    	t-suffixed-type-alias (PYI043),
+    	future-annotations-in-stub (PYI044),
+    	iter-method-return-iterable (PYI045),
+    	unused-private-protocol (PYI046),
+    	unused-private-type-alias (PYI047),
+    	stub-body-multiple-statements (PYI048),
+    	unused-private-typed-dict (PYI049),
+    	no-return-argument-annotation-in-stub (PYI050),
+    	unannotated-assignment-in-stub (PYI052),
+    	unnecessary-type-union (PYI055),
+    	byte-string-usage (PYI057),
+    	generator-return-from-iter-method (PYI058),
+    	generic-not-last-base-class (PYI059),
+    	redundant-none-literal (PYI061),
+    	duplicate-literal-member (PYI062),
+    	pep484-style-positional-only-parameter (PYI063),
+    	redundant-final-literal (PYI064),
+    	bad-version-info-order (PYI066),
+    	pytest-raises-without-exception (PT010),
+    	pytest-duplicate-parametrize-test-cases (PT014),
+    	pytest-deprecated-yield-fixture (PT020),
+    	pytest-erroneous-use-fixtures-on-fixture (PT025),
+    	pytest-use-fixtures-without-parameters (PT026),
+    	pytest-warns-with-multiple-statements (PT031),
+    	unnecessary-return-none (RET501),
+    	duplicate-isinstance-call (SIM101),
+    	collapsible-if (SIM102),
+    	needless-bool (SIM103),
+    	return-in-try-except-finally (SIM107),
+    	enumerate-for-loop (SIM113),
+    	if-with-same-arms (SIM114),
+    	open-file-with-context-handler (SIM115),
+    	multiple-with-statements (SIM117),
+    	in-dict-keys (SIM118),
+    	negate-equal-op (SIM201),
+    	negate-not-equal-op (SIM202),
+    	double-negation (SIM208),
+    	if-expr-with-true-false (SIM210),
+    	if-expr-with-false-true (SIM211),
+    	expr-and-not-expr (SIM220),
+    	expr-or-not-expr (SIM221),
+    	expr-or-true (SIM222),
+    	expr-and-false (SIM223),
+    	if-else-block-instead-of-dict-get (SIM401),
+    	split-static-string (SIM905),
+    	zip-dict-keys-and-values (SIM911),
+    	runtime-import-in-type-checking-block (TC004),
+    	empty-type-checking-block (TC005),
+    	unquoted-type-alias (TC007),
+    	runtime-string-union (TC010),
+    	py-path (PTH124),
+    	invalid-pathlib-with-suffix (PTH210),
+    	static-join-to-f-string (FLY002),
+    	unsorted-imports (I001),
+    	invalid-module-name (N999),
+    	unnecessary-list-cast (PERF101),
+    	incorrect-dict-iterator (PERF102),
+    	manual-list-copy (PERF402),
+    	bare-except (E722),
+    	io-error (E902),
+    	invalid-escape-sequence (W605),
+    	empty-docstring (D419),
+    	unused-import (F401),
+    	import-shadowed-by-loop-var (F402),
+    	late-future-import (F404),
+    	future-feature-not-defined (F407),
+    	percent-format-invalid-format (F501),
+    	percent-format-expected-mapping (F502),
+    	percent-format-expected-sequence (F503),
+    	percent-format-extra-named-arguments (F504),
+    	percent-format-missing-argument (F505),
+    	percent-format-mixed-positional-and-named (F506),
+    	percent-format-positional-count-mismatch (F507),
+    	percent-format-star-requires-sequence (F508),
+    	percent-format-unsupported-format-character (F509),
+    	string-dot-format-invalid-format (F521),
+    	string-dot-format-extra-named-arguments (F522),
+    	string-dot-format-extra-positional-arguments (F523),
+    	string-dot-format-missing-arguments (F524),
+    	string-dot-format-mixing-automatic (F525),
+    	f-string-missing-placeholders (F541),
+    	multi-value-repeated-key-literal (F601),
+    	multi-value-repeated-key-variable (F602),
+    	expressions-in-star-assignment (F621),
+    	multiple-starred-expressions (F622),
+    	assert-tuple (F631),
+    	is-literal (F632),
+    	invalid-print-syntax (F633),
+    	if-tuple (F634),
+    	break-outside-loop (F701),
+    	continue-outside-loop (F702),
+    	yield-outside-function (F704),
+    	return-outside-function (F706),
+    	default-except-not-last (F707),
+    	redefined-while-unused (F811),
+    	undefined-name (F821),
+    	undefined-export (F822),
+    	undefined-local (F823),
+    	unused-variable (F841),
+    	unused-annotation (F842),
+    	raise-not-implemented (F901),
+    	invalid-mock-access (PGH005),
+    	type-name-incorrect-variance (PLC0105),
+    	type-bivariance (PLC0131),
+    	type-param-name-mismatch (PLC0132),
+    	single-string-slots (PLC0205),
+    	dict-index-missing-items (PLC0206),
+    	iteration-over-set (PLC0208),
+    	useless-import-alias (PLC0414),
+    	unnecessary-direct-lambda-call (PLC3002),
+    	yield-in-init (PLE0100),
+    	return-in-init (PLE0101),
+    	nonlocal-and-global (PLE0115),
+    	continue-in-finally (PLE0116),
+    	nonlocal-without-binding (PLE0117),
+    	load-before-global-declaration (PLE0118),
+    	invalid-length-return-type (PLE0303),
+    	invalid-index-return-type (PLE0305),
+    	invalid-str-return-type (PLE0307),
+    	invalid-bytes-return-type (PLE0308),
+    	invalid-hash-return-type (PLE0309),
+    	invalid-all-object (PLE0604),
+    	invalid-all-format (PLE0605),
+    	potential-index-error (PLE0643),
+    	misplaced-bare-raise (PLE0704),
+    	repeated-keyword-argument (PLE1132),
+    	await-outside-async (PLE1142),
+    	logging-too-many-args (PLE1205),
+    	logging-too-few-args (PLE1206),
+    	bad-string-format-character (PLE1300),
+    	bad-string-format-type (PLE1307),
+    	bad-str-strip-call (PLE1310),
+    	invalid-envvar-value (PLE1507),
+    	singledispatch-method (PLE1519),
+    	singledispatchmethod-function (PLE1520),
+    	yield-from-in-async-function (PLE1700),
+    	bidirectional-unicode (PLE2502),
+    	invalid-character-backspace (PLE2510),
+    	invalid-character-sub (PLE2512),
+    	invalid-character-esc (PLE2513),
+    	invalid-character-nul (PLE2514),
+    	invalid-character-zero-width-space (PLE2515),
+    	comparison-with-itself (PLR0124),
+    	comparison-of-constant (PLR0133),
+    	property-with-parameters (PLR0206),
+    	manual-from-import (PLR0402),
+    	redefined-argument-from-local (PLR1704),
+    	useless-return (PLR1711),
+    	boolean-chained-comparison (PLR1716),
+    	sys-exit-alias (PLR1722),
+    	if-stmt-min-max (PLR1730),
+    	unnecessary-dict-index-lookup (PLR1733),
+    	unnecessary-list-index-lookup (PLR1736),
+    	empty-comment (PLR2044),
+    	useless-else-on-loop (PLW0120),
+    	self-assigning-variable (PLW0127),
+    	redeclared-assigned-name (PLW0128),
+    	assert-on-string-literal (PLW0129),
+    	named-expr-without-context (PLW0131),
+    	useless-exception-statement (PLW0133),
+    	nan-comparison (PLW0177),
+    	bad-staticmethod-argument (PLW0211),
+    	super-without-brackets (PLW0245),
+    	import-self (PLW0406),
+    	global-variable-not-assigned (PLW0602),
+    	global-at-module-level (PLW0604),
+    	self-or-cls-assignment (PLW0642),
+    	binary-op-exception (PLW0711),
+    	bad-open-mode (PLW1501),
+    	shallow-copy-environ (PLW1507),
+    	invalid-envvar-default (PLW1508),
+    	subprocess-popen-preexec-fn (PLW1509),
+    	subprocess-run-without-check (PLW1510),
+    	useless-with-lock (PLW2101),
+    	useless-metaclass-type (UP001),
+    	type-of-primitive (UP003),
+    	useless-object-inheritance (UP004),
+    	deprecated-unittest-alias (UP005),
+    	non-pep585-annotation (UP006),
+    	non-pep604-annotation-union (UP007),
+    	super-call-with-parameters (UP008),
+    	utf8-encoding-declaration (UP009),
+    	unnecessary-future-import (UP010),
+    	lru-cache-without-parameters (UP011),
+    	unnecessary-encode-utf8 (UP012),
+    	convert-named-tuple-functional-to-class (UP014),
+    	datetime-timezone-utc (UP017),
+    	native-literals (UP018),
+    	typing-text-str-alias (UP019),
+    	open-alias (UP020),
+    	replace-universal-newlines (UP021),
+    	replace-stdout-stderr (UP022),
+    	deprecated-c-element-tree (UP023),
+    	os-error-alias (UP024),
+    	unicode-kind-prefix (UP025),
+    	deprecated-mock-import (UP026),
+    	yield-in-for-loop (UP028),
+    	unnecessary-builtin-import (UP029),
+    	format-literals (UP030),
+    	printf-string-formatting (UP031),
+    	f-string (UP032),
+    	lru-cache-with-maxsize-none (UP033),
+    	extraneous-parentheses (UP034),
+    	deprecated-import (UP035),
+    	outdated-version-block (UP036),
+    	quoted-annotation (UP037),
+    	unnecessary-class-parentheses (UP039),
+    	non-pep695-type-alias (UP040),
+    	timeout-error-alias (UP041),
+    	unnecessary-default-type-args (UP043),
+    	non-pep646-unpack (UP044),
+    	non-pep604-annotation-optional (UP045),
+    	non-pep695-generic-class (UP046),
+    	non-pep695-generic-function (UP047),
+    	private-type-parameter (UP049),
+    	useless-class-metaclass-type (UP050),
+    	print-empty-string (FURB105),
+    	for-loop-writes (FURB122),
+    	readlines-in-for (FURB129),
+    	check-and-remove-from-set (FURB132),
+    	if-expr-min-max (FURB136),
+    	verbose-decimal-constructor (FURB157),
+    	bit-count (FURB161),
+    	fromisoformat-replace-z (FURB162),
+    	redundant-log-base (FURB163),
+    	int-on-sliced-str (FURB166),
+    	regex-flag-alias (FURB167),
+    	isinstance-type-none (FURB168),
+    	type-none-comparison (FURB169),
+    	implicit-cwd (FURB177),
+    	hashlib-digest-hex (FURB181),
+    	slice-to-remove-prefix-or-suffix (FURB188),
+    	zip-instead-of-pairwise (RUF007),
+    	mutable-dataclass-default (RUF008),
+    	function-call-in-dataclass-default-argument (RUF009),
+    	explicit-f-string-type-conversion (RUF010),
+    	mutable-class-default (RUF012),
+    	implicit-optional (RUF013),
+    	unnecessary-iterable-allocation-for-first-element (RUF015),
+    	invalid-index-type (RUF016),
+    	quadratic-list-summation (RUF017),
+    	assignment-in-assert (RUF018),
+    	unnecessary-key-check (RUF019),
+    	never-union (RUF020),
+    	unsorted-dunder-all (RUF022),
+    	unsorted-dunder-slots (RUF023),
+    	mutable-fromkeys-value (RUF024),
+    	default-factory-kwarg (RUF026),
+    	invalid-formatter-suppression-comment (RUF028),
+    	assert-with-print-message (RUF030),
+    	decimal-from-float-literal (RUF032),
+    	post-init-default (RUF033),
+    	useless-if-else (RUF034),
+    	invalid-assert-message-literal-argument (RUF040),
+    	unnecessary-nested-literal (RUF041),
+    	unnecessary-cast-to-int (RUF046),
+    	map-int-version-parsing (RUF048),
+    	dataclass-enum (RUF049),
+    	if-key-in-dict-del (RUF051),
+    	class-with-mixed-type-vars (RUF053),
+    	unnecessary-round (RUF057),
+    	starmap-zip (RUF058),
+    	unused-unpacked-variable (RUF059),
+    	unused-noqa (RUF100),
+    	redirected-noqa (RUF101),
+    	invalid-pyproject-toml (RUF200),
+    	raise-vanilla-class (TRY002),
+    	type-check-without-type-error (TRY004),
+    	verbose-raise (TRY201),
+    	useless-try-except (TRY203),
+    	verbose-log-message (TRY401),
+    ]
+    ",
+    );
     Ok(())
 }

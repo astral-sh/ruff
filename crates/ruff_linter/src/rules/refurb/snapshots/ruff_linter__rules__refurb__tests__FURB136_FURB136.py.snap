@@ -181,3 +181,29 @@ help: Replace with `max(y, x)`
    -     > y
    - ) else y  # FURB136
 22 + max(y, x)  # FURB136
+23 | 
+24 | 
+25 | highest_score = (
+
+FURB136 [*] Replace `if` expression with `max(y, x)`
+  --> FURB136.py:29:5
+   |
+28 |   highest_score = (
+29 | /     x
+30 | |     # text
+31 | |     if x > y
+32 | |     else y
+   | |__________^
+33 |   )
+   |
+help: Replace with `max(y, x)`
+26 | 
+27 | 
+28 | highest_score = (
+   -     x
+   -     # text
+   -     if x > y
+   -     else y
+29 +     max(y, x)
+30 | )
+note: This is an unsafe fix and may change runtime behavior

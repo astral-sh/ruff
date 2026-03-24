@@ -9,9 +9,21 @@ import {
   useRef,
   useState,
 } from "react";
-import { ErrorMessage, Header, setupMonaco, useTheme } from "shared";
+import {
+  ErrorMessage,
+  Header,
+  setupMonaco,
+  useTheme,
+  downloadZip,
+} from "shared";
 import { FileHandle, PositionEncoding, Workspace } from "ty_wasm";
-import { persist, persistLocal, restore } from "./Editor/persist";
+import {
+  copyAsMarkdown,
+  copyAsMarkdownLink,
+  persist,
+  persistLocal,
+  restore,
+} from "./Editor/persist";
 import { loader } from "@monaco-editor/react";
 import tySchema from "../../../ty.schema.json";
 import Chrome, { formatError } from "./Editor/Chrome";
@@ -58,7 +70,45 @@ export default function Playground() {
     }
   }, [files]);
 
-  const handleFileAdded = (workspace: Workspace, name: string) => {
+  const handleCopyMarkdown = useCallback(async () => {
+    const serialized = serializeFiles(files);
+
+    if (serialized != null) {
+      await copyAsMarkdown(serialized);
+    }
+  }, [files]);
+
+  const handleCopyMarkdownLink = useCallback(async () => {
+    const serialized = serializeFiles(files);
+
+    if (serialized != null) {
+      await copyAsMarkdownLink(serialized);
+    }
+  }, [files]);
+
+  const handleDownload = useCallback(async () => {
+    const serialized = serializeFiles(files);
+
+    if (serialized != null) {
+      const downloadFiles = { ...serialized.files };
+
+      if (SETTINGS_FILE_NAME in downloadFiles) {
+        try {
+          const toml = await import("smol-toml");
+          const tomlContent = toml.stringify(
+            JSON.parse(downloadFiles[SETTINGS_FILE_NAME]),
+          );
+          delete downloadFiles[SETTINGS_FILE_NAME];
+          downloadFiles["ty.toml"] = tomlContent;
+        } catch {
+          // Keep the original JSON file if conversion fails.
+        }
+      }
+
+      await downloadZip(downloadFiles, "ty-playground");
+    }
+  }, [files]);
+  const handleFileAdded = useCallback((workspace: Workspace, name: string) => {
     let handle = null;
 
     if (name === SETTINGS_FILE_NAME) {
@@ -68,69 +118,74 @@ export default function Playground() {
     }
 
     dispatchFiles({ type: "add", name, handle, content: "" });
-  };
+  }, []);
 
-  const handleFileChanged = (workspace: Workspace, content: string) => {
-    if (files.selected == null) {
-      return;
-    }
+  const handleFileChanged = useCallback(
+    (workspace: Workspace, content: string) => {
+      if (files.selected == null) {
+        return;
+      }
 
-    dispatchFiles({
-      type: "change",
-      id: files.selected,
-      content,
-    });
+      const handle = files.handles[files.selected];
 
-    const handle = files.handles[files.selected];
+      if (handle != null) {
+        updateFile(workspace, handle, content, setError);
+      } else if (fileName === SETTINGS_FILE_NAME) {
+        updateOptions(workspace, content, setError);
+      }
 
-    if (handle != null) {
-      updateFile(workspace, handle, content, setError);
-    } else if (fileName === SETTINGS_FILE_NAME) {
-      updateOptions(workspace, content, setError);
-    }
-  };
+      dispatchFiles({
+        type: "change",
+        id: files.selected,
+        content,
+      });
+    },
+    [fileName, files.handles, files.selected],
+  );
 
-  const handleFileRenamed = (
-    workspace: Workspace,
-    file: FileId,
-    newName: string,
-  ) => {
-    if (newName.startsWith("/")) {
-      setError("File names cannot start with '/'.");
-      return;
-    }
-    if (newName.startsWith("vendored:")) {
-      setError("File names cannot start with 'vendored:'.");
-      return;
-    }
+  const handleFileRenamed = useCallback(
+    (workspace: Workspace, file: FileId, newName: string) => {
+      if (newName.startsWith("/")) {
+        setError("File names cannot start with '/'.");
+        return;
+      }
+      if (newName.startsWith("vendored:")) {
+        setError("File names cannot start with 'vendored:'.");
+        return;
+      }
 
-    const handle = files.handles[file];
-    let newHandle: FileHandle | null = null;
-    if (handle == null) {
-      updateOptions(workspace, null, setError);
-    } else {
-      workspace.closeFile(handle);
-    }
+      const handle = files.handles[file];
+      let newHandle: FileHandle | null = null;
+      if (handle == null) {
+        updateOptions(workspace, null, setError);
+      } else {
+        workspace.closeFile(handle);
+      }
 
-    if (newName === SETTINGS_FILE_NAME) {
-      updateOptions(workspace, files.contents[file], setError);
-    } else {
-      newHandle = workspace.openFile(newName, files.contents[file]);
-    }
+      if (newName === SETTINGS_FILE_NAME) {
+        updateOptions(workspace, files.contents[file], setError);
+      } else {
+        newHandle = workspace.openFile(newName, files.contents[file]);
+      }
 
-    dispatchFiles({ type: "rename", id: file, to: newName, newHandle });
-  };
+      dispatchFiles({ type: "rename", id: file, to: newName, newHandle });
+    },
+    [files.contents, files.handles],
+  );
 
-  const handleFileRemoved = (workspace: Workspace, file: FileId) => {
-    const handle = files.handles[file];
-    if (handle == null) {
-      updateOptions(workspace, null, setError);
-    } else {
-      workspace.closeFile(handle);
-    }
+  const handleFileRemoved = useCallback(
+    (workspace: Workspace, file: FileId) => {
+      const handle = files.handles[file];
+      if (handle == null) {
+        updateOptions(workspace, null, setError);
+      } else {
+        workspace.closeFile(handle);
+      }
 
-    dispatchFiles({ type: "remove", id: file });
-  };
+      dispatchFiles({ type: "remove", id: file });
+    },
+    [files.handles],
+  );
 
   const handleFileSelected = useCallback((file: FileId) => {
     dispatchFiles({ type: "selectFile", id: file });
@@ -170,12 +225,15 @@ export default function Playground() {
   return (
     <main className="flex flex-col h-full bg-ayu-background dark:bg-ayu-background-dark">
       <Header
-        edit={files.revision}
         theme={theme}
         tool="ty"
         version={version}
         onChangeTheme={setTheme}
+        edit={files.revision}
         onShare={handleShare}
+        onCopyMarkdownLink={handleCopyMarkdownLink}
+        onCopyMarkdown={handleCopyMarkdown}
+        onDownload={handleDownload}
         onReset={workspace == null ? undefined : handleReset}
       />
 
@@ -502,6 +560,13 @@ export interface InitializedPlayground {
 async function startPlayground(): Promise<InitializedPlayground> {
   const ty = await import("ty_wasm");
   await ty.default();
+
+  if (import.meta.env.DEV) {
+    ty.initLogging(ty.LogLevel.Debug);
+  } else {
+    ty.initLogging(ty.LogLevel.Info);
+  }
+
   const version = ty.version();
   const monaco = await loader.init();
 

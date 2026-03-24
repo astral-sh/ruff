@@ -1,0 +1,73 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+---
+## AST
+
+```
+Module(
+    ModModule {
+        node_index: NodeIndex(None),
+        range: 0..60,
+        body: [
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 44..59,
+                    value: ListComp(
+                        ExprListComp {
+                            node_index: NodeIndex(None),
+                            range: 44..59,
+                            elt: Starred(
+                                ExprStarred {
+                                    node_index: NodeIndex(None),
+                                    range: 45..47,
+                                    value: Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 46..47,
+                                            id: Name("x"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    ctx: Load,
+                                },
+                            ),
+                            generators: [
+                                Comprehension {
+                                    range: 48..58,
+                                    node_index: NodeIndex(None),
+                                    target: Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 52..53,
+                                            id: Name("x"),
+                                            ctx: Store,
+                                        },
+                                    ),
+                                    iter: Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 57..58,
+                                            id: Name("y"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    ifs: [],
+                                    is_async: false,
+                                },
+                            ],
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Unsupported Syntax Errors
+
+  |
+1 | # parse_options: {"target-version": "3.14"}
+2 | [*x for x in y]
+  |  ^^ Syntax Error: Cannot use iterable unpacking in a list comprehension on Python 3.14 (syntax was added in Python 3.15)
+  |

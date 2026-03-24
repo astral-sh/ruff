@@ -1,6 +1,9 @@
+use std::sync::LazyLock;
+
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::{Attribute, DeriveInput, Error, Lit, LitStr, Meta};
+use regex::Regex;
+use syn::{Attribute, DeriveInput, Error, Lit, LitStr, Meta, meta::ParseNestedMeta};
 
 pub(crate) fn violation_metadata(input: DeriveInput) -> syn::Result<TokenStream> {
     let docs = get_docs(&input.attrs)?;
@@ -79,19 +82,19 @@ fn get_rule_status(attrs: &[Attribute]) -> syn::Result<Option<TokenStream>> {
         if attr.path().is_ident("violation_metadata") {
             attr.parse_nested_meta(|meta| {
                 if meta.path.is_ident("stable_since") {
-                    let lit: LitStr = meta.value()?.parse()?;
+                    let lit: LitStr = parse_version(&meta)?;
                     group = Some(quote!(RuleGroup::Stable { since: #lit }));
                     return Ok(());
                 } else if meta.path.is_ident("preview_since") {
-                    let lit: LitStr = meta.value()?.parse()?;
+                    let lit: LitStr = parse_version(&meta)?;
                     group = Some(quote!(RuleGroup::Preview { since: #lit }));
                     return Ok(());
                 } else if meta.path.is_ident("deprecated_since") {
-                    let lit: LitStr = meta.value()?.parse()?;
+                    let lit: LitStr = parse_version(&meta)?;
                     group = Some(quote!(RuleGroup::Deprecated { since: #lit }));
                     return Ok(());
                 } else if meta.path.is_ident("removed_since") {
-                    let lit: LitStr = meta.value()?.parse()?;
+                    let lit: LitStr = parse_version(&meta)?;
                     group = Some(quote!(RuleGroup::Removed { since: #lit }));
                     return Ok(());
                 }
@@ -127,4 +130,24 @@ fn parse_attr<'a, const LEN: usize>(
     }
 
     None
+}
+
+fn parse_version(meta: &ParseNestedMeta) -> syn::Result<LitStr> {
+    /// Match either a semantic version with an optional `v` prefix for versions before 0.5.0
+    /// (`v0.2.3`, `0.12.34`) or the special `NEXT_RUFF_VERSION` placeholder that is updated by
+    /// rooster in releases.
+    static VERSION: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"^(v0.[0-4].\d+|\d+\.\d+\.\d+|NEXT_RUFF_VERSION)$").unwrap());
+
+    let lit: LitStr = meta.value()?.parse()?;
+    let value = lit.value();
+
+    if VERSION.is_match(&value) {
+        Ok(lit)
+    } else {
+        Err(Error::new_spanned(
+            lit,
+            format_args!("Unknown version specifier `{value}`"),
+        ))
+    }
 }
