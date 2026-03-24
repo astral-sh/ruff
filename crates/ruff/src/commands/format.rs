@@ -43,6 +43,7 @@ use ruff_workspace::resolver::{
 
 use crate::args::{ConfigArguments, FormatArguments, FormatRange};
 use crate::cache::{Cache, FileCacheKey, PackageCacheMap, PackageCaches};
+use crate::output_ui::write_two_col_block;
 use crate::{ExitStatus, resolve_default_files};
 
 #[derive(Debug, Copy, Clone, is_macro::Is)]
@@ -650,48 +651,42 @@ impl<'a> FormatResults<'a> {
             }
         }
 
-        // Write out a summary of the formatting results.
-        if changed > 0 && unchanged > 0 {
-            writeln!(
-                f,
-                "{} file{} {}, {} file{} {}",
-                changed,
-                if changed == 1 { "" } else { "s" },
-                match self.mode {
-                    FormatMode::Write => "reformatted",
-                    FormatMode::Check | FormatMode::Diff => "would be reformatted",
-                },
-                unchanged,
-                if unchanged == 1 { "" } else { "s" },
-                match self.mode {
-                    FormatMode::Write => "left unchanged",
-                    FormatMode::Check | FormatMode::Diff => "already formatted",
-                },
-            )
-        } else if changed > 0 {
-            writeln!(
-                f,
-                "{} file{} {}",
-                changed,
-                if changed == 1 { "" } else { "s" },
-                match self.mode {
-                    FormatMode::Write => "reformatted",
-                    FormatMode::Check | FormatMode::Diff => "would be reformatted",
-                }
-            )
-        } else if unchanged > 0 {
-            writeln!(
-                f,
-                "{} file{} {}",
-                unchanged,
-                if unchanged == 1 { "" } else { "s" },
-                match self.mode {
-                    FormatMode::Write => "left unchanged",
-                    FormatMode::Check | FormatMode::Diff => "already formatted",
-                },
-            )
-        } else {
+        let mut rows = Vec::new();
+        if changed > 0 {
+            rows.push((
+                "Changed".to_string(),
+                format!(
+                    "{changed} file{} {}",
+                    if changed == 1 { "" } else { "s" },
+                    match self.mode {
+                        FormatMode::Write => "reformatted",
+                        FormatMode::Check | FormatMode::Diff => "would be reformatted",
+                    }
+                ),
+            ));
+        }
+        if unchanged > 0 {
+            rows.push((
+                "Unchanged".to_string(),
+                format!(
+                    "{unchanged} file{} {}",
+                    if unchanged == 1 { "" } else { "s" },
+                    match self.mode {
+                        FormatMode::Write => "left unchanged",
+                        FormatMode::Check | FormatMode::Diff => "already formatted",
+                    }
+                ),
+            ));
+        }
+        if rows.is_empty() {
             Ok(())
+        } else {
+            write_two_col_block(
+                f,
+                "Format Summary",
+                &rows,
+                colored::control::SHOULD_COLORIZE.should_colorize(),
+            )
         }
     }
 

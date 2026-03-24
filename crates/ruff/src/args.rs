@@ -110,12 +110,21 @@ const STYLES: Styles = Styles::styled()
     .literal(AnsiColor::Cyan.on_default().effects(Effects::BOLD))
     .placeholder(AnsiColor::Cyan.on_default());
 
+const HELP_TEMPLATE: &str = "\
+{before-help}{about-with-newline}\n\
+╭─ Usage\n\
+│ {usage}\n\
+╰─\n\n\
+{all-args}\n\
+{after-help}";
+
 #[derive(Debug, Parser)]
 #[command(
     author,
     name = "ruff",
     about = "Ruff: An extremely fast Python linter and code formatter.",
-    after_help = "For help with a specific command, see: `ruff help <command>`."
+    after_help = "For help with a specific command, see: `ruff help <command>`.",
+    help_template = HELP_TEMPLATE
 )]
 #[command(version)]
 #[command(styles = STYLES)]
@@ -190,6 +199,7 @@ pub enum AnalyzeCommand {
 }
 
 #[derive(Clone, Debug, clap::Parser)]
+#[command(help_template = HELP_TEMPLATE)]
 #[expect(clippy::struct_excessive_bools)]
 pub struct AnalyzeGraphCommand {
     /// List of files or directories to include.
@@ -227,6 +237,7 @@ pub struct AnalyzeGraphCommand {
 
 // The `Parser` derive is for ruff_dev, for ruff `Args` would be sufficient
 #[derive(Clone, Debug, clap::Parser)]
+#[command(help_template = HELP_TEMPLATE)]
 #[expect(clippy::struct_excessive_bools)]
 pub struct CheckCommand {
     /// List of files or directories to check.
@@ -495,6 +506,7 @@ pub struct CheckCommand {
 }
 
 #[derive(Clone, Debug, clap::Parser)]
+#[command(help_template = HELP_TEMPLATE)]
 #[expect(clippy::struct_excessive_bools)]
 pub struct FormatCommand {
     /// List of files or directories to format.

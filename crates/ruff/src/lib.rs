@@ -29,6 +29,8 @@ pub mod args;
 mod cache;
 mod commands;
 mod diagnostics;
+mod help_ui;
+mod output_ui;
 mod printer;
 pub mod resolve;
 mod stdin;
@@ -209,6 +211,14 @@ pub fn run(
         Command::Server(args) => server(args),
         Command::Analyze(AnalyzeCommand::Graph(args)) => analyze_graph(args, global_options),
     }
+}
+
+/// Hook for the `ruff` binary only: unified block-style help for `-h`, `--help`, and `ruff help …`
+/// before Clap parsing (so every entry point matches).
+#[doc(hidden)]
+pub fn render_block_help_if_requested(args: &[OsString]) -> Result<bool> {
+    let mut stdout = io::stdout().lock();
+    help_ui::render_help_if_requested(args, &mut stdout)
 }
 
 fn format(args: FormatCommand, global_options: GlobalConfigArgs) -> Result<ExitStatus> {

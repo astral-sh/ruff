@@ -6,7 +6,7 @@ use clap::Parser;
 use colored::Colorize;
 
 use ruff::args::Args;
-use ruff::{ExitStatus, run};
+use ruff::{ExitStatus, render_block_help_if_requested, run};
 
 #[cfg(target_os = "windows")]
 #[global_allocator]
@@ -39,6 +39,12 @@ pub fn main() -> ExitCode {
         Ok(args) => args,
         Err(err) => return report_error(&err),
     };
+
+    match render_block_help_if_requested(&args) {
+        Ok(true) => return ExitStatus::Success.into(),
+        Ok(false) => {}
+        Err(err) => return report_error(&err),
+    }
 
     let args = Args::parse_from(args);
 

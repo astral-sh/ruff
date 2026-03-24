@@ -19,6 +19,7 @@ use ruff_linter::settings::flags::{self};
 use ruff_linter::settings::types::{OutputFormat, PreviewMode, UnsafeFixes};
 
 use crate::diagnostics::{Diagnostics, FixMap};
+use crate::output_ui::{write_text_block, write_two_col_block};
 
 bitflags! {
     #[derive(Default, Debug, Copy, Clone)]
@@ -81,7 +82,11 @@ impl Printer {
         }
     }
 
-    fn write_summary_text(&self, writer: &mut dyn Write, diagnostics: &Diagnostics) -> Result<()> {
+    fn write_summary_text_plain(
+        &self,
+        writer: &mut dyn Write,
+        diagnostics: &Diagnostics,
+    ) -> Result<()> {
         if self.log_level >= LogLevel::Default {
             let fixables = FixableStatistics::try_from(diagnostics, self.unsafe_fixes);
 
@@ -205,6 +210,30 @@ impl Printer {
         Ok(())
     }
 
+    fn should_use_block_ui(&self) -> bool {
+        self.format.is_human_readable()
+    }
+
+    fn write_summary_text(&self, writer: &mut dyn Write, diagnostics: &Diagnostics) -> Result<()> {
+        if !self.should_use_block_ui() {
+            return self.write_summary_text_plain(writer, diagnostics);
+        }
+        let mut buffer = Vec::new();
+        self.write_summary_text_plain(&mut buffer, diagnostics)?;
+        let body = String::from_utf8(buffer)?;
+        if body.trim().is_empty() {
+            return Ok(());
+        }
+        write_text_block(
+            writer,
+            "Summary",
+            body.trim_end(),
+            colored::control::SHOULD_COLORIZE.should_colorize(),
+            false,
+        )?;
+        Ok(())
+    }
+
     pub(crate) fn write_once(
         &self,
         diagnostics: &Diagnostics,
@@ -243,7 +272,27 @@ impl Printer {
             .with_fix_applicability(self.unsafe_fixes.required_applicability())
             .show_fix_diff(preview.is_enabled());
 
-        render_diagnostics(writer, self.format, config, &context, &diagnostics.inner)?;
+        if self.should_use_block_ui() {
+            let mut rendered = Vec::new();
+            render_diagnostics(
+                &mut rendered,
+                self.format,
+                config,
+                &context,
+                &diagnostics.inner,
+            )?;
+            let body = String::from_utf8(rendered)?;
+            write_text_block(
+                writer,
+                "Diagnostics",
+                body.trim_end(),
+                colored::control::SHOULD_COLORIZE.should_colorize(),
+                false,
+            )?;
+            writeln!(writer)?;
+        } else {
+            render_diagnostics(writer, self.format, config, &context, &diagnostics.inner)?;
+        }
 
         if matches!(
             self.format,
@@ -334,30 +383,64 @@ impl Printer {
                 let unfixable = "[ ] ";
 
                 // By default, we mimic Flake8's `--statistics` format.
-                for statistic in &statistics {
-                    writeln!(
-                        writer,
-                        "{:>count_width$}\t{:<code_width$}\t{}{}",
-                        statistic.count.to_string().bold(),
-                        statistic
-                            .code
-                            .map(SecondaryCode::as_str)
-                            .unwrap_or_default()
-                            .red()
-                            .bold(),
-                        if any_fixable {
-                            if statistic.all_fixable {
-                                &all_fixable
-                            } else if statistic.any_fixable() {
-                                &partially_fixable
+                if self.should_use_block_ui() {
+                    let rows: Vec<(String, String)> = statistics
+                        .iter()
+                        .map(|statistic| {
+                            let code = statistic
+                                .code
+                                .map(SecondaryCode::as_str)
+                                .unwrap_or_default();
+                            let fix_status = if any_fixable {
+                                if statistic.all_fixable {
+                                    &all_fixable
+                                } else if statistic.any_fixable() {
+                                    &partially_fixable
+                                } else {
+                                    unfixable
+                                }
                             } else {
-                                unfixable
-                            }
-                        } else {
-                            ""
-                        },
-                        statistic.name,
+                                ""
+                            };
+                            (
+                                format!("{:>count_width$} {:<code_width$}", statistic.count, code),
+                                format!("{fix_status}{}", statistic.name),
+                            )
+                        })
+                        .collect();
+                    write_two_col_block(
+                        writer,
+                        "Statistics",
+                        &rows,
+                        colored::control::SHOULD_COLORIZE.should_colorize(),
                     )?;
+                    writeln!(writer)?;
+                } else {
+                    for statistic in &statistics {
+                        writeln!(
+                            writer,
+                            "{:>count_width$}\t{:<code_width$}\t{}{}",
+                            statistic.count.to_string().bold(),
+                            statistic
+                                .code
+                                .map(SecondaryCode::as_str)
+                                .unwrap_or_default()
+                                .red()
+                                .bold(),
+                            if any_fixable {
+                                if statistic.all_fixable {
+                                    &all_fixable
+                                } else if statistic.any_fixable() {
+                                    &partially_fixable
+                                } else {
+                                    unfixable
+                                }
+                            } else {
+                                ""
+                            },
+                            statistic.name,
+                        )?;
+                    }
                 }
 
                 self.write_summary_text(writer, diagnostics)?;
@@ -416,7 +499,26 @@ impl Printer {
                 .with_show_fix_status(show_fix_status(self.fix_mode, fixables.as_ref()))
                 .with_fix_applicability(self.unsafe_fixes.required_applicability())
                 .show_fix_diff(preview.is_enabled());
-            render_diagnostics(writer, self.format, config, &context, &diagnostics.inner)?;
+            if self.should_use_block_ui() {
+                let mut rendered = Vec::new();
+                render_diagnostics(
+                    &mut rendered,
+                    self.format,
+                    config,
+                    &context,
+                    &diagnostics.inner,
+                )?;
+                let body = String::from_utf8(rendered)?;
+                write_text_block(
+                    writer,
+                    "Diagnostics",
+                    body.trim_end(),
+                    colored::control::SHOULD_COLORIZE.should_colorize(),
+                    false,
+                )?;
+            } else {
+                render_diagnostics(writer, self.format, config, &context, &diagnostics.inner)?;
+            }
         }
         writer.flush()?;
 
@@ -461,27 +563,32 @@ fn print_fix_summary(writer: &mut dyn Write, fixed: &FixMap) -> Result<()> {
             .unwrap(),
     );
 
-    let s = if total == 1 { "" } else { "s" };
-    let label = format!("Fixed {total} error{s}:");
-    writeln!(writer, "{}", label.bold().green())?;
-
+    let mut rows: Vec<(String, String)> = Vec::new();
     for (filename, table) in fixed
         .iter()
         .sorted_by_key(|(filename, ..)| filename.as_str())
     {
-        writeln!(
-            writer,
-            "{} {}{}",
-            "-".cyan(),
-            relativize_path(filename).bold(),
-            ":".cyan()
-        )?;
+        let mut details = String::new();
         for (code, name, count) in table.iter().sorted_by_key(|(.., count)| Reverse(*count)) {
-            writeln!(
-                writer,
-                "    {count:>num_digits$} × {code} ({name})",
-                code = code.to_string().red().bold(),
-            )?;
+            if !details.is_empty() {
+                details.push_str(", ");
+            }
+            details.push_str(&format!(
+                "{count:>num_digits$} × {} ({name})",
+                code.to_string().red().bold()
+            ));
+        }
+        rows.push((relativize_path(filename).to_string(), details));
+    }
+    if colored::control::SHOULD_COLORIZE.should_colorize() {
+        let s = if total == 1 { "" } else { "s" };
+        let title = format!("Fixed {total} error{s}");
+        write_two_col_block(writer, &title, &rows, true)?;
+    } else {
+        let s = if total == 1 { "" } else { "s" };
+        writeln!(writer, "Fixed {total} error{s}:")?;
+        for (filename, details) in rows {
+            writeln!(writer, "- {filename}: {details}")?;
         }
     }
     Ok(())
