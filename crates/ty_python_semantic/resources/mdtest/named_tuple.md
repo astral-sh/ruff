@@ -1084,7 +1084,7 @@ class Property[T](NamedTuple):
 
 reveal_type(Property("height", 3.4))  # revealed: Property[float]
 reveal_type(Property.value)  # revealed: property
-reveal_type(Property.value.fget)  # revealed: (self, /) -> Unknown
+reveal_type(Property.value.fget)  # revealed: (self, /) -> T@Property
 reveal_type(Property[str].value.fget)  # revealed: (self, /) -> str
 reveal_type(Property("height", 3.4).value)  # revealed: float
 
@@ -1096,7 +1096,7 @@ class LegacyProperty(NamedTuple, Generic[T]):
 
 reveal_type(LegacyProperty("height", 42))  # revealed: LegacyProperty[int]
 reveal_type(LegacyProperty.value)  # revealed: property
-reveal_type(LegacyProperty.value.fget)  # revealed: (self, /) -> Unknown
+reveal_type(LegacyProperty.value.fget)  # revealed: (self, /) -> T@LegacyProperty
 reveal_type(LegacyProperty[str].value.fget)  # revealed: (self, /) -> str
 reveal_type(LegacyProperty("height", 3.4).value)  # revealed: int | float
 ```

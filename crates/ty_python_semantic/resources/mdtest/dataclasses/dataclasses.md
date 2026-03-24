@@ -1326,8 +1326,7 @@ class ChildOfParentDataclass[T](ParentDataclass[T]): ...
 def uses_dataclass[T](x: T) -> ChildOfParentDataclass[T]:
     return ChildOfParentDataclass(x)
 
-# TODO: ParentDataclass.__init__ should show generic types, not Unknown
-# revealed: (self: ParentDataclass[Unknown], value: Unknown) -> None
+# revealed: [T](self: ParentDataclass[T], value: T) -> None
 reveal_type(ParentDataclass.__init__)
 
 # revealed: [T](self: ParentDataclass[T], value: T) -> None

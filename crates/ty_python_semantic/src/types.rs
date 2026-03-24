@@ -3256,9 +3256,76 @@ impl<'db> Type<'db> {
                     .into();
                 }
 
-                let class_attr_plain = self.find_name_in_mro_with_policy(db, name_str, policy).expect(
-                    "Calling `find_name_in_mro` on class literals and subclass-of types should always return `Some`",
-                );
+                let class_attr_plain = if let Type::ClassLiteral(ClassLiteral::Static(class)) = self
+                {
+                    if let Some(class_generic_context) = class.generic_context(db) {
+                        let class_attr_plain = Type::from(class.identity_specialization(db))
+                            .find_name_in_mro_with_policy(db, name_str, policy)
+                            .expect(
+                                "Calling `find_name_in_mro` on class literals and subclass-of types should always return `Some`",
+                            );
+
+                        class_attr_plain.map_type(|ty| {
+                            if let Type::FunctionLiteral(function) = ty
+                                && !function.is_staticmethod(db)
+                                && !function.is_classmethod(db)
+                            {
+                                let signature_mentions_typevar =
+                                    |signature: &Signature<'db>, typevar| {
+                                        GenericContext::from_signature_types(
+                                            db,
+                                            signature.parameters(),
+                                            signature.return_ty,
+                                        )
+                                        .is_some_and(
+                                            |generic_context| {
+                                                generic_context.binds_typevar(db, typevar).is_some()
+                                            },
+                                        )
+                                    };
+                                let function_signature = function.signature(db);
+                                let last_definition_signature =
+                                    function.last_definition_signature(db);
+                                let mut mentioned_inherited_typevars = class_generic_context
+                                    .variables(db)
+                                    .filter(|bound_typevar| {
+                                        let typevar = bound_typevar.typevar(db);
+                                        function_signature.iter().any(|signature| {
+                                            signature_mentions_typevar(signature, typevar)
+                                        }) || signature_mentions_typevar(
+                                            last_definition_signature,
+                                            typevar,
+                                        )
+                                    })
+                                    .peekable();
+
+                                if mentioned_inherited_typevars.peek().is_some() {
+                                    Type::FunctionLiteral(function.with_inherited_generic_context(
+                                        db,
+                                        GenericContext::from_typevar_instances(
+                                            db,
+                                            mentioned_inherited_typevars,
+                                        ),
+                                    ))
+                                } else {
+                                    ty
+                                }
+                            } else {
+                                ty
+                            }
+                        })
+                    } else {
+                        self.find_name_in_mro_with_policy(db, name_str, policy)
+                            .expect(
+                                "Calling `find_name_in_mro` on class literals and subclass-of types should always return `Some`",
+                            )
+                    }
+                } else {
+                    self.find_name_in_mro_with_policy(db, name_str, policy)
+                        .expect(
+                            "Calling `find_name_in_mro` on class literals and subclass-of types should always return `Some`",
+                        )
+                };
 
                 let self_instance = self
                     .to_instance(db)

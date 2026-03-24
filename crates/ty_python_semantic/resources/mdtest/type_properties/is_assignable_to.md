@@ -1314,7 +1314,7 @@ specializations. That means that a generic callable is assignable to any particu
 the generic callable.)
 
 ```py
-from typing import Callable
+from typing import Callable, TypeVar
 from ty_extensions import RegularCallableTypeOf, TypeOf, is_assignable_to, static_assert
 
 def identity[T](t: T) -> T:
@@ -1331,6 +1331,12 @@ static_assert(is_assignable_to(RegularCallableTypeOf[identity], Callable[[str], 
 # TODO: no error
 # error: [static-assert-error]
 static_assert(not is_assignable_to(RegularCallableTypeOf[identity], Callable[[str], int]))
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+static_assert(is_assignable_to(Callable[[T], T], Callable[[U], U]))
+static_assert(is_assignable_to(Callable[[U], U], Callable[[T], T]))
 ```
 
 The reverse is not true — if someone expects a generic function that can be called with any

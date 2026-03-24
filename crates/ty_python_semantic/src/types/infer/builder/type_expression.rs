@@ -15,12 +15,13 @@ use crate::types::special_form::{AliasSpec, LegacyStdlibAlias};
 use crate::types::string_annotation::parse_string_annotation;
 use crate::types::tuple::{TupleSpecBuilder, TupleType};
 use crate::types::{
-    BindingContext, CallableType, DynamicType, GenericContext, IntersectionBuilder, KnownClass,
-    KnownInstanceType, LintDiagnosticGuard, LiteralValueTypeKind, Parameter, Parameters,
-    SpecialFormType, SubclassOfType, Type, TypeAliasType, TypeContext, TypeGuardType, TypeIsType,
-    TypeMapping, TypeVarKind, UnionBuilder, UnionType, any_over_type, todo_type,
+    ApplyTypeMappingVisitor, BindingContext, CallableType, DynamicType, GenericContext,
+    IntersectionBuilder, KnownClass, KnownInstanceType, LintDiagnosticGuard, LiteralValueTypeKind,
+    Parameter, Parameters, SpecialFormType, SubclassOfType, Type, TypeAliasType, TypeContext,
+    TypeGuardType, TypeIsType, TypeMapping, TypeVarKind, UnionBuilder, UnionType, any_over_type,
+    todo_type,
 };
-use crate::{FxOrderSet, Program, add_inferred_python_version_hint_to_diagnostic};
+use crate::{Db, FxOrderSet, Program, add_inferred_python_version_hint_to_diagnostic};
 
 /// Type expressions
 impl<'db> TypeInferenceBuilder<'db, '_> {
@@ -1475,8 +1476,61 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         fn inner<'db>(
             builder: &mut TypeInferenceBuilder<'db, '_>,
             subscript: &ast::ExprSubscript,
+            allow_implicit_generic_context: bool,
         ) -> Type<'db> {
+            fn callable_type_expression<'db>(
+                db: &'db dyn Db,
+                should_bind_standalone_legacy_typevars: bool,
+                parameters: Parameters<'db>,
+                return_type: Type<'db>,
+            ) -> Type<'db> {
+                if should_bind_standalone_legacy_typevars {
+                    // A standalone raw `Callable[[T], T]` type expression outside annotation
+                    // contexts implicitly binds otherwise-unbound legacy `TypeVar`s to the
+                    // callable itself so relation checking can treat the whole signature as
+                    // generic instead of comparing those typevars by raw identity. In
+                    // annotations, or when an enclosing definition already owns the typevars,
+                    // we keep the callable nongeneric so existing scoping rules are preserved.
+                    let signature = Signature::new(parameters, return_type)
+                        .apply_type_mapping_impl(
+                            db,
+                            &TypeMapping::BindLegacyTypevars(BindingContext::Synthetic),
+                            TypeContext::default(),
+                            &ApplyTypeMappingVisitor::default(),
+                        );
+                    let generic_context = GenericContext::from_signature_types(
+                        db,
+                        signature.parameters(),
+                        signature.return_ty,
+                    )
+                    .and_then(|context| {
+                        let mut synthetic_typevars = context
+                            .variables(db)
+                            .filter(|bound_typevar| {
+                                bound_typevar.binding_context(db) == BindingContext::Synthetic
+                            })
+                            .peekable();
+                        synthetic_typevars
+                            .peek()
+                            .is_some()
+                            .then(|| GenericContext::from_typevar_instances(db, synthetic_typevars))
+                    });
+                    Type::single_callable(
+                        db,
+                        Signature::new_generic(
+                            generic_context,
+                            signature.parameters().clone(),
+                            signature.return_ty,
+                        ),
+                    )
+                } else {
+                    Type::single_callable(db, Signature::new(parameters, return_type))
+                }
+            }
+
             let db = builder.db();
+            let should_bind_standalone_legacy_typevars =
+                allow_implicit_generic_context && builder.typevar_binding_context.is_none();
 
             let arguments_slice = &*subscript.slice;
 
@@ -1515,12 +1569,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         ));
                     }
                 }
-                Type::single_callable(
+                callable_type_expression(
                     db,
-                    Signature::new(
-                        Parameters::unknown(),
-                        return_type.unwrap_or_else(Type::unknown),
-                    ),
+                    should_bind_standalone_legacy_typevars,
+                    Parameters::unknown(),
+                    return_type.unwrap_or_else(Type::unknown),
                 )
             } else {
                 let correct_argument_number = if let Some(third_argument) = arguments.next() {
@@ -1540,7 +1593,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 if correct_argument_number
                     && let (Some(parameters), Some(return_type)) = (parameters, return_type)
                 {
-                    Type::single_callable(db, Signature::new(parameters, return_type))
+                    callable_type_expression(
+                        db,
+                        should_bind_standalone_legacy_typevars,
+                        parameters,
+                        return_type,
+                    )
                 } else {
                     Type::Callable(CallableType::unknown(db))
                 }
@@ -1560,10 +1618,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // in the global scope or similar should be considered to create an implicit generic context.
         // For now, we do not report unbound type variables in any `Callable` contexts, but we may
         // decide to revisit this in the future.
+        let allow_implicit_generic_context = !self
+            .inference_flags
+            .contains(InferenceFlags::CHECK_UNBOUND_TYPEVARS);
         let previous_check_unbound_typevars = self
             .inference_flags
             .replace(InferenceFlags::CHECK_UNBOUND_TYPEVARS, false);
-        let result = inner(self, subscript);
+        let result = inner(self, subscript, allow_implicit_generic_context);
         self.inference_flags.set(
             InferenceFlags::CHECK_UNBOUND_TYPEVARS,
             previous_check_unbound_typevars,
