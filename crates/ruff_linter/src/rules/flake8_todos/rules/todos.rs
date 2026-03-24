@@ -241,8 +241,8 @@ impl Violation for MissingSpaceAfterTodoColon {
 static ISSUE_LINK_OWN_LINE_REGEX_SET: LazyLock<RegexSet> = LazyLock::new(|| {
     RegexSet::new([
         r"^#\s*(http|https)://.*", // issue link
-        r"^#\s*\d+$",              // issue code - like "003"
-        r"^#\s*[A-Z]+\-?\d+$",     // issue code - like "TD003"
+        r"^#\s*\d+.*",              // issue code - like "003"
+        r"^#\s*[A-Z]+\-?\d+.*",     // issue code - like "TD003"
     ])
     .unwrap()
 });
