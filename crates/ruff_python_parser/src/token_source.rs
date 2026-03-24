@@ -30,8 +30,13 @@ impl<'src> TokenSource<'src> {
     }
 
     /// Create a new token source from the given source code which starts at the given offset.
-    pub(crate) fn from_source(source: &'src str, mode: Mode, start_offset: TextSize) -> Self {
-        let lexer = Lexer::new(source, mode, start_offset);
+    pub(crate) fn from_source(
+        source: &'src str,
+        mode: Mode,
+        start_offset: TextSize,
+        cell_offsets: &'src [TextSize],
+    ) -> Self {
+        let lexer = Lexer::new(source, mode, start_offset, cell_offsets);
         let mut source = TokenSource::new(lexer);
 
         // Initialize the token source so that the current token is set correctly.

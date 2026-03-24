@@ -76,7 +76,7 @@ use ruff_python_ast::token::Tokens;
 use ruff_python_ast::{
     Expr, Mod, ModExpression, ModModule, PySourceType, StringFlags, StringLiteral, Suite,
 };
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 mod error;
 pub mod lexer;
@@ -162,7 +162,7 @@ pub fn parse_expression_range(
     range: TextRange,
 ) -> Result<Parsed<ModExpression>, ParseError> {
     let source = &source[..range.end().to_usize()];
-    Parser::new_starts_at(source, range.start(), ParseOptions::from(Mode::Expression))
+    Parser::new_starts_at(source, range.start(), ParseOptions::from(Mode::Expression), &[])
         .parse()
         .try_into_expression()
         .unwrap()
@@ -192,6 +192,7 @@ pub fn parse_parenthesized_expression_range(
         source,
         range.start(),
         ParseOptions::from(Mode::ParenthesizedExpression),
+        &[],
     )
     .parse();
     parsed.try_into_expression().unwrap().into_result()
@@ -289,6 +290,24 @@ pub fn parse(source: &str, options: ParseOptions) -> Result<Parsed<Mod>, ParseEr
 /// and returns the [`Parsed`] as is.
 pub fn parse_unchecked(source: &str, options: ParseOptions) -> Parsed<Mod> {
     Parser::new(source, options).parse()
+}
+
+/// Parse the given Python source code using the specified [`ParseOptions`] with notebook
+/// cell boundary awareness.
+///
+/// The `cell_offsets` parameter contains the byte offsets where each notebook cell begins
+/// in the concatenated source. When the lexer crosses a cell boundary and the indent stack
+/// is not at the root level, it will emit `Dedent` tokens to flush the stack. This allows
+/// the parser to detect syntax errors that span cell boundaries (e.g., `if True:` in one
+/// cell with its body in another).
+///
+/// Pass an empty slice for non-notebook sources.
+pub fn parse_unchecked_with_cell_offsets(
+    source: &str,
+    options: ParseOptions,
+    cell_offsets: &[TextSize],
+) -> Parsed<Mod> {
+    Parser::new_starts_at(source, TextSize::new(0), options, cell_offsets).parse()
 }
 
 /// Parse the given Python source code using the specified [`PySourceType`].

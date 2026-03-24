@@ -768,19 +768,31 @@ impl ParseSource {
 }
 
 /// Like [`ruff_python_parser::parse_unchecked_source`] but with an additional [`PythonVersion`]
-/// argument.
+/// argument and notebook cell boundary support.
 fn parse_unchecked_source(
     source_kind: &SourceKind,
     source_type: PySourceType,
     target_version: PythonVersion,
 ) -> Parsed<ModModule> {
     let options = ParseOptions::from(source_type).with_target_version(target_version);
+
+    // For notebooks, pass cell offsets so the lexer can reset indent state at cell boundaries.
+    let empty_offsets = Vec::new();
+    let cell_offsets: &[ruff_text_size::TextSize] = source_kind
+        .as_ipy_notebook()
+        .map(|nb| nb.cell_offsets().as_ref())
+        .unwrap_or(&empty_offsets);
+
     // SAFETY: Safe because `PySourceType` always parses to a `ModModule`. See
     // `ruff_python_parser::parse_unchecked_source`. We use `parse_unchecked` (and thus
     // have to unwrap) in order to pass the `PythonVersion` via `ParseOptions`.
-    ruff_python_parser::parse_unchecked(source_kind.source_code(), options)
-        .try_into_module()
-        .expect("PySourceType always parses into a module")
+    ruff_python_parser::parse_unchecked_with_cell_offsets(
+        source_kind.source_code(),
+        options,
+        cell_offsets,
+    )
+    .try_into_module()
+    .expect("PySourceType always parses into a module")
 }
 
 #[cfg(test)]
