@@ -23,7 +23,7 @@ use super::{
 ///
 /// In particular, old-style `TypeVar` variables are typically allocated at module scope, but their
 /// semantic meaning is only valid within the context of a generic class, function, or type alias.
-/// [PEP 695] eliminates this source of confusion by declaring type parameters at their point of
+/// [PEP 695] eliminates this [source of confusion] by declaring type parameters at their point of
 /// use.
 ///
 /// ## Known problems
@@ -64,8 +64,8 @@ use super::{
 ///     var: T
 /// ```
 ///
-/// When a `TypeVar` is reused across multiple classes, a [type alias] can be used
-/// for the bound:
+/// If a `TypeVar` is shared across multiple classes, a [type alias] can extract
+/// the bound so that each class declares its own scoped type parameter:
 ///
 /// ```python
 /// from typing import Generic, TypeVar
@@ -78,7 +78,9 @@ use super::{
 /// class GenericClass3(Generic[ReusableT]): ...
 /// ```
 ///
-/// Use instead:
+/// Although each class below gets its own `ReusableT`, this is semantically
+/// equivalent — type checkers already treated each class's parameterization
+/// independently. Use instead:
 ///
 /// ```python
 /// type ReusableTBound = int | str | dict[int, str]
@@ -119,6 +121,7 @@ use super::{
 /// [UP047]: https://docs.astral.sh/ruff/rules/non-pep695-generic-function/
 /// [UP049]: https://docs.astral.sh/ruff/rules/private-type-parameter/
 /// [fail]: https://github.com/python/mypy/issues/18507
+/// [source of confusion]: https://peps.python.org/pep-0695/#points-of-confusion
 /// [type alias]: https://docs.python.org/3/reference/simple_stmts.html#type-aliases
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "0.12.0")]
