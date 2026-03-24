@@ -598,28 +598,16 @@ impl<'db> Bindings<'db> {
         if let Some(return_ty) = self.constructor_return_type(db) {
             return return_ty;
         }
-        // If there's a single binding, return its type directly
-        if let Some(binding) = self.single_element() {
-            return binding.return_type();
-        }
 
-        // For each element (union variant), compute its return type:
-        // - Single binding: use that binding's return type
-        // - Multiple bindings (intersection): for intersections, only include
-        //   successful bindings (failed ones have been filtered out by retain_successful)
+        // For each element (union variant), intersect the return types of its surviving bindings.
         let element_return_types = self.elements.iter().map(|element| {
-            if let [single_binding] = &*element.bindings {
-                single_binding.return_type()
-            } else {
-                // For intersections, intersect the return types of remaining bindings
-                IntersectionType::from_elements(
-                    db,
-                    element.bindings.iter().map(CallableBinding::return_type),
-                )
-            }
+            IntersectionType::from_elements(
+                db,
+                element.bindings.iter().map(CallableBinding::return_type),
+            )
         });
 
-        // Union the return types of all elements
+        // Union the return types of all elements.
         UnionType::from_elements(db, element_return_types)
     }
 

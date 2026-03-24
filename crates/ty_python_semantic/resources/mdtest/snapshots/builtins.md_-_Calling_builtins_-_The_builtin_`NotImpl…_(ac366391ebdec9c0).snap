@@ -13,21 +13,26 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/call/builtins.md
 ## mdtest_snippet.py
 
 ```
-1 | raise NotImplemented()  # error: [call-non-callable]
-2 | raise NotImplemented("this module is not implemented yet!!!")  # error: [call-non-callable]
+1 | def _():
+2 |     raise NotImplemented()  # error: [call-non-callable]
+3 | 
+4 | def _():
+5 |     raise NotImplemented("this module is not implemented yet!!!")  # error: [call-non-callable]
 ```
 
 # Diagnostics
 
 ```
 error[call-non-callable]: `NotImplemented` is not callable
- --> src/mdtest_snippet.py:1:7
+ --> src/mdtest_snippet.py:2:11
   |
-1 | raise NotImplemented()  # error: [call-non-callable]
-  |       --------------^^
-  |       |
-  |       Did you mean `NotImplementedError`?
-2 | raise NotImplemented("this module is not implemented yet!!!")  # error: [call-non-callable]
+1 | def _():
+2 |     raise NotImplemented()  # error: [call-non-callable]
+  |           --------------^^
+  |           |
+  |           Did you mean `NotImplementedError`?
+3 |
+4 | def _():
   |
 info: rule `call-non-callable` is enabled by default
 
@@ -35,13 +40,13 @@ info: rule `call-non-callable` is enabled by default
 
 ```
 error[call-non-callable]: `NotImplemented` is not callable
- --> src/mdtest_snippet.py:2:7
+ --> src/mdtest_snippet.py:5:11
   |
-1 | raise NotImplemented()  # error: [call-non-callable]
-2 | raise NotImplemented("this module is not implemented yet!!!")  # error: [call-non-callable]
-  |       --------------^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  |       |
-  |       Did you mean `NotImplementedError`?
+4 | def _():
+5 |     raise NotImplemented("this module is not implemented yet!!!")  # error: [call-non-callable]
+  |           --------------^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |           |
+  |           Did you mean `NotImplementedError`?
   |
 info: rule `call-non-callable` is enabled by default
 

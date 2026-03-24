@@ -46,6 +46,27 @@ else:
     reveal_type(x)  # revealed: Literal[b"", b"bar", 0, False, ""] | None | tuple[()]
 ```
 
+## Walrus Member Access
+
+We can narrow on an attribute expression, even when its base is a named expression:
+
+```py
+class Foo:
+    val: int | None
+
+if (foo := Foo()).val:
+    reveal_type(foo.val)  # revealed: int & ~AlwaysFalsy
+```
+
+But we don't pick up stale narrowings from before the assignment in the named expression:
+
+```py
+foo1 = Foo()
+foo1.val = None
+if (foo1 := Foo()).val:
+    reveal_type(foo1.val)  # revealed: int & ~AlwaysFalsy
+```
+
 ## Function Literals
 
 Basically functions are always truthy.
@@ -488,4 +509,25 @@ def test() -> None:
     reveal_type(p)  # revealed: Person & ~AlwaysFalsy
     # error: [invalid-key] "Unknown key "nonexistent" for TypedDict `Person`"
     print(p["nonexistent"])
+```
+
+## Truthiness narrowing of `NewType`s
+
+```py
+from typing import NewType
+
+FloatNewType = NewType("FloatNewType", float)
+ComplexNewType = NewType("ComplexNewType", complex)
+
+def expects_float(x: float): ...
+def expects_complex(x: complex): ...
+def f(floaty: FloatNewType, complexy: ComplexNewType):
+    if floaty:
+        reveal_type(floaty)  # revealed:FloatNewType & ~AlwaysFalsy
+        expects_float(floaty)  # fine
+
+    if complexy:
+        reveal_type(complexy)  # revealed: ComplexNewType & ~AlwaysFalsy
+        expects_complex(complexy)  # fine
+        expects_float(complexy)  # error: [invalid-argument-type]
 ```

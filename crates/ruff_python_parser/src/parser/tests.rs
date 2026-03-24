@@ -115,6 +115,8 @@ p1 = !pwd
 p2: str = !pwd
 foo = %foo \
     bar
+bar = %foo?
+baz = !pwd?
 
 % foo
 foo = %foo  # comment

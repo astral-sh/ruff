@@ -162,6 +162,75 @@ mod tests {
     }
 
     #[test]
+    fn add_code_existing_type_ignore() {
+        let test = CodeActionTest::with_source(
+            r#"
+            b = <START>a<END> / 0  # type:ignore[ty:division-by-zero]
+        "#,
+        );
+
+        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @"
+        info[code-action]: Ignore 'unresolved-reference' for this line
+         --> main.py:2:5
+          |
+        2 | b = a / 0  # type:ignore[ty:division-by-zero]
+          |     ^
+          |
+        1 | 
+          - b = a / 0  # type:ignore[ty:division-by-zero]
+        2 + b = a / 0  # type:ignore[ty:division-by-zero, ty:unresolved-reference]
+        ");
+    }
+
+    #[test]
+    fn add_code_existing_type_ignore_without_any_ty_code() {
+        let test = CodeActionTest::with_source(
+            r#"
+            b = <START>a<END> / 0  # type:ignore[mypy-code]
+        "#,
+        );
+
+        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @"
+        info[code-action]: Ignore 'unresolved-reference' for this line
+         --> main.py:2:5
+          |
+        2 | b = a / 0  # type:ignore[mypy-code]
+          |     ^
+          |
+        1 | 
+          - b = a / 0  # type:ignore[mypy-code]
+        2 + b = a / 0  # type:ignore[mypy-code]  # ty:ignore[unresolved-reference]
+        ");
+    }
+
+    #[test]
+    fn add_ignore_existing_file_level_ignore() {
+        let test = CodeActionTest::with_source(
+            r#"
+            # ty:ignore[division-by-zero]
+
+            b = <START>a<END> / 0
+        "#,
+        );
+
+        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @"
+        info[code-action]: Ignore 'unresolved-reference' for this line
+         --> main.py:4:5
+          |
+        2 | # ty:ignore[division-by-zero]
+        3 |
+        4 | b = a / 0
+          |     ^
+          |
+        1 | 
+        2 | # ty:ignore[division-by-zero]
+        3 | 
+          - b = a / 0
+        4 + b = a / 0  # ty:ignore[unresolved-reference]
+        ");
+    }
+
+    #[test]
     fn add_code_existing_ignore_trailing_comma() {
         let test = CodeActionTest::with_source(
             r#"
