@@ -4605,7 +4605,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                     // For generator functions, the declared return type is e.g.
                     // `Generator[YieldType, SendType, ReturnType]`. The type context
-                    // for a `return` statement should be the ReturnType type parameter,
+                    // for a `return` statement should be the `ReturnType` type parameter
                     let context_ty = return_ty
                         .generator_return_type(self.db())
                         .unwrap_or(return_ty);
