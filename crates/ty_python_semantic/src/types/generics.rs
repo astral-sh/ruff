@@ -1765,7 +1765,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             self.db,
             self.constraints,
             |typevar, _variance, lower, upper| {
-                PathBounds::default_solve(self.db, typevar, lower, upper)
+                PathBounds::default_solve(self.db, self.constraints, typevar, lower, upper)
             },
         ) {
             Solutions::Unsatisfiable => return Err(()),

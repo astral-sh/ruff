@@ -3968,7 +3968,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                             .entry(identity)
                             .and_modify(|current| *current = current.join(variance))
                             .or_insert(variance);
-                        PathBounds::default_solve(self.db, typevar, lower, upper)
+                        PathBounds::default_solve(self.db, constraints, typevar, lower, upper)
                     });
 
                 let Solutions::Constrained(solutions) = solutions else {

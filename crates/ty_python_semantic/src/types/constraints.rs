@@ -2884,9 +2884,9 @@ impl<'db> PathBounds<'db> {
         Self(result)
     }
 
-    fn solve(&self, db: &'db dyn Db) -> Vec<Solution<'db>> {
+    fn solve(&self, db: &'db dyn Db, builder: &ConstraintSetBuilder<'db>) -> Vec<Solution<'db>> {
         self.solve_with(|bound_typevar, _variance, lower, upper| {
-            Self::default_solve(db, bound_typevar, lower, upper)
+            Self::default_solve(db, builder, bound_typevar, lower, upper)
         })
     }
 
@@ -2950,6 +2950,7 @@ impl<'db> PathBounds<'db> {
     /// - `Err(())` if the path is invalid (bounds violate the typevar's declared constraints)
     pub(crate) fn default_solve(
         db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
         bound_typevar: BoundTypeVarInstance<'db>,
         lower: Type<'db>,
         upper: Type<'db>,
@@ -2957,7 +2958,8 @@ impl<'db> PathBounds<'db> {
         match bound_typevar.typevar(db).require_bound_or_constraints(db) {
             TypeVarBoundOrConstraints::UpperBound(bound) => {
                 let bound = bound.top_materialization(db);
-                if !lower.is_assignable_to(db, bound) {
+                let when = lower.when_constraint_set_assignable_to(db, bound, builder);
+                if when.is_never_satisfied(db) {
                     // This path does not satisfy the typevar's upper bound, and is
                     // therefore not a valid specialization.
                     return Err(());
@@ -2986,8 +2988,12 @@ impl<'db> PathBounds<'db> {
                 let compatible_constraints = constraints.elements(db).iter().filter(|constraint| {
                     let constraint_lower = constraint.bottom_materialization(db);
                     let constraint_upper = constraint.top_materialization(db);
-                    lower.is_assignable_to(db, constraint_lower)
-                        && constraint_upper.is_assignable_to(db, upper)
+                    let when = lower
+                        .when_constraint_set_assignable_to(db, constraint_lower, builder)
+                        .and(db, builder, || {
+                            constraint_upper.when_constraint_set_assignable_to(db, upper, builder)
+                        });
+                    !when.is_never_satisfied(db)
                 });
 
                 // If only one constraint remains, that's our specialization for this path.
@@ -3559,7 +3565,7 @@ impl InteriorNode {
             }
 
             let path_bounds = PathBounds::compute(db, builder, interior);
-            let solutions = path_bounds.solve(db);
+            let solutions = path_bounds.solve(db, builder);
 
             let mut storage = builder.storage.borrow_mut();
             storage.solutions_cache.insert(key, solutions);
