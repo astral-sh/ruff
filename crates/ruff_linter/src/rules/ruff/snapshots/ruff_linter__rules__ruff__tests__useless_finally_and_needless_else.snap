@@ -1,0 +1,60 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF047 [*] Empty `else` clause
+  --> RUF072_RUF047.py:7:1
+   |
+ 5 |   except Exception:
+ 6 |       bar()
+ 7 | / else:
+ 8 | |     pass
+   | |________^
+ 9 |   finally:
+10 |       pass
+   |
+help: Remove the `else` clause
+4 |     foo()
+5 | except Exception:
+6 |     bar()
+  - else:
+  -     pass
+7 | finally:
+8 |     pass
+9 | 
+
+RUF072 [*] Empty `finally` clause
+  --> RUF072_RUF047.py:9:1
+   |
+ 7 |   else:
+ 8 |       pass
+ 9 | / finally:
+10 | |     pass
+   | |________^
+11 |
+12 |   # Only the `finally` is empty; `else` has real code
+   |
+help: Remove the `finally` clause
+6  |     bar()
+7  | else:
+8  |     pass
+   - finally:
+   -     pass
+9  | 
+10 | # Only the `finally` is empty; `else` has real code
+11 | try:
+
+RUF072 [*] Empty `finally` clause
+  --> RUF072_RUF047.py:19:1
+   |
+17 |   else:
+18 |       baz()
+19 | / finally:
+20 | |     pass
+   | |________^
+   |
+help: Remove the `finally` clause
+16 |     bar()
+17 | else:
+18 |     baz()
+   - finally:
+   -     pass
