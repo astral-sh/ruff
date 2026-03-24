@@ -3275,15 +3275,27 @@ impl InteriorNode {
         inferable: InferableTypeVars<'db>,
     ) -> NodeId {
         let mut path = self.path_assignments(builder);
+        let is_bare_inferable_typevar = |ty: Type<'db>| {
+            ty.as_typevar()
+                .is_some_and(|bound_typevar| bound_typevar.is_inferable(db, inferable))
+        };
         self.abstract_one_inner(
             db,
             builder,
-            // Remove constraints whose _constrained_ typevar is non-inferable. We still keep
-            // constraints on inferable typevars even if their bounds mention non-inferable
-            // typevars, because those mixed bounds can carry useful solution information.
+            // We only want to keep constraints on inferable typevars. If the constraint's typevar
+            // is itself inferable, we keep it. We also need to keep some constraints in
+            // non-inferable typevars, if their lower or upper bound is a bare inferable typevar.
+            // This ensure that our quantification logic does not depend on typevar ordering.
+            //
+            // For example, `I ≤ N` (where I is inferable and N is non-inferable) could be encoded
+            // either as `Never ≤ I ≤ N` or `I ≤ N ≤ object`, depending on typevar ordering. If we
+            // only checked the inferability of the constrained typevar, we would keep the first
+            // encoding but remove the second.
             &mut |constraint| {
                 let constraint = builder.constraint_data(constraint);
                 !constraint.typevar.is_inferable(db, inferable)
+                    && !is_bare_inferable_typevar(constraint.lower)
+                    && !is_bare_inferable_typevar(constraint.upper)
             },
             &mut path,
         )

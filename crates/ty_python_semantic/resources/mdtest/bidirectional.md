@@ -371,8 +371,10 @@ T2 = TypeVar("T2")
 def sink(func: Callable[[], Union[Awaitable[T2], T2]], future: Future[T2]) -> None:
     raise NotImplementedError
 
+# TODO: This should not error once we conjoin constraints from all call arguments.
 def f9(func: Callable[[], Union[Awaitable[T2], T2]]) -> Future[T2]:
     future: Future[T2] = Future()
+    # error: [invalid-argument-type]
     sink(func, future)
     return future
 ```
