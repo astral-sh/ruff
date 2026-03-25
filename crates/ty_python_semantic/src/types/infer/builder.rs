@@ -288,13 +288,6 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     /// is a stub file but we're still in a non-deferred region.
     deferred_state: DeferredExpressionState,
 
-    multi_inference_state: MultiInferenceState,
-
-    /// If you cannot avoid the possibility of calling `infer(_type)_expression` multiple times for a given expression,
-    /// set this to `Get` after the expression has been inferred for the first time.
-    /// While this is `Get`, any expressions will be considered to have already been inferred.
-    inner_expression_inference_state: InnerExpressionInferenceState,
-
     inferring_vararg_annotation: bool,
 
     /// For function definitions, the undecorated type of the function.
@@ -336,8 +329,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             called_functions: FxIndexSet::default(),
             deferred_state: DeferredExpressionState::None,
             inferring_vararg_annotation: false,
-            multi_inference_state: MultiInferenceState::Panic,
-            inner_expression_inference_state: InnerExpressionInferenceState::Infer,
             expressions: FxHashMap::default(),
             string_annotations: FxHashSet::default(),
             bindings: VecMap::default(),
@@ -375,12 +366,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         assert_eq!(self.scope, inference.scope);
 
         self.expressions.extend(inference.expressions.iter());
-        self.declarations
-            .extend(inference.declarations(), self.multi_inference_state);
+        self.declarations.extend(inference.declarations());
 
         if !matches!(self.region, InferenceRegion::Scope(..)) {
-            self.bindings
-                .extend(inference.bindings(), self.multi_inference_state);
+            self.bindings.extend(inference.bindings());
         }
 
         if let Some(extra) = &inference.extra {
@@ -388,8 +377,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .extend(extra.called_functions.iter().copied());
             self.extend_cycle_recovery(extra.cycle_recovery);
             self.context.extend(&extra.diagnostics);
-            self.deferred
-                .extend(extra.deferred.iter().copied(), self.multi_inference_state);
+            self.deferred.extend(extra.deferred.iter().copied());
             self.string_annotations
                 .extend(extra.string_annotations.iter().copied());
         }
@@ -412,8 +400,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .extend(extra.string_annotations.iter().copied());
 
             if !matches!(self.region, InferenceRegion::Scope(..)) {
-                self.bindings
-                    .extend(extra.bindings.iter().copied(), self.multi_inference_state);
+                self.bindings.extend(extra.bindings.iter().copied());
             }
         }
     }
@@ -484,11 +471,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if let Some(specifiers) = field_specifiers(self.db(), self.index, self.scope()) {
             self.dataclass_field_specifiers = specifiers;
         }
-    }
-
-    /// Set the multi-inference state, returning the previous value.
-    fn set_multi_inference_state(&mut self, state: MultiInferenceState) -> MultiInferenceState {
-        std::mem::replace(&mut self.multi_inference_state, state)
     }
 
     /// Are we currently inferring types in file with deferred types?
@@ -1117,8 +1099,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             TypeAndQualifiers::declared(Type::unknown())
         };
-        self.declarations
-            .insert(declaration, ty, self.multi_inference_state);
+        self.declarations.insert(declaration, ty);
     }
 
     fn add_declaration_with_binding(
@@ -1193,10 +1174,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         };
 
-        self.declarations
-            .insert(definition, declared_ty, self.multi_inference_state);
-        self.bindings
-            .insert(definition, inferred_ty, self.multi_inference_state);
+        self.declarations.insert(definition, declared_ty);
+        self.bindings.insert(definition, inferred_ty);
     }
 
     fn add_unknown_declaration_with_binding(
@@ -1761,8 +1740,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             union.add_in_place(narrowed_ty);
         }
 
-        self.bindings
-            .insert(definition, union.build(), self.multi_inference_state);
+        self.bindings.insert(definition, union.build());
     }
 
     fn infer_match_statement(&mut self, match_statement: &ast::StmtMatch) {
@@ -3017,7 +2995,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         // Inference of `tp` must be deferred, to avoid cycles.
-        self.deferred.insert(definition, self.multi_inference_state);
+        self.deferred.insert(definition);
 
         Type::KnownInstance(KnownInstanceType::NewType(NewType::new(
             db,
@@ -3253,7 +3231,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         // Inference of the value argument must be deferred, to avoid cycles.
-        self.deferred.insert(definition, self.multi_inference_state);
+        self.deferred.insert(definition);
 
         Type::KnownInstance(KnownInstanceType::TypeAliasType(
             TypeAliasType::ManualPEP695(ManualPEP695TypeAliasType::new(
@@ -3537,7 +3515,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         //   and store the explicit bases directly (since they were inferred eagerly).
         let anchor = if let Some(def) = definition {
             // Register for deferred inference to infer bases and validate later.
-            self.deferred.insert(def, self.multi_inference_state);
+            self.deferred.insert(def);
             DynamicClassAnchor::Definition(def)
         } else {
             let call_node_index = call_expr.node_index().load();
@@ -5054,7 +5032,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 )
                 .is_err()
             {
-                speculative_builder.discard();
                 return None;
             }
 
@@ -5067,7 +5044,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .return_type(db)
                 .is_assignable_to(db, narrowed_ty)
             {
-                speculative_builder.discard();
                 return None;
             }
 
@@ -5306,13 +5282,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     infer_argument_ty(self, (argument_index, ast_argument, TypeContext::default())),
                 );
 
-                // We then silence any diagnostics emitted during multi-inference, as the type context is only
-                // used as a hint to infer a more assignable argument type, and should not lead to diagnostics
-                // for non-matching overloads.
-                let was_in_multi_inference = self.context.set_multi_inference(true);
-                let prev_multi_inference_state =
-                    self.set_multi_inference_state(MultiInferenceState::Ignore);
-
                 // Infer the type of each argument once with each distinct parameter type as type context.
                 let parameter_types = overloads_with_binding
                     .iter()
@@ -5325,14 +5294,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         continue;
                     }
 
-                    let inferred_ty =
-                        infer_argument_ty(self, (argument_index, ast_argument, parameter_tcx));
+                    // We use a speculative builder to silence any diagnostics emitted during multi-inference, as the
+                    // type context is only used as a hint to infer a more assignable argument type, and should not lead
+                    // to diagnostics for non-matching overloads.
+                    let inferred_ty = infer_argument_ty(
+                        &mut self.speculate(),
+                        (argument_index, ast_argument, parameter_tcx),
+                    );
                     argument_types.insert(parameter.annotated_type(), inferred_ty);
                 }
-
-                // Re-enable diagnostics.
-                self.context.set_multi_inference(was_in_multi_inference);
-                self.set_multi_inference_state(prev_multi_inference_state);
             }
         }
     }
@@ -5423,9 +5393,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         expression: &ast::Expr,
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
-        if self.inner_expression_inference_state.is_get() {
-            return self.expression_type(expression);
-        }
         let mut ty = match expression {
             ast::Expr::NoneLiteral(ast::ExprNoneLiteral {
                 range: _,
@@ -5467,16 +5434,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ast::Expr::Yield(yield_expression) => self.infer_yield_expression(yield_expression),
             ast::Expr::YieldFrom(yield_from) => self.infer_yield_from_expression(yield_from),
             ast::Expr::Await(await_expression) => self.infer_await_expression(await_expression),
-            ast::Expr::Named(named) => {
-                // Definitions must be unique, so we bypass multi-inference for named expressions.
-                if !self.multi_inference_state.is_panic()
-                    && let Some(ty) = self.expressions.get(&expression.into())
-                {
-                    return *ty;
-                }
-
-                self.infer_named_expression(named)
-            }
+            ast::Expr::Named(named) => self.infer_named_expression(named),
             ast::Expr::IpyEscapeCommand(_) => {
                 todo_type!("Ipy escape command support")
             }
@@ -5500,19 +5458,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     #[track_caller]
     fn store_expression_type(&mut self, expression: &ast::Expr, ty: Type<'db>) {
-        if self.inner_expression_inference_state.is_get() {
-            // If `inner_expression_inference_state` is `Get`, the expression type has already been stored.
-            return;
-        }
-
-        match self.multi_inference_state {
-            MultiInferenceState::Ignore => {}
-
-            MultiInferenceState::Panic => {
-                let previous = self.expressions.insert(expression.into(), ty);
-                assert_eq!(previous, None);
-            }
-        }
+        let previous = self.expressions.insert(expression.into(), ty);
+        assert_eq!(previous, None);
     }
 
     fn infer_number_literal_expression(&self, literal: &ast::ExprNumberLiteral) -> Type<'db> {
@@ -5890,28 +5837,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         item_types.insert(item.value.node_index().load(), value_ty);
                     }
 
-                    // Disable diagnostics as we attempt to narrow to specific `TypedDict`
-                    // elements of the union. Mixed unions like `TypedDict | dict[str, Any]`
-                    // should not emit `TypedDict` diagnostics if a non-`TypedDict` arm accepts
-                    // the literal.
-                    let old_multi_inference = self.context.set_multi_inference(true);
-                    let old_multi_inference_state =
-                        self.set_multi_inference_state(MultiInferenceState::Ignore);
-
                     let mut narrowed_tys = Vec::new();
                     let mut item_types = FxHashMap::default();
                     for typed_dict in typed_dicts {
-                        if let Some(inferred_ty) =
-                            self.infer_typed_dict_expression(dict, typed_dict, &mut item_types)
-                        {
+                        // Disable diagnostics as we attempt to narrow to specific `TypedDict`
+                        // elements of the union. Mixed unions like `TypedDict | dict[str, Any]`
+                        // should not emit `TypedDict` diagnostics if a non-`TypedDict` arm accepts
+                        // the literal.
+                        if let Some(inferred_ty) = self.speculate().infer_typed_dict_expression(
+                            dict,
+                            typed_dict,
+                            &mut item_types,
+                        ) {
                             narrowed_tys.push(inferred_ty);
                         }
 
                         item_types.clear();
                     }
-
-                    self.context.set_multi_inference(old_multi_inference);
-                    self.set_multi_inference_state(old_multi_inference_state);
 
                     // Successfully narrowed to a subset of typed dicts.
                     if !narrowed_tys.is_empty() {
@@ -6021,7 +5963,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // Ensure the inferred return type is assignable to the narrowed declared type.
             if !inferred_ty.is_assignable_to(db, narrowed_ty) {
-                speculative_builder.discard();
                 return None;
             }
 
@@ -8971,8 +8912,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             typevar_binding_context: _,
             inference_flags: _,
             deferred_state: _,
-            multi_inference_state: _,
-            inner_expression_inference_state: _,
             inferring_vararg_annotation: _,
             called_functions: _,
             index: _,
@@ -9058,8 +8997,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             typevar_binding_context: _,
             inference_flags: _,
             deferred_state: _,
-            multi_inference_state: _,
-            inner_expression_inference_state: _,
             inferring_vararg_annotation: _,
             index: _,
             region: _,
@@ -9101,8 +9038,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             inference_flags: _,
             deferred_state: _,
             inferring_vararg_annotation: _,
-            multi_inference_state: _,
-            inner_expression_inference_state: _,
             index: _,
             region: _,
             return_types_and_ranges: _,
@@ -9183,8 +9118,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             typevar_binding_context: _,
             inference_flags: _,
             deferred_state: _,
-            multi_inference_state: _,
-            inner_expression_inference_state: _,
             inferring_vararg_annotation: _,
             called_functions: _,
             index: _,
@@ -9214,9 +9147,52 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// to speculatively infer expressions during multi-inference.
     ///
     /// The inference results can be merged into the current inference region using
-    /// [`TypeInferenceBuilder::extend`], or ignored using [`TypeInferenceBuilder::discard`].
+    /// [`TypeInferenceBuilder::extend`].
     fn speculate(&mut self) -> Self {
-        TypeInferenceBuilder::new(self.db(), self.region, self.index, self.module())
+        let Self {
+            region,
+            index,
+            cycle_recovery,
+            deferred_state,
+            inference_flags,
+            typevar_binding_context,
+            inferring_vararg_annotation,
+            ref return_types_and_ranges,
+            ref dataclass_field_specifiers,
+
+            // These fields are type inference results, but do not affect the inference of a given
+            // expression.
+            context: _,
+            expressions: _,
+            string_annotations: _,
+            scope: _,
+            bindings: _,
+            declarations: _,
+            deferred: _,
+            called_functions: _,
+            undecorated_type: _,
+            all_definitely_bound: _,
+        } = *self;
+
+        let mut builder = TypeInferenceBuilder::new(self.db(), region, index, self.module());
+
+        // Speculated builders are often discarded immediately.
+        builder.context.defuse();
+
+        // Ensure the speculative builder has the same inference context as the current one.
+        builder.cycle_recovery = cycle_recovery;
+        builder.deferred_state = deferred_state;
+        builder.typevar_binding_context = typevar_binding_context;
+        builder.inference_flags = inference_flags;
+        builder.inferring_vararg_annotation = inferring_vararg_annotation;
+        builder
+            .return_types_and_ranges
+            .clone_from(return_types_and_ranges);
+        builder
+            .dataclass_field_specifiers
+            .clone_from(dataclass_field_specifiers);
+
+        builder
     }
 
     /// Extend the current region with the results of a speculative [`TypeInferenceBuilder`].
@@ -9240,8 +9216,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             typevar_binding_context: _,
             inference_flags: _,
             deferred_state: _,
-            multi_inference_state: _,
-            inner_expression_inference_state: _,
             inferring_vararg_annotation: _,
             called_functions: _,
             index: _,
@@ -9268,19 +9242,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .extend(string_annotations.iter().copied());
 
         if !matches!(self.region, InferenceRegion::Scope(..)) {
-            self.bindings.extend(
-                bindings.iter().map(|(def, ty)| (*def, *ty)),
-                self.multi_inference_state,
-            );
+            self.bindings
+                .extend(bindings.iter().map(|(def, ty)| (*def, *ty)));
         }
-    }
-
-    /// Ignore the results of this [`TypeInferenceBuilder`].
-    ///
-    /// Note that dropping a [`TypeInferenceBuilder`] without calling this method will result
-    /// in a panic.
-    fn discard(self) {
-        let _ = self.context.finish();
     }
 }
 
@@ -9332,18 +9296,8 @@ impl<'db, 'ast, 'infer> MultiInferenceGuard<'db, 'ast, 'infer> {
         builder: &mut TypeInferenceBuilder<'db, 'ast>,
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
-        let prev_multi_inference_state =
-            builder.set_multi_inference_state(MultiInferenceState::Ignore);
-        let was_in_multi_inference = builder.context.set_multi_inference(true);
-
-        let value_ty = (self.infer_expr)(builder, tcx);
         self.last_tcx = Some(tcx);
-
-        // Reset the multi-inference state.
-        builder.set_multi_inference_state(prev_multi_inference_state);
-        builder.context.set_multi_inference(was_in_multi_inference);
-
-        value_ty
+        (self.infer_expr)(&mut builder.speculate(), tcx)
     }
 
     fn last_tcx(&self) -> TypeContext<'db> {
@@ -9389,36 +9343,6 @@ impl<'a> Iterator for ArgumentsIter<'a> {
             ArgumentsIter::FromAst(args) => args.next(),
             ArgumentsIter::Synthesized(args) => args.next().copied(),
         }
-    }
-}
-
-/// Dictates the behavior when an expression is inferred multiple times.
-#[derive(Default, Debug, Clone, Copy)]
-enum MultiInferenceState {
-    /// Panic if the expression has already been inferred.
-    #[default]
-    Panic,
-
-    /// Ignore the newly inferred value.
-    Ignore,
-}
-
-impl MultiInferenceState {
-    const fn is_panic(self) -> bool {
-        matches!(self, MultiInferenceState::Panic)
-    }
-}
-
-#[derive(Default, Debug, Clone, Copy)]
-enum InnerExpressionInferenceState {
-    #[default]
-    Infer,
-    Get,
-}
-
-impl InnerExpressionInferenceState {
-    const fn is_get(self) -> bool {
-        matches!(self, InnerExpressionInferenceState::Get)
     }
 }
 
@@ -9578,11 +9502,7 @@ where
     K: std::fmt::Debug,
     V: std::fmt::Debug,
 {
-    fn insert(&mut self, key: K, value: V, multi_inference_state: MultiInferenceState) {
-        if matches!(multi_inference_state, MultiInferenceState::Ignore) {
-            return;
-        }
-
+    fn insert(&mut self, key: K, value: V) {
         debug_assert!(
             !self.0.iter().any(|(existing, _)| existing == &key),
             "An existing entry already exists for key {key:?}",
@@ -9592,14 +9512,10 @@ where
     }
 
     #[inline]
-    fn extend<T: IntoIterator<Item = (K, V)>>(
-        &mut self,
-        iter: T,
-        multi_inference_state: MultiInferenceState,
-    ) {
+    fn extend<T: IntoIterator<Item = (K, V)>>(&mut self, iter: T) {
         if cfg!(debug_assertions) {
             for (key, value) in iter {
-                self.insert(key, value, multi_inference_state);
+                self.insert(key, value);
             }
         } else {
             self.0.extend(iter);
@@ -9666,11 +9582,7 @@ where
     V: Eq,
     V: std::fmt::Debug,
 {
-    fn insert(&mut self, value: V, multi_inference_state: MultiInferenceState) {
-        if matches!(multi_inference_state, MultiInferenceState::Ignore) {
-            return;
-        }
-
+    fn insert(&mut self, value: V) {
         debug_assert!(
             !self.0.iter().any(|existing| existing == &value),
             "An existing entry already exists for {value:?}",
@@ -9686,14 +9598,10 @@ where
     V: std::fmt::Debug,
 {
     #[inline]
-    fn extend<T: IntoIterator<Item = V>>(
-        &mut self,
-        iter: T,
-        multi_inference_state: MultiInferenceState,
-    ) {
+    fn extend<T: IntoIterator<Item = V>>(&mut self, iter: T) {
         if cfg!(debug_assertions) {
             for value in iter {
-                self.insert(value, multi_inference_state);
+                self.insert(value);
             }
         } else {
             self.0.extend(iter);
@@ -9831,9 +9739,7 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
             }
         }
 
-        builder
-            .bindings
-            .insert(self.binding, bound_ty, builder.multi_inference_state);
+        builder.bindings.insert(self.binding, bound_ty);
 
         inferred_ty
     }
