@@ -371,6 +371,62 @@ t = TestMeta(name="test")
 t.name = "new"  # error: [invalid-assignment]
 ```
 
+### Transformers using `**kwargs`
+
+Dataclass transform parameters like `frozen` should be recognized even when the transformer doesn't
+explicitly list them in its signature, but instead uses `**kwargs`.
+
+#### Function-based transformer
+
+```py
+from typing import dataclass_transform, Callable
+
+@dataclass_transform()
+def create_model[T: type](**kwargs) -> Callable[[T], T]:
+    raise NotImplementedError
+
+@create_model(frozen=True)
+class Frozen:
+    name: str
+
+f = Frozen("Alice")
+f.name = "Bob"  # error: [invalid-assignment]
+```
+
+#### Metaclass-based transformer
+
+```py
+from typing import dataclass_transform
+
+@dataclass_transform()
+class ModelMeta(type):
+    def __new__(cls, name, bases, namespace, **kwargs): ...
+
+class ModelBase(metaclass=ModelMeta): ...
+
+class Frozen(ModelBase, frozen=True):
+    name: str
+
+f = Frozen(name="test")
+f.name = "new"  # error: [invalid-assignment]
+```
+
+#### Base-class-based transformer
+
+```py
+from typing import dataclass_transform
+
+@dataclass_transform()
+class ModelBase:
+    def __init_subclass__(cls, **kwargs): ...
+
+class Frozen(ModelBase, frozen=True):
+    name: str
+
+f = Frozen(name="test")
+f.name = "new"  # error: [invalid-assignment]
+```
+
 ### Combining parameters
 
 Combining several of these parameters also works as expected:

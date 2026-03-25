@@ -1788,8 +1788,14 @@ impl<'db> Bindings<'db> {
                                 let mut flags = dataclass_params.flags(db);
 
                                 for (param, flag) in DATACLASS_FLAGS {
-                                    if let Ok(Some(ty)) =
-                                        overload.parameter_type_by_name(param, false)
+                                    if let Some(ty) =
+                                        call_arguments.iter().find_map(|(arg, arg_types)| {
+                                            if matches!(arg, Argument::Keyword(name) if *name == **param) {
+                                                arg_types.get_default()
+                                            } else {
+                                                None
+                                            }
+                                        })
                                         && let Some(LiteralValueTypeKind::Bool(value)) =
                                             ty.as_literal_value_kind()
                                     {
