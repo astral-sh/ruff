@@ -2199,12 +2199,28 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             // subtype/subclass of the self type.
             (Type::BoundMethod(a), Type::BoundMethod(b)) => {
                 if a.function(db).name(db) != b.function(db).name(db) {
-                    // Two `BoundMethod`s have to have the same method name to have any possibility
-                    // of overlap.
+                    // We typically ask about `BoundMethod` disjointness when we're looking at a
+                    // method call on an intersection type like `A & B`. In that case, the same
+                    // method name would show up on both sides of this check. However for
+                    // completeness, if we're ever comparing `BoundMethod` types with different
+                    // method names, then they're clearly disjoint.
                     self.always()
                 } else {
-                    // If the names match, then disjointness depends on whether the class types are
-                    // disjoint.
+                    // The names match, so `BoundMethod` disjointness depends on whether the bound
+                    // self types are disjoint. Note that this can produce confusing results in the
+                    // face of Liskov violations. For example:
+                    // ```
+                    // class A:
+                    //     def f(self) -> int: ...
+                    // class B:
+                    //     def f(self) -> str: ...
+                    // def _(x: Intersection[A, B]):
+                    //     x.f()
+                    // ```
+                    // `class C(A, B)` could inhabit that intersection, but `int` and `str` are
+                    // disjoint, so the type of `x.f()` there is going to be inferred as `Never`.
+                    // That's probably not correct in practice, but the right way to address it is
+                    // to emit a diagnostic on the definition of `C.f`.
                     self.check_type_pair(db, a.self_instance(db), b.self_instance(db))
                 }
             }
