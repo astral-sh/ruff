@@ -2311,6 +2311,22 @@ pub(crate) enum ParametersKind<'db> {
     Concatenate(ConcatenateTail<'db>),
 }
 
+/// Represents a list of parameters in a function signature.
+///
+/// ## Representation
+///
+/// The way this is represented internally is a bit subtle given that both `value` and `kind` fields
+/// need to follow certain invariants to correctly represent the different forms of parameter lists.
+///
+/// The `value` field should always contain the full list of parameters regardless of the `kind`
+/// variant. For example, even if this represents a `Gradual` form, the `value` field should still
+/// contain the `*args: Any` and `**kwargs: Any` parameter.
+///
+/// The `kind` field is used to indicate the specific form of the parameter list which can,
+/// optionally, include additional information such as the bound `ParamSpec` type variable.
+// TODO: Given how the current structure is laid out which needs to follow certain invariants
+// between the `value` and `kind` field, it would be better to structure it such that these
+// invariants are followed at the type level instead.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 pub(crate) struct Parameters<'db> {
     // TODO: use SmallVec here once invariance bug is fixed
@@ -2437,10 +2453,11 @@ impl<'db> Parameters<'db> {
         matches!(self.kind, ParametersKind::Top)
     }
 
-    /// Returns the bound `ParamSpec` type variable if the entire parameter list is exactly `P`.
+    /// Returns the bound `ParamSpec` type variable if the parameter list is exactly `P`.
     ///
-    /// For either `P` or `Concatenate[<prefix-params>, P]`, use
-    /// [`Self::as_paramspec_with_prefix`].
+    /// For either `P` or `Concatenate[<prefix-params>, P]`, use [`as_paramspec_with_prefix`].
+    ///
+    /// [`as_paramspec_with_prefix`]: Self::as_paramspec_with_prefix
     pub(crate) const fn as_paramspec(&self) -> Option<BoundTypeVarInstance<'db>> {
         match self.kind {
             ParametersKind::ParamSpec(bound_typevar) => Some(bound_typevar),
@@ -2451,7 +2468,9 @@ impl<'db> Parameters<'db> {
     /// Returns the prefix parameters and bound `ParamSpec` if this parameter list is either `P` or
     /// `Concatenate[<prefix-params>, P]`.
     ///
-    /// For the narrower bare-`P` case, use [`Self::as_paramspec`].
+    /// For the narrower bare-`P` case, use [`as_paramspec`].
+    ///
+    /// [`as_paramspec`]: Self::as_paramspec
     pub(crate) fn as_paramspec_with_prefix<'a>(
         &'a self,
     ) -> Option<(&'a [Parameter<'db>], BoundTypeVarInstance<'db>)> {
