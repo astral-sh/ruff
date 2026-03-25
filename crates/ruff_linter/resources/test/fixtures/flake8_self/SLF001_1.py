@@ -47,7 +47,7 @@ class M(type):
 
 # https://github.com/astral-sh/ruff/issues/24140
 
-from typing import Self
+from typing import Annotated, Self
 
 class Sit:
     def __init__(self, x: int) -> None:
@@ -59,3 +59,12 @@ class Sit:
 
     def g(self, other: Self) -> None:
         print(other._x)  # fine (annotated as Self)
+
+    def h(self, other: Annotated[Self, "meta"]) -> None:
+        print(other._x)  # fine (Annotated[Self, ...])
+
+    @staticmethod
+    def s() -> None:
+        self = object()
+        alias = self
+        print(alias._x)  # error (self is not an instance parameter)
