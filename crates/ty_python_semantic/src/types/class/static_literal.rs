@@ -34,9 +34,9 @@ use crate::{
         call::{CallError, CallErrorKind},
         callable::CallableTypeKind,
         class::{
-            ClassMemberResult, CodeGeneratorKind, DisjointBase, Field, FieldKind,
-            InstanceMemberResult, MetaclassError, MetaclassErrorKind, MethodDecorator, MroLookup,
-            NamedTupleField, SlotsKind, synthesize_namedtuple_class_member,
+            ClassMemberResult, CodeGeneratorKind, DisjointBase, DynamicTypedDictLiteral, Field,
+            FieldKind, InstanceMemberResult, MetaclassError, MetaclassErrorKind, MethodDecorator,
+            MroLookup, NamedTupleField, SlotsKind, synthesize_namedtuple_class_member,
             synthesize_typed_dict_update_member,
         },
         context::InferContext,
@@ -55,7 +55,9 @@ use crate::{
         mro::{Mro, MroIterator},
         signatures::CallableSignature,
         tuple::{Tuple, TupleSpec, TupleType},
-        typed_dict::{TypedDictParams, typed_dict_params_from_class_def},
+        typed_dict::{
+            TypedDictParams, dynamic_typed_dict_schema, typed_dict_params_from_class_def,
+        },
         variance::VarianceInferable,
         visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard},
     },
@@ -656,8 +658,13 @@ impl<'db> StaticClassLiteral<'db> {
             return known.is_typed_dict_subclass();
         }
 
-        self.iter_mro(db, None)
-            .any(|base| matches!(base, ClassBase::TypedDict))
+        self.iter_mro(db, None).any(|base| match base {
+            ClassBase::TypedDict => true,
+            ClassBase::Class(class) => {
+                matches!(class.class_literal(db), ClassLiteral::DynamicTypedDict(_))
+            }
+            _ => false,
+        })
     }
 
     /// Return `true` if this class is, or inherits from, a `NamedTuple` (inherits from
@@ -2057,31 +2064,64 @@ impl<'db> StaticClassLiteral<'db> {
         specialization: Option<Specialization<'db>>,
         field_policy: CodeGeneratorKind<'db>,
     ) -> FxIndexMap<Name, Field<'db>> {
+        enum FieldSource<'db> {
+            Static(StaticClassLiteral<'db>, Option<Specialization<'db>>),
+            DynamicTypedDict(DynamicTypedDictLiteral<'db>),
+        }
+
         if field_policy == CodeGeneratorKind::NamedTuple {
             // NamedTuples do not allow multiple inheritance, so it is sufficient to enumerate the
             // fields of this class only.
             return self.own_fields(db, specialization, field_policy);
         }
 
-        let matching_classes_in_mro: Vec<(StaticClassLiteral<'db>, Option<Specialization<'db>>)> =
-            self.iter_mro(db, specialization)
-                .filter_map(|superclass| {
-                    let class = superclass.into_class()?;
-                    // Dynamic classes don't have fields (no class body).
-                    let (class_literal, specialization) = class.static_class_literal(db)?;
+        let matching_classes_in_mro: Vec<FieldSource<'db>> = self
+            .iter_mro(db, specialization)
+            .filter_map(|superclass| {
+                let class = superclass.into_class()?;
+
+                if let Some((class_literal, specialization)) = class.static_class_literal(db) {
                     if field_policy.matches(db, class_literal.into(), specialization) {
-                        Some((class_literal, specialization))
-                    } else {
-                        None
+                        return Some(FieldSource::Static(class_literal, specialization));
                     }
-                })
-                // We need to collect into a `Vec` here because we iterate the MRO in reverse order
-                .collect();
+                }
+
+                if field_policy == CodeGeneratorKind::TypedDict
+                    && let ClassLiteral::DynamicTypedDict(typeddict) = class.class_literal(db)
+                {
+                    return Some(FieldSource::DynamicTypedDict(typeddict));
+                }
+
+                None
+            })
+            .collect();
 
         matching_classes_in_mro
             .into_iter()
             .rev()
-            .flat_map(|(class, specialization)| class.own_fields(db, specialization, field_policy))
+            .flat_map(|source| match source {
+                FieldSource::Static(class, specialization) => {
+                    class.own_fields(db, specialization, field_policy)
+                }
+                FieldSource::DynamicTypedDict(typeddict) => {
+                    dynamic_typed_dict_schema(db, typeddict)
+                        .iter()
+                        .map(|(name, td_field)| {
+                            (
+                                name.clone(),
+                                Field {
+                                    declared_ty: td_field.declared_ty,
+                                    kind: FieldKind::TypedDict {
+                                        is_required: td_field.is_required(),
+                                        is_read_only: td_field.is_read_only(),
+                                    },
+                                    first_declaration: td_field.first_declaration(),
+                                },
+                            )
+                        })
+                        .collect()
+                }
+            })
             // KW_ONLY sentinels are markers, not real fields. Exclude them so
             // they cannot shadow an inherited field with the same name.
             .filter(|(_, field)| !field.is_kw_only_sentinel(db))

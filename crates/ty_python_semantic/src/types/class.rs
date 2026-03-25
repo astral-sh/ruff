@@ -911,6 +911,11 @@ impl<'db> ClassType<'db> {
         self.is_known(db, KnownClass::Object)
     }
 
+    /// Return `true` if this class is a `TypedDict`.
+    pub(crate) fn is_typed_dict(self, db: &'db dyn Db) -> bool {
+        self.class_literal(db).is_typed_dict(db)
+    }
+
     pub(super) fn apply_type_mapping_impl<'a>(
         self,
         db: &'db dyn Db,
