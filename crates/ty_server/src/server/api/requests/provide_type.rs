@@ -41,7 +41,7 @@ pub struct ProvideTypeParams {
 #[serde(rename_all = "camelCase")]
 pub struct ProvideTypeResponse {
     /// Fully qualified names of the types, one per input range
-    pub tys: Vec<Option<String>>,
+    pub types: Vec<Option<String>>,
 }
 
 impl RequestHandler for ProvideTypeRequestHandler {
@@ -70,7 +70,7 @@ impl BackgroundDocumentRequestHandler for ProvideTypeRequestHandler {
 
         let model = SemanticModel::new(db, file);
 
-        let tys: Vec<Option<String>> = params
+        let types: Vec<Option<String>> = params
             .ranges
             .iter()
             .map(|range| {
@@ -132,7 +132,7 @@ impl BackgroundDocumentRequestHandler for ProvideTypeRequestHandler {
             })
             .collect();
 
-        Ok(Some(ProvideTypeResponse { tys }))
+        Ok(Some(ProvideTypeResponse { types }))
     }
 }
 
