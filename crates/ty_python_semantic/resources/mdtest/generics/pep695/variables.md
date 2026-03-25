@@ -850,6 +850,51 @@ def intersection_is_assignable[T](t: T) -> None:
     static_assert(is_subtype_of(Intersection[T, Not[None]], T))
 ```
 
+## Bounded typevars remain assignable to their upper bound after narrowing
+
+Narrowing can leave a bounded typevar represented as an intersection, but it should still be
+assignable to its upper bound.
+
+```py
+class A: ...
+
+class SomeClass[T: int | str]:
+    field: T
+
+    def narrowed1(self) -> None:
+        narrowed: int | str
+        assert not isinstance(self.field, int)
+        reveal_type(self.field)  # revealed: T@SomeClass & ~int
+        narrowed = self.field
+
+    def narrowed2(self) -> None:
+        narrowed: int | str
+        assert not isinstance(self.field, A)
+        reveal_type(self.field)  # revealed: T@SomeClass & ~A
+        narrowed = self.field
+```
+
+## Constrained typevars remain assignable to the union of their constraints after narrowing
+
+```py
+class A: ...
+
+class SomeClass[T: (int, str)]:
+    field: T
+
+    def narrowed1(self) -> None:
+        narrowed: int | str
+        assert not isinstance(self.field, int)
+        reveal_type(self.field)  # revealed: T@SomeClass & str
+        narrowed = self.field
+
+    def narrowed2(self) -> None:
+        narrowed: int | str
+        assert not isinstance(self.field, A)
+        reveal_type(self.field)  # revealed: T@SomeClass & ~A
+        narrowed = self.field
+```
+
 ## Narrowing
 
 We can use narrowing expressions to eliminate some of the possibilities of a constrained typevar:
