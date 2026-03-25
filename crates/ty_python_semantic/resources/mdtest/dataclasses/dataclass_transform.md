@@ -1813,6 +1813,30 @@ class WrongDefault:
     a: int = field(converter=str_to_int, default=0)
 ```
 
+When a field specifier declares a default value for `converter`, fields that don't explicitly pass a
+converter will use the default:
+
+```py
+from typing_extensions import Any
+
+# TODO: no error here (https://github.com/astral-sh/ty/issues/592)
+# error: [invalid-parameter-default]
+def field_with_default_converter[T, R](*, converter: Callable[[T], R] = str_to_int, default: T | None = None) -> R:
+    raise NotImplementedError
+
+@dataclass_transform(field_specifiers=(field_with_default_converter,))
+def model_with_default_converter[T](cls: type[T]) -> type[T]:
+    return cls
+
+@model_with_default_converter
+class WithDefaultConverter:
+    with_default_converter: int = field_with_default_converter()
+    overwritten_converter: str = field_with_default_converter(converter=str)
+
+# revealed: (self: WithDefaultConverter, with_default_converter: str, overwritten_converter: object) -> None
+reveal_type(WithDefaultConverter.__init__)
+```
+
 Classes can also be used as converters:
 
 ```py
