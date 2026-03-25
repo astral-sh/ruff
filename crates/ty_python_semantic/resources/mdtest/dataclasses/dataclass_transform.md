@@ -1842,6 +1842,28 @@ with_class_converter.b = "3.5"
 with_class_converter.b = None  # error: [invalid-assignment]
 ```
 
+Generic classes and generic functions can also be used as converters:
+
+```py
+def duplicate[T](x: T) -> tuple[T, T]:
+    return (x, x)
+
+@my_model
+class WithGenericClassConverter:
+    a: list[str] = field(converter=list)
+    b: tuple[int, int] = field(converter=duplicate)
+
+# TODO: The input types should ideally be `a: Iterable[str]` and `b: int` here
+# revealed: (self: WithGenericClassConverter, a: Iterable[Unknown], b: Unknown) -> None
+reveal_type(WithGenericClassConverter.__init__)
+
+WithGenericClassConverter(("a", "b", "c"), 1)
+
+# TODO: these should ideally be errors
+WithGenericClassConverter((1, 2, 3), 1)
+WithGenericClassConverter(("a", "b", "c"), "foo")
+```
+
 When a converter function is overloaded, the input type is the union of all first parameter types:
 
 ```py

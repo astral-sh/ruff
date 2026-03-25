@@ -1182,20 +1182,66 @@ impl<'db> Bindings<'db> {
                                 // The index of the "actual" first parameters depends on whether or not there
                                 // is a bound `self` parameter in the converter callable.
                                 let first_index = usize::from(binding.bound_type.is_some());
+                                // TODO: for generic converters, we currently use the default
+                                // specialization so as not to produce any false-positives on
+                                // the field declarations. Ideally, we would treat the type
+                                // variables as inferable and use the declared field type as
+                                // type context to solve them, but no other type checker seems
+                                // to support this at the moment, and `converter` is not a
+                                // widely used feature anyway.
+                                let class_default_specialization = binding
+                                    .constructor_instance_type
+                                    .and_then(|ty| ty.class_specialization(db))
+                                    .map(|specialization| {
+                                        specialization
+                                            .generic_context(db)
+                                            .default_specialization(db, None)
+                                    });
                                 // For class converters, calling the class produces an instance,
                                 // not the `__init__` return type (`None`). Use
                                 // `constructor_instance_type` when available.
-                                let return_ty_override = binding.constructor_instance_type;
+                                let return_ty_override =
+                                    binding.constructor_instance_type.map(|ty| {
+                                        if let Some(specialization) = class_default_specialization {
+                                            ty.apply_specialization(db, specialization)
+                                        } else {
+                                            ty
+                                        }
+                                    });
                                 for overload in binding {
                                     let params = overload.signature.parameters();
                                     let return_ty =
                                         return_ty_override.unwrap_or(overload.signature.return_ty);
+
+                                    let default_specialization = class_default_specialization
+                                        .or_else(|| {
+                                            overload
+                                                .signature
+                                                .generic_context
+                                                .map(|ctx| ctx.default_specialization(db, None))
+                                        });
+
                                     if let Some(first_param) = params.get_positional(first_index) {
-                                        input_types = input_types.add(first_param.annotated_type());
-                                        output_types = output_types.add(return_ty);
+                                        let mut input_ty = first_param.annotated_type();
+                                        if let Some(specialization) = default_specialization {
+                                            input_ty =
+                                                input_ty.apply_specialization(db, specialization);
+                                        }
+                                        input_types = input_types.add(input_ty);
+                                        let mut output_ty = return_ty;
+                                        if let Some(specialization) = default_specialization {
+                                            output_ty =
+                                                output_ty.apply_specialization(db, specialization);
+                                        }
+                                        output_types = output_types.add(output_ty);
                                         found_any = true;
                                     } else if let Some((_, variadic)) = params.variadic() {
-                                        input_types = input_types.add(variadic.annotated_type());
+                                        let mut input_ty = variadic.annotated_type();
+                                        if let Some(specialization) = default_specialization {
+                                            input_ty =
+                                                input_ty.apply_specialization(db, specialization);
+                                        }
+                                        input_types = input_types.add(input_ty);
                                         output_types = output_types.add(return_ty);
                                         found_any = true;
                                     } else if params.is_gradual() {
