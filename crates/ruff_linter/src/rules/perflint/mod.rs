@@ -17,6 +17,7 @@ mod tests {
 
     #[test_case(Rule::UnnecessaryListCast, Path::new("PERF101.py"))]
     #[test_case(Rule::IncorrectDictIterator, Path::new("PERF102.py"))]
+    #[test_case(Rule::LoopGlobalUsage, Path::new("PERF202.py"))]
     #[test_case(Rule::TryExceptInLoop, Path::new("PERF203.py"))]
     #[test_case(Rule::ManualListComprehension, Path::new("PERF401.py"))]
     #[test_case(Rule::ManualListCopy, Path::new("PERF402.py"))]

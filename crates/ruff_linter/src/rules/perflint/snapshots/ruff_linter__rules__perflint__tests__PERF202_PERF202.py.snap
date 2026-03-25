@@ -1,0 +1,137 @@
+---
+source: crates/ruff_linter/src/rules/perflint/mod.rs
+---
+PERF202 Global variable `GLOBAL_VAR` accessed in loop body
+  --> PERF202.py:18:9
+   |
+16 |     items = (1, 2, 3, 4)
+17 |     for item in list(items):
+18 |         GLOBAL_VAR  # PERF202
+   |         ^^^^^^^^^^
+   |
+
+PERF202 Global variable `MY_GLOBAL_CONSTANT_C` accessed in loop body
+  --> PERF202.py:26:22
+   |
+24 |     total = MY_GLOBAL_CONSTANT_A
+25 |     for i in range(10_000):
+26 |         total += i * MY_GLOBAL_CONSTANT_C  # PERF202
+   |                      ^^^^^^^^^^^^^^^^^^^^
+   |
+
+PERF202 Global variable `MY_GLOBAL_VARIABLE` accessed in loop body
+  --> PERF202.py:35:9
+   |
+33 |     total = MY_GLOBAL_CONSTANT_A
+34 |     for i in range(10_000):
+35 |         MY_GLOBAL_VARIABLE += total  # PERF202
+   |         ^^^^^^^^^^^^^^^^^^
+36 |         total += i
+   |
+
+PERF202 Global variable `GLOBAL_VAR` accessed in loop body
+  --> PERF202.py:42:15
+   |
+40 | def while_loop():
+41 |     while True:
+42 |         print(GLOBAL_VAR)  # PERF202
+   |               ^^^^^^^^^^
+43 |         break
+   |
+
+PERF202 Global variable `GLOBAL_VAR` accessed in loop body
+  --> PERF202.py:49:13
+   |
+47 | def multiple_globals():
+48 |     for i in range(10):
+49 |         a = GLOBAL_VAR  # PERF202
+   |             ^^^^^^^^^^
+50 |         b = ANOTHER_GLOBAL  # PERF202
+   |
+
+PERF202 Global variable `ANOTHER_GLOBAL` accessed in loop body
+  --> PERF202.py:50:13
+   |
+48 |     for i in range(10):
+49 |         a = GLOBAL_VAR  # PERF202
+50 |         b = ANOTHER_GLOBAL  # PERF202
+   |             ^^^^^^^^^^^^^^
+   |
+
+PERF202 Global variable `GLOBAL_VAR` accessed in loop body
+  --> PERF202.py:57:19
+   |
+55 |     for i in range(10):
+56 |         for j in range(10):
+57 |             print(GLOBAL_VAR)  # PERF202
+   |                   ^^^^^^^^^^
+   |
+
+PERF202 Global variable `GLOBAL_VAR` accessed in loop body
+  --> PERF202.py:63:15
+   |
+61 | async def async_loop():
+62 |     async for item in some_aiter():
+63 |         print(GLOBAL_VAR)  # PERF202
+   |               ^^^^^^^^^^
+   |
+
+PERF202 Global variable `GLOBAL_VAR` accessed in loop body
+  --> PERF202.py:70:19
+   |
+68 |     for i in range(10):
+69 |         if i > 5:
+70 |             print(GLOBAL_VAR)  # PERF202
+   |                   ^^^^^^^^^^
+71 |         elif GLOBAL_VAR:  # PERF202
+72 |             pass
+   |
+
+PERF202 Global variable `GLOBAL_VAR` accessed in loop body
+  --> PERF202.py:71:14
+   |
+69 |         if i > 5:
+70 |             print(GLOBAL_VAR)  # PERF202
+71 |         elif GLOBAL_VAR:  # PERF202
+   |              ^^^^^^^^^^
+72 |             pass
+73 |         try:
+   |
+
+PERF202 Global variable `GLOBAL_VAR` accessed in loop body
+  --> PERF202.py:74:19
+   |
+72 |             pass
+73 |         try:
+74 |             print(GLOBAL_VAR)  # PERF202
+   |                   ^^^^^^^^^^
+75 |         except Exception:
+76 |             pass
+   |
+
+PERF202 Global variable `GLOBAL_VAR` accessed in loop body
+  --> PERF202.py:78:19
+   |
+76 |             pass
+77 |         with open("f") as fh:
+78 |             print(GLOBAL_VAR)  # PERF202
+   |                   ^^^^^^^^^^
+   |
+
+PERF202 Global variable `GLOBAL_DICT` accessed in loop body
+  --> PERF202.py:84:13
+   |
+82 | def subscript_global():
+83 |     for i in range(10):
+84 |         x = GLOBAL_DICT[i]  # PERF202
+   |             ^^^^^^^^^^^
+   |
+
+PERF202 Global variable `GLOBAL_VAR` accessed in loop body
+  --> PERF202.py:90:14
+   |
+88 | def comprehension_in_loop():
+89 |     for i in range(10):
+90 |         x = [GLOBAL_VAR for _ in range(5)]  # PERF202
+   |              ^^^^^^^^^^
+   |

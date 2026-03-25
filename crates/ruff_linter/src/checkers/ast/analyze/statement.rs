@@ -1218,6 +1218,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.is_rule_enabled(Rule::TryExceptInLoop) {
                 perflint::rules::try_except_in_loop(checker, body);
             }
+            if checker.is_rule_enabled(Rule::LoopGlobalUsage) {
+                perflint::rules::loop_global_usage(checker, body);
+            }
             if checker.is_rule_enabled(Rule::AsyncBusyWait) {
                 flake8_async::rules::async_busy_wait(checker, while_stmt);
             }
@@ -1291,6 +1294,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.is_rule_enabled(Rule::ReadlinesInFor) {
                 refurb::rules::readlines_in_for(checker, for_stmt);
+            }
+            if checker.is_rule_enabled(Rule::LoopGlobalUsage) {
+                perflint::rules::loop_global_usage(checker, body);
             }
             if !*is_async {
                 if checker.is_rule_enabled(Rule::ReimplementedBuiltin) {

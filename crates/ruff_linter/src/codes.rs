@@ -1145,6 +1145,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         // perflint
         (Perflint, "101") => rules::perflint::rules::UnnecessaryListCast,
         (Perflint, "102") => rules::perflint::rules::IncorrectDictIterator,
+        (Perflint, "202") => rules::perflint::rules::LoopGlobalUsage,
         (Perflint, "203") => rules::perflint::rules::TryExceptInLoop,
         (Perflint, "401") => rules::perflint::rules::ManualListComprehension,
         (Perflint, "402") => rules::perflint::rules::ManualListCopy,
