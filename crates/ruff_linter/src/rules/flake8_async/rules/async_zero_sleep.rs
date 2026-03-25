@@ -27,7 +27,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///
 /// Use instead:
 /// ```python
-/// import trio
+/// import trio.lowlevel
 ///
 ///
 /// async def func():
