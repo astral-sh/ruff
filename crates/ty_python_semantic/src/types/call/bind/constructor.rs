@@ -273,11 +273,11 @@ impl<'db> ConstructorBinding<'db> {
         if let (Some(constructor_class_literal), Some(overload)) =
             (constructor_class_literal, single_relevant_overload)
         {
-            let outcome = constructor_return_outcome(db, constructor_class_literal, overload);
-            if outcome.kind.is_instance()
-                && outcome.resolved_return.is_subtype_of(db, combined_return)
+            if classify_constructor_return(db, constructor_class_literal, overload.return_ty)
+                .is_instance()
+                && overload.return_ty.is_subtype_of(db, combined_return)
             {
-                return outcome.resolved_return;
+                return overload.return_ty;
             }
         }
 
@@ -494,12 +494,6 @@ impl ConstructorReturnKind {
 }
 
 #[derive(Debug, Clone, Copy)]
-struct ConstructorReturnOutcome<'db> {
-    resolved_return: Type<'db>,
-    kind: ConstructorReturnKind,
-}
-
-#[derive(Debug, Clone, Copy)]
 enum ConstructorOverloadReturns<'db> {
     AllInstance,
     AllSameNonInstance(Type<'db>),
@@ -574,26 +568,12 @@ fn classify_constructor_return<'db>(
     }
 }
 
-fn constructor_return_outcome<'db>(
-    db: &'db dyn Db,
-    class_literal: ClassLiteral<'db>,
-    overload: &Binding<'db>,
-) -> ConstructorReturnOutcome<'db> {
-    let kind = classify_constructor_return(db, class_literal, overload.return_ty);
-    ConstructorReturnOutcome {
-        resolved_return: overload.return_ty,
-        kind,
-    }
-}
-
 fn overload_returns_instance<'db>(
     db: &'db dyn Db,
     class_literal: ClassLiteral<'db>,
     overload: &Binding<'db>,
 ) -> bool {
-    constructor_return_outcome(db, class_literal, overload)
-        .kind
-        .is_instance()
+    classify_constructor_return(db, class_literal, overload.return_ty).is_instance()
 }
 
 fn analyze_relevant_constructor_overloads<'a, 'db, I>(
@@ -606,25 +586,24 @@ where
 {
     let mut overloads = overloads.into_iter();
     let first_overload = overloads.next()?;
-    let first_outcome = constructor_return_outcome(db, class_literal, first_overload);
 
     let mut single_relevant_overload = Some(first_overload);
-    let mut saw_instance_return = first_outcome.kind.is_instance();
+    let first_return_is_instance =
+        classify_constructor_return(db, class_literal, first_overload.return_ty).is_instance();
+    let mut saw_instance_return = first_return_is_instance;
     let mut first_non_instance_return =
-        (!first_outcome.kind.is_instance()).then_some(first_outcome.resolved_return);
+        (!first_return_is_instance).then_some(first_overload.return_ty);
     let mut saw_distinct_non_instance_return = false;
 
     for overload in overloads {
         single_relevant_overload = None;
 
-        let outcome = constructor_return_outcome(db, class_literal, overload);
-        if outcome.kind.is_instance() {
+        if classify_constructor_return(db, class_literal, overload.return_ty).is_instance() {
             saw_instance_return = true;
         } else if let Some(first_non_instance_return) = first_non_instance_return {
-            saw_distinct_non_instance_return |=
-                outcome.resolved_return != first_non_instance_return;
+            saw_distinct_non_instance_return |= overload.return_ty != first_non_instance_return;
         } else {
-            first_non_instance_return = Some(outcome.resolved_return);
+            first_non_instance_return = Some(overload.return_ty);
         }
     }
 
