@@ -304,18 +304,18 @@ help: Replace with `trio.lowlevel.checkpoint()`
 167 +     await trio.lowlevel.checkpoint()  # ASYNC115
 168 |     await trio.sleep(delay=0)  # OK
 169 | 
-170 | 
+170 | # https://github.com/astral-sh/ruff/issues/18740
 
 ASYNC115 [*] Use `trio.lowlevel.checkpoint()` instead of `trio.sleep(0)`
-   --> ASYNC115.py:176:5
+   --> ASYNC115.py:175:5
     |
-175 |       await (
-176 | /     trio # comment
-177 | |     .sleep( # comment
-178 | |     0 # comment
-179 | |     )
+174 |       await (
+175 | /     trio # comment
+176 | |     .sleep( # comment
+177 | |     0 # comment
+178 | |     )
     | |_____^
-180 |       )
+179 |       )
     |
 help: Replace with `trio.lowlevel.checkpoint()`
 49  | 
@@ -326,25 +326,25 @@ help: Replace with `trio.lowlevel.checkpoint()`
 54  | 
 55  | def func():
 --------------------------------------------------------------------------------
-174 |     import trio
-175 | 
-176 |     await (
+173 |     import trio
+174 | 
+175 |     await (
     -     trio # comment
     -     .sleep( # comment
     -     0 # comment
     -     )
-177 +     trio.lowlevel.checkpoint()
-178 |     )
+176 +     trio.lowlevel.checkpoint()
+177 |     )
+178 | 
 179 | 
-180 | 
 note: This is an unsafe fix and may change runtime behavior
 
 ASYNC115 [*] Use `anyio.lowlevel.checkpoint()` instead of `anyio.sleep(0)`
-   --> ASYNC115.py:189:11
+   --> ASYNC115.py:188:11
     |
-187 |     from anyio import sleep as anyio_sleep
-188 |
-189 |     await anyio_sleep(0)  # ASYNC115
+186 |     from anyio import sleep as anyio_sleep
+187 |
+188 |     await anyio_sleep(0)  # ASYNC115
     |           ^^^^^^^^^^^^^^
     |
 help: Replace with `anyio.lowlevel.checkpoint()`
@@ -356,8 +356,8 @@ help: Replace with `anyio.lowlevel.checkpoint()`
 54  | 
 55  | def func():
 --------------------------------------------------------------------------------
-187 |     # `from anyio import lowlevel`, since `anyio.lowlevel` is a submodule.
-188 |     from anyio import sleep as anyio_sleep
-189 | 
+186 |     # `from anyio import lowlevel`, since `anyio.lowlevel` is a submodule.
+187 |     from anyio import sleep as anyio_sleep
+188 | 
     -     await anyio_sleep(0)  # ASYNC115
-190 +     await anyio.lowlevel.checkpoint()  # ASYNC115
+189 +     await anyio.lowlevel.checkpoint()  # ASYNC115
