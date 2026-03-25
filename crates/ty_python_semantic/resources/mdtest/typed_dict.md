@@ -2139,7 +2139,7 @@ from __future__ import annotations
 from typing_extensions import TypedDict
 
 # Self-referencing TypedDict using functional syntax
-TreeNode = TypedDict("TreeNode", {"value": int, "left": TreeNode | None, "right": TreeNode | None})
+TreeNode = TypedDict("TreeNode", {"value": int, "left": "TreeNode | None", "right": "TreeNode | None"})
 
 reveal_type(TreeNode)  # revealed: <class 'TreeNode'>
 
