@@ -214,7 +214,7 @@ reveal_type(f(a=1, b="", x=2))  # revealed: int
 type argument.
 
 ```py
-from typing import Concatenate
+from typing import Callable, Concatenate, ParamSpec
 
 # error: [invalid-type-form] "`typing.Concatenate` is not allowed in this context in a type expression"
 def invalid0(x: Concatenate): ...
@@ -227,6 +227,16 @@ def invalid2(x: Concatenate[int, ...]) -> None: ...
 
 # error: [invalid-type-form] "`typing.Concatenate` is not allowed in this context in a type expression"
 def invalid3() -> Concatenate[int, ...]: ...
+
+# error: [invalid-type-form] "`typing.Concatenate` is not allowed in this context in a type expression"
+def invalid4() -> Concatenate[()]: ...
+
+# error: [invalid-type-form] "`typing.Concatenate` is not allowed in this context in a type expression"
+a: Concatenate
+
+class Foo[**P]:
+    # error: [invalid-type-form] "`typing.Concatenate` is not allowed in this context in a type expression"
+    b: Concatenate[int, P]
 ```
 
 ### Too few arguments
@@ -244,6 +254,8 @@ def _(
     b: Callable[Concatenate[int], int],
     # error: [invalid-type-form] "Special form `typing.Concatenate` expected at least 2 parameters but got 1"
     c: Callable[Concatenate[(int,)], int],
+    # error: [invalid-type-form] "`typing.Concatenate` requires at least two arguments when used in a type expression"
+    d: Callable[Concatenate, int],
 ):
     reveal_type(a)  # revealed: (...) -> int
     reveal_type(b)  # revealed: (...) -> int
@@ -255,6 +267,19 @@ reveal_type(Foo[Concatenate[()]].attr)  # revealed: (...) -> None
 reveal_type(Foo[Concatenate[int]].attr)  # revealed: (...) -> None
 # error: [invalid-type-form] "Special form `typing.Concatenate` expected at least 2 parameters but got 1"
 reveal_type(Foo[Concatenate[(int,)]].attr)  # revealed: (...) -> None
+# error: [invalid-type-form] "`typing.Concatenate` requires at least two arguments when used in a type expression"
+reveal_type(Foo[Concatenate].attr)  # revealed: (...) -> None
+# error: [invalid-type-form] "`typing.Concatenate` requires at least two arguments when used in a type expression"
+reveal_type(Foo[[Concatenate]].attr)  # revealed: (...) -> None
+# error: [invalid-type-form] "`typing.Concatenate` requires at least two arguments when used in a type expression"
+reveal_type(Foo[[Concatenate, int]].attr)  # revealed: (Unknown, int, /) -> None
+
+# error: [invalid-type-form] "`typing.Concatenate` is not allowed in this context in a type expression"
+reveal_type(Foo[[Concatenate[int], str]].attr)  # revealed: (Unknown, str, /) -> None
+# error: [invalid-type-form] "`typing.Concatenate` is not allowed in this context in a type expression"
+reveal_type(Foo[[Concatenate[int, str], str]].attr)  # revealed: (Unknown, str, /) -> None
+# error: [invalid-type-form] "`typing.Concatenate` is not allowed in this context in a type expression"
+reveal_type(Foo[[Concatenate[()], str]].attr)  # revealed: (Unknown, str, /) -> None
 ```
 
 ### Last argument must be `ParamSpec` or `...`
@@ -272,6 +297,21 @@ def _(c: Callable[Concatenate[int, str], bool]): ...
 
 # error: [invalid-type-arguments] "The last argument to `typing.Concatenate` must be either `...` or a `ParamSpec` type variable: Got `str`"
 reveal_type(Foo[Concatenate[int, str]].attr)  # revealed: (...) -> None
+
+# error: [invalid-type-form] "`typing.Concatenate` requires at least two arguments when used in a type expression"
+reveal_type(Foo[Concatenate[int, Concatenate]].attr)  # revealed: (...) -> None
+
+# error: [invalid-type-arguments] "The last argument to `typing.Concatenate` must be either `...` or a `ParamSpec` type variable: Got `Unknown`"
+# error: [invalid-type-form] "`typing.Concatenate` is not allowed in this context in a type expression"
+reveal_type(Foo[Concatenate[int, Concatenate[()]]].attr)  # revealed: (...) -> None
+
+# error: [invalid-type-arguments] "The last argument to `typing.Concatenate` must be either `...` or a `ParamSpec` type variable: Got `Unknown`"
+# error: [invalid-type-form] "`typing.Concatenate` is not allowed in this context in a type expression"
+reveal_type(Foo[Concatenate[int, Concatenate[int]]].attr)  # revealed: (...) -> None
+
+# error: [invalid-type-arguments] "The last argument to `typing.Concatenate` must be either `...` or a `ParamSpec` type variable: Got `Unknown`"
+# error: [invalid-type-form] "`typing.Concatenate` is not allowed in this context in a type expression"
+reveal_type(Foo[Concatenate[int, Concatenate[int, str]]].attr)  # revealed: (...) -> None
 ```
 
 ### `ParamSpec` must be last
@@ -312,8 +352,12 @@ def valid[**P2](c: Callable[Concatenate[int, P2], bool]):
 ```py
 from typing import Callable, Concatenate
 
-# error: [invalid-type-form] "`typing.Concatenate` is not allowed in this context"
-def invalid[**P](c: Callable[Concatenate[Concatenate[int, ...], P], None]):
+def invalid[**P](
+    # error: [invalid-type-form] "`typing.Concatenate` is not allowed in this context"
+    c: Callable[Concatenate[Concatenate[int, ...], P], None],
+    # error: [invalid-type-form] "`typing.Concatenate` is not allowed in this context"
+    d: Callable[Concatenate[Concatenate, P], int],
+):
     pass
 ```
 

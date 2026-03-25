@@ -810,32 +810,44 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             ast::Expr::Tuple(ast::ExprTuple { elts, .. })
             | ast::Expr::List(ast::ExprList { elts, .. }) => {
-                let mut parameter_types = Vec::with_capacity(elts.len());
-
-                // Whether to infer `Todo` for the parameters
-                let mut return_todo = false;
-
-                for param in elts {
-                    let param_type = self.infer_type_expression(param);
-                    // This is similar to what we currently do for inferring tuple type expression.
-                    // We currently infer `Todo` for the parameters to avoid invalid diagnostics
-                    // when trying to check for assignability or any other relation. For example,
-                    // `*tuple[int, str]`, `Unpack[]`, etc. are not yet supported.
-                    return_todo |= param_type.is_todo()
-                        && matches!(param, ast::Expr::Starred(_) | ast::Expr::Subscript(_));
-                    parameter_types.push(param_type);
-                }
-
-                let parameters = if return_todo {
-                    // TODO: `Unpack`
-                    Parameters::todo()
+                let parameters = if let [single_elt] = &**elts {
+                    let param_type = self.infer_type_expression(single_elt);
+                    match param_type {
+                        Type::Dynamic(dynamic) if dynamic.is_todo() => Parameters::todo(),
+                        Type::Dynamic(DynamicType::Unknown) => Parameters::unknown(),
+                        _ => Parameters::new(
+                            self.db(),
+                            [Parameter::positional_only(None).with_annotated_type(param_type)],
+                        ),
+                    }
                 } else {
-                    Parameters::new(
-                        self.db(),
-                        parameter_types.iter().map(|param_type| {
-                            Parameter::positional_only(None).with_annotated_type(*param_type)
-                        }),
-                    )
+                    let mut parameter_types = Vec::with_capacity(elts.len());
+
+                    // Whether to infer `Todo` for the parameters
+                    let mut return_todo = false;
+
+                    for param in elts {
+                        let param_type = self.infer_type_expression(param);
+                        // This is similar to what we currently do for inferring tuple type expression.
+                        // We currently infer `Todo` for the parameters to avoid invalid diagnostics
+                        // when trying to check for assignability or any other relation. For example,
+                        // `*tuple[int, str]`, `Unpack[]`, etc. are not yet supported.
+                        return_todo |= param_type.is_todo()
+                            && matches!(param, ast::Expr::Starred(_) | ast::Expr::Subscript(_));
+                        parameter_types.push(param_type);
+                    }
+
+                    if return_todo {
+                        // TODO: `Unpack`
+                        Parameters::todo()
+                    } else {
+                        Parameters::new(
+                            self.db(),
+                            parameter_types.iter().map(|param_type| {
+                                Parameter::positional_only(None).with_annotated_type(*param_type)
+                            }),
+                        )
+                    }
                 };
 
                 return Ok(Type::paramspec_value_callable(db, parameters));
@@ -918,6 +930,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         let parameters =
                             if param_type.is_todo() {
                                 Parameters::todo()
+                            } else if param_type.is_unknown() {
+                                // If we ended up with an `Unknown` type here, it almost certainly means
+                                // that we already emitted an error elsewhere
+                                Parameters::unknown()
                             } else {
                                 Parameters::new(
                                     self.db(),
@@ -944,6 +960,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             db,
                             Parameters::gradual_form(),
                         ));
+                    }
+
+                    // If we ended up with an `Unknown` type here, it almost certainly means
+                    // that we already emitted an error elsewhere
+                    Type::Dynamic(DynamicType::Unknown) => {
+                        return Ok(Type::paramspec_value_callable(db, Parameters::unknown()));
                     }
 
                     _ => {}

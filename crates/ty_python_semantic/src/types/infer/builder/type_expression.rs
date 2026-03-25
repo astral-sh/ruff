@@ -2200,6 +2200,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 {
                     return Some(Parameters::paramspec(self.db(), tvar));
                 }
+                if parameters_type == Type::Dynamic(DynamicType::Unknown) {
+                    // This *probably* means we emitted an error during the
+                    // `self.infer_type_expression_no_store` call above, so we can avoid emitting a
+                    // follow-up error about invalid `Callable` parameters.
+                    return Some(Parameters::unknown());
+                }
             }
             ast::Expr::StringLiteral(string) => {
                 if let Some(parsed) = parse_string_annotation(&self.context, string) {
@@ -2307,7 +2313,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     previously_allowed_paramspec,
                 );
                 let Type::TypeVar(typevar) = expr_type else {
-                    report_invalid_concatenate_last_arg(&self.context, expr, expr_type);
+                    // `Unknown` signifies that we probably emitted a diagnostic elsewhere,
+                    // so avoid emitting another diagnostic here
+                    if !expr_type.is_unknown() {
+                        report_invalid_concatenate_last_arg(&self.context, expr, expr_type);
+                    }
                     return None;
                 };
                 if !typevar.is_paramspec(self.db()) {
