@@ -408,6 +408,48 @@ shape: list[int] = [1, 2, 3]
 reveal_type(prod(shape))  # revealed: Any
 ```
 
+## Overloaded stdlib callable with keyword-only binding
+
+`partial(zip, strict=True)` should accept the keyword-only argument and preserve the element types
+of the resulting iterator:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from functools import partial
+import builtins
+
+zips = partial(builtins.zip, strict=True)
+
+xs = [1]
+ys = ["a"]
+pairs = list(zips(xs, ys))
+
+reveal_type(pairs)  # revealed: list[tuple[int, str]]
+```
+
+## Keyword argument with literal sequence annotation
+
+`partial(...)` should accept keyword arguments whose literal container types are inferred without
+context at the call site:
+
+```py
+from functools import partial
+from typing import Literal, Sequence
+
+Distribution = Literal["sdist", "wheel", "editable"]
+
+def build(distributions: Sequence[Distribution]) -> None:
+    pass
+
+p = partial(build, distributions=["wheel"])
+reveal_type(p)  # revealed: partial[(*, distributions: Sequence[Literal["sdist", "wheel", "editable"]] = ...) -> None]
+reveal_type(p())  # revealed: None
+```
+
 ## Overloaded functions with remaining params
 
 ```py
@@ -973,6 +1015,26 @@ def task(
     )
 ```
 
+## Bound classmethod callback with weakref
+
+Binding the first explicit parameter of a bound classmethod callback should preserve assignability
+for `ReferenceType[Self]` arguments:
+
+```py
+from functools import partial
+from typing import Any, Generic, TypeVar
+from weakref import ReferenceType, ref
+
+T = TypeVar("T")
+
+class CallbackHost(Generic[T]):
+    @classmethod
+    def callback(cls, wself: ReferenceType["CallbackHost[Any]"], x: int) -> None: ...
+    def __init__(self) -> None:
+        p = partial(self.callback, ref(self))
+        reveal_type(p)  # revealed: partial[(x: int) -> None]
+```
+
 ## Assignability to protocol
 
 A `partial` result is assignable to a `Protocol` with a matching `__call__` signature. Extra
@@ -1042,4 +1104,20 @@ def f(a: int, b: str) -> bool:
 
 p = partial(f, 1)
 p.func = f  # error: [invalid-assignment]
+```
+
+## Unknown attribute assignment on partial results
+
+We intentionally reject ad-hoc attributes on `functools.partial` results. This matches `pyright` and
+`mypy`, even though these assignments work at runtime.
+
+```py
+from functools import partial
+
+def f() -> None:
+    pass
+
+p = partial(f)
+# error: [unresolved-attribute]
+p.__name__ = "renamed"
 ```
