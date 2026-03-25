@@ -490,7 +490,8 @@ def takes_list_int(x: list[int]): ...
 
 x3 = []
 takes_list_int(x3)
-reveal_type(x3)  # revealed: list[int]
+# TODO: Non-receiver calls are not currently used as constraints for collection literals.
+reveal_type(x3)  # revealed: list[Unknown]
 ```
 
 ```py
@@ -514,7 +515,8 @@ reveal_type(x5)  # revealed: list[int]
 ```py
 def _() -> list[int | None]:
     x6 = [1]
-    return reveal_type(x6)  # revealed: list[int | None]
+    reveal_type(x6)  # revealed: list[int | None]
+    return x6
 ```
 
 ```py
@@ -568,7 +570,36 @@ reveal_type(x14)  # revealed: list[Divergent]
 def _(i):
     x15 = [i]
     x15.append(x15)
-    reveal_type(x15)  # revealed: list[Divergent | Unknown]
+    reveal_type(x15)  # revealed: list[Divergent]
+```
+
+Multiple identically named collection literals in the same scope should not conflate constraints:
+
+```py
+x = []
+x.append(1)
+reveal_type(x)  # revealed: list[int]
+
+x = []
+x.append("hello")
+reveal_type(x)  # revealed: list[str]
+
+x = {}
+x.update({"a": True})
+reveal_type(x)  # revealed: dict[str, bool]
+```
+
+Subscript assignments also provide constraints:
+
+```py
+d = {}
+d["key"] = 42
+reveal_type(d)  # revealed: dict[str, int]
+
+d2 = {}
+d2[0] = "hello"
+d2[1] = "world"
+reveal_type(d2)  # revealed: dict[int, str]
 ```
 
 ## Multi-inference diagnostics

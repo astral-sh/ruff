@@ -53,19 +53,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ExprContext::Load => self.infer_subscript_load(subscript),
             ExprContext::Store => {
                 let value_ty = self.infer_expression(value, TypeContext::default());
-                let slice_ty = self.infer_expression(slice, TypeContext::default());
+                let slice_ty =
+                    self.infer_maybe_standalone_expression(slice, TypeContext::default());
                 self.infer_subscript_expression_types(subscript, value_ty, slice_ty, *ctx);
                 Type::Never
             }
             ExprContext::Del => {
                 let value_ty = self.infer_expression(value, TypeContext::default());
-                let slice_ty = self.infer_expression(slice, TypeContext::default());
+                let slice_ty =
+                    self.infer_maybe_standalone_expression(slice, TypeContext::default());
                 self.validate_subscript_deletion(subscript, value_ty, slice_ty);
                 Type::Never
             }
             ExprContext::Invalid => {
                 let value_ty = self.infer_expression(value, TypeContext::default());
-                let slice_ty = self.infer_expression(slice, TypeContext::default());
+                let slice_ty =
+                    self.infer_maybe_standalone_expression(slice, TypeContext::default());
                 self.infer_subscript_expression_types(subscript, value_ty, slice_ty, *ctx);
                 Type::unknown()
             }
@@ -1111,7 +1114,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = target;
 
         let object_ty = self.infer_expression(object, TypeContext::default());
-        let mut infer_slice_ty = |builder: &mut Self, tcx| builder.infer_expression(slice, tcx);
+        let mut infer_slice_ty =
+            |builder: &mut Self, tcx| builder.infer_maybe_standalone_expression(slice, tcx);
 
         self.validate_subscript_assignment_impl(
             target,
@@ -1367,6 +1371,63 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     &mut infer_argument_ty,
                     TypeContext::default(),
                 ) else {
+                    // Record use-context constraints for the object of the
+                    // subscript assignment (e.g., `x["a"] = True` constrains
+                    // `x` to `dict[str, bool]`). This mirrors the bound method
+                    // call handler's use_contexts recording.
+                    if let Some((class_literal, _)) = object_ty.class_specialization(db)
+                        && let Some(use_id) = crate::semantic_index::ast_ids::try_scoped_use_id(
+                            db,
+                            self.scope(),
+                            target.value.as_ref(),
+                        )
+                    {
+                        let identity_instance =
+                            Type::instance(db, class_literal.identity_specialization(db));
+
+                        if let Some(dunder_ty) = identity_instance
+                            .member_lookup_with_policy(
+                                db,
+                                "__setitem__".into(),
+                                crate::types::MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                            )
+                            .place
+                            .ignore_possibly_undefined()
+                        {
+                            let mut identity_bindings =
+                                dunder_ty.bindings(db).match_parameters(db, &call_arguments);
+
+                            for identity_binding in identity_bindings.iter_flat_mut() {
+                                for (_, identity_overload) in
+                                    identity_binding.matching_overloads_mut()
+                                {
+                                    let identity_sig = identity_overload.signature.clone();
+                                    if let Some(inherited_specialization) = identity_overload
+                                        .infer_inherited_specialization(
+                                            db,
+                                            &call_arguments,
+                                            &identity_sig,
+                                            TypeContext::default(),
+                                        )
+                                    {
+                                        let constraints = identity_instance
+                                            .apply_specialization(db, inherited_specialization);
+
+                                        let use_def =
+                                            self.index.use_def_map(self.scope().file_scope_id(db));
+                                        for binding in use_def.bindings_at_use(use_id) {
+                                            if let Some(definition) = binding.binding.definition() {
+                                                self.use_contexts
+                                                    .entry(definition)
+                                                    .or_default()
+                                                    .insert(constraints);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                     return true;
                 };
 

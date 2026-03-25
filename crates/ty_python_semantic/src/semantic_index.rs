@@ -21,7 +21,7 @@ use crate::semantic_index::ast_ids::AstIds;
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::builder::SemanticIndexBuilder;
 use crate::semantic_index::definition::{Definition, DefinitionNodeKey, Definitions};
-use crate::semantic_index::expression::Expression;
+use crate::semantic_index::expression::{CollectionLiteralUse, Expression};
 use crate::semantic_index::narrowing_constraints::ScopedNarrowingConstraint;
 use crate::semantic_index::place::{PlaceExprRef, PlaceTable};
 pub use crate::semantic_index::scope::FileScopeId;
@@ -351,6 +351,10 @@ pub(crate) struct SemanticIndex<'db> {
 
     /// Set of all generator functions in this file.
     generator_functions: FxHashSet<FileScopeId>,
+
+    /// Use sites for unannotated collection literal definitions.
+    /// Maps the Definition that created the collection literal to its use sites.
+    collection_literal_uses: FxHashMap<Definition<'db>, Box<[CollectionLiteralUse<'db>]>>,
 }
 
 impl<'db> SemanticIndex<'db> {
@@ -618,6 +622,16 @@ impl<'db> SemanticIndex<'db> {
     ) -> bool {
         self.expressions_by_node
             .contains_key(&expression_key.into())
+    }
+
+    /// Returns the collection literal use sites for a given definition.
+    pub(crate) fn collection_literal_uses(
+        &self,
+        definition: Definition<'db>,
+    ) -> Option<&[CollectionLiteralUse<'db>]> {
+        self.collection_literal_uses
+            .get(&definition)
+            .map(|uses| &**uses)
     }
 
     /// Returns the id of the scope that `node` creates.

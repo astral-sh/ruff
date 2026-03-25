@@ -616,13 +616,6 @@ impl<'db> ScopeInference<'db> {
             .unwrap_or_else(Type::unknown)
     }
 
-    pub(crate) fn definition_use_contexts(
-        &self,
-        definition: Definition<'db>,
-    ) -> Option<&FxIndexSet<Type<'db>>> {
-        self.extra.as_ref()?.use_contexts.get(&definition)
-    }
-
     pub(crate) fn try_expression_type(
         &self,
         expression: impl Into<ExpressionNodeKey>,
@@ -844,6 +837,13 @@ impl<'db> DefinitionInference<'db> {
         self.extra.as_ref().and_then(|extra| extra.cycle_recovery)
     }
 
+    pub(crate) fn definition_use_contexts(
+        &self,
+        definition: Definition<'db>,
+    ) -> Option<&FxIndexSet<Type<'db>>> {
+        self.extra.as_ref()?.use_contexts.get(&definition)
+    }
+
     pub(crate) fn undecorated_type(&self) -> Option<Type<'db>> {
         self.extra.as_ref().and_then(|extra| extra.undecorated_type)
     }
@@ -966,7 +966,14 @@ impl<'db> ExpressionInference<'db> {
             .unwrap_or_else(Type::unknown)
     }
 
-    fn fallback_type(&self) -> Option<Type<'db>> {
+    pub(crate) fn definition_use_contexts(
+        &self,
+        definition: Definition<'db>,
+    ) -> Option<&FxIndexSet<Type<'db>>> {
+        self.extra.as_ref()?.use_contexts.get(&definition)
+    }
+
+    pub(crate) fn fallback_type(&self) -> Option<Type<'db>> {
         self.extra.as_ref().and_then(|extra| extra.cycle_recovery)
     }
 }

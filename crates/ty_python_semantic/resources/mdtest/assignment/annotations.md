@@ -458,8 +458,8 @@ x13: dict[str, list[int | None]] | dict[str, list[str | None]] = {"a": ["b"]}
 reveal_type(x13)  # revealed: dict[str, list[str | None]]
 
 x14 = [{"a": [1], "b": 1}, {"a": [1]}]
-x14.append(reveal_type({"b": 1}))  # revealed: dict[str, list[int] | int]
-reveal_type(x14)  # revealed: list[dict[str, list[int] | int] | dict[str, list[int]]]
+x14.append(reveal_type({"b": 1}))  # revealed: dict[str, int]
+reveal_type(x14)  # revealed: list[dict[str, int] | dict[str, list[int] | int] | dict[str, list[int]]]
 ```
 
 ## Annotations influence generic call argument inference

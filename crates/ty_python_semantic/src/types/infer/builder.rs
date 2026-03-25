@@ -40,7 +40,7 @@ use crate::semantic_index::definition::{
     Definition, DefinitionKind, DefinitionNodeKey, DefinitionState, ExceptHandlerDefinitionKind,
     ForStmtDefinitionKind, LoopHeaderDefinitionKind, TargetKind, WithItemDefinitionKind,
 };
-use crate::semantic_index::expression::{Expression, ExpressionKind};
+use crate::semantic_index::expression::{CollectionLiteralUse, Expression, ExpressionKind};
 use crate::semantic_index::narrowing_constraints::ConstraintKey;
 use crate::semantic_index::place::{PlaceExpr, PlaceExprRef};
 use crate::semantic_index::scope::{
@@ -1056,7 +1056,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 ) = node
                 {
                     let value_ty = self.infer_expression(value, TypeContext::default());
-                    let slice_ty = self.infer_expression(slice, TypeContext::default());
+                    let slice_ty =
+                        self.infer_maybe_standalone_expression(slice, TypeContext::default());
                     Some(self.infer_subscript_expression_types(subscript, value_ty, slice_ty, *ctx))
                 } else {
                     None
@@ -4634,7 +4635,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } else {
             TypeContext::default()
         };
-        if let Some(ty) = self.infer_optional_expression(ret.value.as_deref(), tcx) {
+        if let Some(ty) = ret
+            .value
+            .as_deref()
+            .map(|expr| self.infer_maybe_standalone_expression(expr, tcx))
+        {
             let range = ret
                 .value
                 .as_ref()
@@ -6364,13 +6369,109 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             && let [target] = assignment.node(self.module()).targets.as_slice()
             && let Some(definition) = self.index.try_definition(NodeKey::from_node(target))
         {
-            // For unannotated collection literals, collect any constraints created by later uses
-            // of this definition in the scope.
-            let scope_use_types =
-                infer_scope_types(self.db(), self.scope(), TypeContext::default());
+            // For unannotated collection literals, collect constraints from targeted use-site
+            // expressions instead of inferring the entire scope. This is much faster for large
+            // scopes because we only infer the expressions that actually provide constraints.
+            let mut all_constraints = FxIndexSet::default();
+            let mut has_fallback = false;
 
-            if let Some(use_constraints) = scope_use_types.definition_use_contexts(definition) {
-                for constraint in use_constraints {
+            if let Some(uses) = self.index.collection_literal_uses(definition) {
+                for use_site in uses {
+                    match *use_site {
+                        CollectionLiteralUse::MethodCall(call_expr) => {
+                            let inference = infer_expression_types(
+                                self.db(),
+                                call_expr,
+                                TypeContext::default(),
+                            );
+                            // If the call expression type is Divergent, the receiver's
+                            // definition was in a cycle and resolved to Divergent, so
+                            // no real constraints could be produced. Skip constraint
+                            // collection and treat this as a fallback to emit
+                            // Collection[Divergent] and let Salsa iterate.
+                            let call_ty = inference.expression_type(call_expr.node_ref(self.db()));
+                            if call_ty.is_divergent() || inference.fallback_type().is_some() {
+                                has_fallback = true;
+                            } else if let Some(constraints) =
+                                inference.definition_use_contexts(definition)
+                            {
+                                all_constraints.extend(constraints.iter().copied());
+                            }
+                        }
+                        CollectionLiteralUse::AnnotatedAssignment(ann_def) => {
+                            let inference = infer_definition_types(self.db(), ann_def);
+                            if let Some(constraints) = inference.definition_use_contexts(definition)
+                            {
+                                all_constraints.extend(constraints.iter().copied());
+                            }
+                            if inference.fallback_type().is_some() {
+                                has_fallback = true;
+                            }
+                        }
+                        CollectionLiteralUse::SubscriptAssignment { key, value } => {
+                            let key_inference =
+                                infer_expression_types(self.db(), key, TypeContext::default());
+                            let value_inference =
+                                infer_expression_types(self.db(), value, TypeContext::default());
+                            let key_ty = key_inference.expression_type(key.node_ref(self.db()));
+                            let value_ty =
+                                value_inference.expression_type(value.node_ref(self.db()));
+
+                            if key_ty.is_divergent() || value_ty.is_divergent() {
+                                has_fallback = true;
+                            } else {
+                                // Construct a specialized instance of the collection
+                                // type from the key and value types (e.g.,
+                                // `dict[str, int]` from `d["key"] = 42`).
+                                let constraint = collection_alias
+                                    .origin(self.db())
+                                    .apply_specialization(self.db(), |generic_context| {
+                                        match generic_context.len(self.db()) {
+                                            1 => generic_context.specialize(
+                                                self.db(),
+                                                &[key_ty.promote(self.db())],
+                                            ),
+                                            2 => generic_context.specialize(
+                                                self.db(),
+                                                &[
+                                                    key_ty.promote(self.db()),
+                                                    value_ty.promote(self.db()),
+                                                ],
+                                            ),
+                                            _ => generic_context.identity_specialization(self.db()),
+                                        }
+                                    });
+
+                                all_constraints.insert(Type::instance(self.db(), constraint));
+                            }
+                        }
+                        CollectionLiteralUse::Return(return_expr) => {
+                            let return_tcx =
+                                nearest_enclosing_function(self.db(), self.index, self.scope())
+                                    .map(|func| {
+                                        TypeContext::new(Some(
+                                            func.last_definition_raw_signature(self.db()).return_ty,
+                                        ))
+                                    })
+                                    .unwrap_or_default();
+                            let inference =
+                                infer_expression_types(self.db(), return_expr, return_tcx);
+                            if let Some(constraints) = inference.definition_use_contexts(definition)
+                            {
+                                all_constraints.extend(constraints.iter().copied());
+                            }
+                            let return_ty =
+                                inference.expression_type(return_expr.node_ref(self.db()));
+                            if return_ty.is_divergent() || inference.fallback_type().is_some() {
+                                has_fallback = true;
+                            }
+                        }
+                    }
+                }
+            }
+
+            if !all_constraints.is_empty() {
+                for constraint in &all_constraints {
                     if constraint.has_unspecialized_type_var(self.db()) {
                         continue;
                     }
@@ -6385,8 +6486,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         )
                         .ok()?;
                 }
-            } else if let Some(divergent) = scope_use_types.fallback_type() {
+            } else if has_fallback {
                 // Infer `Collection[Divergent]` for the initial cycle result.
+                // Get the Divergent type with the correct salsa ID by calling
+                // infer_definition_types, which will cycle back to our query and
+                // return the cycle_initial Divergent.
+                let divergent = infer_definition_types(self.db(), definition)
+                    .fallback_type()
+                    .unwrap_or_else(Type::unknown);
                 let divergent_instance = collection_alias
                     .origin(self.db())
                     .apply_specialization(self.db(), |generic_context| {

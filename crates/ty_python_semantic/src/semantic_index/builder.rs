@@ -31,7 +31,7 @@ use crate::semantic_index::definition::{
     ImportFromSubmoduleDefinitionNodeRef, LoopHeaderDefinitionNodeRef, LoopStmtRef,
     MatchPatternDefinitionNodeRef, StarImportDefinitionNodeRef, WithItemDefinitionNodeRef,
 };
-use crate::semantic_index::expression::{Expression, ExpressionKind};
+use crate::semantic_index::expression::{CollectionLiteralUse, Expression, ExpressionKind};
 use crate::semantic_index::member::MemberExprBuilder;
 use crate::semantic_index::place::{PlaceExpr, PlaceTableBuilder, ScopedPlaceId};
 use crate::semantic_index::predicate::{
@@ -83,10 +83,12 @@ impl Loop {
     }
 }
 
-struct ScopeInfo {
+struct ScopeInfo<'db> {
     file_scope_id: FileScopeId,
     /// Current loop state; None if we are not currently visiting a loop
     current_loop: Option<Loop>,
+    /// Saved collection literal definitions from the enclosing scope.
+    saved_collection_literal_definitions: FxHashMap<Name, Definition<'db>>,
 }
 
 pub(super) struct SemanticIndexBuilder<'db, 'ast> {
@@ -95,7 +97,7 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     file: File,
     source_type: PySourceType,
     module: &'ast ParsedModuleRef,
-    scope_stack: Vec<ScopeInfo>,
+    scope_stack: Vec<ScopeInfo<'db>>,
     /// The assignments we're currently visiting, with
     /// the most recent visit at the end of the Vec
     current_assignments: Vec<CurrentAssignment<'ast, 'db>>,
@@ -138,6 +140,14 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     enclosing_snapshots: FxHashMap<EnclosingSnapshotKey, ScopedEnclosingSnapshotId>,
     /// Errors collected by the `semantic_checker`.
     semantic_syntax_errors: RefCell<Vec<SemanticSyntaxError>>,
+
+    /// Maps variable names to the Definition that assigned them a collection literal in the
+    /// current scope. Used to identify use sites during semantic indexing.
+    collection_literal_definitions: FxHashMap<Name, Definition<'db>>,
+
+    /// Use-site expressions for collection literal definitions, keyed by the Definition that
+    /// created the collection literal.
+    collection_literal_uses: FxHashMap<Definition<'db>, Vec<CollectionLiteralUse<'db>>>,
 }
 
 impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
@@ -178,6 +188,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             semantic_checker: SemanticSyntaxChecker::default(),
             in_try: false,
             semantic_syntax_errors: RefCell::default(),
+
+            collection_literal_definitions: FxHashMap::default(),
+            collection_literal_uses: FxHashMap::default(),
         };
 
         builder.push_scope_with_parent(
@@ -189,13 +202,13 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         builder
     }
 
-    fn current_scope_info(&self) -> &ScopeInfo {
+    fn current_scope_info(&self) -> &ScopeInfo<'db> {
         self.scope_stack
             .last()
             .expect("SemanticIndexBuilder should have created a root scope")
     }
 
-    fn current_scope_info_mut(&mut self) -> &mut ScopeInfo {
+    fn current_scope_info_mut(&mut self) -> &mut ScopeInfo<'db> {
         self.scope_stack
             .last_mut()
             .expect("SemanticIndexBuilder should have created a root scope")
@@ -328,6 +341,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.scope_stack.push(ScopeInfo {
             file_scope_id,
             current_loop: None,
+            saved_collection_literal_definitions: std::mem::take(
+                &mut self.collection_literal_definitions,
+            ),
         });
     }
 
@@ -563,11 +579,14 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
         let ScopeInfo {
             file_scope_id: popped_scope_id,
+            saved_collection_literal_definitions,
             ..
         } = self
             .scope_stack
             .pop()
             .expect("Root scope should be present");
+
+        self.collection_literal_definitions = saved_collection_literal_definitions;
 
         let children_end = self.scopes.next_index();
 
@@ -1388,6 +1407,18 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.add_standalone_expression_impl(expression_node, ExpressionKind::TypeExpression, None)
     }
 
+    /// Record a use site that may provide type constraints for an unannotated collection literal.
+    fn add_collection_literal_use(
+        &mut self,
+        definition: Definition<'db>,
+        use_site: CollectionLiteralUse<'db>,
+    ) {
+        self.collection_literal_uses
+            .entry(definition)
+            .or_default()
+            .push(use_site);
+    }
+
     fn add_standalone_expression_impl(
         &mut self,
         expression_node: &ast::Expr,
@@ -1709,6 +1740,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             enclosing_snapshots: self.enclosing_snapshots,
             semantic_syntax_errors: self.semantic_syntax_errors.into_inner(),
             generator_functions: self.generator_functions,
+            collection_literal_uses: self
+                .collection_literal_uses
+                .into_iter()
+                .map(|(key, uses)| (key, uses.into_boxed_slice()))
+                .collect(),
         }
     }
 
@@ -2129,13 +2165,14 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
 
                 self.visit_expr(&node.value);
 
-                // Unannotated collection literals must be standalone expressions to participate
-                // in full-scope bidirectional inference.
-                if node.targets.len() == 1
+                let is_collection_literal = node.targets.len() == 1
                     && (node.value.is_list_expr()
                         || node.value.is_set_expr()
-                        || node.value.is_dict_expr())
-                {
+                        || node.value.is_dict_expr());
+
+                // Unannotated collection literals must be standalone expressions to participate
+                // in bidirectional inference via targeted use-site analysis.
+                if is_collection_literal {
                     self.add_standalone_assigned_expression(&node.value, node);
                 }
 
@@ -2148,11 +2185,52 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     self.push_assignment(CurrentAssignment::Assign { node, unpack: None });
                     self.visit_expr(target);
                     self.pop_assignment();
+
+                    // After visiting the target (which creates the Definition), record the
+                    // name-to-definition mapping for collection literal use-site identification.
+                    if is_collection_literal {
+                        if let Some(name) = target.as_name_expr()
+                            && let Some(&definition) = self
+                                .definitions_by_node
+                                .get(&DefinitionNodeKey(NodeKey::from_node(name)))
+                                .and_then(|defs| defs.iter().next())
+                        {
+                            self.collection_literal_definitions
+                                .insert(name.id.clone(), definition);
+                        }
+                    } else if let Some(name) = target.as_name_expr() {
+                        // Non-collection-literal assignment: remove any previous collection
+                        // literal tracking for this name.
+                        self.collection_literal_definitions.remove(&name.id);
+                    }
                 } else {
+                    // Before visiting targets, register standalone expressions for any
+                    // subscript assignments on collection literal variables. This must
+                    // happen before `visit_expr` processes these nodes.
+                    let mut subscript_uses = Vec::new();
+                    for target in &node.targets {
+                        if let ast::Expr::Subscript(subscript) = target
+                            && let Some(name) = subscript.value.as_name_expr()
+                            && let Some(&collection_def) =
+                                self.collection_literal_definitions.get(&name.id)
+                        {
+                            let key = self.add_standalone_expression(&subscript.slice);
+                            let value = self.add_standalone_expression(&node.value);
+                            subscript_uses.push((collection_def, key, value));
+                        }
+                    }
+
                     let value = self.add_standalone_assigned_expression(&node.value, node);
 
                     for target in &node.targets {
                         self.add_unpackable_assignment(&Unpackable::Assign(node), target, value);
+                    }
+
+                    for (collection_def, key, value) in subscript_uses {
+                        self.add_collection_literal_use(
+                            collection_def,
+                            CollectionLiteralUse::SubscriptAssignment { key, value },
+                        );
                     }
                 }
             }
@@ -2203,6 +2281,26 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     self.pop_assignment();
                 } else {
                     self.visit_expr(&node.target);
+                }
+
+                // If the value is a collection literal variable, record this annotated
+                // assignment as a use site for bidirectional inference.
+                if let Some(value) = &node.value
+                    && let Some(value_name) = value.as_name_expr()
+                    && let Some(&collection_def) =
+                        self.collection_literal_definitions.get(&value_name.id)
+                    && node.target.is_name_expr()
+                {
+                    if let Some(&target_def) = self
+                        .definitions_by_node
+                        .get(&DefinitionNodeKey(NodeKey::from_node(node)))
+                        .and_then(|defs| defs.iter().next())
+                    {
+                        self.add_collection_literal_use(
+                            collection_def,
+                            CollectionLiteralUse::AnnotatedAssignment(target_def),
+                        );
+                    }
                 }
             }
             ast::Stmt::AugAssign(
@@ -2734,7 +2832,26 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 self.in_try = was_in_try;
             }
 
-            ast::Stmt::Raise(_) | ast::Stmt::Return(_) => {
+            ast::Stmt::Return(ret) => {
+                // If the return value is a collection literal variable, record
+                // this as a use site for bidirectional inference.
+                if let Some(value) = &ret.value
+                    && let Some(name) = value.as_name_expr()
+                    && let Some(&collection_def) = self.collection_literal_definitions.get(&name.id)
+                {
+                    let expr = self.add_standalone_expression(value);
+                    self.add_collection_literal_use(
+                        collection_def,
+                        CollectionLiteralUse::Return(expr),
+                    );
+                }
+
+                walk_stmt(self, stmt);
+                // Everything in the current block after a terminal statement is unreachable.
+                self.mark_unreachable();
+            }
+
+            ast::Stmt::Raise(_) => {
                 walk_stmt(self, stmt);
                 // Everything in the current block after a terminal statement is unreachable.
                 self.mark_unreachable();
@@ -2879,6 +2996,18 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     if let Some(expr) = dunder_all_extend_argument(value) {
                         self.add_standalone_expression(expr);
                     }
+                }
+
+                // If this is a method call on a collection literal variable,
+                // record it as a use site for bidirectional inference.
+                if let Some(name) = method_call_receiver_name(value)
+                    && let Some(&collection_def) = self.collection_literal_definitions.get(name)
+                {
+                    let expr = self.add_standalone_expression(value);
+                    self.add_collection_literal_use(
+                        collection_def,
+                        CollectionLiteralUse::MethodCall(expr),
+                    );
                 }
 
                 self.visit_expr(value);
@@ -3589,6 +3718,15 @@ impl<'ast> Unpackable<'ast> {
 /// Returns the single argument to `__all__.extend()`, if it is a call to `__all__.extend()`
 /// where it looks like the argument might be a `submodule.__all__` expression.
 /// Else, returns `None`.
+/// If `expr` is a method call on a simple name (e.g., `x.append(1)`),
+/// return the name of the receiver (`x`).
+fn method_call_receiver_name(expr: &ast::Expr) -> Option<&Name> {
+    let call = expr.as_call_expr()?;
+    let attr = call.func.as_attribute_expr()?;
+    let name = attr.value.as_name_expr()?;
+    Some(&name.id)
+}
+
 fn dunder_all_extend_argument(value: &ast::Expr) -> Option<&ast::Expr> {
     let ast::ExprCall {
         func,
