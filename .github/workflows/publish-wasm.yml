@@ -30,6 +30,9 @@ jobs:
         with:
           node-version: 24
           registry-url: "https://registry.npmjs.org"
+      - name: "Upgrade npm"
+        # npm trusted publishing requires npm 11.5.1 or later
+        run: npm install -g npm@11.12.0
       - name: "Publish (dry-run)"
         if: ${{ inputs.plan == '' || fromJson(inputs.plan).announcement_tag_is_implicit }}
         run: npm publish --dry-run pkg/
