@@ -6,6 +6,7 @@ use ruff_db::parsed::parsed_module;
 use ruff_index::{IndexSlice, IndexVec};
 use ruff_python_ast::NodeIndex;
 use ruff_python_parser::semantic_errors::SemanticSyntaxError;
+use ruff_text_size::TextRange;
 use rustc_hash::{FxHashMap, FxHashSet};
 use salsa::Update;
 use salsa::plumbing::AsId;
@@ -506,6 +507,18 @@ impl<'db> SemanticIndex<'db> {
     ) -> bool {
         self.is_scope_reachable(db, scope_id)
             && self.use_def_map(scope_id).is_node_reachable(db, node_key)
+    }
+
+    /// Check whether a diagnostic emitted at `range` is in reachable code, considering both
+    /// scope reachability and statement-level reachability within the scope.
+    pub(crate) fn is_range_reachable(
+        &self,
+        db: &'db dyn crate::Db,
+        scope_id: FileScopeId,
+        range: TextRange,
+    ) -> bool {
+        self.is_scope_reachable(db, scope_id)
+            && self.use_def_map(scope_id).is_range_reachable(db, range)
     }
 
     /// Returns an iterator over the descendent scopes of `scope`.

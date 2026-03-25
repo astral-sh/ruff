@@ -389,7 +389,6 @@ def f(cond: bool) -> str:
 ```py
 def f() -> None:
     if False:
-        # error: [invalid-return-type]
         return 1
 
 # error: [invalid-return-type]

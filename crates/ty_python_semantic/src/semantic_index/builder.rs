@@ -16,7 +16,7 @@ use ruff_python_parser::semantic_errors::{
     LazyImportContext, SemanticSyntaxChecker, SemanticSyntaxContext, SemanticSyntaxError,
     SemanticSyntaxErrorKind, YieldOutsideFunctionKind,
 };
-use ruff_text_size::TextRange;
+use ruff_text_size::{Ranged, TextRange};
 use ty_module_resolver::{ModuleName, resolve_module};
 
 use crate::ast_node_ref::AstNodeRef;
@@ -1728,6 +1728,9 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
     fn visit_stmt(&mut self, stmt: &'ast ast::Stmt) {
         self.with_semantic_checker(|semantic, context| semantic.visit_stmt(stmt, context));
 
+        self.current_use_def_map_mut()
+            .record_statement_reachability(stmt.range());
+
         match stmt {
             ast::Stmt::FunctionDef(function_def) => {
                 let ast::StmtFunctionDef {
@@ -3088,12 +3091,16 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 let pre_if = self.flow_snapshot();
                 let (predicate, predicate_id) = self.record_expression_narrowing_constraint(test);
                 let reachability_constraint = self.record_reachability_constraint(predicate);
+                self.current_use_def_map_mut()
+                    .record_statement_reachability(body.range());
                 self.visit_expr(body);
                 let post_body = self.flow_snapshot();
                 self.flow_restore(pre_if);
 
                 self.record_negated_narrowing_constraint(predicate, predicate_id);
                 self.record_negated_reachability_constraint(reachability_constraint);
+                self.current_use_def_map_mut()
+                    .record_statement_reachability(orelse.range());
                 self.visit_expr(orelse);
                 self.flow_merge(post_body);
             }
@@ -3162,6 +3169,8 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                             .record_reachability_constraint(*id); // TODO: nicer API
                     }
 
+                    self.current_use_def_map_mut()
+                        .record_statement_reachability(value.range());
                     self.visit_expr(value);
 
                     // For the last value, we don't need to model control flow. There is no short-circuiting

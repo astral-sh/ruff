@@ -242,6 +242,7 @@
 //! visits a `StmtIf` node.
 
 use ruff_index::{IndexVec, newtype_index};
+use ruff_text_size::TextRange;
 use rustc_hash::{FxBuildHasher, FxHashMap};
 
 use crate::node_key::NodeKey;
@@ -329,6 +330,11 @@ pub(crate) struct UseDefMap<'db> {
 
     /// Tracks whether or not a given AST node is reachable from the start of the scope.
     node_reachability: FxHashMap<NodeKey, ScopedReachabilityConstraintId>,
+
+    /// Tracks the reachability constraint for statements and certain sub-expressions
+    /// (e.g. ternary branches, boolean operator operands), keyed by their text range.
+    /// Used to suppress diagnostics in unreachable code.
+    statement_reachability: Vec<(TextRange, ScopedReachabilityConstraintId)>,
 
     /// If the definition is a binding (only) -- `x = 1` for example -- then we need
     /// [`Declarations`] to know whether this binding is permitted by the live declarations.
@@ -498,6 +504,31 @@ impl<'db> UseDefMap<'db> {
                     .expect("`is_node_reachable` should only be called on AST nodes with recorded reachability"),
             )
             .may_be_true()
+    }
+
+    /// Check whether a diagnostic emitted at `range` is in reachable code within this scope.
+    ///
+    /// Walks the recorded statement/expression reachability entries to find the tightest
+    /// enclosing range and evaluates its reachability constraint. If any enclosing range
+    /// is unreachable, returns `false`.
+    pub(crate) fn is_range_reachable(&self, db: &dyn crate::Db, range: TextRange) -> bool {
+        // Find the tightest (smallest) enclosing range that contains `range`.
+        // If that range is unreachable, the diagnostic should be suppressed.
+        let mut tightest: Option<(TextRange, ScopedReachabilityConstraintId)> = None;
+        for &(stmt_range, constraint) in &self.statement_reachability {
+            if stmt_range.contains_range(range) {
+                match tightest {
+                    Some((current, _)) if stmt_range.len() < current.len() => {
+                        tightest = Some((stmt_range, constraint));
+                    }
+                    None => {
+                        tightest = Some((stmt_range, constraint));
+                    }
+                    _ => {}
+                }
+            }
+        }
+        tightest.is_none_or(|(_, constraint)| self.is_reachable(db, constraint))
     }
 
     pub(crate) fn end_of_scope_bindings(
@@ -925,6 +956,10 @@ pub(super) struct UseDefMapBuilder<'db> {
     /// Tracks whether or not a given AST node is reachable from the start of the scope.
     node_reachability: FxHashMap<NodeKey, ScopedReachabilityConstraintId>,
 
+    /// Tracks the reachability constraint for statements and certain sub-expressions,
+    /// keyed by their text range.
+    statement_reachability: Vec<(TextRange, ScopedReachabilityConstraintId)>,
+
     /// Live declarations for each so-far-recorded binding.
     declarations_by_binding: FxHashMap<Definition<'db>, Declarations>,
 
@@ -959,6 +994,7 @@ impl<'db> UseDefMapBuilder<'db> {
             multi_bindings_by_use: FxHashMap::default(),
             reachability: ScopedReachabilityConstraintId::ALWAYS_TRUE,
             node_reachability: FxHashMap::default(),
+            statement_reachability: Vec::new(),
             declarations_by_binding: FxHashMap::default(),
             bindings_by_definition: FxHashMap::default(),
             symbol_states: IndexVec::new(),
@@ -1419,6 +1455,10 @@ impl<'db> UseDefMapBuilder<'db> {
         self.node_reachability.insert(node_key, self.reachability);
     }
 
+    pub(super) fn record_statement_reachability(&mut self, range: TextRange) {
+        self.statement_reachability.push((range, self.reachability));
+    }
+
     pub(super) fn snapshot_enclosing_state(
         &mut self,
         enclosing_place: ScopedPlaceId,
@@ -1579,6 +1619,7 @@ impl<'db> UseDefMapBuilder<'db> {
         self.bindings_by_use.shrink_to_fit();
         self.multi_bindings_by_use.shrink_to_fit();
         self.node_reachability.shrink_to_fit();
+        self.statement_reachability.shrink_to_fit();
         self.declarations_by_binding.shrink_to_fit();
         self.bindings_by_definition.shrink_to_fit();
         self.enclosing_snapshots.shrink_to_fit();
@@ -1635,6 +1676,9 @@ impl<'db> UseDefMapBuilder<'db> {
         for constraint in self.node_reachability.values() {
             self.reachability_constraints.mark_used(*constraint);
         }
+        for &(_, constraint) in &self.statement_reachability {
+            self.reachability_constraints.mark_used(constraint);
+        }
         for symbol_state in &mut self.symbol_states {
             symbol_state.finish(&mut self.reachability_constraints);
         }
@@ -1671,6 +1715,7 @@ impl<'db> UseDefMapBuilder<'db> {
             bindings_by_use,
             multi_bindings_by_use: self.multi_bindings_by_use,
             node_reachability: self.node_reachability,
+            statement_reachability: self.statement_reachability,
             end_of_scope_symbols: self.symbol_states,
             end_of_scope_members,
             reachable_definitions_by_symbol: self.reachable_symbol_definitions,
