@@ -865,6 +865,28 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     })
             }
 
+            (
+                Type::KnownInstance(KnownInstanceType::FunctoolsPartial(source_callable)),
+                Type::KnownInstance(KnownInstanceType::FunctoolsPartial(target_callable)),
+            ) => self.with_recursion_guard(source, target, || {
+                self.check_callable_pair(db, source_callable, target_callable)
+            }),
+
+            // When checking `FunctoolsPartial <: functools.partial[T]`, we need to specialize
+            // the nominal instance with the partial's return type so the check is precise.
+            (
+                Type::KnownInstance(KnownInstanceType::FunctoolsPartial(callable)),
+                Type::NominalInstance(target_instance),
+            ) if target_instance
+                .class(db)
+                .is_known(db, KnownClass::FunctoolsPartial) =>
+            {
+                let return_ty = callable.signatures(db).overload_return_type_or_unknown(db);
+                let specialized =
+                    KnownClass::FunctoolsPartial.to_specialized_instance(db, &[return_ty]);
+                self.check_type_pair(db, specialized, target)
+            }
+
             // Dynamic is only a subtype of `object` and only a supertype of `Never`; both were
             // handled above. It's always assignable, though.
             //
@@ -1227,6 +1249,22 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // only subtypes of each other if they result in the same signature.
             (Type::FunctionLiteral(source_function), Type::FunctionLiteral(target_function)) => {
                 self.check_function_pair(db, source_function, target_function)
+            }
+            (
+                Type::KnownInstance(KnownInstanceType::FunctoolsPartial(source_callable)),
+                Type::FunctionLiteral(target_function),
+            ) if matches!(
+                self.relation,
+                TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability
+            ) =>
+            {
+                self.with_recursion_guard(source, target, || {
+                    self.check_callable_signature_pair(
+                        db,
+                        source_callable.signatures(db),
+                        target_function.into_callable_type(db).signatures(db),
+                    )
+                })
             }
             (Type::BoundMethod(source_method), Type::BoundMethod(target_method)) => {
                 self.check_bound_method_pair(db, source_method, target_method)
