@@ -840,6 +840,17 @@ def f21(x: tuple[int, int] | tuple[int, int, int]) -> None:
 def f22(a: int, b: int, c: int) -> None: ...
 def f23(x: tuple[int, int] | tuple[int, int, int]) -> None:
     f22(*x)  # error: [missing-argument]
+
+# Later positional arguments must not be allowed to "slide left" when a longer
+# union member would still bind an incompatible tuple element. We currently
+# handle this conservatively, so this still reports the broader iterator-based
+# family of errors.
+def f24(a: int, b: int, c: int = 0) -> None: ...
+def f25(x: tuple[int] | tuple[int, str]) -> None:
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    # error: [too-many-positional-arguments]
+    f24(*x, 1)  # error: [invalid-argument-type]
 ```
 
 ### Mixed argument and parameter containing variadic

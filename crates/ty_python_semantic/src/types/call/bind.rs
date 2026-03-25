@@ -3305,6 +3305,7 @@ struct ParameterInfo {
 }
 
 struct ArgumentMatcher<'a, 'db> {
+    arguments: &'a CallArguments<'a, 'db>,
     parameters: &'a Parameters<'db>,
     argument_forms: &'a mut ArgumentForms,
     errors: &'a mut Vec<BindingError<'db>>,
@@ -3325,7 +3326,7 @@ struct ArgumentMatcher<'a, 'db> {
 
 impl<'a, 'db> ArgumentMatcher<'a, 'db> {
     fn new(
-        arguments: &CallArguments<'a, 'db>,
+        arguments: &'a CallArguments<'a, 'db>,
         parameters: &'a Parameters<'db>,
         argument_forms: &'a mut ArgumentForms,
         errors: &'a mut Vec<BindingError<'db>>,
@@ -3342,6 +3343,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
             .collect();
 
         Self {
+            arguments,
             parameters,
             argument_forms,
             errors,
@@ -3353,6 +3355,18 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
             variadic_argument_matched_to_variadic_parameter: false,
             explicit_keyword_parameters,
         }
+    }
+
+    fn has_later_positional_input(&self, argument_index: usize) -> bool {
+        self.arguments
+            .iter()
+            .skip(argument_index + 1)
+            .any(|(argument, _)| {
+                matches!(
+                    argument,
+                    Argument::Synthetic | Argument::Positional | Argument::Variadic
+                )
+            })
     }
 
     fn get_argument_index(&self, argument_index: usize) -> Option<usize> {
@@ -3530,8 +3544,14 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
                     // later element types. `match_variadic` accounts for that by treating
                     // positions beyond the guaranteed minimum as only conditionally present: they
                     // can satisfy optional parameters, but any required positional parameter
-                    // beyond the minimum still causes the match to fail provisionally.
-                    Type::Union(union) if self.parameters.variadic().is_none() => {
+                    // beyond the minimum still causes the match to fail provisionally. This is
+                    // only sound when no later argument can still contribute more positional
+                    // slots; otherwise, a later positional argument could shift left differently
+                    // for different union members.
+                    Type::Union(union)
+                        if self.parameters.variadic().is_none()
+                            && !self.has_later_positional_input(argument_index) =>
+                    {
                         let tuple_specs: Vec<_> =
                             union.elements(db).iter().map(|ty| ty.iterate(db)).collect();
 
