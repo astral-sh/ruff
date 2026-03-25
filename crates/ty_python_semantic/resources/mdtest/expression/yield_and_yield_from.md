@@ -95,7 +95,7 @@ def outer_generator():
 A dict literal that is structurally compatible with a `TypedDict` should be accepted.
 
 ```py
-from typing import Iterator, TypedDict
+from typing import Iterator, Generator, TypedDict
 
 class Person(TypedDict):
     name: str
@@ -119,6 +119,19 @@ def persons() -> Iterator[Person]:
     # error: [invalid-yield]
     # error: [invalid-argument-type]
     yield from [{"name": 42}]
+```
+
+This also works for return values:
+
+```py
+def persons(f: bool) -> Generator[None, None, Person]:
+    yield
+    if f:
+        return {"name": "Bob"}
+    else:
+        # error: [invalid-return-type]
+        # error: [invalid-argument-type]
+        return {"name": 42}
 ```
 
 ## `yield` expression send type inference
@@ -170,6 +183,7 @@ async def async_iterator_send_none() -> AsyncIterator[int]:
 
 def iterator_yield_from() -> Generator[int, None, int]:
     yield from iterator_send_none()
+    return 1
 ```
 
 ## Error cases
@@ -214,14 +228,14 @@ def sync_returns_async_generator() -> AsyncGenerator[int, str]:  # error: [inval
 ```py
 from typing import Generator
 
-# TODO: should emit an error (does not return `str`)
+# error: [invalid-return-type]
 def invalid_generator1() -> Generator[int, None, str]:
     yield 1
 
-# TODO: should emit an error (does not return `int`)
 def invalid_generator2() -> Generator[int, None, None]:
     yield 1
 
+    # error: [invalid-return-type]
     return "done"
 ```
 
@@ -251,4 +265,18 @@ def inner() -> Generator[int, int, None]:
 def outer() -> Generator[int, str, None]:
     # error: [invalid-yield] "Send type `int` does not match annotated send type `str`"
     yield from inner()
+```
+
+### Non generator function with `Generator` annotation
+
+<!-- snapshot-diagnostics -->
+
+```py
+from typing import Generator
+
+def non_gen() -> Generator[int, int, None]:
+    # error: [invalid-return-type]
+    return 1
+
+reveal_type(non_gen)  # revealed: def non_gen() -> Generator[int, int, None]
 ```

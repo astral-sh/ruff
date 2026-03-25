@@ -45,6 +45,21 @@ reveal_type(bob["age"])  # revealed: int | None
 reveal_type(bob["non_existing"])  # revealed: Unknown
 ```
 
+If a dict literal is inferred against a union containing both a `TypedDict` and a plain `dict`,
+extra keys accepted by the non-`TypedDict` arm should not trigger eager `TypedDict` diagnostics:
+
+```py
+from typing import Any
+
+class FormatterConfig(TypedDict, total=False):
+    format: str
+
+def takes_formatter(config: FormatterConfig | dict[str, Any]) -> None: ...
+
+takes_formatter({"format": "%(message)s"})
+takes_formatter({"factory": object(), "facility": "local0"})
+```
+
 Methods that are available on `dict`s are also available on `TypedDict`s:
 
 ```py
@@ -513,6 +528,13 @@ class Foo(TypedDict):
 
 x1: Foo | None = {"foo": 1}
 reveal_type(x1)  # revealed: Foo
+
+# A union with no dict-compatible fallback should still validate eagerly against the
+# TypedDict arm.
+# error: [missing-typed-dict-key] "Missing required key 'foo' in TypedDict `Foo` constructor"
+# error: [invalid-key] "Unknown key "bar" for TypedDict `Foo`"
+x1_bad: Foo | None = {"bar": 1}
+reveal_type(x1_bad)  # revealed: Foo | None
 
 class Bar(TypedDict):
     bar: int
@@ -1633,6 +1655,47 @@ config: Config = {"host": "localhost", "port": 8080}
 config["host"] = "127.0.0.1"
 # error: [invalid-assignment] "Cannot assign to key "port" on TypedDict `Config`: key is marked read-only"
 config["port"] = 80
+```
+
+## `update()` with `ReadOnly` items
+
+`update()` also cannot write to `ReadOnly` items, unless the source key is bottom-typed and
+therefore cannot be present:
+
+```py
+from typing_extensions import Never, NotRequired, ReadOnly, TypedDict
+
+class ReadOnlyPerson(TypedDict):
+    id: ReadOnly[int]
+    age: int
+
+class AgePatch(TypedDict, total=False):
+    age: int
+
+class IdPatch(TypedDict, total=False):
+    id: int
+
+class ImpossibleIdPatch(TypedDict, total=False):
+    id: NotRequired[Never]
+
+person: ReadOnlyPerson = {"id": 1, "age": 30}
+age_patch: AgePatch = {"age": 31}
+id_patch: IdPatch = {"id": 2}
+impossible_id_patch: ImpossibleIdPatch = {}
+
+person.update(age_patch)
+
+# error: [invalid-argument-type]
+person.update(id_patch)
+
+# error: [invalid-argument-type]
+# error: [invalid-argument-type]
+person.update({"id": 2})
+
+# error: [invalid-argument-type]
+person.update(id=2)
+
+person.update(impossible_id_patch)
 ```
 
 ## Methods on `TypedDict`

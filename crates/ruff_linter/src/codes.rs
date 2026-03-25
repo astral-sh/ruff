@@ -1069,6 +1069,8 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "069") => rules::ruff::rules::FloatEqualityComparison,
         (Ruff, "070") => rules::ruff::rules::UnnecessaryAssignBeforeYield,
         (Ruff, "071") => rules::ruff::rules::OsPathCommonprefix,
+        (Ruff, "072") => rules::ruff::rules::UselessFinally,
+        (Ruff, "073") => rules::ruff::rules::FStringPercentFormat,
 
         (Ruff, "100") => rules::ruff::rules::UnusedNOQA,
         (Ruff, "101") => rules::ruff::rules::RedirectedNOQA,

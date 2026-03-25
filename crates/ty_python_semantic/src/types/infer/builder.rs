@@ -2005,6 +2005,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 assignable
             };
 
+        // For dataclass fields with converters, the write type is the converter's
+        // input type (the type of the first positional parameter), not the field's
+        // declared type.
+        let effective_write_type = |attr_ty: Type<'db>| -> Type<'db> {
+            if let Type::NominalInstance(instance) = object_ty {
+                if let Some(converter_ty) = instance
+                    .class(db)
+                    .converter_input_type_for_field(db, attribute)
+                {
+                    return converter_ty;
+                }
+            }
+            attr_ty
+        };
+
         let emit_invalid_final = |builder: &Self| {
             if emit_diagnostics
                 && let Some(builder) = builder.context.report_lint(&INVALID_ASSIGNMENT, target)
@@ -2343,56 +2358,57 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                             dunder_set_result.is_ok()
                         } else {
-                            let value_ty = infer_value_ty
-                                .infer_silent(self, TypeContext::new(Some(meta_attr_ty)));
+                            let write_ty = effective_write_type(meta_attr_ty);
+                            let value_ty =
+                                infer_value_ty.infer_silent(self, TypeContext::new(Some(write_ty)));
 
-                            ensure_assignable_to(self, value_ty, meta_attr_ty)
+                            ensure_assignable_to(self, value_ty, write_ty)
                         };
 
-                        let assignable_to_instance_attribute = if meta_attr_boundness
-                            == Definedness::PossiblyUndefined
-                        {
-                            let (assignable, boundness) = if let PlaceAndQualifiers {
-                                place:
-                                    Place::Defined(DefinedPlace {
-                                        ty: instance_attr_ty,
-                                        definedness: instance_attr_boundness,
-                                        ..
-                                    }),
-                                qualifiers,
-                            } =
-                                object_ty.instance_member(db, attribute)
-                            {
-                                // Bind `Self` via MRO matching.
-                                let instance_attr_ty =
-                                    instance_attr_ty.bind_self_typevars(db, object_ty);
-                                let value_ty = infer_value_ty
-                                    .infer_silent(self, TypeContext::new(Some(instance_attr_ty)));
-                                if invalid_assignment_to_final(self, qualifiers) {
-                                    return false;
+                        let assignable_to_instance_attribute =
+                            if meta_attr_boundness == Definedness::PossiblyUndefined {
+                                let (assignable, boundness) = if let PlaceAndQualifiers {
+                                    place:
+                                        Place::Defined(DefinedPlace {
+                                            ty: instance_attr_ty,
+                                            definedness: instance_attr_boundness,
+                                            ..
+                                        }),
+                                    qualifiers,
+                                } =
+                                    object_ty.instance_member(db, attribute)
+                                {
+                                    // Bind `Self` via MRO matching.
+                                    let instance_attr_ty =
+                                        instance_attr_ty.bind_self_typevars(db, object_ty);
+                                    let write_ty = effective_write_type(instance_attr_ty);
+                                    let value_ty = infer_value_ty
+                                        .infer_silent(self, TypeContext::new(Some(write_ty)));
+                                    if invalid_assignment_to_final(self, qualifiers) {
+                                        return false;
+                                    }
+
+                                    (
+                                        ensure_assignable_to(self, value_ty, write_ty),
+                                        instance_attr_boundness,
+                                    )
+                                } else {
+                                    (true, Definedness::PossiblyUndefined)
+                                };
+
+                                if boundness == Definedness::PossiblyUndefined {
+                                    report_possibly_missing_attribute(
+                                        &self.context,
+                                        target,
+                                        attribute,
+                                        object_ty,
+                                    );
                                 }
 
-                                (
-                                    ensure_assignable_to(self, value_ty, instance_attr_ty),
-                                    instance_attr_boundness,
-                                )
+                                assignable
                             } else {
-                                (true, Definedness::PossiblyUndefined)
+                                true
                             };
-
-                            if boundness == Definedness::PossiblyUndefined {
-                                report_possibly_missing_attribute(
-                                    &self.context,
-                                    target,
-                                    attribute,
-                                    object_ty,
-                                );
-                            }
-
-                            assignable
-                        } else {
-                            true
-                        };
 
                         assignable_to_meta_attr && assignable_to_instance_attribute
                     }
@@ -2414,8 +2430,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             // Bind `Self` via MRO matching.
                             let instance_attr_ty =
                                 instance_attr_ty.bind_self_typevars(db, object_ty);
-                            let value_ty = infer_value_ty
-                                .infer_silent(self, TypeContext::new(Some(instance_attr_ty)));
+                            let write_ty = effective_write_type(instance_attr_ty);
+                            let value_ty =
+                                infer_value_ty.infer_silent(self, TypeContext::new(Some(write_ty)));
                             if invalid_assignment_to_final(self, qualifiers) {
                                 return false;
                             }
@@ -2429,7 +2446,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 );
                             }
 
-                            ensure_assignable_to(self, value_ty, instance_attr_ty)
+                            ensure_assignable_to(self, value_ty, write_ty)
                         } else {
                             // No explicit attribute found. Use `__setattr__` (already inferred
                             // above) as a fallback for dynamic attribute assignment.
@@ -4601,9 +4618,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // the expected type passed should be the "raw" type,
                     // i.e. type variables in the return type are non-inferable,
                     // and the return types of async functions are not wrapped in `CoroutineType[...]`.
-                    TypeContext::new(Some(
-                        func.last_definition_raw_signature(self.db()).return_ty,
-                    ))
+                    let return_ty = func.last_definition_raw_signature(self.db()).return_ty;
+
+                    // For generator functions, the declared return type is e.g.
+                    // `Generator[YieldType, SendType, ReturnType]`. The type context
+                    // for a `return` statement should be the `ReturnType` type parameter
+                    let file_scope_id = self.scope().file_scope_id(self.db());
+                    let context_ty = if file_scope_id.is_generator_function(self.index) {
+                        return_ty
+                            .generator_return_type(self.db())
+                            .unwrap_or(return_ty)
+                    } else {
+                        return_ty
+                    };
+
+                    TypeContext::new(Some(context_ty))
                 })
                 .unwrap_or_default()
         } else {
@@ -5813,57 +5842,76 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut item_types = FxHashMap::default();
 
         // Validate `TypedDict` dictionary literal assignments.
-        if let Some(tcx) = tcx.annotation {
-            let tcx = tcx.filter_union(self.db(), Type::is_typed_dict);
-
-            if let Some(typed_dict) = tcx.as_typed_dict() {
+        if let Some(annotation) = tcx
+            .annotation
+            .map(|annotation| annotation.resolve_type_alias(self.db()))
+        {
+            if let Some(typed_dict) = annotation.as_typed_dict() {
                 // If there is a single typed dict annotation, infer against it directly.
                 if let Some(ty) =
                     self.infer_typed_dict_expression(dict, typed_dict, &mut item_types)
                 {
                     return ty;
                 }
-            } else if let Type::Union(tcx) = tcx {
-                // Otherwise, we have to narrow to specific elements of the union.
-                //
-                // Infer all expressions with diagnostics enabled before starting multi-inference.
-                for item in items {
-                    if let Some(key) = item.key.as_ref() {
-                        let key_ty = self.infer_expression(key, TypeContext::default());
-                        item_types.insert(key.node_index().load(), key_ty);
-                    }
+            } else if let Type::Union(union) = annotation {
+                let union_elements = union.elements(self.db());
+                let typed_dicts = union_elements
+                    .iter()
+                    .filter_map(|element| element.as_typed_dict())
+                    .collect_vec();
+                let has_dict_compatible_fallback = union_elements.iter().any(|element| {
+                    !element.is_typed_dict() && element.is_instance_of(self.db(), KnownClass::Dict)
+                });
 
-                    let value_ty = self.infer_expression(&item.value, TypeContext::default());
-                    item_types.insert(item.value.node_index().load(), value_ty);
-                }
-
-                // Disable diagnostics as we attempt to narrow to specific elements of the union.
-                let old_multi_inference = self.context.set_multi_inference(true);
-                let old_multi_inference_state =
-                    self.set_multi_inference_state(MultiInferenceState::Ignore);
-
-                let mut narrowed_tys = Vec::new();
-                let mut item_types = FxHashMap::default();
-                for element in tcx.elements(self.db()) {
-                    let typed_dict = element
-                        .as_typed_dict()
-                        .expect("filtered out non-typed-dict types above");
-
-                    if let Some(inferred_ty) =
-                        self.infer_typed_dict_expression(dict, typed_dict, &mut item_types)
+                if let [typed_dict] = typed_dicts.as_slice()
+                    && !has_dict_compatible_fallback
+                {
+                    if let Some(ty) =
+                        self.infer_typed_dict_expression(dict, *typed_dict, &mut item_types)
                     {
-                        narrowed_tys.push(inferred_ty);
+                        return ty;
+                    }
+                } else if !typed_dicts.is_empty() {
+                    // Infer all expressions with diagnostics enabled before starting
+                    // multi-inference. This preserves the general expression types even if we later
+                    // fall back to a non-`TypedDict` arm of the union.
+                    for item in items {
+                        if let Some(key) = item.key.as_ref() {
+                            let key_ty = self.infer_expression(key, TypeContext::default());
+                            item_types.insert(key.node_index().load(), key_ty);
+                        }
+
+                        let value_ty = self.infer_expression(&item.value, TypeContext::default());
+                        item_types.insert(item.value.node_index().load(), value_ty);
                     }
 
-                    item_types.clear();
-                }
+                    // Disable diagnostics as we attempt to narrow to specific `TypedDict`
+                    // elements of the union. Mixed unions like `TypedDict | dict[str, Any]`
+                    // should not emit `TypedDict` diagnostics if a non-`TypedDict` arm accepts
+                    // the literal.
+                    let old_multi_inference = self.context.set_multi_inference(true);
+                    let old_multi_inference_state =
+                        self.set_multi_inference_state(MultiInferenceState::Ignore);
 
-                self.context.set_multi_inference(old_multi_inference);
-                self.set_multi_inference_state(old_multi_inference_state);
+                    let mut narrowed_tys = Vec::new();
+                    let mut item_types = FxHashMap::default();
+                    for typed_dict in typed_dicts {
+                        if let Some(inferred_ty) =
+                            self.infer_typed_dict_expression(dict, typed_dict, &mut item_types)
+                        {
+                            narrowed_tys.push(inferred_ty);
+                        }
 
-                // Successfully narrowed to a subset of typed dicts.
-                if !narrowed_tys.is_empty() {
-                    return UnionType::from_elements(self.db(), narrowed_tys);
+                        item_types.clear();
+                    }
+
+                    self.context.set_multi_inference(old_multi_inference);
+                    self.set_multi_inference_state(old_multi_inference_state);
+
+                    // Successfully narrowed to a subset of typed dicts.
+                    if !narrowed_tys.is_empty() {
+                        return UnionType::from_elements(self.db(), narrowed_tys);
+                    }
                 }
             }
         }
