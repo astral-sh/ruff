@@ -1415,6 +1415,15 @@ impl<'db> UseDefMapBuilder<'db> {
     }
 
     pub(super) fn record_range_reachability(&mut self, range: TextRange) {
+        // If the last entry has the same reachability constraint, extend it
+        // to cover this range too, collapsing consecutive statements in the
+        // same basic block into a single entry.
+        if let Some(last) = self.range_reachability.last_mut() {
+            if last.1 == self.reachability {
+                last.0 = last.0.cover(range);
+                return;
+            }
+        }
         self.range_reachability.push((range, self.reachability));
     }
 
