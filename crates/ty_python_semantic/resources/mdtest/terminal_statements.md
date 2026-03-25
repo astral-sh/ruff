@@ -808,6 +808,31 @@ def _() -> NoReturn:
     C().die()
 ```
 
+### Unreachable `NoReturn` call after a `return`
+
+If a `NoReturn` call is unreachable because it appears after a `return` that always executes, the
+enclosing branch should still be considered terminal (because of the `return`), and the `NoReturn`
+call should not interfere with type narrowing.
+
+See: <https://github.com/astral-sh/ruff/pull/23378>
+
+```py
+from typing import NoReturn, Literal
+
+def fail() -> NoReturn:
+    raise
+
+def _(x: Literal["a", "b"]):
+    if x == "a":
+        if 1 + 1 == 2:
+            return
+        fail()
+    if x == "b":
+        return
+
+    assert_never(x)
+```
+
 ### Awaiting async `NoReturn` functions
 
 Awaiting an async function annotated as returning `NoReturn` should be treated as terminal, just
