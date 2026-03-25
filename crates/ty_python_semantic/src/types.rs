@@ -2348,8 +2348,35 @@ impl<'db> Type<'db> {
                         .find_name_in_mro_with_policy(db, name.as_str(), policy)
                         .expect(
                             "`Type::find_name_in_mro()` should return `Some()` when called on a meta-type",
-                        )
+                    )
                 }
+            }
+
+            Type::TypeVar(bound_typevar)
+                if matches!(
+                    bound_typevar.typevar(db).bound_or_constraints(db),
+                    Some(TypeVarBoundOrConstraints::UpperBound(bound))
+                        if bound.as_protocol_instance().is_some()
+                ) =>
+            {
+                let TypeVarBoundOrConstraints::UpperBound(bound) = bound_typevar
+                    .typevar(db)
+                    .bound_or_constraints(db)
+                    .expect("matched above")
+                else {
+                    unreachable!("matched above");
+                };
+
+                let protocol = bound
+                    .as_protocol_instance()
+                    .expect("matched above to a protocol upper bound");
+
+                protocol
+                    .to_meta_type(db)
+                    .find_name_in_mro_with_policy(db, name.as_str(), policy)
+                    .expect(
+                        "`Type::find_name_in_mro()` should return `Some()` when called on a protocol meta-type",
+                    )
             }
 
             _ => self
@@ -6243,6 +6270,9 @@ fn self_typevar_owner_class_literal<'db>(
         .upper_bound(db)
         .and_then(|ty| match ty {
             Type::NominalInstance(instance) => Some(instance.class_literal(db)),
+            Type::ProtocolInstance(protocol) => protocol
+                .to_nominal_instance()
+                .map(|instance| instance.class_literal(db)),
             _ => None,
         })
 }
@@ -6288,6 +6318,9 @@ impl<'db> SelfBinding<'db> {
     ) -> Self {
         let class_literal = match self_type {
             Type::NominalInstance(instance) => Some(instance.class_literal(db)),
+            Type::ProtocolInstance(protocol) => protocol
+                .to_nominal_instance()
+                .map(|instance| instance.class_literal(db)),
             Type::TypeVar(typevar) if typevar.typevar(db).is_self(db) => {
                 self_typevar_owner_class_literal(db, typevar)
             }

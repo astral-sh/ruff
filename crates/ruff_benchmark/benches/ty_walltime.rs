@@ -109,7 +109,7 @@ static ALTAIR: Benchmark = Benchmark::new(
         max_dep_date: "2025-06-17",
         python_version: PythonVersion::PY312,
     },
-    898,
+    900,
 );
 
 static COLOUR_SCIENCE: Benchmark = Benchmark::new(
