@@ -1,5 +1,42 @@
 # Changelog
 
+## 0.15.7
+
+Released on 2026-03-19.
+
+### Preview features
+
+- Display output severity in preview ([#23845](https://github.com/astral-sh/ruff/pull/23845))
+- Don't show `noqa` hover for non-Python documents ([#24040](https://github.com/astral-sh/ruff/pull/24040))
+
+### Rule changes
+
+- \[`pycodestyle`\] Recognize `pyrefly:` as a pragma comment (`E501`) ([#24019](https://github.com/astral-sh/ruff/pull/24019))
+
+### Server
+
+- Don't return code actions for non-Python documents ([#23905](https://github.com/astral-sh/ruff/pull/23905))
+
+### Documentation
+
+- Add company AI policy to contributing guide ([#24021](https://github.com/astral-sh/ruff/pull/24021))
+- Document editor features for Markdown code formatting ([#23924](https://github.com/astral-sh/ruff/pull/23924))
+- \[`pylint`\] Improve phrasing (`PLC0208`) ([#24033](https://github.com/astral-sh/ruff/pull/24033))
+
+### Other changes
+
+- Use PEP 639 license information ([#19661](https://github.com/astral-sh/ruff/pull/19661))
+
+### Contributors
+
+- [@tmimmanuel](https://github.com/tmimmanuel)
+- [@DimitriPapadopoulos](https://github.com/DimitriPapadopoulos)
+- [@amyreese](https://github.com/amyreese)
+- [@statxc](https://github.com/statxc)
+- [@dylwil3](https://github.com/dylwil3)
+- [@hunterhogan](https://github.com/hunterhogan)
+- [@renovate](https://github.com/renovate)
+
 ## 0.15.6
 
 Released on 2026-03-12.

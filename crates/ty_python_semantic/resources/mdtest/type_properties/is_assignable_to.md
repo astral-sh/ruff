@@ -924,6 +924,24 @@ static_assert(is_assignable_to(Never, type[str]))
 static_assert(is_assignable_to(Never, type[Any]))
 ```
 
+### `Any` / `Unknown` is assignable to `Never`
+
+`Any` and `Unknown` are gradual types. They could materialize to any given type at runtime,
+including `Never`.
+
+```py
+from ty_extensions import static_assert, is_assignable_to, Unknown, Intersection
+from typing_extensions import Never, Any
+
+static_assert(is_assignable_to(Any, Never))
+static_assert(is_assignable_to(Unknown, Never))
+static_assert(is_assignable_to(Any | Unknown, Never))
+static_assert(is_assignable_to(Intersection[Any, int], Never))
+static_assert(is_assignable_to(Intersection[Unknown, int], Never))
+static_assert(not is_assignable_to(Any | int, Never))
+static_assert(not is_assignable_to(Unknown | int, Never))
+```
+
 ## Callable
 
 The examples provided below are only a subset of the possible cases and include the ones with

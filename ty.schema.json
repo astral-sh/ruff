@@ -596,7 +596,7 @@
         },
         "ignore-comment-unknown-rule": {
           "title": "detects `ty: ignore` comments that reference unknown rules",
-          "description": "## What it does\nChecks for `ty: ignore[code]` where `code` isn't a known lint rule.\n\n## Why is this bad?\nA `ty: ignore[code]` directive with a `code` that doesn't match\nany known rule will not suppress any type errors, and is probably a mistake.\n\n## Examples\n```py\na = 20 / 0  # ty: ignore[division-by-zer]\n```\n\nUse instead:\n\n```py\na = 20 / 0  # ty: ignore[division-by-zero]\n```",
+          "description": "## What it does\nChecks for `ty: ignore[code]` or `type: ignore[ty:code]` comments where `code` isn't a known lint rule.\n\n## Why is this bad?\nA `ty: ignore[code]` or a `type:ignore[ty:code] directive with a `code` that doesn't match\nany known rule will not suppress any type errors, and is probably a mistake.\n\n## Examples\n```py\na = 20 / 0  # ty: ignore[division-by-zer]\n```\n\nUse instead:\n\n```py\na = 20 / 0  # ty: ignore[division-by-zero]\n```",
           "default": "warn",
           "oneOf": [
             {
@@ -1087,6 +1087,16 @@
         "invalid-typed-dict-statement": {
           "title": "detects invalid statements in `TypedDict` class bodies",
           "description": "## What it does\nDetects statements other than annotated declarations in `TypedDict` class bodies.\n\n## Why is this bad?\n`TypedDict` class bodies aren't allowed to contain any other types of statements. For\nexample, method definitions and field values aren't allowed. None of these will be\navailable on \"instances of the `TypedDict`\" at runtime (as `dict` is the runtime class of\nall \"`TypedDict` instances\").\n\n## Example\n```python\nfrom typing import TypedDict\n\nclass Foo(TypedDict):\n    def bar(self):  # error: [invalid-typed-dict-statement]\n        pass\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "invalid-yield": {
+          "title": "detects yield expressions where the \"yield\" or \"send\" type is incompatible with the annotated return type",
+          "description": "## What it does\nDetects `yield` and `yield from` expressions where the \"yield\" or \"send\" type\nis incompatible with the generator function's annotated return type.\n\n## Why is this bad?\nYielding a value of a type that doesn't match the generator's declared yield type,\nor using `yield from` with a sub-iterator whose yield or send type is incompatible,\nis a type error that may cause downstream consumers of the generator to receive\nvalues of an unexpected type.\n\n## Examples\n```python\nfrom typing import Iterator\n\ndef gen() -> Iterator[int]:\n    yield \"not an int\"  # error: [invalid-yield]\n```",
           "default": "error",
           "oneOf": [
             {

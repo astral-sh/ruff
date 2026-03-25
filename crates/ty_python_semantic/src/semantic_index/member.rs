@@ -26,13 +26,6 @@ impl Member {
         }
     }
 
-    /// Returns the left most part of the member expression, e.g. `x` in `x.y.z`.
-    ///
-    /// This is the symbol on which the member access is performed.
-    pub(crate) fn symbol_name(&self) -> &str {
-        self.expression.symbol_name()
-    }
-
     pub(crate) fn expression(&self) -> &MemberExpr {
         &self.expression
     }
@@ -226,6 +219,9 @@ impl MemberExprBuilder {
                 path: name.id.clone(),
                 segments: smallvec::SmallVec::new_const(),
             }),
+            ast::ExprRef::Named(named) => {
+                MemberExprBuilder::visit_expr(ast::ExprRef::from(named.target.as_ref()))
+            }
 
             ast::ExprRef::Attribute(attribute) => {
                 let mut builder =

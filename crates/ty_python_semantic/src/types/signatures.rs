@@ -318,13 +318,11 @@ impl<'db> CallableSignature<'db> {
         db: &'db dyn Db,
         other: &Self,
         constraints: &'c ConstraintSetBuilder<'db>,
-        inferable: InferableTypeVars<'_, 'db>,
     ) -> ConstraintSet<'db, 'c> {
         let relation_visitor = HasRelationToVisitor::default(constraints);
         let disjointness_visitor = IsDisjointVisitor::default(constraints);
         let checker = TypeRelationChecker::constraint_set_assignability(
             constraints,
-            inferable,
             &relation_visitor,
             &disjointness_visitor,
         );
@@ -728,7 +726,6 @@ impl<'db> Signature<'db> {
         db: &'db dyn Db,
         other: &CallableSignature<'db>,
         constraints: &'c ConstraintSetBuilder<'db>,
-        inferable: InferableTypeVars<'_, 'db>,
     ) -> ConstraintSet<'db, 'c> {
         // If this signature is a paramspec, bind it to the entire overloaded other callable.
         if let Some(self_bound_typevar) = self.parameters.as_paramspec()
@@ -761,7 +758,6 @@ impl<'db> Signature<'db> {
                         db,
                         other_return_type,
                         constraints,
-                        inferable,
                     )
                 });
             return param_spec_matches.and(db, constraints, || return_types_match);
@@ -771,7 +767,7 @@ impl<'db> Signature<'db> {
             .overloads
             .iter()
             .when_all(db, constraints, |other_signature| {
-                self.when_constraint_set_assignable_to(db, other_signature, constraints, inferable)
+                self.when_constraint_set_assignable_to(db, other_signature, constraints)
             })
     }
 
@@ -780,13 +776,11 @@ impl<'db> Signature<'db> {
         db: &'db dyn Db,
         other: &Self,
         constraints: &'c ConstraintSetBuilder<'db>,
-        inferable: InferableTypeVars<'_, 'db>,
     ) -> ConstraintSet<'db, 'c> {
         let relation_visitor = HasRelationToVisitor::default(constraints);
         let disjointness_visitor = IsDisjointVisitor::default(constraints);
         let checker = TypeRelationChecker::constraint_set_assignability(
             constraints,
-            inferable,
             &relation_visitor,
             &disjointness_visitor,
         );

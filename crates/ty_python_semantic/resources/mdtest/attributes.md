@@ -2504,6 +2504,20 @@ class C:
 C().x
 ```
 
+### Walrus reassignment of `self`
+
+```py
+class Other:
+    x: int = 1
+
+class C:
+    def __init__(self, other: Other) -> None:
+        (self := other).x = 1
+
+# error: [unresolved-attribute]
+reveal_type(C(Other()).x)  # revealed: Unknown
+```
+
 ### Assignment to `self` after nested function
 
 ```py

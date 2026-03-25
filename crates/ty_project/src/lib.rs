@@ -20,8 +20,7 @@ use ruff_db::parsed::parsed_module;
 use ruff_db::source::{SourceTextError, source_text};
 use ruff_db::system::{SystemPath, SystemPathBuf};
 use rustc_hash::FxHashSet;
-use salsa::Durability;
-use salsa::Setter;
+use salsa::{Database, Durability, Setter};
 use std::backtrace::BacktraceStatus;
 use std::collections::hash_set;
 use std::iter::FusedIterator;
@@ -184,20 +183,24 @@ impl Project {
                 .options()
                 .to_settings(db, metadata.root(), strategy)?;
 
-        // This adds a file root for the project itself. This enables
-        // tracking of when changes are made to the files in a project
-        // at the directory level. At time of writing (2025-07-17),
-        // this is used for caching completions for submodules.
-        db.files()
-            .try_add_root(db, metadata.root(), FileRootKind::Project);
-
         let project = Project::builder(Box::new(metadata), Box::new(settings), diagnostics)
             .durability(Durability::MEDIUM)
             .open_fileset_durability(Durability::LOW)
             .file_set_durability(Durability::LOW)
             .new(db);
 
+        project.try_add_file_root(db);
+
         Ok(project)
+    }
+
+    fn try_add_file_root(self, db: &dyn Db) {
+        // This adds a file root for the project itself. This enables
+        // tracking of when changes are made to the files in a project
+        // at the directory level. At time of writing (2025-07-17),
+        // this is used for caching completions for submodules.
+        db.files()
+            .try_add_root(db, self.root(db), FileRootKind::Project);
     }
 
     pub fn root(self, db: &dyn Db) -> &SystemPath {
@@ -242,32 +245,37 @@ impl Project {
 
     pub fn reload(self, db: &mut dyn Db, metadata: ProjectMetadata) {
         tracing::debug!("Reloading project");
-        assert_eq!(self.root(db), metadata.root());
-
-        if &metadata != self.metadata(db) {
-            match metadata
-                .options()
-                .to_settings(db, metadata.root(), &FallibleStrategy)
-            {
-                Ok((settings, settings_diagnostics)) => {
-                    if self.settings(db) != &settings {
-                        self.set_settings(db).to(Box::new(settings));
-                    }
-
-                    if self.settings_diagnostics(db) != settings_diagnostics {
-                        self.set_settings_diagnostics(db).to(settings_diagnostics);
-                    }
-                }
-                Err(error) => {
-                    self.set_settings_diagnostics(db)
-                        .to(vec![error.into_diagnostic()]);
-                }
-            }
-
-            self.set_metadata(db).to(Box::new(metadata));
-        }
 
         self.reload_files(db);
+
+        if &metadata == self.metadata(db) {
+            return;
+        }
+
+        match metadata
+            .options()
+            .to_settings(db, metadata.root(), &FallibleStrategy)
+        {
+            Ok((settings, settings_diagnostics)) => {
+                if self.settings(db) != &settings {
+                    self.set_settings(db).to(Box::new(settings));
+                }
+
+                if self.settings_diagnostics(db) != settings_diagnostics {
+                    self.set_settings_diagnostics(db).to(settings_diagnostics);
+                }
+            }
+            Err(error) => {
+                tracing::warn!(
+                    "Keeping old project configuration because loading the new settings failed with: {error}"
+                );
+                self.set_settings_diagnostics(db)
+                    .to(vec![error.into_diagnostic()]);
+            }
+        }
+
+        self.set_metadata(db).to(Box::new(metadata));
+        self.try_add_file_root(db);
     }
 
     /// Checks the project and its dependencies according to the project's check mode.
@@ -310,6 +318,9 @@ impl Project {
                 for file in &files {
                     let db = db.clone();
                     let reporter = &*reporter;
+
+                    db.unwind_if_revision_cancelled();
+
                     scope.spawn(move |_| {
                         let check_file_span =
                             tracing::debug_span!(parent: project_span, "check_file", ?file);
@@ -637,10 +648,9 @@ pub(crate) fn check_file_impl(db: &dyn Db, file: File) -> Result<Box<[Diagnostic
     {
         let db = AssertUnwindSafe(db);
         match catch(&**db, file, || check_types(*db, file)) {
-            Ok(Some(type_check_diagnostics)) => {
+            Ok(type_check_diagnostics) => {
                 diagnostics.extend(type_check_diagnostics);
             }
-            Ok(None) => {}
             Err(diagnostic) => diagnostics.push(diagnostic),
         }
     }
@@ -740,16 +750,37 @@ enum IOErrorKind {
     SourceText(#[from] SourceTextError),
 }
 
-fn catch<F, R>(db: &dyn Db, file: File, f: F) -> Result<Option<R>, Diagnostic>
+fn catch<F, R>(db: &dyn Db, file: File, f: F) -> Result<R, Diagnostic>
 where
     F: FnOnce() -> R + UnwindSafe,
 {
-    match ruff_db::panic::catch_unwind(|| {
-        // Ignore salsa errors
-        salsa::Cancelled::catch(f).ok()
-    }) {
+    match ruff_db::panic::catch_unwind(f) {
         Ok(result) => Ok(result),
         Err(error) => {
+            match error.payload.downcast_ref::<salsa::Cancelled>() {
+                None => {
+                    // Add a diagnostic (by not early returning) for
+                    // any non Salsa panic (a bug in ty)
+                }
+                Some(salsa::Cancelled::PropagatedPanic) => {
+                    // Add a diagnostic for propagated Salsa panics. That is, query `A`
+                    // running on thread `a` depends on query `B` running on thread `b`
+                    // and query `B` panics. However, avoid adding such a diagnostic
+                    // if query `B` panicked because of a cancellation by calling
+                    // `unwind_if_revision_cancelled`.
+                    //
+                    // The propagated Salsa panic isn't very actionable for users,
+                    // but it can be useful to know that file A failed to type check
+                    // because file B panicked (both files will have a panic-diagnostic).
+                    db.unwind_if_revision_cancelled();
+                }
+
+                // For any pending write or local cancellation, resume the panic to abort the outer query.
+                Some(_) => {
+                    error.resume_unwind();
+                }
+            }
+
             let message = error.to_diagnostic_message(Some(file.path(db)));
             let mut diagnostic = Diagnostic::new(DiagnosticId::Panic, Severity::Fatal, message);
             diagnostic.add_bug_sub_diagnostics("%5Bpanic%5D");
@@ -780,6 +811,10 @@ where
                     ));
                 });
             }
+
+            // Report an untracked read because Salsa didn't carry over
+            // the dependencies of any query called by `f` because it panicked.
+            db.report_untracked_read();
 
             Err(diagnostic)
         }
