@@ -1008,7 +1008,9 @@ However, they are lazily evaluated and can cyclically refer to their own type:
 class G[T: list[G]]:
     x: T
 
-reveal_type(G[list[G]]().x)  # revealed: list[G[Unknown]]
+# TODO: ideally we would support these anonymous recursive types better
+reveal_type(G[list[G]]().x)  # revealed: list[G[list[Divergent] & Unknown]]
+reveal_type(G[list[G]]().x[0].x)  # revealed: list[Divergent] & Unknown
 ```
 
 An invalid specialization in a recursive bound doesn't cause a panic:
@@ -1039,7 +1041,8 @@ class Bar[T: list[int]]:
 
 def f(foo: Foo, bar: Bar):
     reveal_type(foo)  # revealed: Foo[(list[Foo[Any]] & Unknown) | (None & Unknown)]
-    reveal_type(foo.x)  # revealed: (list[Foo[Any]] & Unknown) | (None & Unknown)
+    reveal_type(foo.x)  # revealed: Unknown
+    # TODO: should be `(list[Foo[Any]] & Unknown) | (None & Unknown)`
     reveal_type(bar)  # revealed: Bar[list[int] & Unknown]
     reveal_type(bar.x)  # revealed: list[int] & Unknown
 ```

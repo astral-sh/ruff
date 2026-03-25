@@ -479,8 +479,8 @@ reveal_type(g(D()))  # revealed: D
 # TODO: one diagnostic would probably be sufficient here...?
 #
 # error: [invalid-argument-type] "Argument type `C` does not satisfy upper bound `A` of type variable `T`"
-# error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `B`, found `C`"
-reveal_type(f(C()))  # revealed: B
+# error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `A & Unknown`, found `C`"
+reveal_type(f(C()))  # revealed: A & Unknown
 
 # error: [invalid-argument-type]
 reveal_type(g(A()))  # revealed: Unknown
@@ -625,7 +625,9 @@ T = TypeVar("T", bound=list["G"])
 class G(Generic[T]):
     x: T
 
-reveal_type(G[list[G]]().x)  # revealed: list[G[Unknown]]
+# TODO: ideally we would support these anonymous recursive types better
+reveal_type(G[list[G]]().x)  # revealed: list[G[list[Divergent] & Unknown]]
+reveal_type(G[list[G]]().x[0].x)  # revealed: list[Divergent] & Unknown
 ```
 
 An invalid specialization in a recursive bound doesn't cause a panic:
@@ -663,7 +665,8 @@ class Bar(Generic[U]):
 
 def f(foo: Foo, bar: Bar):
     reveal_type(foo)  # revealed: Foo[(list[Foo[Any]] & Unknown) | (None & Unknown)]
-    reveal_type(foo.x)  # revealed: (list[Foo[Any]] & Unknown) | (None & Unknown)
+    # TODO: should be (list[Foo[Any]] & Unknown) | (None & Unknown)
+    reveal_type(foo.x)  # revealed: Unknown
     reveal_type(bar)  # revealed: Bar[list[int] & Unknown]
     reveal_type(bar.x)  # revealed: list[int] & Unknown
 ```

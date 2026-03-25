@@ -312,6 +312,7 @@ pub(super) fn walk_generic_context<'db, V: TypeVisitor<'db> + ?Sized>(
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for GenericContext<'_> {}
 
+#[salsa::tracked]
 impl<'db> GenericContext<'db> {
     /// Creates a generic context from a list of PEP-695 type parameters.
     pub(crate) fn from_type_params(
@@ -764,6 +765,21 @@ impl<'db> GenericContext<'db> {
         self.variables_inner(db).len()
     }
 
+    #[salsa::tracked(
+        cycle_initial=|db, id, self_: GenericContext<'db>, _| {
+            Specialization::new(
+                db,
+                self_,
+                vec![Type::divergent(id); self_.len(db)].into_boxed_slice(),
+                None,
+                None
+            )
+        },
+        cycle_fn=|db, cycle, previous: &Specialization<'db>, current: Specialization<'db>, _, _| {
+            current.cycle_normalized(db, *previous, cycle)
+        },
+        heap_size=ruff_memory_usage::heap_size,
+    )]
     pub(crate) fn default_specialization(
         self,
         db: &'db dyn Db,
@@ -1152,6 +1168,26 @@ impl<'db> Specialization<'db> {
         } else {
             self
         }
+    }
+
+    fn cycle_normalized(self, db: &'db dyn Db, previous: Self, cycle: &salsa::Cycle) -> Self {
+        Self::new(
+            db,
+            self.generic_context(db),
+            self.types(db)
+                .iter()
+                .zip(previous.types(db))
+                .map(|(&this, &prev)| {
+                    if this.is_nominal_instance() {
+                        this
+                    } else {
+                        this.cycle_normalized(db, prev, cycle)
+                    }
+                })
+                .collect::<Box<_>>(),
+            self.materialization_kind(db),
+            self.tuple_inner(db),
+        )
     }
 
     /// Combines two specializations of the same generic context. If either specialization maps a

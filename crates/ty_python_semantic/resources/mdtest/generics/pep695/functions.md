@@ -51,7 +51,7 @@ def bounded_typevar[T: int]() -> T:
 
 reveal_type(bounded_typevar())  # revealed: int & Unknown
 reveal_type(bounded_typevar().numerator)  # revealed: int & Unknown
-reveal_type(bounded_typevar().bit_length())  # revealed: @Todo(Type::Intersection.call)
+reveal_type(bounded_typevar().bit_length())  # revealed: int & Unknown
 ```
 
 ## Inferring generic function parameter types
