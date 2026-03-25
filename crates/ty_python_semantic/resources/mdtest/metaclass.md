@@ -499,9 +499,10 @@ reveal_type(Test(B()))  # revealed: B
 # error: [no-matching-overload]
 reveal_type(Test(C()))  # revealed: Test
 
-# `D` fails metaclass `__call__`, so never reaches `__new__` or `__init__`.
+# `D` fails metaclass `__call__`, so never reaches `__new__` or `__init__`, and we infer `Unknown`
+# since not all overloads are instance-returning.
 # error: [no-matching-overload]
-reveal_type(Test(D()))  # revealed: Test
+reveal_type(Test(D()))  # revealed: Unknown
 
 # `str` returns `Test` from both `__call__` and `__new__`, but `__init__` rejects `Literal["bad"]`.
 # error: [invalid-argument-type]

@@ -233,29 +233,24 @@ impl<'db> ConstructorBinding<'db> {
             // constructor return type.
             if !self.constructor_kind().is_init() {
                 match analyze_constructor_overloads(db, constructor_class_literal, callable) {
-                    ConstructorOverloadAnalysis::AmbiguousUnmatched {
-                        has_instance_return: false,
-                    } => {
-                        // If none of the unmatched overloads could produce the constructed
-                        // instance, fall back to the overloaded callable result instead of
-                        // inventing an instance return.
-                        return self.entry.return_type();
-                    }
-                    ConstructorOverloadAnalysis::AmbiguousUnmatched {
-                        has_instance_return: true,
+                    ConstructorOverloadAnalysis::NoMatchingOverloads {
+                        all_instance_returns: false,
+                    } => return Type::unknown(),
+                    ConstructorOverloadAnalysis::NoMatchingOverloads {
+                        all_instance_returns: true,
                     } => {}
                     ConstructorOverloadAnalysis::Relevant(relevant_overloads) => {
                         single_relevant_overload = relevant_overloads.single_relevant_overload;
 
                         match relevant_overloads.return_kind {
-                            RelevantConstructorReturnKind::AllSameNonInstance(return_ty) => {
+                            ConstructorOverloadReturns::AllSameNonInstance(return_ty) => {
                                 return return_ty;
                             }
-                            RelevantConstructorReturnKind::DivergentNonInstance => {
+                            ConstructorOverloadReturns::DivergentNonInstance => {
                                 return Type::unknown();
                             }
-                            RelevantConstructorReturnKind::AllInstance
-                            | RelevantConstructorReturnKind::Mixed => {
+                            ConstructorOverloadReturns::AllInstance
+                            | ConstructorOverloadReturns::Mixed => {
                                 // For layered mixed-constructor handling (metaclass `__call__`
                                 // mixed with downstream constructor logic), if the downstream
                                 // constructor resolves to a non-instance return, that becomes the
@@ -505,7 +500,7 @@ struct ConstructorReturnOutcome<'db> {
 }
 
 #[derive(Debug, Clone, Copy)]
-enum RelevantConstructorReturnKind<'db> {
+enum ConstructorOverloadReturns<'db> {
     AllInstance,
     AllSameNonInstance(Type<'db>),
     DivergentNonInstance,
@@ -515,13 +510,13 @@ enum RelevantConstructorReturnKind<'db> {
 #[derive(Debug, Clone, Copy)]
 struct RelevantConstructorOverloads<'a, 'db> {
     single_relevant_overload: Option<&'a Binding<'db>>,
-    return_kind: RelevantConstructorReturnKind<'db>,
+    return_kind: ConstructorOverloadReturns<'db>,
 }
 
 #[derive(Debug, Clone, Copy)]
 enum ConstructorOverloadAnalysis<'a, 'db> {
     Relevant(RelevantConstructorOverloads<'a, 'db>),
-    AmbiguousUnmatched { has_instance_return: bool },
+    NoMatchingOverloads { all_instance_returns: bool },
 }
 
 /// Return `true` if `class_ty` is a subtype of (any specialization of) `class_literal`.
@@ -639,15 +634,15 @@ where
     }
 
     let return_kind = match (saw_instance_return, first_non_instance_return) {
-        (true, Some(_)) => RelevantConstructorReturnKind::Mixed,
-        (true, None) => RelevantConstructorReturnKind::AllInstance,
+        (true, Some(_)) => ConstructorOverloadReturns::Mixed,
+        (true, None) => ConstructorOverloadReturns::AllInstance,
         (false, Some(_)) if saw_distinct_non_instance_return => {
-            RelevantConstructorReturnKind::DivergentNonInstance
+            ConstructorOverloadReturns::DivergentNonInstance
         }
         (false, Some(first_non_instance_return)) => {
-            RelevantConstructorReturnKind::AllSameNonInstance(first_non_instance_return)
+            ConstructorOverloadReturns::AllSameNonInstance(first_non_instance_return)
         }
-        (false, None) => RelevantConstructorReturnKind::AllInstance,
+        (false, None) => ConstructorOverloadReturns::AllInstance,
     };
 
     Some(RelevantConstructorOverloads {
@@ -677,16 +672,17 @@ fn analyze_constructor_overloads<'a, 'db>(
         [overload] => {
             analyze_relevant_constructor_overloads(db, class_literal, std::iter::once(overload))
                 .map_or(
-                    ConstructorOverloadAnalysis::AmbiguousUnmatched {
-                        has_instance_return: false,
+                    ConstructorOverloadAnalysis::NoMatchingOverloads {
+                        all_instance_returns: false,
                     },
                     ConstructorOverloadAnalysis::Relevant,
                 )
         }
-        overloads => ConstructorOverloadAnalysis::AmbiguousUnmatched {
-            has_instance_return: overloads
-                .iter()
-                .any(|overload| overload_returns_instance(db, class_literal, overload)),
+        overloads => ConstructorOverloadAnalysis::NoMatchingOverloads {
+            all_instance_returns: !overloads.is_empty()
+                && overloads
+                    .iter()
+                    .all(|overload| overload_returns_instance(db, class_literal, overload)),
         },
     }
 }
