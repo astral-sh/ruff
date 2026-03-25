@@ -579,14 +579,9 @@ fn constructor_return_outcome<'db>(
     class_literal: ClassLiteral<'db>,
     overload: &Binding<'db>,
 ) -> ConstructorReturnOutcome<'db> {
-    let declared_return = overload.return_ty;
-    let resolved_return = overload
-        .specialization
-        .map(|specialization| declared_return.apply_specialization(db, specialization))
-        .unwrap_or(declared_return);
-    let kind = classify_constructor_return(db, class_literal, resolved_return);
+    let kind = classify_constructor_return(db, class_literal, overload.return_ty);
     ConstructorReturnOutcome {
-        resolved_return,
+        resolved_return: overload.return_ty,
         kind,
     }
 }
