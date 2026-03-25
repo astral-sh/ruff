@@ -4618,9 +4618,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // the expected type passed should be the "raw" type,
                     // i.e. type variables in the return type are non-inferable,
                     // and the return types of async functions are not wrapped in `CoroutineType[...]`.
-                    TypeContext::new(Some(
-                        func.last_definition_raw_signature(self.db()).return_ty,
-                    ))
+                    let return_ty = func.last_definition_raw_signature(self.db()).return_ty;
+
+                    // For generator functions, the declared return type is e.g.
+                    // `Generator[YieldType, SendType, ReturnType]`. The type context
+                    // for a `return` statement should be the `ReturnType` type parameter
+                    let file_scope_id = self.scope().file_scope_id(self.db());
+                    let context_ty = if file_scope_id.is_generator_function(self.index) {
+                        return_ty
+                            .generator_return_type(self.db())
+                            .unwrap_or(return_ty)
+                    } else {
+                        return_ty
+                    };
+
+                    TypeContext::new(Some(context_ty))
                 })
                 .unwrap_or_default()
         } else {
