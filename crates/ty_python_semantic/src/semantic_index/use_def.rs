@@ -484,28 +484,13 @@ impl<'db> UseDefMap<'db> {
     }
 
     /// Check whether a diagnostic emitted at `range` is in reachable code within this scope.
-    ///
-    /// Walks the recorded statement/expression reachability entries to find the tightest
-    /// enclosing range and evaluates its reachability constraint. If any enclosing range
-    /// is unreachable, returns `false`.
     pub(crate) fn is_range_reachable(&self, db: &dyn crate::Db, range: TextRange) -> bool {
-        // Find the tightest (smallest) enclosing range that contains `range`.
-        // If that range is unreachable, the diagnostic should be suppressed.
-        let mut tightest: Option<(TextRange, ScopedReachabilityConstraintId)> = None;
-        for &(stmt_range, constraint) in &self.range_reachability {
-            if stmt_range.contains_range(range) {
-                match tightest {
-                    Some((current, _)) if stmt_range.len() < current.len() => {
-                        tightest = Some((stmt_range, constraint));
-                    }
-                    None => {
-                        tightest = Some((stmt_range, constraint));
-                    }
-                    _ => {}
-                }
-            }
-        }
-        tightest.is_none_or(|(_, constraint)| self.is_reachable(db, constraint))
+        !self
+            .range_reachability
+            .iter()
+            .any(|&(entry_range, constraint)| {
+                entry_range.contains_range(range) && !self.is_reachable(db, constraint)
+            })
     }
 
     pub(crate) fn end_of_scope_bindings(
