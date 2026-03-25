@@ -45,7 +45,7 @@ use super::{
 /// of the `covariant` and `contravariant` keywords used by `TypeVar` variables. As such, replacing
 /// a `TypeVar` variable with an inline type parameter may change its variance.
 ///
-/// ## Example
+/// ## Examples
 ///
 /// ```python
 /// from typing import Generic, TypeVar
@@ -64,8 +64,8 @@ use super::{
 ///     var: T
 /// ```
 ///
-/// If a `TypeVar` is shared across multiple classes, a [type alias] can extract
-/// the bound so that each class declares its own scoped type parameter:
+/// In cases where you've intentionally defined a reusable `TypeVar` to share
+/// the bounds across multiple uses:
 ///
 /// ```python
 /// from typing import Generic, TypeVar
@@ -78,9 +78,8 @@ use super::{
 /// class GenericClass3(Generic[ReusableT]): ...
 /// ```
 ///
-/// Although each class below gets its own `ReusableT`, this is semantically
-/// equivalent — type checkers already treated each class's parameterization
-/// independently. Use instead:
+/// You can instead extract the bound as a [type alias] to retain both the
+/// benefits of the PEP 695 syntax and the reuse of the bound:
 ///
 /// ```python
 /// type ReusableTBound = int | str | dict[int, str]
