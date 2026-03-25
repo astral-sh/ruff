@@ -36,5 +36,3 @@ jobs:
       - name: "Publish"
         if: ${{ inputs.plan != '' && !fromJson(inputs.plan).announcement_tag_is_implicit }}
         run: npm publish --provenance --access public pkg/
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
