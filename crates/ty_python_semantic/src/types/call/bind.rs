@@ -1173,6 +1173,11 @@ impl<'db> Bindings<'db> {
                             let mut input_types = UnionBuilder::new(db);
                             let mut output_types = UnionBuilder::new(db);
                             let mut found_any = false;
+                            // Note: `iter_flat` collapses the union/intersection structure.
+                            // In principle, if the converter is a union of callables, we should
+                            // only accept the intersection of all first parameter types for the
+                            // input type. This seems unlikely to be a real world use case, so
+                            // we currently don't have any special handling for this.
                             for binding in converter_ty.bindings(db).iter_flat() {
                                 // The index of the "actual" first parameters depends on whether or not there
                                 // is a bound `self` parameter in the converter callable.
