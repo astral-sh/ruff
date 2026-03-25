@@ -34,9 +34,9 @@ use crate::{
         call::{CallError, CallErrorKind},
         callable::CallableTypeKind,
         class::{
-            ClassMemberResult, CodeGeneratorKind, DisjointBase, Field, FieldKind,
-            InstanceMemberResult, MetaclassError, MetaclassErrorKind, MethodDecorator, MroLookup,
-            NamedTupleField, SlotsKind, synthesize_namedtuple_class_member,
+            ClassMemberResult, CodeGeneratorKind, DisjointBase, DynamicTypedDictLiteral, Field,
+            FieldKind, InstanceMemberResult, MetaclassError, MetaclassErrorKind, MethodDecorator,
+            MroLookup, NamedTupleField, SlotsKind, synthesize_namedtuple_class_member,
         },
         context::InferContext,
         declaration_type, definition_expression_type, determine_upper_bound,
@@ -54,7 +54,10 @@ use crate::{
         mro::{Mro, MroIterator},
         signatures::CallableSignature,
         tuple::{Tuple, TupleSpec, TupleType},
-        typed_dict::{TypedDictField, TypedDictParams, typed_dict_params_from_class_def},
+        typed_dict::{
+            TypedDictField, TypedDictParams, dynamic_typed_dict_schema,
+            typed_dict_params_from_class_def,
+        },
         variance::VarianceInferable,
         visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard},
     },
@@ -1670,25 +1673,64 @@ impl<'db> StaticClassLiteral<'db> {
         specialization: Option<Specialization<'db>>,
         field_policy: CodeGeneratorKind<'db>,
     ) -> FxIndexMap<Name, Field<'db>> {
+        enum FieldSource<'db> {
+            Static(StaticClassLiteral<'db>, Option<Specialization<'db>>),
+            DynamicTypedDict(DynamicTypedDictLiteral<'db>),
+        }
+
         if field_policy == CodeGeneratorKind::NamedTuple {
             // NamedTuples do not allow multiple inheritance, so it is sufficient to enumerate the
             // fields of this class only.
             return self.own_fields(db, specialization, field_policy);
         }
 
-        self.iter_mro(db, specialization)
-            .rev()
+        let matching_classes_in_mro: Vec<FieldSource<'db>> = self
+            .iter_mro(db, specialization)
             .filter_map(|superclass| {
                 let class = superclass.into_class()?;
-                // Dynamic classes don't have fields (no class body).
-                let (class_literal, specialization) = class.static_class_literal(db)?;
-                if field_policy.matches(db, class_literal.into(), specialization) {
-                    Some((class_literal, specialization))
-                } else {
-                    None
+
+                if let Some((class_literal, specialization)) = class.static_class_literal(db) {
+                    if field_policy.matches(db, class_literal.into(), specialization) {
+                        return Some(FieldSource::Static(class_literal, specialization));
+                    }
+                }
+
+                if field_policy == CodeGeneratorKind::TypedDict
+                    && let ClassLiteral::DynamicTypedDict(typeddict) = class.class_literal(db)
+                {
+                    return Some(FieldSource::DynamicTypedDict(typeddict));
+                }
+
+                None
+            })
+            .collect();
+
+        matching_classes_in_mro
+            .into_iter()
+            .rev()
+            .flat_map(|source| match source {
+                FieldSource::Static(class, specialization) => {
+                    class.own_fields(db, specialization, field_policy)
+                }
+                FieldSource::DynamicTypedDict(typeddict) => {
+                    dynamic_typed_dict_schema(db, typeddict)
+                        .iter()
+                        .map(|(name, td_field)| {
+                            (
+                                name.clone(),
+                                Field {
+                                    declared_ty: td_field.declared_ty,
+                                    kind: FieldKind::TypedDict {
+                                        is_required: td_field.is_required(),
+                                        is_read_only: td_field.is_read_only(),
+                                    },
+                                    first_declaration: td_field.first_declaration(),
+                                },
+                            )
+                        })
+                        .collect()
                 }
             })
-            .flat_map(|(class, specialization)| class.own_fields(db, specialization, field_policy))
             // KW_ONLY sentinels are markers, not real fields. Exclude them so
             // they cannot shadow an inherited field with the same name.
             .filter(|(_, field)| !field.is_kw_only_sentinel(db))

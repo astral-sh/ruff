@@ -1949,6 +1949,33 @@ emp_invalid1 = Employee(department="HR")
 emp_invalid2 = Employee(id=3)
 ```
 
+## Class-based inheritance from functional `TypedDict`
+
+Class-based TypedDicts can inherit from functional TypedDicts:
+
+```py
+from typing import TypedDict
+
+Base = TypedDict("Base", {"a": int}, total=False)
+
+class Child(Base):
+    b: str
+    c: list[int]
+
+child1 = Child(b="hello", c=[1, 2, 3])
+child2 = Child(a=1, b="world", c=[])
+
+reveal_type(child1["a"])  # revealed: int
+reveal_type(child1["b"])  # revealed: str
+reveal_type(child1["c"])  # revealed: list[int]
+
+# error: [missing-typed-dict-key] "Missing required key 'b' in TypedDict `Child` constructor"
+bad_child1 = Child(c=[1])
+
+# error: [missing-typed-dict-key] "Missing required key 'c' in TypedDict `Child` constructor"
+bad_child2 = Child(b="test")
+```
+
 ## Generic `TypedDict`
 
 `TypedDict`s can also be generic.
@@ -2551,6 +2578,9 @@ def f():
 
 # fine
 MyFunctionalTypedDict = TypedDict("MyFunctionalTypedDict", {"not-an-identifier": Required[int]})
+
+class FunctionalTypedDictSubclass(MyFunctionalTypedDict):
+    y: NotRequired[int]  # fine
 ```
 
 ### Nested `Required` and `NotRequired`
@@ -3588,6 +3618,18 @@ class Base(TypedDict):
 # error: [invalid-dataclass]
 class Child(Base):
     y: str
+```
+
+The functional `TypedDict` syntax also triggers this error:
+
+```py
+from dataclasses import dataclass
+from typing import TypedDict
+
+@dataclass
+# error: [invalid-dataclass]
+class Foo(TypedDict("Foo", {"x": int, "y": str})):
+    pass
 ```
 
 ## Class header validation
