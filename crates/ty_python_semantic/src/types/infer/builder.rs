@@ -9181,8 +9181,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn speculate(&mut self) -> Self {
         let mut builder =
             TypeInferenceBuilder::new(self.db(), self.region, self.index, self.module());
+
         // Speculated builders are often discarded immediately.
         builder.context.defuse();
+
+        // Ensure the speculative builder has the same inference context as the current one.
+        builder.deferred_state = self.deferred_state;
+        builder.typevar_binding_context = self.typevar_binding_context;
+        builder.inference_flags = self.inference_flags;
+        builder.inferring_vararg_annotation = self.inferring_vararg_annotation;
+        builder
+            .return_types_and_ranges
+            .clone_from(&self.return_types_and_ranges.clone());
+        builder
+            .dataclass_field_specifiers
+            .clone_from(&self.dataclass_field_specifiers.clone());
+
         builder
     }
 

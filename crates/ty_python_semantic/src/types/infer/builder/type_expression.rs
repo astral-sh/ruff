@@ -1395,8 +1395,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             Type::Union(union) => {
                 self.infer_type_expression(slice);
                 union.map(self.db(), |element| {
-                    self.speculate()
-                        .infer_subscript_type_expression(subscript, *element)
+                    let mut speculative_builder = self.speculate();
+                    let subscript_ty =
+                        speculative_builder.infer_subscript_type_expression(subscript, *element);
+                    self.context.extend(&speculative_builder.context.finish());
+                    subscript_ty
                 })
             }
             _ => {
