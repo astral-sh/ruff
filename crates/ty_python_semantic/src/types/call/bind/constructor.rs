@@ -35,7 +35,7 @@ impl<'db> ConstructorBinding<'db> {
         self.constructor_context
     }
 
-    fn constructed_instance_type(&self) -> Type<'db> {
+    pub(super) fn constructed_instance_type(&self) -> Type<'db> {
         self.constructor_context.instance_type()
     }
 

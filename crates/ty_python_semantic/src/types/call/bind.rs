@@ -1425,12 +1425,14 @@ impl<'db> Bindings<'db> {
                             let mut input_types = UnionBuilder::new(db);
                             let mut output_types = UnionBuilder::new(db);
                             let mut found_any = false;
-                            // Note: `iter_flat` collapses the union/intersection structure.
-                            // In principle, if the converter is a union of callables, we should
-                            // only accept the intersection of all first parameter types for the
-                            // input type. This seems unlikely to be a real world use case, so
-                            // we currently don't have any special handling for this.
-                            for binding in converter_ty.bindings(db).iter_flat() {
+                            let bindings = converter_ty.bindings(db);
+                            // Note: `iter_callable_items` collapses the union/intersection
+                            // structure. In principle, if the converter is a union of callables,
+                            // we should only accept the intersection of all first parameter
+                            // types for the input type. This seems unlikely to be a real world
+                            // use case, so we currently don't have any special handling for this.
+                            for item in bindings.iter_callable_items() {
+                                let binding = item.callable();
                                 // The index of the "actual" first parameters depends on whether or not there
                                 // is a bound `self` parameter in the converter callable.
                                 let first_index = usize::from(binding.bound_type.is_some());
@@ -1441,29 +1443,18 @@ impl<'db> Bindings<'db> {
                                 // type context to solve them, but no other type checker seems
                                 // to support this at the moment, and `converter` is not a
                                 // widely used feature anyway.
-                                let class_default_specialization = binding
-                                    .constructor_instance_type
+                                let class_default_specialization = item
+                                    .as_constructor()
+                                    .map(ConstructorBinding::constructed_instance_type)
                                     .and_then(|ty| ty.class_specialization(db))
                                     .map(|specialization| {
                                         specialization
                                             .generic_context(db)
                                             .default_specialization(db, None)
                                     });
-                                // For class converters, calling the class produces an instance,
-                                // not the `__init__` return type (`None`). Use
-                                // `constructor_instance_type` when available.
-                                let return_ty_override =
-                                    binding.constructor_instance_type.map(|ty| {
-                                        if let Some(specialization) = class_default_specialization {
-                                            ty.apply_specialization(db, specialization)
-                                        } else {
-                                            ty
-                                        }
-                                    });
                                 for overload in binding {
                                     let params = overload.signature.parameters();
-                                    let return_ty =
-                                        return_ty_override.unwrap_or(overload.signature.return_ty);
+                                    let return_ty = overload.return_ty;
 
                                     let default_specialization = class_default_specialization
                                         .or_else(|| {
