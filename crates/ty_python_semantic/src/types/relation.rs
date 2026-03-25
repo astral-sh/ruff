@@ -585,6 +585,31 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         ConstraintSet::from_bool(self.constraints, false)
     }
 
+    fn expanded_intersection_source(
+        &self,
+        db: &'db dyn Db,
+        intersection: crate::types::IntersectionType<'db>,
+    ) -> Option<Type<'db>> {
+        let expanded = intersection.map_positive(db, |element| match *element {
+            Type::TypeVar(typevar) if !typevar.is_inferable(db, self.inferable) => {
+                // Leave inferable typevars alone: widening them here could bypass the normal
+                // solving path and discard information needed to infer a concrete specialization.
+                match typevar.typevar(db).bound_or_constraints(db) {
+                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => bound,
+                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                        constraints.as_type(db)
+                    }
+                    None => *element,
+                }
+            }
+            _ => element
+                .as_new_type()
+                .map_or(*element, |newtype| newtype.concrete_base_type(db)),
+        });
+
+        (expanded != Type::Intersection(intersection)).then_some(expanded)
+    }
+
     fn with_recursion_guard(
         &self,
         source: Type<'db>,
@@ -944,26 +969,27 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 .or(db, self.constraints, || {
                     // Normally non-unions cannot directly contain unions in our model due to the fact that we
                     // enforce a DNF structure on our set-theoretic types. However, it *is* possible for there
-                    // to be a newtype of a union, or for an intersection to contain a newtype of a union; this
-                    // requires special handling.
+                    // to be a newtype of a union, for an intersection to contain a newtype of a union, or for
+                    // a non-inferable typevar (possibly inside an intersection) to widen to a bound or set of
+                    // constraints that exposes a union; this requires special handling.
                     match source {
-                        Type::Intersection(intersection) => {
-                            if intersection.positive(db).iter().any(|&element| {
-                                element.as_new_type().is_some_and(|newtype| {
-                                    newtype.concrete_base_type(db).is_union()
-                                })
-                            }) {
-                                let mapped = intersection.map_positive(db, |&t| match t {
-                                    Type::NewTypeInstance(newtype) => {
-                                        newtype.concrete_base_type(db)
-                                    }
-                                    _ => t,
-                                });
-                                self.check_type_pair(db, mapped, target)
-                            } else {
-                                self.never()
+                        Type::TypeVar(typevar) if !typevar.is_inferable(db, self.inferable) => {
+                            match typevar.typevar(db).bound_or_constraints(db) {
+                                Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                                    self.check_type_pair(db, bound, target)
+                                }
+                                Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                                    self.check_type_pair(db, constraints.as_type(db), target)
+                                }
+                                None => self.never(),
                             }
                         }
+                        Type::Intersection(intersection) => self
+                            .expanded_intersection_source(db, intersection)
+                            .map_or_else(
+                                || self.never(),
+                                |expanded| self.check_type_pair(db, expanded, target),
+                            ),
                         Type::NewTypeInstance(newtype) => {
                             let concrete_base = newtype.concrete_base_type(db);
                             if concrete_base.is_union() {
@@ -1030,11 +1056,21 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 // positive elements is a subtype of that type. If there are no positive elements,
                 // we treat `object` as the implicit positive element (e.g., `~str` is semantically
                 // `object & ~str`).
-                intersection.positive_elements_or_object(db).when_any(
+                let direct = intersection.positive_elements_or_object(db).when_any(
                     db,
                     self.constraints,
                     |elem_ty| self.check_type_pair(db, elem_ty, target),
-                )
+                );
+
+                if let Some(expanded_source) = self.expanded_intersection_source(db, intersection) {
+                    // Replacing a positive bounded/constrained typevar or newtype with its
+                    // bound/base yields a wider view of the same source intersection.
+                    direct.or(db, self.constraints, || {
+                        self.check_type_pair(db, expanded_source, target)
+                    })
+                } else {
+                    direct
+                }
             }
 
             // `Never` is the bottom type, the empty set.
