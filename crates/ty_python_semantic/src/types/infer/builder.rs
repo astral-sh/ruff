@@ -7374,7 +7374,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // Validate `TypedDict` constructor calls after argument type inference.
         if let Some(class) = class
-            && class.class_literal(self.db()).is_typed_dict(self.db())
+            && class.is_typed_dict(self.db())
         {
             validate_typed_dict_constructor(
                 &self.context,
