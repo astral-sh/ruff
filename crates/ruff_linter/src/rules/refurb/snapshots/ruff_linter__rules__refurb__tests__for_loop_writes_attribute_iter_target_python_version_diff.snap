@@ -1,0 +1,75 @@
+---
+source: crates/ruff_linter/src/rules/refurb/mod.rs
+---
+--- Linter settings ---
+-linter.unresolved_target_version = 3.11
++linter.unresolved_target_version = 3.12
+
+--- Summary ---
+Removed: 2
+Added: 2
+
+--- Removed ---
+FURB122 Use of `dst.write` in a for loop
+ --> FURB122_21107.py:8:9
+  |
+6 |       ns = SimpleNamespace(prev=[], last=None)
+7 |       with open("file", "r", encoding="utf-8") as src, open("file", "w", encoding="utf-8") as dst:
+8 | /         for ns.last in src:
+9 | |             dst.write((ns := SimpleNamespace(prev=[*ns.prev, ns.last], last=None)).prev[-1])
+  | |____________________________________________________________________________________________^
+  |
+help: Replace with `dst.writelines`
+
+
+FURB122 Use of `dst.write` in a for loop
+  --> FURB122_21107.py:16:9
+   |
+14 |       index = 0
+15 |       with open("file", "r", encoding="utf-8") as src, open("file", "w", encoding="utf-8") as dst:
+16 | /         for cache[index] in src:
+17 | |             dst.write(str(index := 0))
+   | |______________________________________^
+   |
+help: Replace with `dst.writelines`
+
+
+
+--- Added ---
+FURB122 [*] Use of `dst.write` in a for loop
+ --> FURB122_21107.py:8:9
+  |
+6 |       ns = SimpleNamespace(prev=[], last=None)
+7 |       with open("file", "r", encoding="utf-8") as src, open("file", "w", encoding="utf-8") as dst:
+8 | /         for ns.last in src:
+9 | |             dst.write((ns := SimpleNamespace(prev=[*ns.prev, ns.last], last=None)).prev[-1])
+  | |____________________________________________________________________________________________^
+  |
+help: Replace with `dst.writelines`
+5  | def _():
+6  |     ns = SimpleNamespace(prev=[], last=None)
+7  |     with open("file", "r", encoding="utf-8") as src, open("file", "w", encoding="utf-8") as dst:
+   -         for ns.last in src:
+   -             dst.write((ns := SimpleNamespace(prev=[*ns.prev, ns.last], last=None)).prev[-1])
+8  +         dst.writelines((ns := SimpleNamespace(prev=[*ns.prev, ns.last], last=None)).prev[-1] for ns.last in src)
+9  | 
+10 | 
+11 | def _():
+
+
+FURB122 [*] Use of `dst.write` in a for loop
+  --> FURB122_21107.py:16:9
+   |
+14 |       index = 0
+15 |       with open("file", "r", encoding="utf-8") as src, open("file", "w", encoding="utf-8") as dst:
+16 | /         for cache[index] in src:
+17 | |             dst.write(str(index := 0))
+   | |______________________________________^
+   |
+help: Replace with `dst.writelines`
+13 |     cache = {}
+14 |     index = 0
+15 |     with open("file", "r", encoding="utf-8") as src, open("file", "w", encoding="utf-8") as dst:
+   -         for cache[index] in src:
+   -             dst.write(str(index := 0))
+16 +         dst.writelines(str(index := 0) for cache[index] in src)

@@ -79,6 +79,19 @@ mod tests {
     }
 
     #[test]
+    fn for_loop_writes_attribute_iter_target_python_version_diff() -> Result<()> {
+        assert_diagnostics_diff!(
+            "for_loop_writes_attribute_iter_target_python_version_diff",
+            Path::new("refurb/FURB122_21107.py"),
+            &settings::LinterSettings::for_rule(Rule::ForLoopWrites)
+                .with_target_version(PythonVersion::PY311),
+            &settings::LinterSettings::for_rule(Rule::ForLoopWrites)
+                .with_target_version(PythonVersion::PY312),
+        );
+        Ok(())
+    }
+
+    #[test]
     fn write_whole_file_python_39() -> Result<()> {
         let diagnostics = test_path(
             Path::new("refurb/FURB103_0.py"),

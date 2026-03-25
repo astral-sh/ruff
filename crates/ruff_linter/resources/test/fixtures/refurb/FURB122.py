@@ -97,6 +97,21 @@ def _():
             f.write(f"{char}")
 
 
+# Assignment expression vs comprehension iteration - https://github.com/astral-sh/ruff/issues/21107
+
+
+def _():
+    with open("file", "w") as f:
+        for line in lines:
+            f.write(line := line.upper())
+
+
+def _():
+    with open("file", "w") as f:
+        for first, *rest in lines:
+            f.write(rest := "".join(rest))
+
+
 # OK
 
 def _():
