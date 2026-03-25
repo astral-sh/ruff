@@ -3598,6 +3598,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         // `variable_element.is_some()`) or if we have a union of different fixed-length tuples (in
         // which case `variable_element.is_none()`).
         let is_variable = length.is_variable();
+        let has_fixed_union_tail = is_variable && variable_element.is_none();
 
         // We must be able to match up the fixed-length portion of the argument with positional
         // parameters, so we pass on any errors that occur.
@@ -3613,8 +3614,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         // If the tuple is variable-length, we assume that it will soak up all remaining positional
         // parameters, stopping only when we reach a parameter that has an explicit keyword argument
         // or a parameter that can only be provided via keyword argument, or if we run out of
-        // `argument_types` and have no `variable_element`. (The combination of `is_variable` with
-        // no `variable_element` can only happen with a union of different-fixed-length tuples.)
+        // `argument_types` and have no `variable_element`.
         if is_variable {
             while self
                 .parameters
@@ -3632,6 +3632,19 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
                     break;
                 }
                 self.match_positional(argument_index, argument, arg_type, is_variable)?;
+            }
+        }
+
+        // A "variable" length with no `variable_element` only comes from a union of different
+        // fixed-length tuples. Any remaining `argument_types` are therefore still concrete
+        // positions from the longer union members, not an open-ended variadic tail. Feed them back
+        // through normal positional matching so we report the same errors as a concrete longer
+        // tuple would (`too-many-positional-arguments`, or a later
+        // `parameter-already-assigned` when an explicit keyword also targets that parameter)
+        // instead of silently dropping those extra positions.
+        if has_fixed_union_tail {
+            for argument_type in argument_types.by_ref() {
+                self.match_positional(argument_index, argument, Some(argument_type), is_variable)?;
             }
         }
 

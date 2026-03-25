@@ -957,7 +957,7 @@ retries it from the start which includes parameter matching as well.
 from typing import overload
 
 @overload
-def f(x: int, y: int) -> None: ...
+def f(x: int, y: int, z: str | None = None) -> None: ...
 @overload
 def f(x: int, y: str, z: int) -> None: ...
 ```
@@ -968,21 +968,21 @@ from overloaded import f
 # Test all of the above with a number of different splatted argument types
 
 def _(t: tuple[int, str]) -> None:
-    # This correctly produces an error because the first element of the union has a precise arity of
-    # 2, which matches the first overload, but the second element of the tuple doesn't match the
-    # second parameter type, yielding an `invalid-argument-type` error.
+    # This correctly produces an error because the argument has a precise arity of 2, which
+    # matches the first overload, but the second element of the tuple doesn't match the second
+    # parameter type, yielding an `invalid-argument-type` error.
     f(*t)  # error: [invalid-argument-type]
 
 def _(t: tuple[int, str, int]) -> None:
-    # This correctly produces no error because the first element of the union has a precise arity of
-    # 3, which matches the second overload.
+    # This correctly produces no error because the argument has a precise arity of 3, which
+    # matches the second overload.
     f(*t)
 
 def _(t: tuple[int, str] | tuple[int, str, int]) -> None:
     # This produces an error because the expansion produces two argument lists: `[*tuple[int, str]]`
-    # and `[*tuple[int, str, int]]`. The first list produces produces a type checking error as
-    # described in the first example, while the second list matches the second overload. And,
-    # because not all of the expanded argument list evaluates successfully, we produce an error.
+    # and `[*tuple[int, str, int]]`. The first list produces a type checking error as described in
+    # the first example, while the second list matches the second overload. And, because not all of
+    # the expanded argument list evaluates successfully, we produce an error.
     f(*t)  # error: [no-matching-overload]
 ```
 

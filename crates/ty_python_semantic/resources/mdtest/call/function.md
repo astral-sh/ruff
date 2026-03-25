@@ -828,6 +828,12 @@ def f19(args: tuple[int, ...] | tuple[int, int]) -> None:
 def f16(a: int, b: int = 0, c: str = "") -> None: ...
 def f17(x: tuple[int] | tuple[int, int]) -> None:
     f16(*x)
+
+# Longer union elements must still be rejected when they would contribute
+# extra positional arguments.
+def f20(a: int, b: str) -> None: ...
+def f21(x: tuple[int, str] | tuple[int, str, int]) -> None:
+    f20(*x)  # error: [too-many-positional-arguments]
 ```
 
 ### Mixed argument and parameter containing variadic
@@ -1569,6 +1575,10 @@ from ty_extensions import Unknown
 def f(a: int = 0, b: int = 0, c: int = 0, fmt: str | None = None) -> None: ...
 def _(args: "Unknown | tuple[int, int, int]"):
     f(*args, fmt="{key}")  # fine
+
+def g(a: int, b: int = 0, c: int = 0) -> None: ...
+def _(args: tuple[int, int] | tuple[int, int, int]):
+    g(*args, c=1)  # error: [parameter-already-assigned]
 ```
 
 ## Variadic unpacking should stop at max known arity
