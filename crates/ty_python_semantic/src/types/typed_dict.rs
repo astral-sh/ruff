@@ -151,6 +151,27 @@ impl<'db> TypedDictType<'db> {
         Self::from_patch_items(db, items)
     }
 
+    /// Returns a patch version of this `TypedDict` for `TypedDict.update()`.
+    ///
+    /// All fields become optional, and read-only fields become bottom-typed. This preserves the
+    /// PEP 705 rule that `update()` must reject any source that can write a read-only key, while
+    /// still accepting `NotRequired[Never]` placeholders for keys that cannot be present.
+    pub(crate) fn to_update_patch(self, db: &'db dyn Db) -> Self {
+        let items: TypedDictSchema<'db> = self
+            .items(db)
+            .iter()
+            .map(|(name, field)| {
+                let mut field = field.clone().with_required(false);
+                if field.is_read_only() {
+                    field.declared_ty = Type::Never;
+                }
+                (name.clone(), field)
+            })
+            .collect();
+
+        Self::from_patch_items(db, items)
+    }
+
     pub fn definition(self, db: &'db dyn Db) -> Option<Definition<'db>> {
         match self {
             TypedDictType::Class(defining_class) => defining_class.definition(db),

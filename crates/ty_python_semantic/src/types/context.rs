@@ -211,6 +211,16 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
         }
     }
 
+    /// Check whether a diagnostic emitted at `range` is in reachable code.
+    ///
+    /// This checks both whether the scope itself is reachable and whether the
+    /// specific statement or expression containing this range is reachable.
+    fn is_range_reachable(&self, range: TextRange) -> bool {
+        let index = semantic_index(self.db, self.file);
+        let scope_id = self.scope.file_scope_id(self.db);
+        index.is_range_reachable(self.db, scope_id, range)
+    }
+
     /// Are we currently inferring types in a stub file?
     pub(crate) fn in_stub(&self) -> bool {
         self.file.is_stub(self.db())
@@ -458,6 +468,13 @@ impl<'db, 'ctx> LintDiagnosticGuardBuilder<'db, 'ctx> {
         let suppressions = suppressions(ctx.db(), ctx.file());
         if let Some(suppression) = suppressions.find_suppression(range, lint_id) {
             ctx.diagnostics.borrow_mut().mark_used(suppression.id());
+            return None;
+        }
+
+        // Suppress diagnostics in unreachable code. This checks both whether
+        // the scope itself is unreachable and whether the specific statement or
+        // expression containing this diagnostic is unreachable.
+        if !ctx.is_range_reachable(range) {
             return None;
         }
 

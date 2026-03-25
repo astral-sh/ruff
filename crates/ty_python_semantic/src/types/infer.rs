@@ -1,5 +1,6 @@
 //! We have Salsa queries for inferring types at three different granularities: scope-level,
-//! definition-level, and expression-level.
+//! definition-level, and expression-level, plus lightweight queries for focused subregions like
+//! function decorators.
 //!
 //! Scope-level inference is for when we are actually checking a file, and need to check types for
 //! everything in that file's scopes, or give a linter access to types of arbitrary expressions
@@ -49,7 +50,7 @@ use crate::semantic_index::expression::Expression;
 use crate::semantic_index::scope::ScopeId;
 use crate::semantic_index::{SemanticIndex, semantic_index};
 use crate::types::diagnostic::TypeCheckDiagnostics;
-use crate::types::function::FunctionType;
+use crate::types::function::{FunctionDecorators, FunctionType};
 use crate::types::generics::Specialization;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
@@ -100,6 +101,82 @@ fn definition_cycle_initial<'db>(
     definition: Definition<'db>,
 ) -> DefinitionInference<'db> {
     DefinitionInference::cycle_initial(definition.scope(db), Type::divergent(id))
+}
+
+/// Infer decorator expression types for a function definition.
+///
+/// This is a lightweight query that avoids the cycle risk of calling
+/// `infer_definition_types` when we need to check decorators while
+/// already inside definition inference (e.g. checking `Self` in a
+/// `@staticmethod`).
+#[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
+pub(crate) fn function_known_decorators<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+) -> FunctionDecoratorInference<'db> {
+    let file = definition.file(db);
+    let module = parsed_module(db, file).load(db);
+    let index = semantic_index(db, file);
+
+    TypeInferenceBuilder::new(
+        db,
+        InferenceRegion::FunctionDecorators(definition),
+        index,
+        &module,
+    )
+    .finish_function_decorator_inference()
+}
+
+pub(crate) fn function_known_decorator_flags<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+) -> FunctionDecorators {
+    function_known_decorators(db, definition).known_decorators()
+}
+
+/// A compact inference result for function decorators.
+///
+/// Unlike [`DefinitionInference`], this stores only decorator expression types and
+/// diagnostics, plus the expression-side state that needs to be merged back into
+/// function-definition inference.
+#[derive(Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
+pub(crate) struct FunctionDecoratorInference<'db> {
+    expression_types: FxHashMap<ExpressionNodeKey, Type<'db>>,
+    bindings: Box<[(Definition<'db>, Type<'db>)]>,
+    called_functions: Box<[FunctionType<'db>]>,
+    known_decorators: FunctionDecorators,
+    diagnostics: TypeCheckDiagnostics,
+}
+
+impl<'db> FunctionDecoratorInference<'db> {
+    pub(crate) fn expression_type(
+        &self,
+        expression: impl Into<ExpressionNodeKey>,
+    ) -> Option<Type<'db>> {
+        self.expression_types.get(&expression.into()).copied()
+    }
+
+    pub(crate) fn expression_types(&self) -> &FxHashMap<ExpressionNodeKey, Type<'db>> {
+        &self.expression_types
+    }
+
+    pub(crate) fn bindings(
+        &self,
+    ) -> impl ExactSizeIterator<Item = (Definition<'db>, Type<'db>)> + '_ {
+        self.bindings.iter().copied()
+    }
+
+    pub(crate) fn called_functions(&self) -> &[FunctionType<'db>] {
+        &self.called_functions
+    }
+
+    pub(crate) fn known_decorators(&self) -> FunctionDecorators {
+        self.known_decorators
+    }
+
+    pub(crate) fn diagnostics(&self) -> &TypeCheckDiagnostics {
+        &self.diagnostics
+    }
 }
 
 /// Infer types for all deferred type expressions in a [`Definition`].
@@ -513,6 +590,8 @@ pub(crate) enum InferenceRegion<'db> {
     Expression(Expression<'db>, TypeContext<'db>),
     /// infer types for a [`Definition`]
     Definition(Definition<'db>),
+    /// infer types for the decorators on a function [`Definition`]
+    FunctionDecorators(Definition<'db>),
     /// infer deferred types for a [`Definition`]
     Deferred(Definition<'db>),
     /// infer types for an entire [`ScopeId`]
@@ -523,9 +602,9 @@ impl<'db> InferenceRegion<'db> {
     fn scope(self, db: &'db dyn Db) -> ScopeId<'db> {
         match self {
             InferenceRegion::Expression(expression, _) => expression.scope(db),
-            InferenceRegion::Definition(definition) | InferenceRegion::Deferred(definition) => {
-                definition.scope(db)
-            }
+            InferenceRegion::Definition(definition)
+            | InferenceRegion::FunctionDecorators(definition)
+            | InferenceRegion::Deferred(definition) => definition.scope(db),
             InferenceRegion::Scope(scope, _) => scope,
         }
     }

@@ -45,13 +45,24 @@ reveal_type(user.internal_name)  # revealed: str
 ```py
 from attrs import define, field
 
+def serialize_data(data: dict[str, int]) -> bytes:
+    raise NotImplementedError
+
 @define
 class Product:
     id: int = field(init=False)
     name: str = field()
     price_cent: int = field(kw_only=True)
+    data: bytes = field(converter=serialize_data, kw_only=True)
 
-reveal_type(Product.__init__)  # revealed: (self: Product, name: str, *, price_cent: int) -> None
+reveal_type(Product.__init__)  # revealed: (self: Product, name: str, *, price_cent: int, data: dict[str, int]) -> None
+
+p = Product(name="Gadget", price_cent=1999, data={"a": 1})
+
+p.data = {"b": 2}
+reveal_type(p.data)  # revealed: bytes
+
+p.data = "not a dict"  # error: [invalid-assignment]
 ```
 
 ## Dedicated support for the `default` decorator?

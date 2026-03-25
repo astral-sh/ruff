@@ -1136,7 +1136,12 @@ impl<'db> FunctionType<'db> {
     ///
     /// Were this not a salsa query, then the calling query
     /// would depend on the function's AST and rerun for every change in that file.
-    #[salsa::tracked(returns(ref), cycle_initial=|_, _, _| CallableSignature::single(Signature::bottom()), heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(
+        returns(ref),
+        cycle_initial=|_, _, _| CallableSignature::single(Signature::bottom()),
+        cycle_fn=|db, cycle, previous, value: CallableSignature<'db>, _| value.cycle_normalized(db, previous, cycle),
+        heap_size=ruff_memory_usage::heap_size,
+    )]
     pub(crate) fn signature(self, db: &'db dyn Db) -> CallableSignature<'db> {
         self.updated_signature(db)
             .cloned()
