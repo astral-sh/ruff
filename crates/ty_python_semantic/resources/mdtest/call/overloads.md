@@ -968,22 +968,73 @@ from overloaded import f
 # Test all of the above with a number of different splatted argument types
 
 def _(t: tuple[int, str]) -> None:
-    # This correctly produces an error because the first element of the union has a precise arity of
-    # 2, which matches the first overload, but the second element of the tuple doesn't match the
-    # second parameter type, yielding an `invalid-argument-type` error.
+    # This correctly produces an error because the argument has a precise arity of 2, which
+    # matches the first overload, but the second element of the tuple doesn't match the second
+    # parameter type, yielding an `invalid-argument-type` error.
     f(*t)  # error: [invalid-argument-type]
 
 def _(t: tuple[int, str, int]) -> None:
-    # This correctly produces no error because the first element of the union has a precise arity of
-    # 3, which matches the second overload.
+    # This correctly produces no error because the argument has a precise arity of 3, which
+    # matches the second overload.
     f(*t)
 
 def _(t: tuple[int, str] | tuple[int, str, int]) -> None:
     # This produces an error because the expansion produces two argument lists: `[*tuple[int, str]]`
-    # and `[*tuple[int, str, int]]`. The first list produces produces a type checking error as
-    # described in the first example, while the second list matches the second overload. And,
-    # because not all of the expanded argument list evaluates successfully, we produce an error.
+    # and `[*tuple[int, str, int]]`. The first list produces a type checking error as described in
+    # the first example, while the second list matches the second overload. And, because not all of
+    # the expanded argument list evaluates successfully, we produce an error.
     f(*t)  # error: [no-matching-overload]
+
+from typing import Literal, overload
+
+@overload
+def g(x: int, y: str) -> Literal[1]: ...
+@overload
+def g(x: int, y: str, z: int) -> Literal[2]: ...
+def g(*args, **kwargs) -> int:
+    return 1
+
+def _(t: tuple[int, str] | tuple[int, str, int]) -> None:
+    # Here both expanded argument lists evaluate successfully, so argument expansion should keep
+    # both overloads and combine their return types.
+    reveal_type(g(*t))  # revealed: Literal[1, 2]
+
+@overload
+def h(x: int, y: str) -> Literal[1]: ...
+@overload
+def h(x: object, y: object, z: object) -> Literal[2]: ...
+def h(*args, **kwargs) -> int:
+    return 1
+
+def _(t: tuple[int, str] | tuple[int, str, int]) -> None:
+    reveal_type(h(*t))  # revealed: Literal[1, 2]
+
+@overload
+def k(x: int, y: str) -> Literal[1]: ...
+@overload
+def k(x: int | str, y: object, z: object) -> Literal[2]: ...
+@overload
+def k(x: object, y: object, z: object) -> Literal[2]: ...
+def k(*args, **kwargs) -> int:
+    return 1
+
+def _(t: tuple[int, str] | tuple[int, str, int]) -> None:
+    reveal_type(k(*t))  # revealed: Literal[1, 2]
+
+# TODO: this case should error with overlapping overloads -- but people do write overlapping
+# overloads, and `Literal[1, 2]` is still a better return type here than `Literal[2]`.
+
+@overload
+def m(x: int, y: str) -> Literal[1]: ...
+@overload
+def m(x: int, y: str, z: int = 0) -> Literal[2]: ...
+def m(*args, **kwargs) -> int:
+    return 1
+
+def _(t: tuple[int, str] | tuple[int, str, int]) -> None:
+    # The defaulted third parameter lets the second overload survive provisional arity checking,
+    # but argument expansion should still revive the 2-arg overload and combine both return types.
+    reveal_type(m(*t))  # revealed: Literal[1, 2]
 ```
 
 ## Filtering based on variadic arguments

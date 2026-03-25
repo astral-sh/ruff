@@ -2284,38 +2284,54 @@ impl<'db> CallableBinding<'db> {
         );
 
         // Step 1: Check the result of the arity check which is done by `match_parameters`
-        let matching_overload_indexes = match self.matching_overload_index() {
-            MatchingOverloadIndex::None => {
-                // If no candidate overloads remain from the arity check, we can stop here. We
-                // still perform type checking for non-overloaded function to provide better user
-                // experience.
-                if let [overload] = self.overloads.as_mut_slice() {
-                    overload.check_types(
-                        db,
-                        constraints,
-                        call_arguments.as_ref(),
-                        call_expression_tcx,
-                    );
+
+        // For overloaded calls with expandable `*args`, any arity-based overload pruning is only
+        // provisional. If we have an arity-2 overload and an arity-3 overload, and the call has
+        // `*arg` where `arg` is a union of a 2-tuple and a 3-tuple, we shouldn't eliminate any
+        // overload for arity reasons before trying argument expansion.
+        let (should_retry_after_provisional_arity, overloads_for_expansion) =
+            if self.overloads.len() > 1
+                && self.matching_overload_index().len() < self.overloads.len()
+                && call_arguments.iter().any(|(argument, argument_types)| {
+                    matches!(argument, Argument::Variadic)
+                        && argument_types
+                            .get_default()
+                            .is_some_and(|argument_type| is_expandable_type(db, argument_type))
+                })
+            {
+                // We will retry all overloads after argument expansion.
+                (true, (0..self.overloads.len()).collect())
+            } else {
+                match self.matching_overload_index() {
+                    MatchingOverloadIndex::None => {
+                        // If no candidate overloads remain from the arity check, we can stop here. We
+                        // still perform type checking for non-overloaded function to provide better
+                        // user experience.
+                        if let [overload] = self.overloads.as_mut_slice() {
+                            overload.check_types(
+                                db,
+                                constraints,
+                                call_arguments.as_ref(),
+                                call_expression_tcx,
+                            );
+                        }
+                        return None;
+                    }
+                    MatchingOverloadIndex::Single(index) => {
+                        // If only one candidate overload remains, it is the winning match. Evaluate
+                        // it as a regular (non-overloaded) call.
+                        self.matching_overload_before_type_checking = Some(index);
+                        self.overloads[index].check_types(
+                            db,
+                            constraints,
+                            call_arguments.as_ref(),
+                            call_expression_tcx,
+                        );
+                        return None;
+                    }
+                    MatchingOverloadIndex::Multiple(indexes) => (false, indexes),
                 }
-                return None;
-            }
-            MatchingOverloadIndex::Single(index) => {
-                // If only one candidate overload remains, it is the winning match. Evaluate it as
-                // a regular (non-overloaded) call.
-                self.matching_overload_before_type_checking = Some(index);
-                self.overloads[index].check_types(
-                    db,
-                    constraints,
-                    call_arguments.as_ref(),
-                    call_expression_tcx,
-                );
-                return None;
-            }
-            MatchingOverloadIndex::Multiple(indexes) => {
-                // If two or more candidate overloads remain, proceed to step 2.
-                indexes
-            }
-        };
+            };
 
         // Step 2: Evaluate each remaining overload as a regular (non-overloaded) call to determine
         // whether it is compatible with the supplied argument list.
@@ -2334,54 +2350,58 @@ impl<'db> CallableBinding<'db> {
             "after step 2",
         );
 
-        match self.matching_overload_index() {
-            MatchingOverloadIndex::None => {
-                // If all overloads result in errors, proceed to step 3.
-            }
-            MatchingOverloadIndex::Single(_) => {
-                // If only one overload evaluates without error, it is the winning match.
-                return None;
-            }
-            MatchingOverloadIndex::Multiple(indexes) => {
-                // If two or more candidate overloads remain, proceed to step 4.
-                self.filter_overloads_containing_variadic(&indexes);
-
-                tracing::trace!(
-                    target: "ty_python_semantic::types::call::bind",
-                    matching_overload_index = ?self.matching_overload_index(),
-                    "after step 4",
-                );
-
-                match self.matching_overload_index() {
-                    MatchingOverloadIndex::None => {
-                        // This shouldn't be possible because step 4 can only filter out overloads
-                        // when there _is_ a matching variadic argument.
-                        tracing::debug!("All overloads have been filtered out in step 4");
-                        return None;
-                    }
-                    MatchingOverloadIndex::Single(_) => {
-                        // If only one candidate overload remains, it is the winning match.
-                        return None;
-                    }
-                    MatchingOverloadIndex::Multiple(indexes) => {
-                        // If two or more candidate overloads remain, proceed to step 5.
-                        self.filter_overloads_using_any_or_unknown(
-                            db,
-                            constraints,
-                            call_arguments.as_ref(),
-                            &indexes,
-                        );
-
-                        tracing::trace!(
-                            target: "ty_python_semantic::types::call::bind",
-                            matching_overload_index = ?self.matching_overload_index(),
-                            "after step 5",
-                        );
-                    }
+        // If we are in the "retry for provisional arity" case, we have to try argument expansion
+        // before deciding we are done or moving on to step 4+.
+        if !should_retry_after_provisional_arity {
+            match self.matching_overload_index() {
+                MatchingOverloadIndex::None => {
+                    // If all overloads result in errors, proceed to step 3.
                 }
+                MatchingOverloadIndex::Single(_) => {
+                    // If only one overload evaluates without error, it is the winning match.
+                    return None;
+                }
+                MatchingOverloadIndex::Multiple(indexes) => {
+                    // If two or more candidate overloads remain, proceed to step 4.
+                    self.filter_overloads_containing_variadic(&indexes);
 
-                // This shouldn't lead to argument type expansion.
-                return None;
+                    tracing::trace!(
+                        target: "ty_python_semantic::types::call::bind",
+                        matching_overload_index = ?self.matching_overload_index(),
+                        "after step 4",
+                    );
+
+                    match self.matching_overload_index() {
+                        MatchingOverloadIndex::None => {
+                            // This shouldn't be possible because step 4 can only filter out overloads
+                            // when there _is_ a matching variadic argument.
+                            tracing::debug!("All overloads have been filtered out in step 4");
+                            return None;
+                        }
+                        MatchingOverloadIndex::Single(_) => {
+                            // If only one candidate overload remains, it is the winning match.
+                            return None;
+                        }
+                        MatchingOverloadIndex::Multiple(indexes) => {
+                            // If two or more candidate overloads remain, proceed to step 5.
+                            self.filter_overloads_using_any_or_unknown(
+                                db,
+                                constraints,
+                                call_arguments.as_ref(),
+                                &indexes,
+                            );
+
+                            tracing::trace!(
+                                target: "ty_python_semantic::types::call::bind",
+                                matching_overload_index = ?self.matching_overload_index(),
+                                "after step 5",
+                            );
+                        }
+                    }
+
+                    // This shouldn't lead to argument type expansion.
+                    return None;
+                }
             }
         }
 
@@ -2440,7 +2460,7 @@ impl<'db> CallableBinding<'db> {
             }
         }
 
-        let snapshotter = CallableBindingSnapshotter::new(matching_overload_indexes);
+        let snapshotter = CallableBindingSnapshotter::new(overloads_for_expansion);
 
         // State of the bindings _after_ evaluating (type checking) the matching overloads using
         // the non-expanded argument types.
@@ -3215,6 +3235,16 @@ pub(crate) enum MatchingOverloadIndex {
     Multiple(Vec<usize>),
 }
 
+impl MatchingOverloadIndex {
+    pub(crate) fn len(&self) -> usize {
+        match self {
+            MatchingOverloadIndex::None => 0,
+            MatchingOverloadIndex::Single(_) => 1,
+            MatchingOverloadIndex::Multiple(indexes) => indexes.len(),
+        }
+    }
+}
+
 #[derive(Default, Debug, Clone)]
 struct ArgumentForms {
     values: Vec<Option<ParameterForm>>,
@@ -3272,6 +3302,7 @@ struct ParameterInfo {
 }
 
 struct ArgumentMatcher<'a, 'db> {
+    arguments: &'a CallArguments<'a, 'db>,
     parameters: &'a Parameters<'db>,
     argument_forms: &'a mut ArgumentForms,
     errors: &'a mut Vec<BindingError<'db>>,
@@ -3292,7 +3323,7 @@ struct ArgumentMatcher<'a, 'db> {
 
 impl<'a, 'db> ArgumentMatcher<'a, 'db> {
     fn new(
-        arguments: &CallArguments<'a, 'db>,
+        arguments: &'a CallArguments<'a, 'db>,
         parameters: &'a Parameters<'db>,
         argument_forms: &'a mut ArgumentForms,
         errors: &'a mut Vec<BindingError<'db>>,
@@ -3309,6 +3340,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
             .collect();
 
         Self {
+            arguments,
             parameters,
             argument_forms,
             errors,
@@ -3320,6 +3352,18 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
             variadic_argument_matched_to_variadic_parameter: false,
             explicit_keyword_parameters,
         }
+    }
+
+    fn has_later_positional_input(&self, argument_index: usize) -> bool {
+        self.arguments
+            .iter()
+            .skip(argument_index + 1)
+            .any(|(argument, _)| {
+                matches!(
+                    argument,
+                    Argument::Synthetic | Argument::Positional | Argument::Variadic
+                )
+            })
     }
 
     fn get_argument_index(&self, argument_index: usize) -> Option<usize> {
@@ -3493,24 +3537,17 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
                     // union types, length bounds, and variable element so that the rest of the
                     // matching logic handles unions correctly.
                     //
-                    // We restrict this to cases where all remaining positional parameters are
-                    // defaulted and there is no variadic parameter, because the per-position
-                    // union loses the correlation between element lengths and per-position types.
-                    // For example, given overloads `f(x: int, y: int)` and `f(x: int, y: str, z: int)`
-                    // with `t: tuple[int, str] | tuple[int, str, int]`, the per-position union
-                    // would collapse the two arities, preventing the expansion step from correctly
-                    // splitting the union into separate argument lists per overload.
-                    //
-                    // TODO: This is overly conservative. We could also apply this when all
-                    // non-defaulted parameters are covered by the shortest union element,
-                    // e.g. `f(a: int, b: int = 0)` with `*x` where `x: tuple[int] | tuple[int, int]`.
+                    // The per-position union loses the correlation between tuple length and the
+                    // later element types. `match_variadic` accounts for that by treating
+                    // positions beyond the guaranteed minimum as only conditionally present: they
+                    // can satisfy optional parameters, but any required positional parameter
+                    // beyond the minimum still causes the match to fail provisionally. This is
+                    // only sound when no later argument can still contribute more positional
+                    // slots; otherwise, a later positional argument could shift left differently
+                    // for different union members.
                     Type::Union(union)
                         if self.parameters.variadic().is_none()
-                            && self
-                                .parameters
-                                .positional()
-                                .skip(self.next_positional)
-                                .all(|parameter| parameter.default_type().is_some()) =>
+                            && !self.has_later_positional_input(argument_index) =>
                     {
                         let tuple_specs: Vec<_> =
                             union.elements(db).iter().map(|ty| ty.iterate(db)).collect();
@@ -3520,6 +3557,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
                             .map(|s| s.len().minimum())
                             .min()
                             .unwrap_or(0);
+
                         let any_variable = tuple_specs.iter().any(|s| s.len().is_variable());
                         let max_elements = tuple_specs
                             .iter()
@@ -3593,6 +3631,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         // `variable_element.is_some()`) or if we have a union of different fixed-length tuples (in
         // which case `variable_element.is_none()`).
         let is_variable = length.is_variable();
+        let has_fixed_union_tail = is_variable && variable_element.is_none();
 
         // We must be able to match up the fixed-length portion of the argument with positional
         // parameters, so we pass on any errors that occur.
@@ -3605,12 +3644,30 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
             )?;
         }
 
-        // If the tuple is variable-length, we assume that it will soak up all remaining positional
-        // parameters, stopping only when we reach a parameter that has an explicit keyword argument
-        // or a parameter that can only be provided via keyword argument, or if we run out of
-        // `argument_types` and have no `variable_element`. (The combination of `is_variable` with
-        // no `variable_element` can only happen with a union of different-fixed-length tuples.)
-        if is_variable {
+        // For a union of fixed-length tuples, positions beyond the guaranteed minimum are only
+        // present in the longer union members. They therefore cannot satisfy a required
+        // positional parameter, because the shorter members would still be missing that argument.
+        if has_fixed_union_tail {
+            while let Some(parameter) = self.parameters.get_positional(self.next_positional) {
+                if self
+                    .explicit_keyword_parameters
+                    .contains(&self.next_positional)
+                {
+                    break;
+                }
+                let Some(argument_type) = argument_types.next() else {
+                    break;
+                };
+                if parameter.default_type().is_none() {
+                    return Err(());
+                }
+                self.match_positional(argument_index, argument, Some(argument_type), is_variable)?;
+            }
+        // If the tuple is truly variable-length, we assume that it will soak up all remaining
+        // positional parameters, stopping only when we reach a parameter that has an explicit
+        // keyword argument or a parameter that can only be provided via keyword argument, or if
+        // we run out of `argument_types` and have no `variable_element`.
+        } else if is_variable {
             while self
                 .parameters
                 .get_positional(self.next_positional)
@@ -3627,6 +3684,19 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
                     break;
                 }
                 self.match_positional(argument_index, argument, arg_type, is_variable)?;
+            }
+        }
+
+        // A "variable" length with no `variable_element` only comes from a union of different
+        // fixed-length tuples. Any remaining `argument_types` are therefore still concrete
+        // positions from the longer union members, not an open-ended variadic tail. Feed them back
+        // through normal positional matching so we report the same errors as a concrete longer
+        // tuple would (`too-many-positional-arguments`, or a later
+        // `parameter-already-assigned` when an explicit keyword also targets that parameter)
+        // instead of silently dropping those extra positions.
+        if has_fixed_union_tail {
+            for argument_type in argument_types.by_ref() {
+                self.match_positional(argument_index, argument, Some(argument_type), is_variable)?;
             }
         }
 
@@ -4886,10 +4956,11 @@ struct CallableBindingSnapshot<'db> {
 
     /// Represents the snapshot of the matched overload bindings.
     ///
-    /// The reason that this only contains the matched overloads are:
-    /// 1. Avoid creating snapshots for the overloads that have been filtered by the arity check
-    /// 2. Avoid duplicating errors when merging the snapshots on a successful evaluation of all
-    ///    the expanded argument lists
+    /// Usually this contains only the overloads that survived the initial arity check, to avoid
+    /// duplicating errors when merging snapshots after a successful evaluation of all expanded
+    /// argument lists. For provisional arity retries on expandable `*args`, however, it can also
+    /// include overloads that were filtered out in step 1 so those overloads can be reconsidered
+    /// against concrete expanded argument lists.
     matching_overloads: Vec<(usize, BindingSnapshot<'db>)>,
 }
 
