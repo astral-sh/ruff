@@ -2088,19 +2088,29 @@ reveal_type(movie["name"])  # revealed: str
 reveal_type(movie["year"])  # revealed: int
 ```
 
-An empty functional `TypedDict` can omit the `fields` argument entirely:
+An empty functional `TypedDict` should pass an empty dict for the `fields` argument:
 
 ```py
 from typing_extensions import TypedDict
 
-Empty = TypedDict("Empty")
+Empty = TypedDict("Empty", {})
 empty = Empty()
 
 reveal_type(Empty)  # revealed: <class 'Empty'>
 reveal_type(empty)  # revealed: Empty
 
-EmptyPartial = TypedDict("EmptyPartial", total=False)
+EmptyPartial = TypedDict("EmptyPartial", {}, total=False)
 reveal_type(EmptyPartial())  # revealed: EmptyPartial
+```
+
+Omitting the `fields` argument entirely is an error:
+
+```py
+from typing_extensions import TypedDict
+
+# error: [missing-argument] "No argument provided for required parameter `fields` of function `TypedDict`"
+Empty = TypedDict("Empty")
+reveal_type(Empty)  # revealed: <class 'Empty'>
 ```
 
 Constructor validation also works with dict literals:
