@@ -9179,23 +9179,48 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// The inference results can be merged into the current inference region using
     /// [`TypeInferenceBuilder::extend`].
     fn speculate(&mut self) -> Self {
-        let mut builder =
-            TypeInferenceBuilder::new(self.db(), self.region, self.index, self.module());
+        let Self {
+            region,
+            index,
+            cycle_recovery,
+            deferred_state,
+            inference_flags,
+            typevar_binding_context,
+            inferring_vararg_annotation,
+            ref return_types_and_ranges,
+            ref dataclass_field_specifiers,
+
+            // These fields are type inference results, but do not affect the inference of a given
+            // expression.
+            context: _,
+            expressions: _,
+            string_annotations: _,
+            scope: _,
+            bindings: _,
+            declarations: _,
+            deferred: _,
+            called_functions: _,
+            undecorated_type: _,
+            all_definitely_bound: _,
+        } = *self;
+
+        let mut builder = TypeInferenceBuilder::new(self.db(), region, index, self.module());
 
         // Speculated builders are often discarded immediately.
         builder.context.defuse();
 
         // Ensure the speculative builder has the same inference context as the current one.
-        builder.deferred_state = self.deferred_state;
-        builder.typevar_binding_context = self.typevar_binding_context;
-        builder.inference_flags = self.inference_flags;
-        builder.inferring_vararg_annotation = self.inferring_vararg_annotation;
+        builder.cycle_recovery = cycle_recovery;
+        builder.deferred_state = deferred_state;
+        builder.typevar_binding_context = typevar_binding_context;
+        builder.inference_flags = inference_flags;
+        builder.inferring_vararg_annotation = inferring_vararg_annotation;
         builder
             .return_types_and_ranges
-            .clone_from(&self.return_types_and_ranges.clone());
+            .clone_from(return_types_and_ranges);
         builder
             .dataclass_field_specifiers
-            .clone_from(&self.dataclass_field_specifiers.clone());
+            .clone_from(dataclass_field_specifiers);
 
         builder
     }
