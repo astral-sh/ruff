@@ -216,8 +216,8 @@ impl<'db> StaticClassLiteral<'db> {
                             return Some(ty);
                         }
                     }
-                    // Dynamic namedtuples don't define their own ordering methods.
-                    ClassLiteral::DynamicNamedTuple(_) => {}
+                    // Dynamic namedtuples and TypedDicts don't define their own ordering methods.
+                    ClassLiteral::DynamicNamedTuple(_) | ClassLiteral::DynamicTypedDict(_) => {}
                 }
             }
         }
@@ -668,7 +668,7 @@ impl<'db> StaticClassLiteral<'db> {
             .filter_map(ClassBase::into_class)
             .any(|base| match base.class_literal(db) {
                 ClassLiteral::DynamicNamedTuple(_) => true,
-                ClassLiteral::Dynamic(_) => false,
+                ClassLiteral::Dynamic(_) | ClassLiteral::DynamicTypedDict(_) => false,
                 ClassLiteral::Static(class) => class
                     .explicit_bases(db)
                     .contains(&Type::SpecialForm(SpecialFormType::NamedTuple)),
