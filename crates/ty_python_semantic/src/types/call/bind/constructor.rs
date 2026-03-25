@@ -68,7 +68,12 @@ impl<'db> ConstructorBinding<'db> {
         }
     }
 
-    fn combine_constructor_return_type(&self, db: &'db dyn Db) -> Type<'db> {
+    /// Combine inferred specializations from all matched overloads of this constructor and
+    /// downstream constructors, and apply the combined specialization to the constructed instance
+    /// type. This is used as the return type of the constructor call in the common case, assuming
+    /// that no metaclass `__call__` or `__new__` overload returns a non-instance type that takes
+    /// precedence.
+    fn instance_return_type(&self, db: &'db dyn Db) -> Type<'db> {
         let constructed_instance_type = self.constructed_instance_type();
         let Some(class_specialization) = constructed_instance_type.class_specialization(db) else {
             return constructed_instance_type;
@@ -90,20 +95,12 @@ impl<'db> ConstructorBinding<'db> {
                 .next()
                 .map(|(_, overload)| overload)
                 .or_else(|| match callable.overloads() {
-                    [overload] if binding.constructor_kind().is_init() => Some(overload),
+                    [overload] => Some(overload),
                     _ => None,
                 });
             let Some(overload) = overload else {
                 return;
             };
-            let self_parameter_specialization = static_class_literal.and_then(|lit| {
-                let self_param_ty = overload.signature.parameters().get(0)?.annotated_type();
-                let resolved_self_param_ty = overload
-                    .specialization
-                    .map(|specialization| self_param_ty.apply_specialization(db, specialization))
-                    .unwrap_or(self_param_ty);
-                resolved_self_param_ty.specialization_of(db, lit)
-            });
             let return_specialization = static_class_literal
                 // Fast path: use the already-resolved overload return type when possible.
                 .and_then(|lit| overload.return_ty.specialization_of(db, lit));
@@ -112,11 +109,17 @@ impl<'db> ConstructorBinding<'db> {
                     class_context.variables(db).any(|class_typevar| {
                         specialization
                             .get(db, class_typevar)
-                            .is_some_and(|mapped_ty| {
-                                !mapped_ty.is_unknown() && mapped_ty != Type::TypeVar(class_typevar)
-                            })
+                            .is_some_and(|mapped_ty| !mapped_ty.is_unknown())
                     })
                 });
+            let self_parameter_specialization = static_class_literal.and_then(|lit| {
+                let self_param_ty = overload.signature.parameters().get(0)?.annotated_type();
+                let resolved_self_param_ty = overload
+                    .specialization
+                    .map(|specialization| self_param_ty.apply_specialization(db, specialization))
+                    .unwrap_or(self_param_ty);
+                resolved_self_param_ty.specialization_of(db, lit)
+            });
             let refined_self_parameter_specialization =
                 self_parameter_specialization.map(|specialization| {
                     let types: Box<[_]> = specialization
@@ -271,7 +274,7 @@ impl<'db> ConstructorBinding<'db> {
             }
         }
 
-        let combined_return = self.combine_constructor_return_type(db);
+        let combined_return = self.instance_return_type(db);
         if let (Some(constructor_class_literal), Some(overload)) =
             (constructor_class_literal, single_relevant_overload)
         {
