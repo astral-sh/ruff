@@ -195,7 +195,9 @@
 
 use std::cmp::Ordering;
 
+use ruff_db::parsed::parsed_module;
 use ruff_index::{Idx, IndexVec};
+use ruff_python_ast as ast;
 use rustc_hash::FxHashMap;
 
 use crate::Db;
@@ -208,8 +210,9 @@ use crate::semantic_index::predicate::{
     PatternPredicate, PatternPredicateKind, Predicate, PredicateNode, Predicates, ScopedPredicateId,
 };
 use crate::types::{
-    IntersectionBuilder, KnownClass, NarrowingConstraint, Truthiness, Type, TypeContext,
-    UnionBuilder, UnionType, infer_expression_type, infer_narrowing_constraint,
+    IntersectionBuilder, KnownClass, KnownFunction, NarrowingConstraint, Truthiness, Type,
+    TypeContext, UnionBuilder, UnionType, infer_expression_type, infer_expression_types,
+    infer_narrowing_constraint,
 };
 
 /// A ternary formula that defines under what conditions a binding is visible. (A ternary formula
@@ -1090,9 +1093,25 @@ impl ReachabilityConstraints {
                     .negate_if(!predicate.is_positive)
             }
             PredicateNode::IsNonTerminalCall(call_expr) => {
-                let call_expr_ty = infer_expression_type(db, call_expr, TypeContext::default());
+                let inference = infer_expression_types(db, call_expr, TypeContext::default());
+                let node = call_expr.node_ref(db);
+                let call_expr_ty = inference.expression_type(node);
                 if call_expr_ty.is_equivalent_to(db, Type::Never) {
-                    Truthiness::AlwaysFalse
+                    // Special-case `assert_type` and `reveal_type` calls:
+                    // it's never really desirable for these to create reachability constraints
+                    // that would lead to us inferring unreachable code later on.
+                    let parsed = parsed_module(db, call_expr.file(db)).load(db);
+                    if let ast::Expr::Call(ast::ExprCall { func, .. }) = node.node(&parsed)
+                        && let Type::FunctionLiteral(function) = inference.expression_type(func)
+                        && matches!(
+                            function.known(db),
+                            Some(KnownFunction::AssertType | KnownFunction::RevealType)
+                        )
+                    {
+                        Truthiness::AlwaysTrue
+                    } else {
+                        Truthiness::AlwaysFalse
+                    }
                 } else {
                     Truthiness::AlwaysTrue
                 }

@@ -2894,7 +2894,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 };
 
                 if is_call && !self.source_type.is_stub() && self.in_function_scope() {
-                    let call_expr = self.add_standalone_expression(value.as_ref());
+                    let call_expr = self.add_standalone_expression(value);
 
                     let predicate = Predicate {
                         node: PredicateNode::IsNonTerminalCall(call_expr),
