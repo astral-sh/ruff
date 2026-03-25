@@ -1734,6 +1734,11 @@ User()
 
 ## Converters
 
+```toml
+[environment]
+python-version = "3.13"  # we need __replace__ below
+```
+
 When a field specifier uses a `converter` parameter, the synthesized `__init__` parameter type
 should be the converter's input type (i.e. the type of its first positional parameter), not the
 field's declared type.
@@ -1915,6 +1920,16 @@ class ConverterWithDefault:
 
     # TODO: this should be an error
     incorrect2: int = field(default="0")
+```
+
+We currently assume that the presence of a converter also implies that the this converter function
+will be called when using `replace` (this is how `attrs` behaves):
+
+```py
+basic = Basic("1", "2")
+
+# __replace__ uses the converter input type (str):
+reveal_type(Basic.__replace__)  # revealed: (self: Basic, *, a: str = ..., b: str = ...) -> Basic
 ```
 
 Converter fields inherited from a base class should also be validated correctly:
