@@ -326,3 +326,66 @@ def f():
     ) in original:
         if i > 0:
             filtered.append(i)
+
+
+# Tuple unpacking support (https://github.com/astral-sh/ruff/issues/21648)
+# The following cases are preview-gated.
+
+def f():
+    result = []
+    for x, y in [(1, 2), (3, 4)]:
+        result.append(x + y)  # PERF401 (preview)
+
+
+def f():
+    result = []
+    for x, y in [(1, 2), (3, 4)]:
+        if x > 0:
+            result.append(y)  # PERF401 (preview)
+
+
+def f():
+    result = []
+    for [x, y] in [[1, 2], [3, 4]]:
+        result.append(x + y)  # PERF401 (preview)
+
+
+def f():
+    result = [1, 2]
+    for x, y in [(1, 2), (3, 4)]:
+        result.append(x + y)  # PERF401 (preview, extend)
+
+
+async def f():
+    result = []
+    async for x, y in aiter:
+        result.append(x + y)  # PERF401 (preview, async)
+
+
+# Single-element tuple: PERF402 can't handle this, so PERF401 should flag it
+def f():
+    result = []
+    for x, in [(1,), (2,)]:
+        result.append(x)  # PERF401 (preview)
+
+
+# Should NOT be flagged: nested unpacking
+def f():
+    result = []
+    for (x, y), z in [((1, 2), 3)]:
+        result.append(x + y + z)  # OK
+
+
+# Should NOT be flagged: starred expression
+def f():
+    result = []
+    for x, *y in [(1, 2, 3)]:
+        result.append(x)  # OK
+
+
+# Should NOT be flagged: target used after the loop
+def f():
+    result = []
+    for x, y in [(1, 2), (3, 4)]:
+        result.append(x + y)  # OK
+    print(x)

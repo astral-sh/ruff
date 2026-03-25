@@ -2,7 +2,8 @@ use ruff_python_ast::{self as ast, Arguments, Expr};
 
 use crate::{Edit, Fix, FixAvailability, Violation};
 use crate::{
-    checkers::ast::Checker, preview::is_fix_manual_list_comprehension_enabled,
+    checkers::ast::Checker,
+    preview::{is_fix_manual_list_comprehension_enabled, is_perf401_tuple_unpacking_enabled},
     rules::perflint::helpers::statement_deletion_range,
 };
 use anyhow::{Result, anyhow};
@@ -95,12 +96,23 @@ impl Violation for ManualListComprehension {
 
 /// PERF401
 pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtFor) {
-    let Expr::Name(ast::ExprName {
-        id: for_stmt_target_id,
-        ..
-    }) = &*for_stmt.target
-    else {
-        return;
+    // Extract target variable names from the for-loop target.
+    // Tuple/list unpacking (e.g., `for x, y in items`) is preview-gated
+    // since it expands the rule's scope.
+    let target_names: Vec<&ast::ExprName> = match &*for_stmt.target {
+        Expr::Name(name) => vec![name],
+        Expr::Tuple(ast::ExprTuple { elts, .. }) | Expr::List(ast::ExprList { elts, .. }) => {
+            if !is_perf401_tuple_unpacking_enabled(checker.settings()) {
+                return;
+            }
+            let names: Vec<_> = elts.iter().filter_map(Expr::as_name_expr).collect();
+            // Only handle flat unpacking; bail on nested tuples or starred expressions
+            if names.len() != elts.len() {
+                return;
+            }
+            names
+        }
+        _ => return,
     };
 
     let (stmt, if_test) = match &*for_stmt.body {
@@ -175,16 +187,17 @@ pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtF
     };
 
     // Ignore direct list copies (e.g., `for x in y: filtered.append(x)`), unless it's async, which
-    // `manual-list-copy` doesn't cover.
-    if !for_stmt.is_async {
-        if if_test.is_none() {
-            if arg
-                .as_name_expr()
-                .is_some_and(|arg| arg.id == *for_stmt_target_id)
-            {
-                return;
-            }
-        }
+    // `manual-list-copy` doesn't cover. We check that the target is a plain name (not a
+    // single-element tuple like `for x, in ...`) because PERF402 only handles `Expr::Name` targets.
+    if !for_stmt.is_async
+        && if_test.is_none()
+        && for_stmt.target.is_name_expr()
+        && let [target] = target_names.as_slice()
+        && arg
+            .as_name_expr()
+            .is_some_and(|arg| arg.id == *target.id)
+    {
+        return;
     }
 
     // Avoid, e.g., `for x in y: filtered.append(filtered[-1] * 2)`.
@@ -230,7 +243,7 @@ pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtF
         return;
     }
 
-    // Avoid if the for-loop target is used outside the for loop, e.g.,
+    // Avoid if any for-loop target variable is used outside the for loop, e.g.,
     //
     // ```python
     // for x in y:
@@ -244,25 +257,29 @@ pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtF
     // filtered = [x for x in y]
     // print(x)
     // ```
-    let target_binding = checker
-        .semantic()
-        .bindings
-        .iter()
-        .find(|binding| for_stmt.target.range() == binding.range)
-        .unwrap();
-    // If the target variable is global (e.g., `global INDEX`) or nonlocal (e.g., `nonlocal INDEX`),
-    // then it is intended to be used elsewhere outside the for loop.
-    if target_binding.is_global() || target_binding.is_nonlocal() {
-        return;
-    }
-    // If any references to the loop target variable are after the loop,
-    // then converting it into a comprehension would cause a NameError
-    if target_binding
-        .references()
-        .map(|reference| checker.semantic().reference(reference))
-        .any(|other_reference| for_stmt.end() < other_reference.start())
-    {
-        return;
+    for target_name in &target_names {
+        let Some(target_binding) = checker
+            .semantic()
+            .bindings
+            .iter()
+            .find(|binding| target_name.range() == binding.range)
+        else {
+            return;
+        };
+        // If the target variable is global or nonlocal, it is intended
+        // to be used elsewhere outside the for loop.
+        if target_binding.is_global() || target_binding.is_nonlocal() {
+            return;
+        }
+        // If any references to the loop target variable are after the loop,
+        // then converting it into a comprehension would cause a NameError
+        if target_binding
+            .references()
+            .map(|reference| checker.semantic().reference(reference))
+            .any(|other_reference| for_stmt.end() < other_reference.start())
+        {
+            return;
+        }
     }
 
     let list_binding_stmt = list_binding.statement(checker.semantic());

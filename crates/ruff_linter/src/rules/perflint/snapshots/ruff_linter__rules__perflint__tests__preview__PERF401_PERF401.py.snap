@@ -677,4 +677,133 @@ help: Replace for loop with list comprehension
     -             filtered.append(i)
 323 +     # comment
 324 +     filtered = [i for i in original if i > 0]
+325 | 
+326 | 
+327 | # Tuple unpacking support (https://github.com/astral-sh/ruff/issues/21648)
+note: This is an unsafe fix and may change runtime behavior
+
+PERF401 [*] Use a list comprehension to create a transformed list
+   --> PERF401.py:337:9
+    |
+335 |     result = []
+336 |     for x, y in [(1, 2), (3, 4)]:
+337 |         result.append(x + y)  # PERF401 (preview)
+    |         ^^^^^^^^^^^^^^^^^^^^
+    |
+help: Replace for loop with list comprehension
+332 | # The following cases are preview-gated.
+333 | 
+334 | def f():
+    -     result = []
+    -     for x, y in [(1, 2), (3, 4)]:
+    -         result.append(x + y)  # PERF401 (preview)
+335 +     result = [x + y for x, y in [(1, 2), (3, 4)]]  # PERF401 (preview)
+336 | 
+337 | 
+338 | def f():
+note: This is an unsafe fix and may change runtime behavior
+
+PERF401 [*] Use a list comprehension to create a transformed list
+   --> PERF401.py:344:13
+    |
+342 |     for x, y in [(1, 2), (3, 4)]:
+343 |         if x > 0:
+344 |             result.append(y)  # PERF401 (preview)
+    |             ^^^^^^^^^^^^^^^^
+    |
+help: Replace for loop with list comprehension
+338 | 
+339 | 
+340 | def f():
+    -     result = []
+    -     for x, y in [(1, 2), (3, 4)]:
+    -         if x > 0:
+    -             result.append(y)  # PERF401 (preview)
+341 +     result = [y for x, y in [(1, 2), (3, 4)] if x > 0]  # PERF401 (preview)
+342 | 
+343 | 
+344 | def f():
+note: This is an unsafe fix and may change runtime behavior
+
+PERF401 [*] Use a list comprehension to create a transformed list
+   --> PERF401.py:350:9
+    |
+348 |     result = []
+349 |     for [x, y] in [[1, 2], [3, 4]]:
+350 |         result.append(x + y)  # PERF401 (preview)
+    |         ^^^^^^^^^^^^^^^^^^^^
+    |
+help: Replace for loop with list comprehension
+345 | 
+346 | 
+347 | def f():
+    -     result = []
+    -     for [x, y] in [[1, 2], [3, 4]]:
+    -         result.append(x + y)  # PERF401 (preview)
+348 +     result = [x + y for [x, y] in [[1, 2], [3, 4]]]  # PERF401 (preview)
+349 | 
+350 | 
+351 | def f():
+note: This is an unsafe fix and may change runtime behavior
+
+PERF401 [*] Use `list.extend` to create a transformed list
+   --> PERF401.py:356:9
+    |
+354 |     result = [1, 2]
+355 |     for x, y in [(1, 2), (3, 4)]:
+356 |         result.append(x + y)  # PERF401 (preview, extend)
+    |         ^^^^^^^^^^^^^^^^^^^^
+    |
+help: Replace for loop with list.extend
+352 | 
+353 | def f():
+354 |     result = [1, 2]
+    -     for x, y in [(1, 2), (3, 4)]:
+    -         result.append(x + y)  # PERF401 (preview, extend)
+355 +     result.extend(x + y for x, y in [(1, 2), (3, 4)])  # PERF401 (preview, extend)
+356 | 
+357 | 
+358 | async def f():
+note: This is an unsafe fix and may change runtime behavior
+
+PERF401 [*] Use an async list comprehension to create a transformed list
+   --> PERF401.py:362:9
+    |
+360 |     result = []
+361 |     async for x, y in aiter:
+362 |         result.append(x + y)  # PERF401 (preview, async)
+    |         ^^^^^^^^^^^^^^^^^^^^
+    |
+help: Replace for loop with list comprehension
+357 | 
+358 | 
+359 | async def f():
+    -     result = []
+    -     async for x, y in aiter:
+    -         result.append(x + y)  # PERF401 (preview, async)
+360 +     result = [x + y async for x, y in aiter]  # PERF401 (preview, async)
+361 | 
+362 | 
+363 | # Single-element tuple: PERF402 can't handle this, so PERF401 should flag it
+note: This is an unsafe fix and may change runtime behavior
+
+PERF401 [*] Use a list comprehension to create a transformed list
+   --> PERF401.py:369:9
+    |
+367 |     result = []
+368 |     for x, in [(1,), (2,)]:
+369 |         result.append(x)  # PERF401 (preview)
+    |         ^^^^^^^^^^^^^^^^
+    |
+help: Replace for loop with list comprehension
+364 | 
+365 | # Single-element tuple: PERF402 can't handle this, so PERF401 should flag it
+366 | def f():
+    -     result = []
+    -     for x, in [(1,), (2,)]:
+    -         result.append(x)  # PERF401 (preview)
+367 +     result = [x for x, in [(1,), (2,)]]  # PERF401 (preview)
+368 | 
+369 | 
+370 | # Should NOT be flagged: nested unpacking
 note: This is an unsafe fix and may change runtime behavior
