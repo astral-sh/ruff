@@ -195,6 +195,24 @@ pub(crate) struct Bindings<'db> {
     argument_forms: ArgumentForms,
 }
 
+/// Recover the underlying unpacked `dict` fallback from an intersection, if any.
+fn unpacked_dict_kwargs_fallback<'db>(
+    db: &'db dyn Db,
+    argument_type: Type<'db>,
+) -> Option<(Type<'db>, Type<'db>)> {
+    if let Type::Intersection(intersection) = argument_type {
+        intersection.positive(db).iter().find_map(|element| {
+            element
+                .as_nominal_instance()
+                .is_some_and(|instance| instance.has_known_class(db, KnownClass::Dict))
+                .then(|| element.unpack_keys_and_items(db))
+                .flatten()
+        })
+    } else {
+        argument_type.unpack_keys_and_items(db)
+    }
+}
+
 impl<'db> Bindings<'db> {
     /// Creates a new `Bindings` from an iterator of [`Bindings`]s for a union type.
     /// Each input `Bindings` becomes a union element, preserving any intersection structure.
@@ -3657,8 +3675,10 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         argument_index: usize,
         argument_type: Option<Type<'db>>,
     ) {
-        if let Some(Type::TypedDict(typed_dict)) = argument_type {
-            // Special case TypedDict because we know which keys are present.
+        if let Some(typed_dict) = argument_type
+            .and_then(Type::as_typed_dict)
+            .filter(|typed_dict| typed_dict.defining_class().is_some())
+        {
             for (name, field) in typed_dict.items(db) {
                 let _ = self.match_keyword(
                     argument_index,
@@ -3688,7 +3708,15 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
                 let value_type = match argument_type {
                     Some(argument_type) => argument_type
                         .as_paramspec_typevar(db)
-                        .or_else(|| argument_type.getitem_dunder_call(db, parameter_name))
+                        .or_else(|| {
+                            argument_type
+                                .getitem_dunder_call(db, parameter_name)
+                                .filter(|value_type| !value_type.is_unknown())
+                        })
+                        .or_else(|| {
+                            unpacked_dict_kwargs_fallback(db, argument_type)
+                                .map(|(_, value_ty)| value_ty)
+                        })
                         .unwrap_or(Type::unknown()),
 
                     None => Type::unknown(),
@@ -4450,7 +4478,10 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         argument: Argument<'a>,
         argument_type: Type<'db>,
     ) {
-        if let Type::TypedDict(typed_dict) = argument_type {
+        if let Some(typed_dict) = argument_type
+            .as_typed_dict()
+            .filter(|typed_dict| typed_dict.defining_class().is_some())
+        {
             for (argument_type, parameter_index) in typed_dict
                 .items(self.db)
                 .values()
@@ -4470,11 +4501,13 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             return;
         }
 
-        let value_type_paramspec =
+        let (value_type_paramspec, value_type_fallback) =
             if let Some(paramspec) = argument_type.as_paramspec_typevar(self.db) {
-                Some(paramspec)
+                (Some(paramspec), None)
             } else {
-                let Some((key_type, _)) = argument_type.unpack_keys_and_items(self.db) else {
+                let Some((key_type, value_type)) =
+                    unpacked_dict_kwargs_fallback(self.db, argument_type)
+                else {
                     return;
                 };
 
@@ -4493,7 +4526,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     });
                 }
 
-                None
+                (None, Some(value_type))
             };
 
         for parameter_index in &self.argument_matches[argument_index].parameters {
@@ -4506,6 +4539,8 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
                 argument_type
                     .getitem_dunder_call(self.db, parameter_name)
+                    .filter(|value_type| !value_type.is_unknown())
+                    .or(value_type_fallback)
                     .unwrap_or(Type::unknown())
             };
 

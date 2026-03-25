@@ -6827,8 +6827,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// Attempt to narrow a splatted dictionary argument based on the narrowed types of individual
     /// keys, if any.
     ///
-    /// Returns the intersection between the dictionary type and a synthesized typed dict of any narrowed
-    /// keys, or `None` otherwise.
+    /// Returns the intersection between the original dictionary type and a synthesized protocol
+    /// that refines `__getitem__` for the narrowed keys, or `None` otherwise.
     fn try_narrow_dict_kwargs(
         &self,
         argument_type: Type<'db>,
@@ -6847,37 +6847,106 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return None;
         }
 
-        let definition_key = |definition: Definition<'_>| {
-            let key = match definition.kind(db) {
-                DefinitionKind::DictKeyAssignment(assignment) => assignment.key(self.module()),
-                DefinitionKind::Assignment(assignment) => {
-                    &assignment.target(self.module()).as_subscript_expr()?.slice
-                }
-                DefinitionKind::AnnotatedAssignment(assignment) => {
-                    &assignment.target(self.module()).as_subscript_expr()?.slice
-                }
-                _ => return None,
-            };
+        // Collect the types of each distinct key from either whole-dict assignments like
+        // `kwargs = {"a": 1}` or subsequent key writes like `kwargs["a"] = 1`.
+        let mut elements: FxHashMap<Name, Type<'db>> = FxHashMap::default();
 
-            Some(key.as_string_literal_expr()?.value.to_str())
+        let mut add_element = |name: &str, ty| {
+            elements
+                .entry(Name::new(name))
+                .and_modify(|existing| {
+                    *existing = UnionType::from_two_elements(db, *existing, ty);
+                })
+                .or_insert(ty);
         };
-
-        // Collect the types of each distinct key.
-        let mut elements: Vec<(&str, Type<'db>)> = Vec::new();
 
         for bindings in use_def.multi_bindings_at_use(keyword.scoped_use_id(db, self.scope())) {
             let place = place_from_bindings(db, bindings.clone());
-            let Some(key) = place.first_definition.and_then(definition_key) else {
+            let Some(definition) = place.first_definition else {
                 continue;
             };
 
-            if let Place::Defined(DefinedPlace {
-                ty: field_ty,
-                definedness: Definedness::AlwaysDefined,
-                ..
-            }) = place.place
-            {
-                elements.push((key, field_ty));
+            match definition.kind(db) {
+                DefinitionKind::Assignment(assignment) => {
+                    let target = assignment.target(self.module());
+                    if let Some(subscript) = target.as_subscript_expr() {
+                        if let Some(key) = subscript.slice.as_string_literal_expr()
+                            && let Place::Defined(DefinedPlace {
+                                ty: field_ty,
+                                definedness: Definedness::AlwaysDefined,
+                                ..
+                            }) = place.place
+                        {
+                            add_element(key.value.to_str(), field_ty);
+                        }
+                        continue;
+                    }
+
+                    let Some(value) = definition.kind(db).value(self.module()) else {
+                        continue;
+                    };
+                    let Some(dict) = value.as_dict_expr() else {
+                        continue;
+                    };
+
+                    for item in &dict.items {
+                        let Some(key) = item
+                            .key
+                            .as_ref()
+                            .and_then(|key| key.as_string_literal_expr())
+                        else {
+                            continue;
+                        };
+                        add_element(key.value.to_str(), self.expression_type(&item.value));
+                    }
+                }
+                DefinitionKind::AnnotatedAssignment(assignment) => {
+                    let target = assignment.target(self.module());
+                    if let Some(subscript) = target.as_subscript_expr() {
+                        if let Some(key) = subscript.slice.as_string_literal_expr()
+                            && let Place::Defined(DefinedPlace {
+                                ty: field_ty,
+                                definedness: Definedness::AlwaysDefined,
+                                ..
+                            }) = place.place
+                        {
+                            add_element(key.value.to_str(), field_ty);
+                        }
+                        continue;
+                    }
+
+                    let Some(value) = definition.kind(db).value(self.module()) else {
+                        continue;
+                    };
+                    let Some(dict) = value.as_dict_expr() else {
+                        continue;
+                    };
+
+                    for item in &dict.items {
+                        let Some(key) = item
+                            .key
+                            .as_ref()
+                            .and_then(|key| key.as_string_literal_expr())
+                        else {
+                            continue;
+                        };
+                        add_element(key.value.to_str(), self.expression_type(&item.value));
+                    }
+                }
+                DefinitionKind::DictKeyAssignment(assignment) => {
+                    let Some(key) = assignment.key(self.module()).as_string_literal_expr() else {
+                        continue;
+                    };
+                    if let Place::Defined(DefinedPlace {
+                        ty: field_ty,
+                        definedness: Definedness::AlwaysDefined,
+                        ..
+                    }) = place.place
+                    {
+                        add_element(key.value.to_str(), field_ty);
+                    }
+                }
+                _ => {}
             }
         }
 
@@ -6893,7 +6962,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     [
                         Parameter::positional_only(Some(Name::new_static("self"))),
                         Parameter::positional_or_keyword(Name::new_static("key"))
-                            .with_annotated_type(Type::string_literal(db, name)),
+                            .with_annotated_type(Type::string_literal(db, name.as_str())),
                     ],
                 ),
                 ty,
@@ -6912,8 +6981,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             )],
         );
 
-        // Note that we return an intersection to preserve the original dictionary type,
-        // as it may contain keys that were not explicitly assigned to.
+        // Preserve the original dictionary type, which may still contain keys that were
+        // not explicitly assigned to, while refining `__getitem__` for known items.
         Some(IntersectionType::from_elements(
             db,
             [argument_type, getitem_protocol],

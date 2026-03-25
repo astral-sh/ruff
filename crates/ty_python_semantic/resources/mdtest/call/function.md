@@ -1269,6 +1269,42 @@ f(**dict(a=1, b=2))
 f(**Foo(a=1, b=2))
 ```
 
+### Local kwargs variable
+
+```py
+from typing import Any, Optional, cast, overload
+
+MISSING = cast(Any, object())
+
+class Token: ...
+
+@overload
+def send(*, count: int, token: Token = MISSING) -> None: ...
+@overload
+def send(message: str, *, silent: bool = False, token: Token = MISSING) -> None: ...
+def send(*args: Any, **kwargs: Any) -> None: ...
+def _(message: str, silent: bool, token: Optional[Token]) -> None:
+    kwargs = {
+        "message": message,
+        "silent": silent,
+        "token": MISSING if token is None else token,
+    }
+    send(**kwargs)
+
+def f(*, message: str) -> None: ...
+def _(key: str, message: str) -> None:
+    kwargs: dict[str, object] = {}
+    kwargs[key] = {"message": message}
+    # error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `str`, found `object`"
+    f(**kwargs)
+
+def _(key: str, message: str) -> None:
+    kwargs: dict[str, object] = {}
+    kwargs[key]: object = {"message": message}
+    # error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `str`, found `object`"
+    f(**kwargs)
+```
+
 ### Multiple keywords argument
 
 ```py
