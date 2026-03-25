@@ -242,7 +242,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
                 schema.insert(
                     Name::new(key_literal.value(db)),
-                    functional_typed_dict_field(annotation.inner_type(), total),
+                    functional_typed_dict_field(
+                        annotation.inner_type(),
+                        annotation.qualifiers(),
+                        total,
+                    ),
                 );
             }
 
@@ -255,7 +259,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
             schema.insert(
                 field_name.clone(),
-                functional_typed_dict_field(annotation.inner_type(), total),
+                functional_typed_dict_field(
+                    annotation.inner_type(),
+                    annotation.qualifiers(),
+                    total,
+                ),
             );
         }
 

@@ -221,6 +221,10 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     /// The types of every expression in this region.
     expressions: FxHashMap<ExpressionNodeKey, Type<'db>>,
 
+    /// Type qualifiers (`Required`, `NotRequired`, etc.) for annotation expressions.
+    /// Only populated for expressions that have non-empty qualifiers.
+    qualifiers: FxHashMap<ExpressionNodeKey, TypeQualifiers>,
+
     /// Expressions that are string annotations
     string_annotations: FxHashSet<ExpressionNodeKey>,
 
@@ -340,6 +344,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             multi_inference_state: MultiInferenceState::Panic,
             inner_expression_inference_state: InnerExpressionInferenceState::Infer,
             expressions: FxHashMap::default(),
+            qualifiers: FxHashMap::default(),
             string_annotations: FxHashSet::default(),
             bindings: VecMap::default(),
             declarations: VecMap::default(),
@@ -376,6 +381,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         assert_eq!(self.scope, inference.scope);
 
         self.expressions.extend(inference.expressions.iter());
+        self.qualifiers.extend(inference.qualifiers.iter());
         self.declarations
             .extend(inference.declarations(), self.multi_inference_state);
 
@@ -547,6 +553,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .get(&expr.into())
             .copied()
             .or(self.fallback_type())
+    }
+
+    /// Store qualifiers for an annotation expression.
+    fn store_qualifiers(&mut self, expr: &ast::Expr, qualifiers: TypeQualifiers) {
+        if !qualifiers.is_empty() {
+            self.qualifiers.insert(expr.into(), qualifiers);
+        }
     }
 
     /// Get the type of an expression from any scope in the same file.
@@ -3032,7 +3045,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn infer_assignment_deferred(&mut self, target: &ast::Expr, value: &'ast ast::Expr) {
-        // Infer deferred bounds/constraints/defaults of a legacy TypeVar / ParamSpec / NewType.
+        // Infer deferred bounds/constraints/defaults of a legacy TypeVar / ParamSpec / NewType,
+        // and field types for functional TypedDict.
         let ast::Expr::Call(ast::ExprCall {
             func, arguments, ..
         }) = value
@@ -3066,6 +3080,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             _ => {}
         }
+        // Check for functional TypedDict calls using SpecialFormType
         if matches!(func_ty, Type::SpecialForm(SpecialFormType::TypedDict)) {
             self.infer_functional_typeddict_deferred(arguments);
             return;
@@ -7022,6 +7037,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return self.infer_namedtuple_call_expression(call_expression, None, namedtuple_kind);
         }
 
+        // Handle `TypedDict(name, fields)`.
         if matches!(callable_type, Type::SpecialForm(SpecialFormType::TypedDict)) {
             return self.infer_typeddict_call_expression(call_expression, None);
         }
@@ -8958,6 +8974,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let Self {
             context,
             mut expressions,
+            qualifiers: _,
             string_annotations,
             scope,
             bindings,
@@ -9068,6 +9085,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             region: _,
             cycle_recovery: _,
             all_definitely_bound: _,
+            qualifiers: _,
         } = self;
         let diagnostics = context.finish();
 
@@ -9089,6 +9107,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let Self {
             context,
             mut expressions,
+            mut qualifiers,
             string_annotations,
             scope,
             bindings,
@@ -9151,9 +9170,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         expressions.shrink_to_fit();
+        qualifiers.shrink_to_fit();
 
         DefinitionInference {
             expressions,
+            qualifiers,
             #[cfg(debug_assertions)]
             scope,
             bindings: bindings.into_boxed_slice(),
@@ -9176,6 +9197,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             deferred: _,
             bindings: _,
             declarations: _,
+            qualifiers: _,
 
             // Ignored; only relevant to definition regions
             undecorated_type: _,
@@ -9250,6 +9272,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             index: _,
             region: _,
             return_types_and_ranges: _,
+            qualifiers: _,
         } = other;
 
         let diagnostics = context.finish();
@@ -9845,7 +9868,7 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
     /// necessarily guarantee that the passed-in value for `__setitem__` is stored and
     /// can be retrieved unmodified via `__getitem__`. Therefore, we currently only
     /// perform assignment-based narrowing on a few built-in classes (`list`, `dict`,
-    /// `bytesarray`, `TypedDict` and `collections` types) where we are confident that
+    /// `bytesarray`, `TypedDict`, and `collections` types) where we are confident that
     /// this kind of narrowing can be performed soundly. This is the same approach as
     /// pyright. TODO: Other standard library classes may also be considered safe. Also,
     /// subclasses of these safe classes that do not override `__getitem__/__setitem__`
