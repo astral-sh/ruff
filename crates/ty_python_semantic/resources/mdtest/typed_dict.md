@@ -2130,33 +2130,6 @@ def _(node: Node, person: Person):
 _: Node = Person(name="Alice", parent=Node(name="Bob", parent=Person(name="Charlie", parent=None)))
 ```
 
-## Recursive functional `TypedDict`
-
-Functional `TypedDict`s can also be recursive, referencing themselves in field types:
-
-```py
-from __future__ import annotations
-from typing_extensions import TypedDict
-
-# Self-referencing TypedDict using functional syntax
-TreeNode = TypedDict("TreeNode", {"value": int, "left": "TreeNode | None", "right": "TreeNode | None"})
-
-reveal_type(TreeNode)  # revealed: <class 'TreeNode'>
-
-leaf: TreeNode = {"value": 1, "left": None, "right": None}
-reveal_type(leaf["value"])  # revealed: Literal[1]
-reveal_type(leaf["left"])  # revealed: None
-
-tree: TreeNode = {
-    "value": 10,
-    "left": {"value": 5, "left": None, "right": None},
-    "right": {"value": 15, "left": None, "right": None},
-}
-
-# error: [invalid-argument-type]
-bad_tree: TreeNode = {"value": 1, "left": "not a node", "right": None}
-```
-
 ## Function/assignment syntax
 
 TypedDicts can be created using the functional syntax:
@@ -2299,6 +2272,33 @@ MovieWithDirector = TypedDict("MovieWithDirector", {"title": str, "director": "D
 
 movie: MovieWithDirector = {"title": "The Matrix", "director": Director()}
 reveal_type(movie)  # revealed: MovieWithDirector
+```
+
+## Recursive functional `TypedDict`
+
+Functional `TypedDict`s can also be recursive, referencing themselves in field types:
+
+```py
+from __future__ import annotations
+from typing_extensions import TypedDict
+
+# Self-referencing TypedDict using functional syntax
+TreeNode = TypedDict("TreeNode", {"value": int, "left": "TreeNode | None", "right": "TreeNode | None"})
+
+reveal_type(TreeNode)  # revealed: <class 'TreeNode'>
+
+leaf: TreeNode = {"value": 1, "left": None, "right": None}
+reveal_type(leaf["value"])  # revealed: Literal[1]
+reveal_type(leaf["left"])  # revealed: None
+
+tree: TreeNode = {
+    "value": 10,
+    "left": {"value": 5, "left": None, "right": None},
+    "right": {"value": 15, "left": None, "right": None},
+}
+
+# error: [invalid-argument-type]
+bad_tree: TreeNode = {"value": 1, "left": "not a node", "right": None}
 ```
 
 ## Deprecated keyword-argument syntax
