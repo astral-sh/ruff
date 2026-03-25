@@ -1,7 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::analyze::visibility::is_property;
 use ruff_source_file::UniversalNewlines;
-use ruff_text_size::Ranged;
+use ruff_text_size::{Ranged, TextLen, TextRange};
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
@@ -10,8 +10,8 @@ use crate::rules::pydocstyle::helpers::normalize_word;
 use crate::rules::pydocstyle::settings::Settings;
 
 /// ## What it does
-/// Checks for `@property` method docstrings that start with a return or
-/// getter verb (e.g., "Returns", "Gets").
+/// Checks for `@property` method docstrings that start with known verbs
+/// (e.g., "returns", "gets", etc).
 ///
 /// ## Why is this bad?
 /// The [Google Python style guide] recommends that the docstring for a
@@ -59,7 +59,7 @@ impl Violation for PropertyDocstringStartsWithVerb {
     fn message(&self) -> String {
         let PropertyDocstringStartsWithVerb { first_word } = self;
         format!(
-            "Property docstring should not start with a return/getter verb; started with \"{first_word}\""
+            r#"Property docstring should not start with a verb ("{first_word}")"#
         )
     }
 }
@@ -78,7 +78,11 @@ const DISALLOWED_VERBS: &[&str] = &[
 ];
 
 /// D421
-pub(crate) fn property_doc_verb(checker: &Checker, docstring: &Docstring, settings: &Settings) {
+pub(crate) fn property_docstring_verb(
+    checker: &Checker,
+    docstring: &Docstring,
+    settings: &Settings,
+) {
     let Some(function) = docstring.definition.as_function_def() else {
         return;
     };
@@ -92,28 +96,20 @@ pub(crate) fn property_doc_verb(checker: &Checker, docstring: &Docstring, settin
     }
 
     let body = docstring.body();
+    let trim_start_body = body.trim_start();
 
-    // Find the first non-empty line.
-    let first_line = match body.trim().universal_newlines().next() {
-        Some(line) => line.as_str().trim(),
-        None => return,
-    };
-
-    // Extract and normalize the first word.
-    let Some(first_word) = first_line.split_whitespace().next() else {
-        return;
-    };
-    let first_word_norm = normalize_word(first_word);
-    if first_word_norm.is_empty() {
-        return;
-    }
-
-    if DISALLOWED_VERBS.contains(&first_word_norm.as_str()) {
+    if let Some(first_line) = trim_start_body.universal_newlines().next()
+        && let Some(first_word) = first_line.as_str().split_whitespace().next()
+        && let first_word_norm = normalize_word(first_word)
+        && !first_word_norm.is_empty()
+        && DISALLOWED_VERBS.contains(&first_word_norm.as_str())
+    {
+        let leading_whitespace_len = body.text_len() - trim_start_body.text_len();
         checker.report_diagnostic(
             PropertyDocstringStartsWithVerb {
                 first_word: first_word.to_string(),
             },
-            docstring.range(),
+            TextRange::at(body.start() + leading_whitespace_len, first_word.text_len()),
         );
     }
 }
