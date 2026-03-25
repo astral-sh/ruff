@@ -1,0 +1,92 @@
+---
+source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+---
+UP026 [*] `mock` is deprecated, use `unittest.mock`
+  --> UP026_py37.py:11:1
+   |
+10 | # Error: all names available since 3.3
+11 | from mock import Mock
+   | ^^^^^^^^^^^^^^^^^^^^^
+12 |
+13 | # Error: seal was added in 3.7, which matches the target
+   |
+help: Import from `unittest.mock` instead
+8  | from mock import Mock, AsyncMock
+9  | 
+10 | # Error: all names available since 3.3
+   - from mock import Mock
+11 + from unittest.mock import Mock
+12 | 
+13 | # Error: seal was added in 3.7, which matches the target
+14 | from mock import seal
+
+UP026 [*] `mock` is deprecated, use `unittest.mock`
+  --> UP026_py37.py:14:1
+   |
+13 | # Error: seal was added in 3.7, which matches the target
+14 | from mock import seal
+   | ^^^^^^^^^^^^^^^^^^^^^
+15 |
+16 | # Error: all names available since 3.3
+   |
+help: Import from `unittest.mock` instead
+11 | from mock import Mock
+12 | 
+13 | # Error: seal was added in 3.7, which matches the target
+   - from mock import seal
+14 + from unittest.mock import seal
+15 | 
+16 | # Error: all names available since 3.3
+17 | from mock import patch, MagicMock
+
+UP026 [*] `mock` is deprecated, use `unittest.mock`
+  --> UP026_py37.py:17:1
+   |
+16 | # Error: all names available since 3.3
+17 | from mock import patch, MagicMock
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+18 |
+19 | # Error: star imports can't be checked
+   |
+help: Import from `unittest.mock` instead
+14 | from mock import seal
+15 | 
+16 | # Error: all names available since 3.3
+   - from mock import patch, MagicMock
+17 + from unittest.mock import patch, MagicMock
+18 | 
+19 | # Error: star imports can't be checked
+20 | from mock import *
+
+UP026 [*] `mock` is deprecated, use `unittest.mock`
+  --> UP026_py37.py:20:1
+   |
+19 | # Error: star imports can't be checked
+20 | from mock import *
+   | ^^^^^^^^^^^^^^^^^^
+21 |
+22 | # Error: bare `import mock` always works (the module exists since 3.3)
+   |
+help: Import from `unittest.mock` instead
+17 | from mock import patch, MagicMock
+18 | 
+19 | # Error: star imports can't be checked
+   - from mock import *
+20 + from unittest.mock import *
+21 | 
+22 | # Error: bare `import mock` always works (the module exists since 3.3)
+23 | import mock
+
+UP026 [*] `mock` is deprecated, use `unittest.mock`
+  --> UP026_py37.py:23:8
+   |
+22 | # Error: bare `import mock` always works (the module exists since 3.3)
+23 | import mock
+   |        ^^^^
+   |
+help: Import from `unittest.mock` instead
+20 | from mock import *
+21 | 
+22 | # Error: bare `import mock` always works (the module exists since 3.3)
+   - import mock
+23 + from unittest import mock

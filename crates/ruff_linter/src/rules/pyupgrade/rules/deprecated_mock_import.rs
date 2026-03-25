@@ -8,7 +8,7 @@ use log::debug;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::UnqualifiedName;
 use ruff_python_ast::whitespace::indentation;
-use ruff_python_ast::{self as ast, Stmt};
+use ruff_python_ast::{self as ast, PythonVersion, Stmt};
 use ruff_python_codegen::Stylist;
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
@@ -50,6 +50,15 @@ pub(crate) enum MockReference {
 /// This rule will not trigger if the `mock` import is required by the `isort` configuration.
 ///
 /// - `lint.isort.required-imports`
+/// - `target-version`
+///
+/// ## Note
+///
+/// The standalone `mock` package on `PyPI` is a rolling backport of `unittest.mock`
+/// that may include APIs not yet present in the standard library for a given Python
+/// version (e.g., `AsyncMock` was added in Python 3.8, `ThreadingMock` in 3.13).
+/// This rule will not flag `from mock import ...` statements that reference such
+/// APIs when the target Python version predates their introduction.
 ///
 /// ## References
 /// - [Python documentation: `unittest.mock`](https://docs.python.org/3/library/unittest.mock.html)
@@ -257,6 +266,18 @@ fn format_import_from(
     }
 }
 
+/// Returns the minimum Python version that includes the given member in
+/// `unittest.mock`, for members added after the module's introduction in 3.3.
+/// Returns `None` for members that have always been available.
+fn mock_member_min_version(name: &str) -> Option<PythonVersion> {
+    match name {
+        "seal" => Some(PythonVersion::PY37),
+        "AsyncMock" => Some(PythonVersion::PY38),
+        "ThreadingMock" => Some(PythonVersion::PY313),
+        _ => None,
+    }
+}
+
 /// UP026
 pub(crate) fn deprecated_mock_attribute(checker: &Checker, attribute: &ast::ExprAttribute) {
     if !checker.semantic().seen_module(Modules::MOCK) {
@@ -344,6 +365,16 @@ pub(crate) fn deprecated_mock_import(checker: &Checker, stmt: &Stmt) {
             }
 
             if module == "mock" {
+                // The PyPI `mock` package is a rolling backport that may include APIs
+                // not yet available in `unittest.mock` for the target Python version.
+                // Skip the diagnostic if any imported name requires a newer version.
+                if names.iter().any(|alias| {
+                    mock_member_min_version(alias.name.as_str())
+                        .is_some_and(|min_version| checker.target_version() < min_version)
+                }) {
+                    return;
+                }
+
                 if names.iter().any(|alias| {
                     alias.name.as_str() == "mock"
                         && is_import_required_by_isort(

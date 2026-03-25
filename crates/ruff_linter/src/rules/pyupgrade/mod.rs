@@ -282,6 +282,19 @@ mod tests {
     }
 
     #[test]
+    fn deprecated_mock_import_py37() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pyupgrade/UP026_py37.py"),
+            &settings::LinterSettings {
+                unresolved_target_version: PythonVersion::PY37.into(),
+                ..settings::LinterSettings::for_rule(Rule::DeprecatedMockImport)
+            },
+        )?;
+        assert_diagnostics!("UP026_py37", diagnostics);
+        Ok(())
+    }
+
+    #[test]
     fn async_timeout_error_alias_not_applied_py310() -> Result<()> {
         let diagnostics = test_path(
             Path::new("pyupgrade/UP041.py"),
