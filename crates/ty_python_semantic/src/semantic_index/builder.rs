@@ -20,7 +20,6 @@ use ruff_text_size::{Ranged, TextRange};
 use ty_module_resolver::{ModuleName, resolve_module};
 
 use crate::ast_node_ref::AstNodeRef;
-use crate::node_key::NodeKey;
 use crate::semantic_index::ast_ids::AstIdsBuilder;
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::definition::{
@@ -665,8 +664,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             self.mark_symbol_used(symbol_id);
         }
         let use_id = self.current_ast_ids().record_use(expr);
-        self.current_use_def_map_mut()
-            .record_use(place_id, use_id, NodeKey::from_node(expr));
+        self.current_use_def_map_mut().record_use(place_id, use_id);
     }
 
     fn record_place_definition(&mut self, place_id: ScopedPlaceId, expr: &'ast ast::Expr) {
@@ -1795,11 +1793,8 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 // done on the `Identifier` node as opposed to `ExprName` because that's what the
                 // AST uses.
                 let use_id = self.current_ast_ids().record_use(name);
-                self.current_use_def_map_mut().record_use(
-                    symbol.into(),
-                    use_id,
-                    NodeKey::from_node(name),
-                );
+                self.current_use_def_map_mut()
+                    .record_use(symbol.into(), use_id);
 
                 self.add_definition(symbol.into(), function_def);
                 self.mark_symbol_used(symbol);
@@ -1850,9 +1845,6 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 );
             }
             ast::Stmt::Import(node) => {
-                self.current_use_def_map_mut()
-                    .record_node_reachability(NodeKey::from_node(node));
-
                 for (alias_index, alias) in node.names.iter().enumerate() {
                     // Mark the imported module, and all of its parents, as being imported in this
                     // file.
@@ -1880,9 +1872,6 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 }
             }
             ast::Stmt::ImportFrom(node) => {
-                self.current_use_def_map_mut()
-                    .record_node_reachability(NodeKey::from_node(node));
-
                 // If we see:
                 //
                 // * `from .x.y import z` (or `from whatever.thispackage.x.y`)
@@ -2958,11 +2947,8 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
             });
 
         let use_id = self.ast_ids[current_scope].record_use(keyword);
-        self.use_def_maps[current_scope].record_multi_use(
-            member_places.into_iter().flatten(),
-            use_id,
-            NodeKey::from_node(keyword),
-        );
+        self.use_def_maps[current_scope]
+            .record_multi_use(member_places.into_iter().flatten(), use_id);
     }
 
     fn visit_expr(&mut self, expr: &'ast ast::Expr) {
@@ -2970,8 +2956,6 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
 
         self.scopes_by_expression
             .record_expression(expr, self.current_scope());
-
-        let node_key = NodeKey::from_node(expr);
 
         match expr {
             ast::Expr::Name(ast::ExprName { ctx, .. })
@@ -3022,13 +3006,6 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         (ast::ExprContext::Invalid, _) => (false, false),
                     };
                     deferred_effects = Some((place_expr, is_use, is_definition));
-                }
-
-                // Track reachability of attribute expressions to silence `unresolved-attribute`
-                // diagnostics in unreachable code.
-                if expr.is_attribute_expr() {
-                    self.current_use_def_map_mut()
-                        .record_node_reachability(node_key);
                 }
 
                 walk_expr(self, expr);
@@ -3213,11 +3190,6 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 }
             }
             ast::Expr::StringLiteral(_) => {
-                // Track reachability of string literals, as they could be a stringified annotation
-                // with child expressions whose reachability we are interested in.
-                self.current_use_def_map_mut()
-                    .record_node_reachability(node_key);
-
                 walk_expr(self, expr);
             }
             ast::Expr::Yield(_) | ast::Expr::YieldFrom(_) => {

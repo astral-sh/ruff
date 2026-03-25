@@ -245,7 +245,6 @@ use ruff_index::{IndexVec, newtype_index};
 use ruff_text_size::TextRange;
 use rustc_hash::{FxBuildHasher, FxHashMap};
 
-use crate::node_key::NodeKey;
 use crate::place::BoundnessAnalysis;
 use crate::semantic_index::ast_ids::ScopedUseId;
 use crate::semantic_index::definition::{Definition, DefinitionState};
@@ -327,9 +326,6 @@ pub(crate) struct UseDefMap<'db> {
     /// This is only used for kwargs expressions, whose corresponding `bindings_by_use` entry
     /// is empty.
     multi_bindings_by_use: FxHashMap<ScopedUseId, Vec<Bindings>>,
-
-    /// Tracks whether or not a given AST node is reachable from the start of the scope.
-    node_reachability: FxHashMap<NodeKey, ScopedReachabilityConstraintId>,
 
     /// Tracks the reachability constraint for statements and certain sub-expressions
     /// (e.g. ternary branches, boolean operator operands), keyed by their text range.
@@ -934,9 +930,6 @@ pub(super) struct UseDefMapBuilder<'db> {
     /// start of the scope.
     pub(super) reachability: ScopedReachabilityConstraintId,
 
-    /// Tracks whether or not a given AST node is reachable from the start of the scope.
-    node_reachability: FxHashMap<NodeKey, ScopedReachabilityConstraintId>,
-
     /// Tracks the reachability constraint for statements and certain sub-expressions,
     /// keyed by their text range.
     statement_reachability: Vec<(TextRange, ScopedReachabilityConstraintId)>,
@@ -974,7 +967,6 @@ impl<'db> UseDefMapBuilder<'db> {
             bindings_by_use: IndexVec::new(),
             multi_bindings_by_use: FxHashMap::default(),
             reachability: ScopedReachabilityConstraintId::ALWAYS_TRUE,
-            node_reachability: FxHashMap::default(),
             statement_reachability: Vec::new(),
             declarations_by_binding: FxHashMap::default(),
             bindings_by_definition: FxHashMap::default(),
@@ -1385,25 +1377,19 @@ impl<'db> UseDefMapBuilder<'db> {
         );
     }
 
-    pub(super) fn record_use(
-        &mut self,
-        place: ScopedPlaceId,
-        use_id: ScopedUseId,
-        node_key: NodeKey,
-    ) {
+    pub(super) fn record_use(&mut self, place: ScopedPlaceId, use_id: ScopedUseId) {
         let bindings = match place {
             ScopedPlaceId::Symbol(symbol) => self.symbol_states[symbol].bindings(),
             ScopedPlaceId::Member(member) => self.member_states[member].bindings(),
         };
 
-        self.record_use_bindings(bindings.clone(), use_id, node_key);
+        self.record_use_bindings(bindings.clone(), use_id);
     }
 
     pub(super) fn record_multi_use(
         &mut self,
         places: impl Iterator<Item = ScopedPlaceId>,
         use_id: ScopedUseId,
-        node_key: NodeKey,
     ) {
         for place in places {
             let bindings = match place {
@@ -1418,22 +1404,14 @@ impl<'db> UseDefMapBuilder<'db> {
         }
 
         // Record a placeholder use of the parent expression to preserve the indices of `bindings_by_use`.
-        self.record_use_bindings(Bindings::default(), use_id, node_key);
+        self.record_use_bindings(Bindings::default(), use_id);
     }
 
-    fn record_use_bindings(&mut self, bindings: Bindings, use_id: ScopedUseId, node_key: NodeKey) {
+    fn record_use_bindings(&mut self, bindings: Bindings, use_id: ScopedUseId) {
         // We have a use of a place; clone the current bindings for that place, and record them
         // as the live bindings for this use.
         let new_use = self.bindings_by_use.push(bindings);
         debug_assert_eq!(use_id, new_use);
-
-        // Track reachability of all uses of places to silence `unresolved-reference`
-        // diagnostics in unreachable code.
-        self.record_node_reachability(node_key);
-    }
-
-    pub(super) fn record_node_reachability(&mut self, node_key: NodeKey) {
-        self.node_reachability.insert(node_key, self.reachability);
     }
 
     pub(super) fn record_statement_reachability(&mut self, range: TextRange) {
@@ -1599,7 +1577,6 @@ impl<'db> UseDefMapBuilder<'db> {
         self.reachable_member_definitions.shrink_to_fit();
         self.bindings_by_use.shrink_to_fit();
         self.multi_bindings_by_use.shrink_to_fit();
-        self.node_reachability.shrink_to_fit();
         self.statement_reachability.shrink_to_fit();
         self.declarations_by_binding.shrink_to_fit();
         self.bindings_by_definition.shrink_to_fit();
@@ -1654,9 +1631,6 @@ impl<'db> UseDefMapBuilder<'db> {
         for bindings in self.multi_bindings_by_use.values_mut().flatten() {
             bindings.finish(&mut self.reachability_constraints);
         }
-        for constraint in self.node_reachability.values() {
-            self.reachability_constraints.mark_used(*constraint);
-        }
         for &(_, constraint) in &self.statement_reachability {
             self.reachability_constraints.mark_used(constraint);
         }
@@ -1695,7 +1669,6 @@ impl<'db> UseDefMapBuilder<'db> {
             interned_declarations,
             bindings_by_use,
             multi_bindings_by_use: self.multi_bindings_by_use,
-            node_reachability: self.node_reachability,
             statement_reachability: self.statement_reachability,
             end_of_scope_symbols: self.symbol_states,
             end_of_scope_members,
