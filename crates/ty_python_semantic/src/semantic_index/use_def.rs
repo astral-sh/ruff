@@ -1403,11 +1403,11 @@ impl<'db> UseDefMapBuilder<'db> {
         // If the last entry has the same reachability constraint, extend it
         // to cover this range too, collapsing consecutive statements in the
         // same basic block into a single entry.
-        if let Some(last) = self.range_reachability.last_mut() {
-            if last.1 == self.reachability {
-                last.0 = last.0.cover(range);
-                return;
-            }
+        if let Some((last_range, last_reachability)) = self.range_reachability.last_mut()
+            && *last_reachability == self.reachability
+        {
+            *last_range = last_range.cover(range);
+            return;
         }
         self.range_reachability.push((range, self.reachability));
     }
