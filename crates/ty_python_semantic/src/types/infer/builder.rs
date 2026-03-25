@@ -174,7 +174,9 @@ const NUM_FIELD_SPECIFIERS_INLINE: usize = 1;
 ///
 /// The `finish` methods call [`infer_region`](TypeInferenceBuilder::infer_region), which delegates
 /// to one of [`infer_region_scope`](TypeInferenceBuilder::infer_region_scope),
-/// [`infer_region_definition`](TypeInferenceBuilder::infer_region_definition), or
+/// [`infer_region_definition`](TypeInferenceBuilder::infer_region_definition),
+/// [`infer_region_function_decorators`](TypeInferenceBuilder::infer_region_function_decorators),
+/// [`infer_region_deferred`](TypeInferenceBuilder::infer_region_deferred), or
 /// [`infer_region_expression`](TypeInferenceBuilder::infer_region_expression), depending which
 /// kind of [`InferenceRegion`] we are inferring types for.
 ///
@@ -590,6 +592,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         match self.region {
             InferenceRegion::Scope(scope, tcx) => self.infer_region_scope(scope, tcx),
             InferenceRegion::Definition(definition) => self.infer_region_definition(definition),
+            InferenceRegion::FunctionDecorators(definition) => {
+                self.infer_region_function_decorators(definition);
+            }
             InferenceRegion::Deferred(definition) => self.infer_region_deferred(definition),
             InferenceRegion::Expression(expression, tcx) => {
                 self.infer_region_expression(expression, tcx);
@@ -828,6 +833,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             DefinitionKind::LoopHeader(loop_header) => {
                 self.infer_loop_header_definition(loop_header, definition);
+            }
+        }
+    }
+
+    fn infer_region_function_decorators(&mut self, definition: Definition<'db>) {
+        let DefinitionKind::Function(function) = definition.kind(self.db()) else {
+            return;
+        };
+
+        for decorator in &function.node(self.module()).decorator_list {
+            let decorator_type = self.infer_decorator(decorator);
+            if let Type::FunctionLiteral(function) = decorator_type
+                && let Some(KnownFunction::NoTypeCheck) = function.known(self.db())
+            {
+                // Match `infer_function_definition`: suppress diagnostics that follow
+                // `@no_type_check`, including later decorators.
+                self.context.set_in_no_type_check(InNoTypeCheck::Yes);
             }
         }
     }
@@ -9030,26 +9052,26 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     pub(super) fn finish_function_decorator_inference(mut self) -> FunctionDecoratorInference<'db> {
-        let InferenceRegion::Definition(definition) = self.region else {
-            panic!("Expected Definition region");
-        };
+        self.infer_region();
 
-        let mut known_decorators = FunctionDecorators::empty();
-        if let DefinitionKind::Function(func_ref) = definition.kind(self.db()) {
-            let func = func_ref.node(self.module());
-            for decorator in &func.decorator_list {
-                let decorator_type = self.infer_decorator(decorator);
-                known_decorators |=
-                    FunctionDecorators::from_decorator_type(self.db(), decorator_type);
-                if let Type::FunctionLiteral(function) = decorator_type
-                    && let Some(KnownFunction::NoTypeCheck) = function.known(self.db())
-                {
-                    // Match `infer_function_definition`: suppress diagnostics that follow
-                    // `@no_type_check`, including later decorators.
-                    self.context.set_in_no_type_check(InNoTypeCheck::Yes);
+        let known_decorators = match self.region {
+            InferenceRegion::FunctionDecorators(definition) => match definition.kind(self.db()) {
+                DefinitionKind::Function(function) => {
+                    function.node(self.module()).decorator_list.iter().fold(
+                        FunctionDecorators::empty(),
+                        |known_decorators, decorator| {
+                            known_decorators
+                                | FunctionDecorators::from_decorator_type(
+                                    self.db(),
+                                    self.expression_type(&decorator.expression),
+                                )
+                        },
+                    )
                 }
-            }
-        }
+                _ => FunctionDecorators::empty(),
+            },
+            _ => FunctionDecorators::empty(),
+        };
 
         let Self {
             context,

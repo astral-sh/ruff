@@ -1,5 +1,6 @@
 //! We have Salsa queries for inferring types at three different granularities: scope-level,
-//! definition-level, and expression-level.
+//! definition-level, and expression-level, plus lightweight queries for focused subregions like
+//! function decorators.
 //!
 //! Scope-level inference is for when we are actually checking a file, and need to check types for
 //! everything in that file's scopes, or give a linter access to types of arbitrary expressions
@@ -117,8 +118,13 @@ pub(crate) fn function_known_decorators<'db>(
     let module = parsed_module(db, file).load(db);
     let index = semantic_index(db, file);
 
-    TypeInferenceBuilder::new(db, InferenceRegion::Definition(definition), index, &module)
-        .finish_function_decorator_inference()
+    TypeInferenceBuilder::new(
+        db,
+        InferenceRegion::FunctionDecorators(definition),
+        index,
+        &module,
+    )
+    .finish_function_decorator_inference()
 }
 
 pub(crate) fn function_known_decorator_flags<'db>(
@@ -571,6 +577,8 @@ pub(crate) enum InferenceRegion<'db> {
     Expression(Expression<'db>, TypeContext<'db>),
     /// infer types for a [`Definition`]
     Definition(Definition<'db>),
+    /// infer types for the decorators on a function [`Definition`]
+    FunctionDecorators(Definition<'db>),
     /// infer deferred types for a [`Definition`]
     Deferred(Definition<'db>),
     /// infer types for an entire [`ScopeId`]
@@ -581,9 +589,9 @@ impl<'db> InferenceRegion<'db> {
     fn scope(self, db: &'db dyn Db) -> ScopeId<'db> {
         match self {
             InferenceRegion::Expression(expression, _) => expression.scope(db),
-            InferenceRegion::Definition(definition) | InferenceRegion::Deferred(definition) => {
-                definition.scope(db)
-            }
+            InferenceRegion::Definition(definition)
+            | InferenceRegion::FunctionDecorators(definition)
+            | InferenceRegion::Deferred(definition) => definition.scope(db),
             InferenceRegion::Scope(scope, _) => scope,
         }
     }
