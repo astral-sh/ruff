@@ -957,7 +957,7 @@ retries it from the start which includes parameter matching as well.
 from typing import overload
 
 @overload
-def f(x: int, y: int, z: str | None = None) -> None: ...
+def f(x: int, y: int) -> None: ...
 @overload
 def f(x: int, y: str, z: int) -> None: ...
 ```
@@ -984,6 +984,47 @@ def _(t: tuple[int, str] | tuple[int, str, int]) -> None:
     # the first example, while the second list matches the second overload. And, because not all of
     # the expanded argument list evaluates successfully, we produce an error.
     f(*t)  # error: [no-matching-overload]
+
+from typing import Literal, overload
+
+@overload
+def g(x: int, y: str) -> Literal[1]: ...
+@overload
+def g(x: int, y: str, z: int) -> Literal[2]: ...
+def g(*args):
+    return 1
+
+def _(t: tuple[int, str] | tuple[int, str, int]) -> None:
+    # Here both expanded argument lists evaluate successfully, so argument expansion should keep
+    # both overloads and combine their return types.
+    reveal_type(g(*t))  # revealed: Literal[1, 2]
+
+@overload
+def h(x: int, y: str) -> Literal[1]: ...
+@overload
+def h(x: object, y: object, z: object) -> Literal[2]: ...
+def h(*args):
+    return 1
+
+def _(t: tuple[int, str] | tuple[int, str, int]) -> None:
+    # Even though the 3-arg overload can type-check against the unexpanded `*args`, argument
+    # expansion should still revive the 2-arg overload and combine both return types.
+    reveal_type(h(*t))  # revealed: Literal[1, 2]
+
+@overload
+def k(x: int, y: str) -> Literal[1]: ...
+@overload
+def k(x: int | str, y: object, z: object) -> Literal[2]: ...
+@overload
+def k(x: object, y: object, z: object) -> Literal[2]: ...
+def k(*args, **kwargs):
+    return 1
+
+def _(t: tuple[int, str] | tuple[int, str, int]) -> None:
+    # Here argument expansion should run before continuing with the multi-overload logic, because
+    # the 2-arg overload can still match one expansion even though it was pruned provisionally
+    # before expansion.
+    reveal_type(k(*t))  # revealed: Literal[1, 2]
 ```
 
 ## Filtering based on variadic arguments

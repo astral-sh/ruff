@@ -2287,38 +2287,54 @@ impl<'db> CallableBinding<'db> {
         );
 
         // Step 1: Check the result of the arity check which is done by `match_parameters`
-        let matching_overload_indexes = match self.matching_overload_index() {
-            MatchingOverloadIndex::None => {
-                // If no candidate overloads remain from the arity check, we can stop here. We
-                // still perform type checking for non-overloaded function to provide better user
-                // experience.
-                if let [overload] = self.overloads.as_mut_slice() {
-                    overload.check_types(
-                        db,
-                        constraints,
-                        call_arguments.as_ref(),
-                        call_expression_tcx,
-                    );
+
+        // For overloaded calls with expandable `*args`, any arity-based overload pruning is only
+        // provisional. If we have an arity-2 overload and an arity-3 overload, and the call has
+        // `*arg` where `arg` is a union of a 2-tuple and a 3-tuple, we shouldn't eliminate any
+        // overload for arity reasons before trying argument expansion.
+        let (should_retry_after_provisional_arity, overloads_for_expansion) =
+            if self.overloads.len() > 1
+                && self.matching_overload_index().len() < self.overloads.len()
+                && call_arguments.iter().any(|(argument, argument_types)| {
+                    matches!(argument, Argument::Variadic)
+                        && argument_types
+                            .get_default()
+                            .is_some_and(|argument_type| is_expandable_type(db, argument_type))
+                })
+            {
+                // We will retry all overloads after argument expansion.
+                (true, (0..self.overloads.len()).collect())
+            } else {
+                match self.matching_overload_index() {
+                    MatchingOverloadIndex::None => {
+                        // If no candidate overloads remain from the arity check, we can stop here. We
+                        // still perform type checking for non-overloaded function to provide better
+                        // user experience.
+                        if let [overload] = self.overloads.as_mut_slice() {
+                            overload.check_types(
+                                db,
+                                constraints,
+                                call_arguments.as_ref(),
+                                call_expression_tcx,
+                            );
+                        }
+                        return None;
+                    }
+                    MatchingOverloadIndex::Single(index) => {
+                        // If only one candidate overload remains, it is the winning match. Evaluate
+                        // it as a regular (non-overloaded) call.
+                        self.matching_overload_before_type_checking = Some(index);
+                        self.overloads[index].check_types(
+                            db,
+                            constraints,
+                            call_arguments.as_ref(),
+                            call_expression_tcx,
+                        );
+                        return None;
+                    }
+                    MatchingOverloadIndex::Multiple(indexes) => (false, indexes),
                 }
-                return None;
-            }
-            MatchingOverloadIndex::Single(index) => {
-                // If only one candidate overload remains, it is the winning match. Evaluate it as
-                // a regular (non-overloaded) call.
-                self.matching_overload_before_type_checking = Some(index);
-                self.overloads[index].check_types(
-                    db,
-                    constraints,
-                    call_arguments.as_ref(),
-                    call_expression_tcx,
-                );
-                return None;
-            }
-            MatchingOverloadIndex::Multiple(indexes) => {
-                // If two or more candidate overloads remain, proceed to step 2.
-                indexes
-            }
-        };
+            };
 
         // Step 2: Evaluate each remaining overload as a regular (non-overloaded) call to determine
         // whether it is compatible with the supplied argument list.
@@ -2337,54 +2353,58 @@ impl<'db> CallableBinding<'db> {
             "after step 2",
         );
 
-        match self.matching_overload_index() {
-            MatchingOverloadIndex::None => {
-                // If all overloads result in errors, proceed to step 3.
-            }
-            MatchingOverloadIndex::Single(_) => {
-                // If only one overload evaluates without error, it is the winning match.
-                return None;
-            }
-            MatchingOverloadIndex::Multiple(indexes) => {
-                // If two or more candidate overloads remain, proceed to step 4.
-                self.filter_overloads_containing_variadic(&indexes);
-
-                tracing::trace!(
-                    target: "ty_python_semantic::types::call::bind",
-                    matching_overload_index = ?self.matching_overload_index(),
-                    "after step 4",
-                );
-
-                match self.matching_overload_index() {
-                    MatchingOverloadIndex::None => {
-                        // This shouldn't be possible because step 4 can only filter out overloads
-                        // when there _is_ a matching variadic argument.
-                        tracing::debug!("All overloads have been filtered out in step 4");
-                        return None;
-                    }
-                    MatchingOverloadIndex::Single(_) => {
-                        // If only one candidate overload remains, it is the winning match.
-                        return None;
-                    }
-                    MatchingOverloadIndex::Multiple(indexes) => {
-                        // If two or more candidate overloads remain, proceed to step 5.
-                        self.filter_overloads_using_any_or_unknown(
-                            db,
-                            constraints,
-                            call_arguments.as_ref(),
-                            &indexes,
-                        );
-
-                        tracing::trace!(
-                            target: "ty_python_semantic::types::call::bind",
-                            matching_overload_index = ?self.matching_overload_index(),
-                            "after step 5",
-                        );
-                    }
+        // If we are in the "retry for provisional arity" case, we have to try argument expansion
+        // before deciding we are done or moving on to step 4+.
+        if !should_retry_after_provisional_arity {
+            match self.matching_overload_index() {
+                MatchingOverloadIndex::None => {
+                    // If all overloads result in errors, proceed to step 3.
                 }
+                MatchingOverloadIndex::Single(_) => {
+                    // If only one overload evaluates without error, it is the winning match.
+                    return None;
+                }
+                MatchingOverloadIndex::Multiple(indexes) => {
+                    // If two or more candidate overloads remain, proceed to step 4.
+                    self.filter_overloads_containing_variadic(&indexes);
 
-                // This shouldn't lead to argument type expansion.
-                return None;
+                    tracing::trace!(
+                        target: "ty_python_semantic::types::call::bind",
+                        matching_overload_index = ?self.matching_overload_index(),
+                        "after step 4",
+                    );
+
+                    match self.matching_overload_index() {
+                        MatchingOverloadIndex::None => {
+                            // This shouldn't be possible because step 4 can only filter out overloads
+                            // when there _is_ a matching variadic argument.
+                            tracing::debug!("All overloads have been filtered out in step 4");
+                            return None;
+                        }
+                        MatchingOverloadIndex::Single(_) => {
+                            // If only one candidate overload remains, it is the winning match.
+                            return None;
+                        }
+                        MatchingOverloadIndex::Multiple(indexes) => {
+                            // If two or more candidate overloads remain, proceed to step 5.
+                            self.filter_overloads_using_any_or_unknown(
+                                db,
+                                constraints,
+                                call_arguments.as_ref(),
+                                &indexes,
+                            );
+
+                            tracing::trace!(
+                                target: "ty_python_semantic::types::call::bind",
+                                matching_overload_index = ?self.matching_overload_index(),
+                                "after step 5",
+                            );
+                        }
+                    }
+
+                    // This shouldn't lead to argument type expansion.
+                    return None;
+                }
             }
         }
 
@@ -2443,7 +2463,7 @@ impl<'db> CallableBinding<'db> {
             }
         }
 
-        let snapshotter = CallableBindingSnapshotter::new(matching_overload_indexes);
+        let snapshotter = CallableBindingSnapshotter::new(overloads_for_expansion);
 
         // State of the bindings _after_ evaluating (type checking) the matching overloads using
         // the non-expanded argument types.
@@ -3216,6 +3236,16 @@ pub(crate) enum MatchingOverloadIndex {
 
     /// Multiple matching overloads found at the given indexes.
     Multiple(Vec<usize>),
+}
+
+impl MatchingOverloadIndex {
+    pub(crate) fn len(&self) -> usize {
+        match self {
+            MatchingOverloadIndex::None => 0,
+            MatchingOverloadIndex::Single(_) => 1,
+            MatchingOverloadIndex::Multiple(indexes) => indexes.len(),
+        }
+    }
 }
 
 #[derive(Default, Debug, Clone)]
@@ -4904,10 +4934,11 @@ struct CallableBindingSnapshot<'db> {
 
     /// Represents the snapshot of the matched overload bindings.
     ///
-    /// The reason that this only contains the matched overloads are:
-    /// 1. Avoid creating snapshots for the overloads that have been filtered by the arity check
-    /// 2. Avoid duplicating errors when merging the snapshots on a successful evaluation of all
-    ///    the expanded argument lists
+    /// Usually this contains only the overloads that survived the initial arity check, to avoid
+    /// duplicating errors when merging snapshots after a successful evaluation of all expanded
+    /// argument lists. For provisional arity retries on expandable `*args`, however, it can also
+    /// include overloads that were filtered out in step 1 so those overloads can be reconsidered
+    /// against concrete expanded argument lists.
     matching_overloads: Vec<(usize, BindingSnapshot<'db>)>,
 }
 
