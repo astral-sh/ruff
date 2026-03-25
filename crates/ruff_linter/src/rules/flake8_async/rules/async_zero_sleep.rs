@@ -128,29 +128,18 @@ pub(crate) fn async_zero_sleep(checker: &Checker, call: &ExprCall) {
 
         let mut diagnostic = checker.report_diagnostic(AsyncZeroSleep { module }, call.range());
         diagnostic.try_set_fix(|| {
-            let (import_edit, binding) = match module {
-                AsyncModule::AnyIo => {
-                    // `anyio.lowlevel` is a submodule, so we need `import anyio.lowlevel`
-                    // rather than `from anyio import lowlevel`.
-                    checker.importer().get_or_import_symbol(
-                        &ImportRequest::import("anyio.lowlevel", "checkpoint"),
-                        call.func.start(),
-                        checker.semantic(),
-                    )?
-                }
-                AsyncModule::Trio => checker.importer().get_or_import_symbol(
-                    &ImportRequest::import_from("trio", "lowlevel"),
-                    call.func.start(),
-                    checker.semantic(),
-                )?,
-                AsyncModule::AsyncIo => unreachable!(),
-            };
-            let replacement = match module {
-                AsyncModule::AnyIo => binding,
-                AsyncModule::Trio => format!("{binding}.checkpoint"),
-                AsyncModule::AsyncIo => unreachable!(),
-            };
-            let reference_edit = Edit::range_replacement(replacement, call.func.range());
+            // `anyio.lowlevel` is a submodule, so we need `import anyio.lowlevel`
+            // rather than `from anyio import lowlevel`.
+            let full_module_name = format!("{module}.lowlevel");
+
+            let (import_edit, binding) = checker.importer().get_or_import_symbol(
+                &ImportRequest::import(&full_module_name, "checkpoint"),
+                call.func.start(),
+                checker.semantic(),
+            )?;
+
+            let reference_edit = Edit::range_replacement(binding, call.func.range());
+
             let arg_edit = Edit::range_replacement("()".to_string(), call.arguments.range());
             Ok(Fix::applicable_edits(
                 import_edit,
