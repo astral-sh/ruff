@@ -322,6 +322,33 @@ C.f2(1)
 C().f2(1)
 ```
 
+The same classmethod-like shortcut should preserve generic owner specialization when the decorated
+attribute is materialized as a `Callable` rather than a plain function literal:
+
+```py
+from typing import Callable, Generic, TypeVar
+from typing_extensions import ParamSpec
+
+T = TypeVar("T")
+P = ParamSpec("P")
+R = TypeVar("R")
+
+def callable_identity(func: Callable[P, R]) -> Callable[P, R]:
+    return func
+
+class Box(Generic[T]):
+    @callable_identity
+    @classmethod
+    def make(cls, x: T) -> Box[T]:
+        return cls()
+
+class Child(Box[T]): ...
+
+reveal_type(Box.make(1))  # revealed: Box[int]
+reveal_type(Box[int].make(1))  # revealed: Box[int]
+reveal_type(Child.make(1))  # revealed: Box[int]
+```
+
 ## Types are not bound-method descriptors
 
 ```toml

@@ -6419,60 +6419,91 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             {
                 let db = self.db();
 
-                let path_bounds =
-                    identity_instance.assignable_solutions_with_inferable(db, tcx, inferable);
-                let solutions = path_bounds.solve_with(|typevar, variance, lower, upper| {
-                    let identity = typevar.identity(db);
-                    elt_tcx_variance
-                        .entry(identity)
-                        .and_modify(|current| *current = current.join(variance))
-                        .or_insert(variance);
-                    PathBounds::default_solve(db, &constraints, typevar, lower, upper)
-                });
-
-                match solutions {
-                    // If the type context is not compatible with the collection type (e.g., a
-                    // `list` literal where a `tuple` is expected), the assignability check
-                    // produces an unsatisfiable result. In that case, we simply proceed without
-                    // type context constraints rather than aborting the entire collection literal
-                    // inference.
-                    Solutions::Unsatisfiable | Solutions::Unconstrained => {}
-                    Solutions::Constrained(solutions) => {
-                        for solution in &solutions {
-                            for binding in solution {
-                                // The SequentMap's transitivity reasoning can inject
-                                // cross-typevar references into the solution bounds.
-                                // For example, `_KT ≤ str ∧ str ≤ _VT` derives `_KT ≤ _VT`,
-                                // which adds `_KT` to `_VT`'s lower bound. Filter out any
-                                // inferable typevars from the solution, since they represent
-                                // cross-typevar relationships that are resolved independently.
-                                let inferred_ty = binding.solution.filter_union(db, |ty| {
-                                    !ty.as_typevar()
-                                        .is_some_and(|tv| tv.is_inferable(db, inferable))
-                                });
-
-                                // Avoid inferring a preferred type based on partially specialized
-                                // type context from an outer generic call. If the type context is
-                                // a union, we try to keep any concrete elements.
-                                let inferred_ty = inferred_ty
-                                    .filter_union(db, |ty| !ty.has_unspecialized_type_var(db));
-                                if inferred_ty.has_unspecialized_type_var(db) {
-                                    continue;
-                                }
-
-                                let identity = binding.bound_typevar.identity(db);
-                                elt_tcx_constraints
-                                    .entry(identity)
-                                    .and_modify(|existing| existing.add(db, inferred_ty))
-                                    .or_insert_with(|| UnionAccumulator::new(inferred_ty));
+                if tcx.has_unspecialized_type_var(db) {
+                    // Partially-specialized parameter types from multi-inference can still carry
+                    // useful concrete context on some collection elements. For example,
+                    // `dict[tuple[int, ...], UnspecializedTypeVar]` should still contextually type
+                    // the key expression against `tuple[int, ...]`.
+                    //
+                    // Keep that direct per-element context only when the annotation is a
+                    // specialization of this same concrete collection class. This avoids the
+                    // broader assignability walk through protocol and superclass structure that
+                    // motivated the contamination guard added in `b8fad8312fd`.
+                    if let Some(specialization) = tcx.known_specialization(db, collection_class) {
+                        for (elt_ty, specialized_ty) in elt_tys
+                            .clone()
+                            .zip(specialization.types(db).iter().copied())
+                        {
+                            let inferred_tcx = specialized_ty
+                                .filter_union(db, |ty| !ty.has_unspecialized_type_var(db));
+                            if inferred_tcx.has_unspecialized_type_var(db) {
+                                continue;
                             }
-                        }
 
-                        // Remove variance entries for typevars whose solutions were filtered out
-                        // (e.g., due to unspecialized typevars). Variance should only be tracked
-                        // for typevars with actual type context constraints.
+                            let identity = elt_ty.identity(db);
+                            elt_tcx_constraints
+                                .entry(identity)
+                                .and_modify(|existing| existing.add(db, inferred_tcx))
+                                .or_insert_with(|| UnionAccumulator::new(inferred_tcx));
+                            elt_tcx_variance.insert(identity, elt_ty.variance(db));
+                        }
+                    }
+                } else {
+                    let path_bounds =
+                        identity_instance.assignable_solutions_with_inferable(db, tcx, inferable);
+                    let solutions = path_bounds.solve_with(|typevar, variance, lower, upper| {
+                        let identity = typevar.identity(db);
                         elt_tcx_variance
-                            .retain(|identity, _| elt_tcx_constraints.contains_key(identity));
+                            .entry(identity)
+                            .and_modify(|current| *current = current.join(variance))
+                            .or_insert(variance);
+                        PathBounds::default_solve(db, &constraints, typevar, lower, upper)
+                    });
+
+                    match solutions {
+                        // If the type context is not compatible with the collection type (e.g., a
+                        // `list` literal where a `tuple` is expected), the assignability check
+                        // produces an unsatisfiable result. In that case, we simply proceed without
+                        // type context constraints rather than aborting the entire collection literal
+                        // inference.
+                        Solutions::Unsatisfiable | Solutions::Unconstrained => {}
+                        Solutions::Constrained(solutions) => {
+                            for solution in &solutions {
+                                for binding in solution {
+                                    // The SequentMap's transitivity reasoning can inject
+                                    // cross-typevar references into the solution bounds.
+                                    // For example, `_KT ≤ str ∧ str ≤ _VT` derives `_KT ≤ _VT`,
+                                    // which adds `_KT` to `_VT`'s lower bound. Filter out any
+                                    // inferable typevars from the solution, since they represent
+                                    // cross-typevar relationships that are resolved independently.
+                                    let inferred_ty = binding.solution.filter_union(db, |ty| {
+                                        !ty.as_typevar()
+                                            .is_some_and(|tv| tv.is_inferable(db, inferable))
+                                    });
+
+                                    // Avoid inferring a preferred type based on partially specialized
+                                    // type context from an outer generic call. If the type context is
+                                    // a union, we try to keep any concrete elements.
+                                    let inferred_ty = inferred_ty
+                                        .filter_union(db, |ty| !ty.has_unspecialized_type_var(db));
+                                    if inferred_ty.has_unspecialized_type_var(db) {
+                                        continue;
+                                    }
+
+                                    let identity = binding.bound_typevar.identity(db);
+                                    elt_tcx_constraints
+                                        .entry(identity)
+                                        .and_modify(|existing| existing.add(db, inferred_ty))
+                                        .or_insert_with(|| UnionAccumulator::new(inferred_ty));
+                                }
+                            }
+
+                            // Remove variance entries for typevars whose solutions were filtered out
+                            // (e.g., due to unspecialized typevars). Variance should only be tracked
+                            // for typevars with actual type context constraints.
+                            elt_tcx_variance
+                                .retain(|identity, _| elt_tcx_constraints.contains_key(identity));
+                        }
                     }
                 }
             }

@@ -84,7 +84,10 @@ use crate::types::known_instance::DeprecatedInstance;
 use crate::types::list_members::all_members;
 use crate::types::narrow::ClassInfoConstraintFunction;
 use crate::types::relation::TypeRelationChecker;
-use crate::types::signatures::{CallableSignature, ReturnCallableTypeVarScope, Signature};
+use crate::types::signatures::{
+    CallableSignature, Parameter, ReturnCallableTypeVarScope, Signature,
+};
+use crate::types::typevar::BoundTypeVarIdentity;
 use crate::types::variance::{TypeVarVariance, VarianceInferable};
 use crate::types::visitor::any_over_type;
 use crate::types::{
@@ -982,6 +985,88 @@ pub(super) fn walk_function_type<'db, V: super::visitor::TypeVisitor<'db> + ?Siz
     if let Some(signature) = function.updated_last_definition_signature(db) {
         walk_signature(db, signature, visitor);
     }
+}
+
+pub(crate) fn callable_signatures_mention_inherited_typevars<'db>(
+    db: &'db dyn Db,
+    signatures: &CallableSignature<'db>,
+    inherited_generic_context: GenericContext<'db>,
+) -> bool {
+    fn type_mentions_inherited_typevars<'db>(
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        inherited_typevars: &FxOrderSet<BoundTypeVarIdentity<'db>>,
+    ) -> bool {
+        any_over_type(
+            db,
+            ty,
+            true,
+            |nested| matches!(nested, Type::TypeVar(typevar) if inherited_typevars.contains(&typevar.identity(db))),
+        )
+    }
+
+    fn signature_mentions_inherited_typevars<'db>(
+        db: &'db dyn Db,
+        signature: &Signature<'db>,
+        inherited_typevars: &FxOrderSet<BoundTypeVarIdentity<'db>>,
+    ) -> bool {
+        // Method-local typevars can still depend on inherited class typevars through their
+        // explicit bounds or constraints, even when those inherited typevars do not appear
+        // directly in parameter or return annotations.
+        let annotations_mention_inherited_typevars = signature
+            .parameters()
+            .iter()
+            .filter(|parameter| parameter.should_annotation_be_displayed())
+            .map(Parameter::annotated_type)
+            .chain(std::iter::once(signature.return_ty))
+            .any(|ty| type_mentions_inherited_typevars(db, ty, inherited_typevars));
+
+        let typevar_bounds_or_constraints_mention_inherited_typevars =
+            signature.generic_context.is_some_and(|generic_context| {
+                generic_context
+                    .variables(db)
+                    .filter(|typevar| !typevar.typevar(db).is_self(db))
+                    .filter_map(|typevar| typevar.typevar(db).bound_or_constraints(db))
+                    .any(|bound_or_constraints| match bound_or_constraints {
+                        TypeVarBoundOrConstraints::UpperBound(bound) => {
+                            type_mentions_inherited_typevars(db, bound, inherited_typevars)
+                        }
+                        TypeVarBoundOrConstraints::Constraints(constraints) => {
+                            constraints.elements(db).iter().copied().any(|constraint| {
+                                type_mentions_inherited_typevars(db, constraint, inherited_typevars)
+                            })
+                        }
+                    })
+            });
+
+        annotations_mention_inherited_typevars
+            || typevar_bounds_or_constraints_mention_inherited_typevars
+    }
+
+    let inherited_typevars = inherited_generic_context
+        .variables(db)
+        .map(|typevar| typevar.identity(db))
+        .collect::<FxOrderSet<_>>();
+
+    signatures
+        .iter()
+        .any(|signature| signature_mentions_inherited_typevars(db, signature, &inherited_typevars))
+}
+
+pub(crate) fn function_signature_mentions_inherited_typevars<'db>(
+    db: &'db dyn Db,
+    function: FunctionType<'db>,
+    inherited_generic_context: GenericContext<'db>,
+) -> bool {
+    callable_signatures_mention_inherited_typevars(
+        db,
+        function.signature(db),
+        inherited_generic_context,
+    ) || callable_signatures_mention_inherited_typevars(
+        db,
+        &CallableSignature::single(function.last_definition_signature(db).clone()),
+        inherited_generic_context,
+    )
 }
 
 #[salsa::tracked]
