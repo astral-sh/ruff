@@ -95,11 +95,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             self.inference_flags,
                         )
                         .unwrap_or_else(|error| {
-                            error.into_fallback_type(
-                                &self.context,
-                                expression,
-                                self.is_reachable(expression),
-                            )
+                            error.into_fallback_type(&self.context, expression)
                         });
                     self.check_for_unbound_type_variable(expression, ty)
                 }
@@ -119,13 +115,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         self.typevar_binding_context,
                         self.inference_flags,
                     )
-                    .unwrap_or_else(|error| {
-                        error.into_fallback_type(
-                            &self.context,
-                            expression,
-                            self.is_reachable(expression),
-                        )
-                    }),
+                    .unwrap_or_else(|error| error.into_fallback_type(&self.context, expression)),
                 ast::ExprContext::Invalid => Type::unknown(),
                 ast::ExprContext::Store | ast::ExprContext::Del => {
                     todo_type!("Attribute expression annotation in Store/Del context")
@@ -1587,7 +1577,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         subscript,
                     )
                     .in_type_expression(db, self.scope(), None, self.inference_flags)
-                    .unwrap_or_else(|err| err.into_fallback_type(&self.context, subscript, true));
+                    .unwrap_or_else(|err| err.into_fallback_type(&self.context, subscript));
                 // Only store on the tuple slice; non-tuple cases are handled by
                 // `infer_subscript_load_impl` via `infer_expression`.
                 if arguments_slice.is_tuple_expr() {

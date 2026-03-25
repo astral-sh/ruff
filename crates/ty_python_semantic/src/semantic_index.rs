@@ -16,7 +16,6 @@ use ty_module_resolver::ModuleName;
 use crate::semantic_index::place::ScopedPlaceId;
 
 use crate::Db;
-use crate::node_key::NodeKey;
 use crate::semantic_index::ast_ids::AstIds;
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::builder::SemanticIndexBuilder;
@@ -486,27 +485,6 @@ impl<'db> SemanticIndex<'db> {
 
                 parent_use_def.is_reachable(db, reachability)
             })
-    }
-
-    /// Returns true if a given AST node is reachable from the start of the scope. For example,
-    /// in the following code, expression `2` is reachable, but expressions `1` and `3` are not:
-    /// ```py
-    /// def f():
-    ///     x = 1
-    ///     if False:
-    ///         x  # 1
-    ///     x  # 2
-    ///     return
-    ///     x  # 3
-    /// ```
-    pub(crate) fn is_node_reachable(
-        &self,
-        db: &'db dyn crate::Db,
-        scope_id: FileScopeId,
-        node_key: NodeKey,
-    ) -> bool {
-        self.is_scope_reachable(db, scope_id)
-            && self.use_def_map(scope_id).is_node_reachable(db, node_key)
     }
 
     /// Check whether a diagnostic emitted at `range` is in reachable code, considering both

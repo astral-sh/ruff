@@ -487,25 +487,6 @@ impl<'db> UseDefMap<'db> {
         }
     }
 
-    /// Check whether or not a given expression is reachable from the start of the scope. This
-    /// is a local analysis which does not capture the possibility that the entire scope might
-    /// be unreachable. Use [`super::SemanticIndex::is_node_reachable`] for the global
-    /// analysis.
-    #[track_caller]
-    pub(super) fn is_node_reachable(&self, db: &dyn crate::Db, node_key: NodeKey) -> bool {
-        self
-            .reachability_constraints
-            .evaluate(
-                db,
-                &self.predicates,
-                *self
-                    .node_reachability
-                    .get(&node_key)
-                    .expect("`is_node_reachable` should only be called on AST nodes with recorded reachability"),
-            )
-            .may_be_true()
-    }
-
     /// Check whether a diagnostic emitted at `range` is in reachable code within this scope.
     ///
     /// Walks the recorded statement/expression reachability entries to find the tightest
