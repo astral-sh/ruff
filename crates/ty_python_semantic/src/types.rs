@@ -2526,8 +2526,18 @@ impl<'db> Type<'db> {
                     Some((self, AttributeKind::NormalOrNonDataDescriptor))
                 } else {
                     let self_type = instance.unwrap_or_else(|| {
-                        // For classmethod-like callables, bind to the owner class.
-                        owner.to_instance(db).unwrap_or(owner)
+                        if callable.is_classmethod_like(db) {
+                            match owner {
+                                Type::ClassLiteral(class)
+                                    if class.generic_context(db).is_some() =>
+                                {
+                                    Type::from(class.identity_specialization(db))
+                                }
+                                _ => owner.to_instance(db).unwrap_or(owner),
+                            }
+                        } else {
+                            owner.to_instance(db).unwrap_or(owner)
+                        }
                     });
 
                     Some((
@@ -3485,6 +3495,32 @@ impl<'db> Type<'db> {
     /// elements. It's usually best to only worry about "callability" relative to a particular
     /// argument list, via [`try_call`][Self::try_call] and [`CallErrorKind::NotCallable`].
     fn bindings(self, db: &'db dyn Db) -> Bindings<'db> {
+        fn has_only_object_constructor<'db>(db: &'db dyn Db, bound: Type<'db>) -> bool {
+            let has_non_object_init = matches!(
+                bound.member_lookup_with_policy(
+                    db,
+                    "__init__".into(),
+                    MemberLookupPolicy::NO_INSTANCE_FALLBACK
+                        | MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
+                )
+                .place,
+                Place::Defined(place) if place.is_definitely_defined()
+            );
+
+            let has_non_object_new =
+                bound
+                    .to_meta_type(db)
+                    .lookup_dunder_new(db)
+                    .is_some_and(|place_and_qualifiers| {
+                        matches!(
+                            place_and_qualifiers.place,
+                            Place::Defined(place) if place.is_definitely_defined()
+                        )
+                    });
+
+            !has_non_object_init && !has_non_object_new
+        }
+
         match self {
             Type::Callable(callable) => {
                 CallableBinding::from_overloads(self, callable.signatures(db).iter().cloned())
@@ -3743,7 +3779,20 @@ impl<'db> Type<'db> {
                     let bindings = match tvar.typevar(db).bound_or_constraints(db) {
                         None => KnownClass::Type.to_instance(db).bindings(db),
                         Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                            bound.to_meta_type(db).bindings(db)
+                            if tvar.typevar(db).is_self(db)
+                                && has_only_object_constructor(db, bound)
+                            {
+                                // `type[Self]` must stay gradual here so `cls(...)` can still bind
+                                // to a subclass constructor when the upper bound does not expose a
+                                // meaningful non-`object` constructor surface of its own.
+                                Binding::single(
+                                    self,
+                                    Signature::new(Parameters::gradual_form(), Type::TypeVar(tvar)),
+                                )
+                                .into()
+                            } else {
+                                bound.to_meta_type(db).bindings(db)
+                            }
                         }
                         Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
                             Bindings::from_union(

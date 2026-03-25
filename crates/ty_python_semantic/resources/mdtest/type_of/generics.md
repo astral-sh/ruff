@@ -175,6 +175,21 @@ class B:
         return self.__class__(1)
 ```
 
+`type[Self]` should stay strict when the current class only defines `__new__`:
+
+```py
+from typing import Self
+
+class C:
+    def __new__(cls, x: int) -> Self:
+        return super().__new__(cls)
+
+    @classmethod
+    def clone(cls) -> Self:
+        # error: [invalid-argument-type] "Argument to function `__new__` is incorrect: Expected `int`, found `Literal["x"]`"
+        return cls("x")
+```
+
 ## Subtyping
 
 A class `A` is a subtype of `type[T]` if any instance of `A` is a subtype of `T`.

@@ -323,6 +323,7 @@ impl<'db> Type<'db> {
             constraints,
             inferable,
             relation: TypeRelation::SubtypingAssuming,
+            preserve_source_inherited_signature_typevars: false,
             given: assuming,
             relation_visitor: &HasRelationToVisitor::default(constraints),
             disjointness_visitor: &IsDisjointVisitor::default(constraints),
@@ -421,6 +422,7 @@ impl<'db> Type<'db> {
             constraints,
             inferable,
             relation,
+            preserve_source_inherited_signature_typevars: false,
             given: ConstraintSet::from_bool(constraints, false),
             relation_visitor: &HasRelationToVisitor::default(constraints),
             disjointness_visitor: &IsDisjointVisitor::default(constraints),
@@ -526,6 +528,7 @@ pub(super) struct TypeRelationChecker<'a, 'c, 'db> {
     pub(super) constraints: &'c ConstraintSetBuilder<'db>,
     pub(super) inferable: InferableTypeVars<'db>,
     pub(super) relation: TypeRelation,
+    pub(super) preserve_source_inherited_signature_typevars: bool,
     given: ConstraintSet<'db, 'c>,
 
     // N.B. these fields are private to reduce the risk of
@@ -549,6 +552,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             constraints,
             inferable,
             relation: TypeRelation::Subtyping,
+            preserve_source_inherited_signature_typevars: false,
             given: ConstraintSet::from_bool(constraints, false),
             relation_visitor,
             disjointness_visitor,
@@ -564,6 +568,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             constraints,
             inferable: InferableTypeVars::None,
             relation: TypeRelation::ConstraintSetAssignability,
+            preserve_source_inherited_signature_typevars: false,
             given: ConstraintSet::from_bool(constraints, false),
             relation_visitor,
             disjointness_visitor,
@@ -573,6 +578,13 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
     pub(super) fn with_inferable_typevars(&self, inferable: InferableTypeVars<'db>) -> Self {
         Self {
             inferable,
+            ..self.clone()
+        }
+    }
+
+    pub(super) fn with_preserved_source_inherited_signature_typevars(&self) -> Self {
+        Self {
+            preserve_source_inherited_signature_typevars: true,
             ..self.clone()
         }
     }
@@ -1572,6 +1584,7 @@ impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
             constraints: self.constraints,
             given: self.given,
             inferable: InferableTypeVars::None,
+            preserve_source_inherited_signature_typevars: false,
             relation_visitor: self.relation_visitor,
             disjointness_visitor: self.disjointness_visitor,
         }
@@ -1639,6 +1652,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             relation,
             constraints: self.constraints,
             inferable: self.inferable,
+            preserve_source_inherited_signature_typevars: false,
             given: self.given,
             relation_visitor: self.relation_visitor,
             disjointness_visitor: self.disjointness_visitor,

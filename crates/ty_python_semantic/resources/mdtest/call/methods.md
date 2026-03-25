@@ -514,6 +514,146 @@ with Child().create() as child:
     reveal_type(child)  # revealed: Child
 ```
 
+### Generic classmethod factories preserve the class specialization
+
+```py
+from inspect import getattr_static
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+class Box(Generic[T]):
+    def __init__(self, x: T) -> None:
+        self.x = x
+
+    @classmethod
+    def make(cls, x: T) -> "Box[T]":
+        return cls(x)
+
+    @classmethod
+    def pair(cls, x: T, extra: U) -> tuple["Box[T]", U]:
+        return cls(x), extra
+
+reveal_type(getattr_static(Box, "make"))  # revealed: def make[T](cls, x: T) -> Box[T]
+reveal_type(Box.make(1))  # revealed: Box[int]
+reveal_type(Box.pair(1, "a"))  # revealed: tuple[Box[int], Literal["a"]]
+reveal_type(Box[int].make(1))  # revealed: Box[int]
+```
+
+### Generic classmethod factories still contextually type dict literals
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Domain(Generic[T]): ...
+
+class Poly(Generic[T]):
+    @classmethod
+    def from_dict(cls, rep: dict[tuple[int, ...], T], lev: int, dom: Domain[T]) -> "Poly[T]":
+        raise NotImplementedError
+
+def from_dict_fn(rep: dict[tuple[int, ...], T], lev: int, dom: Domain[T]) -> Poly[T]:
+    raise NotImplementedError
+
+class MPZ: ...
+
+ZZ = Domain[MPZ]()
+
+reveal_type(from_dict_fn({(1, 1): MPZ(), (0, 0): MPZ()}, 1, ZZ))  # revealed: Poly[MPZ]
+reveal_type(Poly.from_dict({(1, 1): MPZ(), (0, 0): MPZ()}, 1, ZZ))  # revealed: Poly[MPZ]
+```
+
+### Generic classmethod factories can satisfy callable parameters tied to the receiver type
+
+```py
+from typing import Callable, Generic, TypeVar, overload
+from typing_extensions import TypeVarTuple, Unpack
+
+T = TypeVar("T")
+Ts = TypeVarTuple("Ts")
+
+@overload
+def get_callable_args(x: T, fn: None = ...) -> tuple[object, ...]: ...
+@overload
+def get_callable_args(x: T, fn: Callable[[Unpack[Ts]], T]) -> tuple[Unpack[Ts]] | None: ...
+def get_callable_args(x: T, fn: Callable[[Unpack[Ts]], T] | None = None) -> tuple[Unpack[Ts]] | None:
+    return None
+
+class Vec(Generic[T]):
+    @classmethod
+    def empty(cls) -> "Vec[T]":
+        return cls()
+
+    @classmethod
+    def make(cls, x: T) -> "Vec[T]":
+        return cls()
+
+    def value(self) -> None:
+        reveal_type(get_callable_args(self, Vec.empty))  # revealed: tuple[@Todo(TypeVarTuple), ...] | None
+        reveal_type(get_callable_args(self, Vec.make))  # revealed: tuple[@Todo(TypeVarTuple), ...] | None
+```
+
+### Callable-owned type variables are still abstracted away
+
+```py
+from typing import Callable, TypeVar, cast
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+def get_result(fn: Callable[[], T]) -> T:
+    return fn()
+
+def generic() -> U:
+    return cast(U, 0)
+
+reveal_type(get_result(generic))  # revealed: Unknown
+```
+
+### Generic classmethods only inherit the class context when the signature needs it
+
+```py
+from typing import Generic, TypeVar
+from ty_extensions import generic_context
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+class Box(Generic[T]):
+    @classmethod
+    def cls_echo(cls, x: U) -> U:
+        return x
+
+# revealed: ty_extensions.GenericContext[Self@cls_echo, U@cls_echo]
+reveal_type(generic_context(Box.cls_echo))
+reveal_type(Box.cls_echo(1))  # revealed: Literal[1]
+```
+
+### Inherited generic classmethod factories preserve the lookup class specialization
+
+```py
+from inspect import getattr_static
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+class Base(Generic[T]):
+    @classmethod
+    def make(cls, x: T) -> "Base[T]":
+        return cls(x)
+
+class Child(Base[U]):
+    def __init__(self, x: U) -> None:
+        self.x = x
+
+reveal_type(getattr_static(Child, "make"))  # revealed: def make[U](cls, x: U) -> Base[U]
+reveal_type(Child.make(1))  # revealed: Base[int]
+```
+
 ### `__init_subclass__`
 
 The [`__init_subclass__`] method is implicitly a classmethod:
@@ -816,6 +956,75 @@ reveal_type(D.ctx(5))  # revealed: _GeneratorContextManager[int, None, None]
 
 # Accessing via instance should also work (no self-binding)
 reveal_type(D().ctx(5))  # revealed: _GeneratorContextManager[int, None, None]
+```
+
+### Generic staticmethod factories preserve the class specialization
+
+```py
+from inspect import getattr_static
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+class Box(Generic[T]):
+    def __init__(self, x: T) -> None:
+        self.x = x
+
+    @staticmethod
+    def make(x: T) -> "Box[T]":
+        return Box(x)
+
+    @staticmethod
+    def pair(x: T, extra: U) -> tuple["Box[T]", U]:
+        return Box(x), extra
+
+reveal_type(getattr_static(Box, "make"))  # revealed: def make[T](x: T) -> Box[T]
+reveal_type(Box.make(1))  # revealed: Box[int]
+reveal_type(Box.pair(1, "a"))  # revealed: tuple[Box[int], Literal["a"]]
+```
+
+### Generic staticmethods only inherit the class context when the signature needs it
+
+```py
+from typing import Generic, TypeVar
+from ty_extensions import generic_context
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+class Box(Generic[T]):
+    @staticmethod
+    def static_echo(x: U) -> U:
+        return x
+
+# revealed: ty_extensions.GenericContext[U@static_echo]
+reveal_type(generic_context(Box.static_echo))
+reveal_type(Box.static_echo(1))  # revealed: Literal[1]
+```
+
+### Inherited generic staticmethod factories preserve the lookup class specialization
+
+```py
+from inspect import getattr_static
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+class Base(Generic[T]):
+    @staticmethod
+    def make_static(x: T) -> "Base[T]":
+        return Base(x)
+
+    def __init__(self, x: T) -> None:
+        self.x = x
+
+class Child(Base[U]):
+    pass
+
+reveal_type(getattr_static(Child, "make_static"))  # revealed: def make_static[U](x: U) -> Base[U]
+reveal_type(Child.make_static(1))  # revealed: Base[int]
 ```
 
 ### `__new__`

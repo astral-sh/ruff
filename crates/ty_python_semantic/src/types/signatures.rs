@@ -13,7 +13,7 @@
 use std::slice::Iter;
 
 use itertools::{EitherOrBoth, Itertools};
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::{SmallVec, smallvec_inline};
 
 use super::{DynamicType, Type, TypeVarVariance, semantic_index};
@@ -27,6 +27,7 @@ use crate::types::infer::infer_deferred_types;
 use crate::types::relation::{
     HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker,
 };
+use crate::types::typevar::BoundTypeVarIdentity;
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType,
     FindLegacyTypeVarsVisitor, KnownClass, MaterializationKind, ParamSpecAttrKind, SelfBinding,
@@ -340,6 +341,25 @@ impl<'db> CallableSignature<'db> {
         other: &Self,
         constraints: &'c ConstraintSetBuilder<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        self.when_constraint_set_assignable_to_inner(db, other, constraints, false)
+    }
+
+    pub(crate) fn when_constraint_set_assignable_to_preserving_source_inherited<'c>(
+        &self,
+        db: &'db dyn Db,
+        other: &Self,
+        constraints: &'c ConstraintSetBuilder<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        self.when_constraint_set_assignable_to_inner(db, other, constraints, true)
+    }
+
+    fn when_constraint_set_assignable_to_inner<'c>(
+        &self,
+        db: &'db dyn Db,
+        other: &Self,
+        constraints: &'c ConstraintSetBuilder<'db>,
+        preserve_source_inherited: bool,
+    ) -> ConstraintSet<'db, 'c> {
         let relation_visitor = HasRelationToVisitor::default(constraints);
         let disjointness_visitor = IsDisjointVisitor::default(constraints);
         let checker = TypeRelationChecker::constraint_set_assignability(
@@ -347,6 +367,11 @@ impl<'db> CallableSignature<'db> {
             &relation_visitor,
             &disjointness_visitor,
         );
+        let checker = if preserve_source_inherited {
+            checker.with_preserved_source_inherited_signature_typevars()
+        } else {
+            checker
+        };
         checker.check_callable_signature_pair_inner(db, &self.overloads, &other.overloads)
     }
 }
@@ -768,11 +793,50 @@ impl<'db> Signature<'db> {
         }
     }
 
+    fn owned_inferable_typevars(&self, db: &'db dyn Db) -> FxHashSet<BoundTypeVarIdentity<'db>> {
+        let Some(generic_context) = self.generic_context else {
+            return FxHashSet::default();
+        };
+
+        generic_context
+            .variables(db)
+            .filter(
+                |typevar| match (self.definition, typevar.binding_context(db)) {
+                    (Some(definition), BindingContext::Definition(binding_context)) => {
+                        binding_context == definition
+                    }
+                    (None, BindingContext::Synthetic) => true,
+                    _ => false,
+                },
+            )
+            .map(|typevar| typevar.identity(db))
+            .collect()
+    }
+
     pub(crate) fn when_constraint_set_assignable_to_signatures<'c>(
         &self,
         db: &'db dyn Db,
         other: &CallableSignature<'db>,
         constraints: &'c ConstraintSetBuilder<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        self.when_constraint_set_assignable_to_signatures_inner(db, other, constraints, false)
+    }
+
+    pub(crate) fn when_constraint_set_assignable_to_signatures_preserving_source_inherited<'c>(
+        &self,
+        db: &'db dyn Db,
+        other: &CallableSignature<'db>,
+        constraints: &'c ConstraintSetBuilder<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        self.when_constraint_set_assignable_to_signatures_inner(db, other, constraints, true)
+    }
+
+    fn when_constraint_set_assignable_to_signatures_inner<'c>(
+        &self,
+        db: &'db dyn Db,
+        other: &CallableSignature<'db>,
+        constraints: &'c ConstraintSetBuilder<'db>,
+        preserve_source_inherited: bool,
     ) -> ConstraintSet<'db, 'c> {
         // If this signature is a paramspec, bind it to the entire overloaded other callable.
         if let Some(self_bound_typevar) = self.parameters.as_paramspec()
@@ -814,15 +878,21 @@ impl<'db> Signature<'db> {
             .overloads
             .iter()
             .when_all(db, constraints, |other_signature| {
-                self.when_constraint_set_assignable_to(db, other_signature, constraints)
+                self.when_constraint_set_assignable_to_inner(
+                    db,
+                    other_signature,
+                    constraints,
+                    preserve_source_inherited,
+                )
             })
     }
 
-    fn when_constraint_set_assignable_to<'c>(
+    fn when_constraint_set_assignable_to_inner<'c>(
         &self,
         db: &'db dyn Db,
         other: &Self,
         constraints: &'c ConstraintSetBuilder<'db>,
+        preserve_source_inherited: bool,
     ) -> ConstraintSet<'db, 'c> {
         let relation_visitor = HasRelationToVisitor::default(constraints);
         let disjointness_visitor = IsDisjointVisitor::default(constraints);
@@ -831,6 +901,11 @@ impl<'db> Signature<'db> {
             &relation_visitor,
             &disjointness_visitor,
         );
+        let checker = if preserve_source_inherited {
+            checker.with_preserved_source_inherited_signature_typevars()
+        } else {
+            checker
+        };
         checker.check_signature_pair(db, self, other)
     }
 
@@ -1156,10 +1231,20 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // we produce, we reduce it back down to the inferable set that the caller asked about.
         // If we introduced new inferable typevars, those will be existentially quantified away
         // before returning.
+        let source_reduced: FxHashSet<_> = if self.preserve_source_inherited_signature_typevars {
+            // Function-like source signatures can borrow inherited typevars from an enclosing
+            // generic owner. Reducing those away here would lose the callable-to-receiver link
+            // before specialization inference can solve it.
+            source.owned_inferable_typevars(db)
+        } else {
+            source_inferable.iter(db).collect()
+        };
+        let target_reduced: FxHashSet<_> = target_inferable.iter(db).collect();
+
         when.reduce_inferable(
             db,
             self.constraints,
-            source_inferable.iter(db).chain(target_inferable.iter(db)),
+            source_reduced.iter().chain(target_reduced.iter()).copied(),
         )
     }
 

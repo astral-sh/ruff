@@ -44,7 +44,9 @@ use crate::{
         diagnostic::INVALID_DATACLASS_OVERRIDE,
         enums::{enum_metadata, is_enum_class_by_inheritance, try_unwrap_nonmember_value},
         function::{
-            DataclassTransformerParams, KnownFunction, is_implicit_classmethod,
+            DataclassTransformerParams, KnownFunction,
+            callable_signatures_mention_inherited_typevars,
+            function_signature_mentions_inherited_typevars, is_implicit_classmethod,
             is_implicit_staticmethod,
         },
         generics::Specialization,
@@ -954,6 +956,38 @@ impl<'db> StaticClassLiteral<'db> {
     /// The member resolves to a member on the class itself or any of its proper superclasses.
     ///
     /// TODO: Should this be made private...?
+    fn needs_identity_specialization_for_own_class_member(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+    ) -> bool {
+        let Some(generic_context) = self.generic_context(db) else {
+            return false;
+        };
+
+        match class_member(db, self.body_scope(db), name)
+            .inner
+            .place
+            .unwidened_type()
+        {
+            Some(Type::FunctionLiteral(_)) if matches!(name, "__new__" | "__init__") => true,
+            Some(Type::FunctionLiteral(function)) => {
+                (function.is_classmethod(db) || function.is_staticmethod(db))
+                    && function_signature_mentions_inherited_typevars(db, function, generic_context)
+            }
+            Some(Type::Callable(_)) if matches!(name, "__new__" | "__init__") => true,
+            Some(Type::Callable(callable)) => {
+                (callable.is_classmethod_like(db) || callable.is_staticmethod_like(db))
+                    && callable_signatures_mention_inherited_typevars(
+                        db,
+                        callable.signatures(db),
+                        generic_context,
+                    )
+            }
+            _ => false,
+        }
+    }
+
     pub(super) fn class_member(
         self,
         db: &'db dyn Db,
@@ -976,7 +1010,16 @@ impl<'db> StaticClassLiteral<'db> {
             }
         }
 
-        let mut member = self.class_member_inner(db, None, name, policy);
+        let specialization = self
+            .needs_identity_specialization_for_own_class_member(db, name)
+            .then(|| {
+                self.identity_specialization(db)
+                    .class_literal_and_specialization(db)
+                    .1
+                    .expect("identity specialization exists for generic classes")
+            });
+
+        let mut member = self.class_member_inner(db, specialization, name, policy);
 
         // We generally treat dunder attributes with `Callable` types as function-like callables.
         // See `callables_as_descriptors.md` for more details.
@@ -1093,27 +1136,56 @@ impl<'db> StaticClassLiteral<'db> {
 
         let body_scope = self.body_scope(db);
         let member = class_member(db, body_scope, name).map_type(|ty| {
-            // The `__new__` and `__init__` members of a non-specialized generic class are handled
-            // specially: they inherit the generic context of their class. That lets us treat them
-            // as generic functions when constructing the class, and infer the specialization of
-            // the class from the arguments that are passed in.
-            //
-            // We might decide to handle other class methods the same way, having them inherit the
-            // class's generic context, and performing type inference on calls to them to determine
-            // the specialization of the class. If we do that, we would update this to also apply
-            // to any method with a `@classmethod` decorator. (`__init__` would remain a special
-            // case, since it's an _instance_ method where we don't yet know the generic class's
-            // specialization.)
-            match (inherited_generic_context, ty, specialization, name) {
-                (
-                    Some(generic_context),
-                    Type::FunctionLiteral(function),
-                    Some(_),
-                    "__new__" | "__init__",
-                ) => Type::FunctionLiteral(
-                    function.with_inherited_generic_context(db, generic_context),
-                ),
-                _ => ty,
+            let Some(generic_context) = inherited_generic_context else {
+                return ty;
+            };
+
+            let specialized_ty = ty.apply_optional_specialization(db, specialization);
+
+            match (ty, specialized_ty) {
+                (Type::FunctionLiteral(function), _) if matches!(name, "__new__" | "__init__") => {
+                    Type::FunctionLiteral(
+                        function.with_inherited_generic_context(db, generic_context),
+                    )
+                }
+                (Type::FunctionLiteral(function), Type::FunctionLiteral(specialized_function))
+                    if (function.is_classmethod(db) || function.is_staticmethod(db))
+                        && function_signature_mentions_inherited_typevars(
+                            db,
+                            specialized_function,
+                            generic_context,
+                        ) =>
+                {
+                    Type::FunctionLiteral(
+                        function.with_inherited_generic_context(db, generic_context),
+                    )
+                }
+                (Type::Callable(callable), _) if matches!(name, "__new__" | "__init__") => {
+                    Type::Callable(CallableType::new(
+                        db,
+                        callable
+                            .signatures(db)
+                            .with_inherited_generic_context(db, generic_context),
+                        callable.kind(db),
+                    ))
+                }
+                (Type::Callable(callable), Type::Callable(specialized_callable))
+                    if (callable.is_classmethod_like(db) || callable.is_staticmethod_like(db))
+                        && callable_signatures_mention_inherited_typevars(
+                            db,
+                            specialized_callable.signatures(db),
+                            generic_context,
+                        ) =>
+                {
+                    Type::Callable(CallableType::new(
+                        db,
+                        callable
+                            .signatures(db)
+                            .with_inherited_generic_context(db, generic_context),
+                        callable.kind(db),
+                    ))
+                }
+                (ty, _) => ty,
             }
         });
 
