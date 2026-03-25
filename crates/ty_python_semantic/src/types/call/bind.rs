@@ -321,6 +321,49 @@ impl<'db> BindingsElement<'db> {
     }
 }
 
+/// A request to re-infer call arguments using refinement bindings discovered after an initial
+/// binding pass.
+#[derive(Clone, Debug)]
+pub(crate) enum ArgumentInferenceRefinement<'db> {
+    Bindings(ArgumentInferenceRefinementBindings<'db>),
+}
+
+impl<'db> ArgumentInferenceRefinement<'db> {
+    fn bindings(
+        bindings: Bindings<'db>,
+        argument_start_index: usize,
+        argument_index_offset: usize,
+    ) -> Self {
+        Self::Bindings(ArgumentInferenceRefinementBindings {
+            bindings,
+            argument_start_index,
+            argument_index_offset,
+        })
+    }
+}
+
+/// Refinement bindings to use for a suffix of the call arguments during a refinement pass.
+#[derive(Clone, Debug)]
+pub(crate) struct ArgumentInferenceRefinementBindings<'db> {
+    bindings: Bindings<'db>,
+    argument_start_index: usize,
+    argument_index_offset: usize,
+}
+
+impl<'db> ArgumentInferenceRefinementBindings<'db> {
+    pub(crate) fn bindings(&self) -> &Bindings<'db> {
+        &self.bindings
+    }
+
+    pub(crate) fn argument_start_index(&self) -> usize {
+        self.argument_start_index
+    }
+
+    pub(crate) fn argument_index_offset(&self) -> usize {
+        self.argument_index_offset
+    }
+}
+
 /// Binding information for a union of callables, where each union element may be an intersection.
 ///
 /// This structure represents a union (possibly size one) of callable elements, where each element
@@ -681,6 +724,52 @@ impl<'db> Bindings<'db> {
                 .flat_map(CallableBinding::matching_overloads)
                 .any(|(_, overload)| f(overload))
         })
+    }
+
+    /// Returns `true` if this call shape may request a second argument-inference pass after the
+    /// initial binding result is known.
+    pub(crate) fn may_request_argument_inference_refinement(&self, db: &'db dyn Db) -> bool {
+        matches!(
+            self.callable_type,
+            Type::ClassLiteral(class) if class.is_known(db, KnownClass::FunctoolsPartial)
+        ) && self.argument_forms().len() > 1
+    }
+
+    /// Returns an argument-inference refinement request derived from the current binding result.
+    pub(crate) fn argument_inference_refinement_request<'a>(
+        &self,
+        db: &'db dyn Db,
+        call_arguments: &CallArguments<'a, 'db>,
+    ) -> Option<ArgumentInferenceRefinement<'db>> {
+        if !self.may_request_argument_inference_refinement(db) {
+            return None;
+        }
+
+        let should_refine = !matches!(
+            self.return_type(db),
+            Type::KnownInstance(KnownInstanceType::FunctoolsPartial(_))
+        ) || self
+            .iter_flat()
+            .flat_map(CallableBinding::overloads)
+            .flat_map(Binding::errors)
+            .any(BindingError::is_relevant_for_partial_application);
+
+        if !should_refine {
+            return None;
+        }
+
+        let wrapped_callable_ty = call_arguments
+            .types()
+            .first()
+            .and_then(CallArgumentTypes::get_default)?;
+        let (_, refinement_bindings) =
+            Self::functools_partial_matched_bindings(db, wrapped_callable_ty, call_arguments)?;
+
+        Some(ArgumentInferenceRefinement::bindings(
+            refinement_bindings,
+            1,
+            1,
+        ))
     }
 
     /// Maps each `CallableBinding` to a type and combines results while preserving
@@ -4638,6 +4727,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         let specialization = builder.build_with(generic_context, maybe_promote);
         let partial_specialization =
             builder.build_preserving_unmapped_with(generic_context, maybe_promote);
+
         self.return_ty = self.return_ty.apply_specialization(self.db, specialization);
         self.specialization = Some(specialization);
         self.partial_specialization = Some(partial_specialization);
