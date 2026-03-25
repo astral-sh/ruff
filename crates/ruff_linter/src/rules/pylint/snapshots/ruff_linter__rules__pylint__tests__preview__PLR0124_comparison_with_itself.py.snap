@@ -1,0 +1,93 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+--- Linter settings ---
+-linter.preview = disabled
++linter.preview = enabled
+
+--- Summary ---
+Removed: 0
+Added: 7
+
+--- Added ---
+PLR0124 Name compared with itself, consider replacing `id(foo, bar) == id(foo, bar)`
+  --> comparison_with_itself.py:55:1
+   |
+53 | id(foo) == id(bar)
+54 |
+55 | id(foo, bar) == id(foo, bar)
+   | ^^^^^^^^^^^^
+56 |
+57 | id(foo, bar=1) == id(foo, bar=1)
+   |
+
+
+PLR0124 Name compared with itself, consider replacing `id(foo, bar=1) == id(foo, bar=1)`
+  --> comparison_with_itself.py:57:1
+   |
+55 | id(foo, bar) == id(foo, bar)
+56 |
+57 | id(foo, bar=1) == id(foo, bar=1)
+   | ^^^^^^^^^^^^^^
+58 |
+59 | # Preview errors (attribute, subscript, call).
+   |
+
+
+PLR0124 Name compared with itself, consider replacing `self.x == self.x`
+  --> comparison_with_itself.py:60:1
+   |
+59 | # Preview errors (attribute, subscript, call).
+60 | self.x == self.x
+   | ^^^^^^
+61 |
+62 | a.b.c == a.b.c
+   |
+
+
+PLR0124 Name compared with itself, consider replacing `a.b.c == a.b.c`
+  --> comparison_with_itself.py:62:1
+   |
+60 | self.x == self.x
+61 |
+62 | a.b.c == a.b.c
+   | ^^^^^
+63 |
+64 | a[0] == a[0]
+   |
+
+
+PLR0124 Name compared with itself, consider replacing `a[0] == a[0]`
+  --> comparison_with_itself.py:64:1
+   |
+62 | a.b.c == a.b.c
+63 |
+64 | a[0] == a[0]
+   | ^^^^
+65 |
+66 | obj.method() == obj.method()
+   |
+
+
+PLR0124 Name compared with itself, consider replacing `obj.method() == obj.method()`
+  --> comparison_with_itself.py:66:1
+   |
+64 | a[0] == a[0]
+65 |
+66 | obj.method() == obj.method()
+   | ^^^^^^^^^^^^
+67 |
+68 | a[0:2] == a[0:2]
+   |
+
+
+PLR0124 Name compared with itself, consider replacing `a[0:2] == a[0:2]`
+  --> comparison_with_itself.py:68:1
+   |
+66 | obj.method() == obj.method()
+67 |
+68 | a[0:2] == a[0:2]
+   | ^^^^^^
+69 |
+70 | # Preview non-errors.
+   |

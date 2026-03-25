@@ -258,6 +258,10 @@ mod tests {
     }
 
     #[test_case(
+        Rule::ComparisonWithItself,
+        Path::new("comparison_with_itself.py")
+    )]
+    #[test_case(
         Rule::UselessExceptionStatement,
         Path::new("useless_exception_statement.py")
     )]

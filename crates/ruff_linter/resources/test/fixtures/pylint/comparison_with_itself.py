@@ -55,3 +55,25 @@ id(foo) == id(bar)
 id(foo, bar) == id(foo, bar)
 
 id(foo, bar=1) == id(foo, bar=1)
+
+# Preview errors (attribute, subscript, call).
+self.x == self.x
+
+a.b.c == a.b.c
+
+a[0] == a[0]
+
+obj.method() == obj.method()
+
+a[0:2] == a[0:2]
+
+# Preview non-errors.
+self.x == self.y
+
+a.b.c == a.b.d
+
+a[0] == a[1]
+
+obj.method() == other.method()
+
+a.x == b.x
