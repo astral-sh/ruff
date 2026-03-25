@@ -4,7 +4,7 @@ assertion_line: 24
 expression: "&provide_type_response"
 ---
 {
-  "tys": [
+  "types": [
     "builtins.type[foo.A]"
   ]
 }
