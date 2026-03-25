@@ -66,6 +66,7 @@ pub(crate) use unused_async::*;
 pub(crate) use unused_noqa::*;
 pub(crate) use unused_unpacked_variable::*;
 pub(crate) use used_dummy_variable::*;
+pub(crate) use useless_finally::*;
 pub(crate) use useless_if_else::*;
 pub(crate) use zip_instead_of_pairwise::*;
 
@@ -140,6 +141,7 @@ mod unused_async;
 mod unused_noqa;
 mod unused_unpacked_variable;
 mod used_dummy_variable;
+mod useless_finally;
 mod useless_if_else;
 mod zip_instead_of_pairwise;
 
