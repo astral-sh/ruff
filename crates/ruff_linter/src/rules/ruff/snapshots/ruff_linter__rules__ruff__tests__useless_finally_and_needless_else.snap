@@ -31,7 +31,7 @@ RUF072 [*] Empty `finally` clause
 10 | |     pass
    | |________^
 11 |
-12 |   # Only the `finally` is empty; `else` has real code
+12 |   # All non-body clauses are no-ops
    |
 help: Remove the `finally` clause
 6  |     bar()
@@ -40,21 +40,63 @@ help: Remove the `finally` clause
    - finally:
    -     pass
 9  | 
-10 | # Only the `finally` is empty; `else` has real code
+10 | # All non-body clauses are no-ops
 11 | try:
+
+RUF047 [*] Empty `else` clause
+  --> RUF072_RUF047.py:17:1
+   |
+15 |   except Exception:
+16 |       pass
+17 | / else:
+18 | |     pass
+   | |________^
+19 |   finally:
+20 |       pass
+   |
+help: Remove the `else` clause
+14 |     foo()
+15 | except Exception:
+16 |     pass
+   - else:
+   -     pass
+17 | finally:
+18 |     pass
+19 | 
 
 RUF072 [*] Empty `finally` clause
   --> RUF072_RUF047.py:19:1
    |
 17 |   else:
-18 |       baz()
+18 |       pass
 19 | / finally:
 20 | |     pass
    | |________^
+21 |
+22 |   # Only the `finally` is empty; `else` has real code
    |
 help: Remove the `finally` clause
-16 |     bar()
+16 |     pass
 17 | else:
-18 |     baz()
+18 |     pass
+   - finally:
+   -     pass
+19 | 
+20 | # Only the `finally` is empty; `else` has real code
+21 | try:
+
+RUF072 [*] Empty `finally` clause
+  --> RUF072_RUF047.py:29:1
+   |
+27 |   else:
+28 |       baz()
+29 | / finally:
+30 | |     pass
+   | |________^
+   |
+help: Remove the `finally` clause
+26 |     bar()
+27 | else:
+28 |     baz()
    - finally:
    -     pass

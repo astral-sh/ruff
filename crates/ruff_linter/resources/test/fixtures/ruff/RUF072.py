@@ -1,6 +1,6 @@
 # Errors
 
-# Case A: try/except/finally with pass
+# try/except/finally with pass
 try:
     foo()
 except Exception:
@@ -8,7 +8,7 @@ except Exception:
 finally:
     pass
 
-# Case A: try/except/finally with ellipsis
+# try/except/finally with ellipsis
 try:
     foo()
 except Exception:
@@ -16,7 +16,7 @@ except Exception:
 finally:
     ...
 
-# Case A: try/except/else/finally with pass
+# try/except/else/finally with pass
 try:
     foo()
 except Exception:
@@ -26,19 +26,19 @@ else:
 finally:
     pass
 
-# Case B: bare try/finally with pass
+# bare try/finally with pass
 try:
     foo()
 finally:
     pass
 
-# Case B: bare try/finally with ellipsis
+# bare try/finally with ellipsis
 try:
     foo()
 finally:
     ...
 
-# Case B: bare try/finally with multi-line body
+# bare try/finally with multi-line body
 try:
     foo()
     bar()
@@ -54,6 +54,22 @@ try:
         pass
 except Exception:
     bar()
+
+# finally with two pass statements
+try:
+    foo()
+except Exception:
+    bar()
+finally:
+    pass
+    pass
+
+# bare try/finally with pass and ellipsis
+try:
+    foo()
+finally:
+    pass
+    ...
 
 # OK
 
@@ -120,6 +136,34 @@ except Exception:
 finally:
     # comment
     pass
+
+# Own-line comment extra-indented before `pass`
+try:
+    foo()
+except Exception:
+    bar()
+finally:
+        # comment
+    pass
+
+# Trailing comment indented one level (belongs to finally body)
+try:
+    foo()
+except Exception:
+    bar()
+finally:
+    pass
+        # indented comment
+
+# Trailing comment dedented one level (not part of finally, but
+# immediately adjacent — suppresses fix conservatively)
+try:
+    foo()
+except Exception:
+    bar()
+finally:
+    pass
+# dedented comment
 
 # Comment on bare try/finally
 try:

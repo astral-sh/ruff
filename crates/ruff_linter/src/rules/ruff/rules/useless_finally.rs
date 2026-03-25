@@ -1,10 +1,10 @@
 use std::cmp::Ordering;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::helpers::comment_indentation_after;
+use ruff_python_ast::helpers::{comment_indentation_after, is_stub_body};
 use ruff_python_ast::token::TokenKind;
 use ruff_python_ast::whitespace::indentation;
-use ruff_python_ast::{Stmt, StmtExpr, StmtTry};
+use ruff_python_ast::{Stmt, StmtTry};
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
@@ -59,7 +59,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///   so RUF072 must remove it first
 /// - [`useless-try-except`][TRY203]: Flags `try/except` that only re-raises
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.15.7")]
+#[violation_metadata(preview_since = "NEXT_RUFF_VERSION")]
 pub(crate) struct UselessFinally;
 
 impl Violation for UselessFinally {
@@ -79,19 +79,19 @@ impl Violation for UselessFinally {
 pub(crate) fn useless_finally(checker: &Checker, try_stmt: &StmtTry) {
     let finalbody = &try_stmt.finalbody;
 
-    if !body_is_no_op(finalbody) {
+    if !is_stub_body(finalbody) {
         return;
     }
 
     let source = checker.source();
     let tokens = checker.tokens();
 
-    // `body_is_no_op` guarantees exactly one statement in finalbody
-    let finalbody_stmt = &finalbody[0];
+    // `is_stub_body` guarantees at least one statement in finalbody
+    let last_finalbody_stmt = finalbody.last().unwrap();
     let (preceding_end, preceding_stmt) = preceding_clause_info(try_stmt);
 
     let Some(finally_start) = tokens
-        .in_range(TextRange::new(preceding_end, finalbody_stmt.end()))
+        .in_range(TextRange::new(preceding_end, last_finalbody_stmt.end()))
         .iter()
         .find(|token| token.kind() == TokenKind::Finally)
         .map(Ranged::start)
@@ -99,12 +99,12 @@ pub(crate) fn useless_finally(checker: &Checker, try_stmt: &StmtTry) {
         return;
     };
 
-    let finally_range = TextRange::new(finally_start, finalbody_stmt.end());
+    let finally_range = TextRange::new(finally_start, last_finalbody_stmt.end());
 
     let has_comments = finally_contains_comments(
         preceding_stmt,
         preceding_end,
-        finalbody_stmt,
+        last_finalbody_stmt,
         finally_range,
         checker,
     );
@@ -141,25 +141,16 @@ pub(crate) fn useless_finally(checker: &Checker, try_stmt: &StmtTry) {
         };
 
         let try_line_start = source.line_start(try_stmt.start());
-        let finally_full_end = source.full_line_end(finalbody_stmt.end());
+        let finally_full_end = source.full_line_end(last_finalbody_stmt.end());
         let edit =
             Edit::range_replacement(adjusted, TextRange::new(try_line_start, finally_full_end));
         diagnostic.set_fix(Fix::safe_edit(edit));
     } else {
         // `try/except/finally: pass` — remove the finally clause
         let finally_line_start = source.line_start(finally_start);
-        let finally_full_end = source.full_line_end(finalbody_stmt.end());
+        let finally_full_end = source.full_line_end(last_finalbody_stmt.end());
         let edit = Edit::range_deletion(TextRange::new(finally_line_start, finally_full_end));
         diagnostic.set_fix(Fix::safe_edit(edit));
-    }
-}
-
-/// Whether `body` contains only one `pass` or `...` statement
-fn body_is_no_op(body: &[Stmt]) -> bool {
-    match body {
-        [Stmt::Pass(_)] => true,
-        [Stmt::Expr(StmtExpr { value, .. })] => value.is_ellipsis_literal_expr(),
-        _ => false,
     }
 }
 

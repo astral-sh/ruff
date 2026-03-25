@@ -9,6 +9,16 @@ else:
 finally:
     pass
 
+# All non-body clauses are no-ops
+try:
+    foo()
+except Exception:
+    pass
+else:
+    pass
+finally:
+    pass
+
 # Only the `finally` is empty; `else` has real code
 try:
     foo()

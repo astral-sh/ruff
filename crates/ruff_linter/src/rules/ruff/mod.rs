@@ -177,6 +177,28 @@ mod tests {
         Ok(())
     }
 
+    /// Test that RUF072 + RUF047 + SIM105 converge when all three non-body
+    /// clauses (except, else, finally) are no-ops
+    #[test]
+    fn useless_finally_and_needless_else_and_suppressible_exception() -> Result<()> {
+        use ruff_python_ast::{PySourceType, SourceType};
+
+        let path = test_resource_path("fixtures").join("ruff/RUF072_RUF047_SIM105.py");
+        let source_type = SourceType::Python(PySourceType::from(&path));
+        let source_kind = SourceKind::from_path(&path, source_type)?.expect("valid source");
+        let settings = settings::LinterSettings::for_rules(vec![
+            Rule::UselessFinally,
+            Rule::NeedlessElse,
+            Rule::SuppressibleException,
+        ]);
+
+        let (diagnostics, transformed) = test_contents(&source_kind, &path, &settings);
+        assert_diagnostics!(diagnostics);
+
+        insta::assert_snapshot!(transformed.source_code());
+        Ok(())
+    }
+
     #[test]
     fn missing_fstring_syntax_backslash_py311() -> Result<()> {
         assert_diagnostics_diff!(

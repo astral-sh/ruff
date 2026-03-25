@@ -9,6 +9,12 @@ try:
 except Exception:
     bar()
 
+# All non-body clauses are no-ops
+try:
+    foo()
+except Exception:
+    pass
+
 # Only the `finally` is empty; `else` has real code
 try:
     foo()
