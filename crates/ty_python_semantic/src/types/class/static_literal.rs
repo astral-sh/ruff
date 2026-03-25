@@ -2909,7 +2909,7 @@ impl<'db> StaticClassLiteral<'db> {
         if !matches!(field_policy, CodeGeneratorKind::DataclassLike(_)) {
             return None;
         }
-        let fields = self.own_fields(db, None, field_policy);
+        let fields = self.fields(db, None, field_policy);
         let field = fields.get(name)?;
         if let FieldKind::Dataclass { converter, .. } = field.kind {
             converter.map(|(input_ty, _)| input_ty)

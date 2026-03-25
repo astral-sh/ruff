@@ -1917,6 +1917,28 @@ class ConverterWithDefault:
     incorrect2: int = field(default="0")
 ```
 
+Converter fields inherited from a base class should also be validated correctly:
+
+```py
+@my_model
+class Base:
+    a: int = field(converter=str_to_int)
+
+@my_model
+class Child(Base):
+    b: int = field(converter=str_to_int)
+
+child = Child("1", "2")
+reveal_type(child.a)  # revealed: int
+reveal_type(child.b)  # revealed: int
+
+child.a = "2"
+child.a = 3  # error: [invalid-assignment]
+
+child.b = "2"
+child.b = 3  # error: [invalid-assignment]
+```
+
 We also validate writes to unions of converter fields:
 
 ```py
