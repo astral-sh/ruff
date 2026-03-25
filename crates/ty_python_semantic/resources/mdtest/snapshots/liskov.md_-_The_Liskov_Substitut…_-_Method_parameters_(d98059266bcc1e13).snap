@@ -95,6 +95,12 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/liskov.md
 81 | 
 82 | class Sub22(Super4):
 83 |     def method(self, **kwargs): ...  # error: [invalid-method-override]
+84 | 
+85 | class Sub23(Super4):
+86 |     # This is not a liskov violation because this is a gradual callable as it contains both
+87 |     # `*args` and `**kwargs` without annotations, so it is compatible with any signature of
+88 |     # `method` on the superclass.
+89 |     def method(self, x, *args, y, **kwargs): ...
 ```
 
 # Diagnostics
@@ -290,6 +296,8 @@ error[invalid-method-override]: Invalid override of method `method`
 82 | class Sub22(Super4):
 83 |     def method(self, **kwargs): ...  # error: [invalid-method-override]
    |         ^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Super4.method`
+84 |
+85 | class Sub23(Super4):
    |
   ::: src/mdtest_snippet.pyi:74:9
    |

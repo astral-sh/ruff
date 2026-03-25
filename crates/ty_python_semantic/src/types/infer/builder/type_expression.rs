@@ -3,13 +3,11 @@ use ruff_python_ast::{self as ast, PythonVersion};
 
 use super::{DeferredExpressionState, TypeInferenceBuilder};
 use crate::semantic_index::scope::ScopeKind;
-use crate::semantic_index::semantic_index;
 use crate::types::diagnostic::{
     self, INVALID_TYPE_FORM, NOT_SUBSCRIPTABLE, UNBOUND_TYPE_VARIABLE, UNSUPPORTED_OPERATOR,
     note_py_version_too_old_for_pep_604, report_invalid_argument_number_to_special_form,
     report_invalid_arguments_to_callable, report_invalid_concatenate_last_arg,
 };
-use crate::types::generics::bind_typevar;
 use crate::types::infer::InferenceFlags;
 use crate::types::infer::builder::{InnerExpressionInferenceState, MultiInferenceState};
 use crate::types::signatures::{ConcatenateTail, Signature};
@@ -2188,55 +2186,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 let value_ty = self.infer_expression(&subscript.value, TypeContext::default());
 
                 if matches!(value_ty, Type::SpecialForm(SpecialFormType::Concatenate)) {
-                    let arguments_slice = &*subscript.slice;
-                    let arguments = if let ast::Expr::Tuple(tuple) = arguments_slice {
-                        &*tuple.elts
-                    } else {
-                        std::slice::from_ref(arguments_slice)
-                    };
-
-                    let num_arguments = arguments.len();
-                    if num_arguments < 2 {
-                        for argument in arguments {
-                            self.infer_type_expression(argument);
-                        }
-                        if let Some(builder) =
-                            self.context.report_lint(&INVALID_TYPE_FORM, subscript)
-                        {
-                            builder.into_diagnostic(format_args!(
-                                "Special form `typing.Concatenate` expected at least 2 parameters \
-                                    but got {num_arguments}",
-                            ));
-                        }
-                        if arguments_slice.is_tuple_expr() {
-                            self.store_expression_type(arguments_slice, Type::unknown());
-                        }
-                        return Some(Parameters::gradual_form());
-                    }
-
-                    // SAFETY: `arguments` is guaranteed to have at least two elements from the
-                    // length check above.
-                    let (last_arg, prefix_args) = arguments.split_last().unwrap();
-
-                    let prefix_params = prefix_args
-                        .iter()
-                        .map(|arg| {
-                            Parameter::positional_only(None)
-                                .with_annotated_type(self.infer_type_expression(arg))
-                        })
-                        .collect();
-
-                    let parameters = self
-                        .infer_concatenate_tail(last_arg)
-                        .map(|tail| Parameters::concatenate(self.db(), prefix_params, tail));
-
-                    if arguments_slice.is_tuple_expr() {
-                        // TODO: What type to store for the argument slice in `Concatenate` because
-                        // `Parameters` is not a `Type` variant?
-                        self.store_expression_type(arguments_slice, Type::unknown());
-                    }
-
-                    return Some(parameters.unwrap_or_else(Parameters::unknown));
+                    return Some(self.infer_concatenate_special_form(subscript));
                 }
 
                 self.infer_subscript_type_expression(subscript, value_ty);
@@ -2302,55 +2252,113 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         None
     }
 
+    /// Infer the parameter types represented by a `typing.Concatenate` special form.
+    pub(super) fn infer_concatenate_special_form(
+        &mut self,
+        subscript: &ast::ExprSubscript,
+    ) -> Parameters<'db> {
+        let arguments_slice = &*subscript.slice;
+        let arguments = if let ast::Expr::Tuple(tuple) = arguments_slice {
+            &*tuple.elts
+        } else {
+            std::slice::from_ref(arguments_slice)
+        };
+
+        let (last_arg, prefix_args) = match arguments.split_last() {
+            Some((last_arg, prefix_args)) if !prefix_args.is_empty() => (last_arg, prefix_args),
+            _ => {
+                for argument in arguments {
+                    self.infer_type_expression(argument);
+                }
+                if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
+                    builder.into_diagnostic(format_args!(
+                        "Special form `typing.Concatenate` expected at least 2 parameters \
+                            but got {}",
+                        arguments.len()
+                    ));
+                }
+                if arguments_slice.is_tuple_expr() {
+                    self.store_expression_type(arguments_slice, Type::unknown());
+                }
+                return Parameters::gradual_form();
+            }
+        };
+
+        let prefix_params = prefix_args
+            .iter()
+            .map(|arg| {
+                Parameter::positional_only(None)
+                    .with_annotated_type(self.infer_type_expression(arg))
+            })
+            .collect();
+
+        let parameters = self
+            .infer_concatenate_tail(last_arg)
+            .map(|tail| Parameters::concatenate(self.db(), prefix_params, tail));
+
+        if arguments_slice.is_tuple_expr() {
+            // TODO: What type to store for the argument slice in `Concatenate` because
+            // `Parameters` is not a `Type` variant?
+            self.store_expression_type(arguments_slice, Type::unknown());
+        }
+
+        parameters.unwrap_or_else(Parameters::unknown)
+    }
+
+    /// Infer the last argument to a `typing.Concatenate` special form, which can be either `...`
+    /// (for gradual typing), a `ParamSpec` type variable, or a string annotation that evaluates to
+    /// a `ParamSpec` type variable.
     fn infer_concatenate_tail(&mut self, expr: &ast::Expr) -> Option<ConcatenateTail<'db>> {
         match expr {
             ast::Expr::EllipsisLiteral(_) => Some(ConcatenateTail::Gradual),
-            ast::Expr::Name(name) if !name.is_invalid() => {
-                let name_ty = self.infer_name_load(name);
-                if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = name_ty
-                    && typevar.is_paramspec(self.db())
-                {
-                    let index = semantic_index(self.db(), self.scope().file(self.db()));
-                    bind_typevar(
-                        self.db(),
-                        index,
-                        self.scope().file_scope_id(self.db()),
-                        self.typevar_binding_context,
-                        typevar,
-                    )
-                    .map(ConcatenateTail::ParamSpec)
-                } else {
-                    report_invalid_concatenate_last_arg(&self.context, expr, name_ty);
-                    None
+            ast::Expr::Name(_) | ast::Expr::Attribute(_) => {
+                if expr.as_name_expr().is_some_and(ast::ExprName::is_invalid) {
+                    return None;
                 }
+                let previously_allowed_paramspec = self
+                    .inference_flags
+                    .replace(InferenceFlags::ALLOW_PARAMSPEC_TYPE_EXPR, true);
+                let expr_type = self.infer_type_expression_no_store(expr);
+                self.inference_flags.set(
+                    InferenceFlags::ALLOW_PARAMSPEC_TYPE_EXPR,
+                    previously_allowed_paramspec,
+                );
+                let Type::TypeVar(typevar) = expr_type else {
+                    report_invalid_concatenate_last_arg(&self.context, expr, expr_type);
+                    return None;
+                };
+                if !typevar.is_paramspec(self.db()) {
+                    report_invalid_concatenate_last_arg(&self.context, expr, expr_type);
+                    return None;
+                }
+                Some(ConcatenateTail::ParamSpec(typevar))
             }
             ast::Expr::StringLiteral(string) => {
-                if let Some(parsed) = parse_string_annotation(&self.context, string) {
-                    self.string_annotations
-                        .insert(ruff_python_ast::ExprRef::StringLiteral(string).into());
-                    let node_key = self.enclosing_node_key(string.into());
-
-                    let previous_deferred_state = std::mem::replace(
-                        &mut self.deferred_state,
-                        DeferredExpressionState::InStringAnnotation(node_key),
-                    );
-                    let result = matches!(
-                        parsed.expr(),
-                        ast::Expr::Name(_) | ast::Expr::EllipsisLiteral(_)
-                    )
-                    .then(|| self.infer_concatenate_tail(parsed.expr()));
-                    self.deferred_state = previous_deferred_state;
-
-                    if let Some(result) = result {
-                        result
-                    } else {
-                        report_invalid_concatenate_last_arg(&self.context, expr, Type::unknown());
-                        None
-                    }
-                } else {
+                let Some(parsed) = parse_string_annotation(&self.context, string) else {
                     report_invalid_concatenate_last_arg(&self.context, expr, Type::unknown());
-                    None
+                    return None;
+                };
+
+                self.string_annotations
+                    .insert(ruff_python_ast::ExprRef::StringLiteral(string).into());
+                let node_key = self.enclosing_node_key(string.into());
+
+                if !matches!(
+                    parsed.expr(),
+                    ast::Expr::Name(_) | ast::Expr::Attribute(_) | ast::Expr::Subscript(_)
+                ) {
+                    report_invalid_concatenate_last_arg(&self.context, expr, Type::unknown());
+                    return None;
                 }
+
+                let previous_deferred_state = std::mem::replace(
+                    &mut self.deferred_state,
+                    DeferredExpressionState::InStringAnnotation(node_key),
+                );
+                let result = self.infer_concatenate_tail(parsed.expr());
+                self.deferred_state = previous_deferred_state;
+
+                result
             }
             _ => {
                 let ty = self.infer_type_expression(expr);

@@ -129,6 +129,12 @@ class Sub21(Super4):
 
 class Sub22(Super4):
     def method(self, **kwargs): ...  # error: [invalid-method-override]
+
+class Sub23(Super4):
+    # This is not a liskov violation because this is a gradual callable as it contains both
+    # `*args` and `**kwargs` without annotations, so it is compatible with any signature of
+    # `method` on the superclass.
+    def method(self, x, *args, y, **kwargs): ...
 ```
 
 ## The entire class hierarchy is checked

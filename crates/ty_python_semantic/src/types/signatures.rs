@@ -2520,10 +2520,7 @@ impl<'db> Parameters<'db> {
         concatenate_tail: ConcatenateTail<'db>,
     ) -> Self {
         let (args_type, kwargs_type) = match concatenate_tail {
-            ConcatenateTail::Gradual => (
-                Type::Dynamic(DynamicType::Any),
-                Type::Dynamic(DynamicType::Any),
-            ),
+            ConcatenateTail::Gradual => (Type::any(), Type::any()),
             ConcatenateTail::ParamSpec(typevar) => (
                 Type::TypeVar(typevar.with_paramspec_attr(db, ParamSpecAttrKind::Args)),
                 Type::TypeVar(typevar.with_paramspec_attr(db, ParamSpecAttrKind::Kwargs)),

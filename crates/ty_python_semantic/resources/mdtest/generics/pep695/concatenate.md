@@ -31,8 +31,14 @@ reveal_type(result)  # revealed: (int, /, y: str) -> bool
 ```py
 from typing import Callable, Concatenate
 
+class Foo[**P]:
+    attr: Callable[P, None]
+
 def _(c: Callable[Concatenate[int, str, ...], bool]):
     reveal_type(c)  # revealed: (int, str, /, *args: Any, **kwargs: Any) -> bool
+
+# revealed: (int, str, /, *args: Any, **kwargs: Any) -> None
+reveal_type(Foo[Concatenate[int, str, ...]].attr)
 ```
 
 ### Complex types inside `Concatenate`
@@ -40,8 +46,14 @@ def _(c: Callable[Concatenate[int, str, ...], bool]):
 ```py
 from typing import Callable, Concatenate
 
+class Foo[**P]:
+    attr: Callable[P, None]
+
 def _(c: Callable[Concatenate[int | str, list[int], type[str], ...], None]):
     reveal_type(c)  # revealed: (int | str, list[int], type[str], /, *args: Any, **kwargs: Any) -> None
+
+# revealed: (int | str, list[int], type[str], /, *args: Any, **kwargs: Any) -> None
+reveal_type(Foo[Concatenate[int | str, list[int], type[str], ...]].attr)
 ```
 
 ### Nested
@@ -49,8 +61,14 @@ def _(c: Callable[Concatenate[int | str, list[int], type[str], ...], None]):
 ```py
 from typing import Callable, Concatenate
 
+class Foo[**P]:
+    attr: Callable[P, None]
+
 def _(c: Callable[Concatenate[int, Callable[Concatenate[str, ...], None], ...], None]):
     reveal_type(c)  # revealed: (int, (str, /, *args: Any, **kwargs: Any) -> None, /, *args: Any, **kwargs: Any) -> None
+
+# revealed: (int, (str, /, *args: Any, **kwargs: Any) -> None, /, *args: Any, **kwargs: Any) -> None
+reveal_type(Foo[Concatenate[int, Callable[Concatenate[str, ...], None], ...]].attr)
 ```
 
 ### Both `*args` and `**kwargs` are required
@@ -64,6 +82,25 @@ def decorator[**P](func: Callable[Concatenate[int, P], None]) -> Callable[P, Non
         func(1, *args)  # TODO: error: [missing-argument]
         func(1, **kwargs)  # TODO: error: [missing-argument]
     return wrapper
+```
+
+### Imported `ParamSpec` type variable
+
+`module.py`:
+
+```py
+from typing import ParamSpec
+
+P = ParamSpec("P")
+```
+
+```py
+from typing import Concatenate, Callable
+
+import module
+
+def foo(f: Callable[Concatenate[int, module.P], None]):
+    reveal_type(f)  # revealed: (int, /, *args: P@foo.args, **kwargs: P@foo.kwargs) -> None
 ```
 
 ## Decorator patterns
@@ -197,6 +234,9 @@ def invalid3() -> Concatenate[int, ...]: ...
 ```py
 from typing import Callable, Concatenate
 
+class Foo[**P]:
+    attr: Callable[P, None]
+
 def _(
     # error: [invalid-type-form] "Special form `typing.Concatenate` expected at least 2 parameters but got 0"
     a: Callable[Concatenate[()], int],
@@ -208,6 +248,13 @@ def _(
     reveal_type(a)  # revealed: (...) -> int
     reveal_type(b)  # revealed: (...) -> int
     reveal_type(c)  # revealed: (...) -> int
+
+# error: [invalid-type-form] "Special form `typing.Concatenate` expected at least 2 parameters but got 0"
+reveal_type(Foo[Concatenate[()]].attr)  # revealed: (...) -> None
+# error: [invalid-type-form] "Special form `typing.Concatenate` expected at least 2 parameters but got 1"
+reveal_type(Foo[Concatenate[int]].attr)  # revealed: (...) -> None
+# error: [invalid-type-form] "Special form `typing.Concatenate` expected at least 2 parameters but got 1"
+reveal_type(Foo[Concatenate[(int,)]].attr)  # revealed: (...) -> None
 ```
 
 ### Last argument must be `ParamSpec` or `...`
@@ -217,8 +264,14 @@ The final argument to `Concatenate` must be a `ParamSpec` or `...`.
 ```py
 from typing import Callable, Concatenate
 
-# error: [invalid-type-arguments] "The last argument to `typing.Concatenate` must be either `...` or a `ParamSpec` type variable: Got `<class 'str'>`"
+class Foo[**P]:
+    attr: Callable[P, None]
+
+# error: [invalid-type-arguments] "The last argument to `typing.Concatenate` must be either `...` or a `ParamSpec` type variable: Got `str`"
 def _(c: Callable[Concatenate[int, str], bool]): ...
+
+# error: [invalid-type-arguments] "The last argument to `typing.Concatenate` must be either `...` or a `ParamSpec` type variable: Got `str`"
+reveal_type(Foo[Concatenate[int, str]].attr)  # revealed: (...) -> None
 ```
 
 ### `ParamSpec` must be last
@@ -228,19 +281,30 @@ If a `ParamSpec` appears in `Concatenate`, it must be the last element.
 ```py
 from typing import Callable, Concatenate
 
-# error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
-# error: [invalid-type-arguments] "The last argument to `typing.Concatenate` must be either `...` or a `ParamSpec` type variable: Got `<class 'int'>`"
-def invalid1[**P](c: Callable[Concatenate[P, int], bool]):
-    reveal_type(c)  # revealed: (...) -> bool
+class Foo[**P1]:
+    attr: Callable[P1, None]
 
-# error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
-def invalid2[**P](c: Callable[Concatenate[P, ...], bool]):
-    # The bare `P` falls back to `Unknown` as a prefix parameter, while `...` is a valid
+# error: [invalid-type-form] "Bare ParamSpec `P2` is not valid in this context"
+# error: [invalid-type-arguments] "The last argument to `typing.Concatenate` must be either `...` or a `ParamSpec` type variable: Got `int`"
+def invalid1[**P2](c: Callable[Concatenate[P2, int], bool]):
+    reveal_type(c)  # revealed: (...) -> bool
+    # error: [invalid-type-arguments] "The last argument to `typing.Concatenate` must be either `...` or a `ParamSpec` type variable: Got `int`"
+    reveal_type(Foo[Concatenate[P2, int]].attr)  # revealed: (...) -> None
+
+# error: [invalid-type-form] "Bare ParamSpec `P2` is not valid in this context"
+def invalid2[**P2](c: Callable[Concatenate[P2, ...], bool]):
+    # The bare `P2` falls back to `Unknown` as a prefix parameter, while `...` is a valid
     # gradual tail, resulting in `(Unknown, /, *args: Any, **kwargs: Any) -> bool`.
     reveal_type(c)  # revealed: (Unknown, /, *args: Any, **kwargs: Any) -> bool
 
-def valid[**P](c: Callable[Concatenate[int, P], bool]):
-    reveal_type(c)  # revealed: (int, /, *args: P@valid.args, **kwargs: P@valid.kwargs) -> bool
+    # revealed: (P2@invalid2, /, *args: Any, **kwargs: Any) -> None
+    reveal_type(Foo[Concatenate[P2, ...]].attr)
+
+def valid[**P2](c: Callable[Concatenate[int, P2], bool]):
+    reveal_type(c)  # revealed: (int, /, *args: P2@valid.args, **kwargs: P2@valid.kwargs) -> bool
+
+    # revealed: (int, /, *args: P2@valid.args, **kwargs: P2@valid.kwargs) -> None
+    reveal_type(Foo[Concatenate[int, P2]].attr)
 ```
 
 ### Nested `Concatenate`
