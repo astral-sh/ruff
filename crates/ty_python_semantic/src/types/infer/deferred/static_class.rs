@@ -70,7 +70,7 @@ pub(crate) fn check_static_class_definitions<'db>(
     ty: Type<'db>,
     class_node: &ast::StmtClassDef,
     index: &SemanticIndex<'db>,
-    file_expression_type: &impl Fn(&ast::Expr) -> Type<'db>,
+    file_expression_type: &dyn Fn(&ast::Expr) -> Type<'db>,
 ) {
     let db = context.db();
 

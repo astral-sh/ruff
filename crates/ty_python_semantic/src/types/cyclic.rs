@@ -97,7 +97,7 @@ impl<Tag, T, R> CycleDetector<Tag, T, R> {
 }
 
 impl<Tag, T: Hash + Eq + Clone, R: Clone> CycleDetector<Tag, T, R> {
-    pub fn visit(&self, item: T, func: impl FnOnce() -> R) -> R {
+    pub fn visit(&self, item: T, func: &mut dyn FnMut() -> R) -> R {
         if let Some(val) = self.cache.borrow().get(&item) {
             return val.clone();
         }

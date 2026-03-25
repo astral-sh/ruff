@@ -205,7 +205,7 @@ impl ClassInfoConstraintFunction {
                     None
                 }
             }
-            Type::Union(union) => union.try_map(db, |element| {
+            Type::Union(union) => union.try_map(db, &mut |element| {
                 self.generate_constraint(db, *element, is_positive)
             }),
             Type::TypeVar(bound_typevar) => {
@@ -950,7 +950,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             ) -> Type<'db> {
                 match ty {
                     Type::Union(union) => {
-                        union.map(db, |ty| filter_to_cannot_be_equal(db, *ty, rhs_ty))
+                        union.map(db, &mut |ty| filter_to_cannot_be_equal(db, *ty, rhs_ty))
                     }
                     // Treat `bool` as `Literal[True, False]`.
                     Type::NominalInstance(instance)
@@ -1245,7 +1245,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             && rhs_ty.is_singleton(self.db)
         {
             let is_positive_check = is_positive == (ops[0] == ast::CmpOp::Is);
-            let filtered = union.filter(self.db, |elem| {
+            let filtered = union.filter(self.db, &mut |elem| {
                 elem.as_nominal_instance()
                     .and_then(|inst| inst.tuple_spec(self.db))
                     .and_then(|spec| spec.py_index(self.db, index).ok())
@@ -1374,7 +1374,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     }
                     Type::Union(union) => {
                         // remove all members of the union that would require the key
-                        union.filter(self.db, |ty| match ty {
+                        union.filter(self.db, &mut |ty| match ty {
                             Type::TypedDict(td) => !requires_key(*td),
                             Type::Intersection(intersection) => !intersection
                                 .positive(self.db)
@@ -1981,7 +1981,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         }
 
         // Filter the union based on whether each tuple element at the index could match the rhs.
-        let filtered = union.filter(self.db, |elem| {
+        let filtered = union.filter(self.db, &mut |elem| {
             elem.as_nominal_instance()
                 .and_then(|inst| inst.tuple_spec(self.db))
                 .and_then(|spec| spec.py_index(self.db, index).ok())

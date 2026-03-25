@@ -1629,10 +1629,10 @@ impl<'db> Type<'db> {
     pub(crate) fn filter_union(
         self,
         db: &'db dyn Db,
-        f: impl FnMut(&Type<'db>) -> bool,
+        mut f: impl FnMut(&Type<'db>) -> bool,
     ) -> Type<'db> {
         if let Type::Union(union) = self.resolve_type_alias(db) {
-            union.filter(db, f)
+            union.filter(db, &mut f)
         } else {
             self
         }
@@ -1803,7 +1803,7 @@ impl<'db> Type<'db> {
             }
             Type::TypeAlias(_) => Some(self),
             Type::NewTypeInstance(newtype) => newtype
-                .try_map_base_class_type(db, |class_type| {
+                .try_map_base_class_type(db, &|class_type| {
                     class_type.recursive_type_normalized_impl(db, div, nested)
                 })
                 .map(Type::NewTypeInstance),
@@ -1877,7 +1877,7 @@ impl<'db> Type<'db> {
                         );
                     }
                 }
-                Type::TypeAlias(alias) => visitor.visit(self, || {
+                Type::TypeAlias(alias) => visitor.visit(self, &mut || {
                     alias.value_type(db).visit_specialization_impl(
                         db,
                         tcx,
@@ -1940,7 +1940,7 @@ impl<'db> Type<'db> {
 
             f(type_var, *ty, variance, narrowed_tcx);
 
-            visitor.visit(*ty, || {
+            visitor.visit(*ty, &mut || {
                 ty.visit_specialization_impl(db, narrowed_tcx, variance, f, constraints, visitor);
             });
         }
@@ -2168,7 +2168,7 @@ impl<'db> Type<'db> {
         policy: MemberLookupPolicy,
     ) -> Option<PlaceAndQualifiers<'db>> {
         match self {
-            Type::Union(union) => Some(union.map_with_boundness_and_qualifiers(db, |elem| {
+            Type::Union(union) => Some(union.map_with_boundness_and_qualifiers(db, &mut |elem| {
                 elem.find_name_in_mro_with_policy(db, name, policy)
                     // If some elements are classes, and some are not, we simply fall back to `Unbound` for the non-class
                     // elements instead of short-circuiting the whole result to `None`. We would need a more detailed
@@ -2177,7 +2177,7 @@ impl<'db> Type<'db> {
                     .unwrap_or_default()
             })),
             Type::Intersection(inter) => {
-                Some(inter.map_with_boundness_and_qualifiers(db, |elem| {
+                Some(inter.map_with_boundness_and_qualifiers(db, &mut |elem| {
                     elem.find_name_in_mro_with_policy(db, name, policy)
                         // Fall back to Unbound, similar to the union case (see above).
                         .unwrap_or_default()
@@ -2320,10 +2320,10 @@ impl<'db> Type<'db> {
     ) -> PlaceAndQualifiers<'db> {
         tracing::trace!("class_member: {}.{}", self.display(db), name);
         match self {
-            Type::Union(union) => union.map_with_boundness_and_qualifiers(db, |elem| {
+            Type::Union(union) => union.map_with_boundness_and_qualifiers(db, &mut |elem| {
                 elem.class_member_with_policy(db, name.clone(), policy)
             }),
-            Type::Intersection(inter) => inter.map_with_boundness_and_qualifiers(db, |elem| {
+            Type::Intersection(inter) => inter.map_with_boundness_and_qualifiers(db, &mut |elem| {
                 elem.class_member_with_policy(db, name.clone(), policy)
             }),
             // TODO: Once `to_meta_type` for the synthesized protocol is fully implemented, this handling should be removed.
@@ -2379,12 +2379,11 @@ impl<'db> Type<'db> {
     /// ```
     fn instance_member(&self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
         match self {
-            Type::Union(union) => {
-                union.map_with_boundness_and_qualifiers(db, |elem| elem.instance_member(db, name))
-            }
+            Type::Union(union) => union
+                .map_with_boundness_and_qualifiers(db, &mut |elem| elem.instance_member(db, name)),
 
             Type::Intersection(intersection) => intersection
-                .map_with_boundness_and_qualifiers(db, |elem| elem.instance_member(db, name)),
+                .map_with_boundness_and_qualifiers(db, &mut |elem| elem.instance_member(db, name)),
 
             Type::Dynamic(_) | Type::Never => Place::bound(self).into(),
 
@@ -2422,7 +2421,7 @@ impl<'db> Type<'db> {
                         bound.instance_member(db, name)
                     }
                     Some(TypeVarBoundOrConstraints::Constraints(constraints)) => constraints
-                        .map_with_boundness_and_qualifiers(db, |constraint| {
+                        .map_with_boundness_and_qualifiers(db, &mut |constraint| {
                             constraint.instance_member(db, name)
                         }),
                 }
@@ -2627,7 +2626,7 @@ impl<'db> Type<'db> {
                 qualifiers,
             } => (
                 union
-                    .map_with_boundness(db, |elem| {
+                    .map_with_boundness(db, &mut |elem| {
                         Place::Defined(DefinedPlace {
                             ty: elem
                                 .try_call_dunder_get(db, instance, owner)
@@ -2663,7 +2662,7 @@ impl<'db> Type<'db> {
                     attribute
                 } else {
                     intersection
-                        .map_with_boundness(db, |elem| {
+                        .map_with_boundness(db, &mut |elem| {
                             Place::Defined(DefinedPlace {
                                 ty: elem
                                     .try_call_dunder_get(db, instance, owner)
@@ -2920,12 +2919,12 @@ impl<'db> Type<'db> {
         let name_str = name.as_str();
 
         match self {
-            Type::Union(union) => union.map_with_boundness_and_qualifiers(db, |elem| {
+            Type::Union(union) => union.map_with_boundness_and_qualifiers(db, &mut |elem| {
                 elem.member_lookup_with_policy(db, name_str.into(), policy)
             }),
 
             Type::Intersection(intersection) => intersection
-                .map_with_boundness_and_qualifiers(db, |elem| {
+                .map_with_boundness_and_qualifiers(db, &mut |elem| {
                     elem.member_lookup_with_policy(db, name_str.into(), policy)
                 }),
 
@@ -3252,7 +3251,7 @@ impl<'db> Type<'db> {
 
                 let result = self.fallback_to_getattr(db, &name, result, policy);
 
-                result.map_type(|ty| ty.bind_self_typevars(db, self))
+                result.map_type(&|ty| ty.bind_self_typevars(db, self))
             }
 
             Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..) => {
@@ -3284,7 +3283,7 @@ impl<'db> Type<'db> {
                     .to_instance(db)
                     .expect("`to_instance` always returns `Some` for `ClassLiteral`, `GenericAlias`, and `SubclassOf`");
                 let class_attr_plain =
-                    class_attr_plain.map_type(|ty| ty.bind_self_typevars(db, self_instance));
+                    class_attr_plain.map_type(&|ty| ty.bind_self_typevars(db, self_instance));
 
                 let class_attr_fallback =
                     Self::try_call_dunder_get_on_attribute(db, class_attr_plain, None, self).0;
@@ -3312,7 +3311,7 @@ impl<'db> Type<'db> {
                 if let Type::SubclassOf(subclass_of) = self
                     && let SubclassOfInner::Dynamic(dynamic) = subclass_of.subclass_of()
                 {
-                    result.map_type(|ty| {
+                    result.map_type(&|ty| {
                         if ty.is_dynamic() {
                             ty
                         } else {
@@ -3354,7 +3353,7 @@ impl<'db> Type<'db> {
                     _ => None,
                 },
                 Type::Union(union) => {
-                    union.try_map(db, |element| non_negative_int_literal(db, *element))
+                    union.try_map(db, &mut |element| non_negative_int_literal(db, *element))
                 }
                 _ => None,
             }
@@ -5203,7 +5202,7 @@ impl<'db> Type<'db> {
             Type::KnownInstance(known_instance) => known_instance.to_meta_type(db),
             Type::SpecialForm(special_form) => special_form.to_meta_type(db),
             Type::PropertyInstance(_) => KnownClass::Property.to_class_literal(db),
-            Type::Union(union) => union.map(db, |ty| ty.to_meta_type(db)),
+            Type::Union(union) => union.map(db, &mut |ty| ty.to_meta_type(db)),
             Type::TypeIs(_) | Type::TypeGuard(_) => KnownClass::Bool.to_class_literal(db),
             Type::LiteralValue(literal) => match literal.kind() {
                 LiteralValueTypeKind::Bool(_) => KnownClass::Bool.to_class_literal(db),
@@ -5355,7 +5354,7 @@ impl<'db> Type<'db> {
             Type::TypeVar(bound_typevar) => bound_typevar.apply_type_mapping_impl(db, type_mapping, visitor),
             Type::KnownInstance(known_instance) => known_instance.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
 
-            Type::FunctionLiteral(function) => visitor.visit(self, || {
+            Type::FunctionLiteral(function) => visitor.visit(self, &mut || {
                 match type_mapping {
                     // Promote the types within the signature before promoting the signature to its
                     // callable form.
@@ -5403,8 +5402,8 @@ impl<'db> Type<'db> {
                 instance.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
             },
 
-            Type::NewTypeInstance(newtype) => visitor.visit(self, || {
-                Type::NewTypeInstance(newtype.map_base_class_type(db, |class_type| {
+            Type::NewTypeInstance(newtype) => visitor.visit(self, &mut || {
+                Type::NewTypeInstance(newtype.map_base_class_type(db, &|class_type| {
                     class_type.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
                 }))
             }),
@@ -5462,7 +5461,7 @@ impl<'db> Type<'db> {
                 Type::PropertyInstance(property.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
             }
 
-            Type::Union(union) => union.map_leave_aliases(db, |element| {
+            Type::Union(union) => union.map_leave_aliases(db, &mut |element| {
                 element.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
             }),
             Type::Intersection(intersection) => {
@@ -5484,7 +5483,7 @@ impl<'db> Type<'db> {
             }
 
             // TODO(jelle): Materialize should be handled differently, since TypeIs is invariant
-            Type::TypeIs(type_is) => visitor.visit(self, || {
+            Type::TypeIs(type_is) => visitor.visit(self, &mut|| {
                 type_is.with_type(
                     db,
                     type_is
@@ -5493,7 +5492,7 @@ impl<'db> Type<'db> {
                 )
             }),
 
-            Type::TypeGuard(type_guard) => visitor.visit(self, || {
+            Type::TypeGuard(type_guard) => visitor.visit(self, &mut|| {
                 type_guard.with_type(
                     db,
                     type_guard
@@ -5517,7 +5516,7 @@ impl<'db> Type<'db> {
                 // IMPORTANT: All processing must happen inside a single visitor.visit() call so that if we encounter
                 // this same TypeAlias again (e.g., in `type RecursiveT = int | tuple[RecursiveT, ...]`), the visitor
                 // will detect the cycle and return the fallback value.
-                let mapped = visitor.visit(self, || {
+                let mapped = visitor.visit(self, &mut|| {
                     match type_mapping {
                         TypeMapping::EagerExpansion => unreachable!("handled above"),
 
@@ -5649,7 +5648,7 @@ impl<'db> Type<'db> {
             }
 
             Type::FunctionLiteral(function) => {
-                visitor.visit(self, || {
+                visitor.visit(self, &mut || {
                     function.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
                 });
             }
@@ -5746,7 +5745,7 @@ impl<'db> Type<'db> {
             }
 
             Type::TypeAlias(alias) => {
-                visitor.visit(self, || {
+                visitor.visit(self, &mut || {
                     alias.value_type(db).find_legacy_typevars_impl(
                         db,
                         binding_context,
@@ -6641,10 +6640,7 @@ impl<'db> TypeAndQualifiers<'db> {
         self.qualifiers
     }
 
-    pub(crate) fn map_type(
-        &self,
-        f: impl FnOnce(Type<'db>) -> Type<'db>,
-    ) -> TypeAndQualifiers<'db> {
+    pub(crate) fn map_type(&self, f: &dyn Fn(Type<'db>) -> Type<'db>) -> TypeAndQualifiers<'db> {
         TypeAndQualifiers {
             inner: f(self.inner),
             origin: self.origin,

@@ -657,7 +657,7 @@ impl<'db> Signature<'db> {
     pub(crate) fn add_implicit_self_annotation(
         &mut self,
         db: &'db dyn Db,
-        self_type: impl FnOnce() -> Option<Type<'db>>,
+        self_type: &dyn Fn() -> Option<Type<'db>>,
     ) {
         if let Some(first_parameter) = self.parameters.value.first_mut()
             && first_parameter.is_positional()
@@ -800,7 +800,7 @@ impl<'db> Signature<'db> {
                 .overloads
                 .iter()
                 .map(|signature| signature.return_ty)
-                .when_any(db, constraints, |other_return_type| {
+                .when_any(db, constraints, &|other_return_type| {
                     self.return_ty.when_constraint_set_assignable_to(
                         db,
                         other_return_type,
@@ -813,7 +813,7 @@ impl<'db> Signature<'db> {
         other
             .overloads
             .iter()
-            .when_all(db, constraints, |other_signature| {
+            .when_all(db, constraints, &|other_signature| {
                 self.when_constraint_set_assignable_to(db, other_signature, constraints)
             })
     }
@@ -1015,7 +1015,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         target_overloads
                             .iter()
                             .map(|signature| signature.return_ty)
-                            .when_any(db, self.constraints, |target_return| {
+                            .when_any(db, self.constraints, &|target_return| {
                                 self.check_type_pair(db, source_return, target_return)
                             })
                     };
@@ -1047,7 +1047,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         source_overloads
                             .iter()
                             .map(|signature| signature.return_ty)
-                            .when_any(db, self.constraints, |source_return| {
+                            .when_any(db, self.constraints, &|source_return| {
                                 self.check_type_pair(db, source_return, target_return)
                             })
                     };
@@ -1089,7 +1089,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
                 source_overloads
                     .iter()
-                    .when_any(db, self.constraints, |self_signature| {
+                    .when_any(db, self.constraints, &|self_signature| {
                         self.check_callable_signature_pair_inner(
                             db,
                             std::slice::from_ref(self_signature),
@@ -1102,7 +1102,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             ([_], _) => {
                 target_overloads
                     .iter()
-                    .when_all(db, self.constraints, |target_signature| {
+                    .when_all(db, self.constraints, &|target_signature| {
                         self.check_callable_signature_pair_inner(
                             db,
                             source_overloads,
@@ -1114,7 +1114,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             // source is definitely overloaded while target is possibly overloaded.
             (_, _) => target_overloads
                 .iter()
-                .when_all(db, self.constraints, |target_signature| {
+                .when_all(db, self.constraints, &|target_signature| {
                     self.check_callable_signature_pair_inner(
                         db,
                         source_overloads,

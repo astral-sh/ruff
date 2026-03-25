@@ -261,7 +261,7 @@ impl<'db> TypeVarInstance<'db> {
         db: &'db dyn Db,
         visitor: &TypeVarDefaultVisitor<'db>,
     ) -> Option<Type<'db>> {
-        visitor.visit(self, || {
+        visitor.visit(self, &mut || {
             self._default(db).and_then(|default| match default {
                 TypeVarDefaultEvaluation::Eager(ty) => Some(ty),
                 TypeVarDefaultEvaluation::Lazy => self.lazy_default_impl(db, visitor),
@@ -799,7 +799,9 @@ impl<'db> BoundTypeVarInstance<'db> {
     pub(crate) fn map_bound_or_constraints(
         self,
         db: &'db dyn Db,
-        f: impl FnOnce(Option<TypeVarBoundOrConstraints<'db>>) -> Option<TypeVarBoundOrConstraints<'db>>,
+        f: &dyn Fn(
+            Option<TypeVarBoundOrConstraints<'db>>,
+        ) -> Option<TypeVarBoundOrConstraints<'db>>,
     ) -> Self {
         let bound_or_constraints = f(self.typevar(db).bound_or_constraints(db));
         let typevar = TypeVarInstance::new(
@@ -1239,7 +1241,7 @@ impl<'db> TypeVarConstraints<'db> {
     pub(super) fn map(
         self,
         db: &'db dyn Db,
-        transform_fn: impl FnMut(&Type<'db>) -> Type<'db>,
+        transform_fn: &mut dyn FnMut(&Type<'db>) -> Type<'db>,
     ) -> Self {
         let mapped = self
             .elements(db)
@@ -1252,7 +1254,7 @@ impl<'db> TypeVarConstraints<'db> {
     pub(crate) fn map_with_boundness_and_qualifiers(
         self,
         db: &'db dyn Db,
-        mut transform_fn: impl FnMut(&Type<'db>) -> PlaceAndQualifiers<'db>,
+        transform_fn: &mut dyn FnMut(&Type<'db>) -> PlaceAndQualifiers<'db>,
     ) -> PlaceAndQualifiers<'db> {
         let mut builder = UnionBuilder::new(db);
         let mut qualifiers = TypeQualifiers::empty();
@@ -1340,7 +1342,7 @@ impl<'db> TypeVarConstraints<'db> {
     ///
     /// See [`Type::recursive_type_normalized`] for more details.
     fn recursive_type_normalized(self, db: &'db dyn Db, cycle: &salsa::Cycle) -> Self {
-        self.map(db, |ty| ty.recursive_type_normalized(db, cycle))
+        self.map(db, &mut |ty| ty.recursive_type_normalized(db, cycle))
     }
 }
 

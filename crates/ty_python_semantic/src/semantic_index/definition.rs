@@ -244,8 +244,11 @@ impl<'db> DefinitionState<'db> {
     }
 
     pub(crate) fn is_undefined_or(self, f: impl Fn(Definition<'db>) -> bool) -> bool {
-        matches!(self, DefinitionState::Undefined)
-            || matches!(self, DefinitionState::Defined(def) if f(def))
+        match self {
+            Self::Undefined => true,
+            Self::Deleted => false,
+            Self::Defined(def) => f(def),
+        }
     }
 
     #[allow(unused)]

@@ -1258,7 +1258,7 @@ impl<'db> ClassType<'db> {
         let fallback_member_lookup = || {
             class_literal
                 .own_class_member(db, inherited_generic_context, specialization, name)
-                .map_type(|ty| ty.apply_optional_specialization(db, specialization))
+                .map_type(&|ty| ty.apply_optional_specialization(db, specialization))
         };
 
         match name {
@@ -1550,7 +1550,7 @@ impl<'db> ClassType<'db> {
 
                 class_literal
                     .instance_member(db, specialization, name)
-                    .map_type(|ty| ty.apply_optional_specialization(db, specialization))
+                    .map_type(&|ty| ty.apply_optional_specialization(db, specialization))
             }
         }
     }
@@ -1591,7 +1591,7 @@ impl<'db> ClassType<'db> {
                 generic
                     .origin(db)
                     .own_instance_member(db, name)
-                    .map_type(|ty| ty.apply_optional_specialization(db, Some(specialization)))
+                    .map_type(&|ty| ty.apply_optional_specialization(db, Some(specialization)))
             }
         }
     }
@@ -1878,7 +1878,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             _ => {}
         }
 
-        source.iter_mro(db).when_any(db, self.constraints, |base| {
+        source.iter_mro(db).when_any(db, self.constraints, &|base| {
             match base {
                 ClassBase::Dynamic(_) => match self.relation {
                     TypeRelation::Subtyping

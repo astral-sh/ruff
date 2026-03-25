@@ -1399,7 +1399,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     &mut self.inner_expression_inference_state,
                     InnerExpressionInferenceState::Get,
                 );
-                let union = union.map(self.db(), |element| {
+                let union = union.map(self.db(), &mut |element| {
                     self.infer_subscript_type_expression(subscript, *element)
                 });
                 self.inner_expression_inference_state = previous_slice_inference_state;
@@ -1771,7 +1771,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     argument_type.try_upcast_to_callable(db).map(|callables| {
                         if special_form == SpecialFormType::RegularCallableTypeOf {
                             callables
-                                .map(|callable| callable.into_regular(db))
+                                .map(&|callable| callable.into_regular(db))
                                 .into_type(db)
                         } else {
                             callables.into_type(db)

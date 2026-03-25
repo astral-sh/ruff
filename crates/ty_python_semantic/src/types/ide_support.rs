@@ -661,7 +661,7 @@ pub fn call_signature_details<'db>(
         // Use from_arguments_typed so that check_types can infer TypeVar
         // specializations from the actual argument types at this call site.
         let call_arguments =
-            CallArguments::from_arguments_typed(&call_expr.arguments, |splatted_value| {
+            CallArguments::from_arguments_typed(&call_expr.arguments, &mut |splatted_value| {
                 splatted_value
                     .inferred_type(model)
                     .unwrap_or(Type::unknown())
@@ -725,7 +725,7 @@ pub fn call_type_simplified_by_overloads(
     }
 
     // Hand the overload resolution system as much type info as we have
-    let args = CallArguments::from_arguments_typed(&call_expr.arguments, |splatted_value| {
+    let args = CallArguments::from_arguments_typed(&call_expr.arguments, &mut |splatted_value| {
         splatted_value
             .inferred_type(model)
             .unwrap_or(Type::unknown())
@@ -847,11 +847,11 @@ pub fn definitions_for_unary_op<'db>(
 /// This is so that we show e.g. `int.__add__` instead of `Literal[4].__add__`.
 fn promote_for_self<'db>(db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
     match ty {
-        Type::BoundMethod(method) => Type::BoundMethod(method.map_self_type(db, |self_ty| {
+        Type::BoundMethod(method) => Type::BoundMethod(method.map_self_type(db, &|self_ty| {
             self_ty.literal_fallback_instance(db).unwrap_or(self_ty)
         })),
-        Type::Union(elements) => elements.map(db, |ty| match ty {
-            Type::BoundMethod(method) => Type::BoundMethod(method.map_self_type(db, |self_ty| {
+        Type::Union(elements) => elements.map(db, &mut |ty| match ty {
+            Type::BoundMethod(method) => Type::BoundMethod(method.map_self_type(db, &|self_ty| {
                 self_ty.literal_fallback_instance(db).unwrap_or(self_ty)
             })),
             _ => *ty,
@@ -913,7 +913,7 @@ fn resolve_call_signature<'db>(
     let func_type = call_expr.func.inferred_type(model)?;
     let callable_type = func_type.try_upcast_to_callable(db)?.into_type(db);
 
-    let args = CallArguments::from_arguments_typed(&call_expr.arguments, |splatted_value| {
+    let args = CallArguments::from_arguments_typed(&call_expr.arguments, &mut |splatted_value| {
         splatted_value
             .inferred_type(model)
             .unwrap_or(Type::unknown())

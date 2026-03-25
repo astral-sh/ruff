@@ -248,7 +248,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         db: &'db dyn Db,
         typevar: Type<'db>,
         constraints: TypeVarConstraints<'db>,
-        mut op: impl FnMut(Type<'db>) -> Option<Type<'db>>,
+        op: &mut dyn FnMut(Type<'db>) -> Option<Type<'db>>,
     ) -> Option<Type<'db>> {
         let mut builder = UnionBuilder::new(db);
         let mut any_different = false;
@@ -299,7 +299,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         };
 
         match (left_ty, right_ty, op) {
-            (Type::Union(lhs_union), rhs, _) => lhs_union.try_map(db, |lhs_element| {
+            (Type::Union(lhs_union), rhs, _) => lhs_union.try_map(db, &mut |lhs_element| {
                 self.infer_binary_expression_type(
                     node,
                     emitted_division_by_zero_diagnostic,
@@ -308,7 +308,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     op,
                 )
             }),
-            (lhs, Type::Union(rhs_union), _) => rhs_union.try_map(db, |rhs_element| {
+            (lhs, Type::Union(rhs_union), _) => rhs_union.try_map(db, &mut |rhs_element| {
                 self.infer_binary_expression_type(
                     node,
                     emitted_division_by_zero_diagnostic,
@@ -387,7 +387,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             db,
                             left_ty,
                             constraints,
-                            |constraint| {
+                            &mut |constraint| {
                                 self.infer_binary_expression_type(
                                     node,
                                     emitted_division_by_zero_diagnostic,
@@ -419,7 +419,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             db,
                             left_ty,
                             constraints,
-                            |constraint| {
+                            &mut |constraint| {
                                 self.infer_binary_expression_type(
                                     node,
                                     emitted_division_by_zero_diagnostic,
@@ -446,7 +446,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             db,
                             right_ty,
                             constraints,
-                            |constraint| {
+                            &mut |constraint| {
                                 self.infer_binary_expression_type(
                                     node,
                                     emitted_division_by_zero_diagnostic,

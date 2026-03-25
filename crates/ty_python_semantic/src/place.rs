@@ -209,7 +209,7 @@ impl<'db> Place<'db> {
     }
 
     #[must_use]
-    pub(crate) fn map_type(self, f: impl FnOnce(Type<'db>) -> Type<'db>) -> Place<'db> {
+    pub(crate) fn map_type(self, f: &dyn Fn(Type<'db>) -> Type<'db>) -> Place<'db> {
         match self {
             Place::Defined(defined) => Place::Defined(DefinedPlace {
                 ty: f(defined.ty),
@@ -246,7 +246,7 @@ impl<'db> Place<'db> {
                     ty: Type::Union(union),
                     ..
                 },
-            ) => union.map_with_boundness(db, |elem| {
+            ) => union.map_with_boundness(db, &mut |elem| {
                 Place::Defined(DefinedPlace { ty: *elem, ..place }).try_call_dunder_get(db, owner)
             }),
 
@@ -255,7 +255,7 @@ impl<'db> Place<'db> {
                     ty: Type::Intersection(intersection),
                     ..
                 },
-            ) => intersection.map_with_boundness(db, |elem| {
+            ) => intersection.map_with_boundness(db, &mut |elem| {
                 Place::Defined(DefinedPlace { ty: *elem, ..place }).try_call_dunder_get(db, owner)
             }),
 
@@ -722,10 +722,7 @@ impl<'db> PlaceAndQualifiers<'db> {
     }
 
     #[must_use]
-    pub(crate) fn map_type(
-        self,
-        f: impl FnOnce(Type<'db>) -> Type<'db>,
-    ) -> PlaceAndQualifiers<'db> {
+    pub(crate) fn map_type(self, f: &dyn Fn(Type<'db>) -> Type<'db>) -> PlaceAndQualifiers<'db> {
         PlaceAndQualifiers {
             place: self.place.map_type(f),
             qualifiers: self.qualifiers,
@@ -769,7 +766,7 @@ impl<'db> PlaceAndQualifiers<'db> {
     pub(crate) fn unwrap_with_diagnostic(
         self,
         db: &'db dyn Db,
-        diagnostic_fn: impl FnOnce(LookupError<'db>) -> TypeAndQualifiers<'db>,
+        diagnostic_fn: &dyn Fn(LookupError<'db>) -> TypeAndQualifiers<'db>,
     ) -> TypeAndQualifiers<'db> {
         self.into_lookup_result(db).unwrap_or_else(diagnostic_fn)
     }

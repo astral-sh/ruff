@@ -119,7 +119,7 @@ pub(crate) trait OptionConstraintsExtension<T> {
         self,
         db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
-        f: impl FnOnce(T) -> ConstraintSet<'db, 'c>,
+        f: &dyn Fn(T) -> ConstraintSet<'db, 'c>,
     ) -> ConstraintSet<'db, 'c>;
 
     /// Returns a constraint set that is never satisfiable if the option is `None`; otherwise
@@ -128,7 +128,7 @@ pub(crate) trait OptionConstraintsExtension<T> {
         self,
         db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
-        f: impl FnOnce(T) -> ConstraintSet<'db, 'c>,
+        f: &dyn Fn(T) -> ConstraintSet<'db, 'c>,
     ) -> ConstraintSet<'db, 'c>;
 }
 
@@ -137,7 +137,7 @@ impl<T> OptionConstraintsExtension<T> for Option<T> {
         self,
         _db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
-        f: impl FnOnce(T) -> ConstraintSet<'db, 'c>,
+        f: &dyn Fn(T) -> ConstraintSet<'db, 'c>,
     ) -> ConstraintSet<'db, 'c> {
         match self {
             Some(value) => f(value),
@@ -149,7 +149,7 @@ impl<T> OptionConstraintsExtension<T> for Option<T> {
         self,
         _db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
-        f: impl FnOnce(T) -> ConstraintSet<'db, 'c>,
+        f: &dyn Fn(T) -> ConstraintSet<'db, 'c>,
     ) -> ConstraintSet<'db, 'c> {
         match self {
             Some(value) => f(value),
@@ -169,7 +169,7 @@ pub(crate) trait IteratorConstraintsExtension<T> {
         self,
         db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
-        f: impl FnMut(T) -> ConstraintSet<'db, 'c>,
+        f: &dyn Fn(T) -> ConstraintSet<'db, 'c>,
     ) -> ConstraintSet<'db, 'c>;
 
     /// Returns the constraints under which every element of the iterator holds.
@@ -181,7 +181,7 @@ pub(crate) trait IteratorConstraintsExtension<T> {
         self,
         db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
-        f: impl FnMut(T) -> ConstraintSet<'db, 'c>,
+        f: &dyn Fn(T) -> ConstraintSet<'db, 'c>,
     ) -> ConstraintSet<'db, 'c>;
 }
 
@@ -193,7 +193,7 @@ where
         self,
         db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
-        mut f: impl FnMut(T) -> ConstraintSet<'db, 'c>,
+        f: &dyn Fn(T) -> ConstraintSet<'db, 'c>,
     ) -> ConstraintSet<'db, 'c> {
         let node = NodeId::distributed_or(
             db,
@@ -211,7 +211,7 @@ where
         self,
         db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
-        mut f: impl FnMut(T) -> ConstraintSet<'db, 'c>,
+        f: &dyn Fn(T) -> ConstraintSet<'db, 'c>,
     ) -> ConstraintSet<'db, 'c> {
         let node = NodeId::distributed_and(
             db,

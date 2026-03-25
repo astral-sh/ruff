@@ -431,7 +431,7 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
         right: TypedDictType<'db>,
     ) -> ConstraintSet<'db, 'c> {
         let fields_in_common = btreemap_values_with_same_key(left.items(db), right.items(db));
-        fields_in_common.when_any(db, self.constraints, |(left_field, right_field)| {
+        fields_in_common.when_any(db, self.constraints, &|(left_field, right_field)| {
             // Condition 1 above.
             if left_field.is_required() || right_field.is_required() {
                 if (!left_field.is_required() && !left_field.is_read_only())
@@ -822,7 +822,7 @@ pub(super) fn validate_typed_dict_constructor<'db, 'ast>(
     typed_dict: TypedDictType<'db>,
     arguments: &'ast Arguments,
     error_node: AnyNodeRef<'ast>,
-    expression_type_fn: impl Fn(&ast::Expr) -> Type<'db>,
+    expression_type_fn: &dyn Fn(&ast::Expr) -> Type<'db>,
 ) {
     let db = context.db();
 
@@ -879,7 +879,7 @@ fn validate_from_dict_literal<'db, 'ast>(
     typed_dict: TypedDictType<'db>,
     arguments: &'ast Arguments,
     typed_dict_node: AnyNodeRef<'ast>,
-    expression_type_fn: &impl Fn(&ast::Expr) -> Type<'db>,
+    expression_type_fn: &dyn Fn(&ast::Expr) -> Type<'db>,
 ) -> OrderSet<Name> {
     let mut provided_keys = OrderSet::new();
 
@@ -923,7 +923,7 @@ fn validate_from_keywords<'db, 'ast>(
     typed_dict: TypedDictType<'db>,
     arguments: &'ast Arguments,
     typed_dict_node: AnyNodeRef<'ast>,
-    expression_type_fn: &impl Fn(&ast::Expr) -> Type<'db>,
+    expression_type_fn: &dyn Fn(&ast::Expr) -> Type<'db>,
 ) -> OrderSet<Name> {
     let db = context.db();
 
@@ -998,7 +998,7 @@ pub(super) fn validate_typed_dict_dict_literal<'db>(
     typed_dict: TypedDictType<'db>,
     dict_expr: &ast::ExprDict,
     typed_dict_node: AnyNodeRef,
-    expression_type_fn: impl Fn(&ast::Expr) -> Type<'db>,
+    expression_type_fn: &dyn Fn(&ast::Expr) -> Type<'db>,
 ) -> Result<OrderSet<Name>, OrderSet<Name>> {
     let mut valid = true;
     let mut provided_keys = OrderSet::new();

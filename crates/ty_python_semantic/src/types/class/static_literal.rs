@@ -968,10 +968,10 @@ impl<'db> StaticClassLiteral<'db> {
                     CallableTypeKind::FunctionLike,
                 )),
                 Type::Union(union) => {
-                    union.map(db, |element| into_function_like_callable(db, *element))
+                    union.map(db, &mut |element| into_function_like_callable(db, *element))
                 }
                 Type::Intersection(intersection) => intersection
-                    .map_positive(db, |element| into_function_like_callable(db, *element)),
+                    .map_positive(db, &mut |element| into_function_like_callable(db, *element)),
                 _ => ty,
             }
         }
@@ -981,7 +981,7 @@ impl<'db> StaticClassLiteral<'db> {
         // We generally treat dunder attributes with `Callable` types as function-like callables.
         // See `callables_as_descriptors.md` for more details.
         if name.starts_with("__") && name.ends_with("__") {
-            member = member.map_type(|ty| into_function_like_callable(db, ty));
+            member = member.map_type(&|ty| into_function_like_callable(db, ty));
         }
 
         member
@@ -1018,7 +1018,7 @@ impl<'db> StaticClassLiteral<'db> {
                 .to_class_literal(db)
                 .find_name_in_mro_with_policy(db, name, policy)
                 .expect("Will return Some() when called on class literal")
-                .map_type(|ty| {
+                .map_type(&|ty| {
                     ty.apply_type_mapping(
                         db,
                         &TypeMapping::ReplaceSelf {
@@ -1092,7 +1092,7 @@ impl<'db> StaticClassLiteral<'db> {
         }
 
         let body_scope = self.body_scope(db);
-        let member = class_member(db, body_scope, name).map_type(|ty| {
+        let member = class_member(db, body_scope, name).map_type(&|ty| {
             // The `__new__` and `__init__` members of a non-specialized generic class are handled
             // specially: they inherit the generic context of their class. That lets us treat them
             // as generic functions when constructing the class, and infer the specialization of
@@ -1191,7 +1191,7 @@ impl<'db> StaticClassLiteral<'db> {
             && let Some(callables) = root_method_ty.try_upcast_to_callable(db)
         {
             let bool_ty = KnownClass::Bool.to_instance(db);
-            let synthesized_callables = callables.map(|callable| {
+            let synthesized_callables = callables.map(&|callable| {
                 let signatures = CallableSignature::from_overloads(
                     callable.signatures(db).iter().map(|signature| {
                         // The generated methods return a union of the root method's return type
@@ -1268,7 +1268,7 @@ impl<'db> StaticClassLiteral<'db> {
                         //
                         // We union parameter types across overloads of a single callable, intersect
                         // callable bindings inside an intersection element, and union outer elements.
-                        field_ty = dunder_set.bindings(db).map_types(db, |binding| {
+                        field_ty = dunder_set.bindings(db).map_types(db, &mut |binding| {
                             let mut value_types = UnionBuilder::new(db);
                             let mut has_value_type = false;
                             for overload in binding {
@@ -2027,7 +2027,7 @@ impl<'db> StaticClassLiteral<'db> {
                 .to_class_literal(db)
                 .find_name_in_mro_with_policy(db, name, policy)
                 .expect("`find_name_in_mro_with_policy` will return `Some()` when called on class literal")
-                .map_type(|ty|
+                .map_type(&|ty|
                     ty.apply_type_mapping(
                         db,
                         &TypeMapping::ReplaceSelf {
@@ -2333,7 +2333,7 @@ impl<'db> StaticClassLiteral<'db> {
             InstanceMemberResult::TypedDict => KnownClass::TypedDictFallback
                 .to_instance(db)
                 .instance_member(db, name)
-                .map_type(|ty| {
+                .map_type(&|ty| {
                     ty.apply_type_mapping(
                         db,
                         &TypeMapping::ReplaceSelf {

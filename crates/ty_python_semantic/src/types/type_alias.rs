@@ -83,7 +83,7 @@ impl<'db> PEP695TypeAliasType<'db> {
     pub(crate) fn apply_specialization(
         self,
         db: &'db dyn Db,
-        f: impl FnOnce(GenericContext<'db>) -> Specialization<'db>,
+        f: &dyn Fn(GenericContext<'db>) -> Specialization<'db>,
     ) -> PEP695TypeAliasType<'db> {
         match self.generic_context(db) {
             None => self,
@@ -269,7 +269,7 @@ impl<'db> TypeAliasType<'db> {
     pub(crate) fn apply_specialization(
         self,
         db: &'db dyn Db,
-        f: impl FnOnce(GenericContext<'db>) -> Specialization<'db>,
+        f: &dyn Fn(GenericContext<'db>) -> Specialization<'db>,
     ) -> Self {
         match self {
             TypeAliasType::PEP695(type_alias) => {

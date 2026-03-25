@@ -105,7 +105,7 @@ impl<'db> Type<'db> {
                         let upcast_callables = bound
                             .to_meta_type(db)
                             .try_upcast_to_callable_with_policy(db, policy)?;
-                        Some(upcast_callables.map(|callable| {
+                        Some(upcast_callables.map(&|callable| {
                             let signatures = callable
                                 .signatures(db)
                                 .into_iter()
@@ -483,7 +483,7 @@ impl<'db> CallableTypes<'db> {
         UnionType::from_elements(db, self.0.into_iter().map(Type::Callable))
     }
 
-    pub(crate) fn map(self, mut f: impl FnMut(CallableType<'db>) -> CallableType<'db>) -> Self {
+    pub(crate) fn map(self, f: &dyn Fn(CallableType<'db>) -> CallableType<'db>) -> Self {
         Self::from_elements(self.0.iter().map(|element| f(*element)))
     }
 }
@@ -519,7 +519,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source: &CallableTypes<'db>,
         target: CallableType<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        source.iter().when_all(db, self.constraints, |element| {
+        source.iter().when_all(db, self.constraints, &|element| {
             self.check_callable_pair(db, *element, target)
         })
     }

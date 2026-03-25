@@ -121,7 +121,7 @@ impl<'db> NewType<'db> {
     pub(crate) fn try_map_base_class_type(
         self,
         db: &'db dyn Db,
-        f: impl FnOnce(ClassType<'db>) -> Option<ClassType<'db>>,
+        f: &dyn Fn(ClassType<'db>) -> Option<ClassType<'db>>,
     ) -> Option<Self> {
         // Modifying the base class type requires unwrapping and re-wrapping however many base
         // newtypes there are between here and there. Normally recursion would be natural for this,
@@ -170,9 +170,9 @@ impl<'db> NewType<'db> {
     pub(crate) fn map_base_class_type(
         self,
         db: &'db dyn Db,
-        f: impl FnOnce(ClassType<'db>) -> ClassType<'db>,
+        f: &dyn Fn(ClassType<'db>) -> ClassType<'db>,
     ) -> Self {
-        self.try_map_base_class_type(db, |class_type| Some(f(class_type)))
+        self.try_map_base_class_type(db, &|class_type| Some(f(class_type)))
             .unwrap()
     }
 }

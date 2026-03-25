@@ -12,7 +12,7 @@ use ruff_text_size::Ranged;
 pub(super) fn validate_paramspec_components<'db>(
     context: &'db InferContext<'db, '_>,
     parameters: &ast::Parameters,
-    infer_type: impl Fn(&ast::Expr) -> Type<'db>,
+    infer_type: &dyn Fn(&ast::Expr) -> Type<'db>,
 ) {
     let db = context.db();
 

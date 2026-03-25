@@ -22,7 +22,7 @@ use ruff_text_size::{Ranged, TextRange};
 pub(crate) fn check_function_definition<'db>(
     context: &InferContext<'db, '_>,
     definition: Definition<'db>,
-    file_expression_type: &impl Fn(&ast::Expr) -> Type<'db>,
+    file_expression_type: &dyn Fn(&ast::Expr) -> Type<'db>,
 ) {
     let db = context.db();
 
@@ -108,7 +108,7 @@ fn check_legacy_typevar_defaults<'db>(
     context: &InferContext<'db, '_>,
     last_definition: OverloadLiteral<'db>,
     signature: &Signature<'db>,
-    file_expression_type: &impl Fn(&ast::Expr) -> Type<'db>,
+    file_expression_type: &dyn Fn(&ast::Expr) -> Type<'db>,
 ) {
     let db = context.db();
 
@@ -206,7 +206,7 @@ fn find_typevar_annotation_range<'db>(
     context: &InferContext<'db, '_>,
     node: &ast::StmtFunctionDef,
     typevar: TypeVarInstance<'db>,
-    file_expression_type: impl Fn(&ast::Expr) -> Type<'db>,
+    file_expression_type: &dyn Fn(&ast::Expr) -> Type<'db>,
 ) -> TextRange {
     let db = context.db();
     let typevar_id = typevar.identity(db);
@@ -229,7 +229,7 @@ fn check_legacy_typevar_ordering<'db>(
     context: &InferContext<'db, '_>,
     last_definition: OverloadLiteral<'db>,
     signature: &Signature<'db>,
-    file_expression_type: &impl Fn(&ast::Expr) -> Type<'db>,
+    file_expression_type: &dyn Fn(&ast::Expr) -> Type<'db>,
 ) {
     struct State<'db> {
         typevar_with_default: TypeVarInstance<'db>,

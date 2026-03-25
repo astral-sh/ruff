@@ -119,7 +119,7 @@ impl<'a, 'db> CallArguments<'a, 'db> {
     /// will remain uninitialized as `Unknown`.
     pub(crate) fn from_arguments(
         arguments: &'a ast::Arguments,
-        mut infer_argument_type: impl FnMut(&ast::ArgOrKeyword, &ast::Expr) -> Type<'db>,
+        infer_argument_type: &mut dyn FnMut(&ast::ArgOrKeyword, &ast::Expr) -> Type<'db>,
     ) -> Self {
         arguments
             .arguments_source_order()
@@ -149,7 +149,7 @@ impl<'a, 'db> CallArguments<'a, 'db> {
     /// typechecking.
     pub(crate) fn from_arguments_typed(
         arguments: &'a ast::Arguments,
-        mut infer_argument_type: impl FnMut(&ast::Expr) -> Type<'db>,
+        infer_argument_type: &mut dyn FnMut(&ast::Expr) -> Type<'db>,
     ) -> Self {
         arguments
             .arguments_source_order()

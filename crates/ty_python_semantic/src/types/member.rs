@@ -44,7 +44,7 @@ impl<'db> Member<'db> {
 
     /// Map a type transformation function over the type of this member.
     #[must_use]
-    pub(super) fn map_type(self, f: impl FnOnce(Type<'db>) -> Type<'db>) -> Self {
+    pub(super) fn map_type(self, f: &dyn Fn(Type<'db>) -> Type<'db>) -> Self {
         Self {
             inner: self.inner.map_type(f),
         }

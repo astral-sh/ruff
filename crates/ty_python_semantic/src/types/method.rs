@@ -59,11 +59,7 @@ impl<'db> BoundMethodType<'db> {
         self_instance
     }
 
-    pub(crate) fn map_self_type(
-        self,
-        db: &'db dyn Db,
-        f: impl FnOnce(Type<'db>) -> Type<'db>,
-    ) -> Self {
+    pub(crate) fn map_self_type(self, db: &'db dyn Db, f: &dyn Fn(Type<'db>) -> Type<'db>) -> Self {
         Self::new(db, self.function(db), f(self.self_instance(db)))
     }
 

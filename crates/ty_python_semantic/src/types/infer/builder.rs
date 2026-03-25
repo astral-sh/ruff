@@ -4358,7 +4358,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // equally applicable type contexts for each union member.
                 infer_value_ty.infer_loud(self, TypeContext::default());
 
-                union.map(db, |&elem_type| {
+                union.map(db, &mut |&elem_type| {
                     self.infer_augmented_op(
                         assignment,
                         elem_type,
@@ -4825,9 +4825,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     callable.signatures(db),
                     kind,
                 ))),
-                Type::Union(union) => {
-                    union.try_map(db, |element| propagate_callable_kind(db, *element, kind))
-                }
+                Type::Union(union) => union.try_map(db, &mut |element| {
+                    propagate_callable_kind(db, *element, kind)
+                }),
                 Type::TypeAlias(alias) => propagate_callable_kind(db, alias.value_type(db), kind),
                 // Intersections are currently not handled here because that would require
                 // the decorator to be explicitly annotated as returning an intersection.
@@ -5013,7 +5013,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let mut try_narrow = |narrowed_ty: Type<'db>| {
             // Short-circuit if there is no overload with a matching return type.
-            if !bindings.satisfies(|overload| {
+            if !bindings.satisfies(&|overload| {
                 let inferable = overload
                     .signature
                     .generic_context
@@ -5693,7 +5693,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = tuple;
 
         // Remove any union elements of the annotation that are unrelated to the tuple type.
-        let tcx = tcx.map(|annotation| {
+        let tcx = tcx.map(&|annotation| {
             let inferable = KnownClass::Tuple
                 .try_to_class_literal(self.db())
                 .and_then(|class| class.generic_context(self.db()))
@@ -5982,7 +5982,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             item_types.insert(item.value.node_index().load(), value_ty);
         }
 
-        validate_typed_dict_dict_literal(&self.context, typed_dict, dict, dict.into(), |expr| {
+        validate_typed_dict_dict_literal(&self.context, typed_dict, dict, dict.into(), &|expr| {
             item_types
                 .get(&expr.node_index().load())
                 .copied()
@@ -6085,7 +6085,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         //
         // For example, we only want the `list[int]` from `annotation: list[int] | None` if
         // `collection_ty` is `list`.
-        let tcx = tcx.map(|annotation| {
+        let tcx = tcx.map(&|annotation| {
             let collection_ty = collection_class.to_instance(self.db());
             annotation.filter_disjoint_elements(self.db(), collection_ty, inferable)
         });
@@ -6335,7 +6335,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let class_type = collection_alias
             .origin(self.db())
             .apply_specialization(self.db(), |_| {
-                builder.build_with(generic_context, |_, lower, _| {
+                builder.build_with(generic_context, &mut |_, lower, _| {
                     // Promote singleton types to `T | Unknown` in inferred type parameters,
                     // so that e.g. `[None]` is inferred as `list[None | Unknown]`.
                     if elt_tcx_constraints.is_empty() {
@@ -7005,7 +7005,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 typed_dict,
                 arguments,
                 func.as_ref().into(),
-                |expr| self.expression_type(expr),
+                &|expr| self.expression_type(expr),
             );
 
             return Type::TypedDict(typed_dict);
@@ -7027,7 +7027,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // arguments after matching them to parameters, but before checking that the argument types
         // are assignable to any parameter annotations.
         let mut call_arguments =
-            CallArguments::from_arguments(arguments, |arg_or_keyword, splatted_value| {
+            CallArguments::from_arguments(arguments, &mut |arg_or_keyword, splatted_value| {
                 let ty = self.infer_expression(splatted_value, TypeContext::default());
                 if let ast::ArgOrKeyword::Arg(argument) = arg_or_keyword
                     && argument.is_starred_expr()
@@ -7308,7 +7308,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 TypedDictType::new(class),
                 arguments,
                 func.as_ref().into(),
-                |expr| self.expression_type(expr),
+                &|expr| self.expression_type(expr),
             );
         }
 
@@ -7706,7 +7706,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // Check the "implicit globals" such as `__doc__`, `__file__`, `__name__`, etc.
             // These are looked up as attributes on `types.ModuleType`.
             .or_fall_back_to(db, || {
-                module_type_implicit_global_symbol(db, symbol_name).map_type(|ty| {
+                module_type_implicit_global_symbol(db, symbol_name).map_type(&|ty| {
                     self.narrow_place_with_applicable_constraints(
                         PlaceExprRef::from(&expr),
                         ty,
@@ -7744,16 +7744,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         let ty =
-            resolved_after_fallback.unwrap_with_diagnostic(db, |lookup_error| match lookup_error {
-                LookupError::Undefined(qualifiers) => {
-                    self.report_unresolved_reference(name_node);
-                    TypeAndQualifiers::new(Type::unknown(), TypeOrigin::Inferred, qualifiers)
-                }
-                LookupError::PossiblyUndefined(type_when_bound) => {
-                    report_possibly_unresolved_reference(&self.context, name_node);
-                    type_when_bound
-                }
-            });
+            resolved_after_fallback.unwrap_with_diagnostic(
+                db,
+                &|lookup_error| match lookup_error {
+                    LookupError::Undefined(qualifiers) => {
+                        self.report_unresolved_reference(name_node);
+                        TypeAndQualifiers::new(Type::unknown(), TypeOrigin::Inferred, qualifiers)
+                    }
+                    LookupError::PossiblyUndefined(type_when_bound) => {
+                        report_possibly_unresolved_reference(&self.context, name_node);
+                        type_when_bound
+                    }
+                },
+            );
 
         ty.inner_type()
     }
@@ -7841,7 +7844,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let fallback_to_global =
                     scope.node(db).scope_kind().is_class() && symbol_resolves_locally;
                 if self.skip_non_global_scopes(file_scope_id, symbol_id) || fallback_to_global {
-                    return global_symbol(self.db(), self.file(), symbol.name()).map_type(|ty| {
+                    return global_symbol(self.db(), self.file(), symbol.name()).map_type(&|ty| {
                         self.narrow_place_with_applicable_constraints(
                             place_expr,
                             ty,
@@ -7942,7 +7945,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             }
                         }
                         EnclosingSnapshotResult::FoundBindings(bindings) => {
-                            let place = place_from_bindings(db, bindings).place.map_type(|ty| {
+                            let place = place_from_bindings(db, bindings).place.map_type(&|ty| {
                                 self.narrow_place_with_applicable_constraints(
                                     place_expr,
                                     ty,
@@ -8008,7 +8011,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             place_expr,
                             ConsideredDefinitions::AllReachable,
                         )
-                        .map_type(|ty| {
+                        .map_type(&|ty| {
                             self.narrow_place_with_applicable_constraints(
                                 place_expr,
                                 ty,
@@ -8052,7 +8055,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     {
                         let implicit = class_body_implicit_symbol(db, symbol.name());
                         if implicit.place.is_definitely_bound() {
-                            return implicit.map_type(|ty| {
+                            return implicit.map_type(&|ty| {
                                 self.narrow_place_with_applicable_constraints(
                                     place_expr,
                                     ty,
@@ -8087,7 +8090,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             }
                             EnclosingSnapshotResult::FoundBindings(bindings) => {
                                 let place =
-                                    place_from_bindings(db, bindings).place.map_type(|ty| {
+                                    place_from_bindings(db, bindings).place.map_type(&|ty| {
                                         self.narrow_place_with_applicable_constraints(
                                             place_expr,
                                             ty,
@@ -8112,7 +8115,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         return Place::Undefined.into();
                     };
 
-                    explicit_global_symbol(db, self.file(), symbol.name()).map_type(|ty| {
+                    explicit_global_symbol(db, self.file(), symbol.name()).map_type(&|ty| {
                         self.narrow_place_with_applicable_constraints(
                             place_expr,
                             ty,
@@ -8230,7 +8233,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn narrow_expr_with_applicable_constraints<'r>(
-        &mut self,
+        &self,
         target: impl Into<ast::ExprRef<'r>>,
         target_ty: Type<'db>,
         constraint_keys: &[(FileScopeId, ConstraintKey)],
@@ -8305,13 +8308,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.all_definitely_bound = false;
         }
 
-        fallback_place = fallback_place.map_type(|ty| {
+        fallback_place = fallback_place.map_type(&|ty| {
             self.narrow_expr_with_applicable_constraints(attribute, ty, &constraint_keys)
         });
 
         let attr_name = &attr.id;
         let resolved_type =
-            fallback_place.unwrap_with_diagnostic(db, |lookup_err| match lookup_err {
+            fallback_place.unwrap_with_diagnostic(db, &|lookup_err| match lookup_err {
                 LookupError::Undefined(_) => {
                     let fallback = || {
                         TypeAndQualifiers::new(
@@ -8688,7 +8691,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             db,
                             operand_type,
                             constraints,
-                            |constraint| {
+                            &mut |constraint| {
                                 constraint
                                     .try_call_dunder(
                                         db,

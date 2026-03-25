@@ -297,7 +297,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 (source.0.iter().zip(&target.0)).when_all(
                     db,
                     self.constraints,
-                    |(&source, &target)| self.check_type_pair(db, source, target),
+                    &|(&source, &target)| self.check_type_pair(db, source, target),
                 )
             }),
 
@@ -334,7 +334,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 // In addition, any remaining elements in this tuple must satisfy the
                 // variable-length portion of the other tuple.
                 result.and(db, self.constraints, || {
-                    source_iter.when_all(db, self.constraints, |&source_ty| {
+                    source_iter.when_all(db, self.constraints, &|&source_ty| {
                         self.check_type_pair(db, source_ty, target.variable())
                     })
                 })
@@ -526,10 +526,10 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
                 std::iter::zip(a.iter().rev(), b.iter().rev()).when_any(
                     db,
                     self.constraints,
-                    |(&left_elem, &right_elem)| self.check_type_pair(db, left_elem, right_elem),
+                    &|(&left_elem, &right_elem)| self.check_type_pair(db, left_elem, right_elem),
                 )
             } else {
-                std::iter::zip(a, b).when_any(db, self.constraints, |(&left_elem, &right_elem)| {
+                std::iter::zip(a, b).when_any(db, self.constraints, &|(&left_elem, &right_elem)| {
                     self.check_type_pair(db, left_elem, right_elem)
                 })
             }

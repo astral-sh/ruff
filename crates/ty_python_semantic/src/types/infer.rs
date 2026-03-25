@@ -490,7 +490,7 @@ impl<'db> TypeContext<'db> {
             .and_then(|ty| ty.known_specialization(db, known_class))
     }
 
-    pub(crate) fn map(self, f: impl FnOnce(Type<'db>) -> Type<'db>) -> Self {
+    pub(crate) fn map(self, f: &dyn Fn(Type<'db>) -> Type<'db>) -> Self {
         Self {
             annotation: self.annotation.map(f),
         }
@@ -783,12 +783,12 @@ impl<'db> DefinitionInference<'db> {
                 .iter()
                 .find(|(previous_declaration, _)| previous_declaration == declaration)
             {
-                *declaration_ty = declaration_ty.map_type(|decl_ty| {
+                *declaration_ty = declaration_ty.map_type(&|decl_ty| {
                     decl_ty.cycle_normalized(db, previous_declaration.inner_type(), cycle)
                 });
             } else {
-                *declaration_ty =
-                    declaration_ty.map_type(|decl_ty| decl_ty.recursive_type_normalized(db, cycle));
+                *declaration_ty = declaration_ty
+                    .map_type(&|decl_ty| decl_ty.recursive_type_normalized(db, cycle));
             }
         }
 

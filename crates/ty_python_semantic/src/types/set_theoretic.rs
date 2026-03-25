@@ -124,7 +124,7 @@ impl<'db> UnionType<'db> {
     pub(crate) fn map(
         self,
         db: &'db dyn Db,
-        transform_fn: impl FnMut(&Type<'db>) -> Type<'db>,
+        transform_fn: &mut dyn FnMut(&Type<'db>) -> Type<'db>,
     ) -> Type<'db> {
         self.elements(db)
             .iter()
@@ -140,7 +140,7 @@ impl<'db> UnionType<'db> {
     pub(crate) fn map_leave_aliases(
         self,
         db: &'db dyn Db,
-        transform_fn: impl FnMut(&Type<'db>) -> Type<'db>,
+        transform_fn: &mut dyn FnMut(&Type<'db>) -> Type<'db>,
     ) -> Type<'db> {
         self.elements(db)
             .iter()
@@ -163,7 +163,7 @@ impl<'db> UnionType<'db> {
     pub(crate) fn try_map(
         self,
         db: &'db dyn Db,
-        transform_fn: impl FnMut(&Type<'db>) -> Option<Type<'db>>,
+        transform_fn: &mut dyn FnMut(&Type<'db>) -> Option<Type<'db>>,
     ) -> Option<Type<'db>> {
         let mut builder = UnionBuilder::new(db);
         for element in self.elements(db).iter().map(transform_fn) {
@@ -174,10 +174,14 @@ impl<'db> UnionType<'db> {
     }
 
     pub(crate) fn to_instance(self, db: &'db dyn Db) -> Option<Type<'db>> {
-        self.try_map(db, |element| element.to_instance(db))
+        self.try_map(db, &mut |element| element.to_instance(db))
     }
 
-    pub(crate) fn filter(self, db: &'db dyn Db, f: impl FnMut(&Type<'db>) -> bool) -> Type<'db> {
+    pub(crate) fn filter(
+        self,
+        db: &'db dyn Db,
+        f: &mut dyn FnMut(&Type<'db>) -> bool,
+    ) -> Type<'db> {
         let current = self.elements(db);
         let new: Box<[Type<'db>]> = current.iter().copied().filter(f).collect();
         match &*new {
@@ -191,7 +195,7 @@ impl<'db> UnionType<'db> {
     pub(crate) fn map_with_boundness(
         self,
         db: &'db dyn Db,
-        mut transform_fn: impl FnMut(&Type<'db>) -> Place<'db>,
+        transform_fn: &mut dyn FnMut(&Type<'db>) -> Place<'db>,
     ) -> Place<'db> {
         let mut builder = UnionBuilder::new(db);
 
@@ -242,7 +246,7 @@ impl<'db> UnionType<'db> {
     pub(crate) fn map_with_boundness_and_qualifiers(
         self,
         db: &'db dyn Db,
-        mut transform_fn: impl FnMut(&Type<'db>) -> PlaceAndQualifiers<'db>,
+        transform_fn: &mut dyn FnMut(&Type<'db>) -> PlaceAndQualifiers<'db>,
     ) -> PlaceAndQualifiers<'db> {
         let mut builder = UnionBuilder::new(db);
         let mut qualifiers = TypeQualifiers::empty();
@@ -535,7 +539,7 @@ impl<'db> NegativeIntersectionElements<'db> {
 
     /// Apply a transformation to all elements in this collection,
     /// and return a new collection of the transformed elements.
-    fn map(&self, map_fn: impl Fn(&Type<'db>) -> Type<'db>) -> Self {
+    fn map(&self, map_fn: &dyn Fn(&Type<'db>) -> Type<'db>) -> Self {
         match self {
             NegativeIntersectionElements::Empty => NegativeIntersectionElements::Empty,
             NegativeIntersectionElements::Single(ty) => {
@@ -551,7 +555,7 @@ impl<'db> NegativeIntersectionElements<'db> {
     /// and return a new collection of the transformed elements.
     ///
     /// Returns `None` if `map_fn` fails for any element in the collection.
-    fn try_map(&self, map_fn: impl Fn(&Type<'db>) -> Option<Type<'db>>) -> Option<Self> {
+    fn try_map(&self, map_fn: &dyn Fn(&Type<'db>) -> Option<Type<'db>>) -> Option<Self> {
         match self {
             NegativeIntersectionElements::Empty => Some(NegativeIntersectionElements::Empty),
             NegativeIntersectionElements::Single(ty) => {
@@ -696,9 +700,9 @@ impl<'db> IntersectionType<'db> {
 
         let negative = if nested {
             self.negative(db)
-                .try_map(|ty| ty.recursive_type_normalized_impl(db, div, nested))?
+                .try_map(&|ty| ty.recursive_type_normalized_impl(db, div, nested))?
         } else {
-            self.negative(db).map(|ty| {
+            self.negative(db).map(&|ty| {
                 ty.recursive_type_normalized_impl(db, div, nested)
                     .unwrap_or(div)
             })
@@ -725,7 +729,7 @@ impl<'db> IntersectionType<'db> {
     pub(crate) fn map_positive(
         self,
         db: &'db dyn Db,
-        mut transform_fn: impl FnMut(&Type<'db>) -> Type<'db>,
+        transform_fn: &mut dyn FnMut(&Type<'db>) -> Type<'db>,
     ) -> Type<'db> {
         let mut builder = IntersectionBuilder::new(db);
         for ty in self.positive(db) {
@@ -740,7 +744,7 @@ impl<'db> IntersectionType<'db> {
     pub(crate) fn map_with_boundness(
         self,
         db: &'db dyn Db,
-        mut transform_fn: impl FnMut(&Type<'db>) -> Place<'db>,
+        transform_fn: &mut dyn FnMut(&Type<'db>) -> Place<'db>,
     ) -> Place<'db> {
         let mut builder = IntersectionBuilder::new(db);
 
@@ -787,7 +791,7 @@ impl<'db> IntersectionType<'db> {
     pub(crate) fn map_with_boundness_and_qualifiers(
         self,
         db: &'db dyn Db,
-        mut transform_fn: impl FnMut(&Type<'db>) -> PlaceAndQualifiers<'db>,
+        transform_fn: &mut dyn FnMut(&Type<'db>) -> PlaceAndQualifiers<'db>,
     ) -> PlaceAndQualifiers<'db> {
         let mut builder = IntersectionBuilder::new(db);
         let mut qualifiers = TypeQualifiers::empty();

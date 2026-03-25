@@ -716,10 +716,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 let fallback_other = ty.literal_fallback_instance(db).unwrap_or(ty);
                 attribute_type
                     .try_upcast_to_callable_with_policy(db, UpcastPolicy::from(self.relation))
-                    .when_some_and(db, self.constraints, |callables| {
+                    .when_some_and(db, self.constraints, &|callables| {
                         self.check_callables_vs_callable(
                             db,
-                            &callables.map(|callable| callable.apply_self(db, fallback_other)),
+                            &callables.map(&|callable| callable.apply_self(db, fallback_other)),
                             protocol_bind_self(db, *method, Some(fallback_other)),
                         )
                     })
@@ -761,11 +761,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     ) -> ConstraintSet<'db, 'c> {
         target
             .members(db)
-            .when_all(db, self.constraints, |target_member| {
+            .when_all(db, self.constraints, &|target_member| {
                 source.member_by_name(db, target_member.name).when_some_and(
                     db,
                     self.constraints,
-                    |source_member| {
+                    &|source_member| {
                         match (source_member.kind, target_member.kind) {
                             // Method members are always immutable;
                             // they can never be subtypes of/assignable to mutable attribute members.

@@ -302,7 +302,7 @@ impl<'db> Type<'db> {
                 LiteralValueTypeKind::Bytes(bytes) => Truthiness::from(!bytes.value(db).is_empty()),
             },
 
-            Type::TypeAlias(alias) => visitor.visit(*self, || {
+            Type::TypeAlias(alias) => visitor.visit(*self, &mut || {
                 alias
                     .value_type(db)
                     .try_bool_impl(db, allow_short_circuit, visitor)

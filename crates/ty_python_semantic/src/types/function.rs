@@ -299,7 +299,7 @@ impl<'db> OverloadLiteral<'db> {
     pub(super) fn find_decorator_span(
         self,
         db: &'db dyn Db,
-        predicate: impl Fn(Type<'db>) -> bool,
+        predicate: &dyn Fn(Type<'db>) -> bool,
     ) -> Option<Span> {
         let definition = self.definition(db);
         let file = definition.file(db);
@@ -323,7 +323,7 @@ impl<'db> OverloadLiteral<'db> {
         db: &'db dyn Db,
         needle: KnownFunction,
     ) -> Option<Span> {
-        self.find_decorator_span(db, |ty| {
+        self.find_decorator_span(db, &|ty| {
             ty.as_function_literal()
                 .is_some_and(|f| f.is_known(db, needle))
         })
@@ -520,7 +520,7 @@ impl<'db> OverloadLiteral<'db> {
         );
 
         let generic_context = raw_signature.generic_context;
-        raw_signature.add_implicit_self_annotation(db, || {
+        raw_signature.add_implicit_self_annotation(db, &|| {
             if self.is_staticmethod(db) {
                 return None;
             }
@@ -827,7 +827,7 @@ impl<'db> FunctionLiteral<'db> {
             let file = definition.file(db);
             let module = parsed_module(db, file).load(db);
             let node = implementation.node(db, file, &module);
-            function_body_kind(db, node, |expr| {
+            function_body_kind(db, node, &|expr| {
                 definition_expression_type(db, definition, expr)
             })
         }
@@ -1602,7 +1602,7 @@ fn last_definition_signature_cycle_initial<'db>(
 pub(super) fn function_body_kind<'db>(
     db: &'db dyn Db,
     node: &ast::StmtFunctionDef,
-    infer_type: impl Fn(&ast::Expr) -> Type<'db>,
+    infer_type: &dyn Fn(&ast::Expr) -> Type<'db>,
 ) -> FunctionBodyKind {
     // Allow docstrings, but only as the first statement.
     let suite = if let Some(ast::Stmt::Expr(ast::StmtExpr { value, .. })) = node.body.first()

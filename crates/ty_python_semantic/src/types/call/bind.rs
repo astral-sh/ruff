@@ -353,7 +353,7 @@ impl<'db> Bindings<'db> {
 
     /// Returns `true` if every element of the union contains an intersection element with a matching
     /// overload that satisfies the provided closure, or `false` otherwise.
-    pub(crate) fn satisfies(&self, f: impl Fn(&Binding<'db>) -> bool) -> bool {
+    pub(crate) fn satisfies(&self, f: &dyn Fn(&Binding<'db>) -> bool) -> bool {
         self.elements.iter().all(|element| {
             element
                 .bindings
@@ -371,7 +371,7 @@ impl<'db> Bindings<'db> {
     pub(crate) fn map_types(
         &self,
         db: &'db dyn Db,
-        mut map: impl FnMut(&CallableBinding<'db>) -> Option<Type<'db>>,
+        map: &mut dyn FnMut(&CallableBinding<'db>) -> Option<Type<'db>>,
     ) -> Type<'db> {
         let mut element_types = Vec::with_capacity(self.elements.len());
         for element in &self.elements {
@@ -1415,7 +1415,7 @@ impl<'db> Bindings<'db> {
                             };
                             let Some(callables) = ty.try_upcast_to_callable(db).map(|callables| {
                                 if into_callable == KnownFunction::IntoRegularCallable {
-                                    callables.map(|callable| callable.into_regular(db))
+                                    callables.map(&|callable| callable.into_regular(db))
                                 } else {
                                     callables
                                 }
@@ -2054,7 +2054,7 @@ impl<'db> Bindings<'db> {
                                 // `__iter__ = None`, for example). That would be badly written Python code, but we still
                                 // need to be able to handle it without crashing.
                                 let return_type = if let Type::Union(union) = argument {
-                                    union.map(db, |element| {
+                                    union.map(db, &mut |element| {
                                         Type::tuple(TupleType::new(db, &element.iterate(db)))
                                     })
                                 } else {
@@ -4011,7 +4011,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         // The hook receives (typevar, lower_bound, upper_bound) and returns Some(ty) to
         // override the default solution, or None to keep it.
         let maybe_promote =
-            |typevar: BoundTypeVarInstance<'db>, lower: Type<'db>, _upper: Type<'db>| {
+            &mut |typevar: BoundTypeVarInstance<'db>, lower: Type<'db>, _upper: Type<'db>| {
                 let bound_or_constraints = typevar.typevar(self.db).bound_or_constraints(self.db);
 
                 // For constrained TypeVars, the inferred type is already one of the
@@ -4085,7 +4085,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 let specialization_result = builder.infer_map(
                     declared_type,
                     variadic_argument_type.unwrap_or(argument_type),
-                    |(identity, _, inferred_ty)| {
+                    &mut |(identity, _, inferred_ty)| {
                         // Avoid widening the inferred type if it is already assignable to the
                         // preferred declared type.
                         if let Some(preferred_ty) = preferred_type_mappings.get(&identity) {

@@ -46,7 +46,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.infer_definition(parameter);
         }
 
-        validate_paramspec_components(&self.context, &function.parameters, |expr| {
+        validate_paramspec_components(&self.context, &function.parameters, &|expr| {
             self.file_expression_type(expr)
         });
 
@@ -54,7 +54,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         if let Some(returns) = function.returns.as_deref() {
             let has_empty_body = self.return_types_and_ranges.is_empty()
-                && function_body_kind(db, function, |expr| self.expression_type(expr))
+                && function_body_kind(db, function, &|expr| self.expression_type(expr))
                     == FunctionBodyKind::Stub;
 
             let mut enclosing_class_context = None;
@@ -162,7 +162,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // We skip `is_assignable_to` checks for `NotImplemented`,
                     // so we remove it beforehand.
                     Type::Union(union) => Some(TypeAndRange {
-                        ty: union.filter(db, |ty| !ty.is_notimplemented(db)),
+                        ty: union.filter(db, &mut |ty| !ty.is_notimplemented(db)),
                         range: ty_range.range,
                     }),
                     ty if ty.is_notimplemented(db) => None,

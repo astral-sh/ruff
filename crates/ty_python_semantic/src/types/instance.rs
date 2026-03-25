@@ -504,7 +504,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 .inner
                 .interface(db)
                 .members(db)
-                .when_all(db, self.constraints, |member| {
+                .when_all(db, self.constraints, &|member| {
                     self.type_satisfies_protocol_member(db, ty, &member)
                 })
         };

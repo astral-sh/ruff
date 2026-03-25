@@ -443,7 +443,7 @@ impl<'db> SubclassOfInner<'db> {
             return self;
         };
 
-        let bound_typevar = bound_typevar.map_bound_or_constraints(db, |bound_or_constraints| {
+        let bound_typevar = bound_typevar.map_bound_or_constraints(db, &|bound_or_constraints| {
             Some(match bound_or_constraints {
                 None => TypeVarBoundOrConstraints::UpperBound(
                     SubclassOfType::try_from_instance(db, Type::object())
@@ -456,7 +456,7 @@ impl<'db> SubclassOfInner<'db> {
                     )
                 }
                 Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                    TypeVarBoundOrConstraints::Constraints(constraints.map(db, |constraint| {
+                    TypeVarBoundOrConstraints::Constraints(constraints.map(db, &mut |constraint| {
                         SubclassOfType::try_from_instance(db, *constraint)
                             .unwrap_or(SubclassOfType::subclass_of_unknown())
                     }))

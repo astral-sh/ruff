@@ -178,7 +178,7 @@ impl<'db> AllMembers<'db> {
                         }
                 }
 
-                let union = match union.filter(db, |&ty| !is_dynamic(db, ty)) {
+                let union = match union.filter(db, &mut |&ty| !is_dynamic(db, ty)) {
                     Type::Union(union) => union,
                     ty => return self.extend_with_type(db, ty),
                 };

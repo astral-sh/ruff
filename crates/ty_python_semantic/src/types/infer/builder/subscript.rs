@@ -410,7 +410,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ) -> Type<'db> {
         let db = self.db();
         let specialize = &|types: &[Option<Type<'db>>]| {
-            let type_alias = generic_type_alias.apply_specialization(db, |_| {
+            let type_alias = generic_type_alias.apply_specialization(db, &|_| {
                 generic_context.specialize_partial(db, types.iter().copied())
             });
 

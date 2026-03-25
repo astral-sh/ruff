@@ -2491,7 +2491,7 @@ fn completion_kind_from_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Comp
             | Type::AlwaysTruthy
             | Type::AlwaysFalsy => return None,
             Type::TypeAlias(alias) => {
-                visitor.visit(ty, || imp(db, alias.value_type(db), visitor))?
+                visitor.visit(ty, &mut || imp(db, alias.value_type(db), visitor))?
             }
         })
     }

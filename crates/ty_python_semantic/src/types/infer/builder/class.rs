@@ -37,7 +37,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             let previous_deferred_state =
                 std::mem::replace(&mut self.deferred_state, in_stub.into());
             let mut call_arguments =
-                CallArguments::from_arguments(arguments, |arg_or_keyword, splatted_value| {
+                CallArguments::from_arguments(arguments, &mut |arg_or_keyword, splatted_value| {
                     let ty = self.infer_expression(splatted_value, TypeContext::default());
                     if let ast::ArgOrKeyword::Arg(argument) = arg_or_keyword
                         && argument.is_starred_expr()
