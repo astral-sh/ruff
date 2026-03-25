@@ -129,6 +129,7 @@ mod named_tuple;
 mod paramspec_validation;
 mod subscript;
 mod type_expression;
+mod typed_dict;
 mod typevar;
 
 use super::comparisons::{self, BinaryComparisonVisitor};
@@ -2889,6 +2890,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             Some(definition),
                             namedtuple_kind,
                         )
+                    } else if callable_type == Type::SpecialForm(SpecialFormType::TypedDict) {
+                        self.infer_typeddict_call_expression(call_expr, Some(definition))
                     } else {
                         match callable_type
                             .as_class_literal()
@@ -3090,6 +3093,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 return;
             }
             _ => {}
+        }
+        if func_ty == Type::SpecialForm(SpecialFormType::TypedDict) {
+            self.infer_functional_typeddict_deferred(arguments);
+            return;
         }
         let mut constraint_tys = Vec::new();
         for arg in arguments.args.iter().skip(1) {
@@ -4136,17 +4143,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 TypeQualifiers::REQUIRED | TypeQualifiers::NOT_REQUIRED | TypeQualifiers::READ_ONLY,
             ) {
                 let in_typed_dict = current_scope.kind() == ScopeKind::Class
-                    && nearest_enclosing_class(self.db(), self.index, self.scope()).is_some_and(
-                        |class| {
-                            class.iter_mro(self.db(), None).any(|base| {
-                                matches!(
-                                    base,
-                                    ClassBase::TypedDict
-                                        | ClassBase::Dynamic(DynamicType::TodoFunctionalTypedDict)
-                                )
-                            })
-                        },
-                    );
+                    && nearest_enclosing_class(self.db(), self.index, self.scope())
+                        .is_some_and(|class| class.is_typed_dict(self.db()));
                 if !in_typed_dict {
                     for qualifier in [
                         TypeQualifiers::REQUIRED,
@@ -5964,13 +5962,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
-        // Avoid false positives for the functional `TypedDict` form, which is currently
-        // unsupported.
-        if let Some(Type::Dynamic(DynamicType::TodoFunctionalTypedDict)) = tcx.annotation {
-            return KnownClass::Dict
-                .to_specialized_instance(self.db(), &[Type::unknown(), Type::unknown()]);
-        }
-
         let items = items
             .iter()
             .map(|item| [item.key.as_ref(), Some(&item.value)])
@@ -7099,6 +7090,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Handle `typing.NamedTuple(typename, fields)` and `collections.namedtuple(typename, field_names)`.
         if let Some(namedtuple_kind) = NamedTupleKind::from_type(self.db(), callable_type) {
             return self.infer_namedtuple_call_expression(call_expression, None, namedtuple_kind);
+        }
+
+        if callable_type == Type::SpecialForm(SpecialFormType::TypedDict) {
+            return self.infer_typeddict_call_expression(call_expression, None);
         }
 
         // We don't call `Type::try_call`, because we want to perform type inference on the
