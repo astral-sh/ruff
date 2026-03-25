@@ -137,10 +137,13 @@ pub(crate) fn function_known_decorator_flags<'db>(
 /// A compact inference result for function decorators.
 ///
 /// Unlike [`DefinitionInference`], this stores only decorator expression types and
-/// diagnostics, plus precomputed known-decorator flags.
+/// diagnostics, plus the expression-side state that needs to be merged back into
+/// function-definition inference.
 #[derive(Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
 pub(crate) struct FunctionDecoratorInference<'db> {
     expression_types: FxHashMap<ExpressionNodeKey, Type<'db>>,
+    bindings: Box<[(Definition<'db>, Type<'db>)]>,
+    called_functions: Box<[FunctionType<'db>]>,
     known_decorators: FunctionDecorators,
     diagnostics: TypeCheckDiagnostics,
 }
@@ -155,6 +158,16 @@ impl<'db> FunctionDecoratorInference<'db> {
 
     pub(crate) fn expression_types(&self) -> &FxHashMap<ExpressionNodeKey, Type<'db>> {
         &self.expression_types
+    }
+
+    pub(crate) fn bindings(
+        &self,
+    ) -> impl ExactSizeIterator<Item = (Definition<'db>, Type<'db>)> + '_ {
+        self.bindings.iter().copied()
+    }
+
+    pub(crate) fn called_functions(&self) -> &[FunctionType<'db>] {
+        &self.called_functions
     }
 
     pub(crate) fn known_decorators(&self) -> FunctionDecorators {

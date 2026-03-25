@@ -9076,12 +9076,35 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let Self {
             context,
             expressions,
-            ..
+            bindings,
+            called_functions,
+            declarations: _,
+            deferred: _,
+            scope: _,
+            string_annotations: _,
+            return_types_and_ranges: _,
+            dataclass_field_specifiers: _,
+            undecorated_type: _,
+            typevar_binding_context: _,
+            inference_flags: _,
+            deferred_state: _,
+            multi_inference_state: _,
+            inner_expression_inference_state: _,
+            inferring_vararg_annotation: _,
+            index: _,
+            region: _,
+            cycle_recovery: _,
+            all_definitely_bound: _,
         } = self;
         let diagnostics = context.finish();
 
         FunctionDecoratorInference {
             expression_types: expressions,
+            bindings: bindings.into_boxed_slice(),
+            called_functions: called_functions
+                .into_iter()
+                .collect::<Vec<_>>()
+                .into_boxed_slice(),
             known_decorators,
             diagnostics,
         }

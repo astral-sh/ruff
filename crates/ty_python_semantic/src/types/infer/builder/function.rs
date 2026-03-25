@@ -228,6 +228,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .iter()
                 .map(|(expression, ty)| (*expression, *ty)),
         );
+        self.bindings
+            .extend(decorator_inference.bindings(), self.multi_inference_state);
+        self.called_functions
+            .extend(decorator_inference.called_functions().iter().copied());
 
         let mut decorator_types_and_nodes = Vec::with_capacity(decorator_list.len());
         let mut function_decorators = FunctionDecorators::empty();
