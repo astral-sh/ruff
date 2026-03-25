@@ -26,7 +26,7 @@ use crate::{
                 DeclaredAndInferredType, DeferredExpressionState, TypeAndRange,
                 validate_paramspec_components,
             },
-            nearest_enclosing_function,
+            function_known_decorators, nearest_enclosing_function,
         },
         infer_definition_types, infer_scope_types, todo_type,
     },
@@ -114,6 +114,43 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         declared_ty,
                     );
                 }
+
+                if let Some(expected_return_ty) = declared_ty.generator_return_type(db) {
+                    for invalid in
+                        self.return_types_and_ranges
+                            .iter()
+                            .copied()
+                            .filter(|actual_return_ty| {
+                                !actual_return_ty.ty.is_assignable_to(db, expected_return_ty)
+                            })
+                    {
+                        report_invalid_return_type(
+                            &self.context,
+                            invalid.range,
+                            returns.range(),
+                            expected_return_ty,
+                            invalid.ty,
+                        );
+                    }
+
+                    if self
+                        .index
+                        .use_def_map(scope_id)
+                        .can_implicitly_return_none(db)
+                        && !Type::none(db).is_assignable_to(db, expected_return_ty)
+                    {
+                        let no_return = self.return_types_and_ranges.is_empty();
+                        report_implicit_return_type(
+                            &self.context,
+                            returns.range(),
+                            expected_return_ty,
+                            false,
+                            None,
+                            no_return,
+                        );
+                    }
+                }
+
                 return;
             }
 
@@ -183,6 +220,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let db = self.db();
 
+        let decorator_inference = function_known_decorators(db, definition);
+        self.context.extend(decorator_inference.diagnostics());
+        self.expressions.extend(
+            decorator_inference
+                .expression_types()
+                .iter()
+                .map(|(expression, ty)| (*expression, *ty)),
+        );
+        self.bindings
+            .extend(decorator_inference.bindings(), self.multi_inference_state);
+        self.called_functions
+            .extend(decorator_inference.called_functions().iter().copied());
+
         let mut decorator_types_and_nodes = Vec::with_capacity(decorator_list.len());
         let mut function_decorators = FunctionDecorators::empty();
         let mut deprecated = None;
@@ -190,7 +240,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut final_decorator = None;
 
         for decorator in decorator_list {
-            let decorator_type = self.infer_decorator(decorator);
+            let decorator_type = decorator_inference
+                .expression_type(&decorator.expression)
+                .unwrap_or_else(Type::unknown);
             let decorator_function_decorator =
                 FunctionDecorators::from_decorator_type(db, decorator_type);
             function_decorators |= decorator_function_decorator;

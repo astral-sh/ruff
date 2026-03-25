@@ -33,6 +33,22 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/function/return_type.md
 18 | 
 19 | def j() -> str:  # error: [invalid-return-type]
 20 |     yield 42
+21 | 
+22 | def invalid_return_type() -> typing.Generator[None, None, None]:
+23 |     yield
+24 |     return ""  # error: [invalid-return-type]
+25 | def wrong_return() -> typing.Generator[int, int, int]:
+26 |     yield 1
+27 |     return ""  # error: [invalid-return-type]
+28 | def bare_return_ok() -> typing.Generator[int, int, None]:
+29 |     yield 1
+30 | 
+31 | def missing_return() -> typing.Generator[int, int, int]:  # error: [invalid-return-type]
+32 |     yield 1
+33 | def iterator_must_not_return() -> typing.Iterator[int]:
+34 |     yield 2
+35 |     # error: [invalid-return-type]
+36 |     return "foo"
 ```
 
 # Diagnostics
@@ -49,6 +65,75 @@ error[invalid-return-type]: Return type does not match returned value
    |
 info: Function is inferred as returning `types.GeneratorType` because it is a generator function
 info: See https://docs.python.org/3/glossary.html#term-generator for more details
+info: rule `invalid-return-type` is enabled by default
+
+```
+
+```
+error[invalid-return-type]: Return type does not match returned value
+  --> src/mdtest_snippet.py:22:30
+   |
+20 |     yield 42
+21 |
+22 | def invalid_return_type() -> typing.Generator[None, None, None]:
+   |                              ---------------------------------- Expected `None` because of return type
+23 |     yield
+24 |     return ""  # error: [invalid-return-type]
+   |            ^^ expected `None`, found `Literal[""]`
+25 | def wrong_return() -> typing.Generator[int, int, int]:
+26 |     yield 1
+   |
+info: rule `invalid-return-type` is enabled by default
+
+```
+
+```
+error[invalid-return-type]: Return type does not match returned value
+  --> src/mdtest_snippet.py:25:23
+   |
+23 |     yield
+24 |     return ""  # error: [invalid-return-type]
+25 | def wrong_return() -> typing.Generator[int, int, int]:
+   |                       ------------------------------- Expected `int` because of return type
+26 |     yield 1
+27 |     return ""  # error: [invalid-return-type]
+   |            ^^ expected `int`, found `Literal[""]`
+28 | def bare_return_ok() -> typing.Generator[int, int, None]:
+29 |     yield 1
+   |
+info: rule `invalid-return-type` is enabled by default
+
+```
+
+```
+error[invalid-return-type]: Function always implicitly returns `None`, which is not assignable to return type `int`
+  --> src/mdtest_snippet.py:31:25
+   |
+29 |     yield 1
+30 |
+31 | def missing_return() -> typing.Generator[int, int, int]:  # error: [invalid-return-type]
+   |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+32 |     yield 1
+33 | def iterator_must_not_return() -> typing.Iterator[int]:
+   |
+info: Consider changing the return annotation to `-> None` or adding a `return` statement
+info: rule `invalid-return-type` is enabled by default
+
+```
+
+```
+error[invalid-return-type]: Return type does not match returned value
+  --> src/mdtest_snippet.py:33:35
+   |
+31 | def missing_return() -> typing.Generator[int, int, int]:  # error: [invalid-return-type]
+32 |     yield 1
+33 | def iterator_must_not_return() -> typing.Iterator[int]:
+   |                                   -------------------- Expected `None` because of return type
+34 |     yield 2
+35 |     # error: [invalid-return-type]
+36 |     return "foo"
+   |            ^^^^^ expected `None`, found `Literal["foo"]`
+   |
 info: rule `invalid-return-type` is enabled by default
 
 ```

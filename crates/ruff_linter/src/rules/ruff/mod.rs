@@ -22,7 +22,8 @@ mod tests {
     use crate::rules::pydocstyle::settings::Settings as PydocstyleSettings;
     use crate::settings::LinterSettings;
     use crate::settings::types::{CompiledPerFileIgnoreList, PerFileIgnore, PreviewMode};
-    use crate::test::{test_path, test_resource_path, test_snippet};
+    use crate::source_kind::SourceKind;
+    use crate::test::{test_contents, test_path, test_resource_path, test_snippet};
     use crate::{assert_diagnostics, assert_diagnostics_diff, settings};
 
     #[test_case(Rule::CollectionLiteralConcatenation, Path::new("RUF005.py"))]
@@ -97,6 +98,7 @@ mod tests {
     #[test_case(Rule::MapIntVersionParsing, Path::new("RUF048.py"))]
     #[test_case(Rule::MapIntVersionParsing, Path::new("RUF048_1.py"))]
     #[test_case(Rule::DataclassEnum, Path::new("RUF049.py"))]
+    #[test_case(Rule::UnnecessaryIf, Path::new("RUF050.py"))]
     #[test_case(Rule::IfKeyInDictDel, Path::new("RUF051.py"))]
     #[test_case(Rule::UsedDummyVariable, Path::new("RUF052_0.py"))]
     #[test_case(Rule::UsedDummyVariable, Path::new("RUF052_1.py"))]
@@ -131,6 +133,111 @@ mod tests {
             &settings::LinterSettings::for_rule(rule_code),
         )?;
         assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    /// Test that RUF072 (useless-finally) and RUF047 (needless-else) converge
+    /// when both are enabled on the same `try` statement: RUF072 removes the
+    /// empty `finally` and RUF047 removes the empty `else` independently
+    #[test]
+    fn useless_finally_and_needless_else() -> Result<()> {
+        use ruff_python_ast::{PySourceType, SourceType};
+
+        let path = test_resource_path("fixtures").join("ruff/RUF072_RUF047.py");
+        let source_type = SourceType::Python(PySourceType::from(&path));
+        let source_kind = SourceKind::from_path(&path, source_type)?.expect("valid source");
+        let settings =
+            settings::LinterSettings::for_rules(vec![Rule::UselessFinally, Rule::NeedlessElse]);
+
+        let (diagnostics, transformed) = test_contents(&source_kind, &path, &settings);
+        assert_diagnostics!(diagnostics);
+
+        insta::assert_snapshot!(transformed.source_code());
+        Ok(())
+    }
+
+    /// Test that RUF072 (useless-finally) and SIM105 (suppressible-exception)
+    /// converge: RUF072 removes the empty `finally` first, unblocking SIM105
+    /// to rewrite `try/except: pass` into `contextlib.suppress()`
+    #[test]
+    fn useless_finally_and_suppressible_exception() -> Result<()> {
+        use ruff_python_ast::{PySourceType, SourceType};
+
+        let path = test_resource_path("fixtures").join("ruff/RUF072_SIM105.py");
+        let source_type = SourceType::Python(PySourceType::from(&path));
+        let source_kind = SourceKind::from_path(&path, source_type)?.expect("valid source");
+        let settings = settings::LinterSettings::for_rules(vec![
+            Rule::UselessFinally,
+            Rule::SuppressibleException,
+        ]);
+
+        let (diagnostics, transformed) = test_contents(&source_kind, &path, &settings);
+        assert_diagnostics!(diagnostics);
+
+        insta::assert_snapshot!(transformed.source_code());
+        Ok(())
+    }
+
+    /// Test that RUF072 + RUF047 + SIM105 converge when all three non-body
+    /// clauses (except, else, finally) are no-ops
+    #[test]
+    fn useless_finally_and_needless_else_and_suppressible_exception() -> Result<()> {
+        use ruff_python_ast::{PySourceType, SourceType};
+
+        let path = test_resource_path("fixtures").join("ruff/RUF072_RUF047_SIM105.py");
+        let source_type = SourceType::Python(PySourceType::from(&path));
+        let source_kind = SourceKind::from_path(&path, source_type)?.expect("valid source");
+        let settings = settings::LinterSettings::for_rules(vec![
+            Rule::UselessFinally,
+            Rule::NeedlessElse,
+            Rule::SuppressibleException,
+        ]);
+
+        let (diagnostics, transformed) = test_contents(&source_kind, &path, &settings);
+        assert_diagnostics!(diagnostics);
+
+        insta::assert_snapshot!(transformed.source_code());
+        Ok(())
+    }
+
+    /// Test that RUF047 (needless-else) and RUF050 (unnecessary-if) converge
+    /// when both are enabled: RUF047 removes the empty `else` first, then
+    /// RUF050 removes the remaining empty `if` on the next fix iteration.
+    #[test]
+    fn unnecessary_if_and_needless_else() -> Result<()> {
+        use ruff_python_ast::{PySourceType, SourceType};
+
+        let path = test_resource_path("fixtures").join("ruff/RUF050_RUF047.py");
+        let source_type = SourceType::Python(PySourceType::from(&path));
+        let source_kind = SourceKind::from_path(&path, source_type)?.expect("valid source");
+        let settings =
+            settings::LinterSettings::for_rules(vec![Rule::NeedlessElse, Rule::UnnecessaryIf]);
+
+        let (diagnostics, transformed) = test_contents(&source_kind, &path, &settings);
+        assert_diagnostics!(diagnostics);
+
+        insta::assert_snapshot!(transformed.source_code());
+        Ok(())
+    }
+
+    /// Reproduces issue #9472: F401 removes unused imports leaving empty `if`
+    /// blocks, then RUF050 removes those, then F401 cleans up the now-unused
+    /// guard imports. Verifies the full chain converges and produces the
+    /// expected output.
+    #[test]
+    fn unnecessary_if_and_unused_import() -> Result<()> {
+        use ruff_python_ast::{PySourceType, SourceType};
+
+        let path = test_resource_path("fixtures").join("ruff/RUF050_F401.py");
+        let source_type = SourceType::Python(PySourceType::from(&path));
+        let source_kind = SourceKind::from_path(&path, source_type)?.expect("valid source");
+        let settings =
+            settings::LinterSettings::for_rules(vec![Rule::UnusedImport, Rule::UnnecessaryIf]);
+
+        let (diagnostics, transformed) = test_contents(&source_kind, &path, &settings);
+        assert_diagnostics!(diagnostics);
+
+        insta::assert_snapshot!(transformed.source_code());
         Ok(())
     }
 
@@ -668,6 +775,8 @@ mod tests {
     #[test_case(Rule::FloatEqualityComparison, Path::new("RUF069.py"))]
     #[test_case(Rule::UnnecessaryAssignBeforeYield, Path::new("RUF070.py"))]
     #[test_case(Rule::OsPathCommonprefix, Path::new("RUF071.py"))]
+    #[test_case(Rule::UselessFinally, Path::new("RUF072.py"))]
+    #[test_case(Rule::FStringPercentFormat, Path::new("RUF073.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",

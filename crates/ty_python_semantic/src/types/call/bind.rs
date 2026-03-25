@@ -27,7 +27,7 @@ use crate::place::{DefinedPlace, Definedness, Place, known_module_symbol};
 use crate::subscript::PyIndex;
 use crate::types::call::arguments::{CallArgumentTypes, Expansion, is_expandable_type};
 use crate::types::callable::CallableTypeKind;
-use crate::types::constraints::{ConstraintSet, ConstraintSetBuilder};
+use crate::types::constraints::{ConstraintSet, ConstraintSetBuilder, PathBounds, Solutions};
 use crate::types::diagnostic::{
     CALL_NON_CALLABLE, CALL_TOP_CALLABLE, CONFLICTING_ARGUMENT_FORMS, INVALID_ARGUMENT_TYPE,
     INVALID_DATACLASS, MISSING_ARGUMENT, NO_MATCHING_OVERLOAD, PARAMETER_ALREADY_ASSIGNED,
@@ -56,7 +56,7 @@ use crate::types::{
     TypeVarBoundOrConstraints, TypeVarVariance, UnionBuilder, UnionType, WrapperDescriptorKind,
     enums, list_members,
 };
-use crate::{DisplaySettings, Program};
+use crate::{DisplaySettings, FxOrderSet, Program};
 use ruff_db::diagnostic::{Annotation, Diagnostic, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_python_ast::{self as ast, ArgOrKeyword, PythonVersion};
 use ty_module_resolver::KnownModule;
@@ -1127,6 +1127,7 @@ impl<'db> Bindings<'db> {
                         let init = get_argument_type("init", true);
                         let kw_only = get_argument_type("kw_only", true);
                         let alias = get_argument_type("alias", true);
+                        let converter = get_argument_type("converter", true);
 
                         // `dataclasses.field` and field-specifier functions of commonly used
                         // libraries like `pydantic`, `attrs`, and `SQLAlchemy` all return
@@ -1163,6 +1164,96 @@ impl<'db> Bindings<'db> {
                             .and_then(Type::as_string_literal)
                             .map(|literal| Box::from(literal.value(db)));
 
+                        // Extract the first positional parameter type and the return type from the
+                        // converter callable. The input type determines the "input type" for this
+                        // field in the `__init__` signature and when assigning to this field on
+                        // instances (`my_model.field = …`). The output type is used to validate
+                        // that the converter's return type is assignable to the field's declared type.
+                        let converter = converter.and_then(|converter_ty| {
+                            let mut input_types = UnionBuilder::new(db);
+                            let mut output_types = UnionBuilder::new(db);
+                            let mut found_any = false;
+                            // Note: `iter_flat` collapses the union/intersection structure.
+                            // In principle, if the converter is a union of callables, we should
+                            // only accept the intersection of all first parameter types for the
+                            // input type. This seems unlikely to be a real world use case, so
+                            // we currently don't have any special handling for this.
+                            for binding in converter_ty.bindings(db).iter_flat() {
+                                // The index of the "actual" first parameters depends on whether or not there
+                                // is a bound `self` parameter in the converter callable.
+                                let first_index = usize::from(binding.bound_type.is_some());
+                                // TODO: for generic converters, we currently use the default
+                                // specialization so as not to produce any false-positives on
+                                // the field declarations. Ideally, we would treat the type
+                                // variables as inferable and use the declared field type as
+                                // type context to solve them, but no other type checker seems
+                                // to support this at the moment, and `converter` is not a
+                                // widely used feature anyway.
+                                let class_default_specialization = binding
+                                    .constructor_instance_type
+                                    .and_then(|ty| ty.class_specialization(db))
+                                    .map(|specialization| {
+                                        specialization
+                                            .generic_context(db)
+                                            .default_specialization(db, None)
+                                    });
+                                // For class converters, calling the class produces an instance,
+                                // not the `__init__` return type (`None`). Use
+                                // `constructor_instance_type` when available.
+                                let return_ty_override =
+                                    binding.constructor_instance_type.map(|ty| {
+                                        if let Some(specialization) = class_default_specialization {
+                                            ty.apply_specialization(db, specialization)
+                                        } else {
+                                            ty
+                                        }
+                                    });
+                                for overload in binding {
+                                    let params = overload.signature.parameters();
+                                    let return_ty =
+                                        return_ty_override.unwrap_or(overload.signature.return_ty);
+
+                                    let default_specialization = class_default_specialization
+                                        .or_else(|| {
+                                            overload
+                                                .signature
+                                                .generic_context
+                                                .map(|ctx| ctx.default_specialization(db, None))
+                                        });
+
+                                    if let Some(first_param) = params.get_positional(first_index) {
+                                        let mut input_ty = first_param.annotated_type();
+                                        if let Some(specialization) = default_specialization {
+                                            input_ty =
+                                                input_ty.apply_specialization(db, specialization);
+                                        }
+                                        input_types = input_types.add(input_ty);
+                                        let mut output_ty = return_ty;
+                                        if let Some(specialization) = default_specialization {
+                                            output_ty =
+                                                output_ty.apply_specialization(db, specialization);
+                                        }
+                                        output_types = output_types.add(output_ty);
+                                        found_any = true;
+                                    } else if let Some((_, variadic)) = params.variadic() {
+                                        let mut input_ty = variadic.annotated_type();
+                                        if let Some(specialization) = default_specialization {
+                                            input_ty =
+                                                input_ty.apply_specialization(db, specialization);
+                                        }
+                                        input_types = input_types.add(input_ty);
+                                        output_types = output_types.add(return_ty);
+                                        found_any = true;
+                                    } else if params.is_gradual() {
+                                        input_types = input_types.add(Type::unknown());
+                                        output_types = output_types.add(return_ty);
+                                        found_any = true;
+                                    }
+                                }
+                            }
+                            found_any.then(|| (input_types.build(), output_types.build()))
+                        });
+
                         // `typeshed` pretends that `dataclasses.field()` returns the type of the
                         // default value directly. At runtime, however, this function returns an
                         // instance of `dataclasses.Field`. We also model it this way and return
@@ -1171,7 +1262,7 @@ impl<'db> Bindings<'db> {
                         // are assignable to `T` if the default type of the field is assignable
                         // to `T`. Otherwise, we would error on `name: str = field(default="")`.
                         overload.set_return_type(Type::KnownInstance(KnownInstanceType::Field(
-                            FieldInstance::new(db, default_ty, init, kw_only, alias),
+                            FieldInstance::new(db, default_ty, init, kw_only, alias, converter),
                         )));
                     }
 
@@ -1697,8 +1788,16 @@ impl<'db> Bindings<'db> {
                                 let mut flags = dataclass_params.flags(db);
 
                                 for (param, flag) in DATACLASS_FLAGS {
-                                    if let Ok(Some(ty)) =
-                                        overload.parameter_type_by_name(param, false)
+                                    if let Some(ty) =
+                                        call_arguments.iter().find_map(|(arg, arg_types)| {
+                                            if let Argument::Keyword(arg_name) = arg
+                                                && *arg_name == **param
+                                            {
+                                                arg_types.get_default()
+                                            } else {
+                                                None
+                                            }
+                                        })
                                         && let Some(LiteralValueTypeKind::Bool(value)) =
                                             ty.as_literal_value_kind()
                                     {
@@ -1882,21 +1981,22 @@ impl<'db> Bindings<'db> {
                         let extract_inferable = |instance: &NominalInstanceType<'db>| {
                             if instance.has_known_class(db, KnownClass::NoneType) {
                                 // Caller explicitly passed None, so no typevars are inferable.
-                                return Some(FxHashSet::default());
+                                return Some(InferableTypeVars::None);
                             }
-                            instance
+                            let typevars: Option<FxOrderSet<_>> = instance
                                 .tuple_spec(db)?
                                 .fixed_elements()
                                 .map(|ty| {
                                     ty.as_typevar()
                                         .map(|bound_typevar| bound_typevar.identity(db))
                                 })
-                                .collect()
+                                .collect();
+                            typevars.map(|typevars| InferableTypeVars::from_typevars(db, typevars))
                         };
 
                         let inferable = match overload.parameter_types() {
                             // Caller did not provide argument, so no typevars are inferable.
-                            [None] => FxHashSet::default(),
+                            [None] => InferableTypeVars::None,
                             [Some(Type::NominalInstance(instance))] => {
                                 match extract_inferable(instance) {
                                     Some(inferable) => inferable,
@@ -1908,11 +2008,7 @@ impl<'db> Bindings<'db> {
 
                         let constraints = ConstraintSetBuilder::new();
                         let set = constraints.load(db, tracked.constraints(db));
-                        let result = set.satisfied_by_all_typevars(
-                            db,
-                            &constraints,
-                            InferableTypeVars::One(&inferable),
-                        );
+                        let result = set.satisfied_by_all_typevars(db, &constraints, inferable);
                         overload.set_return_type(Type::bool_literal(result));
                     }
 
@@ -3623,7 +3719,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         // For ParamSpec parameters, both *args and **kwargs are required since we don't know
         // what arguments the underlying callable expects. For all other callables, variadic
         // and keyword_variadic parameters are optional.
-        let paramspec_parameters = self.parameters.as_paramspec().is_some();
+        let paramspec = self.parameters.as_paramspec();
 
         let mut missing = vec![];
         for (
@@ -3639,7 +3735,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
                     continue;
                 }
                 let param = &self.parameters[index];
-                if !paramspec_parameters && (param.is_variadic() || param.is_keyword_variadic())
+                if paramspec.is_none() && (param.is_variadic() || param.is_keyword_variadic())
                     || param.default_type().is_some()
                 {
                     // variadic/keywords and defaulted arguments are not required
@@ -3652,7 +3748,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         if !missing.is_empty() {
             self.errors.push(BindingError::MissingArguments {
                 parameters: ParameterContexts(missing),
-                paramspec: self.parameters.as_paramspec(),
+                paramspec,
             });
         }
 
@@ -3672,7 +3768,7 @@ struct ArgumentTypeChecker<'a, 'db> {
     return_ty: Type<'db>,
     errors: &'a mut Vec<BindingError<'db>>,
 
-    inferable_typevars: InferableTypeVars<'db, 'db>,
+    inferable_typevars: InferableTypeVars<'db>,
     specialization: Option<Specialization<'db>>,
 
     /// Argument indices for which specialization inference has already produced a sufficiently
@@ -3754,7 +3850,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             .zip(self.call_expression_tcx.annotation);
 
         self.inferable_typevars = generic_context.inferable_typevars(self.db);
-        let mut builder = SpecializationBuilder::new(self.db, self.inferable_typevars);
+        let mut builder = SpecializationBuilder::new(self.db, constraints, self.inferable_typevars);
 
         // Type variables for which we inferred a declared type based on a partially specialized
         // type from an outer generic context. For these type variables, we may infer types that
@@ -3763,54 +3859,129 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         let mut partially_specialized_declared_type: FxHashSet<BoundTypeVarIdentity<'_>> =
             FxHashSet::default();
 
-        // Attempt to to solve the specialization while preferring the declared type of non-covariant
+        // Attempt to solve the specialization while preferring the declared type of non-covariant
         // type parameters from generic classes.
+        //
+        // We use an assignability check (`return_ty ≤ tcx`) to infer what each typevar in the
+        // function's return type maps to in the type context. (We use _constraint set_
+        // assignability so that we get a constraint set describing the typevars.) For example, if
+        // the return type is `list[T]` and the type context is `list[int]`, the check produces
+        // `T = int`, from which we extract the preferred type `int`.
+        //
+        // TODO: This two-phase approach (extract preferred types from the type context, then check
+        // argument compatibility) should eventually be replaced by conjoining the type context
+        // constraint set directly with the argument constraint sets in the builder. The current
+        // solution-level filtering (variance, inferable typevars, concrete content) works around
+        // extracting solutions too early. When the builder maintains a single constraint set, the
+        // combined set `(return_ty ≤ tcx) ∧ (∧ᵢ actual_i ≤ formal_i)` will naturally resolve the
+        // tension between type context preferences and argument constraints. If the combined set
+        // is unsatisfiable, we will fall back to argument constraints alone (which the current
+        // code does via `assignable_to_declared_type`).
         let preferred_type_mappings = return_with_tcx
             .and_then(|(return_ty, tcx)| {
                 tcx.filter_union(self.db, |ty| ty.class_specialization(self.db).is_some())
                     .class_specialization(self.db)?;
 
-                builder
-                    .infer_reverse_map(
-                        constraints,
-                        tcx,
-                        return_ty,
-                        |(identity, variance, inferred_ty)| {
-                            // Avoid unnecessarily widening the return type based on a covariant
-                            // type parameter from the type context, as it can lead to argument
-                            // assignability errors if the type variable is constrained by a narrower
-                            // parameter type.
-                            if variance.is_covariant() {
-                                return None;
+                let return_ty =
+                    return_ty.filter_disjoint_elements(self.db, tcx, self.inferable_typevars);
+                let tcx = tcx.filter_disjoint_elements(self.db, return_ty, self.inferable_typevars);
+                let set = return_ty.when_constraint_set_assignable_to(self.db, tcx, constraints);
+
+                // Use `solutions_with` to determine per-typevar variance from the raw
+                // lower/upper bounds on each BDD path.
+                let mut variance_map: FxHashMap<BoundTypeVarIdentity<'_>, TypeVarVariance> =
+                    FxHashMap::default();
+                let solutions = set.solutions_with_inferable(
+                    self.db,
+                    constraints,
+                    self.inferable_typevars,
+                    |typevar, variance, lower, upper| {
+                        if !typevar.is_inferable(self.db, self.inferable_typevars) {
+                            return Ok(None);
+                        }
+
+                        let identity = typevar.identity(self.db);
+                        variance_map
+                            .entry(identity)
+                            .and_modify(|current| *current = current.join(variance))
+                            .or_insert(variance);
+                        PathBounds::default_solve(self.db, typevar, lower, upper)
+                    },
+                );
+
+                let Solutions::Constrained(solutions) = solutions else {
+                    return None;
+                };
+
+                let mut preferred: FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>> =
+                    FxHashMap::default();
+
+                for solution in &solutions {
+                    for binding in solution {
+                        let identity = binding.bound_typevar.identity(self.db);
+
+                        // Avoid unnecessarily widening the return type based on a covariant
+                        // type parameter from the type context, as it can lead to argument
+                        // assignability errors if the type variable is constrained by a narrower
+                        // parameter type.
+                        if variance_map
+                            .get(&identity)
+                            .is_some_and(|v| v.is_covariant())
+                        {
+                            continue;
+                        }
+
+                        // Filter out inferable typevars (cross-typevar references from
+                        // SequentMap transitivity) and unspecialized typevars (from partially
+                        // specialized contexts).
+                        let inferred_ty = binding.solution.filter_union(self.db, |ty| {
+                            if ty.has_unspecialized_type_var(self.db) {
+                                partially_specialized_declared_type.insert(identity);
+                                return false;
                             }
+                            true
+                        });
+                        if inferred_ty.has_unspecialized_type_var(self.db) {
+                            continue;
+                        }
 
-                            // Avoid inferring a preferred type based on partially specialized type context
-                            // from an outer generic call. If the type context is a union, we try to keep
-                            // any concrete elements.
-                            let inferred_ty = inferred_ty.filter_union(self.db, |ty| {
-                                if ty.has_unspecialized_type_var(self.db) {
-                                    partially_specialized_declared_type.insert(identity);
-                                    false
-                                } else {
-                                    true
-                                }
-                            });
-                            if inferred_ty.has_unspecialized_type_var(self.db) {
-                                return None;
-                            }
+                        // Skip preferred types where every non-TypeVar union element still
+                        // deeply contains non-inferable typevars. Such types (e.g.,
+                        // `T@h | list[T@h]` from an outer generic scope) don't provide
+                        // useful concrete information and would cause over-expansion.
+                        let concrete_content =
+                            inferred_ty.filter_union(self.db, |ty| !ty.has_typevar(self.db));
+                        if concrete_content.is_never() && inferred_ty.has_typevar(self.db) {
+                            continue;
+                        }
 
-                            Some(inferred_ty)
-                        },
-                    )
-                    .ok()?;
+                        preferred
+                            .entry(identity)
+                            .and_modify(|existing| {
+                                *existing =
+                                    UnionType::from_two_elements(self.db, *existing, inferred_ty);
+                            })
+                            .or_insert(inferred_ty);
+                    }
+                }
 
-                Some(builder.type_mappings().clone())
+                // Add preferred types to the builder so they serve as the base mapping
+                // when argument inference adds more types.
+                for solution in &solutions {
+                    for binding in solution {
+                        let identity = binding.bound_typevar.identity(self.db);
+                        if let Some(&ty) = preferred.get(&identity) {
+                            builder.insert_type_mapping(binding.bound_typevar, ty);
+                        }
+                    }
+                }
+
+                Some(preferred)
             })
             .unwrap_or_default();
 
         let mut specialization_errors = Vec::new();
         let assignable_to_declared_type = self.infer_argument_constraints(
-            constraints,
             &mut builder,
             &preferred_type_mappings,
             &partially_specialized_declared_type,
@@ -3823,11 +3994,10 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         // Note that this will still lead to an invalid specialization, but may
         // produce more precise diagnostics.
         if !assignable_to_declared_type {
-            builder = SpecializationBuilder::new(self.db, self.inferable_typevars);
+            builder = SpecializationBuilder::new(self.db, constraints, self.inferable_typevars);
             specialization_errors.clear();
 
             self.infer_argument_constraints(
-                constraints,
                 &mut builder,
                 &FxHashMap::default(),
                 &FxHashSet::default(),
@@ -3838,64 +4008,64 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         self.errors.extend(specialization_errors);
 
         // Attempt to promote any promotable types assigned to the specialization.
-        let maybe_promote = |typevar: BoundTypeVarInstance<'db>, ty: Type<'db>| {
-            let bound_or_constraints = typevar.typevar(self.db).bound_or_constraints(self.db);
+        // The hook receives (typevar, lower_bound, upper_bound) and returns Some(ty) to
+        // override the default solution, or None to keep it.
+        let maybe_promote =
+            |typevar: BoundTypeVarInstance<'db>, lower: Type<'db>, _upper: Type<'db>| {
+                let bound_or_constraints = typevar.typevar(self.db).bound_or_constraints(self.db);
 
-            // For constrained TypeVars, the inferred type is already one of the
-            // constraints. Promoting literals would produce a type that doesn't
-            // match any constraint.
-            if matches!(
-                bound_or_constraints,
-                Some(TypeVarBoundOrConstraints::Constraints(_))
-            ) {
-                return ty;
-            }
-
-            let return_ty = self.constructor_instance_type.unwrap_or(self.return_ty);
-            let mut variance_in_return = TypeVarVariance::Bivariant;
-
-            // Find all occurrences of the type variable in the return type.
-            let visit_return_ty = |_, ty, variance, _| {
-                if ty != Type::TypeVar(typevar) {
-                    return;
+                // For constrained TypeVars, the inferred type is already one of the
+                // constraints. Promoting literals would produce a type that doesn't
+                // match any constraint.
+                if matches!(
+                    bound_or_constraints,
+                    Some(TypeVarBoundOrConstraints::Constraints(_))
+                ) {
+                    return None;
                 }
 
-                variance_in_return = variance_in_return.join(variance);
+                let return_ty = self.constructor_instance_type.unwrap_or(self.return_ty);
+                let mut variance_in_return = TypeVarVariance::Bivariant;
+
+                // Find all occurrences of the type variable in the return type.
+                let visit_return_ty = |_, ty, variance, _| {
+                    if ty != Type::TypeVar(typevar) {
+                        return;
+                    }
+
+                    variance_in_return = variance_in_return.join(variance);
+                };
+
+                return_ty.visit_specialization(self.db, self.call_expression_tcx, visit_return_ty);
+
+                // Promotion is only useful if the type variable is in invariant or contravariant
+                // position in the return type.
+                if variance_in_return.is_covariant() {
+                    return None;
+                }
+
+                let promoted = lower.promote(self.db);
+
+                // If the TypeVar has an upper bound, only use the promoted type if it
+                // still satisfies the bound.
+                if let Some(TypeVarBoundOrConstraints::UpperBound(bound)) = bound_or_constraints {
+                    if !promoted.is_assignable_to(self.db, bound) {
+                        return None;
+                    }
+                }
+
+                Some(promoted)
             };
 
-            return_ty.visit_specialization(self.db, self.call_expression_tcx, visit_return_ty);
-
-            // Promotion is only useful if the type variable is in invariant or contravariant
-            // position in the return type.
-            if variance_in_return.is_covariant() {
-                return ty;
-            }
-
-            let promoted = ty.promote(self.db);
-
-            // If the TypeVar has an upper bound, only use the promoted type if it
-            // still satisfies the bound.
-            if let Some(TypeVarBoundOrConstraints::UpperBound(bound)) = bound_or_constraints {
-                if !promoted.is_assignable_to(self.db, bound) {
-                    return ty;
-                }
-            }
-
-            promoted
-        };
-
-        let specialization = builder
-            .mapped(generic_context, maybe_promote)
-            .build(generic_context);
+        let specialization = builder.build_with(generic_context, maybe_promote);
 
         self.return_ty = self.return_ty.apply_specialization(self.db, specialization);
         self.specialization = Some(specialization);
     }
 
-    fn infer_argument_constraints(
+    fn infer_argument_constraints<'c>(
         &mut self,
-        constraints: &ConstraintSetBuilder<'db>,
-        builder: &mut SpecializationBuilder<'db>,
+        builder: &mut SpecializationBuilder<'db, 'c>,
         preferred_type_mappings: &FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>>,
         partially_specialized_declared_type: &FxHashSet<BoundTypeVarIdentity<'_>>,
         specialization_errors: &mut Vec<BindingError<'db>>,
@@ -3913,7 +4083,6 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 let argument_type = argument_types.get_for_declared_type(declared_type);
 
                 let specialization_result = builder.infer_map(
-                    constraints,
                     declared_type,
                     variadic_argument_type.unwrap_or(argument_type),
                     |(identity, _, inferred_ty)| {
@@ -4004,10 +4173,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
     }
 
     fn check_argument_types(&mut self, constraints: &ConstraintSetBuilder<'db>) {
-        let paramspec = self
-            .signature
-            .parameters()
-            .find_paramspec_from_args_kwargs(self.db);
+        let paramspec = self.signature.parameters().as_paramspec_with_prefix();
 
         for (argument_index, adjusted_argument_index, argument, argument_types) in
             self.enumerate_argument_types()
@@ -4357,7 +4523,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
     fn finish(
         self,
     ) -> (
-        InferableTypeVars<'db, 'db>,
+        InferableTypeVars<'db>,
         Option<Specialization<'db>>,
         Type<'db>,
     ) {
@@ -4430,7 +4596,7 @@ pub(crate) struct Binding<'db> {
     return_ty: Type<'db>,
 
     /// The inferable typevars in this signature.
-    inferable_typevars: InferableTypeVars<'db, 'db>,
+    inferable_typevars: InferableTypeVars<'db>,
 
     /// The specialization that was inferred from the argument types, if the callable is generic.
     specialization: Option<Specialization<'db>>,
@@ -4707,7 +4873,7 @@ impl<'db> Binding<'db> {
 #[derive(Clone, Debug)]
 struct BindingSnapshot<'db> {
     return_ty: Type<'db>,
-    inferable_typevars: InferableTypeVars<'db, 'db>,
+    inferable_typevars: InferableTypeVars<'db>,
     specialization: Option<Specialization<'db>>,
     argument_matches: Box<[MatchedArgument<'db>]>,
     parameter_tys: Box<[Option<Type<'db>>]>,

@@ -4,7 +4,6 @@ use ruff_diagnostics::{Edit, Fix};
 use rustc_hash::FxHashMap;
 
 use std::borrow::Cow;
-use std::cell::RefCell;
 use std::time::Duration;
 
 use bitflags::bitflags;
@@ -51,7 +50,7 @@ use crate::types::bound_super::BoundSuperType;
 use crate::types::call::{Binding, Bindings, CallArguments, CallableBinding};
 pub(crate) use crate::types::callable::{CallableType, CallableTypes};
 pub(crate) use crate::types::class_base::ClassBase;
-use crate::types::constraints::ConstraintSetBuilder;
+use crate::types::constraints::{ConstraintSetBuilder, Solutions};
 use crate::types::context::{LintDiagnosticGuard, LintDiagnosticGuardBuilder};
 use crate::types::diagnostic::{INVALID_AWAIT, INVALID_TYPE_FORM};
 pub use crate::types::display::{DisplaySettings, TypeDetail, TypeDisplayDetails};
@@ -60,10 +59,10 @@ use crate::types::function::{
     DataclassTransformerFlags, DataclassTransformerParams, FunctionDecorators, FunctionSpans,
     FunctionType, KnownFunction,
 };
+pub(crate) use crate::types::generics::GenericContext;
 use crate::types::generics::{
     ApplySpecialization, InferableTypeVars, Specialization, bind_typevar,
 };
-pub(crate) use crate::types::generics::{GenericContext, SpecializationBuilder};
 use crate::types::infer::InferenceFlags;
 use crate::types::known_instance::{InternedConstraintSet, InternedType, UnionTypeInstance};
 pub use crate::types::method::{BoundMethodType, KnownBoundMethodType, WrapperDescriptorKind};
@@ -1646,7 +1645,7 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         target: Type<'db>,
-        inferable: InferableTypeVars<'_, 'db>,
+        inferable: InferableTypeVars<'db>,
     ) -> Type<'db> {
         let constraints = ConstraintSetBuilder::new();
         self.filter_union(db, |elem| {
@@ -1902,17 +1901,38 @@ impl<'db> Type<'db> {
         let generic_context = specialization.generic_context(db);
 
         // Collect the type mappings used to narrow the type context.
-        let tcx_mappings = {
-            let mut builder =
-                SpecializationBuilder::new(db, generic_context.inferable_typevars(db));
-
-            if let Some(tcx) = tcx.annotation {
+        //
+        // We use a forward CSA check (`alias_instance ≤ tcx`) to infer what each typevar
+        // in the identity specialization maps to in the type context. For example, if
+        // `tcx = list[int]` and `alias_instance = list[T]`, the CSA produces `T = int`.
+        let tcx_mappings: FxHashMap<_, _> = tcx
+            .annotation
+            .and_then(|tcx| {
                 let alias_instance = Type::instance(db, class_literal.identity_specialization(db));
-                let _ = builder.infer_reverse(constraints, tcx, alias_instance);
-            }
-
-            builder.into_type_mappings()
-        };
+                let set = alias_instance.when_constraint_set_assignable_to(db, tcx, constraints);
+                match set.solutions(db, constraints) {
+                    Solutions::Constrained(solutions) => {
+                        let mut mappings = FxHashMap::default();
+                        for solution in solutions.iter() {
+                            for binding in solution {
+                                mappings
+                                    .entry(binding.bound_typevar.identity(db))
+                                    .and_modify(|existing| {
+                                        *existing = UnionType::from_two_elements(
+                                            db,
+                                            *existing,
+                                            binding.solution,
+                                        );
+                                    })
+                                    .or_insert(binding.solution);
+                            }
+                        }
+                        Some(mappings)
+                    }
+                    _ => None,
+                }
+            })
+            .unwrap_or_default();
 
         for (type_var, ty) in generic_context.variables(db).zip(specialization.types(db)) {
             let variance = type_var.variance_with_polarity(db, polarity);
@@ -4803,7 +4823,7 @@ impl<'db> Type<'db> {
                 Some(GeneratorTypes {
                     yield_ty: Some(*yield_ty),
                     send_ty: Some(Type::none(db)),
-                    return_ty: Some(Type::unknown()),
+                    return_ty: Some(Type::none(db)),
                 })
             } else {
                 None
@@ -5501,12 +5521,6 @@ impl<'db> Type<'db> {
                     match type_mapping {
                         TypeMapping::EagerExpansion => unreachable!("handled above"),
 
-                        // For UniqueSpecialization, get raw value type, apply specialization, then apply mapping.
-                        TypeMapping::UniqueSpecialization { .. } => {
-                            let value_type = alias.raw_value_type(db);
-                            alias.apply_function_specialization(db, value_type).apply_type_mapping_impl(db, type_mapping, tcx, visitor)
-                        }
-
                         _ => {
                             let value_type = alias.raw_value_type(db).apply_type_mapping_impl(db, type_mapping, tcx, visitor);
                             alias.apply_function_specialization(db, value_type).apply_type_mapping_impl(db, type_mapping, tcx, visitor)
@@ -5531,7 +5545,6 @@ impl<'db> Type<'db> {
             Type::LiteralValue(_) => match type_mapping {
                 TypeMapping::ApplySpecialization(_) |
                 TypeMapping::ApplySpecializationWithMaterialization { .. } |
-                TypeMapping::UniqueSpecialization { .. } |
                 TypeMapping::BindLegacyTypevars(_) |
                 TypeMapping::BindSelf { .. } |
                 TypeMapping::ReplaceSelf { .. } |
@@ -5547,7 +5560,6 @@ impl<'db> Type<'db> {
             Type::Dynamic(_) => match type_mapping {
                 TypeMapping::ApplySpecialization(_) |
                 TypeMapping::ApplySpecializationWithMaterialization { .. } |
-                TypeMapping::UniqueSpecialization { .. } |
                 TypeMapping::BindLegacyTypevars(_) |
                 TypeMapping::BindSelf(..) |
                 TypeMapping::ReplaceSelf { .. } |
@@ -6328,11 +6340,6 @@ pub enum TypeMapping<'a, 'db> {
         specialization: ApplySpecialization<'a, 'db>,
         materialization_kind: MaterializationKind,
     },
-    /// Resets any specializations to contain unique synthetic type variables.
-    UniqueSpecialization {
-        // A list of synthetic type variables, and the types they replaced.
-        specialization: RefCell<Vec<(BoundTypeVarInstance<'db>, Type<'db>)>>,
-    },
     /// Replaces any literal types with their corresponding promoted type form (e.g. `Literal["string"]`
     /// to `str`, or `def _() -> int` to `Callable[[], int]`).
     Promote(PromotionMode, PromotionKind),
@@ -6384,8 +6391,7 @@ impl<'db> TypeMapping<'_, 'db> {
                     }),
                 )
             }
-            TypeMapping::UniqueSpecialization { .. }
-            | TypeMapping::Promote(..)
+            TypeMapping::Promote(..)
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::Materialize(_)
             | TypeMapping::ReplaceParameterDefaults
@@ -6430,7 +6436,6 @@ impl<'db> TypeMapping<'_, 'db> {
             },
             TypeMapping::Promote(mode, kind) => TypeMapping::Promote(mode.flip(), *kind),
             TypeMapping::ApplySpecialization(_)
-            | TypeMapping::UniqueSpecialization { .. }
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::BindSelf(..)
             | TypeMapping::ReplaceSelf { .. }
@@ -6658,24 +6663,17 @@ pub struct InvalidTypeExpressionError<'db> {
 }
 
 impl<'db> InvalidTypeExpressionError<'db> {
-    fn into_fallback_type(
-        self,
-        context: &InferContext,
-        node: &impl Ranged,
-        is_reachable: bool,
-    ) -> Type<'db> {
+    fn into_fallback_type(self, context: &InferContext, node: &impl Ranged) -> Type<'db> {
         let InvalidTypeExpressionError {
             fallback_type,
             invalid_expressions,
         } = self;
-        if is_reachable {
-            for error in invalid_expressions {
-                let Some(builder) = context.report_lint(&INVALID_TYPE_FORM, node) else {
-                    continue;
-                };
-                let diagnostic = builder.into_diagnostic(error.reason(context.db()));
-                error.add_subdiagnostics(context.db(), diagnostic, node);
-            }
+        for error in invalid_expressions {
+            let Some(builder) = context.report_lint(&INVALID_TYPE_FORM, node) else {
+                continue;
+            };
+            let diagnostic = builder.into_diagnostic(error.reason(context.db()));
+            error.add_subdiagnostics(context.db(), diagnostic, node);
         }
         fallback_type
     }
@@ -6711,12 +6709,19 @@ enum InvalidTypeExpression<'db> {
     /// Same for `typing.TypeAlias`, anywhere except for as the sole annotation on an annotated
     /// assignment
     TypeAlias,
+    /// Same for `typing.Concatenate`, anywhere except for as the first parameter of a `Callable`
+    /// type expression
+    Concatenate,
     /// Type qualifiers are always invalid in *type expressions*,
     /// but these ones are okay with 0 arguments in *annotation expressions*
     TypeQualifier(TypeQualifier),
     /// Type qualifiers that are invalid in type expressions,
     /// and which would require exactly one argument even if they appeared in an annotation expression
     TypeQualifierRequiresOneArgument(TypeQualifier),
+    /// `typing.Self` cannot be used in `@staticmethod` definitions.
+    TypingSelfInStaticMethod,
+    /// `typing.Self` cannot be used in metaclass definitions.
+    TypingSelfInMetaclass,
     /// Some types are always invalid in type expressions
     InvalidType(Type<'db>, ScopeId<'db>),
     InvalidBareParamSpec(TypeVarInstance<'db>),
@@ -6786,6 +6791,12 @@ impl<'db> InvalidTypeExpression<'db> {
                         "Type qualifier `{qualifier}` is not allowed in type expressions \
                         (only in annotation expressions, and only with exactly one argument)",
                     ),
+                    InvalidTypeExpression::TypingSelfInStaticMethod => {
+                        f.write_str("`Self` cannot be used in a static method")
+                    }
+                    InvalidTypeExpression::TypingSelfInMetaclass => {
+                        f.write_str("`Self` cannot be used in a metaclass")
+                    }
                     InvalidTypeExpression::InvalidType(Type::FunctionLiteral(function), _) => {
                         write!(
                             f,
@@ -6807,6 +6818,9 @@ impl<'db> InvalidTypeExpression<'db> {
                         f,
                         "Bare ParamSpec `{}` is not valid in this context in a type expression",
                         paramspec.name(self.db)
+                    ),
+                    InvalidTypeExpression::Concatenate => f.write_str(
+                        "`typing.Concatenate` is not allowed in this context in a type expression",
                     ),
                 }
             }
@@ -6880,6 +6894,10 @@ impl<'db> InvalidTypeExpression<'db> {
             diagnostic.info(" - as the default type for another ParamSpec");
             diagnostic.info(" - as part of a type parameter list when defining a generic class");
             diagnostic.info(" - or as part of an argument list when specializing a generic class");
+        } else if matches!(self, InvalidTypeExpression::Concatenate) {
+            diagnostic.info("`typing.Concatenate` is only valid:");
+            diagnostic.info(" - as the first argument to `typing.Callable`");
+            diagnostic.info(" - as a type argument for a `ParamSpec` parameter");
         }
     }
 }

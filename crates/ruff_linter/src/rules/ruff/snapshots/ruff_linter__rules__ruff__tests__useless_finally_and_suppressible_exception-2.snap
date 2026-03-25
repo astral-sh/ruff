@@ -1,0 +1,10 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+expression: transformed.source_code()
+---
+# SIM105 cannot fire while `finally` is non-empty
+# RUF072 removes the empty `finally` first, then SIM105 rewrites
+# the `try/except: pass` to `contextlib.suppress()` on the next pass
+import contextlib
+with contextlib.suppress(Exception):
+    foo()
