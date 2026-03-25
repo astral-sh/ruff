@@ -46,6 +46,12 @@ use crate::{AlwaysFixableViolation, Edit, Fix, fix};
 /// replaces the `if` statement with just the condition as an expression
 /// statement, preserving the side effects.
 ///
+/// Note: conditions consisting solely of a name expression (like
+/// `if x: pass`) are treated as side-effect-free, even though `if x`
+/// implicitly calls `x.__bool__()` (or `x.__len__()`), which could have
+/// side effects if overridden. In practice this is very rare, but if you
+/// rely on this behavior, suppress the diagnostic with `# noqa: RUF050`.
+///
 /// ## Related rules
 /// - [`needless-else (RUF047)`]: Detects empty `else` clauses. For `if`/`else`
 ///   statements where all branches are empty, `RUF047` first removes the empty
