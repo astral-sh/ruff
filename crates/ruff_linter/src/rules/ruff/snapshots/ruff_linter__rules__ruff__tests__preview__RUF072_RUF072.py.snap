@@ -18,7 +18,7 @@ help: Remove the `finally` clause
 7  |     bar()
    - finally:
    -     pass
-8  |
+8  | 
 9  | # try/except/finally with ellipsis
 10 | try:
 
@@ -39,7 +39,7 @@ help: Remove the `finally` clause
 15 |     bar()
    - finally:
    -     ...
-16 |
+16 | 
 17 | # try/except/else/finally with pass
 18 | try:
 
@@ -60,7 +60,7 @@ help: Remove the `finally` clause
 25 |     baz()
    - finally:
    -     pass
-26 |
+26 | 
 27 | # bare try/finally with pass
 28 | try:
 
@@ -77,14 +77,14 @@ RUF072 [*] Empty `finally` clause
    |
 help: Remove the `finally` clause
 27 |     pass
-28 |
+28 | 
 29 | # bare try/finally with pass
    - try:
    -     foo()
    - finally:
    -     pass
 30 + foo()
-31 |
+31 | 
 32 | # bare try/finally with ellipsis
 33 | try:
 
@@ -101,14 +101,14 @@ RUF072 [*] Empty `finally` clause
    |
 help: Remove the `finally` clause
 33 |     pass
-34 |
+34 | 
 35 | # bare try/finally with ellipsis
    - try:
    -     foo()
    - finally:
    -     ...
 36 + foo()
-37 |
+37 | 
 38 | # bare try/finally with multi-line body
 39 | try:
 
@@ -125,7 +125,7 @@ RUF072 [*] Empty `finally` clause
    |
 help: Remove the `finally` clause
 39 |     ...
-40 |
+40 | 
 41 | # bare try/finally with multi-line body
    - try:
    -     foo()
@@ -136,7 +136,7 @@ help: Remove the `finally` clause
 42 + foo()
 43 + bar()
 44 + baz()
-45 |
+45 | 
 46 | # Nested try with useless finally
 47 | try:
 
@@ -152,7 +152,7 @@ RUF072 [*] Empty `finally` clause
 56 |       bar()
    |
 help: Remove the `finally` clause
-48 |
+48 | 
 49 | # Nested try with useless finally
 50 | try:
    -     try:
@@ -162,7 +162,7 @@ help: Remove the `finally` clause
 51 +     foo()
 52 | except Exception:
 53 |     bar()
-54 |
+54 | 
 
 RUF072 [*] Empty `finally` clause
   --> RUF072.py:63:1
@@ -183,7 +183,7 @@ help: Remove the `finally` clause
    - finally:
    -     pass
    -     pass
-63 |
+63 | 
 64 | # bare try/finally with pass and ellipsis
 65 | try:
 
@@ -201,7 +201,7 @@ RUF072 [*] Empty `finally` clause
    |
 help: Remove the `finally` clause
 65 |     pass
-66 |
+66 | 
 67 | # bare try/finally with pass and ellipsis
    - try:
    -     foo()
@@ -209,9 +209,9 @@ help: Remove the `finally` clause
    -     pass
    -     ...
 68 + foo()
-69 |
+69 | 
 70 | # OK
-71 |
+71 | 
 
 RUF072 Empty `finally` clause
    --> RUF072.py:102:1

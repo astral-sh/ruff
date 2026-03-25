@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
-assertion_line: 685
 ---
 RUF073 `%` operator used on an f-string
  --> RUF073.py:5:1
