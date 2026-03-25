@@ -129,6 +129,7 @@ mod named_tuple;
 mod paramspec_validation;
 mod subscript;
 mod type_expression;
+mod typed_dict;
 mod typevar;
 
 use super::comparisons::{self, BinaryComparisonVisitor};
@@ -2883,6 +2884,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             Some(definition),
                             namedtuple_kind,
                         )
+                    } else if matches!(callable_type, Type::SpecialForm(SpecialFormType::TypedDict))
+                    {
+                        self.infer_typeddict_call_expression(call_expr, Some(definition))
                     } else {
                         match callable_type
                             .as_class_literal()
@@ -3084,6 +3088,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 return;
             }
             _ => {}
+        }
+        if matches!(func_ty, Type::SpecialForm(SpecialFormType::TypedDict)) {
+            self.infer_functional_typeddict_deferred(arguments);
+            return;
         }
         let mut constraint_tys = Vec::new();
         for arg in arguments.args.iter().skip(1) {
@@ -7093,6 +7101,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Handle `typing.NamedTuple(typename, fields)` and `collections.namedtuple(typename, field_names)`.
         if let Some(namedtuple_kind) = NamedTupleKind::from_type(self.db(), callable_type) {
             return self.infer_namedtuple_call_expression(call_expression, None, namedtuple_kind);
+        }
+
+        if matches!(callable_type, Type::SpecialForm(SpecialFormType::TypedDict)) {
+            return self.infer_typeddict_call_expression(call_expression, None);
         }
 
         // We don't call `Type::try_call`, because we want to perform type inference on the
