@@ -672,6 +672,17 @@ reveal_type(C("foo"))  # revealed: list[str]
 reveal_type(C(1))  # revealed: list[int]
 ```
 
+### Failed `__new__` call with unambiguous non-instance return type
+
+```py
+class C:
+    def __new__(cls, x: int) -> str:
+        return str(x)
+
+# error: [invalid-argument-type]
+reveal_type(C("foo"))  # revealed: str
+```
+
 ### Overloaded `__new__` with generic return types
 
 Overloaded `__new__` methods should correctly resolve to the matching overload and infer the class
