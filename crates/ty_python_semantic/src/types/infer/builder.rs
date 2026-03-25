@@ -20,9 +20,9 @@ use ty_module_resolver::{KnownModule, ModuleName, resolve_module};
 use super::deferred;
 use super::{
     DefinitionInference, DefinitionInferenceExtra, ExpressionInference, ExpressionInferenceExtra,
-    InferenceRegion, ScopeInference, ScopeInferenceExtra, infer_deferred_types,
-    infer_definition_types, infer_expression_types, infer_same_file_expression_type,
-    infer_unpack_types,
+    FunctionDecoratorInference, InferenceRegion, ScopeInference, ScopeInferenceExtra,
+    infer_deferred_types, infer_definition_types, infer_expression_types,
+    infer_same_file_expression_type, infer_unpack_types,
 };
 use crate::diagnostic::format_enumeration;
 use crate::node_key::NodeKey;
@@ -58,6 +58,7 @@ use crate::types::class::{
     DynamicMetaclassConflict, MethodDecorator,
 };
 use crate::types::constraints::{ConstraintSetBuilder, PathBounds, Solutions};
+use crate::types::context::InNoTypeCheck;
 use crate::types::context::InferContext;
 use crate::types::diagnostic::{
     self, CALL_NON_CALLABLE, CONFLICTING_DECLARATIONS, CYCLIC_CLASS_DEFINITION,
@@ -85,7 +86,9 @@ use crate::types::diagnostic::{
     report_unsupported_comparison,
 };
 use crate::types::enums::{enum_ignored_names, is_enum_class_by_inheritance};
-use crate::types::function::{FunctionType, KnownFunction, report_revealed_type};
+use crate::types::function::{
+    FunctionDecorators, FunctionType, KnownFunction, report_revealed_type,
+};
 use crate::types::generics::{InferableTypeVars, SpecializationBuilder, bind_typevar};
 use crate::types::infer::builder::named_tuple::NamedTupleKind;
 use crate::types::infer::builder::paramspec_validation::validate_paramspec_components;
@@ -171,7 +174,9 @@ const NUM_FIELD_SPECIFIERS_INLINE: usize = 1;
 ///
 /// The `finish` methods call [`infer_region`](TypeInferenceBuilder::infer_region), which delegates
 /// to one of [`infer_region_scope`](TypeInferenceBuilder::infer_region_scope),
-/// [`infer_region_definition`](TypeInferenceBuilder::infer_region_definition), or
+/// [`infer_region_definition`](TypeInferenceBuilder::infer_region_definition),
+/// [`infer_region_function_decorators`](TypeInferenceBuilder::infer_region_function_decorators),
+/// [`infer_region_deferred`](TypeInferenceBuilder::infer_region_deferred), or
 /// [`infer_region_expression`](TypeInferenceBuilder::infer_region_expression), depending which
 /// kind of [`InferenceRegion`] we are inferring types for.
 ///
@@ -587,6 +592,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         match self.region {
             InferenceRegion::Scope(scope, tcx) => self.infer_region_scope(scope, tcx),
             InferenceRegion::Definition(definition) => self.infer_region_definition(definition),
+            InferenceRegion::FunctionDecorators(definition) => {
+                self.infer_region_function_decorators(definition);
+            }
             InferenceRegion::Deferred(definition) => self.infer_region_deferred(definition),
             InferenceRegion::Expression(expression, tcx) => {
                 self.infer_region_expression(expression, tcx);
@@ -825,6 +833,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             DefinitionKind::LoopHeader(loop_header) => {
                 self.infer_loop_header_definition(loop_header, definition);
+            }
+        }
+    }
+
+    fn infer_region_function_decorators(&mut self, definition: Definition<'db>) {
+        let DefinitionKind::Function(function) = definition.kind(self.db()) else {
+            return;
+        };
+
+        for decorator in &function.node(self.module()).decorator_list {
+            let decorator_type = self.infer_decorator(decorator);
+            if let Type::FunctionLiteral(function) = decorator_type
+                && let Some(KnownFunction::NoTypeCheck) = function.known(self.db())
+            {
+                // Match `infer_function_definition`: suppress diagnostics that follow
+                // `@no_type_check`, including later decorators.
+                self.context.set_in_no_type_check(InNoTypeCheck::Yes);
             }
         }
     }
@@ -9023,6 +9048,65 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             extra,
             #[cfg(debug_assertions)]
             scope,
+        }
+    }
+
+    pub(super) fn finish_function_decorator_inference(mut self) -> FunctionDecoratorInference<'db> {
+        self.infer_region();
+
+        let known_decorators = match self.region {
+            InferenceRegion::FunctionDecorators(definition) => match definition.kind(self.db()) {
+                DefinitionKind::Function(function) => {
+                    function.node(self.module()).decorator_list.iter().fold(
+                        FunctionDecorators::empty(),
+                        |known_decorators, decorator| {
+                            known_decorators
+                                | FunctionDecorators::from_decorator_type(
+                                    self.db(),
+                                    self.expression_type(&decorator.expression),
+                                )
+                        },
+                    )
+                }
+                _ => FunctionDecorators::empty(),
+            },
+            _ => FunctionDecorators::empty(),
+        };
+
+        let Self {
+            context,
+            expressions,
+            bindings,
+            called_functions,
+            declarations: _,
+            deferred: _,
+            scope: _,
+            string_annotations: _,
+            return_types_and_ranges: _,
+            dataclass_field_specifiers: _,
+            undecorated_type: _,
+            typevar_binding_context: _,
+            inference_flags: _,
+            deferred_state: _,
+            multi_inference_state: _,
+            inner_expression_inference_state: _,
+            inferring_vararg_annotation: _,
+            index: _,
+            region: _,
+            cycle_recovery: _,
+            all_definitely_bound: _,
+        } = self;
+        let diagnostics = context.finish();
+
+        FunctionDecoratorInference {
+            expression_types: expressions,
+            bindings: bindings.into_boxed_slice(),
+            called_functions: called_functions
+                .into_iter()
+                .collect::<Vec<_>>()
+                .into_boxed_slice(),
+            known_decorators,
+            diagnostics,
         }
     }
 
