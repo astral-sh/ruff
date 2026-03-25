@@ -1077,6 +1077,30 @@ from _stat import ST_INO
 ST_INO = 1  # error: [invalid-assignment]
 ```
 
+Instance attribute assignment outside `__init__`:
+
+```py
+from typing import Final
+
+class C:
+    x: Final[int] = 1
+
+    def f(self):
+        self.x = 2  # error: [invalid-assignment]
+```
+
+Standalone function named `__init__`:
+
+```py
+from typing import Final
+
+class C:
+    x: Final[int] = 1
+
+def __init__(c: C):
+    c.x = 2  # error: [invalid-assignment]
+```
+
 `Final` declaration without value:
 
 ```py

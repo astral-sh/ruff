@@ -2247,11 +2247,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                         if emit_diagnostics
                             && self.invalid_assignment_to_final_attribute(
-                                target.range(),
-                                object_ty,
-                                Some(target),
-                                attribute,
-                                qualifiers,
+                                object_ty, target, attribute, qualifiers,
                             )
                         {
                             return false;
@@ -2311,11 +2307,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                         .infer_silent(self, TypeContext::new(Some(write_ty)));
                                     if emit_diagnostics
                                         && self.invalid_assignment_to_final_attribute(
-                                            target.range(),
-                                            object_ty,
-                                            Some(target),
-                                            attribute,
-                                            qualifiers,
+                                            object_ty, target, attribute, qualifiers,
                                         )
                                     {
                                         return false;
@@ -2368,11 +2360,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 infer_value_ty.infer_silent(self, TypeContext::new(Some(write_ty)));
                             if emit_diagnostics
                                 && self.invalid_assignment_to_final_attribute(
-                                    target.range(),
-                                    object_ty,
-                                    Some(target),
-                                    attribute,
-                                    qualifiers,
+                                    object_ty, target, attribute, qualifiers,
                                 )
                             {
                                 return false;
@@ -2446,11 +2434,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     } => {
                         if emit_diagnostics
                             && self.invalid_assignment_to_final_attribute(
-                                target.range(),
-                                object_ty,
-                                Some(target),
-                                attribute,
-                                qualifiers,
+                                object_ty, target, attribute, qualifiers,
                             )
                         {
                             infer_value_ty(self, TypeContext::default());
@@ -2552,11 +2536,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 infer_value_ty(self, TypeContext::new(Some(class_attr_ty)));
                             if emit_diagnostics
                                 && self.invalid_assignment_to_final_attribute(
-                                    target.range(),
-                                    object_ty,
-                                    Some(target),
-                                    attribute,
-                                    qualifiers,
+                                    object_ty, target, attribute, qualifiers,
                                 )
                             {
                                 return false;
@@ -3891,9 +3871,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             {
                 let object_ty = self.expression_type(&attr_expr.value);
                 self.invalid_assignment_to_final_attribute(
-                    assignment.range(),
                     object_ty,
-                    Some(attr_expr),
+                    attr_expr,
                     attr_expr.attr.id(),
                     annotated.qualifiers,
                 );
@@ -4347,7 +4326,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let object_ty = self.expression_type(&attr_expr.value);
                 self.validate_final_attribute_assignment(
                     attr_expr,
-                    assignment.range(),
                     object_ty,
                     attr_expr.attr.id(),
                     true,

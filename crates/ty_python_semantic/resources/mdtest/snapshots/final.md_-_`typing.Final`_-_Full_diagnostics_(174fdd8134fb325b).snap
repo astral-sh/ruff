@@ -25,7 +25,21 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/type_qualifiers/final.md
 10 | ST_INO = 1  # error: [invalid-assignment]
 11 | from typing import Final
 12 | 
-13 | UNINITIALIZED: Final[int]  # error: [final-without-value]
+13 | class C:
+14 |     x: Final[int] = 1
+15 | 
+16 |     def f(self):
+17 |         self.x = 2  # error: [invalid-assignment]
+18 | from typing import Final
+19 | 
+20 | class C:
+21 |     x: Final[int] = 1
+22 | 
+23 | def __init__(c: C):
+24 |     c.x = 2  # error: [invalid-assignment]
+25 | from typing import Final
+26 | 
+27 | UNINITIALIZED: Final[int]  # error: [final-without-value]
 ```
 
 # Diagnostics
@@ -64,12 +78,38 @@ info: rule `invalid-assignment` is enabled by default
 ```
 
 ```
-error[final-without-value]: `Final` symbol `UNINITIALIZED` is not assigned a value
-  --> src/mdtest_snippet.py:13:1
+error[invalid-assignment]: Cannot assign to final attribute `x` on type `Self@f`; `Final` attributes can only be assigned in the class body or `__init__`
+  --> src/mdtest_snippet.py:17:9
    |
-11 | from typing import Final
-12 |
-13 | UNINITIALIZED: Final[int]  # error: [final-without-value]
+16 |     def f(self):
+17 |         self.x = 2  # error: [invalid-assignment]
+   |         ^^^^^^
+18 | from typing import Final
+   |
+info: rule `invalid-assignment` is enabled by default
+
+```
+
+```
+error[invalid-assignment]: Cannot assign to final attribute `x` on type `C`; `Final` attributes can only be assigned in the class body or `__init__`
+  --> src/mdtest_snippet.py:24:5
+   |
+23 | def __init__(c: C):
+24 |     c.x = 2  # error: [invalid-assignment]
+   |     ^^^
+25 | from typing import Final
+   |
+info: rule `invalid-assignment` is enabled by default
+
+```
+
+```
+error[final-without-value]: `Final` symbol `UNINITIALIZED` is not assigned a value
+  --> src/mdtest_snippet.py:27:1
+   |
+25 | from typing import Final
+26 |
+27 | UNINITIALIZED: Final[int]  # error: [final-without-value]
    | ^^^^^^^^^^^^^^^^^^^^^^^^^
    |
 info: rule `final-without-value` is enabled by default
