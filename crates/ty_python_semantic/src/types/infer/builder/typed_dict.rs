@@ -150,6 +150,15 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
         }
 
+        if deprecated_syntax
+            && deprecated_field_values.is_empty()
+            && let Some(builder) = self.context.report_lint(&MISSING_ARGUMENT, call_expr)
+        {
+            builder.into_diagnostic(
+                "No argument provided for required parameter `fields` of function `TypedDict`",
+            );
+        }
+
         let name = if let Some(literal) = name_type.as_string_literal() {
             Name::new(literal.value(db))
         } else {
