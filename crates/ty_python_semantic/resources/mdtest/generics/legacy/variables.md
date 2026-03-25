@@ -644,6 +644,30 @@ def _(n: Node[str]):
     reveal_type(n)  # revealed: Node[Unknown]
 ```
 
+### Recursive bounds with explicit specialization
+
+Default specialization should preserve an explicit recursive bound instead of collapsing the member
+type to `Unknown`:
+
+```py
+from typing import Any, Generic, TypeVar
+
+T = TypeVar("T", bound=list["Foo[Any]"] | None)
+U = TypeVar("U", bound=list[int])
+
+class Foo(Generic[T]):
+    x: T
+
+class Bar(Generic[U]):
+    x: U
+
+def f(foo: Foo, bar: Bar):
+    reveal_type(foo)  # revealed: Foo[(list[Foo[Any]] & Unknown) | (None & Unknown)]
+    reveal_type(foo.x)  # revealed: (list[Foo[Any]] & Unknown) | (None & Unknown)
+    reveal_type(bar)  # revealed: Bar[list[int] & Unknown]
+    reveal_type(bar.x)  # revealed: list[int] & Unknown
+```
+
 ### Defaults
 
 ```toml
