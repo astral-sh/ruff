@@ -230,6 +230,60 @@ p = partial(42)  # error: [invalid-argument-type]
 reveal_type(p)  # revealed: partial[Unknown]
 ```
 
+## Generic functions
+
+Type variables are inferred from the bound arguments:
+
+```py
+from functools import partial
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def identity(x: T) -> T:
+    return x
+
+p = partial(identity, 1)
+reveal_type(p)  # revealed: partial[() -> Literal[1]]
+```
+
+## Generic functions with remaining params
+
+```py
+from functools import partial
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def pair(a: T, b: T) -> tuple[T, T]:
+    return (a, b)
+
+p = partial(pair, 1)
+reveal_type(p)  # revealed: partial[(b: int) -> tuple[Literal[1], Literal[1]]]
+reveal_type(p(2))  # revealed: tuple[Literal[1], Literal[1]]
+```
+
+## Generic constructors
+
+```py
+from functools import partial
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Box(Generic[T]):
+    def __init__(self, value: T) -> None:
+        self.value = value
+
+list_factory = partial(list, [1])
+reveal_type(list_factory)  # revealed: partial[() -> list[int]]
+reveal_type(list_factory())  # revealed: list[int]
+
+box_factory = partial(Box, "hi")
+reveal_type(box_factory)  # revealed: partial[() -> Box[str]]
+reveal_type(box_factory())  # revealed: Box[str]
+```
+
 ## Overloaded functions
 
 ```py
@@ -264,6 +318,47 @@ p = partial(g, start=".")
 paths: list[str] = ["x"]
 reveal_type(p)  # revealed: partial[(path: str, *, start: str | None = ".") -> str]
 reveal_type(list(map(p, paths)))  # revealed: list[str]
+```
+
+## ParamSpec callable bound with `partial`
+
+```py
+from functools import partial
+from typing import Any, Callable, TypeVar
+from typing_extensions import ParamSpec
+
+P = ParamSpec("P")
+R = TypeVar("R")
+
+def invoke(func: Callable[P, R], *args: P.args, **kwargs: P.kwargs) -> R:
+    return func(*args, **kwargs)
+
+def pre(cfg: Any) -> Any:
+    return cfg
+
+bound = partial(invoke, pre)
+reveal_type(bound)  # revealed: partial[(cfg: Any) -> Any]
+reveal_type(bound({}))  # revealed: Any
+```
+
+## ParamSpec callable with keyword-bound wrapper parameters
+
+```py
+from functools import partial
+from typing import Callable, TypeVar
+from typing_extensions import ParamSpec
+
+P = ParamSpec("P")
+R = TypeVar("R")
+
+def invoke(flag: int, func: Callable[P, R], *args: P.args, **kwargs: P.kwargs) -> R:
+    return func(*args, **kwargs)
+
+def pre(*, cfg: str) -> int:
+    return 1
+
+bound = partial(invoke, flag=1, func=pre)
+reveal_type(bound(cfg="x"))  # revealed: int
 ```
 
 ## Partial assignability with a keyword-bound middle parameter
@@ -584,6 +679,24 @@ def f(a: int, b: str) -> bool:
 args: tuple[()] = ()
 p = partial(f, *args)
 reveal_type(p)  # revealed: partial[(a: int, b: str) -> bool]
+```
+
+## Generic function with multiple type variables
+
+Unresolved type variables remain generic in the resulting partial signature.
+
+```py
+from functools import partial
+from typing import TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+def combine(a: T, b: U) -> tuple[T, U]:
+    return (a, b)
+
+p = partial(combine, 1)
+reveal_type(p)  # revealed: partial[[U](b: U) -> tuple[Literal[1], U]]
 ```
 
 ## Callable object (class with `__call__`)

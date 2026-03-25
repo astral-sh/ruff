@@ -4349,6 +4349,7 @@ struct ArgumentTypeChecker<'a, 'db> {
 
     inferable_typevars: InferableTypeVars<'db>,
     specialization: Option<Specialization<'db>>,
+    partial_specialization: Option<Specialization<'db>>,
 
     /// Argument indices for which specialization inference has already produced a sufficiently
     /// precise argument mismatch. We can then silence `check_argument_type` for those arguments to
@@ -4384,6 +4385,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             errors,
             inferable_typevars: InferableTypeVars::None,
             specialization: None,
+            partial_specialization: None,
             constraint_set_errors: vec![false; arguments.len()],
         }
     }
@@ -4634,8 +4636,11 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             };
 
         let specialization = builder.build_with(generic_context, maybe_promote);
+        let partial_specialization =
+            builder.build_preserving_unmapped_with(generic_context, maybe_promote);
         self.return_ty = self.return_ty.apply_specialization(self.db, specialization);
         self.specialization = Some(specialization);
+        self.partial_specialization = Some(partial_specialization);
     }
 
     fn infer_argument_constraints<'c>(
@@ -5102,9 +5107,15 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
     ) -> (
         InferableTypeVars<'db>,
         Option<Specialization<'db>>,
+        Option<Specialization<'db>>,
         Type<'db>,
     ) {
-        (self.inferable_typevars, self.specialization, self.return_ty)
+        (
+            self.inferable_typevars,
+            self.specialization,
+            self.partial_specialization,
+            self.return_ty,
+        )
     }
 }
 
@@ -5178,6 +5189,10 @@ pub(crate) struct Binding<'db> {
     /// The specialization that was inferred from the argument types, if the callable is generic.
     specialization: Option<Specialization<'db>>,
 
+    /// A partial-application view of the inferred specialization which preserves uninferred
+    /// type variables as generic.
+    partial_specialization: Option<Specialization<'db>>,
+
     /// Information about which parameter(s) each argument was matched with, in argument source
     /// order.
     argument_matches: Box<[MatchedArgument<'db>]>,
@@ -5205,6 +5220,7 @@ impl<'db> Binding<'db> {
             constructor_context: None,
             inferable_typevars: InferableTypeVars::None,
             specialization: None,
+            partial_specialization: None,
             argument_matches: Box::from([]),
             variadic_argument_matched_to_variadic_parameter: false,
             parameter_tys: Box::from([]),
@@ -5293,7 +5309,12 @@ impl<'db> Binding<'db> {
         checker.infer_specialization(constraints);
         checker.check_argument_types(constraints);
 
-        (self.inferable_typevars, self.specialization, self.return_ty) = checker.finish();
+        (
+            self.inferable_typevars,
+            self.specialization,
+            self.partial_specialization,
+            self.return_ty,
+        ) = checker.finish();
     }
 
     pub(crate) fn set_return_type(&mut self, return_ty: Type<'db>) {
@@ -5328,13 +5349,38 @@ impl<'db> Binding<'db> {
         db: &'db dyn Db,
         arguments: &CallArguments<'_, 'db>,
     ) -> Signature<'db> {
-        let signature = self.specialization.map_or_else(
+        let signature = self.partial_specialization.map_or_else(
             || self.signature.clone(),
-            |specialization| self.signature.apply_specialization(db, specialization),
+            |specialization| {
+                if let Some(generic_context) = self.signature.generic_context {
+                    // `partial(...)` creates a reusable callable, so avoid freezing typevars to
+                    // one specific literal value from bound arguments.
+                    let promoted = generic_context.specialize_recursive(
+                        db,
+                        generic_context.variables(db).map(|typevar| {
+                            Some(
+                                specialization
+                                    .get(db, typevar)
+                                    .unwrap_or(Type::TypeVar(typevar))
+                                    .promote(db),
+                            )
+                        }),
+                    );
+                    self.signature.apply_specialization(db, promoted)
+                } else {
+                    self.signature.apply_specialization(db, specialization)
+                }
+            },
         );
 
         let parameters = signature.parameters().as_slice();
-        let return_ty = self.return_ty;
+        let return_ty = self.partial_specialization.map_or_else(
+            || self.unspecialized_return_type(db),
+            |specialization| {
+                self.unspecialized_return_type(db)
+                    .apply_specialization(db, specialization)
+            },
+        );
         let mut remove_positionally_bound = vec![false; parameters.len()];
         let mut keyword_defaults = vec![None; parameters.len()];
         let mut keyword_bound = vec![false; parameters.len()];
@@ -5378,29 +5424,41 @@ impl<'db> Binding<'db> {
         }
 
         let mut remaining = Vec::with_capacity(parameters.len());
-        let mut keyword_only = Vec::new();
-        let mut keyword_variadic = Vec::new();
-        let mut saw_keyword_bound_positional_or_keyword = false;
+        let mut first_keyword_bound_positional_or_keyword = None;
         for (index, parameter) in parameters.iter().enumerate() {
             if remove_positionally_bound[index] {
                 continue;
             }
 
-            let mut parameter = keyword_defaults[index].map_or_else(
+            let parameter = keyword_defaults[index].map_or_else(
                 || parameter.clone(),
                 |default_ty| parameter.clone().with_default_type(default_ty),
             );
 
-            if keyword_bound[index]
+            if first_keyword_bound_positional_or_keyword.is_none()
+                && keyword_bound[index]
                 && matches!(parameter.kind(), ParameterKind::PositionalOrKeyword { .. })
             {
-                saw_keyword_bound_positional_or_keyword = true;
+                first_keyword_bound_positional_or_keyword = Some(remaining.len());
             }
 
+            remaining.push(parameter);
+        }
+
+        // Expand `P.args`/`P.kwargs` while the pair is still adjacent. The keyword-only reshuffle
+        // below can separate them, which would otherwise prevent expansion.
+        let remaining = expand_paramspec_variadics(db, remaining);
+
+        let mut reordered = Vec::with_capacity(remaining.len());
+        let mut keyword_only = Vec::new();
+        let mut keyword_variadic = Vec::new();
+        for (index, parameter) in remaining.into_iter().enumerate() {
+            let mut parameter = parameter;
             // Keyword-bound positional-or-keyword parameters can only be overridden by keyword at
             // call time. Once one appears, later positional-or-keyword parameters also become
             // keyword-only to match `inspect.signature(functools.partial(...))`.
-            if saw_keyword_bound_positional_or_keyword
+            if first_keyword_bound_positional_or_keyword
+                .is_some_and(|first_bound_index| index >= first_bound_index)
                 && matches!(parameter.kind(), ParameterKind::PositionalOrKeyword { .. })
             {
                 parameter = positional_or_keyword_to_keyword_only(&parameter);
@@ -5411,17 +5469,15 @@ impl<'db> Binding<'db> {
             } else if parameter.is_keyword_only() {
                 keyword_only.push(parameter);
             } else {
-                remaining.push(parameter);
+                reordered.push(parameter);
             }
         }
 
-        remaining.extend(keyword_only);
-        remaining.extend(keyword_variadic);
-
-        let remaining = expand_paramspec_variadics(db, remaining);
+        reordered.extend(keyword_only);
+        reordered.extend(keyword_variadic);
 
         signature
-            .with_parameters(Parameters::new(db, remaining))
+            .with_parameters(Parameters::new(db, reordered))
             .with_return_type(return_ty)
     }
 
@@ -5509,6 +5565,7 @@ impl<'db> Binding<'db> {
             return_ty: self.return_ty,
             inferable_typevars: self.inferable_typevars,
             specialization: self.specialization,
+            partial_specialization: self.partial_specialization,
             argument_matches: self.argument_matches.clone(),
             parameter_tys: self.parameter_tys.clone(),
             errors: self.errors.clone(),
@@ -5520,6 +5577,7 @@ impl<'db> Binding<'db> {
             return_ty,
             inferable_typevars,
             specialization,
+            partial_specialization,
             argument_matches,
             parameter_tys,
             errors,
@@ -5528,6 +5586,7 @@ impl<'db> Binding<'db> {
         self.return_ty = return_ty;
         self.inferable_typevars = inferable_typevars;
         self.specialization = specialization;
+        self.partial_specialization = partial_specialization;
         self.argument_matches = argument_matches;
         self.parameter_tys = parameter_tys;
         self.errors = errors;
@@ -5552,6 +5611,7 @@ impl<'db> Binding<'db> {
         self.return_ty = self.initial_return_type(db);
         self.inferable_typevars = InferableTypeVars::None;
         self.specialization = None;
+        self.partial_specialization = None;
         self.argument_matches = Box::from([]);
         self.parameter_tys = Box::from([]);
         self.errors.clear();
@@ -5639,6 +5699,7 @@ struct BindingSnapshot<'db> {
     return_ty: Type<'db>,
     inferable_typevars: InferableTypeVars<'db>,
     specialization: Option<Specialization<'db>>,
+    partial_specialization: Option<Specialization<'db>>,
     argument_matches: Box<[MatchedArgument<'db>]>,
     parameter_tys: Box<[Option<Type<'db>>]>,
     errors: Vec<BindingError<'db>>,
@@ -5680,6 +5741,7 @@ impl<'db> CallableBindingSnapshot<'db> {
                 snapshot.return_ty = binding.return_ty;
                 snapshot.inferable_typevars = binding.inferable_typevars;
                 snapshot.specialization = binding.specialization;
+                snapshot.partial_specialization = binding.partial_specialization;
                 snapshot
                     .argument_matches
                     .clone_from(&binding.argument_matches);
