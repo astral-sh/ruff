@@ -1,13 +1,118 @@
+use std::ops::DerefMut;
+
+use ruff_db::diagnostic::{Annotation, Diagnostic, Span};
+use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
 
+use crate::place::place_from_declarations;
+use crate::semantic_index::definition::{Definition, DefinitionKind, DefinitionState};
 use crate::semantic_index::place::{PlaceExpr, ScopedPlaceId};
+use crate::semantic_index::semantic_index;
+use crate::types::{TypeVarBoundOrConstraints, declaration_type};
 use crate::{
     TypeQualifiers,
     types::{Type, diagnostic::INVALID_ASSIGNMENT, infer::TypeInferenceBuilder},
 };
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
+    /// Add a secondary annotation to a diagnostic pointing to the `Final` declaration site.
+    fn annotate_final_declaration(
+        &self,
+        diagnostic: &mut impl DerefMut<Target = Diagnostic>,
+        declaration: Definition<'db>,
+    ) {
+        let db = self.db();
+        let file = declaration.file(db);
+        let module = parsed_module(db, file).load(db);
+        let range = match declaration.kind(db) {
+            DefinitionKind::AnnotatedAssignment(assignment) => {
+                assignment.annotation(&module).range()
+            }
+            kind => kind.target_range(&module),
+        };
+
+        diagnostic.annotate(
+            Annotation::secondary(Span::from(file).with_range(range))
+                .message("Attribute declared as `Final` here"),
+        );
+    }
+
+    /// Try to find the unique `Final` declaration for `attribute` on `object_ty`.
+    ///
+    /// Returns `None` if the attribute is not `Final`, if there are multiple `Final`
+    /// declarations, or if the owning class cannot be determined.
+    fn precise_final_attribute_declaration(
+        &self,
+        object_ty: Type<'db>,
+        attribute: &str,
+    ) -> Option<Definition<'db>> {
+        let db = self.db();
+        let class_ty = object_ty
+            .nominal_class(db)
+            .or_else(|| {
+                let Type::TypeVar(typevar) = object_ty else {
+                    return None;
+                };
+
+                let TypeVarBoundOrConstraints::UpperBound(bound) =
+                    typevar.typevar(db).bound_or_constraints(db)?
+                else {
+                    return None;
+                };
+
+                bound.nominal_class(db)
+            })
+            .or_else(|| object_ty.to_class_type(db))?;
+
+        for base in class_ty.iter_mro(db) {
+            let Some(class) = base.into_class() else {
+                continue;
+            };
+            let Some((class_literal, _)) = class.static_class_literal(db) else {
+                continue;
+            };
+
+            let class_body_scope = class_literal.body_scope(db);
+            let class_scope_id = class_body_scope.file_scope_id(db);
+            let class_index = semantic_index(db, class_body_scope.file(db));
+            let place_table = class_index.place_table(class_scope_id);
+            let Some(symbol_id) = place_table.symbol_id(attribute) else {
+                continue;
+            };
+
+            let use_def = class_index.use_def_map(class_scope_id);
+            let place_and_quals =
+                place_from_declarations(db, use_def.end_of_scope_symbol_declarations(symbol_id))
+                    .ignore_conflicting_declarations();
+            if !place_and_quals.qualifiers.contains(TypeQualifiers::FINAL) {
+                return None;
+            }
+
+            let mut final_declarations = use_def
+                .end_of_scope_symbol_declarations(symbol_id)
+                .filter_map(|declaration| {
+                    let DefinitionState::Defined(definition) = declaration.declaration else {
+                        return None;
+                    };
+
+                    declaration_type(db, definition)
+                        .qualifiers()
+                        .contains(TypeQualifiers::FINAL)
+                        .then_some(definition)
+                });
+            let final_declaration = final_declarations.next()?;
+
+            if final_declarations.next().is_some() {
+                return None;
+            }
+
+            return Some(final_declaration);
+        }
+
+        None
+    }
+
     /// Check if the target attribute expression (e.g. `self.x`) is an instance attribute
     /// assignment, i.e. the object is the implicit `self`/`cls` receiver.
     ///
@@ -38,10 +143,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
 
         let db = self.db();
-
-        // TODO: Point to the `Final` declaration once we can reliably resolve the owning
-        // declaration for this attribute, including inherited members and locally introduced
-        // `Final` annotations on assignments.
+        let final_declaration = self.precise_final_attribute_declaration(object_ty, attribute);
 
         // TODO: Use the full assignment statement range for these diagnostics instead of
         // just the attribute target range.
@@ -64,6 +166,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             diagnostic.set_primary_message(
                 "`Final` attributes can only be assigned in the class body or `__init__`",
             );
+            if let Some(final_declaration) = final_declaration {
+                self.annotate_final_declaration(&mut diagnostic, final_declaration);
+            }
         };
 
         if !is_in_init {
@@ -91,8 +196,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
 
         if let Some((class_literal, _)) = class_ty.static_class_literal(db) {
-            let class_scope_id = class_literal.body_scope(db).file_scope_id(db);
-            let pt = self.index.place_table(class_scope_id);
+            let class_body_scope = class_literal.body_scope(db);
+            let class_scope_id = class_body_scope.file_scope_id(db);
+            let class_index = semantic_index(db, class_body_scope.file(db));
+            let pt = class_index.place_table(class_scope_id);
 
             if let Some(symbol) = pt.symbol_by_name(attribute)
                 && symbol.is_bound()
@@ -106,6 +213,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     diagnostic.set_primary_message(format_args!(
                         "`{attribute}` already has a value in the class body"
                     ));
+                    if let Some(final_declaration) = final_declaration {
+                        self.annotate_final_declaration(&mut diagnostic, final_declaration);
+                    }
                 }
 
                 return true;
