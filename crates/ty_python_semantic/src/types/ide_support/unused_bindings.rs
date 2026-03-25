@@ -50,6 +50,29 @@ fn function_has_stub_body(function: &ast::StmtFunctionDef) -> bool {
     })
 }
 
+fn function_scope_is_overload_declaration(
+    db: &dyn Db,
+    index: &crate::semantic_index::SemanticIndex<'_>,
+    file_scope_id: FileScopeId,
+) -> bool {
+    let scope = index.scope(file_scope_id);
+    let Some(function) = scope.node().as_function() else {
+        return false;
+    };
+
+    let definition = index.expect_single_definition(function);
+    let Some(function_type) = crate::types::binding_type(db, definition).as_function_literal()
+    else {
+        return false;
+    };
+
+    function_type
+        .iter_overloads_and_implementation(db)
+        .any(|overload| {
+            overload.body_scope(db).file_scope_id(db) == file_scope_id && overload.is_overload(db)
+        })
+}
+
 fn class_defines_member_named(db: &dyn Db, class: ClassType<'_>, member_name: &str) -> bool {
     let Some((class_literal, specialization)) = class.static_class_literal(db) else {
         // If we cannot inspect class members precisely, be conservative and avoid false positives.
@@ -144,6 +167,8 @@ pub fn unused_bindings(db: &dyn Db, file: ruff_db::files::File) -> Vec<UnusedBin
                 .node()
                 .as_function()
                 .is_some_and(|function| function_has_stub_body(function.node(&parsed)));
+        let function_is_overload_declaration =
+            function_scope_is_overload_declaration(db, index, file_scope_id);
         let place_table = index.place_table(file_scope_id);
         let use_def_map = index.use_def_map(file_scope_id);
         let mut skip_unused_parameters_for_override = None;
@@ -166,6 +191,7 @@ pub fn unused_bindings(db: &dyn Db, file: ruff_db::files::File) -> Vec<UnusedBin
 
             if is_parameter
                 && (is_stub_file
+                    || function_is_overload_declaration
                     || method_has_stub_body
                     || *skip_unused_parameters_for_override.get_or_insert_with(|| {
                         method_name_exists_in_superclass(db, index, &parsed, file_scope_id)
@@ -480,6 +506,29 @@ mod tests {
 
                 def a(self, bar: str | int) -> None:
                     print(bar)
+            ",
+        );
+
+        let names = collect_unused_names(&source)?;
+        assert_eq!(names, Vec::<String>::new());
+        Ok(())
+    }
+
+    #[test]
+    fn skips_unused_parameter_for_module_level_overload_stub_declarations() -> anyhow::Result<()> {
+        let source = dedent(
+            "
+            import typing
+
+            @typing.overload
+            def f(x: str) -> str: ...
+
+            @typing.overload
+            def f(x: int) -> int:
+                ...
+
+            def f(x: str | int) -> str | int:
+                return x
             ",
         );
 

@@ -25,9 +25,6 @@ use crate::system::{AnySystemPath, file_to_url};
 use crate::{DIAGNOSTIC_NAME, Db, DiagnosticMode};
 use crate::{PositionEncoding, Session};
 
-/// Server-only LSP code for IDE dimming (not a configurable lint rule).
-const UNUSED_BINDING_CODE: &str = "unused-binding";
-
 #[derive(Debug)]
 pub(super) struct Diagnostics {
     items: Vec<ruff_db::diagnostic::Diagnostic>,
@@ -403,10 +400,10 @@ fn unused_binding_to_lsp_diagnostic(
         Diagnostic {
             range: range.local_range(),
             severity: Some(DiagnosticSeverity::HINT),
-            code: Some(NumberOrString::String(UNUSED_BINDING_CODE.to_owned())),
+            code: None,
             code_description: None,
             source: Some(DIAGNOSTIC_NAME.into()),
-            message: format!("Binding `{}` is unused", binding.name),
+            message: format!("`{}` is unused", binding.name),
             related_information: None,
             tags: Some(vec![DiagnosticTag::UNNECESSARY]),
             data: None,

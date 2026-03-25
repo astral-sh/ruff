@@ -16,9 +16,8 @@ expression: diagnostics
         }
       },
       "severity": 4,
-      "code": "unused-binding",
       "source": "ty",
-      "message": "Binding `x` is unused",
+      "message": "`x` is unused",
       "tags": [
         1
       ]
