@@ -1787,6 +1787,17 @@ basic.b = "1"
 basic.b = 1  # error: [invalid-assignment]
 ```
 
+This also works when the object type is a type alias to a dataclass instance:
+
+```py
+type BasicAlias = Basic
+
+def _(obj: BasicAlias):
+    reveal_type(obj.a)  # revealed: int
+    obj.a = "2"
+    obj.a = 3  # error: [invalid-assignment]
+```
+
 The default parameter for a converter field should also be verified against the converter's input
 type:
 
