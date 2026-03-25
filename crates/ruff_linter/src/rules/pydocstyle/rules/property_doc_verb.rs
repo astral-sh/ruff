@@ -20,8 +20,6 @@ use crate::rules::pydocstyle::settings::Settings;
 /// rather than a function-style docstring (e.g.,
 /// `"""Returns the Bigtable path."""`).
 ///
-/// This rule is only enforced when using the `google` convention.
-///
 /// ## Example
 /// ```python
 /// class Foo:
@@ -41,7 +39,6 @@ use crate::rules::pydocstyle::settings::Settings;
 /// ```
 ///
 /// ## Options
-/// - `lint.pydocstyle.convention`
 /// - `lint.pydocstyle.property-decorators`
 ///
 /// ## References

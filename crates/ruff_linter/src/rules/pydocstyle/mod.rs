@@ -222,15 +222,11 @@ mod tests {
     }
 
     #[test]
-    fn d421_google() -> Result<()> {
+    fn d421() -> Result<()> {
         let diagnostics = test_path(
             Path::new("pydocstyle/D421.py"),
             &settings::LinterSettings {
                 preview: PreviewMode::Enabled,
-                pydocstyle: Settings {
-                    convention: Some(Convention::Google),
-                    ..Settings::default()
-                },
                 ..settings::LinterSettings::for_rule(Rule::PropertyDocstringStartsWithVerb)
             },
         )?;
