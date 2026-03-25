@@ -33,6 +33,15 @@ pub trait Db: SemanticDb {
 #[salsa::db]
 #[derive(Clone)]
 pub struct ProjectDatabase {
+    // This handle must remain stable for the lifetime of the database.
+    //
+    // Many tracked queries branch on the untracked `db.project()` read before
+    // consulting tracked `Project` fields. Replacing the handle during reload
+    // therefore changes query behavior outside salsa's dependency graph and can
+    // trigger stale results.
+    //
+    // Structural reloads must update the existing `Project` in place via salsa
+    // setters instead of swapping in a freshly constructed handle.
     project: Option<Project>,
     files: Files,
 

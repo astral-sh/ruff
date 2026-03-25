@@ -1,5 +1,5 @@
 ---
-source: crates/ruff/tests/show_settings.rs
+source: crates/ruff/tests/cli/show_settings.rs
 info:
   program: ruff
   args:
@@ -10,11 +10,11 @@ info:
 success: true
 exit_code: 0
 ----- stdout -----
-Resolved settings for: "<temp_dir>/subdir/test.py"
-Settings path: "<temp_dir>/subdir/pyproject.toml"
+Resolved settings for: "[TMP]/subdir/test.py"
+Settings path: "[TMP]/subdir/pyproject.toml"
 
 # General Settings
-cache_dir = "<temp_dir>/subdir/.ruff_cache"
+cache_dir = "[TMP]/subdir/.ruff_cache"
 fix = false
 fix_only = false
 output_format = full
@@ -59,11 +59,11 @@ file_resolver.include = [
 ]
 file_resolver.extend_include = []
 file_resolver.respect_gitignore = true
-file_resolver.project_root = "<temp_dir>/subdir"
+file_resolver.project_root = "[TMP]/subdir"
 
 # Linter Settings
 linter.exclude = []
-linter.project_root = "<temp_dir>/subdir"
+linter.project_root = "[TMP]/subdir"
 linter.rules.enabled = [
 	unsorted-imports (I001),
 	missing-required-import (I002),
@@ -210,8 +210,8 @@ linter.ignore_init_module_imports = true
 linter.logger_objects = []
 linter.namespace_packages = []
 linter.src = [
-	"<temp_dir>/subdir",
-	"<temp_dir>/subdir/src",
+	"[TMP]/subdir",
+	"[TMP]/subdir/src",
 ]
 linter.tab_size = 4
 linter.line_length = 120

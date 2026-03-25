@@ -10,9 +10,10 @@ use crate::types::cyclic::PairVisitor;
 use crate::types::enums::is_single_member_enum;
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::{
-    CallableType, ClassBase, ClassType, CycleDetector, DynamicType, KnownBoundMethodType,
-    KnownClass, KnownInstanceType, LiteralValueTypeKind, MemberLookupPolicy, PropertyInstanceType,
-    ProtocolInstanceType, SubclassOfInner, TypeVarBoundOrConstraints, UnionType, UpcastPolicy,
+    CallableType, ClassBase, ClassType, CycleDetector, DynamicType, IntersectionBuilder,
+    KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind, MemberLookupPolicy,
+    PropertyInstanceType, ProtocolInstanceType, SubclassOfInner, TypeVarBoundOrConstraints,
+    UnionType, UpcastPolicy,
 };
 use crate::{
     Db,
@@ -597,6 +598,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             .visit((source, target, self.relation), work)
     }
 
+    /// Return a constraint set indicating the conditions under which `self.relation` holds between `source` and `target`.
     pub(super) fn check_type_pair(
         &self,
         db: &'db dyn Db,
@@ -897,12 +899,10 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 self.never()
             }
 
-            // `Never` is the bottom type, the empty set.
-            (_, Type::Never) => self.never(),
-
             (Type::NewTypeInstance(source_newtype), Type::NewTypeInstance(target_newtype)) => {
                 self.check_newtype_pair(db, source_newtype, target_newtype)
             }
+
             // In the special cases of `NewType`s of `float` or `complex`, the concrete base type
             // can be a union (`int | float` or `int | float | complex`). For that reason,
             // `NewType` assignability to a union needs to consider two different cases. It could
@@ -945,6 +945,40 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                         } else {
                             self.never()
                         }
+                    })
+            }
+
+            // Similar to above, another somewhat unfortunate special case for
+            // intersections of newtypes of unions vs unions.
+            (Type::Intersection(intersection), Type::Union(union))
+                if intersection.positive(db).iter().any(|element| {
+                    element
+                        .as_new_type()
+                        .is_some_and(|newtype| newtype.concrete_base_type(db).is_union())
+                }) =>
+            {
+                // First the normal "assign to union" case, unfortunately duplicated from below (and above :().
+                union
+                    .elements(db)
+                    .iter()
+                    .when_any(db, self.constraints, |&elem_ty| {
+                        self.check_type_pair(db, source, elem_ty)
+                    })
+                    // Construct a new intersection with every newtype mapped to its concrete base
+                    // type and check that.
+                    .or(db, self.constraints, || {
+                        let mut builder = IntersectionBuilder::new(db);
+                        for &pos in intersection.positive(db) {
+                            if let Some(newtype) = pos.as_new_type() {
+                                builder = builder.add_positive(newtype.concrete_base_type(db));
+                            } else {
+                                builder = builder.add_positive(pos);
+                            }
+                        }
+                        for &neg in intersection.negative(db) {
+                            builder = builder.add_negative(neg);
+                        }
+                        self.check_type_pair(db, builder.build(), target)
                     })
             }
 
@@ -1026,6 +1060,9 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     |elem_ty| self.check_type_pair(db, elem_ty, target),
                 )
             }
+
+            // `Never` is the bottom type, the empty set.
+            (_, Type::Never) => self.never(),
 
             // Other than the special cases checked above, no other types are a subtype of a
             // typevar, since there's no guarantee what type the typevar will be specialized to.

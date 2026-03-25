@@ -189,25 +189,54 @@ def _(x: dict[str, int | str], flag: bool):
     # error: [invalid-argument-type]
     f1(**x)
 
-x2: dict[str, object] = {"outer": {"a": 1}}
+x2: dict[str, object] = {"inner": {"a": 1}}
 # error: [invalid-argument-type]
 f1(**x2)
 
+x3: dict[str, dict[str, object]] = {"inner": {"a": 1, "b": "a"}}
+
+f2(**x3["inner"])  # ok
+f1(**x3["inner"])  # ok
+# error: [invalid-argument-type]
+f3(**x3["inner"])
+
+x3["inner"]["c"] = 1.0
+f3(**x3["inner"])  # ok
+
+x3["inner"] = {"inner": {"a": 1}}
+# error: [invalid-argument-type]
+f1(**x3["inner"])
+
+def _(x: dict[str, object]):
+    x["inner"]: dict[str, float | str] = {"a": 1, "b": "a"}
+
+    f2(**x["inner"])  # ok
+    f1(**x["inner"])  # ok
+    # error: [invalid-argument-type]
+    f3(**x["inner"])
+
+    x["inner"]["c"] = 1.0
+    f3(**x["inner"])  # ok
+
+    x["inner"] = {"inner": {"a": 1}}
+    # error: [invalid-argument-type]
+    f1(**x["inner"])
+
 class Y:
-    x: dict[str, object]
+    inner: dict[str, object]
 
-y1 = Y()
-y1.x = {"a": 1, "b": "a"}
+def _(y: Y):
+    y.inner = {"a": 1, "b": "a"}
 
-f2(**y1.x)  # ok
-f1(**y1.x)  # ok
-# error: [invalid-argument-type]
-f3(**y1.x)
+    f2(**y.inner)  # ok
+    f1(**y.inner)  # ok
+    # error: [invalid-argument-type]
+    f3(**y.inner)
 
-y1.x["c"] = 1.0
-f3(**y1.x)  # ok
+    y.inner["c"] = 1.0
+    f3(**y.inner)  # ok
 
-y1.x = {"outer": {"a": 1}}
-# error: [invalid-argument-type]
-f1(**y1.x)
+    y.inner = {"inner": {"a": 1}}
+    # error: [invalid-argument-type]
+    f1(**y.inner)
 ```
