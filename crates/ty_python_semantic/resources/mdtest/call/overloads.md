@@ -991,7 +991,7 @@ from typing import Literal, overload
 def g(x: int, y: str) -> Literal[1]: ...
 @overload
 def g(x: int, y: str, z: int) -> Literal[2]: ...
-def g(*args):
+def g(*args, **kwargs) -> int:
     return 1
 
 def _(t: tuple[int, str] | tuple[int, str, int]) -> None:
@@ -1003,12 +1003,10 @@ def _(t: tuple[int, str] | tuple[int, str, int]) -> None:
 def h(x: int, y: str) -> Literal[1]: ...
 @overload
 def h(x: object, y: object, z: object) -> Literal[2]: ...
-def h(*args):
+def h(*args, **kwargs) -> int:
     return 1
 
 def _(t: tuple[int, str] | tuple[int, str, int]) -> None:
-    # Even though the 3-arg overload can type-check against the unexpanded `*args`, argument
-    # expansion should still revive the 2-arg overload and combine both return types.
     reveal_type(h(*t))  # revealed: Literal[1, 2]
 
 @overload
@@ -1017,14 +1015,26 @@ def k(x: int, y: str) -> Literal[1]: ...
 def k(x: int | str, y: object, z: object) -> Literal[2]: ...
 @overload
 def k(x: object, y: object, z: object) -> Literal[2]: ...
-def k(*args, **kwargs):
+def k(*args, **kwargs) -> int:
     return 1
 
 def _(t: tuple[int, str] | tuple[int, str, int]) -> None:
-    # Here argument expansion should run before continuing with the multi-overload logic, because
-    # the 2-arg overload can still match one expansion even though it was pruned provisionally
-    # before expansion.
     reveal_type(k(*t))  # revealed: Literal[1, 2]
+
+# TODO: this case should error with overlapping overloads -- but people do write overlapping
+# overloads, and `Literal[1, 2]` is still a better return type here than `Literal[2]`.
+
+@overload
+def m(x: int, y: str) -> Literal[1]: ...
+@overload
+def m(x: int, y: str, z: int = 0) -> Literal[2]: ...
+def m(*args, **kwargs) -> int:
+    return 1
+
+def _(t: tuple[int, str] | tuple[int, str, int]) -> None:
+    # The defaulted third parameter lets the second overload survive provisional arity checking,
+    # but argument expansion should still revive the 2-arg overload and combine both return types.
+    reveal_type(m(*t))  # revealed: Literal[1, 2]
 ```
 
 ## Filtering based on variadic arguments

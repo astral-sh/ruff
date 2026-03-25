@@ -831,9 +831,15 @@ def f17(x: tuple[int] | tuple[int, int]) -> None:
 
 # Longer union elements must still be rejected when they would contribute
 # extra positional arguments.
-def f20(a: int, b: str) -> None: ...
-def f21(x: tuple[int, str] | tuple[int, str, int]) -> None:
+def f20(a: int, b: int) -> None: ...
+def f21(x: tuple[int, int] | tuple[int, int, int]) -> None:
     f20(*x)  # error: [too-many-positional-arguments]
+
+# Shorter union elements must also be rejected when they cannot provide a required
+# positional argument.
+def f22(a: int, b: int, c: int) -> None: ...
+def f23(x: tuple[int, int] | tuple[int, int, int]) -> None:
+    f22(*x)  # error: [missing-argument]
 ```
 
 ### Mixed argument and parameter containing variadic
