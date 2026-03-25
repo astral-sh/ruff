@@ -1649,7 +1649,7 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         target: Type<'db>,
-        inferable: InferableTypeVars<'_, 'db>,
+        inferable: InferableTypeVars<'db>,
     ) -> Type<'db> {
         let constraints = ConstraintSetBuilder::new();
         self.filter_union(db, |elem| {
@@ -4827,7 +4827,7 @@ impl<'db> Type<'db> {
                 Some(GeneratorTypes {
                     yield_ty: Some(*yield_ty),
                     send_ty: Some(Type::none(db)),
-                    return_ty: Some(Type::unknown()),
+                    return_ty: Some(Type::none(db)),
                 })
             } else {
                 None
@@ -6720,12 +6720,19 @@ enum InvalidTypeExpression<'db> {
     /// Same for `typing.TypeAlias`, anywhere except for as the sole annotation on an annotated
     /// assignment
     TypeAlias,
+    /// Same for `typing.Concatenate`, anywhere except for as the first parameter of a `Callable`
+    /// type expression
+    Concatenate,
     /// Type qualifiers are always invalid in *type expressions*,
     /// but these ones are okay with 0 arguments in *annotation expressions*
     TypeQualifier(TypeQualifier),
     /// Type qualifiers that are invalid in type expressions,
     /// and which would require exactly one argument even if they appeared in an annotation expression
     TypeQualifierRequiresOneArgument(TypeQualifier),
+    /// `typing.Self` cannot be used in `@staticmethod` definitions.
+    TypingSelfInStaticMethod,
+    /// `typing.Self` cannot be used in metaclass definitions.
+    TypingSelfInMetaclass,
     /// Some types are always invalid in type expressions
     InvalidType(Type<'db>, ScopeId<'db>),
     InvalidBareParamSpec(TypeVarInstance<'db>),
@@ -6795,6 +6802,12 @@ impl<'db> InvalidTypeExpression<'db> {
                         "Type qualifier `{qualifier}` is not allowed in type expressions \
                         (only in annotation expressions, and only with exactly one argument)",
                     ),
+                    InvalidTypeExpression::TypingSelfInStaticMethod => {
+                        f.write_str("`Self` cannot be used in a static method")
+                    }
+                    InvalidTypeExpression::TypingSelfInMetaclass => {
+                        f.write_str("`Self` cannot be used in a metaclass")
+                    }
                     InvalidTypeExpression::InvalidType(Type::FunctionLiteral(function), _) => {
                         write!(
                             f,
@@ -6816,6 +6829,9 @@ impl<'db> InvalidTypeExpression<'db> {
                         f,
                         "Bare ParamSpec `{}` is not valid in this context in a type expression",
                         paramspec.name(self.db)
+                    ),
+                    InvalidTypeExpression::Concatenate => f.write_str(
+                        "`typing.Concatenate` is not allowed in this context in a type expression",
                     ),
                 }
             }
@@ -6889,6 +6905,10 @@ impl<'db> InvalidTypeExpression<'db> {
             diagnostic.info(" - as the default type for another ParamSpec");
             diagnostic.info(" - as part of a type parameter list when defining a generic class");
             diagnostic.info(" - or as part of an argument list when specializing a generic class");
+        } else if matches!(self, InvalidTypeExpression::Concatenate) {
+            diagnostic.info("`typing.Concatenate` is only valid:");
+            diagnostic.info(" - as the first argument to `typing.Callable`");
+            diagnostic.info(" - as a type argument for a `ParamSpec` parameter");
         }
     }
 }

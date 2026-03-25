@@ -1220,15 +1220,16 @@ impl<'db> StaticClassLiteral<'db> {
 
         let signature_from_fields = |mut parameters: Vec<_>, return_ty: Type<'db>| {
             for (field_name, field) in self.fields(db, specialization, field_policy) {
-                let (init, mut default_ty, kw_only, alias) = match &field.kind {
-                    FieldKind::NamedTuple { default_ty } => (true, *default_ty, None, None),
+                let (init, mut default_ty, kw_only, alias, converter) = match &field.kind {
+                    FieldKind::NamedTuple { default_ty } => (true, *default_ty, None, None, None),
                     FieldKind::Dataclass {
                         init,
                         default_ty,
                         kw_only,
                         alias,
+                        converter,
                         ..
-                    } => (*init, *default_ty, *kw_only, alias.as_ref()),
+                    } => (*init, *default_ty, *kw_only, alias.as_ref(), *converter),
                     FieldKind::TypedDict { .. } => continue,
                 };
                 let mut field_ty = field.declared_ty;
@@ -1296,6 +1297,10 @@ impl<'db> StaticClassLiteral<'db> {
                                 .unwrap_or_else(Type::unknown);
                         }
                     }
+                }
+
+                if let Some((converter_input_ty, _)) = converter {
+                    field_ty = converter_input_ty;
                 }
 
                 let is_kw_only =
@@ -1978,15 +1983,20 @@ impl<'db> StaticClassLiteral<'db> {
                 )))
             }
             (CodeGeneratorKind::TypedDict, "update") => {
-                let keyword_parameters: Vec<_> = self
-                    .fields(db, specialization, field_policy)
-                    .iter()
-                    .map(|(name, field)| {
-                        Parameter::keyword_only(name.clone())
-                            .with_annotated_type(field.declared_ty)
-                            .with_default_type(field.declared_ty)
-                    })
-                    .collect();
+                let keyword_parameters: Vec<_> = if let Type::TypedDict(typed_dict) = instance_ty {
+                    typed_dict
+                        .to_update_patch(db)
+                        .items(db)
+                        .iter()
+                        .map(|(name, field)| {
+                            Parameter::keyword_only(name.clone())
+                                .with_annotated_type(field.declared_ty)
+                                .with_default_type(field.declared_ty)
+                        })
+                        .collect()
+                } else {
+                    Vec::new()
+                };
 
                 Some(synthesize_typed_dict_update_member(
                     db,
@@ -2216,6 +2226,7 @@ impl<'db> StaticClassLiteral<'db> {
                 let mut init = true;
                 let mut kw_only = None;
                 let mut alias = None;
+                let mut converter = None;
                 if let Some(Type::KnownInstance(KnownInstanceType::Field(field))) = default_ty {
                     default_ty = field.default_type(db);
                     if self
@@ -2230,6 +2241,7 @@ impl<'db> StaticClassLiteral<'db> {
                         init = field.init(db);
                         kw_only = field.kw_only(db);
                         alias = field.alias(db);
+                        converter = field.converter(db);
                     }
                 }
 
@@ -2241,6 +2253,7 @@ impl<'db> StaticClassLiteral<'db> {
                         init,
                         kw_only,
                         alias,
+                        converter,
                     },
                     CodeGeneratorKind::TypedDict => {
                         let is_required = if attr.is_required() {
@@ -2888,6 +2901,26 @@ impl<'db> StaticClassLiteral<'db> {
                 ..
             }
         )
+    }
+
+    /// Returns the converter's input type (i.e., the type of its first positional parameter) for a
+    /// dataclass field, if the field has a converter function specified.
+    pub(super) fn converter_input_type_for_field(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+    ) -> Option<Type<'db>> {
+        let field_policy = CodeGeneratorKind::from_static_class(db, self, None)?;
+        if !matches!(field_policy, CodeGeneratorKind::DataclassLike(_)) {
+            return None;
+        }
+        let fields = self.fields(db, None, field_policy);
+        let field = fields.get(name)?;
+        if let FieldKind::Dataclass { converter, .. } = field.kind {
+            converter.map(|(input_ty, _)| input_ty)
+        } else {
+            None
+        }
     }
 
     pub(super) fn to_non_generic_instance(self, db: &'db dyn Db) -> Type<'db> {

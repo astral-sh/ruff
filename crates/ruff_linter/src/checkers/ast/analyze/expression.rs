@@ -1532,6 +1532,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                     flake8_bandit::rules::hardcoded_sql_expression(checker, expr);
                 }
             }
+            if checker.is_rule_enabled(Rule::FStringPercentFormat) {
+                ruff::rules::fstring_percent_format(checker, bin_op);
+            }
         }
         Expr::BinOp(ast::ExprBinOp {
             op: Operator::Add, ..

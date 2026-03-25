@@ -207,83 +207,79 @@ pub(crate) fn typing_self<'db>(
     )
 }
 
-#[derive(Clone, Copy, Debug)]
-pub(crate) enum InferableTypeVars<'a, 'db> {
+#[derive(Clone, Copy, Debug, Hash, Eq, PartialEq, get_size2::GetSize, salsa::Update)]
+pub(crate) enum InferableTypeVars<'db> {
     None,
-    One(&'a FxHashSet<BoundTypeVarIdentity<'db>>),
-    Two(
-        &'a InferableTypeVars<'a, 'db>,
-        &'a InferableTypeVars<'a, 'db>,
-    ),
+    Some(InferableTypeVarsInner<'db>),
 }
 
+impl<'db> InferableTypeVars<'db> {
+    pub(crate) fn from_typevars(
+        db: &'db dyn Db,
+        typevars: FxOrderSet<BoundTypeVarIdentity<'db>>,
+    ) -> Self {
+        if typevars.is_empty() {
+            return InferableTypeVars::None;
+        }
+        Self::Some(InferableTypeVarsInner::new_internal(db, typevars))
+    }
+}
+
+#[salsa::interned(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
+pub(crate) struct InferableTypeVarsInner<'db> {
+    #[returns(ref)]
+    inferable: FxOrderSet<BoundTypeVarIdentity<'db>>,
+}
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for InferableTypeVarsInner<'_> {}
+
 impl<'db> BoundTypeVarIdentity<'db> {
-    pub(crate) fn is_inferable(self, inferable: InferableTypeVars<'_, 'db>) -> bool {
+    pub(crate) fn is_inferable(self, db: &'db dyn Db, inferable: InferableTypeVars<'db>) -> bool {
         match inferable {
             InferableTypeVars::None => false,
-            InferableTypeVars::One(typevars) => typevars.contains(&self),
-            InferableTypeVars::Two(left, right) => {
-                self.is_inferable(*left) || self.is_inferable(*right)
-            }
+            InferableTypeVars::Some(inner) => inner.inferable(db).contains(&self),
         }
     }
 }
 
 impl<'db> BoundTypeVarInstance<'db> {
-    pub(crate) fn is_inferable(
-        self,
-        db: &'db dyn Db,
-        inferable: InferableTypeVars<'_, 'db>,
-    ) -> bool {
-        self.identity(db).is_inferable(inferable)
+    pub(crate) fn is_inferable(self, db: &'db dyn Db, inferable: InferableTypeVars<'db>) -> bool {
+        self.identity(db).is_inferable(db, inferable)
     }
 }
 
-impl<'a, 'db> InferableTypeVars<'a, 'db> {
-    pub(crate) fn merge(&'a self, other: &'a InferableTypeVars<'a, 'db>) -> Self {
+#[salsa::tracked]
+impl<'db> InferableTypeVars<'db> {
+    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+    pub(crate) fn merge(self, db: &'db dyn Db, other: Self) -> Self {
         match (self, other) {
-            (InferableTypeVars::None, other) | (other, InferableTypeVars::None) => *other,
-            _ => InferableTypeVars::Two(self, other),
+            (InferableTypeVars::None, other) | (other, InferableTypeVars::None) => other,
+            (InferableTypeVars::Some(self_inner), InferableTypeVars::Some(other_inner)) => {
+                let merged = self_inner.inferable(db) | other_inner.inferable(db);
+                Self::Some(InferableTypeVarsInner::new_internal(db, merged))
+            }
         }
     }
 
     // This is not an IntoIterator implementation because I have no desire to try to name the
     // iterator type.
-    pub(crate) fn iter(self) -> impl Iterator<Item = BoundTypeVarIdentity<'db>> {
+    pub(crate) fn iter(
+        self,
+        db: &'db dyn Db,
+    ) -> impl Iterator<Item = BoundTypeVarIdentity<'db>> + 'db {
         match self {
-            InferableTypeVars::None => Either::Left(Either::Left(std::iter::empty())),
-            InferableTypeVars::One(typevars) => Either::Right(typevars.iter().copied()),
-            InferableTypeVars::Two(left, right) => {
-                let chained: Box<dyn Iterator<Item = BoundTypeVarIdentity<'db>>> =
-                    Box::new(left.iter().chain(right.iter()));
-                Either::Left(Either::Right(chained))
-            }
+            InferableTypeVars::None => Either::Left(std::iter::empty()),
+            InferableTypeVars::Some(inner) => Either::Right(inner.inferable(db).iter().copied()),
         }
     }
 
     // Keep this around for debugging purposes
     #[expect(dead_code)]
     pub(crate) fn display(&self, db: &'db dyn Db) -> impl Display {
-        fn find_typevars<'db>(
-            result: &mut FxHashSet<BoundTypeVarIdentity<'db>>,
-            inferable: &InferableTypeVars<'_, 'db>,
-        ) {
-            match inferable {
-                InferableTypeVars::None => {}
-                InferableTypeVars::One(typevars) => result.extend(typevars.iter().copied()),
-                InferableTypeVars::Two(left, right) => {
-                    find_typevars(result, left);
-                    find_typevars(result, right);
-                }
-            }
-        }
-
-        let mut typevars = FxHashSet::default();
-        find_typevars(&mut typevars, self);
         format!(
             "[{}]",
-            typevars
-                .into_iter()
+            self.iter(db)
                 .map(|identity| identity.display(db))
                 .format(", ")
         )
@@ -391,10 +387,10 @@ impl<'db> GenericContext<'db> {
     /// In this example, `method`'s generic context binds `Self` and `T`, but its inferable set
     /// also includes `A@C`. This is needed because at each call site, we need to infer the
     /// specialized class instance type whose method is being invoked.
-    pub(crate) fn inferable_typevars(self, db: &'db dyn Db) -> InferableTypeVars<'db, 'db> {
+    pub(crate) fn inferable_typevars(self, db: &'db dyn Db) -> InferableTypeVars<'db> {
         #[derive(Default)]
         struct CollectTypeVars<'db> {
-            typevars: RefCell<FxHashSet<BoundTypeVarIdentity<'db>>>,
+            typevars: RefCell<FxOrderSet<BoundTypeVarIdentity<'db>>>,
             recursion_guard: TypeCollector<'db>,
         }
 
@@ -423,25 +419,21 @@ impl<'db> GenericContext<'db> {
         }
 
         #[salsa::tracked(
-            returns(ref),
-            cycle_initial=|_, _, _| FxHashSet::default(),
+            cycle_initial=|_, _, _| InferableTypeVars::None,
             heap_size=ruff_memory_usage::heap_size,
         )]
         fn inferable_typevars_inner<'db>(
             db: &'db dyn Db,
             generic_context: GenericContext<'db>,
-        ) -> FxHashSet<BoundTypeVarIdentity<'db>> {
+        ) -> InferableTypeVars<'db> {
             let visitor = CollectTypeVars::default();
             for bound_typevar in generic_context.variables(db) {
                 visitor.visit_bound_type_var_type(db, bound_typevar);
             }
-            visitor.typevars.into_inner()
+            InferableTypeVars::from_typevars(db, visitor.typevars.into_inner())
         }
 
-        // This ensures that salsa caches the FxHashSet, not the InferableTypeVars that wraps it.
-        // (That way InferableTypeVars can contain references, and doesn't need to impl
-        // salsa::Update.)
-        InferableTypeVars::One(inferable_typevars_inner(db, self))
+        inferable_typevars_inner(db, self)
     }
 
     pub(crate) fn variables(
@@ -1273,7 +1265,7 @@ impl<'db> Specialization<'db> {
         db: &'db dyn Db,
         other: Self,
         constraints: &'c ConstraintSetBuilder<'db>,
-        inferable: InferableTypeVars<'_, 'db>,
+        inferable: InferableTypeVars<'db>,
     ) -> ConstraintSet<'db, 'c> {
         let relation_visitor = HasRelationToVisitor::default(constraints);
         let disjointness_visitor = IsDisjointVisitor::default(constraints);
@@ -1656,7 +1648,7 @@ impl<'db> Type<'db> {
 pub(crate) struct SpecializationBuilder<'db, 'c> {
     db: &'db dyn Db,
     constraints: &'c ConstraintSetBuilder<'db>,
-    inferable: InferableTypeVars<'db, 'db>,
+    inferable: InferableTypeVars<'db>,
     types: FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>>,
 }
 
@@ -1668,7 +1660,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     pub(crate) fn new(
         db: &'db dyn Db,
         constraints: &'c ConstraintSetBuilder<'db>,
-        inferable: InferableTypeVars<'db, 'db>,
+        inferable: InferableTypeVars<'db>,
     ) -> Self {
         Self {
             db,

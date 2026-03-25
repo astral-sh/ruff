@@ -29,8 +29,8 @@ use crate::types::subscript::{LegacyGenericOrigin, SubscriptError, SubscriptErro
 use crate::types::tuple::{Tuple, TupleType};
 use crate::types::typed_dict::{TypedDictAssignmentKind, TypedDictKeyAssignment};
 use crate::types::{
-    BoundTypeVarInstance, CallArguments, CallDunderError, CallableType, DynamicType, InternedType,
-    KnownClass, KnownInstanceType, LintDiagnosticGuard, Parameter, Parameters, SpecialFormType,
+    BoundTypeVarInstance, CallArguments, CallDunderError, DynamicType, InternedType, KnownClass,
+    KnownInstanceType, LintDiagnosticGuard, Parameter, Parameters, SpecialFormType,
     StaticClassLiteral, Type, TypeAliasType, TypeContext, TypeVarBoundOrConstraints, UnionType,
     UnionTypeInstance, any_over_type, todo_type,
 };
@@ -303,51 +303,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     ));
                 }
                 SpecialFormType::Callable => {
-                    let arguments = if let ast::Expr::Tuple(tuple) = &*subscript.slice {
-                        &*tuple.elts
-                    } else {
-                        std::slice::from_ref(&*subscript.slice)
-                    };
-
-                    // TODO: Remove this once we support Concatenate properly. This is necessary
-                    // to avoid a lot of false positives downstream, because we can't represent the typevar-
-                    // specialized `Callable` types yet.
-                    if let [first_arg, second_arg] = arguments
-                        && first_arg.is_subscript_expr()
-                    {
-                        let first_arg_ty = self.infer_expression(first_arg, TypeContext::default());
-                        if let Type::Dynamic(DynamicType::UnknownGeneric(generic_context)) =
-                            first_arg_ty
-                        {
-                            let mut variables =
-                                generic_context.variables(db).collect::<FxOrderSet<_>>();
-
-                            let return_ty =
-                                self.infer_expression(second_arg, TypeContext::default());
-                            return_ty.bind_and_find_all_legacy_typevars(
-                                db,
-                                self.typevar_binding_context,
-                                &mut variables,
-                            );
-
-                            let generic_context =
-                                GenericContext::from_typevar_instances(db, variables);
-                            return Type::Dynamic(DynamicType::UnknownGeneric(generic_context));
-                        }
-
-                        if let Some(builder) =
-                            self.context.report_lint(&INVALID_TYPE_FORM, subscript)
-                        {
-                            builder.into_diagnostic(format_args!(
-                                "The first argument to `Callable` must be either a list of types, \
-                                     ParamSpec, Concatenate, or `...`",
-                            ));
-                        }
-                        return Type::KnownInstance(KnownInstanceType::Callable(
-                            CallableType::unknown(db),
-                        ));
-                    }
-
                     let callable = self
                         .infer_callable_type(subscript)
                         .as_callable()
@@ -886,8 +841,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 return Ok(Type::paramspec_value_callable(db, parameters));
             }
 
-            ast::Expr::Subscript(_) => {
-                // TODO: Support `Concatenate[...]`
+            ast::Expr::Subscript(subscript) => {
+                let value_ty = self.infer_expression(&subscript.value, TypeContext::default());
+
+                if matches!(value_ty, Type::SpecialForm(SpecialFormType::Concatenate)) {
+                    return Ok(Type::paramspec_value_callable(
+                        db,
+                        self.infer_concatenate_special_form(subscript),
+                    ));
+                }
+
+                // Non-Concatenate subscript: fall back to todo
                 return Ok(Type::paramspec_value_callable(db, Parameters::todo()));
             }
 

@@ -203,6 +203,38 @@ class Calculator:
 reveal_type(Calculator().square_then_round(3.14))  # revealed: Unknown | int
 ```
 
+## Use case: Wrappers with explicit receivers
+
+`trio` defines multiple functions that takes in a callable with `Concatenate`-prepended receiver
+types, and returns a wrapper function with a different receiver type. They should still preserve
+descriptor behavior when the returned callable is assigned in the class body.
+
+```py
+from collections.abc import Callable, Iterable
+from typing import Concatenate, ParamSpec, TypeVar
+
+P = ParamSpec("P")
+T = TypeVar("T")
+
+class RawPath:
+    def write_bytes(self, data: bytes) -> int:
+        raise NotImplementedError
+
+def _wrap_method(
+    fn: Callable[Concatenate[RawPath, P], T],
+) -> Callable[Concatenate["Path", P], T]:
+    raise NotImplementedError
+
+class Path:
+    write_bytes = _wrap_method(RawPath.write_bytes)
+
+def check(path: Path) -> None:
+    # TODO: shouldn't be errors, should reveal `int`
+    # error: [missing-argument]
+    # error: [invalid-argument-type]
+    reveal_type(path.write_bytes(b""))  # revealed: Unknown | int
+```
+
 ## Use case: Treating dunder methods as bound-method descriptors
 
 pytorch defines a `__pow__` dunder attribute on [`TensorBase`] in a similar way to the following

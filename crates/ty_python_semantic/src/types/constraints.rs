@@ -342,11 +342,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         self.is_cyclic_impl(db, None)
     }
 
-    fn is_cyclic_impl(
-        self,
-        db: &'db dyn Db,
-        inferable: Option<InferableTypeVars<'_, 'db>>,
-    ) -> bool {
+    fn is_cyclic_impl(self, db: &'db dyn Db, inferable: Option<InferableTypeVars<'db>>) -> bool {
         #[derive(Default)]
         struct CollectReachability<'db> {
             reachable_typevars: RefCell<FxHashSet<BoundTypeVarIdentity<'db>>>,
@@ -423,7 +419,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
             .for_each_constraint(self.builder, &mut |constraint, _| {
                 let constraint = self.builder.constraint_data(constraint);
                 let identity = constraint.typevar.identity(db);
-                if inferable.is_some_and(|inferable| !identity.is_inferable(inferable)) {
+                if inferable.is_some_and(|inferable| !identity.is_inferable(db, inferable)) {
                     return;
                 }
                 let visitor = CollectReachability::default();
@@ -435,7 +431,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
                     entry.extend(
                         reachable
                             .into_iter()
-                            .filter(|tv| tv.is_inferable(inferable)),
+                            .filter(|tv| tv.is_inferable(db, inferable)),
                     );
                 } else {
                     entry.extend(reachable);
@@ -489,7 +485,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         &self,
         db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
-        inferable: InferableTypeVars<'_, 'db>,
+        inferable: InferableTypeVars<'db>,
     ) -> bool {
         self.verify_builder(builder);
         self.node.satisfied_by_all_typevars(db, builder, inferable)
@@ -648,7 +644,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         self,
         db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
-        inferable: InferableTypeVars<'_, 'db>,
+        inferable: InferableTypeVars<'db>,
         choose: impl FnMut(
             BoundTypeVarInstance<'db>,
             TypeVarVariance,
@@ -2192,7 +2188,7 @@ impl NodeId {
         self,
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
-        inferable: InferableTypeVars<'_, 'db>,
+        inferable: InferableTypeVars<'db>,
     ) -> bool {
         match self.node() {
             Node::AlwaysTrue => return true,

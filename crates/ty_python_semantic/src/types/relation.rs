@@ -302,7 +302,7 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         target: Type<'db>,
         constraints: &'c ConstraintSetBuilder<'db>,
-        inferable: InferableTypeVars<'_, 'db>,
+        inferable: InferableTypeVars<'db>,
     ) -> ConstraintSet<'db, 'c> {
         self.has_relation_to(db, target, constraints, inferable, TypeRelation::Subtyping)
     }
@@ -317,7 +317,7 @@ impl<'db> Type<'db> {
         target: Type<'db>,
         assuming: ConstraintSet<'db, 'c>,
         constraints: &'c ConstraintSetBuilder<'db>,
-        inferable: InferableTypeVars<'_, 'db>,
+        inferable: InferableTypeVars<'db>,
     ) -> ConstraintSet<'db, 'c> {
         let checker = TypeRelationChecker {
             constraints,
@@ -355,7 +355,7 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         target: Type<'db>,
         constraints: &'c ConstraintSetBuilder<'db>,
-        inferable: InferableTypeVars<'_, 'db>,
+        inferable: InferableTypeVars<'db>,
     ) -> ConstraintSet<'db, 'c> {
         self.has_relation_to(
             db,
@@ -414,7 +414,7 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         target: Type<'db>,
         constraints: &'c ConstraintSetBuilder<'db>,
-        inferable: InferableTypeVars<'_, 'db>,
+        inferable: InferableTypeVars<'db>,
         relation: TypeRelation,
     ) -> ConstraintSet<'db, 'c> {
         let checker = TypeRelationChecker {
@@ -486,7 +486,7 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         other: Type<'db>,
         constraints: &'c ConstraintSetBuilder<'db>,
-        inferable: InferableTypeVars<'_, 'db>,
+        inferable: InferableTypeVars<'db>,
     ) -> ConstraintSet<'db, 'c> {
         let checker = DisjointnessChecker {
             constraints,
@@ -524,7 +524,7 @@ impl<'db, 'c> IsDisjointVisitor<'db, 'c> {
 #[derive(Clone)]
 pub(super) struct TypeRelationChecker<'a, 'c, 'db> {
     pub(super) constraints: &'c ConstraintSetBuilder<'db>,
-    pub(super) inferable: InferableTypeVars<'a, 'db>,
+    pub(super) inferable: InferableTypeVars<'db>,
     pub(super) relation: TypeRelation,
     given: ConstraintSet<'db, 'c>,
 
@@ -541,7 +541,7 @@ pub(super) struct TypeRelationChecker<'a, 'c, 'db> {
 impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
     pub(super) fn subtyping(
         constraints: &'c ConstraintSetBuilder<'db>,
-        inferable: InferableTypeVars<'a, 'db>,
+        inferable: InferableTypeVars<'db>,
         relation_visitor: &'a HasRelationToVisitor<'db, 'c>,
         disjointness_visitor: &'a IsDisjointVisitor<'db, 'c>,
     ) -> Self {
@@ -570,7 +570,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         }
     }
 
-    pub(super) fn with_inferable_typevars(&self, inferable: InferableTypeVars<'a, 'db>) -> Self {
+    pub(super) fn with_inferable_typevars(&self, inferable: InferableTypeVars<'db>) -> Self {
         Self {
             inferable,
             ..self.clone()
@@ -681,9 +681,27 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 self.check_type_pair(db, source, target_alias.value_type(db))
             }),
 
-            // Pretend that instances of `dataclasses.Field` are assignable to their default type.
-            // This allows field definitions like `name: str = field(default="")` in dataclasses
-            // to pass the assignability check of the inferred type to the declared type.
+            // Field definitions in dataclasses and dataclass-transformers can involve calls to
+            // `dataclasses.field` or custom field-specifier functions. The annotated return type
+            // of these functions is often explicitly wrong to "help" type checkers. We therefore
+            // overwrite their return type unconditionally and pretend that all field-specifier
+            // calls return a `KnownInstanceType::Field`.
+            //
+            // Here, we model assignability of this special type to the declared field type. In
+            // order to catch mistakes in the field definition, we only consider this known instance
+            // type to be assignable if the default value and converter output type is compatible
+            // with the declared field type.
+            //
+            // We consider three cases:
+            //     1. If a converter is provided, we validate the output/return type of the converter
+            //        function against the declared field type. The presence of a default value is
+            //        irrelevant in this case, as the converter is expected to handle conversion from
+            //        the default value's type to the declared field type. Incompatibilities between
+            //        the two must be caught by the field-specifier function's signature.
+            //     2. If no converter is provided, we validate the default value's type against the
+            //        declared field type.
+            //     3. If neither a converter nor a default value is provided, we allow the field to be
+            //        considered assignable to any type.
             (Type::KnownInstance(KnownInstanceType::Field(field)), _)
                 if self.relation.is_assignability() =>
             {
@@ -691,6 +709,14 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     .default_type(db)
                     .when_none_or(db, self.constraints, |default_type| {
                         self.check_type_pair(db, default_type, target)
+                    })
+                    .and(db, self.constraints, || {
+                        field
+                            .converter(db)
+                            .map(|(_, output_ty)| output_ty)
+                            .when_none_or(db, self.constraints, |converter_output_type| {
+                                self.check_type_pair(db, converter_output_type, target)
+                            })
                     })
             }
 
@@ -1576,7 +1602,7 @@ impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
 
 pub(super) struct DisjointnessChecker<'a, 'c, 'db> {
     pub(super) constraints: &'c ConstraintSetBuilder<'db>,
-    pub(super) inferable: InferableTypeVars<'a, 'db>,
+    pub(super) inferable: InferableTypeVars<'db>,
     given: ConstraintSet<'db, 'c>,
 
     // N.B. these fields are private to reduce the risk of
@@ -1592,7 +1618,7 @@ pub(super) struct DisjointnessChecker<'a, 'c, 'db> {
 impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
     pub(super) fn new(
         constraints: &'c ConstraintSetBuilder<'db>,
-        inferable: InferableTypeVars<'a, 'db>,
+        inferable: InferableTypeVars<'db>,
         relation_visitor: &'a HasRelationToVisitor<'db, 'c>,
         disjointness_visitor: &'a IsDisjointVisitor<'db, 'c>,
     ) -> Self {
