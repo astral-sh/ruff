@@ -447,7 +447,7 @@ is a convenience option that sets four settings at once
 
 - `no_sections = True` — removes section grouping (standard library, third-party, etc.)
 - `from_first = True` — places `from` imports before straight `import` statements
-- `force_alphabetical_sort_within_sections = True` — sorts names within `from X import ...` purely alphabetically, ignoring type-based ordering (i.e., no grouping of `CONSTANTS` before `Classes` before `names`)
+- `force_alphabetical_sort_within_sections = True` — interleaves all import statements within each section and sorts them purely alphabetically, ignoring type-based ordering. Since `from_first` is also enabled, the interleaving is overridden (from-imports still come first), so the net effect is disabling type-based ordering
 - `lines_between_types = 1` — adds a blank line between `import` and `from` statements
 
 You can approximate it in Ruff with:
@@ -474,10 +474,19 @@ from typing import TYPE_CHECKING, Counter, Final, OrderedDict
 from typing import Counter, Final, OrderedDict, TYPE_CHECKING
 ```
 
-For most inputs, this configuration produces identical output to isort's
-`force_alphabetical_sort`. The only known difference is when two names differ only in
-casing (e.g., `Final` vs `final`): isort preserves the original source order (stable sort),
-while Ruff sorts uppercase before lowercase (`Final, final`).
+Note that this configuration is an approximation — the only known difference is in
+tie-breaking when two names differ only in casing. isort sorts lowercase first, while
+Ruff sorts uppercase first. For example, given `from mylib import foo, Foo`:
+
+```python
+# isort with force_alphabetical_sort: lowercase first
+from mylib import foo, Foo
+
+# Ruff with the above config: uppercase first
+from mylib import Foo, foo
+```
+
+In practice, this rarely affects real-world codebases.
 
 ## Does Ruff support Jupyter Notebooks?
 
