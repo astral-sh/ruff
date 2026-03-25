@@ -21,8 +21,7 @@ use ruff_python_ast::{self as ast, AnyNodeRef, name::Name};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 
-#[path = "ide_support/unused_bindings.rs"]
-mod unused_binding_support;
+mod unused_bindings;
 
 pub use resolve_definition::{ImportAliasResolution, ResolvedDefinition, map_stub_definition};
 use resolve_definition::{find_symbol_in_scope, resolve_definition};
