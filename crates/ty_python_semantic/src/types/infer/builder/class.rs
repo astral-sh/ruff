@@ -225,7 +225,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     .iter()
                     .any(|expr| any_over_expr(expr, &ast::Expr::is_string_literal_expr))
             {
-                self.deferred.insert(definition, self.multi_inference_state);
+                self.deferred.insert(definition);
             } else {
                 let previous_typevar_binding_context =
                     self.typevar_binding_context.replace(definition);

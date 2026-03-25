@@ -1,6 +1,6 @@
 use ruff_python_ast::{self as ast, AnyNodeRef};
 
-use super::{MultiInferenceState, TypeInferenceBuilder};
+use super::TypeInferenceBuilder;
 use crate::Db;
 use crate::types::call::CallArguments;
 use crate::types::constraints::ConstraintSetBuilder;
@@ -162,16 +162,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     ) -> Option<Type<'db>> {
         let db = self.db();
 
-        let old_multi_inference = self.context.set_multi_inference(true);
-        let old_multi_inference_state = self.set_multi_inference_state(MultiInferenceState::Ignore);
-
-        let update_ty = self.infer_expression(
+        let update_ty = self.speculate().infer_expression(
             update,
             TypeContext::new(Some(Type::TypedDict(update_context_typed_dict))),
         );
-
-        self.context.set_multi_inference(old_multi_inference);
-        self.set_multi_inference_state(old_multi_inference_state);
 
         Type::TypedDict(result_typed_dict)
             .try_call_dunder(

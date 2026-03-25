@@ -367,7 +367,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     // The `fields` argument to `typing.NamedTuple` cannot be inferred
                     // eagerly if it's not a dangling call, as it may contain forward references
                     // or recursive references.
-                    self.deferred.insert(definition, self.multi_inference_state);
+                    self.deferred.insert(definition);
                     DynamicNamedTupleAnchor::TypingDefinition(definition)
                 }
             },

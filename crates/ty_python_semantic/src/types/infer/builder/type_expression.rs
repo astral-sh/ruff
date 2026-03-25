@@ -9,7 +9,6 @@ use crate::types::diagnostic::{
     report_invalid_arguments_to_callable, report_invalid_concatenate_last_arg,
 };
 use crate::types::infer::InferenceFlags;
-use crate::types::infer::builder::{InnerExpressionInferenceState, MultiInferenceState};
 use crate::types::signatures::{ConcatenateTail, Signature};
 use crate::types::special_form::{AliasSpec, LegacyStdlibAlias};
 use crate::types::string_annotation::parse_string_annotation;
@@ -27,9 +26,6 @@ use crate::{FxOrderSet, Program, add_inferred_python_version_hint_to_diagnostic}
 impl<'db> TypeInferenceBuilder<'db, '_> {
     /// Infer the type of a type expression.
     pub(super) fn infer_type_expression(&mut self, expression: &ast::Expr) -> Type<'db> {
-        if self.inner_expression_inference_state.is_get() {
-            return self.expression_type(expression);
-        }
         let previous_deferred_state = self.deferred_state;
 
         // `DeferredExpressionState::InStringAnnotation` takes precedence over other states.
@@ -78,9 +74,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
     /// Infer the type of a type expression without storing the result.
     pub(super) fn infer_type_expression_no_store(&mut self, expression: &ast::Expr) -> Type<'db> {
-        if self.inner_expression_inference_state.is_get() {
-            return self.expression_type(expression);
-        }
         // https://typing.python.org/en/latest/spec/annotations.html#grammar-token-expression-grammar-type_expression
         match expression {
             ast::Expr::Name(name) => match name.ctx {
@@ -162,20 +155,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         if !self.deferred_state.is_deferred()
                             && !self.scope.scope(self.db()).in_type_checking_block()
                         {
-                            let previous_state =
-                                self.set_multi_inference_state(MultiInferenceState::Ignore);
-                            let was_in_multi_inference = self.context.set_multi_inference(true);
+                            let mut speculative_builder = self.speculate();
                             // If the left-hand side of the union is itself a PEP-604 union,
                             // we'll already have checked whether it can be used with `|` in a previous inference step
                             // and emitted a diagnostic if it was appropriate. We should skip inferring it here to
                             // avoid duplicate diagnostics; just assume that the l.h.s. is a `UnionType` instance
                             // in that case.
-                            let left_type_value =
-                                self.infer_expression(&binary.left, TypeContext::default());
-                            let right_type_value =
-                                self.infer_expression(&binary.right, TypeContext::default());
-                            self.multi_inference_state = previous_state;
-                            self.context.set_multi_inference(was_in_multi_inference);
+                            let left_type_value = speculative_builder
+                                .infer_expression(&binary.left, TypeContext::default());
+                            let right_type_value = speculative_builder
+                                .infer_expression(&binary.right, TypeContext::default());
 
                             let dunder_fails = Type::try_call_bin_op(
                                 self.db(),
@@ -1405,15 +1394,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
             Type::Union(union) => {
                 self.infer_type_expression(slice);
-                let previous_slice_inference_state = std::mem::replace(
-                    &mut self.inner_expression_inference_state,
-                    InnerExpressionInferenceState::Get,
-                );
-                let union = union.map(self.db(), |element| {
-                    self.infer_subscript_type_expression(subscript, *element)
-                });
-                self.inner_expression_inference_state = previous_slice_inference_state;
-                union
+                union.map(self.db(), |element| {
+                    self.speculate()
+                        .infer_subscript_type_expression(subscript, *element)
+                })
             }
             _ => {
                 self.infer_type_expression(slice);

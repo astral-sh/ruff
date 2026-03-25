@@ -228,8 +228,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .iter()
                 .map(|(expression, ty)| (*expression, *ty)),
         );
-        self.bindings
-            .extend(decorator_inference.bindings(), self.multi_inference_state);
+        self.bindings.extend(decorator_inference.bindings());
         self.called_functions
             .extend(decorator_inference.called_functions().iter().copied());
 
@@ -305,7 +304,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // (lazily) inferring the parameter and return types.) If defaults exist, we also defer so
         // they can be inferred once with type context in the enclosing scope.
         if type_params.is_none() || has_defaults {
-            self.deferred.insert(definition, self.multi_inference_state);
+            self.deferred.insert(definition);
         }
 
         let known_function = KnownFunction::try_from_definition_and_name(db, definition, name);
