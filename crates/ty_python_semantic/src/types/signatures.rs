@@ -714,7 +714,7 @@ impl<'db> Signature<'db> {
         }
     }
 
-    fn inferable_typevars(&self, db: &'db dyn Db) -> InferableTypeVars<'db, 'db> {
+    fn inferable_typevars(&self, db: &'db dyn Db) -> InferableTypeVars<'db> {
         match self.generic_context {
             Some(generic_context) => generic_context.inferable_typevars(db),
             None => InferableTypeVars::None,
@@ -1098,8 +1098,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         //         return t
         let source_inferable = source.inferable_typevars(db);
         let target_inferable = target.inferable_typevars(db);
-        let inferable = self.inferable.merge(&source_inferable);
-        let inferable = inferable.merge(&target_inferable);
+        let inferable = source_inferable.merge(db, target_inferable);
+        let inferable = self.inferable.merge(db, inferable);
 
         // `inner` will create a constraint set that references these newly inferable typevars.
         let checker = self.with_inferable_typevars(inferable);
@@ -1112,7 +1112,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         when.reduce_inferable(
             db,
             self.constraints,
-            source_inferable.iter().chain(target_inferable.iter()),
+            source_inferable.iter(db).chain(target_inferable.iter(db)),
         )
     }
 
