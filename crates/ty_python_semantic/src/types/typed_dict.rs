@@ -18,8 +18,8 @@ use super::diagnostic::{
 };
 use super::infer::infer_deferred_types;
 use super::{
-    ApplyTypeMappingVisitor, IntersectionBuilder, Type, TypeMapping, definition_expression_type,
-    visitor,
+    ApplyTypeMappingVisitor, IntersectionBuilder, Type, TypeMapping, TypeQualifiers,
+    definition_expression_type, visitor,
 };
 use crate::Db;
 use crate::semantic_index::definition::Definition;
@@ -50,10 +50,20 @@ impl Default for TypedDictParams {
 
 pub(super) fn functional_typed_dict_field(
     declared_ty: Type<'_>,
+    qualifiers: TypeQualifiers,
     total: bool,
 ) -> TypedDictField<'_> {
+    let required = if qualifiers.contains(TypeQualifiers::REQUIRED) {
+        true
+    } else if qualifiers.contains(TypeQualifiers::NOT_REQUIRED) {
+        false
+    } else {
+        total
+    };
+
     TypedDictFieldBuilder::new(declared_ty)
-        .required(total)
+        .required(required)
+        .read_only(qualifiers.contains(TypeQualifiers::READ_ONLY))
         .build()
 }
 
@@ -554,11 +564,33 @@ pub(super) fn deferred_functional_typed_dict_schema<'db>(
             let field_ty = deferred_inference
                 .try_expression_type(&item.value)
                 .unwrap_or(Type::unknown());
+            let qualifiers = deferred_inference.qualifiers(&item.value);
 
             schema.insert(
                 Name::new(key_lit.value(db)),
-                functional_typed_dict_field(field_ty, total),
+                functional_typed_dict_field(field_ty, qualifiers, total),
             );
+        }
+    }
+
+    for keyword in &node.arguments.keywords {
+        let Some(arg) = &keyword.arg else {
+            continue;
+        };
+
+        match arg.id.as_str() {
+            "total" | "closed" | "extra_items" => continue,
+            field_name => {
+                let field_ty = deferred_inference
+                    .try_expression_type(&keyword.value)
+                    .unwrap_or(Type::unknown());
+                let qualifiers = deferred_inference.qualifiers(&keyword.value);
+
+                schema.insert(
+                    Name::new(field_name),
+                    functional_typed_dict_field(field_ty, qualifiers, total),
+                );
+            }
         }
     }
 

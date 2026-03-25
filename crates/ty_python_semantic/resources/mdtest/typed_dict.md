@@ -2238,6 +2238,17 @@ reveal_type(inline["x"])  # revealed: int
 inline_bad = TypedDict("InlineBad", {"x": int})(x="bad")
 ```
 
+Inline functional `TypedDict`s preserve `ReadOnly` qualifiers:
+
+```py
+from typing_extensions import TypedDict, ReadOnly
+
+inline_readonly = TypedDict("InlineReadOnly", {"id": ReadOnly[int]})(id=1)
+
+# error: [invalid-assignment] "Cannot assign to key "id" on TypedDict `InlineReadOnly`: key is marked read-only"
+inline_readonly["id"] = 2
+```
+
 Inline functional `TypedDict`s resolve string forward references to existing names:
 
 ```py
@@ -2272,6 +2283,38 @@ TotalNone = TypedDict("TotalNone", {"id": int}, total=None)
 def f(total: bool) -> None:
     # error: [invalid-argument-type] "Invalid argument to parameter `total` of `TypedDict()`"
     TotalDynamic = TypedDict("TotalDynamic", {"id": int}, total=total)
+```
+
+## Function syntax with `Required` and `NotRequired`
+
+The `Required` and `NotRequired` wrappers can be used to override the default requiredness:
+
+```py
+from typing_extensions import TypedDict, Required, NotRequired
+
+# With total=True (default), all fields are required unless wrapped in NotRequired
+MovieWithOptional = TypedDict("MovieWithOptional", {"name": str, "year": NotRequired[int]})
+
+# name is required, year is optional
+# error: [missing-typed-dict-key] "Missing required key 'name' in TypedDict `MovieWithOptional` constructor"
+empty_movie = MovieWithOptional()
+movie_no_year = MovieWithOptional(name="The Matrix")
+reveal_type(movie_no_year)  # revealed: MovieWithOptional
+reveal_type(movie_no_year["name"])  # revealed: str
+reveal_type(movie_no_year["year"])  # revealed: int
+```
+
+```py
+from typing_extensions import TypedDict, Required, NotRequired
+
+# With total=False, all fields are optional unless wrapped in Required
+PartialWithRequired = TypedDict("PartialWithRequired", {"name": Required[str], "year": int}, total=False)
+
+# name is required, year is optional
+# error: [missing-typed-dict-key] "Missing required key 'name' in TypedDict `PartialWithRequired` constructor"
+empty_partial = PartialWithRequired()
+partial_no_year = PartialWithRequired(name="The Matrix")
+reveal_type(partial_no_year)  # revealed: PartialWithRequired
 ```
 
 ## Function syntax with `closed`
@@ -2327,7 +2370,7 @@ class Bar(TypedDict("TD3", {}, extra_items=ReadOnly[int])): ...
 Functional TypedDict supports forward references (string annotations):
 
 ```py
-from typing_extensions import TypedDict
+from typing_extensions import TypedDict, NotRequired
 
 # Forward reference to a class defined below
 MovieWithDirector = TypedDict("MovieWithDirector", {"title": str, "director": "Director"})
@@ -2337,6 +2380,39 @@ class Director:
 
 movie: MovieWithDirector = {"title": "The Matrix", "director": Director()}
 reveal_type(movie)  # revealed: MovieWithDirector
+
+# Forward reference to a class defined above
+MovieWithDirector2 = TypedDict("MovieWithDirector2", {"title": str, "director": NotRequired["Director"]})
+
+movie2: MovieWithDirector2 = {"title": "The Matrix"}
+reveal_type(movie2)  # revealed: MovieWithDirector2
+```
+
+String annotations can also wrap the entire `Required` or `NotRequired` qualifier:
+
+```py
+from typing_extensions import TypedDict, Required, NotRequired
+
+# NotRequired as a string annotation
+TD = TypedDict("TD", {"required": str, "optional": "NotRequired[int]"})
+
+# 'required' is required, 'optional' is not required
+td1: TD = {"required": "hello"}  # Valid - optional is not required
+td2: TD = {"required": "hello", "optional": 42}  # Valid - all keys provided
+reveal_type(td1)  # revealed: TD
+reveal_type(td1["required"])  # revealed: Literal["hello"]
+reveal_type(td1["optional"])  # revealed: int
+
+# error: [missing-typed-dict-key] "Missing required key 'required' in TypedDict `TD` constructor"
+bad_td: TD = {"optional": 42}
+
+# Also works with Required in total=False TypedDicts
+TD2 = TypedDict("TD2", {"required": "Required[str]", "optional": int}, total=False)
+
+# 'required' is required, 'optional' is not required
+td3: TD2 = {"required": "hello"}  # Valid
+# error: [missing-typed-dict-key] "Missing required key 'required' in TypedDict `TD2` constructor"
+bad_td2: TD2 = {"optional": 42}
 ```
 
 ## Recursive functional `TypedDict` (unstringified forward reference)
