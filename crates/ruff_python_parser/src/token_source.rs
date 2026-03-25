@@ -34,14 +34,18 @@ impl<'src> TokenSource<'src> {
         source: &'src str,
         mode: Mode,
         start_offset: TextSize,
-        cell_offsets: &'src [TextSize],
     ) -> Self {
-        let lexer = Lexer::new(source, mode, start_offset, cell_offsets);
+        let lexer = Lexer::new(source, mode, start_offset);
         let mut source = TokenSource::new(lexer);
 
         // Initialize the token source so that the current token is set correctly.
         source.do_bump();
         source
+    }
+
+    /// Set cell offsets for notebook cell boundary awareness.
+    pub(crate) fn set_cell_offsets(&mut self, cell_offsets: &'src [TextSize]) {
+        self.lexer.set_cell_offsets(cell_offsets);
     }
 
     /// Returns the kind of the current token.

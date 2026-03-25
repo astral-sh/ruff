@@ -29,7 +29,7 @@ mod statement;
 mod tests;
 
 #[derive(Debug)]
-pub(crate) struct Parser<'src> {
+pub struct Parser<'src> {
     source: &'src str,
 
     /// Token source for the parser that skips over any non-trivia token.
@@ -60,8 +60,8 @@ pub(crate) struct Parser<'src> {
 
 impl<'src> Parser<'src> {
     /// Create a new parser for the given source code.
-    pub(crate) fn new(source: &'src str, options: ParseOptions) -> Self {
-        Parser::new_starts_at(source, TextSize::new(0), options, &[])
+    pub fn new(source: &'src str, options: ParseOptions) -> Self {
+        Parser::new_starts_at(source, TextSize::new(0), options)
     }
 
     /// Create a new parser for the given source code which starts parsing at the given offset.
@@ -69,9 +69,8 @@ impl<'src> Parser<'src> {
         source: &'src str,
         start_offset: TextSize,
         options: ParseOptions,
-        cell_offsets: &'src [TextSize],
     ) -> Self {
-        let tokens = TokenSource::from_source(source, options.mode, start_offset, cell_offsets);
+        let tokens = TokenSource::from_source(source, options.mode, start_offset);
 
         Parser {
             options,
@@ -86,8 +85,13 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// Set cell offsets for notebook cell boundary awareness.
+    pub fn set_cell_offsets(&mut self, cell_offsets: &'src [TextSize]) {
+        self.tokens.set_cell_offsets(cell_offsets);
+    }
+
     /// Consumes the [`Parser`] and returns the parsed [`Parsed`].
-    pub(crate) fn parse(mut self) -> Parsed<Mod> {
+    pub fn parse(mut self) -> Parsed<Mod> {
         let syntax = match self.options.mode {
             Mode::Expression | Mode::ParenthesizedExpression => {
                 Mod::Expression(self.parse_single_expression())

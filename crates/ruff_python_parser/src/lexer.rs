@@ -97,12 +97,7 @@ impl<'src> Lexer<'src> {
     /// If the start offset is greater than 0, the cursor is moved ahead that many bytes.
     /// This means that the input source should be the complete source code and not the
     /// sliced version.
-    pub(crate) fn new(
-        source: &'src str,
-        mode: Mode,
-        start_offset: TextSize,
-        cell_offsets: &'src [TextSize],
-    ) -> Self {
+    pub(crate) fn new(source: &'src str, mode: Mode, start_offset: TextSize) -> Self {
         assert!(
             u32::try_from(source.len()).is_ok(),
             "Lexer only supports files with a size up to 4GB"
@@ -128,7 +123,7 @@ impl<'src> Lexer<'src> {
             mode,
             interpolated_strings: InterpolatedStrings::default(),
             errors: Vec::new(),
-            cell_offsets,
+            cell_offsets: &[],
             current_cell: 0,
             pending_cell_dedent: false,
             pending_cell_dedent_offset: TextSize::new(0),
@@ -142,6 +137,14 @@ impl<'src> Lexer<'src> {
         }
 
         lexer
+    }
+
+    /// Set cell offsets for notebook cell boundary awareness.
+    ///
+    /// When the lexer crosses a cell boundary and the indent stack is not at root level,
+    /// it will emit `Dedent` tokens to flush the stack.
+    pub(crate) fn set_cell_offsets(&mut self, cell_offsets: &'src [TextSize]) {
+        self.cell_offsets = cell_offsets;
     }
 
     /// Returns the kind of the current token.
@@ -178,17 +181,41 @@ impl<'src> Lexer<'src> {
 
     /// Lex the next token.
     pub fn next_token(&mut self) -> TokenKind {
-        // Handle pending cell boundary dedent before lexing the next token.
-        // This flushes the indent stack at cell boundaries, similar to what
-        // `consume_end()` does at EOF.
+        // Handle pending cell boundary cleanup before lexing the next token.
+        // This shares logic with `consume_end()` at EOF to ensure consistent
+        // handling of nesting, interpolated strings, and indentation.
         if self.pending_cell_dedent {
-            if let Some(_indent) = self.indentations.dedent() {
+            // Finish any unterminated interpolated-strings at the cell boundary.
+            while let Some(interpolated_string) = self.interpolated_strings.pop() {
+                self.nesting = interpolated_string.nesting();
+                self.push_error(LexicalError::new(
+                    LexicalErrorType::from_interpolated_string_error(
+                        InterpolatedStringErrorType::UnterminatedString,
+                        interpolated_string.kind(),
+                    ),
+                    self.token_range(),
+                ));
+            }
+
+            // Report errors for unclosed nesting at the cell boundary.
+            let init_nesting = u32::from(self.mode == Mode::ParenthesizedExpression);
+            if self.nesting > init_nesting {
+                self.nesting = 0;
+                self.push_error(LexicalError::new(
+                    LexicalErrorType::Eof,
+                    self.token_range(),
+                ));
+            }
+
+            // Flush to logical line start (newline + dedents).
+            let token = self.flush_to_logical_line_start(TokenKind::Dedent);
+            if token == TokenKind::Dedent {
                 self.current_kind = TokenKind::Dedent;
                 self.current_range =
                     TextRange::empty(self.pending_cell_dedent_offset);
                 return TokenKind::Dedent;
             }
-            // Stack is empty, clear the flag and continue lexing normally.
+            // All dedents emitted, clear the flag and continue lexing normally.
             self.pending_cell_dedent = false;
             self.state = State::AfterNewline;
         }
@@ -1451,8 +1478,6 @@ impl<'src> Lexer<'src> {
     }
 
     fn consume_end(&mut self) -> TokenKind {
-        // We reached end of file.
-
         // First, finish any unterminated interpolated-strings.
         while let Some(interpolated_string) = self.interpolated_strings.pop() {
             self.nesting = interpolated_string.nesting();
@@ -1476,16 +1501,31 @@ impl<'src> Lexer<'src> {
             return self.push_error(LexicalError::new(LexicalErrorType::Eof, self.token_range()));
         }
 
-        // Next, insert a trailing newline, if required.
+        // Then flush to a logical line boundary (newline + dedents).
+        self.flush_to_logical_line_start(TokenKind::EndOfFile)
+    }
+
+    /// Flush the lexer state to a logical line boundary by emitting a trailing newline
+    /// (if needed) and then dedenting the indent stack to zero.
+    ///
+    /// This is shared between EOF handling (`consume_end`) and notebook cell boundary
+    /// handling to ensure consistent cleanup of nesting, interpolated strings, and
+    /// indentation state.
+    ///
+    /// `end_token` is returned when the indent stack is fully flushed (typically
+    /// `TokenKind::EndOfFile` at EOF or `TokenKind::Dedent` at cell boundaries where
+    /// the caller will continue lexing).
+    fn flush_to_logical_line_start(&mut self, end_token: TokenKind) -> TokenKind {
+        // Insert a trailing newline, if required.
         if !self.state.is_new_logical_line() {
             self.state = State::AfterNewline;
             TokenKind::Newline
         }
-        // Next, flush the indentation stack to zero.
+        // Flush the indentation stack to zero.
         else if self.indentations.dedent().is_some() {
             TokenKind::Dedent
         } else {
-            TokenKind::EndOfFile
+            end_token
         }
     }
 
@@ -1985,7 +2025,7 @@ impl<'a> LexedText<'a> {
 
 /// Create a new [`Lexer`] for the given source code and [`Mode`].
 pub fn lex(source: &str, mode: Mode) -> Lexer<'_> {
-    Lexer::new(source, mode, TextSize::default(), &[])
+    Lexer::new(source, mode, TextSize::default())
 }
 
 #[cfg(test)]
@@ -2043,7 +2083,7 @@ mod tests {
     }
 
     fn lex(source: &str, mode: Mode, start_offset: TextSize) -> LexerOutput {
-        let mut lexer = Lexer::new(source, mode, start_offset, &[]);
+        let mut lexer = Lexer::new(source, mode, start_offset);
         let mut tokens = Vec::new();
         loop {
             let kind = lexer.next_token();
