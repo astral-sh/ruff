@@ -330,7 +330,7 @@ pub(crate) struct UseDefMap<'db> {
     /// Tracks the reachability constraint for statements and certain sub-expressions
     /// (e.g. ternary branches, boolean operator operands), keyed by their text range.
     /// Used to suppress diagnostics in unreachable code.
-    statement_reachability: Vec<(TextRange, ScopedReachabilityConstraintId)>,
+    range_reachability: Vec<(TextRange, ScopedReachabilityConstraintId)>,
 
     /// If the definition is a binding (only) -- `x = 1` for example -- then we need
     /// [`Declarations`] to know whether this binding is permitted by the live declarations.
@@ -492,7 +492,7 @@ impl<'db> UseDefMap<'db> {
         // Find the tightest (smallest) enclosing range that contains `range`.
         // If that range is unreachable, the diagnostic should be suppressed.
         let mut tightest: Option<(TextRange, ScopedReachabilityConstraintId)> = None;
-        for &(stmt_range, constraint) in &self.statement_reachability {
+        for &(stmt_range, constraint) in &self.range_reachability {
             if stmt_range.contains_range(range) {
                 match tightest {
                     Some((current, _)) if stmt_range.len() < current.len() => {
@@ -932,7 +932,7 @@ pub(super) struct UseDefMapBuilder<'db> {
 
     /// Tracks the reachability constraint for statements and certain sub-expressions,
     /// keyed by their text range.
-    statement_reachability: Vec<(TextRange, ScopedReachabilityConstraintId)>,
+    range_reachability: Vec<(TextRange, ScopedReachabilityConstraintId)>,
 
     /// Live declarations for each so-far-recorded binding.
     declarations_by_binding: FxHashMap<Definition<'db>, Declarations>,
@@ -967,7 +967,7 @@ impl<'db> UseDefMapBuilder<'db> {
             bindings_by_use: IndexVec::new(),
             multi_bindings_by_use: FxHashMap::default(),
             reachability: ScopedReachabilityConstraintId::ALWAYS_TRUE,
-            statement_reachability: Vec::new(),
+            range_reachability: Vec::new(),
             declarations_by_binding: FxHashMap::default(),
             bindings_by_definition: FxHashMap::default(),
             symbol_states: IndexVec::new(),
@@ -1414,8 +1414,8 @@ impl<'db> UseDefMapBuilder<'db> {
         debug_assert_eq!(use_id, new_use);
     }
 
-    pub(super) fn record_statement_reachability(&mut self, range: TextRange) {
-        self.statement_reachability.push((range, self.reachability));
+    pub(super) fn record_range_reachability(&mut self, range: TextRange) {
+        self.range_reachability.push((range, self.reachability));
     }
 
     pub(super) fn snapshot_enclosing_state(
@@ -1577,7 +1577,7 @@ impl<'db> UseDefMapBuilder<'db> {
         self.reachable_member_definitions.shrink_to_fit();
         self.bindings_by_use.shrink_to_fit();
         self.multi_bindings_by_use.shrink_to_fit();
-        self.statement_reachability.shrink_to_fit();
+        self.range_reachability.shrink_to_fit();
         self.declarations_by_binding.shrink_to_fit();
         self.bindings_by_definition.shrink_to_fit();
         self.enclosing_snapshots.shrink_to_fit();
@@ -1631,7 +1631,7 @@ impl<'db> UseDefMapBuilder<'db> {
         for bindings in self.multi_bindings_by_use.values_mut().flatten() {
             bindings.finish(&mut self.reachability_constraints);
         }
-        for &(_, constraint) in &self.statement_reachability {
+        for &(_, constraint) in &self.range_reachability {
             self.reachability_constraints.mark_used(constraint);
         }
         for symbol_state in &mut self.symbol_states {
@@ -1669,7 +1669,7 @@ impl<'db> UseDefMapBuilder<'db> {
             interned_declarations,
             bindings_by_use,
             multi_bindings_by_use: self.multi_bindings_by_use,
-            statement_reachability: self.statement_reachability,
+            range_reachability: self.range_reachability,
             end_of_scope_symbols: self.symbol_states,
             end_of_scope_members,
             reachable_definitions_by_symbol: self.reachable_symbol_definitions,

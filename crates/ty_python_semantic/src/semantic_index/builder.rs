@@ -1727,7 +1727,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
         self.with_semantic_checker(|semantic, context| semantic.visit_stmt(stmt, context));
 
         self.current_use_def_map_mut()
-            .record_statement_reachability(stmt.range());
+            .record_range_reachability(stmt.range());
 
         match stmt {
             ast::Stmt::FunctionDef(function_def) => {
@@ -3069,7 +3069,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 let (predicate, predicate_id) = self.record_expression_narrowing_constraint(test);
                 let reachability_constraint = self.record_reachability_constraint(predicate);
                 self.current_use_def_map_mut()
-                    .record_statement_reachability(body.range());
+                    .record_range_reachability(body.range());
                 self.visit_expr(body);
                 let post_body = self.flow_snapshot();
                 self.flow_restore(pre_if);
@@ -3077,7 +3077,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 self.record_negated_narrowing_constraint(predicate, predicate_id);
                 self.record_negated_reachability_constraint(reachability_constraint);
                 self.current_use_def_map_mut()
-                    .record_statement_reachability(orelse.range());
+                    .record_range_reachability(orelse.range());
                 self.visit_expr(orelse);
                 self.flow_merge(post_body);
             }
@@ -3147,7 +3147,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     }
 
                     self.current_use_def_map_mut()
-                        .record_statement_reachability(value.range());
+                        .record_range_reachability(value.range());
                     self.visit_expr(value);
 
                     // For the last value, we don't need to model control flow. There is no short-circuiting
