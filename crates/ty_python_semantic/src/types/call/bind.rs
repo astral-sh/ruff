@@ -1790,7 +1790,9 @@ impl<'db> Bindings<'db> {
                                 for (param, flag) in DATACLASS_FLAGS {
                                     if let Some(ty) =
                                         call_arguments.iter().find_map(|(arg, arg_types)| {
-                                            if matches!(arg, Argument::Keyword(name) if *name == **param) {
+                                            if let Argument::Keyword(arg_name) = arg
+                                                && *arg_name == **param
+                                            {
                                                 arg_types.get_default()
                                             } else {
                                                 None
