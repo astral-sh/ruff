@@ -148,13 +148,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     );
                 }
             }
-            Type::TypeAlias(alias) => self.validate_final_attribute_assignment(
-                target,
-                alias.value_type(db),
-                attribute,
-                emit_diagnostics,
-            ),
-            Type::NominalInstance(..)
+            Type::TypeAlias(..)
+            | Type::NominalInstance(..)
             | Type::ProtocolInstance(_)
             | Type::LiteralValue(..)
             | Type::SpecialForm(..)

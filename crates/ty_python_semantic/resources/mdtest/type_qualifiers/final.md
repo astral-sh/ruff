@@ -286,6 +286,36 @@ c.INSTANCE_FINAL_C = 2
 c.INSTANCE_FINAL_A += 1
 ```
 
+### Attributes via indirections
+
+`Final` attribute assignments are also detected through type aliases, `NewType`s, and type variables:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Final, NewType
+
+class Foo:
+    x: Final = 42
+
+NT = NewType("NT", Foo)
+
+n = NT(Foo())
+n.x = 42  # error: [invalid-assignment]
+
+def f[T: Foo](x: T) -> T:
+    x.x = 56  # error: [invalid-assignment]
+    return x
+
+type TA = Foo
+
+def g(x: TA):
+    x.x = 56  # error: [invalid-assignment]
+```
+
 ## Mutability
 
 Objects qualified with `Final` *can be modified*. `Final` represents a constant reference to an
