@@ -8,6 +8,7 @@ use crate::types::constraints::{
 };
 use crate::types::cyclic::PairVisitor;
 use crate::types::enums::is_single_member_enum;
+use crate::types::function::FunctionDecorators;
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::{
     CallableType, ClassBase, ClassType, CycleDetector, DynamicType, KnownBoundMethodType,
@@ -2204,6 +2205,28 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                     // method name would show up on both sides of this check. However for
                     // completeness, if we're ever comparing `BoundMethod` types with different
                     // method names, then they're clearly disjoint.
+                    self.always()
+                } else if a.function(db) != b.function(db)
+                    && a.function(db)
+                        .has_known_decorator(db, FunctionDecorators::FINAL)
+                    && b.function(db)
+                        .has_known_decorator(db, FunctionDecorators::FINAL)
+                {
+                    // If *both* methods are `@final` (and they're not literally the same
+                    // definition), they must be disjoint.
+                    //
+                    // Note that we can't establish disjointness when only one side is `@final`,
+                    // because we have to worry about cases like this:
+                    //
+                    // ```
+                    // class A:
+                    //      def f(self): ...
+                    // class B:
+                    //      @final
+                    //      def f(self): ...
+                    // # Valid in this order, though `C(A, B)` would be invalid.
+                    // class C(B, A): ...
+                    // ```
                     self.always()
                 } else {
                     // The names match, so `BoundMethod` disjointness depends on whether the bound
