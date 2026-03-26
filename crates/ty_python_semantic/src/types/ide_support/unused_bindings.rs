@@ -141,10 +141,6 @@ pub struct UnusedBinding {
 #[salsa::tracked(returns(ref))]
 pub fn unused_bindings(db: &dyn Db, file: ruff_db::files::File) -> Vec<UnusedBinding> {
     let parsed = parsed_module(db, file).load(db);
-    if !parsed.errors().is_empty() {
-        return Vec::new();
-    }
-
     let is_stub_file = file.is_stub(db);
     let index = semantic_index(db, file);
     let mut unused = Vec::new();
@@ -703,11 +699,25 @@ mod tests {
     }
 
     #[test]
-    fn skips_unused_binding_analysis_on_syntax_error() -> anyhow::Result<()> {
+    fn reports_unused_binding_on_syntax_error() -> anyhow::Result<()> {
         let source = dedent(
             "
             def f(
                 x = 1
+            ",
+        );
+
+        let names = collect_unused_names(&source)?;
+        assert_eq!(names, vec!["x"]);
+        Ok(())
+    }
+
+    #[test]
+    fn does_not_report_used_parameter_on_syntax_error() -> anyhow::Result<()> {
+        let source = dedent(
+            "
+            def f(x
+                return x
             ",
         );
 
