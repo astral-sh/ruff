@@ -313,11 +313,31 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 let ast::DictItem { key, value: _ } = item;
 
                 let Some(key) = key else {
+                    if let Some(builder) =
+                        self.context.report_lint(&INVALID_ARGUMENT_TYPE, fields_arg)
+                    {
+                        builder.into_diagnostic(
+                            "Expected a dict literal with string-literal keys \
+                                for parameter `fields` of `TypedDict()`",
+                        );
+                    }
                     return false;
                 };
 
                 let key_ty = self.infer_expression(key, TypeContext::default());
                 if key_ty.as_string_literal().is_none() {
+                    if let Some(builder) =
+                        self.context.report_lint(&INVALID_ARGUMENT_TYPE, key)
+                    {
+                        let mut diagnostic = builder.into_diagnostic(
+                            "Expected a string-literal key \
+                                in the `fields` dict of `TypedDict()`",
+                        );
+                        diagnostic.set_primary_message(format_args!(
+                            "Found `{}`",
+                            key_ty.display(db)
+                        ));
+                    }
                     return false;
                 }
             }
