@@ -2373,6 +2373,18 @@ Bad3 = TypedDict("Bad3", {"name": str}, total="not a bool")
 
 # error: [invalid-argument-type] "Invalid argument to parameter `closed` of `TypedDict()`"
 Bad4 = TypedDict("Bad4", {"name": str}, closed=123)
+
+tup = ("foo", "bar")
+kw = {"name": str}
+
+# error: [invalid-argument-type] "Variadic positional arguments are not supported in `TypedDict()` calls"
+Bad5 = TypedDict(*tup)
+
+# error: [invalid-argument-type] "Variadic keyword arguments are not supported in `TypedDict()` calls"
+Bad6 = TypedDict("Bad6", {"name": str}, **kw)
+
+# error: [invalid-argument-type] "Variadic positional and keyword arguments are not supported in `TypedDict()` calls"
+Bad7 = TypedDict(*tup, **kw)
 ```
 
 ## Error cases
