@@ -2227,11 +2227,11 @@ Functional TypedDict supports forward references (string annotations):
 ```py
 from typing_extensions import TypedDict
 
+# Forward reference to a class defined below
+MovieWithDirector = TypedDict("MovieWithDirector", {"title": str, "director": "Director"})
+
 class Director:
     name: str
-
-# Forward reference to a class defined above
-MovieWithDirector = TypedDict("MovieWithDirector", {"title": str, "director": "Director"})
 
 movie: MovieWithDirector = {"title": "The Matrix", "director": Director()}
 reveal_type(movie)  # revealed: MovieWithDirector
