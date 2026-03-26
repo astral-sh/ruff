@@ -6,7 +6,7 @@ use regex::{CaptureMatches, Regex};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_ast::{Arguments, Expr, ExprCall, ExprSubscript, Parameter, ParameterWithDefault};
-use ruff_python_semantic::{BindingKind, Modules, ScopeKind, SemanticModel};
+use ruff_python_semantic::{BindingKind, Modules, ScopeId, ScopeKind, SemanticModel};
 use ruff_python_stdlib::identifiers::is_identifier;
 use ruff_text_size::{Ranged, TextSize};
 
@@ -270,13 +270,14 @@ impl<'a> Dependency<'a> {
             return Some(dependency);
         }
 
-        Self::from_annotation(parameter.annotation()?, semantic, 0)
+        Self::from_annotation(parameter.annotation()?, semantic, 0, None)
     }
 
     fn from_annotation(
         annotation: &'a Expr,
         semantic: &SemanticModel<'a>,
         alias_depth: usize,
+        scope_hint: Option<ScopeId>,
     ) -> Option<Self> {
         if alias_depth > Self::MAX_ALIAS_DEPTH {
             return Some(Self::Unknown);
@@ -289,8 +290,14 @@ impl<'a> Dependency<'a> {
         }
 
         let alias_name = annotation.as_name_expr()?;
-        let alias_annotation = Self::resolve_local_alias_annotation(alias_name, semantic)?;
-        Self::from_annotation(alias_annotation, semantic, alias_depth + 1)
+        let (alias_annotation, alias_scope) =
+            Self::resolve_local_alias_annotation(alias_name, semantic, scope_hint)?;
+        Self::from_annotation(
+            alias_annotation,
+            semantic,
+            alias_depth + 1,
+            Some(alias_scope),
+        )
     }
 
     fn from_annotated_slice(slice: &'a Expr, semantic: &SemanticModel<'a>) -> Option<Self> {
@@ -323,9 +330,14 @@ impl<'a> Dependency<'a> {
     fn resolve_local_alias_annotation(
         name: &'a ast::ExprName,
         semantic: &SemanticModel<'a>,
-    ) -> Option<&'a Expr> {
-        let binding_id = semantic.lookup_symbol(name.id.as_str())?;
+        scope_hint: Option<ScopeId>,
+    ) -> Option<(&'a Expr, ScopeId)> {
+        let binding_id = match scope_hint {
+            Some(scope_id) => semantic.lookup_symbol_in_scope(name.id.as_str(), scope_id, false)?,
+            None => semantic.lookup_symbol(name.id.as_str())?,
+        };
         let binding = semantic.binding(binding_id);
+        let binding_scope = binding.scope;
         let source = binding.source?;
         let statement = semantic.statement(source);
 
@@ -336,7 +348,7 @@ impl<'a> Dependency<'a> {
                         .as_name_expr()
                         .is_some_and(|target| target.id == name.id)
                 {
-                    Some(value.as_ref())
+                    Some((value.as_ref(), binding_scope))
                 } else {
                     None
                 }
@@ -346,7 +358,7 @@ impl<'a> Dependency<'a> {
                     .as_name_expr()
                     .is_some_and(|target| target.id == name.id)
                 {
-                    value.as_deref()
+                    Some((value.as_deref()?, binding_scope))
                 } else {
                     None
                 }
@@ -360,7 +372,7 @@ impl<'a> Dependency<'a> {
                     .as_name_expr()
                     .is_some_and(|alias_name| alias_name.id == name.id)
                 {
-                    Some(value.as_ref())
+                    Some((value.as_ref(), binding_scope))
                 } else {
                     None
                 }

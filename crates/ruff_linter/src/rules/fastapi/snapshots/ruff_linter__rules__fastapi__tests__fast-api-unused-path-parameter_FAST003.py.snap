@@ -552,4 +552,24 @@ help: Add `thing_id` to function signature
 397 | @app.get("/alias-missing/{thing_id}")
     - async def read_thing_alias_missing_dep(query: ThingDepMissingAlias): ...
 398 + async def read_thing_alias_missing_dep(query: ThingDepMissingAlias, thing_id): ...
+399 | 
+400 | # Alias shadowing: the last binding at module scope should be used.
+401 | ShadowedAlias = Annotated[dict, Depends(takes_other_alias)]
+note: This is an unsafe fix and may change runtime behavior
+
+FAST003 [*] Parameter `thing_id` appears in route path, but not in `read_thing_alias_plain` signature
+   --> FAST003.py:411:24
+    |
+409 | PlainAlias = dict
+410 |
+411 | @app.get("/alias-plain/{thing_id}")
+    |                        ^^^^^^^^^^
+412 | async def read_thing_alias_plain(query: PlainAlias): ...
+    |
+help: Add `thing_id` to function signature
+409 | PlainAlias = dict
+410 | 
+411 | @app.get("/alias-plain/{thing_id}")
+    - async def read_thing_alias_plain(query: PlainAlias): ...
+412 + async def read_thing_alias_plain(query: PlainAlias, thing_id): ...
 note: This is an unsafe fix and may change runtime behavior

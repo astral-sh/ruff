@@ -396,3 +396,17 @@ async def read_thing_type_alias_dep(query: ThingDepTypeAlias): ...
 # Error: alias dependency does not define `thing_id`.
 @app.get("/alias-missing/{thing_id}")
 async def read_thing_alias_missing_dep(query: ThingDepMissingAlias): ...
+
+# Alias shadowing: the last binding at module scope should be used.
+ShadowedAlias = Annotated[dict, Depends(takes_other_alias)]
+ShadowedAlias = Annotated[dict, Depends(takes_thing_id_alias)]
+
+# No error: the second (active) binding includes `thing_id`.
+@app.get("/alias-shadow/{thing_id}")
+async def read_thing_alias_shadow(query: ShadowedAlias): ...
+
+# Alias that is not `Annotated` — should be ignored, not crash.
+PlainAlias = dict
+
+@app.get("/alias-plain/{thing_id}")
+async def read_thing_alias_plain(query: PlainAlias): ...
