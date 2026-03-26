@@ -58,37 +58,51 @@ from typing import Callable, Hashable, Mapping, TypedDict
 class TD(TypedDict):
     x: int
 
-d1 = {"x": 1}
-d2: TD = {"x": 1}
-d3: dict[str, int] = {"x": 1}
-d4: TD = dict(x=1)
-d5: TD = dict(x="1")  # error: [invalid-argument-type]
+d1_literal = {"x": 1}
+d1_dict = dict(x=1)
 
-reveal_type(d1)  # revealed: dict[str, int]
-reveal_type(d2)  # revealed: TD
-reveal_type(d3)  # revealed: dict[str, int]
-reveal_type(d4)  # revealed: TD
+reveal_type(d1_literal)  # revealed: dict[str, int]
+reveal_type(d1_dict)  # revealed: dict[str, int]
 
-def _() -> TD:
+d2_literal: TD = {"x": 1}
+d2_dict: TD = dict(x=1)
+
+reveal_type(d2_literal)  # revealed: TD
+reveal_type(d2_dict)  # revealed: TD
+
+d3_literal: dict[str, int] = {"x": 1}
+d3_dict: dict[str, int] = dict(x=1)
+
+reveal_type(d3_literal)  # revealed: dict[str, int]
+reveal_type(d3_dict)  # revealed: dict[str, int]
+
+d4_invalid_literal: TD = {"x": "1"}  # error: [invalid-argument-type]
+d4_invalid_dict: TD = dict(x="1")  # error: [invalid-argument-type]
+
+reveal_type(d4_invalid_literal)  # revealed: TD
+reveal_type(d4_invalid_dict)  # revealed: TD
+
+# Note: the second variant (`d5_dict`) is not technically allowed by the `dict.__init__` overloads
+# in typeshed, which require the key type to be `str` when using keyword arguments. However, we
+# special-case this pattern to match the behavior of `d5_literal`.
+d5_literal: dict[Hashable, Callable[..., object]] = {"x": lambda: 1}
+d5_dict: dict[Hashable, Callable[..., object]] = dict(x=lambda: 1)
+
+def return_literal() -> TD:
     return {"x": 1}
 
-def _() -> TD:
+def return_dict() -> TD:
+    return dict(x=1)
+
+def return_invalid_literal() -> TD:
+    # TODO: ideally, this would only emit the first error, but not `invalid-return-type` (like the `return_invalid_dict` case below).
     # error: [missing-typed-dict-key] "Missing required key 'x' in TypedDict `TD` constructor"
     # error: [invalid-return-type]
     return {}
 
-nested: dict[str, dict[str, float]] = dict(
-    a={"x": 1.5, "y": 2},
-    b={"x": 3, "y": 4},
-)
-
-class Reducer:
-    def from_label_map(self, func_map: Mapping[Hashable, Callable[..., object]]) -> None:
-        pass
-
-# Regression test: keyword-only `dict(...)` should respect broader mapping key context.
-r = Reducer()
-r.from_label_map(dict(a=lambda: 1))
+def return_invalid_dict() -> TD:
+    # error: [missing-typed-dict-key] "Missing required key 'x' in TypedDict `TD` constructor"
+    return dict()
 ```
 
 ## Propagating return type annotation
