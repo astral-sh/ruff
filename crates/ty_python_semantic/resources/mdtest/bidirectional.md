@@ -43,11 +43,42 @@ def f[T](x: T, cond: bool) -> T | list[T]:
 
 l5: int | list[int] = f(1, True)
 
-a: list[int] = [1, 2, *(3, 4, 5)]
-reveal_type(a)  # revealed: list[int]
+x: list[int] = [1, 2, *(3, 4, 5)]
+reveal_type(x)  # revealed: list[int]
 
-b: list[list[int]] = [[1], [2], *([3], [4])]
-reveal_type(b)  # revealed: list[list[int]]
+x: list[list[int]] = [[1], [2], *([3], [4])]
+reveal_type(x)  # revealed: list[list[int]]
+
+x: list[list[int | str]] = [[1], [2]] * 3
+reveal_type(x)  # revealed: list[list[int | str]]
+
+x: list[list[int | str]] = 3 * ([[1]] + [[2]])
+reveal_type(x)  # revealed: list[list[int | str]]
+
+x: list[int | str] = 3 * ["x" for _ in range(3)]
+reveal_type(x)  # revealed: list[int | str]
+
+# Tuple elements are inferred individually, but type context can prevent e.g. `int` widening.
+x: tuple[list[Literal[1]]] = (list1(1),)
+reveal_type(x)  # revealed: tuple[list[Literal[1]]]
+
+x: tuple[list[Literal[1]], ...] = (list1(1),) * 3
+reveal_type(x)  # revealed: tuple[list[Literal[1]], ...]
+
+x: tuple[list[Literal[1]], ...] = 3 * ((list1(1),) + (list1(1),))
+reveal_type(x)  # revealed: tuple[list[Literal[1]], ...]
+
+x: set[int | str] = {1, 2} | {3, 4}
+reveal_type(x)  # revealed: set[int | str]
+
+x: set[int | str] = {42 for _ in range(3)}
+reveal_type(x)  # revealed: set[int | str]
+
+x: dict[int | str, int | str] = {1: 2} | {3: 4}
+reveal_type(x)  # revealed: dict[int | str, int | str]
+
+x: dict[int | str, int | str] = {str(i): i for i in range(3)}
+reveal_type(x)  # revealed: dict[int | str, int | str]
 ```
 
 `typed_dict.py`:
