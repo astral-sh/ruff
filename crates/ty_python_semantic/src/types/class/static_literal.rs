@@ -1556,7 +1556,8 @@ impl<'db> StaticClassLiteral<'db> {
             }
             (
                 CodeGeneratorKind::TypedDict,
-                name @ ("__setitem__" | "__getitem__" | "__delitem__" | "get"),
+                name @ ("__getitem__" | "__setitem__" | "__delitem__" | "get" | "pop"
+                | "setdefault" | "update"),
             ) => {
                 let td_fields: Vec<_> = self
                     .fields(db, specialization, field_policy)
@@ -1570,35 +1571,14 @@ impl<'db> StaticClassLiteral<'db> {
                     "__setitem__" => synthesize_typed_dict_setitem(db, instance_ty, fields_iter),
                     "__delitem__" => synthesize_typed_dict_delitem(db, instance_ty, fields_iter),
                     "get" => synthesize_typed_dict_get(db, instance_ty, fields_iter),
-                    _ => unreachable!(),
-                })
-            }
-            (CodeGeneratorKind::TypedDict, name @ ("pop" | "setdefault")) => {
-                let td_fields: Vec<_> = self
-                    .fields(db, specialization, field_policy)
-                    .iter()
-                    .map(|(name, field)| (name.clone(), TypedDictField::from_field(field)))
-                    .collect();
-                let fields_iter = td_fields.iter().map(|(n, f)| (n, f));
-
-                Some(match name {
                     "pop" => synthesize_typed_dict_pop(db, instance_ty, fields_iter),
                     "setdefault" => synthesize_typed_dict_setdefault(db, instance_ty, fields_iter),
+                    "update" => synthesize_typed_dict_update(db, instance_ty, fields_iter),
                     _ => unreachable!(),
                 })
             }
             (CodeGeneratorKind::TypedDict, name @ ("__or__" | "__ror__" | "__ior__")) => {
                 Some(synthesize_typed_dict_merge(db, instance_ty, name))
-            }
-            (CodeGeneratorKind::TypedDict, "update") => {
-                let td_fields: Vec<_> = self
-                    .fields(db, specialization, field_policy)
-                    .iter()
-                    .map(|(name, field)| (name.clone(), TypedDictField::from_field(field)))
-                    .collect();
-                let fields_iter = td_fields.iter().map(|(n, f)| (n, f));
-
-                Some(synthesize_typed_dict_update(db, instance_ty, fields_iter))
             }
             _ => None,
         }

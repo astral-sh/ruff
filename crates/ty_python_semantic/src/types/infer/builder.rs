@@ -4139,13 +4139,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let in_typed_dict = current_scope.kind() == ScopeKind::Class
                     && nearest_enclosing_class(self.db(), self.index, self.scope()).is_some_and(
                         |class| {
-                            class.iter_mro(self.db(), None).any(|base| {
-                                matches!(
-                                    base,
-                                    ClassBase::TypedDict
-                                        | ClassBase::Dynamic(DynamicType::TodoFunctionalTypedDict)
-                                )
-                            })
+                            class
+                                .iter_mro(self.db(), None)
+                                .contains(&ClassBase::TypedDict)
                         },
                     );
                 if !in_typed_dict {
@@ -5963,13 +5959,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                 }
             }
-        }
-
-        // Avoid false positives for the functional `TypedDict` form, which is currently
-        // unsupported.
-        if let Some(Type::Dynamic(DynamicType::TodoFunctionalTypedDict)) = tcx.annotation {
-            return KnownClass::Dict
-                .to_specialized_instance(self.db(), &[Type::unknown(), Type::unknown()]);
         }
 
         let items = items
