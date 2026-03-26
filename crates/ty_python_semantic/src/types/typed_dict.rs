@@ -54,7 +54,7 @@ impl Default for TypedDictParams {
 /// calls store it eagerly on the anchor.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 #[derive(PartialOrd, Ord)]
-pub struct TypedDictSpec<'db> {
+pub struct FunctionalTypedDictSpec<'db> {
     /// The fully materialized schema for this `TypedDict`.
     #[returns(ref)]
     pub(crate) items: TypedDictSchema<'db>,
@@ -63,7 +63,7 @@ pub struct TypedDictSpec<'db> {
     pub(crate) has_known_fields: bool,
 }
 
-impl<'db> TypedDictSpec<'db> {
+impl<'db> FunctionalTypedDictSpec<'db> {
     pub(crate) fn known(db: &'db dyn Db, items: TypedDictSchema<'db>) -> Self {
         Self::new(db, items, true)
     }
@@ -73,7 +73,7 @@ impl<'db> TypedDictSpec<'db> {
     }
 }
 
-impl get_size2::GetSize for TypedDictSpec<'_> {}
+impl get_size2::GetSize for FunctionalTypedDictSpec<'_> {}
 
 pub(super) fn functional_typed_dict_field(
     declared_ty: Type<'_>,
@@ -550,7 +550,7 @@ pub(super) fn dynamic_typed_dict_schema<'db>(
 pub(super) fn deferred_functional_typed_dict_spec<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
-) -> TypedDictSpec<'db> {
+) -> FunctionalTypedDictSpec<'db> {
     let module = parsed_module(db, definition.file(db)).load(db);
     let node = definition
         .kind(db)
@@ -576,19 +576,19 @@ pub(super) fn deferred_functional_typed_dict_spec<'db>(
 
     if let Some(fields_arg) = node.arguments.args.get(1) {
         let ast::Expr::Dict(dict_expr) = fields_arg else {
-            return TypedDictSpec::unknown(db);
+            return FunctionalTypedDictSpec::unknown(db);
         };
 
         let mut schema = TypedDictSchema::default();
 
         for item in &dict_expr.items {
             let Some(key) = &item.key else {
-                return TypedDictSpec::unknown(db);
+                return FunctionalTypedDictSpec::unknown(db);
             };
 
             let key_ty = definition_expression_type(db, definition, key);
             let Some(key_lit) = key_ty.as_string_literal() else {
-                return TypedDictSpec::unknown(db);
+                return FunctionalTypedDictSpec::unknown(db);
             };
 
             let field_ty = deferred_inference
@@ -601,7 +601,7 @@ pub(super) fn deferred_functional_typed_dict_spec<'db>(
             );
         }
 
-        return TypedDictSpec::known(db, schema);
+        return FunctionalTypedDictSpec::known(db, schema);
     }
 
     let mut schema = TypedDictSchema::default();
@@ -626,7 +626,7 @@ pub(super) fn deferred_functional_typed_dict_spec<'db>(
         }
     }
 
-    TypedDictSpec::known(db, schema)
+    FunctionalTypedDictSpec::known(db, schema)
 }
 
 pub(super) fn typed_dict_params_from_class_def(class_stmt: &StmtClassDef) -> TypedDictParams {
