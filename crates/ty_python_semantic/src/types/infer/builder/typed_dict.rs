@@ -223,6 +223,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     if fields_are_known {
                         self.infer_dangling_typeddict_spec(fields_arg, total)
                     } else {
+                        self.infer_typeddict_field_types(fields_arg);
                         FunctionalTypedDictSpec::unknown(db)
                     }
                 } else {
