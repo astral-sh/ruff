@@ -661,29 +661,12 @@ impl<'db> DynamicTypedDictLiteral<'db> {
 
     /// Look up a class-level member defined directly on this `TypedDict` (not inherited).
     pub(super) fn own_class_member(self, db: &'db dyn Db, name: &str) -> Member<'db> {
-        let instance_ty = self.to_instance(db);
-
-        // When fields are unknown, handle constructors specially.
-        if !self.has_known_fields(db) && matches!(name, "__init__" | "update") {
-            let signature = if name == "__init__" {
-                Signature::new(Parameters::gradual_form(), Type::none(db))
-            } else {
-                Signature::new(
-                    Parameters::new(
-                        db,
-                        [
-                            Parameter::positional_only(Some(Name::new_static("self")))
-                                .with_annotated_type(instance_ty),
-                            Parameter::variadic(Name::new_static("args")),
-                            Parameter::keyword_variadic(Name::new_static("kwargs")),
-                        ],
-                    ),
-                    Type::none(db),
-                )
-            };
-            return Member::definitely_declared(Type::function_like_callable(db, signature));
+        // When fields are unknown, skip synthesis and fall through to TypedDictFallback.
+        if !self.has_known_fields(db) {
+            return Member::default();
         }
 
+        let instance_ty = self.to_instance(db);
         let schema = dynamic_typed_dict_schema(db, self);
 
         let synthesized = match name {

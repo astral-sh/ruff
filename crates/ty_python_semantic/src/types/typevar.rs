@@ -541,7 +541,6 @@ impl<'db> TypeVarInstance<'db> {
                     DynamicType::Todo(_)
                     | DynamicType::TodoUnpack
                     | DynamicType::TodoStarredExpression
-                    | DynamicType::TodoFunctionalTypedDict
                     | DynamicType::TodoTypeVarTuple => Parameters::todo(),
                     DynamicType::Any
                     | DynamicType::Unknown
