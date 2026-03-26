@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Arguments, Expr, Stmt};
+use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_python_semantic::analyze::class::any_base_class;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -54,7 +54,6 @@ impl Violation for ErrorSuffixOnExceptionName {
 pub(crate) fn error_suffix_on_exception_name(
     checker: &Checker,
     class_def: &Stmt,
-    _arguments: Option<&Arguments>,
     name: &str,
     ignore_names: &IgnoreNames,
 ) {

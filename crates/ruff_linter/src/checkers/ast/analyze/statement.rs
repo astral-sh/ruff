@@ -442,7 +442,6 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 pep8_naming::rules::error_suffix_on_exception_name(
                     checker,
                     stmt,
-                    arguments.as_deref(),
                     name,
                     &checker.settings().pep8_naming.ignore_names,
                 );
