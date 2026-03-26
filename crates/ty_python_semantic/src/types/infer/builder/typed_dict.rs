@@ -7,7 +7,9 @@ use crate::types::class::{ClassLiteral, DynamicTypedDictAnchor, DynamicTypedDict
 use crate::types::diagnostic::{
     INVALID_ARGUMENT_TYPE, MISSING_ARGUMENT, TOO_MANY_POSITIONAL_ARGUMENTS, UNKNOWN_ARGUMENT,
 };
-use crate::types::typed_dict::{TypedDictSchema, FunctionalTypedDictSpec, functional_typed_dict_field};
+use crate::types::typed_dict::{
+    FunctionalTypedDictSpec, TypedDictSchema, functional_typed_dict_field,
+};
 use crate::types::{IntersectionType, KnownClass, Type, TypeContext};
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
@@ -38,10 +40,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let fallback = || {
             let spec = &[KnownClass::Str.to_instance(db), Type::object()];
             let str_object_map = KnownClass::Mapping.to_specialized_instance(db, spec);
-            IntersectionType::from_elements(
-                db,
-                [str_object_map.to_meta_type(db), Type::unknown()],
-            )
+            IntersectionType::from_elements(db, [str_object_map.to_meta_type(db), Type::unknown()])
         };
 
         let Some(name_arg) = args.first() else {
@@ -142,7 +141,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }
                 }
                 "extra_items" => {
-                    self.infer_type_expression(&kw.value);
+                    if definition.is_none() {
+                        self.infer_type_expression(&kw.value);
+                    }
                 }
                 field_name => {
                     self.infer_expression(&kw.value, TypeContext::default());
