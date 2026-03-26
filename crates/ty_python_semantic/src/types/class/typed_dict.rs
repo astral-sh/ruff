@@ -14,7 +14,7 @@ use crate::types::member::Member;
 use crate::types::mro::Mro;
 use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
 use crate::types::typed_dict::{
-    TypedDictSchema, TypedDictSpec, deferred_functional_typed_dict_spec, dynamic_typed_dict_schema,
+    TypedDictSchema, FunctionalTypedDictSpec, deferred_functional_typed_dict_spec, dynamic_typed_dict_schema,
 };
 use crate::types::{
     BoundTypeVarInstance, CallableType, ClassBase, ClassType, KnownClass, MemberLookupPolicy, Type,
@@ -71,7 +71,7 @@ pub(super) fn synthesize_typed_dict_update_member<'db>(
 ///
 /// The type of `Movie` would be `type[Movie]` where `Movie` is a `DynamicTypedDictLiteral`.
 ///
-/// The field schema is represented by a separate [`TypedDictSpec`].
+/// The field schema is represented by a separate [`FunctionalTypedDictSpec`].
 #[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 pub enum DynamicTypedDictAnchor<'db> {
     /// The `TypedDict()` call is assigned to a variable.
@@ -88,7 +88,7 @@ pub enum DynamicTypedDictAnchor<'db> {
     ScopeOffset {
         scope: ScopeId<'db>,
         offset: u32,
-        spec: TypedDictSpec<'db>,
+        spec: FunctionalTypedDictSpec<'db>,
     },
 }
 
@@ -175,12 +175,12 @@ impl<'db> DynamicTypedDictLiteral<'db> {
         Span::from(self.scope(db).file(db)).with_range(self.header_range(db))
     }
 
-    fn spec(self, db: &'db dyn Db) -> TypedDictSpec<'db> {
+    fn spec(self, db: &'db dyn Db) -> FunctionalTypedDictSpec<'db> {
         #[salsa::tracked(
             cycle_initial = deferred_spec_initial,
             heap_size = ruff_memory_usage::heap_size
         )]
-        fn deferred_spec<'db>(db: &'db dyn Db, definition: Definition<'db>) -> TypedDictSpec<'db> {
+        fn deferred_spec<'db>(db: &'db dyn Db, definition: Definition<'db>) -> FunctionalTypedDictSpec<'db> {
             deferred_functional_typed_dict_spec(db, definition)
         }
 
@@ -188,8 +188,8 @@ impl<'db> DynamicTypedDictLiteral<'db> {
             db: &'db dyn Db,
             _id: salsa::Id,
             _definition: Definition<'db>,
-        ) -> TypedDictSpec<'db> {
-            TypedDictSpec::unknown(db)
+        ) -> FunctionalTypedDictSpec<'db> {
+            FunctionalTypedDictSpec::unknown(db)
         }
 
         match self.anchor(db) {
