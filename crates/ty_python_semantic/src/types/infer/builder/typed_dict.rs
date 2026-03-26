@@ -1,7 +1,7 @@
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, NodeIndex};
 
-use super::{DeferredExpressionState, TypeInferenceBuilder};
+use super::TypeInferenceBuilder;
 use crate::semantic_index::definition::Definition;
 use crate::types::class::{ClassLiteral, DynamicTypedDictAnchor, DynamicTypedDictLiteral};
 use crate::types::diagnostic::{
@@ -249,8 +249,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 return FunctionalTypedDictSpec::unknown(db);
             };
 
-            let annotation =
-                self.infer_annotation_expression(&item.value, DeferredExpressionState::None);
+            let annotation = self.infer_annotation_expression(&item.value, self.deferred_state);
 
             schema.insert(
                 Name::new(key_literal.value(db)),
@@ -276,16 +275,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 match arg.id.as_str() {
                     "total" | "closed" => continue,
                     "extra_items" => {
-                        self.infer_annotation_expression(
-                            &kw.value,
-                            DeferredExpressionState::Deferred,
-                        );
+                        self.infer_annotation_expression(&kw.value, self.deferred_state);
                     }
                     _ => {
-                        self.infer_annotation_expression(
-                            &kw.value,
-                            DeferredExpressionState::Deferred,
-                        );
+                        self.infer_annotation_expression(&kw.value, self.deferred_state);
                     }
                 }
             }
@@ -296,7 +289,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     fn infer_typeddict_field_types(&mut self, fields_arg: &ast::Expr) {
         if let ast::Expr::Dict(dict_expr) = fields_arg {
             for item in &dict_expr.items {
-                self.infer_annotation_expression(&item.value, DeferredExpressionState::Deferred);
+                self.infer_annotation_expression(&item.value, self.deferred_state);
             }
         }
     }
