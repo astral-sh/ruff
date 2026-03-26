@@ -686,6 +686,20 @@ pub struct EnvironmentOptions {
     /// modules that are not installed into your Python environment in a conventional way.
     /// Use the `python` option to specify the location of your Python environment.
     ///
+    /// Each entry may be a literal path or a glob pattern using PEP 639 portable
+    /// glob syntax (the same syntax as [`src.include`] and [`src.exclude`]).
+    /// Glob patterns are expanded against the filesystem at startup:
+    ///
+    /// - `*` matches any sequence of characters except `/`
+    /// - `**` matches zero or more directory components (recursive)
+    /// - `?` matches a single character except `/`
+    /// - `[abc]` matches any character in the set; Unicode ranges like `[a-z]` are supported
+    ///
+    /// Only entries that resolve to directories are used. Patterns matching no
+    /// directories produce a warning and are skipped. Tilde (`~`) and environment
+    /// variable (`$VAR`) expansion are not supported in glob patterns; use a
+    /// literal path for those cases.
+    ///
     /// This option is similar to mypy's `MYPYPATH` environment variable and pyright's `stubPath`
     /// configuration setting.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -693,7 +707,10 @@ pub struct EnvironmentOptions {
         default = r#"[]"#,
         value_type = "list[str]",
         example = r#"
-            extra-paths = ["./shared/my-search-path"]
+            extra-paths = [
+                "./shared/stubs",
+                "./packages/*/src",
+            ]
         "#
     )]
     pub extra_paths: Option<Vec<RelativePathBuf>>,
