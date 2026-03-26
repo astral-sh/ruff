@@ -2916,8 +2916,8 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                                 .record_narrowing_constraint_for_all_places(constraint);
                         } else {
                             // In non-function scopes, we only record a narrowing constraint
-                            // (no a reachability constraints). Recording reachability for
                             // (not a reachability constraint). Recording reachability for
+                            // calls in module scope is simply too expensive, and it's not
                             // too important of a use case.
                             let predicate_id =
                                 self.add_predicate(PredicateOrLiteral::Predicate(predicate));
