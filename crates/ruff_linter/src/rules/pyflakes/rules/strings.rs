@@ -772,6 +772,17 @@ pub(crate) fn percent_format_positional_count_mismatch(
                 location,
             );
         }
+    } else if summary.num_positional == 0 {
+        // When the format string has no placeholders, only `()` or `{}` would
+        // succeed at runtime. The chance that this is intentional is very low,
+        // so flag any RHS that isn't an empty tuple or empty dict literal.
+        checker.report_diagnostic(
+            PercentFormatPositionalCountMismatch {
+                wanted: 0,
+                got: 1,
+            },
+            location,
+        );
     }
 }
 
