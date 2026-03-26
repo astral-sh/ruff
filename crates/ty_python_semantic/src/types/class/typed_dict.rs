@@ -15,7 +15,7 @@ use crate::types::member::Member;
 use crate::types::mro::Mro;
 use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
 use crate::types::typed_dict::{
-    FunctionalTypedDictSpec, TypedDictSchema, deferred_functional_typed_dict_spec,
+    FunctionalTypedDictSpec, TypedDictField, TypedDictSchema, deferred_functional_typed_dict_spec,
     dynamic_typed_dict_schema,
 };
 use crate::types::{
@@ -23,11 +23,280 @@ use crate::types::{
     TypeVarVariance, UnionBuilder, UnionType,
 };
 
-pub(super) fn synthesize_typed_dict_update_member<'db>(
+/// Synthesize the `__getitem__` method for a `TypedDict`.
+pub(super) fn synthesize_typed_dict_getitem<'a, 'db>(
     db: &'db dyn Db,
     instance_ty: Type<'db>,
-    keyword_parameters: &[Parameter<'db>],
-) -> Type<'db> {
+    fields: impl IntoIterator<Item = (&'a Name, &'a TypedDictField<'db>)>,
+) -> Type<'db>
+where
+    'db: 'a,
+{
+    let overloads = fields.into_iter().map(|(field_name, field)| {
+        let key_type = Type::string_literal(db, field_name.as_str());
+        Signature::new(
+            Parameters::new(
+                db,
+                [
+                    Parameter::positional_only(Some(Name::new_static("self")))
+                        .with_annotated_type(instance_ty),
+                    Parameter::positional_only(Some(Name::new_static("key")))
+                        .with_annotated_type(key_type),
+                ],
+            ),
+            field.declared_ty,
+        )
+    });
+
+    Type::Callable(CallableType::new(
+        db,
+        CallableSignature::from_overloads(overloads),
+        CallableTypeKind::FunctionLike,
+    ))
+}
+
+/// Synthesize the `__setitem__` method for a `TypedDict`.
+pub(super) fn synthesize_typed_dict_setitem<'a, 'db>(
+    db: &'db dyn Db,
+    instance_ty: Type<'db>,
+    fields: impl IntoIterator<Item = (&'a Name, &'a TypedDictField<'db>)>,
+) -> Type<'db>
+where
+    'db: 'a,
+{
+    let mut writeable_fields = fields
+        .into_iter()
+        .filter(|(_, field)| !field.is_read_only())
+        .peekable();
+
+    if writeable_fields.peek().is_none() {
+        return Type::Callable(CallableType::new(
+            db,
+            CallableSignature::single(Signature::new(
+                Parameters::new(
+                    db,
+                    [
+                        Parameter::positional_only(Some(Name::new_static("self")))
+                            .with_annotated_type(instance_ty),
+                        Parameter::positional_only(Some(Name::new_static("key")))
+                            .with_annotated_type(Type::Never),
+                        Parameter::positional_only(Some(Name::new_static("value")))
+                            .with_annotated_type(Type::any()),
+                    ],
+                ),
+                Type::none(db),
+            )),
+            CallableTypeKind::FunctionLike,
+        ));
+    }
+
+    let overloads = writeable_fields.map(|(field_name, field)| {
+        let key_type = Type::string_literal(db, field_name.as_str());
+        Signature::new(
+            Parameters::new(
+                db,
+                [
+                    Parameter::positional_only(Some(Name::new_static("self")))
+                        .with_annotated_type(instance_ty),
+                    Parameter::positional_only(Some(Name::new_static("key")))
+                        .with_annotated_type(key_type),
+                    Parameter::positional_only(Some(Name::new_static("value")))
+                        .with_annotated_type(field.declared_ty),
+                ],
+            ),
+            Type::none(db),
+        )
+    });
+
+    Type::Callable(CallableType::new(
+        db,
+        CallableSignature::from_overloads(overloads),
+        CallableTypeKind::FunctionLike,
+    ))
+}
+
+/// Synthesize the `__delitem__` method for a `TypedDict`.
+pub(super) fn synthesize_typed_dict_delitem<'a, 'db>(
+    db: &'db dyn Db,
+    instance_ty: Type<'db>,
+    fields: impl IntoIterator<Item = (&'a Name, &'a TypedDictField<'db>)>,
+) -> Type<'db>
+where
+    'db: 'a,
+{
+    let mut deletable_fields = fields
+        .into_iter()
+        .filter(|(_, field)| !field.is_required())
+        .peekable();
+
+    if deletable_fields.peek().is_none() {
+        return Type::Callable(CallableType::new(
+            db,
+            CallableSignature::single(Signature::new(
+                Parameters::new(
+                    db,
+                    [
+                        Parameter::positional_only(Some(Name::new_static("self")))
+                            .with_annotated_type(instance_ty),
+                        Parameter::positional_only(Some(Name::new_static("key")))
+                            .with_annotated_type(Type::Never),
+                    ],
+                ),
+                Type::none(db),
+            )),
+            CallableTypeKind::FunctionLike,
+        ));
+    }
+
+    let overloads = deletable_fields.map(|(field_name, _)| {
+        let key_type = Type::string_literal(db, field_name.as_str());
+        Signature::new(
+            Parameters::new(
+                db,
+                [
+                    Parameter::positional_only(Some(Name::new_static("self")))
+                        .with_annotated_type(instance_ty),
+                    Parameter::positional_only(Some(Name::new_static("key")))
+                        .with_annotated_type(key_type),
+                ],
+            ),
+            Type::none(db),
+        )
+    });
+
+    Type::Callable(CallableType::new(
+        db,
+        CallableSignature::from_overloads(overloads),
+        CallableTypeKind::FunctionLike,
+    ))
+}
+
+/// Synthesize the `get` method for a `TypedDict`.
+pub(super) fn synthesize_typed_dict_get<'a, 'db>(
+    db: &'db dyn Db,
+    instance_ty: Type<'db>,
+    fields: impl IntoIterator<Item = (&'a Name, &'a TypedDictField<'db>)>,
+) -> Type<'db>
+where
+    'db: 'a,
+{
+    let overloads = fields
+        .into_iter()
+        .flat_map(|(field_name, field)| {
+            let key_type = Type::string_literal(db, field_name.as_str());
+
+            let get_sig = Signature::new(
+                Parameters::new(
+                    db,
+                    [
+                        Parameter::positional_only(Some(Name::new_static("self")))
+                            .with_annotated_type(instance_ty),
+                        Parameter::positional_only(Some(Name::new_static("key")))
+                            .with_annotated_type(key_type),
+                    ],
+                ),
+                if field.is_required() {
+                    field.declared_ty
+                } else {
+                    UnionType::from_two_elements(db, field.declared_ty, Type::none(db))
+                },
+            );
+
+            let t_default = BoundTypeVarInstance::synthetic(
+                db,
+                Name::new_static("T"),
+                TypeVarVariance::Covariant,
+            );
+
+            let get_with_default_sig = Signature::new_generic(
+                Some(GenericContext::from_typevar_instances(db, [t_default])),
+                Parameters::new(
+                    db,
+                    [
+                        Parameter::positional_only(Some(Name::new_static("self")))
+                            .with_annotated_type(instance_ty),
+                        Parameter::positional_only(Some(Name::new_static("key")))
+                            .with_annotated_type(key_type),
+                        Parameter::positional_only(Some(Name::new_static("default")))
+                            .with_annotated_type(Type::TypeVar(t_default)),
+                    ],
+                ),
+                if field.is_required() {
+                    field.declared_ty
+                } else {
+                    UnionType::from_two_elements(db, field.declared_ty, Type::TypeVar(t_default))
+                },
+            );
+
+            [get_sig, get_with_default_sig]
+        })
+        // Fallback overloads for unknown keys
+        .chain(std::iter::once(Signature::new(
+            Parameters::new(
+                db,
+                [
+                    Parameter::positional_only(Some(Name::new_static("self")))
+                        .with_annotated_type(instance_ty),
+                    Parameter::positional_only(Some(Name::new_static("key")))
+                        .with_annotated_type(KnownClass::Str.to_instance(db)),
+                ],
+            ),
+            UnionType::from_two_elements(db, Type::unknown(), Type::none(db)),
+        )))
+        .chain(std::iter::once({
+            let t_default = BoundTypeVarInstance::synthetic(
+                db,
+                Name::new_static("T"),
+                TypeVarVariance::Covariant,
+            );
+
+            Signature::new_generic(
+                Some(GenericContext::from_typevar_instances(db, [t_default])),
+                Parameters::new(
+                    db,
+                    [
+                        Parameter::positional_only(Some(Name::new_static("self")))
+                            .with_annotated_type(instance_ty),
+                        Parameter::positional_only(Some(Name::new_static("key")))
+                            .with_annotated_type(KnownClass::Str.to_instance(db)),
+                        Parameter::positional_only(Some(Name::new_static("default")))
+                            .with_annotated_type(Type::TypeVar(t_default)),
+                    ],
+                ),
+                UnionType::from_two_elements(db, Type::unknown(), Type::TypeVar(t_default)),
+            )
+        }));
+
+    Type::Callable(CallableType::new(
+        db,
+        CallableSignature::from_overloads(overloads),
+        CallableTypeKind::FunctionLike,
+    ))
+}
+
+/// Synthesize the `update` method for a `TypedDict`.
+pub(super) fn synthesize_typed_dict_update<'a, 'db>(
+    db: &'db dyn Db,
+    instance_ty: Type<'db>,
+    fields: impl IntoIterator<Item = (&'a Name, &'a TypedDictField<'db>)>,
+) -> Type<'db>
+where
+    'db: 'a,
+{
+    let keyword_parameters: Vec<_> = fields
+        .into_iter()
+        .map(|(field_name, field)| {
+            let ty = if field.is_read_only() {
+                Type::Never
+            } else {
+                field.declared_ty
+            };
+            Parameter::keyword_only(field_name.clone())
+                .with_annotated_type(ty)
+                .with_default_type(ty)
+        })
+        .collect();
+
     let update_patch_ty = if let Type::TypedDict(typed_dict) = instance_ty {
         Type::TypedDict(typed_dict.to_update_patch(db))
     } else {
@@ -56,12 +325,177 @@ pub(super) fn synthesize_typed_dict_update_member<'db>(
                     .with_default_type(Type::none(db)),
             ]
             .into_iter()
-            .chain(keyword_parameters.iter().cloned()),
+            .chain(keyword_parameters),
         ),
         Type::none(db),
     );
 
     Type::function_like_callable(db, update_signature)
+}
+
+/// Synthesize the `pop` method for a `TypedDict`.
+pub(super) fn synthesize_typed_dict_pop<'a, 'db>(
+    db: &'db dyn Db,
+    instance_ty: Type<'db>,
+    fields: impl IntoIterator<Item = (&'a Name, &'a TypedDictField<'db>)>,
+) -> Type<'db>
+where
+    'db: 'a,
+{
+    let overloads = fields
+        .into_iter()
+        .filter(|(_, field)| !field.is_required())
+        .flat_map(|(field_name, field)| {
+            let key_type = Type::string_literal(db, field_name.as_str());
+
+            let pop_sig = Signature::new(
+                Parameters::new(
+                    db,
+                    [
+                        Parameter::positional_only(Some(Name::new_static("self")))
+                            .with_annotated_type(instance_ty),
+                        Parameter::positional_only(Some(Name::new_static("key")))
+                            .with_annotated_type(key_type),
+                    ],
+                ),
+                field.declared_ty,
+            );
+
+            let t_default = BoundTypeVarInstance::synthetic(
+                db,
+                Name::new_static("T"),
+                TypeVarVariance::Covariant,
+            );
+
+            let pop_with_default_sig = Signature::new_generic(
+                Some(GenericContext::from_typevar_instances(db, [t_default])),
+                Parameters::new(
+                    db,
+                    [
+                        Parameter::positional_only(Some(Name::new_static("self")))
+                            .with_annotated_type(instance_ty),
+                        Parameter::positional_only(Some(Name::new_static("key")))
+                            .with_annotated_type(key_type),
+                        Parameter::positional_only(Some(Name::new_static("default")))
+                            .with_annotated_type(Type::TypeVar(t_default)),
+                    ],
+                ),
+                UnionType::from_two_elements(db, field.declared_ty, Type::TypeVar(t_default)),
+            );
+
+            [pop_sig, pop_with_default_sig]
+        });
+
+    Type::Callable(CallableType::new(
+        db,
+        CallableSignature::from_overloads(overloads),
+        CallableTypeKind::FunctionLike,
+    ))
+}
+
+/// Synthesize the `setdefault` method for a `TypedDict`.
+pub(super) fn synthesize_typed_dict_setdefault<'a, 'db>(
+    db: &'db dyn Db,
+    instance_ty: Type<'db>,
+    fields: impl IntoIterator<Item = (&'a Name, &'a TypedDictField<'db>)>,
+) -> Type<'db>
+where
+    'db: 'a,
+{
+    let overloads = fields.into_iter().map(|(field_name, field)| {
+        let key_type = Type::string_literal(db, field_name.as_str());
+
+        Signature::new(
+            Parameters::new(
+                db,
+                [
+                    Parameter::positional_only(Some(Name::new_static("self")))
+                        .with_annotated_type(instance_ty),
+                    Parameter::positional_only(Some(Name::new_static("key")))
+                        .with_annotated_type(key_type),
+                    Parameter::positional_only(Some(Name::new_static("default")))
+                        .with_annotated_type(field.declared_ty),
+                ],
+            ),
+            field.declared_ty,
+        )
+    });
+
+    Type::Callable(CallableType::new(
+        db,
+        CallableSignature::from_overloads(overloads),
+        CallableTypeKind::FunctionLike,
+    ))
+}
+
+/// Synthesize a merge operator (`__or__`, `__ror__`, or `__ior__`) for a `TypedDict`.
+pub(super) fn synthesize_typed_dict_merge<'db>(
+    db: &'db dyn Db,
+    instance_ty: Type<'db>,
+    name: &str,
+) -> Type<'db> {
+    let mut overloads = vec![Signature::new(
+        Parameters::new(
+            db,
+            [
+                Parameter::positional_only(Some(Name::new_static("self")))
+                    .with_annotated_type(instance_ty),
+                Parameter::positional_only(Some(Name::new_static("value")))
+                    .with_annotated_type(instance_ty),
+            ],
+        ),
+        instance_ty,
+    )];
+
+    if name != "__ior__" {
+        let partial_ty = if let Type::TypedDict(td) = instance_ty {
+            Type::TypedDict(td.to_partial(db))
+        } else {
+            instance_ty
+        };
+
+        let dict_param_ty = KnownClass::Dict
+            .to_specialized_instance(db, &[KnownClass::Str.to_instance(db), Type::any()]);
+
+        let dict_return_ty = KnownClass::Dict.to_specialized_instance(
+            db,
+            &[
+                KnownClass::Str.to_instance(db),
+                KnownClass::Object.to_instance(db),
+            ],
+        );
+
+        overloads.push(Signature::new(
+            Parameters::new(
+                db,
+                [
+                    Parameter::positional_only(Some(Name::new_static("self")))
+                        .with_annotated_type(instance_ty),
+                    Parameter::positional_only(Some(Name::new_static("value")))
+                        .with_annotated_type(partial_ty),
+                ],
+            ),
+            instance_ty,
+        ));
+        overloads.push(Signature::new(
+            Parameters::new(
+                db,
+                [
+                    Parameter::positional_only(Some(Name::new_static("self")))
+                        .with_annotated_type(instance_ty),
+                    Parameter::positional_only(Some(Name::new_static("value")))
+                        .with_annotated_type(dict_param_ty),
+                ],
+            ),
+            dict_return_ty,
+        ));
+    }
+
+    Type::Callable(CallableType::new(
+        db,
+        CallableSignature::from_overloads(overloads),
+        CallableTypeKind::FunctionLike,
+    ))
 }
 
 /// Represents a `TypedDict` created via the functional form:
@@ -267,323 +701,25 @@ impl<'db> DynamicTypedDictLiteral<'db> {
             return Member::definitely_declared(Type::function_like_callable(db, signature));
         }
 
-        // Get the computed schema for field lookups.
         let schema = dynamic_typed_dict_schema(db, self);
 
-        match name {
-            "__init__" => {
-                // TypedDict constructors accept two forms:
-                // 1. __init__(self, mapping: dict[str, object], /) -> None
-                // 2. __init__(self, *, field1: T1, field2: T2, ...) -> None
-
-                // Overload 1: Accept a dict literal as positional argument
-                let dict_type = KnownClass::Dict.to_specialized_instance(
-                    db,
-                    &[KnownClass::Str.to_instance(db), Type::object()],
-                );
-                let dict_signature = Signature::new(
-                    Parameters::new(
-                        db,
-                        [
-                            Parameter::positional_only(Some(Name::new_static("self")))
-                                .with_annotated_type(instance_ty),
-                            Parameter::positional_only(Some(Name::new_static("__m")))
-                                .with_annotated_type(dict_type),
-                        ],
-                    ),
-                    Type::none(db),
-                );
-
-                // Overload 2: Accept keyword arguments for each field
-                let mut kw_parameters = vec![
-                    Parameter::positional_or_keyword(Name::new_static("self"))
-                        .with_annotated_type(instance_ty),
-                ];
-
-                for (field_name, field) in schema {
-                    let mut param = Parameter::keyword_only(field_name.clone())
-                        .with_annotated_type(field.declared_ty);
-                    if !field.is_required() {
-                        // Optional fields have a default (conceptually the key being absent).
-                        param = param.with_default_type(field.declared_ty);
-                    }
-                    kw_parameters.push(param);
-                }
-
-                let kw_signature =
-                    Signature::new(Parameters::new(db, kw_parameters), Type::none(db));
-
-                Member::definitely_declared(Type::Callable(CallableType::new(
-                    db,
-                    CallableSignature::from_overloads([dict_signature, kw_signature]),
-                    CallableTypeKind::FunctionLike,
-                )))
+        let synthesized = match name {
+            "__getitem__" => Some(synthesize_typed_dict_getitem(db, instance_ty, schema)),
+            "__setitem__" => Some(synthesize_typed_dict_setitem(db, instance_ty, schema)),
+            "__delitem__" => Some(synthesize_typed_dict_delitem(db, instance_ty, schema)),
+            "get" => Some(synthesize_typed_dict_get(db, instance_ty, schema)),
+            "update" => Some(synthesize_typed_dict_update(db, instance_ty, schema)),
+            "pop" => Some(synthesize_typed_dict_pop(db, instance_ty, schema)),
+            "setdefault" => Some(synthesize_typed_dict_setdefault(db, instance_ty, schema)),
+            "__or__" | "__ror__" | "__ior__" => {
+                Some(synthesize_typed_dict_merge(db, instance_ty, name))
             }
-            "__required_keys__" => {
-                // frozenset of required key names
-                let required_keys: Box<[Type<'db>]> = schema
-                    .iter()
-                    .filter(|(_, field)| field.is_required())
-                    .map(|(name, _)| Type::string_literal(db, name.as_str()))
-                    .collect();
-                let union = UnionType::from_elements(db, required_keys.iter().copied());
-                Member::definitely_declared(
-                    KnownClass::FrozenSet.to_specialized_instance(db, &[union]),
-                )
-            }
-            "__optional_keys__" => {
-                // frozenset of optional key names
-                let optional_keys: Box<[Type<'db>]> = schema
-                    .iter()
-                    .filter(|(_, field)| !field.is_required())
-                    .map(|(name, _)| Type::string_literal(db, name.as_str()))
-                    .collect();
-                let union = UnionType::from_elements(db, optional_keys.iter().copied());
-                Member::definitely_declared(
-                    KnownClass::FrozenSet.to_specialized_instance(db, &[union]),
-                )
-            }
-            "__getitem__" => {
-                // __getitem__(self, key: Literal["name"]) -> type for each field
-                let overloads = schema.iter().map(|(field_name, field)| {
-                    let key_type = Type::string_literal(db, field_name.as_str());
-                    Signature::new(
-                        Parameters::new(
-                            db,
-                            [
-                                Parameter::positional_only(Some(Name::new_static("self")))
-                                    .with_annotated_type(instance_ty),
-                                Parameter::positional_only(Some(Name::new_static("key")))
-                                    .with_annotated_type(key_type),
-                            ],
-                        ),
-                        field.declared_ty,
-                    )
-                });
-                Member::definitely_declared(Type::Callable(CallableType::new(
-                    db,
-                    CallableSignature::from_overloads(overloads),
-                    CallableTypeKind::FunctionLike,
-                )))
-            }
-            "__setitem__" => {
-                // __setitem__(self, key: Literal["name"], value: type) -> None for each non-readonly field
-                let overloads: Vec<_> = schema
-                    .iter()
-                    .map(|(field_name, field)| {
-                        let key_type = Type::string_literal(db, field_name.as_str());
-                        Signature::new(
-                            Parameters::new(
-                                db,
-                                [
-                                    Parameter::positional_only(Some(Name::new_static("self")))
-                                        .with_annotated_type(instance_ty),
-                                    Parameter::positional_only(Some(Name::new_static("key")))
-                                        .with_annotated_type(key_type),
-                                    Parameter::positional_only(Some(Name::new_static("value")))
-                                        .with_annotated_type(field.declared_ty),
-                                ],
-                            ),
-                            Type::none(db),
-                        )
-                    })
-                    .collect();
-                if overloads.is_empty() {
-                    // No fields, return a callable that takes no keys
-                    Member::definitely_declared(Type::Callable(CallableType::new(
-                        db,
-                        CallableSignature::single(Signature::new(
-                            Parameters::new(
-                                db,
-                                [
-                                    Parameter::positional_only(Some(Name::new_static("self")))
-                                        .with_annotated_type(instance_ty),
-                                    Parameter::positional_only(Some(Name::new_static("key")))
-                                        .with_annotated_type(Type::Never),
-                                    Parameter::positional_only(Some(Name::new_static("value")))
-                                        .with_annotated_type(Type::Never),
-                                ],
-                            ),
-                            Type::none(db),
-                        )),
-                        CallableTypeKind::FunctionLike,
-                    )))
-                } else {
-                    Member::definitely_declared(Type::Callable(CallableType::new(
-                        db,
-                        CallableSignature::from_overloads(overloads),
-                        CallableTypeKind::FunctionLike,
-                    )))
-                }
-            }
-            "__delitem__" => {
-                // __delitem__(self, key: Literal["name"]) -> None for each non-required field
-                let deletable: Vec<_> = schema
-                    .iter()
-                    .filter(|(_, field)| !field.is_required())
-                    .map(|(field_name, _)| {
-                        let key_type = Type::string_literal(db, field_name.as_str());
-                        Signature::new(
-                            Parameters::new(
-                                db,
-                                [
-                                    Parameter::positional_only(Some(Name::new_static("self")))
-                                        .with_annotated_type(instance_ty),
-                                    Parameter::positional_only(Some(Name::new_static("key")))
-                                        .with_annotated_type(key_type),
-                                ],
-                            ),
-                            Type::none(db),
-                        )
-                    })
-                    .collect();
-                if deletable.is_empty() {
-                    // No deletable fields, return a callable with Never key type
-                    Member::definitely_declared(Type::Callable(CallableType::new(
-                        db,
-                        CallableSignature::single(Signature::new(
-                            Parameters::new(
-                                db,
-                                [
-                                    Parameter::positional_only(Some(Name::new_static("self")))
-                                        .with_annotated_type(instance_ty),
-                                    Parameter::positional_only(Some(Name::new_static("key")))
-                                        .with_annotated_type(Type::Never),
-                                ],
-                            ),
-                            Type::none(db),
-                        )),
-                        CallableTypeKind::FunctionLike,
-                    )))
-                } else {
-                    Member::definitely_declared(Type::Callable(CallableType::new(
-                        db,
-                        CallableSignature::from_overloads(deletable),
-                        CallableTypeKind::FunctionLike,
-                    )))
-                }
-            }
-            "get" => {
-                // get(key: Literal["name"]) -> type | None for each field
-                // get(key: Literal["name"], default: T) -> type | T for each field
-                let overloads = schema
-                    .iter()
-                    .flat_map(|(field_name, field)| {
-                        let key_type = Type::string_literal(db, field_name.as_str());
+            _ => None,
+        };
 
-                        // For a required key, `.get()` always returns the value type.
-                        // For a non-required key, `.get()` returns union with None/default.
-                        let get_sig = Signature::new(
-                            Parameters::new(
-                                db,
-                                [
-                                    Parameter::positional_only(Some(Name::new_static("self")))
-                                        .with_annotated_type(instance_ty),
-                                    Parameter::positional_only(Some(Name::new_static("key")))
-                                        .with_annotated_type(key_type),
-                                ],
-                            ),
-                            if field.is_required() {
-                                field.declared_ty
-                            } else {
-                                UnionType::from_elements(db, [field.declared_ty, Type::none(db)])
-                            },
-                        );
-
-                        let t_default = BoundTypeVarInstance::synthetic(
-                            db,
-                            Name::new_static("T"),
-                            TypeVarVariance::Covariant,
-                        );
-
-                        let get_with_default_sig = Signature::new_generic(
-                            Some(GenericContext::from_typevar_instances(db, [t_default])),
-                            Parameters::new(
-                                db,
-                                [
-                                    Parameter::positional_only(Some(Name::new_static("self")))
-                                        .with_annotated_type(instance_ty),
-                                    Parameter::positional_only(Some(Name::new_static("key")))
-                                        .with_annotated_type(key_type),
-                                    Parameter::positional_only(Some(Name::new_static("default")))
-                                        .with_annotated_type(Type::TypeVar(t_default)),
-                                ],
-                            ),
-                            if field.is_required() {
-                                field.declared_ty
-                            } else {
-                                UnionType::from_elements(
-                                    db,
-                                    [field.declared_ty, Type::TypeVar(t_default)],
-                                )
-                            },
-                        );
-
-                        [get_sig, get_with_default_sig]
-                    })
-                    // Fallback overloads for unknown keys
-                    .chain(std::iter::once(Signature::new(
-                        Parameters::new(
-                            db,
-                            [
-                                Parameter::positional_only(Some(Name::new_static("self")))
-                                    .with_annotated_type(instance_ty),
-                                Parameter::positional_only(Some(Name::new_static("key")))
-                                    .with_annotated_type(KnownClass::Str.to_instance(db)),
-                            ],
-                        ),
-                        UnionType::from_elements(db, [Type::unknown(), Type::none(db)]),
-                    )))
-                    .chain(std::iter::once({
-                        let t_default = BoundTypeVarInstance::synthetic(
-                            db,
-                            Name::new_static("T"),
-                            TypeVarVariance::Covariant,
-                        );
-
-                        Signature::new_generic(
-                            Some(GenericContext::from_typevar_instances(db, [t_default])),
-                            Parameters::new(
-                                db,
-                                [
-                                    Parameter::positional_only(Some(Name::new_static("self")))
-                                        .with_annotated_type(instance_ty),
-                                    Parameter::positional_only(Some(Name::new_static("key")))
-                                        .with_annotated_type(KnownClass::Str.to_instance(db)),
-                                    Parameter::positional_only(Some(Name::new_static("default")))
-                                        .with_annotated_type(Type::TypeVar(t_default)),
-                                ],
-                            ),
-                            UnionType::from_elements(
-                                db,
-                                [Type::unknown(), Type::TypeVar(t_default)],
-                            ),
-                        )
-                    }));
-
-                Member::definitely_declared(Type::Callable(CallableType::new(
-                    db,
-                    CallableSignature::from_overloads(overloads),
-                    CallableTypeKind::FunctionLike,
-                )))
-            }
-            "update" => {
-                let keyword_parameters: Vec<_> = schema
-                    .iter()
-                    .map(|(field_name, field)| {
-                        Parameter::keyword_only(field_name.clone())
-                            .with_annotated_type(field.declared_ty)
-                            .with_default_type(field.declared_ty)
-                    })
-                    .collect();
-
-                Member::definitely_declared(synthesize_typed_dict_update_member(
-                    db,
-                    instance_ty,
-                    &keyword_parameters,
-                ))
-            }
-            _ => Member::default(),
+        match synthesized {
+            Some(ty) => Member::definitely_declared(ty),
+            None => Member::default(),
         }
     }
 

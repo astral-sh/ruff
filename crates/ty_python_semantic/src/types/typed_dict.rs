@@ -1267,6 +1267,15 @@ impl<'db> TypedDictField<'db> {
         self.first_declaration
     }
 
+    /// Create a `TypedDictField` from a [`Field`] with `FieldKind::TypedDict`.
+    pub(crate) fn from_field(field: &super::class::Field<'db>) -> Self {
+        TypedDictFieldBuilder::new(field.declared_ty)
+            .required(field.is_required())
+            .read_only(field.is_read_only())
+            .first_declaration(field.first_declaration)
+            .build()
+    }
+
     pub(crate) fn apply_type_mapping_impl<'a>(
         self,
         db: &'db dyn Db,
