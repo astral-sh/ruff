@@ -339,6 +339,7 @@ impl<'db> Type<'db> {
             inferable,
             relation: TypeRelation::SubtypingAssuming,
             context_tree: ErrorContextTree::disabled(),
+            preserve_source_inherited_signature_typevars: false,
             given: assuming,
             relation_visitor: &relation_visitor,
             disjointness_visitor: &disjointness_visitor,
@@ -375,6 +376,7 @@ impl<'db> Type<'db> {
             inferable: InferableTypeVars::None,
             relation: TypeRelation::Assignability,
             context_tree: ErrorContextTree::enabled(),
+            preserve_source_inherited_signature_typevars: false,
             given: ConstraintSet::from_bool(&builder, false),
             relation_visitor: &HasRelationToVisitor::default(&builder),
             disjointness_visitor: &IsDisjointVisitor::default(&builder),
@@ -504,6 +506,7 @@ impl<'db> Type<'db> {
             inferable,
             relation,
             context_tree: ErrorContextTree::disabled(),
+            preserve_source_inherited_signature_typevars: false,
             given: ConstraintSet::from_bool(constraints, false),
             relation_visitor: &relation_visitor,
             disjointness_visitor: &disjointness_visitor,
@@ -654,6 +657,7 @@ pub(super) struct TypeRelationChecker<'a, 'c, 'db> {
     pub(super) inferable: InferableTypeVars<'db>,
     pub(super) relation: TypeRelation,
     context_tree: ErrorContextTree<'db>,
+    pub(super) preserve_source_inherited_signature_typevars: bool,
     given: ConstraintSet<'db, 'c>,
 
     // N.B. these fields are private to reduce the risk of
@@ -682,6 +686,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             inferable,
             relation: TypeRelation::Subtyping,
             context_tree: ErrorContextTree::disabled(),
+            preserve_source_inherited_signature_typevars: false,
             given: ConstraintSet::from_bool(constraints, false),
             relation_visitor,
             disjointness_visitor,
@@ -702,6 +707,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             inferable: InferableTypeVars::None,
             relation: TypeRelation::ConstraintSetAssignability,
             context_tree: ErrorContextTree::disabled(),
+            preserve_source_inherited_signature_typevars: false,
             given: ConstraintSet::from_bool(constraints, false),
             relation_visitor,
             disjointness_visitor,
@@ -722,6 +728,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             inferable: InferableTypeVars::None,
             relation: TypeRelation::ConstraintSetAssignability,
             context_tree: ErrorContextTree::enabled(),
+            preserve_source_inherited_signature_typevars: false,
             given: ConstraintSet::from_bool(constraints, false),
             relation_visitor,
             disjointness_visitor,
@@ -742,6 +749,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             inferable: InferableTypeVars::None,
             relation: TypeRelation::Assignability,
             context_tree: ErrorContextTree::enabled(),
+            preserve_source_inherited_signature_typevars: false,
             given: ConstraintSet::from_bool(constraints, false),
             relation_visitor,
             disjointness_visitor,
@@ -759,6 +767,13 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
     pub(super) fn into_error_context(self) -> ErrorContextTree<'db> {
         self.context_tree
+    }
+
+    pub(super) fn with_preserved_source_inherited_signature_typevars(&self) -> Self {
+        Self {
+            preserve_source_inherited_signature_typevars: true,
+            ..self.clone()
+        }
     }
 
     pub(super) fn always(&self) -> ConstraintSet<'db, 'c> {
@@ -2083,6 +2098,7 @@ impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
             context_tree: ErrorContextTree::disabled(),
             given: self.given,
             inferable: InferableTypeVars::None,
+            preserve_source_inherited_signature_typevars: false,
             relation_visitor: self.relation_visitor,
             disjointness_visitor: self.disjointness_visitor,
             signature_relation_visitor: self.signature_relation_visitor,
@@ -2166,6 +2182,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             constraints: self.constraints,
             inferable: self.inferable,
             context_tree: ErrorContextTree::disabled(),
+            preserve_source_inherited_signature_typevars: false,
             given: self.given,
             relation_visitor: self.relation_visitor,
             disjointness_visitor: self.disjointness_visitor,
