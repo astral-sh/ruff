@@ -324,7 +324,7 @@ impl<'a> Dependency<'a> {
         name: &'a ast::ExprName,
         semantic: &SemanticModel<'a>,
     ) -> Option<&'a Expr> {
-        let binding_id = semantic.global_scope().get(name.id.as_str())?;
+        let binding_id = semantic.lookup_symbol(name.id.as_str())?;
         let binding = semantic.binding(binding_id);
         let source = binding.source?;
         let statement = semantic.statement(source);

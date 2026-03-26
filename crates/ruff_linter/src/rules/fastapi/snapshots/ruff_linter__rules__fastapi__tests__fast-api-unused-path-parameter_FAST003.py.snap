@@ -344,212 +344,212 @@ help: Add `thing_id` to function signature
 164 | ### No errors
 note: This is an unsafe fix and may change runtime behavior
 
-FAST003 [*] Parameter `thing_id` appears in route path, but not in `read_thing_alias_missing_dep` signature
-   --> FAST003.py:206:26
-    |
-205 | # Error: alias dependency does not define `thing_id`.
-206 | @app.get("/alias-missing/{thing_id}")
-    |                          ^^^^^^^^^^
-207 | async def read_thing_alias_missing_dep(query: ThingDepMissingAlias): ...
-    |
-help: Add `thing_id` to function signature
-204 | 
-205 | # Error: alias dependency does not define `thing_id`.
-206 | @app.get("/alias-missing/{thing_id}")
-    - async def read_thing_alias_missing_dep(query: ThingDepMissingAlias): ...
-207 + async def read_thing_alias_missing_dep(query: ThingDepMissingAlias, thing_id): ...
-208 | 
-209 | 
-210 | # Class dependencies
-note: This is an unsafe fix and may change runtime behavior
-
 FAST003 [*] Parameter `id` appears in route path, but not in `get_id_init_not_annotated` signature
-   --> FAST003.py:230:12
+   --> FAST003.py:203:12
     |
-228 | @app.get("/{id}")
-229 | async def get_id_pydantic_short(params: Annotated[PydanticParams, Depends()]): ...
-230 | @app.get("/{id}")
+201 | @app.get("/{id}")
+202 | async def get_id_pydantic_short(params: Annotated[PydanticParams, Depends()]): ...
+203 | @app.get("/{id}")
     |            ^^^^
-231 | async def get_id_init_not_annotated(params = Depends(InitParams)): ...
+204 | async def get_id_init_not_annotated(params = Depends(InitParams)): ...
     |
 help: Add `id` to function signature
-228 | @app.get("/{id}")
-229 | async def get_id_pydantic_short(params: Annotated[PydanticParams, Depends()]): ...
-230 | @app.get("/{id}")
+201 | @app.get("/{id}")
+202 | async def get_id_pydantic_short(params: Annotated[PydanticParams, Depends()]): ...
+203 | @app.get("/{id}")
     - async def get_id_init_not_annotated(params = Depends(InitParams)): ...
-231 + async def get_id_init_not_annotated(id, params = Depends(InitParams)): ...
-232 | 
-233 | 
-234 | # No errors
+204 + async def get_id_init_not_annotated(id, params = Depends(InitParams)): ...
+205 | 
+206 | 
+207 | # No errors
 note: This is an unsafe fix and may change runtime behavior
 
 FAST003 Parameter `import` appears in route path, but not in `get_import` signature
-   --> FAST003.py:293:20
+   --> FAST003.py:266:20
     |
-292 | # https://github.com/astral-sh/ruff/issues/20941
-293 | @app.get("/imports/{import}")
+265 | # https://github.com/astral-sh/ruff/issues/20941
+266 | @app.get("/imports/{import}")
     |                    ^^^^^^^^
-294 | async def get_import():
-295 |     ...
+267 | async def get_import():
+268 |     ...
     |
 help: Add `import` to function signature
 
 FAST003 Parameter `__debug__` appears in route path, but not in `get_debug` signature
-   --> FAST003.py:297:18
+   --> FAST003.py:270:18
     |
-295 |     ...
-296 |
-297 | @app.get("/debug/{__debug__}")
+268 |     ...
+269 |
+270 | @app.get("/debug/{__debug__}")
     |                  ^^^^^^^^^^^
-298 | async def get_debug():
-299 |     ...
+271 | async def get_debug():
+272 |     ...
     |
 help: Add `__debug__` to function signature
 
 FAST003 [*] Parameter `thing_id` appears in route path, but not in `read_thing_vararg` signature
-   --> FAST003.py:305:19
+   --> FAST003.py:278:19
     |
-304 | # Errors: vararg-only and kwarg-only functions
-305 | @app.get("/things/{thing_id}")
+277 | # Errors: vararg-only and kwarg-only functions
+278 | @app.get("/things/{thing_id}")
     |                   ^^^^^^^^^^
-306 | async def read_thing_vararg(*query: str): ...
+279 | async def read_thing_vararg(*query: str): ...
     |
 help: Add `thing_id` to function signature
-303 | 
-304 | # Errors: vararg-only and kwarg-only functions
-305 | @app.get("/things/{thing_id}")
+276 | 
+277 | # Errors: vararg-only and kwarg-only functions
+278 | @app.get("/things/{thing_id}")
     - async def read_thing_vararg(*query: str): ...
-306 + async def read_thing_vararg(thing_id, *query: str): ...
-307 | 
-308 | @app.get("/things/{thing_id}")
-309 | async def read_thing_kwarg(**query: str): ...
+279 + async def read_thing_vararg(thing_id, *query: str): ...
+280 | 
+281 | @app.get("/things/{thing_id}")
+282 | async def read_thing_kwarg(**query: str): ...
 note: This is an unsafe fix and may change runtime behavior
 
 FAST003 [*] Parameter `thing_id` appears in route path, but not in `read_thing_kwarg` signature
-   --> FAST003.py:308:19
+   --> FAST003.py:281:19
     |
-306 | async def read_thing_vararg(*query: str): ...
-307 |
-308 | @app.get("/things/{thing_id}")
+279 | async def read_thing_vararg(*query: str): ...
+280 |
+281 | @app.get("/things/{thing_id}")
     |                   ^^^^^^^^^^
-309 | async def read_thing_kwarg(**query: str): ...
+282 | async def read_thing_kwarg(**query: str): ...
     |
 help: Add `thing_id` to function signature
-306 | async def read_thing_vararg(*query: str): ...
-307 | 
-308 | @app.get("/things/{thing_id}")
+279 | async def read_thing_vararg(*query: str): ...
+280 | 
+281 | @app.get("/things/{thing_id}")
     - async def read_thing_kwarg(**query: str): ...
-309 + async def read_thing_kwarg(thing_id, **query: str): ...
-310 | 
-311 | @app.get("/things/{thing_id}")
-312 | async def read_thing_vararg_kwarg(*args, **kwargs): ...
+282 + async def read_thing_kwarg(thing_id, **query: str): ...
+283 | 
+284 | @app.get("/things/{thing_id}")
+285 | async def read_thing_vararg_kwarg(*args, **kwargs): ...
 note: This is an unsafe fix and may change runtime behavior
 
 FAST003 [*] Parameter `thing_id` appears in route path, but not in `read_thing_vararg_kwarg` signature
-   --> FAST003.py:311:19
+   --> FAST003.py:284:19
     |
-309 | async def read_thing_kwarg(**query: str): ...
-310 |
-311 | @app.get("/things/{thing_id}")
+282 | async def read_thing_kwarg(**query: str): ...
+283 |
+284 | @app.get("/things/{thing_id}")
     |                   ^^^^^^^^^^
-312 | async def read_thing_vararg_kwarg(*args, **kwargs): ...
+285 | async def read_thing_vararg_kwarg(*args, **kwargs): ...
     |
 help: Add `thing_id` to function signature
-309 | async def read_thing_kwarg(**query: str): ...
-310 | 
-311 | @app.get("/things/{thing_id}")
+282 | async def read_thing_kwarg(**query: str): ...
+283 | 
+284 | @app.get("/things/{thing_id}")
     - async def read_thing_vararg_kwarg(*args, **kwargs): ...
-312 + async def read_thing_vararg_kwarg(thing_id, *args, **kwargs): ...
-313 | 
-314 | # Errors: positional-only parameter edge cases
-315 | @app.get("/things/{thing_id}")
+285 + async def read_thing_vararg_kwarg(thing_id, *args, **kwargs): ...
+286 | 
+287 | # Errors: positional-only parameter edge cases
+288 | @app.get("/things/{thing_id}")
 note: This is an unsafe fix and may change runtime behavior
 
 FAST003 [*] Parameter `thing_id` appears in route path, but not in `read_thing_posonly` signature
-   --> FAST003.py:315:19
+   --> FAST003.py:288:19
     |
-314 | # Errors: positional-only parameter edge cases
-315 | @app.get("/things/{thing_id}")
+287 | # Errors: positional-only parameter edge cases
+288 | @app.get("/things/{thing_id}")
     |                   ^^^^^^^^^^
-316 | async def read_thing_posonly(query: str, /): ...
+289 | async def read_thing_posonly(query: str, /): ...
     |
 help: Add `thing_id` to function signature
-313 | 
-314 | # Errors: positional-only parameter edge cases
-315 | @app.get("/things/{thing_id}")
+286 | 
+287 | # Errors: positional-only parameter edge cases
+288 | @app.get("/things/{thing_id}")
     - async def read_thing_posonly(query: str, /): ...
-316 + async def read_thing_posonly(query: str, /, thing_id): ...
-317 | 
-318 | @app.get("/things/{thing_id}")
-319 | async def read_thing_posonly_trailing(query: str, /,): ...
+289 + async def read_thing_posonly(query: str, /, thing_id): ...
+290 | 
+291 | @app.get("/things/{thing_id}")
+292 | async def read_thing_posonly_trailing(query: str, /,): ...
 note: This is an unsafe fix and may change runtime behavior
 
 FAST003 [*] Parameter `thing_id` appears in route path, but not in `read_thing_posonly_trailing` signature
-   --> FAST003.py:318:19
+   --> FAST003.py:291:19
     |
-316 | async def read_thing_posonly(query: str, /): ...
-317 |
-318 | @app.get("/things/{thing_id}")
+289 | async def read_thing_posonly(query: str, /): ...
+290 |
+291 | @app.get("/things/{thing_id}")
     |                   ^^^^^^^^^^
-319 | async def read_thing_posonly_trailing(query: str, /,): ...
+292 | async def read_thing_posonly_trailing(query: str, /,): ...
     |
 help: Add `thing_id` to function signature
-316 | async def read_thing_posonly(query: str, /): ...
-317 | 
-318 | @app.get("/things/{thing_id}")
+289 | async def read_thing_posonly(query: str, /): ...
+290 | 
+291 | @app.get("/things/{thing_id}")
     - async def read_thing_posonly_trailing(query: str, /,): ...
-319 + async def read_thing_posonly_trailing(query: str, /, thing_id,): ...
-320 | 
-321 | @app.get("/things/{thing_id}")
-322 | async def read_thing_posonly_default(query: str = "", /): ...
+292 + async def read_thing_posonly_trailing(query: str, /, thing_id,): ...
+293 | 
+294 | @app.get("/things/{thing_id}")
+295 | async def read_thing_posonly_default(query: str = "", /): ...
 note: This is an unsafe fix and may change runtime behavior
 
 FAST003 Parameter `thing_id` appears in route path, but not in `read_thing_posonly_default` signature
-   --> FAST003.py:321:19
+   --> FAST003.py:294:19
     |
-319 | async def read_thing_posonly_trailing(query: str, /,): ...
-320 |
-321 | @app.get("/things/{thing_id}")
+292 | async def read_thing_posonly_trailing(query: str, /,): ...
+293 |
+294 | @app.get("/things/{thing_id}")
     |                   ^^^^^^^^^^
-322 | async def read_thing_posonly_default(query: str = "", /): ...
+295 | async def read_thing_posonly_default(query: str = "", /): ...
     |
 help: Add `thing_id` to function signature
 
 FAST003 Parameter `thing_id` appears in route path, but not in `read_thing_posonly_default_trailing` signature
-   --> FAST003.py:324:19
+   --> FAST003.py:297:19
     |
-322 | async def read_thing_posonly_default(query: str = "", /): ...
-323 |
-324 | @app.get("/things/{thing_id}")
+295 | async def read_thing_posonly_default(query: str = "", /): ...
+296 |
+297 | @app.get("/things/{thing_id}")
     |                   ^^^^^^^^^^
-325 | async def read_thing_posonly_default_trailing(query: str = "", /,): ...
+298 | async def read_thing_posonly_default_trailing(query: str = "", /,): ...
     |
 help: Add `thing_id` to function signature
 
 FAST003 Parameter `thing_id` appears in route path, but not in `read_thing_posonly_with_regular` signature
-   --> FAST003.py:327:19
+   --> FAST003.py:300:19
     |
-325 | async def read_thing_posonly_default_trailing(query: str = "", /,): ...
-326 |
-327 | @app.get("/things/{thing_id}")
+298 | async def read_thing_posonly_default_trailing(query: str = "", /,): ...
+299 |
+300 | @app.get("/things/{thing_id}")
     |                   ^^^^^^^^^^
-328 | async def read_thing_posonly_with_regular(query: str = "", /, x=None): ...
+301 | async def read_thing_posonly_with_regular(query: str = "", /, x=None): ...
     |
 help: Add `thing_id` to function signature
 
 FAST003 [*] Parameter `thing_id` appears in route path, but not in `read_thing_init_and_call_instance_default` signature
-   --> FAST003.py:397:19
+   --> FAST003.py:370:19
     |
-395 | async def read_thing_callable_dep_instance_default(query: str = Depends(CallableQuery())): ...
-396 | # Error: `__call__` has `other`, not `thing_id`.
-397 | @app.get("/things/{thing_id}")
+368 | async def read_thing_callable_dep_instance_default(query: str = Depends(CallableQuery())): ...
+369 | # Error: `__call__` has `other`, not `thing_id`.
+370 | @app.get("/things/{thing_id}")
     |                   ^^^^^^^^^^
-398 | async def read_thing_init_and_call_instance_default(query: str = Depends(InitAndCallQuery())): ...
+371 | async def read_thing_init_and_call_instance_default(query: str = Depends(InitAndCallQuery())): ...
     |
 help: Add `thing_id` to function signature
-395 | async def read_thing_callable_dep_instance_default(query: str = Depends(CallableQuery())): ...
-396 | # Error: `__call__` has `other`, not `thing_id`.
-397 | @app.get("/things/{thing_id}")
+368 | async def read_thing_callable_dep_instance_default(query: str = Depends(CallableQuery())): ...
+369 | # Error: `__call__` has `other`, not `thing_id`.
+370 | @app.get("/things/{thing_id}")
     - async def read_thing_init_and_call_instance_default(query: str = Depends(InitAndCallQuery())): ...
-398 + async def read_thing_init_and_call_instance_default(thing_id, query: str = Depends(InitAndCallQuery())): ...
+371 + async def read_thing_init_and_call_instance_default(thing_id, query: str = Depends(InitAndCallQuery())): ...
+372 | 
+373 | 
+374 | # https://github.com/astral-sh/ruff/issues/21075
+note: This is an unsafe fix and may change runtime behavior
+
+FAST003 [*] Parameter `thing_id` appears in route path, but not in `read_thing_alias_missing_dep` signature
+   --> FAST003.py:397:26
+    |
+396 | # Error: alias dependency does not define `thing_id`.
+397 | @app.get("/alias-missing/{thing_id}")
+    |                          ^^^^^^^^^^
+398 | async def read_thing_alias_missing_dep(query: ThingDepMissingAlias): ...
+    |
+help: Add `thing_id` to function signature
+395 | 
+396 | # Error: alias dependency does not define `thing_id`.
+397 | @app.get("/alias-missing/{thing_id}")
+    - async def read_thing_alias_missing_dep(query: ThingDepMissingAlias): ...
+398 + async def read_thing_alias_missing_dep(query: ThingDepMissingAlias, thing_id): ...
 note: This is an unsafe fix and may change runtime behavior

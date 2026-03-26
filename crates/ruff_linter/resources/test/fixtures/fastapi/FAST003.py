@@ -180,33 +180,6 @@ async def unknown_2(other: str = Depends(unknown_not_function)): ...
 async def unknown_3(other: str = Depends(unknown_imported)): ...
 
 
-# https://github.com/astral-sh/ruff/issues/21075
-async def takes_thing_id_alias(thing_id: int): ...
-async def takes_other_alias(other: int): ...
-
-ThingDepAlias = Annotated[dict, Depends(takes_thing_id_alias)]
-ThingDepAliasChain = ThingDepAlias
-ThingDepAnnAlias: type[Annotated[dict, Depends(takes_thing_id_alias)]] = Annotated[
-    dict, Depends(takes_thing_id_alias)
-]
-type ThingDepTypeAlias = Annotated[dict, Depends(takes_thing_id_alias)]
-ThingDepMissingAlias = Annotated[dict, Depends(takes_other_alias)]
-
-# No errors: local Annotated aliases should resolve.
-@app.get("/alias/{thing_id}")
-async def read_thing_alias_dep(query: ThingDepAlias): ...
-@app.get("/alias-chain/{thing_id}")
-async def read_thing_alias_chain_dep(query: ThingDepAliasChain): ...
-@app.get("/alias-annassign/{thing_id}")
-async def read_thing_alias_annassign_dep(query: ThingDepAnnAlias): ...
-@app.get("/alias-type/{thing_id}")
-async def read_thing_type_alias_dep(query: ThingDepTypeAlias): ...
-
-# Error: alias dependency does not define `thing_id`.
-@app.get("/alias-missing/{thing_id}")
-async def read_thing_alias_missing_dep(query: ThingDepMissingAlias): ...
-
-
 # Class dependencies
 from pydantic import BaseModel
 from dataclasses import dataclass
@@ -396,3 +369,30 @@ async def read_thing_callable_dep_instance_default(query: str = Depends(Callable
 # Error: `__call__` has `other`, not `thing_id`.
 @app.get("/things/{thing_id}")
 async def read_thing_init_and_call_instance_default(query: str = Depends(InitAndCallQuery())): ...
+
+
+# https://github.com/astral-sh/ruff/issues/21075
+async def takes_thing_id_alias(thing_id: int): ...
+async def takes_other_alias(other: int): ...
+
+ThingDepAlias = Annotated[dict, Depends(takes_thing_id_alias)]
+ThingDepAliasChain = ThingDepAlias
+ThingDepAnnAlias: type[Annotated[dict, Depends(takes_thing_id_alias)]] = Annotated[
+    dict, Depends(takes_thing_id_alias)
+]
+type ThingDepTypeAlias = Annotated[dict, Depends(takes_thing_id_alias)]
+ThingDepMissingAlias = Annotated[dict, Depends(takes_other_alias)]
+
+# No errors: local Annotated aliases should resolve.
+@app.get("/alias/{thing_id}")
+async def read_thing_alias_dep(query: ThingDepAlias): ...
+@app.get("/alias-chain/{thing_id}")
+async def read_thing_alias_chain_dep(query: ThingDepAliasChain): ...
+@app.get("/alias-annassign/{thing_id}")
+async def read_thing_alias_annassign_dep(query: ThingDepAnnAlias): ...
+@app.get("/alias-type/{thing_id}")
+async def read_thing_type_alias_dep(query: ThingDepTypeAlias): ...
+
+# Error: alias dependency does not define `thing_id`.
+@app.get("/alias-missing/{thing_id}")
+async def read_thing_alias_missing_dep(query: ThingDepMissingAlias): ...
