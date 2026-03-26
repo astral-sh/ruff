@@ -126,6 +126,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&OVERRIDE_OF_FINAL_VARIABLE);
     registry.register_lint(&INEFFECTIVE_FINAL);
     registry.register_lint(&FINAL_ON_NON_METHOD);
+    registry.register_lint(&FINAL_ON_PRIVATE_METHOD);
     registry.register_lint(&FINAL_WITHOUT_VALUE);
     registry.register_lint(&ABSTRACT_METHOD_IN_FINAL_CLASS);
     registry.register_lint(&CALL_ABSTRACT_METHOD);
@@ -2313,6 +2314,32 @@ declare_lint! {
     pub(crate) static FINAL_ON_NON_METHOD = {
         summary: "detects `@final` applied to non-method functions",
         status: LintStatus::stable("0.0.20"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for `@final` decorators applied to class-private methods.
+    ///
+    /// ## Why is this bad?
+    /// Class-private methods use Python name mangling, so subclasses cannot override them
+    /// under the same name. Applying `@final` to such a method therefore has no effect and
+    /// is likely a mistake.
+    ///
+    /// ## Example
+    ///
+    /// ```python
+    /// from typing import final
+    ///
+    /// class A:
+    ///     @final
+    ///     def __foo(self) -> None:
+    ///         pass
+    /// ```
+    pub(crate) static FINAL_ON_PRIVATE_METHOD = {
+        summary: "detects `@final` applied to class-private methods",
+        status: LintStatus::preview("0.0.26"),
         default_level: Level::Error,
     }
 }

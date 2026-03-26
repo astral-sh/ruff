@@ -574,6 +574,16 @@
             }
           ]
         },
+        "final-on-private-method": {
+          "title": "detects `@final` applied to class-private methods",
+          "description": "## What it does\nChecks for `@final` decorators applied to class-private methods.\n\n## Why is this bad?\nClass-private methods use Python name mangling, so subclasses cannot override them\nunder the same name. Applying `@final` to such a method therefore has no effect and\nis likely a mistake.\n\n## Example\n\n```python\nfrom typing import final\n\nclass A:\n    @final\n    def __foo(self) -> None:\n        pass\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "final-without-value": {
           "title": "detects `Final` declarations without a value",
           "description": "## What it does\nChecks for `Final` symbols that are declared without a value and are never\nassigned a value in their scope.\n\n## Why is this bad?\nA `Final` symbol must be initialized with a value at the time of declaration\nor in a subsequent assignment. At module or function scope, the assignment must\noccur in the same scope. In a class body, the assignment may occur in `__init__`.\n\n## Examples\n```python\nfrom typing import Final\n\n# Error: `Final` symbol without a value\nMY_CONSTANT: Final[int]\n\n# OK: `Final` symbol with a value\nMY_CONSTANT: Final[int] = 1\n```",

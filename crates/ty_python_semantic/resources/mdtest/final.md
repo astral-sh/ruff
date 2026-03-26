@@ -451,6 +451,19 @@ class F:
         def not_a_method(): ...
 ```
 
+## `@final` is useless on class-private methods
+
+Class-private methods are name-mangled, so they cannot be overridden by subclasses under the same
+name. Decorating them with `@final` is therefore an error.
+
+```py
+from typing import final
+
+class Foo:
+    @final  # error: [final-on-private-method] "`@final` is useless on class-private method `__foo`"
+    def __foo(self) -> None: ...
+```
+
 ## An `@final` method is overridden by an implicit instance attribute
 
 ```py

@@ -9,11 +9,11 @@ use crate::{
         TypeContext, UnionType,
         context::InNoTypeCheck,
         diagnostic::{
-            FINAL_ON_NON_METHOD, INVALID_PARAMETER_DEFAULT, INVALID_PARAMSPEC, INVALID_TYPE_FORM,
-            USELESS_OVERLOAD_BODY, add_type_expression_reference_link,
-            is_invalid_typed_dict_literal, report_implicit_return_type,
-            report_invalid_generator_function_return_type, report_invalid_return_type,
-            report_shadowed_type_variable,
+            FINAL_ON_NON_METHOD, FINAL_ON_PRIVATE_METHOD, INVALID_PARAMETER_DEFAULT,
+            INVALID_PARAMSPEC, INVALID_TYPE_FORM, USELESS_OVERLOAD_BODY,
+            add_type_expression_reference_link, is_invalid_typed_dict_literal,
+            report_implicit_return_type, report_invalid_generator_function_return_type,
+            report_invalid_return_type, report_shadowed_type_variable,
         },
         function::{
             FunctionBodyKind, FunctionDecorators, FunctionLiteral, FunctionType, KnownFunction,
@@ -33,6 +33,7 @@ use crate::{
 };
 
 use ruff_python_ast as ast;
+use ruff_python_stdlib::identifiers::is_mangled_private;
 use ruff_text_size::Ranged;
 
 impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
@@ -277,20 +278,34 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // Check for `@final` applied to non-method functions.
         // `@final` is only meaningful on methods and classes.
-        if let Some(final_decorator) = final_decorator
-            && !self
+        if let Some(final_decorator) = final_decorator {
+            let in_class_scope = self
                 .index
                 .scope(self.scope().file_scope_id(db))
                 .kind()
-                .is_class()
-            && let Some(builder) = self
-                .context
-                .report_lint(&FINAL_ON_NON_METHOD, final_decorator)
-        {
-            let mut diagnostic = builder.into_diagnostic(format_args!(
-                "`@final` cannot be applied to non-method function `{name}`",
-            ));
-            diagnostic.info("`@final` is only meaningful on methods and classes");
+                .is_class();
+
+            if !in_class_scope
+                && let Some(builder) = self
+                    .context
+                    .report_lint(&FINAL_ON_NON_METHOD, final_decorator)
+            {
+                let mut diagnostic = builder.into_diagnostic(format_args!(
+                    "`@final` cannot be applied to non-method function `{name}`",
+                ));
+                diagnostic.info("`@final` is only meaningful on methods and classes");
+            } else if is_mangled_private(name.as_str())
+                && let Some(builder) = self
+                    .context
+                    .report_lint(&FINAL_ON_PRIVATE_METHOD, final_decorator)
+            {
+                let mut diagnostic = builder.into_diagnostic(format_args!(
+                    "`@final` is useless on class-private method `{name}`",
+                ));
+                diagnostic.info(
+                    "Class-private methods are name-mangled and cannot be overridden in subclasses",
+                );
+            }
         }
 
         let has_defaults = parameters
