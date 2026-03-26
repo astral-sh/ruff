@@ -812,6 +812,28 @@ fn benchmark_large_isinstance_narrowing(criterion: &mut Criterion) {
     });
 }
 
+/// Regression benchmark for <https://github.com/astral-sh/ty/issues/3120>.
+///
+/// Sequential (`TypeIs`) narrowing on a large `Literal` union, combined with
+/// `match`/`assert_never` on another `Literal` union, caused a combinatorial
+/// explosion when the `PredicateNode::IsNonTerminalCall` optimization was
+/// removed.
+fn benchmark_typeis_narrowing(criterion: &mut Criterion) {
+    setup_rayon();
+
+    criterion.bench_function("ty_micro[typeis_narrowing]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(include_str!("../resources/typeis_narrowing.py")),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 fn benchmark_pandas_tdd(criterion: &mut Criterion) {
     setup_rayon();
 
@@ -1009,6 +1031,7 @@ criterion_group!(
     benchmark_very_large_tuple,
     benchmark_large_union_narrowing,
     benchmark_large_isinstance_narrowing,
+    benchmark_typeis_narrowing,
     benchmark_pandas_tdd,
 );
 criterion_group!(project, anyio, attrs, hydra, datetype);
