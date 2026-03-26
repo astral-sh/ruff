@@ -2367,6 +2367,32 @@ Bad10 = TypedDict("Bad10", {name: 42})
 class Bad11(TypedDict("Bad11", {name: 42})): ...
 ```
 
+## Functional `TypedDict` with unknown fields
+
+When a functional `TypedDict` has unparseable fields (e.g., non-literal keys), the resulting type
+behaves like a `TypedDict` with no known fields. This is consistent with pyright and mypy:
+
+```py
+from typing import TypedDict
+
+def get_name() -> str:
+    return "x"
+
+key = get_name()
+
+# error: [invalid-argument-type] "Expected a string-literal key in the `fields` dict of `TypedDict()`"
+Bad = TypedDict("Bad", {key: int})
+
+# No known fields, so keyword arguments are rejected
+# error: [invalid-key]
+b = Bad(x=1)
+reveal_type(b)  # revealed: Bad
+
+# Field access reports unknown keys
+# error: [invalid-key]
+reveal_type(b["x"])  # revealed: Unknown
+```
+
 ## Equivalence between functional and class-based `TypedDict`
 
 Functional and class-based `TypedDict`s with the same fields are structurally equivalent:

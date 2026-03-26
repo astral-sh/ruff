@@ -622,10 +622,6 @@ impl<'db> DynamicTypedDictLiteral<'db> {
         self.spec(db).items(db)
     }
 
-    pub(crate) fn has_known_fields(self, db: &'db dyn Db) -> bool {
-        self.spec(db).has_known_fields(db)
-    }
-
     /// Get the MRO for this `TypedDict`.
     ///
     /// Functional `TypedDict` classes have the same MRO as class-based ones:
@@ -650,22 +646,13 @@ impl<'db> DynamicTypedDictLiteral<'db> {
     }
 
     /// Look up an instance member defined directly on this `TypedDict` (not inherited).
-    pub(super) fn own_instance_member(self, db: &'db dyn Db, _name: &str) -> Member<'db> {
-        if !self.has_known_fields(db) {
-            // When fields are unknown, return Any for any field lookup.
-            return Member::definitely_declared(Type::any());
-        }
-
+    #[expect(clippy::unused_self)]
+    pub(super) fn own_instance_member(self, _db: &'db dyn Db, _name: &str) -> Member<'db> {
         Member::default()
     }
 
     /// Look up a class-level member defined directly on this `TypedDict` (not inherited).
     pub(super) fn own_class_member(self, db: &'db dyn Db, name: &str) -> Member<'db> {
-        // When fields are unknown, skip synthesis and fall through to TypedDictFallback.
-        if !self.has_known_fields(db) {
-            return Member::default();
-        }
-
         let instance_ty = self.to_instance(db);
         let schema = dynamic_typed_dict_schema(db, self);
 
