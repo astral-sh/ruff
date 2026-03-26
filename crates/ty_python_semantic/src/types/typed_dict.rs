@@ -53,7 +53,6 @@ impl Default for TypedDictParams {
 /// Assigned functional `TypedDict`s compute this lazily after deferred inference, while dangling
 /// calls store it eagerly on the anchor.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
-#[derive(PartialOrd, Ord)]
 pub struct FunctionalTypedDictSpec<'db> {
     /// The fully materialized schema for this `TypedDict`.
     #[returns(ref)]
