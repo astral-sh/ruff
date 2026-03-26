@@ -2683,7 +2683,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         "called on Type::ClassLiteral, Type::GenericAlias, or Type::SubclassOf",
                     )
                 }
-                _ => return None,
+                Type::Union(..)
+                | Type::Intersection(..)
+                | Type::TypeAlias(..)
+                | Type::Dynamic(..)
+                | Type::Never
+                | Type::ModuleLiteral(..)
+                | Type::BoundSuper(..) => return None,
             })
         } else {
             None

@@ -288,7 +288,8 @@ c.INSTANCE_FINAL_A += 1
 
 ### Attributes via indirections
 
-`Final` attribute assignments are also detected through type aliases, `NewType`s, and type variables:
+`Final` attribute assignments are also detected through type aliases, `NewType`s, and type
+variables:
 
 ```toml
 [environment]
