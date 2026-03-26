@@ -2076,10 +2076,12 @@ TypedDicts can be created using the functional syntax:
 
 ```py
 from typing_extensions import TypedDict
+from ty_extensions import reveal_mro
 
 Movie = TypedDict("Movie", {"name": str, "year": int})
 
 reveal_type(Movie)  # revealed: <class 'Movie'>
+reveal_mro(Movie)  # revealed: (<class 'Movie'>, typing.TypedDict, <class 'object'>)
 
 movie = Movie(name="The Matrix", year=1999)
 
