@@ -610,27 +610,10 @@ impl<'db> DynamicTypedDictLiteral<'db> {
     }
 
     fn spec(self, db: &'db dyn Db) -> FunctionalTypedDictSpec<'db> {
-        #[salsa::tracked(
-            cycle_initial = deferred_spec_initial,
-            heap_size = ruff_memory_usage::heap_size
-        )]
-        fn deferred_spec<'db>(
-            db: &'db dyn Db,
-            definition: Definition<'db>,
-        ) -> FunctionalTypedDictSpec<'db> {
-            deferred_functional_typed_dict_spec(db, definition)
-        }
-
-        fn deferred_spec_initial<'db>(
-            db: &'db dyn Db,
-            _id: salsa::Id,
-            _definition: Definition<'db>,
-        ) -> FunctionalTypedDictSpec<'db> {
-            FunctionalTypedDictSpec::unknown(db)
-        }
-
         match self.anchor(db) {
-            DynamicTypedDictAnchor::Definition(definition) => deferred_spec(db, definition),
+            DynamicTypedDictAnchor::Definition(definition) => {
+                deferred_functional_typed_dict_spec(db, definition)
+            }
             DynamicTypedDictAnchor::ScopeOffset { spec, .. } => spec,
         }
     }
