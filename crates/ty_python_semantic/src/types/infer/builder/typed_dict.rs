@@ -149,7 +149,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
                 "extra_items" => {
                     if definition.is_none() {
-                        self.infer_type_expression(&kw.value);
+                        self.infer_annotation_expression(&kw.value, self.deferred_state);
                     }
                 }
                 field_name => {
