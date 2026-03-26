@@ -698,8 +698,7 @@ class Linkable(Protocol):
         return self.next_node
 
 def _(l: Linkable) -> None:
-    # TODO: Should be `Linkable`
-    reveal_type(l.next_node)  # revealed: @Todo(type[T] for protocols)
+    reveal_type(l.next_node)  # revealed: Linkable
 
 class CopyableImpl:
     def copy(self) -> Self:

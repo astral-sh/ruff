@@ -908,6 +908,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         let infer_type_argument = |builder: &mut Self, slice: &ast::Expr| {
             let slice_ty = builder.infer_type_expression(slice);
+            if matches!(slice_ty, Type::ProtocolInstance(_)) {
+                return SubclassOfType::from(
+                    builder.db(),
+                    todo_type!("type[T] for protocols").expect_dynamic(),
+                );
+            }
             SubclassOfType::try_from_instance(builder.db(), slice_ty).unwrap_or_else(|| {
                 match slice_ty {
                     Type::Callable(_) => invalid_type_argument(builder, slice),
