@@ -2884,7 +2884,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             Some(definition),
                             namedtuple_kind,
                         )
-                    } else if matches!(callable_type, Type::SpecialForm(SpecialFormType::TypedDict))
+                    } else if callable_type == Type::SpecialForm(SpecialFormType::TypedDict)
                     {
                         self.infer_typeddict_call_expression(call_expr, Some(definition))
                     } else {
@@ -3089,7 +3089,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             _ => {}
         }
-        if matches!(func_ty, Type::SpecialForm(SpecialFormType::TypedDict)) {
+        if func_ty == Type::SpecialForm(SpecialFormType::TypedDict) {
             self.infer_functional_typeddict_deferred(arguments);
             return;
         }
@@ -7103,7 +7103,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return self.infer_namedtuple_call_expression(call_expression, None, namedtuple_kind);
         }
 
-        if matches!(callable_type, Type::SpecialForm(SpecialFormType::TypedDict)) {
+        if callable_type == Type::SpecialForm(SpecialFormType::TypedDict) {
             return self.infer_typeddict_call_expression(call_expression, None);
         }
 
