@@ -2214,6 +2214,10 @@ from typing_extensions import TypedDict
 
 # extra_items is accepted (no error)
 MovieWithExtras = TypedDict("MovieWithExtras", {"name": str}, extra_items=bool)
+
+# Invalid type expressions are rejected:
+# error: [invalid-syntax-in-forward-annotation] "Syntax error in forward annotation: Unexpected token at the end of an expression"
+BadExtras = TypedDict("BadExtras", {"name": str}, extra_items="not a type expression")
 ```
 
 ## Function syntax with forward references
