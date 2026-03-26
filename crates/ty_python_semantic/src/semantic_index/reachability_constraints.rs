@@ -1104,20 +1104,15 @@ impl ReachabilityConstraints {
                 // very large in number, since we add them on all statement level function calls.
                 let ty = infer_expression_type(db, callable, TypeContext::default());
 
-                // Short-circuit for well known types.
-                //
+                // Short-circuit for well known types that are known not to return `Never` when called.
                 // Without the short-circuit, we've seen that threads keep blocking each other
                 // because they all try to acquire Salsa's `CallableType` lock that ensures each type
                 // is only interned once. The lock is so heavily congested because there are only
                 // very few dynamic types, in which case Salsa's sharding the locks by value
                 // doesn't help much.
                 // See <https://github.com/astral-sh/ty/issues/968>.
-                if ty.is_dynamic() {
+                if matches!(ty, Type::Dynamic(_)) {
                     return Truthiness::AlwaysTrue.negate_if(!predicate.is_positive);
-                } else if ty.is_never() {
-                    // This handles a case where the callable *itself* is `Never`, which can also
-                    // be considered a terminal call.
-                    return Truthiness::AlwaysFalse.negate_if(!predicate.is_positive);
                 }
 
                 let overloads_iterator = if let Some(callable) = ty
